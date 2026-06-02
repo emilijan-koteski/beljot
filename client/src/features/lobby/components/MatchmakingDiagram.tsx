@@ -22,12 +22,14 @@ type Props = {
   cancelDisabled?: boolean;
 };
 
-// Orbit slot geometry — west, north, east around the centred "You". Matches
-// MatchmakingSearching in room-flow-scenes-1.jsx.
+// Orbit slot geometry — west, north, east around the centred "You". Offsets are
+// percentages of the (square) orbit box so the whole diagram scales down with
+// the box on narrow screens; at the 380px design size these resolve to ±130px,
+// matching MatchmakingSearching in room-flow-scenes-1.jsx.
 const ORBIT_OFFSETS = [
-  { x: -130, y: 0 },
-  { x: 0, y: -130 },
-  { x: 130, y: 0 },
+  { x: -34.21, y: 0 },
+  { x: 0, y: -34.21 },
+  { x: 34.21, y: 0 },
 ] as const;
 
 /**
@@ -56,7 +58,7 @@ export function MatchmakingDiagram({
   return (
     <div
       data-testid="matchmaking-diagram"
-      className="relative flex flex-col items-center"
+      className="relative flex max-w-full flex-col items-center"
       style={{
         background: `
           radial-gradient(ellipse 70% 50% at 50% 35%, rgba(25,101,54,0.07), transparent 70%),
@@ -76,7 +78,7 @@ export function MatchmakingDiagram({
       </p>
 
       {/* Fixed-rules + elapsed strip */}
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
         <Badge tone="neutral" icon={<Trophy className="size-3 text-(--accent)" />}>
           {t("lobby.card.variantBitola")}
         </Badge>
@@ -92,18 +94,27 @@ export function MatchmakingDiagram({
         </span>
       </div>
 
-      {/* Orbit diagram */}
-      <div className="relative mt-7" style={{ width: 380, height: 380 }}>
+      {/* Orbit diagram — an explicit square (not aspect-ratio: a flex-column
+          item with only absolute children would collapse its height to 0).
+          Capped at the 380px design size, shrinking to fit narrow screens; the
+          inner geometry is percentage-based so it scales with the box. */}
+      <div
+        className="relative mt-7"
+        style={{
+          width: "min(380px, calc(100vw - 72px))",
+          height: "min(380px, calc(100vw - 72px))",
+        }}
+      >
         {/* Brass ring — the table edge */}
         <div
           className="border-border-2 absolute rounded-full border-2 border-dashed opacity-70"
-          style={{ inset: 40 }}
+          style={{ inset: "10.53%" }}
         />
         {/* Felt halo */}
         <div
           className="absolute rounded-full"
           style={{
-            inset: 60,
+            inset: "15.79%",
             background: "radial-gradient(circle, rgba(25,101,54,0.10) 0%, transparent 70%)",
           }}
         />
@@ -111,7 +122,7 @@ export function MatchmakingDiagram({
         <div
           className="absolute rounded-full animate-[spin_2.4s_linear_infinite]"
           style={{
-            inset: 40,
+            inset: "10.53%",
             background:
               "conic-gradient(from 0deg, transparent 0%, transparent 70%, rgba(25,101,54,0.25) 90%, transparent 100%)",
             maskImage: "radial-gradient(circle, transparent 65%, #000 66%, #000 100%)",
@@ -145,7 +156,7 @@ export function MatchmakingDiagram({
               key={seatIndex}
               data-testid={`matchmaking-orbit-${seatIndex}`}
               className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5"
-              style={{ left: `calc(50% + ${offset.x}px)`, top: `calc(50% + ${offset.y}px)` }}
+              style={{ left: `calc(50% + ${offset.x}%)`, top: `calc(50% + ${offset.y}%)` }}
             >
               {occupant ? (
                 <Avatar name={occupant.username} size={52} team={team} />

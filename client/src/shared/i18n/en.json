@@ -15,7 +15,8 @@
     "rules": "Rules",
     "appName": "Beljot",
     "logout": "Log out",
-    "signedInAs": "Signed in as"
+    "signedInAs": "Signed in as",
+    "menu": "Menu"
   },
   "profile": {
     "title": "Profile",

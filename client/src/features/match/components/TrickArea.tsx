@@ -32,6 +32,8 @@ interface TrickAreaProps {
    * (when the flight completes) is a pixel-equivalent handoff.
    */
   suppressedCardIds?: ReadonlySet<string>;
+  /** Phone layout: smaller placeholders pulled into a tighter diamond. */
+  compact?: boolean;
 }
 
 /** PlayingCard `md` dimensions — used for both placeholders and slot cards.
@@ -71,7 +73,16 @@ export function TrickArea({
   myPlayerSeat,
   pendingResolvedTrick = null,
   suppressedCardIds = EMPTY_SET,
+  compact = false,
 }: TrickAreaProps) {
+  // Phone: keep the placeholders (and thrown cards) at full card size but pull
+  // the diamond in a little so it fits the narrower felt. Placeholders and cards
+  // share the same size + scaled offsets so a thrown card lands exactly on its
+  // slot.
+  const phW = PLACEHOLDER_W;
+  const phH = PLACEHOLDER_H;
+  const slotScale = compact ? 0.78 : 1;
+
   const liveTrick = rawTrick ?? EMPTY_TRICK;
   // Resolve which trick the slots paint from. When the snapshot is set the
   // server may already have cleared `currentTrick` — using the snapshot
@@ -119,9 +130,9 @@ export function TrickArea({
             style={{
               left: "50%",
               top: "50%",
-              width: PLACEHOLDER_W,
-              height: PLACEHOLDER_H,
-              transform: `translate(calc(-50% + ${slot.offsetX}px), calc(-50% + ${slot.offsetY}px)) rotate(${slot.rotation}deg)`,
+              width: phW,
+              height: phH,
+              transform: `translate(calc(-50% + ${slot.offsetX * slotScale}px), calc(-50% + ${slot.offsetY * slotScale}px)) rotate(${slot.rotation}deg)`,
               borderRadius: 6,
               border: occupied ? "1.5px solid transparent" : "1.5px dashed rgba(255,255,255,0.14)",
               background: occupied ? "transparent" : "rgba(255,255,255,0.02)",
@@ -149,7 +160,7 @@ export function TrickArea({
             style={{
               left: "50%",
               top: "50%",
-              transform: `translate(calc(-50% + ${slot.offsetX}px), calc(-50% + ${slot.offsetY}px)) rotate(${slot.rotation}deg)`,
+              transform: `translate(calc(-50% + ${slot.offsetX * slotScale}px), calc(-50% + ${slot.offsetY * slotScale}px)) rotate(${slot.rotation}deg)`,
             }}
           >
             <PlayingCard card={tc.card} state="default" size="md" withTransition={false} />

@@ -133,10 +133,12 @@ export function RulesDialog({ open, onOpenChange }: RulesDialogProps) {
             </div>
           </div>
 
-          {/* Body: TOC rail + scrolling content */}
+          {/* Body: TOC rail + scrolling content. On phones the rail is hidden
+              and the content fills the full width (everything scrolls in one
+              column). */}
           <div className="flex min-h-0 flex-1">
             <nav
-              className="flex shrink-0 flex-col gap-0.5"
+              className="hidden shrink-0 flex-col gap-0.5 md:flex"
               style={{
                 width: 200,
                 borderRight: "1px solid rgba(201,168,118,0.22)",
@@ -193,8 +195,7 @@ export function RulesDialog({ open, onOpenChange }: RulesDialogProps) {
 
             <div
               ref={scrollRef}
-              className="min-w-0 flex-1 overflow-y-auto"
-              style={{ padding: "4px 26px 22px" }}
+              className="min-w-0 flex-1 overflow-y-auto px-4 pt-1 pb-5 md:px-6.5 md:pb-5.5"
             >
               <DarkRulesCtx.Provider value={content}>
                 {sections.map((s, i) => (
@@ -440,7 +441,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
 function DarkCardLadders() {
   const { cardsTrump, cardsPlain, ui } = useDarkRules();
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <DarkCardLadder
         title={ui.ladderTrumpTitle}
         eyebrow={ui.ladderTrumpEyebrow}
@@ -579,7 +580,7 @@ function DarkCardLadder({
 function DarkMeldsGrid() {
   const { declarations, ui } = useDarkRules();
   return (
-    <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
       {declarations.map((m) => (
         <DarkMeldChip key={m.id} meld={m} ptsLabel={ui.pts} kindLabel={ui.meldKinds[m.kind]} />
       ))}

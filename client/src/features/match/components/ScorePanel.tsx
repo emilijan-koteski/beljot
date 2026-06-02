@@ -196,127 +196,201 @@ export function ScorePanel({
         ? teamBGradient
         : null;
 
+  // Viewer-first compact rows for the mobile scoreboard. Us is always gold,
+  // Them always silver — matching the desktop panel's viewer-relative colours.
+  const usIsA = viewerTeam === "teamA";
+  const mobileRows = [
+    {
+      key: "us",
+      label: t("team.us"),
+      dot: TEAM_GOLD[0],
+      potential: usIsA ? teamAHandPotential : teamBHandPotential,
+      score: usIsA ? teamAScore : teamBScore,
+    },
+    {
+      key: "them",
+      label: t("team.them"),
+      dot: TEAM_SILVER[0],
+      potential: usIsA ? teamBHandPotential : teamAHandPotential,
+      score: usIsA ? teamBScore : teamAScore,
+    },
+  ];
+
   return (
-    <div
-      className="fixed top-4 left-4 z-10 rounded-xl overflow-hidden"
-      style={{
-        background: PANEL_BG,
-        border: PANEL_BORDER,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        minWidth: 240,
-      }}
-      data-testid="score-panel"
-      aria-live="polite"
-    >
-      {/* Header eyebrow — brass "SCOREBOARD" on the left, "Hand N · Variant"
-          metadata on the right (per design). Both lines share the same brass
-          uppercase tracking so they read as one band. */}
+    <>
+      {/* Mobile (<md): ultra-compact scoreboard — one line per team, showing
+          this-hand points (+N) and total / target. No heading, momentum bars,
+          trick counts or hand/variant metadata; the desktop panel keeps those. */}
       <div
-        className="flex items-center justify-between px-4 py-2 font-body text-[10.5px] uppercase tracking-wider"
+        className="fixed top-3 left-3 z-10 flex flex-col gap-0.5 rounded-lg px-2.5 py-1.5 md:hidden"
         style={{
-          color: BRASS_LABEL,
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          background: PANEL_BG,
+          border: PANEL_BORDER,
+          boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
         }}
+        data-testid="score-panel-mobile"
+        aria-live="polite"
       >
-        <span>{t("match.score.heading", { defaultValue: "Scoreboard" })}</span>
-        {(handNumber !== undefined || variantLabel) && (
-          <span style={{ opacity: 0.85 }} data-testid="score-meta">
-            {handNumber !== undefined && variantLabel
-              ? t("match.score.handVariant", {
-                  hand: handNumber,
-                  variant: variantLabel,
-                  defaultValue: `Hand ${handNumber} · ${variantLabel}`,
-                })
-              : handNumber !== undefined
-                ? t("match.score.handLabel", {
-                    hand: handNumber,
-                    defaultValue: `Hand ${handNumber}`,
-                  })
-                : variantLabel}
-          </span>
-        )}
+        {mobileRows.map((r) => (
+          <div
+            key={r.key}
+            className="flex items-center gap-1.5 tabular-nums"
+            style={{ color: INK }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: r.dot,
+                boxShadow: `0 0 5px ${r.dot}`,
+              }}
+            />
+            <span
+              className="font-body text-[11px] font-semibold uppercase"
+              style={{ opacity: 0.85, minWidth: 30 }}
+            >
+              {r.label}
+            </span>
+            <span
+              className="font-body text-[11px] font-semibold tabular-nums"
+              style={{ color: BRASS_LABEL, minWidth: 24, textAlign: "right" }}
+            >
+              +{r.potential}
+            </span>
+            <span className="font-display text-[11px] font-bold" style={{ marginLeft: 4 }}>
+              {r.score}
+              <span style={{ opacity: 0.5 }}>{`/${matchTarget}`}</span>
+            </span>
+          </div>
+        ))}
       </div>
 
-      {/* Rows are laid out viewer-first: the viewer's row ("Us") always
+      {/* Desktop (md+): full felt scoreboard panel. */}
+      <div
+        className="fixed top-4 left-4 z-10 hidden overflow-hidden rounded-xl md:block"
+        style={{
+          background: PANEL_BG,
+          border: PANEL_BORDER,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          minWidth: 240,
+        }}
+        data-testid="score-panel"
+        aria-live="polite"
+      >
+        {/* Header eyebrow — brass "SCOREBOARD" on the left, "Hand N · Variant"
+          metadata on the right (per design). Both lines share the same brass
+          uppercase tracking so they read as one band. */}
+        <div
+          className="flex items-center justify-between px-4 py-2 font-body text-[10.5px] uppercase tracking-wider"
+          style={{
+            color: BRASS_LABEL,
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          <span>{t("match.score.heading", { defaultValue: "Scoreboard" })}</span>
+          {(handNumber !== undefined || variantLabel) && (
+            <span style={{ opacity: 0.85 }} data-testid="score-meta">
+              {handNumber !== undefined && variantLabel
+                ? t("match.score.handVariant", {
+                    hand: handNumber,
+                    variant: variantLabel,
+                    defaultValue: `Hand ${handNumber} · ${variantLabel}`,
+                  })
+                : handNumber !== undefined
+                  ? t("match.score.handLabel", {
+                      hand: handNumber,
+                      defaultValue: `Hand ${handNumber}`,
+                    })
+                  : variantLabel}
+            </span>
+          )}
+        </div>
+
+        {/* Rows are laid out viewer-first: the viewer's row ("Us") always
           renders above the opposition ("Them"), regardless of which seats
           map to teamA / teamB. The wire-level data-testid contract still
           tags rows by absolute team identity (score-row-a / score-row-b),
           so existing assertions on team-A vs team-B numbers stay valid. */}
-      {viewerTeam === "teamA" ? (
-        <>
-          <ScoreRow
-            label={teamALabel}
-            rowTestId="score-row-a"
-            scoreTestId="score-a"
-            potentialTestId="score-a-potential"
-            team="teamA"
-            teamGradient={teamAGradient}
-            score={teamAScore}
-            potential={teamAHandPotential}
-            tricks={teamATricks}
-            matchTarget={matchTarget}
-          />
-          <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
-          <ScoreRow
-            label={teamBLabel}
-            rowTestId="score-row-b"
-            scoreTestId="score-b"
-            potentialTestId="score-b-potential"
-            team="teamB"
-            teamGradient={teamBGradient}
-            score={teamBScore}
-            potential={teamBHandPotential}
-            tricks={teamBTricks}
-            matchTarget={matchTarget}
-          />
-        </>
-      ) : (
-        <>
-          <ScoreRow
-            label={teamBLabel}
-            rowTestId="score-row-b"
-            scoreTestId="score-b"
-            potentialTestId="score-b-potential"
-            team="teamB"
-            teamGradient={teamBGradient}
-            score={teamBScore}
-            potential={teamBHandPotential}
-            tricks={teamBTricks}
-            matchTarget={matchTarget}
-          />
-          <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
-          <ScoreRow
-            label={teamALabel}
-            rowTestId="score-row-a"
-            scoreTestId="score-a"
-            potentialTestId="score-a-potential"
-            team="teamA"
-            teamGradient={teamAGradient}
-            score={teamAScore}
-            potential={teamAHandPotential}
-            tricks={teamATricks}
-            matchTarget={matchTarget}
-          />
-        </>
-      )}
+        {viewerTeam === "teamA" ? (
+          <>
+            <ScoreRow
+              label={teamALabel}
+              rowTestId="score-row-a"
+              scoreTestId="score-a"
+              potentialTestId="score-a-potential"
+              team="teamA"
+              teamGradient={teamAGradient}
+              score={teamAScore}
+              potential={teamAHandPotential}
+              tricks={teamATricks}
+              matchTarget={matchTarget}
+            />
+            <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+            <ScoreRow
+              label={teamBLabel}
+              rowTestId="score-row-b"
+              scoreTestId="score-b"
+              potentialTestId="score-b-potential"
+              team="teamB"
+              teamGradient={teamBGradient}
+              score={teamBScore}
+              potential={teamBHandPotential}
+              tricks={teamBTricks}
+              matchTarget={matchTarget}
+            />
+          </>
+        ) : (
+          <>
+            <ScoreRow
+              label={teamBLabel}
+              rowTestId="score-row-b"
+              scoreTestId="score-b"
+              potentialTestId="score-b-potential"
+              team="teamB"
+              teamGradient={teamBGradient}
+              score={teamBScore}
+              potential={teamBHandPotential}
+              tricks={teamBTricks}
+              matchTarget={matchTarget}
+            />
+            <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+            <ScoreRow
+              label={teamALabel}
+              rowTestId="score-row-a"
+              scoreTestId="score-a"
+              potentialTestId="score-a-potential"
+              team="teamA"
+              teamGradient={teamAGradient}
+              score={teamAScore}
+              potential={teamAHandPotential}
+              tricks={teamATricks}
+              matchTarget={matchTarget}
+            />
+          </>
+        )}
 
-      {/* Float-up bonus animation */}
-      {showBonus !== null && bonusTeamString !== null && bonusGradient !== null && (
-        <div
-          className={`absolute -top-2 right-3 font-display text-sm font-bold ${
-            prefersReducedMotion
-              ? ""
-              : "motion-safe:animate-out motion-safe:fade-out motion-safe:slide-out-to-top-6 motion-safe:duration-1200 motion-safe:ease-out motion-safe:fill-mode-forwards"
-          } pointer-events-none`}
-          style={{ color: bonusGradient[0] }}
-          data-testid="score-bonus"
-          data-team={bonusTeamString}
-        >
-          +{showBonus.amount}
-        </div>
-      )}
-    </div>
+        {/* Float-up bonus animation */}
+        {showBonus !== null && bonusTeamString !== null && bonusGradient !== null && (
+          <div
+            className={`absolute -top-2 right-3 font-display text-sm font-bold ${
+              prefersReducedMotion
+                ? ""
+                : "motion-safe:animate-out motion-safe:fade-out motion-safe:slide-out-to-top-6 motion-safe:duration-1200 motion-safe:ease-out motion-safe:fill-mode-forwards"
+            } pointer-events-none`}
+            style={{ color: bonusGradient[0] }}
+            data-testid="score-bonus"
+            data-team={bonusTeamString}
+          >
+            +{showBonus.amount}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

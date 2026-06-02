@@ -35,6 +35,13 @@ interface PlayerSeatProps {
    * name + card-back stack flow inward.
    */
   orientation?: SeatOrientation;
+  /**
+   * Phone layout: every seat stacks vertically (avatar → name → card-backs),
+   * the avatar shrinks, and the name pill drops the team-label / seconds row
+   * (the timer ring around the avatar carries that). Dealer/trump chips keep
+   * their size. Defaults to the desktop layout.
+   */
+  compact?: boolean;
 }
 
 const SUIT_GLYPH: Record<Suit, string> = {
@@ -56,7 +63,8 @@ function suitColorHex(suit: Suit): string {
 }
 
 const AVATAR_DISC_PX = 64;
-const AVATAR_FRAME_PX = AVATAR_DISC_PX + 16; // 3 px conic frame + 5 px ring lane
+const AVATAR_DISC_PX_COMPACT = 44;
+const FRAME_PAD_PX = 16; // 3 px conic frame + 5 px ring lane (both sides)
 
 const TURN_LIME = "var(--turn-lime, #00e5a0)";
 const COLOR_URGENT = "var(--turn-urgent, #ef4444)";
@@ -123,12 +131,18 @@ function CardBackStack({
   count,
   isHorizontal,
   seat,
+  compact = false,
 }: {
   count: number;
   isHorizontal: boolean;
   seat: number;
+  compact?: boolean;
 }) {
   const visible = Math.min(count, 5);
+  // Extra-small card backs on phones so the seat stays tight.
+  const cw = compact ? 15 : 26;
+  const ch = compact ? 22 : 38;
+  const overlap = compact ? 12 : 22;
   // Render the wrapper div even when count === 0 so the CardFlight overlay
   // can always measure this seat's deck rect (used as the destination on a
   // collect flight that converges on this seat as winner). Without this,
@@ -139,11 +153,11 @@ function CardBackStack({
       className="flex items-center"
       style={{
         marginLeft: isHorizontal ? 8 : 0,
-        marginTop: isHorizontal ? 0 : 4,
+        marginTop: isHorizontal ? 0 : compact ? 2 : 4,
         // Reserve enough box for the card-back fan + count badge so the rect
         // measurement returns a non-zero size even with no cards visible.
-        minWidth: 56,
-        minHeight: 38,
+        minWidth: compact ? 34 : 56,
+        minHeight: compact ? 22 : 38,
         // When there are no cards to show, hide the children visually but
         // keep the box (and its rect) addressable.
         visibility: visible > 0 ? "visible" : "hidden",
@@ -157,21 +171,21 @@ function CardBackStack({
           key={i}
           aria-hidden
           style={{
-            width: 26,
-            height: 38,
-            marginLeft: i === 0 ? 0 : -22,
+            width: cw,
+            height: ch,
+            marginLeft: i === 0 ? 0 : -overlap,
             transform: `rotate(${(i - 2) * 1.5}deg)`,
             background: "linear-gradient(135deg, #2a1a10 0%, #4a2818 50%, #2a1a10 100%)",
-            border: "1.5px solid var(--brass, #c9a876)",
-            borderRadius: 4,
+            border: `${compact ? 1 : 1.5}px solid var(--brass, #c9a876)`,
+            borderRadius: compact ? 3 : 4,
             boxShadow: "0 2px 6px rgba(0,0,0,0.45)",
           }}
         />
       ))}
       <span
-        className="font-body text-[11px] tabular-nums"
+        className={`font-body tabular-nums ${compact ? "text-[9px]" : "text-[11px]"}`}
         style={{
-          marginLeft: 8,
+          marginLeft: compact ? 4 : 8,
           color: "var(--ink-light, #f5f2e8)",
           opacity: 0.7,
         }}
@@ -206,11 +220,15 @@ export function PlayerSeat({
   isDealer = false,
   trumpCallerSuit = null,
   orientation = "bottom",
+  compact = false,
 }: PlayerSeatProps) {
   const { t } = useTranslation();
 
   const teamLabel = t(teamLabelKey(seatTeam));
   const teamGradient = teamColors(seatTeam);
+
+  const discPx = compact ? AVATAR_DISC_PX_COMPACT : AVATAR_DISC_PX;
+  const framePx = discPx + FRAME_PAD_PX;
 
   // Hook must run before the empty-seat early return — the seconds drive the
   // external label rendered inside the name pill (next to the team label).
@@ -228,8 +246,8 @@ export function PlayerSeat({
         <div
           className="rounded-full flex items-center justify-center"
           style={{
-            width: AVATAR_FRAME_PX,
-            height: AVATAR_FRAME_PX,
+            width: framePx,
+            height: framePx,
             background: "rgba(255,255,255,0.04)",
             border: "1px dashed rgba(255,255,255,0.18)",
           }}
@@ -242,7 +260,9 @@ export function PlayerSeat({
   }
 
   const isDisconnected = player.connected === false;
-  const isHorizontal = orientation === "left" || orientation === "right";
+  // On phones every seat stacks vertically (avatar on top); only desktop keeps
+  // the horizontal left/right edge layout.
+  const isHorizontal = !compact && (orientation === "left" || orientation === "right");
 
   const flexDirection: React.CSSProperties["flexDirection"] = isHorizontal
     ? orientation === "right"
@@ -286,14 +306,26 @@ export function PlayerSeat({
     </StatusChip>
   ) : null;
 
+  // Chip anchoring. Both chips share the same `top`, so the pair reads as one
+  // chip layered over the other (caller wins z-order). The front/back `right`
+  // values differ by 10 px → the two 30 px chips overlap by 20 px, the same
+  // staggered "stack" the desktop layout uses. On phones the whole pair tucks
+  // inward (front at the avatar's right edge, back 10 px behind-left) so the
+  // rightmost chip can't clip off-screen on an edge-hugging seat — instead of
+  // fanning the dealer far inward, which left them sitting side-by-side.
+  const chipTop = compact ? -4 : -6;
+  const chipRightLone = compact ? -2 : -6;
+  const chipRightFront = compact ? -2 : -16; // caller (top of z-stack)
+  const chipRightBack = compact ? 8 : -6; // dealer (behind, 10px left of caller)
+
   return (
     <div
-      className="inline-flex items-center gap-2 select-none"
+      className={`inline-flex items-center select-none ${compact ? "gap-1" : "gap-2"}`}
       style={{
         flexDirection,
         opacity: isDisconnected ? 0.5 : 1,
         filter: isDisconnected ? "grayscale(1)" : undefined,
-        transform: isSelf ? "scale(1.08)" : undefined,
+        transform: isSelf && !compact ? "scale(1.08)" : undefined,
       }}
       aria-label={`${displayName}, ${teamLabel}, ${statusLabel}`}
       data-testid={`player-seat-${player.seat}`}
@@ -302,10 +334,7 @@ export function PlayerSeat({
       data-self={isSelf ? "true" : undefined}
     >
       {/* Avatar w/ team-color conic frame + (when active) lime/red countdown ring */}
-      <div
-        className="relative shrink-0"
-        style={{ width: AVATAR_FRAME_PX, height: AVATAR_FRAME_PX }}
-      >
+      <div className="relative shrink-0" style={{ width: framePx, height: framePx }}>
         <div
           className="rounded-full"
           style={{
@@ -327,7 +356,7 @@ export function PlayerSeat({
               height: "100%",
               background: "var(--avatar-inner, #1f2e23)",
               color: "var(--ink-light, #f5f2e8)",
-              fontSize: AVATAR_DISC_PX * 0.5,
+              fontSize: discPx * 0.5,
             }}
             data-testid="player-seat-avatar"
           >
@@ -352,31 +381,32 @@ export function PlayerSeat({
             trump has been taken. */}
         {callerChipNode && dealerChipNode && (
           <>
-            <div className="absolute" style={{ top: -6, right: -16, zIndex: 2 }}>
+            <div className="absolute" style={{ top: chipTop, right: chipRightFront, zIndex: 2 }}>
               {callerChipNode}
             </div>
-            <div className="absolute" style={{ top: -6, right: -6, zIndex: 1 }}>
+            <div className="absolute" style={{ top: chipTop, right: chipRightBack, zIndex: 1 }}>
               {dealerChipNode}
             </div>
           </>
         )}
         {!callerChipNode && dealerChipNode && (
-          <div className="absolute" style={{ top: -6, right: -6 }}>
+          <div className="absolute" style={{ top: chipTop, right: chipRightLone }}>
             {dealerChipNode}
           </div>
         )}
         {callerChipNode && !dealerChipNode && (
-          <div className="absolute" style={{ top: -6, right: -6 }}>
+          <div className="absolute" style={{ top: chipTop, right: chipRightLone }}>
             {callerChipNode}
           </div>
         )}
       </div>
 
-      {/* Name pill */}
+      {/* Name pill. On phones it's name-only and tight — the team label and
+          seconds counter are dropped (the avatar's timer ring covers timing). */}
       <div
-        className="rounded-lg flex flex-col items-center gap-0.5 px-3 py-1.5"
+        className={`rounded-lg flex flex-col items-center ${compact ? "px-2 py-0.5" : "gap-0.5 px-3 py-1.5"}`}
         style={{
-          minWidth: 88,
+          minWidth: compact ? undefined : 88,
           background: "var(--panel-dark, rgba(20,45,30,0.85))",
           border:
             isActive && !isDisconnected
@@ -388,47 +418,54 @@ export function PlayerSeat({
         data-testid="player-seat-name-pill"
       >
         <span
-          className="font-body text-sm font-semibold"
+          className={`font-body font-semibold ${compact ? "text-[11px]" : "text-sm"}`}
           style={{ color: "var(--ink-light, #f5f2e8)" }}
         >
           {displayName}
         </span>
-        <span
-          className="font-body text-[10px] tabular-nums flex items-center gap-1.5"
-          style={{ color: "rgba(245,242,232,0.6)" }}
-        >
+        {!compact && (
           <span
-            className="rounded-full"
-            style={{
-              width: 5,
-              height: 5,
-              background: teamGradient[0],
-            }}
-            aria-hidden
-          />
-          <span style={{ letterSpacing: 0.6, opacity: 0.7 }}>{teamLabel}</span>
-          {showRing && (
+            className="font-body text-[10px] tabular-nums flex items-center gap-1.5"
+            style={{ color: "rgba(245,242,232,0.6)" }}
+          >
             <span
-              className="font-body font-semibold tabular-nums"
+              className="rounded-full"
               style={{
-                color: secondsUrgent ? COLOR_URGENT : TURN_LIME,
-                transition: `color ${MOTION.RING_COLOR_FLIP}ms ease`,
-                marginLeft: 4,
+                width: 5,
+                height: 5,
+                background: teamGradient[0],
               }}
-              data-testid="player-seat-timer-seconds"
-              aria-label={`${secondsLeft} seconds remaining`}
-            >
-              {secondsLeft}s
-            </span>
-          )}
-        </span>
+              aria-hidden
+            />
+            <span style={{ letterSpacing: 0.6, opacity: 0.7 }}>{teamLabel}</span>
+            {showRing && (
+              <span
+                className="font-body font-semibold tabular-nums"
+                style={{
+                  color: secondsUrgent ? COLOR_URGENT : TURN_LIME,
+                  transition: `color ${MOTION.RING_COLOR_FLIP}ms ease`,
+                  marginLeft: 4,
+                }}
+                data-testid="player-seat-timer-seconds"
+                aria-label={`${secondsLeft} seconds remaining`}
+              >
+                {secondsLeft}s
+              </span>
+            )}
+          </span>
+        )}
       </div>
 
       {/* Card-back stack — opponents only. Rendered even when `cardCount === 0`
           (last trick of a hand) so the CardFlight overlay can always measure
           this seat's deck rect; the inner stack hides itself when empty. */}
       {!isSelf && cardCount !== undefined && (
-        <CardBackStack count={cardCount} isHorizontal={isHorizontal} seat={player.seat} />
+        <CardBackStack
+          count={cardCount}
+          isHorizontal={isHorizontal}
+          seat={player.seat}
+          compact={compact}
+        />
       )}
 
       {/* sr-live region for assistive tech — same wording as before so existing

@@ -98,15 +98,20 @@ export function DeclarationReveal({
       data-testid="declaration-reveal"
     >
       <div
-        className="relative rounded-2xl"
+        className="relative rounded-2xl px-4 py-4 md:px-5.5 md:pt-5 md:pb-4.5"
         style={{
-          width: 520,
+          // Desktop keeps the 520 design width; on a phone it caps to the
+          // viewport (−2rem) so the centered panel no longer clips its cards
+          // and +value column off both edges. maxHeight guards a tall melds
+          // list on short screens — the rows scroll, the brass total stays.
+          width: "min(520px, calc(100vw - 2rem))",
+          maxHeight: "calc(100vh - 2rem)",
+          overflowY: "auto",
           background: "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)",
           border: "1px solid rgba(201,168,118,0.55)",
           boxShadow: `0 12px 32px rgba(0,0,0,0.55), 0 0 0 2px ${glowColor}88, 0 0 24px ${glowColor}77, inset 0 1px 0 rgba(201,168,118,0.22)`,
           color: "var(--ink-light, #f5f2e8)",
           fontFamily: "var(--font-body)",
-          padding: "20px 22px 18px",
         }}
         data-team={winnerTeamString}
       >

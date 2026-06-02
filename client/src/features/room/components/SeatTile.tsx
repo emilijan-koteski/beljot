@@ -8,6 +8,15 @@ import type { RoomPlayer } from "@/shared/types/apiTypes";
 
 type SeatMode = "us" | "them" | "neutral";
 
+// Diamond placement — only at sm+, where the parent grid defines the matching
+// `grid-template-areas`. Literal class strings so Tailwind's scanner emits them.
+const SEAT_AREA_CLASS = {
+  south: "sm:[grid-area:south]",
+  east: "sm:[grid-area:east]",
+  north: "sm:[grid-area:north]",
+  west: "sm:[grid-area:west]",
+} as const;
+
 type SeatTileProps = {
   seatIndex: 0 | 1 | 2 | 3;
   cardinal: "south" | "east" | "north" | "west";
@@ -78,8 +87,12 @@ export function SeatTile({
 
   return (
     <div
-      className="group relative"
-      style={{ gridArea: cardinal }}
+      // grid-area is applied only at sm+, where the parent defines the diamond
+      // `grid-template-areas`. On phones the parent is a plain 2-col grid with
+      // NO named areas — an unconditional `gridArea: "south"` there matches no
+      // area and collapses all four tiles into one cell (they overlapped). With
+      // it scoped to sm, mobile tiles auto-flow into the 2×2 grid.
+      className={cn("group relative", SEAT_AREA_CLASS[cardinal])}
       data-testid={`seat-position-${cardinal}`}
       data-team={seatIndex % 2 === 0 ? "teamA" : "teamB"}
     >
@@ -89,7 +102,7 @@ export function SeatTile({
         disabled={!isClickable || isPending}
         data-testid={`player-seat-${seatIndex}`}
         className={cn(
-          "flex min-h-32.5 w-full flex-col items-center justify-center gap-2 rounded-2xl p-3.5 transition-all",
+          "flex min-h-26 w-full flex-col items-center justify-center gap-1.5 rounded-2xl p-3 transition-all sm:min-h-32.5 sm:gap-2 sm:p-3.5",
           isClickable && !isPending ? "cursor-pointer" : "cursor-default",
           isPending && "pointer-events-none opacity-60",
         )}

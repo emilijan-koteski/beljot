@@ -24,9 +24,14 @@ export function LandingNav() {
           >
             {t("landing.nav.login")}
           </Link>
-          <LandingCta to="/register" testId="landing-signup" className="px-4.5 py-2.5 text-sm">
-            {t("landing.nav.signup")}
-          </LandingCta>
+          {/* Sign-up CTA — hidden on phones; the page body already carries the
+              primary "create account" call to action, so the narrow header just
+              needs the language picker and a way back in (log in). */}
+          <span className="hidden sm:inline-flex">
+            <LandingCta to="/register" testId="landing-signup" className="px-4.5 py-2.5 text-sm">
+              {t("landing.nav.signup")}
+            </LandingCta>
+          </span>
         </nav>
       </div>
     </header>

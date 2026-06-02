@@ -48,6 +48,9 @@ export function ClassicPanel({
       className={`overflow-hidden ${className}`}
       style={{
         width,
+        // Never exceed the viewport on a narrow (phone) screen — the panel
+        // shrinks to fit with a small gutter, then caps at `width` on desktop.
+        maxWidth: "calc(100vw - 2rem)",
         borderRadius: 14,
         background: PANEL_BG,
         border: "1px solid rgba(201,168,118,0.55)",

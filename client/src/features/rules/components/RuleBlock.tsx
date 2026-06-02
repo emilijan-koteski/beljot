@@ -42,7 +42,7 @@ function NoteBlock({ text }: { text: string }) {
 function CardBlock() {
   const { cardsTrump, cardsPlain, ui } = useRules();
   return (
-    <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+    <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
       <CardLadder
         testId="ladder-trump"
         title={ui.ladderTrumpTitle}

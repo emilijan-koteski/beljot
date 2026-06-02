@@ -61,7 +61,7 @@ export function TrumpPrompt({
         data-testid="trump-prompt"
       >
         <div
-          className="rounded-lg px-4 py-3"
+          className="mx-4 max-w-[20rem] rounded-lg px-4 py-3 md:max-w-none"
           style={{
             background: "var(--panel-dark, rgba(20,45,30,0.85))",
             border: "1px solid rgba(201,168,118,0.4)",

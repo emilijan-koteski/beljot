@@ -1,6 +1,7 @@
 import { Smile } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useRef,
@@ -36,9 +37,25 @@ const COOLDOWN_MS = MOTION.EMOTE_COOLDOWN;
 interface EmotePickerButtonProps {
   onSend: (emote: EmoteID) => void;
   disabled?: boolean;
+  /** When set, the trigger renders as a labeled row (mobile HUD menu). */
+  label?: ReactNode;
+  /** Picker opens upward by default (bottom HUD); "down" opens below the
+   *  trigger (top-right menu). */
+  openDirection?: "up" | "down";
+  /** Extra classes for the trigger button (e.g. full-width row). */
+  className?: string;
+  /** Fired after an emote is sent — lets the host (mobile menu) close itself. */
+  onSent?: () => void;
 }
 
-export function EmotePickerButton({ onSend, disabled = false }: EmotePickerButtonProps) {
+export function EmotePickerButton({
+  onSend,
+  disabled = false,
+  label,
+  openDirection = "up",
+  className = "",
+  onSent,
+}: EmotePickerButtonProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   // lastSentAt lives on matchStore so the cooldown survives the picker's
@@ -145,8 +162,9 @@ export function EmotePickerButton({ onSend, disabled = false }: EmotePickerButto
       setNow(stamp);
       onSend(emote);
       setIsOpen(false);
+      onSent?.();
     },
-    [lastSentAt, setLastSentAt, onSend],
+    [lastSentAt, setLastSentAt, onSend, onSent],
   );
 
   return (
@@ -158,7 +176,7 @@ export function EmotePickerButton({ onSend, disabled = false }: EmotePickerButto
         disabled={disabled}
         aria-label={t("match.emote.button")}
         aria-pressed={isOpen}
-        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] transition-colors hover:not-disabled:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass disabled:cursor-not-allowed disabled:opacity-40"
+        className={`inline-flex h-9 cursor-pointer items-center rounded-[10px] transition-colors hover:not-disabled:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass disabled:cursor-not-allowed disabled:opacity-40 ${label ? "w-full justify-start gap-2 px-3.5" : "w-9 justify-center"} ${className}`}
         style={{
           background: "var(--panel-hud, rgba(18,32,22,0.85))",
           border: "1px solid rgba(201,168,118,0.4)",
@@ -168,7 +186,8 @@ export function EmotePickerButton({ onSend, disabled = false }: EmotePickerButto
         }}
         data-testid="emote-toggle"
       >
-        <Smile className="h-5 w-5" aria-hidden="true" />
+        <Smile className="h-5 w-5 shrink-0" aria-hidden="true" />
+        {label && <span className="font-body text-xs font-semibold">{label}</span>}
       </button>
 
       {isOpen && (
@@ -176,7 +195,7 @@ export function EmotePickerButton({ onSend, disabled = false }: EmotePickerButto
           ref={popoverRef}
           role="group"
           aria-label={t("match.emote.picker.title")}
-          className="absolute right-0 bottom-12 z-30 w-44 rounded-lg p-2 shadow-xl"
+          className={`absolute right-0 z-30 w-44 rounded-lg p-2 shadow-xl ${openDirection === "down" ? "top-full mt-1" : "bottom-12"}`}
           style={{
             background: "var(--panel-deeper, rgba(18,32,22,0.94))",
             border: "1px solid rgba(201,168,118,0.4)",

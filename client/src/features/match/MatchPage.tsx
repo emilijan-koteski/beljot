@@ -1,9 +1,17 @@
-import { HelpCircle, Pause, Settings as SettingsIcon } from "lucide-react";
+import {
+  Flag,
+  HelpCircle,
+  Menu as MenuIcon,
+  Pause,
+  Settings as SettingsIcon,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router";
 
 import { getRoom } from "@/shared/api/rooms";
+import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { FLAG_LIFETIME, MOTION } from "@/shared/lib/motion";
 import { useWsConnectionState, useWsSendMessage } from "@/shared/providers/WebSocketContext";
@@ -50,7 +58,7 @@ import { RulesDialog } from "./components/RulesDialog";
 import { ScorePanel } from "./components/ScorePanel";
 import { ScoreReveal } from "./components/ScoreReveal";
 import { SettingsDialog } from "./components/SettingsDialog";
-import { SurrenderButton } from "./components/SurrenderButton";
+import { SurrenderButton, SurrenderConfirmDialog } from "./components/SurrenderButton";
 import { SurrenderOpponentBanner } from "./components/SurrenderOpponentBanner";
 import { SurrenderPrompt } from "./components/SurrenderPrompt";
 import { TableAmbience } from "./components/TableAmbience";
@@ -167,10 +175,12 @@ function winnerCollectRect(winner: number, myPlayerSeat: number): FlightRect {
 }
 
 const SEAT_POSITIONS: Record<number, string> = {
-  0: "bottom-44 left-1/2 -translate-x-1/2", // South (self) - above the fanned hand
-  1: "right-16 top-1/2 -translate-y-1/2", // East (next player counter-clockwise) - inset off wood rim
-  2: "top-16 left-1/2 -translate-x-1/2", // North (partner) - clears the wordmark
-  3: "left-16 top-1/2 -translate-y-1/2", // West (third player) - inset off wood rim
+  // Phones hug the screen edges (matching the scoreboard inset); md+ insets off
+  // the wood rim as before.
+  0: "bottom-48 left-1/2 -translate-x-1/2 md:bottom-44", // South (self) - above the fanned hand
+  1: "right-3 top-1/2 -translate-y-1/2 md:right-16", // East (next player counter-clockwise)
+  2: "top-6 left-1/2 -translate-x-1/2 md:top-16", // North (partner) - clears the wordmark on md+
+  3: "left-3 top-1/2 -translate-y-1/2 md:left-16", // West (third player)
 };
 
 const SEAT_ORIENTATIONS: Record<number, SeatOrientation> = {
@@ -228,6 +238,9 @@ export function MatchPage() {
   const location = useLocation();
   const cameFromRoom = (location.state as { fromRoom?: boolean } | null)?.fromRoom === true;
   const prefersReducedMotion = useReducedMotion();
+  // Phone layout: compact seats (vertical, smaller avatars, name-only) and a
+  // tighter center trick area. Matches Tailwind's `md` breakpoint (768px).
+  const isCompactTable = useMediaQuery("(max-width: 767px)");
   const [splashElapsed, setSplashElapsed] = useState(!cameFromRoom);
   useEffect(() => {
     if (!cameFromRoom) return;
@@ -247,6 +260,11 @@ export function MatchPage() {
   const errorToastTimerRef = useRef<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  // Mobile HUD: the bottom action buttons collapse into a top-right hamburger.
+  const [hudMenuOpen, setHudMenuOpen] = useState(false);
+  // Surrender confirm, driven from the mobile menu (the menu closes on tap, so
+  // it can't host the SurrenderButton's own confirm — see SurrenderConfirmDialog).
+  const [surrenderConfirmOpen, setSurrenderConfirmOpen] = useState(false);
   // Local card-throw animation: set on play_card dispatch, cleared shortly
   // after so HandCards hides the played card via visibility:hidden while the
   // CardFlight overlay paints the motion. The actual hand removal arrives via
@@ -1016,7 +1034,7 @@ export function MatchPage() {
       data-testid="match-page"
     >
       {/* Static table chrome — felt + wood rim + brass oval + filigree */}
-      <TableBackdrop />
+      <TableBackdrop compact={isCompactTable} />
       {/* Floating particles + soft top beam (decorative, reduced-motion aware) */}
       <TableAmbience intensity={0.9} tint="#ffe9b0" />
       {/* "Beljot.online" wordmark — top center */}
@@ -1047,7 +1065,7 @@ export function MatchPage() {
         matchState.trumpSuit &&
         matchState.phase !== "dealing" &&
         matchState.phase !== "bidding" && (
-          <div className="absolute top-4 right-4 z-10">
+          <div className="absolute top-4 right-4 z-10 hidden md:block">
             <TrumpIndicator
               trumpSuit={matchState.trumpSuit}
               trumpCallerSeat={matchState.trumpCallerSeat}
@@ -1094,6 +1112,7 @@ export function MatchPage() {
               isDealer={matchState.dealerSeat === player.seat}
               trumpCallerSuit={isCaller ? matchState.trumpSuit : null}
               orientation={SEAT_ORIENTATIONS[compass]}
+              compact={isCompactTable}
             />
           </div>
         );
@@ -1107,6 +1126,7 @@ export function MatchPage() {
           myPlayerSeat={myPlayerSeat}
           pendingResolvedTrick={pendingResolvedTrick}
           suppressedCardIds={flightingCardIds}
+          compact={isCompactTable}
         />
       </div>
 
@@ -1126,12 +1146,14 @@ export function MatchPage() {
           playableCardIds={playableCardIds}
           onPlayCard={handlePlayCard}
           flyingId={flyingCardId}
+          compact={isCompactTable}
         />
       </div>
 
-      {/* Pause + surrender controls — bottom-left HUD cluster */}
+      {/* Pause + surrender controls — bottom-left HUD cluster (desktop only;
+          phones fold these into the top-right hamburger menu below). */}
       {(matchState.phase === "playing" || matchState.phase === "bidding") && (
-        <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2">
+        <div className="absolute bottom-4 left-4 z-10 hidden items-center gap-2 md:flex">
           <HUDButton
             icon={<Pause className="h-4 w-4" aria-hidden="true" />}
             label={
@@ -1158,7 +1180,7 @@ export function MatchPage() {
           since the floating panel covers this corner; it returns on close. The
           Sound button is intentionally omitted until audio ships. */}
       {!isOverlayActive && !isChatOpen && (
-        <div className="absolute bottom-4 right-24 z-10 flex items-center gap-2">
+        <div className="absolute bottom-4 right-24 z-10 hidden items-center gap-2 md:flex">
           <HUDButton
             icon={<HelpCircle className="h-4 w-4" aria-hidden="true" />}
             aria-label={t("match.hud.rules")}
@@ -1179,6 +1201,135 @@ export function MatchPage() {
             matchEndData === null &&
             matchAbandonedData === null && <EmotePickerButton onSend={handleSendEmote} />}
         </div>
+      )}
+
+      {/* Mobile HUD menu — the bottom action clusters fold into a top-right
+          hamburger; only the chat FAB stays at the bottom-right on phones. */}
+      {!isOverlayActive && (
+        <div className="md:hidden">
+          <button
+            type="button"
+            onClick={() => setHudMenuOpen((v) => !v)}
+            aria-label={t("nav.menu")}
+            aria-expanded={hudMenuOpen}
+            data-testid="hud-menu-button"
+            className="absolute top-3 right-3 z-30 inline-flex size-9 items-center justify-center rounded-[10px]"
+            style={{
+              background: "var(--panel-hud, rgba(18,32,22,0.85))",
+              border: "1px solid rgba(201,168,118,0.4)",
+              color: "var(--ink-light, #f5f2e8)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+            }}
+          >
+            {hudMenuOpen ? (
+              <X className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <MenuIcon className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
+
+          {hudMenuOpen && (
+            <>
+              {/* tap-away backdrop */}
+              <button
+                type="button"
+                aria-hidden="true"
+                tabIndex={-1}
+                onClick={() => setHudMenuOpen(false)}
+                className="fixed inset-0 z-20 cursor-default"
+              />
+              <div
+                className="absolute top-14 right-3 z-30 flex w-44 flex-col gap-1.5 rounded-xl p-2"
+                style={{
+                  background: "var(--panel-deeper, rgba(18,32,22,0.94))",
+                  border: "1px solid rgba(201,168,118,0.4)",
+                  boxShadow: "0 14px 36px rgba(0,0,0,0.5)",
+                  backdropFilter: "blur(10px)",
+                  WebkitBackdropFilter: "blur(10px)",
+                }}
+                data-testid="hud-menu"
+              >
+                {(matchState.phase === "playing" || matchState.phase === "bidding") && (
+                  <>
+                    <HUDButton
+                      icon={<Pause className="h-4 w-4" aria-hidden="true" />}
+                      label={
+                        matchState.pauseUsed?.[myPlayerSeat]
+                          ? t("match.pause.pauseUsed")
+                          : t("match.hud.pause")
+                      }
+                      onClick={() => {
+                        handlePause();
+                        setHudMenuOpen(false);
+                      }}
+                      disabled={!canPause}
+                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      data-testid="hud-menu-pause"
+                    />
+                    <HUDButton
+                      variant="danger"
+                      icon={<Flag className="h-4 w-4" aria-hidden="true" />}
+                      label={t("match.surrender.requestButton")}
+                      onClick={() => {
+                        setSurrenderConfirmOpen(true);
+                        setHudMenuOpen(false);
+                      }}
+                      disabled={!canSurrenderRequest}
+                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      data-testid="hud-menu-surrender"
+                    />
+                  </>
+                )}
+                <HUDButton
+                  icon={<HelpCircle className="h-4 w-4" aria-hidden="true" />}
+                  label={t("match.hud.rules")}
+                  onClick={() => {
+                    setRulesOpen(true);
+                    setHudMenuOpen(false);
+                  }}
+                  style={{ width: "100%", justifyContent: "flex-start" }}
+                  data-testid="hud-menu-rules"
+                />
+                <HUDButton
+                  icon={<SettingsIcon className="h-4 w-4" aria-hidden="true" />}
+                  label={t("match.hud.settings")}
+                  onClick={() => {
+                    setSettingsOpen(true);
+                    setHudMenuOpen(false);
+                  }}
+                  style={{ width: "100%", justifyContent: "flex-start" }}
+                  data-testid="hud-menu-settings"
+                />
+                {(matchState.phase === "dealing" ||
+                  matchState.phase === "bidding" ||
+                  matchState.phase === "playing") &&
+                  matchEndData === null &&
+                  matchAbandonedData === null && (
+                    <EmotePickerButton
+                      onSend={handleSendEmote}
+                      onSent={() => setHudMenuOpen(false)}
+                      label={t("match.emote.button")}
+                      openDirection="down"
+                    />
+                  )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Surrender confirm (mobile HUD menu path). Owned here, not by the menu,
+          so closing the menu doesn't unmount the modal. Auto-dismisses if
+          surrender stops being available (partner proposed / attempt spent). */}
+      {surrenderConfirmOpen && canSurrenderRequest && (
+        <SurrenderConfirmDialog
+          onCancel={() => setSurrenderConfirmOpen(false)}
+          onConfirm={() => {
+            setSurrenderConfirmOpen(false);
+            handleSurrenderRequest();
+          }}
+        />
       )}
 
       {/* Surrender prompt — partner-only, modal. Suppress while a match-end

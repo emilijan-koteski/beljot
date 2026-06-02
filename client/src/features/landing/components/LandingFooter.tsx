@@ -19,9 +19,9 @@ export function LandingFooter() {
 
   return (
     <footer className="felt-surface border-brass-soft border-t py-10">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-5 px-[clamp(28px,5vw,72px)]">
+      <div className="mx-auto flex max-w-7xl flex-col items-start gap-5 px-[clamp(28px,5vw,72px)] sm:flex-row sm:flex-wrap sm:items-center">
         <BrandLockup size={30} wordmarkSize={18} />
-        <nav className="text-ink-mute ml-auto flex flex-wrap items-center gap-6 text-[13px]">
+        <nav className="text-ink-mute flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] sm:ml-auto">
           {links.map((l) => (
             <Link key={l.label} to={l.to} className="hover:text-ink transition-colors">
               {l.label}
