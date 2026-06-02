@@ -155,7 +155,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         >
           {/* ── Left: form ────────────────────────────────────────────── */}
           <div className="bg-surface flex min-h-0 flex-col">
-            <header className="flex flex-shrink-0 flex-col gap-2 px-8 pt-7 pb-1.5">
+            <header className="flex shrink-0 flex-col gap-2 px-8 pt-7 pb-1.5">
               <Eyebrow tone="accent">
                 <span className="bg-accent inline-block size-1.5 rounded-full" />
                 {t("lobby.createRoomModal.eyebrow")}
@@ -251,7 +251,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               )}
             </div>
 
-            <footer className="border-border bg-surface flex flex-shrink-0 items-center justify-between gap-2 border-t px-8 py-3.5">
+            <footer className="border-border bg-surface flex shrink-0 items-center justify-between gap-2 border-t px-8 py-3.5">
               <Button
                 type="button"
                 variant="ghost"
@@ -409,7 +409,7 @@ function PreviewCard({
           {t("lobby.createRoomModal.preview.seated", { current: 1 })}
         </span>
         <span className="ml-auto">
-          <span className="bg-accent text-accent-ink inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--accent-deep)] px-3.5 py-1.5 text-[11px] font-semibold opacity-70">
+          <span className="bg-accent text-accent-ink inline-flex items-center gap-1.5 rounded-[10px] border border-accent-deep px-3.5 py-1.5 text-[11px] font-semibold opacity-70">
             {t("lobby.createRoomModal.preview.joinLabel")}
             <ArrowRight className="size-3.5" strokeWidth={2.2} />
           </span>
@@ -424,7 +424,7 @@ function TeamLabel({ team }: { team: "A" | "B" }) {
     <span
       className={cn(
         "pr-1 text-[10px] font-bold uppercase tracking-[1.2px]",
-        team === "A" ? "text-[var(--team-a)]" : "text-[var(--team-b)]",
+        team === "A" ? "text-team-a" : "text-team-b",
       )}
     >
       {team}

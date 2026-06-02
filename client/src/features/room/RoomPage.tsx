@@ -827,7 +827,7 @@ export function RoomPage() {
             two diagonal pairs read "Us {you + open} vs Them {open + open}",
             centred, with solid gold/silver square indicators. */}
         <div
-          className="border-border-2 bg-surface mb-3 rounded-(--radius) border border-dashed px-4 py-3"
+          className="border-border-2 bg-surface mb-3 rounded-lg border border-dashed px-4 py-3"
           data-testid="team-legend"
         >
           {viewerSeat === null ? (
@@ -1020,7 +1020,7 @@ export function RoomPage() {
             on the left; one primary CTA on the right whose state is resolved
             above (Start match / Finish swap to start / Waiting …). */}
         <div
-          className="border-border bg-surface flex items-center justify-between gap-3 rounded-(--radius) border px-4 py-3"
+          className="border-border bg-surface flex items-center justify-between gap-3 rounded-lg border px-4 py-3"
           data-testid="action-bar"
         >
           <div className="flex min-w-0 items-center gap-3">

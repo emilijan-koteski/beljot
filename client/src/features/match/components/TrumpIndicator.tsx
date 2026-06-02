@@ -190,7 +190,7 @@ export function TrumpIndicator({
           >
             {callerName && (
               <span
-                className="font-body text-text-primary max-w-[8rem] truncate"
+                className="font-body text-text-primary max-w-32 truncate"
                 data-testid="trump-caller-name"
               >
                 {callerName}

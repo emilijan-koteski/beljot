@@ -152,7 +152,7 @@ describe("TrumpIndicator", () => {
       />,
     );
     const nameEl = screen.getByTestId("trump-caller-name");
-    expect(nameEl.className).toContain("max-w-[8rem]");
+    expect(nameEl.className).toContain("max-w-32");
     expect(nameEl.className).toContain("truncate");
   });
 });

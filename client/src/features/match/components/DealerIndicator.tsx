@@ -28,7 +28,7 @@ export function DealerIndicator({ dealerName }: DealerIndicatorProps) {
         ·
       </span>
       <span
-        className="text-text-primary font-display text-sm font-semibold max-w-[8rem] truncate"
+        className="text-text-primary font-display text-sm font-semibold max-w-32 truncate"
         data-testid="dealer-name"
       >
         {trimmed}

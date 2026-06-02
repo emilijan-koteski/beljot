@@ -30,7 +30,7 @@ describe("DealerIndicator", () => {
   it("dealer name span has truncate clamp (AC6)", () => {
     render(<DealerIndicator dealerName="aVeryLongUsernameThatShouldClamp" />);
     const nameEl = screen.getByTestId("dealer-name");
-    expect(nameEl.className).toContain("max-w-[8rem]");
+    expect(nameEl.className).toContain("max-w-32");
     expect(nameEl.className).toContain("truncate");
   });
 });
