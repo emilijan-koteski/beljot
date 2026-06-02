@@ -83,7 +83,7 @@ export function BelotReveal({
       data-testid="belot-reveal"
     >
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center gap-4 rounded-2xl px-5 py-4"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-4 max-w-[calc(100vw-1.5rem)] md:gap-4 md:px-5"
         style={{
           background: "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)",
           border: "1px solid rgba(201,168,118,0.55)",
@@ -93,9 +93,18 @@ export function BelotReveal({
         }}
         data-team={team}
       >
-        <PlayingCard card={parseCardId(cardId)} state="default" size="md" withTransition={false} />
+        <div className="shrink-0">
+          <PlayingCard
+            card={parseCardId(cardId)}
+            state="default"
+            size="md"
+            withTransition={false}
+          />
+        </div>
 
-        <div className="flex flex-col gap-1 min-w-50">
+        {/* min-w-0 lets the title wrap (instead of forcing a 200px floor that
+            overflows ~360px phones); the 200px design floor returns at md. */}
+        <div className="flex flex-col gap-1 min-w-0 md:min-w-50">
           <div
             className="text-[10px] uppercase tracking-[0.18em]"
             style={{ color: "var(--brass, #c9a876)", fontFamily: "var(--font-body)" }}
@@ -137,12 +146,14 @@ export function BelotReveal({
           </div>
         </div>
 
-        <AutoCloseRing
-          duration={prefersReducedMotion ? 1.5 : 8}
-          onClose={handleClose}
-          ariaLabel={t("match.belot.reveal.dismiss", { defaultValue: "Dismiss" })}
-          testId="belot-reveal-close"
-        />
+        <div className="shrink-0">
+          <AutoCloseRing
+            duration={prefersReducedMotion ? 1.5 : 8}
+            onClose={handleClose}
+            ariaLabel={t("match.belot.reveal.dismiss", { defaultValue: "Dismiss" })}
+            testId="belot-reveal-close"
+          />
+        </div>
       </div>
     </div>
   );

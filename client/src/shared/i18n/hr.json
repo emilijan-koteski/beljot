@@ -15,7 +15,8 @@
     "rules": "Pravila",
     "appName": "Beljot",
     "logout": "Odjavi se",
-    "signedInAs": "Prijavljen kao"
+    "signedInAs": "Prijavljen kao",
+    "menu": "Izbornik"
   },
   "profile": {
     "title": "Profil",
@@ -39,7 +40,7 @@
       "winTitle": "Niz pobjeda — {{count}} zaredom",
       "lossTitle": "Hladni niz — {{count}} poraza",
       "winSubtitle": "Samo tako nastavi — sljedeći meč ulazi u niz.",
-      "lossSubtitle": "Otresi se — pokreni Brzu igru i prekini niz.",
+      "lossSubtitle": "Glavu gore, pokreni Brzu igru i prekini niz.",
       "play": "Igraj"
     },
     "stats": {

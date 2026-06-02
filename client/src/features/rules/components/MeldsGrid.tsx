@@ -72,15 +72,11 @@ function MeldCard({ meld }: { meld: Declaration }) {
   );
 }
 
-/** 2-column grid of every declaration, ordered by the shared base. */
+/** Grid of every declaration (one column on phones, two on tablet+). */
 export function MeldsGrid() {
   const { declarations } = useRules();
   return (
-    <div
-      data-testid="melds-grid"
-      className="grid gap-3"
-      style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
-    >
+    <div data-testid="melds-grid" className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {declarations.map((d) => (
         <MeldCard key={d.id} meld={d} />
       ))}

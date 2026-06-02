@@ -432,6 +432,14 @@
   --chat-shadow-fab: 0 8px 22px rgba(0, 0, 0, 0.45);
 }
 
+/* The floating message peek sits over the felt + cards (not inside the dark
+   panel), so it needs an OPAQUE felt-green fill — the in-panel `--surface-2`
+   bubble tint is near-transparent and would let the white cards bleed through
+   on a phone. `--surface-3` is a branding green not re-pointed above. */
+.chat-dock-match [data-testid$="-peek"] {
+  background-color: var(--surface-3);
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    Shared keyframes — referenced across screens.
    ────────────────────────────────────────────────────────────────────── */

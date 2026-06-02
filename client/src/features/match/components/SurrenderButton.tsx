@@ -74,7 +74,12 @@ interface SurrenderConfirmDialogProps {
   onConfirm: () => void;
 }
 
-function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirmDialogProps) {
+/**
+ * The surrender confirmation modal. Exported so surfaces that can't keep the
+ * SurrenderButton mounted (e.g. the mobile HUD menu, which closes on tap) can
+ * drive the confirm dialog directly from their own state.
+ */
+export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirmDialogProps) {
   const { t } = useTranslation();
   // Escape cancels the proposal — matches BelotPrompt's onEscape→decline
   // convention so destructive overlays bail out safely on a stray keystroke.

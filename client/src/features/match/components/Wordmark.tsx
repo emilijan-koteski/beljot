@@ -7,7 +7,7 @@
 export function Wordmark() {
   return (
     <div
-      className="pointer-events-none absolute top-5 left-1/2 -translate-x-1/2 z-9 flex items-center gap-2 select-none"
+      className="pointer-events-none absolute top-5 left-1/2 z-9 hidden -translate-x-1/2 items-center gap-2 select-none md:flex"
       style={{
         fontFamily: "var(--font-body)",
         color: "var(--ink)",

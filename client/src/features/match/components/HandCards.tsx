@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import type { Card, Rank, Suit } from "@/shared/types/matchTypes";
 
 import type { CardState } from "./PlayingCard";
@@ -8,6 +10,12 @@ interface HandCardsProps {
   isMyTurn: boolean;
   playableCardIds: string[];
   onPlayCard: (cardId: string) => void;
+  /**
+   * Phone layout: the fan overlaps more so all 8 cards fit the viewport width
+   * (rather than running off the edges). Card size is unchanged — only the
+   * lateral spread compresses to fit.
+   */
+  compact?: boolean;
   /**
    * Card id (e.g. `"KS"`) currently being thrown into the trick. Hides the
    * matching card via `visibility: hidden` so the `CardFlight` overlay is
@@ -73,17 +81,37 @@ export function HandCards({
   playableCardIds,
   onPlayCard,
   flyingId = null,
+  compact = false,
 }: HandCardsProps) {
+  // Track viewport width so the phone fan can compress to whatever's available
+  // (and re-fit on rotation). Desktop ignores this — spread stays budget-based.
+  const [viewportWidth, setViewportWidth] = useState<number>(() =>
+    typeof window === "undefined" ? 1280 : window.innerWidth,
+  );
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   if (hand.length === 0) {
     return <div className="relative h-36 w-px" data-testid="hand-cards" />;
   }
 
   const sortedHand = sortHand(hand);
   const total = sortedHand.length;
-  const spread = Math.min(MAX_SPREAD_PX, total > 1 ? SPREAD_BUDGET_PX / total : 0);
+  const budgetSpread = Math.min(MAX_SPREAD_PX, total > 1 ? SPREAD_BUDGET_PX / total : 0);
+  // On phones, cap the spread so the whole fan fits within the viewport; cards
+  // keep their full `lg` size and just overlap more. The margin also absorbs the
+  // ~17 px the outermost (rotated) cards' corners swing past their nominal box.
+  const COMPACT_SIDE_MARGIN = 28;
+  const fitSpread =
+    total > 1 ? (viewportWidth - 2 * COMPACT_SIDE_MARGIN - CARD_WIDTH) / (total - 1) : budgetSpread;
+  const spread =
+    compact && total > 1 ? Math.max(8, Math.min(budgetSpread, fitSpread)) : budgetSpread;
   // Container width needs to fit the outermost card's centre offset + half a
-  // card width on either side. Add 24 px safety for the lift transform halo.
-  const containerWidth = spread * Math.max(0, total - 1) + CARD_WIDTH + 24;
+  // card width on either side. Add safety for the lift transform halo.
+  const containerWidth = spread * Math.max(0, total - 1) + CARD_WIDTH + (compact ? 8 : 24);
 
   return (
     <div

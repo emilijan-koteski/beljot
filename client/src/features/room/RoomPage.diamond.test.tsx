@@ -155,14 +155,15 @@ describe("RoomPage diamond layout invariant", () => {
       const east = screen.getByTestId("seat-position-east");
       const west = screen.getByTestId("seat-position-west");
 
-      // gridArea — JSDOM doesn't compute layout, but the inline
-      // `style={{ gridArea }}` survives the React render and is the
-      // single source of truth for visual placement in the CSS-Grid
-      // scheme.
-      expect((south as HTMLElement).style.gridArea).toBe("south");
-      expect((north as HTMLElement).style.gridArea).toBe("north");
-      expect((east as HTMLElement).style.gridArea).toBe("east");
-      expect((west as HTMLElement).style.gridArea).toBe("west");
+      // Placement source — JSDOM doesn't compute layout, but the responsive
+      // `sm:[grid-area:<cardinal>]` class survives the React render and is what
+      // drives the CSS-Grid `grid-template-areas` resolution at sm+. (It's
+      // scoped to sm so the mobile 2-col grid auto-flows instead of collapsing
+      // every tile into one cell.)
+      expect(south.className).toContain("sm:[grid-area:south]");
+      expect(north.className).toContain("sm:[grid-area:north]");
+      expect(east.className).toContain("sm:[grid-area:east]");
+      expect(west.className).toContain("sm:[grid-area:west]");
 
       function seatIndexAt(el: HTMLElement): number {
         const button = el.querySelector("[data-testid^='player-seat-']") as HTMLElement | null;

@@ -1,6 +1,6 @@
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, Menu } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { NavLink, useNavigate } from "react-router";
+import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import {
@@ -40,6 +40,7 @@ export function TopBar({
 }: TopBarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
 
@@ -55,7 +56,12 @@ export function TopBar({
       className="sticky top-0 z-50 flex h-15 items-center border-b border-border bg-[rgba(245,242,232,0.85)] px-7 backdrop-blur-md"
       data-testid="app-nav"
     >
-      <div className="flex items-center gap-2.5">
+      <Link
+        to={user ? "/lobby" : "/"}
+        data-testid="app-brand"
+        aria-label={t("nav.appName")}
+        className="flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:ring-accent/50 focus-visible:outline-none focus-visible:ring-2"
+      >
         <img
           src="/beljot-logo.svg"
           alt=""
@@ -69,10 +75,10 @@ export function TopBar({
         >
           {t("nav.appName")}
         </span>
-      </div>
+      </Link>
 
       {showNav && (
-        <div className="ml-7 flex h-full items-center">
+        <div className="ml-7 hidden h-full items-center md:flex">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
@@ -96,10 +102,11 @@ export function TopBar({
       <div className="ml-auto flex items-center gap-2.5">
         <LanguageSelector persistToServer={persistLanguage} testIdPrefix={languageTestIdPrefix} />
 
+        {/* Desktop (≥md): username pill with a logout dropdown. */}
         {showUserMenu && user && (
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="bg-surface-elevated hover:bg-surface-sunken aria-expanded:bg-surface-sunken flex items-center gap-2 rounded-full border border-border py-1 pr-3 pl-1 transition-colors"
+              className="bg-surface-elevated hover:bg-surface-sunken aria-expanded:bg-surface-sunken hidden items-center gap-2 rounded-full border border-border py-1 pr-3 pl-1 transition-colors md:flex"
               data-testid="nav-user"
             >
               <span
@@ -128,6 +135,64 @@ export function TopBar({
                 <LogOut className="text-ink-dim size-3.5" />
                 <span>{t("nav.logout")}</span>
               </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {/* Phones (<md): one hamburger folds the nav links + logout that the
+            bar can't fit. The language picker stays beside it as its own icon. */}
+        {(showNav || (showUserMenu && user)) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={t("nav.menu")}
+              data-testid="nav-menu"
+              className="text-ink-dim hover:bg-surface-sunken hover:text-ink aria-expanded:bg-surface-sunken aria-expanded:text-ink inline-flex size-8 items-center justify-center rounded-lg border border-border bg-transparent transition-colors md:hidden"
+            >
+              <Menu className="size-4.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="bg-surface-elevated min-w-48 border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
+            >
+              {showUserMenu && user && (
+                <>
+                  <div className="text-ink-mute px-2.5 pt-2 pb-1.5 text-[11px] tracking-[0.3px]">
+                    {t("nav.signedInAs", { defaultValue: "Signed in as" })}{" "}
+                    <span className="text-ink font-semibold">{user.username}</span>
+                  </div>
+                  <div className="mx-1 my-1 h-px bg-border" />
+                </>
+              )}
+              {showNav &&
+                navItems.map((item) => {
+                  const active = location.pathname === item.path;
+                  return (
+                    <DropdownMenuItem
+                      key={item.path}
+                      render={<Link to={item.path} />}
+                      data-testid={`nav-menu-${item.labelKey.split(".")[1]}`}
+                      className={cn(
+                        "rounded-md px-2.5 py-2 text-sm",
+                        active
+                          ? "bg-accent-soft text-ink font-semibold"
+                          : "text-ink hover:bg-surface-sunken font-medium",
+                      )}
+                    >
+                      {t(item.labelKey)}
+                    </DropdownMenuItem>
+                  );
+                })}
+              {showNav && showUserMenu && user && <div className="mx-1 my-1 h-px bg-border" />}
+              {showUserMenu && user && (
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  data-testid="nav-menu-logout"
+                  className="text-ink hover:bg-surface-sunken flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium"
+                >
+                  <LogOut className="text-ink-dim size-3.5" />
+                  <span>{t("nav.logout")}</span>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

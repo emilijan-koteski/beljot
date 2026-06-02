@@ -614,7 +614,7 @@ export function RoomPage() {
   }
 
   return (
-    <div className="mx-auto max-w-330 px-4 py-6 md:px-8">
+    <div className="mx-auto max-w-330 px-4 pt-6 pb-24 md:px-8 md:pb-6">
       <div data-testid="room-page">
         {/* Room info card — parchment chrome (brass top hairline + soft inset
             shadow). Left: name + meta row (host · roster · seated count).
@@ -633,7 +633,10 @@ export function RoomPage() {
             {/* Left — name + meta row */}
             <div className="flex min-w-0 flex-col gap-1.5">
               <h1
-                className="font-display text-ink m-0 truncate text-[28px] leading-tight font-bold tracking-[-0.6px]"
+                // pr reserves room for the code chip that floats onto this row
+                // on mobile (absolute, top-right of the card); cleared at md
+                // where the chip returns to the right column.
+                className="font-display text-ink m-0 truncate pr-28 text-[28px] leading-tight font-bold tracking-[-0.6px] md:pr-0"
                 data-testid="room-info-name"
               >
                 {room.name}
@@ -790,15 +793,20 @@ export function RoomPage() {
 
             {/* Right — copy-code chip on top, game-mode badges below. */}
             <div className="flex flex-col items-start gap-2 md:items-end">
-              <CodeChip
-                code={room.code}
-                variant="compact"
-                copied={justCopied}
-                onCopy={handleCopyLink}
-                ariaLabel={t("room.copyLinkAriaLabel", { code: room.code })}
-                testId="copy-link"
-                codeTestId="room-code"
-              />
+              {/* On mobile the chip floats to the card's top-right so it shares
+                  the title's row (the card is `relative`); at md it returns to
+                  static flow above the badges — desktop layout unchanged. */}
+              <div className="absolute top-6 right-6 md:static md:top-auto md:right-auto">
+                <CodeChip
+                  code={room.code}
+                  variant="compact"
+                  copied={justCopied}
+                  onCopy={handleCopyLink}
+                  ariaLabel={t("room.copyLinkAriaLabel", { code: room.code })}
+                  testId="copy-link"
+                  codeTestId="room-code"
+                />
+              </div>
               <div
                 className="flex flex-wrap items-center gap-2 md:justify-end"
                 data-testid="room-info-badges"
@@ -889,7 +897,7 @@ export function RoomPage() {
             />
           </div>
 
-          <div className="relative z-10 mb-6 grid grid-cols-2 gap-5 sm:grid-cols-[1fr_1fr_1fr] sm:[grid-template-areas:'._north_.''west_center_east''._south_.']">
+          <div className="relative z-10 mb-4 grid grid-cols-2 gap-3 sm:mb-6 sm:grid-cols-[1fr_1fr_1fr] sm:gap-5 sm:[grid-template-areas:'._north_.''west_center_east''._south_.']">
             {SEAT_INDEXES.map((seatIndex) => {
               const player = getPlayerAtSeat(players, seatIndex);
               const cardinal = SEAT_TO_CARDINAL[seatIndex] as CardinalPosition;
@@ -1020,10 +1028,14 @@ export function RoomPage() {
             on the left; one primary CTA on the right whose state is resolved
             above (Start match / Finish swap to start / Waiting …). */}
         <div
-          className="border-border bg-surface flex items-center justify-between gap-3 rounded-lg border px-4 py-3"
+          // Stack on phones: the long "waiting for host" CTA label can't shrink
+          // (fixed-height, nowrap button), so a single justify-between row made
+          // it overlap the Leave button. flex-col puts Leave on top + a
+          // full-width CTA below; the original row returns at sm.
+          className="border-border bg-surface flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
           data-testid="action-bar"
         >
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
             <Button
               variant="ghost"
               onClick={handleLeaveRoom}
@@ -1048,7 +1060,10 @@ export function RoomPage() {
             disabled={ctaDisabled}
             title={!inSwapMode && isOwner && !allSeated ? t("room.startMatchDisabled") : undefined}
             data-testid={ctaTestId}
-            className="shrink-0"
+            // Full-width on phones; let the long "waiting for host" label wrap
+            // (the cta size is fixed-height + nowrap by default) so it never
+            // clips. Original single-line pill returns at sm.
+            className="h-auto min-h-11.5 w-full py-2.5 leading-tight whitespace-normal sm:h-11.5 sm:w-auto sm:py-0 sm:leading-normal sm:whitespace-nowrap"
           >
             {ctaLabel}
           </Button>

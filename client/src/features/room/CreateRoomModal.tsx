@@ -138,7 +138,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="bg-surface border-border w-[calc(100%-2rem)] gap-0 overflow-hidden rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_rgba(201,168,118,0.20)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
+        className="bg-surface border-border max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-0 overflow-y-auto rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_rgba(201,168,118,0.20)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))] md:overflow-hidden"
         showCloseButton={false}
         data-testid="create-room-modal"
       >
@@ -150,11 +150,11 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
         <form
           onSubmit={handleSubmit}
-          className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[1.05fr_0.95fr]"
+          className="grid grid-cols-1 md:h-full md:min-h-0 md:grid-cols-[1.05fr_0.95fr]"
           noValidate
         >
           {/* ── Left: form ────────────────────────────────────────────── */}
-          <div className="bg-surface flex min-h-0 flex-col">
+          <div className="bg-surface flex flex-col md:min-h-0">
             <header className="flex shrink-0 flex-col gap-2 px-8 pt-7 pb-1.5">
               <Eyebrow tone="accent">
                 <span className="bg-accent inline-block size-1.5 rounded-full" />
@@ -168,7 +168,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               </p>
             </header>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-4">
+            <div className="flex flex-col gap-4 px-8 py-4 md:min-h-0 md:flex-1 md:overflow-y-auto">
               <Field
                 label={t("lobby.createRoomModal.roomName")}
                 htmlFor="room-name"
@@ -275,7 +275,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
           {/* ── Right: live preview pane ──────────────────────────────── */}
           <aside
-            className="border-border flex flex-col gap-4 overflow-y-auto border-t px-9 py-7 md:border-t-0 md:border-l"
+            className="border-border hidden flex-col gap-4 border-t px-9 py-7 md:flex md:overflow-y-auto md:border-t-0 md:border-l"
             style={{
               background:
                 "radial-gradient(ellipse 90% 60% at 50% -10%, rgba(201,168,118,0.18), transparent 70%), var(--surface-3)",
