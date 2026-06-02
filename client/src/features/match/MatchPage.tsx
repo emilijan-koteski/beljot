@@ -128,15 +128,26 @@ function viewportBottomCenterRect(): FlightRect {
  * out to be flaky (deck stack visibility-toggling on the last trick of a
  * hand, and a recurring "always lands at the same seat" race when the
  * effect captured a stale rect). The seat positions in `SEAT_POSITIONS`
- * are hard-anchored to the four edges of the viewport via CSS
- * `bottom-44 / right-16 / top-16 / left-16`, so we can compute the
+ * are hard-anchored to the viewport edges via CSS, so we can compute the
  * destination directly from the compass without consulting the DOM at
- * collect time.
+ * collect time. The rim insets mirror `SEAT_POSITIONS` per breakpoint:
+ * phones hug the edge (`right-3 / top-6 / left-3` = 12 / 24 / 12 px), md+
+ * sits off the wood rim (`right-16 / top-16 / left-16` = 64 px). The inboard
+ * nudge (~half the seat frame) lands the cards near the seat's avatar.
  */
 function winnerCollectRect(winner: number, myPlayerSeat: number): FlightRect {
   const compass = compassOffset(winner, myPlayerSeat);
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+
+  // Breakpoint-aware rim insets matching `SEAT_POSITIONS` (Tailwind `md` =
+  // 768 px). Computed from the same `vw` the destination math uses so the
+  // two never drift. The inboard nudge approximates half the seat frame
+  // (compact 60 px / md 80 px) so cards land on the avatar, not past it.
+  const compact = vw < 768;
+  const sideInset = compact ? 12 : 64; // right-3 / left-3 vs right-16 / left-16
+  const topInset = compact ? 24 : 64; // top-6 vs top-16
+  const inboard = compact ? 40 : 56;
 
   let cx: number;
   let cy: number;
@@ -149,19 +160,18 @@ function winnerCollectRect(winner: number, myPlayerSeat: number): FlightRect {
       cy = vh - TRICK_SLOT_H / 2 - 24;
       break;
     case 1:
-      // East opponent. Tucked in from the wood rim (right-16 = 64 px) by
-      // about a card width.
-      cx = vw - 120;
+      // East opponent. Tucked in from the rim by about a card width.
+      cx = vw - sideInset - inboard;
       cy = vh / 2;
       break;
     case 2:
-      // Teammate / north. Just below the top wood rim (top-16 = 64 px).
+      // Teammate / north. Just below the top rim.
       cx = vw / 2;
-      cy = 120;
+      cy = topInset + inboard;
       break;
     case 3:
       // West opponent. Mirror of east.
-      cx = 120;
+      cx = sideInset + inboard;
       cy = vh / 2;
       break;
   }
