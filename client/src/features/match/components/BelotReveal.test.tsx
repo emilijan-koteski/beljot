@@ -95,7 +95,9 @@ describe("BelotReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent("Stefan announced Re-belot.");
+    expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent(
+      "Stefan announced Re-belot.",
+    );
   });
 
   it("falls back to the team label when players is not provided", () => {
