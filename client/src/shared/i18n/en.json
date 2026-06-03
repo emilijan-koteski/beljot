@@ -38,14 +38,14 @@
     },
     "streak": {
       "winTitle": "Win streak — {{count}} in a row",
-      "lossTitle": "Cold streak — {{count}} losses",
+      "lossTitle": "Cold streak — {{count}} losses in a row",
       "winSubtitle": "Keep it going — your next match counts toward the streak.",
       "lossSubtitle": "Shake it off — Quick Play to break the run.",
       "play": "Play"
     },
     "stats": {
       "eyebrow": "Career",
-      "sub": "Career totals across every match — declarations, capots, lost contracts and all.",
+      "sub": "Career totals across every match — declarations, capots, failed contracts and all.",
       "totalGamesPlayed": "Matches played",
       "wins": "Wins",
       "losses": "Losses",
@@ -62,9 +62,9 @@
       "eyebrow": "Activity",
       "title": "Match history",
       "sub": "Every completed match — open a row to see hand-by-hand scoring, declarations, capots and failed contracts.",
-      "empty": "No games yet — Quick Play to get started",
+      "empty": "No matches yet — Quick Play to get started",
       "emptyCta": "Go to lobby",
-      "emptyFiltered": "No matches match this filter yet.",
+      "emptyFiltered": "No matches for this filter yet.",
       "loading": "Loading matches…",
       "error": "Could not load match history — try again",
       "loadMore": "Load more",
@@ -159,7 +159,6 @@
     }
   },
   "language": {
-    "label": "Language",
     "en": "English",
     "sr": "Srpski",
     "mk": "Македонски",
@@ -198,14 +197,7 @@
   },
   "chat": {
     "title": "Lobby chat",
-    "placeholder": "Say hi…",
-    "placeholderAfterFirst": "Message…",
-    "placeholderDisabled": "Reconnecting…",
-    "send": "Send",
-    "empty": "No messages yet — say hi.",
-    "tooLong": "Messages must be 500 characters or fewer.",
-    "clearAriaLabel": "Clear chat",
-    "clearTooltip": "Clear chat (or type /cc)"
+    "placeholderDisabled": "Reconnecting…"
   },
   "room": {
     "chat": {
@@ -235,15 +227,10 @@
       "promoteNotInRoom": "That player is no longer in the room."
     },
     "waitingForPlayers": "Waiting for players",
-    "backToLobby": "Back to Lobby",
-    "copyLink": "Copy Link",
     "copyLinkAriaLabel": "Copy room code {{code}}",
     "copyLinkSuccess": "Room code copied!",
     "copyLinkFailed": "Failed to copy — code: {{code}}",
-    "codeLabel": "Code",
-    "copied": "Copied!",
     "leaveRoom": "Leave Room",
-    "seatEmpty": "Waiting…",
     "seatYou": "You",
     "seatYouInline": "you",
     "seatOwner": "Host",
@@ -257,34 +244,24 @@
       "seated": "Seat {{seat}}",
       "notSeated": "Standing"
     },
-    "yourSeat": "Your seat",
-    "loading": "Loading room…",
     "notFound": "Room not found",
     "notFoundAction": "Back to Lobby",
     "roomClosed": "This room is closed.",
     "returningToLobby": "Returning to lobby…",
-    "playerJoined": "{{username}} joined the room",
-    "playerLeft": "{{username}} left the room",
     "startMatch": "Start match",
     "startMatchDisabled": "All 4 players must be seated",
     "waitingForOwner": "Waiting for host to start the match",
     "seatTaken": "That seat is already taken",
-    "seatUpdated": "Seat updated",
     "matchStarting": "Match starting…",
-    "autoStartMessage": "Match starts automatically once 4 seats fill",
     "autoStarting": "Starting match…",
     "kickIconLabel": "Kick {{username}}",
     "kickConfirm": {
       "title": "Kick <name>{{name}}</name> from the room?",
-      "lede": "This is a kick, not a ban — and <strong>{{name}}</strong> can rejoin any time. Their seat opens up right away, but it won't end the match in progress.",
+      "lede": "This is a kick, not a permanent ban — <strong>{{name}}</strong> can rejoin any time.",
       "confirm": "Kick",
       "cancel": "Cancel"
     },
     "kickedToast": "You were removed from room {{name}}",
-    "swapMode": {
-      "enter": "Pick a seat to swap with"
-    },
-    "leaveSeatLabel": "Leave seat (stay in room)",
     "promoteIconLabel": "Make {{username}} the host",
     "transferConfirm": {
       "title": "Transfer room ownership to another player?",
@@ -313,12 +290,11 @@
     "legendUs": "Us",
     "legendThem": "Them",
     "actionBarSwap": "Swap mode · pick a seat",
-    "actionBarWaiting": "Waiting for players · {{current}}/{{max}} seated",
     "actionBarFinishSwap": "Finish swap to start",
     "tip": {
       "unseated": "Take any seat to join — your partner sits diagonally across.",
       "owner": "Click a seated player, then another seat to swap them — or an empty seat to move them. Hover a player to kick or make host.",
-      "seated": "Settle in — chat lives in the bottom-right. Type /cc to clear it."
+      "seated": "Settle in — chat lives in the bottom-right. Type something."
     },
     "tableCenter": "Room",
     "seatTile": {
@@ -332,9 +308,6 @@
       "opponentSeat": "Opponent seat · open",
       "openSeat": "Open seat"
     }
-  },
-  "rules": {
-    "title": "Rules"
   },
   "legal": {
     "wipBadge": "Work in progress",
@@ -354,38 +327,26 @@
     "title": "Open rooms",
     "quickPlay": "Quick Play",
     "stats": {
-      "title": "Players",
-      "loading": "Loading…",
       "inLobby": "in lobby",
       "inRoom": "in a room",
       "inMatch": "playing",
-      "totalActive": "Total online",
-      "registered": "Registered",
-      "activeRatio": "Online / Registered",
-      "activeRatioValue": "{{active}} / {{registered}}",
       "online": "online"
     },
     "matchmaking": {
-      "finding": "Finding match…",
-      "cancel": "Cancel",
-      "failed": "Could not find a match — try again",
-      "alreadyInRoom": "You're already in a room — leave it first",
       "title": "Quick Play",
       "subtitle": "You'll be seated as soon as three other players are ready. The match starts the moment the last seat fills.",
-      "eyebrow": "Searching for opponents",
+      "eyebrow": "Searching for players",
       "elapsed": "elapsed",
       "seated": "{{found}} / 4 seated",
       "remaining": "{{count}} more to go",
-      "cancelQueue": "Cancel queue",
+      "cancelQueue": "Cancel search",
       "you": "You",
       "searching": "searching",
       "errors": {
-        "alreadyInRoom": "You are already in a room",
-        "generic": "Matchmaking failed. Try again."
+        "alreadyInRoom": "You are already in a room"
       }
     },
     "createRoomModal": {
-      "title": "Create a room",
       "roomName": "Room name",
       "roomNamePlaceholder": "Sunday Service…",
       "variant": "Variant",
@@ -396,7 +357,6 @@
       "timerRelaxed": "Relaxed",
       "timerPerMove": "Per move",
       "timerDuration": "Move duration",
-      "create": "Create room",
       "cancel": "Cancel",
       "errors": {
         "nameRequired": "Room name is required",
@@ -411,12 +371,10 @@
       "variantCroatia": "Croatian",
       "matchMode501": "501 points",
       "timerDurationSuffix": "seconds / move",
-      "timerDurationRange": "{{min}}s – {{max}}s",
       "submit": "Create room",
       "submitting": "Creating…",
       "preview": {
         "title": "Live preview · how the room appears in the lobby",
-        "placeholderName": "Untitled room",
         "joinLabel": "Join",
         "justNow": "just now",
         "codeLabel": "CODE",
@@ -428,8 +386,8 @@
       "timerDurationHint": "10–120s · default 30s",
       "nextSteps": {
         "title": "What happens next",
-        "step1": "You land in the new room as <strong>owner</strong> with seat 1.",
-        "step2": "Share the <code>CODE</code> with friends — or wait for the lobby list.",
+        "step1": "You land in the new room as <strong>host</strong> in seat 1.",
+        "step2": "Share the <code>CODE</code> with friends — or wait for them to find you in the lobby.",
         "step3": "Once all four seats are filled, you start the match."
       }
     },
@@ -465,7 +423,7 @@
     },
     "empty": {
       "title": "No open rooms match your filters",
-      "description": "Try clearing filters, hit Quick Play to drop into the next opening, or create a room and invite your friends.",
+      "description": "Try clearing filters, hit Quick Play, or create a room and invite your friends.",
       "clear": "Clear search"
     },
     "card": {
@@ -508,7 +466,6 @@
       "toggleClose": "Close match chat",
       "sendLabel": "Send message"
     },
-    "trump": "Trump: {{suit}}",
     "starting": "Match is starting…",
     "reconnecting": "Reconnecting to the game…",
     "noActiveMatch": "Match no longer active. Returning to lobby…",
@@ -590,7 +547,6 @@
     "belot": {
       "titleBelot": "Announce Belot?",
       "titleRebelot": "Announce Re-belot?",
-      "description": "You hold King and Queen of trump suit (+20 pts)",
       "subtitleBelot": "You hold the K and Q of trump. Announcing now grants +20. The Queen is the trick card.",
       "subtitleRebelot": "You hold the K and Q of trump. Announcing now grants +20. The King is the trick card.",
       "accentStripBelot": "Announcing Belot is your move — +20 to your team's score.",
@@ -599,10 +555,10 @@
       "announceRebelot": "Announce Re-belot +20",
       "decline": "Skip",
       "reveal": {
-        "belot": "Belot!",
-        "rebelot": "Re-belot!",
-        "titleBelot": "{{name}} announced belot",
-        "titleRebelot": "{{name}} announced re-belot",
+        "belot": "Belot",
+        "rebelot": "Re-belot",
+        "titleBelot": "{{name}} announced Belot.",
+        "titleRebelot": "{{name}} announced Re-belot.",
         "bonus": "+20 to your team's score",
         "dismiss": "Dismiss"
       }
@@ -614,8 +570,7 @@
       "illegalPlay": "That card cannot be played",
       "pauseExhausted": "You have already used your pause",
       "noActivePause": "You don't have an active pause",
-      "notRoomOwner": "Only the room owner can do this",
-      "playerDisconnected": "A player is disconnected"
+      "notRoomOwner": "Only the host can do this"
     },
     "timer": {
       "autoPlayed": "Auto-played: {{card}}",
@@ -627,7 +582,6 @@
       "heading": "Scoreboard",
       "tricks": "tricks",
       "trick": "trick",
-      "lastTrickBonus": "+{{amount}}",
       "thisHand": "this hand",
       "handLabel": "Hand {{hand}}",
       "handVariant": "Hand {{hand}} · {{variant}}"
@@ -646,7 +600,6 @@
       "lastTrickBonus": "Last Trick Bonus",
       "capotBonus": "Capot Bonus",
       "failedContract": "Failed Contract",
-      "failedContractDesc": "{{team}} failed — all points to {{otherTeam}}",
       "handTotal": "Hand Total",
       "matchTotal": "Match Score",
       "continue": "Continue"
@@ -728,12 +681,10 @@
       "waitingMessage": "The game is on hold while we wait for {{player}} to reconnect.",
       "waitingMessageMany": "The game is on hold while we wait for {{count}} players to reconnect.",
       "countdownLabel": "Time remaining",
-      "reconnected": "You have reconnected",
       "reconnectFailed": "Reconnection failed — the match may have ended",
       "matchAbandoned": "{{player}} disconnected — match ended",
       "matchAbandonedScores": "Final: Us {{us}} : Them {{them}}",
       "returningToLobby": "Returning to lobby…",
-      "statusBadge": "disconnected",
       "matchEnded": "Match has ended"
     },
     "hud": {
@@ -745,19 +696,7 @@
       "title": "Settings",
       "languageHeading": "Language",
       "close": "Close"
-    },
-    "rules": {
-      "title": "Match rules",
-      "close": "Close"
     }
-  },
-  "ws": {
-    "connecting": "Connecting…",
-    "authenticating": "Authenticating…",
-    "connected": "Connected",
-    "disconnected": "Disconnected",
-    "reconnecting": "Reconnecting…",
-    "authFailed": "Connection authentication failed"
   },
   "auth": {
     "languageSelector": {
@@ -840,13 +779,13 @@
     },
     "how": {
       "eyebrow": "Three steps to the first trick",
-      "title": "You're dealt in before the kettle boils.",
+      "title": "You're dealt in before the coffee cools.",
       "s1t": "Make a free account",
       "s1b": "Pick a name, no downloads. You're in the lobby in under a minute.",
       "s2t": "Take a seat",
       "s2b": "Hit Quick Play and we'll matchmake your four, or open a custom room and share the code with friends.",
       "s3t": "Call trump & play",
-      "s3b": "Bid for the trump suit, win tricks alongside your partner, and race your team to 1001 points."
+      "s3b": "Take the trump suit, win tricks alongside your partner, and race your team to 1001 points."
     },
     "feat": {
       "f1tag": "The lobby · live",
@@ -857,7 +796,7 @@
       "f2body": "Two against two, the way Beljot is built. Sit across from your partner, read the declarations, and play the long game to 1001. Built-in chat and emotes keep the table talking.",
       "f3tag": "Profile · match history",
       "f3title": "Every hand counts toward your record",
-      "f3body": "Track your games played, win rate and streak, with a full match history hand by hand. See who you win alongside and how tonight stacked up."
+      "f3body": "Track your matches played, win and loss rate, with a full match history hand by hand. See who you win alongside and how tonight stacked up."
     },
     "room": {
       "join": "Join",
@@ -879,9 +818,9 @@
       "games": "matches",
       "winrate": "win rate",
       "wins": "wins",
-      "recent": "Recent matches",
-      "won": "Won",
-      "lost": "Lost",
+      "recent": "Match history",
+      "won": "Win",
+      "lost": "Loss",
       "with": "with"
     },
     "cta": {

@@ -29,7 +29,7 @@ describe("BelotReveal", () => {
       />,
     );
     expect(screen.getByTestId("belot-reveal")).toBeInTheDocument();
-    expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent("Belot!");
+    expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent("Belot");
     expect(screen.getByTestId("playing-card-QC")).toBeInTheDocument();
   });
 
@@ -43,7 +43,7 @@ describe("BelotReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent("Re-belot!");
+    expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent("Re-belot");
     expect(screen.getByTestId("playing-card-KC")).toBeInTheDocument();
   });
 
@@ -95,7 +95,7 @@ describe("BelotReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent("Stefan announced re-belot");
+    expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent("Stefan announced Re-belot.");
   });
 
   it("falls back to the team label when players is not provided", () => {

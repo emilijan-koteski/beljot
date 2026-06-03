@@ -76,7 +76,7 @@ describe("MatchmakingDiagram", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /cancel queue/i }));
+    await user.click(screen.getByRole("button", { name: /cancel search/i }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });
