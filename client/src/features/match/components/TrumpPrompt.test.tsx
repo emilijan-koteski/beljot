@@ -80,7 +80,7 @@ describe("TrumpPrompt", () => {
     expect(screen.queryByTestId("trump-prompt-pass")).not.toBeInTheDocument();
   });
 
-  it("does not render the candidate card for round 2 non-active bidder", () => {
+  it("shows the candidate card to a round 2 non-active bidder but no pickable suit buttons", () => {
     render(
       <TrumpPrompt
         trumpCandidate={trumpCandidate}
@@ -90,10 +90,34 @@ describe("TrumpPrompt", () => {
         onPass={vi.fn()}
       />,
     );
-    // Non-active bidders see only the waiting indicator — no candidate card,
-    // no suit buttons, no PICK/PASS.
-    expect(screen.queryByTestId(/^playing-card-/)).not.toBeInTheDocument();
+    // Waiting players now see the candidate card so they know what the active
+    // bidder turned down — but never the interactive PICK/PASS suit buttons.
+    expect(screen.getByTestId("playing-card-KH")).toBeInTheDocument();
     expect(screen.queryByTestId("trump-prompt-suit-S")).not.toBeInTheDocument();
+  });
+
+  it("shows all four suit chips to a round 2 non-active bidder, candidate locked", () => {
+    render(
+      <TrumpPrompt
+        trumpCandidate={trumpCandidate}
+        biddingRound={2}
+        isActiveBidder={false}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+    // All four suits render so waiting players see the full set; the candidate
+    // (hearts) is shown disabled because it can't be picked in round 2.
+    expect(screen.getByTestId("trump-prompt-considering")).toBeInTheDocument();
+    expect(screen.getByTestId("trump-prompt-considering-S")).toBeInTheDocument();
+    expect(screen.getByTestId("trump-prompt-considering-D")).toBeInTheDocument();
+    expect(screen.getByTestId("trump-prompt-considering-C")).toBeInTheDocument();
+    const candidateChip = screen.getByTestId("trump-prompt-considering-H");
+    expect(candidateChip).toBeInTheDocument();
+    expect(candidateChip).toHaveAttribute("aria-disabled", "true");
+    expect(candidateChip).toHaveAttribute("data-locked", "true");
+    // The three pickable suits are not flagged locked.
+    expect(screen.getByTestId("trump-prompt-considering-S")).not.toHaveAttribute("data-locked");
   });
 
   it("shows all four suit buttons in round 2 for active bidder (candidate locked)", () => {

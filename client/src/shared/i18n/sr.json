@@ -75,6 +75,7 @@
       "vs": "&",
       "with": "sa",
       "versus": "protiv",
+      "and": "i",
       "you": "Ti",
       "teammate": "Saigrač",
       "opponents": "Protivnici",
@@ -117,8 +118,8 @@
           "notes": "Beleške"
         },
         "desc": {
-          "capot": "Kapot ruka",
-          "failed": "Ugovor pao",
+          "capot": "Kapot",
+          "failed": "Pali ugovor",
           "weCalled": "Mi smo uzeli adut",
           "theyCalled": "Oni su uzeli adut"
         },
@@ -558,8 +559,8 @@
       "roundLabel": "Krug {{round}} / 2",
       "pick": "Uzmi",
       "pass": "Dalje",
-      "waitingRound1": "Čeka se da {{name}} uzme adut ili propusti",
-      "waitingRound2": "Čeka se da {{name}} izabere boju ili propusti"
+      "waitingRound1": "Čeka se da <name>{{name}}</name> uzme adut ili propusti",
+      "waitingRound2": "Čeka se da <name>{{name}}</name> izabere boju ili propusti"
     },
     "deal": {
       "dealing": "Deljenje karata…"
@@ -652,8 +653,10 @@
     },
     "capot": {
       "title": "KAPOT!",
-      "eyebrow": "Svaki štih · {{team}} su pokupili sve",
-      "bonus": "+{{points}} za {{team}}"
+      "eyebrowUs": "Svaki štih · mi smo pokupili sve",
+      "eyebrowThem": "Svaki štih · oni su pokupili sve",
+      "bonusUs": "+{{points}} za nas",
+      "bonusThem": "+{{points}} za njih"
     },
     "matchResult": {
       "title": "Meč je završen",

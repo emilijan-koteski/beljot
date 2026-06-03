@@ -371,6 +371,7 @@ export function PlayerSeat({
             turnExpiresAt={turnExpiresAt ?? null}
             totalDuration={timerDuration ?? 0}
             secondsLeft={secondsLeft}
+            size={compact ? "seatCompact" : "seat"}
             hideLabel
           />
         )}

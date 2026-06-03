@@ -75,6 +75,7 @@
       "vs": "&",
       "with": "with",
       "versus": "vs",
+      "and": "and",
       "you": "You",
       "teammate": "Teammate",
       "opponents": "Opponents",
@@ -117,8 +118,8 @@
           "notes": "Notes"
         },
         "desc": {
-          "capot": "Capot hand",
-          "failed": "Contract failed",
+          "capot": "Capot",
+          "failed": "Failed contract",
           "weCalled": "We called trump",
           "theyCalled": "They called trump"
         },
@@ -558,8 +559,8 @@
       "roundLabel": "Round {{round}} / 2",
       "pick": "Take",
       "pass": "Pass",
-      "waitingRound1": "Waiting for {{name}} to take or pass the trump",
-      "waitingRound2": "Waiting for {{name}} to pick a suit or pass"
+      "waitingRound1": "Waiting for <name>{{name}}</name> to take or pass the trump",
+      "waitingRound2": "Waiting for <name>{{name}}</name> to pick a suit or pass"
     },
     "deal": {
       "dealing": "Dealing cards…"
@@ -652,8 +653,10 @@
     },
     "capot": {
       "title": "CAPOT!",
-      "eyebrow": "Every trick · {{team}} swept the hand",
-      "bonus": "+{{points}} to {{team}}"
+      "eyebrowUs": "Every trick · we swept the hand",
+      "eyebrowThem": "Every trick · they swept the hand",
+      "bonusUs": "+{{points}} to us",
+      "bonusThem": "+{{points}} to them"
     },
     "matchResult": {
       "title": "Match Complete",

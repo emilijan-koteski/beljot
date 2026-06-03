@@ -5,7 +5,7 @@ import { URGENT_FRACTION, useTurnCountdown } from "../lib/turnCountdown";
 interface TimerRingProps {
   turnExpiresAt: string | null;
   totalDuration: number; // total timer duration in seconds (for ring progress)
-  size?: "seat" | "button";
+  size?: "seat" | "seatCompact" | "button";
   /**
    * Suppress the inner seconds label. The ring still renders. Used by
    * [PlayerSeat] which displays the seconds outside the avatar (next to the
@@ -28,6 +28,10 @@ const SIZE_CONFIG = {
   // frame's box-shadow, this gives a 3-band stack: outer lime · gold ·
   // inner lime timer.
   seat: { px: 70, strokeWidth: 2.5, labelClass: "text-xs" },
+  // Phone seat: the avatar disc shrinks to 44px (frame 60px), so the ring
+  // shrinks to 50px to keep tracing *just inside* the team frame — the same
+  // proportion the 70px ring has inside the desktop 80px frame.
+  seatCompact: { px: 50, strokeWidth: 2, labelClass: "text-[10px]" },
   button: { px: 36, strokeWidth: 2, labelClass: "text-[10px]" },
 } as const;
 

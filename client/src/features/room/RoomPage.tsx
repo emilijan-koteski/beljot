@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import {
+  useJoinRoomMutation,
   useKickPlayerMutation,
   useLeaveRoomMutation,
   useLeaveSeatMutation,
@@ -100,6 +101,21 @@ function LegendIndicator({ variant }: { variant: "neutral" | "us" | "them" }) {
   );
 }
 
+// Leave the room in a way that survives a full document unload (typing a URL in
+// the address bar, refresh, tab close). React does NOT run effect cleanups on a
+// hard unload, so the unmount-cleanup leave below never fires and an in-flight
+// XHR would be aborted — leaving the player a member, which then blocks joining
+// any other room (ErrAlreadyInRoom). `keepalive` lets this POST outlive the
+// page; auth rides the same Bearer token axios uses (plus cookies, harmless).
+function sendLeaveBeacon(roomId: number, token: string) {
+  void fetch(`/api/v1/rooms/${roomId}/leave`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    keepalive: true,
+    credentials: "include",
+  }).catch(() => {});
+}
+
 export function RoomPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
@@ -121,6 +137,9 @@ export function RoomPage() {
 
   const hasLeftRef = useRef(false);
   const hasJoinedRef = useRef(false);
+  // Guards the deep-link auto-join below to a single attempt (the query data
+  // changes on refetch, and React StrictMode double-invokes effects in dev).
+  const joinAttemptedRef = useRef(false);
 
   // Owner-only transient UI state — kept local instead of pushed into a store
   // because nothing outside RoomPage cares about it.
@@ -136,6 +155,7 @@ export function RoomPage() {
   } | null>(null);
 
   // Mutations
+  const joinRoomMutation = useJoinRoomMutation();
   const selectSeatMutation = useSelectSeatMutation();
   const startGameMutation = useStartMatchMutation();
   const leaveRoomMutation = useLeaveRoomMutation();
@@ -157,6 +177,49 @@ export function RoomPage() {
       }
     }
   }, [roomQuery.data]);
+
+  // Deep-link / direct-URL entry: reaching this page without going through the
+  // lobby's "Join" means the server has no membership row for us, so seat
+  // selection is rejected (ErrNotInRoom) and we receive no room WS broadcasts —
+  // the page looks dead, you can only leave. When the fetched room shows we are
+  // NOT yet a member of an open (waiting, non-quick-play) room, join it here —
+  // mirroring what the lobby's Join does — then refetch to pick up membership.
+  useEffect(() => {
+    if (!roomQuery.isSuccess || !roomQuery.data || !id) return;
+    if (joinAttemptedRef.current) return;
+    const { room, players } = roomQuery.data;
+    const userId = useAuthStore.getState().user?.id;
+    if (!userId) return;
+    // Already a member (arrived via lobby / already seated) — nothing to do.
+    if (players.some((p) => p.userId === userId)) return;
+    // Quick-play rooms redirect to /matchmaking; closed / in-progress rooms are
+    // handled by their own guards. Only a joinable waiting room is auto-joined.
+    if (room.isQuickPlay || room.status !== "waiting") return;
+
+    joinAttemptedRef.current = true;
+    joinRoomMutation
+      .mutateAsync(Number(id))
+      .then(() => {
+        hasJoinedRef.current = true;
+        void roomQuery.refetch();
+      })
+      .catch((err) => {
+        const code = err instanceof FetchError ? err.code : null;
+        // ALREADY_IN_ROOM: a membership exists after all (e.g. another tab) —
+        // resync from the server rather than bouncing to the lobby.
+        if (code === "ALREADY_IN_ROOM") {
+          hasJoinedRef.current = true;
+          void roomQuery.refetch();
+          return;
+        }
+        hasLeftRef.current = true; // suppress the unmount cleanup-leave
+        toast.error(
+          code === "ROOM_FULL" ? t("lobby.errors.roomFull") : t("lobby.errors.joinFailed"),
+        );
+        navigate("/lobby", { replace: true });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomQuery.isSuccess, roomQuery.data, id]);
 
   // Quick-play rooms have their own dedicated matchmaking screen — a deep link
   // or refresh that lands here must redirect to /matchmaking/:id. Gate on the
@@ -251,7 +314,10 @@ export function RoomPage() {
     };
   }, [id]);
 
-  // Leave room on unmount if player joined and hasn't explicitly left
+  // Leave room on unmount if player joined and hasn't explicitly left.
+  // NOTE: this covers SPA navigation only — a hard unload (address-bar nav to
+  // /lobby, refresh, tab close) does NOT run React cleanups; the `pagehide`
+  // handler below covers that case with a keepalive request.
   useEffect(() => {
     return () => {
       if (id && hasJoinedRef.current && !hasLeftRef.current) {
@@ -259,6 +325,21 @@ export function RoomPage() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Hard unload (typing a URL, refresh, tab close): fire a keepalive leave so
+  // the membership doesn't linger and trap the user "in a room". On a refresh
+  // the deep-link auto-join above re-establishes membership when the room page
+  // reloads, so this only sticks when the user actually navigates away.
+  useEffect(() => {
+    const onPageHide = () => {
+      if (id && hasJoinedRef.current && !hasLeftRef.current) {
+        const token = useAuthStore.getState().token;
+        if (token) sendLeaveBeacon(Number(id), token);
+      }
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
   }, [id]);
 
   // `justCopied` flips the copy-code button into a transient success state
@@ -542,26 +623,35 @@ export function RoomPage() {
   // viewer is "Us". `slotLabel` returns null for an empty (still "open") seat.
   const yourPair = viewerSeat !== null && viewerSeat % 2 === 0 ? [0, 2] : [1, 3];
   const otherPair = yourPair[0] === 0 ? [1, 3] : [0, 2];
-  // Render a diagonal pair's two seats as " name + name " — your own seat reads
-  // "you" (accent), an empty seat reads a blinking "open".
+  // Render a diagonal pair's two seats as "(name + name)" — your own seat reads
+  // "you" (accent), an empty seat reads a blinking "open". The parentheses
+  // bracket the pair so the legend reads "Us (you + open) vs Them (open + open)".
   const renderSlots = (pair: number[]) => (
-    <span className="text-ink-mute inline-flex flex-wrap items-center gap-1">
-      {pair.map((seatIndex, i) => {
-        const p = getPlayerAtSeat(players, seatIndex);
-        const isYouSlot = p?.userId === currentUser?.id;
-        return (
-          <span key={seatIndex} className="inline-flex items-center gap-1">
-            {i > 0 && <span className="text-ink-off">+</span>}
-            {p ? (
-              <span className={isYouSlot ? "text-accent font-semibold" : "text-ink-dim"}>
-                {isYouSlot ? t("room.seatYouInline") : p.username}
-              </span>
-            ) : (
-              <span className="text-ink-mute animate-pulse">{t("room.legendOpen")}</span>
-            )}
-          </span>
-        );
-      })}
+    <span className="text-ink-mute inline-flex flex-wrap items-center">
+      <span className="text-ink-off" aria-hidden>
+        (
+      </span>
+      <span className="inline-flex flex-wrap items-center gap-1">
+        {pair.map((seatIndex, i) => {
+          const p = getPlayerAtSeat(players, seatIndex);
+          const isYouSlot = p?.userId === currentUser?.id;
+          return (
+            <span key={seatIndex} className="inline-flex items-center gap-1">
+              {i > 0 && <span className="text-ink-off">+</span>}
+              {p ? (
+                <span className={isYouSlot ? "text-accent font-semibold" : "text-ink-dim"}>
+                  {isYouSlot ? t("room.seatYouInline") : p.username}
+                </span>
+              ) : (
+                <span className="text-ink-mute animate-pulse">{t("room.legendOpen")}</span>
+              )}
+            </span>
+          );
+        })}
+      </span>
+      <span className="text-ink-off" aria-hidden>
+        )
+      </span>
     </span>
   );
 

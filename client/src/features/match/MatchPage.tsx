@@ -1038,6 +1038,25 @@ export function MatchPage() {
   // Deal animation state
   const isDealingPhase = matchState.phase === "dealing";
 
+  // Emote bubbles are suppressed while an overlay or pause owns the screen; the
+  // store still records the latest emote so re-emergence renders the live one.
+  const emotesVisible =
+    matchEndData === null &&
+    matchAbandonedData === null &&
+    matchState.phase !== "paused" &&
+    matchState.phase !== "disconnected";
+
+  // Surrender "opponent is proposing" banner — shown to the opposing team while
+  // a proposal is pending. Anchored to the proposer's seat (compass 1 or 3 in
+  // practice). On phones it renders inside that seat's wrapper (avatar-anchored,
+  // below); on desktop it's the standalone viewport-anchored layer.
+  const showSurrenderBanner =
+    isOpponentOfProposer &&
+    myPlayerSeat !== null &&
+    surrenderProposerSeat !== null &&
+    matchEndData === null &&
+    matchAbandonedData === null;
+
   return (
     <div
       className="game-table h-screen w-screen overflow-hidden relative bg-background"
@@ -1101,6 +1120,13 @@ export function MatchPage() {
           matchState.trumpCallerSeat === player.seat &&
           matchState.trumpSuit !== null;
 
+        // Phone: the emote bubble is anchored to this seat's avatar (rendered
+        // inside the positioned seat wrapper), not viewport-offset like
+        // desktop — so it stays beside the seat wherever the compact layout
+        // parks it. Desktop keeps the standalone viewport-anchored layer below.
+        const emoteSlot =
+          isCompactTable && emotesVisible ? activeEmotes[player.seat as 0 | 1 | 2 | 3] : null;
+
         return (
           <div
             key={player.seat}
@@ -1124,6 +1150,22 @@ export function MatchPage() {
               orientation={SEAT_ORIENTATIONS[compass]}
               compact={isCompactTable}
             />
+            {emoteSlot && (
+              <EmoteBubble
+                key={`emote-${player.seat}-${emoteSlot.receivedAt}`}
+                emote={emoteSlot.emote}
+                compassPosition={compass as 0 | 1 | 2 | 3}
+                compact
+                onDismiss={() => setActiveEmote(player.seat, null)}
+              />
+            )}
+            {isCompactTable && showSurrenderBanner && player.seat === surrenderProposerSeat && (
+              <SurrenderOpponentBanner
+                proposerUsername={proposerUsername}
+                compassPosition={compass as 0 | 1 | 2 | 3}
+                compact
+              />
+            )}
           </div>
         );
       })}
@@ -1353,19 +1395,17 @@ export function MatchPage() {
         />
       )}
 
-      {/* Surrender opponent banner — non-modal status strip anchored to the
-          proposer's seat (same per-seat pattern as EmoteBubble). Same overlay
-          gate as the prompt. */}
-      {isOpponentOfProposer &&
-        myPlayerSeat !== null &&
-        surrenderProposerSeat !== null &&
-        matchEndData === null &&
-        matchAbandonedData === null && (
-          <SurrenderOpponentBanner
-            proposerUsername={proposerUsername}
-            compassPosition={compassOffset(surrenderProposerSeat, myPlayerSeat) as 0 | 1 | 2 | 3}
-          />
-        )}
+      {/* Surrender opponent banner (desktop) — non-modal status strip
+          viewport-anchored beside the proposer's seat. On phones it's rendered
+          inside the proposer's seat wrapper instead (avatar-anchored, above),
+          so this standalone layer is desktop-only. Same overlay gate as the
+          prompt. */}
+      {!isCompactTable && showSurrenderBanner && surrenderProposerSeat !== null && (
+        <SurrenderOpponentBanner
+          proposerUsername={proposerUsername}
+          compassPosition={compassOffset(surrenderProposerSeat, myPlayerSeat) as 0 | 1 | 2 | 3}
+        />
+      )}
 
       {/* Pause overlay */}
       {isPaused && (
@@ -1438,6 +1478,11 @@ export function MatchPage() {
               activePlayerName={
                 matchState.players.find((p) => p.seat === matchState.activePlayerSeat)?.username ??
                 null
+              }
+              activePlayerTeam={
+                matchState.activePlayerSeat !== null
+                  ? seatTeam(matchState.activePlayerSeat, myPlayerSeat)
+                  : null
               }
               onPick={handlePickTrump}
               onPass={handlePassTrump}
@@ -1522,13 +1567,12 @@ export function MatchPage() {
       {/* Match chat dock — bottom-right floating window broadcasting to the 4 participants */}
       <MatchChatDock isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
 
-      {/* Emote bubbles — one per seat that has an active emote. Suppressed
-          when an overlay or pause owns the screen; the store still records
-          the latest emote so that re-emergence renders the next live one. */}
-      {matchEndData === null &&
-        matchAbandonedData === null &&
-        matchState.phase !== "paused" &&
-        matchState.phase !== "disconnected" &&
+      {/* Emote bubbles (desktop) — one per seat that has an active emote,
+          viewport-anchored beside each seat. On phones the bubble is rendered
+          inside the seat wrapper instead (anchored to the avatar), so this
+          standalone layer is desktop-only. */}
+      {!isCompactTable &&
+        emotesVisible &&
         matchState.players.map((player) => {
           const slot = activeEmotes[player.seat as 0 | 1 | 2 | 3];
           if (slot === null) return null;

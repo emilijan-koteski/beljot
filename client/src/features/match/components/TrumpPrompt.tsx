@@ -1,8 +1,9 @@
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import type { Card, Suit } from "@/shared/types/matchTypes";
 
+import { type SeatTeam, teamColors } from "../lib/tableTheme";
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
@@ -15,6 +16,12 @@ interface TrumpPromptProps {
   isActiveBidder: boolean;
   /** Username of the player currently deciding trump — shown to everyone else. */
   activePlayerName?: string | null;
+  /**
+   * Viewer-relative team of the player currently deciding trump. Colors their
+   * name in the waiting banner — gold for you/your partner, silver for the
+   * opponents — so waiting players can read at a glance whose decision it is.
+   */
+  activePlayerTeam?: SeatTeam | null;
   onPick: (suit?: Suit) => void;
   onPass: () => void;
   turnExpiresAt?: string | null;
@@ -45,6 +52,7 @@ export function TrumpPrompt({
   biddingRound,
   isActiveBidder,
   activePlayerName,
+  activePlayerTeam,
   onPick,
   onPass,
   turnExpiresAt,
@@ -55,13 +63,25 @@ export function TrumpPrompt({
   const showRing = isActiveBidder && Boolean(turnExpiresAt) && (timerDurationSec ?? 0) > 0;
 
   if (!isActiveBidder) {
+    // The active bidder's name is bolded in their viewer-relative team color
+    // (gold = you/partner, silver = opponents). `opacity` would dim the whole
+    // line including the name, so the surrounding copy uses a translucent ink
+    // *color* instead — keeping the team-colored name at full strength.
+    const nameColor = activePlayerTeam
+      ? teamColors(activePlayerTeam)[0]
+      : "var(--ink-light, #f5f2e8)";
+    // Round 2: surface all four suits as little parchment "suit chips" beside
+    // the copy. The candidate suit is shown muted/disabled (it can't be picked
+    // in round 2) — mirroring the active bidder's locked tile — so waiting
+    // players see the full set and which suit is off the table.
+
     return (
       <div
         className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
         data-testid="trump-prompt"
       >
         <div
-          className="mx-4 max-w-[20rem] rounded-lg px-4 py-3 md:max-w-none"
+          className="mx-4 flex max-w-[24rem] items-center gap-3 rounded-lg px-4 py-3"
           style={{
             background: "var(--panel-dark, rgba(20,45,30,0.85))",
             border: "1px solid rgba(201,168,118,0.4)",
@@ -69,14 +89,62 @@ export function TrumpPrompt({
             WebkitBackdropFilter: "blur(8px)",
           }}
         >
-          <p
-            className="font-body text-sm text-center"
-            style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.85 }}
-          >
-            {biddingRound === 1
-              ? t("match.trumpPrompt.waitingRound1", { name: activePlayerName ?? "" })
-              : t("match.trumpPrompt.waitingRound2", { name: activePlayerName ?? "" })}
-          </p>
+          {trumpCandidate && (
+            // shrink-0 so the flex row can't squash the card narrower than its
+            // 44×64 footprint — without it the card compresses to ~32px wide,
+            // stretching the aspect ratio and overflowing the centred pip.
+            <div className="shrink-0">
+              <PlayingCard card={trumpCandidate} state="default" size="sm" withTransition={false} />
+            </div>
+          )}
+          <div className="flex min-w-0 flex-col gap-2">
+            <p
+              className="font-body text-sm leading-snug"
+              style={{ color: "rgba(245,242,232,0.85)" }}
+            >
+              <Trans
+                i18nKey={
+                  biddingRound === 1
+                    ? "match.trumpPrompt.waitingRound1"
+                    : "match.trumpPrompt.waitingRound2"
+                }
+                values={{ name: activePlayerName ?? "" }}
+                components={{ name: <strong style={{ color: nameColor, fontWeight: 700 }} /> }}
+              />
+            </p>
+            {biddingRound === 2 && trumpCandidate && (
+              <div className="flex items-center gap-1.5" data-testid="trump-prompt-considering">
+                {SUITS.map((suit) => {
+                  const isLocked = suit === trumpCandidate.suit;
+                  return (
+                    <span
+                      key={suit}
+                      aria-label={t(`match.suits.${suitName(suit)}`)}
+                      aria-disabled={isLocked}
+                      data-locked={isLocked ? "true" : undefined}
+                      data-testid={`trump-prompt-considering-${suit}`}
+                      className="inline-flex shrink-0 items-center justify-center rounded-[5px]"
+                      style={{
+                        width: 22,
+                        height: 30,
+                        background: "linear-gradient(180deg, #fdfaf0 0%, #f4ecd8 100%)",
+                        border: "1px solid rgba(0,0,0,0.15)",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
+                        color: SUIT_COLOR[suit],
+                        fontFamily: "var(--font-suit)",
+                        fontSize: 15,
+                        lineHeight: 1,
+                        opacity: isLocked ? 0.4 : 1,
+                        filter: isLocked ? "grayscale(0.85)" : undefined,
+                      }}
+                    >
+                      <span aria-hidden="true">{SUIT_SYMBOL[suit]}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION, motionDuration } from "@/shared/lib/motion";
 
-import { seatTeam, teamColors, teamLabelKey } from "../lib/tableTheme";
+import { seatTeam, teamColors } from "../lib/tableTheme";
 
 interface CapotAnimationProps {
   /** Absolute capot team (0 = team A, 1 = team B). */
@@ -50,7 +50,11 @@ export function CapotAnimation({
 
   const team = seatTeam(capotTeam, viewerSeat);
   const [bright] = teamColors(team);
-  const teamLabel = t(teamLabelKey(team));
+  // Grammar is viewer-relative: when the viewer's own team swept ("gold") the
+  // copy reads first-person ("we swept" / "to us"); the opponents read
+  // third-person. A single {{team}} label can't carry verb agreement or noun
+  // case across languages, so each perspective gets its own string.
+  const isUs = team === "gold";
 
   return (
     <div
@@ -80,7 +84,7 @@ export function CapotAnimation({
             marginBottom: 12,
           }}
         >
-          {t("match.capot.eyebrow", { team: teamLabel })}
+          {isUs ? t("match.capot.eyebrowUs") : t("match.capot.eyebrowThem")}
         </div>
 
         <h1
@@ -130,7 +134,9 @@ export function CapotAnimation({
               boxShadow: `0 0 8px ${bright}`,
             }}
           />
-          {t("match.capot.bonus", { points: capotBonus, team: teamLabel })}
+          {isUs
+            ? t("match.capot.bonusUs", { points: capotBonus })
+            : t("match.capot.bonusThem", { points: capotBonus })}
         </div>
       </div>
     </div>

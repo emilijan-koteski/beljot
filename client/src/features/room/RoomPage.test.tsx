@@ -26,6 +26,7 @@ vi.mock("react-router", async () => {
 // Mock API
 vi.mock("@/shared/api/rooms", () => ({
   getRoom: vi.fn(),
+  joinRoom: vi.fn(),
   leaveRoom: vi.fn(),
   selectSeat: vi.fn(),
   startMatch: vi.fn(),
@@ -53,6 +54,7 @@ import { toast } from "sonner";
 
 import {
   getRoom,
+  joinRoom,
   kickPlayer,
   leaveRoom,
   leaveSeat,
@@ -63,6 +65,7 @@ import {
 } from "@/shared/api/rooms";
 
 const mockGetRoom = vi.mocked(getRoom);
+const mockJoinRoom = vi.mocked(joinRoom);
 const mockLeaveRoom = vi.mocked(leaveRoom);
 const mockSelectSeat = vi.mocked(selectSeat);
 const mockStartGame = vi.mocked(startMatch);
@@ -108,6 +111,7 @@ const defaultUser = {
 
 beforeEach(() => {
   mockLeaveRoom.mockResolvedValue(undefined);
+  mockJoinRoom.mockResolvedValue(defaultRoom);
   // jsdom has no scrollIntoView — the nested ChatDock calls it on mount.
   Element.prototype.scrollIntoView = vi.fn();
   // jsdom has no matchMedia — RoomPage reads `prefers-reduced-motion` to
@@ -265,6 +269,78 @@ describe("RoomPage", () => {
 
     expect(mockLeaveRoom).toHaveBeenCalledWith(1);
     expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+  });
+
+  it("auto-joins when arriving via direct URL as a non-member (deep link)", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+
+    // Viewer alice (id 10) is NOT among the players — she pasted the room URL
+    // directly instead of going through the lobby's Join, so she never became
+    // a member. Without auto-join the server rejects seat selection with
+    // ErrNotInRoom and sends her no room WS events.
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, ownerId: 20, playerCount: 1 },
+      players: [
+        { id: 1, roomId: 1, userId: 20, username: "bob", seat: 0, team: "teamA", createdAt: "" },
+      ],
+    });
+    mockJoinRoom.mockResolvedValue({ ...defaultRoom, ownerId: 20, playerCount: 2 });
+
+    renderRoomPage();
+
+    await waitFor(() => {
+      expect(mockJoinRoom).toHaveBeenCalledWith(1);
+    });
+  });
+
+  it("does not auto-join when the viewer is already a member", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1 },
+      players: [
+        { id: 1, roomId: 1, userId: 10, username: "alice", seat: 0, team: "teamA", createdAt: "" },
+      ],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("room-page")).toBeInTheDocument();
+    });
+    expect(mockJoinRoom).not.toHaveBeenCalled();
+  });
+
+  it("sends a keepalive leave on hard page unload (direct URL navigation) when a member", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1 },
+      players: [
+        { id: 1, roomId: 1, userId: 10, username: "alice", seat: 0, team: "teamA", createdAt: "" },
+      ],
+    });
+
+    const fetchSpy = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("fetch", fetchSpy);
+
+    renderRoomPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("room-page")).toBeInTheDocument();
+    });
+
+    // A hard navigation (typing /lobby in the address bar, refresh, tab close)
+    // unloads the document — React never runs the unmount-cleanup leave, so the
+    // leave must go out via a keepalive request fired on `pagehide`.
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/rooms/1/leave"),
+      expect.objectContaining({ method: "POST", keepalive: true }),
+    );
+
+    vi.unstubAllGlobals();
   });
 
   it("displays loading skeleton while fetching", () => {
