@@ -31,7 +31,7 @@ so that I can play in my native language.
     - declarations → `зови` (the canonical Belot term — same role as Serbian `Zvanja`)
     - hand / deal → `делење`
     - bidder / pass → `налогодавач` / `даље`
-    - belot / re-belot → `белот` / `ре-белот`
+    - belote / rebelote → `белот` / `ре-белот`
     - capot → `капот` (uppercase in `game.capot.title` → `КАПОТ!`)
     - team Us / Them → `Ние` / `Тие`
     - suits — Cyrillic German-deck names: `Пик` (spades), `Херц` (hearts), `Каро` (diamonds), `Спато` (clubs). Note: clubs is the one suit where MK diverges from SR/HR — Macedonian uses `Спато`, while Serbian/Croatian use `Tref`. (Corrected 2026-05-09 during code review; the original value in mk.json was `Треф`, a Serbian carryover.)
@@ -46,7 +46,7 @@ so that I can play in my native language.
     - declarations → `zvanja`
     - hand / deal → `dijeljenje`
     - bidder / pass → `licitator` / `dalje`
-    - belot / re-belot → `belot` / `re-belot`
+    - belote / rebelote → `belot` / `re-belot`
     - capot → `kapot` (uppercase in `game.capot.title` → `KAPOT!`)
     - team Us / Them → `Mi` / `Oni`
     - suits — German-deck names: `Pik`, `Herc`, `Karo`, `Tref` (same as SR)

@@ -52,7 +52,7 @@ so that we can end a hopeless game without grinding it out to 1001.
      And the session manager broadcasts (separate ordered messages):
    - `event:surrender_declined` with `SurrenderDeclinedPayload{ proposerSeat, decliningSeat }` to all 4 player WS connections.
    - `event:game_state` with the cleared `pendingSurrenderProposerSeat`.
-     And the per-move turn timer is **not reset** by decline — whatever time the active player had left when the proposal opened is still ticking down (same lock-step semantics as Belot accept/decline today: Belot decline does not bump the active player's timer either).
+     And the per-move turn timer is **not reset** by decline — whatever time the active player had left when the proposal opened is still ticking down (same lock-step semantics as Belote accept/decline today: Belote decline does not bump the active player's timer either).
      And the partner can decline even if they themselves have already used their own surrender attempt (`gs.SurrenderUsed[partnerSeat] == true`) — surrender_used controls the **request** action, not the **decline** action.
 
 4. **Match record is persisted with surrender outcome**

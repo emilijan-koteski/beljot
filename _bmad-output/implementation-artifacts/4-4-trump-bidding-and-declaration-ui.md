@@ -20,7 +20,7 @@ So that I can make game-critical decisions confidently without confusion.
 
 5. **AC 4.4.5 — Permanent Trump Suit Indicator:** Given trump has been selected, when play begins, then a permanent trump suit indicator appears in the HUD (accent-colored suit icon) and remains visible for the entire hand.
 
-6. **AC 4.4.6 — DeclarationPrompt Rendering:** Given the game is at trick 1 and a player holds a declarable combination, when the DeclarationPrompt renders, then it shows the declaration type and value (e.g., "Sequence of 4 — 50 pts") with DECLARE (primary) and SKIP (ghost) buttons. The prompt must be resolved before card play is enabled for that player's turn.
+6. **AC 4.4.6 — DeclarationPrompt Rendering:** Given the game is at trick 1 and a player holds a declarable combination, when the DeclarationPrompt renders, then it shows the declaration type and value (e.g., "Quarte — 50 pts") with DECLARE (primary) and SKIP (ghost) buttons. The prompt must be resolved before card play is enabled for that player's turn.
 
 7. **AC 4.4.7 — Declaration Resolution Animation:** Given declarations are resolved at the end of trick 1, when the winning declaration is determined, then the winning declaration value floats up with a brief animation and is logged in the ScorePanel.
 
@@ -70,7 +70,7 @@ So that I can make game-critical decisions confidently without confusion.
 - [x] Task 5: DeclarationPrompt Component (AC: 6)
   - [x] 5.1 Create `DeclarationPrompt.tsx` in `client/src/features/game/components/`
   - [x] 5.2 Render centered overlay (`surface-elevated` bg, 24px padding, max 480px wide)
-  - [x] 5.3 Show declaration type and value (e.g., "Sequence of 4 — 50 pts") using Space Grotesk for values
+  - [x] 5.3 Show declaration type and value (e.g., "Quarte — 50 pts") using Space Grotesk for values
   - [x] 5.4 Render DECLARE button (primary/accent) and SKIP button (ghost) using shadcn Button
   - [x] 5.5 Block card play until prompt is resolved (no backdrop-click dismiss)
   - [x] 5.6 Show only when `gameState.awaitingDeclaration === true` AND `activePlayerSeat === myPlayerSeat`
@@ -91,10 +91,10 @@ So that I can make game-critical decisions confidently without confusion.
 - [x] Task 7: BelotPrompt Component (implicit from rules engine)
   - [x] 7.1 Create `BelotPrompt.tsx` in `client/src/features/game/components/`
   - [x] 7.2 Detect when player is playing K or Q of trump while holding both — server signals via `awaitingBelot` field in GameState (add `awaitingBelot: boolean` to `GameState` in `gameTypes.ts` if missing)
-  - [x] 7.3 Show "Announce Belot?" with ANNOUNCE (primary) and SKIP (ghost) buttons
+  - [x] 7.3 Show "Announce Belote?" with ANNOUNCE (primary) and SKIP (ghost) buttons
   - [x] 7.4 ANNOUNCE sends `ACTION_ANNOUNCE_BELOT`; SKIP sends `ACTION_DECLINE_BELOT`
-  - [x] 7.5 Display Belot announcement to all players when `EVENT_BELOT_ANNOUNCED` received
-  - [x] 7.6 Add i18n keys for Belot prompt and announcement text
+  - [x] 7.5 Display Belote announcement to all players when `EVENT_BELOT_ANNOUNCED` received
+  - [x] 7.6 Add i18n keys for Belote prompt and announcement text
   - [x] 7.7 Write co-located tests: `BelotPrompt.test.tsx`
 
 - [x] Task 8: GamePage Integration
@@ -171,9 +171,9 @@ So that I can make game-critical decisions confidently without confusion.
 
 - Declarations detected server-side via `checkDeclarationPrompt()` after trump is picked and after each card play in trick 1
 - Server sets `awaitingDeclaration = true` in GameState when active player has declarable combinations
-- Types: sequences (3+ consecutive same suit) and four-of-a-kind
+- Types: sequences (3+ consecutive same suit) and carré
 - Resolution at end of trick 1: highest declaration wins; winning team scores all their declarations, losing team's cleared
-- Belot (K+Q of trump): announced when playing either card if player holds both; server tracks via `awaitingBelot`
+- Belote (K+Q of trump): announced when playing either card if player holds both; server tracks via `awaitingBelot`
 
 ### Card Display Mapping
 

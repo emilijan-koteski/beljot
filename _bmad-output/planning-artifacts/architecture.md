@@ -751,7 +751,7 @@ beljot/
     │   │   ├── rules_engine.go            # ★ Pure function: ApplyAction(state, action) → (state, error)
     │   │   ├── bidding.go                 # Trump bidding logic per variant
     │   │   ├── declarations.go            # Declaration detection + resolution
-    │   │   ├── scoring.go                 # Card points, last trick, Capot, failed contracts
+    │   │   ├── scoring.go                 # Card points, last trick, Capot, failed hands
     │   │   ├── validation.go              # Legal move checking (suit-following, trump obligations)
     │   │   ├── auto_play.go              # Timer expiry: select first legal card by suit/rank
     │   │   ├── testfixtures/

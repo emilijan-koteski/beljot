@@ -27,7 +27,7 @@ so that scoring feels transparent, accurate, and satisfying.
 3. **Score Reveal After Hand Completion**
    Given all 8 tricks in a hand are complete,
    When the score reveal phase begins,
-   Then a dedicated ScoreReveal overlay expands showing: points per team (card points, declaration points, last-trick bonus), any failed contract adjustment, and updated match totals,
+   Then a dedicated ScoreReveal overlay expands showing: points per team (card points, declaration points, last-trick bonus), any failed hand adjustment, and updated match totals,
    And numbers animate in sequentially for theatrical effect,
    And a "Continue" action becomes available after 2 seconds.
 
@@ -70,10 +70,10 @@ so that scoring feels transparent, accurate, and satisfying.
   - [x] 3.4 Update `MatchEndPayload` in `wsEvents.ts` with `matchDurationSec: number` — SAME COMMIT
 
 - [x] Task 4: Backend tests (AC: #3, #4, #5)
-  - [x] 4.1 Add scoring tests in `scoring_test.go` (if exists) or through `ApplyAction` in existing test file — verify `LastHandResult` is populated correctly for: normal hand, failed contract, capot, match-end
+  - [x] 4.1 Add scoring tests in `scoring_test.go` (if exists) or through `ApplyAction` in existing test file — verify `LastHandResult` is populated correctly for: normal hand, failed hand, capot, match-end
   - [x] 4.2 Verify `LastHandResult.TeamAHandTotal + TeamBHandTotal` equals the actual points added to `TeamScores`
   - [x] 4.3 Verify capot scenario: `LastHandResult.Capot == true`, `CapotTeam` set correctly, bonus is 100 (not 10)
-  - [x] 4.4 Verify failed contract: `LastHandResult.FailedContract == true`, contracting team total is 0, opposing team gets all
+  - [x] 4.4 Verify failed hand: `LastHandResult.FailedContract == true`, the taker's team total is 0, opposing team gets all
   - [x] 4.5 Update `manager_test.go` — verify `EVENT_HAND_SCORED` payload contains all new fields
   - [x] 4.6 Update `manager_test.go` — verify `EVENT_MATCH_END` payload contains `matchDurationSec`
 
@@ -108,14 +108,14 @@ so that scoring feels transparent, accurate, and satisfying.
     - Last-trick bonus: "+10" to winning team (only if not capot)
     - Capot bonus: "+100" to winning team (only if capot)
     - Divider line
-    - Failed contract indicator (if `failedContract === true`): "Failed contract — [Team] scores 0, all points to [Other Team]"
+    - Failed hand indicator (if `failedContract === true`): "Failed hand — [Team] scores 0, all points to [Other Team]"
     - Hand totals: Team A vs Team B (after adjustment)
     - Match totals: Team A vs Team B (bold, larger)
   - [x] 7.5 Sequential animation: each row animates in with 200ms stagger delay, numbers use counter animation (300ms)
   - [x] 7.6 "Continue" button: primary style (`bg-accent text-background`), disabled for first 2 seconds, then enabled
   - [x] 7.7 All animations respect `prefers-reduced-motion` — stagger reduces to 0, counters instant
   - [x] 7.8 `data-testid="score-reveal"` and sub-testids for each row
-  - [x] 7.9 Create `ScoreReveal.test.tsx` — renders breakdown, Continue button disabled then enabled, failed contract display, capot display, reduced motion
+  - [x] 7.9 Create `ScoreReveal.test.tsx` — renders breakdown, Continue button disabled then enabled, failed hand display, capot display, reduced motion
 
 - [x] Task 8: Frontend — CapotAnimation component (AC: #4)
   - [x] 8.1 Create `CapotAnimation.tsx` in `features/game/components/`
@@ -161,7 +161,7 @@ so that scoring feels transparent, accurate, and satisfying.
     - `game.scoreReveal.declarationPoints`: "Declarations"
     - `game.scoreReveal.lastTrickBonus`: "Last Trick Bonus"
     - `game.scoreReveal.capotBonus`: "Capot Bonus"
-    - `game.scoreReveal.failedContract`: "Failed Contract"
+    - `game.scoreReveal.failedContract`: "Failed hand"
     - `game.scoreReveal.failedContractDesc`: "{{team}} failed — all points to {{otherTeam}}"
     - `game.scoreReveal.handTotal`: "Hand Total"
     - `game.scoreReveal.matchTotal`: "Match Total"
@@ -181,7 +181,7 @@ so that scoring feels transparent, accurate, and satisfying.
     - `game.scoreReveal.declarationPoints`: "Zvanja"
     - `game.scoreReveal.lastTrickBonus`: "Bonus poslednje ruke"
     - `game.scoreReveal.capotBonus`: "Kapot bonus"
-    - `game.scoreReveal.failedContract`: "Pao ugovor"
+    - `game.scoreReveal.failedContract`: "Pala ruka"
     - `game.scoreReveal.failedContractDesc`: "{{team}} pao — svi bodovi za {{otherTeam}}"
     - `game.scoreReveal.handTotal`: "Ukupno ruka"
     - `game.scoreReveal.matchTotal`: "Ukupno mec"
@@ -202,7 +202,7 @@ so that scoring feels transparent, accurate, and satisfying.
 ### Review Findings
 
 - [x] [Review][Patch] P1-HIGH: ScoreReveal stagger animation non-functional — `delay` prop silently dropped in `ScoreRow` [ScoreReveal.tsx:163] — FIXED: wired delay into ScoreRow destructuring + applied as animationDelay style
-- [x] [Review][Patch] P2-HIGH: ScorePanel float-up hardcodes "+10" — wrong for capot/failed-contract; also missing i18n key `game.score.lastTrickBonus` [ScorePanel.tsx:90] — FIXED: bonus now driven by lastTrickBonus/lastTrickTeam props from scoreRevealData; i18n key added
+- [x] [Review][Patch] P2-HIGH: ScorePanel float-up hardcodes "+10" — wrong for capot/failed-hand; also missing i18n key `game.score.lastTrickBonus` [ScorePanel.tsx:90] — FIXED: bonus now driven by lastTrickBonus/lastTrickTeam props from scoreRevealData; i18n key added
 - [x] [Review][Patch] P3-HIGH: ScorePanel uses `absolute` instead of `fixed` positioning — violates AC1 "fixed to the top-left" [ScorePanel.tsx:44] — FIXED: changed to `fixed`
 - [x] [Review][Patch] P4-HIGH: manager_test.go missing tests for new EVENT_HAND_SCORED payload fields and EVENT_MATCH_END matchDurationSec (Tasks 4.5, 4.6) — DEFERRED: Manager uses concrete \*ws.Hub (no interface), broadcast payloads can't be captured without refactoring. LastHandResult fields verified through 6 scoring_test.go tests; payload construction is mechanical mapping.
 - [x] [Review][Patch] P5-MED: useWsDispatch.test.ts missing test for event:hand_scored → setScoreRevealData — FIXED: added test
@@ -378,7 +378,7 @@ func scoreHand(state *GameState) {
 }
 ```
 
-The `contractFailed`, `contractingTeam`, `actualAAwarded`, `actualBAwarded` values come from the failed-contract logic in step 5. Refactor the step 5 block to capture these intermediate values.
+The `contractFailed`, `contractingTeam`, `actualAAwarded`, `actualBAwarded` values come from the failed-hand logic in step 5. Refactor the step 5 block to capture these intermediate values.
 
 #### `broadcastActionResult` Changes (`server/internal/session/manager.go`)
 
@@ -606,9 +606,9 @@ See Task 11 for complete list. Follow existing key pattern: `game.{component}.{e
 **Backend (Go):**
 
 - Test `scoreHand()` through `ApplyAction` (per project-context testing rules) — verify `LastHandResult` populated for:
-  - Normal hand (no capot, no failed contract)
+  - Normal hand (no capot, no failed hand)
   - Capot hand (one team takes all 8 tricks)
-  - Failed contract (calling team loses)
+  - Failed hand (calling team loses)
   - Match-ending hand (both regular and capot)
 - Use `testfixtures/` factory functions to build game states — do NOT use raw struct literals
 - Table-driven tests with `t.Run` for each scenario
@@ -624,7 +624,7 @@ See Task 11 for complete list. Follow existing key pattern: `game.{component}.{e
   - Renders all breakdown rows from `HandScoredPayload`
   - Continue button is disabled for first 2 seconds
   - Continue button becomes enabled after 2 seconds
-  - Shows failed contract message when `failedContract === true`
+  - Shows failed hand message when `failedContract === true`
   - Shows capot bonus when `capot === true`
   - Hides declaration row when declaration points are 0
   - Calls `onContinue` when Continue clicked
@@ -750,7 +750,7 @@ All recent work follows the `feat(game):` commit scope. Commit for this story sh
 | `team-b`           | `#4d9fff`     | Team B scores, labels              |
 | `accent`           | `#00e5a0`     | Continue button, highlights        |
 | `success`          | `#22c55e`     | Positive outcomes                  |
-| `warning`          | `#f59e0b`     | Failed contract indicator          |
+| `warning`          | `#f59e0b`     | Failed hand indicator          |
 | `font-display`     | Space Grotesk | Score numbers (font-bold)          |
 | `font-body`        | Inter         | Labels, descriptions               |
 
@@ -759,7 +759,7 @@ All recent work follows the `feat(game):` commit scope. Commit for this story sh
 - [Source: _bmad-output/planning-artifacts/epics.md — Epic 4, Story 4.6, lines 1065-1103]
 - [Source: _bmad-output/planning-artifacts/architecture.md — Game phases, session manager, scoring, match persistence]
 - [Source: _bmad-output/planning-artifacts/ux-design-specification.md — ScorePanel, ScoreReveal, CapotAnimation, design tokens, animation patterns]
-- [Source: _bmad-output/planning-artifacts/prd.md — FR11 (failed contracts), FR12 (last-trick/capot), FR14 (1001 mode), FR23 (real-time sync)]
+- [Source: _bmad-output/planning-artifacts/prd.md — FR11 (failed hands), FR12 (last-trick/capot), FR14 (1001 mode), FR23 (real-time sync)]
 - [Source: _bmad-output/project-context.md — Anti-patterns, testing rules, gameStore cleanup, multi-event ordering]
 - [Source: server/internal/game/state.go — GameState struct, TeamScores, HandPoints, DeclarationPoints, TricksWon]
 - [Source: server/internal/game/scoring.go — scoreHand(), startNewHand(), determineMatchWinner(), matchTarget()]
@@ -787,17 +787,17 @@ Claude Opus 4.6 (1M context)
 
 ### Completion Notes List
 
-- Backend: Added `HandResult` struct to `state.go` capturing full hand scoring breakdown (card points, declaration points, bonuses, failed contract, totals)
+- Backend: Added `HandResult` struct to `state.go` capturing full hand scoring breakdown (card points, declaration points, bonuses, failed hand, totals)
 - Backend: Modified `scoreHand()` in `scoring.go` to populate `LastHandResult` before `startNewHand()` — fixes the pre-existing bug where `HandScoredPayload` contained zeroed-out HandPoints after hand reset
 - Backend: Enhanced `broadcastActionResult` to build hand_scored payload from `LastHandResult` with 15 fields (up from 6)
 - Backend: Added `matchDurationSec` to match_end event payload, computed from `session.startedAt`
-- Backend: Added 6 new scoring tests verifying `LastHandResult` for normal, capot, failed contract, declarations, match-end, and delta-matching scenarios
+- Backend: Added 6 new scoring tests verifying `LastHandResult` for normal, capot, failed hand, declarations, match-end, and delta-matching scenarios
 - Frontend: Updated `HandScoredPayload` (15 fields) and `MatchEndPayload` (+matchDurationSec) in wsEvents.ts
 - Frontend: Added `HandResult` interface and `lastHandResult` field to `GameState` in gameTypes.ts
 - Frontend: Added `scoreRevealData` and `matchEndData` fields with setters to gameStore
 - Frontend: Updated `useWsDispatch.ts` to store hand_scored and match_end payloads in gameStore for overlay consumption
 - Frontend: Created `ScorePanel.tsx` — fixed top-left HUD with team scores, trick counts, aria-live, float-up bonus animation
-- Frontend: Created `ScoreReveal.tsx` — full-screen overlay with sequential animated breakdown (card points, declarations, bonuses, failed contract, totals), Continue button disabled for 2s
+- Frontend: Created `ScoreReveal.tsx` — full-screen overlay with sequential animated breakdown (card points, declarations, bonuses, failed hand, totals), Continue button disabled for 2s
 - Frontend: Created `CapotAnimation.tsx` — full-screen non-skippable 2.5s animation with team-color glow, CSS keyframe scale animation
 - Frontend: Created `MatchResult.tsx` — match completion overlay with winner, final scores, duration, Return to Lobby button
 - Frontend: Integrated all 4 components into `GamePage.tsx` with overlay flow state machine (normal → capot_animation → score_reveal → normal/match_result)

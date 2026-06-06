@@ -32,7 +32,7 @@ All users are comfortable with online card game conventions — lobbies, matchma
 ### Key Design Challenges
 
 1. **4-player turn management** — Communicating active player, counter-clockwise turn order, and per-move timer state instantly and unambiguously across all four seats.
-2. **Rules-critical UI moments** — Trump bidding, declaration announcements, Belot bonus triggers — the UI must surface exactly the right prompt at each game-critical moment without breaking immersion or requiring a rules reference lookup.
+2. **Rules-critical UI moments** — Trump bidding, declaration announcements, Belote bonus triggers — the UI must surface exactly the right prompt at each game-critical moment without breaking immersion or requiring a rules reference lookup.
 3. **Lobby serving two audiences** — Ana's zero-friction private room flow and Marko's ranked queue/leaderboard access must coexist cleanly without either cluttering the other.
 4. **Disconnection and pause communication** — Reconnect countdowns, stacked pauses, and room owner overrides are anxiety-inducing moments; the UX must communicate state calmly and clearly.
 5. **Competitive identity** — Rank tiers, season progress, and placement reveals must feel prestigious and earned.
@@ -724,7 +724,7 @@ These are game-specific components with no shadcn/ui equivalent. All built with 
 
 **Purpose:** DECLARE / SKIP overlay shown at first trick when player holds a declarable combination.
 
-**Anatomy:** Declaration type and value ("Sequence of 4 — 50 pts"), DECLARE button, SKIP button.
+**Anatomy:** Declaration type and value ("Quarte — 50 pts"), DECLARE button, SKIP button.
 
 **Behaviour:** Must be resolved before card play is enabled for that turn.
 

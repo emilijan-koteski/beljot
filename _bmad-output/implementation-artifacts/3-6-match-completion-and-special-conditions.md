@@ -17,7 +17,7 @@ So that match outcomes are resolved accurately.
 
 2. **Given** both teams exceed 1001 points in the same hand
    **When** the match-end check runs
-   **Then** the team with the higher score wins; if scores are equal, the contracting team (trump picker) wins
+   **Then** the team with the higher score wins; if scores are equal, the taker's team (trump picker) wins
    **And** `WinnerTeam` is set to the winning team index
 
 3. **Given** a player holds all 8 trump cards (7, 8, 9, T, J, Q, K, A of the trump suit) after dealing completes
@@ -48,7 +48,7 @@ So that match outcomes are resolved accurately.
 - [x] Task 2: Implement tiebreaker logic in `scoreHand()` (AC: 1, 2)
   - [x] Replace simple `>=` check (step 6 in `scoring.go:48-52`) with tiebreaker-aware logic
   - [x] If only one team >= target: that team wins, set `WinnerTeam`
-  - [x] If both teams >= target: higher score wins; if tied, contracting team wins
+  - [x] If both teams >= target: higher score wins; if tied, the taker's team wins
   - [x] Set `state.WinnerTeam` before setting `state.Phase = PhaseMatchEnd`
 
 - [x] Task 3: Implement instant-win detection (AC: 3)
@@ -138,7 +138,7 @@ Where `determineMatchWinner` implements:
 
 1. If only one team crossed → that team
 2. If both crossed → team with higher `TeamScores`
-3. If both crossed AND tied → `TeamForSeat(*state.TrumpCallerSeat)` (contracting team)
+3. If both crossed AND tied → `TeamForSeat(*state.TrumpCallerSeat)` (the taker's team)
 
 ### Key Integration Point — Instant-Win in startNewHand
 
@@ -279,7 +279,7 @@ Recent commit pattern: `feat(game): implement <feature> with code review fixes`
 - [Source: _bmad-output/planning-artifacts/epics.md, Epic 3, Story 3.6, lines 826-862]
 - [Source: _bmad-output/planning-artifacts/architecture.md — Game state machine, scoring sub-system, test fixtures]
 - [Source: _bmad-output/planning-artifacts/prd.md — FR13 (instant-win), FR14 (1001-point match mode)]
-- [Source: _bmad-output/implementation-artifacts/3-5-hand-scoring-failed-contracts-and-capot.md — scoreHand implementation, startNewHand, match-end check pattern]
+- [Source: _bmad-output/implementation-artifacts/3-5-hand-scoring-failed-hands-and-capot.md — scoreHand implementation, startNewHand, match-end check pattern]
 - [Source: server/internal/game/scoring.go — Current match-end check at lines 48-52]
 - [Source: server/internal/game/rules_engine.go — Current ApplyAction switch with only PhaseBidding and PhasePlaying]
 - [Source: server/internal/game/state.go — GameState struct, no WinnerTeam field yet]
@@ -300,7 +300,7 @@ None — all tests passed on first run after implementation.
 - Added `WinnerTeam *int` field to `GameState` struct in Scoring section with `json:"winnerTeam"` tag
 - Updated `cloneGameState` to deep-copy `WinnerTeam` pointer field
 - Replaced simple `>= target` match-end check in `scoreHand()` with tiebreaker-aware logic via `determineMatchWinner` helper
-- Tiebreaker rules: single team over → that team wins; both over → higher score; tied scores → contracting team
+- Tiebreaker rules: single team over → that team wins; both over → higher score; tied scores → the taker's team
 - Implemented `checkInstantWin()` — detects player holding all 8 trump cards, returns winning team
 - Integrated instant-win check into both `startNewHand()` and `NewGame()` after dealing
 - Added `PhaseMatchEnd` → `ErrWrongPhase` and `PhasePaused` → `ErrGamePaused` cases to `ApplyAction`

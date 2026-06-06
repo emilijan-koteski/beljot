@@ -301,7 +301,7 @@ Every feature must pass all items before it is considered complete — this is a
 | Assume clockwise turn order                        | Counter-clockwise: `(currentPlayer + 1) % 4` — seats are numbered CCW |
 | Continue rotation after trick resolves             | Trick winner leads the next trick — rotation resets                   |
 | Implement generic trump bidding                    | Branch by variant from the start — separate code paths                |
-| Auto-award Belot bonus (K+Q of trump)              | Require player announcement — prompt on trump K/Q play                |
+| Auto-award Belote bonus (K+Q of trump)             | Require player announcement — prompt on trump K/Q play                |
 
 **Security Rules:**
 
@@ -321,12 +321,12 @@ Every feature must pass all items before it is considered complete — this is a
 - **Declaration single-use (Bitola)** — a single card may belong to only one declaration group. When two detected groups share a card (e.g. sequence 9-T-J-Q of spades AND four Jacks sharing J♠), keep the higher-value group and drop the other. Enforced in `detectDeclarations` via a dedup pass. Croatian variant allows overlap (deferred)
 - **Declaration phase timing (Bitola)** — declarations happen during trick 1 as each player plays their first card; reveal fires at the start of trick 2 before the first card. Croatian variant has a separate declaration phase between bidding and trick 1 (all players click yes/no), reveal at the start of trick 1 (deferred)
 - **Declaration reveal** — small panel anchored to the winning player's seat showing their actual cards for ~4 seconds (1.5s for reduced-motion). Auto-dismisses. Losing team's declarations are never revealed. Points remain pending (not locked in) until hand-end scoring
-- **Belot / Re-belot bonus requires player announcement** — when a player plays trump K or Q and holds the other, UI prompts for announcement. Terminology is rank-bound, not play-order-bound: announcing on the Queen is "Belot", on the King is "Re-belot". If declined on the first K/Q played, bonus is forfeit — no second chance on the other card. +20 pts to the announcing team, pending until hand end. Reveal shows the announced card only (not the partner). Same in both variants
+- **Belote / Rebelote bonus requires player announcement** — when a player plays trump K or Q and holds the other, UI prompts for announcement. Terminology is rank-bound, not play-order-bound: announcing on the Queen is "Belote", on the King is "Rebelote". If declined on the first K/Q played, bonus is forfeit — no second chance on the other card. +20 pts to the announcing team, pending until hand end. Reveal shows the announced card only (not the partner). Same in both variants
 - **Three-layer card validation** in `validation.go`: (1) follow led suit if possible, (2) if void in led suit, must play trump if held, (3) if trumping, must play higher trump than current highest trump in trick if possible
-- **Two-phase scoring** in `scoring.go`: hand scoring (card points + declarations + last trick/Capot bonuses → failed contract check) feeds into match scoring (cumulative team totals → win condition check). Keep as separate functions
-- **Failed contract**: failing team scores 0, all points transfer to opponents
+- **Two-phase scoring** in `scoring.go`: hand scoring (card points + declarations + last trick/Capot bonuses → failed hand check) feeds into match scoring (cumulative team totals → win condition check). Keep as separate functions
+- **Failed hand**: failing team scores 0, all points transfer to opponents
 - **Capot** (+100) replaces last-trick bonus (+10), not added to it
-- **Match target tiebreaker**: if both teams cross 1001/501 in the same hand, the contracting team (team that called trump) wins — contract ownership is the tiebreaker
+- **Match target tiebreaker**: if both teams cross 1001/501 in the same hand, the taker's team (team that called trump) wins — taking trump is the tiebreaker
 - **Auto-play on timer expiry**: first legal card sorted by suit then rank
 
 **Card ID Format (Standardized Everywhere):**

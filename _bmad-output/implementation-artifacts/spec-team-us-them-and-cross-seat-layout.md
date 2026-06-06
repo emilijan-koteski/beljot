@@ -66,7 +66,7 @@ DB migrations 000006 and 000009 are edited in place (user is solo dev, no other 
 | Room lobby on mobile portrait <640px               | viewer of any seat state                              | Vertical 2-column stack (same as today), team-color borders preserved, same testids                                                                                                                       |
 | RoomDetailPreview (lobby browse)                   | any room                                              | Headers "Team A" / "Team B"; never "Us"/"Them"                                                                                                                                                            |
 | Game starts (deal animation)                       | match begins                                          | ScorePanel takes over; first time "Us"/"Them" labels appear                                                                                                                                               |
-| Match history — viewer's own past match            | viewer participated, was teamA                        | Row shows "Us 1010 — Them 640", failed-contract chip and last-trick chip use Us/Them                                                                                                                      |
+| Match history — viewer's own past match            | viewer participated, was teamA                        | Row shows "Us 1010 — Them 640", failed-hand chip and last-trick chip use Us/Them                                                                                                                      |
 | Match history — admin viewing someone else's match | edge case, not in current product                     | Falls back to "Team A" / "Team B" — covered by viewer-participation predicate                                                                                                                             |
 | Match-abandoned toast                              | aFinalScore 200, bFinalScore 180, viewer participated | "Final: Us 200 : Them 180" (in-game toast — viewer is participant)                                                                                                                                        |
 | Backend persists hand result                       | hand finishes                                         | Row inserted into `hand_results` with columns `a_card_points`, `b_card_points`, `a_decl_points`, `b_decl_points`, `a_hand_total`, `b_hand_total`                                                          |
@@ -116,12 +116,12 @@ DB migrations 000006 and 000009 are edited in place (user is solo dev, no other 
 
 - `client/src/features/game/GamePage.tsx` + test — derive `viewerTeam: TeamString | null` from `myPlayerSeat`; pass to all team-aware children
 - `client/src/features/game/components/ScorePanel.tsx` + test — accept `viewerTeam`; relabel rows Us/Them; preserve team colors; props are `aScore`/`bScore`; add `data-team` attribute on each row
-- `client/src/features/game/components/ScoreReveal.tsx` + test — accept `viewerTeam`; team-name helper returns Us/Them; failed-contract sentence uses Us/Them; payload reads
+- `client/src/features/game/components/ScoreReveal.tsx` + test — accept `viewerTeam`; team-name helper returns Us/Them; failed-hand sentence uses Us/Them; payload reads
 - `client/src/features/game/components/MatchResult.tsx` + test — accept `viewerTeam`; winner banner + final-score columns use Us/Them; payload reads
 - `client/src/features/game/components/DeclarationReveal.tsx` + test — accept `viewerTeam`; "{{team}} declared" uses Us/Them based on `team === viewerTeam` (covers both partners)
 - `client/src/features/game/components/CapotAnimation.tsx` + test, `TrumpIndicator.tsx` + test, `PlayerSeat.tsx` + test — Tailwind class renames; remove any legacy literal team-string reads; add `data-team`
 - `client/src/features/lobby/RoomDetailPreview.tsx` + test — Team A / Team B headers; literal updates
-- `client/src/features/profile/MatchHistory.tsx` + test — relabel R/B chips, failed-contract chip, score line; **predicate: viewer participated → Us/Them; otherwise Team A/B** (refined per Sally); field reads use new names; Tailwind rename; add `data-team`
+- `client/src/features/profile/MatchHistory.tsx` + test — relabel R/B chips, failed-hand chip, score line; **predicate: viewer participated → Us/Them; otherwise Team A/B** (refined per Sally); field reads use new names; Tailwind rename; add `data-team`
 
 **Frontend — cross/diamond seat layout (commit 6):**
 

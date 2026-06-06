@@ -111,7 +111,7 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 - Player profile with username and basic match history
 - Belot rules engine: **Bitola trump variant only** (32-card deck, 4 players, 2 teams, counter-clockwise play)
 - Dealing sequence (3+2), trump selection bidding (Bitola variant: reshuffle and rotate dealer if no one picks in round 2)
-- Declarations, Belot bonus (K+Q trump = 20pts), scoring (card points, last trick +10, Capot +100), failed contracts
+- Declarations, Belote bonus (K+Q trump = 20pts), scoring (card points, last trick +10, Capot +100), failed hands
 - Instant win (all 8 trump in sequence)
 - 1001-point match mode only
 - Lobby: Create Room, Browse/Search Rooms, Quick Play (random matchmaking)
@@ -219,7 +219,7 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 
 **Opening Scene:** Marko registers, picks a username. He wants to go straight to ranked but sees it's locked — Level 5 required. Fair enough. He hits Quick Play to start grinding XP.
 
-**Rising Action:** His first few casual games are smooth — Croatian variant, 1001 mode, per-move timer. The rules are correct. He notices the card point table is right, declarations work properly, failed contracts transfer points correctly. He earns XP from game points. After roughly 20 games, he hits Level 5. Ranked mode unlocks.
+**Rising Action:** His first few casual games are smooth — Croatian variant, 1001 mode, per-move timer. The rules are correct. He notices the card point table is right, declarations work properly, failed hands transfer points correctly. He earns XP from game points. After roughly 20 games, he hits Level 5. Ranked mode unlocks.
 
 **Climax:** Marko queues for ranked. The system matches him with players around his hidden ELO. First match — it's tight, competitive, the timer keeps things moving. One opponent hesitates too long on a critical trick — timer expires, and the system auto-plays their first eligible card (sorted by suit, then rank). It's a weak play. Marko capitalizes. He wins. Then two more placement matches. After three games, his rank reveals: Silver II. He can see the tier ladder — Iron through Radiant. The season has just started. He has three months to climb.
 
@@ -331,8 +331,8 @@ Single Page Application (SPA) for desktop browsers. Real-time multiplayer with p
 - FR7: The system enforces Bitola variant rules: 3+2 dealing sequence, reshuffle-and-rotate-dealer trump bidding mechanic when no player selects trump in round 2, counter-clockwise play, and variant-specific scoring
 - FR8: The system enforces Croatian variant rules: 3+2 dealing sequence, forced trump selection by last player in bidding, counter-clockwise play, and variant-specific scoring
 - FR9: The system validates and scores declarations at the first trick — highest-value set wins ties; only the winning team's declarations count
-- FR10: The system awards the Belot bonus (K+Q of trump held by same player = 20 pts) when announced during play
-- FR11: The system applies failed contract scoring: the failing team scores 0 pts and all points transfer to opponents
+- FR10: The system awards the Belote bonus (K+Q of trump held by same player = 20 pts) when announced during play
+- FR11: The system applies failed hand scoring: the failing team scores 0 pts and all points transfer to opponents
 - FR12: The system awards last-trick bonus (+10 pts) to the team winning the final trick, and applies Capot scoring (+100 pts, replacing last-trick bonus) when one team takes all tricks
 - FR13: The system detects and resolves the instant-win condition when a player holds all 8 trump in sequence
 - FR14: The system supports 1001-point match mode
