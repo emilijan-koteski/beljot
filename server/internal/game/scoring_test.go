@@ -108,20 +108,41 @@ func TestHandScoring_FailedContract(t *testing.T) {
 	assert.Equal(t, 0, result.TeamScores[game.TeamB], "Team B gets 0 on failed contract")
 }
 
-func TestHandScoring_EqualPointsNotFailure(t *testing.T) {
+func TestHandScoring_EqualPointsIsFailure(t *testing.T) {
 	gs := testfixtures.NewGameLastTrick()
-	// Team B (seat 1) is contracting. Arrange so totals are equal after trick 8.
+	// Team B (seat 1) is contracting. Arrange so totals are EQUAL after trick 8.
 	// Trick 8: 7H(trump) wins, team B gets 21 card pts + 10 bonus = 31
-	// Team B after trick 8: handPts + 31 + declarations(0) should equal team A total
-	// Team A total = aHandPts + 0 (declarations)
 	// Set: team A=80, team B=49 → after trick 8: team A=80, team B=49+21+10=80. Equal!
 	gs.HandPoints = [2]int{80, 49}
 
 	result := playTrick8(t, gs)
 
-	// Equal totals (80 = 80): contracting team succeeds → normal scoring
-	assert.Equal(t, 80, result.TeamScores[game.TeamA], "Team A keeps own points")
-	assert.Equal(t, 80, result.TeamScores[game.TeamB], "Team B keeps own points (equal = not failure)")
+	// Equal totals (80 = 80): the trump-calling team must score STRICTLY MORE to
+	// succeed, so a tie is a FAILED hand → all points transfer to the opponents.
+	assert.Equal(t, 160, result.TeamScores[game.TeamA], "Team A (opponent) gets ALL points on a tie")
+	assert.Equal(t, 0, result.TeamScores[game.TeamB], "Team B (caller) gets 0 — a tie is a failure")
+	require.NotNil(t, result.LastHandResult)
+	assert.True(t, result.LastHandResult.FailedContract, "a tie marks the hand failed for the caller")
+}
+
+func TestHandScoring_TieFailsTrumpCaller(t *testing.T) {
+	gs := testfixtures.NewGameLastTrick()
+	// Canonical case: an exact 81:81 split of the 162 base points.
+	// Team B (seat 1) is the trump caller. Trick 8 (7H trump wins) gives team B
+	// 21 card pts + 10 last-trick bonus = 31. Set team B=50 so it lands on 81;
+	// team A=81. Final totals: A=81, B=81 — a tie.
+	gs.HandPoints = [2]int{81, 50}
+	gs.TeamScores = [2]int{0, 0}
+
+	result := playTrick8(t, gs)
+
+	// 81:81 — the caller (team B) did not score strictly more, so the hand fails:
+	// team B loses its points and team A wins all 162.
+	require.NotNil(t, result.LastHandResult)
+	assert.True(t, result.LastHandResult.FailedContract, "81:81 is a failed hand for the caller")
+	assert.Equal(t, game.TeamB, result.LastHandResult.ContractingTeam, "team B called trump")
+	assert.Equal(t, 162, result.TeamScores[game.TeamA], "opponents win all 162 points")
+	assert.Equal(t, 0, result.TeamScores[game.TeamB], "caller scores 0 on the tie")
 }
 
 func TestHandScoring_NormalScoring(t *testing.T) {

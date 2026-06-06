@@ -20,11 +20,11 @@ So that the competitive integrity of the game is maintained.
    **When** hand scoring is calculated
    **Then** the winning team receives +100 bonus points (replacing the +10 last-trick bonus, not in addition to it)
 
-3. **Given** the team that picked trump (the taker's team) scores fewer points than the opposing team
+3. **Given** the team that picked trump (the taker's team) scores fewer points than, or exactly ties, the opposing team
    **When** failed hand logic is applied
    **Then** the taker's team scores 0 points for the hand and ALL points (both teams' card points + declarations + bonuses) are awarded to the opposing team
 
-4. **Given** the team that picked trump scores equal or more points than the opposing team
+4. **Given** the team that picked trump scores **strictly more** points than the opposing team
    **When** normal scoring is applied
    **Then** each team keeps their own card points + declaration points + applicable bonuses
 
@@ -46,7 +46,7 @@ So that the competitive integrity of the game is maintained.
   - [x] 1.3: Implement last-trick bonus: add +10 to `HandPoints[TeamForSeat(*state.TrickWinnerSeat)]` — the team that won trick 8 gets the bonus
   - [x] 1.4: Implement Capot detection: if `TricksWon[team] == 8` for either team, award +100 to that team's `HandPoints` **instead of** the +10 last-trick bonus (Capot replaces, does not stack)
   - [x] 1.5: Calculate each team's total hand score: `teamTotal = HandPoints[team] + DeclarationPoints[team]`
-  - [x] 1.6: Implement failed hand check: identify the taker's team via `TeamForSeat(*state.TrumpCallerSeat)`. If `contractingTeamTotal < opposingTeamTotal`, the taker's team gets 0 and opponent's `TeamScores` increases by `contractingTeamTotal + opposingTeamTotal` (ALL points). If the taker's team total >= opposing team total, each team's `TeamScores` increases by their own total (normal scoring)
+  - [x] 1.6: Implement failed hand check: identify the taker's team via `TeamForSeat(*state.TrumpCallerSeat)`. If `contractingTeamTotal <= opposingTeamTotal` (a tie counts as failure), the taker's team gets 0 and opponent's `TeamScores` increases by `contractingTeamTotal + opposingTeamTotal` (ALL points). If the taker's team total is strictly greater than the opposing team total, each team's `TeamScores` increases by their own total (normal scoring)
   - [x] 1.7: Implement match-end check: determine target from `MatchMode` ("501" → 501, default → 1001). If either team's `TeamScores >= target`, set `Phase = PhaseMatchEnd` and return. Story 3.6 will refine this with tiebreaker logic for simultaneous threshold crossing
   - [x] 1.8: If match not over, call `startNewHand(state)` to set up the next hand
 
@@ -77,7 +77,7 @@ So that the competitive integrity of the game is maintained.
   - [x] 5.3: Test Capot scoring (TestHandScoring_CapotScoring)
   - [x] 5.4: Test Capot broken (TestHandScoring_CapotBroken)
   - [x] 5.5: Test failed hand (TestHandScoring_FailedContract)
-  - [x] 5.6: Test equal points not failure (TestHandScoring_EqualPointsNotFailure)
+  - [x] 5.6: Test equal points is failure (TestHandScoring_EqualPointsIsFailure) and explicit 81:81 tie (TestHandScoring_TieFailsTrumpCaller)
   - [x] 5.7: Test normal scoring (TestHandScoring_NormalScoring)
   - [x] 5.8: Test match end triggered (TestHandScoring_MatchEndTriggered)
   - [x] 5.9: Test match continues (TestHandScoring_MatchContinues)
@@ -130,7 +130,7 @@ So that the competitive integrity of the game is maintained.
 
 1. Add last-trick bonus (+10) OR Capot bonus (+100) to `HandPoints`
 2. Calculate each team's total: `teamTotal = HandPoints[team] + DeclarationPoints[team]`
-3. Check failed hand: is the taker's team's total **strictly less than** opponent's total?
+3. Check failed hand: is the taker's team's total **less than or equal to** opponent's total (i.e., NOT strictly more)?
 4. If failed: `TeamScores[opponent] += contractingTotal + opponentTotal` (opponent gets ALL)
 5. If not failed: `TeamScores[team] += teamTotal` for each team
 6. Check match-end condition
@@ -138,8 +138,8 @@ So that the competitive integrity of the game is maintained.
 **Failed hand — Precise Rule:**
 
 - The the taker's team = the team of the player who picked trump: `TeamForSeat(*state.TrumpCallerSeat)`
-- **Strictly less than** triggers failure: `contractingTotal < opposingTotal`
-- **Equal** is NOT a failure — the taker's team succeeds when they tie
+- **Less than or equal** triggers failure: `contractingTotal <= opposingTotal`
+- **A tie IS a failure** — the taker's team must score strictly more than the opponents to succeed (e.g. 81:81 → failed for the caller)
 - On failure: the taker's team adds **0** to `TeamScores`, opponent adds the **sum of both totals**
 
 **Capot Rule:**
@@ -171,7 +171,7 @@ scoreHand(state *GameState):
      opposingTeam = 1 - contractingTeam
      contractingTotal = IF contractingTeam == TeamA THEN teamATotal ELSE teamBTotal
      opposingTotal = IF opposingTeam == TeamA THEN teamATotal ELSE teamBTotal
-  5. IF contractingTotal < opposingTotal:
+  5. IF contractingTotal <= opposingTotal:    // a tie counts as failure
        TeamScores[opposingTeam] += teamATotal + teamBTotal  // ALL points to opponent
        // contractingTeam gets 0 — no addition to TeamScores
      ELSE:
@@ -357,6 +357,11 @@ server/internal/apperr/
 - [x] [Review][Defer] `matchTarget` returns 1001 for any unrecognized MatchMode string — upstream validation at room creation prevents invalid modes reaching the engine. Defensive validation deferred [scoring.go:104-108]
 - [x] [Review][Defer] `resolveDeclarationsForHand` dereferences `*state.TrumpSuit` without nil check — pre-existing pattern noted in Story 3.3 and 3.4 [declarations.go:393]
 
+### Rule Correction — 2026-06-06
+
+- **Tie now fails the trump-calling team.** This story originally shipped "equal total is NOT a failure" (AC #4, Dev Notes, `TestHandScoring_EqualPointsNotFailure`). On user direction the rule was corrected: the trump-calling team must score **strictly more** than the opponents; an equal total (e.g. 81:81) is a failed hand and all points transfer to the opponents. Changed `contractingTotal < opposingTotal` → `<=` in `scoreHand` [scoring.go:64]; inverted the equal-points test to `TestHandScoring_EqualPointsIsFailure` and added `TestHandScoring_TieFailsTrumpCaller`. ACs #3/#4 and Dev Notes above updated to match. Tracked by `spec-fix-tie-fails-trump-caller.md`.
+- **Variant divergence (deferred to Epic 12).** The corrected "tie → all points to the opponents" rule is the **Croatian-variant** rule, applied to all variants for now. The **Bitola variant** should eventually use **hanging points (carry-over)** on a tie (points held over, nobody scores, carried to the next decisive hand). This needs cross-hand state and is deferred to Epic 12 (Variant Expansion, Phase 3). See `deferred-work.md` and the Epic 12 entry in `planning-artifacts/epics.md`. Until then, do not treat the Bitola tie behavior as a bug.
+
 ## Dev Agent Record
 
 ### Agent Model Used
@@ -367,7 +372,7 @@ Claude Opus 4.6 (1M context)
 
 ### Completion Notes List
 
-- Implemented `scoreHand()` in `scoring.go` — orchestrates all hand scoring: last-trick bonus (+10), Capot detection (+100 replaces +10), failed hand check (the taker's team < opponent → all points to opponent), normal scoring, match-end check (1001/501), and new hand setup.
+- Implemented `scoreHand()` in `scoring.go` — orchestrates all hand scoring: last-trick bonus (+10), Capot detection (+100 replaces +10), failed hand check (the taker's team <= opponent, i.e. a tie also fails → all points to opponent), normal scoring, match-end check (1001/501), and new hand setup.
 - Implemented `startNewHand()` in `scoring.go` — resets all 20+ per-hand state fields (bidding, trick, declaration/Belote, scoring, player hands), rotates dealer, shuffles and deals fresh deck via existing `dealCards()`.
 - Implemented `matchTarget()` helper — returns 1001 or 501 based on MatchMode.
 - Integrated scoring into game flow via single `if state.Phase == PhaseHandScoring` guard in `resolveTrickWithDeclarations()` in `declarations.go`. Scoring runs atomically within the same `ApplyAction` call after trick 8 resolves.

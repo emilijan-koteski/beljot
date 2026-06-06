@@ -56,8 +56,17 @@ func scoreHand(state *GameState) {
 		opposingTotal = aTotal
 	}
 
-	// Step 5: Award points — failed contract or normal scoring
-	failedContract := contractingTotal < opposingTotal
+	// Step 5: Award points — failed contract or normal scoring.
+	// The trump-calling team must score STRICTLY MORE than the opponents to
+	// succeed. An equal total (a tie, e.g. 81:81 of the 162 base points) is a
+	// failed hand for the caller — they don't clear half the points in play.
+	//
+	// NOTE: this "tie -> all points to opponents" behavior is the CROATIAN-variant
+	// rule, currently applied to ALL variants as an interim stand-in. The Bitola
+	// variant must eventually use HANGING POINTS (carry-over) on a tie instead —
+	// points held over, nobody scores, carried to the next decisive hand. That
+	// needs cross-hand state and is deferred to Epic 12 (see deferred-work.md).
+	failedContract := contractingTotal <= opposingTotal
 	var aAwarded, bAwarded int
 	if failedContract {
 		// Failed contract: contracting team gets 0, opponent gets ALL points

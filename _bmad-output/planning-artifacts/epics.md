@@ -169,6 +169,7 @@ NFR17: A single player's disconnection must not affect game state integrity or c
 - Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40), social login (FR3), mobile (FR52)
 - Phase 5: Spectator (FR48), achievements (FR49), cosmetics (FR50), tournaments (FR51)
 - Agents must NOT implement Croatian variant or 501 mode before Phase 3
+- Tied-hand rule diverges by variant (deferred to Epic 12 / Phase 3): the interim engine applies the **Croatian** rule (a tie sends all points to the taker's opponents) to all variants; the **Bitola** variant must later use **hanging points (carry-over)** instead. See `deferred-work.md`. Do not treat the current Bitola tie behavior as a bug before then.
 - FR28 and FR43 have undefined formulas — require product decisions before implementation (abandonment mechanics must be settled to wire Honor FR56 and partial XP FR43 correctly)
 
 **From UX Design:**
@@ -338,6 +339,8 @@ Players can search for other players by username, send/accept friend requests, m
 ### Epic 12: Variant Expansion
 
 Players can play the Croatian trump variant, 501-point matches, and access an in-app rules reference covering both variants.
+
+**Variant rule divergence — tied hand (carried over from Story 3.5):** the two variants must differ on the tied-hand rule. The **Croatian variant** awards all points to the opponents when the taker's team only ties (already implemented in Epic 3 and applied to all variants as an interim stand-in). The **Bitola variant** must instead use **hanging points (carry-over)**: on a tie the hand's points are held over, nobody scores, and they carry to the winner of the next decisive hand. This needs cross-hand carry-over state plus match-end interaction — see the dedicated item in `deferred-work.md`. Until this lands, Bitola intentionally uses the Croatian tie rule.
 
 **FRs covered:** FR8, FR15, FR29
 **Phase:** 3
@@ -871,13 +874,15 @@ So that the competitive integrity of the game is maintained.
 **When** hand scoring is calculated
 **Then** the winning team receives +100 bonus points (replacing the +10 last-trick bonus, not in addition to it)
 
-**Given** the team that picked trump (the taker's team) scores fewer points than the opposing team
+**Given** the team that picked trump (the taker's team) scores fewer points than, or exactly ties, the opposing team
 **When** failed hand logic is applied
 **Then** the taker's team scores 0 points for the hand and ALL points (both teams' card points + declarations + bonuses) are awarded to the opposing team
 
-**Given** the team that picked trump scores equal or more points than the opposing team
+**Given** the team that picked trump scores strictly more points than the opposing team
 **When** normal scoring is applied
 **Then** each team keeps their own card points + declaration points + applicable bonuses
+
+> **Variant note (interim simplification — see Epic 12 and `deferred-work.md`):** the "a tie sends all points to the opponents" rule above is the **Croatian-variant** rule. It is applied to all variants for now. The **Bitola variant** must eventually use **hanging points (carry-over)** on a tie instead — the hand's points are held over, nobody scores, and they carry to the winner of the next decisive hand. Deferred to Epic 12 (Variant Expansion, Phase 3).
 
 **Given** hand scoring is complete
 **When** scores are added to the match total
