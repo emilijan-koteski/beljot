@@ -616,6 +616,23 @@ describe("MatchPage", () => {
     expect(screen.queryByTestId("emote-bubble-2")).not.toBeInTheDocument();
   });
 
+  it("elevates seat wrappers above the trick area so emotes/surrender banners aren't hidden by thrown cards", () => {
+    // Regression: on phones the EmoteBubble / SurrenderOpponentBanner render
+    // INSIDE the seat wrapper, whose `-translate-*` transform forms a stacking
+    // context — so their own `z-20` is trapped there and can't beat the center
+    // TrickArea (rendered later in the DOM at z-auto). The wrapper itself must
+    // carry `z-20` to outrank the thrown cards; otherwise the cards paint over
+    // the emote/banner (most visible on mobile, where seats overlap the table).
+    useMatchStore.getState().setMatchState(mockMatchState);
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    renderMatchPage();
+
+    for (const compass of [0, 1, 2, 3] as const) {
+      expect(screen.getByTestId(`player-seat-${compass}-wrapper`).className).toContain("z-20");
+    }
+  });
+
   it("hides declarationReveal while the table is paused (AC3)", () => {
     useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "paused" });
     useMatchStore.getState().setMyPlayerSeat(0);

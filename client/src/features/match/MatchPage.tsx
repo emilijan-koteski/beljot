@@ -1128,9 +1128,17 @@ export function MatchPage() {
           isCompactTable && emotesVisible ? activeEmotes[player.seat as 0 | 1 | 2 | 3] : null;
 
         return (
+          // `z-20` elevates the whole seat above the center TrickArea (which
+          // renders later in the DOM at z-auto). Crucial on phones: the compact
+          // EmoteBubble / SurrenderOpponentBanner are rendered INSIDE this
+          // wrapper, and the wrapper's `-translate-*` transform forms a stacking
+          // context — so their own `z-20` is trapped here and can't beat the
+          // thrown cards unless the wrapper itself outranks the trick area. Sits
+          // below every dialog/overlay (z-30+), so cards stay under emotes while
+          // modals stay on top.
           <div
             key={player.seat}
-            className={`absolute ${SEAT_POSITIONS[compass]}`}
+            className={`absolute z-20 ${SEAT_POSITIONS[compass]}`}
             data-testid={`player-seat-${compass}-wrapper`}
           >
             <PlayerSeat
