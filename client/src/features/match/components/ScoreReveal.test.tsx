@@ -17,10 +17,9 @@ vi.mock("react-i18next", () => ({
         "match.scoreReveal.continue": "Continue",
         "team.us": "Us",
         "team.them": "Them",
+        "match.scoreReveal.subtitleFailedUs": "Went down · all points to us",
+        "match.scoreReveal.subtitleFailedThem": "Went down · all points to them",
       };
-      if (key === "match.scoreReveal.subtitleFailed" && opts) {
-        return `Contract failed · all points to ${opts.team}`;
-      }
       if (key === "match.scoreReveal.subtitleHeldYour" && opts) {
         return `Contract held · your team called ${opts.suit}`;
       }
@@ -137,7 +136,7 @@ describe("ScoreReveal", () => {
     const { container } = render(
       <ScoreReveal data={failedData} viewerTeam="teamA" onContinue={vi.fn()} />,
     );
-    expect(container.textContent).toContain("Contract failed · all points to Us");
+    expect(container.textContent).toContain("Went down · all points to us");
     // The legacy middle paragraph is gone — the message lives in the subtitle.
     expect(screen.queryByTestId("row-failed-contract")).not.toBeInTheDocument();
   });
@@ -148,7 +147,7 @@ describe("ScoreReveal", () => {
     const { container } = render(
       <ScoreReveal data={failedData} viewerTeam="teamB" onContinue={vi.fn()} />,
     );
-    expect(container.textContent).toContain("Contract failed · all points to Them");
+    expect(container.textContent).toContain("Went down · all points to them");
   });
 
   it("shows the contract-held subtitle when the viewer's team called trump", () => {

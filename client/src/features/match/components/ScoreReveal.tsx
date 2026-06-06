@@ -91,16 +91,21 @@ export function ScoreReveal({
   const callerWasViewer = callerTeam !== null && callerTeam === viewerTeam;
   const trumpSuitName = trumpSuit ? t(SUIT_NAME_KEY[trumpSuit]) : null;
 
-  // Subtitle carries the contract callout per design. When the contract
-  // failed, it also names the beneficiary team so the "all points to Them"
-  // message no longer floats awkwardly between the score rows. Held =
-  // "Contract held · your team called Spades"; failed = "Contract failed ·
-  // all points to Them".
+  // Subtitle carries the hand-outcome callout per design. When the taker's
+  // team went down, it names who collects the points — split into Us/Them
+  // keys (mirroring capot.bonusUs/bonusThem) rather than interpolating the
+  // team LABEL, because "all points to {{team}}" reads ungrammatically after
+  // the preposition in mk/hr/sr: the nominative label ("за Тие" / "za Oni")
+  // must be the oblique pronoun ("за нив" / "za njih"). Held = "Pulled it off
+  // · your team took Spades"; went down = "Went down · all points to us/them".
   let subtitle: string | null = null;
   if (data.failedContract) {
     const beneficiary: TeamString = data.contractingTeam === 0 ? "teamB" : "teamA";
-    const beneficiaryLabel = beneficiary === viewerTeam ? t("team.us") : t("team.them");
-    subtitle = t("match.scoreReveal.subtitleFailed", { team: beneficiaryLabel });
+    subtitle = t(
+      beneficiary === viewerTeam
+        ? "match.scoreReveal.subtitleFailedUs"
+        : "match.scoreReveal.subtitleFailedThem",
+    );
   } else if (trumpSuitName && callerTeam) {
     subtitle = t(
       callerWasViewer
