@@ -40,16 +40,16 @@ describe("BelotPrompt", () => {
     expect(dialog).toHaveAttribute("aria-modal", "true");
   });
 
-  it("shows Belot copy when playing the Queen first", () => {
+  it("shows Belote copy when playing the Queen first", () => {
     render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
-    expect(screen.getByText("Announce Belot?")).toBeInTheDocument();
-    expect(screen.getByTestId("belot-prompt-announce")).toHaveTextContent("Announce Belot");
+    expect(screen.getByText("Declare Belote?")).toBeInTheDocument();
+    expect(screen.getByTestId("belot-prompt-announce")).toHaveTextContent("Declare Belote");
   });
 
-  it("shows Re-belot copy when playing the King first", () => {
+  it("shows Rebelote copy when playing the King first", () => {
     render(<BelotPrompt isKing={true} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
-    expect(screen.getByText("Announce Re-belot?")).toBeInTheDocument();
-    expect(screen.getByTestId("belot-prompt-announce")).toHaveTextContent("Announce Re-belot");
+    expect(screen.getByText("Declare Rebelote?")).toBeInTheDocument();
+    expect(screen.getByTestId("belot-prompt-announce")).toHaveTextContent("Declare Rebelote");
   });
 
   it("wraps the Decline button with the button-timer ring when per-move", () => {
