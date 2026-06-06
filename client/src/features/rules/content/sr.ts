@@ -149,7 +149,7 @@ export const sr: RulesLangData = {
         {
           kind: "rule",
           title: "Sečeno adutom? Praćenje boje ipak je prvo",
-          text: "Čak i nakon što je štih sečen adutom, igrač koji može da prati izašlu boju ipak mora da je prati i ipak mora da je nadbije: baci svoju najveću kartu te boje ako pobeđuje ono na stolu, inače manju. Za adut posežeš tek kad si potpuno bez izašle boje, čak i kad već znaš da je adut osvojio štih.",
+          text: "Čak i kad je štih već sečen adutom, moraš da pratiš izašlu boju i da je nadbiješ višom kartom te boje kad god možeš. Za adut posežeš samo kad uopšte nemaš izašlu boju. A ako je neko pre tebe već sekao, moraš da nadsečeš njegov adut ako imaš viši.",
         },
         {
           kind: "p",

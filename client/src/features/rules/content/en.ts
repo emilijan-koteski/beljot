@@ -31,7 +31,8 @@ export const en: RulesLangData = {
     kvarta: {
       name: "Quarte",
       summary: "Four cards in a row, all the same suit.",
-      detail: "A quarte always beats any tierce the other team holds, no matter which suits are in play.",
+      detail:
+        "A quarte always beats any tierce the other team holds, no matter which suits are in play.",
     },
     kvinta: {
       name: "Quint",
@@ -149,7 +150,7 @@ export const en: RulesLangData = {
         {
           kind: "rule",
           title: "Cut by a trump? Following suit still comes first",
-          text: "Even after the trick is cut by a trump, a player who can follow the led suit must still follow it — and must still try to top it: play your highest card of that suit if it beats what’s down, otherwise a lower one. You only reach for a trump once you’re completely out of the led suit — even when you already know the trump has taken the trick.",
+          text: "Even once the trick has been cut by a trump, you must follow the led suit if you hold it, beating it with a higher card of that suit whenever you can. You only reach for a trump when you have none of the led suit. And if someone before you has already cut in, you must overtrump theirs if you have a higher one.",
         },
         {
           kind: "p",
