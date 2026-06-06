@@ -1,11 +1,11 @@
-# Story 3.5: Hand Scoring, Failed Contracts & Capot
+# Story 3.5: Hand Scoring, Failed Hands & Capot
 
 Status: done
 
 ## Story
 
 As a player,
-I want hand scoring to correctly calculate points including failed contracts and Capot,
+I want hand scoring to correctly calculate points including failed hands and Capot,
 So that the competitive integrity of the game is maintained.
 
 ## Acceptance Criteria
@@ -20,9 +20,9 @@ So that the competitive integrity of the game is maintained.
    **When** hand scoring is calculated
    **Then** the winning team receives +100 bonus points (replacing the +10 last-trick bonus, not in addition to it)
 
-3. **Given** the team that picked trump (the contracting team) scores fewer points than the opposing team
-   **When** failed contract logic is applied
-   **Then** the contracting team scores 0 points for the hand and ALL points (both teams' card points + declarations + bonuses) are awarded to the opposing team
+3. **Given** the team that picked trump (the taker's team) scores fewer points than the opposing team
+   **When** failed hand logic is applied
+   **Then** the taker's team scores 0 points for the hand and ALL points (both teams' card points + declarations + bonuses) are awarded to the opposing team
 
 4. **Given** the team that picked trump scores equal or more points than the opposing team
    **When** normal scoring is applied
@@ -46,7 +46,7 @@ So that the competitive integrity of the game is maintained.
   - [x] 1.3: Implement last-trick bonus: add +10 to `HandPoints[TeamForSeat(*state.TrickWinnerSeat)]` — the team that won trick 8 gets the bonus
   - [x] 1.4: Implement Capot detection: if `TricksWon[team] == 8` for either team, award +100 to that team's `HandPoints` **instead of** the +10 last-trick bonus (Capot replaces, does not stack)
   - [x] 1.5: Calculate each team's total hand score: `teamTotal = HandPoints[team] + DeclarationPoints[team]`
-  - [x] 1.6: Implement failed contract check: identify contracting team via `TeamForSeat(*state.TrumpCallerSeat)`. If `contractingTeamTotal < opposingTeamTotal`, contracting team gets 0 and opponent's `TeamScores` increases by `contractingTeamTotal + opposingTeamTotal` (ALL points). If contracting team total >= opposing team total, each team's `TeamScores` increases by their own total (normal scoring)
+  - [x] 1.6: Implement failed hand check: identify the taker's team via `TeamForSeat(*state.TrumpCallerSeat)`. If `contractingTeamTotal < opposingTeamTotal`, the taker's team gets 0 and opponent's `TeamScores` increases by `contractingTeamTotal + opposingTeamTotal` (ALL points). If the taker's team total >= opposing team total, each team's `TeamScores` increases by their own total (normal scoring)
   - [x] 1.7: Implement match-end check: determine target from `MatchMode` ("501" → 501, default → 1001). If either team's `TeamScores >= target`, set `Phase = PhaseMatchEnd` and return. Story 3.6 will refine this with tiebreaker logic for simultaneous threshold crossing
   - [x] 1.8: If match not over, call `startNewHand(state)` to set up the next hand
 
@@ -55,7 +55,7 @@ So that the competitive integrity of the game is maintained.
   - [x] 2.2: Increment `HandNumber`, rotate dealer: `DealerSeat = (DealerSeat + 1) % 4`
   - [x] 2.3: Reset bidding state: `TrumpSuit = nil`, `TrumpCallerSeat = nil`, `TrumpCandidate = nil`, `BiddingRound = 1`, `BiddingPassCount = 0`
   - [x] 2.4: Reset trick state: `TrickNumber = 0`, `CurrentTrick = []TrickCard{}`, `LeadSuit = nil`, `TrickWinnerSeat = nil`
-  - [x] 2.5: Reset declaration/Belot state (fields from Story 3.4 that must be reset between hands): `AwaitingDeclaration = false`, `DeclarationsResolved = false`, `PendingBelotSeat = nil`, `BelotAnnounced = false`
+  - [x] 2.5: Reset declaration/Belote state (fields from Story 3.4 that must be reset between hands): `AwaitingDeclaration = false`, `DeclarationsResolved = false`, `PendingBelotSeat = nil`, `BelotAnnounced = false`
   - [x] 2.6: Reset per-hand scoring: `HandPoints = [2]int{0, 0}`, `DeclarationPoints = [2]int{0, 0}`, `TricksWon = [2]int{0, 0}`
   - [x] 2.7: Clear player state: `Players[i].Hand = []Card{}`, `Players[i].Declarations = nil` for all 4 players
   - [x] 2.8: Generate fresh deck via `NewDeck()`, shuffle via `ShuffleDeck()`, deal via existing `dealCards()` function
@@ -66,7 +66,7 @@ So that the competitive integrity of the game is maintained.
   - [x] 3.2: Verify the call order: `resolveTrick()` → `resolveDeclarationsForHand()` (if needed) → `scoreHand()` — scoring must run AFTER declarations are resolved since it reads `DeclarationPoints`
 
 - [x] Task 4: Create test fixtures (AC: #6)
-      **Note:** `NewGameMidPlay(8)` already provides TrickNumber=8 with 1 card per player, but it has arbitrary HandPoints/TricksWon and no controlled TrumpCallerSeat for failed-contract testing. The new fixtures below provide deterministic scoring state needed for hand-scoring tests.
+      **Note:** `NewGameMidPlay(8)` already provides TrickNumber=8 with 1 card per player, but it has arbitrary HandPoints/TricksWon and no controlled TrumpCallerSeat for failed-hand testing. The new fixtures below provide deterministic scoring state needed for hand-scoring tests.
   - [x] 4.1: Add `NewGameLastTrick() *GameState` to `testfixtures/fixtures.go`
   - [x] 4.2: Add `NewGameCapotInProgress() *GameState` to `testfixtures/fixtures.go`
   - [x] 4.3: Write fixture validation tests in `testfixtures/fixtures_test.go`
@@ -76,14 +76,14 @@ So that the competitive integrity of the game is maintained.
   - [x] 5.2: Test last-trick bonus (TestHandScoring_LastTrickBonus)
   - [x] 5.3: Test Capot scoring (TestHandScoring_CapotScoring)
   - [x] 5.4: Test Capot broken (TestHandScoring_CapotBroken)
-  - [x] 5.5: Test failed contract (TestHandScoring_FailedContract)
+  - [x] 5.5: Test failed hand (TestHandScoring_FailedContract)
   - [x] 5.6: Test equal points not failure (TestHandScoring_EqualPointsNotFailure)
   - [x] 5.7: Test normal scoring (TestHandScoring_NormalScoring)
   - [x] 5.8: Test match end triggered (TestHandScoring_MatchEndTriggered)
   - [x] 5.9: Test match continues (TestHandScoring_MatchContinues)
   - [x] 5.10: Test new hand state reset (TestHandScoring_NewHandStateReset)
   - [x] 5.11: Test declarations included (TestHandScoring_DeclarationsIncluded)
-  - [x] 5.12: Test Belot bonus included (TestHandScoring_BelotBonusIncluded)
+  - [x] 5.12: Test Belote bonus included (TestHandScoring_BelotBonusIncluded)
   - [x] 5.13: Test 501 match mode (TestHandScoring_501MatchMode)
   - [x] 5.14: Test state immutability (TestHandScoring_StateImmutability)
 
@@ -119,7 +119,7 @@ So that the competitive integrity of the game is maintained.
 | Component               | Source                            | Where Stored                                                  |
 | ----------------------- | --------------------------------- | ------------------------------------------------------------- |
 | Card points from tricks | Sum of card values in won tricks  | `HandPoints[team]` (set by `resolveTrick` in playing.go)      |
-| Belot bonus             | +20 if announced during hand      | `HandPoints[team]` (set by Story 3.4 in declarations.go)      |
+| Belote bonus            | +20 if announced during hand      | `HandPoints[team]` (set by Story 3.4 in declarations.go)      |
 | Last-trick bonus        | +10 to team winning trick 8       | `HandPoints[team]` (set by `scoreHand` — this story)          |
 | Capot bonus             | +100 if one team won all 8 tricks | `HandPoints[team]` (set by `scoreHand` — replaces last-trick) |
 | Declaration points      | From trick 1 resolution           | `DeclarationPoints[team]` (set by Story 3.4)                  |
@@ -130,17 +130,17 @@ So that the competitive integrity of the game is maintained.
 
 1. Add last-trick bonus (+10) OR Capot bonus (+100) to `HandPoints`
 2. Calculate each team's total: `teamTotal = HandPoints[team] + DeclarationPoints[team]`
-3. Check failed contract: is contracting team's total **strictly less than** opponent's total?
+3. Check failed hand: is the taker's team's total **strictly less than** opponent's total?
 4. If failed: `TeamScores[opponent] += contractingTotal + opponentTotal` (opponent gets ALL)
 5. If not failed: `TeamScores[team] += teamTotal` for each team
 6. Check match-end condition
 
-**Failed Contract — Precise Rule:**
+**Failed hand — Precise Rule:**
 
-- The contracting team = the team of the player who picked trump: `TeamForSeat(*state.TrumpCallerSeat)`
+- The the taker's team = the team of the player who picked trump: `TeamForSeat(*state.TrumpCallerSeat)`
 - **Strictly less than** triggers failure: `contractingTotal < opposingTotal`
-- **Equal** is NOT a failure — the contracting team succeeds when they tie
-- On failure: contracting team adds **0** to `TeamScores`, opponent adds the **sum of both totals**
+- **Equal** is NOT a failure — the taker's team succeeds when they tie
+- On failure: the taker's team adds **0** to `TeamScores`, opponent adds the **sum of both totals**
 
 **Capot Rule:**
 
@@ -152,7 +152,7 @@ So that the competitive integrity of the game is maintained.
 
 - Target: 1001 for MatchMode "1001", 501 for MatchMode "501"
 - If either team's `TeamScores >= target` → `Phase = PhaseMatchEnd`
-- Story 3.6 will add tiebreaker logic (both teams cross threshold simultaneously → contracting team wins)
+- Story 3.6 will add tiebreaker logic (both teams cross threshold simultaneously → the taker's team wins)
 - For this story, the simple check is sufficient — just detect if any team crossed the target
 
 ### `scoreHand` Function Specification
@@ -186,7 +186,7 @@ scoreHand(state *GameState):
 
 ### `startNewHand` Function Specification
 
-This resets ALL per-hand state. Reference: `reshuffleAndRedeal()` in `bidding.go` for the pattern, but this function resets more fields (scoring, declarations, Belot).
+This resets ALL per-hand state. Reference: `reshuffleAndRedeal()` in `bidding.go` for the pattern, but this function resets more fields (scoring, declarations, Belote).
 
 **Fields to reset:**
 
@@ -248,7 +248,7 @@ This must come AFTER the `resolveDeclarationsForHand` call (which is already gua
 
 Story 3.6 will:
 
-1. Refine the match-end check with tiebreaker logic: if both teams cross 1001 in the same hand, the team with the higher score wins; if tied, the contracting team wins
+1. Refine the match-end check with tiebreaker logic: if both teams cross 1001 in the same hand, the team with the higher score wins; if tied, the taker's team wins
 2. Add instant-win detection: player holds all 8 trump in sequence → immediate match end after dealing
 3. Add `ErrWrongPhase` handling for `PhaseMatchEnd` and `ErrGamePaused` for `PhasePaused`
 4. Potentially add a `WinnerTeam *int` field to `GameState` for PhaseMatchEnd
@@ -341,17 +341,17 @@ server/internal/apperr/
 
 ### References
 
-- [Source: _bmad-output/planning-artifacts/epics.md — Story 3.5: Hand Scoring, Failed Contracts & Capot]
+- [Source: _bmad-output/planning-artifacts/epics.md — Story 3.5: Hand Scoring, Failed Hands & Capot]
 - [Source: _bmad-output/planning-artifacts/architecture.md — Game State Machine Phases, hand_scoring phase, Minimum Test Fixture Set]
-- [Source: _bmad-output/planning-artifacts/prd.md — FR11 (failed contract scoring), FR12 (last-trick bonus, Capot)]
+- [Source: _bmad-output/planning-artifacts/prd.md — FR11 (failed hand scoring), FR12 (last-trick bonus, Capot)]
 - [Source: _bmad-output/planning-artifacts/ux-design-specification.md — ScorePanel, CapotAnimation, score reveal moment]
-- [Source: _bmad-output/project-context.md — Two-phase scoring, failed contract rule, Capot replaces last-trick, match target tiebreaker]
+- [Source: _bmad-output/project-context.md — Two-phase scoring, failed hand rule, Capot replaces last-trick, match target tiebreaker]
 - [Source: _bmad-output/implementation-artifacts/3-4-declarations-and-belot-bonus.md — State Reset Between Hands, Forward Compatibility note for Story 3.5, deferred review items]
 
 ### Review Findings
 
 - [x] [Review][Patch] `TurnExpiresAt` not reset in `startNewHand` — FIXED: added `state.TurnExpiresAt = nil` in `startNewHand` and assertion in `TestHandScoring_NewHandStateReset` [scoring.go:86, scoring_test.go:191]
-- [x] [Review][Patch] Missing test: failed contract where both teams have non-zero DeclarationPoints — FIXED: added `TestHandScoring_FailedContractBothTeamsHaveDeclarations` verifying opponent absorbs contracting team's declarations [scoring_test.go]
+- [x] [Review][Patch] Missing test: failed hand where both teams have non-zero DeclarationPoints — FIXED: added `TestHandScoring_FailedContractBothTeamsHaveDeclarations` verifying opponent absorbs the taker's team's declarations [scoring_test.go]
 - [x] [Review][Defer] `scoreHand` dereferences `*state.TrickWinnerSeat` without nil guard — safe because `resolveTrick` always sets it at trick 8, but implicit invariant with no defensive check. Pre-existing pattern (Story 3.3, 3.4) [scoring.go:9]
 - [x] [Review][Defer] `scoreHand` dereferences `*state.TrumpCallerSeat` without nil guard — safe because PhaseHandScoring only reachable after trump picked. Pre-existing pattern deferred to session manager (Epic 4) [scoring.go:25]
 - [x] [Review][Defer] `matchTarget` returns 1001 for any unrecognized MatchMode string — upstream validation at room creation prevents invalid modes reaching the engine. Defensive validation deferred [scoring.go:104-108]
@@ -367,13 +367,13 @@ Claude Opus 4.6 (1M context)
 
 ### Completion Notes List
 
-- Implemented `scoreHand()` in `scoring.go` — orchestrates all hand scoring: last-trick bonus (+10), Capot detection (+100 replaces +10), failed contract check (contracting team < opponent → all points to opponent), normal scoring, match-end check (1001/501), and new hand setup.
-- Implemented `startNewHand()` in `scoring.go` — resets all 20+ per-hand state fields (bidding, trick, declaration/Belot, scoring, player hands), rotates dealer, shuffles and deals fresh deck via existing `dealCards()`.
+- Implemented `scoreHand()` in `scoring.go` — orchestrates all hand scoring: last-trick bonus (+10), Capot detection (+100 replaces +10), failed hand check (the taker's team < opponent → all points to opponent), normal scoring, match-end check (1001/501), and new hand setup.
+- Implemented `startNewHand()` in `scoring.go` — resets all 20+ per-hand state fields (bidding, trick, declaration/Belote, scoring, player hands), rotates dealer, shuffles and deals fresh deck via existing `dealCards()`.
 - Implemented `matchTarget()` helper — returns 1001 or 501 based on MatchMode.
 - Integrated scoring into game flow via single `if state.Phase == PhaseHandScoring` guard in `resolveTrickWithDeclarations()` in `declarations.go`. Scoring runs atomically within the same `ApplyAction` call after trick 8 resolves.
 - Created `NewGameLastTrick()` fixture — trick 8 state with controlled card distribution (AS, 8D, TD, 7H), TrumpCallerSeat=1 (Team B), TricksWon=[4,3], HandPoints=[70,61] (sum=131, matching 152-21 remaining).
 - Created `NewGameCapotInProgress()` fixture — trick 8 state with Team A winning all 7 prior tricks, TricksWon=[7,0], HandPoints=[121,0], Team A holds JH+AH (guaranteed to win).
-- All 13 new scoring tests pass through `ApplyAction` — covering last-trick bonus, Capot, Capot broken, failed contract, equal points, normal scoring, match end, match continues, state reset, declarations in scoring, Belot in scoring, 501 mode, and state immutability.
+- All 13 new scoring tests pass through `ApplyAction` — covering last-trick bonus, Capot, Capot broken, failed hand, equal points, normal scoring, match end, match continues, state reset, declarations in scoring, Belote in scoring, 501 mode, and state immutability.
 - Updated 2 existing tests in `playing_test.go` (TestEighthTrickTransition, TestFull8TrickHand) that expected `PhaseHandScoring` as final state — now expect `PhaseBidding` or `PhaseMatchEnd` since scoring processes atomically.
 - Full backend suite: all packages OK. Frontend: 109/109 tests pass. Zero regressions.
 

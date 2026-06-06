@@ -55,8 +55,8 @@ documents:
 | FR7   | Bitola variant rules: 3+2 dealing, reshuffle-and-rotate-dealer trump bidding, counter-clockwise play, variant-specific scoring |
 | FR8   | Croatian variant rules: 3+2 dealing, forced trump selection by last player, counter-clockwise play, variant-specific scoring   |
 | FR9   | Declaration validation and scoring at first trick — highest-value wins ties; only winning team's declarations count            |
-| FR10  | Belot bonus (K+Q of trump = 20 pts) when announced during play                                                                 |
-| FR11  | Failed contract scoring: failing team 0 pts, all points transfer to opponents                                                  |
+| FR10  | Belote bonus (K+Q of trump = 20 pts) when announced during play                                                                 |
+| FR11  | Failed hand scoring: failing team 0 pts, all points transfer to opponents                                                  |
 | FR12  | Last-trick bonus (+10 pts) and Capot scoring (+100 pts replacing last-trick bonus)                                             |
 | FR13  | Instant-win: player holds all 8 trump in sequence                                                                              |
 | FR14  | 1001-point match mode                                                                                                          |
@@ -153,8 +153,8 @@ The PRD is thorough and well-structured. All 53 FRs are clearly numbered and sco
 | FR7   | Bitola variant rules engine                 | Epic 3                             | Covered |
 | FR8   | Croatian variant rules engine               | Epic 8                             | Covered |
 | FR9   | Declaration validation and scoring          | Epic 3                             | Covered |
-| FR10  | Belot bonus (K+Q trump = 20 pts)            | Epic 3                             | Covered |
-| FR11  | Failed contract scoring                     | Epic 3                             | Covered |
+| FR10  | Belote bonus (K+Q trump = 20 pts)            | Epic 3                             | Covered |
+| FR11  | Failed hand scoring                     | Epic 3                             | Covered |
 | FR12  | Last-trick bonus and Capot scoring          | Epic 3                             | Covered |
 | FR13  | Instant-win (8 trump in sequence)           | Epic 3                             | Covered |
 | FR14  | 1001-point match mode                       | Epic 4                             | Covered |

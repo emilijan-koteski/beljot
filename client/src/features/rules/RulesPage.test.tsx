@@ -37,7 +37,7 @@ describe("RulesPage", () => {
     ).toBeInTheDocument();
     for (const title of [
       "Race your team to 1001",
-      "Shuffle, deal, call trump",
+      "Shuffle, deal, take trump",
       "Trump plays by its own rules",
       "When you can play what",
       "Some hands carry points of their own",
@@ -86,7 +86,7 @@ describe("RulesPage", () => {
       screen.getByRole("heading", { level: 1, name: "Научи Бељот во неколку минути" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { level: 2, name: "Трка до 1001 со твојот тим" }),
+      screen.getByRole("heading", { level: 2, name: "Трка до 1001 поен со твојот партнер" }),
     ).toBeInTheDocument();
   });
 

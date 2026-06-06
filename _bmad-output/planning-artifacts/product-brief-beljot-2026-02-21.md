@@ -194,9 +194,9 @@ Phased, reflecting passion project → public launch trajectory:
 - Dealing sequence: 3 cards each → 2 cards each → trump candidate revealed
 - Trump selection bidding (Croatian variant: last player forced to pick; Bitola variant: reshuffle and rotate dealer if no one picks in round 2)
 - Declarations: player-announced at first trick, highest card wins ties, only winning team's declarations count
-- Belot bonus: K+Q of trump in same hand = 20pts, announced during play
+- Belote bonus: K+Q of trump in same hand = 20pts, announced during play
 - Scoring: full card point table (trump/non-trump), last trick +10, Capot +100 (replaces last trick bonus)
-- Failed contract: 0pts for failing team, all points transferred to opponents
+- Failed hand: 0pts for failing team, all points transferred to opponents
 - Instant win declaration: all 8 trump in sequence = match over immediately (in both 1001 and 501 modes)
 - Match modes: 1001 (competitive-eligible) and 501 (casual/quick only)
 

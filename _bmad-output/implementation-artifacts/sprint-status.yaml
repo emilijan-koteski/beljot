@@ -66,7 +66,7 @@ development_status:
   3-2-trump-bidding-bitola-variant: done
   3-3-card-play-and-trick-resolution: done
   3-4-declarations-and-belot-bonus: done
-  3-5-hand-scoring-failed-contracts-and-capot: done
+  3-5-hand-scoring-failed-hands-and-capot: done
   3-6-match-completion-and-special-conditions: done
   epic-3-retrospective: optional
 

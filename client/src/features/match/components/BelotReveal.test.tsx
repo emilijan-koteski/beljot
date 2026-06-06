@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 describe("BelotReveal", () => {
-  it("renders label and card for Queen-first (Belot)", () => {
+  it("renders label and card for Queen-first (Belote)", () => {
     render(
       <BelotReveal
         playerSeat={0}
@@ -29,11 +29,11 @@ describe("BelotReveal", () => {
       />,
     );
     expect(screen.getByTestId("belot-reveal")).toBeInTheDocument();
-    expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent("Belot");
+    expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent("Belote");
     expect(screen.getByTestId("playing-card-QC")).toBeInTheDocument();
   });
 
-  it("renders Re-belot label and King card for King-first", () => {
+  it("renders Rebelote label and King card for King-first", () => {
     render(
       <BelotReveal
         playerSeat={2}
@@ -43,7 +43,7 @@ describe("BelotReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent("Re-belot");
+    expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent("Rebelote");
     expect(screen.getByTestId("playing-card-KC")).toBeInTheDocument();
   });
 
@@ -95,9 +95,7 @@ describe("BelotReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent(
-      "Stefan announced Re-belot.",
-    );
+    expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent("Stefan declared Rebelote.");
   });
 
   it("falls back to the team label when players is not provided", () => {

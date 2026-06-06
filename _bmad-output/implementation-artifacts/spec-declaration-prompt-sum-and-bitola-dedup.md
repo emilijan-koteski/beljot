@@ -13,12 +13,12 @@ baseline_commit: "8f05a5d6f127acbe39ef5eab829e7ea38d631d43"
 
 **Problem (two parts):**
 
-1. The declaration modal shows every detected group but does not display a **personal sum** — a player with a tierce (20) + a four-of-a-kind (100) sees "Sequence of 3 — 20 pts" and "Four of a Kind — 100 pts" but no "Total: 120". Players want an at-a-glance commit-or-skip decision.
+1. The declaration modal shows every detected group but does not display a **personal sum** — a player with a tierce (20) + a carré (100) sees "Tierce — 20 pts" and "Carré — 100 pts" but no "Total: 120". Players want an at-a-glance commit-or-skip decision.
 2. The detection logic in both [server/internal/game/declarations.go](server/internal/game/declarations.go) and [client/src/features/game/lib/declarations.ts](client/src/features/game/lib/declarations.ts) allows a single card to contribute to two declarations (e.g. J♠ in both a 9♠-T♠-J♠-Q♠ sequence and a 4×J). This matches the **Croatian variant**. For the **Bitola variant** (currently the only supported variant), a card may only be part of one group — when two groups conflict on a shared card, keep the higher-value group, drop the other.
 
 **Approach:**
 
-- **Detection (server + client helpers):** after `detectDeclarations` returns the raw set, run a Bitola-variant deduplication pass that removes any group that shares at least one card with a higher-value group. Higher-value always wins; ties are impossible in practice (min FoaK = 100 > any sequence value unless quinte+ = 100, but quinte+ and a FoaK cannot share a card because sequence is single-suit and FoaK spans all 4 suits; the only overlap case is tierce/quarte vs FoaK, where FoaK always wins).
+- **Detection (server + client helpers):** after `detectDeclarations` returns the raw set, run a Bitola-variant deduplication pass that removes any group that shares at least one card with a higher-value group. Higher-value always wins; ties are impossible in practice (min FoaK = 100 > any sequence value unless quint = 100, but quint and a FoaK cannot share a card because sequence is single-suit and FoaK spans all 4 suits; the only overlap case is tierce/quarte vs FoaK, where FoaK always wins).
 - **Modal UI:** keep the per-group rows (cards + label + per-group points) exactly as they are today. Add a bold "Total: {sum} pts" footer row inside the modal, above the Declare/Skip buttons. Sum = the de-duplicated set's values.
 
 ## Boundaries & Constraints
@@ -34,7 +34,7 @@ baseline_commit: "8f05a5d6f127acbe39ef5eab829e7ea38d631d43"
 **Ask First:**
 
 - Any change to how tiebreaks resolve between teams (existing `declarationBeats` chain in [server/internal/game/declarations.go:167](server/internal/game/declarations.go#L167) is out of scope here).
-- Any change to the four-of-a-kind point values or sequence point values.
+- Any change to the carré point values or sequence point values.
 - Any rendering change in the _reveal_ flow (that's a separate spec — goal 2).
 
 ## Rule Reference
@@ -85,7 +85,7 @@ baseline_commit: "8f05a5d6f127acbe39ef5eab829e7ea38d631d43"
 
 ## Acceptance
 
-- **Given** a hand with J♠,9♠,T♠,Q♠ and J♥,J♦,J♣ (sequence of 4 spades valuing 50, FoaK jacks valuing 200, sharing J♠)
+- **Given** a hand with J♠,9♠,T♠,Q♠ and J♥,J♦,J♣ (quarte of spades valuing 50, FoaK jacks valuing 200, sharing J♠)
   **When** `detectDeclarations` runs
   **Then** only the FoaK is returned; the sequence is dropped.
 - **Given** a hand with 7♠,8♠,9♠ (tierce 20) and 9♦,9♥,9♣,9♠ (FoaK 9s, 150, sharing 9♠)

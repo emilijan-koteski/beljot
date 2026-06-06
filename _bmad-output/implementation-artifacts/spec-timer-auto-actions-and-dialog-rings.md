@@ -43,7 +43,7 @@ context:
 |---|---|---|
 | Bidder AFK, round 1 OR round 2 | `phase=bidding` | Server `pass_trump` → `event:auto_action {type:"pass_trump", playerSeat}` → `event:game_state`. All clients toast "Auto-passed: {player}" |
 | Active player AFK at declaration prompt | `phase=playing`, `awaitingDeclaration` | `skip_declare` → `event:auto_action {type:"skip_declare"}` → state. Toast "Auto-skipped declaration: {player}" |
-| Belot prompt holder AFK | `pendingBelotSeat==active` | `skip_belot` → `event:auto_action {type:"skip_belot"}` → state. Toast "Auto-declined belot: {player}" |
+| Belote prompt holder AFK | `pendingBelotSeat==active` | `skip_belot` → `event:auto_action {type:"skip_belot"}` → state. Toast "Auto-declined Belote: {player}" |
 | Active player AFK during regular play | `phase=playing`, no prompt | Unchanged: existing `event:card_played {autoPlayed:true}` + existing toast. **No** `event:auto_action`. |
 | ScoreReveal sits 8s without click | `scoreRevealData != null` | All clients unmount overlay (`onContinue` fires). Reduced-motion: 1500ms |
 | Manual Continue ≥2s | User clicks Continue | Existing path; auto-dismiss timer cleared on unmount |
@@ -69,7 +69,7 @@ context:
 **Execution:**
 - [x] `server/internal/ws/events.go` -- add `EventAutoAction` + `AutoActionPayload`
 - [x] `server/internal/session/manager.go` -- in `handleTimerExpiry`, after `action` is built and **before** `broadcastActionResult`, broadcast `EventAutoAction {PlayerSeat: expectedSeat, Type: <"pass_trump"|"skip_declare"|"skip_belot">}` for those three cases. Card path unchanged.
-- [x] `server/internal/session/manager_test.go` -- table-driven: bidding/declaration/belot expiry asserts the new event fires with right payload; card-play expiry asserts it does NOT
+- [x] `server/internal/session/manager_test.go` -- table-driven: bidding/declaration/belote expiry asserts the new event fires with right payload; card-play expiry asserts it does NOT
 - [x] `client/src/shared/types/wsEvents.ts` -- `EVENT_AUTO_ACTION`, `AutoActionType = "pass_trump" | "skip_declare" | "skip_belot"`, `AutoActionPayload`
 - [x] `client/src/shared/hooks/useWsDispatch.ts` -- handler: defensive payload check; resolve `players[playerSeat].username`; toast.info with i18n key per `type`, `duration: 3000`
 - [x] `client/src/shared/hooks/useWsDispatch.test.ts` -- assert toast fires for each type; suppressed when `gameState === null`
@@ -86,7 +86,7 @@ context:
 
 **Acceptance Criteria:**
 - Given a per-move bidder is AFK in round 1 or round 2, when the timer reaches 0, then `event:auto_action {type:"pass_trump"}` precedes the next `event:game_state` and a toast naming the player appears for all 4 clients.
-- Given the active player is AFK at the declaration prompt or holding a belot prompt, when the timer expires, then the matching `event:auto_action` fires, the prompt unmounts, and the toast appears.
+- Given the active player is AFK at the declaration prompt or holding a belote prompt, when the timer expires, then the matching `event:auto_action` fires, the prompt unmounts, and the toast appears.
 - Given any of the three prompts is open AND viewer is the active player AND room is per-move, then a small `TimerRing` overlay is centered on the negative-action button. In relaxed-timer rooms no overlay renders.
 - Given a `ScoreReveal` is shown, when 8000ms elapse without interaction (1500ms reduced-motion), then `onContinue` fires on all clients.
 - Given a card auto-play, then no `event:auto_action` is emitted; the existing `autoPlayed: true` flag and "Auto-played: {card}" toast remain unchanged.

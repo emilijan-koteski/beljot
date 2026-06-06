@@ -11,7 +11,7 @@ baseline_commit: "7c77683d4275701febb4f802138319ae273c55be"
 
 ## Intent
 
-**Problem:** The `event:declarations_resolved` broadcast already carries the winning team's full card data (see [server/internal/session/manager.go:446-475](server/internal/session/manager.go#L446-L475)), but [client/src/features/game/components/DeclarationReveal.tsx](client/src/features/game/components/DeclarationReveal.tsx) renders only "+{totalValue}" and a team label. Other players never see which cards won. Worse, the large "+100" implies points are locked in, but the contracting team can still fail the hand and transfer everything.
+**Problem:** The `event:declarations_resolved` broadcast already carries the winning team's full card data (see [server/internal/session/manager.go:446-475](server/internal/session/manager.go#L446-L475)), but [client/src/features/game/components/DeclarationReveal.tsx](client/src/features/game/components/DeclarationReveal.tsx) renders only "+{totalValue}" and a team label. Other players never see which cards won. Worse, the large "+100" implies points are locked in, but the taker's team can still fail the hand and transfer everything.
 
 **Approach:**
 
@@ -43,7 +43,7 @@ baseline_commit: "7c77683d4275701febb4f802138319ae273c55be"
 
 - **Bitola:** declaration prompt per-player during trick 1, reveal at start of trick 2. Current behavior, unchanged.
 - **Croatian (deferred):** declaration is its own phase between bidding and trick 1 — all players click yes/no — reveal at start of trick 1. Documented in [project-context.md](_bmad-output/project-context.md) variant differences section. Not implemented.
-- Reveal shows only the winning team's declarations. Points become real only at hand-end scoring (failed contract can transfer everything).
+- Reveal shows only the winning team's declarations. Points become real only at hand-end scoring (failed hand can transfer everything).
 
 ## Implementation Outline
 
@@ -109,7 +109,7 @@ baseline_commit: "7c77683d4275701febb4f802138319ae273c55be"
   **When** the game reaches trick 2
   **Then** no reveal overlay is rendered.
 
-- **Given** the failed-contract scenario (Team B declares 100, Team B later fails the hand)
+- **Given** the failed-hand scenario (Team B declares 100, Team B later fails the hand)
   **When** hand scoring runs
   **Then** the points transfer to Team A per existing logic; the reveal had already expired and is not re-shown. ScorePanel's "+X this hand" line reflects the final transfer at hand end.
 

@@ -52,7 +52,7 @@ so that we can banter and communicate during play and recreate the card-table at
 
 7. **Game interactivity is preserved when the sidebar is expanded**
    Given the sidebar is expanded during gameplay,
-   When a player needs to play a card, bid trump, announce belot, declare, pause, or respond to any prompt/overlay,
+   When a player needs to play a card, bid trump, announce belote, declare, pause, or respond to any prompt/overlay,
    Then every existing game control remains fully clickable and the seat 3 (East) avatar remains visible — the sidebar is positioned/sized so no pointer or focus event is blocked on the game table
    And `data-testid="hand-cards"` and the seat controls continue to pass the existing interaction tests.
 
@@ -374,7 +374,7 @@ so that we can banter and communicate during play and recreate the card-table at
 
 AC #1 says the sidebar is "available" and "can be toggled". UX spec says "always visible and accessible". The implementation choice: **toggle button always visible, panel collapsed by default at match start**. Rationale:
 
-- First trick is attentionally critical (bidding, declarations, belot prompts, hand orientation). Showing a full chat panel on top of that overwhelms new players.
+- First trick is attentionally critical (bidding, declarations, belote prompts, hand orientation). Showing a full chat panel on top of that overwhelms new players.
 - Unread badge (AC #5) advertises activity without stealing focus.
 - Returning players who value chat will click once; the state persists for the duration of the match (optional future: remember the preference in localStorage — out of scope here).
 

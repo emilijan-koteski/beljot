@@ -1,5 +1,5 @@
 ---
-title: "Belot / Re-belot: rank-specific prompt and seat-anchored card reveal"
+title: "Belote / Rebelote: rank-specific prompt and seat-anchored card reveal"
 type: "feature"
 created: "2026-04-17"
 status: "done"
@@ -13,15 +13,15 @@ baseline_commit: "c0945b9"
 
 **Problem (three parts):**
 
-1. The Belot prompt currently reads a generic "Announce Belot?" regardless of whether the player is about to play the **Queen** or the **King** of trump. The rule distinguishes: playing the Queen first → "Belot"; playing the King first → "Re-belot".
-2. The Belot announcement is silent client-side — [client/src/shared/hooks/useWsDispatch.ts:191-194](client/src/shared/hooks/useWsDispatch.ts#L191-L194) handles `event:belot_announced` as a no-op. Other players get no feedback about who just announced or which card triggered it.
+1. The Belote prompt currently reads a generic "Announce Belote?" regardless of whether the player is about to play the **Queen** or the **King** of trump. The rule distinguishes: playing the Queen first → "Belote"; playing the King first → "Rebelote".
+2. The Belote announcement is silent client-side — [client/src/shared/hooks/useWsDispatch.ts:191-194](client/src/shared/hooks/useWsDispatch.ts#L191-L194) handles `event:belot_announced` as a no-op. Other players get no feedback about who just announced or which card triggered it.
 3. The `event:belot_announced` payload ([server/internal/ws/events.go — BelotAnnouncedPayload](server/internal/ws/events.go)) carries only `{playerSeat, team}`. The card ID is needed to render the reveal; extend the event.
 
 **Approach:**
 
-1. **Prompt label:** the prompt title and button text must reflect the card being played. When the player is about to play the **Queen of trump**, prompt says "Announce Belot?". When about to play the **King of trump**, prompt says "Announce Re-belot?". Terminology is rank-bound, not play-order-bound.
+1. **Prompt label:** the prompt title and button text must reflect the card being played. When the player is about to play the **Queen of trump**, prompt says "Announce Belote?". When about to play the **King of trump**, prompt says "Announce Rebelote?". Terminology is rank-bound, not play-order-bound.
 2. **Server payload:** extend `event:belot_announced` to include `cardId` (the K or Q being announced). Session manager already knows — it fires off the `ActionAnnounceBelot` action, whose last-played card is the triggering card.
-3. **Reveal:** Belot's reveal stays seat-anchored to the announcer (PANEL_POSITIONS in BelotReveal); the declaration reveal centers on the table since 2026-04-29 (spec-center-declaration-dialog). The Belot panel shows the single card (the K or Q of trump that triggered the announcement), with the text "Belot!" or "Re-belot!" above it. Auto-dismisses after 4s (1.5s reduced-motion). Non-blocking.
+3. **Reveal:** Belote's reveal stays seat-anchored to the announcer (PANEL_POSITIONS in BelotReveal); the declaration reveal centers on the table since 2026-04-29 (spec-center-declaration-dialog). The Belote panel shows the single card (the K or Q of trump that triggered the announcement), with the text "Belote!" or "Rebelote!" above it. Auto-dismisses after 4s (1.5s reduced-motion). Non-blocking.
 
 ## Boundaries & Constraints
 
@@ -31,7 +31,7 @@ baseline_commit: "c0945b9"
 - If the player skips the first K/Q prompt, they cannot announce later — already correct.
 - The reveal shows **only the card that triggered the announcement**, not both K+Q. The other card is still in the announcer's hand and stays hidden until naturally played.
 - Reveal is non-blocking: `pointer-events-none`, no modal, no focus trap.
-- Reveal placement: same anchoring pattern as declaration reveal (seat-anchored via `compassOffset`). If both a declaration reveal and a belot reveal could theoretically overlap in time, they won't in practice — declarations resolve at trick 2 start, Belot announce fires mid-trick on a K/Q play. No z-index conflict expected.
+- Reveal placement: same anchoring pattern as declaration reveal (seat-anchored via `compassOffset`). If both a declaration reveal and a Belote reveal could theoretically overlap in time, they won't in practice — declarations resolve at trick 2 start, Belote announce fires mid-trick on a K/Q play. No z-index conflict expected.
 - Points still flow through existing `handleAnnounceBelot` → `HandPoints[team] += 20`. The reveal is purely visual; does not mutate score paths. ScorePanel's "+X this hand" line reflects the pending +20 naturally.
 - `prefers-reduced-motion` reduces the reveal duration to 1.5s and drops slide-in animation.
 
@@ -43,11 +43,11 @@ baseline_commit: "c0945b9"
 
 ## Rule Reference
 
-- **Belot (bela):** announced when playing the **Queen** of trump, provided the player also holds the King of trump in hand. +20 to the announcer's team.
-- **Re-belot (re-bela):** announced when playing the **King** of trump, provided the player also holds the Queen of trump in hand. +20 to the announcer's team.
+- **Belote (bela):** announced when playing the **Queen** of trump, provided the player also holds the King of trump in hand. +20 to the announcer's team.
+- **Rebelote (re-bela):** announced when playing the **King** of trump, provided the player also holds the Queen of trump in hand. +20 to the announcer's team.
 - The player picks one moment to announce — whichever K/Q they play first. If they decline at that moment, the bonus is forfeit; they cannot re-claim it when playing the other card.
-- Points remain pending until hand end (failed-contract rules can transfer them).
-- **Both variants (Bitola + Croatian future) behave identically** for Belot / Re-belot.
+- Points remain pending until hand end (failed-hand rules can transfer them).
+- **Both variants (Bitola + Croatian future) behave identically** for Belote / Rebelote.
 
 ## Implementation Outline
 
@@ -57,11 +57,11 @@ baseline_commit: "c0945b9"
 
 **Server — [server/internal/session/manager.go](server/internal/session/manager.go):**
 
-- In the `case game.ActionAnnounceBelot, game.ActionSkipBelot:` branch (around line 477), include the triggering card ID in the `belot` map. The card is the last entry of `oldState.CurrentTrick` immediately before the announce action (the K/Q that was just played and whose post-play flow was paused on the Belot prompt). Capture it from `oldState.CurrentTrick[len(oldState.CurrentTrick)-1].Card.String()`.
+- In the `case game.ActionAnnounceBelot, game.ActionSkipBelot:` branch (around line 477), include the triggering card ID in the `belot` map. The card is the last entry of `oldState.CurrentTrick` immediately before the announce action (the K/Q that was just played and whose post-play flow was paused on the Belote prompt). Capture it from `oldState.CurrentTrick[len(oldState.CurrentTrick)-1].Card.String()`.
 
 **Client — [client/src/features/game/components/BelotPrompt.tsx](client/src/features/game/components/BelotPrompt.tsx):**
 
-- Accept a new prop `isKing: boolean` (or `cardRank: "Q" | "K"`). Switch title from a single i18n key to two: `game.belot.titleBelot` ("Announce Belot?") vs `game.belot.titleRebelot` ("Announce Re-belot?"). Do the same for the description/button label where it reads "Announce".
+- Accept a new prop `isKing: boolean` (or `cardRank: "Q" | "K"`). Switch title from a single i18n key to two: `game.belot.titleBelot` ("Announce Belote?") vs `game.belot.titleRebelot` ("Announce Rebelote?"). Do the same for the description/button label where it reads "Announce".
 - Caller (GamePage) determines the rank from `state.currentTrick`'s last played card (the K/Q that triggered the prompt).
 
 **Client — [client/src/features/game/GamePage.tsx](client/src/features/game/GamePage.tsx):**
@@ -72,7 +72,7 @@ baseline_commit: "c0945b9"
 
 - Pattern after `DeclarationReveal`: absolute-positioned panel anchored near the announcing seat via `compassOffset`.
 - Props: `{ playerSeat: number, myPlayerSeat: number, cardId: string, isKing: boolean, onComplete: () => void }`.
-- Shows a large label "Belot!" or "Re-belot!" plus one `<PlayingCard size="sm" state="default" />` rendered from the `cardId`.
+- Shows a large label "Belote!" or "Rebelote!" plus one `<PlayingCard size="sm" state="default" />` rendered from the `cardId`.
 - Auto-dismiss after 4s (1.5s reduced-motion). `pointer-events-none`.
 - `data-testid="belot-reveal"`.
 
@@ -100,8 +100,8 @@ baseline_commit: "c0945b9"
 
 - `game.belot.titleBelot` / `game.belot.titleRebelot`.
 - `game.belot.announceBelot` / `game.belot.announceRebelot`.
-- `game.belot.reveal.belot` → "Belot!".
-- `game.belot.reveal.rebelot` → "Re-belot!".
+- `game.belot.reveal.belot` → "Belote!".
+- `game.belot.reveal.rebelot` → "Rebelote!".
 - Update EN and SR locale files.
 
 ## Files
@@ -127,20 +127,20 @@ baseline_commit: "c0945b9"
 
 - **Given** the player holds K♣+Q♣ of trump and their turn comes to play the **Queen** first
   **When** they click Q♣
-  **Then** the Belot prompt reads "Announce Belot?" with "Announce Belot" and "Skip" buttons.
-  **And** on Announce, all four players see a small panel near the announcing seat showing "Belot!" and the Q♣ card. The panel auto-dismisses after 4s.
+  **Then** the Belote prompt reads "Announce Belote?" with "Announce Belote" and "Skip" buttons.
+  **And** on Announce, all four players see a small panel near the announcing seat showing "Belote!" and the Q♣ card. The panel auto-dismisses after 4s.
   **And** +20 is added to the announcing team's pending hand total.
   **And** when the announcer later plays K♣ in a subsequent trick, no prompt fires and no reveal appears.
 
 - **Given** the player holds K♣+Q♣ and plays the **King** first
   **When** they click K♣
-  **Then** the prompt reads "Announce Re-belot?" and the reveal shows "Re-belot!" with the K♣ card.
+  **Then** the prompt reads "Announce Rebelote?" and the reveal shows "Rebelote!" with the K♣ card.
 
 - **Given** the player skips the prompt on their first K/Q play
   **When** they later play the other K/Q
-  **Then** no prompt appears and no Belot points are awarded.
+  **Then** no prompt appears and no Belote points are awarded.
 
-- **Given** the announcer's contracting team later fails the hand
+- **Given** the announcer's the taker's team later fails the hand
   **When** hand scoring runs
   **Then** the +20 is part of the "all points to opponent" transfer (already correct server-side; reveal has no effect on scoring path).
 
@@ -149,7 +149,7 @@ baseline_commit: "c0945b9"
 - `go test ./server/internal/game/... ./server/internal/session/... ./server/internal/ws/...` — new payload field covered.
 - `npx vitest run` — all existing + new tests green.
 - `npx tsc --noEmit` — clean.
-- Manual/Playwright: play through a hand where the dealer forces K+Q of trump to the human player. Announce Belot on Q-first play. Verify the prompt label, the reveal card, the auto-dismiss duration, the pending score bump, and the absence of any prompt/reveal on the second card. Repeat with K-first.
+- Manual/Playwright: play through a hand where the dealer forces K+Q of trump to the human player. Announce Belote on Q-first play. Verify the prompt label, the reveal card, the auto-dismiss duration, the pending score bump, and the absence of any prompt/reveal on the second card. Repeat with K-first.
 
 </frozen-after-approval>
 
@@ -201,7 +201,7 @@ baseline_commit: "c0945b9"
 
 **Tests**
 
-- Prompt asserts both Belot and Re-belot copy variants.
+- Prompt asserts both Belote and Rebelote copy variants.
   [`BelotPrompt.test.tsx:45`](../../client/src/features/game/components/BelotPrompt.test.tsx#L45)
 
 - Reveal asserts label/card for both ranks and the 4s / 1.5s auto-dismiss paths.

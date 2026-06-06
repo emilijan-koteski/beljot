@@ -31,8 +31,8 @@ FR6: Players can send, accept, and decline friend requests and maintain a friend
 FR7: The system enforces Bitola variant rules: 3+2 dealing sequence, reshuffle-and-rotate-dealer trump bidding mechanic when no player selects trump in round 2, counter-clockwise play, and variant-specific scoring
 FR8: The system enforces Croatian variant rules: 3+2 dealing sequence, forced trump selection by last player in bidding, counter-clockwise play, and variant-specific scoring
 FR9: The system validates and scores declarations at the first trick — highest-value set wins ties; only the winning team's declarations count
-FR10: The system awards the Belot bonus (K+Q of trump held by same player = 20 pts) when announced during play
-FR11: The system applies failed contract scoring: the failing team scores 0 pts and all points transfer to opponents
+FR10: The system awards the Belote bonus (K+Q of trump held by same player = 20 pts) when announced during play
+FR11: The system applies failed hand scoring: the failing team scores 0 pts and all points transfer to opponents
 FR12: The system awards last-trick bonus (+10 pts) to the team winning the final trick, and applies Capot scoring (+100 pts, replacing last-trick bonus) when one team takes all tricks
 FR13: The system detects and resolves the instant-win condition when a player holds all 8 trump in sequence
 FR14: The system supports 1001-point match mode
@@ -198,8 +198,8 @@ FR6: Epic 11 — Friend requests and friend list
 FR7: Epic 3 — Bitola variant rules engine
 FR8: Epic 12 — Croatian variant rules engine
 FR9: Epic 3 — Declaration validation and scoring
-FR10: Epic 3 — Belot bonus (K+Q trump = 20 pts)
-FR11: Epic 3 — Failed contract scoring
+FR10: Epic 3 — Belote bonus (K+Q trump = 20 pts)
+FR11: Epic 3 — Failed hand scoring
 FR12: Epic 3 — Last-trick bonus and Capot scoring
 FR13: Epic 3 — Instant-win (8 trump in sequence)
 FR14: Epic 4 — 1001-point match mode
@@ -267,7 +267,7 @@ Players can create/configure rooms, browse/search rooms, join via list or code, 
 
 ### Epic 3: Belot Rules Engine (Bitola Variant)
 
-The server-side rules engine correctly enforces all Bitola variant game rules — dealing, trump bidding with reshuffle-and-rotate, declarations, Belot bonus, trick play with suit-following and trump obligations, failed contracts, last-trick bonus, Capot, and instant-win detection. Fully testable as a pure function with no side effects.
+The server-side rules engine correctly enforces all Bitola variant game rules — dealing, trump bidding with reshuffle-and-rotate, declarations, Belote bonus, trick play with suit-following and trump obligations, failed hands, last-trick bonus, Capot, and instant-win detection. Fully testable as a pure function with no side effects.
 
 **FRs covered:** FR7, FR9, FR10, FR11, FR12, FR13
 **Phase:** 1
@@ -699,7 +699,7 @@ So that I can start playing as fast as possible.
 
 ## Epic 3: Belot Rules Engine (Bitola Variant)
 
-The server-side rules engine correctly enforces all Bitola variant game rules — dealing, trump bidding with reshuffle-and-rotate, declarations, Belot bonus, trick play with suit-following and trump obligations, failed contracts, last-trick bonus, Capot, and instant-win detection. Fully testable as a pure function with no side effects.
+The server-side rules engine correctly enforces all Bitola variant game rules — dealing, trump bidding with reshuffle-and-rotate, declarations, Belote bonus, trick play with suit-following and trump obligations, failed hands, last-trick bonus, Capot, and instant-win detection. Fully testable as a pure function with no side effects.
 
 ### Story 3.1: Game State Types, Card Encoding & Deck
 
@@ -817,10 +817,10 @@ So that every trick resolves fairly according to Bitola rules.
 **When** I inspect `testfixtures/`
 **Then** `NewGameMidPlay(trickNum int)` exists, returning a game in `playing` phase at the specified trick number
 
-### Story 3.4: Declarations & Belot Bonus
+### Story 3.4: Declarations & Belote Bonus
 
 As a player,
-I want declarations to be detected and scored correctly at the first trick, and Belot bonus to work when I hold K+Q of trump,
+I want declarations to be detected and scored correctly at the first trick, and Belote bonus to work when I hold K+Q of trump,
 So that these important scoring mechanics are authentic.
 
 **Acceptance Criteria:**
@@ -832,13 +832,13 @@ So that these important scoring mechanics are authentic.
 
 **Given** declarations are submitted at the first trick
 **When** the first trick resolves
-**Then** declarations are compared: sequences (3=20pts, 4=50pts, 5+=100pts), four-of-a-kind (4xJ=200pts, 4x9=150pts, 4xA/T/K/Q=100pts)
+**Then** declarations are compared: tierce (20pts), quarte (50pts), quint (100pts), carré (4xJ=200pts, 4x9=150pts, 4xA/T/K/Q=100pts)
 **And** the highest-value declaration wins; on tie, the team that declared first in play order wins
 **And** only the winning team's declarations are scored — the losing team's declarations are discarded
 
 **Given** a player holds K and Q of the trump suit
 **When** they play either the K or Q during any trick
-**Then** they can announce Belot (bela), and 20 points are added to their team's score for that hand
+**Then** they can announce Belote (bela), and 20 points are added to their team's score for that hand
 
 **Given** a player tries to declare after the first trick
 **When** `ApplyAction` processes a `declare` action
@@ -853,10 +853,10 @@ So that these important scoring mechanics are authentic.
 **Then** `NewGameFirstTrick(trump Suit)` exists with configurable hands that include declarable combinations
 **And** `NewGameWithDeclarations(decls []Declaration)` exists for testing declaration resolution
 
-### Story 3.5: Hand Scoring, Failed Contracts & Capot
+### Story 3.5: Hand Scoring, Failed Hands & Capot
 
 As a player,
-I want hand scoring to correctly calculate points including failed contracts and Capot,
+I want hand scoring to correctly calculate points including failed hands and Capot,
 So that the competitive integrity of the game is maintained.
 
 **Acceptance Criteria:**
@@ -871,9 +871,9 @@ So that the competitive integrity of the game is maintained.
 **When** hand scoring is calculated
 **Then** the winning team receives +100 bonus points (replacing the +10 last-trick bonus, not in addition to it)
 
-**Given** the team that picked trump (the contracting team) scores fewer points than the opposing team
-**When** failed contract logic is applied
-**Then** the contracting team scores 0 points for the hand and ALL points (both teams' card points + declarations + bonuses) are awarded to the opposing team
+**Given** the team that picked trump (the taker's team) scores fewer points than the opposing team
+**When** failed hand logic is applied
+**Then** the taker's team scores 0 points for the hand and ALL points (both teams' card points + declarations + bonuses) are awarded to the opposing team
 
 **Given** the team that picked trump scores equal or more points than the opposing team
 **When** normal scoring is applied
@@ -903,7 +903,7 @@ So that match outcomes are resolved accurately.
 
 **Given** both teams exceed 1001 points in the same hand
 **When** the match-end check runs
-**Then** the team with the higher score wins; if tied, the contracting team (the team that picked trump) wins
+**Then** the team with the higher score wins; if tied, the taker's team (the team that picked trump) wins
 
 **Given** a player holds all 8 trump cards in sequence (7, 8, 9, T, J, Q, K, A of the trump suit)
 **When** the dealing phase completes and hands are evaluated
@@ -1083,7 +1083,7 @@ So that I can make game-critical decisions confidently without confusion.
 
 **Given** the game is at the first trick and a player holds a declarable combination
 **When** the DeclarationPrompt renders
-**Then** it shows the declaration type and value (e.g., "Sequence of 4 — 50 pts") with DECLARE (primary) and SKIP (ghost) buttons
+**Then** it shows the declaration type and value (e.g., "Quarte — 50 pts") with DECLARE (primary) and SKIP (ghost) buttons
 **And** the prompt must be resolved before card play is enabled for that player's turn
 
 **Given** declarations are resolved at the end of the first trick
@@ -1147,7 +1147,7 @@ So that scoring feels transparent, accurate, and satisfying.
 
 **Given** all 8 tricks in a hand are complete
 **When** the score reveal phase begins
-**Then** a dedicated ScoreReveal overlay expands showing: points per team (card points, declaration points, last-trick bonus), any failed contract adjustment, and updated match totals
+**Then** a dedicated ScoreReveal overlay expands showing: points per team (card points, declaration points, last-trick bonus), any failed hand adjustment, and updated match totals
 **And** numbers animate in sequentially for theatrical effect
 **And** a "Continue" action becomes available after 2 seconds
 
@@ -1409,7 +1409,7 @@ So that I can review past games and track my performance.
 
 **Given** a player clicks on a match entry
 **When** the detail view expands
-**Then** per-hand scoring breakdown is displayed: hand number, card points per team, declarations, bonuses (last trick, Capot), failed contract indicators
+**Then** per-hand scoring breakdown is displayed: hand number, card points per team, declarations, bonuses (last trick, Capot), failed hand indicators
 
 **Given** a player has no completed matches
 **When** the match history section renders
@@ -2096,7 +2096,7 @@ So that the platform supports both major Balkan Belot variants.
 
 **Given** the Croatian variant is selected
 **When** card play and scoring proceed
-**Then** all other rules (suit-following, trump obligations, declarations, Belot bonus, scoring, failed contracts, Capot, last-trick bonus) are identical to Bitola variant
+**Then** all other rules (suit-following, trump obligations, declarations, Belote bonus, scoring, failed hands, Capot, last-trick bonus) are identical to Bitola variant
 
 **Given** the rules engine receives a Croatian game
 **When** `ApplyAction` processes bidding actions
@@ -2121,7 +2121,7 @@ So that I can enjoy a quicker game when I don't have time for a full 1001 match.
 
 **Given** a team's score reaches or exceeds 501
 **When** the match-end check runs
-**Then** the match ends with the same resolution rules as 1001 (higher score wins; tie goes to contracting team)
+**Then** the match ends with the same resolution rules as 1001 (higher score wins; tie goes to the taker's team)
 
 **Given** a room is created
 **When** the mode dropdown is configured
@@ -2141,7 +2141,7 @@ So that I can look up rules without leaving the platform.
 
 **Given** a player is in the lobby
 **When** they click the "Rules" tab in the top nav
-**Then** a rules reference page loads with sections covering: card values, dealing, trump bidding (both variants), suit-following obligations, declarations, Belot bonus, scoring, failed contracts, Capot, and instant-win
+**Then** a rules reference page loads with sections covering: card values, dealing, trump bidding (both variants), suit-following obligations, declarations, Belote bonus, scoring, failed hands, Capot, and instant-win
 
 **Given** a player is in an active game
 **When** they click the rules icon (bottom-right persistent icon)

@@ -1,11 +1,11 @@
-# Story 3.4: Declarations & Belot Bonus
+# Story 3.4: Declarations & Belote Bonus
 
 Status: done
 
 ## Story
 
 As a player,
-I want declarations to be detected and scored correctly at the first trick, and Belot bonus to work when I hold K+Q of trump,
+I want declarations to be detected and scored correctly at the first trick, and Belote bonus to work when I hold K+Q of trump,
 So that these important scoring mechanics are authentic.
 
 ## Acceptance Criteria
@@ -17,13 +17,13 @@ So that these important scoring mechanics are authentic.
 
 2. **Given** declarations are submitted at the first trick
    **When** the first trick resolves (all 4 cards played)
-   **Then** declarations are compared: sequences (3=20pts, 4=50pts, 5+=100pts), four-of-a-kind (4xJ=200pts, 4x9=150pts, 4xA/T/K/Q=100pts)
+   **Then** declarations are compared: tierce (20pts), quarte (50pts), quint (100pts), carré (4xJ=200pts, 4x9=150pts, 4xA/T/K/Q=100pts)
    **And** the highest-value declaration wins; on tie, the team that declared first in play order wins
    **And** only the winning team's declarations are scored — the losing team's declarations are discarded
 
 3. **Given** a player holds K and Q of the trump suit
    **When** they play either the K or Q during any trick
-   **Then** the game state indicates a pending Belot announcement for that player
+   **Then** the game state indicates a pending Belote announcement for that player
    **And** if the player submits `announce_belot`, 20 points are added to their team's hand score
    **And** if the player submits `skip_belot`, no bonus is awarded
 
@@ -42,13 +42,13 @@ So that these important scoring mechanics are authentic.
 
 ## Tasks / Subtasks
 
-- [x] Task 1: Add new GameState fields for declaration/Belot tracking (AC: all)
+- [x] Task 1: Add new GameState fields for declaration/Belote tracking (AC: all)
   - [x] 1.1: In `server/internal/game/state.go`, add `AwaitingDeclaration bool` to GameState — true when the active player at trick 1 has declarable combos and has not yet declared/skipped
   - [x] 1.2: Add `DeclarationsResolved bool` to GameState — true after trick 1 declarations have been compared and points awarded. Reset to false each new hand
   - [x] 1.3: Add `PendingBelotSeat *int` to GameState — set when a player plays trump K or Q while holding the other; must be resolved via `announce_belot`/`skip_belot` before turn advances
-  - [x] 1.4: Add `BelotAnnounced bool` to GameState — true if Belot has been announced this hand (at most once per hand since only one player can hold both trump K+Q)
+  - [x] 1.4: Add `BelotAnnounced bool` to GameState — true if Belote has been announced this hand (at most once per hand since only one player can hold both trump K+Q)
   - [x] 1.5: Update `cloneGameState()` in `bidding.go` to deep-copy the new pointer field (`PendingBelotSeat`)
-  - [x] 1.6: Ensure new fields have correct JSON tags (`json:"awaitingDeclaration"`, `json:"declarationsResolved"`, `json:"pendingBelotSeat"`, `json:"belotAnnounced"`) and are placed in the correct GameState sections (declaration fields in "Current trick state" or "Player states" section, Belot fields near scoring)
+  - [x] 1.6: Ensure new fields have correct JSON tags (`json:"awaitingDeclaration"`, `json:"declarationsResolved"`, `json:"pendingBelotSeat"`, `json:"belotAnnounced"`) and are placed in the correct GameState sections (declaration fields in "Current trick state" or "Player states" section, Belote fields near scoring)
 
 - [x] Task 2: Add new action type constants and error sentinels (AC: #3, #4)
   - [x] 2.1: In `server/internal/game/types.go`, add `ActionAnnounceBelot = "announce_belot"` and `ActionSkipBelot = "skip_belot"` action type constants
@@ -59,12 +59,12 @@ So that these important scoring mechanics are authentic.
 - [x] Task 3: Create `declarations.go` with declaration detection and resolution (AC: #1, #2, #4, #5)
   - [x] 3.1: Create `server/internal/game/declarations.go`
   - [x] 3.2: Implement `detectDeclarations(hand []Card, trumpSuit Suit) []Declaration` — scans a player's hand for all valid declarations:
-    - **Sequences**: Find consecutive ranks of the same suit using the natural rank order (7,8,9,T,J,Q,K,A). A sequence of 3 = 20pts, 4 = 50pts, 5+ = 100pts. A longer sequence subsumes shorter subsequences (e.g., a sequence of 5 does NOT also count a sequence of 3 within it)
-    - **Four-of-a-kind**: Find ranks where the player holds all 4 suits. 4×J = 200pts, 4×9 = 150pts, 4×A/T/K/Q = 100pts. 4×8 and 4×7 are NOT declarable (0-point cards)
+    - **Sequences**: Find consecutive ranks of the same suit using the natural rank order (7,8,9,T,J,Q,K,A). A tierce = 20pts, quarte = 50pts, quint = 100pts. A longer sequence subsumes shorter subsequences (e.g., a quint does NOT also count a tierce within it)
+    - **Carré**: Find ranks where the player holds all 4 suits. 4×J = 200pts, 4×9 = 150pts, 4×A/T/K/Q = 100pts. 4×8 and 4×7 are NOT declarable (0-point cards)
     - Return all valid declarations with their type, cards, and point value
   - [x] 3.3: Implement `resolveDeclarations(players [4]PlayerState, trumpSuit Suit) (winningTeam int, totalPoints int)` — compares all players' declarations after trick 1:
     - Compare highest individual declaration from each team
-    - Higher value wins. On equal value: sequence beats four-of-a-kind if somehow equal (in practice they can't be); for equal sequences, the one with the higher top card wins; for still-equal sequences, the one in the trump suit wins; for still-equal, the team that declared first in counter-clockwise play order from the trick leader wins
+    - Higher value wins. On equal value: sequence beats carré if somehow equal (in practice they can't be); for equal sequences, the one with the higher top card wins; for still-equal sequences, the one in the trump suit wins; for still-equal, the team that declared first in counter-clockwise play order from the trick leader wins
     - Return winning team index (0=Team A, 1=Team B) and total declaration points for the winning team (sum of ALL their declarations, not just the highest)
     - If no declarations at all, return -1 for winningTeam and 0 points
   - [x] 3.4: Implement `hasDeclarableCombinations(hand []Card, trumpSuit Suit) bool` — quick check returning true if `detectDeclarations` would return any results. Used by `handlePlaying` to decide whether to set `AwaitingDeclaration`
@@ -80,7 +80,7 @@ So that these important scoring mechanics are authentic.
     - Set `AwaitingDeclaration = false`
     - Return new state (player now needs to play a card)
 
-- [x] Task 4: Implement Belot bonus detection and announcement (AC: #3)
+- [x] Task 4: Implement Belote bonus detection and announcement (AC: #3)
   - [x] 4.1: In `declarations.go`, implement `hasBelot(hand []Card, trumpSuit Suit) bool` — returns true if player holds both K and Q of trump suit
   - [x] 4.2: Implement `shouldPromptBelot(state *GameState, seat int, playedCard Card) bool` — returns true if:
     - The played card is K or Q of the trump suit
@@ -96,7 +96,7 @@ So that these important scoring mechanics are authentic.
     - Set `PendingBelotSeat = nil` (no bonus)
     - Resume normal turn flow
 
-- [x] Task 5: Modify `handlePlaying` to integrate declarations and Belot (AC: #1-5)
+- [x] Task 5: Modify `handlePlaying` to integrate declarations and Belote (AC: #1-5)
   - [x] 5.1: In `playing.go`, update `handlePlaying` to route new action types:
     ```go
     case ActionDeclare:     return handleDeclare(state, action)
@@ -108,9 +108,9 @@ So that these important scoring mechanics are authentic.
   - [x] 5.3: In `handlePlayCard`, add guard: if `PendingBelotSeat != nil`, return `ErrActionRequired` ("must announce or skip belot first")
   - [x] 5.4: After a card is successfully played (after removing card from hand, before advancing active player), check `shouldPromptBelot()`. If true:
     - Set `PendingBelotSeat` to the playing seat
-    - Do NOT advance ActivePlayerSeat yet — the same player must resolve Belot first
-    - Do NOT call `resolveTrick` yet even if 4 cards played — Belot must resolve first
-  - [x] 5.5: In the Belot handlers (`handleAnnounceBelot`/`handleSkipBelot`), after clearing `PendingBelotSeat`:
+    - Do NOT advance ActivePlayerSeat yet — the same player must resolve Belote first
+    - Do NOT call `resolveTrick` yet even if 4 cards played — Belote must resolve first
+  - [x] 5.5: In the Belote handlers (`handleAnnounceBelot`/`handleSkipBelot`), after clearing `PendingBelotSeat`:
     - Advance `ActivePlayerSeat = (seat + 1) % 4` (the normal post-play advance that was deferred)
     - If `len(CurrentTrick) == 4`, call `resolveTrick`
   - [x] 5.6: When trick 1 begins (after a player's card is played as the first card, OR when a new player's turn starts at trick 1), check if the newly-active player has declarable combos via `hasDeclarableCombinations()`:
@@ -126,12 +126,12 @@ So that these important scoring mechanics are authentic.
     - Phase = PhasePlaying, TrickNumber = 1, CurrentTrick = nil, LeadSuit = nil
     - Trump set to the given suit, TrumpCallerSeat set
     - **Critical**: Player hands must contain declarable combinations for testing:
-      - Seat 0: A sequence of 3 in one suit (e.g., 7H, 8H, 9H among other cards) → 20 pts
-      - Seat 1: A sequence of 4 in one suit (e.g., JD, QD, KD, AD among other cards) → 50 pts
-      - Seat 2: Four-of-a-kind Jacks (JS, JH, JD, JC among other cards) → 200 pts (but this requires all 4 Jacks — may conflict with other seats; adjust to a valid 32-card distribution)
+      - Seat 0: A tierce in one suit (e.g., 7H, 8H, 9H among other cards) → 20 pts
+      - Seat 1: A quarte in one suit (e.g., JD, QD, KD, AD among other cards) → 50 pts
+      - Seat 2: Carré of Jacks (JS, JH, JD, JC among other cards) → 200 pts (but this requires all 4 Jacks — may conflict with other seats; adjust to a valid 32-card distribution)
       - Seat 3: No declarable combinations
     - Design hands carefully so all 32 cards are distributed (8 per player) and declarations are testable
-    - Include at least one player with K+Q of trump for Belot testing
+    - Include at least one player with K+Q of trump for Belote testing
   - [x] 6.2: Add `NewGameWithDeclarations(decls []Declaration) *GameState` to `testfixtures/fixtures.go`:
     - Phase = PhasePlaying, TrickNumber = 1, some cards played in CurrentTrick (simulating mid-trick-1)
     - Pre-populated `Players[seat].Declarations` from the provided `decls` parameter
@@ -144,17 +144,17 @@ So that these important scoring mechanics are authentic.
 - [x] Task 7: Write declaration detection tests in `declarations_test.go` (AC: #1, #2)
   - [x] 7.1: Create `server/internal/game/declarations_test.go` with `package game_test`
   - [x] 7.2: Test `detectDeclarations` through `ApplyAction` — player at trick 1 submits `declare`, verify correct declarations stored:
-    - Sequence of 3 (e.g., 7H, 8H, 9H) = 20 pts
-    - Sequence of 4 (e.g., TH, JH, QH, KH) = 50 pts
-    - Sequence of 5+ = 100 pts
-    - Four-of-a-kind Jacks = 200 pts
-    - Four-of-a-kind Nines = 150 pts
-    - Four-of-a-kind A/T/K/Q = 100 pts
+    - Tierce (e.g., 7H, 8H, 9H) = 20 pts
+    - Quarte (e.g., TH, JH, QH, KH) = 50 pts
+    - Quint = 100 pts
+    - Carré of Jacks = 200 pts
+    - Carré of Nines = 150 pts
+    - Carré of A/T/K/Q = 100 pts
     - No declaration for 4×8 or 4×7
-    - Multiple declarations from same player (sequence + four-of-a-kind)
+    - Multiple declarations from same player (sequence + carré)
   - [x] 7.3: Test declaration resolution through full trick 1 play:
     - Higher-value declaration wins (50 beats 20)
-    - On tie (e.g., two sequences of 3), higher top card wins
+    - On tie (e.g., two tierces), higher top card wins
     - On still-tie, trump suit sequence wins
     - On still-tie, first in play order (counter-clockwise from trick leader) wins
     - Only winning team's declarations are scored — losing team gets 0
@@ -168,23 +168,23 @@ So that these important scoring mechanics are authentic.
     - `declare` when not active player → `ErrNotYourTurn`
     - `play_card` while `AwaitingDeclaration = true` → `ErrActionRequired`
 
-- [x] Task 8: Write Belot bonus tests (AC: #3)
-  - [x] 8.1: Test Belot detection — play trump K while holding trump Q → `PendingBelotSeat` is set
-  - [x] 8.2: Test Belot detection — play trump Q while holding trump K → `PendingBelotSeat` is set
+- [x] Task 8: Write Belote bonus tests (AC: #3)
+  - [x] 8.1: Test Belote detection — play trump K while holding trump Q → `PendingBelotSeat` is set
+  - [x] 8.2: Test Belote detection — play trump Q while holding trump K → `PendingBelotSeat` is set
   - [x] 8.3: Test `announce_belot` → 20 points added to team's HandPoints, turn advances normally
   - [x] 8.4: Test `skip_belot` → no points, turn advances normally
-  - [x] 8.5: Test Belot at trick 1 with declarations — declaration resolved first, then card play with Belot prompt
-  - [x] 8.6: Test Belot at later tricks (trick 2-8) — no declaration prompt, just Belot
-  - [x] 8.7: Test no Belot when playing K of trump without Q in hand → no prompt
-  - [x] 8.8: Test no Belot when playing non-trump K or Q → no prompt
+  - [x] 8.5: Test Belote at trick 1 with declarations — declaration resolved first, then card play with Belote prompt
+  - [x] 8.6: Test Belote at later tricks (trick 2-8) — no declaration prompt, just Belote
+  - [x] 8.7: Test no Belote when playing K of trump without Q in hand → no prompt
+  - [x] 8.8: Test no Belote when playing non-trump K or Q → no prompt
   - [x] 8.9: Test `announce_belot` when `PendingBelotSeat` is nil → error
   - [x] 8.10: Test `play_card` while `PendingBelotSeat` is set → `ErrActionRequired`
 
-- [x] Task 9: Write integration test — full trick 1 with declarations + Belot (AC: all)
-  - [x] 9.1: Test full trick 1 flow: player declares → plays card (with Belot) → announces Belot → next player skips declare → plays card → ... → trick resolves → declarations compared → points awarded
+- [x] Task 9: Write integration test — full trick 1 with declarations + Belote (AC: all)
+  - [x] 9.1: Test full trick 1 flow: player declares → plays card (with Belote) → announces Belote → next player skips declare → plays card → ... → trick resolves → declarations compared → points awarded
   - [x] 9.2: Verify declaration points appear in `DeclarationPoints[team]` after trick 1
-  - [x] 9.3: Verify Belot points appear in `HandPoints[team]` (20 pts added)
-  - [x] 9.4: Verify tricks 2-8 have no declaration prompts (only Belot possible)
+  - [x] 9.3: Verify Belote points appear in `HandPoints[team]` (20 pts added)
+  - [x] 9.4: Verify tricks 2-8 have no declaration prompts (only Belote possible)
   - [x] 9.5: Verify state immutability — original state unchanged after all ApplyAction calls
 
 - [x] Task 10: Verify full regression suite passes
@@ -200,7 +200,7 @@ So that these important scoring mechanics are authentic.
 
 **State Cloning:** All `handle*` functions must clone the `GameState` via `cloneGameState()` before any mutation. After Story 3.3, `cloneGameState` properly deep-copies all pointer fields and slices.
 
-**Phase-Based Dispatch:** Extend the existing `handlePlaying` function's action type switch (from Story 3.3) to route `ActionDeclare`, `ActionSkipDeclare`, `ActionAnnounceBelot`, `ActionSkipBelot`. Do NOT modify `ApplyAction` in `rules_engine.go` — all declaration and Belot logic lives within the `PhasePlaying` phase handler.
+**Phase-Based Dispatch:** Extend the existing `handlePlaying` function's action type switch (from Story 3.3) to route `ActionDeclare`, `ActionSkipDeclare`, `ActionAnnounceBelot`, `ActionSkipBelot`. Do NOT modify `ApplyAction` in `rules_engine.go` — all declaration and Belote logic lives within the `PhasePlaying` phase handler.
 
 ### Declaration Rules — Complete Specification
 
@@ -216,7 +216,7 @@ So that these important scoring mechanics are authentic.
 | ----------- | ------------------------------- | ------ |
 | Tierce      | 3 consecutive ranks, same suit  | 20     |
 | Quarte      | 4 consecutive ranks, same suit  | 50     |
-| Quinte+     | 5+ consecutive ranks, same suit | 100    |
+| Quint       | 5+ consecutive ranks, same suit | 100    |
 | Four Jacks  | J of all 4 suits                | 200    |
 | Four Nines  | 9 of all 4 suits                | 150    |
 | Four Aces   | A of all 4 suits                | 100    |
@@ -226,9 +226,9 @@ So that these important scoring mechanics are authentic.
 
 **Rank Order for Sequences:** 7 < 8 < 9 < T < J < Q < K < A. Consecutive means adjacent in this order. Example: T-J-Q is a valid tierce; 9-J-Q is NOT (skips T).
 
-**Subsumption Rule:** A longer sequence subsumes shorter ones within it. A player holding 7-8-9-T-J of hearts has ONE declaration (quinte = 100pts), NOT a quinte + two tierces.
+**Subsumption Rule:** A longer sequence subsumes shorter ones within it. A player holding 7-8-9-T-J of hearts has ONE declaration (quint = 100pts), NOT a quint + two tierces.
 
-**Four-of-a-Kind Exclusions:** 4×8 and 4×7 are NOT valid declarations (they have 0 card points).
+**Carré Exclusions:** 4×8 and 4×7 are NOT valid declarations (they have 0 card points).
 
 **Declaration Resolution (after all 4 trick-1 cards played):**
 
@@ -242,7 +242,7 @@ So that these important scoring mechanics are authentic.
 
 **Auto-Detection:** When a player submits `declare`, the server auto-detects ALL valid declarations from their hand. The player does NOT specify which declarations — the server finds them all. The `declare` action is a simple "yes, I want to declare" signal.
 
-### Belot Bonus — Complete Specification
+### Belote Bonus — Complete Specification
 
 **What:** King + Queen of the trump suit held by the same player = 20 bonus points.
 
@@ -254,13 +254,13 @@ So that these important scoring mechanics are authentic.
 2. Server detects player held both trump K+Q (checking hand BEFORE the card was removed)
 3. `PendingBelotSeat` is set → turn does NOT advance
 4. Player submits `announce_belot` (20 pts to team's `HandPoints`) or `skip_belot` (no bonus)
-5. After Belot resolved → turn advances normally (or trick resolves if 4th card)
+5. After Belote resolved → turn advances normally (or trick resolves if 4th card)
 
 **Constraints:**
 
-- At most one Belot per hand (only one player can hold both trump K+Q)
-- Belot points go into `HandPoints[team]`, NOT `DeclarationPoints[team]` — they are a hand bonus, not a declaration
-- Belot can be announced at ANY trick, not just trick 1
+- At most one Belote per hand (only one player can hold both trump K+Q)
+- Belote points go into `HandPoints[team]`, NOT `DeclarationPoints[team]` — they are a hand bonus, not a declaration
+- Belote can be announced at ANY trick, not just trick 1
 - If the player does not announce (skips), the bonus is lost permanently for that hand
 
 ### Action Flow at Trick 1 (Per Player)
@@ -313,13 +313,13 @@ Player's turn begins
 - `DeclarationPoints [2]int` field in GameState — already exists
 - `Players[i].Declarations []Declaration` field in PlayerState — already exists
 - `legalCards()`, `isCardLegal()` in `validation.go` — reuse for card play validation
-- `resolveTrick()` in `playing.go` — call after Belot resolution at trick end
+- `resolveTrick()` in `playing.go` — call after Belote resolution at trick end
 - All error sentinels: `ErrWrongPhase`, `ErrNotYourTurn`, `ErrInvalidCard`, `ErrIllegalPlay` in `apperr/errors.go`
 - `slices.Clone()` for slice deep-copies
 
 ### Forward Compatibility — Story 3.5 (Hand Scoring)
 
-Story 3.5 will implement hand scoring after all 8 tricks. It will read `DeclarationPoints[team]` (set by this story) and `HandPoints[team]` (card points + Belot bonus set by this story and Story 3.3) to calculate final hand scores including last-trick bonus, Capot, and failed contracts. Ensure `DeclarationPoints` and `HandPoints` are correctly populated so Story 3.5 can consume them directly.
+Story 3.5 will implement hand scoring after all 8 tricks. It will read `DeclarationPoints[team]` (set by this story) and `HandPoints[team]` (card points + Belote bonus set by this story and Story 3.3) to calculate final hand scores including last-trick bonus, Capot, and failed hands. Ensure `DeclarationPoints` and `HandPoints` are correctly populated so Story 3.5 can consume them directly.
 
 ### State Reset Between Hands
 
@@ -340,8 +340,8 @@ This reset logic belongs in Story 3.5/3.6 (hand/match scoring transitions), NOT 
 
 ```
 server/internal/game/
-  declarations.go          -- NEW: declaration detection, resolution, Belot bonus logic
-  declarations_test.go     -- NEW: declaration + Belot tests through ApplyAction
+  declarations.go          -- NEW: declaration detection, resolution, Belote bonus logic
+  declarations_test.go     -- NEW: declaration + Belote tests through ApplyAction
 ```
 
 **Modified files:**
@@ -350,7 +350,7 @@ server/internal/game/
 server/internal/game/
   state.go                 -- MODIFIED: Add AwaitingDeclaration, DeclarationsResolved, PendingBelotSeat, BelotAnnounced fields
   types.go                 -- MODIFIED: Add ActionAnnounceBelot, ActionSkipBelot constants
-  playing.go               -- MODIFIED: Route new action types, integrate declaration/Belot guards into handlePlayCard
+  playing.go               -- MODIFIED: Route new action types, integrate declaration/Belote guards into handlePlayCard
   bidding.go               -- MODIFIED: Update cloneGameState for new pointer field (PendingBelotSeat)
   testfixtures/
     fixtures.go            -- MODIFIED: Add NewGameFirstTrick(), NewGameWithDeclarations()
@@ -393,23 +393,23 @@ These deferred items from the 3.3 code review are NOT addressed by this story bu
 
 ### References
 
-- [Source: _bmad-output/planning-artifacts/epics.md — Story 3.4: Declarations & Belot Bonus]
+- [Source: _bmad-output/planning-artifacts/epics.md — Story 3.4: Declarations & Belote Bonus]
 - [Source: _bmad-output/planning-artifacts/architecture.md — Game Domain Specifications, phase table, test fixture minimum set]
-- [Source: _bmad-output/planning-artifacts/prd.md — FR9 (declarations), FR10 (Belot bonus)]
+- [Source: _bmad-output/planning-artifacts/prd.md — FR9 (declarations), FR10 (Belote bonus)]
 - [Source: _bmad-output/planning-artifacts/ux-design-specification.md — DeclarationPrompt component]
-- [Source: _bmad-output/project-context.md — Anti-pattern: require player announcement for Belot]
+- [Source: _bmad-output/project-context.md — Anti-pattern: require player announcement for Belote]
 - [Source: _bmad-output/implementation-artifacts/3-3-card-play-and-trick-resolution.md — Forward compatibility note for Story 3.4]
 
 ### Review Findings
 
-- [x] [Review][Patch] Four-of-a-kind (100pts) vs 5-card sequence (100pts) tiebreaker — FIXED: four-of-a-kind beats equal-value sequence — `declarationBeats` falls through to play-order when a FourOfAKind ties a quinte at 100pts. Standard Belot rules say four-of-a-kind beats equal-value sequence; story spec says "in practice they can't be equal" but they CAN (100 vs 100). Which should win? [declarations.go:167-195]
+- [x] [Review][Patch] Carré (100pts) vs quint (100pts) tiebreaker — FIXED: carré beats equal-value sequence — `declarationBeats` falls through to play-order when a FourOfAKind ties a quint at 100pts. Standard Belot rules say carré beats equal-value sequence; story spec says "in practice they can't be equal" but they CAN (100 vs 100). Which should win? [declarations.go:167-195]
 - [x] [Review][Patch] `Declaration.Cards` shallow-cloned in `cloneGameState` — `slices.Clone` copies the outer `[]Declaration` but each `Declaration.Cards []Card` shares backing array with original. Deep-clone Cards to preserve pure-function contract [bidding.go:162]
-- [x] [Review][Patch] `handBeforePlay` aliases cloned hand — correct today but if `removeCard` ever mutates in-place, Belot detection breaks. Add explicit `slices.Clone` [playing.go:65]
+- [x] [Review][Patch] `handBeforePlay` aliases cloned hand — correct today but if `removeCard` ever mutates in-place, Belote detection breaks. Add explicit `slices.Clone` [playing.go:65]
 - [x] [Review][Patch] `NewGameFirstTrick(trump)` ignores `trump` parameter — always uses Hearts. Spec says configurable [testfixtures/fixtures.go:234]
 - [x] [Review][Patch] Fixture comment for seat 2 says "tierce QS-KS-AS" but seat 2 has no QS — correct comment to "tierce 9H-TH-JH (trump)" [testfixtures/fixtures.go:217-229]
 - [x] [Review][Patch] `detectDeclarations` accepts unused `trumpSuit` parameter — remove or document [declarations.go:42]
 - [x] [Review][Patch] Dead code: `trickPointsForTeam` helper always returns 0 and is unused — remove [declarations_test.go:514-519]
-- [x] [Review][Patch] Missing tests: tiebreaker resolution (top card, trump suit, play-order), four-of-a-kind declarations (4xJ=200, 4x9=150, 4xA/T/K/Q=100, no 4x8/7), quinte (5+ sequence = 100pts), Belot at tricks 2-8, skip_declare at trick 2, fixture validation tests for NewGameFirstTrick/NewGameWithDeclarations [declarations_test.go]
+- [x] [Review][Patch] Missing tests: tiebreaker resolution (top card, trump suit, play-order), carré declarations (4xJ=200, 4x9=150, 4xA/T/K/Q=100, no 4x8/7), quint (5+ sequence = 100pts), Belote at tricks 2-8, skip_declare at trick 2, fixture validation tests for NewGameFirstTrick/NewGameWithDeclarations [declarations_test.go]
 - [x] [Review][Defer] `checkDeclarationPrompt` cannot distinguish skip from never-asked — safe in current linear 4-player flow but fragile for future changes; no re-prompt possible today [declarations.go:404]
 - [x] [Review][Defer] `TrumpSuit` nil dereference in `resolveDeclarationsForHand` and `checkDeclarationPrompt` — pre-existing pattern deferred in Story 3.3; current call paths guarantee non-nil [declarations.go:382,407]
 - [x] [Review][Defer] `BelotAnnounced`/`DeclarationsResolved`/`DeclarationPoints` not reset between hands — Story 3.5/3.6 responsibility per story Dev Notes [state.go]
@@ -425,10 +425,10 @@ Claude Opus 4.6 (1M context)
 
 ### Completion Notes List
 
-- Implemented declaration detection (`detectDeclarations`) supporting sequences (tierce 20, quarte 50, quinte+ 100) and four-of-a-kind (4xJ=200, 4x9=150, 4xA/T/K/Q=100). Longer sequences subsume shorter subsequences.
+- Implemented declaration detection (`detectDeclarations`) supporting sequences (tierce 20, quarte 50, quint 100) and carré (4xJ=200, 4x9=150, 4xA/T/K/Q=100). Longer sequences subsume shorter subsequences.
 - Implemented declaration resolution (`resolveDeclarations`) with full tiebreaker chain: value > top card rank > trump suit > play order. Only winning team's declarations scored.
-- Implemented Belot bonus: plays trump K or Q when holding the other triggers pending announcement. `announce_belot` awards 20pts to team's HandPoints; `skip_belot` awards nothing.
-- Integrated declarations and Belot into `handlePlaying` — new action types routed, guards added for pending actions (`ErrActionRequired`).
+- Implemented Belote bonus: plays trump K or Q when holding the other triggers pending announcement. `announce_belot` awards 20pts to team's HandPoints; `skip_belot` awards nothing.
+- Integrated declarations and Belote into `handlePlaying` — new action types routed, guards added for pending actions (`ErrActionRequired`).
 - `handlePickTrump` now calls `checkDeclarationPrompt` for the first player when transitioning to playing phase.
 - `NewGameMidPlay` fixture updated with `DeclarationsResolved=true` and `BelotAnnounced=true` to preserve backward compatibility for existing card play tests.
 - All 26 new test cases pass. All existing tests pass (zero regressions). Full backend suite: all packages OK. Frontend: 109/109 tests pass.
@@ -437,14 +437,14 @@ Claude Opus 4.6 (1M context)
 
 **New files:**
 
-- `server/internal/game/declarations.go` — Declaration detection, resolution, Belot bonus, handlers
-- `server/internal/game/declarations_test.go` — 26 test cases covering declarations, Belot, integration flow
+- `server/internal/game/declarations.go` — Declaration detection, resolution, Belote bonus, handlers
+- `server/internal/game/declarations_test.go` — 26 test cases covering declarations, Belote, integration flow
 
 **Modified files:**
 
 - `server/internal/game/state.go` — Added `AwaitingDeclaration`, `DeclarationsResolved`, `PendingBelotSeat`, `BelotAnnounced` fields
 - `server/internal/game/types.go` — Added `ActionAnnounceBelot`, `ActionSkipBelot` constants
-- `server/internal/game/playing.go` — Routed new action types, added declaration/Belot guards, integrated Belot detection into card play flow
+- `server/internal/game/playing.go` — Routed new action types, added declaration/Belote guards, integrated Belote detection into card play flow
 - `server/internal/game/bidding.go` — Updated `cloneGameState` for `PendingBelotSeat`, added `checkDeclarationPrompt` call in `handlePickTrump`
-- `server/internal/game/testfixtures/fixtures.go` — Added `NewGameFirstTrick`, `NewGameWithDeclarations` fixtures; updated `NewGameMidPlay` with declaration/Belot flags
+- `server/internal/game/testfixtures/fixtures.go` — Added `NewGameFirstTrick`, `NewGameWithDeclarations` fixtures; updated `NewGameMidPlay` with declaration/Belote flags
 - `server/internal/apperr/errors.go` — Added `ErrDeclarationNotAvailable`, `ErrBelotNotAvailable`, `ErrActionRequired`
