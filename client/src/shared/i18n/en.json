@@ -45,7 +45,7 @@
     },
     "stats": {
       "eyebrow": "Career",
-      "sub": "Career totals across every match — declarations, capots, failed contracts and all.",
+      "sub": "Career totals across every match — declarations, capots, failed hands and all.",
       "totalGamesPlayed": "Matches played",
       "wins": "Wins",
       "losses": "Losses",
@@ -61,7 +61,7 @@
     "matchHistory": {
       "eyebrow": "Activity",
       "title": "Match history",
-      "sub": "Every completed match — open a row to see hand-by-hand scoring, declarations, capots and failed contracts.",
+      "sub": "Every completed match — open a row to see hand-by-hand scoring, declarations, capots and failed hands.",
       "empty": "No matches yet — Quick Play to get started",
       "emptyCta": "Go to lobby",
       "emptyFiltered": "No matches for this filter yet.",
@@ -108,7 +108,7 @@
         "declarationPoints": "Declarations",
         "lastTrickBonus": "Last trick",
         "capot": "Capot",
-        "failedContract": "Failed",
+        "failedContract": "Failed hand",
         "handTotal": "Hand Total",
         "col": {
           "number": "#",
@@ -119,9 +119,9 @@
         },
         "desc": {
           "capot": "Capot",
-          "failed": "Failed contract",
-          "weCalled": "We called trump",
-          "theyCalled": "They called trump"
+          "failed": "Failed hand",
+          "weCalled": "We took trump",
+          "theyCalled": "They took trump"
         },
         "note": {
           "capot": "+{{points}} capot",
@@ -147,7 +147,7 @@
     "milestones": {
       "eyebrow": "Milestones",
       "title": "Career highlights",
-      "capotsLabel": "Capots called",
+      "capotsLabel": "Capots made",
       "capotsHint": "max-points hands",
       "bestHandLabel": "Best hand",
       "bestHandHint": "Hand {{hand}} · {{date}}",
@@ -539,26 +539,26 @@
       "teamDeclared": "{{team}} declared",
       "headlineUs": "We won the declarations",
       "headlineThem": "They won the declarations",
-      "tiebreaker": "{{player}}'s {{label}} — highest meld at the table",
+      "tiebreaker": "{{player}}'s {{label}} — highest declaration at the table",
       "byPlayer": "by {{name}}",
       "addedToHand": "Added to this hand's score",
       "dismiss": "Dismiss"
     },
     "belot": {
-      "titleBelot": "Announce Belot?",
-      "titleRebelot": "Announce Re-belot?",
-      "subtitleBelot": "You hold the K and Q of trump. Announcing now grants +20. The Queen is the trick card.",
-      "subtitleRebelot": "You hold the K and Q of trump. Announcing now grants +20. The King is the trick card.",
-      "accentStripBelot": "Announcing Belot is your move — +20 to your team's score.",
-      "accentStripRebelot": "Announcing Re-belot is your move — +20 to your team's score.",
-      "announceBelot": "Announce Belot +20",
-      "announceRebelot": "Announce Re-belot +20",
+      "titleBelot": "Declare Belote?",
+      "titleRebelot": "Declare Rebelote?",
+      "subtitleBelot": "You hold the K and Q of trump. Declaring now grants +20. The Queen is the trick card.",
+      "subtitleRebelot": "You hold the K and Q of trump. Declaring now grants +20. The King is the trick card.",
+      "accentStripBelot": "Declaring Belote is your move — +20 to your team's score.",
+      "accentStripRebelot": "Declaring Rebelote is your move — +20 to your team's score.",
+      "announceBelot": "Declare Belote +20",
+      "announceRebelot": "Declare Rebelote +20",
       "decline": "Skip",
       "reveal": {
-        "belot": "Belot",
-        "rebelot": "Re-belot",
-        "titleBelot": "{{name}} announced Belot.",
-        "titleRebelot": "{{name}} announced Re-belot.",
+        "belot": "Belote",
+        "rebelot": "Rebelote",
+        "titleBelot": "{{name}} declared Belote.",
+        "titleRebelot": "{{name}} declared Rebelote.",
         "bonus": "+20 to your team's score",
         "dismiss": "Dismiss"
       }
@@ -576,7 +576,7 @@
       "autoPlayed": "Auto-played: {{card}}",
       "autoPassed": "{{player}} ran out of time — auto-passed",
       "autoSkippedDeclare": "{{player}} ran out of time — auto-skipped declarations",
-      "autoSkippedBelot": "{{player}} ran out of time — auto-declined belot"
+      "autoSkippedBelot": "{{player}} ran out of time — auto-declined Belote"
     },
     "score": {
       "heading": "Scoreboard",
@@ -592,14 +592,14 @@
     "scoreReveal": {
       "title": "Hand Score",
       "titleWithHand": "Hand {{hand}} — results",
-      "subtitleHeldYour": "Contract held · your team called {{suit}}",
-      "subtitleHeldTheir": "Contract held · their team called {{suit}}",
-      "subtitleFailed": "Contract failed · all points to {{team}}",
+      "subtitleHeldYour": "Pulled it off · your team took {{suit}}",
+      "subtitleHeldTheir": "Pulled it off · their team took {{suit}}",
+      "subtitleFailed": "Went down · all points to {{team}}",
       "cardPoints": "Card Points",
       "declarationPoints": "Declarations",
       "lastTrickBonus": "Last Trick Bonus",
       "capotBonus": "Capot Bonus",
-      "failedContract": "Failed Contract",
+      "failedContract": "Failed Hand",
       "handTotal": "Hand Total",
       "matchTotal": "Match Score",
       "continue": "Continue"
@@ -784,7 +784,7 @@
       "s1b": "Pick a name, no downloads. You're in the lobby in under a minute.",
       "s2t": "Take a seat",
       "s2b": "Hit Quick Play and we'll matchmake your four, or open a custom room and share the code with friends.",
-      "s3t": "Call trump & play",
+      "s3t": "Take trump & play",
       "s3b": "Take the trump suit, win tricks alongside your partner, and race your team to 1001 points."
     },
     "feat": {

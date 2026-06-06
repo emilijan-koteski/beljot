@@ -1,4 +1,4 @@
-// Beljot · Rules content — English (source copy, verbatim from the design).
+// Beljot · Rules content — English (source copy, cleaned for terminology consistency).
 import type { RulesLangData } from "./types";
 
 export const en: RulesLangData = {
@@ -17,10 +17,10 @@ export const en: RulesLangData = {
 
   declarations: {
     belot: {
-      name: "Belot / Rebelot",
+      name: "Belote-Rebelote",
       summary: "The King and Queen of trump, both sitting in one hand.",
       detail:
-        "The Queen is the Belot, the King the Rebelot — announce each as you play it. The pair always pays out, even when the other team holds something bigger; it stands on its own, outside the contest.",
+        "The Queen is the Belote, the King the Rebelote — announce each as you play it, and it carries +20 points for your team.",
     },
     terca: {
       name: "Tierce",
@@ -31,14 +31,13 @@ export const en: RulesLangData = {
     kvarta: {
       name: "Quarte",
       summary: "Four cards in a row, all the same suit.",
-      detail:
-        "A quarte always beats any tierce the other team holds, no matter which suits are in play.",
+      detail: "A quarte always beats any tierce the other team holds, no matter which suits are in play.",
     },
     kvinta: {
       name: "Quint",
       summary: "Five or more cards in a row, same suit.",
       detail:
-        "Any run of five-plus in a single suit is worth 100. A longer run doesn’t pay any more than a five-card one.",
+        "A quint always beats any quarte the other team holds, no matter which suits are in play. Any run of five-plus in a single suit is worth 100.",
     },
     carre: {
       name: "Carré",
@@ -65,7 +64,7 @@ export const en: RulesLangData = {
       id: "goal",
       label: "The goal",
       title: "Race your team to 1001",
-      lede: "You and your partner share one score. First side to 1001 takes the match — that’s the whole game in a sentence.",
+      lede: "You and your partner share one score. First side to 1001 takes the match.",
       blocks: [
         {
           kind: "p",
@@ -80,7 +79,7 @@ export const en: RulesLangData = {
     {
       id: "basics",
       label: "Getting dealt in",
-      title: "Shuffle, deal, call trump",
+      title: "Shuffle, deal, take trump",
       lede: "Four players, 32 cards, eight to a hand, and a quick round to settle which suit is trump.",
       blocks: [
         {
@@ -166,13 +165,13 @@ export const en: RulesLangData = {
       blocks: [
         {
           kind: "p",
-          text: "Once the cards are dealt and trump is set, check your hand for declarations: runs of cards in a row in one suit, four of a kind, and the King-and-Queen-of-trump pair — the Queen is the Belot, the King the Rebelot. You announce a declaration on your turn during the first trick, as you play your card — then lay the cards face-up for everyone at the start of the second trick. Belot and Rebelot are the odd ones out — you announce each as you play that card during the hand.",
+          text: "Once the cards are dealt and trump is set, check your hand for declarations: runs of cards in a row in one suit, four of a kind, and the King-and-Queen-of-trump pair — the Queen is the Belote, the King the Rebelote. You announce a declaration on your turn during the first trick, as you play your card — then lay the cards face-up for everyone at the start of the second trick. Belote and Rebelote are the odd ones out — you announce each as you play that card during the hand.",
         },
         { kind: "melds" },
         {
           kind: "rule",
           title: "Only one team gets paid for declarations",
-          text: "Each side puts forward its single best declaration. Whoever’s is stronger scoops up every declaration across both their hands — the other team scores nothing for theirs. A longer run beats a shorter one. Same length? The higher top card wins. Still tied? A run in trump takes it. Belot and Rebelot sit outside this contest — whoever announces them always scores them.",
+          text: "Each side puts forward its single best declaration. Whoever’s is stronger scoops up every declaration across both their hands — the other team scores nothing for theirs. A longer run beats a shorter one. Same length? The higher top card wins. Still tied? A run in trump takes it. Belote and Rebelote sit outside this contest — whoever announces them always scores them.",
         },
       ],
     },
@@ -180,7 +179,7 @@ export const en: RulesLangData = {
       id: "scoring",
       label: "Scoring",
       title: "Counting up — and the catch",
-      lede: "Whoever called trump makes a promise: finish ahead, or hand the opponents everything you earned that hand.",
+      lede: "The taker makes a promise: finish ahead, or hand the opponents everything you earned that hand.",
       blocks: [
         {
           kind: "steps",
@@ -191,22 +190,22 @@ export const en: RulesLangData = {
             },
             {
               t: "Add the last-trick bonus",
-              d: "Won the eighth and final trick? That’s another 10 points — table slang calls it “des de der”. Now you’re at 162 for the cards alone.",
+              d: "Won the eighth and final trick? That’s another 10 points — table slang calls it “dix de der”. Now you’re at 162 for the cards alone.",
             },
             {
               t: "Add the declarations",
-              d: "The side that won the declarations contest adds up every combination across both partners’ hands. Any Belot or Rebelot called during the hand goes on top, for whoever announced it.",
+              d: "The side that won the declarations contest adds up every combination across both partners’ hands. Any Belote or Rebelote called during the hand goes on top, for whoever announced it.",
             },
           ],
         },
         {
           kind: "rule",
-          title: "The trump-caller has to come out ahead",
-          text: "The team that took trump must finish with strictly more points than the other side, declarations on both sides included. Fall short — or even tie — and the hand is lost: everything you scored that hand, cards and declarations alike, goes to your opponents instead. Players call this “falling in”, and one bad hand can wipe out a comfortable lead.",
+          title: "The taker has to come out ahead",
+          text: "The team that took trump must finish with strictly more points than the other side, declarations on both sides included. Fall short — or even tie — and the hand is lost: everything you scored that hand, cards and declarations alike, goes to your opponents instead. Players call this “going down”, and one bad hand can wipe out a comfortable lead.",
         },
         {
           kind: "note",
-          text: "Hands keep coming until at least one team is sitting on 1001 or more at the end of a hand. If both teams cross the line on the same hand, the side that called trump that hand takes the match.",
+          text: "Hands keep coming until at least one team is sitting on 1001 or more at the end of a hand. If both teams cross the line on the same hand, the side with more total points takes the match.",
         },
       ],
     },
@@ -237,7 +236,7 @@ export const en: RulesLangData = {
     colCard: "Card",
     colPoints: "Points",
     colPower: "Power",
-    meldKinds: { belot: "Trump pair", set: "Four of a kind", run: "Run" },
+    meldKinds: { belot: "Trump pair", set: "Carré", run: "Run" },
     ovReference: "Reference",
     ovTitle: "Beljot rules",
     ovChapters: "Chapters",
