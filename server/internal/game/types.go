@@ -86,9 +86,14 @@ const (
 	PhasePlaying        Phase = "playing"
 	PhaseTrickResolving Phase = "trick_resolving"
 	PhaseHandScoring    Phase = "hand_scoring"
-	PhaseMatchEnd       Phase = "match_end"
-	PhasePaused         Phase = "paused"
-	PhaseDisconnected   Phase = "disconnected"
+	// PhaseHandComplete holds after a hand is scored and before the next hand is
+	// dealt: the server waits for players to acknowledge the score (action:continue)
+	// or for an auto-continue timeout, so the score breakdown and trick-collect
+	// animation are seen before the next hand begins.
+	PhaseHandComplete Phase = "hand_complete"
+	PhaseMatchEnd     Phase = "match_end"
+	PhasePaused       Phase = "paused"
+	PhaseDisconnected Phase = "disconnected"
 )
 
 // Action type constants for player actions.
@@ -100,9 +105,12 @@ const (
 	ActionSkipDeclare   = "skip_declare"
 	ActionAnnounceBelot = "announce_belot"
 	ActionSkipBelot     = "skip_belot"
-	ActionPause         = "pause"
-	ActionUnpause       = "unpause"
-	ActionOwnerUnpause  = "owner_unpause"
+	// ActionContinue acknowledges the hand-complete pause; the next hand deals
+	// once every connected player has continued (or the timeout fires).
+	ActionContinue     = "continue"
+	ActionPause        = "pause"
+	ActionUnpause      = "unpause"
+	ActionOwnerUnpause = "owner_unpause"
 
 	// Surrender actions (Story 8.2). Each player may initiate at most one
 	// surrender request per match; the proposer's partner accepts (ends match

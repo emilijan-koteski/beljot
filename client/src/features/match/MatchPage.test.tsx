@@ -6,9 +6,11 @@ import { BrowserRouter, MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MOTION } from "@/shared/lib/motion";
+import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
-import type { MatchState } from "@/shared/types/matchTypes";
+import type { MatchState, TrickCard } from "@/shared/types/matchTypes";
+import type { HandScoredPayload } from "@/shared/types/wsEvents";
 
 import { MatchPage } from "./MatchPage";
 
@@ -619,17 +621,20 @@ describe("MatchPage", () => {
   it("elevates seat wrappers above the trick area so emotes/surrender banners aren't hidden by thrown cards", () => {
     // Regression: on phones the EmoteBubble / SurrenderOpponentBanner render
     // INSIDE the seat wrapper, whose `-translate-*` transform forms a stacking
-    // context — so their own `z-20` is trapped there and can't beat the center
+    // context — so their own z is trapped there and can't beat the center
     // TrickArea (rendered later in the DOM at z-auto). The wrapper itself must
-    // carry `z-20` to outrank the thrown cards; otherwise the cards paint over
-    // the emote/banner (most visible on mobile, where seats overlap the table).
+    // carry the seats tier (Z.SEATS) to outrank the thrown cards; otherwise the
+    // cards paint over the emote/banner (most visible on mobile, where seats
+    // overlap the table).
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
 
     renderMatchPage();
 
     for (const compass of [0, 1, 2, 3] as const) {
-      expect(screen.getByTestId(`player-seat-${compass}-wrapper`).className).toContain("z-20");
+      expect(screen.getByTestId(`player-seat-${compass}-wrapper`).style.zIndex).toBe(
+        String(Z.SEATS),
+      );
     }
   });
 
@@ -697,6 +702,193 @@ describe("MatchPage", () => {
     expect(screen.queryByTestId("belot-reveal")).not.toBeInTheDocument();
   });
 
+  // Trick-collect gating: end-of-hand and reveal overlays must wait for the
+  // four-card collect sweep (pendingResolvedTrick) to finish before they mount,
+  // so players see the final card, the winner, and where the cards went.
+  describe("trick-collect gating", () => {
+    const collectSnapshot: { trick: TrickCard[]; winnerSeat: number } = {
+      trick: [
+        { card: { rank: "K", suit: "S" }, playerSeat: 0 },
+        { card: { rank: "7", suit: "H" }, playerSeat: 1 },
+        { card: { rank: "A", suit: "D" }, playerSeat: 2 },
+        { card: { rank: "9", suit: "C" }, playerSeat: 3 },
+      ],
+      winnerSeat: 2,
+    };
+
+    const scorePayload: HandScoredPayload = {
+      teamACardPoints: 90,
+      teamBCardPoints: 72,
+      teamADeclPoints: 0,
+      teamBDeclPoints: 0,
+      lastTrickTeam: 0,
+      lastTrickBonus: 10,
+      capot: false,
+      capotTeam: null,
+      capotBonus: 0,
+      failedContract: false,
+      contractingTeam: 0,
+      teamAHandTotal: 100,
+      teamBHandTotal: 62,
+      teamAMatchScore: 100,
+      teamBMatchScore: 62,
+    };
+
+    it("defers the score reveal until the collect snapshot clears (bug 1)", () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      // Hand-end burst: trick_resolved (snapshot) is immediately followed by
+      // hand_scored. The scoreboard must stay hidden while the four cards are
+      // still sweeping to the winner.
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+        useMatchStore.getState().setScoreRevealData(scorePayload);
+      });
+      expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
+
+      // Collect completes → snapshot cleared (handleFlightComplete) → mounts.
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(null);
+      });
+      expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+    });
+
+    it("defers the declaration reveal until the collect snapshot clears (bug 3)", () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+        useMatchStore.getState().setDeclarationReveal({
+          winnerTeam: 0,
+          declarations: [
+            { playerSeat: 0, type: "sequence", cards: ["9S", "TS", "JS", "QS"], value: 50 },
+          ],
+        });
+      });
+      expect(screen.queryByTestId("declaration-reveal")).not.toBeInTheDocument();
+
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(null);
+      });
+      expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
+    });
+
+    it("shows the belot reveal immediately, even while the collect snapshot is in flight", () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      // Unlike declarations, the belot reveal is NOT deferred behind the
+      // collect sweep — the announcer expects "belote!" the instant they
+      // confirm, concurrent with the throw (issue 3).
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+        useMatchStore.getState().setBelotReveal({ playerSeat: 0, team: 0, cardId: "QS" });
+      });
+      expect(screen.getByTestId("belot-reveal")).toBeInTheDocument();
+
+      // Still up after the collect completes.
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(null);
+      });
+      expect(screen.getByTestId("belot-reveal")).toBeInTheDocument();
+    });
+
+    it("shows the score reveal immediately when no collect is in flight", () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setScoreRevealData(scorePayload);
+      });
+      expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+    });
+
+    it("shows the final-hand score reveal before the match result (does not skip it)", () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      // Final-hand burst: trick_resolved (snapshot) → hand_scored → match_end,
+      // with match_end landing while the collect is still sweeping. The match
+      // result must NOT preempt the (still-gated) score reveal.
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+        useMatchStore.getState().setScoreRevealData(scorePayload);
+        useMatchStore.getState().setMatchEndData({
+          winnerTeam: 0,
+          teamAFinalScore: 1020,
+          teamBFinalScore: 850,
+          matchDurationSec: 300,
+        });
+      });
+      expect(screen.queryByTestId("match-result")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
+
+      // Collect completes → the score reveal surfaces first; the match result
+      // still waits until the reveal is dismissed.
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(null);
+      });
+      expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+      expect(screen.queryByTestId("match-result")).not.toBeInTheDocument();
+    });
+
+    it("defers the capot animation until the collect snapshot clears", () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+        useMatchStore
+          .getState()
+          .setScoreRevealData({ ...scorePayload, capot: true, capotTeam: 0, capotBonus: 100 });
+      });
+      expect(screen.queryByTestId("capot-animation")).not.toBeInTheDocument();
+
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(null);
+      });
+      expect(screen.getByTestId("capot-animation")).toBeInTheDocument();
+    });
+
+    it("still gates the score reveal for the glow beat under reduced motion", () => {
+      // Reduced-motion path runs no flights and clears the snapshot after
+      // TRICK_RESOLVE_PAUSE — the reveal must wait that beat, not appear instantly.
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("prefers-reduced-motion"),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+        useMatchStore.getState().setScoreRevealData(scorePayload);
+      });
+      expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE);
+      });
+      expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+    });
+  });
+
   it("shows confirm dialog on browser back button and stays if declined", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
@@ -716,5 +908,261 @@ describe("MatchPage", () => {
     expect(useMatchStore.getState().matchState).not.toBeNull();
 
     confirmSpy.mockRestore();
+  });
+
+  describe("belote/rebelote pre-play prompt", () => {
+    // Seat 0 holds both trump (spades) K and Q and it is their turn to lead.
+    function belotEligibleState(): MatchState {
+      return {
+        ...mockMatchState,
+        phase: "playing",
+        trumpSuit: "S",
+        activePlayerSeat: 0,
+        currentTrick: [],
+        awaitingDeclaration: false,
+        pendingBelotSeat: null,
+        players: mockMatchState.players.map((p) =>
+          p.seat === 0
+            ? {
+                ...p,
+                hand: [
+                  { rank: "K", suit: "S" },
+                  { rank: "Q", suit: "S" },
+                ],
+              }
+            : p,
+        ) as MatchState["players"],
+      };
+    }
+
+    it("prompts to announce before throwing the belot card (no play_card sent yet)", () => {
+      useMatchStore.getState().setMatchState(belotEligibleState());
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        fireEvent.click(screen.getByTestId("playing-card-KS"));
+      });
+
+      // The announce/pass dialog appears and the card has NOT been sent.
+      expect(screen.getByTestId("belot-prompt")).toBeInTheDocument();
+      expect(mockSendMessage).not.toHaveBeenCalledWith("action:play_card", expect.anything());
+    });
+
+    it("throws the card on confirm, then announces only once the server confirms the deferred play", () => {
+      useMatchStore.getState().setMatchState(belotEligibleState());
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        fireEvent.click(screen.getByTestId("playing-card-KS"));
+      });
+      act(() => {
+        fireEvent.click(screen.getByTestId("belot-prompt-announce"));
+      });
+
+      // Card is thrown immediately; the announce is held back so it can't race
+      // play_card on the server (the race that produced "Невалидна акција" and
+      // stalled the turn).
+      expect(mockSendMessage).toHaveBeenCalledWith("action:play_card", { cardId: "KS" });
+      expect(mockSendMessage).not.toHaveBeenCalledWith("action:announce_belot", {});
+
+      // Server registers the deferred play (pendingBelotSeat === my seat) — now
+      // the announce is safe to fire.
+      act(() => {
+        useMatchStore.getState().setMatchState({ ...belotEligibleState(), pendingBelotSeat: 0 });
+      });
+      expect(mockSendMessage).toHaveBeenCalledWith("action:announce_belot", {});
+    });
+
+    it("declines via the local prompt, then sends skip once the server confirms the deferred play", () => {
+      useMatchStore.getState().setMatchState(belotEligibleState());
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        fireEvent.click(screen.getByTestId("playing-card-KS"));
+      });
+      act(() => {
+        fireEvent.click(screen.getByTestId("belot-prompt-decline"));
+      });
+
+      expect(mockSendMessage).toHaveBeenCalledWith("action:play_card", { cardId: "KS" });
+      expect(mockSendMessage).not.toHaveBeenCalledWith("action:decline_belot", {});
+
+      act(() => {
+        useMatchStore.getState().setMatchState({ ...belotEligibleState(), pendingBelotSeat: 0 });
+      });
+      expect(mockSendMessage).toHaveBeenCalledWith("action:decline_belot", {});
+    });
+  });
+
+  describe("declaration / belot reveal lifetime (issue 5)", () => {
+    const decls = {
+      winnerTeam: 0 as const,
+      declarations: [
+        { playerSeat: 0, type: "sequence" as const, cards: ["9S", "TS", "JS", "QS"], value: 50 },
+      ],
+    };
+
+    const aSnapshot: { trick: TrickCard[]; winnerSeat: number } = {
+      trick: [
+        { card: { rank: "K", suit: "S" }, playerSeat: 0 },
+        { card: { rank: "7", suit: "H" }, playerSeat: 1 },
+        { card: { rank: "A", suit: "D" }, playerSeat: 2 },
+        { card: { rank: "9", suit: "C" }, playerSeat: 3 },
+      ],
+      winnerSeat: 2,
+    };
+
+    it("stays up through a LATER trick's collect — no re-loop every trick (issue 2)", () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      // Trick 1 resolves: the reveal is deferred behind the trick-1 sweep.
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(aSnapshot);
+        useMatchStore.getState().setDeclarationReveal(decls);
+      });
+      expect(screen.queryByTestId("declaration-reveal")).not.toBeInTheDocument();
+
+      // Sweep clears → the reveal latches visible.
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(null);
+      });
+      expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
+
+      // A LATER trick resolves while the reveal is still up (players played fast).
+      // It must NOT unmount/re-defer — that's what restarted its countdown every
+      // trick and made it re-appear forever. It stays up for its own 8 s.
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(aSnapshot);
+      });
+      expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
+    });
+
+    it("keeps the declaration reveal up across a normal match_state (another player's move)", () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setDeclarationReveal(decls);
+      });
+      expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
+
+      // Another player plays → a fresh playing match_state lands. The reveal
+      // owns its own 8 s countdown + X, so an unrelated state push must NOT
+      // close it (that was the bug: the dialog vanished the instant anyone
+      // played).
+      act(() => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, activePlayerSeat: 1 });
+      });
+      expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
+    });
+
+    it("does not resurface a stale declaration reveal after an overlay clears (D69/D71)", () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setDeclarationReveal(decls);
+      });
+      expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
+
+      // Overlay takes over the table (pause) — the reveal is orphaned (its
+      // component unmounts, so its own countdown can't fire it).
+      act(() => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "paused" });
+      });
+      expect(screen.queryByTestId("declaration-reveal")).not.toBeInTheDocument();
+
+      // Resume → back to playing. The stale reveal must NOT reappear.
+      act(() => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "playing" });
+      });
+      expect(screen.queryByTestId("declaration-reveal")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("server-gated hand-complete pause", () => {
+    const handScore = {
+      teamACardPoints: 70,
+      teamBCardPoints: 82,
+      teamADeclPoints: 0,
+      teamBDeclPoints: 0,
+      lastTrickTeam: 1,
+      lastTrickBonus: 10,
+      capot: false,
+      capotTeam: null,
+      capotBonus: 0,
+      failedContract: false,
+      contractingTeam: 1,
+      teamAHandTotal: 70,
+      teamBHandTotal: 92,
+    };
+    const scorePayload = { ...handScore, teamAMatchScore: 70, teamBMatchScore: 92 };
+
+    it("acknowledges via action:continue and waits (does not dismiss locally)", () => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setScoreRevealData(scorePayload);
+      });
+      act(() => {
+        vi.advanceTimersByTime(2000); // Continue-enable delay
+      });
+      expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+
+      act(() => {
+        fireEvent.click(screen.getByTestId("score-reveal-continue"));
+      });
+      // Sends the continue action; the dialog stays up in its waiting state —
+      // the server (not the client) decides when the next hand is dealt.
+      expect(mockSendMessage).toHaveBeenCalledWith("action:continue", {});
+      expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+    });
+
+    it("dismisses the score dialog when the server deals the next hand", () => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setScoreRevealData(scorePayload);
+      });
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+
+      // Next hand dealt — phase leaves "hand_complete".
+      act(() => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "bidding" });
+      });
+      expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
+    });
+
+    it("reconstructs the score dialog from lastHandResult on reconnect", () => {
+      // Reconnect snapshot: phase hand_complete, lastHandResult present, but no
+      // event:hand_scored was received (scoreRevealData stays null until derived).
+      useMatchStore.getState().setMatchState({
+        ...mockMatchState,
+        phase: "hand_complete",
+        lastHandResult: handScore,
+        teamScores: [70, 92],
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+    });
   });
 });

@@ -38,6 +38,9 @@ export const ACTION_DECLARE = "action:declare" as const;
 export const ACTION_SKIP_DECLARE = "action:skip_declare" as const;
 export const ACTION_ANNOUNCE_BELOT = "action:announce_belot" as const;
 export const ACTION_DECLINE_BELOT = "action:decline_belot" as const;
+// Acknowledges the hand-complete pause; the server deals the next hand once
+// every connected player has continued (or the auto-continue timeout fires).
+export const ACTION_CONTINUE = "action:continue" as const;
 export const ACTION_PAUSE = "action:pause" as const;
 export const ACTION_UNPAUSE = "action:unpause" as const;
 export const ACTION_OWNER_UNPAUSE = "action:owner_unpause" as const;

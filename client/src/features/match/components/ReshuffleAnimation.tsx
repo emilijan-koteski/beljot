@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
+import { Z } from "@/shared/lib/zLayers";
 
 interface ReshuffleAnimationProps {
   onComplete: () => void;
@@ -33,7 +34,8 @@ export function ReshuffleAnimation({ onComplete }: ReshuffleAnimationProps) {
 
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+      style={{ zIndex: Z.TABLE_ANIM }}
       data-testid="reshuffle-animation"
     >
       <div className="text-center">

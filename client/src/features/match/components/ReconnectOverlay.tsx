@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MOTION } from "@/shared/lib/motion";
+import { Z } from "@/shared/lib/zLayers";
 import type { TeamString } from "@/shared/types/matchTypes";
 import type { MatchAbandonedPayload } from "@/shared/types/wsEvents";
 
@@ -147,7 +148,12 @@ export function ReconnectOverlay({
     const themValue = viewerTeam === "teamA" ? teamBValue : teamAValue;
 
     return (
-      <div className="fixed inset-0 z-50" data-testid="reconnect-overlay" aria-live="assertive">
+      <div
+        className="fixed inset-0"
+        style={{ zIndex: Z.BLOCKER }}
+        data-testid="reconnect-overlay"
+        aria-live="assertive"
+      >
         <OverlayBackdrop dim={0.7}>
           <ClassicPanel width={520} glowColor={RING_DANGER}>
             <div className="flex flex-col items-center text-center gap-3">
@@ -211,7 +217,12 @@ export function ReconnectOverlay({
   // fire onReturnToLobby after RECONNECT_REDIRECT ms.
   if (isExpiredWithoutAbandon) {
     return (
-      <div className="fixed inset-0 z-50" data-testid="reconnect-overlay" aria-live="assertive">
+      <div
+        className="fixed inset-0"
+        style={{ zIndex: Z.BLOCKER }}
+        data-testid="reconnect-overlay"
+        aria-live="assertive"
+      >
         <OverlayBackdrop dim={0.7}>
           <ClassicPanel width={440} glowColor={RING_DANGER}>
             <div className="flex flex-col items-center text-center gap-3">
@@ -262,7 +273,12 @@ export function ReconnectOverlay({
   const ringCirc = 2 * Math.PI * ringRadius;
 
   return (
-    <div className="fixed inset-0 z-30" data-testid="reconnect-overlay" aria-live="assertive">
+    <div
+      className="fixed inset-0"
+      style={{ zIndex: Z.BLOCKER }}
+      data-testid="reconnect-overlay"
+      aria-live="assertive"
+    >
       <OverlayBackdrop dim={0.65}>
         <ClassicPanel
           width={440}

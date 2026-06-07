@@ -46,10 +46,10 @@ export function MatchChatDock({ isOpen, onOpenChange }: MatchChatDockProps) {
       open={isOpen}
       onOpenChange={onOpenChange}
       resolveNameColor={resolveNameColor}
-      // Float above the table chrome — incl. the hand fan (elevated to z-50
-      // during prompts) and overlay panels (z-60) — so the chat stays reachable
-      // at any point in the game instead of getting buried under the cards.
-      className="z-70"
+      // Float above everything so chat stays reachable at any point in the game
+      // (no blocker buries it). Literal mirrors Z.CHROME_TOP — ChatDock only
+      // accepts a className, and Tailwind can't see a dynamic `z-${...}` value.
+      className="z-120"
     />
   );
 }

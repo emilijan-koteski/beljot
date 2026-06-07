@@ -2,6 +2,7 @@ import { Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import { Z } from "@/shared/lib/zLayers";
 
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
@@ -22,7 +23,7 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
   const promptRef = useFocusTrap<HTMLDivElement>({ onEscape: onDecline });
 
   return (
-    <div className="fixed inset-0 z-50" data-testid="surrender-prompt">
+    <div className="fixed inset-0" style={{ zIndex: Z.SURRENDER }} data-testid="surrender-prompt">
       <OverlayBackdrop dim={0.5}>
         <div
           ref={promptRef}

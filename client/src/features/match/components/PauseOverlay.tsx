@@ -1,6 +1,7 @@
 import { Crown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState } from "@/shared/types/matchTypes";
 
 import { seatTeam, teamColors } from "../lib/tableTheme";
@@ -52,7 +53,12 @@ export function PauseOverlay({
     .filter(Boolean);
 
   return (
-    <div className="fixed inset-0 z-20" data-testid="pause-overlay" aria-live="polite">
+    <div
+      className="fixed inset-0"
+      style={{ zIndex: Z.BLOCKER }}
+      data-testid="pause-overlay"
+      aria-live="polite"
+    >
       <OverlayBackdrop dim={0.65}>
         <ClassicPanel
           width={440}

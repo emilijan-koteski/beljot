@@ -1,6 +1,7 @@
 import { Trans, useTranslation } from "react-i18next";
 
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import { Z } from "@/shared/lib/zLayers";
 import type { Card, Suit } from "@/shared/types/matchTypes";
 
 import { type SeatTeam, teamColors } from "../lib/tableTheme";
@@ -77,7 +78,8 @@ export function TrumpPrompt({
 
     return (
       <div
-        className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+        style={{ zIndex: Z.PROMPT }}
         data-testid="trump-prompt"
       >
         <div

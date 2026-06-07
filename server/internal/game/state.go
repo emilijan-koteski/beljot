@@ -27,12 +27,18 @@ type TrickCard struct {
 // Populated by scoreHand() before startNewHand() or PhaseMatchEnd,
 // so the match manager can broadcast the full breakdown to clients.
 type HandScore struct {
-	TeamACardPoints int  `json:"teamACardPoints"` // Trick-taking card points (Team A) before bonus
-	TeamBCardPoints int  `json:"teamBCardPoints"` // Trick-taking card points (Team B) before bonus
-	TeamADeclPoints int  `json:"teamADeclPoints"` // Declaration points (Team A)
-	TeamBDeclPoints int  `json:"teamBDeclPoints"` // Declaration points (Team B)
-	LastTrickTeam   int  `json:"lastTrickTeam"`   // Team that won last trick (0=Team A, 1=Team B)
-	LastTrickBonus  int  `json:"lastTrickBonus"`  // 10 (normal) or 0 (capot replaces it)
+	TeamACardPoints int `json:"teamACardPoints"` // Trick-taking card points (Team A) before bonus
+	TeamBCardPoints int `json:"teamBCardPoints"` // Trick-taking card points (Team B) before bonus
+	TeamADeclPoints int `json:"teamADeclPoints"` // Declaration points (Team A)
+	TeamBDeclPoints int `json:"teamBDeclPoints"` // Declaration points (Team B)
+	LastTrickTeam   int `json:"lastTrickTeam"`   // Team that won last trick (0=Team A, 1=Team B)
+	LastTrickBonus  int `json:"lastTrickBonus"`  // 10 (normal) or 0 (capot replaces it)
+	// LastTrickSeat is the seat (0-3) that won the final trick. Server-only
+	// (json:"-"): the client validates match_state's lastHandResult with a
+	// strict schema and only needs the team. The match manager reads this for
+	// the event:trick_resolved winnerSeat on a hand's last trick, because by
+	// broadcast time scoreHand/startNewHand have cleared state.TrickWinnerSeat.
+	LastTrickSeat   int  `json:"-"`
 	Capot           bool `json:"capot"`           // One team took all 8 tricks
 	CapotTeam       *int `json:"capotTeam"`       // Team with capot (nil if no capot)
 	CapotBonus      int  `json:"capotBonus"`      // 100 or 0
@@ -81,14 +87,20 @@ type GameState struct {
 	Players [4]PlayerState `json:"players"`
 
 	// Scoring (index 0=Team A, 1=Team B)
-	TeamScores        [2]int      `json:"teamScores"`
-	HandPoints        [2]int      `json:"handPoints"`
-	DeclarationPoints [2]int      `json:"declarationPoints"`
-	TricksWon         [2]int      `json:"tricksWon"`
-	PendingBelotSeat  *int        `json:"pendingBelotSeat"`
-	BelotAnnounced    bool        `json:"belotAnnounced"`
-	WinnerTeam        *int        `json:"winnerTeam"`
+	TeamScores        [2]int     `json:"teamScores"`
+	HandPoints        [2]int     `json:"handPoints"`
+	DeclarationPoints [2]int     `json:"declarationPoints"`
+	TricksWon         [2]int     `json:"tricksWon"`
+	PendingBelotSeat  *int       `json:"pendingBelotSeat"`
+	BelotAnnounced    bool       `json:"belotAnnounced"`
+	WinnerTeam        *int       `json:"winnerTeam"`
 	LastHandResult    *HandScore `json:"lastHandResult"`
+	// HandCompleteReady tracks which seats have acknowledged the PhaseHandComplete
+	// pause (action:continue). The next hand deals once every connected seat is
+	// ready (or the session manager's auto-continue timeout fires). Server-only
+	// (json:"-"): the client validates match_state with a strict schema and only
+	// needs the phase; it shows a local "waiting" state after the player continues.
+	HandCompleteReady [4]bool `json:"-"`
 
 	// Timer state
 	ActivePlayerSeat int        `json:"activePlayerSeat"`

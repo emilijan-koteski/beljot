@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import { Z } from "@/shared/lib/zLayers";
 
 import { HUDButton } from "./HUDButton";
 import { ClassicButton } from "./overlay/ClassicButton";
@@ -86,12 +87,15 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
   const dialogRef = useFocusTrap<HTMLDivElement>({ onEscape: onCancel });
 
   // Portal to document.body — the SurrenderButton sits inside the bottom-left
-  // HUD cluster (z-10), which would otherwise cap the overlay's stacking
-  // context and hide the dialog behind table elements like the bidder banner
-  // (z-20). Rendering at the body level lets the OverlayBackdrop's z-50
-  // float above the entire game-table.
+  // HUD cluster, which would otherwise cap the overlay's stacking context and
+  // hide the dialog behind table elements. Rendering at the body level lets the
+  // dialog sit at the Z.SURRENDER tier above the entire game-table.
   const dialog = (
-    <div className="fixed inset-0 z-50" data-testid="surrender-confirm-overlay">
+    <div
+      className="fixed inset-0"
+      style={{ zIndex: Z.SURRENDER }}
+      data-testid="surrender-confirm-overlay"
+    >
       <OverlayBackdrop dim={0.5}>
         <div
           ref={dialogRef}

@@ -603,7 +603,8 @@
       "failedContract": "Pala ruka",
       "handTotal": "Ukupno deljenje",
       "matchTotal": "Rezultat meča",
-      "continue": "Nastavi"
+      "continue": "Nastavi",
+      "waiting": "Čeka se na ostale…"
     },
     "capot": {
       "title": "KAPOT!",

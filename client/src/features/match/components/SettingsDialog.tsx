@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { updatePreferences } from "@/shared/api/profile";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 import { ClassicButton } from "./overlay/ClassicButton";
@@ -72,7 +73,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   if (!open) return null;
 
   const dialog = (
-    <div className="fixed inset-0 z-50" data-testid="settings-dialog">
+    <div className="fixed inset-0" style={{ zIndex: Z.UTIL }} data-testid="settings-dialog">
       <OverlayBackdrop dim={0.5}>
         <div
           ref={dialogRef}

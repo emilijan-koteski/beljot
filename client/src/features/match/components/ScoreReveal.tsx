@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
-import { MOTION, motionDuration } from "@/shared/lib/motion";
+import { MOTION } from "@/shared/lib/motion";
+import { Z } from "@/shared/lib/zLayers";
 import { type Suit, type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 import type { HandScoredPayload } from "@/shared/types/wsEvents";
 
@@ -21,6 +22,12 @@ interface ScoreRevealProps {
   trumpSuit?: Suit | null;
   /** Seat that called the trump (used for "your team called X" wording). */
   trumpCallerSeat?: number | null;
+  /**
+   * True once the local player has clicked Continue and the server is waiting
+   * for the other players (server-gated hand-complete pause). Swaps the button
+   * to a disabled "waiting" label until the next hand is dealt.
+   */
+  acknowledged?: boolean;
 }
 
 const SUIT_NAME_KEY: Record<Suit, string> = {
@@ -34,18 +41,110 @@ function callerTeamString(seat: number): TeamString {
   return seat % 2 === 0 ? "teamA" : "teamB";
 }
 
-// Re-exported constants for tests / reads — see `MOTION` for canonical values.
-const ENABLE_DELAY_MS = MOTION.SCORE_REVEAL_ENABLE_DELAY;
-const ENABLE_DELAY_MS_REDUCED = MOTION.SCORE_REVEAL_ENABLE_DELAY_REDUCED;
+const AUTO_CONTINUE_MS = MOTION.SCORE_REVEAL_AUTO_CONTINUE;
+
+// Continue button corner radius — must equal ClassicButton's borderRadius (8)
+// so the traced border curves exactly like the gold button edge. The rect is
+// inset from the edge, so its corner radius is BUTTON_RADIUS - inset to stay
+// concentric (a rounded rect inset by d has corner radius R - d).
+const BUTTON_RADIUS = 8;
+
+/**
+ * Countdown border that traces the Continue button's perimeter, sweeping full →
+ * empty over the auto-continue window — the "loader around the button" the
+ * informational reveals use (an AutoCloseRing's ring around its X), adapted to a
+ * wide button. Two strokes mirror AutoCloseRing: a faint full-perimeter track
+ * (the path the loader has already swept past) and the silver progress on top
+ * that retracts. Colours match AutoCloseRing so it reads identically against the
+ * green (ghost) button. Purely decorative; the timer in ScoreReveal owns the
+ * actual fire.
+ *
+ * Measures the button via the SVG's own rect (it fills the relatively-positioned
+ * wrapper) so the viewBox maps 1 user-unit → 1 px and the rounded corners stay
+ * true. `pathLength={1}` normalises the dash math regardless of the perimeter.
+ */
+function ButtonProgressBorder({ pct }: { pct: number }) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+
+  useLayoutEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setSize({ w: r.width, h: r.height });
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const { w, h } = size;
+  const inset = 1.5;
+
+  return (
+    <svg
+      ref={svgRef}
+      aria-hidden
+      data-testid="score-reveal-countdown"
+      viewBox={w && h ? `0 0 ${w} ${h}` : undefined}
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        overflow: "visible",
+      }}
+    >
+      {w > 0 && h > 0 && (
+        <>
+          {/* Faint full-perimeter track — the swept-past path. */}
+          <rect
+            x={inset}
+            y={inset}
+            width={w - inset * 2}
+            height={h - inset * 2}
+            rx={BUTTON_RADIUS - inset}
+            ry={BUTTON_RADIUS - inset}
+            fill="none"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth={2}
+          />
+          {/* Silver progress that retracts over the track (matches AutoCloseRing). */}
+          <rect
+            x={inset}
+            y={inset}
+            width={w - inset * 2}
+            height={h - inset * 2}
+            rx={BUTTON_RADIUS - inset}
+            ry={BUTTON_RADIUS - inset}
+            fill="none"
+            stroke="#d4d0c4"
+            strokeWidth={2}
+            strokeLinecap="round"
+            pathLength={1}
+            strokeDasharray={1}
+            strokeDashoffset={1 - pct}
+            style={{ transition: "stroke-dashoffset 1s linear" }}
+          />
+        </>
+      )}
+    </svg>
+  );
+}
 
 /**
  * End-of-hand score reveal — felt-panel breakdown of card points + decls
  * + bonuses, ending in a brass-tinted match-score strip.
  *
- * Continue is disabled for the first ~2 s so the player has time to read the
- * breakdown, then enabled. The reveal stays up indefinitely until the player
- * clicks Continue — same dismissal model as MatchResult, so an AFK player
- * doesn't miss their own hand recap.
+ * Continue is enabled from the start. A countdown border around the button runs
+ * the auto-continue window: if the player never clicks, the dialog acknowledges
+ * itself (so one AFK player can't strand the table on the score screen). Once
+ * acknowledged the button swaps to a disabled "waiting" label until the server
+ * deals the next hand.
  */
 export function ScoreReveal({
   data,
@@ -54,21 +153,41 @@ export function ScoreReveal({
   handNumber,
   trumpSuit,
   trumpCallerSeat,
+  acknowledged = false,
 }: ScoreRevealProps) {
   const { t } = useTranslation();
-  const [continueEnabled, setContinueEnabled] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
-  const enableDelay = motionDuration(
-    prefersReducedMotion,
-    ENABLE_DELAY_MS,
-    ENABLE_DELAY_MS_REDUCED,
-  );
+  // Auto-continue: if the player never clicks, the dialog acknowledges itself
+  // after AUTO_CONTINUE_MS so an AFK player can't strand the whole table on the
+  // score screen (each client auto-acks → the server deals the next hand once
+  // everyone is ready). Mirrors the 8 s auto-close on the informational
+  // reveals; the ring around the button visualises the countdown. Once
+  // acknowledged (this click, or the parent already advanced) the timer is
+  // cancelled — see the `acknowledged` dependency.
+  const [autoPct, setAutoPct] = useState(1);
+  const firedRef = useRef(false);
+  const onContinueRef = useRef(onContinue);
+  onContinueRef.current = onContinue;
 
   useEffect(() => {
-    const t = setTimeout(() => setContinueEnabled(true), enableDelay);
-    return () => clearTimeout(t);
-  }, [enableDelay]);
+    if (acknowledged) return;
+    const total = AUTO_CONTINUE_MS;
+    const deadline = Date.now() + total;
+    const update = () => setAutoPct(Math.max(0, (deadline - Date.now()) / total));
+    update();
+    const tick = setInterval(update, MOTION.COUNTDOWN_TICK);
+    const fire = setTimeout(() => {
+      if (firedRef.current) return;
+      firedRef.current = true;
+      setAutoPct(0);
+      onContinueRef.current();
+    }, total);
+    return () => {
+      clearInterval(tick);
+      clearTimeout(fire);
+    };
+  }, [acknowledged]);
 
   const teamAGradient: TeamGradient = viewerTeam === "teamA" ? TEAM_GOLD : TEAM_SILVER;
   const teamBGradient: TeamGradient = viewerTeam === "teamB" ? TEAM_GOLD : TEAM_SILVER;
@@ -116,7 +235,7 @@ export function ScoreReveal({
   }
 
   return (
-    <div className="fixed inset-0 z-30" data-testid="score-reveal">
+    <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="score-reveal">
       <OverlayBackdrop dim={0.6}>
         <div
           className={
@@ -228,14 +347,20 @@ export function ScoreReveal({
                   </span>
                 </div>
               </div>
-              <ClassicButton
-                variant="primary"
-                onClick={onContinue}
-                disabled={!continueEnabled}
-                data-testid="score-reveal-continue"
-              >
-                {t("match.scoreReveal.continue")}
-              </ClassicButton>
+              <span className="relative inline-flex">
+                <ClassicButton
+                  variant="ghost"
+                  onClick={onContinue}
+                  disabled={acknowledged}
+                  data-testid="score-reveal-continue"
+                >
+                  {acknowledged ? t("match.scoreReveal.waiting") : t("match.scoreReveal.continue")}
+                </ClassicButton>
+                {/* Loader traces the button's border (not an inline icon) —
+                    matches the ring-around-the-control pattern of the other
+                    reveals. Hidden once acknowledged (then we're just waiting). */}
+                {!acknowledged && <ButtonProgressBorder pct={autoPct} />}
+              </span>
             </div>
           </ClassicPanel>
         </div>

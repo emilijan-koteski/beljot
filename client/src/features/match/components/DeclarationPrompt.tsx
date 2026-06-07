@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import { Z } from "@/shared/lib/zLayers";
 import type { Declaration } from "@/shared/types/matchTypes";
 
 import { declarationLabelKey } from "../lib/declarations";
@@ -45,7 +46,7 @@ export function DeclarationPrompt({
   const showRing = isActivePlayer && Boolean(turnExpiresAt) && (timerDurationSec ?? 0) > 0;
 
   return (
-    <div className="fixed inset-0" data-testid="declaration-prompt">
+    <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="declaration-prompt">
       <OverlayBackdrop dim={0.5}>
         <div
           ref={promptRef}

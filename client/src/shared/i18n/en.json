@@ -603,7 +603,8 @@
       "failedContract": "Failed Hand",
       "handTotal": "Hand Total",
       "matchTotal": "Match Score",
-      "continue": "Continue"
+      "continue": "Continue",
+      "waiting": "Waiting for others…"
     },
     "capot": {
       "title": "CAPOT!",

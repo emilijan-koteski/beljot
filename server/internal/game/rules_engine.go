@@ -40,6 +40,12 @@ func ApplyAction(state *GameState, action Action) (*GameState, error) {
 		return handleSurrenderDecline(state, action)
 	}
 
+	// Continue acknowledges the hand-complete pause; handled at the dispatch
+	// level because PhaseHandComplete is not one of the play/bid phases below.
+	if action.Type == ActionContinue {
+		return handleContinue(state, action)
+	}
+
 	switch state.Phase {
 	case PhaseBidding:
 		return handleBidding(state, action)
