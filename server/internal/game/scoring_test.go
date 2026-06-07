@@ -52,6 +52,30 @@ func TestHandScoring_LastTrickBonus(t *testing.T) {
 	assert.Equal(t, 92, result.TeamScores[game.TeamB], "Team B score (includes +10 bonus)")
 }
 
+func TestHandScoring_LastTrickSeatPreserved(t *testing.T) {
+	gs := testfixtures.NewGameLastTrick()
+
+	hc := playTrick8(t, gs)
+
+	// Seat 3 (trump 7H) wins trick 8 → team B. The hand holds complete with the
+	// live winner still set and recorded in the hand result for the broadcast.
+	require.Equal(t, game.PhaseHandComplete, hc.Phase)
+	require.NotNil(t, hc.TrickWinnerSeat)
+	assert.Equal(t, 3, *hc.TrickWinnerSeat)
+	require.NotNil(t, hc.LastHandResult)
+	assert.Equal(t, 3, hc.LastHandResult.LastTrickSeat, "winner seat recorded for broadcast")
+	assert.Equal(t, game.TeamB, hc.LastHandResult.LastTrickTeam, "seat 3 is team B")
+
+	// Advancing deals the next hand: startNewHand clears the live TrickWinnerSeat,
+	// but the seat survives in LastHandResult so a late/duplicate broadcast still
+	// resolves the right winner.
+	next, err := game.ForceAdvanceHandComplete(hc)
+	require.NoError(t, err)
+	assert.Nil(t, next.TrickWinnerSeat, "startNewHand clears the live winner field")
+	require.NotNil(t, next.LastHandResult)
+	assert.Equal(t, 3, next.LastHandResult.LastTrickSeat, "winner seat preserved across startNewHand")
+}
+
 func TestHandScoring_CapotScoring(t *testing.T) {
 	gs := testfixtures.NewGameCapotInProgress()
 
@@ -179,7 +203,10 @@ func TestHandScoring_MatchContinues(t *testing.T) {
 	// TeamScores well below 1001
 	gs.TeamScores = [2]int{100, 200}
 
-	result := playTrick8(t, gs)
+	hc := playTrick8(t, gs)
+	require.Equal(t, game.PhaseHandComplete, hc.Phase, "hand holds for the continue pause before dealing")
+	result, err := game.ForceAdvanceHandComplete(hc)
+	require.NoError(t, err)
 
 	// Neither team reaches 1001 → new hand starts (dealing phase before session manager transitions to bidding)
 	assert.Equal(t, game.PhaseDealing, result.Phase, "should start new hand in dealing phase")
@@ -199,7 +226,10 @@ func TestHandScoring_NewHandStateReset(t *testing.T) {
 	gs.TeamScores = [2]int{0, 0}
 	gs.DeclarationPoints = [2]int{50, 20} // Set declarations to verify they're included in scoring then reset
 
-	result := playTrick8(t, gs)
+	hc := playTrick8(t, gs)
+	require.Equal(t, game.PhaseHandComplete, hc.Phase, "hand holds for the continue pause before dealing")
+	result, err := game.ForceAdvanceHandComplete(hc)
+	require.NoError(t, err)
 
 	assert.Equal(t, game.PhaseDealing, result.Phase)
 
@@ -354,8 +384,12 @@ func TestMatchEnd_WinnerTeamFieldSet(t *testing.T) {
 	// Verify WinnerTeam is nil when match continues, set when match ends
 	t.Run("nil when match continues", func(t *testing.T) {
 		gs := testfixtures.NewGameNearEnd(100, 200)
-		result := playTrick8(t, gs)
+		hc := playTrick8(t, gs)
+		require.Equal(t, game.PhaseHandComplete, hc.Phase, "hand holds for the continue pause")
+		assert.Nil(t, hc.WinnerTeam, "WinnerTeam should be nil when match continues")
 
+		result, err := game.ForceAdvanceHandComplete(hc)
+		require.NoError(t, err)
 		assert.Equal(t, game.PhaseDealing, result.Phase)
 		assert.Nil(t, result.WinnerTeam, "WinnerTeam should be nil when match continues")
 	})

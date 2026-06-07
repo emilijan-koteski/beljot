@@ -306,11 +306,12 @@ describe("useWsDispatch", () => {
     expect(state.roomId).toBe(100);
   });
 
-  it("clears stale declarationReveal and belotReveal on a reconnect-style event:match_state", () => {
-    // Seed both reveal fields as if a player disconnected mid-reveal.
-    // No preceding event:declarations_resolved / event:belot_announced is
-    // dispatched here — that mirrors the server's reconnect behaviour
-    // (reveal events are not replayed on reconnect, only the snapshot is).
+  it("does NOT clear declarationReveal / belotReveal on an unrelated event:match_state", () => {
+    // A reveal must survive trailing/standalone match_states (e.g. the snapshot
+    // another player's card-play broadcasts mid-reveal) — closing it on an
+    // unrelated state push was the bug where the declaration dialog vanished
+    // the instant anyone played. Stale-reveal clearing on reconnect now lives
+    // in MatchPage's overlay-clear effect, not the dispatcher.
     useMatchStore.setState({
       declarationReveal: {
         winnerTeam: 0,
@@ -339,8 +340,8 @@ describe("useWsDispatch", () => {
     });
 
     const state = useMatchStore.getState();
-    expect(state.declarationReveal).toBeNull();
-    expect(state.belotReveal).toBeNull();
+    expect(state.declarationReveal).not.toBeNull();
+    expect(state.belotReveal).not.toBeNull();
     expect(state.matchState).not.toBeNull();
   });
 
@@ -405,10 +406,10 @@ describe("useWsDispatch", () => {
     expect(state.matchState).not.toBeNull();
   });
 
-  it("clears reveals on a second event:match_state — the suppression is single-shot", () => {
-    // After the trailing snapshot consumes the suppression flag, a later
-    // standalone event:match_state (e.g., a reconnect snapshot arriving
-    // after a stale reveal payload was set) must still clear.
+  it("keeps the reveal across multiple event:match_state pushes (no single-shot wipe)", () => {
+    // The reveal lives for its full countdown regardless of how many
+    // match_states arrive while it's up — players keep acting (each play
+    // broadcasts a snapshot) and the declaration dialog must not blink out.
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
@@ -427,12 +428,11 @@ describe("useWsDispatch", () => {
       },
     });
     dispatch({ type: "event:match_state", payload: mockMatchState });
-    // First snapshot suppressed the clear; reveal still set.
     expect(useMatchStore.getState().declarationReveal).not.toBeNull();
 
     dispatch({ type: "event:match_state", payload: mockMatchState });
-    // Second standalone snapshot now clears.
-    expect(useMatchStore.getState().declarationReveal).toBeNull();
+    // Still up after a second (and any later) snapshot.
+    expect(useMatchStore.getState().declarationReveal).not.toBeNull();
   });
 
   it("dispatches event:card_played to matchStore", () => {

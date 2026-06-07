@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
+import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 import type { DeclarationsResolvedPayload } from "@/shared/types/wsEvents";
@@ -90,11 +91,12 @@ export function DeclarationReveal({
 
   return (
     <div
-      className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ${
+      className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${
         prefersReducedMotion
           ? ""
           : "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300"
       }`}
+      style={{ zIndex: Z.REVEAL }}
       data-testid="declaration-reveal"
     >
       <div

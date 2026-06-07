@@ -104,22 +104,11 @@ export function useWsDispatch() {
   return dispatch;
 }
 
-// Tracks whether the most recent dispatched event was a reveal event
-// (event:declarations_resolved / event:belot_announced). The server emits
-// these immediately followed by a trailing event:match_state for state sync;
-// the trailing snapshot must NOT wipe the reveal payload that was just set
-// (which would prevent the user from ever seeing the reveal). On reconnect
-// the server sends only the snapshot — the flag is false — and the stale
-// reveal clear runs as D69 / D71 require. The flag is consumed (reset to
-// false) on the next event:match_state regardless of branch, so two snapshots
-// in a row will clear on the second.
-let revealJustEmitted = false;
-
-// Test-only: reset module state between tests. Production has one dispatcher
-// for the lifetime of the app, so this is never called in app code.
-export function __resetWsDispatchStateForTests(): void {
-  revealJustEmitted = false;
-}
+// Test-only hook retained for API stability. The dispatcher no longer keeps
+// module-level reveal state (the reveal lifecycle is owned by the reveal
+// components' own countdown + the MatchPage overlay-clear effect), so this is
+// a no-op. Kept exported so existing test setup that calls it doesn't break.
+export function __resetWsDispatchStateForTests(): void {}
 
 function dispatchGameEvent(message: WsMessage): void {
   const store = useMatchStore.getState();
@@ -127,17 +116,17 @@ function dispatchGameEvent(message: WsMessage): void {
 
   if (type === EVENT_MATCH_STATE) {
     const matchState = message.payload as MatchState;
-    // D69 / D71: a reconnect during the 4–8s reveal window must not re-render
-    // a stale reveal payload on top of the new snapshot. The reveal events
-    // (event:declarations_resolved / event:belot_announced) are not replayed
-    // by the server on reconnect, so the snapshot is treated as a clean slate
-    // — UNLESS the snapshot is the trailing one that follows a reveal event
-    // in normal action flow (see live_match.go), in which case
-    // clearing would cancel the reveal that just rendered.
-    if (!revealJustEmitted) {
-      store.setDeclarationReveal(null);
-      store.setBelotReveal(null);
-    }
+    // NOTE: declarationReveal / belotReveal are intentionally NOT cleared here.
+    // A reveal must live for its full on-screen countdown (8 s) or until the
+    // viewer dismisses it — NOT be wiped by an unrelated trailing match_state,
+    // e.g. the snapshot another player's card-play broadcasts mid-reveal (that
+    // was the bug: the reveal closed the instant anyone played). The reveal
+    // components own their own dismissal; MatchPage clears a stale/orphaned
+    // reveal when an overlay covers the table (disconnect / pause / hand-end),
+    // which is the only situation a reveal can be left up after the moment it
+    // describes has passed (D69 / D71 reconnect case included — the disconnect
+    // overlay clears it before the resync snapshot arrives).
+    //
     // NOTE: pendingResolvedTrick is intentionally NOT cleared here. The
     // server emits a trailing event:match_state ~immediately after every
     // event:trick_resolved (see live_match.go); clearing the snapshot here
@@ -146,7 +135,6 @@ function dispatchGameEvent(message: WsMessage): void {
     // to the animation duration, which also handles the reconnect-mid-
     // collect case (snapshot survives reconnect, the remounted effect
     // re-arms the timer and the snapshot clears within ~1.6s of remount).
-    revealJustEmitted = false;
     store.setMatchState(matchState);
     return;
   }
@@ -281,10 +269,9 @@ function dispatchGameEvent(message: WsMessage): void {
   if (type === EVENT_DECLARATIONS_RESOLVED) {
     const payload = message.payload as DeclarationsResolvedPayload;
     store.setDeclarationReveal(payload);
-    // Mark that the trailing event:match_state must NOT wipe the reveal we
-    // just set. Cleared by the EVENT_MATCH_STATE branch.
-    revealJustEmitted = true;
-    // Full game state update follows via event:match_state
+    // Full game state update follows via event:match_state. That trailing
+    // snapshot (and any later one) leaves this reveal untouched — see the
+    // EVENT_MATCH_STATE branch.
     return;
   }
 
@@ -294,9 +281,8 @@ function dispatchGameEvent(message: WsMessage): void {
     // an empty cardId to BelotReveal where rendering/rank detection would silently break.
     if (!payload.cardId || payload.cardId.length < 2) return;
     store.setBelotReveal(payload);
-    // Same trailing-snapshot suppression as declarations_resolved above.
-    revealJustEmitted = true;
-    // Full state update follows via event:match_state
+    // Full state update follows via event:match_state; it leaves this reveal
+    // untouched (same as declarations_resolved above).
     return;
   }
 

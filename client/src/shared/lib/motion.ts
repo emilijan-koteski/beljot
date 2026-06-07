@@ -127,10 +127,11 @@ export const MOTION = {
   EMOTE_BUBBLE_REDUCED: 1000,
   /** Chat-rail peek preview when the panel is closed. */
   CHAT_PEEK: 2000,
-  /** Delay before the score reveal's "Continue" button becomes enabled —
-   *  prevents accidental dismissal mid-animation. */
-  SCORE_REVEAL_ENABLE_DELAY: 2000,
-  SCORE_REVEAL_ENABLE_DELAY_REDUCED: 500,
+  /** Hand-end score reveal auto-continues after this long so an AFK player
+   *  can't strand the table waiting on their "Continue" click — matches the
+   *  8 s auto-close the informational reveals use. The server keeps a longer
+   *  backstop for fully-disconnected clients. */
+  SCORE_REVEAL_AUTO_CONTINUE: 8000,
   /** Last-trick bonus number flash on the scoreboard. */
   SCORE_BONUS_FADE: 1200,
   SCORE_BONUS_FADE_REDUCED: 300,

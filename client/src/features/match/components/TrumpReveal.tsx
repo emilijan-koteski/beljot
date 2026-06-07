@@ -3,6 +3,7 @@ import { Trans, useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
+import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 
 import { seatTeam, teamColors } from "../lib/tableTheme";
@@ -168,11 +169,12 @@ export function TrumpReveal({
 
   return (
     <div
-      className={`absolute inset-0 z-50 pointer-events-none ${
+      className={`absolute inset-0 pointer-events-none ${
         prefersReducedMotion
           ? ""
           : "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-200"
       }`}
+      style={{ zIndex: Z.REVEAL }}
       data-testid="trump-reveal"
     >
       <div

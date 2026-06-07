@@ -283,6 +283,17 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 			m.setTurnExpiry(session, newState)
 			m.startTimerLocked(session, newState.ActivePlayerSeat)
 		}
+	} else if newState.Phase == game.PhaseHandComplete {
+		// Hand-complete pause: no active turn. Arm (or re-arm) the auto-continue
+		// timer so a connected-but-idle player can't stall the table; players
+		// advance early via action:continue. Applies regardless of timer style.
+		// session.cancelTurnTimer() ran at the top of HandleAction, so the
+		// captured generation is current.
+		newState.TurnExpiresAt = nil
+		gen := session.timerGeneration
+		session.turnTimer = time.AfterFunc(handCompleteAutoContinue, func() {
+			m.handleHandCompleteTimeout(session, gen)
+		})
 	}
 
 	session.gameState = newState
@@ -497,6 +508,34 @@ func (m *Manager) parseAction(userID uint, session *LiveMatch, msg ws.WSMessage)
 // Story 8.5-1 AC4: match-end broadcasts (event:match_end and the trailing
 // event:match_state) are emitted by handleMatchEnd AFTER persistence; this
 // function returns early in those branches.
+// trickResolvedWinnerSeat resolves the seat that won the trick that just
+// completed, for the event:trick_resolved payload. The winner lives in a
+// different field depending on what else the same ApplyAction did:
+//
+//   - Tricks 1-7: resolveTrick cleared TrickWinnerSeat but set
+//     ActivePlayerSeat = winner ("winner leads next trick", playing.go).
+//   - Last trick of a NON-final hand: the same ApplyAction chained
+//     scoreHand -> startNewHand, which cleared TrickWinnerSeat AND advanced
+//     ActivePlayerSeat to the NEXT hand's first bidder. The real winner is
+//     preserved in LastHandResult.LastTrickSeat (HandNumber incremented).
+//   - Last trick of the FINAL hand (match end): scoreHand returns before
+//     startNewHand, so TrickWinnerSeat is still set.
+//
+// The previous code fell back to ActivePlayerSeat whenever TrickWinnerSeat was
+// nil, so on every hand's last trick it sent the next hand's bidder as the
+// winner — the collect animation swept to the wrong seat even though scoring
+// (which uses the true winner internally) was correct.
+func trickResolvedWinnerSeat(oldState, newState *game.GameState) int {
+	switch {
+	case newState.TrickWinnerSeat != nil:
+		return *newState.TrickWinnerSeat
+	case oldState.HandNumber < newState.HandNumber && newState.LastHandResult != nil:
+		return newState.LastHandResult.LastTrickSeat
+	default:
+		return newState.ActivePlayerSeat
+	}
+}
+
 func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *game.GameState, action game.Action, autoPlayed bool) {
 	userIDs := playerIDs[:]
 
@@ -516,27 +555,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			(len(newState.CurrentTrick) == 0 || newState.Phase != game.PhasePlaying)
 
 		if trickCompleted {
-			// Capture the trick winner from newState. The engine flow is:
-			//   - On trick 8 (last trick of hand): ApplyAction returns early
-			//     in resolveTrick (playing.go:132) AFTER setting
-			//     TrickWinnerSeat — so newState.TrickWinnerSeat is set.
-			//   - On tricks 1–7: resolveTrick sets TrickWinnerSeat then
-			//     immediately clears it (playing.go:141) when setting up
-			//     the next trick — so newState.TrickWinnerSeat is nil.
-			//     But the engine ALSO assigns ActivePlayerSeat = winnerSeat
-			//     ("winner leads next trick", playing.go:142), so the
-			//     winner is preserved there.
-			//   - oldState.TrickWinnerSeat is the PREVIOUS trick's winner
-			//     (or nil at hand start) and must NOT be used here — using
-			//     it sent stale winner data to the client for tricks 1–7
-			//     and made the just-played trick visually collapse toward
-			//     whichever seat happened to be set in oldState.
-			var winnerSeat int
-			if newState.TrickWinnerSeat != nil {
-				winnerSeat = *newState.TrickWinnerSeat
-			} else {
-				winnerSeat = newState.ActivePlayerSeat
-			}
+			winnerSeat := trickResolvedWinnerSeat(oldState, newState)
 
 			trickCards := make([]string, 0, 4)
 			for _, tc := range oldState.CurrentTrick {
@@ -562,8 +581,14 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// declarationReveal before any follow-up state logic runs.
 		m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
 
-		// Check if hand was scored (hand number incremented or match ended)
-		if (oldState.HandNumber < newState.HandNumber || newState.Phase == game.PhaseMatchEnd) && newState.LastHandResult != nil {
+		// Check if the hand was just scored. scoreHand now holds in
+		// PhaseHandComplete (next hand deals on action:continue) instead of dealing
+		// immediately, so detect the phase transition into PhaseHandComplete (or
+		// PhaseMatchEnd) rather than a HandNumber increment.
+		handJustScored := newState.LastHandResult != nil &&
+			oldState.Phase != newState.Phase &&
+			(newState.Phase == game.PhaseHandComplete || newState.Phase == game.PhaseMatchEnd)
+		if handJustScored {
 			hr := newState.LastHandResult
 			handScored := map[string]interface{}{
 				"teamACardPoints": hr.TeamACardPoints,
@@ -658,9 +683,42 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventBelotAnnounced, belot))
 		}
+		// If this Belot action completed a deferred trick — the triggering K/Q was
+		// the 4th card, so handlePlayCard set PendingBelotSeat and returned before
+		// resolving (playing.go) — emit the event:trick_resolved the deferred
+		// play_card could not. Without it the client never receives the trick
+		// winner, so pendingResolvedTrick is never set and the just-completed trick
+		// gets no collect animation. A Belot prompt can only fire on tricks 1-7 (a
+		// player cannot hold both trump K and Q at trick 8), so no hand_scored
+		// follows here; trick 1 resolving this way still reveals declarations.
+		if len(oldState.CurrentTrick) == 4 {
+			winnerSeat := trickResolvedWinnerSeat(oldState, newState)
+			trickCards := make([]string, 0, 4)
+			for _, tc := range oldState.CurrentTrick {
+				trickCards = append(trickCards, tc.Card.String())
+			}
+			trickResolved := map[string]interface{}{
+				"winnerSeat": winnerSeat,
+				"winnerTeam": game.TeamForSeat(winnerSeat),
+				"cards":      trickCards,
+			}
+			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrickResolved, trickResolved))
+			m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
+		}
 		// Always follow with full state so the client clears pendingBelotSeat,
 		// advances activePlayerSeat, and resolves the trick if the belot action
 		// came after the 4th card. event:belot_announced is informational only.
+		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+
+	case game.ActionContinue:
+		// Acknowledging the hand-complete pause. If this continue dealt the next
+		// hand (all connected players ready) the state is now bidding/dealing; if
+		// it merely recorded one player's readiness it is still PhaseHandComplete.
+		// Either way the authoritative state syncs clients. An instant-win on the
+		// freshly dealt hand is handled by handleMatchEnd (called from HandleAction).
+		if newState.Phase == game.PhaseMatchEnd {
+			return
+		}
 		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
 
 	case game.ActionPause:
@@ -968,6 +1026,57 @@ func (m *Manager) startTimerLocked(session *LiveMatch, expectedSeat int) {
 	session.turnTimer = time.AfterFunc(duration, func() {
 		m.handleTimerExpiry(session, gen, expectedSeat)
 	})
+}
+
+// handCompleteAutoContinue is how long the server holds the PhaseHandComplete
+// pause before auto-dealing the next hand when not every connected player has
+// acknowledged it. Generous so players can read the score; players advance
+// early by acknowledging (action:continue → all connected ready → deal now).
+const handCompleteAutoContinue = 30 * time.Second
+
+// handleHandCompleteTimeout force-advances the hand-complete pause when the
+// auto-continue window elapses without every connected player acknowledging.
+// Mirrors the continue-action advance path (deal next hand, arm the per-move
+// timer, persist the finished hand, broadcast) but bypasses ApplyAction since
+// it is a server-initiated advance, not a player action.
+func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint64) {
+	session.mu.Lock()
+	if session.closed || session.timerGeneration != generation {
+		session.mu.Unlock()
+		return
+	}
+	oldState := session.gameState
+	if oldState.Phase != game.PhaseHandComplete {
+		session.mu.Unlock()
+		return
+	}
+
+	newState, err := game.ForceAdvanceHandComplete(oldState)
+	if err != nil {
+		session.mu.Unlock()
+		return
+	}
+	if newState.Phase == game.PhaseDealing {
+		newState.Phase = game.PhaseBidding
+	}
+	if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding {
+		m.setTurnExpiry(session, newState)
+		m.startTimerLocked(session, newState.ActivePlayerSeat)
+	}
+	session.gameState = newState
+	playerIDs := session.playerIDs
+	startedAt := session.startedAt
+	session.mu.Unlock()
+
+	m.bufferHandResultIfScored(session, oldState, newState)
+
+	// An instant-win on the freshly dealt hand ends the match here.
+	if newState.Phase == game.PhaseMatchEnd {
+		matchEndPayload := buildMatchEndPayload(oldState, newState, game.Action{Type: game.ActionContinue}, startedAt)
+		m.handleMatchEnd(session, newState, nil, matchEndPayload)
+		return
+	}
+	m.hub.BroadcastToUsers(playerIDs[:], buildMessage(ws.EventMatchState, newState))
 }
 
 // handleTimerExpiry is called when a per-move timer fires. It auto-plays for the

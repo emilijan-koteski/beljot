@@ -525,9 +525,10 @@ func TestEighthTrickTransition(t *testing.T) {
 			state = result
 		}
 
-		// After trick 8, scoring runs atomically — state advances to PhaseDealing (new hand) or PhaseMatchEnd
-		assert.Contains(t, []game.Phase{game.PhaseDealing, game.PhaseMatchEnd}, result.Phase,
-			"should advance past PhaseHandScoring to PhaseDealing or PhaseMatchEnd")
+		// After trick 8, scoring runs atomically — state holds in PhaseHandComplete
+		// (next hand deals on action:continue) or, on a crossed target, PhaseMatchEnd.
+		assert.Contains(t, []game.Phase{game.PhaseHandComplete, game.PhaseMatchEnd}, result.Phase,
+			"should advance past PhaseHandScoring to PhaseHandComplete or PhaseMatchEnd")
 	})
 }
 
@@ -792,11 +793,12 @@ func TestFull8TrickHand(t *testing.T) {
 			require.NoError(t, err, "trick 8 seat %d", c.seat)
 		}
 
-		// After trick 8, scoring runs atomically — state advances to PhaseDealing (new hand) or PhaseMatchEnd.
-		// Scoring adds last-trick bonus (+10) to HandPoints, then resets HandPoints on new hand.
-		// Verify scoring completed by checking TeamScores increased (both teams had points from 8 tricks).
-		assert.Contains(t, []game.Phase{game.PhaseDealing, game.PhaseMatchEnd}, state.Phase,
-			"should advance past PhaseHandScoring to PhaseDealing or PhaseMatchEnd")
+		// After trick 8, scoring runs atomically — state holds in PhaseHandComplete
+		// (the next hand deals on action:continue) or, if a team crossed the target,
+		// PhaseMatchEnd. Scoring adds the last-trick bonus (+10) to HandPoints and
+		// records TeamScores before the hold.
+		assert.Contains(t, []game.Phase{game.PhaseHandComplete, game.PhaseMatchEnd}, state.Phase,
+			"should advance past PhaseHandScoring to PhaseHandComplete or PhaseMatchEnd")
 		totalTeamScores := state.TeamScores[0] + state.TeamScores[1]
 		assert.Greater(t, totalTeamScores, 0, "TeamScores should reflect scored hand points (152 card pts + 10 last-trick bonus = 162)")
 

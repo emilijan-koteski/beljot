@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useRef } from "react";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION, motionDuration } from "@/shared/lib/motion";
+import { Z } from "@/shared/lib/zLayers";
 import type { EmoteID } from "@/shared/types/wsEvents";
 
 const EMOTE_GLYPHS: Record<EmoteID, string> = {
@@ -96,10 +97,10 @@ export function EmoteBubble({
       role="status"
       aria-live="polite"
       data-testid={`emote-bubble-${compassPosition}`}
-      className={`absolute pointer-events-none z-20 motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150 ${
+      className={`absolute pointer-events-none motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150 ${
         compact ? "" : SEAT_POSITIONS[compassPosition]
       }`}
-      style={compact ? COMPACT_POSITIONS[compassPosition] : undefined}
+      style={{ zIndex: Z.SEAT_BANNER, ...(compact ? COMPACT_POSITIONS[compassPosition] : {}) }}
     >
       <span
         className={`inline-flex items-center justify-center rounded-full leading-none ${

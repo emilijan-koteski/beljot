@@ -15,6 +15,7 @@ vi.mock("react-i18next", () => ({
         "match.scoreReveal.handTotal": "Hand Total",
         "match.scoreReveal.matchTotal": "Match Score",
         "match.scoreReveal.continue": "Continue",
+        "match.scoreReveal.waiting": "Waiting for others…",
         "team.us": "Us",
         "team.them": "Them",
         "match.scoreReveal.subtitleFailedUs": "Went down · all points to us",
@@ -163,67 +164,57 @@ describe("ScoreReveal", () => {
     expect(container.textContent).toContain("Contract held · your team called");
   });
 
-  it("Continue button is disabled initially and enabled after 2 seconds", () => {
+  it("Continue button is enabled from the start (no read-delay gate)", () => {
     render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} />);
 
-    const btn = screen.getByTestId("score-reveal-continue");
-    expect(btn).toBeDisabled();
-
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
-    expect(btn).toBeEnabled();
+    expect(screen.getByTestId("score-reveal-continue")).toBeEnabled();
   });
 
   it("calls onContinue when Continue button is clicked", async () => {
     const onContinue = vi.fn();
     render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={onContinue} />);
 
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
     vi.useRealTimers();
 
     await userEvent.click(screen.getByTestId("score-reveal-continue"));
     expect(onContinue).toHaveBeenCalledOnce();
   });
 
-  it("does NOT auto-dismiss — stays open until the player clicks Continue", () => {
+  it("auto-continues after the auto-continue window if the player never clicks", () => {
     const onContinue = vi.fn();
     render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={onContinue} />);
 
-    // Walk well past the legacy 8s window — onContinue must stay un-fired
-    // because dismissal is now manual-only (mirrors MatchResult / SurrenderPrompt).
+    // Still up well within the 8s window.
     act(() => {
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(2000);
+    });
+    expect(onContinue).not.toHaveBeenCalled();
+
+    // Crossing the auto-continue window acknowledges for the player exactly once
+    // (so one AFK player can't strand the table on the score screen).
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    expect(onContinue).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT auto-continue once acknowledged (already waiting on the server)", () => {
+    const onContinue = vi.fn();
+    render(
+      <ScoreReveal data={normalData} viewerTeam="teamA" onContinue={onContinue} acknowledged />,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(30_000);
     });
     expect(onContinue).not.toHaveBeenCalled();
     expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
   });
 
-  it("enables Continue button after 500ms when reduced motion is preferred", () => {
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: vi.fn().mockImplementation((query: string) => ({
-        matches: query === "(prefers-reduced-motion: reduce)",
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
-    });
-
-    render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} />);
-
+  it("shows a disabled waiting state once acknowledged (server-gated continue)", () => {
+    render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} acknowledged />);
     const btn = screen.getByTestId("score-reveal-continue");
+    expect(btn).toHaveTextContent("Waiting for others…");
     expect(btn).toBeDisabled();
-
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-    expect(btn).toBeEnabled();
   });
 });

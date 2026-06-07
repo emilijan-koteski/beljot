@@ -603,7 +603,8 @@
       "failedContract": "Падната рака",
       "handTotal": "Вкупно делење",
       "matchTotal": "Резултат на меч",
-      "continue": "Продолжи"
+      "continue": "Продолжи",
+      "waiting": "Се чекаат другите…"
     },
     "capot": {
       "title": "КАПОТ!",

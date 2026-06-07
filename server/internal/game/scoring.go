@@ -6,11 +6,23 @@ package game
 // Populates LastHandResult with the full scoring breakdown for client broadcast.
 // Mutates an already-cloned state (called from within resolveTrickWithDeclarations).
 func scoreHand(state *GameState) {
-	// Step 1: Determine last-trick winner's team
+	// Step 1: Determine last-trick winner's seat and team
 	if state.TrickWinnerSeat == nil {
 		return // defensive: should never happen in normal flow
 	}
-	lastTrickTeam := TeamForSeat(*state.TrickWinnerSeat)
+	lastTrickSeat := *state.TrickWinnerSeat
+	lastTrickTeam := TeamForSeat(lastTrickSeat)
+
+	// The hand is over — clear the just-resolved trick from the served state so
+	// the hand-complete / match-end snapshot carries no current trick. On the
+	// 8th trick resolveTrick returns early (PhaseHandScoring) and SKIPS its
+	// "set up next trick" reset, so without this the authoritative match_state
+	// still holds the four last-trick cards; after the client's collect sweep
+	// clears its snapshot it would fall back to that live trick and flash the
+	// four cards back at table center. TrickWinnerSeat is intentionally KEPT —
+	// the final-hand event:trick_resolved resolves its winner from it.
+	state.CurrentTrick = nil
+	state.LeadSuit = nil
 
 	// Capture raw card points BEFORE bonus application
 	rawTeamACardPoints := state.HandPoints[TeamA]
@@ -94,6 +106,7 @@ func scoreHand(state *GameState) {
 		TeamADeclPoints: state.DeclarationPoints[TeamA],
 		TeamBDeclPoints: state.DeclarationPoints[TeamB],
 		LastTrickTeam:   lastTrickTeam,
+		LastTrickSeat:   lastTrickSeat,
 		LastTrickBonus:  lastTrickBonus,
 		Capot:           isCapot,
 		CapotTeam:       capotTeam,
@@ -116,8 +129,12 @@ func scoreHand(state *GameState) {
 		return
 	}
 
-	// Step 8: Start new hand
-	startNewHand(state)
+	// Step 8: Hold for the hand-complete pause. The next hand is NOT dealt here —
+	// the session manager waits for players to acknowledge (action:continue ->
+	// startNewHand) or for the auto-continue timeout. This keeps the next hand's
+	// cards, turn, and trump prompt off-screen until the score is seen.
+	state.Phase = PhaseHandComplete
+	state.HandCompleteReady = [4]bool{}
 }
 
 // startNewHand resets all per-hand state, rotates the dealer, shuffles and deals
@@ -141,6 +158,7 @@ func startNewHand(state *GameState) {
 	state.TrickWinnerSeat = nil
 	state.AwaitingDeclaration = false
 	state.DeclarationsResolved = false
+	state.HandCompleteReady = [4]bool{}
 
 	// Reset per-hand scoring
 	state.HandPoints = [2]int{0, 0}

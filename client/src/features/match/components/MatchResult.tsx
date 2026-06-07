@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Z } from "@/shared/lib/zLayers";
 import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 import type { MatchEndPayload } from "@/shared/types/wsEvents";
 
@@ -53,7 +54,7 @@ export function MatchResult({
   }, [data.matchDurationSec]);
 
   return (
-    <div className="fixed inset-0 z-50" data-testid="match-result">
+    <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="match-result">
       <OverlayBackdrop dim={0.7}>
         <ClassicPanel width={520} glowColor={glowColor}>
           <div className="flex flex-col items-center text-center gap-3">

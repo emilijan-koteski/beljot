@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
+import { Z } from "@/shared/lib/zLayers";
 import type { Card } from "@/shared/types/matchTypes";
 
 import { PlayingCard } from "./PlayingCard";
@@ -54,7 +55,8 @@ export function DealAnimation({ trumpCandidate }: DealAnimationProps) {
 
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+      style={{ zIndex: Z.TABLE_ANIM }}
       data-testid="deal-animation"
       aria-label={t("match.deal.dealing")}
     >

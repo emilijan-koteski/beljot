@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { Z } from "@/shared/lib/zLayers";
 import type { Card } from "@/shared/types/matchTypes";
 
 import { PlayingCard } from "./PlayingCard";
@@ -199,7 +200,7 @@ export function CardFlight({ flights, onComplete }: CardFlightProps) {
     <div
       ref={overlayRef}
       className="fixed inset-0 pointer-events-none"
-      style={{ zIndex: 1000 }}
+      style={{ zIndex: Z.CARD_FLIGHT }}
       data-testid="card-flight-overlay"
     >
       {flights.map((f) => (

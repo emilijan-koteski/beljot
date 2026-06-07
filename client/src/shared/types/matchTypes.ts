@@ -16,6 +16,7 @@ export type Phase =
   | "playing"
   | "trick_resolving"
   | "hand_scoring"
+  | "hand_complete"
   | "match_end"
   | "paused"
   | "disconnected";

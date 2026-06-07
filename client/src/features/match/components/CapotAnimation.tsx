@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION, motionDuration } from "@/shared/lib/motion";
+import { Z } from "@/shared/lib/zLayers";
 
 import { seatTeam, teamColors } from "../lib/tableTheme";
 
@@ -58,8 +59,9 @@ export function CapotAnimation({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex cursor-pointer items-center justify-center"
+      className="fixed inset-0 flex cursor-pointer items-center justify-center"
       style={{
+        zIndex: Z.CAPOT,
         background:
           "radial-gradient(ellipse at center, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.82) 100%)",
         backdropFilter: "blur(3px)",

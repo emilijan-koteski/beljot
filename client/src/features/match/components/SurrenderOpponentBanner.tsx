@@ -1,6 +1,8 @@
 import { type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Z } from "@/shared/lib/zLayers";
+
 interface SurrenderOpponentBannerProps {
   proposerUsername: string;
   /**
@@ -69,12 +71,13 @@ export function SurrenderOpponentBanner({
 
   return (
     <div
-      className={`absolute z-20 motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150 ${
+      className={`absolute motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150 ${
         compact
           ? "rounded-2xl px-3 py-1"
           : `${SEAT_POSITIONS[compassPosition]} rounded-full px-4 py-1.5`
       }`}
       style={{
+        zIndex: Z.SEAT_BANNER,
         background: "var(--panel-dark, rgba(20,45,30,0.85))",
         border: "1px solid var(--brass, #c9a876)",
         boxShadow: "0 4px 14px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)",

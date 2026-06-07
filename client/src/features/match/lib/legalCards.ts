@@ -117,3 +117,17 @@ export function legalCards(state: MatchState, seat: number): Card[] {
 export function legalCardIds(state: MatchState, seat: number): string[] {
   return legalCards(state, seat).map((c) => `${c.rank}${c.suit}`);
 }
+
+/**
+ * True when playing `card` would trigger a Belote/Rebelote announcement: it is
+ * the trump King or Queen and the hand (before playing) also holds the partner
+ * (trump Queen or King). Mirrors the server's `shouldPromptBelot` so the client
+ * can prompt the player BEFORE sending play_card — the card must not be thrown
+ * (or shown to opponents) until the player decides to announce or pass.
+ */
+export function isBelotEligible(card: Card, hand: Card[], trump: Suit): boolean {
+  if (card.suit !== trump) return false;
+  if (card.rank !== "K" && card.rank !== "Q") return false;
+  const partner: Rank = card.rank === "K" ? "Q" : "K";
+  return hand.some((c) => c.suit === trump && c.rank === partner);
+}

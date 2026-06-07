@@ -12,6 +12,7 @@ import type {
   RuleSection,
 } from "@/features/rules/content/types";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import { Z } from "@/shared/lib/zLayers";
 
 import { ClassicButton } from "./overlay/ClassicButton";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
@@ -77,7 +78,7 @@ export function RulesDialog({ open, onOpenChange }: RulesDialogProps) {
   };
 
   const dialog = (
-    <div className="fixed inset-0 z-50" data-testid="rules-dialog">
+    <div className="fixed inset-0" style={{ zIndex: Z.UTIL }} data-testid="rules-dialog">
       <OverlayBackdrop dim={0.55}>
         <div
           ref={dialogRef}

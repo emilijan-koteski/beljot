@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import { Z } from "@/shared/lib/zLayers";
 import type { Suit } from "@/shared/types/matchTypes";
 
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
@@ -49,7 +50,7 @@ export function BelotPrompt({
   const accentStripKey = isKing ? "match.belot.accentStripRebelot" : "match.belot.accentStripBelot";
 
   return (
-    <div className="fixed inset-0" data-testid="belot-prompt">
+    <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="belot-prompt">
       <OverlayBackdrop dim={0.5}>
         <div
           ref={promptRef}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Card, MatchState, PlayerState, Suit, TrickCard } from "@/shared/types/matchTypes";
 
-import { legalCardIds, legalCards } from "./legalCards";
+import { isBelotEligible, legalCardIds, legalCards } from "./legalCards";
 
 function card(id: string): Card {
   return { rank: id[0] as Card["rank"], suit: id[1] as Card["suit"] };
@@ -377,5 +377,29 @@ describe("legalCards", () => {
       currentTrick: [],
     });
     expect(legalCardIds(state, 0).sort()).toEqual(["7S", "KD"]);
+  });
+});
+
+describe("isBelotEligible", () => {
+  const trump: Suit = "H";
+
+  it("is true for the trump King when the hand also holds the trump Queen", () => {
+    expect(isBelotEligible(card("KH"), hand(["KH", "QH", "7S"]), trump)).toBe(true);
+  });
+
+  it("is true for the trump Queen when the hand also holds the trump King", () => {
+    expect(isBelotEligible(card("QH"), hand(["QH", "KH", "AD"]), trump)).toBe(true);
+  });
+
+  it("is false for a trump King without the trump Queen in hand", () => {
+    expect(isBelotEligible(card("KH"), hand(["KH", "9H", "7S"]), trump)).toBe(false);
+  });
+
+  it("is false for a non-trump King even with the same-suit Queen", () => {
+    expect(isBelotEligible(card("KS"), hand(["KS", "QS"]), trump)).toBe(false);
+  });
+
+  it("is false for trump ranks other than King or Queen", () => {
+    expect(isBelotEligible(card("AH"), hand(["AH", "KH", "QH"]), trump)).toBe(false);
   });
 });
