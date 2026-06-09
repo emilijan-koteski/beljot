@@ -71,6 +71,36 @@ func (m *Manager) SetGameStateForTest(roomID uint, gs *game.GameState) {
 	lm.mu.Unlock()
 }
 
+// HandCompleteExpiresAtForTest returns the session's fixed score-reveal
+// auto-continue deadline (zero if unset). Exposed so tests can assert that a
+// player's continue acknowledgement never pushes the deadline back.
+func (m *Manager) HandCompleteExpiresAtForTest(roomID uint) time.Time {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return time.Time{}
+	}
+	lm.mu.RLock()
+	defer lm.mu.RUnlock()
+	return lm.handCompleteExpiresAt
+}
+
+// SetHandCompleteExpiresAtForTest seeds the score-reveal auto-continue deadline,
+// simulating a pause that has already started (in real flow the deadline is set
+// when the hand-complete transition first occurs).
+func (m *Manager) SetHandCompleteExpiresAtForTest(roomID uint, t time.Time) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.mu.Lock()
+	lm.handCompleteExpiresAt = t
+	lm.mu.Unlock()
+}
+
 // TriggerTimerExpiryForTest cancels any pending turn timer and re-arms a
 // short-duration timer for the given expectedSeat, then waits for it to fire.
 // Used by tests that drive the auto-action code path on an injected game state

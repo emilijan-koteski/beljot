@@ -111,6 +111,99 @@ func TestHandleReconnect_RestoresTurnTimer(t *testing.T) {
 	assert.Equal(t, int64(0), state.TurnTimeRemaining, "TurnTimeRemaining should be reset to 0")
 }
 
+// TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores guards the
+// production jam fix: a socket drop during the score-reveal (hand-complete)
+// pause must pause the table (PhaseDisconnected), not be silently skipped.
+// Otherwise the dropped seat stays Connected=true and allConnectedReady keeps
+// waiting for an acknowledgement that can never arrive — jamming the table for
+// the full auto-continue window (the reported mobile-client symptom). Reconnect
+// restores the pause so the score dialog reappears and play resumes.
+func TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores(t *testing.T) {
+	hub := ws.NewHub()
+	go hub.Run()
+	defer hub.Shutdown()
+
+	repo := newMockMatchRepo()
+	mgr := match.NewManager(hub, repo)
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120))
+
+	// Inject the score-reveal pause: hand scored, holding for continue, with the
+	// other three players already acknowledged.
+	gs := mgr.GetStateSnapshot(100)
+	require.NotNil(t, gs)
+	gs.Phase = game.PhaseHandComplete
+	gs.PreviousPhase = ""
+	gs.DisconnectedSeat = -1
+	gs.TurnExpiresAt = nil
+	gs.HandCompleteReady = [4]bool{false, true, true, true}
+	mgr.SetGameStateForTest(100, gs)
+
+	// Seat 0 (the only un-acked player) drops mid-pause.
+	mgr.HandleDisconnect(uint(10))
+	time.Sleep(100 * time.Millisecond)
+
+	state := mgr.GetStateSnapshot(100)
+	require.NotNil(t, state)
+	assert.Equal(t, game.PhaseDisconnected, state.Phase, "a drop during hand-complete must pause the table, not be skipped")
+	assert.Equal(t, game.PhaseHandComplete, state.PreviousPhase, "the score-reveal pause is the restore target")
+	assert.False(t, state.Players[0].Connected, "dropped seat must be marked disconnected")
+	assert.Equal(t, 0, state.DisconnectedSeat)
+
+	// Reconnect restores the pause so the dialog reappears and play can resume.
+	mgr.HandleReconnect(uint(10))
+	time.Sleep(100 * time.Millisecond)
+
+	state = mgr.GetStateSnapshot(100)
+	require.NotNil(t, state)
+	assert.Equal(t, game.PhaseHandComplete, state.Phase, "reconnect restores the hand-complete pause")
+	assert.Equal(t, "", string(state.PreviousPhase))
+	assert.True(t, state.Players[0].Connected, "reconnected seat marked connected")
+	assert.Equal(t, -1, state.DisconnectedSeat)
+}
+
+// TestHandComplete_AckDoesNotExtendAutoContinueDeadline locks in the fix that a
+// player's continue acknowledgement must NOT push back the auto-continue
+// deadline. The deadline is fixed when the score-reveal pause starts; if each
+// ack reset it, the present players' clicks would keep extending the wait for a
+// missing/idle seat — the production jam. Deterministic: asserts the stored
+// deadline directly, with no timer wait.
+func TestHandComplete_AckDoesNotExtendAutoContinueDeadline(t *testing.T) {
+	hub := ws.NewHub()
+	go hub.Run()
+	defer hub.Shutdown()
+
+	repo := newMockMatchRepo()
+	mgr := match.NewManager(hub, repo)
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120))
+
+	// Put the table in the score-reveal pause with nobody acknowledged yet.
+	gs := mgr.GetStateSnapshot(100)
+	require.NotNil(t, gs)
+	gs.Phase = game.PhaseHandComplete
+	gs.HandCompleteReady = [4]bool{}
+	gs.TurnExpiresAt = nil
+	mgr.SetGameStateForTest(100, gs)
+
+	// Seed the fixed deadline far in the future (as entry into the pause does),
+	// so the auto-continue timer can't fire during the test.
+	deadline := time.Now().Add(time.Hour)
+	mgr.SetHandCompleteExpiresAtForTest(100, deadline)
+
+	// Three of four players acknowledge in turn. None completes readiness (seat 3
+	// never acks), so the phase stays hand_complete and each ack re-enters the
+	// auto-continue arming branch — which must leave the deadline untouched.
+	for _, uid := range []uint{10, 20, 30} {
+		mgr.HandleAction(&ws.Client{UserID: uid}, ws.WSMessage{Type: "action:continue", Payload: []byte(`{}`)})
+		time.Sleep(20 * time.Millisecond)
+
+		state := mgr.GetStateSnapshot(100)
+		require.NotNil(t, state)
+		require.Equal(t, game.PhaseHandComplete, state.Phase, "still paused after a partial ack (uid %d)", uid)
+		assert.True(t, mgr.HandCompleteExpiresAtForTest(100).Equal(deadline),
+			"a continue acknowledgement must not move the auto-continue deadline (uid %d)", uid)
+	}
+}
+
 func TestHandleReconnect_RejectsExpiredWindow(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()

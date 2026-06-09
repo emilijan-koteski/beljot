@@ -80,8 +80,13 @@ func (m *Manager) HandleDisconnect(userID uint) {
 
 	// [F3] Only handle disconnect during stable player-facing phases (AC1).
 	// PhaseDisconnected is handled separately below (concurrent disconnect path).
+	// PhaseHandComplete (the score-reveal pause) is included: a drop there must
+	// pause the table — otherwise the seat stays Connected=true and the
+	// allConnectedReady check waits the full auto-continue window for an
+	// acknowledgement that can never arrive, jamming the table (seen when a
+	// mobile client's socket drops during the pause).
 	switch gs.Phase {
-	case game.PhasePlaying, game.PhaseBidding, game.PhasePaused:
+	case game.PhasePlaying, game.PhaseBidding, game.PhasePaused, game.PhaseHandComplete:
 		// These are valid phases for disconnect handling — proceed
 	case game.PhaseDisconnected:
 		// Concurrent disconnect: another player's reconnect window is already
@@ -418,6 +423,19 @@ func (m *Manager) HandleReconnect(userID uint) {
 			expectedSeat := gs.ActivePlayerSeat
 			session.turnTimer = time.AfterFunc(remaining, func() {
 				m.handleTimerExpiry(session, gen, expectedSeat)
+			})
+		} else if gs.Phase == game.PhaseHandComplete {
+			// Restored into the score-reveal pause. The disconnect interrupted the
+			// pause, so give the returning player a FRESH auto-continue window to
+			// read the score (rather than resuming a deadline that may have already
+			// elapsed during the outage), and re-arm the timer. Applies regardless
+			// of timer style.
+			gs.TurnExpiresAt = nil
+			session.handCompleteExpiresAt = time.Now().Add(handCompleteAutoContinue)
+			session.cancelTurnTimer()
+			gen := session.timerGeneration
+			session.turnTimer = time.AfterFunc(handCompleteAutoContinue, func() {
+				m.handleHandCompleteTimeout(session, gen)
 			})
 		}
 	}

@@ -15,14 +15,19 @@ import (
 
 // LiveMatch holds the live game state and player mapping for one active game.
 type LiveMatch struct {
-	gameState                *game.GameState
-	playerIDs                [4]uint // index = seat
-	roomID                   uint
-	startedAt                time.Time
-	timerStyle               string         // "relaxed" or "per-move"
-	timerDurationSec         int            // seconds per move (only used when timerStyle == "per-move")
-	turnTimer                *time.Timer    // current per-move timer (nil when inactive)
-	timerGeneration          uint64         // incremented on each turn; timer callback checks staleness
+	gameState        *game.GameState
+	playerIDs        [4]uint // index = seat
+	roomID           uint
+	startedAt        time.Time
+	timerStyle       string      // "relaxed" or "per-move"
+	timerDurationSec int         // seconds per move (only used when timerStyle == "per-move")
+	turnTimer        *time.Timer // current per-move timer (nil when inactive)
+	timerGeneration  uint64      // incremented on each turn; timer callback checks staleness
+	// handCompleteExpiresAt is the fixed deadline for the score-reveal pause's
+	// auto-continue. Set once when the pause STARTS; the timer is re-created
+	// against this same deadline (remaining time) on every action so a player's
+	// acknowledgement never pushes it back. Reset on reconnect into the pause.
+	handCompleteExpiresAt    time.Time
 	reconnectWindowSec       int            // seconds to wait for disconnected player (default 120)
 	seatReconnectTimers      [4]*time.Timer // per-seat reconnect countdown timers; nil when seat is online
 	seatReconnectGenerations [4]uint64      // per-seat staleness counters — bumped on cancel + start
@@ -284,14 +289,23 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 			m.startTimerLocked(session, newState.ActivePlayerSeat)
 		}
 	} else if newState.Phase == game.PhaseHandComplete {
-		// Hand-complete pause: no active turn. Arm (or re-arm) the auto-continue
-		// timer so a connected-but-idle player can't stall the table; players
-		// advance early via action:continue. Applies regardless of timer style.
-		// session.cancelTurnTimer() ran at the top of HandleAction, so the
-		// captured generation is current.
+		// Hand-complete pause: no active turn. Arm the auto-continue safety net so
+		// a connected-but-idle player can't stall the table; players advance early
+		// via action:continue. Applies regardless of timer style.
+		//
+		// The deadline is fixed when the pause STARTS and is NOT pushed back by
+		// each acknowledgement — otherwise the present players' continue clicks
+		// would keep extending the wait for a missing/idle seat. cancelTurnTimer()
+		// at the top of HandleAction already stopped the prior tick, so we always
+		// re-create the timer here, but against the SAME deadline (remaining time)
+		// rather than a fresh full window.
 		newState.TurnExpiresAt = nil
+		if oldState.Phase != game.PhaseHandComplete {
+			session.handCompleteExpiresAt = time.Now().Add(handCompleteAutoContinue)
+		}
+		remaining := max(time.Until(session.handCompleteExpiresAt), 0)
 		gen := session.timerGeneration
-		session.turnTimer = time.AfterFunc(handCompleteAutoContinue, func() {
+		session.turnTimer = time.AfterFunc(remaining, func() {
 			m.handleHandCompleteTimeout(session, gen)
 		})
 	}
@@ -1028,11 +1042,16 @@ func (m *Manager) startTimerLocked(session *LiveMatch, expectedSeat int) {
 	})
 }
 
-// handCompleteAutoContinue is how long the server holds the PhaseHandComplete
+// handCompleteAutoContinue is the server's fallback ceiling on the score-reveal
 // pause before auto-dealing the next hand when not every connected player has
-// acknowledged it. Generous so players can read the score; players advance
-// early by acknowledging (action:continue → all connected ready → deal now).
-const handCompleteAutoContinue = 30 * time.Second
+// acknowledged. Each client auto-acknowledges at 8s (SCORE_REVEAL_AUTO_CONTINUE
+// on the client), so the table normally advances the moment the last ack lands;
+// this ceiling only bites when a connected client can't ack (idle/stuck). Kept
+// just above the client's 8s (≈2s network/processing grace) so the normal
+// ack-driven path wins and one non-acking seat can't strand the table — and
+// measured from when the pause STARTS, never extended by later acknowledgements
+// (see handCompleteExpiresAt).
+const handCompleteAutoContinue = 10 * time.Second
 
 // handleHandCompleteTimeout force-advances the hand-complete pause when the
 // auto-continue window elapses without every connected player acknowledging.
@@ -1244,6 +1263,20 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		// timer would auto-act for the wrong player.
 		m.setTurnExpiry(session, finalState)
 		m.startTimerLocked(session, finalState.ActivePlayerSeat)
+	} else if finalState.Phase == game.PhaseHandComplete {
+		// An auto-play ended the hand (the timed-out card was the last of the
+		// hand). Arm the score-reveal auto-continue safety net, exactly as the
+		// normal-action path does in HandleAction — otherwise this pause would
+		// have NO server-side timer and could stall until every player manually
+		// continues. cancelTurnTimer bumps the generation so the captured gen is
+		// current.
+		finalState.TurnExpiresAt = nil
+		session.handCompleteExpiresAt = time.Now().Add(handCompleteAutoContinue)
+		session.cancelTurnTimer()
+		gen := session.timerGeneration
+		session.turnTimer = time.AfterFunc(handCompleteAutoContinue, func() {
+			m.handleHandCompleteTimeout(session, gen)
+		})
 	}
 
 	session.gameState = finalState
