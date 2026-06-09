@@ -87,14 +87,20 @@ type GameState struct {
 	Players [4]PlayerState `json:"players"`
 
 	// Scoring (index 0=Team A, 1=Team B)
-	TeamScores        [2]int     `json:"teamScores"`
-	HandPoints        [2]int     `json:"handPoints"`
-	DeclarationPoints [2]int     `json:"declarationPoints"`
-	TricksWon         [2]int     `json:"tricksWon"`
-	PendingBelotSeat  *int       `json:"pendingBelotSeat"`
-	BelotAnnounced    bool       `json:"belotAnnounced"`
-	WinnerTeam        *int       `json:"winnerTeam"`
-	LastHandResult    *HandScore `json:"lastHandResult"`
+	TeamScores        [2]int `json:"teamScores"`
+	HandPoints        [2]int `json:"handPoints"` // Trick-taking card points only — belote is tracked separately in BelotPoints.
+	DeclarationPoints [2]int `json:"declarationPoints"`
+	// BelotPoints holds the 20-pt belote/rebelote bonus (K+Q of trump), kept
+	// apart from HandPoints so it is classified as a declaration — not card
+	// points — everywhere it surfaces. It is awarded to whoever announces it
+	// (independent of the declaration contest) but, like all hand points, still
+	// transfers to the opponents on a failed contract or capot.
+	BelotPoints      [2]int     `json:"belotPoints"`
+	TricksWon        [2]int     `json:"tricksWon"`
+	PendingBelotSeat *int       `json:"pendingBelotSeat"`
+	BelotAnnounced   bool       `json:"belotAnnounced"`
+	WinnerTeam       *int       `json:"winnerTeam"`
+	LastHandResult   *HandScore `json:"lastHandResult"`
 	// HandCompleteReady tracks which seats have acknowledged the PhaseHandComplete
 	// pause (action:continue). The next hand deals once every connected seat is
 	// ready (or the session manager's auto-continue timeout fires). Server-only

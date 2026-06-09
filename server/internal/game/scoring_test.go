@@ -311,17 +311,54 @@ func TestHandScoring_FailedContractBothTeamsHaveDeclarations(t *testing.T) {
 
 func TestHandScoring_BelotBonusIncluded(t *testing.T) {
 	gs := testfixtures.NewGameLastTrick()
-	// Belot bonus (+20) is already in HandPoints from Story 3.4.
-	// Simulate: team A already got +20 Belot during the hand
-	gs.HandPoints = [2]int{90, 61}
+	// Team A announced belote this hand (K+Q of trump) — 20 pts, tracked in
+	// BelotPoints (a declaration), NOT in HandPoints (card points).
+	gs.HandPoints = [2]int{70, 61}
+	gs.BelotPoints = [2]int{20, 0}
 
 	result := playTrick8(t, gs)
 
-	// Team A total: 90 + 0 (declarations) = 90
+	// Team A total: 70 card + 0 decl + 20 belote = 90
 	// Team B gets trick 8: 21 card pts + 10 bonus → team B total: 61 + 21 + 10 = 92
 	// Team B is contracting (seat 1), team B(92) > team A(90) → normal scoring
-	assert.Equal(t, 90, result.TeamScores[game.TeamA], "Team A total includes Belot bonus in HandPoints")
+	assert.Equal(t, 90, result.TeamScores[game.TeamA], "Team A total includes the belote bonus")
 	assert.Equal(t, 92, result.TeamScores[game.TeamB], "Team B keeps own total")
+}
+
+// Belote/rebelote (K+Q of trump, 20 pts) must be classified as a DECLARATION,
+// not trick-taking card points — in the score breakdown that drives the
+// scoreboard, match history, and broadcast. It still counts toward the team's
+// hand total (and so transfers on a failed contract / capot).
+func TestHandScoring_BeloteCountsAsDeclaration(t *testing.T) {
+	gs := testfixtures.NewGameLastTrick()
+	gs.HandPoints = [2]int{40, 91} // team B (caller) clearly ahead → normal scoring
+	gs.BelotPoints = [2]int{20, 0} // team A announced belote
+
+	result := playTrick8(t, gs)
+	hr := result.LastHandResult
+	require.NotNil(t, hr)
+
+	assert.Equal(t, 20, hr.TeamADeclPoints, "belote is folded into declaration points")
+	assert.Equal(t, 40, hr.TeamACardPoints, "belote is NOT counted as card points")
+	// Trick 8: 7H trump wins for team B (+21 card, +10 bonus). Normal scoring.
+	assert.Equal(t, 60, result.TeamScores[game.TeamA], "team A total = 40 card + 20 belote declaration")
+}
+
+// On a failed contract the no-trick/loser side forfeits everything including
+// belote — the belote declaration transfers with the rest of the points.
+func TestHandScoring_BeloteForfeitedOnFailedContract(t *testing.T) {
+	gs := testfixtures.NewGameLastTrick()
+	// Team B (seat 1) is the caller. Make team B fall short so the contract fails.
+	gs.HandPoints = [2]int{100, 20}
+	gs.BelotPoints = [2]int{0, 20} // caller (team B) announced belote
+
+	result := playTrick8(t, gs)
+
+	// Trick 8: 7H trump wins for team B → +21 card +10 bonus.
+	// Team A total: 100. Team B total: 20 + 21 + 10 + 20 belote = 71.
+	// Caller team B (71) < team A (100) → FAILED: all 171 to team A, incl. belote.
+	assert.Equal(t, 171, result.TeamScores[game.TeamA], "opponent gets all points including the caller's belote")
+	assert.Equal(t, 0, result.TeamScores[game.TeamB], "caller forfeits everything, belote included")
 }
 
 func TestHandScoring_501MatchMode(t *testing.T) {

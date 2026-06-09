@@ -73,6 +73,7 @@ function makeState(args: {
     teamScores: [0, 0],
     handPoints: [0, 0],
     declarationPoints: [0, 0],
+    belotPoints: [0, 0],
     tricksWon: [0, 0],
     pendingBelotSeat: null,
     belotAnnounced: false,

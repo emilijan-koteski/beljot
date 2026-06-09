@@ -103,6 +103,7 @@ export const EventMatchStateSchema = z.strictObject({
   teamScores: z.tuple([z.number(), z.number()]),
   handPoints: z.tuple([z.number(), z.number()]),
   declarationPoints: z.tuple([z.number(), z.number()]),
+  belotPoints: z.tuple([z.number(), z.number()]),
   tricksWon: z.tuple([z.number(), z.number()]),
   pendingBelotSeat: z.number().nullable(),
   belotAnnounced: z.boolean(),

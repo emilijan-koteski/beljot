@@ -232,6 +232,7 @@ function dispatchGameEvent(message: WsMessage): void {
         teamScores: [payload.teamAMatchScore, payload.teamBMatchScore],
         handPoints: [0, 0],
         declarationPoints: [0, 0],
+        belotPoints: [0, 0],
       });
     }
     store.setScoreRevealData(payload);

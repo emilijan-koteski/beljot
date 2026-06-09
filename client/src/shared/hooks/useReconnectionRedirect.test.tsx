@@ -94,6 +94,7 @@ const minimalMatchState: MatchState = {
   handPoints: [0, 0],
   tricksWon: [0, 0],
   declarationPoints: [0, 0],
+  belotPoints: [0, 0],
   winnerTeam: null,
   lastHandResult: null,
   turnExpiresAt: null,

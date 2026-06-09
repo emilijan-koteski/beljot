@@ -120,6 +120,9 @@ export interface MatchState {
   teamScores: [number, number];
   handPoints: [number, number];
   declarationPoints: [number, number];
+  /** Belote/rebelote bonus (K+Q of trump). Classified as a declaration, kept
+   *  separate from handPoints (card points). See server GameState.BelotPoints. */
+  belotPoints: [number, number];
   tricksWon: [number, number];
   pendingBelotSeat: number | null;
   belotAnnounced: boolean;

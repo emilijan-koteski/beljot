@@ -376,7 +376,10 @@ func handleAnnounceBelot(state *GameState, action Action) (*GameState, error) {
 
 	newState := cloneGameState(state)
 	team := TeamForSeat(action.PlayerSeat)
-	newState.HandPoints[team] += 20
+	// Belote is a declaration, not card points — tracked in BelotPoints so it
+	// surfaces under declarations everywhere (it still counts toward the team's
+	// hand total and transfers on a failed contract / capot like any point).
+	newState.BelotPoints[team] += 20
 	newState.BelotAnnounced = true
 	newState.PendingBelotSeat = nil
 

@@ -87,6 +87,7 @@ const mockMatchState: MatchState = {
   teamScores: [0, 0],
   handPoints: [0, 0],
   declarationPoints: [0, 0],
+  belotPoints: [0, 0],
   tricksWon: [0, 0],
   pendingBelotSeat: null,
   belotAnnounced: false,
@@ -553,6 +554,7 @@ describe("useWsDispatch", () => {
       ...mockMatchState,
       handPoints: [70, 82],
       declarationPoints: [0, 50],
+      belotPoints: [0, 0],
     });
 
     const { result } = renderHook(() => useWsDispatch());

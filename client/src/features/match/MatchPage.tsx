@@ -1304,8 +1304,12 @@ export function MatchPage() {
         teamBScore={matchState.teamScores[1]}
         teamATricks={matchState.tricksWon[0]}
         teamBTricks={matchState.tricksWon[1]}
-        teamAHandPotential={matchState.handPoints[0] + matchState.declarationPoints[0]}
-        teamBHandPotential={matchState.handPoints[1] + matchState.declarationPoints[1]}
+        teamAHandPotential={
+          matchState.handPoints[0] + matchState.declarationPoints[0] + matchState.belotPoints[0]
+        }
+        teamBHandPotential={
+          matchState.handPoints[1] + matchState.declarationPoints[1] + matchState.belotPoints[1]
+        }
         lastTrickBonus={scoreRevealData?.lastTrickBonus}
         lastTrickTeam={scoreRevealData?.lastTrickTeam}
         handNumber={matchState.handNumber}

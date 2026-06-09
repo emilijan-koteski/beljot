@@ -391,7 +391,8 @@ func TestAnnounceBelot(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, state2.PendingBelotSeat, "PendingBelotSeat cleared")
 		assert.True(t, state2.BelotAnnounced)
-		assert.Equal(t, 20, state2.HandPoints[game.TeamA], "20 pts to team A")
+		assert.Equal(t, 20, state2.BelotPoints[game.TeamA], "20 belote pts to team A (declaration, not card points)")
+		assert.Equal(t, 0, state2.HandPoints[game.TeamA], "belote does NOT inflate card points")
 		assert.Equal(t, 1, state2.ActivePlayerSeat, "turn advances after Belot")
 	})
 
@@ -543,8 +544,8 @@ func TestFullTrick1WithDeclarations(t *testing.T) {
 		assert.Equal(t, 2, state.TrickNumber)
 		assert.True(t, state.DeclarationsResolved)
 
-		// Verify Belot: HandPoints[team A] includes 20 Belot + trick card points
-		assert.GreaterOrEqual(t, state.HandPoints[game.TeamA], 20, "Team A HandPoints includes Belot bonus")
+		// Verify Belot: the 20 lives in BelotPoints (a declaration), NOT HandPoints.
+		assert.Equal(t, 20, state.BelotPoints[game.TeamA], "Team A belote tracked as a declaration")
 
 		// Verify declarations: team B's quarte (50) beats team A's tierces (20 each)
 		assert.Equal(t, 50, state.DeclarationPoints[game.TeamB])

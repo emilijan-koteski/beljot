@@ -51,9 +51,12 @@ func scoreHand(state *GameState) {
 		lastTrickBonus = 10
 	}
 
-	// Step 3: Calculate total hand score per team
-	aTotal := state.HandPoints[TeamA] + state.DeclarationPoints[TeamA]
-	bTotal := state.HandPoints[TeamB] + state.DeclarationPoints[TeamB]
+	// Step 3: Calculate total hand score per team. Belote (BelotPoints) counts
+	// as a declaration: it joins each team's total and its declaration figure.
+	aDeclTotal := state.DeclarationPoints[TeamA] + state.BelotPoints[TeamA]
+	bDeclTotal := state.DeclarationPoints[TeamB] + state.BelotPoints[TeamB]
+	aTotal := state.HandPoints[TeamA] + aDeclTotal
+	bTotal := state.HandPoints[TeamB] + bDeclTotal
 
 	// Step 4: Failed contract check
 	contractingTeam := TeamForSeat(*state.TrumpCallerSeat)
@@ -116,8 +119,8 @@ func scoreHand(state *GameState) {
 	state.LastHandResult = &HandScore{
 		TeamACardPoints: rawTeamACardPoints,
 		TeamBCardPoints: rawTeamBCardPoints,
-		TeamADeclPoints: state.DeclarationPoints[TeamA],
-		TeamBDeclPoints: state.DeclarationPoints[TeamB],
+		TeamADeclPoints: aDeclTotal,
+		TeamBDeclPoints: bDeclTotal,
 		LastTrickTeam:   lastTrickTeam,
 		LastTrickSeat:   lastTrickSeat,
 		LastTrickBonus:  lastTrickBonus,
@@ -176,6 +179,7 @@ func startNewHand(state *GameState) {
 	// Reset per-hand scoring
 	state.HandPoints = [2]int{0, 0}
 	state.DeclarationPoints = [2]int{0, 0}
+	state.BelotPoints = [2]int{0, 0}
 	state.TricksWon = [2]int{0, 0}
 	state.PendingBelotSeat = nil
 	state.BelotAnnounced = false
