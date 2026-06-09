@@ -79,19 +79,32 @@ func scoreHand(state *GameState) {
 	// points held over, nobody scores, carried to the next decisive hand. That
 	// needs cross-hand state and is deferred to Epic 12 (see deferred-work.md).
 	failedContract := contractingTotal <= opposingTotal
+	allPoints := aTotal + bTotal
 	var aAwarded, bAwarded int
-	if failedContract {
+	switch {
+	case isCapot:
+		// Capot: the team that won all 8 tricks takes EVERY point in the hand —
+		// card points, the +100 bonus, and both teams' declarations. The side
+		// that won no trick scores nothing, forfeiting even declarations it had
+		// won in the declaration contest; a team that takes no trick cannot bank
+		// points. (When the non-contracting team makes Capot the contract has
+		// also failed, but the destination is identical: everything to the Capot
+		// team. The FailedContract flag below still reflects that correctly.)
+		state.TeamScores[*capotTeam] += allPoints
+		if *capotTeam == TeamA {
+			aAwarded = allPoints
+		} else {
+			bAwarded = allPoints
+		}
+	case failedContract:
 		// Failed contract: contracting team gets 0, opponent gets ALL points
-		allPoints := aTotal + bTotal
 		state.TeamScores[opposingTeam] += allPoints
 		if opposingTeam == TeamA {
 			aAwarded = allPoints
-			bAwarded = 0
 		} else {
-			aAwarded = 0
 			bAwarded = allPoints
 		}
-	} else {
+	default:
 		// Normal scoring: each team keeps their own points
 		state.TeamScores[TeamA] += aTotal
 		state.TeamScores[TeamB] += bTotal

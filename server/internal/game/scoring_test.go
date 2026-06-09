@@ -94,6 +94,30 @@ func TestHandScoring_CapotScoring(t *testing.T) {
 	assert.Equal(t, 0, result.TeamScores[game.TeamB], "Team B gets nothing")
 }
 
+// Regression: a Capot (one team wins all 8 tricks) leaves the no-trick team
+// with NOTHING — it forfeits even declarations it won in the declaration
+// contest, and those points flow to the Capot team. Reported bug: opponents
+// made Capot but the no-trick team kept its 40 declaration points instead of
+// them transferring to the Capot side.
+func TestHandScoring_CapotForfeitsLosersDeclarations(t *testing.T) {
+	gs := testfixtures.NewGameCapotInProgress()
+	// Team A (contracting, seat 0) is on track for Capot. Team B won the
+	// declaration contest (40 pts) but takes no trick this hand.
+	gs.DeclarationPoints = [2]int{0, 40}
+
+	result := playTrick8(t, gs)
+
+	// Team A: 152 card pts + 100 Capot bonus + Team B's forfeited 40 = 292.
+	// Team B: 0 — a team that wins no trick banks nothing, declarations included.
+	assert.Equal(t, 292, result.TeamScores[game.TeamA], "Capot team takes everything, incl. opponent's declarations")
+	assert.Equal(t, 0, result.TeamScores[game.TeamB], "no-trick team scores 0, forfeiting its declarations")
+
+	require.NotNil(t, result.LastHandResult)
+	assert.True(t, result.LastHandResult.Capot, "should be a capot")
+	assert.Equal(t, 292, result.LastHandResult.TeamAHandTotal, "Team A hand total includes forfeited declarations")
+	assert.Equal(t, 0, result.LastHandResult.TeamBHandTotal, "Team B hand total is 0")
+}
+
 func TestHandScoring_CapotBroken(t *testing.T) {
 	gs := testfixtures.NewGameCapotInProgress()
 	// Swap seat 0 and seat 1 cards so team B can win trick 8
