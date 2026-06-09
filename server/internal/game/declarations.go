@@ -173,7 +173,7 @@ func hasDeclarableCombinations(hand []Card) bool {
 // Resolution rules (applied to each team's strongest meld via declarationBeats):
 // 1. Pick each team's single strongest declaration
 // 2. Higher point value wins; on tie, four-of-a-kind beats sequence
-// 3. On tie among sequences: higher top card (non-trump rank order) wins
+// 3. On tie among sequences: higher top card (natural rank order, J > 10) wins
 // 4. On tie: trump-suit sequence beats non-trump
 // 5. On tie: team whose declaring player is earlier in play order wins
 // 6. Winning team scores the sum of ALL their declarations
@@ -231,12 +231,14 @@ func declarationBeats(a *Declaration, seatA int, b *Declaration, seatB int, trum
 		return a.Type == DeclarationFourOfAKind
 	}
 
-	// 3. For equal-value sequences: higher top card wins
+	// 3. For equal-value sequences: higher top card wins. Sequences rank by the
+	// NATURAL declaration order (7<8<9<10<J<Q<K<A) — NOT the trick-taking order,
+	// where Ten outranks Jack. In a meld, Jack outranks Ten.
 	if a.Type == DeclarationSequence && b.Type == DeclarationSequence {
 		topA := sequenceTopCard(a.Cards)
 		topB := sequenceTopCard(b.Cards)
-		orderA := NonTrumpRankOrder[topA]
-		orderB := NonTrumpRankOrder[topB]
+		orderA := naturalRankIndex[topA]
+		orderB := naturalRankIndex[topB]
 		if orderA != orderB {
 			return orderA > orderB
 		}

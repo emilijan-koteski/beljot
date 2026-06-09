@@ -665,6 +665,32 @@ func TestDeclarationTiebreakers(t *testing.T) {
 		// Team B (seat 1) wins by value 100 > 20
 		assert.True(t, len(state.Players[1].Declarations) > 0)
 	})
+
+	// Regression: the top-card tiebreak for equal-length sequences must use the
+	// NATURAL declaration rank order (7<8<9<10<J<Q<K<A), where Jack outranks
+	// Ten — NOT the trick-taking non-trump order (7<8<9<J<Q<K<10<A) where Ten
+	// outranks Jack. Bug report: opponent's 9-10-J tierce lost to a player's
+	// 8-9-10 tierce because the comparison used NonTrumpRankOrder.
+	t.Run("Jack-topped tierce beats Ten-topped tierce (natural order)", func(t *testing.T) {
+		decls := []game.Declaration{
+			// Team A (seat 0): tierce 8D-9D-TD — top card Ten (team A's strongest)
+			{Type: game.DeclarationSequence, Cards: makeCards("8D", "9D", "TD"), PlayerSeat: 0, Value: 20},
+			// Team A (seat 2): weaker tierce, placed only so seat 2's natural
+			// declarable hand doesn't trigger a prompt that blocks the scripted
+			// plays in completeTrick1. Does not affect the tiebreak under test.
+			{Type: game.DeclarationSequence, Cards: makeCards("7S", "8S", "9S"), PlayerSeat: 2, Value: 20},
+			// Team B (seat 1): tierce 9C-TC-JC — top card Jack
+			{Type: game.DeclarationSequence, Cards: makeCards("9C", "TC", "JC"), PlayerSeat: 1, Value: 20},
+		}
+		state := completeTrick1(t, decls)
+
+		// Neither tierce is trump (trump=Hearts), so the trump tiebreak never
+		// applies — the winner is decided purely by top card: J > T.
+		assert.Equal(t, 0, state.DeclarationPoints[game.TeamA], "Ten-topped tierce must lose")
+		assert.Equal(t, 20, state.DeclarationPoints[game.TeamB], "Jack-topped tierce wins (J > T)")
+		assert.Empty(t, state.Players[0].Declarations, "Team A declarations cleared")
+		assert.NotEmpty(t, state.Players[1].Declarations, "Team B declarations preserved")
+	})
 }
 
 func TestFourOfAKindDeclarations(t *testing.T) {
