@@ -80,6 +80,7 @@ export const EVENT_HAND_SCORED = "event:hand_scored" as const;
 export const EVENT_MATCH_END = "event:match_end" as const;
 export const EVENT_TRUMP_SELECTED = "event:trump_selected" as const;
 export const EVENT_DECLARATIONS_RESOLVED = "event:declarations_resolved" as const;
+export const EVENT_PLAYER_DECLARED = "event:player_declared" as const;
 export const EVENT_BELOT_ANNOUNCED = "event:belot_announced" as const;
 export const EVENT_MATCH_PAUSED = "event:match_paused" as const;
 export const EVENT_MATCH_RESUMED = "event:match_resumed" as const;
@@ -150,6 +151,13 @@ export interface DeclarationsResolvedPayload {
     value: number;
     cards: string[];
   }>;
+}
+
+// Fired the moment a player commits a declare during trick 1 — drives the
+// seat-anchored "has a declaration" banner. Seat only: meld type/value/cards
+// stay secret until event:declarations_resolved at the end of trick 1.
+export interface PlayerDeclaredPayload {
+  playerSeat: number;
 }
 
 export interface BelotAnnouncedPayload {

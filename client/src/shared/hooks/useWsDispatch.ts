@@ -20,6 +20,7 @@ import type {
   MatchEndPayload,
   MatchResumedPayload,
   MatchStartedPayload,
+  PlayerDeclaredPayload,
   PlayerDisconnectedPayload,
   PlayerJoinedPayload,
   PlayerLeftPayload,
@@ -56,6 +57,7 @@ import {
   EVENT_MATCH_PAUSED,
   EVENT_MATCH_RESUMED,
   EVENT_MATCH_STATE,
+  EVENT_PLAYER_DECLARED,
   EVENT_PLAYER_DISCONNECTED,
   EVENT_PLAYER_RECONNECTED,
   EVENT_SURRENDER_DECLINED,
@@ -273,6 +275,24 @@ function dispatchGameEvent(message: WsMessage): void {
     // Full game state update follows via event:match_state. That trailing
     // snapshot (and any later one) leaves this reveal untouched — see the
     // EVENT_MATCH_STATE branch.
+    return;
+  }
+
+  if (type === EVENT_PLAYER_DECLARED) {
+    // Trick-1 "who declared" announcement — ephemeral per-seat banner, not
+    // part of MatchState. Mirrors the system:emote defensive validation; the
+    // banner component clears its own slot via its auto-dismiss timer.
+    const payload = message.payload as PlayerDeclaredPayload;
+    if (
+      typeof payload?.playerSeat !== "number" ||
+      payload.playerSeat < 0 ||
+      payload.playerSeat > 3
+    ) {
+      console.warn("WS: ignoring malformed event:player_declared payload", payload);
+      return;
+    }
+    if (useMatchStore.getState().matchState === null) return;
+    useMatchStore.getState().setActiveDeclare(payload.playerSeat, true);
     return;
   }
 

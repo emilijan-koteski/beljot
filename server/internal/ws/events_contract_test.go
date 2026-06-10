@@ -184,6 +184,13 @@ func TestEventsJSONContract(t *testing.T) {
 			goldenFile: "declarations_resolved.json",
 		},
 		{
+			name: "PlayerDeclaredPayload",
+			sample: ws.PlayerDeclaredPayload{
+				PlayerSeat: 2,
+			},
+			goldenFile: "player_declared.json",
+		},
+		{
 			name: "BelotAnnouncedPayload",
 			sample: ws.BelotAnnouncedPayload{
 				PlayerSeat: 0,

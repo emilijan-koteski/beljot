@@ -542,7 +542,8 @@
       "tiebreaker": "{{player}}, {{label}} · највисока најава на масата",
       "byPlayer": "од {{name}}",
       "addedToHand": "Додадено на резултатот од оваа рака",
-      "dismiss": "Затвори"
+      "dismiss": "Затвори",
+      "declaredBanner": "{{username}} има најава"
     },
     "belot": {
       "titleBelot": "Најави Бељот?",

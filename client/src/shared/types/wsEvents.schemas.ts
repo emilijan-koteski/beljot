@@ -37,6 +37,7 @@ import type {
   MatchEndPayload,
   MatchPausedPayload,
   MatchResumedPayload,
+  PlayerDeclaredPayload,
   PlayerDisconnectedPayload,
   PlayerReconnectedPayload,
   SurrenderDeclinedPayload,
@@ -233,6 +234,10 @@ export const DeclarationsResolvedPayloadSchema = z.strictObject({
   ),
 });
 
+export const PlayerDeclaredPayloadSchema = z.strictObject({
+  playerSeat: z.number(),
+});
+
 export const BelotAnnouncedPayloadSchema = z.strictObject({
   playerSeat: z.number(),
   team: z.number(),
@@ -329,6 +334,12 @@ type _DeclarationsResolvedConformance = MutualExtends<
 >;
 const _declarationsResolvedConforms: _DeclarationsResolvedConformance = true;
 
+type _PlayerDeclaredConformance = MutualExtends<
+  z.infer<typeof PlayerDeclaredPayloadSchema>,
+  PlayerDeclaredPayload
+>;
+const _playerDeclaredConforms: _PlayerDeclaredConformance = true;
+
 type _BelotAnnouncedConformance = MutualExtends<
   z.infer<typeof BelotAnnouncedPayloadSchema>,
   BelotAnnouncedPayload
@@ -388,6 +399,7 @@ export const _conformanceWitnesses = {
   _matchAbandonedConforms,
   _trumpSelectedConforms,
   _declarationsResolvedConforms,
+  _playerDeclaredConforms,
   _belotAnnouncedConforms,
   _matchPausedConforms,
   _matchResumedConforms,

@@ -38,6 +38,7 @@ const EventHandScored = "event:hand_scored"
 const EventMatchEnd = "event:match_end"
 const EventTrumpSelected = "event:trump_selected"
 const EventDeclarationsResolved = "event:declarations_resolved"
+const EventPlayerDeclared = "event:player_declared"
 const EventBelotAnnounced = "event:belot_announced"
 const EventMatchPaused = "event:match_paused"
 const EventMatchResumed = "event:match_resumed"
@@ -60,6 +61,15 @@ type TrumpSelectedPayload struct {
 	PlayerSeat int    `json:"playerSeat"`
 	TrumpSuit  string `json:"trumpSuit"`
 	CardID     string `json:"cardId"`
+}
+
+// PlayerDeclaredPayload is the typed payload for EventPlayerDeclared events.
+// Emitted the moment a player commits a declare action during trick 1, so the
+// table sees WHO holds declarations right away. Deliberately carries only the
+// seat — type, value, and cards stay secret until EventDeclarationsResolved
+// reveals the winning team's melds at the end of trick 1.
+type PlayerDeclaredPayload struct {
+	PlayerSeat int `json:"playerSeat"`
 }
 
 // BelotAnnouncedPayload is the typed payload for EventBelotAnnounced events.

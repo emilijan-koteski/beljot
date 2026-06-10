@@ -542,7 +542,8 @@
       "tiebreaker": "{{player}}'s {{label}} — highest declaration at the table",
       "byPlayer": "by {{name}}",
       "addedToHand": "Added to this hand's score",
-      "dismiss": "Dismiss"
+      "dismiss": "Dismiss",
+      "declaredBanner": "{{username}} has a declaration"
     },
     "belot": {
       "titleBelot": "Declare Belote?",

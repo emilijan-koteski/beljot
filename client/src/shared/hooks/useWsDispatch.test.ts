@@ -1258,4 +1258,72 @@ describe("useWsDispatch", () => {
       3: null,
     });
   });
+
+  // --- Player declared (trick-1 "has a declaration" banner) ---
+
+  it("writes a valid event:player_declared payload to matchStore.activeDeclares", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "event:player_declared",
+      payload: { playerSeat: 2 },
+    });
+
+    const slot = useMatchStore.getState().activeDeclares[2];
+    expect(slot).not.toBeNull();
+    expect(typeof slot?.receivedAt).toBe("number");
+    // Other seats untouched.
+    expect(useMatchStore.getState().activeDeclares[0]).toBeNull();
+  });
+
+  it("ignores malformed event:player_declared payloads (defensive validation)", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    const malformedPayloads: unknown[] = [
+      null,
+      undefined,
+      {},
+      { playerSeat: -1 },
+      { playerSeat: 4 },
+      { playerSeat: "2" },
+    ];
+
+    for (const payload of malformedPayloads) {
+      dispatch({ type: "event:player_declared", payload });
+    }
+
+    expect(useMatchStore.getState().activeDeclares).toEqual({
+      0: null,
+      1: null,
+      2: null,
+      3: null,
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("ignores event:player_declared when no active game state (defence in depth)", () => {
+    expect(useMatchStore.getState().matchState).toBeNull();
+
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "event:player_declared",
+      payload: { playerSeat: 0 },
+    });
+
+    expect(useMatchStore.getState().activeDeclares).toEqual({
+      0: null,
+      1: null,
+      2: null,
+      3: null,
+    });
+  });
 });

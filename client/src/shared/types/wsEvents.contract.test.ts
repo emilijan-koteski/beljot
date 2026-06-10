@@ -23,6 +23,7 @@ import matchAbandonedGolden from "../../../../server/internal/ws/testdata/events
 import matchEndGolden from "../../../../server/internal/ws/testdata/events/match_end.json";
 import matchPausedGolden from "../../../../server/internal/ws/testdata/events/match_paused.json";
 import matchResumedGolden from "../../../../server/internal/ws/testdata/events/match_resumed.json";
+import playerDeclaredGolden from "../../../../server/internal/ws/testdata/events/player_declared.json";
 import playerDisconnectedGolden from "../../../../server/internal/ws/testdata/events/player_disconnected.json";
 import playerReconnectedGolden from "../../../../server/internal/ws/testdata/events/player_reconnected.json";
 import surrenderDeclinedGolden from "../../../../server/internal/ws/testdata/events/surrender_declined.json";
@@ -40,6 +41,7 @@ import {
   MatchEndPayloadSchema,
   MatchPausedPayloadSchema,
   MatchResumedPayloadSchema,
+  PlayerDeclaredPayloadSchema,
   PlayerDisconnectedPayloadSchema,
   PlayerReconnectedPayloadSchema,
   SurrenderDeclinedPayloadSchema,
@@ -64,6 +66,7 @@ const cases = [
   ["MatchAbandonedPayload", MatchAbandonedPayloadSchema, matchAbandonedGolden],
   ["TrumpSelectedPayload", TrumpSelectedPayloadSchema, trumpSelectedGolden],
   ["DeclarationsResolvedPayload", DeclarationsResolvedPayloadSchema, declarationsResolvedGolden],
+  ["PlayerDeclaredPayload", PlayerDeclaredPayloadSchema, playerDeclaredGolden],
   ["BelotAnnouncedPayload", BelotAnnouncedPayloadSchema, belotAnnouncedGolden],
   ["MatchPausedPayload", MatchPausedPayloadSchema, matchPausedGolden],
   ["MatchResumedPayload", MatchResumedPayloadSchema, matchResumedGolden],

@@ -37,6 +37,15 @@ export interface ActiveEmote {
 
 export type ActiveEmotesMap = Record<0 | 1 | 2 | 3, ActiveEmote | null>;
 
+// Per-seat ephemeral "has a declaration" banner slot (trick 1). Mirrors the
+// emote pattern: the receivedAt stamp doubles as a remount key, and the
+// banner component clears its own slot via its auto-dismiss timer.
+export interface ActiveDeclare {
+  receivedAt: number;
+}
+
+export type ActiveDeclaresMap = Record<0 | 1 | 2 | 3, ActiveDeclare | null>;
+
 // Transient signal that the server auto-played a card for the local player.
 // Dispatcher writes this on EVENT_CARD_PLAYED with autoPlayed=true and
 // payload.playerSeat === myPlayerSeat; MatchPage observes it to drive the
@@ -66,6 +75,7 @@ export interface MatchStoreState {
   pendingAutoPlayedCard: PendingAutoPlayedCard | null;
   pendingResolvedTrick: PendingResolvedTrick | null;
   activeEmotes: ActiveEmotesMap;
+  activeDeclares: ActiveDeclaresMap;
   // Monotonic timestamp (performance.now()) of the most recent emote sent
   // from this client. Lifted out of EmotePickerButton's local useState so
   // the picker's cooldown survives mount/unmount across phase transitions
@@ -88,6 +98,7 @@ export interface MatchStoreState {
   setPendingAutoPlayedCard: (cardId: string | null) => void;
   setPendingResolvedTrick: (snapshot: { trick: TrickCard[]; winnerSeat: number } | null) => void;
   setActiveEmote: (seat: number, emote: EmoteID | null) => void;
+  setActiveDeclare: (seat: number, active: boolean) => void;
   setLastEmoteSentAt: (value: number) => void;
   clearGame: () => void;
   reset: () => void;
@@ -125,6 +136,7 @@ const initialState = {
   pendingAutoPlayedCard: null,
   pendingResolvedTrick: null,
   activeEmotes: { 0: null, 1: null, 2: null, 3: null } as ActiveEmotesMap,
+  activeDeclares: { 0: null, 1: null, 2: null, 3: null } as ActiveDeclaresMap,
   lastEmoteSentAt: 0,
 };
 
@@ -188,6 +200,17 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
       const next: ActiveEmote | null = emote === null ? null : { emote, receivedAt: Date.now() };
       return {
         activeEmotes: { ...state.activeEmotes, [slot]: next } as ActiveEmotesMap,
+      };
+    }),
+
+  setActiveDeclare: (seat, active) =>
+    set((state) => {
+      // Defensive: out-of-range seat is a noop, same as setActiveEmote.
+      if (seat !== 0 && seat !== 1 && seat !== 2 && seat !== 3) return state;
+      const slot = seat as 0 | 1 | 2 | 3;
+      const next: ActiveDeclare | null = active ? { receivedAt: Date.now() } : null;
+      return {
+        activeDeclares: { ...state.activeDeclares, [slot]: next } as ActiveDeclaresMap,
       };
     }),
 

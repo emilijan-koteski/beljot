@@ -672,6 +672,14 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
 
 	case game.ActionDeclare, game.ActionSkipDeclare:
+		// Announce WHO declared the moment the declare commits, so the table
+		// learns a declaration exists during trick 1 (seat only — the melds
+		// themselves stay secret until event:declarations_resolved). Timer
+		// expiry only ever auto-SKIPS, so this fires for manual declares only.
+		if action.Type == game.ActionDeclare {
+			declared := ws.PlayerDeclaredPayload{PlayerSeat: action.PlayerSeat}
+			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventPlayerDeclared, declared))
+		}
 		// In Bitola, DeclarationsResolved cannot actually flip here — declarations
 		// resolve only at end of trick 1 (see ActionPlayCard branch). The helper
 		// is still called so future variants (e.g. Croatian, where declarations

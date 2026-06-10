@@ -542,7 +542,8 @@
       "tiebreaker": "{{player}} · {{label}} · najviše zvanje za stolom",
       "byPlayer": "od {{name}}",
       "addedToHand": "Dodato na rezultat ove ruke",
-      "dismiss": "Zatvori"
+      "dismiss": "Zatvori",
+      "declaredBanner": "{{username}} ima zvanje"
     },
     "belot": {
       "titleBelot": "Zovi Belu?",

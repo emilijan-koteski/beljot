@@ -46,6 +46,7 @@ import { CardFlight, type CardFlightDescriptor, type FlightRect } from "./compon
 import { DealAnimation } from "./components/DealAnimation";
 import { DeclarationPrompt } from "./components/DeclarationPrompt";
 import { DeclarationReveal } from "./components/DeclarationReveal";
+import { DeclareBanner } from "./components/DeclareBanner";
 import { EmoteBubble } from "./components/EmoteBubble";
 import { EmotePickerButton } from "./components/EmotePickerButton";
 import { HandCards } from "./components/HandCards";
@@ -235,6 +236,8 @@ export function MatchPage() {
   const setMatchAbandonedData = useMatchStore((s) => s.setMatchAbandonedData);
   const activeEmotes = useMatchStore((s) => s.activeEmotes);
   const setActiveEmote = useMatchStore((s) => s.setActiveEmote);
+  const activeDeclares = useMatchStore((s) => s.activeDeclares);
+  const setActiveDeclare = useMatchStore((s) => s.setActiveDeclare);
   const pendingAutoPlayedCard = useMatchStore((s) => s.pendingAutoPlayedCard);
   const setPendingAutoPlayedCard = useMatchStore((s) => s.setPendingAutoPlayedCard);
   const pendingResolvedTrick = useMatchStore((s) => s.pendingResolvedTrick);
@@ -1358,6 +1361,10 @@ export function MatchPage() {
         // parks it. Desktop keeps the standalone viewport-anchored layer below.
         const emoteSlot =
           isCompactTable && emotesVisible ? activeEmotes[player.seat as 0 | 1 | 2 | 3] : null;
+        // Trick-1 "has a declaration" banner — same compact anchoring as the
+        // emote bubble. Not gated by emotesVisible: it's game information,
+        // not social chrome.
+        const declareSlot = isCompactTable ? activeDeclares[player.seat as 0 | 1 | 2 | 3] : null;
 
         return (
           // `z-20` elevates the whole seat above the center TrickArea (which
@@ -1405,6 +1412,15 @@ export function MatchPage() {
                 proposerUsername={proposerUsername}
                 compassPosition={compass as 0 | 1 | 2 | 3}
                 compact
+              />
+            )}
+            {declareSlot && (
+              <DeclareBanner
+                key={`declare-${player.seat}-${declareSlot.receivedAt}`}
+                declarerUsername={player.username}
+                compassPosition={compass as 0 | 1 | 2 | 3}
+                compact
+                onDismiss={() => setActiveDeclare(player.seat, false)}
               />
             )}
           </div>
@@ -1859,6 +1875,25 @@ export function MatchPage() {
               emote={slot.emote}
               compassPosition={compass}
               onDismiss={() => setActiveEmote(player.seat, null)}
+            />
+          );
+        })}
+
+      {/* Declaration banners (desktop) — trick-1 "has a declaration" notice,
+          viewport-anchored beside the declarer's seat. On phones it's rendered
+          inside the seat wrapper instead (avatar-anchored, above), so this
+          standalone layer is desktop-only. */}
+      {!isCompactTable &&
+        matchState.players.map((player) => {
+          const slot = activeDeclares[player.seat as 0 | 1 | 2 | 3];
+          if (slot === null) return null;
+          const compass = compassOffset(player.seat, myPlayerSeat) as 0 | 1 | 2 | 3;
+          return (
+            <DeclareBanner
+              key={`declare-${player.seat}-${slot.receivedAt}`}
+              declarerUsername={player.username}
+              compassPosition={compass}
+              onDismiss={() => setActiveDeclare(player.seat, false)}
             />
           );
         })}

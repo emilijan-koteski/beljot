@@ -219,6 +219,55 @@ describe("matchStore", () => {
     });
   });
 
+  it("initializes activeDeclares with all four slots null", () => {
+    const state = useMatchStore.getState();
+    expect(state.activeDeclares).toEqual({ 0: null, 1: null, 2: null, 3: null });
+  });
+
+  it("setActiveDeclare writes a per-seat slot with a receivedAt stamp", () => {
+    useMatchStore.getState().setActiveDeclare(2, true);
+
+    const slot = useMatchStore.getState().activeDeclares[2];
+    expect(slot).not.toBeNull();
+    expect(typeof slot?.receivedAt).toBe("number");
+    // Other seats untouched
+    expect(useMatchStore.getState().activeDeclares[0]).toBeNull();
+    expect(useMatchStore.getState().activeDeclares[1]).toBeNull();
+    expect(useMatchStore.getState().activeDeclares[3]).toBeNull();
+  });
+
+  it("setActiveDeclare(seat, false) clears the slot", () => {
+    useMatchStore.getState().setActiveDeclare(0, true);
+    expect(useMatchStore.getState().activeDeclares[0]).not.toBeNull();
+
+    useMatchStore.getState().setActiveDeclare(0, false);
+    expect(useMatchStore.getState().activeDeclares[0]).toBeNull();
+  });
+
+  it("setActiveDeclare ignores out-of-range seats", () => {
+    useMatchStore.getState().setActiveDeclare(7, true);
+    expect(useMatchStore.getState().activeDeclares).toEqual({
+      0: null,
+      1: null,
+      2: null,
+      3: null,
+    });
+  });
+
+  it("clearGame zeroes all four declare slots", () => {
+    useMatchStore.getState().setActiveDeclare(1, true);
+    useMatchStore.getState().setActiveDeclare(3, true);
+
+    useMatchStore.getState().clearGame();
+
+    expect(useMatchStore.getState().activeDeclares).toEqual({
+      0: null,
+      1: null,
+      2: null,
+      3: null,
+    });
+  });
+
   it("initializes lastEmoteSentAt to 0", () => {
     expect(useMatchStore.getState().lastEmoteSentAt).toBe(0);
   });

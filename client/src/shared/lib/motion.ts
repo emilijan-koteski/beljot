@@ -125,6 +125,10 @@ export const MOTION = {
   /** Emote bubble dwell. */
   EMOTE_BUBBLE: 2000,
   EMOTE_BUBBLE_REDUCED: 1000,
+  /** "Has a declaration" seat banner dwell (trick 1). Longer than an emote —
+   *  it's a text sentence, and game-relevant information worth reading. */
+  DECLARE_BANNER: 4000,
+  DECLARE_BANNER_REDUCED: 1500,
   /** Chat-rail peek preview when the panel is closed. */
   CHAT_PEEK: 2000,
   /** Hand-end score reveal auto-continues after this long so an AFK player

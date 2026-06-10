@@ -285,3 +285,64 @@ func TestBroadcastActionResult_ContinueAdvanceBroadcastsState(t *testing.T) {
 	assert.Equal(t, []string{ws.EventMatchState}, rec.eventTypes(),
 		"a continue advance just syncs authoritative state")
 }
+
+// TestBroadcastActionResult_DeclareEmitsPlayerDeclared guards the trick-1
+// "who declared" announcement: a manual declare must broadcast
+// event:player_declared (seat only — no meld details) before the
+// authoritative match_state, and a skip must stay silent.
+func TestBroadcastActionResult_DeclareEmitsPlayerDeclared(t *testing.T) {
+	trump := game.SuitHearts
+
+	declareStates := func() (*game.GameState, *game.GameState) {
+		oldState := &game.GameState{
+			Phase:               game.PhasePlaying,
+			HandNumber:          1,
+			TrumpSuit:           &trump,
+			TrickNumber:         1,
+			AwaitingDeclaration: true,
+			ActivePlayerSeat:    2,
+		}
+		newState := &game.GameState{
+			Phase:            game.PhasePlaying,
+			HandNumber:       1,
+			TrumpSuit:        &trump,
+			TrickNumber:      1,
+			ActivePlayerSeat: 2,
+		}
+		return oldState, newState
+	}
+
+	t.Run("declare broadcasts player_declared before match_state", func(t *testing.T) {
+		rec := &recordingBroadcaster{}
+		m := &Manager{hub: rec}
+		oldState, newState := declareStates()
+
+		m.broadcastActionResult([4]uint{10, 20, 30, 40}, oldState, newState,
+			game.Action{Type: game.ActionDeclare, PlayerSeat: 2}, false)
+
+		types := rec.eventTypes()
+		assert.Contains(t, types, ws.EventPlayerDeclared,
+			"a declare must announce the declarer to the table (got %v)", types)
+
+		payload := rec.payloadOf(t, ws.EventPlayerDeclared)
+		require.NotNil(t, payload)
+		assert.Equal(t, float64(2), payload["playerSeat"])
+		assert.Len(t, payload, 1,
+			"payload must carry the seat ONLY — meld details stay secret until declarations_resolved")
+
+		assert.Less(t, indexOf(types, ws.EventPlayerDeclared), indexOf(types, ws.EventMatchState),
+			"player_declared must come before match_state (got %v)", types)
+	})
+
+	t.Run("skip_declare stays silent", func(t *testing.T) {
+		rec := &recordingBroadcaster{}
+		m := &Manager{hub: rec}
+		oldState, newState := declareStates()
+
+		m.broadcastActionResult([4]uint{10, 20, 30, 40}, oldState, newState,
+			game.Action{Type: game.ActionSkipDeclare, PlayerSeat: 2}, false)
+
+		assert.NotContains(t, rec.eventTypes(), ws.EventPlayerDeclared,
+			"skipping declarations must not announce anything")
+	})
+}
