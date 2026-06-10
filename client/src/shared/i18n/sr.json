@@ -128,8 +128,8 @@
           "lastTrick": "+{{points}} poslednji štih",
           "us": "mi",
           "them": "oni",
-          "failedUs": "pao · mi",
-          "failedThem": "pao · oni"
+          "failedUs": "pali · mi",
+          "failedThem": "pali · oni"
         }
       }
     },

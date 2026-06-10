@@ -128,8 +128,8 @@
           "lastTrick": "+{{points}} последен штих",
           "us": "ние",
           "them": "тие",
-          "failedUs": "падна · ние",
-          "failedThem": "падна · тие"
+          "failedUs": "паднаа · ние",
+          "failedThem": "паднаа · тие"
         }
       }
     },
