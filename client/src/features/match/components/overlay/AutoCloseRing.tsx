@@ -99,8 +99,15 @@ export function AutoCloseRing({
         alignItems: "center",
         justifyContent: "center",
         padding: 0,
+        touchAction: "manipulation",
       }}
     >
+      {/* Invisible hit-area extender: the visible circle is 32px, below the
+          ~44px touch-target minimum, which made the X frustratingly precise to
+          tap on phones. Clicks on any child of a <button> fire its onClick, so
+          this pad widens the effective target to 48×48 without moving a pixel
+          of the visuals. */}
+      <span aria-hidden style={{ position: "absolute", inset: -8 }} />
       <IconX size={14} />
       <svg
         viewBox="0 0 24 24"
