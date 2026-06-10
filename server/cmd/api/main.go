@@ -164,6 +164,10 @@ func main() {
 	lobbyDisconnectHandler := room.NewLobbyDisconnectHandler(roomRepo, hub)
 	hub.SetConnectHandler(func(userID uint) {
 		sessionManager.HandleReconnect(userID)
+		// Always follow with a direct state push: when the hub replaced a
+		// still-registered socket (no disconnect ever fired) HandleReconnect
+		// no-ops, and the refreshed client has no other way to obtain state.
+		sessionManager.SyncStateOnConnect(userID)
 		lobbyDisconnectHandler.HandleReconnect(userID)
 	})
 	hub.SetDisconnectHandler(func(userID uint) {

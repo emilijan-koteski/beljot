@@ -179,13 +179,36 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 		session.mu.Unlock()
 		return
 	}
+
+	// A continue that arrives after the score-reveal pause already advanced is
+	// a benign race, not a player error: the client's 8s auto-ack countdown
+	// starts when its dialog MOUNTS — gated behind the trick-collect sweep and
+	// the capot banner — so it can trail the server's force-advance. Drop it
+	// silently BEFORE cancelTurnTimer so the new turn's timer is untouched,
+	// and send no error (the "cannot perform this action" toast was pure noise
+	// the player could do nothing about).
+	if action.Type == game.ActionContinue && session.gameState.Phase != game.PhaseHandComplete {
+		session.mu.Unlock()
+		return
+	}
+
 	session.cancelTurnTimer()
 
 	oldState := session.gameState
 	newState, err := game.ApplyAction(oldState, action)
 	if err != nil {
-		// Restart timer since we cancelled it preemptively at line 179, but
-		// restore the ORIGINAL deadline rather than minting a fresh full
+		// The pre-mutation cancelTurnTimer above also stops the score-reveal
+		// auto-continue fallback when the table is paused in hand_complete —
+		// and the per-move restore branch below can never re-arm it, because
+		// TurnExpiresAt is always nil during the pause. Re-create it here
+		// against the SAME fixed deadline, or one rejected action (a stray tap
+		// that sends play_card while the collect animation still covers the
+		// table, a pause click, …) would permanently disarm the fallback and a
+		// connected-but-unresponsive seat could strand the table forever.
+		// Applies regardless of timer style, mirroring the success branch.
+		//
+		// Otherwise restart the timer we cancelled preemptively above,
+		// restoring the ORIGINAL deadline rather than minting a fresh full
 		// window. Two reasons:
 		//   1. We don't broadcast state on error, so all four clients still
 		//      hold the original TurnExpiresAt. A fresh full window would
@@ -197,7 +220,13 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 		//      branch by clicking an illegal card / sending a stale action.
 		//      Resetting to a fresh window would let any client extend the
 		//      active player's turn indefinitely via spam.
-		if oldState.Phase != game.PhasePaused && session.timerStyle == "per-move" && oldState.TurnExpiresAt != nil {
+		if oldState.Phase == game.PhaseHandComplete {
+			remaining := max(time.Until(session.handCompleteExpiresAt), 0)
+			gen := session.timerGeneration
+			session.turnTimer = time.AfterFunc(remaining, func() {
+				m.handleHandCompleteTimeout(session, gen)
+			})
+		} else if oldState.Phase != game.PhasePaused && session.timerStyle == "per-move" && oldState.TurnExpiresAt != nil {
 			// Clamp to ≥ 0 so an already-expired deadline fires the auto-action
 			// immediately rather than tripping AfterFunc's negative-duration path.
 			remaining := max(time.Until(*oldState.TurnExpiresAt), 0)
@@ -1052,14 +1081,17 @@ func (m *Manager) startTimerLocked(session *LiveMatch, expectedSeat int) {
 
 // handCompleteAutoContinue is the server's fallback ceiling on the score-reveal
 // pause before auto-dealing the next hand when not every connected player has
-// acknowledged. Each client auto-acknowledges at 8s (SCORE_REVEAL_AUTO_CONTINUE
-// on the client), so the table normally advances the moment the last ack lands;
-// this ceiling only bites when a connected client can't ack (idle/stuck). Kept
-// just above the client's 8s (≈2s network/processing grace) so the normal
-// ack-driven path wins and one non-acking seat can't strand the table — and
-// measured from when the pause STARTS, never extended by later acknowledgements
-// (see handCompleteExpiresAt).
-const handCompleteAutoContinue = 10 * time.Second
+// acknowledged. Each client auto-acknowledges 8s after its dialog MOUNTS
+// (SCORE_REVEAL_AUTO_CONTINUE on the client) — and the mount trails this
+// deadline's start by the trick-collect sweep (~2s) plus, on capot hands, the
+// capot banner (~2.5s). The ceiling must therefore cover 8s + ~4.5s of reveal
+// pacing + network grace, or the auto-acks land after the force-advance and
+// every slow hand ends in a wrong-phase race (observed as "cannot perform this
+// action" toasts at 10s). 14s keeps the normal ack-driven path comfortably
+// ahead while still capping how long one stuck seat can hold the table — and
+// is measured from when the pause STARTS, never extended by later
+// acknowledgements (see handCompleteExpiresAt).
+const handCompleteAutoContinue = 14 * time.Second
 
 // handleHandCompleteTimeout force-advances the hand-complete pause when the
 // auto-continue window elapses without every connected player acknowledging.

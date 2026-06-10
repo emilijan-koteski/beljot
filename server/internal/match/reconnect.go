@@ -453,6 +453,41 @@ func (m *Manager) HandleReconnect(userID uint) {
 	m.hub.BroadcastToUsers(playerIDs[:], stateMsg)
 }
 
+// SyncStateOnConnect pushes the current authoritative match state directly to
+// a user who just (re)registered a WebSocket while being part of an active
+// session. HandleReconnect only restores seats that were marked disconnected —
+// when the hub REPLACES a still-registered socket (the user reconnects before
+// the dead connection is reaped by the ping loop) no disconnect handler ever
+// fires, the seat is still Connected=true, and HandleReconnect no-ops. There
+// is no client→server "request state" message, so without this push the
+// refreshed client would sit on the reconnect splash with no way to recover
+// until some unrelated event happened to broadcast. Call AFTER HandleReconnect
+// so the snapshot reflects any phase restore. Safe for every registration:
+// no-ops for users outside a session.
+func (m *Manager) SyncStateOnConnect(userID uint) {
+	m.mu.RLock()
+	roomID, ok := m.userToRoom[userID]
+	if !ok {
+		m.mu.RUnlock()
+		return
+	}
+	session, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+
+	session.mu.RLock()
+	if session.closed {
+		session.mu.RUnlock()
+		return
+	}
+	msg := buildMessage(ws.EventMatchState, session.gameState)
+	session.mu.RUnlock()
+
+	m.hub.SendToUser(userID, msg)
+}
+
 // handleSeatReconnectTimeout is called when an individual seat's reconnect
 // countdown fires. It transitions the game to PhaseMatchEnd (abandoned),
 // persists the match record, broadcasts event:match_abandoned to all players,
