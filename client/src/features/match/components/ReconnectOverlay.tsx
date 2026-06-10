@@ -1,13 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import type { TeamString } from "@/shared/types/matchTypes";
 import type { MatchAbandonedPayload } from "@/shared/types/wsEvents";
 
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
-import { isCountdownUrgent, URGENT_FRACTION } from "../lib/turnCountdown";
+import {
+  isCountdownUrgent,
+  URGENT_FRACTION,
+  useRingDrain,
+  useTurnCountdown,
+} from "../lib/turnCountdown";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 
@@ -53,6 +59,12 @@ const RECONNECT_TOTAL_SECONDS_DEFAULT = 120;
 // Color tokens lifted from the design's classic-states.jsx countdown rings.
 const RING_PARCHMENT = "#d4d0c4";
 const RING_DANGER = "#e85a5a";
+// Center ring geometry — module constants so the drain hook (which needs the
+// circumference) can run at the top of the component, above the
+// abandoned-state early return.
+const RING_SIZE = 132;
+const RING_RADIUS = (RING_SIZE - 4) / 2; // 2 px stroke inset on each side
+const RING_CIRC = 2 * Math.PI * RING_RADIUS;
 // The ring + countdown text flip to the urgent palette at the same threshold
 // the in-game TimerRing uses (URGENT_FRACTION = 1/8 of the original window).
 // Re-using the shared helper keeps the per-move ring and the reconnect ring
@@ -66,32 +78,6 @@ function formatCountdown(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-/**
- * Wallclock-driven countdown. Returns whole seconds remaining until
- * `expiresAt`, ticking every `MOTION.COUNTDOWN_TICK` ms, clamped at 0.
- * Re-anchors when `expiresAt` changes so a fresh window applied mid-overlay
- * (e.g. the chained-disconnect promotion before the per-seat-window rewrite)
- * doesn't keep counting against the old expiry.
- */
-function useCountdownSeconds(expiresAt: string): number {
-  const [remainingSeconds, setRemainingSeconds] = useState(() => {
-    const diff = new Date(expiresAt).getTime() - Date.now();
-    return Math.max(0, Math.ceil(diff / 1000));
-  });
-
-  useEffect(() => {
-    const tick = () => {
-      const diff = new Date(expiresAt).getTime() - Date.now();
-      setRemainingSeconds(Math.max(0, Math.ceil(diff / 1000)));
-    };
-    tick();
-    const interval = setInterval(tick, MOTION.COUNTDOWN_TICK);
-    return () => clearInterval(interval);
-  }, [expiresAt]);
-
-  return remainingSeconds;
 }
 
 export function ReconnectOverlay({
@@ -110,8 +96,14 @@ export function ReconnectOverlay({
   const { t } = useTranslation();
   // Center ring tracks the *earliest* expiry — the seat that drives abandon.
   // Per-row countdowns inside `DisconnectedPlayerRow` track each seat's own
-  // expiry independently.
-  const remainingSeconds = useCountdownSeconds(reconnectExpiresAt);
+  // expiry independently. The shared hook measures against the server's clock
+  // (clockSync) with deadline-aligned ticks, same as the in-game TimerRing.
+  const remainingSeconds = useTurnCountdown(reconnectExpiresAt);
+  const prefersReducedMotion = useReducedMotion();
+  // Deadline-anchored sweep — empties exactly at the abandon deadline. Must
+  // run above the abandoned-state early return (hooks order); the quantized
+  // dashoffset at the render site stays as the reduced-motion fallback.
+  const ringDrain = useRingDrain(reconnectExpiresAt, totalSeconds, RING_CIRC);
 
   // Auto-redirect to lobby after match abandonment
   useEffect(() => {
@@ -268,9 +260,9 @@ export function ReconnectOverlay({
   const pct = Math.max(0, Math.min(1, remainingSeconds / totalSeconds));
   const isUrgent = pct <= URGENT_FRACTION;
   const ringColor = isUrgent ? RING_DANGER : RING_PARCHMENT;
-  const ringSize = 132;
-  const ringRadius = (ringSize - 4) / 2; // 2 px stroke inset on each side
-  const ringCirc = 2 * Math.PI * ringRadius;
+  const ringSize = RING_SIZE;
+  const ringRadius = RING_RADIUS;
+  const ringCirc = RING_CIRC;
 
   return (
     <div
@@ -324,7 +316,13 @@ export function ReconnectOverlay({
                   stroke="rgba(255,255,255,0.08)"
                   strokeWidth={2}
                 />
+                {/* Keyed by the deadline: when the earliest-expiring seat
+                    reconnects, reconnectExpiresAt swaps in place — a running
+                    CSS animation keeps its original start time even when
+                    animation-delay changes, so the element must be recreated
+                    to re-anchor the sweep. */}
                 <circle
+                  key={reconnectExpiresAt}
                   cx={ringSize / 2}
                   cy={ringSize / 2}
                   r={ringRadius}
@@ -333,9 +331,10 @@ export function ReconnectOverlay({
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeDasharray={ringCirc}
-                  strokeDashoffset={ringCirc * (1 - pct)}
                   style={{
-                    transition: `stroke-dashoffset ${MOTION.COUNTDOWN_TICK}ms linear, stroke ${MOTION.RING_COLOR_FLIP}ms ease-out`,
+                    transition: `stroke ${MOTION.RING_COLOR_FLIP}ms ease-out`,
+                    strokeDashoffset: ringCirc * (1 - pct),
+                    ...(prefersReducedMotion ? undefined : ringDrain),
                   }}
                 />
               </svg>
@@ -401,7 +400,7 @@ function DisconnectedPlayerRow({
   // shifts the bbox and is what was nudging the "C" off-center here.
   const AVATAR_DISC = 32;
   const AVATAR_FRAME = AVATAR_DISC + 4;
-  const remainingSeconds = useCountdownSeconds(expiresAt);
+  const remainingSeconds = useTurnCountdown(expiresAt);
   // Use the shared `isCountdownUrgent` so per-row coloring flips at the
   // same 1/8-of-window threshold as the center ring (and the in-game
   // per-move TimerRing). For a 120 s reconnect window that's 15 s.

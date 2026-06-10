@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
@@ -8,6 +8,7 @@ import { type Suit, type TeamString, teamStringForIndex } from "@/shared/types/m
 import type { HandScoredPayload } from "@/shared/types/wsEvents";
 
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
+import { ringDrainStyle } from "../lib/turnCountdown";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
@@ -62,8 +63,13 @@ const BUTTON_RADIUS = 8;
  * Measures the button via the SVG's own rect (it fills the relatively-positioned
  * wrapper) so the viewBox maps 1 user-unit → 1 px and the rounded corners stay
  * true. `pathLength={1}` normalises the dash math regardless of the perimeter.
+ *
+ * `sweep` carries the ring-drain animation style (mount-anchored, same
+ * duration as the auto-continue fire timer) so the border reads empty exactly
+ * when the auto-ack fires; undefined renders a static full border
+ * (reduced motion).
  */
-function ButtonProgressBorder({ pct }: { pct: number }) {
+function ButtonProgressBorder({ sweep }: { sweep?: CSSProperties }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
@@ -127,8 +133,7 @@ function ButtonProgressBorder({ pct }: { pct: number }) {
             strokeLinecap="round"
             pathLength={1}
             strokeDasharray={1}
-            strokeDashoffset={1 - pct}
-            style={{ transition: "stroke-dashoffset 1s linear" }}
+            style={{ strokeDashoffset: 0, ...sweep }}
           />
         </>
       )}
@@ -162,32 +167,41 @@ export function ScoreReveal({
   // after AUTO_CONTINUE_MS so an AFK player can't strand the whole table on the
   // score screen (each client auto-acks → the server deals the next hand once
   // everyone is ready). Mirrors the 8 s auto-close on the informational
-  // reveals; the ring around the button visualises the countdown. Once
+  // reveals; the border around the button visualises the countdown. Once
   // acknowledged (this click, or the parent already advanced) the timer is
   // cancelled — see the `acknowledged` dependency.
-  const [autoPct, setAutoPct] = useState(1);
   const firedRef = useRef(false);
   const onContinueRef = useRef(onContinue);
   onContinueRef.current = onContinue;
 
   useEffect(() => {
     if (acknowledged) return;
-    const total = AUTO_CONTINUE_MS;
-    const deadline = Date.now() + total;
-    const update = () => setAutoPct(Math.max(0, (deadline - Date.now()) / total));
-    update();
-    const tick = setInterval(update, MOTION.COUNTDOWN_TICK);
     const fire = setTimeout(() => {
       if (firedRef.current) return;
       firedRef.current = true;
-      setAutoPct(0);
       onContinueRef.current();
-    }, total);
-    return () => {
-      clearInterval(tick);
-      clearTimeout(fire);
-    };
+    }, AUTO_CONTINUE_MS);
+    return () => clearTimeout(fire);
   }, [acknowledged]);
+
+  // Mount-anchored drain sweep for the button border: starts on the same
+  // commit as the fire timer above and shares its duration, so the border
+  // reads empty exactly when the auto-ack fires.
+  const borderSweep = useMemo(() => ringDrainStyle(AUTO_CONTINUE_MS, AUTO_CONTINUE_MS, 1), []);
+
+  // Reduced-motion fallback: no drain animation, but the border must still
+  // reflect the countdown — step the dashoffset once per second, anchored to
+  // the same mount instant as the fire timer.
+  const [reducedPct, setReducedPct] = useState(1);
+  useEffect(() => {
+    if (!prefersReducedMotion || acknowledged) return;
+    const deadline = Date.now() + AUTO_CONTINUE_MS;
+    const update = () => setReducedPct(Math.max(0, (deadline - Date.now()) / AUTO_CONTINUE_MS));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [prefersReducedMotion, acknowledged]);
+  const reducedSweep: CSSProperties = { strokeDashoffset: 1 - reducedPct };
 
   const teamAGradient: TeamGradient = viewerTeam === "teamA" ? TEAM_GOLD : TEAM_SILVER;
   const teamBGradient: TeamGradient = viewerTeam === "teamB" ? TEAM_GOLD : TEAM_SILVER;
@@ -359,7 +373,9 @@ export function ScoreReveal({
                 {/* Loader traces the button's border (not an inline icon) —
                     matches the ring-around-the-control pattern of the other
                     reveals. Hidden once acknowledged (then we're just waiting). */}
-                {!acknowledged && <ButtonProgressBorder pct={autoPct} />}
+                {!acknowledged && (
+                  <ButtonProgressBorder sweep={prefersReducedMotion ? reducedSweep : borderSweep} />
+                )}
               </span>
             </div>
           </ClassicPanel>

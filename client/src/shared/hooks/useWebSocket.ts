@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { refresh } from "@/shared/api/auth";
+import { recordServerNow } from "@/shared/lib/clockSync";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { AuthenticatedPayload, AuthFailedPayload, WsMessage } from "@/shared/types/wsEvents";
 import {
@@ -98,6 +99,12 @@ export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketRe
         message = JSON.parse(String(event.data)) as WsMessage;
       } catch {
         return;
+      }
+
+      // Clock-offset sample: match messages stamp the server's wall clock on
+      // the envelope so countdowns can render against corrected time.
+      if (typeof message.serverNow === "string") {
+        recordServerNow(message.serverNow);
       }
 
       if (message.type === SYSTEM_AUTHENTICATED) {

@@ -1,8 +1,15 @@
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
+import { remainingMsUntil } from "@/shared/lib/clockSync";
 import { MOTION } from "@/shared/lib/motion";
 
-import { URGENT_FRACTION } from "../../lib/turnCountdown";
+import {
+  ringDrainStyle,
+  URGENT_FRACTION,
+  useRingDrain,
+  useTurnCountdown,
+} from "../../lib/turnCountdown";
 
 interface ButtonTimerRingProps {
   /**
@@ -56,50 +63,41 @@ export function ButtonTimerRing({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
-  // Two countdown sources — server expiry (stays in sync across clients) or
-  // a client-only seconds counter.
-  const [secondsLeft, setSecondsLeft] = useState(() => {
-    if (turnExpiresAt) {
-      const ms = new Date(turnExpiresAt).getTime() - Date.now();
-      return Math.max(0, Math.ceil(ms / 1000));
-    }
-    return clientCountdown ? totalDuration : totalDuration;
-  });
+  // Two countdown sources — server expiry (clock-offset corrected,
+  // deadline-aligned ticks via the shared hook) or a client-only seconds
+  // counter anchored at mount.
+  const serverSecondsLeft = useTurnCountdown(turnExpiresAt ?? null);
+  const [clientSecondsLeft, setClientSecondsLeft] = useState(totalDuration);
 
   useEffect(() => {
-    if (turnExpiresAt) {
-      const tick = () => {
-        const ms = new Date(turnExpiresAt).getTime() - Date.now();
-        const remaining = Math.max(0, Math.ceil(ms / 1000));
-        setSecondsLeft(remaining);
-        return remaining;
-      };
-      tick();
-      const id = setInterval(() => {
-        const remaining = tick();
-        if (remaining <= 0) clearInterval(id);
-      }, MOTION.COUNTDOWN_TICK);
-      return () => clearInterval(id);
-    }
-    if (clientCountdown) {
-      setSecondsLeft(totalDuration);
-      const id = setInterval(() => {
-        setSecondsLeft((s) => {
-          if (s <= 0) {
-            clearInterval(id);
-            return 0;
-          }
-          return s - 1;
-        });
-      }, MOTION.COUNTDOWN_TICK);
-      return () => clearInterval(id);
-    }
+    if (turnExpiresAt || !clientCountdown) return;
+    setClientSecondsLeft(totalDuration);
+    const id = setInterval(() => {
+      setClientSecondsLeft((s) => {
+        if (s <= 0) {
+          clearInterval(id);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, MOTION.COUNTDOWN_TICK);
+    return () => clearInterval(id);
   }, [turnExpiresAt, totalDuration, clientCountdown]);
+
+  const secondsLeft = turnExpiresAt
+    ? serverSecondsLeft
+    : clientCountdown
+      ? clientSecondsLeft
+      : totalDuration;
 
   // Fire onExpire exactly once when secondsLeft hits 0.
   const expireFiredRef = useRef(false);
   useEffect(() => {
     if (secondsLeft <= 0 && !expireFiredRef.current && (turnExpiresAt || clientCountdown)) {
+      // A deadline that just arrived (null → set, or value swap) renders one
+      // commit with the previous countdown state — re-verify against the
+      // wall clock so a stale 0 can't fire the expiry for a live deadline.
+      if (turnExpiresAt && remainingMsUntil(turnExpiresAt) > 0) return;
       expireFiredRef.current = true;
       onExpire?.();
     }
@@ -121,7 +119,7 @@ export function ButtonTimerRing({
     return () => ro.disconnect();
   }, []);
 
-  const pct = totalDuration > 0 ? Math.max(0, secondsLeft) / totalDuration : 0;
+  const pct = totalDuration > 0 ? Math.min(1, Math.max(0, secondsLeft) / totalDuration) : 0;
   const isUrgent = totalDuration > 0 && pct <= URGENT_FRACTION;
   // Cream / red palette to match the AutoCloseRing on info-toast X buttons
   // (the avatar's lime/red ring stays the primary turn signal — dialogs use
@@ -134,6 +132,20 @@ export function ButtonTimerRing({
   // Approximate rounded-rect perimeter — good enough for a visually consistent
   // dasharray, no need to be analytically perfect.
   const perim = 2 * (w + h) - 8 * radius + 2 * Math.PI * radius;
+
+  // Deadline-anchored sweep (server mode) or mount-anchored sweep (client
+  // mode): the arc reaches empty exactly when the countdown truly hits 0.
+  // The quantized dashoffset below remains the reduced-motion fallback.
+  const prefersReducedMotion = useReducedMotion();
+  const serverDrain = useRingDrain(turnExpiresAt ?? null, totalDuration, perim);
+  const clientDrain = useMemo(
+    () =>
+      !turnExpiresAt && clientCountdown && totalDuration > 0
+        ? ringDrainStyle(totalDuration * 1000, totalDuration * 1000, perim)
+        : undefined,
+    [turnExpiresAt, clientCountdown, totalDuration, perim],
+  );
+  const drainStyle = prefersReducedMotion ? undefined : (serverDrain ?? clientDrain);
 
   return (
     <div
@@ -167,7 +179,11 @@ export function ButtonTimerRing({
             stroke="rgba(255,255,255,0.12)"
             strokeWidth={strokeW}
           />
+          {/* Keyed by the countdown source: a running CSS animation keeps
+              its original start time even when animation-delay changes, so a
+              deadline swap must recreate the element to re-anchor the sweep. */}
           <rect
+            key={turnExpiresAt ?? (clientCountdown ? "client" : "static")}
             x={strokeW / 2}
             y={strokeW / 2}
             width={w - strokeW}
@@ -179,9 +195,10 @@ export function ButtonTimerRing({
             strokeWidth={strokeW}
             strokeLinecap="round"
             strokeDasharray={perim}
-            strokeDashoffset={perim * (1 - pct)}
             style={{
-              transition: `stroke-dashoffset ${MOTION.COUNTDOWN_TICK}ms linear, stroke ${MOTION.RING_COLOR_FLIP_FAST}ms ease-out`,
+              transition: `stroke ${MOTION.RING_COLOR_FLIP_FAST}ms ease-out`,
+              strokeDashoffset: perim * (1 - pct),
+              ...drainStyle,
             }}
           />
         </svg>

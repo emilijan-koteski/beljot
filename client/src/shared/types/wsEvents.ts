@@ -11,6 +11,13 @@ import type { RoomPlayer } from "@/shared/types/apiTypes";
 export interface WsMessage<T = unknown> {
   type: string;
   payload: T;
+  /**
+   * Server wall clock at send time (RFC3339). Stamped on match events whose
+   * payloads carry absolute deadlines (turnExpiresAt, reconnectExpiresAt) so
+   * the client can estimate its clock offset — see `shared/lib/clockSync.ts`.
+   * Absent on client→server messages and on senders without deadlines.
+   */
+  serverNow?: string;
 }
 
 // --- Authentication events ---

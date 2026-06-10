@@ -57,9 +57,11 @@ describe("ReconnectOverlay", () => {
 
     expect(screen.getByTestId("reconnect-countdown").textContent).toBe("1:05");
 
-    // Advance 10 seconds
+    // Advance 10 seconds. Ticks align to the deadline's whole-second
+    // boundaries with a small slack (TICK_SLACK_MS), so cross the boundary
+    // by a comfortable margin rather than landing exactly on it.
     act(() => {
-      vi.advanceTimersByTime(10_000);
+      vi.advanceTimersByTime(10_100);
     });
 
     expect(screen.getByTestId("reconnect-countdown").textContent).toBe("0:55");

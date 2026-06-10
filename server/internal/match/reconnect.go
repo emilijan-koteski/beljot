@@ -46,8 +46,12 @@ func recomputeEarliestReconnectExpiryLocked(gs *game.GameState) {
 func (m *Manager) startSeatReconnectTimerLocked(session *LiveMatch, seat int) {
 	session.cancelSeatReconnectTimer(seat) // bumps generation + nils any prior timer
 	gen := session.seatReconnectGenerations[seat]
+	// expiryGrace: clients render ReconnectExpiresAt and their ring reaches 0
+	// exactly at the window's end — abandon a beat later so nobody watches the
+	// match die while their countdown still shows time (same contract as the
+	// per-move turn timer).
 	session.seatReconnectTimers[seat] = time.AfterFunc(
-		time.Duration(session.reconnectWindowSec)*time.Second,
+		time.Duration(session.reconnectWindowSec)*time.Second+expiryGrace,
 		func() {
 			m.handleSeatReconnectTimeout(session, seat, gen)
 		},
@@ -365,8 +369,14 @@ func (m *Manager) HandleReconnect(userID uint) {
 	// rather than the earliest-expiry derivation. A seat whose own window
 	// fired already has its abandon path in flight — guard against a racy
 	// rejoin landing between fire and timeout-handler-acquires-lock.
+	//
+	// The abandon timer fires expiryGrace AFTER the advertised deadline, so
+	// honor the same cushion here: a reconnect landing inside the grace is
+	// late-but-honest input the contract promises to accept, not a stale
+	// rejoin (the generation check in handleSeatReconnectTimeout keeps the
+	// race-with-abandon path safe either way).
 	if gs.PlayerReconnectExpiresAt[mySeat] == nil ||
-		!time.Now().Before(*gs.PlayerReconnectExpiresAt[mySeat]) {
+		!time.Now().Before(gs.PlayerReconnectExpiresAt[mySeat].Add(expiryGrace)) {
 		session.mu.Unlock()
 		m.sendError(userID, ws.ErrorInvalidAction, "reconnection rejected: reconnect window expired")
 		return
@@ -417,13 +427,11 @@ func (m *Manager) HandleReconnect(userID uint) {
 			expiry := time.Now().Add(remaining)
 			gs.TurnExpiresAt = &expiry
 			gs.TurnTimeRemaining = 0
-			// cancelTurnTimer bumps timerGeneration; captured gen is post-cancel.
+			// cancelTurnTimer bumps timerGeneration; armTurnTimerLocked
+			// captures the post-cancel generation and adds expiryGrace, so the
+			// restored turn keeps the players-see-0-first contract too.
 			session.cancelTurnTimer()
-			gen := session.timerGeneration
-			expectedSeat := gs.ActivePlayerSeat
-			session.turnTimer = time.AfterFunc(remaining, func() {
-				m.handleTimerExpiry(session, gen, expectedSeat)
-			})
+			m.armTurnTimerLocked(session, remaining, gs.ActivePlayerSeat)
 		} else if gs.Phase == game.PhaseHandComplete {
 			// Restored into the score-reveal pause. The disconnect interrupted the
 			// pause, so give the returning player a FRESH auto-continue window to

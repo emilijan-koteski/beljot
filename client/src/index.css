@@ -493,6 +493,23 @@
   }
 }
 
+/* Countdown ring drain — one keyframe serves every ring regardless of
+   geometry: each ring sets --ring-empty to its "fully drained" dashoffset
+   (the circle's circumference, a rect's perimeter, or 1 when normalized via
+   pathLength). Drive it with `animation-duration: <full window>` and a
+   negative `animation-delay: -<elapsed>` so the sweep is anchored to the
+   wall-clock deadline and reaches empty exactly when the timer fires —
+   never re-target stroke-dashoffset per tick with a transition (that
+   renders the arc one tick behind the truth). */
+@keyframes ring-drain {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: var(--ring-empty, 1);
+  }
+}
+
 @keyframes fadein {
   from {
     opacity: 0;

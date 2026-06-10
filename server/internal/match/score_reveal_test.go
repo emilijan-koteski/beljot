@@ -106,8 +106,9 @@ func TestHandComplete_LateContinueIsSilentlyIgnored(t *testing.T) {
 	}
 
 	// The late continue must not have disturbed the turn timer: the
-	// unresponsive first bidder still gets auto-passed on schedule.
-	time.Sleep(1500 * time.Millisecond)
+	// unresponsive first bidder still gets auto-passed on schedule (1s window
+	// + 400ms expiryGrace, plus settle margin).
+	time.Sleep(2200 * time.Millisecond)
 	after := mgr.GetStateSnapshot(100)
 	require.NotNil(t, after)
 	assert.NotEqual(t, firstBidder, after.ActivePlayerSeat,

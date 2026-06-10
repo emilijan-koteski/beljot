@@ -140,6 +140,23 @@ describe("TimerRing", () => {
     expect(screen.getByTestId("timer-seconds").className).toContain("text-[10px]");
   });
 
+  it("drives the arc with the deadline-anchored ring-drain animation", () => {
+    vi.setSystemTime(0);
+    const expiry = new Date(10_000).toISOString(); // 10s left of a 30s window
+
+    render(<TimerRing turnExpiresAt={expiry} totalDuration={30} />);
+
+    const arc = screen.getByTestId("timer-ring-arc") as unknown as SVGCircleElement;
+    // One wall-clock-anchored animation owns the sweep — never a per-tick
+    // stroke-dashoffset transition, which rendered the arc one tick behind
+    // the truth (the bug where timers visibly fired with ~1-2s remaining).
+    expect(arc.style.animationName).toBe("ring-drain");
+    expect(arc.style.animationDuration).toBe("30000ms");
+    expect(arc.style.animationDelay).toBe("-20000ms");
+    expect(arc.style.animationFillMode).toBe("forwards");
+    expect(arc.style.transition).not.toContain("stroke-dashoffset");
+  });
+
   it("uses motion-safe prefix for transitions (reduced-motion safe)", () => {
     const now = new Date();
     const expiry = new Date(now.getTime() + 5000); // urgent state

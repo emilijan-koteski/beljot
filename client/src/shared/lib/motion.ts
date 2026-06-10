@@ -147,8 +147,11 @@ export const MOTION = {
   EMOTE_COOLDOWN: 3000,
 
   // ─── Server-sync timers ──────────────────────────────────────────
-  /** Wall-clock countdown tick (turn ring, reconnect ring, auto-close
-   *  ring). Server-aligned — keep at 1000 unless you change all rings. */
+  /** Client-side seconds-counter tick (ButtonTimerRing's `clientCountdown`
+   *  mode). Ring ARCS no longer tick — each runs one deadline-anchored
+   *  `ring-drain` animation (turnCountdown.ts `ringDrainStyle`), and
+   *  server-deadline labels self-schedule on the deadline's own
+   *  whole-second boundaries (`useTurnCountdown`). */
   COUNTDOWN_TICK: 1000,
 } as const;
 

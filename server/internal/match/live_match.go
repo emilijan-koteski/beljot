@@ -227,14 +227,7 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 				m.handleHandCompleteTimeout(session, gen)
 			})
 		} else if oldState.Phase != game.PhasePaused && session.timerStyle == "per-move" && oldState.TurnExpiresAt != nil {
-			// Clamp to ≥ 0 so an already-expired deadline fires the auto-action
-			// immediately rather than tripping AfterFunc's negative-duration path.
-			remaining := max(time.Until(*oldState.TurnExpiresAt), 0)
-			gen := session.timerGeneration
-			expectedSeat := oldState.ActivePlayerSeat
-			session.turnTimer = time.AfterFunc(remaining, func() {
-				m.handleTimerExpiry(session, gen, expectedSeat)
-			})
+			m.armTurnTimerLocked(session, time.Until(*oldState.TurnExpiresAt), oldState.ActivePlayerSeat)
 		}
 		session.mu.Unlock()
 		m.sendGameError(client.UserID, err)
@@ -275,11 +268,7 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 			// Start timer with remaining duration. cancelTurnTimer bumps
 			// timerGeneration so the captured gen is the post-cancel value.
 			session.cancelTurnTimer()
-			gen := session.timerGeneration
-			expectedSeat := newState.ActivePlayerSeat
-			session.turnTimer = time.AfterFunc(remaining, func() {
-				m.handleTimerExpiry(session, gen, expectedSeat)
-			})
+			m.armTurnTimerLocked(session, remaining, newState.ActivePlayerSeat)
 		} else {
 			newState.TurnTimeRemaining = 0
 		}
@@ -297,17 +286,12 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 		if preserveTimer {
 			newState.TurnExpiresAt = oldState.TurnExpiresAt
 			newState.TimerDurationSec = oldState.TimerDurationSec
-			remaining := time.Until(*oldState.TurnExpiresAt)
-			if remaining > 0 {
-				// HandleAction's pre-mutation cancelTurnTimer (above) already
-				// bumped timerGeneration; the captured gen is the post-cancel
-				// value. Any future cancel/restart will invalidate it.
-				gen := session.timerGeneration
-				expectedSeat := newState.ActivePlayerSeat
-				session.turnTimer = time.AfterFunc(remaining, func() {
-					m.handleTimerExpiry(session, gen, expectedSeat)
-				})
-			}
+			// HandleAction's pre-mutation cancelTurnTimer (above) already
+			// bumped timerGeneration; armTurnTimerLocked captures the
+			// post-cancel value. An already-past deadline still re-arms (the
+			// helper clamps), so a prompt action racing the expiry callback
+			// can't leave the seat with no timer at all.
+			m.armTurnTimerLocked(session, time.Until(*oldState.TurnExpiresAt), newState.ActivePlayerSeat)
 		} else {
 			// Turn advanced or phase changed — fresh window for the next seat.
 			// Pass newState.ActivePlayerSeat explicitly: session.gameState is
@@ -1031,9 +1015,14 @@ func buildMessage(eventType string, payload interface{}) []byte {
 		slog.Error("session: failed to marshal payload", "eventType", eventType, "error", err)
 		payloadBytes = []byte(`{}`)
 	}
+	// Stamp the server wall clock on every match message so clients can
+	// estimate their clock offset and render TurnExpiresAt /
+	// ReconnectExpiresAt countdowns against corrected time (see WSMessage).
+	now := time.Now()
 	msg, err := json.Marshal(ws.WSMessage{
-		Type:    eventType,
-		Payload: payloadBytes,
+		Type:      eventType,
+		Payload:   payloadBytes,
+		ServerNow: &now,
 	})
 	if err != nil {
 		slog.Error("session: failed to marshal message", "eventType", eventType, "error", err)
@@ -1056,6 +1045,36 @@ func (m *Manager) setTurnExpiry(session *LiveMatch, gs *game.GameState) {
 	}
 }
 
+// expiryGrace is how long the server waits PAST the advertised deadline
+// (TurnExpiresAt / ReconnectExpiresAt) before firing the auto-action. Clients
+// render the advertised deadline — their countdown reaches 0 exactly at the
+// deadline — so the grace absorbs network latency, frame scheduling, and
+// residual clock-offset error, guaranteeing players see "0" before the server
+// acts in their name. The advertised deadline itself never moves; pacing is
+// unchanged beyond this fixed sub-second cushion.
+const expiryGrace = 400 * time.Millisecond
+
+// armTurnTimerLocked arms the per-move turn timer to fire expiryGrace after
+// `remaining` elapses (clamped ≥ 0, so an already-past deadline still fires —
+// one grace later — rather than tripping AfterFunc's negative-duration path).
+//
+// It does not bump the generation itself: every caller sits downstream of a
+// cancelTurnTimer (HandleAction's pre-mutation cancel, or its own explicit
+// cancel), so the generation captured here is the post-cancel value,
+// invalidated by any subsequent cancel/restart. The defensive Stop below
+// keeps a future caller that forgets its cancel from leaking a second live
+// timer on the same generation (double auto-action). Must be called under
+// session.mu.Lock().
+func (m *Manager) armTurnTimerLocked(session *LiveMatch, remaining time.Duration, expectedSeat int) {
+	if session.turnTimer != nil {
+		session.turnTimer.Stop()
+	}
+	gen := session.timerGeneration
+	session.turnTimer = time.AfterFunc(max(remaining, 0)+expiryGrace, func() {
+		m.handleTimerExpiry(session, gen, expectedSeat)
+	})
+}
+
 // startTimerLocked starts the per-move turn timer for the current session.
 // Must be called under session.mu.Lock(). The timer callback will acquire
 // session.mu.Lock() when it fires (safe — fires in a separate goroutine later).
@@ -1068,15 +1087,8 @@ func (m *Manager) startTimerLocked(session *LiveMatch, expectedSeat int) {
 	if session.timerStyle != "per-move" || session.timerDurationSec <= 0 {
 		return
 	}
-	// cancelTurnTimer bumps timerGeneration; the captured gen is the
-	// post-cancel value, invalidated by any subsequent cancel/restart.
 	session.cancelTurnTimer()
-	gen := session.timerGeneration
-
-	duration := time.Duration(session.timerDurationSec) * time.Second
-	session.turnTimer = time.AfterFunc(duration, func() {
-		m.handleTimerExpiry(session, gen, expectedSeat)
-	})
+	m.armTurnTimerLocked(session, time.Duration(session.timerDurationSec)*time.Second, expectedSeat)
 }
 
 // handCompleteAutoContinue is the server's fallback ceiling on the score-reveal

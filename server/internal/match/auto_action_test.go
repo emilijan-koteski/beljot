@@ -65,9 +65,9 @@ func TestPerMoveTimer_BiddingPhaseAutoPasses(t *testing.T) {
 	firstBidder := state.ActivePlayerSeat
 
 	// Wait through one bidding timeout — server auto-passes for the active bidder.
-	// Sleep a little longer than the timer to ensure the callback fires and the
-	// follow-up broadcast settles before snapshotting.
-	time.Sleep(1500 * time.Millisecond)
+	// The timer fires expiryGrace (400ms) past the 1s advertised deadline, so
+	// sleep comfortably past deadline+grace for the broadcast to settle.
+	time.Sleep(2200 * time.Millisecond)
 
 	after := mgr.GetStateSnapshot(100)
 	require.NotNil(t, after, "session must survive the bidding timeout broadcast path")

@@ -235,9 +235,10 @@ func TestHandleReconnect_RejectsExpiredWindow(t *testing.T) {
 	state = mgr.GetStateSnapshot(100)
 	require.Equal(t, game.PhaseDisconnected, state.Phase)
 
-	// Wait for reconnect window to expire — handleReconnectTimeout fires and
-	// removes the session (Story 5.5 match abandonment)
-	time.Sleep(1500 * time.Millisecond)
+	// Wait for reconnect window to expire — handleReconnectTimeout fires
+	// expiryGrace (400ms) past the 1s window and removes the session
+	// (Story 5.5 match abandonment)
+	time.Sleep(2200 * time.Millisecond)
 
 	// Session is removed after timeout-triggered abandonment
 	assert.False(t, mgr.HasSession(100), "session should be removed after timeout")
@@ -537,7 +538,7 @@ func TestReconnectTimeout_TransitionsToMatchEnd(t *testing.T) {
 	mgr, _, _ := setupDisconnectedGameShortWindow(t, hub, 0)
 
 	// Wait for the 1-second reconnect window to expire
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(2200 * time.Millisecond)
 
 	// Session should be removed after abandonment
 	assert.False(t, mgr.HasSession(100), "session should be removed after timeout")
@@ -552,7 +553,7 @@ func TestReconnectTimeout_PersistsAbandonedMatch(t *testing.T) {
 	_, repo, _ := setupDisconnectedGameShortWindow(t, hub, 2)
 
 	// Wait for the 1-second reconnect window to expire
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(2200 * time.Millisecond)
 
 	// Match should be persisted with abandoned status
 	matches := repo.getMatches()
@@ -582,7 +583,7 @@ func TestReconnectTimeout_NoOpWhenReconnected(t *testing.T) {
 	assert.Equal(t, game.PhasePlaying, state.Phase)
 
 	// Wait past the original timeout window
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(2200 * time.Millisecond)
 
 	// Session should still exist (timeout was cancelled by reconnection)
 	assert.True(t, mgr.HasSession(100), "session should still exist after reconnection")
@@ -598,7 +599,7 @@ func TestReconnectTimeout_RemovesSession(t *testing.T) {
 	mgr, _, _ := setupDisconnectedGameShortWindow(t, hub, 1)
 
 	// Wait for timeout
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(2200 * time.Millisecond)
 
 	assert.False(t, mgr.HasSession(100))
 	assert.Nil(t, mgr.GetStateSnapshot(100))

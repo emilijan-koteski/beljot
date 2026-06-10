@@ -1,6 +1,7 @@
+import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
 
-import { URGENT_FRACTION, useTurnCountdown } from "../lib/turnCountdown";
+import { URGENT_FRACTION, useRingDrain, useTurnCountdown } from "../lib/turnCountdown";
 
 interface TimerRingProps {
   turnExpiresAt: string | null;
@@ -66,14 +67,21 @@ export function TimerRing({
     secondsLeftProp === undefined ? turnExpiresAt : null,
   );
   const secondsLeft = secondsLeftProp ?? internalSecondsLeft;
+  const prefersReducedMotion = useReducedMotion();
+
+  const { px, strokeWidth, labelClass } = SIZE_CONFIG[size];
+  const radius = (px - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  // Deadline-anchored sweep: one animation drains the arc to empty exactly at
+  // `turnExpiresAt`. The quantized dashOffset below stays as the
+  // reduced-motion fallback (stepped once per second, no animation).
+  const drainStyle = useRingDrain(turnExpiresAt, totalDuration, circumference);
 
   if (!turnExpiresAt) {
     return null;
   }
 
-  const { px, strokeWidth, labelClass } = SIZE_CONFIG[size];
-  const radius = (px - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
   const progress = totalDuration > 0 ? Math.min(1, Math.max(0, secondsLeft / totalDuration)) : 0;
   const dashOffset = circumference * (1 - progress);
 
@@ -108,8 +116,16 @@ export function TimerRing({
           stroke="rgba(255,255,255,0.15)"
           strokeWidth={strokeWidth}
         />
-        {/* Progress ring — drop-shadow glow lifts the arc off the felt */}
+        {/* Progress ring — drop-shadow glow lifts the arc off the felt.
+            The drain animation owns stroke-dashoffset while motion is
+            allowed; the inline dashOffset is the reduced-motion fallback.
+            Keyed by the deadline: a running CSS animation keeps its original
+            start time even when animation-delay changes, so an in-place
+            deadline change (same seat active twice in a row) must recreate
+            the element to re-anchor the sweep. */}
         <circle
+          key={turnExpiresAt}
+          data-testid="timer-ring-arc"
           cx={px / 2}
           cy={px / 2}
           r={radius}
@@ -117,12 +133,13 @@ export function TimerRing({
           stroke={strokeColor}
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
           strokeLinecap="round"
           transform={`rotate(-90 ${px / 2} ${px / 2})`}
           style={{
             filter: `drop-shadow(0 0 8px ${strokeColor})`,
-            transition: `stroke-dashoffset ${MOTION.COUNTDOWN_TICK}ms linear, stroke ${MOTION.RING_COLOR_FLIP}ms ease`,
+            transition: `stroke ${MOTION.RING_COLOR_FLIP}ms ease`,
+            strokeDashoffset: dashOffset,
+            ...(prefersReducedMotion ? undefined : drainStyle),
           }}
           className="motion-reduce:transition-none"
         />

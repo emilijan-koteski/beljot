@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { MOTION } from "@/shared/lib/motion";
+import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 
+import { ringDrainStyle } from "../../lib/turnCountdown";
 import { IconX } from "./icons";
 
 interface AutoCloseRingProps {
@@ -38,8 +39,8 @@ export function AutoCloseRing({
   testId = "auto-close-ring",
   ariaLabel = "Dismiss",
 }: AutoCloseRingProps) {
-  const [pct, setPct] = useState(1);
   const firedRef = useRef(false);
+  const prefersReducedMotion = useReducedMotion();
   // Wrap `onClose` in a ref so the firing-timer effect doesn't re-run when the
   // parent re-creates the callback identity mid-reveal.
   const onCloseRef = useRef(onClose);
@@ -49,29 +50,36 @@ export function AutoCloseRing({
 
   useEffect(() => {
     if (paused) return;
-    // One fire timer for the close action, plus a per-second tick for the
-    // visual sweep. Splitting them means the close trigger isn't dependent
-    // on the per-second state-update chain — this matters under fake timers.
-    const deadline = Date.now() + duration * 1000;
-    const updatePct = () => {
-      const remainingMs = Math.max(0, deadline - Date.now());
-      setPct(remainingMs / (duration * 1000));
-    };
-    updatePct();
-
-    const tickId = setInterval(updatePct, MOTION.COUNTDOWN_TICK);
     const fireId = setTimeout(() => {
       if (firedRef.current) return;
       firedRef.current = true;
-      setPct(0);
       onCloseRef.current();
     }, duration * 1000);
-
-    return () => {
-      clearInterval(tickId);
-      clearTimeout(fireId);
-    };
+    return () => clearTimeout(fireId);
   }, [duration, paused]);
+
+  // Mount-anchored drain: the sweep and the fire timer above start on the
+  // same commit and share the same duration, so the ring reads empty at the
+  // exact moment the close fires — never one tick behind it. Stable values ⇒
+  // re-renders don't restart the animation.
+  const drainStyle = useMemo(
+    () => ringDrainStyle(duration * 1000, duration * 1000, RING_CIRC),
+    [duration],
+  );
+
+  // Reduced-motion fallback: no drain animation, but the ring must still
+  // reflect the countdown — step the static dashoffset once per second,
+  // anchored to the same mount instant as the fire timer.
+  const [reducedPct, setReducedPct] = useState(1);
+  useEffect(() => {
+    if (!prefersReducedMotion || paused) return;
+    const totalMs = duration * 1000;
+    const deadline = Date.now() + totalMs;
+    const update = () => setReducedPct(Math.max(0, (deadline - Date.now()) / totalMs));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [prefersReducedMotion, paused, duration]);
 
   const handleClick = () => {
     if (firedRef.current) return;
@@ -128,6 +136,7 @@ export function AutoCloseRing({
           strokeWidth="1.5"
         />
         <circle
+          data-testid={`${testId}-arc`}
           cx="12"
           cy="12"
           r={RING_RADIUS}
@@ -136,8 +145,10 @@ export function AutoCloseRing({
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeDasharray={RING_CIRC}
-          strokeDashoffset={RING_CIRC * (1 - pct)}
-          style={{ transition: "stroke-dashoffset 1s linear" }}
+          style={{
+            strokeDashoffset: prefersReducedMotion ? RING_CIRC * (1 - reducedPct) : 0,
+            ...(paused || prefersReducedMotion ? undefined : drainStyle),
+          }}
         />
       </svg>
     </button>
