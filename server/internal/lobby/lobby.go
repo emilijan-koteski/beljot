@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/emilijan/beljot/server/internal/auth"
 	"github.com/emilijan/beljot/server/internal/room"
 	"github.com/emilijan/beljot/server/internal/user"
 )
@@ -27,7 +28,9 @@ type SessionTracker interface {
 // StatsResponse is the wire payload returned by GET /lobby/stats.
 //
 // All values are connection-aware: a user is only counted in inLobby /
-// inRoom / inMatch if they currently hold a live WebSocket connection. Stale
+// inRoom / inMatch if they currently hold a live WebSocket connection — with
+// one deliberate exception: the REQUESTER is always treated as online, since
+// on login the first stats fetch races the WS handshake (see GetStats). Stale
 // DB rows (e.g. a user in room_players who has since dropped their socket)
 // do not appear in any bucket. By construction:
 //
@@ -69,9 +72,20 @@ func NewHandler(hub ConnectionTracker, sessions SessionTracker, rooms room.RoomR
 // them in a waiting room (defensive — the session manager wins).
 func (h *Handler) GetStats(c echo.Context) error {
 	connected := h.hub.ConnectedUserIDs()
-	connectedSet := make(map[uint]struct{}, len(connected))
+	connectedSet := make(map[uint]struct{}, len(connected)+1)
 	for _, uid := range connected {
 		connectedSet[uid] = struct{}{}
+	}
+
+	// The requester is online by definition — they just made an authenticated
+	// request — but their WebSocket may not have registered yet: on login the
+	// lobby's first stats fetch races the WS auth handshake, and losing that
+	// race made a lone player see "0 online" until the next poll. Count them
+	// explicitly so the first paint is self-inclusive. Best-effort: the route
+	// sits behind the auth middleware, so a missing userID only occurs in
+	// direct-invocation tests.
+	if requesterID, err := auth.GetUserID(c); err == nil {
+		connectedSet[requesterID] = struct{}{}
 	}
 
 	inMatchSet := make(map[uint]struct{})

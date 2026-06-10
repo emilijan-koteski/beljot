@@ -158,6 +158,56 @@ func TestGetStats_InMatchWinsOverInRoom(t *testing.T) {
 	assert.Equal(t, 1, stats.Online)
 }
 
+func TestGetStats_CountsRequesterBeforeTheirSocketRegisters(t *testing.T) {
+	// On login the lobby's first stats fetch races the WS auth handshake: the
+	// HTTP request usually lands before the hub has registered the user's
+	// socket. A lone player then saw "0 online / 0 in lobby" until the next
+	// poll. The requester is online by definition (they just made an
+	// authenticated request), so GetStats must count them even when the hub
+	// doesn't know them yet.
+	hub := &fakeHub{connected: nil} // socket not registered yet
+	sessions := &fakeSessions{}
+	rooms := &fakeRoomRepo{}
+	users := &fakeUserRepo{count: 1}
+
+	h := lobby.NewHandler(hub, sessions, rooms, users)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/lobby/stats", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userID", uint(9)) // what the auth middleware sets for the requester
+
+	require.NoError(t, h.GetStats(c))
+
+	stats := decodeStats(t, rec.Body.Bytes())
+	assert.Equal(t, 1, stats.Online, "the requester counts as online")
+	assert.Equal(t, 1, stats.InLobby, "a lone fresh login is in the lobby")
+	assert.Equal(t, 0, stats.InRoom)
+	assert.Equal(t, 0, stats.InMatch)
+}
+
+func TestGetStats_RequesterAlreadyConnectedNotDoubleCounted(t *testing.T) {
+	// Once the requester's socket IS registered, counting them explicitly
+	// must not inflate the totals.
+	hub := &fakeHub{connected: []uint{9}}
+	sessions := &fakeSessions{}
+	rooms := &fakeRoomRepo{}
+	users := &fakeUserRepo{count: 1}
+
+	h := lobby.NewHandler(hub, sessions, rooms, users)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/lobby/stats", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userID", uint(9))
+
+	require.NoError(t, h.GetStats(c))
+
+	stats := decodeStats(t, rec.Body.Bytes())
+	assert.Equal(t, 1, stats.Online)
+	assert.Equal(t, 1, stats.InLobby)
+}
+
 func TestGetStats_EmptyHub(t *testing.T) {
 	hub := &fakeHub{connected: nil}
 	sessions := &fakeSessions{inMatch: nil}
