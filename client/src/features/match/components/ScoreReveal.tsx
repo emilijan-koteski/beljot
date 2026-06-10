@@ -435,20 +435,31 @@ interface BonusRowProps {
 
 function BonusRow({ label, amount, team, teamGradient, testId }: BonusRowProps) {
   const teamString = teamStringForIndex(team);
+  // Same grid as ScoreRow so the bonus lands under the earning team's column
+  // (team A = left, team B = right) instead of always hugging the right edge.
+  const value = (
+    <span
+      className="font-display text-right tabular-nums"
+      style={{ color: teamGradient[0], fontSize: 15, fontWeight: 500 }}
+      data-team={teamString}
+    >
+      +{amount}
+    </span>
+  );
   return (
     <div
-      className="flex items-center justify-between py-1.5"
+      className="grid items-center py-1.5"
+      style={{
+        gridTemplateColumns: "1fr 80px 80px",
+        gap: 8,
+        color: "var(--ink-light, #f5f2e8)",
+        opacity: 0.85,
+      }}
       data-testid={testId}
-      style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.85 }}
     >
       <span className="font-body text-sm">{label}</span>
-      <span
-        className="font-display text-base font-semibold tabular-nums"
-        style={{ color: teamGradient[0] }}
-        data-team={teamString}
-      >
-        +{amount}
-      </span>
+      {team === 0 ? value : <span />}
+      {team === 1 ? value : <span />}
     </div>
   );
 }
