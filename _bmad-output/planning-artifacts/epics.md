@@ -81,6 +81,7 @@ FR55: Quick Play stakes default to 500 coins; if a player's balance is below 500
 FR56: The system computes and displays a public honor score (0–100) based on match-completion behavior — `honor = 100 × completed / (completed + 2.0·rage_quits + 1.5·timeout_abandons + 0.3·dc_abandons)` — with a "New Player" label for players with fewer than 20 completed matches regardless of score
 FR57: Room owners can optionally require a minimum honor score (0–100) and toggle `allow_new_players` for room access; players failing the check receive `error:honor_too_low` or `error:new_player_not_allowed`
 FR58: Room owners can kick seated players and swap seat assignments while the room is in `waiting` status; controls are disabled once the game starts and rejected for non-owners
+FR59: Room owners can seat server-controlled bot players on empty seats while the room is in `waiting` status (1, 2, or 3 bots — any combination of free seats) and remove them before game start. Bots play autonomously server-side with competent heuristic strategy and humanized response timing (never instantaneous). Matches that include at least one bot are flagged as bot-inclusive in persistence and visibly marked in match previews/history. Bots never replace disconnected human players — the reconnect/abandon flow is unchanged
 
 ### NonFunctional Requirements
 
@@ -164,11 +165,11 @@ NFR17: A single player's disconnection must not affect game state integrity or c
 **From Architecture — Phase Scoping:**
 
 - Phase 1: ~25 FRs (auth, Bitola variant only, lobby/rooms, real-time session, chat, disconnect handling, basic match history, i18n EN+SR, desktop web)
-- Phase 2: Coin economy (FR53–55), XP/lifetime level (FR33–34), honor system (FR56–57), room owner kick/seat (FR58), team surrender (FR28a), in-game emotes (FR32), additional languages MK+HR (FR45)
-- Phase 3: Player search (FR5), friends (FR6), public profiles (FR47), Croatian variant (FR8), 501 mode (FR15), in-app rules reference (FR29)
+- Phase 2: Coin economy (FR53–55), XP/lifetime level (FR33–34), honor system (FR56–57), room owner kick/seat (FR58), team surrender (FR28a), in-game emotes (FR32), additional languages MK+HR (FR45), 501 mode (FR15 — moved from Phase 3 on 2026-06-11, see sprint-change-proposal-2026-06-11.md)
+- Phase 3: Player search (FR5), friends (FR6), public profiles (FR47), Croatian variant (FR8), in-app rules reference (FR29)
 - Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40), social login (FR3), mobile (FR52)
 - Phase 5: Spectator (FR48), achievements (FR49), cosmetics (FR50), tournaments (FR51)
-- Agents must NOT implement Croatian variant or 501 mode before Phase 3
+- Agents must NOT implement the Croatian variant before Phase 3 (501 mode was moved to Phase 2 / Epic 10 on 2026-06-11 and is no longer phase-gated)
 - Tied-hand rule diverges by variant (deferred to Epic 12 / Phase 3): the interim engine applies the **Croatian** rule (a tie sends all points to the taker's opponents) to all variants; the **Bitola** variant must later use **hanging points (carry-over)** instead. See `deferred-work.md`. Do not treat the current Bitola tie behavior as a bug before then.
 - FR28 and FR43 have undefined formulas — require product decisions before implementation (abandonment mechanics must be settled to wire Honor FR56 and partial XP FR43 correctly)
 
@@ -204,7 +205,7 @@ FR11: Epic 3 — Failed hand scoring
 FR12: Epic 3 — Last-trick bonus and Capot scoring
 FR13: Epic 3 — Instant-win (8 trump in sequence)
 FR14: Epic 4 — 1001-point match mode
-FR15: Epic 12 — 501-point match mode
+FR15: Epic 10 — 501-point match mode (moved from Epic 12 on 2026-06-11)
 FR16: Epic 2 — Create room with configuration
 FR17: Epic 2 — Browse/search rooms
 FR18: Epic 2 — Join room via list or code
@@ -249,6 +250,7 @@ FR55: Epic 9 — Quick Play coin bracketing
 FR56: Epic 9 — Honor score calculation and display
 FR57: Epic 9 — Honor-gated rooms (min_honor + allow_new_players)
 FR58: Epic 8 — Room owner pre-game kick + seat swap
+FR59: Epic 10 — Bot players (owner-seated, server-controlled; added 2026-06-11)
 
 ## Epic List
 
@@ -322,11 +324,11 @@ Players earn and spend coins (room buy-in, per-match settlement, daily/streak re
 **FRs covered:** FR33, FR34, FR42, FR43, FR53, FR54, FR55, FR56, FR57
 **Phase:** 2
 
-### Epic 10: Additional Languages
+### Epic 10: Additional Languages, 501 Mode & Bot Players
 
-The i18n system is extended with Macedonian and Croatian translations, giving players a fuller native-language experience independent of the social layer.
+The i18n system is extended with Macedonian and Croatian translations, giving players a fuller native-language experience independent of the social layer. The epic also delivers the 501-point match mode for shorter casual matches (Story 10.2, moved from Epic 12 on 2026-06-11) and owner-seated bot players that fill empty seats with competent, human-paced play (Story 10.3, added 2026-06-11) — see sprint-change-proposal-2026-06-11.md.
 
-**FRs covered:** FR45
+**FRs covered:** FR45, FR15, FR59
 **Phase:** 2
 
 ### Epic 11: Friends & Public Profiles
@@ -338,11 +340,11 @@ Players can search for other players by username, send/accept friend requests, m
 
 ### Epic 12: Variant Expansion
 
-Players can play the Croatian trump variant, 501-point matches, and access an in-app rules reference covering both variants.
+Players can play the Croatian trump variant and access an in-app rules reference covering both variants. (The 501-point match mode originally planned here moved to Epic 10 as Story 10.2 on 2026-06-11.)
 
 **Variant rule divergence — tied hand (carried over from Story 3.5):** the two variants must differ on the tied-hand rule. The **Croatian variant** awards all points to the opponents when the taker's team only ties (already implemented in Epic 3 and applied to all variants as an interim stand-in). The **Bitola variant** must instead use **hanging points (carry-over)**: on a tie the hand's points are held over, nobody scores, and they carry to the winner of the next decisive hand. This needs cross-hand carry-over state plus match-end interaction — see the dedicated item in `deferred-work.md`. Until this lands, Bitola intentionally uses the Croatian tie rule.
 
-**FRs covered:** FR8, FR15, FR29
+**FRs covered:** FR8, FR29
 **Phase:** 3
 
 ### Epic 13: Seasonal Rank & Leaderboard
@@ -1972,9 +1974,9 @@ So that I can self-select into a community of reliable players.
 **When** a new match within the same room is about to start
 **Then** the honor check runs again alongside the insolvency check (Story 9.3) and applies the same ejection flow (`event:honor_eject`) with a modal: "Your honor has dropped below this room's threshold."
 
-## Epic 10: Additional Languages
+## Epic 10: Additional Languages, 501 Mode & Bot Players
 
-The i18n system is extended with Macedonian and Croatian translations, giving players a fuller native-language experience independent of the social layer.
+The i18n system is extended with Macedonian and Croatian translations, giving players a fuller native-language experience independent of the social layer. The epic also delivers the 501-point match mode for shorter casual matches (Story 10.2, moved from Epic 12 on 2026-06-11) and owner-seated bot players that fill empty seats with competent, human-paced play (Story 10.3, added 2026-06-11) — see sprint-change-proposal-2026-06-11.md.
 
 ### Story 10.1: Macedonian and Croatian Translations
 
@@ -2003,6 +2005,77 @@ So that I can play in my native language.
 **When** CI runs
 **Then** a lint step verifies `mk.json` and `hr.json` contain every key present in `en.json`
 **And** any missing or empty translation strings fail the build
+
+### Story 10.2: 501-Point Match Mode
+
+_Moved from Epic 12 (was Story 12.2) on 2026-06-11 — see sprint-change-proposal-2026-06-11.md. Acceptance criteria unchanged._
+
+As a player,
+I want to play shorter 501-point matches,
+So that I can enjoy a quicker game when I don't have time for a full 1001 match.
+
+**Acceptance Criteria:**
+
+**Given** a room is configured with 501 match mode
+**When** a game starts
+**Then** the match-end threshold is set to 501 points instead of 1001
+
+**Given** a team's score reaches or exceeds 501
+**When** the match-end check runs
+**Then** the match ends with the same resolution rules as 1001 (higher score wins; tie goes to the taker's team)
+
+**Given** a room is created
+**When** the mode dropdown is configured
+**Then** both 1001 and 501 are available as options
+
+**Given** the ScorePanel displays during a 501 match
+**When** the player views the HUD
+**Then** the target score context reflects 501 (not 1001)
+
+### Story 10.3: Bot Players
+
+_Added 2026-06-11 via bmad-correct-course (sprint-change-proposal-2026-06-11.md). Scheduled after Story 10.2 and before Epic 9. This is the largest Phase 2 story — if story validation flags it as oversized, shard it (e.g., 10.3 bot foundation: seating + legal play + timing; 10.4 strategy hardening) rather than thinning acceptance criteria._
+
+As a room owner,
+I want to seat bots on the empty seats of my room,
+So that a match can start and be played even when fewer than four humans are available.
+
+**Acceptance Criteria:**
+
+**Given** a room in `waiting` status with at least one empty seat
+**When** the room owner adds a bot to an empty seat
+**Then** the bot occupies that seat with a distinct, localized bot identity (name + bot badge) visible to everyone in the room lobby
+**And** the owner can seat 1, 2, or 3 bots — any combination of the free seats
+**And** the owner can remove a seated bot while the room is still in `waiting` status
+**And** add/remove bot actions from non-owners are rejected server-side
+**And** bot seating is available in both 1001 and 501 match modes
+
+**Given** all four seats are filled by any mix of humans and bots
+**When** the owner starts the game
+**Then** the match proceeds through the normal flow (dealing, bidding, declarations, card play, scoring, match end) with bots acting autonomously on their seats
+
+**Given** it is a bot's turn at any decision point (trump bidding, declarations, Belote/Rebelote announcement, card play)
+**When** the bot acts
+**Then** the action is produced server-side and validated by the same rules engine path as human actions (always legal)
+**And** the action lands after a randomized humanized think delay (roughly 1–2.5 seconds, never instantaneous)
+**And** the delay always resolves within the per-move timer so a bot never triggers timeout auto-play
+
+**Given** a bot evaluates its options
+**When** choosing among legal actions
+**Then** it plays a competent heuristic strategy: bidding from hand-strength evaluation (trump length and honors), card play that manages trumps, remembers played cards, supports its partner, and maximizes points won or denied
+**And** it announces declarations and Belote/Rebelote whenever they score points
+**And** automated simulation tests show it is measurably stronger than a random-legal-move baseline
+
+**Given** a match includes at least one bot
+**When** the match is persisted
+**Then** the match record is flagged as bot-inclusive in the database
+**And** match previews and match history visibly mark the game as played with bots
+**And** bot seats are recorded with their bot identity without creating user accounts, and bots accrue no XP, coins, honor, or stats
+
+**Given** resilience features engage during a bot-inclusive match
+**When** pauses, disconnects, or abandons occur
+**Then** bots never pause, disconnect, or abandon, and human reconnect/pause flows are unaffected
+**And** bots are never used to replace a disconnected human player — the existing reconnect/abandon flow is unchanged
 
 ## Epic 11: Friends & Public Profiles
 
@@ -2084,7 +2157,7 @@ So that I can see their reliability, progression, and competitive history.
 
 ## Epic 12: Variant Expansion
 
-Players can play the Croatian trump variant, 501-point matches, and access an in-app rules reference covering both variants.
+Players can play the Croatian trump variant and access an in-app rules reference covering both variants. (The 501-point match mode originally planned here moved to Epic 10 as Story 10.2 on 2026-06-11.)
 
 ### Story 12.1: Croatian Variant Rules Engine
 
@@ -2112,29 +2185,9 @@ So that the platform supports both major Balkan Belot variants.
 **When** the variant dropdown is configured
 **Then** both Bitola and Croatian are available as options
 
-### Story 12.2: 501-Point Match Mode
+### Story 12.2: [moved] 501-Point Match Mode
 
-As a player,
-I want to play shorter 501-point matches,
-So that I can enjoy a quicker game when I don't have time for a full 1001 match.
-
-**Acceptance Criteria:**
-
-**Given** a room is configured with 501 match mode
-**When** a game starts
-**Then** the match-end threshold is set to 501 points instead of 1001
-
-**Given** a team's score reaches or exceeds 501
-**When** the match-end check runs
-**Then** the match ends with the same resolution rules as 1001 (higher score wins; tie goes to the taker's team)
-
-**Given** a room is created
-**When** the mode dropdown is configured
-**Then** both 1001 and 501 are available as options
-
-**Given** the ScorePanel displays during a 501 match
-**When** the player views the HUD
-**Then** the target score context reflects 501 (not 1001)
+Moved to Epic 10 as **Story 10.2** on 2026-06-11 (see sprint-change-proposal-2026-06-11.md). The 12.2 designation is retired; Story 12.3 keeps its number.
 
 ### Story 12.3: In-App Rules Reference
 

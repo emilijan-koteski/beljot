@@ -152,6 +152,8 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 - **Room owner controls (pre-game only):** kick a seated player; swap / reassign seats among seated players. Not available once the game has started.
 - **In-game preset emotes:** rate-limited (max 1 per 3s per player), visible to all 4 seats.
 - **Additional languages:** Macedonian and Croatian translations added to the i18n system (promoted from the later Social phase; decoupled from the friend system).
+- **501-point match mode:** shorter match target for casual rooms (moved up from Phase 3 on 2026-06-11; decoupled from the Croatian variant — the engine, room configuration, and UI plumbing already exist).
+- **Bot players (added 2026-06-11):** room owners can seat server-controlled bots on empty seats (1, 2, or 3) before game start. Bots play autonomously with competent heuristic strategy and humanized response timing (~1–2.5 s think delay, never instant). Matches with at least one bot are flagged in the database and visibly marked in match previews/history. Bots never fill in for disconnected humans — the Phase 1 "no AI fill-ins" disconnect rule stands.
 
 ### Phase 3 — Social & Game Variant Expansion
 
@@ -159,7 +161,6 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 - Friend system (requests, friend list with online status, invite to room)
 - Public player profiles (username, level, stats, honor tier/score with raw counts, prior-season rank archive — seasons with zero games are omitted)
 - Croatian trump variant (forced pick by dealer in round 2 — no reshuffle)
-- 501-point match mode
 - In-app rules reference for both variants
 
 ### Phase 4 — Competitive Climb & Access Expansion

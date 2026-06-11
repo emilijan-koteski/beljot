@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-06
-last_updated: "2026-05-09"  # Story 10.1 code-reviewed via /bmad-code-review — patches applied, status → done
+last_updated: "2026-06-11"  # 12-2 moved into Epic 10 as 10-2; new 10-3-bot-players (FR59) added — both via /bmad-correct-course (sprint-change-proposal-2026-06-11.md)
 project: beljot
 project_key: NOKEY
 tracking_system: file-system
@@ -118,11 +118,15 @@ development_status:
   8.5-3-ux-polish-and-shared-pattern-refactors: done
   epic-8.5-retrospective: optional
 
-  # --- Epic 10: Additional Languages (Phase 2) ---
+  # --- Epic 10: Additional Languages, 501 Mode & Bot Players (Phase 2) ---
   # Promoted ahead of Epic 9 on 2026-05-09 — Macedonian/Croatian translations
   # picked up next; coin economy work follows.
+  # 10-2 added 2026-06-11 via bmad-correct-course (was 12-2; moved out of Phase 3).
+  # 10-3 added 2026-06-11 via bmad-correct-course (new FR59) — runs before Epic 9.
   epic-10: in-progress
   10-1-macedonian-and-croatian-translations: done
+  10-2-501-point-match-mode: backlog
+  10-3-bot-players: backlog
   epic-10-retrospective: optional
 
   # --- Epic 9: Player Economy & Progression (Phase 2) ---
@@ -146,7 +150,7 @@ development_status:
   # --- Epic 12: Variant Expansion (Phase 3) ---
   epic-12: backlog
   12-1-croatian-variant-rules-engine: backlog
-  12-2-501-point-match-mode: backlog
+  # 12-2-501-point-match-mode moved to Epic 10 as 10-2 on 2026-06-11 (bmad-correct-course)
   12-3-in-app-rules-reference: backlog
   epic-12-retrospective: optional
 
