@@ -911,6 +911,50 @@ describe("MatchPage", () => {
     confirmSpy.mockRestore();
   });
 
+  describe("opponent throw flight timing", () => {
+    it("never paints the opponent's card at center before the deck→slot flight starts", () => {
+      // jsdom reports zeroed rects, which makes rectFrom() return null and the
+      // flight push bail. Give every element a plausible rect so the deck and
+      // slot measurements succeed like they would in a real browser.
+      const gbcrSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+        left: 100,
+        top: 100,
+        width: 72,
+        height: 104,
+        right: 172,
+        bottom: 204,
+        x: 100,
+        y: 100,
+        toJSON: () => ({}),
+      } as DOMRect);
+
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      // Opponent at seat 1 (east, compass 1) throws 7H — one store commit,
+      // exactly how the WS dispatcher applies event:card_played.
+      act(() => {
+        useMatchStore.getState().setMatchState({
+          ...mockMatchState,
+          activePlayerSeat: 2,
+          currentTrick: [{ playerSeat: 1, card: { rank: "7", suit: "H" } }],
+        });
+      });
+
+      // The commit that grows the trick must come up with the flight already
+      // active and the static slot card suppressed. If the slot card renders
+      // here, the card flashes at center for a frame before the flight is
+      // pushed — the "appears, disappears, then slides in" bug.
+      expect(
+        document.querySelector('[data-testid^="card-flight-throw-opp-1-7H"]'),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("trick-slot-card-1")).not.toBeInTheDocument();
+
+      gbcrSpy.mockRestore();
+    });
+  });
+
   describe("belote/rebelote pre-play prompt", () => {
     // Seat 0 holds both trump (spades) K and Q and it is their turn to lead.
     function belotEligibleState(): MatchState {

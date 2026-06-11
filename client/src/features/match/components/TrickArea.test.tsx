@@ -89,10 +89,13 @@ describe("TrickArea", () => {
     expect(screen.getByTestId("playing-card-9C")).toBeInTheDocument();
   });
 
-  it("pendingResolvedTrick takes priority over the live trick prop", () => {
-    // The dispatcher snapshot must keep showing the just-resolved trick even
-    // if a fresh snapshot has already updated currentTrick (e.g., the next
-    // hand's first card landed before the collect flight finished).
+  it("renders the union of snapshot and live trick while the collect window is open", () => {
+    // Reproduces the vanish-and-pop bug seen in live play: the next trick's
+    // lead arrives while pendingResolvedTrick still owns the display. When the
+    // lead's throw flight completes (cardId leaves suppressedCardIds), the
+    // card must paint statically — with snapshot-exclusive rendering it had no
+    // painter and vanished until the snapshot cleared, then popped back in
+    // with no animation.
     render(
       <TrickArea
         trick={[{ card: { rank: "T", suit: "S" }, playerSeat: 1 }]}
@@ -102,9 +105,45 @@ describe("TrickArea", () => {
       />,
     );
 
-    // Snapshot wins: KS is from the resolved trick.
+    // Snapshot cards still shown (they own the glow + collect sweep)...
     expect(screen.getByTestId("playing-card-KS")).toBeInTheDocument();
-    // Live trick's TS is hidden until the snapshot clears.
+    // ...AND the next trick's landed lead is painted, not masked.
+    expect(screen.getByTestId("playing-card-TS")).toBeInTheDocument();
+  });
+
+  it("scopes the winner glow to the snapshot card, not a next-trick card at the same compass", () => {
+    // The next trick's leader IS the previous trick's winner, so the new lead
+    // lands at the winner's compass. The glow must stay on the resolved card.
+    render(
+      <TrickArea
+        trick={[{ card: { rank: "T", suit: "S" }, playerSeat: 1 }]}
+        winnerSeat={null}
+        myPlayerSeat={0}
+        pendingResolvedTrick={{ trick: trickCards, winnerSeat: 1 }}
+      />,
+    );
+
+    const resolved = screen.getByTestId("trick-slot-card-1-resolved");
+    expect(resolved.className).toContain("shadow-");
+    const live = screen.getByTestId("trick-slot-card-1");
+    expect(live.className).not.toContain("shadow-");
+  });
+
+  it("suppresses a live card mid-flight without hiding the snapshot card at its compass", () => {
+    // While the new lead is still flying (overlay paints it), its static copy
+    // stays hidden — but the resolving trick's card at the same compass keeps
+    // rendering beneath the flight.
+    render(
+      <TrickArea
+        trick={[{ card: { rank: "T", suit: "S" }, playerSeat: 1 }]}
+        winnerSeat={null}
+        myPlayerSeat={0}
+        pendingResolvedTrick={{ trick: trickCards, winnerSeat: 1 }}
+        suppressedCardIds={new Set(["TS"])}
+      />,
+    );
+
     expect(screen.queryByTestId("playing-card-TS")).not.toBeInTheDocument();
+    expect(screen.getByTestId("playing-card-7H")).toBeInTheDocument();
   });
 });

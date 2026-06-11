@@ -55,12 +55,18 @@ const TRICK_AREA_H = 240;
  * in the `CardFlight` overlay. TrickArea is the static painter that shows the
  * "settled" state of each slot.
  *
- * Rendering source priority:
+ * Rendering sources — the UNION of both, not either/or:
  * 1. `pendingResolvedTrick` (when set) — the captured snapshot of the
- *    just-resolved 4-card trick. Owns the display through the resolve-glow
- *    phase and while the collect flights are in transit.
- * 2. `trick` (the live `currentTrick` from the server) — used during normal
- *    play, between resolves.
+ *    just-resolved 4-card trick. Owns the winner glow and is what the collect
+ *    flights sweep away.
+ * 2. `trick` (the live `currentTrick` from the server) — during normal play
+ *    this is the only source; while the snapshot is displayed it carries the
+ *    NEXT trick's cards. Those must still paint: the next lead can arrive
+ *    (and finish its throw flight) well inside the ~1.5s collect window, and
+ *    with snapshot-exclusive rendering it had no painter — the card vanished
+ *    on flight completion and popped back when the snapshot cleared. Live
+ *    cards layer above snapshot cards so a new lead lands on top of the
+ *    outgoing card at the same compass (the leader IS the previous winner).
  *
  * Suppression: any cardId present in `suppressedCardIds` is removed from
  * rendering — that card is currently being animated by `CardFlight` and the
@@ -84,11 +90,7 @@ export function TrickArea({
   const slotScale = compact ? 0.78 : 1;
 
   const liveTrick = rawTrick ?? EMPTY_TRICK;
-  // Resolve which trick the slots paint from. When the snapshot is set the
-  // server may already have cleared `currentTrick` — using the snapshot
-  // keeps the four cards on screen for the resolve-glow + collect-flight
-  // window.
-  const displayTrick = pendingResolvedTrick !== null ? pendingResolvedTrick.trick : liveTrick;
+  const snapshotTrick = pendingResolvedTrick !== null ? pendingResolvedTrick.trick : null;
   const effectiveWinnerSeat =
     pendingResolvedTrick !== null ? pendingResolvedTrick.winnerSeat : winnerSeat;
   const showWinnerGlow = pendingResolvedTrick !== null;
@@ -96,7 +98,20 @@ export function TrickArea({
   const winnerCompass =
     effectiveWinnerSeat !== null ? compassOffset(effectiveWinnerSeat, myPlayerSeat) : null;
 
-  const renderableTrick = displayTrick.filter((tc) => {
+  // Union of snapshot + live trick. Dedup by cardId: right after the resolve
+  // the dispatcher may briefly leave the four resolved cards in currentTrick
+  // alongside the snapshot — the snapshot copy wins so each card renders once.
+  const snapshotIds = new Set(
+    (snapshotTrick ?? []).map((tc) => `${tc.card.rank}${tc.card.suit}`),
+  );
+  const displayEntries = [
+    ...(snapshotTrick ?? []).map((tc) => ({ tc, fromSnapshot: true })),
+    ...liveTrick
+      .filter((tc) => !snapshotIds.has(`${tc.card.rank}${tc.card.suit}`))
+      .map((tc) => ({ tc, fromSnapshot: false })),
+  ];
+
+  const renderableEntries = displayEntries.filter(({ tc }) => {
     const cardId = `${tc.card.rank}${tc.card.suit}`;
     return !suppressedCardIds.has(cardId);
   });
@@ -105,7 +120,7 @@ export function TrickArea({
   // still shows the dashed placeholder — otherwise the slot reads as a black
   // hole during the flight (no card, no border).
   const playedByCompass = new Set(
-    renderableTrick.map((tc) => compassOffset(tc.playerSeat, myPlayerSeat)),
+    renderableEntries.map(({ tc }) => compassOffset(tc.playerSeat, myPlayerSeat)),
   );
 
   return (
@@ -147,20 +162,24 @@ export function TrickArea({
         );
       })}
 
-      {renderableTrick.map((tc) => {
+      {renderableEntries.map(({ tc, fromSnapshot }) => {
         const compass = compassOffset(tc.playerSeat, myPlayerSeat);
         const slot = SLOT_POSITIONS[compass];
-        const isWinner = showWinnerGlow && compass === winnerCompass;
+        // Glow stays on the snapshot's winning card — a next-trick lead at the
+        // same compass (the leader is the previous winner) must not inherit it.
+        const isWinner = showWinnerGlow && fromSnapshot && compass === winnerCompass;
 
         return (
           <div
             key={`${tc.card.rank}${tc.card.suit}`}
             className={`absolute ${isWinner ? "shadow-[0_0_20px_var(--color-accent)]" : ""}`}
-            data-testid={`trick-slot-card-${compass}`}
+            data-testid={`trick-slot-card-${compass}${fromSnapshot ? "-resolved" : ""}`}
             style={{
               left: "50%",
               top: "50%",
               transform: `translate(calc(-50% + ${slot.offsetX * slotScale}px), calc(-50% + ${slot.offsetY * slotScale}px)) rotate(${slot.rotation}deg)`,
+              // Next-trick cards land on top of the outgoing resolved trick.
+              zIndex: fromSnapshot ? 1 : 2,
             }}
           >
             <PlayingCard card={tc.card} state="default" size="md" withTransition={false} />

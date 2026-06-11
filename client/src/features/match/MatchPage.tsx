@@ -6,7 +6,7 @@ import {
   Settings as SettingsIcon,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router";
 
@@ -340,7 +340,16 @@ export function MatchPage() {
   // expired), the dispatcher writes pendingAutoPlayedCard. Mirror it into
   // flyingCardId so HandCards animates the throw the same way it does for a
   // manual click — without this, the card just vanishes from the hand.
-  useEffect(() => {
+  //
+  // Layout effect, same reason as the opponent-throw effect below: the
+  // dispatcher grows currentTrick in the same batched commit that sets
+  // pendingAutoPlayedCard, so TrickArea paints the card at the south slot on
+  // that commit's frame unless the flight (and with it the suppression) is
+  // pushed before paint. The rects measured here reflect the just-committed
+  // DOM — getBoundingClientRect() forces layout. The hand still contains the
+  // card at this point (event:card_played only updates the trick; hand removal
+  // arrives with the trailing event:match_state), so the source rect resolves.
+  useLayoutEffect(() => {
     if (!pendingAutoPlayedCard) return;
     setFlyingCardId(pendingAutoPlayedCard.cardId);
     if (flyingClearTimerRef.current !== null) {
@@ -352,35 +361,28 @@ export function MatchPage() {
     }, FLAG_LIFETIME.FLYING_CARD);
     // Auto-played throw flight: measure the hand card + south slot rects and
     // push a self-throw flight, mirroring handlePlayCard's overlay wiring.
-    // Defer rect reads via rAF so React's commit + the browser's layout pass
-    // settle before we measure (the hand card may be in a freshly-committed
-    // render).
     if (myPlayerSeat !== null && !prefersReducedMotion) {
       const cardId = pendingAutoPlayedCard.cardId;
       const receivedAt = pendingAutoPlayedCard.receivedAt;
-      const rafId = requestAnimationFrame(() => {
-        const myPlayer = useMatchStore
-          .getState()
-          .matchState?.players.find((p) => p.seat === myPlayerSeat);
-        const card = myPlayer?.hand.find((c) => `${c.rank}${c.suit}` === cardId);
-        const sourceRect = rectFrom(document.querySelector(`[data-testid="hand-card-${cardId}"]`));
-        const destRect = measureTrickSlotRect(0);
-        if (card && sourceRect && destRect) {
-          setActiveFlights((prev) => [
-            ...prev,
-            {
-              id: `throw-self-${cardId}-${receivedAt}`,
-              card,
-              fromRect: sourceRect,
-              toRect: destRect,
-              waypointRect: viewportBottomCenterRect(),
-              durationMs: MOTION.CARD_FLIGHT_SELF_THROW,
-            },
-          ]);
-        }
-      });
-      setPendingAutoPlayedCard(null);
-      return () => cancelAnimationFrame(rafId);
+      const myPlayer = useMatchStore
+        .getState()
+        .matchState?.players.find((p) => p.seat === myPlayerSeat);
+      const card = myPlayer?.hand.find((c) => `${c.rank}${c.suit}` === cardId);
+      const sourceRect = rectFrom(document.querySelector(`[data-testid="hand-card-${cardId}"]`));
+      const destRect = measureTrickSlotRect(0);
+      if (card && sourceRect && destRect) {
+        setActiveFlights((prev) => [
+          ...prev,
+          {
+            id: `throw-self-${cardId}-${receivedAt}`,
+            card,
+            fromRect: sourceRect,
+            toRect: destRect,
+            waypointRect: viewportBottomCenterRect(),
+            durationMs: MOTION.CARD_FLIGHT_SELF_THROW,
+          },
+        ]);
+      }
     }
     setPendingAutoPlayedCard(null);
   }, [pendingAutoPlayedCard, setPendingAutoPlayedCard, myPlayerSeat, prefersReducedMotion]);
@@ -390,51 +392,47 @@ export function MatchPage() {
   // stack to their compass slot. The legacy trickLand keyframe in TrickArea
   // is gone, so without this the opponent's card would simply pop into the
   // slot with no flight.
+  //
+  // Must be useLayoutEffect, and the flight must be pushed synchronously: the
+  // same commit that grows currentTrick makes TrickArea paint the card at its
+  // center slot, and the card is only suppressed once it appears in
+  // `flightingCardIds`. A passive effect (or any rAF deferral) pushes the
+  // flight one paint too late — the card flashes at center for a frame, then
+  // vanishes and flies in from the deck. Layout effects run before paint and
+  // React flushes their state updates pre-paint, so the first painted frame
+  // already has the slot suppressed and the flight at its 0% keyframe.
+  // getBoundingClientRect() forces layout here, so the measured rects reflect
+  // the just-committed DOM.
   const currentTrick = matchState?.currentTrick;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const trick = currentTrick ?? [];
     const prev = prevTrickLenRef.current;
-    if (prefersReducedMotion) {
-      prevTrickLenRef.current = trick.length;
-      return;
-    }
-    if (myPlayerSeat === null) {
-      prevTrickLenRef.current = trick.length;
-      return;
-    }
-    let rafId: number | null = null;
+    prevTrickLenRef.current = trick.length;
+    if (prefersReducedMotion) return;
+    if (myPlayerSeat === null) return;
     if (trick.length > prev && trick.length > 0) {
       const newest = trick[trick.length - 1];
       if (newest && newest.playerSeat !== myPlayerSeat) {
         const compass = compassOffset(newest.playerSeat, myPlayerSeat);
         const card = newest.card;
         const playerSeat = newest.playerSeat;
-        // rAF-defer the rect reads: the new currentTrick state was just
-        // committed; we measure after the layout pass that the commit
-        // schedules so the trick-slot anchor reflects the post-commit DOM.
-        rafId = requestAnimationFrame(() => {
-          const sourceRect = rectFrom(document.querySelector(`[data-seat-deck="${playerSeat}"]`));
-          const destRect = measureTrickSlotRect(compass);
-          if (sourceRect && destRect) {
-            const cardId = `${card.rank}${card.suit}`;
-            setActiveFlights((prevFlights) => [
-              ...prevFlights,
-              {
-                id: `throw-opp-${playerSeat}-${cardId}-${Date.now()}`,
-                card,
-                fromRect: sourceRect,
-                toRect: destRect,
-                durationMs: MOTION.CARD_FLIGHT_OPPONENT_THROW,
-              },
-            ]);
-          }
-        });
+        const sourceRect = rectFrom(document.querySelector(`[data-seat-deck="${playerSeat}"]`));
+        const destRect = measureTrickSlotRect(compass);
+        if (sourceRect && destRect) {
+          const cardId = `${card.rank}${card.suit}`;
+          setActiveFlights((prevFlights) => [
+            ...prevFlights,
+            {
+              id: `throw-opp-${playerSeat}-${cardId}-${Date.now()}`,
+              card,
+              fromRect: sourceRect,
+              toRect: destRect,
+              durationMs: MOTION.CARD_FLIGHT_OPPONENT_THROW,
+            },
+          ]);
+        }
       }
     }
-    prevTrickLenRef.current = trick.length;
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
   }, [currentTrick, myPlayerSeat, prefersReducedMotion]);
 
   // Trick-collect orchestration. When pendingResolvedTrick is captured by
