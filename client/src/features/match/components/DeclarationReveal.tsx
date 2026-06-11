@@ -100,14 +100,17 @@ export function DeclarationReveal({
       data-testid="declaration-reveal"
     >
       <div
-        className="relative rounded-2xl px-4 py-4 md:px-5.5 md:pt-5 md:pb-4.5"
+        className="relative rounded-2xl px-4 py-4 md:px-5.5 md:pt-5 md:pb-4.5 max-h-[calc(100vh-7rem)] md:max-h-[calc(100vh-2rem)]"
         style={{
           // Desktop keeps the 520 design width; on a phone it caps to the
           // viewport (−2rem) so the centered panel no longer clips its cards
-          // and +value column off both edges. maxHeight guards a tall melds
-          // list on short screens — the rows scroll, the brass total stays.
+          // and +value column off both edges. max-h guards a tall melds list
+          // on short screens — the rows scroll, the brass total stays. Below
+          // md the cap reserves 3.5rem per edge (not 1rem): the mobile HUD
+          // hamburger (viewport top-3 right-3, 36px, CHROME_TOP) paints above
+          // Z.REVEAL, and a full-height panel would slide this dialog's own
+          // top-right X under it, making the X swallow taps into the menu.
           width: "min(520px, calc(100vw - 2rem))",
-          maxHeight: "calc(100vh - 2rem)",
           overflowY: "auto",
           background: "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)",
           border: "1px solid rgba(201,168,118,0.55)",
@@ -117,7 +120,10 @@ export function DeclarationReveal({
         }}
         data-team={winnerTeamString}
       >
-        <div className="absolute top-3 right-3">
+        {/* z-3 (matches TrumpReveal/BelotReveal): the header's opacity-bearing
+            lines create stacking contexts that otherwise paint OVER this
+            earlier-DOM wrapper and swallow clicks on the X's center. */}
+        <div className="absolute top-3 right-3 z-3">
           <AutoCloseRing
             duration={prefersReducedMotion ? 1.5 : 8}
             onClose={handleClose}
