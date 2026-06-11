@@ -107,6 +107,41 @@ describe("CreateRoomModal", () => {
     });
   });
 
+  it("submits matchMode 501 when the 501 segment is selected", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 2,
+      name: "Quick Room",
+      code: "DEF456",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "501",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-06-11T14:30:00Z",
+      updatedAt: "2026-06-11T14:30:00Z",
+    });
+
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Quick Room");
+    await user.click(screen.getByTestId("match-mode-segmented-501"));
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith({
+        name: "Quick Room",
+        variant: "bitola",
+        matchMode: "501",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+      });
+    });
+  });
+
   it("navigates to room page after successful creation", async () => {
     const user = userEvent.setup();
     mockCreateRoom.mockResolvedValueOnce({

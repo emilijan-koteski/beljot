@@ -319,6 +319,26 @@ describe("MatchPage", () => {
     expect(screen.getByTestId("hand-cards")).toBeInTheDocument();
   });
 
+  it("propagates a 501 matchMode snapshot to the score panel target", () => {
+    useMatchStore.getState().setMatchState({ ...mockMatchState, matchMode: "501" });
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    renderMatchPage();
+
+    expect(screen.getByTestId("score-a")).toHaveTextContent("/ 501");
+    expect(screen.getByTestId("score-b")).toHaveTextContent("/ 501");
+  });
+
+  it("renders the 1001 target for a snapshot with the default matchMode", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    renderMatchPage();
+
+    expect(screen.getByTestId("score-a")).toHaveTextContent("/ 1001");
+    expect(screen.getByTestId("score-b")).toHaveTextContent("/ 1001");
+  });
+
   it("shows match result overlay on match_end phase with matchEndData", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);

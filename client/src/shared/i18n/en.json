@@ -381,7 +381,7 @@
         "seated": "{{current}}/4"
       },
       "variantHint": "Only Bitola for now",
-      "matchModeHint": "Only 1001 pts for now",
+      "matchModeHint": "501 for a quicker match, 1001 for the full race",
       "timerHintRelaxed": "No timer",
       "timerDurationHint": "10–120s · default 30s",
       "nextSteps": {
@@ -437,7 +437,8 @@
       "empty": "empty",
       "joining": "Joining \"{{name}}\"…",
       "variantBitola": "Bitola",
-      "matchMode1001": "1001 pts"
+      "matchMode1001": "1001 pts",
+      "matchMode501": "501 pts"
     },
     "chat": {
       "title": "Lobby chat",

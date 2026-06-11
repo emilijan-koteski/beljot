@@ -1174,6 +1174,11 @@ export function MatchPage() {
   // always a real TeamString when we're inside an active match.
   const viewerTeam: TeamString = myPlayerSeat % 2 === 0 ? "teamA" : "teamB";
 
+  // Display-only target derived from the server's matchMode; the not-"501"
+  // fallback to 1001 mirrors the server's matchTarget() semantics. The
+  // match-end decision itself is exclusively server-side.
+  const matchTarget = matchState.matchMode === "501" ? 501 : 1001;
+
   // Pause state
   const isRoomOwner = myPlayerSeat !== null && matchState.ownerSeat === myPlayerSeat;
   const isPaused = matchState.phase === "paused";
@@ -1317,6 +1322,7 @@ export function MatchPage() {
         variantLabel={t(`match.variants.${matchState.variant}`, {
           defaultValue: matchState.variant,
         })}
+        matchTarget={matchTarget}
       />
 
       {/* Trump indicator - top right. Gated to play phases (AC 4.4.5) and
@@ -1918,6 +1924,7 @@ export function MatchPage() {
           trumpSuit={matchState.trumpSuit ?? lastTrumpRef.current.suit}
           trumpCallerSeat={matchState.trumpCallerSeat ?? lastTrumpRef.current.callerSeat}
           acknowledged={handCompleteAcked}
+          matchTarget={matchTarget}
         />
       )}
 

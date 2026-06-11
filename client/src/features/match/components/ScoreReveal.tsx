@@ -29,6 +29,8 @@ interface ScoreRevealProps {
    * to a disabled "waiting" label until the next hand is dealt.
    */
   acknowledged?: boolean;
+  /** Match target shown in the brass strip — defaults to the full 1001 race. */
+  matchTarget?: number;
 }
 
 const SUIT_NAME_KEY: Record<Suit, string> = {
@@ -159,6 +161,7 @@ export function ScoreReveal({
   trumpSuit,
   trumpCallerSeat,
   acknowledged = false,
+  matchTarget = 1001,
 }: ScoreRevealProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -357,7 +360,7 @@ export function ScoreReveal({
                     className="text-[12px] font-body font-normal"
                     style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.5 }}
                   >
-                    / 1001
+                    / {matchTarget}
                   </span>
                 </div>
               </div>

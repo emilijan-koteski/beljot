@@ -51,6 +51,7 @@ const variantKeys: Record<string, string> = {
 
 const matchModeKeys: Record<string, string> = {
   "1001": "lobby.card.matchMode1001",
+  "501": "lobby.card.matchMode501",
 };
 
 // Cardinal positions for the diamond seat layout. In the waiting room seat

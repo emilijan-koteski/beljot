@@ -59,6 +59,22 @@ describe("ScorePanel", () => {
     expect(screen.getByTestId("score-label-b")).toHaveTextContent("Them");
   });
 
+  it("renders the 501 target next to scores when matchTarget is 501", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={450}
+        teamBScore={320}
+        teamATricks={3}
+        teamBTricks={2}
+        matchTarget={501}
+      />,
+    );
+
+    expect(screen.getByTestId("score-a")).toHaveTextContent("450 / 501");
+    expect(screen.getByTestId("score-b")).toHaveTextContent("320 / 501");
+  });
+
   it("renders Us/Them labels inverted for a teamB viewer", () => {
     render(
       <ScorePanel

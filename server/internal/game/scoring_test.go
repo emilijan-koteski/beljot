@@ -476,6 +476,68 @@ func TestMatchEnd_501Mode(t *testing.T) {
 	assert.GreaterOrEqual(t, result.TeamScores[game.TeamA], 501)
 }
 
+func TestMatchEnd_BothTeamsExceed501_HigherScoreWins(t *testing.T) {
+	// 501 analog of TestMatchEnd_BothTeamsExceed1001_HigherScoreWins.
+	// Trick 8 awards team A += 70, team B += 92 (team B contracting, succeeds).
+	// Team A final: 450 + 70 = 520, team B final: 420 + 92 = 512
+	// Both >= 501, team A has higher score → team A wins
+	gs := testfixtures.NewGameNearEnd(450, 420)
+	gs.MatchMode = "501"
+
+	result := playTrick8(t, gs)
+
+	assert.Equal(t, game.PhaseMatchEnd, result.Phase)
+	require.NotNil(t, result.WinnerTeam)
+	assert.Equal(t, game.TeamA, *result.WinnerTeam, "Team A has higher score when both cross 501")
+	assert.Greater(t, result.TeamScores[game.TeamA], result.TeamScores[game.TeamB])
+}
+
+func TestMatchEnd_BothTeamsExceed501_TiedScore_ContractingTeamWins(t *testing.T) {
+	// 501 analog of TestMatchEnd_BothTeamsExceed1001_TiedScore_ContractingTeamWins.
+	// Need: teamAScore + 70 == teamBScore + 92, i.e. teamAScore - teamBScore = 22,
+	// with both finals >= 501: team A=500, team B=478 → both end at 570.
+	gs := testfixtures.NewGameNearEnd(500, 478)
+	gs.MatchMode = "501"
+
+	result := playTrick8(t, gs)
+
+	assert.Equal(t, game.PhaseMatchEnd, result.Phase)
+	require.NotNil(t, result.WinnerTeam)
+	assert.Equal(t, result.TeamScores[game.TeamA], result.TeamScores[game.TeamB],
+		"scores should be tied")
+	// Team B is contracting team (seat 1 = team B)
+	assert.Equal(t, game.TeamB, *result.WinnerTeam,
+		"contracting team wins tiebreaker at 501")
+}
+
+func TestMatchEnd_501Mode_ContinuesBelowThreshold(t *testing.T) {
+	// Finals 370/292 — below 501, the match must continue even though it
+	// would also continue under 1001 rules (guards against an accidental
+	// always-end at the lower threshold).
+	gs := testfixtures.NewGameNearEnd(300, 200)
+	gs.MatchMode = "501"
+
+	result := playTrick8(t, gs)
+
+	assert.Equal(t, game.PhaseHandComplete, result.Phase, "hand holds for the continue pause")
+	assert.Nil(t, result.WinnerTeam, "WinnerTeam should be nil when match continues")
+}
+
+func TestMatchEnd_501Mode_ExactlyAtThreshold(t *testing.T) {
+	// Pins the >= comparison at the exact boundary: team A lands on precisely
+	// 501 (431 + 70) while team B stays below (400 + 92 = 492). An accidental
+	// > regression would let this hand continue.
+	gs := testfixtures.NewGameNearEnd(431, 400)
+	gs.MatchMode = "501"
+
+	result := playTrick8(t, gs)
+
+	assert.Equal(t, game.PhaseMatchEnd, result.Phase, "match ends at exactly 501")
+	require.NotNil(t, result.WinnerTeam)
+	assert.Equal(t, game.TeamA, *result.WinnerTeam)
+	assert.Equal(t, 501, result.TeamScores[game.TeamA])
+}
+
 func TestMatchEnd_BlueTeamWins(t *testing.T) {
 	// Team B is contracting (seat 1). Set team B near 1001 so team B's scoring pushes over.
 	// After trick 8: team B total = 92 (see above). Team B needs: teamBScore + 92 >= 1001

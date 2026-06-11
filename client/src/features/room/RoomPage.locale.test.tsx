@@ -156,4 +156,20 @@ describe("RoomPage locale overflow", () => {
       expect(tiles.length).toBe(4);
     },
   );
+
+  it("renders the localized 501 match-mode badge in mk locale", async () => {
+    // mk distinguishes the i18n label ("501 поен") from the raw "501"
+    // fallback that an unmapped matchMode key would render.
+    const detail = fourSeatedRoom();
+    detail.room.matchMode = "501";
+    mockGetRoom.mockResolvedValue(detail);
+    await i18n.changeLanguage("mk");
+
+    renderRoomPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("badge-match-mode")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("badge-match-mode")).toHaveTextContent("501 поен");
+  });
 });

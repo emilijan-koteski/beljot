@@ -31,9 +31,9 @@ const MAX_NAME = 32;
  * what the lobby grid will display.
  *
  * Backend contract unchanged — only `name | variant | matchMode | timerStyle
- * | timerDurationSeconds` are submitted. The disabled segmented options
- * (Croatian variant, 501 pts) sit in the UI to telegraph the planned scope;
- * "Only X for now" Field hints communicate that locked state.
+ * | timerDurationSeconds` are submitted. The disabled segmented option
+ * (Croatian variant) sits in the UI to telegraph the planned scope;
+ * its "Only X for now" Field hint communicates that locked state.
  */
 export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const { t } = useTranslation();
@@ -114,11 +114,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   ];
 
   const matchModeOptions = [
-    {
-      value: "501" as const,
-      label: t("lobby.createRoomModal.matchMode501"),
-      disabled: true,
-    },
+    { value: "501" as const, label: t("lobby.createRoomModal.matchMode501") },
     { value: "1001" as const, label: t("lobby.createRoomModal.matchMode1001") },
   ];
 
@@ -342,7 +338,7 @@ function PreviewCard({
       ? t("lobby.card.variantBitola")
       : t("lobby.createRoomModal.variantCroatia");
   const matchLabel =
-    matchMode === "1001" ? t("lobby.card.matchMode1001") : t("lobby.createRoomModal.matchMode501");
+    matchMode === "1001" ? t("lobby.card.matchMode1001") : t("lobby.card.matchMode501");
   const timerLabel =
     timerStyle === "relaxed"
       ? t("lobby.card.relaxed")

@@ -125,7 +125,7 @@ development_status:
   # 10-3 added 2026-06-11 via bmad-correct-course (new FR59) — runs before Epic 9.
   epic-10: in-progress
   10-1-macedonian-and-croatian-translations: done
-  10-2-501-point-match-mode: backlog
+  10-2-501-point-match-mode: done
   10-3-bot-players: backlog
   epic-10-retrospective: optional
 

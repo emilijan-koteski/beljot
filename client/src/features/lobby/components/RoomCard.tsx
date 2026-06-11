@@ -16,6 +16,7 @@ function variantLabel(t: (key: string) => string, v: string): string {
 }
 function modeLabel(t: (key: string) => string, m: string): string {
   if (m === "1001") return t("lobby.card.matchMode1001");
+  if (m === "501") return t("lobby.card.matchMode501");
   return /^\d+$/.test(m) ? `${m} pts` : m || "—";
 }
 

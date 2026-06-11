@@ -205,7 +205,7 @@ export const hr: RulesLangData = {
         },
         {
           kind: "note",
-          text: "Ruke se igraju dok barem jedan tim ne sjedne na 1001 ili više na kraju ruke. Ako oba tima prijeđu granicu u istoj ruci, strana s više ukupnih bodova osvaja meč.",
+          text: "Ruke se igraju dok barem jedan tim ne sjedne na 1001 ili više na kraju ruke. Ako oba tima prijeđu granicu u istoj ruci, strana s više ukupnih bodova osvaja meč. Za kraći meč, soba se može postaviti i na utrku do 501 boda, uz potpuno ista pravila.",
         },
       ],
     },

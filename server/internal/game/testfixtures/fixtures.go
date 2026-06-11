@@ -519,12 +519,14 @@ func NewGameCapotInProgress() *game.GameState {
 //	Seat 2 (team A):  TD — Ten of Diamonds (10 pts non-trump)
 //	Seat 3 (team B): 7H — 7 of Hearts (0 pts trump)
 //
-// After trick 8 resolves (Seat 0 leads AS, wins trick):
-//   - Team A gets: 70 + 21(trick) + 10(last-trick) = 101 hand points
-//   - Team B gets: 61 hand points
-//   - Team B called trump so if 61 < 101 → failed contract → team A gets 162 total
+// After trick 8 resolves (Seat 0 leads AS; seat 3 is void in spades and must
+// trump with 7H, winning the trick for team B):
+//   - Team A gets: 70 hand points
+//   - Team B gets: 61 + 21(trick) + 10(last-trick) = 92 hand points
+//   - Team B called trump and 92 > 70 → hand succeeds → normal scoring:
+//     team A += 70, team B += 92 (see TestHandScoring_LastTrickBonus)
 //
-// Use teamAScore/teamBScore to position teams near the 1001 threshold.
+// Use teamAScore/teamBScore to position teams near the 1001/501 threshold.
 func NewGameNearEnd(teamAScore, teamBScore int) *game.GameState {
 	gs := NewGameLastTrick()
 	gs.TeamScores = [2]int{teamAScore, teamBScore}

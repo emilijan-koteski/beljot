@@ -147,6 +147,25 @@ func TestStartMatch_CreatesSession(t *testing.T) {
 	assert.Equal(t, uint(40), state.Players[3].UserID)
 }
 
+func TestStartMatch_501MatchMode_PropagatesToState(t *testing.T) {
+	// "501" was rejected at room creation until story 10.2, so this leg of the
+	// room → StartMatch → GameState seam was previously dead for 501 and is
+	// pinned here with the non-default mode (the test above pins "1001").
+	hub := ws.NewHub()
+	go hub.Run()
+	defer hub.Shutdown()
+
+	repo := newMockMatchRepo()
+	mgr := match.NewManager(hub, repo)
+
+	err := mgr.StartMatch(100, "bitola", "501", defaultPlayers(), "relaxed", 0, 10, 120)
+	require.NoError(t, err)
+
+	state := mgr.GetStateSnapshot(100)
+	require.NotNil(t, state)
+	assert.Equal(t, "501", state.MatchMode)
+}
+
 func TestStartMatch_BroadcastsInitialState(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()

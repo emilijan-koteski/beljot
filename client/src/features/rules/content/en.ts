@@ -206,7 +206,7 @@ export const en: RulesLangData = {
         },
         {
           kind: "note",
-          text: "Hands keep coming until at least one team is sitting on 1001 or more at the end of a hand. If both teams cross the line on the same hand, the side with more total points takes the match.",
+          text: "Hands keep coming until at least one team is sitting on 1001 or more at the end of a hand. If both teams cross the line on the same hand, the side with more total points takes the match. For a quicker match, a room can be set up as a race to 501 instead — every other rule stays exactly the same.",
         },
       ],
     },

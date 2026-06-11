@@ -369,7 +369,7 @@
       "subhead": "Daj sobi naziv, izaberi tempo, pa podeli pristupni kod sa prijateljima. Spisak soba u lobiju se osvežava čim kreiraš sobu.",
       "roomNameHint": "{{min}}–{{max}} znakova",
       "variantCroatia": "Hrvatska",
-      "matchMode501": "501 poen",
+      "matchMode501": "501 bod",
       "timerDurationSuffix": "sekundi / potezu",
       "submit": "Kreiraj sobu",
       "submitting": "Kreiram…",
@@ -381,7 +381,7 @@
         "seated": "{{current}}/4"
       },
       "variantHint": "Zasad samo Bitola",
-      "matchModeHint": "Zasad samo 1001 poen",
+      "matchModeHint": "501 za kraći meč, 1001 za punu trku",
       "timerHintRelaxed": "Bez tajmera",
       "timerDurationHint": "10–120s · podrazumevano 30s",
       "nextSteps": {
@@ -437,7 +437,8 @@
       "empty": "prazno",
       "joining": "Pridruživanje sobi \"{{name}}\"…",
       "variantBitola": "Bitola",
-      "matchMode1001": "1001 bod"
+      "matchMode1001": "1001 bod",
+      "matchMode501": "501 bod"
     },
     "chat": {
       "title": "Lobi chat",

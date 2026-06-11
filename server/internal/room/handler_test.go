@@ -406,6 +406,28 @@ func TestCreateRoom_Success(t *testing.T) {
 	assert.Len(t, data.Code, 6)
 }
 
+func TestCreateRoom_501MatchMode(t *testing.T) {
+	e, repo := setupTest()
+	token := validToken(5)
+
+	body := `{"name":"Quick 501","variant":"bitola","matchMode":"501","timerStyle":"relaxed"}`
+	rec := doCreateRoom(e, body, token)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+
+	var data room.Room
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+	assert.Equal(t, "501", data.MatchMode)
+
+	persisted, err := repo.FindByID(data.ID)
+	require.NoError(t, err)
+	require.NotNil(t, persisted)
+	assert.Equal(t, "501", persisted.MatchMode)
+}
+
 func TestCreateRoom_AutoSeatsCreator(t *testing.T) {
 	// The creator is auto-seated at seat 0 / teamA so the room is startable
 	// from creation: with the 4-player cap an unseated owner could otherwise

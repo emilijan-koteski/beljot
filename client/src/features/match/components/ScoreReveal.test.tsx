@@ -87,6 +87,20 @@ describe("ScoreReveal", () => {
     expect(screen.getByTestId("row-match-total")).toBeInTheDocument();
   });
 
+  it("keeps the 1001 target in the match-score strip by default", () => {
+    render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} />);
+
+    expect(screen.getByTestId("row-match-total")).toHaveTextContent("/ 1001");
+  });
+
+  it("renders the 501 target in the match-score strip when matchTarget is passed", () => {
+    render(
+      <ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} matchTarget={501} />,
+    );
+
+    expect(screen.getByTestId("row-match-total")).toHaveTextContent("/ 501");
+  });
+
   it("attaches data-team attributes on each numeric column", () => {
     render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} />);
 
