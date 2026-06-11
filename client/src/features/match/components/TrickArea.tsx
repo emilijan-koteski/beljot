@@ -101,9 +101,7 @@ export function TrickArea({
   // Union of snapshot + live trick. Dedup by cardId: right after the resolve
   // the dispatcher may briefly leave the four resolved cards in currentTrick
   // alongside the snapshot — the snapshot copy wins so each card renders once.
-  const snapshotIds = new Set(
-    (snapshotTrick ?? []).map((tc) => `${tc.card.rank}${tc.card.suit}`),
-  );
+  const snapshotIds = new Set((snapshotTrick ?? []).map((tc) => `${tc.card.rank}${tc.card.suit}`));
   const displayEntries = [
     ...(snapshotTrick ?? []).map((tc) => ({ tc, fromSnapshot: true })),
     ...liveTrick
