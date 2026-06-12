@@ -16,6 +16,8 @@ vi.mock("@/shared/api/auth", () => ({
 }));
 
 vi.mock("@/shared/api/rooms", () => ({
+  addBot: vi.fn(),
+  removeBot: vi.fn(),
   createRoom: vi.fn(),
 }));
 

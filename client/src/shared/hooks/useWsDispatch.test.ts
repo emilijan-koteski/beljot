@@ -55,6 +55,7 @@ const mockMatchState: MatchState = {
       team: "teamA",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [{ rank: "7", suit: "H" }],
@@ -64,6 +65,7 @@ const mockMatchState: MatchState = {
       team: "teamB",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [{ rank: "A", suit: "D" }],
@@ -73,6 +75,7 @@ const mockMatchState: MatchState = {
       team: "teamA",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [{ rank: "9", suit: "C" }],
@@ -82,6 +85,7 @@ const mockMatchState: MatchState = {
       team: "teamB",
       declarations: [],
       connected: true,
+      isBot: false,
     },
   ],
   teamScores: [0, 0],
@@ -646,6 +650,35 @@ describe("useWsDispatch", () => {
 
   // --- Room lobby event dispatch tests ---
 
+  it("dispatches system:bot_added / system:bot_removed to roomStore by seat", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+    useRoomStore.getState().setCurrentRoomId(10);
+
+    dispatch({ type: "system:bot_added", payload: { roomId: 10, seat: 2, team: "teamA" } });
+    expect(useRoomStore.getState().players).toHaveLength(1);
+    expect(useRoomStore.getState().players[0]).toMatchObject({
+      userId: 0,
+      seat: 2,
+      team: "teamA",
+      isBot: true,
+    });
+
+    dispatch({ type: "system:bot_removed", payload: { roomId: 10, seat: 2 } });
+    expect(useRoomStore.getState().players).toHaveLength(0);
+  });
+
+  it("ignores bot events for other rooms and malformed payloads", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+    useRoomStore.getState().setCurrentRoomId(10);
+
+    dispatch({ type: "system:bot_added", payload: { roomId: 99, seat: 2, team: "teamA" } });
+    dispatch({ type: "system:bot_added", payload: { roomId: 10, seat: "2", team: "teamA" } });
+    dispatch({ type: "system:bot_added", payload: {} });
+    expect(useRoomStore.getState().players).toHaveLength(0);
+  });
+
   it("dispatches system:player_joined to roomStore", () => {
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -677,6 +710,7 @@ describe("useWsDispatch", () => {
         username: "Alice",
         seat: null,
         team: null,
+        isBot: false,
         createdAt: "",
       },
       2,
@@ -707,6 +741,7 @@ describe("useWsDispatch", () => {
         username: "Alice",
         seat: null,
         team: null,
+        isBot: false,
         createdAt: "",
       },
       1,

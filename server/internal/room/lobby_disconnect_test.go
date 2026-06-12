@@ -92,6 +92,13 @@ func (r *mockRepoForLobby) FindQuickPlayRoomExcluding(_ map[uint]bool) (*room.Ro
 }
 func (r *mockRepoForLobby) UpdateStatus(_ uint, _ string) error                      { return nil }
 func (r *mockRepoForLobby) FindUserIDsByRoomStatus(_ string) ([]uint, error)         { return nil, nil }
+func (r *mockRepoForLobby) AddBot(_ uint, _ int) error                               { return nil }
+func (r *mockRepoForLobby) RemoveBot(_ uint, _ int) error                            { return nil }
+func (r *mockRepoForLobby) UpdateBotSeat(_ uint, _ int, _ int) error                 { return nil }
+func (r *mockRepoForLobby) FindBotsByRoomID(_ uint) ([]room.RoomBot, error)          { return nil, nil }
+func (r *mockRepoForLobby) FindBotsByRoomIDs(_ []uint) (map[uint][]room.RoomBot, error) {
+	return map[uint][]room.RoomBot{}, nil
+}
 
 func setupLobbyTest() (*mockRepoForLobby, *room.LobbyDisconnectHandler) {
 	repo := newMockRepoForLobby()

@@ -342,6 +342,23 @@ export interface SeatUpdatedPayload {
   previousSeat: number | null;
 }
 
+// --- Bot seating events (Story 10.3) ---
+// Bot identity is seat-derived and rendered client-side (localized "Bot N"),
+// so no name rides the wire. Keep in sync with server events.go.
+export const SYSTEM_BOT_ADDED = "system:bot_added" as const;
+export const SYSTEM_BOT_REMOVED = "system:bot_removed" as const;
+
+export interface BotAddedPayload {
+  roomId: number;
+  seat: number;
+  team: string;
+}
+
+export interface BotRemovedPayload {
+  roomId: number;
+  seat: number;
+}
+
 export interface MatchStartedPayload {
   roomId: number;
 }

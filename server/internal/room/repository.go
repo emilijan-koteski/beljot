@@ -42,5 +42,18 @@ type RoomRepository interface {
 	// room card can render its 2×2 seat chips inline without an extra fetch
 	// per visible row.
 	FindPlayersByRoomIDs(roomIDs []uint) (map[uint][]RoomPlayer, error)
+	// AddBot seats a bot in the room. Returns apperr.ErrSeatTaken when the
+	// (room_id, seat) unique index rejects a concurrent double-add.
+	AddBot(roomID uint, seat int) error
+	// RemoveBot unseats the bot at the given seat. Returns
+	// apperr.ErrNoBotOnSeat when no bot occupies that seat.
+	RemoveBot(roomID uint, seat int) error
+	// UpdateBotSeat moves a bot between seats (owner swap/move flows).
+	// Returns apperr.ErrNoBotOnSeat when no bot occupies fromSeat.
+	UpdateBotSeat(roomID uint, fromSeat, toSeat int) error
+	FindBotsByRoomID(roomID uint) ([]RoomBot, error)
+	// FindBotsByRoomIDs returns a map of roomID → bots for the given rooms in
+	// a single query. Mirrors FindPlayersByRoomIDs for lobby previews.
+	FindBotsByRoomIDs(roomIDs []uint) (map[uint][]RoomBot, error)
 	RunInTransaction(fn func(RoomRepository) error) error
 }

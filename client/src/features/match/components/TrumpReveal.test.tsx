@@ -17,6 +17,7 @@ function makePlayers(): PlayerState[] {
       team: "teamA",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [],
@@ -26,6 +27,7 @@ function makePlayers(): PlayerState[] {
       team: "teamB",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [],
@@ -35,6 +37,7 @@ function makePlayers(): PlayerState[] {
       team: "teamA",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [],
@@ -44,6 +47,7 @@ function makePlayers(): PlayerState[] {
       team: "teamB",
       declarations: [],
       connected: true,
+      isBot: false,
     },
   ];
 }

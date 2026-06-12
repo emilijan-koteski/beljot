@@ -43,6 +43,7 @@ function testPlayer(seat: number, username: string): PlayerState {
     team: seat % 2 === 0 ? "teamA" : "teamB",
     declarations: [],
     connected: true,
+    isBot: false,
   };
 }
 

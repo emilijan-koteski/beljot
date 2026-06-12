@@ -13,6 +13,8 @@ const mockCreateRoom = vi.fn();
 const mockNavigate = vi.fn();
 
 vi.mock("@/shared/api/rooms", () => ({
+  addBot: vi.fn(),
+  removeBot: vi.fn(),
   createRoom: (...args: unknown[]) => mockCreateRoom(...args),
 }));
 

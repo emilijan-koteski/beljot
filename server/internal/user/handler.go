@@ -43,10 +43,13 @@ func IsSupportedLanguage(code string) bool {
 }
 
 // MatchPlayer is the per-seat participant embedded in a match list item.
+// Bot seats carry userId 0 and an empty username with isBot true — the
+// client renders the localized seat-derived bot name.
 type MatchPlayer struct {
 	Seat     int    `json:"seat"`
 	UserID   uint   `json:"userId"`
 	Username string `json:"username"`
+	IsBot    bool   `json:"isBot"`
 }
 
 // MatchHandView is the per-hand scoring breakdown embedded in a match list item.
@@ -78,6 +81,7 @@ type MatchListItem struct {
 	WinnerTeam  int             `json:"winnerTeam"`
 	TeamAScore  int             `json:"teamAScore"`
 	TeamBScore  int             `json:"teamBScore"`
+	HasBots     bool            `json:"hasBots"`
 	AbandonedBy *uint           `json:"abandonedBy,omitempty"`
 	ViewerSeat  int             `json:"viewerSeat"`
 	Outcome     string          `json:"outcome"`
@@ -466,6 +470,8 @@ func parseMatchesQuery(c echo.Context) (limit, offset int, outcome, sort string,
 // loadUsernamesForMatches gathers all participant IDs across the page and
 // issues a single batched query via userRepo.FindManyByIDs. Returns a map
 // keyed by userID so callers can project the 4 seats per match in O(1).
+// Bot seats (NULL player IDs) never reach the users lookup — the client
+// renders the localized bot name from the isBot flag.
 func (h *UserHandler) loadUsernamesForMatches(matches []match.Match) (map[uint]string, error) {
 	if len(matches) == 0 {
 		return map[uint]string{}, nil
@@ -473,13 +479,19 @@ func (h *UserHandler) loadUsernamesForMatches(matches []match.Match) (map[uint]s
 	seen := make(map[uint]struct{}, len(matches)*4)
 	ids := make([]uint, 0, len(matches)*4)
 	for _, m := range matches {
-		for _, id := range [4]uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID} {
-			if _, ok := seen[id]; ok {
+		for _, idPtr := range [4]*uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID} {
+			if idPtr == nil {
 				continue
 			}
-			seen[id] = struct{}{}
-			ids = append(ids, id)
+			if _, ok := seen[*idPtr]; ok {
+				continue
+			}
+			seen[*idPtr] = struct{}{}
+			ids = append(ids, *idPtr)
 		}
+	}
+	if len(ids) == 0 {
+		return map[uint]string{}, nil
 	}
 	users, err := h.userRepo.FindManyByIDs(ids)
 	if err != nil {
@@ -500,10 +512,13 @@ func teamForSeat(seat int) int { return seat % 2 }
 // buildMatchListItem projects a DB Match + preloaded Hands into the viewer-
 // specific response DTO (derives viewerSeat and outcome server-side).
 func buildMatchListItem(m match.Match, viewerID uint, usernames map[uint]string) MatchListItem {
-	seats := [4]uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID}
+	seats := [4]*uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID}
+	botFlags := [4]bool{m.Player1IsBot, m.Player2IsBot, m.Player3IsBot, m.Player4IsBot}
+
+	// The viewer is always human — bot seats (NULL IDs) are skipped.
 	viewerSeat := 0
 	for i, id := range seats {
-		if id == viewerID {
+		if id != nil && *id == viewerID {
 			viewerSeat = i
 			break
 		}
@@ -511,11 +526,12 @@ func buildMatchListItem(m match.Match, viewerID uint, usernames map[uint]string)
 
 	players := make([]MatchPlayer, 0, 4)
 	for i, id := range seats {
-		players = append(players, MatchPlayer{
-			Seat:     i,
-			UserID:   id,
-			Username: usernames[id],
-		})
+		p := MatchPlayer{Seat: i, IsBot: botFlags[i]}
+		if id != nil {
+			p.UserID = *id
+			p.Username = usernames[*id]
+		}
+		players = append(players, p)
 	}
 
 	outcome := "loss"
@@ -560,6 +576,7 @@ func buildMatchListItem(m match.Match, viewerID uint, usernames map[uint]string)
 		WinnerTeam:  m.WinnerTeam,
 		TeamAScore:  m.TeamAScore,
 		TeamBScore:  m.TeamBScore,
+		HasBots:     m.HasBots,
 		AbandonedBy: m.AbandonedBy,
 		ViewerSeat:  viewerSeat,
 		Outcome:     outcome,

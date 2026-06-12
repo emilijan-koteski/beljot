@@ -1,3 +1,4 @@
+import { Bot } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/shared/lib/utils";
@@ -7,6 +8,8 @@ export type SeatTeam = "A" | "B";
 type Props = {
   username: string | null;
   team: SeatTeam;
+  /** Bot seat — the disc shows the bot glyph instead of a name initial. */
+  bot?: boolean;
   testId?: string;
 };
 
@@ -34,7 +37,7 @@ const TOKENS = {
  * player's initial inside a colored disc + their username, with the team
  * color signaling Us (Gold) vs Them (Silver) at a glance.
  */
-export function SeatChip({ username, team, testId }: Props) {
+export function SeatChip({ username, team, bot = false, testId }: Props) {
   const { t } = useTranslation();
   const tone = TOKENS[team];
 
@@ -66,8 +69,13 @@ export function SeatChip({ username, team, testId }: Props) {
           "inline-flex size-4.5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-brass-ink",
           tone.fill,
         )}
+        data-testid={bot ? "seat-chip-bot-icon" : undefined}
       >
-        {username.charAt(0).toUpperCase()}
+        {bot ? (
+          <Bot className="size-3 -translate-y-[5%]" aria-hidden="true" />
+        ) : (
+          username.charAt(0).toUpperCase()
+        )}
       </span>
       <span className="truncate">{username}</span>
     </span>

@@ -7,6 +7,25 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
+// SetBotDelayForTest overrides the bot think-delay bounds so manager tests
+// with bots don't sleep for real (Story 10.3).
+func (m *Manager) SetBotDelayForTest(minDelay, maxDelay time.Duration) {
+	m.botDelayMin = minDelay
+	m.botDelayMax = maxDelay
+}
+
+// BotSchedule exposes maybeScheduleBotAction for tests that inject a game
+// state via SetGameStateForTest and need the driver to re-evaluate it.
+func (m *Manager) BotSchedule(roomID uint) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	m.maybeScheduleBotAction(lm)
+}
+
 // HandleMatchEndForTest exposes handleMatchEnd for tests in the external
 // session_test package. Used by Story 8.5-1 AC4 tests to assert the
 // persist-before-broadcast invariant directly without driving a full game to

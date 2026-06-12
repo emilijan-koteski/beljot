@@ -131,7 +131,8 @@
           "failedUs": "pali · mi",
           "failedThem": "pali · oni"
         }
-      }
+      },
+      "withBots": "Sa botovima"
     },
     "partners": {
       "eyebrow": "U fokusu",
@@ -224,7 +225,10 @@
       "leaveSeatOwner": "Domaćin ne može da napusti mesto. Napusti sobu.",
       "transferFailed": "Prenos uloge domaćina nije uspeo. Pokušaj ponovo",
       "promoteUnseated": "Novi domaćin mora da sedi.",
-      "promoteNotInRoom": "Taj igrač više nije u sobi."
+      "promoteNotInRoom": "Taj igrač više nije u sobi.",
+      "addBotFailed": "Dodavanje bota nije uspelo. Pokušaj ponovo",
+      "removeBotFailed": "Uklanjanje bota nije uspelo. Pokušaj ponovo",
+      "botsNotAllowed": "U ovu sobu ne mogu da se dodaju botovi"
     },
     "waitingForPlayers": "Čekanje igrača",
     "copyLinkAriaLabel": "Kopiraj kod sobe {{code}}",
@@ -259,6 +263,14 @@
       "title": "Izbaciti <name>{{name}}</name> iz sobe?",
       "lede": "Ovo je izbacivanje, ne trajna zabrana. <strong>{{name}}</strong> može da se vrati bilo kada.",
       "confirm": "Izbaci",
+      "cancel": "Otkaži"
+    },
+    "addBot": "Dodaj bota",
+    "removeBotIconLabel": "Ukloni {{name}}",
+    "removeBotConfirm": {
+      "title": "Ukloniti <name>{{name}}</name> sa stola?",
+      "lede": "Mesto se odmah oslobađa. Možeš da postaviš drugog bota ili da ga ostaviš za igrača.",
+      "confirm": "Ukloni",
       "cancel": "Otkaži"
     },
     "kickedToast": "Izbačeni ste iz sobe {{name}}",
@@ -846,5 +858,9 @@
       "linkedin": "LinkedIn",
       "disclaimer": "Ovo je beta verzija za testiranje, nije gotov proizvod."
     }
+  },
+  "bots": {
+    "seatName": "Bot {{n}}",
+    "badge": "Bot"
   }
 }

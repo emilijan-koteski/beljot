@@ -4,8 +4,12 @@ export type MatchOutcome = "win" | "loss" | "abandoned";
 
 export interface MatchPlayer {
   seat: number;
+  // Bot seats arrive as {userId: 0, username: "", isBot: true} — check with
+  // `isBot === true` (explicit comparison, never truthiness on userId) and
+  // render the localized seat-derived bot name.
   userId: number;
   username: string;
+  isBot: boolean;
 }
 
 export interface MatchHandView {
@@ -35,6 +39,8 @@ export interface MatchListItem {
   winnerTeam: number;
   teamAScore: number;
   teamBScore: number;
+  /** True when at least one seat was a bot (Story 10.3) — history rows show a marker. */
+  hasBots: boolean;
   abandonedBy?: number;
   viewerSeat: number;
   outcome: MatchOutcome;

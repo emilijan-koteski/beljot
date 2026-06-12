@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/emilijan/beljot/server/internal/apperr"
+	"github.com/emilijan/beljot/server/internal/bot"
 	"github.com/emilijan/beljot/server/internal/game"
 	"github.com/emilijan/beljot/server/internal/ws"
 )
@@ -36,7 +37,16 @@ type LiveMatch struct {
 	// matchRepo.CreateWithHands when the match completes (normal end) or is
 	// abandoned. Mutated only under session.mu.Lock.
 	handResults []HandResult
-	mu          sync.RWMutex
+	// Bot-driver state (Story 10.3). Each bot seat owns its own think-delay
+	// timer + staleness generation, independent of timerGeneration — another
+	// seat's action (e.g. a human's continue ack during the score reveal)
+	// must not invalidate a bot's pending acknowledgement. botMemory is the
+	// shared per-match public-information memory, allocated only when the
+	// match has bots; all three are guarded by session.mu.
+	botActionTimers      [4]*time.Timer
+	botActionGenerations [4]uint64
+	botMemory            *bot.Memory
+	mu                   sync.RWMutex
 }
 
 // RoomStatusUpdater updates a room's status in the database.
@@ -61,17 +71,38 @@ type Manager struct {
 	matchRepo        MatchRepository
 	roomUpdater      RoomStatusUpdater
 	userRemovedHooks []func(userID uint)
-	mu               sync.RWMutex
+	// Bot think-delay bounds (Story 10.3). Uniform random in [min, max] per
+	// decision; injectable so manager tests don't sleep for real. The 2.5 s
+	// ceiling always resolves inside the 10 s per-move timer minimum, so a
+	// bot never trips timeout auto-play.
+	botDelayMin time.Duration
+	botDelayMax time.Duration
+	mu          sync.RWMutex
 }
 
 // NewManager creates a session manager wired to the WebSocket hub and match repository.
 func NewManager(hub Broadcaster, matchRepo MatchRepository) *Manager {
 	return &Manager{
-		sessions:   make(map[uint]*LiveMatch),
-		userToRoom: make(map[uint]uint),
-		hub:        hub,
-		matchRepo:  matchRepo,
+		sessions:    make(map[uint]*LiveMatch),
+		userToRoom:  make(map[uint]uint),
+		hub:         hub,
+		matchRepo:   matchRepo,
+		botDelayMin: time.Second,
+		botDelayMax: 2500 * time.Millisecond,
 	}
+}
+
+// humanUserIDs filters bot placeholders (UserID 0) out of a seat-indexed
+// playerIDs array for hub broadcasts. The hub tolerates unknown IDs, but
+// bot seats must never ride a recipient list by contract.
+func humanUserIDs(playerIDs [4]uint) []uint {
+	out := make([]uint, 0, 4)
+	for _, id := range playerIDs {
+		if id != 0 {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // SetRoomUpdater sets the interface for updating room status on match completion.
@@ -98,12 +129,14 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 
 	var playerIDs [4]uint
 	var usernames [4]string
+	var botSeats [4]bool
 	for _, p := range players {
 		playerIDs[p.Seat] = p.UserID
 		usernames[p.Seat] = p.Username
+		botSeats[p.Seat] = p.IsBot
 	}
 
-	gs := game.NewGame(playerIDs, usernames, game.Variant(variant), matchMode, roomID)
+	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID)
 
 	// Map room owner to seat index for pause override validation.
 	// Default to -1 (no owner override available) if ownerID not found among players.
@@ -124,17 +157,27 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		timerDurationSec:   timerDurationSec,
 		reconnectWindowSec: reconnectWindowSec,
 	}
+	if botSeats[0] || botSeats[1] || botSeats[2] || botSeats[3] {
+		session.botMemory = bot.NewMemory()
+	}
 
 	m.sessions[roomID] = session
 	for _, uid := range playerIDs {
+		// Bot seats (UserID 0) must NEVER enter userToRoom — HandleDisconnect
+		// and action routing key on it.
+		if uid == 0 {
+			continue
+		}
 		m.userToRoom[uid] = roomID
 	}
 	m.mu.Unlock()
 
 	slog.Info("session: game started", "roomID", roomID, "players", playerIDs)
 
+	humanIDs := humanUserIDs(playerIDs)
+
 	// Broadcast dealing-phase state (client shows deal animation)
-	m.hub.BroadcastToUsers(playerIDs[:], buildMessage(ws.EventMatchState, gs))
+	m.hub.BroadcastToUsers(humanIDs, buildMessage(ws.EventMatchState, gs))
 
 	// Auto-transition to bidding phase (client's DealAnimation handles visual timing)
 	if gs.Phase == game.PhaseDealing {
@@ -143,8 +186,11 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		m.setTurnExpiry(session, gs)
 		m.startTimerLocked(session, gs.ActivePlayerSeat)
 		session.mu.Unlock()
-		m.hub.BroadcastToUsers(playerIDs[:], buildMessage(ws.EventMatchState, gs))
+		m.hub.BroadcastToUsers(humanIDs, buildMessage(ws.EventMatchState, gs))
 	}
+
+	// The first bidder may be a bot.
+	m.maybeScheduleBotAction(session)
 
 	return nil
 }
@@ -173,11 +219,42 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 		return
 	}
 
+	if err := m.applyAndBroadcastAction(session, action); err != nil {
+		m.sendGameError(client.UserID, err)
+	}
+}
+
+// applyAndBroadcastAction is the single apply-and-broadcast path for every
+// in-band action: human actions (HandleAction) and bot decisions
+// (handleBotActionTimer) run through it identically — same timer semantics,
+// same event ordering, no autoPlayed marker. Returns the rules-engine
+// rejection (timers already restored) so the caller decides how to surface
+// it; nil on success and on benign drops.
+func (m *Manager) applyAndBroadcastAction(session *LiveMatch, action game.Action) error {
+	return m.applyAndBroadcastActionWith(session, func(*game.GameState) (game.Action, bool) {
+		return action, true
+	})
+}
+
+// applyAndBroadcastActionWith builds the action under the session lock via
+// the build callback, then applies and broadcasts it. The bot path uses build
+// to re-verify its decision point and run bot.Decide inside the SAME critical
+// section that applies the result — no verify→act gap for a racing state
+// change to slip through. build returning ok=false is a benign drop: state
+// and timers are left untouched. build runs under session.mu and may read
+// session fields guarded by it.
+func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs *game.GameState) (game.Action, bool)) error {
 	// Lock the session for state mutation — cancel timer first to prevent race
 	session.mu.Lock()
 	if session.closed {
 		session.mu.Unlock()
-		return
+		return nil
+	}
+
+	action, ok := build(session.gameState)
+	if !ok {
+		session.mu.Unlock()
+		return nil
 	}
 
 	// A continue that arrives after the score-reveal pause already advanced is
@@ -189,7 +266,7 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 	// the player could do nothing about).
 	if action.Type == game.ActionContinue && session.gameState.Phase != game.PhaseHandComplete {
 		session.mu.Unlock()
-		return
+		return nil
 	}
 
 	session.cancelTurnTimer()
@@ -230,8 +307,7 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 			m.armTurnTimerLocked(session, time.Until(*oldState.TurnExpiresAt), oldState.ActivePlayerSeat)
 		}
 		session.mu.Unlock()
-		m.sendGameError(client.UserID, err)
-		return
+		return err
 	}
 
 	// Handle dealing→bidding auto-transition inside the lock (prevents data race)
@@ -335,6 +411,9 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 	// Buffer per-hand scoring for persistence at match end
 	m.bufferHandResultIfScored(session, oldState, newState)
 
+	// Keep the bot memory current (no-op for human-only matches).
+	m.observeBotMemory(session, oldState, newState, action)
+
 	// Check for match completion
 	if newState.Phase == game.PhaseMatchEnd {
 		// Story 8.2: when accepting surrender, the proposer seat lives on
@@ -349,7 +428,13 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 		}
 		matchEndPayload := buildMatchEndPayload(oldState, newState, action, startedAt)
 		m.handleMatchEnd(session, newState, surrenderedBy, matchEndPayload)
+		return nil
 	}
+
+	// The new state may put a bot on the clock (next turn, prompt, score
+	// reveal acknowledgement, surrender response).
+	m.maybeScheduleBotAction(session)
+	return nil
 }
 
 // GetStateSnapshot returns a shallow copy of the current game state for a room
@@ -377,8 +462,12 @@ func (m *Manager) RemoveSession(roomID uint) {
 		session.closed = true
 		session.cancelTurnTimer()
 		session.cancelAllReconnectTimers()
+		session.cancelAllBotActionTimers()
 		session.mu.Unlock()
 		for _, uid := range session.playerIDs {
+			if uid == 0 {
+				continue // bot seat — never in userToRoom, never hooked
+			}
 			delete(m.userToRoom, uid)
 			removedIDs = append(removedIDs, uid)
 		}
@@ -564,7 +653,7 @@ func trickResolvedWinnerSeat(oldState, newState *game.GameState) int {
 }
 
 func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *game.GameState, action game.Action, autoPlayed bool) {
-	userIDs := playerIDs[:]
+	userIDs := humanUserIDs(playerIDs)
 
 	switch action.Type {
 	case game.ActionPlayCard:
@@ -933,12 +1022,23 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 		winnerTeam = *finalState.WinnerTeam
 	}
 
+	var botSeats [4]bool
+	for i := range finalState.Players {
+		botSeats[i] = finalState.Players[i].IsBot
+	}
+	ids, botFlags, hasBots := matchSeatColumns(session.playerIDs, botSeats)
+
 	matchRecord := &Match{
 		RoomID:        session.roomID,
-		Player1ID:     session.playerIDs[0],
-		Player2ID:     session.playerIDs[1],
-		Player3ID:     session.playerIDs[2],
-		Player4ID:     session.playerIDs[3],
+		Player1ID:     ids[0],
+		Player2ID:     ids[1],
+		Player3ID:     ids[2],
+		Player4ID:     ids[3],
+		Player1IsBot:  botFlags[0],
+		Player2IsBot:  botFlags[1],
+		Player3IsBot:  botFlags[2],
+		Player4IsBot:  botFlags[3],
+		HasBots:       hasBots,
 		TeamAScore:    finalState.TeamScores[game.TeamA],
 		TeamBScore:    finalState.TeamScores[game.TeamB],
 		WinnerTeam:    winnerTeam,
@@ -971,7 +1071,7 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 
 	// Broadcast match_end → match_state AFTER persistence completes. Both fire
 	// regardless of persist outcome (clients must not be stranded on the table).
-	userIDs := session.playerIDs[:]
+	userIDs := humanUserIDs(session.playerIDs)
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchEnd, matchEndPayload))
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, finalState))
 
@@ -1140,6 +1240,8 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 	session.mu.Unlock()
 
 	m.bufferHandResultIfScored(session, oldState, newState)
+	// New hand dealt — sync the bot memory's hand boundary.
+	m.observeBotMemory(session, oldState, newState, game.Action{})
 
 	// An instant-win on the freshly dealt hand ends the match here.
 	if newState.Phase == game.PhaseMatchEnd {
@@ -1147,7 +1249,10 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 		m.handleMatchEnd(session, newState, nil, matchEndPayload)
 		return
 	}
-	m.hub.BroadcastToUsers(playerIDs[:], buildMessage(ws.EventMatchState, newState))
+	m.hub.BroadcastToUsers(humanUserIDs(playerIDs), buildMessage(ws.EventMatchState, newState))
+
+	// The freshly dealt hand's first bidder may be a bot.
+	m.maybeScheduleBotAction(session)
 }
 
 // handleTimerExpiry is called when a per-move timer fires. It auto-plays for the
@@ -1342,7 +1447,7 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	// further chained skip_belot is implementation detail (a single timer
 	// expiry should produce a single user-facing notification).
 	if autoType, ok := autoActionTypeFor(action.Type); ok {
-		m.hub.BroadcastToUsers(playerIDs[:], buildMessage(ws.EventAutoAction, ws.AutoActionPayload{
+		m.hub.BroadcastToUsers(humanUserIDs(playerIDs), buildMessage(ws.EventAutoAction, ws.AutoActionPayload{
 			PlayerSeat: expectedSeat,
 			Type:       autoType,
 		}))
@@ -1356,6 +1461,7 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		isAutoPlayedCard := step.action.Type == game.ActionPlayCard
 		m.broadcastActionResult(playerIDs, step.pre, step.post, step.action, isAutoPlayedCard)
 		m.bufferHandResultIfScored(session, step.pre, step.post)
+		m.observeBotMemory(session, step.pre, step.post, step.action)
 	}
 
 	// Check for match completion. Auto-play never produces a surrender (the
@@ -1370,7 +1476,11 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		matchEndOld := last.pre
 		matchEndPayload := buildMatchEndPayload(matchEndOld, finalState, matchEndAction, startedAt)
 		m.handleMatchEnd(session, finalState, nil, matchEndPayload)
+		return
 	}
+
+	// The post-auto-action state may put a bot on the clock.
+	m.maybeScheduleBotAction(session)
 }
 
 // autoActionTypeFor maps a rules-engine action type to the wire-format

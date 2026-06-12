@@ -24,13 +24,15 @@ import (
 type mockRoomRepo struct {
 	rooms          []*room.Room
 	players        []*room.RoomPlayer
+	bots           []*room.RoomBot
 	nextID         uint
 	nextPID        uint
+	nextBID        uint
 	ownerUsernames map[uint]string
 }
 
 func newMockRoomRepo() *mockRoomRepo {
-	return &mockRoomRepo{nextID: 1, nextPID: 1, ownerUsernames: map[uint]string{}}
+	return &mockRoomRepo{nextID: 1, nextPID: 1, nextBID: 1, ownerUsernames: map[uint]string{}}
 }
 
 func (m *mockRoomRepo) Create(r *room.Room) error {
@@ -256,6 +258,64 @@ func (m *mockRoomRepo) FindPlayersByRoomIDs(roomIDs []uint) (map[uint][]room.Roo
 	return out, nil
 }
 
+func (m *mockRoomRepo) AddBot(roomID uint, seat int) error {
+	for _, b := range m.bots {
+		if b.RoomID == roomID && b.Seat == seat {
+			return apperr.ErrSeatTaken
+		}
+	}
+	m.bots = append(m.bots, &room.RoomBot{ID: m.nextBID, RoomID: roomID, Seat: seat, CreatedAt: time.Now()})
+	m.nextBID++
+	return nil
+}
+
+func (m *mockRoomRepo) RemoveBot(roomID uint, seat int) error {
+	for i, b := range m.bots {
+		if b.RoomID == roomID && b.Seat == seat {
+			m.bots = append(m.bots[:i], m.bots[i+1:]...)
+			return nil
+		}
+	}
+	return apperr.ErrNoBotOnSeat
+}
+
+func (m *mockRoomRepo) UpdateBotSeat(roomID uint, fromSeat, toSeat int) error {
+	for _, b := range m.bots {
+		if b.RoomID == roomID && b.Seat == toSeat {
+			return apperr.ErrSeatTaken
+		}
+	}
+	for _, b := range m.bots {
+		if b.RoomID == roomID && b.Seat == fromSeat {
+			b.Seat = toSeat
+			return nil
+		}
+	}
+	return apperr.ErrNoBotOnSeat
+}
+
+func (m *mockRoomRepo) FindBotsByRoomID(roomID uint) ([]room.RoomBot, error) {
+	var result []room.RoomBot
+	for _, b := range m.bots {
+		if b.RoomID == roomID {
+			result = append(result, *b)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockRoomRepo) FindBotsByRoomIDs(roomIDs []uint) (map[uint][]room.RoomBot, error) {
+	out := make(map[uint][]room.RoomBot)
+	for _, id := range roomIDs {
+		for _, b := range m.bots {
+			if b.RoomID == id {
+				out[id] = append(out[id], *b)
+			}
+		}
+	}
+	return out, nil
+}
+
 func (m *mockRoomRepo) RunInTransaction(fn func(room.RoomRepository) error) error {
 	return fn(m)
 }
@@ -331,6 +391,8 @@ func setupTest() (*echo.Echo, *mockRoomRepo) {
 	api.POST("/rooms/:id/kick", handler.KickPlayer)
 	api.POST("/rooms/:id/swap-seats", handler.SwapSeats)
 	api.POST("/rooms/:id/transfer-ownership", handler.TransferOwnership)
+	api.POST("/rooms/:id/bots", handler.AddBot)
+	api.DELETE("/rooms/:id/bots/:seat", handler.RemoveBot)
 
 	return e, repo
 }
@@ -357,6 +419,8 @@ func setupTestWithBroadcast() (*echo.Echo, *mockRoomRepo, *mockBroadcaster) {
 	api.POST("/rooms/:id/kick", handler.KickPlayer)
 	api.POST("/rooms/:id/swap-seats", handler.SwapSeats)
 	api.POST("/rooms/:id/transfer-ownership", handler.TransferOwnership)
+	api.POST("/rooms/:id/bots", handler.AddBot)
+	api.DELETE("/rooms/:id/bots/:seat", handler.RemoveBot)
 
 	return e, repo, broadcaster
 }
@@ -2095,14 +2159,16 @@ func TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying(t *testing.T) {
 // --- Test fakes for Story 8.5-1 AC2 (gameStarter) ---
 
 type fakeMatchStarter struct {
-	called   int
-	lastRoom uint
-	err      error
+	called      int
+	lastRoom    uint
+	lastPlayers [4]match.PlayerSeatInfo
+	err         error
 }
 
-func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, _ [4]match.PlayerSeatInfo, _ string, _ int, _ uint, _ int) error {
+func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [4]match.PlayerSeatInfo, _ string, _ int, _ uint, _ int) error {
 	g.called++
 	g.lastRoom = roomID
+	g.lastPlayers = players
 	return g.err
 }
 
@@ -2121,6 +2187,9 @@ func setupTestWithStarter(starter room.MatchStarter, broadcaster room.Broadcaste
 	api.POST("/rooms/:id/seat", handler.SelectSeat)
 	api.POST("/rooms/:id/leave-seat", handler.LeaveSeat)
 	api.POST("/rooms/:id/start", handler.StartMatch)
+	api.POST("/rooms/:id/bots", handler.AddBot)
+	api.DELETE("/rooms/:id/bots/:seat", handler.RemoveBot)
+	api.POST("/rooms/:id/swap-seats", handler.SwapSeats)
 	return e, repo
 }
 

@@ -1,6 +1,7 @@
 import { Crown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { playerDisplayName } from "@/shared/lib/botName";
 import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState } from "@/shared/types/matchTypes";
 
@@ -49,7 +50,7 @@ export function PauseOverlay({
   // many there are, so we pick a plural key for 2+ (Slavic locales inflect the
   // verb — "паузираше" → "паузираа"; English reuses the same sentence).
   const pausedNames = pausedPlayers
-    .map((isPaused, seat) => (isPaused ? players[seat]?.username : null))
+    .map((isPaused, seat) => (isPaused ? playerDisplayName(t, players[seat]) : null))
     .filter(Boolean);
 
   return (
@@ -100,7 +101,7 @@ export function PauseOverlay({
                     className="font-display text-sm flex-1"
                     style={{ color: "var(--ink-light, #f5f2e8)" }}
                   >
-                    {player.username || `Player ${player.seat + 1}`}
+                    {playerDisplayName(t, player) ?? `Player ${player.seat + 1}`}
                   </span>
                   {isPaused ? (
                     <span

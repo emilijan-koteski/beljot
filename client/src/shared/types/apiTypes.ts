@@ -63,6 +63,9 @@ export interface RoomPlayer {
   username: string;
   seat: number | null;
   team: string | null;
+  // Synthetic bot entries arrive as {id:0, userId:0, username:"", isBot:true}.
+  // Always check with `isBot === true` — never infer from a falsy userId.
+  isBot: boolean;
   createdAt: string;
 }
 

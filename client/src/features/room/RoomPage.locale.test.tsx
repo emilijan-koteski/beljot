@@ -36,6 +36,8 @@ vi.mock("react-router", async () => {
 });
 
 vi.mock("@/shared/api/rooms", () => ({
+  addBot: vi.fn(),
+  removeBot: vi.fn(),
   getRoom: vi.fn(),
   leaveRoom: vi.fn(),
   selectSeat: vi.fn(),
@@ -76,10 +78,46 @@ function fourSeatedRoom() {
       updatedAt: "",
     },
     players: [
-      { id: 1, roomId: 1, userId: 100, username: "alice", seat: 0, team: "teamA", createdAt: "" },
-      { id: 2, roomId: 1, userId: 200, username: "bob", seat: 1, team: "teamB", createdAt: "" },
-      { id: 3, roomId: 1, userId: 300, username: "carol", seat: 2, team: "teamA", createdAt: "" },
-      { id: 4, roomId: 1, userId: 400, username: "dave", seat: 3, team: "teamB", createdAt: "" },
+      {
+        id: 1,
+        roomId: 1,
+        userId: 100,
+        username: "alice",
+        seat: 0,
+        team: "teamA",
+        isBot: false,
+        createdAt: "",
+      },
+      {
+        id: 2,
+        roomId: 1,
+        userId: 200,
+        username: "bob",
+        seat: 1,
+        team: "teamB",
+        isBot: false,
+        createdAt: "",
+      },
+      {
+        id: 3,
+        roomId: 1,
+        userId: 300,
+        username: "carol",
+        seat: 2,
+        team: "teamA",
+        isBot: false,
+        createdAt: "",
+      },
+      {
+        id: 4,
+        roomId: 1,
+        userId: 400,
+        username: "dave",
+        seat: 3,
+        team: "teamB",
+        isBot: false,
+        createdAt: "",
+      },
     ],
   };
 }

@@ -42,6 +42,18 @@ func (a *StaleRoomRepositoryAdapter) FindPlayersByRoomID(roomID uint) ([]match.S
 	return out, nil
 }
 
+func (a *StaleRoomRepositoryAdapter) FindBotSeatsByRoomID(roomID uint) ([]int, error) {
+	bots, err := a.Repo.FindBotsByRoomID(roomID)
+	if err != nil {
+		return nil, err
+	}
+	seats := make([]int, len(bots))
+	for i, b := range bots {
+		seats[i] = b.Seat
+	}
+	return seats, nil
+}
+
 func (a *StaleRoomRepositoryAdapter) UpdateStatus(roomID uint, status string) error {
 	return a.Repo.UpdateStatus(roomID, status)
 }

@@ -82,6 +82,8 @@ var (
 	ErrCannotTransferToSelf      = NewAppError("CANNOT_TRANSFER_TO_SELF", "ownership cannot be transferred to yourself", http.StatusBadRequest)
 	ErrCannotPromoteUnseated     = NewAppError("CANNOT_PROMOTE_UNSEATED", "the new owner must be seated", http.StatusConflict)
 	ErrMatchAlreadyStarted       = NewAppError("MATCH_ALREADY_STARTED", "the match has already started", http.StatusConflict)
+	ErrBotsNotAllowed            = NewAppError("BOTS_NOT_ALLOWED", "bots cannot be added to this room", http.StatusConflict)
+	ErrNoBotOnSeat               = NewAppError("NO_BOT_ON_SEAT", "no bot occupies this seat", http.StatusNotFound)
 
 	// Game domain errors
 	ErrWrongPhase              = NewAppError("WRONG_PHASE", "action not valid in current game phase", http.StatusBadRequest)

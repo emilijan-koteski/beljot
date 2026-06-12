@@ -50,6 +50,15 @@ func newMockMatchRepo() *mockMatchRepo {
 	return &mockMatchRepo{}
 }
 
+// seatID maps a nullable player ID to its comparison value (0 for bot/NULL
+// seats — never a real user ID).
+func seatID(p *uint) uint {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
 func (r *mockMatchRepo) Create(*match.Match) error { return nil }
 
 func (r *mockMatchRepo) CreateWithHands(*match.Match, []match.HandResult) error { return nil }
@@ -59,7 +68,7 @@ func (r *mockMatchRepo) GetMatchesForUser(userID uint, limit, offset int, outcom
 		return nil, 0, r.err
 	}
 	viewerWon := func(m match.Match) bool {
-		seats := [4]uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID}
+		seats := [4]uint{seatID(m.Player1ID), seatID(m.Player2ID), seatID(m.Player3ID), seatID(m.Player4ID)}
 		for i, id := range seats {
 			if id == userID {
 				return m.WinnerTeam == i%2
@@ -72,7 +81,7 @@ func (r *mockMatchRepo) GetMatchesForUser(userID uint, limit, offset int, outcom
 		if m.Status != "completed" && m.Status != "abandoned" {
 			continue
 		}
-		if m.Player1ID != userID && m.Player2ID != userID && m.Player3ID != userID && m.Player4ID != userID {
+		if seatID(m.Player1ID) != userID && seatID(m.Player2ID) != userID && seatID(m.Player3ID) != userID && seatID(m.Player4ID) != userID {
 			continue
 		}
 		// Viewer-relative outcome filter mirroring the production SQL.
@@ -161,7 +170,7 @@ func (r *mockMatchRepo) GetStatsForUser(userID uint) (int, int, int, error) {
 	}
 	var wins, losses, abandoned int
 	for _, m := range r.matches {
-		seats := [4]uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID}
+		seats := [4]uint{seatID(m.Player1ID), seatID(m.Player2ID), seatID(m.Player3ID), seatID(m.Player4ID)}
 		viewerSeat := -1
 		for i, id := range seats {
 			if id == userID {
@@ -494,13 +503,14 @@ func doListMatches(e *echo.Echo, userID, query, token string) *httptest.Response
 }
 
 func seedMatch(id uint, started, completed time.Time, seats [4]uint, status string, winnerTeam int, abandonedBy *uint, variant, mode string, a, b int, hands []match.HandResult) match.Match {
+	p1, p2, p3, p4 := seats[0], seats[1], seats[2], seats[3]
 	return match.Match{
 		ID:          id,
 		RoomID:      id,
-		Player1ID:   seats[0],
-		Player2ID:   seats[1],
-		Player3ID:   seats[2],
-		Player4ID:   seats[3],
+		Player1ID:   &p1,
+		Player2ID:   &p2,
+		Player3ID:   &p3,
+		Player4ID:   &p4,
 		TeamAScore:  a,
 		TeamBScore:  b,
 		WinnerTeam:  winnerTeam,
@@ -539,6 +549,66 @@ func TestListMatches_EmptyList(t *testing.T) {
 	assert.Equal(t, int64(0), resp.Total)
 	assert.Equal(t, 20, resp.Limit)
 	assert.Equal(t, 0, resp.Offset)
+}
+
+// TestListMatches_BotInclusiveMatchMarksBots pins the Story 10.3 history
+// contract: bot-inclusive rows carry hasBots, bot seats serialize as
+// {userId:0, username:"", isBot:true}, viewer-seat derivation skips NULL
+// player IDs, and bot seats never reach the users lookup.
+func TestListMatches_BotInclusiveMatchMarksBots(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("alice", "alice@example.com", "en")
+	mate := repo.addUser("bob", "bob@example.com", "en")
+
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	viewerID, mateID := viewer.ID, mate.ID
+	matchRepo.matches = []match.Match{{
+		ID:           1,
+		RoomID:       1,
+		Player1ID:    &viewerID,
+		Player3ID:    &mateID,
+		Player2IsBot: true,
+		Player4IsBot: true,
+		HasBots:      true,
+		TeamAScore:   1004,
+		TeamBScore:   730,
+		WinnerTeam:   0,
+		Variant:      "bitola",
+		MatchMode:    "501",
+		StartedAt:    now.Add(-30 * time.Minute),
+		CompletedAt:  now,
+		Status:       "completed",
+	}}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doListMatches(e, "1", "", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	resp := decodeMatchesResponse(t, rec.Body.Bytes())
+	require.Len(t, resp.Items, 1)
+	item := resp.Items[0]
+
+	assert.True(t, item.HasBots)
+	assert.Equal(t, 0, item.ViewerSeat)
+	assert.Equal(t, "win", item.Outcome)
+	require.Len(t, item.Players, 4)
+	for _, p := range item.Players {
+		switch p.Seat {
+		case 0:
+			assert.False(t, p.IsBot)
+			assert.Equal(t, viewer.ID, p.UserID)
+			assert.Equal(t, "alice", p.Username)
+		case 1, 3:
+			assert.True(t, p.IsBot, "seat %d is a bot", p.Seat)
+			assert.Equal(t, uint(0), p.UserID)
+			assert.Equal(t, "", p.Username)
+		case 2:
+			assert.False(t, p.IsBot)
+			assert.Equal(t, "bob", p.Username)
+		}
+	}
 }
 
 func TestListMatches_WinLossAbandonedOutcomes(t *testing.T) {

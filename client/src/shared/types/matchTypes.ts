@@ -76,6 +76,10 @@ export interface PlayerState {
   team: TeamString;
   declarations: Declaration[];
   connected: boolean;
+  // Bot seats carry userId 0 + empty username; display surfaces render the
+  // localized seat-derived bot name. Check with `isBot === true`, never
+  // truthiness on userId/username.
+  isBot: boolean;
 }
 
 export interface HandResult {

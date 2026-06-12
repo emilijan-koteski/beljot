@@ -25,6 +25,7 @@ function player(seat: number, cards: Card[]): PlayerState {
     team: seat % 2 === 0 ? "teamA" : "teamB",
     declarations: [],
     connected: true,
+    isBot: false,
   };
 }
 

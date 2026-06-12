@@ -81,7 +81,7 @@ FR55: Quick Play stakes default to 500 coins; if a player's balance is below 500
 FR56: The system computes and displays a public honor score (0–100) based on match-completion behavior — `honor = 100 × completed / (completed + 2.0·rage_quits + 1.5·timeout_abandons + 0.3·dc_abandons)` — with a "New Player" label for players with fewer than 20 completed matches regardless of score
 FR57: Room owners can optionally require a minimum honor score (0–100) and toggle `allow_new_players` for room access; players failing the check receive `error:honor_too_low` or `error:new_player_not_allowed`
 FR58: Room owners can kick seated players and swap seat assignments while the room is in `waiting` status; controls are disabled once the game starts and rejected for non-owners
-FR59: Room owners can seat server-controlled bot players on empty seats while the room is in `waiting` status (1, 2, or 3 bots — any combination of free seats) and remove them before game start. Bots play autonomously server-side with competent heuristic strategy and humanized response timing (never instantaneous). Matches that include at least one bot are flagged as bot-inclusive in persistence and visibly marked in match previews/history. Bots never replace disconnected human players — the reconnect/abandon flow is unchanged
+FR59: Room owners can seat server-controlled bot players on empty seats while the room is in `waiting` status (1, 2, or 3 bots — any combination of free seats), swap them with seated players or move them between seats, and remove them before game start. Bots play autonomously server-side with competent heuristic strategy and humanized response timing (never instantaneous). Matches that include at least one bot are flagged as bot-inclusive in persistence and visibly marked in match previews/history. Bots never replace disconnected human players — the reconnect/abandon flow is unchanged
 
 ### NonFunctional Requirements
 
@@ -2047,7 +2047,8 @@ So that a match can start and be played even when fewer than four humans are ava
 **Then** the bot occupies that seat with a distinct, localized bot identity (name + bot badge) visible to everyone in the room lobby
 **And** the owner can seat 1, 2, or 3 bots — any combination of the free seats
 **And** the owner can remove a seated bot while the room is still in `waiting` status
-**And** add/remove bot actions from non-owners are rejected server-side
+**And** the owner can swap seats between any two occupants — human ↔ bot included — or move a bot to an empty seat, while the room is still in `waiting` status
+**And** add/remove/swap bot actions from non-owners are rejected server-side
 **And** bot seating is available in both 1001 and 501 match modes
 
 **Given** all four seats are filled by any mix of humans and bots

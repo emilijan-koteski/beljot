@@ -25,6 +25,8 @@ vi.mock("react-router", async () => {
 });
 
 vi.mock("@/shared/api/rooms", () => ({
+  addBot: vi.fn(),
+  removeBot: vi.fn(),
   createRoom: vi.fn(),
   getRooms: (...args: unknown[]) => mockGetRooms(...args),
   joinRoom: (...args: unknown[]) => mockJoinRoom(...args),

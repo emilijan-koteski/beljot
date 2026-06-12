@@ -23,7 +23,16 @@ const baseRoom: Room = {
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   players: [
-    { id: 1, roomId: 1, userId: 1, username: "host", seat: 0, team: "teamA", createdAt: "" },
+    {
+      id: 1,
+      roomId: 1,
+      userId: 1,
+      username: "host",
+      seat: 0,
+      team: "teamA",
+      isBot: false,
+      createdAt: "",
+    },
   ],
 };
 
@@ -40,6 +49,31 @@ describe("RoomCard", () => {
     render(<RoomCard room={{ ...baseRoom, matchMode: "501" }} onJoin={() => {}} />);
 
     expect(screen.getByText(/501 поен/)).toBeInTheDocument();
+  });
+
+  it("renders the localized bot name for bot seats in mk locale", async () => {
+    // mk renders "Бот 2" — all-Cyrillic, seat-derived — never a blank chip
+    // from the bot's empty wire username.
+    await i18n.changeLanguage("mk");
+
+    const players = [
+      ...(baseRoom.players ?? []),
+      {
+        id: 0,
+        roomId: 1,
+        userId: 0,
+        username: "",
+        seat: 1,
+        team: "teamB",
+        isBot: true,
+        createdAt: "",
+      },
+    ];
+    render(<RoomCard room={{ ...baseRoom, players }} onJoin={() => {}} />);
+
+    expect(screen.getByTestId("room-1-seat-1")).toHaveTextContent("Бот 2");
+    // The chip disc shows the bot glyph, not a name initial.
+    expect(screen.getByTestId("seat-chip-bot-icon")).toBeInTheDocument();
   });
 
   it("labels a quick-play room with the Quick Play badge and a 'Join queue' action", () => {

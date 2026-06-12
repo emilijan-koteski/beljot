@@ -1,5 +1,7 @@
+import { Bot } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { botDisplayName } from "@/shared/lib/botName";
 import { MOTION } from "@/shared/lib/motion";
 import type { PlayerState, Suit } from "@/shared/types/matchTypes";
 
@@ -259,7 +261,9 @@ export function PlayerSeat({
     );
   }
 
-  const isDisconnected = player.connected === false;
+  // Bots keep Connected=true server-side forever, so they can never render
+  // the connection-lost treatment; the explicit guard documents the contract.
+  const isDisconnected = player.connected === false && player.isBot !== true;
   // On phones every seat stacks vertically (avatar on top); only desktop keeps
   // the horizontal left/right edge layout.
   const isHorizontal = !compact && (orientation === "left" || orientation === "right");
@@ -271,7 +275,12 @@ export function PlayerSeat({
     : "column";
 
   const statusLabel = isDisconnected ? "disconnected" : isActive ? "active" : "waiting";
-  const displayName = isSelf ? t("match.seat.you") : player.username || `P${player.seat + 1}`;
+  const displayName = isSelf
+    ? t("match.seat.you")
+    : player.isBot === true
+      ? botDisplayName(t, player.seat)
+      : player.username || `P${player.seat + 1}`;
+  // Humans only — bot discs render the Bot glyph below, never an initial.
   const initial = (player.username || "?").charAt(0).toUpperCase();
 
   const showRing =
@@ -360,7 +369,19 @@ export function PlayerSeat({
             }}
             data-testid="player-seat-avatar"
           >
-            {initial}
+            {/* Bot seats show the bot glyph instead of a name initial,
+                mirroring the room-lobby avatars. The 5% upward shift is
+                optical — the glyph's visual mass sits low in its viewBox. */}
+            {player.isBot === true ? (
+              <Bot
+                size={discPx * 0.5}
+                aria-hidden="true"
+                data-testid="avatar-icon"
+                style={{ transform: "translateY(-5%)" }}
+              />
+            ) : (
+              initial
+            )}
           </div>
         </div>
         {/* Countdown ring overlay (lime → urgent red ≤1/8). The numeric label

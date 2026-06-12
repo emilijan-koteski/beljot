@@ -85,6 +85,7 @@ export function handleWsMessage(event: MessageEvent): void {
               username: payload.username,
               seat: null,
               team: null,
+              isBot: false,
               createdAt: new Date().toISOString(),
             };
             const players = r.players ?? [];

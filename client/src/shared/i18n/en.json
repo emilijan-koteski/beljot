@@ -131,7 +131,8 @@
           "failedUs": "failed · us",
           "failedThem": "failed · them"
         }
-      }
+      },
+      "withBots": "With bots"
     },
     "partners": {
       "eyebrow": "Spotlight",
@@ -224,7 +225,10 @@
       "leaveSeatOwner": "The host can't leave their seat — leave the room instead.",
       "transferFailed": "Failed to transfer the host role — try again",
       "promoteUnseated": "The new host must be seated.",
-      "promoteNotInRoom": "That player is no longer in the room."
+      "promoteNotInRoom": "That player is no longer in the room.",
+      "addBotFailed": "Failed to add the bot — try again",
+      "removeBotFailed": "Failed to remove the bot — try again",
+      "botsNotAllowed": "Bots can't be added to this room"
     },
     "waitingForPlayers": "Waiting for players",
     "copyLinkAriaLabel": "Copy room code {{code}}",
@@ -259,6 +263,14 @@
       "title": "Kick <name>{{name}}</name> from the room?",
       "lede": "This is a kick, not a permanent ban — <strong>{{name}}</strong> can rejoin any time.",
       "confirm": "Kick",
+      "cancel": "Cancel"
+    },
+    "addBot": "Add a bot",
+    "removeBotIconLabel": "Remove {{name}}",
+    "removeBotConfirm": {
+      "title": "Remove <name>{{name}}</name> from the table?",
+      "lede": "The seat opens up right away — seat another bot or leave it for a player.",
+      "confirm": "Remove",
       "cancel": "Cancel"
     },
     "kickedToast": "You were removed from room {{name}}",
@@ -846,5 +858,9 @@
       "linkedin": "LinkedIn",
       "disclaimer": "This is a beta build for testing purposes — not a finished production product."
     }
+  },
+  "bots": {
+    "seatName": "Bot {{n}}",
+    "badge": "Bot"
   }
 }

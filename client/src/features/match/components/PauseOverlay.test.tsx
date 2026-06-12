@@ -31,6 +31,7 @@ const mockPlayers = [
     team: "teamA",
     declarations: [],
     connected: true,
+    isBot: false,
   },
   {
     hand: [],
@@ -40,6 +41,7 @@ const mockPlayers = [
     team: "teamB",
     declarations: [],
     connected: true,
+    isBot: false,
   },
   {
     hand: [],
@@ -49,6 +51,7 @@ const mockPlayers = [
     team: "teamA",
     declarations: [],
     connected: true,
+    isBot: false,
   },
   {
     hand: [],
@@ -58,6 +61,7 @@ const mockPlayers = [
     team: "teamB",
     declarations: [],
     connected: true,
+    isBot: false,
   },
 ] as PauseOverlayProps["players"];
 

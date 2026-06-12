@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/shared/api/queryKeys";
 import {
+  addBot,
   createRoom,
   getRoomByCode,
   joinRoom,
@@ -10,6 +11,7 @@ import {
   leaveSeat,
   quickJoin,
   quickPlay,
+  removeBot,
   selectSeat,
   startMatch,
   swapSeats,
@@ -96,6 +98,18 @@ export function useQuickJoinMutation() {
 export function useKickPlayerMutation() {
   return useMutation<{ playerCount: number }, Error, { roomId: number; userId: number }>({
     mutationFn: ({ roomId, userId }) => kickPlayer(roomId, userId),
+  });
+}
+
+export function useAddBotMutation() {
+  return useMutation<{ players: RoomPlayer[] }, Error, { roomId: number; seat: number }>({
+    mutationFn: ({ roomId, seat }) => addBot(roomId, seat),
+  });
+}
+
+export function useRemoveBotMutation() {
+  return useMutation<{ players: RoomPlayer[] }, Error, { roomId: number; seat: number }>({
+    mutationFn: ({ roomId, seat }) => removeBot(roomId, seat),
   });
 }
 

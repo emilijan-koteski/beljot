@@ -221,6 +221,13 @@ type RoomKickedPayload struct {
 const SystemSeatUpdated = "system:seat_updated"
 const SystemMatchStarted = "system:match_started"
 
+// --- Bot seating events (Story 10.3) ---
+// Payloads: bot_added {roomId, seat, team}; bot_removed {roomId, seat}.
+// Bot identity is seat-derived and rendered client-side, so no name rides
+// the wire.
+const SystemBotAdded = "system:bot_added"
+const SystemBotRemoved = "system:bot_removed"
+
 // --- Chat events ---
 const ActionChatMessage = "action:chat_message"
 const SystemChatMessage = "system:chat_message"

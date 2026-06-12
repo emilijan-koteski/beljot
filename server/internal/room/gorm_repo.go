@@ -26,7 +26,18 @@ type roomPlayerRow struct {
 }
 
 func (r roomPlayerRow) toRoomPlayer() RoomPlayer {
-	return RoomPlayer(r)
+	// Field-by-field (not a struct conversion): RoomPlayer carries the
+	// transient IsBot flag, which has no column. Rows scanned from
+	// room_players are always humans — IsBot stays false.
+	return RoomPlayer{
+		ID:        r.ID,
+		RoomID:    r.RoomID,
+		UserID:    r.UserID,
+		Username:  r.Username,
+		Seat:      r.Seat,
+		Team:      r.Team,
+		CreatedAt: r.CreatedAt,
+	}
 }
 
 type GormRepository struct {
@@ -310,6 +321,76 @@ func (r *GormRepository) FindPlayersByRoomIDs(roomIDs []uint) (map[uint][]RoomPl
 	}
 	for _, row := range rows {
 		out[row.RoomID] = append(out[row.RoomID], row.toRoomPlayer())
+	}
+	return out, nil
+}
+
+func (r *GormRepository) AddBot(roomID uint, seat int) error {
+	bot := &RoomBot{RoomID: roomID, Seat: seat}
+	if err := r.db.Create(bot).Error; err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" &&
+			strings.Contains(pgErr.ConstraintName, "idx_room_bots_room_seat") {
+			return apperr.ErrSeatTaken
+		}
+		return fmt.Errorf("adding bot to room %d seat %d: %w", roomID, seat, err)
+	}
+	return nil
+}
+
+func (r *GormRepository) RemoveBot(roomID uint, seat int) error {
+	result := r.db.Where("room_id = ? AND seat = ?", roomID, seat).Delete(&RoomBot{})
+	if result.Error != nil {
+		return fmt.Errorf("removing bot from room %d seat %d: %w", roomID, seat, result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return apperr.ErrNoBotOnSeat
+	}
+	return nil
+}
+
+func (r *GormRepository) UpdateBotSeat(roomID uint, fromSeat, toSeat int) error {
+	result := r.db.Model(&RoomBot{}).
+		Where("room_id = ? AND seat = ?", roomID, fromSeat).
+		Update("seat", toSeat)
+	if result.Error != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(result.Error, &pgErr) && pgErr.Code == "23505" &&
+			strings.Contains(pgErr.ConstraintName, "idx_room_bots_room_seat") {
+			return apperr.ErrSeatTaken
+		}
+		return fmt.Errorf("moving bot in room %d from seat %d to %d: %w", roomID, fromSeat, toSeat, result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return apperr.ErrNoBotOnSeat
+	}
+	return nil
+}
+
+func (r *GormRepository) FindBotsByRoomID(roomID uint) ([]RoomBot, error) {
+	var bots []RoomBot
+	if err := r.db.Where("room_id = ?", roomID).Order("seat ASC").Find(&bots).Error; err != nil {
+		return nil, fmt.Errorf("finding bots for room %d: %w", roomID, err)
+	}
+	return bots, nil
+}
+
+// FindBotsByRoomIDs returns bots for every supplied room id in a single query.
+// Empty input → empty map. Rooms with no bots are missing from the map.
+func (r *GormRepository) FindBotsByRoomIDs(roomIDs []uint) (map[uint][]RoomBot, error) {
+	out := make(map[uint][]RoomBot)
+	if len(roomIDs) == 0 {
+		return out, nil
+	}
+	var bots []RoomBot
+	err := r.db.Where("room_id IN ?", roomIDs).
+		Order("room_id ASC, seat ASC").
+		Find(&bots).Error
+	if err != nil {
+		return nil, fmt.Errorf("finding bots for %d rooms: %w", len(roomIDs), err)
+	}
+	for _, b := range bots {
+		out[b.RoomID] = append(out[b.RoomID], b)
 	}
 	return out, nil
 }
