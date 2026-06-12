@@ -56,6 +56,7 @@ const mockMatchState: MatchState = {
       team: "teamA",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [{ rank: "7", suit: "H" }],
@@ -65,6 +66,7 @@ const mockMatchState: MatchState = {
       team: "teamB",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [{ rank: "A", suit: "D" }],
@@ -74,6 +76,7 @@ const mockMatchState: MatchState = {
       team: "teamA",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [{ rank: "9", suit: "C" }],
@@ -83,6 +86,7 @@ const mockMatchState: MatchState = {
       team: "teamB",
       declarations: [],
       connected: true,
+      isBot: false,
     },
   ],
   teamScores: [0, 0],

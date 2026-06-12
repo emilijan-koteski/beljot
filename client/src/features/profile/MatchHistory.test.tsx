@@ -57,6 +57,7 @@ function makeHand(overrides: Partial<MatchHandView> = {}): MatchHandView {
 function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   return {
     id: 1,
+    hasBots: false,
     variant: "bitola",
     matchMode: "1001",
     startedAt: "2026-04-10T12:00:00Z",
@@ -69,10 +70,10 @@ function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
     viewerSeat: 0,
     outcome: "win",
     players: [
-      { seat: 0, userId: 10, username: "viewer" },
-      { seat: 1, userId: 11, username: "opp1" },
-      { seat: 2, userId: 12, username: "mate" },
-      { seat: 3, userId: 13, username: "opp2" },
+      { seat: 0, userId: 10, username: "viewer", isBot: false },
+      { seat: 1, userId: 11, username: "opp1", isBot: false },
+      { seat: 2, userId: 12, username: "mate", isBot: false },
+      { seat: 3, userId: 13, username: "opp2", isBot: false },
     ],
     hands: [
       makeHand({ handNumber: 1 }),
@@ -142,6 +143,40 @@ describe("MatchHistory", () => {
         sort: "old",
       });
     });
+  });
+
+  it("shows the bots marker and localized bot names on bot-inclusive rows", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(
+      makeResponse(
+        [
+          makeMatch({
+            hasBots: true,
+            players: [
+              { seat: 0, userId: 10, username: "viewer", isBot: false },
+              { seat: 1, userId: 0, username: "", isBot: true },
+              { seat: 2, userId: 12, username: "mate", isBot: false },
+              { seat: 3, userId: 0, username: "", isBot: true },
+            ],
+          }),
+        ],
+        1,
+      ),
+    );
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    expect(within(row).getByTestId("match-history-bots-marker")).toBeInTheDocument();
+    // Opponent seats 1 and 3 are bots — seat-derived localized names, with
+    // the bot glyph (not a name initial) in the chip avatars.
+    expect(within(row).getByText("Bot 2")).toBeInTheDocument();
+    expect(within(row).getByText("Bot 4")).toBeInTheDocument();
+    expect(within(row).getAllByTestId("avatar-icon")).toHaveLength(2);
+  });
+
+  it("hides the bots marker on human-only rows", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    expect(within(row).queryByTestId("match-history-bots-marker")).not.toBeInTheDocument();
   });
 
   it("renders rows with teammate, opponents, outcome and viewer-first score", async () => {

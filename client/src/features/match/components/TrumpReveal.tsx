@@ -1,8 +1,10 @@
+import { Bot } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
+import { playerDisplayName } from "@/shared/lib/botName";
 import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 
@@ -134,6 +136,7 @@ export function TrumpReveal({
   }
 
   const picker = players.find((p) => p.seat === playerSeat);
+  const pickerName = playerDisplayName(t, picker ?? null);
   const card = parseCardId(cardId);
 
   // Free-pick (round 2) is detected purely from the wire fields: when the
@@ -262,10 +265,15 @@ export function TrumpReveal({
           data-testid="trump-reveal-taker"
           data-seat={playerSeat}
         >
-          {picker?.username ? (
+          {pickerName !== null && picker ? (
             <>
-              <Avatar name={picker.username} team={avatarTeam} size={24} />
-              <span>{picker.username}</span>
+              <Avatar
+                name={pickerName}
+                team={avatarTeam}
+                size={24}
+                icon={picker.isBot === true ? <Bot aria-hidden="true" /> : undefined}
+              />
+              <span>{pickerName}</span>
             </>
           ) : (
             <span>{t("match.trumpReveal.unknownPlayer", { defaultValue: "Trump taken" })}</span>

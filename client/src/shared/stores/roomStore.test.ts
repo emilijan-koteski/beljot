@@ -22,6 +22,7 @@ describe("roomStore", () => {
       username: "Alice",
       seat: null,
       team: null,
+      isBot: false,
       createdAt: "2026-04-12T00:00:00Z",
     };
     useRoomStore.getState().addPlayer(player, 2);
@@ -56,6 +57,7 @@ describe("roomStore", () => {
       username: "Alice",
       seat: null,
       team: null,
+      isBot: false,
       createdAt: "2026-04-12T00:00:00Z",
     };
     useRoomStore.getState().addPlayer(player, 2);
@@ -71,6 +73,7 @@ describe("roomStore", () => {
       username: "Alice",
       seat: null,
       team: null,
+      isBot: false,
       createdAt: "2026-04-12T00:00:00Z",
     };
     useRoomStore.getState().addPlayer(player, 1);
@@ -87,6 +90,7 @@ describe("roomStore", () => {
       username: "Alice",
       seat: null,
       team: null,
+      isBot: false,
       createdAt: "2026-04-12T00:00:00Z",
     };
     useRoomStore.getState().addPlayer(player, 1);
@@ -126,6 +130,7 @@ describe("roomStore", () => {
       username: "Alice",
       seat: null,
       team: null,
+      isBot: false,
       createdAt: "2026-04-12T00:00:00Z",
     };
     useRoomStore.getState().addPlayer(player, 1);
@@ -135,6 +140,118 @@ describe("roomStore", () => {
     const updated = useRoomStore.getState().players[0]!;
     expect(updated.seat).toBe(2);
     expect(updated.team).toBe("teamA");
+  });
+
+  it("addBot inserts a synthetic seat-keyed bot entry and skips duplicates", () => {
+    const store = useRoomStore.getState();
+    store.addBot(10, 1, "teamB");
+    store.addBot(10, 3, "teamB");
+    // Duplicate seat is a no-op (e.g. REST response raced the WS event).
+    store.addBot(10, 1, "teamB");
+
+    const players = useRoomStore.getState().players;
+    expect(players).toHaveLength(2);
+    expect(players[0]).toMatchObject({
+      userId: 0,
+      username: "",
+      seat: 1,
+      team: "teamB",
+      isBot: true,
+    });
+    expect(players[1]).toMatchObject({ seat: 3, isBot: true });
+  });
+
+  it("removeBotBySeat removes only the bot at that seat, never humans or other bots", () => {
+    const store = useRoomStore.getState();
+    store.addPlayer(
+      {
+        id: 1,
+        roomId: 10,
+        userId: 42,
+        username: "Alice",
+        seat: 2,
+        team: "teamA",
+        isBot: false,
+        createdAt: "",
+      },
+      1,
+    );
+    store.addBot(10, 1, "teamB");
+    store.addBot(10, 3, "teamB");
+
+    useRoomStore.getState().removeBotBySeat(1);
+
+    const players = useRoomStore.getState().players;
+    expect(players).toHaveLength(2);
+    expect(players.some((p) => p.isBot === true && p.seat === 1)).toBe(false);
+    expect(players.some((p) => p.isBot === true && p.seat === 3)).toBe(true);
+    expect(players.some((p) => p.userId === 42)).toBe(true);
+  });
+
+  it("applies the human↔bot swap event sequence (seat_updated, bot_removed, bot_added)", () => {
+    // Server order for an owner swapping bob (seat 2) with a bot (seat 1):
+    // system:seat_updated moves the human first, then system:bot_removed
+    // clears the bot's old seat and system:bot_added lands it on the
+    // human's vacated one.
+    const store = useRoomStore.getState();
+    store.addPlayer(
+      {
+        id: 1,
+        roomId: 10,
+        userId: 42,
+        username: "Bob",
+        seat: 2,
+        team: "teamA",
+        isBot: false,
+        createdAt: "",
+      },
+      1,
+    );
+    store.addBot(10, 1, "teamB");
+
+    useRoomStore.getState().updatePlayerSeat(42, 1, "teamB", 2);
+    useRoomStore.getState().removeBotBySeat(1);
+    useRoomStore.getState().addBot(10, 2, "teamA");
+
+    const players = useRoomStore.getState().players;
+    expect(players).toHaveLength(2);
+    expect(players.find((p) => p.userId === 42)).toMatchObject({ seat: 1, team: "teamB" });
+    expect(players.find((p) => p.isBot === true)).toMatchObject({ seat: 2, team: "teamA" });
+  });
+
+  it("addBot is a no-op while ANY occupant still holds the seat (stale event guard)", () => {
+    const store = useRoomStore.getState();
+    store.addPlayer(
+      {
+        id: 1,
+        roomId: 10,
+        userId: 42,
+        username: "Bob",
+        seat: 2,
+        team: "teamA",
+        isBot: false,
+        createdAt: "",
+      },
+      1,
+    );
+
+    // A bot_added for a seat a human still occupies is stale/out-of-order —
+    // inserting would dual-occupy the seat in the store.
+    useRoomStore.getState().addBot(10, 2, "teamA");
+
+    const players = useRoomStore.getState().players;
+    expect(players).toHaveLength(1);
+    expect(players[0]!.isBot).toBe(false);
+  });
+
+  it("updatePlayerSeat never matches bot rows (all bots share userId 0)", () => {
+    const store = useRoomStore.getState();
+    store.addBot(10, 1, "teamB");
+    // A (hypothetical) seat update for userId 0 must not drag the bot along.
+    useRoomStore.getState().updatePlayerSeat(0, 2, "teamA", 1);
+
+    const players = useRoomStore.getState().players;
+    expect(players[0]).toMatchObject({ seat: 1, team: "teamB", isBot: true });
   });
 
   it("setMatchStarted sets the matchStarted flag", () => {
@@ -152,6 +269,7 @@ describe("roomStore", () => {
         username: "Alice",
         seat: null,
         team: null,
+        isBot: false,
         createdAt: "2026-04-12T00:00:00Z",
       },
       1,

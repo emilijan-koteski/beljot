@@ -1,8 +1,9 @@
-import { Crown, Shuffle, UserX } from "lucide-react";
+import { Bot, Crown, Shuffle, UserX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
+import { botDisplayName } from "@/shared/lib/botName";
 import { cn } from "@/shared/lib/utils";
 import type { RoomPlayer } from "@/shared/types/apiTypes";
 
@@ -32,6 +33,10 @@ type SeatTileProps = {
   onSelect: () => void;
   onKick?: () => void;
   onPromote?: () => void;
+  /** Owner-only: seat a bot on this EMPTY seat (custom waiting rooms only). */
+  onAddBot?: () => void;
+  /** Owner-only: open the remove-bot confirmation for this bot seat. */
+  onRemoveBot?: () => void;
 };
 
 /**
@@ -60,13 +65,21 @@ export function SeatTile({
   onSelect,
   onKick,
   onPromote,
+  onAddBot,
+  onRemoveBot,
 }: SeatTileProps) {
   const { t } = useTranslation();
   const filled = Boolean(player);
+  const isBot = player?.isBot === true;
+  // Bot identity is seat-derived and rendered client-side — an empty wire
+  // username must never leak through as a blank.
+  const displayName = isBot ? botDisplayName(t, seatIndex) : (player?.username ?? "");
   // In swap mode the kick/promote overlay steps aside — every other filled
   // seat instead reads as a swap candidate (Shuffle hint on hover), since a
   // click there fires the swap rather than opening owner controls.
   const showOwnerControls = ownerCanActOnRow && filled && !isYou && !swapMode;
+  const showRemoveBot = Boolean(onRemoveBot) && isBot && !swapMode;
+  const showAddBot = Boolean(onAddBot) && !filled && !swapMode;
   const showSwapHint = swapMode && filled && !isSwapSource && !isYou;
 
   // Inline styles for the parchment tokens — Tailwind arbitrary values would
@@ -111,18 +124,30 @@ export function SeatTile({
         {filled && player ? (
           <>
             <Avatar
-              name={player.username}
+              name={displayName}
               size={46}
               team={mode === "us" ? "A" : mode === "them" ? "B" : null}
               you={isYou}
               owner={isHost}
+              icon={isBot ? <Bot aria-hidden="true" /> : undefined}
             />
             <div className="flex flex-col items-center gap-1">
-              <span className="font-display text-ink inline-flex items-center gap-1 text-[14.5px] font-semibold tracking-[-0.2px]">
+              <span
+                className="font-display text-ink inline-flex items-center gap-1 text-[14.5px] font-semibold tracking-[-0.2px]"
+                data-testid={isBot ? `bot-name-${seatIndex}` : undefined}
+              >
                 {isHost && <Crown className="text-brass-deep size-3.25" aria-hidden="true" />}
-                {player.username}
+                {displayName}
               </span>
               <div className="flex flex-wrap items-center justify-center gap-1">
+                {/* Bots never show You/Host badges — the bot marker takes their place. */}
+                {isBot && (
+                  <span data-testid={`bot-badge-${seatIndex}`}>
+                    <Badge tone="neutral" icon={<Bot className="size-2.5" aria-hidden="true" />}>
+                      {t("bots.badge")}
+                    </Badge>
+                  </span>
+                )}
                 {isYou && <Badge tone="accent">{t("room.seatYou")}</Badge>}
                 {isHost && !isYou && <Badge tone="brass">{t("room.seatOwner")}</Badge>}
                 {isSwapSource && (
@@ -133,7 +158,7 @@ export function SeatTile({
                     {t("room.seatTile.pickTarget")}
                   </Badge>
                 )}
-                {!isYou && !isHost && !isSwapSource && mode !== "neutral" && (
+                {!isYou && !isHost && !isBot && !isSwapSource && mode !== "neutral" && (
                   <Badge tone={mode === "us" ? "teamA" : "teamB"}>
                     {mode === "us" ? t("room.seatTile.partner") : t("room.seatTile.opponent")}
                   </Badge>
@@ -167,6 +192,47 @@ export function SeatTile({
           </>
         )}
       </button>
+
+      {/* Owner-only "add a bot" affordance on empty seats — sits beside the
+          regular "take this seat" click target so both remain reachable. */}
+      {showAddBot && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddBot?.();
+          }}
+          disabled={isPending}
+          aria-label={t("room.addBot")}
+          title={t("room.addBot")}
+          data-testid={`add-bot-seat-${seatIndex}`}
+          className="bg-surface-elevated border-border text-ink-dim hover:border-brass hover:text-brass-deep absolute top-2 right-2 z-10 inline-flex size-6.5 items-center justify-center rounded-md border disabled:opacity-40"
+        >
+          {/* Nudged up 5%: the lucide Bot glyph's visual mass (the robot
+              head) sits low in its viewBox, so true geometric centering
+              reads as off-center. Same rule as the avatar bot glyphs. */}
+          <Bot className="size-3.5 -translate-y-[5%]" />
+        </button>
+      )}
+
+      {/* Owner-only remove control on bot seats (confirm dialog, kick pattern). */}
+      {showRemoveBot && (
+        <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveBot?.();
+            }}
+            aria-label={t("room.removeBotIconLabel", { name: displayName })}
+            title={t("room.removeBotIconLabel", { name: displayName })}
+            data-testid={`remove-bot-${seatIndex}`}
+            className="bg-surface-elevated text-destructive border-destructive/30 hover:border-destructive/60 inline-flex size-6.5 items-center justify-center rounded-md border disabled:opacity-40"
+          >
+            <UserX className="size-3.25" />
+          </button>
+        </div>
+      )}
 
       {showOwnerControls && player && (
         <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">

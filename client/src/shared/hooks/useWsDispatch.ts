@@ -11,6 +11,8 @@ import type { MatchState } from "@/shared/types/matchTypes";
 import type {
   AutoActionPayload,
   BelotAnnouncedPayload,
+  BotAddedPayload,
+  BotRemovedPayload,
   CardPlayedPayload,
   ChatMessagePayload,
   DeclarationsResolvedPayload,
@@ -65,6 +67,8 @@ import {
   EVENT_TRICK_RESOLVED,
   EVENT_TRUMP_SELECTED,
   SYSTEM_AUTHENTICATED,
+  SYSTEM_BOT_ADDED,
+  SYSTEM_BOT_REMOVED,
   SYSTEM_CHAT_MESSAGE,
   SYSTEM_EMOTE,
   SYSTEM_MATCH_STARTED,
@@ -437,6 +441,7 @@ function dispatchSystemEvent(message: WsMessage): void {
         username: payload.username,
         seat: null,
         team: null,
+        isBot: false,
         createdAt: new Date().toISOString(),
       },
       payload.playerCount,
@@ -457,6 +462,45 @@ function dispatchSystemEvent(message: WsMessage): void {
     const store = useRoomStore.getState();
     if (store.currentRoomId !== null && store.currentRoomId !== payload.roomId) return;
     store.updatePlayerSeat(payload.userId, payload.seat, payload.team, payload.previousSeat);
+    return;
+  }
+
+  // Bot seating (Story 10.3). Room-lobby events are not zod-validated (see
+  // wsEvents.schemas.ts coverage note) — guard the fields defensively so
+  // protocol drift can't inject bogus seats into the store. `typeof x ===
+  // "number"` alone admits NaN, fractions, and out-of-range values; a seat
+  // that isn't an integer 0–3 could insert a phantom player no tile renders
+  // and no removal ever matches.
+  if (type === SYSTEM_BOT_ADDED) {
+    const payload = message.payload as BotAddedPayload;
+    if (
+      typeof payload?.roomId !== "number" ||
+      !Number.isInteger(payload?.seat) ||
+      payload.seat < 0 ||
+      payload.seat > 3 ||
+      typeof payload?.team !== "string"
+    ) {
+      return;
+    }
+    const store = useRoomStore.getState();
+    if (store.currentRoomId !== null && store.currentRoomId !== payload.roomId) return;
+    store.addBot(payload.roomId, payload.seat, payload.team);
+    return;
+  }
+
+  if (type === SYSTEM_BOT_REMOVED) {
+    const payload = message.payload as BotRemovedPayload;
+    if (
+      typeof payload?.roomId !== "number" ||
+      !Number.isInteger(payload?.seat) ||
+      payload.seat < 0 ||
+      payload.seat > 3
+    ) {
+      return;
+    }
+    const store = useRoomStore.getState();
+    if (store.currentRoomId !== null && store.currentRoomId !== payload.roomId) return;
+    store.removeBotBySeat(payload.seat);
     return;
   }
 

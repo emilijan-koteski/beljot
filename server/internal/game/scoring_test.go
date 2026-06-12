@@ -754,7 +754,7 @@ func TestInstantWin_FirstHand(t *testing.T) {
 	// always returns PhaseDealing (auto-promoted to PhaseBidding by the
 	// session manager) and never sets WinnerTeam.
 	for range 50 {
-		gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"p1", "p2", "p3", "p4"}, game.VariantBitola, "1001", 1)
+		gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"p1", "p2", "p3", "p4"}, [4]bool{}, game.VariantBitola, "1001", 1)
 		assert.Equal(t, game.PhaseDealing, gs.Phase, "NewGame returns PhaseDealing post stage-1")
 		assert.Nil(t, gs.WinnerTeam, "instant-win is deferred to stage-2 (post-pick)")
 		assert.Len(t, gs.Deck, 11, "11 cards remain for stage-2")

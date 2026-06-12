@@ -226,10 +226,11 @@ func (m *Manager) HandleDisconnect(userID uint) {
 
 	session.mu.Unlock()
 
-	// Broadcast to remaining 3 players (exclude disconnected player)
+	// Broadcast to the remaining human players (exclude the disconnected
+	// player; bot seats have no sockets).
 	remainingPlayers := make([]uint, 0, 3)
 	for i, uid := range playerIDs {
-		if i != seat {
+		if i != seat && uid != 0 {
 			remainingPlayers = append(remainingPlayers, uid)
 		}
 	}
@@ -292,10 +293,11 @@ func (m *Manager) handleConcurrentDisconnectLocked(session *LiveMatch, gs *game.
 	playerIDs := session.playerIDs
 	session.mu.Unlock()
 
-	// Broadcast to remaining 3 players (exclude the just-disconnected player)
+	// Broadcast to the remaining human players (exclude the just-disconnected
+	// player; bot seats have no sockets).
 	remaining := make([]uint, 0, 3)
 	for i, uid := range playerIDs {
-		if i != seat {
+		if i != seat && uid != 0 {
 			remaining = append(remaining, uid)
 		}
 	}
@@ -456,9 +458,14 @@ func (m *Manager) HandleReconnect(userID uint) {
 
 	session.mu.Unlock()
 
-	// Broadcast to ALL 4 players (reconnecting player needs the state too)
-	m.hub.BroadcastToUsers(playerIDs[:], reconnectMsg)
-	m.hub.BroadcastToUsers(playerIDs[:], stateMsg)
+	// Broadcast to all human players (reconnecting player needs the state too)
+	humanIDs := humanUserIDs(playerIDs)
+	m.hub.BroadcastToUsers(humanIDs, reconnectMsg)
+	m.hub.BroadcastToUsers(humanIDs, stateMsg)
+
+	// The restored phase may put a bot back on the clock (its pending timer
+	// no-oped during the disconnect pause).
+	m.maybeScheduleBotAction(session)
 }
 
 // SyncStateOnConnect pushes the current authoritative match state directly to
@@ -553,6 +560,10 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	teamBScore := gs.TeamScores[game.TeamB]
 	variant := string(gs.Variant)
 	matchMode := gs.MatchMode
+	var botSeats [4]bool
+	for i := range gs.Players {
+		botSeats[i] = gs.Players[i].IsBot
+	}
 	// Snapshot any hands scored before the abandonment so they persist alongside
 	// the match row. Empty when abandonment fires before hand 1 completed.
 	handsCopy := make([]HandResult, len(session.handResults))
@@ -569,8 +580,8 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 
 	session.mu.Unlock()
 
-	// Broadcast to all 4 players (disconnected player gets it if they reconnect to WS later)
-	userIDs := playerIDs[:]
+	// Broadcast to all human players (disconnected player gets it if they reconnect to WS later)
+	userIDs := humanUserIDs(playerIDs)
 	m.hub.BroadcastToUsers(userIDs, abandonedMsg)
 	m.hub.BroadcastToUsers(userIDs, stateMsg)
 
@@ -580,22 +591,29 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		"abandonedSeat", abandonedSeat,
 	)
 
-	// Persist match record with abandoned status
+	// Persist match record with abandoned status. Bot seats persist exactly
+	// as in the completed-match path: NULL IDs + per-seat flags.
+	ids, botFlags, hasBots := matchSeatColumns(playerIDs, botSeats)
 	matchRecord := &Match{
-		RoomID:      roomID,
-		Player1ID:   playerIDs[0],
-		Player2ID:   playerIDs[1],
-		Player3ID:   playerIDs[2],
-		Player4ID:   playerIDs[3],
-		TeamAScore:  teamAScore,
-		TeamBScore:  teamBScore,
-		WinnerTeam:  0,
-		Variant:     variant,
-		MatchMode:   matchMode,
-		StartedAt:   startedAt,
-		CompletedAt: time.Now(),
-		Status:      "abandoned",
-		AbandonedBy: &abandonedPlayerID,
+		RoomID:       roomID,
+		Player1ID:    ids[0],
+		Player2ID:    ids[1],
+		Player3ID:    ids[2],
+		Player4ID:    ids[3],
+		Player1IsBot: botFlags[0],
+		Player2IsBot: botFlags[1],
+		Player3IsBot: botFlags[2],
+		Player4IsBot: botFlags[3],
+		HasBots:      hasBots,
+		TeamAScore:   teamAScore,
+		TeamBScore:   teamBScore,
+		WinnerTeam:   0,
+		Variant:      variant,
+		MatchMode:    matchMode,
+		StartedAt:    startedAt,
+		CompletedAt:  time.Now(),
+		Status:       "abandoned",
+		AbandonedBy:  &abandonedPlayerID,
 	}
 
 	if err := m.matchRepo.CreateWithHands(matchRecord, handsCopy); err != nil {

@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { Bot, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
@@ -12,6 +12,7 @@ import type {
 } from "@/shared/api/matches";
 import { useUserMatchesInfiniteQuery } from "@/shared/hooks/queries/useMatches";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
+import { botDisplayName } from "@/shared/lib/botName";
 import { formatLocalizedDate } from "@/shared/lib/formatDate";
 
 import { HistoryFilters } from "./components/HistoryFilters";
@@ -392,9 +393,18 @@ function MatchRow({ match, username, isOpen, onToggle }: MatchRowProps) {
   const teammateSeat = (match.viewerSeat + 2) % 4;
   const opp1Seat = (match.viewerSeat + 1) % 4;
   const opp2Seat = (match.viewerSeat + 3) % 4;
-  const teammate = match.players.find((p) => p.seat === teammateSeat)?.username ?? "—";
-  const opponent1 = match.players.find((p) => p.seat === opp1Seat)?.username ?? "—";
-  const opponent2 = match.players.find((p) => p.seat === opp2Seat)?.username ?? "—";
+  // Bot seats carry an empty username with isBot:true — render the localized
+  // seat-derived bot name (and the bot glyph in the chip avatar) instead of
+  // a blank chip.
+  const seatChipProps = (seat: number): { name: string; bot: boolean } => {
+    const p = match.players.find((pl) => pl.seat === seat);
+    if (!p) return { name: "—", bot: false };
+    if (p.isBot === true) return { name: botDisplayName(t, p.seat), bot: true };
+    return { name: p.username || "—", bot: false };
+  };
+  const teammate = seatChipProps(teammateSeat);
+  const opponent1 = seatChipProps(opp1Seat);
+  const opponent2 = seatChipProps(opp2Seat);
 
   const viewerTeamIndex: 0 | 1 = match.viewerSeat % 2 === 0 ? 0 : 1;
   const usTeam: "A" | "B" = viewerTeamIndex === 0 ? "A" : "B";
@@ -440,17 +450,17 @@ function MatchRow({ match, username, isOpen, onToggle }: MatchRowProps) {
             <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
               {t("profile.matchHistory.with")}
             </span>
-            <SeatChip name={teammate} team={usTeam} />
+            <SeatChip name={teammate.name} bot={teammate.bot} team={usTeam} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
               {t("profile.matchHistory.versus")}
             </span>
-            <SeatChip name={opponent1} team={themTeam} />
+            <SeatChip name={opponent1.name} bot={opponent1.bot} team={themTeam} />
             <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
               {t("profile.matchHistory.and")}
             </span>
-            <SeatChip name={opponent2} team={themTeam} />
+            <SeatChip name={opponent2.name} bot={opponent2.bot} team={themTeam} />
           </div>
         </div>
 
@@ -475,6 +485,16 @@ function MatchRow({ match, username, isOpen, onToggle }: MatchRowProps) {
 
         {/* Outcome + chevron */}
         <div className="flex items-center gap-2.5 self-start md:self-center">
+          {match.hasBots === true && (
+            <span
+              className="text-ink-dim inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              style={{ borderColor: "var(--border)", background: "var(--surface-3)" }}
+              data-testid="match-history-bots-marker"
+            >
+              <Bot className="size-3" aria-hidden="true" />
+              {t("profile.matchHistory.withBots")}
+            </span>
+          )}
           <OutcomeChip outcome={match.outcome} />
           <ChevronDown
             className={`text-ink-mute size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}

@@ -1,3 +1,4 @@
+import { Bot } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
@@ -7,6 +8,8 @@ type SeatChipProps = {
   team: "A" | "B";
   /** Marks this chip as the viewer with a "YOU" badge. */
   you?: boolean;
+  /** Bot seat — the avatar shows the bot glyph instead of a name initial. */
+  bot?: boolean;
 };
 
 /**
@@ -14,7 +17,7 @@ type SeatChipProps = {
  * username, plus an optional "YOU" badge for the viewer. Tint + edge follow the
  * viewer-relative team palette (Us = gold, Them = silver).
  */
-export function SeatChip({ name, team, you = false }: SeatChipProps) {
+export function SeatChip({ name, team, you = false, bot = false }: SeatChipProps) {
   const { t } = useTranslation();
   const isA = team === "A";
   return (
@@ -26,7 +29,12 @@ export function SeatChip({ name, team, you = false }: SeatChipProps) {
       }}
       data-testid="match-seat-chip"
     >
-      <Avatar name={name} team={team} size={20} />
+      <Avatar
+        name={name}
+        team={team}
+        size={20}
+        icon={bot ? <Bot aria-hidden="true" /> : undefined}
+      />
       <span className="truncate">{name}</span>
       {you && (
         <span

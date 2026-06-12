@@ -63,6 +63,7 @@ describe("BelotReveal", () => {
             hand: [],
             declarations: [],
             connected: true,
+            isBot: false,
           },
           {
             seat: 1,
@@ -72,6 +73,7 @@ describe("BelotReveal", () => {
             hand: [],
             declarations: [],
             connected: true,
+            isBot: false,
           },
           {
             seat: 2,
@@ -81,6 +83,7 @@ describe("BelotReveal", () => {
             hand: [],
             declarations: [],
             connected: true,
+            isBot: false,
           },
           {
             seat: 3,
@@ -90,6 +93,7 @@ describe("BelotReveal", () => {
             hand: [],
             declarations: [],
             connected: true,
+            isBot: false,
           },
         ]}
         onComplete={vi.fn()}

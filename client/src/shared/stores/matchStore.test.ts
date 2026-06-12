@@ -34,6 +34,7 @@ const mockMatchState: MatchState = {
       team: "teamA",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [],
@@ -43,6 +44,7 @@ const mockMatchState: MatchState = {
       team: "teamB",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [],
@@ -52,6 +54,7 @@ const mockMatchState: MatchState = {
       team: "teamA",
       declarations: [],
       connected: true,
+      isBot: false,
     },
     {
       hand: [],
@@ -61,6 +64,7 @@ const mockMatchState: MatchState = {
       team: "teamB",
       declarations: [],
       connected: true,
+      isBot: false,
     },
   ],
   teamScores: [0, 0],

@@ -38,6 +38,8 @@ vi.mock("react-router", async () => {
 });
 
 vi.mock("@/shared/api/rooms", () => ({
+  addBot: vi.fn(),
+  removeBot: vi.fn(),
   getRoom: vi.fn(),
   leaveRoom: vi.fn(),
   selectSeat: vi.fn(),
@@ -74,6 +76,7 @@ function fourSeated(viewerSeat: number) {
     username: usernames[seat]!,
     seat,
     team: seat % 2 === 0 ? "teamA" : "teamB",
+    isBot: false,
     createdAt: "",
   }));
   return {

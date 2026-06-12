@@ -14,6 +14,12 @@ type AvatarProps = {
    * the profile Identity Hero.
    */
   halo?: "profile";
+  /**
+   * Replaces the initial with a glyph (e.g. the bot marker for bot seats).
+   * Pass a bare lucide icon — it is sized proportionally to the avatar the
+   * same way the initial is.
+   */
+  icon?: React.ReactNode;
   className?: string;
 };
 
@@ -23,7 +29,16 @@ type AvatarProps = {
  * brass for owner, accent for "you", team color otherwise. Owner gets a soft
  * brass halo via box-shadow so they read at a glance across the diamond.
  */
-export function Avatar({ name, size = 36, team = null, owner, you, halo, className }: AvatarProps) {
+export function Avatar({
+  name,
+  size = 36,
+  team = null,
+  owner,
+  you,
+  halo,
+  icon,
+  className,
+}: AvatarProps) {
   const initial = (name || "?").charAt(0).toUpperCase();
 
   let background: string;
@@ -78,7 +93,20 @@ export function Avatar({ name, size = 36, team = null, owner, you, halo, classNa
       }}
       aria-hidden="true"
     >
-      {initial}
+      {icon ? (
+        <span
+          data-testid="avatar-icon"
+          className="inline-flex items-center justify-center [&_svg]:h-full [&_svg]:w-full"
+          // The 5% upward shift is optical: the lucide Bot glyph's visual
+          // mass (the robot head) sits low in its viewBox, so geometric
+          // centering reads as off-center — especially at chip sizes.
+          style={{ width: size * 0.52, height: size * 0.52, transform: "translateY(-5%)" }}
+        >
+          {icon}
+        </span>
+      ) : (
+        initial
+      )}
     </div>
   );
 }

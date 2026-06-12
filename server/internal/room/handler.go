@@ -127,12 +127,63 @@ func (h *RoomHandler) broadcastToAll(msgType string, payload interface{}) {
 	h.hub.BroadcastAll(msg)
 }
 
+// mergeBotPlayers appends synthetic bot entries to a humans-only players
+// slice. This is the single place bots enter a players array — every payload
+// path that serializes players must route through it. The wire signature of
+// a bot is {id:0, userId:0, username:"", seat, team, isBot:true}; team
+// derives from seat parity exactly like humans.
+func mergeBotPlayers(players []RoomPlayer, bots []RoomBot) []RoomPlayer {
+	if len(bots) == 0 {
+		if players == nil {
+			return []RoomPlayer{}
+		}
+		return players
+	}
+	out := make([]RoomPlayer, 0, len(players)+len(bots))
+	out = append(out, players...)
+	for _, b := range bots {
+		seat := b.Seat
+		team := teamForSeat(seat)
+		out = append(out, RoomPlayer{
+			RoomID: b.RoomID,
+			Seat:   &seat,
+			Team:   &team,
+			IsBot:  true,
+			// Real seat time from the room_bots row — without it the wire
+			// carries the zero time.Time ("0001-01-01T00:00:00Z").
+			CreatedAt: b.CreatedAt,
+		})
+	}
+	return out
+}
+
+// playersWithBots loads the room's humans + bots and returns the merged wire
+// players array. Broadcast-path errors are logged, not returned — same
+// best-effort contract as the other broadcast helpers.
+func (h *RoomHandler) playersWithBots(roomID uint) []RoomPlayer {
+	players, err := h.repo.FindPlayersByRoomID(roomID)
+	if err != nil {
+		slog.Error("failed to load room players", "roomID", roomID, "error", err)
+		players = []RoomPlayer{}
+	}
+	bots, err := h.repo.FindBotsByRoomID(roomID)
+	if err != nil {
+		slog.Error("failed to load room bots", "roomID", roomID, "error", err)
+		bots = nil
+	}
+	return mergeBotPlayers(players, bots)
+}
+
 // roomLifecyclePayload builds the WS payload shared by `system:room_created`
 // and `system:room_updated`. Ensures `ownerUsername` is hydrated so the lobby
 // grid can render host avatars without an extra round-trip per row, embeds
 // `players` so seat chips render correctly the instant the card appears, and
 // always carries `createdAt`/`updatedAt` so the client's <RelativeTime>
 // component has a valid ISO to format.
+//
+// r.Players, when pre-populated by the caller, must be the HUMANS-ONLY slice
+// (every call site passes FindPlayersByRoomID output) — bots are merged here
+// so the payload always carries the full seat picture.
 func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 	if r.OwnerUsername == "" {
 		if err := h.repo.LoadOwnerUsernames([]*Room{r}); err != nil {
@@ -151,6 +202,12 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		}
 		players = fetched
 	}
+	bots, err := h.repo.FindBotsByRoomID(r.ID)
+	if err != nil {
+		slog.Error("broadcast: failed to load room bots", "roomID", r.ID, "error", err)
+		bots = nil
+	}
+	players = mergeBotPlayers(players, bots)
 	return map[string]any{
 		"id":                   r.ID,
 		"name":                 r.Name,
@@ -346,8 +403,13 @@ func (h *RoomHandler) ListRooms(c echo.Context) error {
 	if playersByRoom, perr := h.repo.FindPlayersByRoomIDs(roomIDs); perr != nil {
 		slog.Error("list rooms: failed to load players", "error", perr)
 	} else {
+		botsByRoom, berr := h.repo.FindBotsByRoomIDs(roomIDs)
+		if berr != nil {
+			slog.Error("list rooms: failed to load bots", "error", berr)
+			botsByRoom = map[uint][]RoomBot{}
+		}
 		for i := range rooms {
-			rooms[i].Players = playersByRoom[rooms[i].ID]
+			rooms[i].Players = mergeBotPlayers(playersByRoom[rooms[i].ID], botsByRoom[rooms[i].ID])
 		}
 	}
 
@@ -377,6 +439,10 @@ func (h *RoomHandler) GetRoom(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("finding room players: %w", err)
 	}
+	bots, err := h.repo.FindBotsByRoomID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("finding room bots: %w", err)
+	}
 
 	if err := h.repo.LoadOwnerUsernames([]*Room{room}); err != nil {
 		slog.Error("get room: failed to load owner username", "roomID", room.ID, "error", err)
@@ -385,7 +451,7 @@ func (h *RoomHandler) GetRoom(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": RoomDetailResponse{
 			Room:    room,
-			Players: players,
+			Players: mergeBotPlayers(players, bots),
 		},
 	})
 }
@@ -408,6 +474,10 @@ func (h *RoomHandler) GetRoomByCode(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("finding room players: %w", err)
 	}
+	bots, err := h.repo.FindBotsByRoomID(room.ID)
+	if err != nil {
+		return fmt.Errorf("finding room bots: %w", err)
+	}
 
 	if err := h.repo.LoadOwnerUsernames([]*Room{room}); err != nil {
 		slog.Error("get room by code: failed to load owner username", "roomID", room.ID, "error", err)
@@ -416,7 +486,7 @@ func (h *RoomHandler) GetRoomByCode(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": RoomDetailResponse{
 			Room:    room,
-			Players: players,
+			Players: mergeBotPlayers(players, bots),
 		},
 	})
 }
@@ -445,6 +515,18 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 	}
 
 	if room.PlayerCount >= 4 {
+		return apperr.ErrRoomFull
+	}
+
+	// Bot-covered seats count toward capacity: every member must be able to
+	// claim a seat eventually (humans ≤ seated humans + free seats), so a
+	// room where humans + bots already cover all four seats is full for
+	// joiners even though PlayerCount is below 4.
+	bots, err := h.repo.FindBotsByRoomID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("counting room bots: %w", err)
+	}
+	if room.PlayerCount+len(bots) >= 4 {
 		return apperr.ErrRoomFull
 	}
 
@@ -675,8 +757,11 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 	var previousSeat *int
 	seatChanged := false
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		// Re-check room status inside transaction to prevent TOCTOU
-		room, err := tx.FindByID(uint(roomID))
+		// Row-lock the room so seat takes serialize against the bot endpoints
+		// (AddBot/RemoveBot/SwapSeats) and the start transition — no DB
+		// constraint spans room_players.seat/room_bots.seat, so without the
+		// lock a human and a bot can race onto the same seat.
+		room, err := tx.FindByIDForUpdate(uint(roomID))
 		if err != nil {
 			return fmt.Errorf("finding room: %w", err)
 		}
@@ -697,6 +782,13 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 				// Player already in this seat — no-op
 				return nil
 			}
+			return apperr.ErrSeatTaken
+		}
+		// Bot seats read as OCCUPIED for self-seating — only the owner's swap
+		// flow may displace a bot.
+		if taken, err := botOccupiesSeat(tx, uint(roomID), seat); err != nil {
+			return fmt.Errorf("checking bot seat occupancy: %w", err)
+		} else if taken {
 			return apperr.ErrSeatTaken
 		}
 
@@ -766,7 +858,7 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": map[string]interface{}{
-			"players":      players,
+			"players":      h.playersWithBots(uint(roomID)),
 			"matchStarted": matchStarted,
 		},
 	})
@@ -1232,14 +1324,25 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 		team         string
 		previousSeat int
 	}
-	var swapA, swapB swapped
-	// moveOnly is set when one of the two seats is empty: the owner is moving
-	// the seated player into the empty seat rather than swapping two players.
-	// Only one seat_updated broadcast is sent in that case.
-	var moveOnly bool
+	// humanMoves collects the seat_updated broadcasts owed to HUMAN
+	// participants (0, 1, or 2 entries). botMove, when set, is a bot
+	// relocation broadcast as bot_removed{from} + bot_added{to}.
+	var humanMoves []swapped
+	type botRelocation struct {
+		from int
+		to   int
+	}
+	var botMove *botRelocation
+	// botNoOp marks a bot ↔ bot swap: identity is seat-derived, so swapping
+	// two bots is observably nothing — success with no state change and no
+	// broadcasts.
+	var botNoOp bool
 
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		r, err := tx.FindByID(uint(roomID))
+		// Row-lock the room so bot-involved rearrangements serialize against
+		// concurrent seat takes, add-bot calls, and the start transition
+		// (story-8.5-1 pattern).
+		r, err := tx.FindByIDForUpdate(uint(roomID))
 		if err != nil {
 			return fmt.Errorf("finding room: %w", err)
 		}
@@ -1261,12 +1364,64 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 		if err != nil {
 			return fmt.Errorf("finding player at seatB: %w", err)
 		}
-		if pA == nil && pB == nil {
+		botA, err := botOccupiesSeat(tx, uint(roomID), seatA)
+		if err != nil {
+			return fmt.Errorf("checking bot at seatA: %w", err)
+		}
+		botB, err := botOccupiesSeat(tx, uint(roomID), seatB)
+		if err != nil {
+			return fmt.Errorf("checking bot at seatB: %w", err)
+		}
+		if pA == nil && pB == nil && !botA && !botB {
 			return apperr.ErrSeatNotOccupied
 		}
 
+		// bot ↔ bot: observable no-op (identity is seat-derived).
+		if botA && botB {
+			botNoOp = true
+			return nil
+		}
+
+		moveHuman := func(p *RoomPlayer, from, to int) error {
+			team := teamForSeat(to)
+			if err := tx.UpdatePlayerSeat(uint(roomID), p.UserID, to, team); err != nil {
+				return fmt.Errorf("updating player seat: %w", err)
+			}
+			humanMoves = append(humanMoves, swapped{
+				userID:       p.UserID,
+				username:     p.Username,
+				seat:         to,
+				team:         team,
+				previousSeat: from,
+			})
+			return nil
+		}
+
+		// Exactly one bot involved → relocate it to the opposite seat. If a
+		// human occupies that seat they move to the bot's seat in the same
+		// transaction (human ↔ bot swap); otherwise the bot moves to the
+		// empty seat.
+		if botA || botB {
+			botFrom, botTo := seatA, seatB
+			otherHuman := pB
+			if botB {
+				botFrom, botTo = seatB, seatA
+				otherHuman = pA
+			}
+			if otherHuman != nil {
+				if err := moveHuman(otherHuman, botTo, botFrom); err != nil {
+					return err
+				}
+			}
+			if err := tx.UpdateBotSeat(uint(roomID), botFrom, botTo); err != nil {
+				return fmt.Errorf("moving bot between seats: %w", err)
+			}
+			botMove = &botRelocation{from: botFrom, to: botTo}
+			return nil
+		}
+
+		// Humans only from here on — original swap / move-to-empty semantics.
 		if pA == nil || pB == nil {
-			moveOnly = true
 			var mover *RoomPlayer
 			var fromSeat, toSeat int
 			if pA == nil {
@@ -1274,47 +1429,13 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 			} else {
 				mover, fromSeat, toSeat = pA, seatA, seatB
 			}
-			newTeam := teamForSeat(toSeat)
-			if err := tx.UpdatePlayerSeat(uint(roomID), mover.UserID, toSeat, newTeam); err != nil {
-				return fmt.Errorf("moving player to empty seat: %w", err)
-			}
-			swapA = swapped{
-				userID:       mover.UserID,
-				username:     mover.Username,
-				seat:         toSeat,
-				team:         newTeam,
-				previousSeat: fromSeat,
-			}
-			return nil
+			return moveHuman(mover, fromSeat, toSeat)
 		}
 
-		newSeatA := seatB
-		newSeatB := seatA
-		teamA := teamForSeat(newSeatA)
-		teamB := teamForSeat(newSeatB)
-
-		if err := tx.UpdatePlayerSeat(uint(roomID), pA.UserID, newSeatA, teamA); err != nil {
-			return fmt.Errorf("updating seatA player: %w", err)
+		if err := moveHuman(pA, seatA, seatB); err != nil {
+			return err
 		}
-		if err := tx.UpdatePlayerSeat(uint(roomID), pB.UserID, newSeatB, teamB); err != nil {
-			return fmt.Errorf("updating seatB player: %w", err)
-		}
-
-		swapA = swapped{
-			userID:       pA.UserID,
-			username:     pA.Username,
-			seat:         newSeatA,
-			team:         teamA,
-			previousSeat: seatA,
-		}
-		swapB = swapped{
-			userID:       pB.UserID,
-			username:     pB.Username,
-			seat:         newSeatB,
-			team:         teamB,
-			previousSeat: seatB,
-		}
-		return nil
+		return moveHuman(pB, seatB, seatA)
 	}); err != nil {
 		if errors.Is(err, apperr.ErrRoomNotFound) ||
 			errors.Is(err, apperr.ErrRoomNotWaiting) ||
@@ -1326,38 +1447,230 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 		return fmt.Errorf("swapping seats: %w", err)
 	}
 
-	players, err := h.repo.FindPlayersByRoomID(uint(roomID))
+	players := h.playersWithBots(uint(roomID))
+
+	// bot ↔ bot: success with no state change and no broadcasts.
+	if botNoOp {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"data": PlayersResponse{Players: players},
+		})
+	}
+
+	// Broadcast system:seat_updated for each HUMAN move, then the bot
+	// relocation as bot_removed{from} + bot_added{to}. Multi-event sequences
+	// are sent as separate messages, never batched.
+	for _, mv := range humanMoves {
+		h.broadcastToRoom(uint(roomID), ws.SystemSeatUpdated, map[string]interface{}{
+			"roomId":       roomID,
+			"userId":       mv.userID,
+			"username":     mv.username,
+			"seat":         mv.seat,
+			"team":         mv.team,
+			"previousSeat": mv.previousSeat,
+		})
+	}
+	if botMove != nil {
+		h.broadcastToRoom(uint(roomID), ws.SystemBotRemoved, map[string]interface{}{
+			"roomId": roomID,
+			"seat":   botMove.from,
+		})
+		h.broadcastToRoom(uint(roomID), ws.SystemBotAdded, map[string]interface{}{
+			"roomId": roomID,
+			"seat":   botMove.to,
+			"team":   teamForSeat(botMove.to),
+		})
+	}
+	// Single snapshot broadcast after the per-room events so lobby viewers
+	// see the final state in one cache update, not intermediate ones.
+	humansOnly, err := h.repo.FindPlayersByRoomID(uint(roomID))
 	if err != nil {
 		return fmt.Errorf("fetching players after swap: %w", err)
 	}
-
-	// Broadcast system:seat_updated events to every room member. A swap emits
-	// two ordered events; a move-to-empty emits one. Multi-event sequences are
-	// sent as separate messages, never batched.
-	h.broadcastToRoom(uint(roomID), ws.SystemSeatUpdated, map[string]interface{}{
-		"roomId":       roomID,
-		"userId":       swapA.userID,
-		"username":     swapA.username,
-		"seat":         swapA.seat,
-		"team":         swapA.team,
-		"previousSeat": swapA.previousSeat,
-	})
-	if !moveOnly {
-		h.broadcastToRoom(uint(roomID), ws.SystemSeatUpdated, map[string]interface{}{
-			"roomId":       roomID,
-			"userId":       swapB.userID,
-			"username":     swapB.username,
-			"seat":         swapB.seat,
-			"team":         swapB.team,
-			"previousSeat": swapB.previousSeat,
-		})
-	}
-	// Single snapshot broadcast after both per-room events so lobby viewers
-	// see the final state in one cache update, not two intermediate ones.
-	h.broadcastRoomSeatSnapshot(uint(roomID), players)
+	h.broadcastRoomSeatSnapshot(uint(roomID), humansOnly)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": PlayersResponse{Players: players},
+	})
+}
+
+// botOccupiesSeat reports whether a bot is seated at the given seat.
+func botOccupiesSeat(repo RoomRepository, roomID uint, seat int) (bool, error) {
+	bots, err := repo.FindBotsByRoomID(roomID)
+	if err != nil {
+		return false, err
+	}
+	for _, b := range bots {
+		if b.Seat == seat {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+type AddBotRequest struct {
+	Seat *int `json:"seat"`
+}
+
+// AddBot seats a bot on an empty seat of a waiting room. Owner-only; rejected
+// for quick-play rooms (they auto-start on 4 humans). Runs inside a
+// row-locking transaction so concurrent seat takes, double add-bot calls, and
+// the start transition serialize — the unique (room_id, seat) index is the
+// backstop for anything that slips through.
+func (h *RoomHandler) AddBot(c echo.Context) error {
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		return apperr.ErrUnauthorized
+	}
+
+	roomID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return apperr.ErrRoomNotFound
+	}
+
+	var req AddBotRequest
+	if err := c.Bind(&req); err != nil {
+		return apperr.ErrBadRequest
+	}
+	if req.Seat == nil {
+		return apperr.ErrInvalidSeat
+	}
+	seat := *req.Seat
+
+	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
+		r, err := tx.FindByIDForUpdate(uint(roomID))
+		if err != nil {
+			return fmt.Errorf("finding room: %w", err)
+		}
+		if r == nil {
+			return apperr.ErrRoomNotFound
+		}
+		if r.OwnerID != userID {
+			return apperr.ErrNotRoomOwner
+		}
+		if r.Status != "waiting" {
+			return apperr.ErrRoomNotWaiting
+		}
+		if r.IsQuickPlay {
+			return apperr.ErrBotsNotAllowed
+		}
+		// Seat-range check sits after the ownership/state gates (KickPlayer
+		// order): a non-owner probing with a junk seat gets NOT_ROOM_OWNER,
+		// not INVALID_SEAT.
+		if seat < 0 || seat > 3 {
+			return apperr.ErrInvalidSeat
+		}
+
+		human, err := tx.FindPlayerBySeat(uint(roomID), seat)
+		if err != nil {
+			return fmt.Errorf("checking seat occupancy: %w", err)
+		}
+		if human != nil {
+			return apperr.ErrSeatTaken
+		}
+		bots, err := tx.FindBotsByRoomID(uint(roomID))
+		if err != nil {
+			return fmt.Errorf("checking bot seat occupancy: %w", err)
+		}
+		for _, b := range bots {
+			if b.Seat == seat {
+				return apperr.ErrSeatTaken
+			}
+		}
+		// Every member must keep a claimable seat: humans + bots may never
+		// exceed the four seats, or unseated members would be stranded in a
+		// waiting room they can neither sit in nor start from (JoinRoom
+		// enforces the same invariant from the joiner's side).
+		if r.PlayerCount+len(bots) >= 4 {
+			return apperr.ErrRoomFull
+		}
+
+		return tx.AddBot(uint(roomID), seat)
+	}); err != nil {
+		if errors.Is(err, apperr.ErrRoomNotFound) ||
+			errors.Is(err, apperr.ErrNotRoomOwner) ||
+			errors.Is(err, apperr.ErrRoomNotWaiting) ||
+			errors.Is(err, apperr.ErrBotsNotAllowed) ||
+			errors.Is(err, apperr.ErrInvalidSeat) ||
+			errors.Is(err, apperr.ErrRoomFull) ||
+			errors.Is(err, apperr.ErrSeatTaken) {
+			return err
+		}
+		return fmt.Errorf("adding bot: %w", err)
+	}
+
+	// Broadcast after commit: bot_added to room participants, then the lobby
+	// seat snapshot so browse-page seat chips refresh. Separate ordered
+	// messages, never batched.
+	h.broadcastToRoom(uint(roomID), ws.SystemBotAdded, map[string]interface{}{
+		"roomId": roomID,
+		"seat":   seat,
+		"team":   teamForSeat(seat),
+	})
+	humansOnly, err := h.repo.FindPlayersByRoomID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("fetching players after add-bot: %w", err)
+	}
+	h.broadcastRoomSeatSnapshot(uint(roomID), humansOnly)
+
+	return c.JSON(http.StatusCreated, map[string]interface{}{
+		"data": PlayersResponse{Players: h.playersWithBots(uint(roomID))},
+	})
+}
+
+// RemoveBot unseats the bot at the given seat. Owner-only, waiting rooms only.
+func (h *RoomHandler) RemoveBot(c echo.Context) error {
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		return apperr.ErrUnauthorized
+	}
+
+	roomID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return apperr.ErrRoomNotFound
+	}
+	seat, err := strconv.Atoi(c.Param("seat"))
+	if err != nil || seat < 0 || seat > 3 {
+		return apperr.ErrInvalidSeat
+	}
+
+	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
+		r, err := tx.FindByIDForUpdate(uint(roomID))
+		if err != nil {
+			return fmt.Errorf("finding room: %w", err)
+		}
+		if r == nil {
+			return apperr.ErrRoomNotFound
+		}
+		if r.OwnerID != userID {
+			return apperr.ErrNotRoomOwner
+		}
+		if r.Status != "waiting" {
+			return apperr.ErrRoomNotWaiting
+		}
+
+		return tx.RemoveBot(uint(roomID), seat)
+	}); err != nil {
+		if errors.Is(err, apperr.ErrRoomNotFound) ||
+			errors.Is(err, apperr.ErrNotRoomOwner) ||
+			errors.Is(err, apperr.ErrRoomNotWaiting) ||
+			errors.Is(err, apperr.ErrNoBotOnSeat) {
+			return err
+		}
+		return fmt.Errorf("removing bot: %w", err)
+	}
+
+	h.broadcastToRoom(uint(roomID), ws.SystemBotRemoved, map[string]interface{}{
+		"roomId": roomID,
+		"seat":   seat,
+	})
+	humansOnly, err := h.repo.FindPlayersByRoomID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("fetching players after remove-bot: %w", err)
+	}
+	h.broadcastRoomSeatSnapshot(uint(roomID), humansOnly)
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": PlayersResponse{Players: h.playersWithBots(uint(roomID))},
 	})
 }
 
@@ -1451,7 +1764,7 @@ func (h *RoomHandler) LeaveSeat(c echo.Context) error {
 	h.broadcastRoomSeatSnapshot(uint(roomID), players)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"data": PlayersResponse{Players: players},
+		"data": PlayersResponse{Players: h.playersWithBots(uint(roomID))},
 	})
 }
 
@@ -1468,7 +1781,10 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 
 	var updatedRoom *Room
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		room, err := tx.FindByID(uint(roomID))
+		// Row-lock the room so the start transition serializes against seat
+		// takes and the bot endpoints — the coverage check below must see a
+		// settled seat picture.
+		room, err := tx.FindByIDForUpdate(uint(roomID))
 		if err != nil {
 			return fmt.Errorf("finding room: %w", err)
 		}
@@ -1492,15 +1808,40 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 		if err != nil {
 			return fmt.Errorf("finding room players: %w", err)
 		}
+		bots, err := tx.FindBotsByRoomID(uint(roomID))
+		if err != nil {
+			return fmt.Errorf("finding room bots: %w", err)
+		}
 
-		seatedCount := 0
+		// Every room member must hold a seat — pre-bots this was implied by
+		// the 4-seated-humans gate (capacity 4 ⇒ all members seated); with
+		// bots covering seats it must be explicit, or unseated members would
+		// receive system:match_started with no seat, no userToRoom entry and
+		// no state. The owner kicks lingering unseated members first.
 		for _, p := range players {
-			if p.Seat != nil {
-				seatedCount++
+			if p.Seat == nil {
+				return apperr.ErrNotAllSeated
 			}
 		}
-		if seatedCount < 4 {
-			return apperr.ErrNotAllSeated
+
+		// Every seat 0–3 must be covered by exactly one human or bot. The
+		// seating paths guarantee exclusivity (a bot can't take a human seat
+		// and vice versa), so coverage is the only check needed.
+		var seatCovered [4]bool
+		for _, p := range players {
+			if p.Seat != nil && *p.Seat >= 0 && *p.Seat <= 3 {
+				seatCovered[*p.Seat] = true
+			}
+		}
+		for _, b := range bots {
+			if b.Seat >= 0 && b.Seat <= 3 {
+				seatCovered[b.Seat] = true
+			}
+		}
+		for _, covered := range seatCovered {
+			if !covered {
+				return apperr.ErrNotAllSeated
+			}
 		}
 
 		room.Status = "playing"
@@ -1523,6 +1864,12 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 		players, err := h.repo.FindPlayersByRoomID(uint(roomID))
 		if err != nil {
 			slog.Error("failed to load players for game start", "roomID", roomID, "error", err)
+		} else if bots, berr := h.repo.FindBotsByRoomID(uint(roomID)); berr != nil {
+			// Proceeding with bots=nil would leave bot seats zero-valued in
+			// seatInfo ({Seat:0, IsBot:false}), clobbering seat 0's human in
+			// the manager's seat loop — skip the start exactly like the
+			// players-load failure above.
+			slog.Error("failed to load bots for game start", "roomID", roomID, "error", berr)
 		} else {
 			var seatInfo [4]match.PlayerSeatInfo
 			for _, p := range players {
@@ -1531,6 +1878,14 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 						UserID:   p.UserID,
 						Username: p.Username,
 						Seat:     *p.Seat,
+					}
+				}
+			}
+			for _, b := range bots {
+				if b.Seat >= 0 && b.Seat <= 3 {
+					seatInfo[b.Seat] = match.PlayerSeatInfo{
+						Seat:  b.Seat,
+						IsBot: true,
 					}
 				}
 			}

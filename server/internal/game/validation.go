@@ -54,6 +54,14 @@ func legalCards(state *GameState, seat int) []Card {
 	return hand
 }
 
+// LegalCards exposes the legal-play set for a seat (Story 10.3 — consumed by
+// the bot decision layer and its simulation baseline). Thin wrapper over the
+// unexported legalCards; zero rule changes, and engine behavior remains
+// tested through ApplyAction.
+func LegalCards(state *GameState, seat int) []Card {
+	return legalCards(state, seat)
+}
+
 // applyMustOverplayLedSuit returns the led-suit cards in hand that are strictly
 // higher than the highest led-suit card currently in the trick. Uses
 // TrumpRankOrder when the led suit is trump, NonTrumpRankOrder otherwise.

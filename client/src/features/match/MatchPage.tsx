@@ -13,6 +13,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { getRoom } from "@/shared/api/rooms";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
+import { playerDisplayName } from "@/shared/lib/botName";
 import { FLAG_LIFETIME, MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import { useWsConnectionState, useWsSendMessage } from "@/shared/providers/WebSocketContext";
@@ -1216,12 +1217,16 @@ export function MatchPage() {
     surrenderProposerSeat !== null
       ? matchState.players.find((p) => p.seat === surrenderProposerSeat)
       : undefined;
-  const proposerUsername = proposerPlayer?.username ?? t("match.surrender.unknownProposer");
+  const proposerUsername =
+    playerDisplayName(t, proposerPlayer) ?? t("match.surrender.unknownProposer");
 
   const surrenderedByUsername =
     matchEndData?.outcomeReason === "surrender" &&
     typeof matchEndData.surrenderedBySeat === "number"
-      ? matchState.players.find((p) => p.seat === matchEndData.surrenderedBySeat)?.username
+      ? (playerDisplayName(
+          t,
+          matchState.players.find((p) => p.seat === matchEndData.surrenderedBySeat),
+        ) ?? undefined)
       : undefined;
 
   // Compute playable card IDs — block during prompts and pause
@@ -1339,8 +1344,10 @@ export function MatchPage() {
               trumpCallerSeat={matchState.trumpCallerSeat}
               trumpCallerName={
                 matchState.trumpCallerSeat !== null
-                  ? (matchState.players.find((p) => p.seat === matchState.trumpCallerSeat)
-                      ?.username ?? null)
+                  ? playerDisplayName(
+                      t,
+                      matchState.players.find((p) => p.seat === matchState.trumpCallerSeat),
+                    )
                   : null
               }
               viewerTeam={viewerTeam}
@@ -1421,7 +1428,7 @@ export function MatchPage() {
             {declareSlot && (
               <DeclareBanner
                 key={`declare-${player.seat}-${declareSlot.receivedAt}`}
-                declarerUsername={player.username}
+                declarerUsername={playerDisplayName(t, player) ?? player.username}
                 compassPosition={compass as 0 | 1 | 2 | 3}
                 compact
                 onDismiss={() => setActiveDeclare(player.seat, false)}
@@ -1705,9 +1712,9 @@ export function MatchPage() {
         <ReconnectOverlay
           disconnectedPlayerName={
             matchAbandonedData
-              ? (matchState.players[matchAbandonedData.abandonedByPlayer]?.username ??
+              ? (playerDisplayName(t, matchState.players[matchAbandonedData.abandonedByPlayer]) ??
                 `Player ${matchAbandonedData.abandonedByPlayer + 1}`)
-              : (matchState.players[matchState.disconnectedSeat]?.username ??
+              : (playerDisplayName(t, matchState.players[matchState.disconnectedSeat]) ??
                 `Player ${matchState.disconnectedSeat + 1}`)
           }
           disconnectedPlayers={matchState.players
@@ -1715,7 +1722,7 @@ export function MatchPage() {
               const expiry = matchState.playerReconnectExpiresAt[p.seat];
               if (p.connected || !expiry) return null;
               return {
-                name: p.username || `Player ${p.seat + 1}`,
+                name: playerDisplayName(t, p) ?? `Player ${p.seat + 1}`,
                 expiresAt: expiry,
               };
             })
@@ -1747,8 +1754,10 @@ export function MatchPage() {
               biddingRound={matchState.biddingRound}
               isActiveBidder={isActiveBidder}
               activePlayerName={
-                matchState.players.find((p) => p.seat === matchState.activePlayerSeat)?.username ??
-                null
+                playerDisplayName(
+                  t,
+                  matchState.players.find((p) => p.seat === matchState.activePlayerSeat),
+                ) ?? null
               }
               activePlayerTeam={
                 matchState.activePlayerSeat !== null
@@ -1895,7 +1904,7 @@ export function MatchPage() {
           return (
             <DeclareBanner
               key={`declare-${player.seat}-${slot.receivedAt}`}
-              declarerUsername={player.username}
+              declarerUsername={playerDisplayName(t, player) ?? player.username}
               compassPosition={compass}
               onDismiss={() => setActiveDeclare(player.seat, false)}
             />

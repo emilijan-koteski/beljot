@@ -34,11 +34,27 @@ type Room struct {
 }
 
 type RoomPlayer struct {
+	ID       uint   `gorm:"primaryKey" json:"id"`
+	RoomID   uint   `gorm:"not null;index" json:"roomId"`
+	UserID   uint   `gorm:"not null;index" json:"userId"`
+	Username string `gorm:"-" json:"username"`
+	Seat     *int   `json:"seat"`
+	Team     *string `gorm:"size:10" json:"team"`
+	// IsBot marks synthetic bot entries merged into wire payloads. Bots are
+	// NOT room_players rows (the user_id FK forbids it) — they live in
+	// room_bots and enter players arrays only via mergeBotPlayers as
+	// {id:0, userId:0, username:"", seat, team, isBot:true}. Humans always
+	// serialize isBot:false.
+	IsBot     bool      `gorm:"-" json:"isBot"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// RoomBot is a bot occupying a seat in a waiting room. Bots have no user
+// account; identity is seat-derived and rendered client-side (localized
+// "Bot N"), so only the seat is persisted.
+type RoomBot struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	RoomID    uint      `gorm:"not null;index" json:"roomId"`
-	UserID    uint      `gorm:"not null;index" json:"userId"`
-	Username  string    `gorm:"-" json:"username"`
-	Seat      *int      `json:"seat"`
-	Team      *string   `gorm:"size:10" json:"team"`
+	Seat      int       `gorm:"not null" json:"seat"`
 	CreatedAt time.Time `json:"createdAt"`
 }

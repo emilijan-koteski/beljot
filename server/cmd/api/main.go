@@ -191,6 +191,8 @@ func main() {
 	api.POST("/rooms/:id/kick", roomHandler.KickPlayer)
 	api.POST("/rooms/:id/swap-seats", roomHandler.SwapSeats)
 	api.POST("/rooms/:id/transfer-ownership", roomHandler.TransferOwnership)
+	api.POST("/rooms/:id/bots", roomHandler.AddBot)
+	api.DELETE("/rooms/:id/bots/:seat", roomHandler.RemoveBot)
 
 	// Lobby stats endpoint — bucket-counts connected users into in-lobby /
 	// in-room / in-game and reports registered totals.

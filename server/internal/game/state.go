@@ -15,6 +15,11 @@ type PlayerState struct {
 	Team         string        `json:"team"`
 	Declarations []Declaration `json:"declarations"`
 	Connected    bool          `json:"connected"`
+	// IsBot marks a server-driven seat (Story 10.3). Bots carry UserID 0 and
+	// an empty Username; they stay Connected forever so no disconnect UI ever
+	// shows for them. A field, not a rule — the engine treats bot seats
+	// exactly like human seats.
+	IsBot bool `json:"isBot"`
 }
 
 // TrickCard represents a single card played in a trick, with the player who played it.
@@ -179,8 +184,9 @@ func ShuffleDeck(deck []Card) {
 }
 
 // NewGame creates a new game state with 4 players, shuffles and deals cards
-// using the Bitola 3+2 dealing sequence.
-func NewGame(playerIDs [4]uint, usernames [4]string, variant Variant, matchMode string, roomID uint) *GameState {
+// using the Bitola 3+2 dealing sequence. bots marks the server-driven seats
+// (UserID 0, empty username) — see PlayerState.IsBot.
+func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint) *GameState {
 	gs := &GameState{
 		RoomID:           roomID,
 		Variant:          variant,
@@ -210,6 +216,7 @@ func NewGame(playerIDs [4]uint, usernames [4]string, variant Variant, matchMode 
 			Team:         team,
 			Declarations: []Declaration{},
 			Connected:    true,
+			IsBot:        bots[i],
 		}
 	}
 

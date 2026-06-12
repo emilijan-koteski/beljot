@@ -79,6 +79,13 @@ func (r *fakeRoomRepo) LoadOwnerUsernames([]*room.Room) error                  {
 func (r *fakeRoomRepo) FindPlayersByRoomIDs([]uint) (map[uint][]room.RoomPlayer, error) {
 	return map[uint][]room.RoomPlayer{}, nil
 }
+func (r *fakeRoomRepo) AddBot(uint, int) error                       { panic("unused") }
+func (r *fakeRoomRepo) RemoveBot(uint, int) error                    { panic("unused") }
+func (r *fakeRoomRepo) UpdateBotSeat(uint, int, int) error           { panic("unused") }
+func (r *fakeRoomRepo) FindBotsByRoomID(uint) ([]room.RoomBot, error) { return nil, nil }
+func (r *fakeRoomRepo) FindBotsByRoomIDs([]uint) (map[uint][]room.RoomBot, error) {
+	return map[uint][]room.RoomBot{}, nil
+}
 
 type fakeUserRepo struct {
 	count    int64

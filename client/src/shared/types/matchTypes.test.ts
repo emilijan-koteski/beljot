@@ -97,6 +97,7 @@ describe("gameTypes", () => {
             team: "teamA",
             declarations: [],
             connected: true,
+            isBot: false,
           },
           {
             hand: [],
@@ -106,6 +107,7 @@ describe("gameTypes", () => {
             team: "teamB",
             declarations: [],
             connected: true,
+            isBot: false,
           },
           {
             hand: [],
@@ -115,6 +117,7 @@ describe("gameTypes", () => {
             team: "teamA",
             declarations: [],
             connected: true,
+            isBot: false,
           },
           {
             hand: [],
@@ -124,6 +127,7 @@ describe("gameTypes", () => {
             team: "teamB",
             declarations: [],
             connected: true,
+            isBot: false,
           },
         ],
         teamScores: [0, 0],

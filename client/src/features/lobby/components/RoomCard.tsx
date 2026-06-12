@@ -1,8 +1,10 @@
+import type { TFunction } from "i18next";
 import { ArrowRight, Clock, KeyRound, Users, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { RelativeTime } from "@/shared/components/RelativeTime";
+import { botDisplayName } from "@/shared/lib/botName";
 import { cn } from "@/shared/lib/utils";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
@@ -27,10 +29,17 @@ type Props = {
   index?: number;
 };
 
-function seatOf(players: RoomPlayer[] | undefined, seat: number): string | null {
-  if (!players) return null;
-  const found = players.find((p) => p.seat === seat);
-  return found?.username ?? null;
+function seatOf(
+  t: TFunction,
+  players: RoomPlayer[] | undefined,
+  seat: number,
+): { username: string | null; bot: boolean } {
+  const found = players?.find((p) => p.seat === seat);
+  if (!found) return { username: null, bot: false };
+  // Bot identity is seat-derived and localized — an empty wire username must
+  // never render as a blank chip.
+  if (found.isBot === true) return { username: botDisplayName(t, seat), bot: true };
+  return { username: found.username || null, bot: false };
 }
 
 /**
@@ -95,11 +104,11 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
 
       <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-1.5 px-5 pb-3.5">
         <TeamLabel team="A" />
-        <SeatChip username={seatOf(room.players, 0)} team="A" testId={`room-${room.id}-seat-0`} />
-        <SeatChip username={seatOf(room.players, 2)} team="A" testId={`room-${room.id}-seat-2`} />
+        <SeatChip {...seatOf(t, room.players, 0)} team="A" testId={`room-${room.id}-seat-0`} />
+        <SeatChip {...seatOf(t, room.players, 2)} team="A" testId={`room-${room.id}-seat-2`} />
         <TeamLabel team="B" />
-        <SeatChip username={seatOf(room.players, 1)} team="B" testId={`room-${room.id}-seat-1`} />
-        <SeatChip username={seatOf(room.players, 3)} team="B" testId={`room-${room.id}-seat-3`} />
+        <SeatChip {...seatOf(t, room.players, 1)} team="B" testId={`room-${room.id}-seat-1`} />
+        <SeatChip {...seatOf(t, room.players, 3)} team="B" testId={`room-${room.id}-seat-3`} />
       </div>
 
       <div className="mt-auto flex items-center gap-2.5 border-t border-border bg-[rgba(14,58,36,0.03)] px-5 py-3">

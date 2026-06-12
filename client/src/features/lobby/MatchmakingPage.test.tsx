@@ -25,6 +25,8 @@ vi.mock("react-router", async () => {
 });
 
 vi.mock("@/shared/api/rooms", () => ({
+  addBot: vi.fn(),
+  removeBot: vi.fn(),
   getRoom: vi.fn(),
   leaveRoom: vi.fn(),
 }));
@@ -96,7 +98,16 @@ describe("MatchmakingPage", () => {
     mockGetRoom.mockResolvedValue({
       room: qpRoom,
       players: [
-        { id: 1, roomId: 1, userId: 10, username: "alice", seat: 0, team: "teamA", createdAt: "" },
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "alice",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
       ],
     });
 
@@ -113,7 +124,16 @@ describe("MatchmakingPage", () => {
     mockGetRoom.mockResolvedValue({
       room: qpRoom,
       players: [
-        { id: 1, roomId: 1, userId: 10, username: "alice", seat: 0, team: "teamA", createdAt: "" },
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "alice",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
       ],
     });
 
@@ -131,7 +151,16 @@ describe("MatchmakingPage", () => {
     mockGetRoom.mockResolvedValue({
       room: { ...qpRoom, isQuickPlay: false },
       players: [
-        { id: 1, roomId: 1, userId: 10, username: "alice", seat: 0, team: "teamA", createdAt: "" },
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "alice",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
       ],
     });
 
@@ -147,7 +176,16 @@ describe("MatchmakingPage", () => {
     mockGetRoom.mockResolvedValue({
       room: qpRoom,
       players: [
-        { id: 1, roomId: 1, userId: 10, username: "alice", seat: 0, team: "teamA", createdAt: "" },
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "alice",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
       ],
     });
 
@@ -168,7 +206,16 @@ describe("MatchmakingPage", () => {
     mockGetRoom.mockResolvedValue({
       room: qpRoom,
       players: [
-        { id: 1, roomId: 1, userId: 10, username: "alice", seat: 0, team: "teamA", createdAt: "" },
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "alice",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
       ],
     });
 
@@ -192,15 +239,42 @@ describe("MatchmakingPage", () => {
     client.setQueryData(queryKeys.rooms.detail(1), {
       room: qpRoom,
       players: [
-        { id: 9, roomId: 1, userId: 9, username: "cece", seat: 0, team: "teamA", createdAt: "" },
+        {
+          id: 9,
+          roomId: 1,
+          userId: 9,
+          username: "cece",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
       ],
     });
     // The fresh fetch (after the just-completed quick-join) includes the viewer.
     mockGetRoom.mockResolvedValue({
       room: qpRoom,
       players: [
-        { id: 9, roomId: 1, userId: 9, username: "cece", seat: 0, team: "teamA", createdAt: "" },
-        { id: 1, roomId: 1, userId: 10, username: "alice", seat: 1, team: "teamB", createdAt: "" },
+        {
+          id: 9,
+          roomId: 1,
+          userId: 9,
+          username: "cece",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "alice",
+          seat: 1,
+          team: "teamB",
+          isBot: false,
+          createdAt: "",
+        },
       ],
     });
 

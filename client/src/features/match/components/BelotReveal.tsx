@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
+import { playerDisplayName } from "@/shared/lib/botName";
 import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 
@@ -66,7 +67,7 @@ export function BelotReveal({
 
   const labelKey = isKing ? "match.belot.reveal.rebelot" : "match.belot.reveal.belot";
   const titleKey = isKing ? "match.belot.reveal.titleRebelot" : "match.belot.reveal.titleBelot";
-  const announcer = players?.find((p) => p.seat === playerSeat)?.username;
+  const announcer = playerDisplayName(t, players?.find((p) => p.seat === playerSeat) ?? null);
   // Mirror TrumpReveal: full sentence on the title row when we know who
   // announced ("{{name}} announced re-belot"), graceful fallback to the
   // team label when the players roster wasn't passed (test renders).

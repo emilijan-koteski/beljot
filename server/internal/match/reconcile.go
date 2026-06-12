@@ -28,6 +28,7 @@ type StaleRoomPlayer struct {
 type StaleRoomRepository interface {
 	FindByStatus(status string) ([]StaleRoom, error)
 	FindPlayersByRoomID(roomID uint) ([]StaleRoomPlayer, error)
+	FindBotSeatsByRoomID(roomID uint) ([]int, error)
 	UpdateStatus(roomID uint, status string) error
 }
 
@@ -65,11 +66,17 @@ func (m *Manager) reconcileStaleRoom(roomRepo StaleRoomRepository, r StaleRoom) 
 		return fmt.Errorf("loading players: %w", err)
 	}
 
-	// matches table requires Player1ID..Player4ID (NOT NULL). A "playing"
-	// row with <4 seated players shouldn't normally exist, but if it does
-	// we still flip the room status so the lobby unblocks — we just skip
-	// the history persistence to avoid a constraint violation.
+	botSeatList, err := roomRepo.FindBotSeatsByRoomID(r.ID)
+	if err != nil {
+		return fmt.Errorf("loading bot seats: %w", err)
+	}
+
+	// Persist history when all four seats were held by occupants the
+	// repository can still see — humans (room_players) or bots (room_bots).
+	// Bot seats persist exactly like a live match end: nil player IDs +
+	// per-seat IsBot flags + HasBots.
 	var seated [4]uint
+	var botSeats [4]bool
 	seatedCount := 0
 	for _, p := range players {
 		if p.Seat != nil && *p.Seat >= 0 && *p.Seat < 4 {
@@ -77,24 +84,36 @@ func (m *Manager) reconcileStaleRoom(roomRepo StaleRoomRepository, r StaleRoom) 
 			seatedCount++
 		}
 	}
+	for _, s := range botSeatList {
+		if s >= 0 && s < 4 && !botSeats[s] && seated[s] == 0 {
+			botSeats[s] = true
+			seatedCount++
+		}
+	}
 	if m.matchRepo != nil && seatedCount == 4 {
 		// No precise game-start timestamp survives the restart — the room's
 		// UpdatedAt is the best proxy (StartMatch is the last writer for a
 		// "playing" row that hasn't moved on).
+		ids, botFlags, hasBots := matchSeatColumns(seated, botSeats)
 		record := &Match{
-			RoomID:      r.ID,
-			Player1ID:   seated[0],
-			Player2ID:   seated[1],
-			Player3ID:   seated[2],
-			Player4ID:   seated[3],
-			TeamAScore:  0,
-			TeamBScore:  0,
-			WinnerTeam:  0,
-			Variant:     r.Variant,
-			MatchMode:   r.MatchMode,
-			StartedAt:   r.UpdatedAt,
-			CompletedAt: time.Now(),
-			Status:      "abandoned",
+			RoomID:       r.ID,
+			Player1ID:    ids[0],
+			Player2ID:    ids[1],
+			Player3ID:    ids[2],
+			Player4ID:    ids[3],
+			Player1IsBot: botFlags[0],
+			Player2IsBot: botFlags[1],
+			Player3IsBot: botFlags[2],
+			Player4IsBot: botFlags[3],
+			HasBots:      hasBots,
+			TeamAScore:   0,
+			TeamBScore:   0,
+			WinnerTeam:   0,
+			Variant:      r.Variant,
+			MatchMode:    r.MatchMode,
+			StartedAt:    r.UpdatedAt,
+			CompletedAt:  time.Now(),
+			Status:       "abandoned",
 		}
 		if err := m.matchRepo.CreateWithHands(record, nil); err != nil {
 			slog.Error("session: failed to persist reconciled abandoned match",

@@ -39,3 +39,17 @@ func (s *LiveMatch) cancelAllReconnectTimers() {
 		s.cancelSeatReconnectTimer(seat)
 	}
 }
+
+// cancelAllBotActionTimers stops every pending bot think-delay timer and
+// bumps each seat's generation so in-flight callbacks blocked on session.mu
+// fail their staleness check. Used by session teardown. Must be called under
+// session.mu.Lock().
+func (s *LiveMatch) cancelAllBotActionTimers() {
+	for seat := 0; seat < 4; seat++ {
+		s.botActionGenerations[seat]++
+		if s.botActionTimers[seat] != nil {
+			s.botActionTimers[seat].Stop()
+			s.botActionTimers[seat] = nil
+		}
+	}
+}

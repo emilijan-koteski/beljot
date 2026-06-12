@@ -68,6 +68,9 @@ const PlayerStateSchema = z.strictObject({
   team: z.string(),
   declarations: z.array(DeclarationSchema),
   connected: z.boolean(),
+  // Story 10.3: bot seats. Strict schema — this entry must land in the same
+  // commit as the Go PlayerState.IsBot field or every snapshot hard-fails.
+  isBot: z.boolean(),
 });
 
 const TrickCardSchema = z.strictObject({

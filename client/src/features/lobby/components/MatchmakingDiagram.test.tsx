@@ -15,6 +15,7 @@ function player(userId: number, username: string, seat: number): RoomPlayer {
     username,
     seat,
     team: seat % 2 === 0 ? "teamA" : "teamB",
+    isBot: false,
     createdAt: "2026-01-01T00:00:00Z",
   };
 }

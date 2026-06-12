@@ -1,4 +1,4 @@
-import { Crown, Settings, Shuffle, UserX, X, Zap } from "lucide-react";
+import { Bot, Crown, Settings, Shuffle, UserX, X, Zap } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -276,7 +276,7 @@ function OwnerConfirmDialog({
 }
 
 // ── Compact player row — the subject of the kick dialog ─────────────────────
-function PlayerRow({ name, seat, team }: DialogTarget) {
+function PlayerRow({ name, seat, team, icon }: DialogTarget & { icon?: ReactNode }) {
   const { t } = useTranslation();
   const seated = seat !== null && seat !== undefined;
   const relation = team === "A" ? "partner" : team === "B" ? "opponent" : null;
@@ -292,7 +292,7 @@ function PlayerRow({ name, seat, team }: DialogTarget) {
         borderRadius: 12,
       }}
     >
-      <Avatar name={name} size={42} team={team} />
+      <Avatar name={name} size={42} team={team} icon={icon} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -370,6 +370,55 @@ export function KickPlayerDialog({
       cancelTestId="kick-cancel"
     >
       <PlayerRow name={target.name} seat={target.seat} team={target.team} />
+    </OwnerConfirmDialog>
+  );
+}
+
+// ── Remove bot (destructive → danger; kick pattern, Story 10.3) ─────────────
+export function RemoveBotDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  pending,
+  target,
+}: ActionDialogProps) {
+  const { t } = useTranslation();
+  return (
+    <OwnerConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      tone="danger"
+      eyebrow={t("room.ownerConfirm.eyebrow")}
+      icon={<Bot size={24} color="var(--danger)" />}
+      titleTestId="remove-bot-dialog-title"
+      title={
+        <Trans
+          i18nKey="room.removeBotConfirm.title"
+          values={{ name: target.name }}
+          components={{ name: <span style={{ color: "var(--danger)" }} /> }}
+        />
+      }
+      lede={
+        <Trans
+          i18nKey="room.removeBotConfirm.lede"
+          values={{ name: target.name }}
+          components={{ strong: <strong style={{ color: "var(--ink)" }} /> }}
+        />
+      }
+      confirmLabel={t("room.removeBotConfirm.confirm")}
+      confirmIcon={<UserX size={15} color="#fbeae6" />}
+      onConfirm={onConfirm}
+      confirmPending={pending}
+      confirmTestId="remove-bot-confirm"
+      cancelLabel={t("room.removeBotConfirm.cancel")}
+      cancelTestId="remove-bot-cancel"
+    >
+      <PlayerRow
+        name={target.name}
+        seat={target.seat}
+        team={target.team}
+        icon={<Bot aria-hidden="true" />}
+      />
     </OwnerConfirmDialog>
   );
 }

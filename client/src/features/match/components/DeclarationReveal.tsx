@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
+import { playerDisplayName } from "@/shared/lib/botName";
 import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
@@ -81,7 +82,7 @@ export function DeclarationReveal({
     : null;
   const highestDeclarer =
     highestMeld !== null
-      ? (players.find((p) => p.seat === highestMeld.playerSeat)?.username ??
+      ? (playerDisplayName(t, players.find((p) => p.seat === highestMeld.playerSeat) ?? null) ??
         `#${highestMeld.playerSeat}`)
       : null;
   const highestLabel =
@@ -188,7 +189,7 @@ export function DeclarationReveal({
         <div className="flex flex-col gap-3 mb-4">
           {payload.declarations.map((decl, i) => {
             const declarer = players.find((p) => p.seat === decl.playerSeat);
-            const username = declarer?.username ?? `#${decl.playerSeat}`;
+            const username = playerDisplayName(t, declarer) ?? `#${decl.playerSeat}`;
             const meldLabel = t(
               `match.declaration.${declarationLabelKey(decl.type, decl.cards.length)}`,
             );

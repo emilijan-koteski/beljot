@@ -64,6 +64,14 @@ export function kickPlayer(roomId: number, userId: number): Promise<{ playerCoun
   return axiosClient.post(`/rooms/${roomId}/kick`, { userId });
 }
 
+export function addBot(roomId: number, seat: number): Promise<{ players: RoomPlayer[] }> {
+  return axiosClient.post(`/rooms/${roomId}/bots`, { seat });
+}
+
+export function removeBot(roomId: number, seat: number): Promise<{ players: RoomPlayer[] }> {
+  return axiosClient.delete(`/rooms/${roomId}/bots/${seat}`);
+}
+
 export function swapSeats(
   roomId: number,
   seatA: number,

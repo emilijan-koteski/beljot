@@ -1,4 +1,5 @@
 import {
+  Bot,
   ChevronDown,
   Clock,
   Crown,
@@ -16,7 +17,11 @@ import { toast } from "sonner";
 
 import { RoomChatDock } from "@/features/room/components/RoomChatDock";
 import { SeatTile } from "@/features/room/components/SeatTile";
-import { KickPlayerDialog, TransferOwnershipDialog } from "@/features/room/OwnerConfirmDialogs";
+import {
+  KickPlayerDialog,
+  RemoveBotDialog,
+  TransferOwnershipDialog,
+} from "@/features/room/OwnerConfirmDialogs";
 import { FetchError } from "@/shared/api/axiosClient";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
@@ -28,16 +33,19 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import {
+  useAddBotMutation,
   useJoinRoomMutation,
   useKickPlayerMutation,
   useLeaveRoomMutation,
   useLeaveSeatMutation,
+  useRemoveBotMutation,
   useSelectSeatMutation,
   useStartMatchMutation,
   useSwapSeatsMutation,
   useTransferOwnershipMutation,
 } from "@/shared/hooks/mutations/useRooms";
 import { useRoomDetailQuery } from "@/shared/hooks/queries/useRooms";
+import { botDisplayName } from "@/shared/lib/botName";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -154,6 +162,7 @@ export function RoomPage() {
     userId: number;
     username: string;
   } | null>(null);
+  const [removeBotConfirm, setRemoveBotConfirm] = useState<{ seat: number } | null>(null);
 
   // Mutations
   const joinRoomMutation = useJoinRoomMutation();
@@ -164,6 +173,8 @@ export function RoomPage() {
   const swapSeatsMutation = useSwapSeatsMutation();
   const leaveSeatMutation = useLeaveSeatMutation();
   const transferOwnershipMutation = useTransferOwnershipMutation();
+  const addBotMutation = useAddBotMutation();
+  const removeBotMutation = useRemoveBotMutation();
 
   // Seed roomStore from query data
   useEffect(() => {
@@ -421,10 +432,23 @@ export function RoomPage() {
     // Click the source again, the current user's own seat, or any click while
     // a swap is already pending cancels swap mode without firing the API.
     // Empty target seats are valid — they trigger a move-to-empty server-side.
+    // Exception: when the SOURCE is a bot, the owner's own seat is a valid
+    // target ("swap yourself with a bot") — the server runs the human ↔ bot
+    // swap atomically. The own-seat cancel stays for human sources, where
+    // clicking yourself has always meant "never mind".
     const targetPlayer = getPlayerAtSeat(players, targetSeat);
+    const sourcePlayer = getPlayerAtSeat(players, swapSourceSeat);
+    const sourceIsBot = sourcePlayer?.isBot === true;
     const isCurrentUser =
-      targetPlayer !== undefined && currentUser !== null && targetPlayer.userId === currentUser.id;
-    if (targetSeat === swapSourceSeat || isCurrentUser || swapSeatsMutation.isPending) {
+      targetPlayer !== undefined &&
+      targetPlayer.isBot !== true &&
+      currentUser !== null &&
+      targetPlayer.userId === currentUser.id;
+    if (
+      targetSeat === swapSourceSeat ||
+      (isCurrentUser && !sourceIsBot) ||
+      swapSeatsMutation.isPending
+    ) {
       setSwapSourceSeat(null);
       return;
     }
@@ -451,6 +475,39 @@ export function RoomPage() {
       } else {
         toast.error(t("room.errors.swapFailed"));
       }
+    }
+  };
+
+  const handleAddBot = async (seat: number) => {
+    if (!storeRoom || addBotMutation.isPending) return;
+    try {
+      const data = await addBotMutation.mutateAsync({ roomId: storeRoom.id, seat });
+      useRoomStore.getState().setPlayers(data.players);
+    } catch (err) {
+      if (err instanceof FetchError && err.code === "SEAT_TAKEN") {
+        toast.error(t("room.seatTaken"));
+      } else if (err instanceof FetchError && err.code === "BOTS_NOT_ALLOWED") {
+        toast.error(t("room.errors.botsNotAllowed"));
+      } else {
+        toast.error(t("room.errors.addBotFailed"));
+      }
+    }
+  };
+
+  const handleRemoveBotConfirm = async () => {
+    if (!storeRoom || !removeBotConfirm) return;
+    const { seat } = removeBotConfirm;
+    setRemoveBotConfirm(null);
+    try {
+      const data = await removeBotMutation.mutateAsync({ roomId: storeRoom.id, seat });
+      useRoomStore.getState().setPlayers(data.players);
+    } catch (err) {
+      if (err instanceof FetchError && err.code === "NO_BOT_ON_SEAT") {
+        // The bot is already gone (e.g. a concurrent removal) — store converges
+        // via the WS snapshot; nothing to surface.
+        return;
+      }
+      toast.error(t("room.errors.removeBotFailed"));
     }
   };
 
@@ -635,13 +692,17 @@ export function RoomPage() {
       <span className="inline-flex flex-wrap items-center gap-1">
         {pair.map((seatIndex, i) => {
           const p = getPlayerAtSeat(players, seatIndex);
-          const isYouSlot = p?.userId === currentUser?.id;
+          const isYouSlot = p !== undefined && p.isBot !== true && p.userId === currentUser?.id;
           return (
             <span key={seatIndex} className="inline-flex items-center gap-1">
               {i > 0 && <span className="text-ink-off">+</span>}
               {p ? (
                 <span className={isYouSlot ? "text-accent font-semibold" : "text-ink-dim"}>
-                  {isYouSlot ? t("room.seatYouInline") : p.username}
+                  {isYouSlot
+                    ? t("room.seatYouInline")
+                    : p.isBot === true
+                      ? botDisplayName(t, p.seat)
+                      : p.username}
                 </span>
               ) : (
                 <span className="text-ink-mute animate-pulse">{t("room.legendOpen")}</span>
@@ -769,13 +830,18 @@ export function RoomPage() {
                     ) : (
                       <ul className="flex flex-col">
                         {players.map((p) => {
-                          const isYou = currentUser?.id === p.userId;
-                          const isRoomOwner = p.userId === room.ownerId;
+                          const isBotRow = p.isBot === true;
+                          const isYou = !isBotRow && currentUser?.id === p.userId;
+                          const isRoomOwner = !isBotRow && p.userId === room.ownerId;
                           const isWaiting = room.status === "waiting";
-                          const ownerCanActOnRow = isOwner && isWaiting && !isRoomOwner && !isYou;
+                          // Kick/promote act on user accounts — bot rows are
+                          // managed from their seat tile's remove control.
+                          const ownerCanActOnRow =
+                            isOwner && isWaiting && !isRoomOwner && !isYou && !isBotRow;
                           const ownerCanKickRow = ownerCanActOnRow;
                           const ownerCanPromoteRow = ownerCanActOnRow && p.seat !== null;
                           const seated = p.seat !== null;
+                          const rowName = isBotRow ? botDisplayName(t, p.seat) : p.username;
                           const seatLabel = seated
                             ? t("room.inRoomList.seated", {
                                 seat: (p.seat as number) + 1,
@@ -783,22 +849,27 @@ export function RoomPage() {
                             : t("room.inRoomList.notSeated");
                           return (
                             <li
-                              key={p.userId}
+                              key={isBotRow ? `bot-${p.seat}` : p.userId}
                               className="flex items-center gap-2 px-2 py-1.5 text-sm"
-                              data-testid={`in-room-list-item-${p.userId}`}
+                              data-testid={
+                                isBotRow
+                                  ? `in-room-list-bot-${p.seat}`
+                                  : `in-room-list-item-${p.userId}`
+                              }
                             >
                               <Avatar
-                                name={p.username}
+                                name={rowName}
                                 size={22}
                                 team={rosterTeam(p)}
                                 you={isYou}
                                 owner={isRoomOwner}
+                                icon={isBotRow ? <Bot aria-hidden="true" /> : undefined}
                               />
                               <span className="text-ink flex min-w-0 flex-1 items-center gap-1">
                                 {isRoomOwner && (
                                   <Crown className="text-brass-deep size-3 shrink-0" aria-hidden />
                                 )}
-                                <span className="truncate font-medium">{p.username}</span>
+                                <span className="truncate font-medium">{rowName}</span>
                                 {isYou && (
                                   <span className="text-accent shrink-0 text-xs font-semibold">
                                     · {t("room.seatYouInline")}
@@ -992,12 +1063,25 @@ export function RoomPage() {
             {SEAT_INDEXES.map((seatIndex) => {
               const player = getPlayerAtSeat(players, seatIndex);
               const cardinal = SEAT_TO_CARDINAL[seatIndex] as CardinalPosition;
+              const isBotSeat = player?.isBot === true;
               const isCurrentUser =
-                player !== undefined && currentUser !== null && player.userId === currentUser.id;
-              const isSeatOwner = player !== undefined && player.userId === room.ownerId;
+                player !== undefined &&
+                !isBotSeat &&
+                currentUser !== null &&
+                player.userId === currentUser.id;
+              const isSeatOwner =
+                player !== undefined && !isBotSeat && player.userId === room.ownerId;
               const isWaiting = room.status === "waiting";
-              const ownerCanKick = isOwner && isWaiting && player !== undefined && !isSeatOwner;
+              // Kick/promote act on user accounts — bot seats get the
+              // dedicated remove-bot control instead.
+              const ownerCanKick =
+                isOwner && isWaiting && player !== undefined && !isSeatOwner && !isBotSeat;
+              const ownerCanRemoveBot = isOwner && isWaiting && isBotSeat;
+              const ownerCanAddBot =
+                isOwner && isWaiting && player === undefined && !room.isQuickPlay;
               const isSwapSource = swapSourceSeat === seatIndex;
+              // Bot tiles participate in the owner's swap flow as both source
+              // and target, exactly like humans.
               const ownerCanInitiateSwap =
                 isOwner && isWaiting && player !== undefined && !isCurrentUser && !inSwapMode;
               const canLeaveOwnSeat =
@@ -1013,8 +1097,14 @@ export function RoomPage() {
                 (swapSeatsMutation.variables?.seatA === seatIndex ||
                   swapSeatsMutation.variables?.seatB === seatIndex);
               const leaveSeatPendingForThisSeat = leaveSeatMutation.isPending && isCurrentUser;
+              const botPendingForThisSeat =
+                (addBotMutation.isPending && addBotMutation.variables?.seat === seatIndex) ||
+                (removeBotMutation.isPending && removeBotMutation.variables?.seat === seatIndex);
               const isPendingForThisSeat =
-                kickPendingForThisSeat || swapPendingForThisSeat || leaveSeatPendingForThisSeat;
+                kickPendingForThisSeat ||
+                swapPendingForThisSeat ||
+                leaveSeatPendingForThisSeat ||
+                botPendingForThisSeat;
 
               return (
                 <SeatTile
@@ -1067,6 +1157,15 @@ export function RoomPage() {
                             userId: player.userId,
                             username: player.username,
                           });
+                        }
+                      : undefined
+                  }
+                  onAddBot={ownerCanAddBot ? () => handleAddBot(seatIndex) : undefined}
+                  onRemoveBot={
+                    ownerCanRemoveBot
+                      ? () => {
+                          setSwapSourceSeat(null);
+                          setRemoveBotConfirm({ seat: seatIndex });
                         }
                       : undefined
                   }
@@ -1191,6 +1290,26 @@ export function RoomPage() {
           name: kickConfirm?.username ?? "",
           seat: kickTarget?.seat ?? kickConfirm?.seat ?? null,
           team: kickTarget ? rosterTeam(kickTarget) : null,
+        }}
+      />
+
+      {/* Owner remove-bot confirmation dialog (kick pattern) */}
+      <RemoveBotDialog
+        open={removeBotConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoveBotConfirm(null);
+        }}
+        onConfirm={handleRemoveBotConfirm}
+        pending={removeBotMutation.isPending}
+        target={{
+          name: removeBotConfirm !== null ? botDisplayName(t, removeBotConfirm.seat) : "",
+          seat: removeBotConfirm?.seat ?? null,
+          team:
+            removeBotConfirm !== null && viewerSeat !== null
+              ? resolveSeatMode(removeBotConfirm.seat) === "us"
+                ? "A"
+                : "B"
+              : null,
         }}
       />
     </div>

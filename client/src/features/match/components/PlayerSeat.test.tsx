@@ -16,11 +16,21 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     team: "teamA",
     declarations: [],
     connected: true,
+    isBot: false,
     ...overrides,
   };
 }
 
 describe("PlayerSeat", () => {
+  it("renders the localized seat-derived bot name for bot seats", () => {
+    const bot = makePlayer({ seat: 2, userId: 0, username: "", isBot: true });
+    render(<PlayerSeat player={bot} isSelf={false} isActive={false} seatTeam="gold" />);
+    expect(screen.getByText("Bot 3")).toBeInTheDocument();
+    // The avatar disc shows the bot glyph, not a name initial.
+    expect(screen.getByTestId("avatar-icon")).toBeInTheDocument();
+    expect(screen.getByTestId("player-seat-avatar")).not.toHaveTextContent("B");
+  });
+
   it("renders empty seat with 'Waiting…' text when player is null", () => {
     render(<PlayerSeat player={null} isSelf={false} isActive={false} seatTeam="gold" />);
 
