@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: rules-page Belote/Bela instant-win declaration (2026-06-14)
+
+- **Implement the "Belote / Bela" instant-win rule (all eight cards of one suit)** — currently documented ONLY in the rules content (`client/src/features/rules/content/shared.ts` `DECLARATIONS_BASE` id `bela`, 1001 pts, + the `bela` strings in `en/hr/mk/sr.ts`). There is no engine support and the rules page intentionally describes it without it being playable. Implementation needs: (1) **detect** a hand of all 8 cards in one suit — at deal time, once the full 8-card deal completes; (2) **award** the holding player's team an immediate **1001-point win and stop the match at once** — a dedicated end-of-match path distinct from normal hand scoring; (3) decide the open product questions before coding: variant applicability (Bitola vs Croatian), precedence vs. other game-end/scoring paths, the WS event(s) + reveal UI to announce it, and interaction with the **501-point match mode** (instant win regardless of the configured target?). Naming note: the chosen name overlaps the existing trump-pair declaration ("Belote-Rebelote" / "Bela-Rebela" / "Бељот-Ромбељот") in every locale — confirm desired final naming with product before implementing. [server/internal/game (deal/declarations/scoring), client rules content `bela`]
+
 ## Deferred from: code review of spec-auth-page-language-selector (2026-05-23)
 
 - **Post-login PATCH `/users/:id/preferences` is awaited before `navigate("/lobby")`** — a slow or hanging preferences endpoint will block the redirect with no loading indicator or timeout. Spec leaves async semantics unspecified; UX would benefit from making the reconcile fire-and-forget so navigation never waits on it. Surfaced by adversarial + edge-case reviews. [client/src/features/auth/LoginPage.tsx handleSubmit]

@@ -283,7 +283,7 @@ func completeTrick1(t *testing.T, decls []game.Declaration) *game.GameState {
 	}{
 		{1, game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}},   // seat 1 leads diamonds
 		{2, game.Card{Rank: game.Rank9, Suit: game.SuitHearts}},     // seat 2 void in diamonds, opponent winning → trumps
-		{3, game.Card{Rank: game.RankTen, Suit: game.SuitDiamonds}}, // seat 3 follows diamonds (Bitola: TD overplays 8D)
+		{3, game.Card{Rank: game.RankTen, Suit: game.SuitDiamonds}}, // seat 3 follows diamonds (trick already cut by 9H — any diamond legal)
 		{0, game.Card{Rank: game.RankQueen, Suit: game.SuitHearts}}, // seat 0 void in diamonds with trump K+Q — must cut; QH < 9H so falls through to any-trump
 	}
 	for _, p := range plays {

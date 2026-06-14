@@ -58,6 +58,12 @@ export const en: RulesLangData = {
       detail:
         "The biggest single declaration in the game. Catching all four Jacks in your eight dealt cards is rare — most players see it only a handful of times in a whole season.",
     },
+    bela: {
+      name: "Belote",
+      summary: "All eight cards of one suit, held by a single player.",
+      detail:
+        "The rarest hand in the game — every card of one suit, all eight, in one hand. It wins the whole match on the spot: that player's team takes the full 1001 points and play stops the instant it's shown.",
+    },
   },
 
   sections: [
@@ -150,7 +156,7 @@ export const en: RulesLangData = {
         {
           kind: "rule",
           title: "Cut by a trump? Following suit still comes first",
-          text: "Even once the trick has been cut by a trump, you must follow the led suit if you hold it, beating it with a higher card of that suit whenever you can. You only reach for a trump when you have none of the led suit. And if someone before you has already cut in, you must overtrump theirs if you have a higher one.",
+          text: "Once the trick has been cut by a trump, you must still follow the led suit if you hold it — but any card of that suit will do, since the trump is already winning and your suit can no longer take the trick. You only reach for a trump when you have none of the led suit; and if someone before you has already cut in, you must overtrump theirs with a higher trump if you can, or play any trump if you can’t.",
         },
         {
           kind: "p",
@@ -172,7 +178,7 @@ export const en: RulesLangData = {
         {
           kind: "rule",
           title: "Only one team gets paid for declarations",
-          text: "Each side puts forward its single best declaration. Whoever’s is stronger scoops up every declaration across both their hands — the other team scores nothing for theirs. A longer run beats a shorter one. Same length? The higher top card wins. Still tied? A run in trump takes it. Belote and Rebelote sit outside this contest — whoever announces them always scores them.",
+          text: "Each side puts forward its single best declaration. Whoever’s is stronger scoops up every declaration across both their hands — the other team scores nothing for theirs. A longer run beats a shorter one — up to a quint. Once both runs are quints (five cards or more), length stops mattering: the higher top card wins, as it does between two runs of equal length. Still level? A run in trump takes it — and if neither is trump, the tie falls to whichever player comes first in the turn order, starting to the dealer’s right. Belote and Rebelote sit outside this contest — whoever announces them always scores them.",
         },
       ],
     },

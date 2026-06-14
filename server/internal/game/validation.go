@@ -4,9 +4,11 @@ package game
 // legally allowed to play, given the current game state. Implements Bitola
 // variant card play validation:
 //
-//  1. Follow suit if possible — must overplay the highest led-suit card
-//     currently in the trick when the player has a higher led-suit card
-//     (applies whether the led suit is trump or not). Otherwise any
+//  1. Follow suit if possible. The overplay (iber) obligation — play a
+//     led-suit card strictly higher than the highest led-suit card on the
+//     table — applies ONLY while the led suit can still win the trick: when
+//     the led suit is trump, or no trump has cut the trick yet. Once a trump
+//     cuts a non-trump-led trick the led suit can no longer win, so any
 //     same-suit card is legal.
 //  2. If void in led suit and the player holds at least one trump → must
 //     cut. Over-trump the highest trump on the table if possible; otherwise
@@ -31,11 +33,16 @@ func legalCards(state *GameState, seat int) []Card {
 	suitCards := filterBySuit(hand, ledSuit)
 
 	if len(suitCards) > 0 {
-		// Must follow suit; must overplay the highest led-suit card on the
-		// table if the player can. Applies to both trump-led and non-trump-led
-		// tricks (Bitola: the iber rule extends to the led non-trump suit).
-		if higher := applyMustOverplayLedSuit(suitCards, state.CurrentTrick, ledSuit, trumpSuit); len(higher) > 0 {
-			return higher
+		// Must follow suit. The overplay (iber) obligation applies only while
+		// the led suit can still win the trick: when the led suit is trump, or
+		// no trump has cut the trick yet. Once a trump cuts a non-trump-led
+		// trick the led suit can no longer take it, so any same-suit card is
+		// legal (the trump is already winning).
+		ledSuitCanWin := ledSuit == trumpSuit || highestTrumpInTrick(state.CurrentTrick, trumpSuit) == nil
+		if ledSuitCanWin {
+			if higher := applyMustOverplayLedSuit(suitCards, state.CurrentTrick, ledSuit, trumpSuit); len(higher) > 0 {
+				return higher
+			}
 		}
 		return suitCards
 	}

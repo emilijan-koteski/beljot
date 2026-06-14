@@ -42,4 +42,7 @@ export const DECLARATIONS_BASE: DeclarationBase[] = [
   { id: "carre", pts: 100, tier: 1, kind: "set" },
   { id: "carre9", pts: 150, tier: 2, kind: "set" },
   { id: "carreJ", pts: 200, tier: 2, kind: "set" },
+  // Belote / Bela — all eight cards of one suit: instant 1001-point win.
+  // Documentation only; engine detection/scoring is deferred (see deferred-work.md).
+  { id: "bela", pts: 1001, tier: 2, kind: "run" },
 ];

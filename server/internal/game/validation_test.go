@@ -203,53 +203,62 @@ func TestValidationMustOverplayLedSuit(t *testing.T) {
 		require.NotNil(t, result)
 	})
 
-	t.Run("must overplay led non-trump even after opponent trumped", func(t *testing.T) {
-		// Trump = Hearts. Seat 0 leads KS. Seat 1 follows with 7S (lowest).
-		// Seat 2 (void in spades, opponent winning) trumps with 7H. Seat 3's
-		// turn — has spades 8S, AS (overridden). Highest spade on table is
-		// still KS (the trump in trick does not change led-suit overplay
-		// obligation), so 8S must be rejected and AS must be legal.
-		gs := testfixtures.NewGameMidPlay(1)
-		gs.Players[1].Hand = []game.Card{
-			{Rank: game.Rank7, Suit: game.SuitSpades},
-			{Rank: game.Rank9, Suit: game.SuitSpades},
-			{Rank: game.Rank8, Suit: game.SuitSpades},
-			{Rank: game.RankJack, Suit: game.SuitSpades},
-			{Rank: game.Rank8, Suit: game.SuitClubs},
+	t.Run("led non-trump cut by trump — any led-suit card legal, off-suit illegal", func(t *testing.T) {
+		// Trump = Hearts. Seat 0 leads KS. Seat 1 follows 7S. Seat 2 (void in
+		// spades) cuts with 7H. Seat 3's turn — holds 8S, AS, a trump (9H) and
+		// clubs. Once the trick is cut by a trump the led suit can no longer
+		// win, so seat 3 may follow with ANY spade (8S, the low card, is now
+		// legal) — but must still follow suit: the off-suit clubs and even the
+		// trump 9H stay illegal because seat 3 holds the led suit.
+		setup := func() *game.GameState {
+			gs := testfixtures.NewGameMidPlay(1)
+			gs.Players[1].Hand = []game.Card{
+				{Rank: game.Rank7, Suit: game.SuitSpades},
+				{Rank: game.Rank9, Suit: game.SuitSpades},
+				{Rank: game.Rank8, Suit: game.SuitSpades},
+				{Rank: game.RankJack, Suit: game.SuitSpades},
+				{Rank: game.Rank8, Suit: game.SuitClubs},
+			}
+			gs.Players[3].Hand = []game.Card{
+				{Rank: game.Rank8, Suit: game.SuitSpades},
+				{Rank: game.RankAce, Suit: game.SuitSpades},
+				{Rank: game.Rank9, Suit: game.SuitHearts}, // trump — still illegal: must follow spades
+				{Rank: game.RankKing, Suit: game.SuitClubs},
+				{Rank: game.RankQueen, Suit: game.SuitClubs},
+			}
+
+			gs, err := game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: 0,
+				Card: &game.Card{Rank: game.RankKing, Suit: game.SuitSpades}})
+			require.NoError(t, err)
+			gs, err = game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: 1,
+				Card: &game.Card{Rank: game.Rank7, Suit: game.SuitSpades}})
+			require.NoError(t, err)
+			gs, err = game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: 2,
+				Card: &game.Card{Rank: game.Rank7, Suit: game.SuitHearts}})
+			require.NoError(t, err)
+			return gs
 		}
-		gs.Players[3].Hand = []game.Card{
-			{Rank: game.Rank8, Suit: game.SuitSpades},
-			{Rank: game.RankAce, Suit: game.SuitSpades},
-			{Rank: game.RankKing, Suit: game.SuitClubs},
-			{Rank: game.RankQueen, Suit: game.SuitClubs},
+
+		// Both the low spade and the high spade are now legal follows.
+		for _, legalRank := range []game.Rank{game.Rank8, game.RankAce} {
+			result, err := game.ApplyAction(setup(), game.Action{Type: game.ActionPlayCard, PlayerSeat: 3,
+				Card: &game.Card{Rank: legalRank, Suit: game.SuitSpades}})
+			require.NoError(t, err, "%s of S must be legal once the trick is cut by a trump", legalRank)
+			require.NotNil(t, result)
 		}
 
-		// Seat 0 leads KS.
-		gs, err := game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: 0,
-			Card: &game.Card{Rank: game.RankKing, Suit: game.SuitSpades}})
-		require.NoError(t, err)
+		// Off-suit clubs remain illegal — following suit is still mandatory.
+		for _, illegalRank := range []game.Rank{game.RankKing, game.RankQueen} {
+			_, err := game.ApplyAction(setup(), game.Action{Type: game.ActionPlayCard, PlayerSeat: 3,
+				Card: &game.Card{Rank: illegalRank, Suit: game.SuitClubs}})
+			assert.ErrorIs(t, err, apperr.ErrIllegalPlay, "%s of C must be illegal: seat 3 still holds spades", illegalRank)
+		}
 
-		// Seat 1 follows with 7S — KS is the only spade on table (rank 5);
-		// seat 1 has 7S(0), 9S(2), 8S(1), JS(3) — none overplay → 7S is legal.
-		gs, err = game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: 1,
-			Card: &game.Card{Rank: game.Rank7, Suit: game.SuitSpades}})
-		require.NoError(t, err)
-
-		// Seat 2 trumps with 7H (void in spades, opponent led/winning).
-		gs, err = game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: 2,
-			Card: &game.Card{Rank: game.Rank7, Suit: game.SuitHearts}})
-		require.NoError(t, err)
-
-		// Seat 3 attempts 8S — illegal (KS still highest spade on table; AS overplays).
-		_, err = game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: 3,
-			Card: &game.Card{Rank: game.Rank8, Suit: game.SuitSpades}})
-		assert.ErrorIs(t, err, apperr.ErrIllegalPlay)
-
-		// Seat 3 plays AS — legal.
-		result, err := game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: 3,
-			Card: &game.Card{Rank: game.RankAce, Suit: game.SuitSpades}})
-		require.NoError(t, err)
-		require.NotNil(t, result)
+		// A trump in hand is NOT a legal alternative — holding the led suit
+		// forces a follow even after the trick has been cut.
+		_, err := game.ApplyAction(setup(), game.Action{Type: game.ActionPlayCard, PlayerSeat: 3,
+			Card: &game.Card{Rank: game.Rank9, Suit: game.SuitHearts}})
+		assert.ErrorIs(t, err, apperr.ErrIllegalPlay, "9H (trump) must be illegal: seat 3 still holds spades")
 	})
 
 	t.Run("multiple higher led-suit cards — all strictly higher are legal", func(t *testing.T) {

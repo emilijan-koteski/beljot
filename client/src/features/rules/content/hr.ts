@@ -57,6 +57,12 @@ export const hr: RulesLangData = {
       detail:
         "Najveće pojedinačno zvanje u igri. Dobiti sva četiri dečka u svojih osam karata je rijetko. Većina igrača to vidi tek nekoliko puta u cijeloj sezoni.",
     },
+    bela: {
+      name: "Bela",
+      summary: "Svih osam karata jedne boje, u jednoj ruci.",
+      detail:
+        "Najrjeđa ruka u igri. Svih osam karata jedne boje kod jednog igrača. Odmah nosi cijeli meč: taj tim dobiva punih 1001 bod i igra staje istog trena kad se pokaže.",
+    },
   },
 
   sections: [
@@ -149,7 +155,7 @@ export const hr: RulesLangData = {
         {
           kind: "rule",
           title: "Rezano adutom? Praćenje boje ipak je prvo",
-          text: "Čak i kad je štih već rezan adutom, moraš pratiti izašlu boju ako je imaš, i nadmašiti je višom kartom te boje kad god možeš. Za adut posežeš samo kad uopće nemaš izašlu boju. A ako je netko prije tebe već rezao, moraš nadmašiti njegov adut ako imaš viši.",
+          text: "Kad je štih već rezan adutom, i dalje moraš pratiti izašlu boju ako je imaš, ali bilo koja karta te boje je dovoljna, jer adut već nosi štih i tvoja boja ga više ne može osvojiti. Za adut posežeš samo kad uopće nemaš izašlu boju; a ako je netko prije tebe već rezao, moraš nadmašiti njegov adut višim ako možeš, ili baciti bilo koji adut ako ne možeš.",
         },
         {
           kind: "p",
@@ -171,7 +177,7 @@ export const hr: RulesLangData = {
         {
           kind: "rule",
           title: "Samo jedan tim je plaćen za zvanja",
-          text: "Svaka strana ističe svoje jedino najbolje zvanje. Čije je jače, skuplja sva zvanja iz obje ruke tima, a drugi tim ne dobiva ništa za svoja. Dulji niz pobjeđuje kraći. Ista duljina? Viša gornja karta nosi. Još uvijek izjednačeno? Niz u adutu pobjeđuje. Bela i Rebela stoje izvan ovog natjecanja, tko ih zove, uvijek ih boduje.",
+          text: "Svaka strana ističe svoje jedino najbolje zvanje. Čije je jače, skuplja sva zvanja iz obje ruke tima, a drugi tim ne dobiva ništa za svoja. Dulji niz pobjeđuje kraći, ali samo do kvinte. Kad obje strane imaju kvintu (pet ili više karata), duljina više ne znači ništa, nego pobjeđuje niz s višom gornjom kartom, jednako kao i kod dva niza iste duljine. Još uvijek izjednačeno? Niz u adutu nosi. A ako nijedan niz nije adut, prednost ima onaj od dvojice igrača koji je prije na redu, počevši zdesna od djelitelja. Bela i Rebela stoje izvan ovog natjecanja, tko ih zove, uvijek ih boduje.",
         },
       ],
     },
