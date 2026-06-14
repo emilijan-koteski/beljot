@@ -135,12 +135,13 @@ describe("legalCards", () => {
     expect(legalCards(state, 2).map((c) => `${c.rank}${c.suit}`)).toEqual(["7H", "8H"]);
   });
 
-  it("must overplay led non-trump even when an opponent already trumped", () => {
+  it("led non-trump cut by trump → any heart legal, off-suit and trump excluded", () => {
     // Trump is diamonds. Hearts led with KH; seat 3 (opponent of seat 2)
-    // trumped with 7D. Hand has 8H, AH. The trump in trick does not change
-    // the led-suit overplay obligation: highest hearts on table is still KH,
-    // so AH (7) must be played; 8H (1) is excluded.
-    const myHand = hand(["8H", "AH", "KC"]);
+    // trumped with 7D. Hand has 8H, AH, KC and a trump QD. Once a trump has cut
+    // the trick the led suit can no longer win, so both 8H and AH are legal
+    // follows — but holding the led suit forces a follow, so the off-suit KC
+    // and even the trump QD stay illegal.
+    const myHand = hand(["8H", "AH", "KC", "QD"]);
     const state = makeState({
       mySeat: 2,
       myHand,
@@ -148,7 +149,11 @@ describe("legalCards", () => {
       leadSuit: "H",
       currentTrick: [trickCard("KH", 1), trickCard("7D", 3)],
     });
-    expect(legalCards(state, 2).map((c) => `${c.rank}${c.suit}`)).toEqual(["AH"]);
+    expect(
+      legalCards(state, 2)
+        .map((c) => `${c.rank}${c.suit}`)
+        .sort(),
+    ).toEqual(["8H", "AH"]);
   });
 
   it("multiple higher led-suit cards — all strictly higher are legal", () => {

@@ -150,7 +150,7 @@ export const en: RulesLangData = {
         {
           kind: "rule",
           title: "Cut by a trump? Following suit still comes first",
-          text: "Even once the trick has been cut by a trump, you must follow the led suit if you hold it, beating it with a higher card of that suit whenever you can. You only reach for a trump when you have none of the led suit. And if someone before you has already cut in, you must overtrump theirs if you have a higher one.",
+          text: "Once the trick has been cut by a trump, you must still follow the led suit if you hold it — but any card of that suit will do, since the trump is already winning and your suit can no longer take the trick. You only reach for a trump when you have none of the led suit; and if someone before you has already cut in, you must overtrump theirs with a higher trump if you can, or play any trump if you can’t.",
         },
         {
           kind: "p",

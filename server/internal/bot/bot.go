@@ -196,12 +196,13 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 			if c := highestPointNonOvertaking(v, legal, trump); c != nil {
 				return *c
 			}
-			// Every legal card overtakes (Bitola's forced overplay) — the
-			// trick stays ours either way; spend the cheapest.
+			// No non-overtaking card — every legal play would overtake the
+			// partner. The trick stays ours either way; spend the cheapest.
 			return lowestValue(legal, trump)
 		}
-		// Partner's card is still contestable — keep our points home. The
-		// forced-overplay rule auto-promotes us when we hold the boss.
+		// Partner's card is still contestable — keep our points home. While the
+		// led suit can still win, the overplay rule auto-promotes us when we
+		// hold the boss.
 		return lowestValue(legal, trump)
 	}
 

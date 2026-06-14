@@ -149,7 +149,7 @@ export const sr: RulesLangData = {
         {
           kind: "rule",
           title: "Sečeno adutom? Praćenje boje ipak je prvo",
-          text: "Čak i kad je štih već sečen adutom, moraš da pratiš izašlu boju i da je nadbiješ višom kartom te boje kad god možeš. Za adut posežeš samo kad uopšte nemaš izašlu boju. A ako je neko pre tebe već sekao, moraš da nadsečeš njegov adut ako imaš viši.",
+          text: "Kad je štih već sečen adutom, i dalje moraš da pratiš izašlu boju ako je imaš — ali bilo koja karta te boje je dovoljna, jer adut već nosi štih i tvoja boja više ne može da ga osvoji. Za adut posežeš samo kad uopšte nemaš izašlu boju; a ako je neko pre tebe već sekao, moraš da nadsečeš njegov adut višim ako možeš, ili da baciš bilo koji adut ako ne možeš.",
         },
         {
           kind: "p",
