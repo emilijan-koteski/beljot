@@ -57,6 +57,12 @@ export const sr: RulesLangData = {
       detail:
         "Najveće pojedinačno zvanje u igri. Dobiti sva četiri žandara u svojih osam karata je retko. Većina igrača to vidi tek nekoliko puta u celoj sezoni.",
     },
+    bela: {
+      name: "Bela",
+      summary: "Svih osam karata jedne boje, u jednoj ruci.",
+      detail:
+        "Najređa ruka u igri — svih osam karata jedne boje kod jednog igrača. Odmah nosi ceo meč: taj tim dobija punih 1001 poen i igra staje istog trena kad se pokaže.",
+    },
   },
 
   sections: [

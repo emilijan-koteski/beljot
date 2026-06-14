@@ -58,6 +58,12 @@ export const en: RulesLangData = {
       detail:
         "The biggest single declaration in the game. Catching all four Jacks in your eight dealt cards is rare — most players see it only a handful of times in a whole season.",
     },
+    bela: {
+      name: "Belote",
+      summary: "All eight cards of one suit, held by a single player.",
+      detail:
+        "The rarest hand in the game — every card of one suit, all eight, in one hand. It wins the whole match on the spot: that player's team takes the full 1001 points and play stops the instant it's shown.",
+    },
   },
 
   sections: [

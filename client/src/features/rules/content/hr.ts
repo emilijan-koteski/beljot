@@ -57,6 +57,12 @@ export const hr: RulesLangData = {
       detail:
         "Najveće pojedinačno zvanje u igri. Dobiti sva četiri dečka u svojih osam karata je rijetko. Većina igrača to vidi tek nekoliko puta u cijeloj sezoni.",
     },
+    bela: {
+      name: "Bela",
+      summary: "Svih osam karata jedne boje, u jednoj ruci.",
+      detail:
+        "Najrjeđa ruka u igri — svih osam karata jedne boje kod jednog igrača. Odmah nosi cijeli meč: taj tim dobiva punih 1001 bod i igra staje istog trena kad se pokaže.",
+    },
   },
 
   sections: [
