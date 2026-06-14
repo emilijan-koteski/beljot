@@ -61,7 +61,7 @@ export const hr: RulesLangData = {
       name: "Bela",
       summary: "Svih osam karata jedne boje, u jednoj ruci.",
       detail:
-        "Najrjeđa ruka u igri — svih osam karata jedne boje kod jednog igrača. Odmah nosi cijeli meč: taj tim dobiva punih 1001 bod i igra staje istog trena kad se pokaže.",
+        "Najrjeđa ruka u igri. Svih osam karata jedne boje kod jednog igrača. Odmah nosi cijeli meč: taj tim dobiva punih 1001 bod i igra staje istog trena kad se pokaže.",
     },
   },
 
@@ -155,7 +155,7 @@ export const hr: RulesLangData = {
         {
           kind: "rule",
           title: "Rezano adutom? Praćenje boje ipak je prvo",
-          text: "Kad je štih već rezan adutom, i dalje moraš pratiti izašlu boju ako je imaš — ali bilo koja karta te boje je dovoljna, jer adut već nosi štih i tvoja boja ga više ne može osvojiti. Za adut posežeš samo kad uopće nemaš izašlu boju; a ako je netko prije tebe već rezao, moraš nadmašiti njegov adut višim ako možeš, ili baciti bilo koji adut ako ne možeš.",
+          text: "Kad je štih već rezan adutom, i dalje moraš pratiti izašlu boju ako je imaš, ali bilo koja karta te boje je dovoljna, jer adut već nosi štih i tvoja boja ga više ne može osvojiti. Za adut posežeš samo kad uopće nemaš izašlu boju; a ako je netko prije tebe već rezao, moraš nadmašiti njegov adut višim ako možeš, ili baciti bilo koji adut ako ne možeš.",
         },
         {
           kind: "p",

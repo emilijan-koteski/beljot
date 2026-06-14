@@ -61,7 +61,7 @@ export const sr: RulesLangData = {
       name: "Bela",
       summary: "Svih osam karata jedne boje, u jednoj ruci.",
       detail:
-        "Najređa ruka u igri — svih osam karata jedne boje kod jednog igrača. Odmah nosi ceo meč: taj tim dobija punih 1001 poen i igra staje istog trena kad se pokaže.",
+        "Najređa ruka u igri. Svih osam karata jedne boje kod jednog igrača. Odmah nosi ceo meč: taj tim dobija punih 1001 poen i igra staje istog trena kad se pokaže.",
     },
   },
 
@@ -155,7 +155,7 @@ export const sr: RulesLangData = {
         {
           kind: "rule",
           title: "Sečeno adutom? Praćenje boje ipak je prvo",
-          text: "Kad je štih već sečen adutom, i dalje moraš da pratiš izašlu boju ako je imaš — ali bilo koja karta te boje je dovoljna, jer adut već nosi štih i tvoja boja više ne može da ga osvoji. Za adut posežeš samo kad uopšte nemaš izašlu boju; a ako je neko pre tebe već sekao, moraš da nadsečeš njegov adut višim ako možeš, ili da baciš bilo koji adut ako ne možeš.",
+          text: "Kad je štih već sečen adutom, i dalje moraš da pratiš izašlu boju ako je imaš, ali bilo koja karta te boje je dovoljna, jer adut već nosi štih i tvoja boja više ne može da ga osvoji. Za adut posežeš samo kad uopšte nemaš izašlu boju; a ako je neko pre tebe već sekao, moraš da nadsečeš njegov adut višim ako možeš, ili da baciš bilo koji adut ako ne možeš.",
         },
         {
           kind: "p",
