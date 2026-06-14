@@ -178,7 +178,7 @@ export const en: RulesLangData = {
         {
           kind: "rule",
           title: "Only one team gets paid for declarations",
-          text: "Each side puts forward its single best declaration. Whoever’s is stronger scoops up every declaration across both their hands — the other team scores nothing for theirs. A longer run beats a shorter one — up to a quint. Once both runs are quints (five cards or more), length stops mattering: the higher top card wins, as it does between two runs of equal length. Still level? A run in trump takes it — and if neither is trump, the tie falls to whichever player comes first in the turn order, starting to the dealer’s right. Belote and Rebelote sit outside this contest — whoever announces them always scores them.",
+          text: "Each side puts forward its single best declaration. Whoever’s is stronger scoops up every declaration across both their hands — the other team scores nothing for theirs. Worth the same? A four-of-a-kind beats a run — a carré of Aces (100) takes it over a quint (100). A longer run beats a shorter one — up to a quint. Once both runs are quints (five cards or more), length stops mattering: the higher top card wins, as it does between two runs of equal length. Still level? A run in trump takes it — and if neither is trump, the tie falls to whichever player comes first in the turn order, starting to the dealer’s right. Belote and Rebelote sit outside this contest — whoever announces them always scores them.",
         },
       ],
     },

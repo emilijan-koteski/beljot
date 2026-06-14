@@ -177,7 +177,7 @@ export const sr: RulesLangData = {
         {
           kind: "rule",
           title: "Samo jedan tim je plaćen za zvanja",
-          text: "Svaka strana ističe svoje jedino najbolje zvanje. Čije je jače, skuplja sva zvanja iz obe ruke tima, a drugi tim ne dobija ništa za svoja. Duži niz pobeđuje kraći, ali samo do kvinte. Kad obe strane imaju kvintu (pet ili više karata), dužina više ne znači ništa, nego pobeđuje niz sa višom gornjom kartom, isto kao i kod dva niza iste dužine. Još uvek izjednačeno? Niz u adutu nosi. A ako nijedan niz nije adut, prednost ima onaj od dvojice igrača koji je pre na redu, počev zdesna od delioca. Bela i Rebela stoje van ovog takmičenja, ko ih zove, uvek ih boduje.",
+          text: "Svaka strana ističe svoje jedino najbolje zvanje. Čije je jače, skuplja sva zvanja iz obe ruke tima, a drugi tim ne dobija ništa za svoja. Jednako vrede? Kare pobeđuje niz, pa kare asova (100) pobeđuje kvintu (100). Duži niz pobeđuje kraći, ali samo do kvinte. Kad obe strane imaju kvintu (pet ili više karata), dužina više ne znači ništa, nego pobeđuje niz sa višom gornjom kartom, isto kao i kod dva niza iste dužine. Još uvek izjednačeno? Niz u adutu nosi. A ako nijedan niz nije adut, prednost ima onaj od dvojice igrača koji je pre na redu, počev zdesna od delioca. Bela i Rebela stoje van ovog takmičenja, ko ih zove, uvek ih boduje.",
         },
       ],
     },
