@@ -1,4 +1,4 @@
-import { Bot, Crown, Shuffle, UserX } from "lucide-react";
+import { Bot, Crown, Hourglass, Shuffle, UserX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
@@ -29,6 +29,12 @@ type SeatTileProps = {
   swapMode: boolean;
   isClickable: boolean;
   isPending: boolean;
+  /**
+   * Reopened-room presence (v2): this seat's human is still away (on the prior
+   * match's result dialog) and has not returned/rejoined yet. Shows a "waiting
+   * to return" badge; the owner Start button is gated until none remain.
+   */
+  waitingToReturn?: boolean;
   ownerCanActOnRow: boolean;
   onSelect: () => void;
   onKick?: () => void;
@@ -61,6 +67,7 @@ export function SeatTile({
   swapMode,
   isClickable,
   isPending,
+  waitingToReturn = false,
   ownerCanActOnRow,
   onSelect,
   onKick,
@@ -162,6 +169,16 @@ export function SeatTile({
                   <Badge tone={mode === "us" ? "teamA" : "teamB"}>
                     {mode === "us" ? t("room.seatTile.partner") : t("room.seatTile.opponent")}
                   </Badge>
+                )}
+                {waitingToReturn && !isBot && (
+                  <span data-testid={`waiting-to-return-${seatIndex}`}>
+                    <Badge
+                      tone="neutral"
+                      icon={<Hourglass className="size-2.5 animate-pulse" aria-hidden="true" />}
+                    >
+                      {t("room.seatTile.waitingToReturn")}
+                    </Badge>
+                  </span>
                 )}
               </div>
             </div>

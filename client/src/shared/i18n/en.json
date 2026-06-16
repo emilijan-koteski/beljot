@@ -231,6 +231,7 @@
       "botsNotAllowed": "Bots can't be added to this room"
     },
     "waitingForPlayers": "Waiting for players",
+    "waitingForReturn": "Waiting for players to return",
     "copyLinkAriaLabel": "Copy room code {{code}}",
     "copyLinkSuccess": "Room code copied!",
     "copyLinkFailed": "Failed to copy — code: {{code}}",
@@ -315,6 +316,7 @@
       "swapHere": "Swap here",
       "partner": "Partner",
       "opponent": "Opponent",
+      "waitingToReturn": "Waiting to return",
       "pickTarget": "To swap",
       "partnerSeat": "Partner seat · open",
       "opponentSeat": "Opponent seat · open",
@@ -635,6 +637,8 @@
       "returnToLobby": "Return to Lobby",
       "returnToRoom": "Return to Room",
       "returnToRoomError": "Couldn't return to the room — it may no longer be available.",
+      "returnToRoomAlreadyStarted": "The next match already started without you.",
+      "returnToRoomNotInRoom": "You're no longer in this room.",
       "surrenderNote": "{{username}} surrendered the match"
     },
     "emote": {

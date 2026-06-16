@@ -67,10 +67,16 @@ type RoomHandler struct {
 	repo         RoomRepository
 	matchStarter MatchStarter
 	hub          Broadcaster
+	presence     *PresenceRegistry
 }
 
-func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster) *RoomHandler {
-	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub}
+func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster, presence *PresenceRegistry) *RoomHandler {
+	// Default to a private registry when none is injected (keeps test setups
+	// that don't exercise presence working without threading a registry).
+	if presence == nil {
+		presence = NewPresenceRegistry()
+	}
+	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence}
 }
 
 // broadcastToRoom sends a WebSocket message to all players in a room.
@@ -365,6 +371,11 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		return createErr
 	}
 
+	// The creator is present from the moment the room exists — without this the
+	// reopened-room Start gate (all seated humans present) would block the owner
+	// on the very first match.
+	h.presence.Add(room.ID, userID)
+
 	// Broadcast system:room_created to all connected clients (lobby-wide).
 	// roomLifecyclePayload also populates room.OwnerUsername so the JSON
 	// response immediately below carries it.
@@ -419,6 +430,11 @@ func (h *RoomHandler) ListRooms(c echo.Context) error {
 type RoomDetailResponse struct {
 	Room    *Room        `json:"room"`
 	Players []RoomPlayer `json:"players"`
+	// ReturnedUserIds lists the seated/joined users currently "present" in a
+	// reopened room (returned via "Return to room" or freshly joined), as
+	// opposed to ex-players still lingering on the match result dialog. Drives
+	// the RoomPage "waiting to return" state and the owner Start gate.
+	ReturnedUserIds []uint `json:"returnedUserIds"`
 }
 
 func (h *RoomHandler) GetRoom(c echo.Context) error {
@@ -450,8 +466,9 @@ func (h *RoomHandler) GetRoom(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": RoomDetailResponse{
-			Room:    room,
-			Players: mergeBotPlayers(players, bots),
+			Room:            room,
+			Players:         mergeBotPlayers(players, bots),
+			ReturnedUserIds: h.presence.Present(uint(roomID)),
 		},
 	})
 }
@@ -485,8 +502,9 @@ func (h *RoomHandler) GetRoomByCode(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": RoomDetailResponse{
-			Room:    room,
-			Players: mergeBotPlayers(players, bots),
+			Room:            room,
+			Players:         mergeBotPlayers(players, bots),
+			ReturnedUserIds: h.presence.Present(room.ID),
 		},
 	})
 }
@@ -559,6 +577,10 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		}
 		return fmt.Errorf("joining room: %w", err)
 	}
+
+	// Mark the fresh joiner present so they count toward the reopened-room
+	// Start gate (and seed presence for first-ever joins, which is harmless).
+	h.presence.Add(uint(roomID), userID)
 
 	// Broadcast system:player_joined to room participants
 	players, broadcastErr := h.repo.FindPlayersByRoomID(uint(roomID))
@@ -677,6 +699,10 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 		}
 		return fmt.Errorf("leaving room: %w", err)
 	}
+
+	// Drop the leaver's presence. Remove auto-clears the room's whole presence
+	// entry once the last present user leaves (empty-room close).
+	h.presence.Remove(uint(roomID), userID)
 
 	// Broadcast system:player_left to remaining room participants (not the leaving player)
 	remainingPlayers, broadcastErr := h.repo.FindPlayersByRoomID(uint(roomID))
@@ -824,6 +850,15 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		h.broadcastRoomUpdated(postRoom)
 	}
 
+	// Mark the returner present and announce it to the room — on EVERY successful
+	// return (member), not just the reopen, so each returner flips their own
+	// "waiting to return" seat to present and the owner Start gate can re-evaluate.
+	h.presence.Add(uint(roomID), userID)
+	h.broadcastToRoom(uint(roomID), ws.SystemPlayerReturned, ws.PlayerReturnedPayload{
+		RoomID: uint(roomID),
+		UserID: userID,
+	})
+
 	players, err := h.repo.FindPlayersByRoomID(uint(roomID))
 	if err != nil {
 		return fmt.Errorf("finding room players: %w", err)
@@ -838,8 +873,9 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": RoomDetailResponse{
-			Room:    postRoom,
-			Players: mergeBotPlayers(players, bots),
+			Room:            postRoom,
+			Players:         mergeBotPlayers(players, bots),
+			ReturnedUserIds: h.presence.Present(uint(roomID)),
 		},
 	})
 }
@@ -1184,6 +1220,9 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 			h.revertAutoStart(roomID, autoStartRoom, autoStartPlayers)
 			matchStarted = false
 		} else {
+			// Match is live — clear presence (quick-play, but keep parity with
+			// the manual StartMatch path).
+			h.presence.Clear(roomID)
 			h.broadcastToRoom(roomID, ws.SystemMatchStarted, map[string]interface{}{
 				"roomId": roomID,
 			})
@@ -1284,6 +1323,10 @@ func (h *RoomHandler) KickPlayer(c echo.Context) error {
 	if postRoom == nil {
 		return apperr.ErrRoomNotFound
 	}
+
+	// Drop the kicked player's presence so they no longer count toward the Start
+	// gate (their /return is already rejected as a non-member — see ReturnToRoom).
+	h.presence.Remove(uint(roomID), req.UserID)
 
 	// Broadcast: kicked user gets system:room_kicked
 	h.broadcastToUsers([]uint{req.UserID}, ws.SystemRoomKicked, ws.RoomKickedPayload{
@@ -1990,6 +2033,10 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 		return fmt.Errorf("starting game: %w", err)
 	}
 
+	// Match is live — presence is no longer meaningful; clear it so the next
+	// reopen starts from an empty "who's back" set.
+	h.presence.Clear(uint(roomID))
+
 	// Start match via match starter
 	if h.matchStarter != nil {
 		players, err := h.repo.FindPlayersByRoomID(uint(roomID))
@@ -2154,6 +2201,10 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 		return createErr
 	}
 
+	// Mark present (quick-play rooms auto-start so the gate never applies, but
+	// keeps the registry consistent for the room-detail payload).
+	h.presence.Add(resultRoom.ID, userID)
+
 	// Broadcast lobby-wide events for QuickPlay
 	if createdNew {
 		h.broadcastToAll(ws.SystemRoomCreated, map[string]interface{}{
@@ -2260,6 +2311,9 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		}
 		return fmt.Errorf("quick joining room: %w", err)
 	}
+
+	// Mark present (mirrors QuickPlay; quick-play rooms auto-start).
+	h.presence.Add(resultRoom.ID, userID)
 
 	// Joined an existing room — refresh the lobby grid, then mirror JoinRoom's
 	// room-scoped player_joined + seat_updated broadcasts.

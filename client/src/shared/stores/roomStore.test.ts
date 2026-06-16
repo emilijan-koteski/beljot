@@ -282,4 +282,33 @@ describe("roomStore", () => {
     expect(state.players).toEqual([]);
     expect(state.matchStarted).toBe(false);
   });
+
+  it("setReturnedUserIds replaces the presence set", () => {
+    useRoomStore.getState().setReturnedUserIds([10, 20]);
+    expect(useRoomStore.getState().returnedUserIds).toEqual([10, 20]);
+  });
+
+  it("markReturned appends a user once (idempotent)", () => {
+    const { markReturned } = useRoomStore.getState();
+    markReturned(10);
+    markReturned(20);
+    markReturned(10); // duplicate
+    expect(useRoomStore.getState().returnedUserIds).toEqual([10, 20]);
+  });
+
+  it("setMatchStartedRoomId records the room whose match started", () => {
+    useRoomStore.getState().setMatchStartedRoomId(7);
+    expect(useRoomStore.getState().matchStartedRoomId).toBe(7);
+    useRoomStore.getState().setMatchStartedRoomId(null);
+    expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
+  });
+
+  it("reset clears presence + match-start navigation state", () => {
+    const store = useRoomStore.getState();
+    store.setReturnedUserIds([1, 2, 3]);
+    store.setMatchStartedRoomId(9);
+    store.reset();
+    expect(useRoomStore.getState().returnedUserIds).toEqual([]);
+    expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
+  });
 });

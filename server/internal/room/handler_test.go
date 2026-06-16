@@ -372,7 +372,7 @@ func testErrorHandler(err error, c echo.Context) {
 
 func setupTest() (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, nil, nil)
+	handler := room.NewRoomHandler(repo, nil, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -401,7 +401,7 @@ func setupTest() (*echo.Echo, *mockRoomRepo) {
 func setupTestWithBroadcast() (*echo.Echo, *mockRoomRepo, *mockBroadcaster) {
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
-	handler := room.NewRoomHandler(repo, nil, broadcaster)
+	handler := room.NewRoomHandler(repo, nil, broadcaster, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -2176,7 +2176,7 @@ func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [
 
 func setupTestWithStarter(starter room.MatchStarter, broadcaster room.Broadcaster) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, starter, broadcaster)
+	handler := room.NewRoomHandler(repo, starter, broadcaster, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -2828,6 +2828,14 @@ func msgTypeOf(t *testing.T, raw []byte) string {
 	var msgType string
 	require.NoError(t, json.Unmarshal(msg["type"], &msgType))
 	return msgType
+}
+
+// payloadOf returns the raw JSON of a broadcast message's payload field.
+func payloadOf(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	var msg map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(raw, &msg))
+	return msg["payload"]
 }
 
 func TestKickPlayer_Success(t *testing.T) {

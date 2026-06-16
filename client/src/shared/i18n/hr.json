@@ -231,6 +231,7 @@
       "botsNotAllowed": "U ovu sobu se ne mogu dodavati botovi"
     },
     "waitingForPlayers": "Čekanje igrača",
+    "waitingForReturn": "Čekanje da se igrači vrate",
     "copyLinkAriaLabel": "Kopiraj kod sobe {{code}}",
     "copyLinkSuccess": "Kod sobe kopiran!",
     "copyLinkFailed": "Kopiranje nije uspjelo, kod: {{code}}",
@@ -315,6 +316,7 @@
       "swapHere": "Zamijeni ovdje",
       "partner": "Partner",
       "opponent": "Protivnik",
+      "waitingToReturn": "Čeka se povratak",
       "pickTarget": "Za zamjenu",
       "partnerSeat": "Mjesto partnera · slobodno",
       "opponentSeat": "Mjesto protivnika · slobodno",
@@ -635,6 +637,8 @@
       "returnToLobby": "Natrag u lobi",
       "returnToRoom": "Natrag u sobu",
       "returnToRoomError": "Povratak u sobu nije uspio — možda više nije dostupna.",
+      "returnToRoomAlreadyStarted": "Sljedeći meč je već počeo bez tebe.",
+      "returnToRoomNotInRoom": "Više nisi u ovoj sobi.",
       "surrenderNote": "{{username}} je predao meč"
     },
     "emote": {

@@ -778,6 +778,129 @@ describe("RoomPage", () => {
     expect(screen.getByTestId("start-game")).toBeDisabled();
   });
 
+  // v2 presence gate: a reopened room with all four seats occupied but a
+  // not-yet-returned human keeps Start disabled and flags the absent seat.
+  it("disables Start and flags absent seats until every seated human has returned", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+
+    const fourSeated = [
+      {
+        id: 1,
+        roomId: 1,
+        userId: 10,
+        username: "alice",
+        seat: 0,
+        team: "teamA",
+        isBot: false,
+        createdAt: "",
+      },
+      {
+        id: 2,
+        roomId: 1,
+        userId: 20,
+        username: "bob",
+        seat: 1,
+        team: "teamB",
+        isBot: false,
+        createdAt: "",
+      },
+      {
+        id: 3,
+        roomId: 1,
+        userId: 30,
+        username: "carol",
+        seat: 2,
+        team: "teamA",
+        isBot: false,
+        createdAt: "",
+      },
+      {
+        id: 4,
+        roomId: 1,
+        userId: 40,
+        username: "dave",
+        seat: 3,
+        team: "teamB",
+        isBot: false,
+        createdAt: "",
+      },
+    ];
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 4 },
+      players: fourSeated,
+      returnedUserIds: [10, 20, 30], // dave (seat 3) is still away
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("start-game")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("start-game")).toBeDisabled();
+    expect(screen.getByTestId("waiting-to-return-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("waiting-to-return-0")).not.toBeInTheDocument();
+  });
+
+  it("enables Start once every seated human has returned", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 4 },
+      players: [
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "alice",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
+        {
+          id: 2,
+          roomId: 1,
+          userId: 20,
+          username: "bob",
+          seat: 1,
+          team: "teamB",
+          isBot: false,
+          createdAt: "",
+        },
+        {
+          id: 3,
+          roomId: 1,
+          userId: 30,
+          username: "carol",
+          seat: 2,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
+        {
+          id: 4,
+          roomId: 1,
+          userId: 40,
+          username: "dave",
+          seat: 3,
+          team: "teamB",
+          isBot: false,
+          createdAt: "",
+        },
+      ],
+      returnedUserIds: [10, 20, 30, 40],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("start-game")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("start-game")).toBeEnabled();
+    expect(screen.queryByTestId("waiting-to-return-3")).not.toBeInTheDocument();
+  });
+
   it("calls startMatch API and navigates on success", async () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });

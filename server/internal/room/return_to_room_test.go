@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,26 @@ import (
 
 	"github.com/emilijan/beljot/server/internal/room"
 )
+
+func doPostJSON(e *echo.Echo, path string, token string, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+func decodeRoomDetail(t *testing.T, raw []byte) room.RoomDetailResponse {
+	t.Helper()
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(raw, &resp))
+	var detail room.RoomDetailResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &detail))
+	return detail
+}
 
 func doReturnToRoom(e *echo.Echo, id string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/return", nil)
@@ -107,11 +128,13 @@ func TestReturnToRoom_FirstReturn_ReopensAndClearsBots(t *testing.T) {
 		require.NotNil(t, p.Seat, "returner %d lost their seat", p.UserID)
 	}
 
-	// Broadcasts: one system:bot_removed per cleared seat, plus a lobby
-	// system:room_updated.
-	require.Len(t, broadcaster.calls, 2)
+	// Broadcasts: one system:bot_removed per cleared seat, then a
+	// system:player_returned for the returner (v2), all room-scoped; plus a
+	// lobby-wide system:room_updated.
+	require.Len(t, broadcaster.calls, 3)
 	assert.Equal(t, "system:bot_removed", msgTypeOf(t, broadcaster.calls[0].msg))
 	assert.Equal(t, "system:bot_removed", msgTypeOf(t, broadcaster.calls[1].msg))
+	assert.Equal(t, "system:player_returned", msgTypeOf(t, broadcaster.calls[2].msg))
 	require.Len(t, broadcaster.allCalls, 1)
 	assert.Equal(t, "system:room_updated", msgTypeOf(t, broadcaster.allCalls[0].msg))
 
@@ -142,9 +165,12 @@ func TestReturnToRoom_AlreadyWaiting_Idempotent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, bots, 2)
 
-	// Idempotent path stays fully silent — neither a bot_removed fan-out nor a
-	// redundant lobby room_updated (the first returner already broadcast both).
-	assert.Empty(t, broadcaster.calls)
+	// The reopen side effects stay silent — no bot_removed fan-out, no redundant
+	// lobby room_updated (the first returner already broadcast both). But the
+	// returner is still announced present: a single system:player_returned fires
+	// (v2) so the owner's "waiting to return" gate updates.
+	require.Len(t, broadcaster.calls, 1)
+	assert.Equal(t, "system:player_returned", msgTypeOf(t, broadcaster.calls[0].msg))
 	assert.Empty(t, broadcaster.allCalls)
 }
 
@@ -176,4 +202,81 @@ func TestReturnToRoom_PlayingRoom_Rejected(t *testing.T) {
 	require.Equal(t, http.StatusConflict, rec.Code)
 	assert.Equal(t, "MATCH_ALREADY_STARTED", errorCodeOf(t, rec.Body.Bytes()))
 	assert.Equal(t, "playing", r.Status)
+}
+
+// v2 presence: each /return marks the caller present (surfaced as
+// returnedUserIds) and announces it with a system:player_returned broadcast;
+// later returners accumulate.
+func TestReturnToRoom_MarksPresentAndBroadcasts(t *testing.T) {
+	e, repo, broadcaster := setupTestWithBroadcast()
+	seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
+
+	rec := doReturnToRoom(e, "1", validToken(100))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	detail := decodeRoomDetail(t, rec.Body.Bytes())
+	assert.Equal(t, []uint{100}, detail.ReturnedUserIds, "returner should be present")
+
+	// No bots to clear → the only room-scoped broadcast is player_returned.
+	require.Len(t, broadcaster.calls, 1)
+	assert.Equal(t, "system:player_returned", msgTypeOf(t, broadcaster.calls[0].msg))
+	var payload struct {
+		RoomID uint `json:"roomId"`
+		UserID uint `json:"userId"`
+	}
+	require.NoError(t, json.Unmarshal(payloadOf(t, broadcaster.calls[0].msg), &payload))
+	assert.Equal(t, uint(1), payload.RoomID)
+	assert.Equal(t, uint(100), payload.UserID)
+
+	// A second returner accumulates (sorted ascending for deterministic payloads).
+	rec2 := doReturnToRoom(e, "1", validToken(200))
+	require.Equal(t, http.StatusOK, rec2.Code)
+	assert.Equal(t, []uint{100, 200}, decodeRoomDetail(t, rec2.Body.Bytes()).ReturnedUserIds)
+}
+
+// v2 presence: kicking a member drops them from the presence set so they no
+// longer count toward the owner's "all seated humans present" Start gate.
+func TestReturnToRoom_KickRemovesPresence(t *testing.T) {
+	e, repo, _ := setupTestWithBroadcast()
+	seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
+
+	require.Equal(t, http.StatusOK, doReturnToRoom(e, "1", validToken(100)).Code)
+	require.Equal(t, http.StatusOK, doReturnToRoom(e, "1", validToken(200)).Code)
+
+	require.Equal(t, http.StatusOK, doPostJSON(e, "/api/v1/rooms/1/kick", validToken(100), `{"userId":200}`).Code)
+
+	detail := decodeRoomDetail(t, doGetRoom(e, "1", validToken(100)).Body.Bytes())
+	assert.Equal(t, []uint{100}, detail.ReturnedUserIds, "kicked player should be dropped from presence")
+}
+
+// v2 presence: leaving the room drops the leaver from the presence set.
+func TestReturnToRoom_LeaveRemovesPresence(t *testing.T) {
+	e, repo, _ := setupTestWithBroadcast()
+	seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
+
+	require.Equal(t, http.StatusOK, doReturnToRoom(e, "1", validToken(100)).Code)
+	require.Equal(t, http.StatusOK, doReturnToRoom(e, "1", validToken(200)).Code)
+
+	require.Equal(t, http.StatusOK, doPostJSON(e, "/api/v1/rooms/1/leave", validToken(200), "").Code)
+
+	detail := decodeRoomDetail(t, doGetRoom(e, "1", validToken(100)).Body.Bytes())
+	assert.Equal(t, []uint{100}, detail.ReturnedUserIds, "leaver should be dropped from presence")
+}
+
+// v2 presence: starting the match clears the room's presence set so the next
+// reopen starts from an empty "who's back" state.
+func TestReturnToRoom_StartClearsPresence(t *testing.T) {
+	e, repo, _ := setupTestWithBroadcast()
+	seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1, 300: 2, 400: 3}, nil)
+
+	for _, uid := range []uint{100, 200, 300, 400} {
+		require.Equal(t, http.StatusOK, doReturnToRoom(e, "1", validToken(uid)).Code)
+	}
+	before := decodeRoomDetail(t, doGetRoom(e, "1", validToken(100)).Body.Bytes())
+	assert.Equal(t, []uint{100, 200, 300, 400}, before.ReturnedUserIds)
+
+	require.Equal(t, http.StatusOK, doPostJSON(e, "/api/v1/rooms/1/start", validToken(100), "").Code)
+
+	after := decodeRoomDetail(t, doGetRoom(e, "1", validToken(100)).Body.Bytes())
+	assert.Empty(t, after.ReturnedUserIds, "presence should be cleared on match start")
 }

@@ -59,8 +59,16 @@ export function handleWsMessage(event: MessageEvent): void {
           update((rooms) => rooms.filter((r) => r.id !== payload.id));
           return;
         }
-        update((rooms) =>
-          rooms.map((r) => {
+        update((rooms) => {
+          // D144: a reopened room (completed → waiting) broadcasts room_updated,
+          // not room_created — but it was dropped from the grid when it went to
+          // playing/completed, so a plain .map would silently lose it. Upsert:
+          // add-if-missing (matching room_created's prepend) so strangers can
+          // discover and join the reopened room live.
+          if (!rooms.some((r) => r.id === payload.id)) {
+            return [payload as unknown as Room, ...rooms];
+          }
+          return rooms.map((r) => {
             if (r.id !== payload.id) return r;
             // Prefer the payload's players[] when present (server includes
             // them on every lifecycle event now), but fall back to whatever
@@ -68,8 +76,8 @@ export function handleWsMessage(event: MessageEvent): void {
             // doesn't blank the seat chips.
             const players = payload.players ?? r.players;
             return { ...r, ...(payload as unknown as Partial<Room>), players };
-          }),
-        );
+          });
+        });
         return;
       }
 

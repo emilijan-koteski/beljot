@@ -231,6 +231,7 @@
       "botsNotAllowed": "Во оваа соба не може да се додаваат ботови"
     },
     "waitingForPlayers": "Се чекаат играчи",
+    "waitingForReturn": "Се чека играчите да се вратат",
     "copyLinkAriaLabel": "Копирај код на соба {{code}}",
     "copyLinkSuccess": "Кодот на собата е копиран!",
     "copyLinkFailed": "Копирањето не успеа. Код: {{code}}",
@@ -315,6 +316,7 @@
       "swapHere": "Замени тука",
       "partner": "Партнер",
       "opponent": "Противник",
+      "waitingToReturn": "Се чека враќање",
       "pickTarget": "За замена",
       "partnerSeat": "Место за партнерот · слободно",
       "opponentSeat": "Место за противникот · слободно",
@@ -635,6 +637,8 @@
       "returnToLobby": "Назад во лоби",
       "returnToRoom": "Назад во собата",
       "returnToRoomError": "Враќањето во собата не успеа — можеби повеќе не е достапна.",
+      "returnToRoomAlreadyStarted": "Следниот меч веќе започна без тебе.",
+      "returnToRoomNotInRoom": "Веќе не си во оваа соба.",
       "surrenderNote": "{{username}} се предаде во мечот"
     },
     "emote": {

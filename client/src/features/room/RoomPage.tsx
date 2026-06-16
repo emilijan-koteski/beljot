@@ -143,6 +143,7 @@ export function RoomPage() {
   const storePlayers = useRoomStore((s) => s.players);
   const matchStarted = useRoomStore((s) => s.matchStarted);
   const kickedFromRoomId = useRoomStore((s) => s.kickedFromRoomId);
+  const returnedUserIds = useRoomStore((s) => s.returnedUserIds);
 
   const hasLeftRef = useRef(false);
   const hasJoinedRef = useRef(false);
@@ -182,6 +183,7 @@ export function RoomPage() {
       const store = useRoomStore.getState();
       store.setRoom(roomQuery.data.room);
       store.setPlayers(roomQuery.data.players);
+      store.setReturnedUserIds(roomQuery.data.returnedUserIds ?? []);
       store.setCurrentRoomId(roomQuery.data.room.id);
       const userId = useAuthStore.getState().user?.id;
       if (userId && roomQuery.data.players.some((p) => p.userId === userId)) {
@@ -664,6 +666,21 @@ export function RoomPage() {
   const seatedCount = players.filter((p) => p.seat !== null).length;
   const allSeated = seatedCount === 4;
 
+  // Presence gate (v2): every seated HUMAN must be "back" in the room (returned
+  // after a match, or freshly joined) before the owner can start — so an
+  // ex-player still on the previous match's result dialog is never pulled in.
+  // Bots are never gated. Gating only engages once presence is tracked for the
+  // room (returnedUserIds non-empty) — always true in production for a waiting
+  // room since the owner/reopener is present and create/join mark presence; an
+  // empty set means "no presence info", so fall back to the plain seated check
+  // and show no "waiting to return" badges.
+  const seatedHumans = players.filter((p) => p.seat !== null && p.isBot !== true);
+  const presenceTracked = returnedUserIds.length > 0;
+  const allReturned =
+    !presenceTracked || seatedHumans.every((p) => returnedUserIds.includes(p.userId));
+  const isWaitingToReturn = (p: RoomPlayer): boolean =>
+    presenceTracked && p.seat !== null && p.isBot !== true && !returnedUserIds.includes(p.userId);
+
   const ownerPlayer = players.find((p) => p.userId === room.ownerId);
   const ownerUsername = ownerPlayer?.username ?? t("room.seatOwner");
   const isRelaxed = room.timerStyle === "relaxed";
@@ -754,13 +771,15 @@ export function RoomPage() {
     ctaLabel = allSeated ? t("room.autoStarting") : t("room.waitingForPlayers");
   } else if (isOwner) {
     ctaTestId = "start-game";
-    ctaDisabled = !allSeated || startGameMutation.isPending;
+    ctaDisabled = !allSeated || !allReturned || startGameMutation.isPending;
     ctaOnClick = ctaDisabled ? undefined : handleStartGame;
     ctaLabel = startGameMutation.isPending
       ? t("room.matchStarting")
-      : allSeated
-        ? t("room.startMatch")
-        : t("room.waitingForPlayers");
+      : !allSeated
+        ? t("room.waitingForPlayers")
+        : !allReturned
+          ? t("room.waitingForReturn")
+          : t("room.startMatch");
   } else {
     ctaLabel = allSeated ? t("room.waitingForOwner") : t("room.waitingForPlayers");
   }
@@ -1119,6 +1138,7 @@ export function RoomPage() {
                   swapMode={inSwapMode}
                   isClickable={isClickable}
                   isPending={isPendingForThisSeat}
+                  waitingToReturn={isWaiting && player !== undefined && isWaitingToReturn(player)}
                   ownerCanActOnRow={ownerCanKick}
                   onSelect={() => {
                     if (inSwapMode) {

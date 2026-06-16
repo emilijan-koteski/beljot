@@ -27,6 +27,7 @@ import type {
   PlayerJoinedPayload,
   PlayerLeftPayload,
   PlayerReconnectedPayload,
+  PlayerReturnedPayload,
   RoomKickedPayload,
   RoomOwnerChangedPayload,
   SeatUpdatedPayload,
@@ -74,6 +75,7 @@ import {
   SYSTEM_MATCH_STARTED,
   SYSTEM_PLAYER_JOINED,
   SYSTEM_PLAYER_LEFT,
+  SYSTEM_PLAYER_RETURNED,
   SYSTEM_ROOM_CREATED,
   SYSTEM_ROOM_KICKED,
   SYSTEM_ROOM_OWNER_CHANGED,
@@ -446,6 +448,10 @@ function dispatchSystemEvent(message: WsMessage): void {
       },
       payload.playerCount,
     );
+    // A joiner is "present" by definition — without this, the owner's Start gate
+    // (all seated humans present) would never satisfy for normally-joined rooms,
+    // since joins arrive as player_joined, not player_returned.
+    store.markReturned(payload.userId);
     return;
   }
 
@@ -504,11 +510,30 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
+  if (type === SYSTEM_PLAYER_RETURNED) {
+    const payload = message.payload as PlayerReturnedPayload;
+    // Defensive guards mirror the bot handlers: reject NaN/fractional ids so
+    // protocol drift can't pollute the presence set.
+    if (!Number.isInteger(payload?.roomId) || !Number.isInteger(payload?.userId)) {
+      return;
+    }
+    const store = useRoomStore.getState();
+    if (store.currentRoomId !== null && store.currentRoomId !== payload.roomId) return;
+    store.markReturned(payload.userId);
+    return;
+  }
+
   if (type === SYSTEM_MATCH_STARTED) {
     const payload = message.payload as MatchStartedPayload;
     const store = useRoomStore.getState();
     if (store.currentRoomId !== null && store.currentRoomId !== payload.roomId) return;
     store.setMatchStarted(true);
+    // D145b: record the room whose match started so the always-mounted
+    // navigator can route a seated player into it even if they are not on
+    // RoomPage (currentRoomId === null after leaving it for the prior match).
+    // match_started is sent only to room members, so receiving it implies
+    // membership — navigating is always correct.
+    store.setMatchStartedRoomId(payload.roomId);
     return;
   }
 
