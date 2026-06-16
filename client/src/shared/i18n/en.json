@@ -633,6 +633,8 @@
       "winnerThem": "They Won!",
       "duration": "Match Duration",
       "returnToLobby": "Return to Lobby",
+      "returnToRoom": "Return to Room",
+      "returnToRoomError": "Couldn't return to the room — it may no longer be available.",
       "surrenderNote": "{{username}} surrendered the match"
     },
     "emote": {

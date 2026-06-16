@@ -713,6 +713,137 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": map[string]string{"message": "left room"}})
 }
 
+// ReturnToRoom reopens a finished room so the same group can play another match
+// without recreating it. Ending a match flips the room to "completed" and tears
+// down its live session, but every room_players row (with its seat/team)
+// survives — so a returner reclaims their original seat for free and no one else
+// can take it (seat-selection already blocks occupied seats).
+//
+// The first caller flips "completed" -> "waiting" and clears any bots left over
+// from the previous match; a later/concurrent call when the room is already
+// "waiting" is an idempotent no-op success. Only a current member may reopen the
+// room, which inherently bars a player the owner kicked (or who left)
+// post-match. This is v1 — there is deliberately no presence layer; see
+// deferred-work.md (v2) for the "waiting to return" display and start-gating on
+// every seated human being present.
+func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		return apperr.ErrUnauthorized
+	}
+
+	roomID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return apperr.ErrRoomNotFound
+	}
+
+	// Reject non-members up front: a kicked/left player's room_players row is
+	// gone, so they can neither reopen nor re-enter the room.
+	members, err := h.repo.FindPlayersByRoomID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("finding room players: %w", err)
+	}
+	isMember := false
+	for _, p := range members {
+		if p.UserID == userID {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		return apperr.ErrNotInRoom
+	}
+
+	// clearedSeats records bot seats removed during the reopen so we can fan out
+	// system:bot_removed after the tx commits — broadcasts are best-effort and
+	// must never run inside the transaction. reopened is false on the idempotent
+	// "already waiting" path so we don't re-broadcast a redundant reopen (the
+	// first returner already told the lobby).
+	var clearedSeats []int
+	var reopened bool
+	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
+		// Row-lock the room so concurrent first-returns (all four clients see the
+		// result dialog at the same instant) serialize: only the first flips
+		// status, the rest fall through the "waiting" no-op below.
+		freshRoom, err := tx.FindByIDForUpdate(uint(roomID))
+		if err != nil {
+			return fmt.Errorf("re-fetching room for return: %w", err)
+		}
+		if freshRoom == nil {
+			return apperr.ErrRoomNotFound
+		}
+		switch freshRoom.Status {
+		case "waiting":
+			return nil // already reopened — idempotent
+		case "completed":
+			reopened = true
+			if err := tx.UpdateStatus(uint(roomID), "waiting"); err != nil {
+				return fmt.Errorf("reopening room: %w", err)
+			}
+			bots, err := tx.FindBotsByRoomID(uint(roomID))
+			if err != nil {
+				return fmt.Errorf("finding room bots: %w", err)
+			}
+			for _, b := range bots {
+				if err := tx.RemoveBot(uint(roomID), b.Seat); err != nil {
+					return fmt.Errorf("clearing bot on seat %d: %w", b.Seat, err)
+				}
+				clearedSeats = append(clearedSeats, b.Seat)
+			}
+			return nil
+		default:
+			// "playing": a match is live; there is nothing to reopen.
+			return apperr.ErrMatchAlreadyStarted
+		}
+	}); err != nil {
+		if errors.Is(err, apperr.ErrRoomNotFound) ||
+			errors.Is(err, apperr.ErrMatchAlreadyStarted) {
+			return err
+		}
+		return fmt.Errorf("returning to room: %w", err)
+	}
+
+	// Post-commit, best-effort broadcasts — only when THIS call performed the
+	// reopen. An idempotent "already waiting" return must stay silent: the first
+	// returner already cleared bots and refreshed the lobby, so re-broadcasting
+	// would fan out a redundant room_updated per remaining click.
+	postRoom, err := h.repo.FindByID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("re-fetching room after return: %w", err)
+	}
+	if postRoom == nil {
+		return apperr.ErrRoomNotFound
+	}
+	if reopened {
+		for _, seat := range clearedSeats {
+			h.broadcastToRoom(uint(roomID), ws.SystemBotRemoved, map[string]interface{}{
+				"roomId": roomID,
+				"seat":   seat,
+			})
+		}
+		h.broadcastRoomUpdated(postRoom)
+	}
+
+	players, err := h.repo.FindPlayersByRoomID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("finding room players: %w", err)
+	}
+	bots, err := h.repo.FindBotsByRoomID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("finding room bots: %w", err)
+	}
+	if err := h.repo.LoadOwnerUsernames([]*Room{postRoom}); err != nil {
+		slog.Error("return to room: failed to load owner username", "roomID", postRoom.ID, "error", err)
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": RoomDetailResponse{
+			Room:    postRoom,
+			Players: mergeBotPlayers(players, bots),
+		},
+	})
+}
+
 type SelectSeatRequest struct {
 	Seat *int `json:"seat"`
 }

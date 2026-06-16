@@ -185,6 +185,7 @@ func main() {
 	api.POST("/rooms/:id/join", roomHandler.JoinRoom)
 	api.POST("/rooms/:id/quick-join", roomHandler.QuickJoin)
 	api.POST("/rooms/:id/leave", roomHandler.LeaveRoom)
+	api.POST("/rooms/:id/return", roomHandler.ReturnToRoom)
 	api.POST("/rooms/:id/seat", roomHandler.SelectSeat)
 	api.POST("/rooms/:id/leave-seat", roomHandler.LeaveSeat)
 	api.POST("/rooms/:id/start", roomHandler.StartMatch)

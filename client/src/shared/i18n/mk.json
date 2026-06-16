@@ -633,6 +633,8 @@
       "winnerThem": "Тие победија!",
       "duration": "Траење на меч",
       "returnToLobby": "Назад во лоби",
+      "returnToRoom": "Назад во собата",
+      "returnToRoomError": "Враќањето во собата не успеа — можеби повеќе не е достапна.",
       "surrenderNote": "{{username}} се предаде во мечот"
     },
     "emote": {

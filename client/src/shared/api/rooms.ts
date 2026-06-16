@@ -32,6 +32,14 @@ export function leaveRoom(id: number): Promise<void> {
   return axiosClient.post(`/rooms/${id}/leave`);
 }
 
+// Reopens a finished room (status completed -> waiting) so the same group can
+// play another match without recreating it. The caller's original seat is
+// preserved server-side; rejects with 404 NOT_IN_ROOM if the caller was kicked
+// or left, in which case the UI routes them back to the lobby.
+export function returnToRoom(roomId: number): Promise<RoomDetail> {
+  return axiosClient.post(`/rooms/${roomId}/return`);
+}
+
 export function selectSeat(roomId: number, seat: number): Promise<SelectSeatResponse> {
   return axiosClient.post(`/rooms/${roomId}/seat`, { seat });
 }

@@ -14,6 +14,10 @@ interface MatchResultProps {
   data: MatchEndPayload;
   viewerTeam: TeamString;
   onReturnToLobby: () => void;
+  /** Reopens the same room (status completed → waiting) and routes the viewer
+   *  back to the room lobby on their original seat, so the group can play
+   *  another match without recreating a room. */
+  onReturnToRoom: () => void;
   /** Resolved username for `data.surrenderedBySeat`. Optional — falls back to
    *  `game.surrender.unknownProposer` when undefined and outcomeReason is
    *  "surrender" (e.g. a race where matchState was cleared before the overlay
@@ -23,14 +27,16 @@ interface MatchResultProps {
 
 /**
  * End-of-match overlay — gold/silver-glowing classic panel with the winner
- * banner, viewer-first score columns, match duration, and a Return-to-Lobby
- * primary action. Surrender wins also show a "<player> surrendered the match"
- * footnote.
+ * banner, viewer-first score columns, match duration, and two actions:
+ * a primary "Return to room" (reopen + replay with the same group) and a
+ * ghost "Return to lobby". Surrender wins also show a "<player> surrendered
+ * the match" footnote.
  */
 export function MatchResult({
   data,
   viewerTeam,
   onReturnToLobby,
+  onReturnToRoom,
   surrenderedByUsername,
 }: MatchResultProps) {
   const { t } = useTranslation();
@@ -142,14 +148,24 @@ export function MatchResult({
               {t("match.matchResult.duration")}: {formattedDuration}
             </p>
 
-            <ClassicButton
-              variant="primary"
-              onClick={onReturnToLobby}
-              data-testid="match-result-lobby-btn"
-              className="mt-2"
-            >
-              {t("match.matchResult.returnToLobby")}
-            </ClassicButton>
+            <div className="mt-2 flex w-full flex-col gap-2" data-testid="match-result-actions">
+              <ClassicButton
+                variant="primary"
+                onClick={onReturnToRoom}
+                data-testid="match-result-room-btn"
+                className="w-full"
+              >
+                {t("match.matchResult.returnToRoom")}
+              </ClassicButton>
+              <ClassicButton
+                variant="ghost"
+                onClick={onReturnToLobby}
+                data-testid="match-result-lobby-btn"
+                className="w-full"
+              >
+                {t("match.matchResult.returnToLobby")}
+              </ClassicButton>
+            </div>
           </div>
         </ClassicPanel>
       </OverlayBackdrop>

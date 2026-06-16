@@ -633,6 +633,8 @@
       "winnerThem": "Oni su pobedili!",
       "duration": "Trajanje meča",
       "returnToLobby": "Nazad u lobi",
+      "returnToRoom": "Nazad u sobu",
+      "returnToRoomError": "Povratak u sobu nije uspeo — možda više nije dostupna.",
       "surrenderNote": "{{username}} je predao meč"
     },
     "emote": {
