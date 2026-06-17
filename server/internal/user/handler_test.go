@@ -270,6 +270,16 @@ func (m *mockUserRepo) UpdateLanguagePreference(id uint, lang string) error {
 	return gorm.ErrRecordNotFound
 }
 
+func (m *mockUserRepo) UpdatePasswordHash(id uint, hash string) error {
+	for _, u := range m.users {
+		if u.ID == id {
+			u.PasswordHash = hash
+			return nil
+		}
+	}
+	return gorm.ErrRecordNotFound
+}
+
 func (m *mockUserRepo) addUser(username, email, lang string) *user.User {
 	u := &user.User{
 		ID:                 m.nextID,

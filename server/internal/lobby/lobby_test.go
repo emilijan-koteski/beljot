@@ -103,6 +103,7 @@ func (u *fakeUserRepo) FindByUsername(string) (*user.User, error)   { panic("unu
 func (u *fakeUserRepo) FindByID(uint) (*user.User, error)           { panic("unused") }
 func (u *fakeUserRepo) FindManyByIDs([]uint) ([]user.User, error)   { panic("unused") }
 func (u *fakeUserRepo) UpdateLanguagePreference(uint, string) error { panic("unused") }
+func (u *fakeUserRepo) UpdatePasswordHash(uint, string) error       { panic("unused") }
 
 func decodeStats(t *testing.T, body []byte) lobby.StatsResponse {
 	t.Helper()

@@ -742,7 +742,8 @@
       "eyebrow": "Dobrodošao nazad",
       "subtitle": "Sedi ponovo za sto, tvoje mesto je još toplo.",
       "altPrompt": "Nov si na Beljotu?",
-      "altCta": "Kreiraj nalog"
+      "altCta": "Kreiraj nalog",
+      "forgotLink": "Zaboravljena?"
     },
     "register": {
       "title": "Kreiraj nalog",
@@ -783,6 +784,49 @@
     },
     "footer": {
       "credit": "Napravio <name>Emilijan Koteski</name> sa <suit>♣</suit>"
+    },
+    "forgotPassword": {
+      "eyebrow": "Zaboravljena lozinka",
+      "title": "Resetuj lozinku",
+      "subtitle": "Unesi svoj email i poslaćemo ti link za postavljanje nove lozinke.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "ime@primer.com",
+      "submitButton": "Pošalji link",
+      "submitting": "Slanje…",
+      "successTitle": "Proveri svoj inboks",
+      "successBody": "Ako nalog za tu adresu postoji, poslali smo link za reset lozinke.",
+      "successHint": "Link ističe za 1 sat. Ne zaboravi da proveriš spam folder.",
+      "altPrompt": "Setio si se?",
+      "altCta": "Nazad na prijavu",
+      "errors": {
+        "emailRequired": "Email je obavezan",
+        "emailInvalid": "Unesite validnu email adresu",
+        "requestFailed": "Nešto je pošlo naopako. Pokušaj ponovo."
+      }
+    },
+    "resetPassword": {
+      "eyebrow": "Nova lozinka",
+      "title": "Postavi novu lozinku",
+      "subtitle": "Izaberi novu lozinku za svoj nalog.",
+      "passwordLabel": "Nova lozinka",
+      "passwordPlaceholder": "Najmanje 8 karaktera",
+      "confirmLabel": "Potvrdi lozinku",
+      "confirmPlaceholder": "Ponovo unesi lozinku",
+      "submitButton": "Resetuj lozinku",
+      "submitting": "Resetovanje…",
+      "success": "Lozinka je ažurirana — prijavi se.",
+      "invalidTitle": "Link je istekao",
+      "invalidBody": "Ovaj link za reset je nevažeći ili je istekao. Zatraži novi da nastaviš.",
+      "requestNewLink": "Zatraži novi link",
+      "altPrompt": "Setio si se?",
+      "altCta": "Nazad na prijavu",
+      "errors": {
+        "passwordRequired": "Lozinka je obavezna",
+        "passwordTooShort": "Lozinka mora imati najmanje 8 karaktera",
+        "passwordTooLong": "Lozinka može imati najviše 72 karaktera",
+        "passwordsMismatch": "Lozinke se ne poklapaju",
+        "resetFailed": "Nešto je pošlo naopako. Pokušaj ponovo."
+      }
     }
   },
   "landing": {

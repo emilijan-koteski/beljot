@@ -742,7 +742,8 @@
       "eyebrow": "Welcome back",
       "subtitle": "Sit back down at the table — your seat's still warm.",
       "altPrompt": "New to Beljot?",
-      "altCta": "Create an account"
+      "altCta": "Create an account",
+      "forgotLink": "Forgot?"
     },
     "register": {
       "title": "Create account",
@@ -783,6 +784,49 @@
     },
     "footer": {
       "credit": "Crafted with <suit>♣</suit> by <name>Emilijan Koteski</name>"
+    },
+    "forgotPassword": {
+      "eyebrow": "Forgot password",
+      "title": "Reset your password",
+      "subtitle": "Enter your email and we'll send you a link to set a new password.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "your@email.com",
+      "submitButton": "Send reset link",
+      "submitting": "Sending…",
+      "successTitle": "Check your inbox",
+      "successBody": "If an account exists for that email, we've sent a link to reset your password.",
+      "successHint": "The link expires in 1 hour. Don't forget to check your spam folder.",
+      "altPrompt": "Remembered it?",
+      "altCta": "Back to log in",
+      "errors": {
+        "emailRequired": "Email is required",
+        "emailInvalid": "Enter a valid email address",
+        "requestFailed": "Something went wrong. Please try again."
+      }
+    },
+    "resetPassword": {
+      "eyebrow": "New password",
+      "title": "Set a new password",
+      "subtitle": "Choose a new password for your account.",
+      "passwordLabel": "New password",
+      "passwordPlaceholder": "Minimum 8 characters",
+      "confirmLabel": "Confirm password",
+      "confirmPlaceholder": "Re-enter your password",
+      "submitButton": "Reset password",
+      "submitting": "Resetting…",
+      "success": "Password updated — please log in.",
+      "invalidTitle": "Link expired",
+      "invalidBody": "This reset link is invalid or has expired. Request a new one to continue.",
+      "requestNewLink": "Request a new link",
+      "altPrompt": "Remembered it?",
+      "altCta": "Back to log in",
+      "errors": {
+        "passwordRequired": "Password is required",
+        "passwordTooShort": "Password must be at least 8 characters",
+        "passwordTooLong": "Password must be at most 72 characters",
+        "passwordsMismatch": "Passwords don't match",
+        "resetFailed": "Something went wrong. Please try again."
+      }
     }
   },
   "landing": {

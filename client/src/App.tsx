@@ -1,8 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import { AuthLayout } from "@/features/auth/AuthLayout";
+import { ForgotPasswordPage } from "@/features/auth/ForgotPasswordPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RegisterPage } from "@/features/auth/RegisterPage";
+import { ResetPasswordPage } from "@/features/auth/ResetPasswordPage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { PrivacyPage } from "@/features/legal/PrivacyPage";
 import { TermsPage } from "@/features/legal/TermsPage";
@@ -43,6 +45,8 @@ function AppRoutes() {
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
       </Route>
       {/* Public reference pages — reachable by guests (from the landing footer)

@@ -96,3 +96,14 @@ func (r *GormUserRepository) UpdateLanguagePreference(id uint, lang string) erro
 	}
 	return nil
 }
+
+func (r *GormUserRepository) UpdatePasswordHash(id uint, hash string) error {
+	result := r.db.Model(&User{}).Where("id = ?", id).Update("password_hash", hash)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return apperr.ErrUserNotFound
+	}
+	return nil
+}
