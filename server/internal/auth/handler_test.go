@@ -85,6 +85,16 @@ func (m *mockUserRepo) UpdateLanguagePreference(id uint, lang string) error {
 	return gorm.ErrRecordNotFound
 }
 
+func (m *mockUserRepo) UpdatePasswordHash(id uint, hash string) error {
+	for _, u := range m.users {
+		if u.ID == id {
+			u.PasswordHash = hash
+			return nil
+		}
+	}
+	return gorm.ErrRecordNotFound
+}
+
 func (m *mockUserRepo) FindManyByIDs(ids []uint) ([]user.User, error) {
 	if len(ids) == 0 {
 		return []user.User{}, nil

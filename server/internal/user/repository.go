@@ -12,4 +12,7 @@ type UserRepository interface {
 	// Count returns the total number of registered (non-soft-deleted) users.
 	Count() (int64, error)
 	UpdateLanguagePreference(id uint, lang string) error
+	// UpdatePasswordHash replaces the user's bcrypt password hash (used by the
+	// password-reset flow). Returns ErrUserNotFound when no row matches.
+	UpdatePasswordHash(id uint, hash string) error
 }

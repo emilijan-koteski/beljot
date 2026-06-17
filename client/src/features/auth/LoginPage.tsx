@@ -1,7 +1,7 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { AltLink, AuthCard, Field } from "@/features/auth/components/AuthCard";
@@ -145,6 +145,15 @@ export function LoginPage() {
         <Field
           label={t("auth.login.passwordLabel")}
           htmlFor="password"
+          hint={
+            <Link
+              to="/forgot-password"
+              className="text-brass-deep/90 hover:text-accent border-b border-dotted border-current pb-px"
+              data-testid="forgot-password-link"
+            >
+              {t("auth.login.forgotLink")}
+            </Link>
+          }
           error={errors.password}
           errorTestId="password-error"
         >

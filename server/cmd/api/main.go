@@ -23,7 +23,9 @@ import (
 	"github.com/emilijan/beljot/server/internal/config"
 	"github.com/emilijan/beljot/server/internal/emote"
 	"github.com/emilijan/beljot/server/internal/lobby"
+	"github.com/emilijan/beljot/server/internal/mailer"
 	"github.com/emilijan/beljot/server/internal/match"
+	"github.com/emilijan/beljot/server/internal/passwordreset"
 	"github.com/emilijan/beljot/server/internal/room"
 	"github.com/emilijan/beljot/server/internal/user"
 	"github.com/emilijan/beljot/server/internal/ws"
@@ -51,6 +53,19 @@ func main() {
 	}
 	userRepo := user.NewGormUserRepository(db)
 	authHandler := auth.NewAuthHandler(userRepo, cfg.JWTSecret, cfg.Environment)
+
+	// Mailer: real SMTP when fully configured, otherwise a log-only fallback so
+	// the forgot-password flow stays testable in dev without SMTP credentials.
+	var appMailer mailer.Mailer
+	if cfg.SMTPConfigured() {
+		appMailer = mailer.NewSMTPMailer(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom, cfg.SMTPFromName)
+		slog.Info("SMTP mailer configured", "host", cfg.SMTPHost, "port", cfg.SMTPPort)
+	} else {
+		appMailer = mailer.NewLogMailer()
+		slog.Warn("SMTP not configured — password reset links will be logged, not emailed")
+	}
+	resetRepo := passwordreset.NewGormRepository(db)
+	passwordResetHandler := auth.NewPasswordResetHandler(userRepo, resetRepo, appMailer, cfg.AppBaseURL, time.Hour)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -91,6 +106,8 @@ func main() {
 	authGroup.POST("/login", authHandler.Login)
 	authGroup.POST("/refresh", authHandler.Refresh)
 	authGroup.POST("/logout", authHandler.Logout)
+	authGroup.POST("/forgot-password", passwordResetHandler.ForgotPassword)
+	authGroup.POST("/reset-password", passwordResetHandler.ResetPassword)
 
 	// Authenticated route group
 	matchRepo := match.NewGormMatchRepository(db)

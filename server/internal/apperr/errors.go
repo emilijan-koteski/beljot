@@ -46,6 +46,9 @@ var (
 	ErrUsernameTooShort     = NewAppError("USERNAME_TOO_SHORT", "username must be at least 3 characters", http.StatusBadRequest)
 	ErrUsernameTooLong      = NewAppError("USERNAME_TOO_LONG", "username must be at most 20 characters", http.StatusBadRequest)
 	ErrUsernameInvalidChars = NewAppError("USERNAME_INVALID_CHARS", "username can only contain letters, numbers, and underscores", http.StatusBadRequest)
+	// ErrInvalidResetToken is deliberately generic — it covers unknown, expired,
+	// and already-used reset tokens alike so the response never reveals which.
+	ErrInvalidResetToken = NewAppError("INVALID_RESET_TOKEN", "reset link is invalid or has expired", http.StatusBadRequest)
 
 	// User domain errors
 	ErrUserNotFound    = NewAppError("USER_NOT_FOUND", "user not found", http.StatusNotFound)

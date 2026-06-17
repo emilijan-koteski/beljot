@@ -34,6 +34,15 @@ export interface RefreshResponse {
   createdAt: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  password: string;
+}
+
 export async function register(data: RegisterRequest): Promise<RegisterResponse> {
   try {
     const response = await axiosPublic.post<{ data: RegisterResponse }>("/auth/register", data);
@@ -84,6 +93,46 @@ export async function refresh(signal?: AbortSignal): Promise<RefreshResponse> {
     return response.data.data;
   } catch (e) {
     throw new Error(`Refresh failed: ${(e as AxiosError).response?.status ?? "unknown"}`);
+  }
+}
+
+export async function forgotPassword(data: ForgotPasswordRequest): Promise<void> {
+  try {
+    await axiosPublic.post("/auth/forgot-password", data);
+  } catch (e) {
+    const err = e as AxiosError<{ error: { code: string; message: string } }>;
+    if (err.response?.data?.error) {
+      throw new FetchError(
+        err.response.status,
+        err.response.data.error.code,
+        err.response.data.error.message,
+      );
+    }
+    throw new FetchError(
+      err.response?.status ?? 0,
+      "UNKNOWN_ERROR",
+      err.response?.statusText ?? "Request failed",
+    );
+  }
+}
+
+export async function resetPassword(data: ResetPasswordRequest): Promise<void> {
+  try {
+    await axiosPublic.post("/auth/reset-password", data);
+  } catch (e) {
+    const err = e as AxiosError<{ error: { code: string; message: string } }>;
+    if (err.response?.data?.error) {
+      throw new FetchError(
+        err.response.status,
+        err.response.data.error.code,
+        err.response.data.error.message,
+      );
+    }
+    throw new FetchError(
+      err.response?.status ?? 0,
+      "UNKNOWN_ERROR",
+      err.response?.statusText ?? "Request failed",
+    );
   }
 }
 
