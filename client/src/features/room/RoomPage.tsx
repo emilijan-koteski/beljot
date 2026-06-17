@@ -150,6 +150,10 @@ export function RoomPage() {
   // Guards the deep-link auto-join below to a single attempt (the query data
   // changes on refetch, and React StrictMode double-invokes effects in dev).
   const joinAttemptedRef = useRef(false);
+  // Holds a deferred unmount-leave ({ id, timer }) so React StrictMode's dev-only
+  // setup→cleanup→setup cycle can cancel it before it fires — see the leave-on-
+  // unmount effect below.
+  const pendingLeaveRef = useRef<{ id: number; timer: ReturnType<typeof setTimeout> } | null>(null);
 
   // Owner-only transient UI state — kept local instead of pushed into a store
   // because nothing outside RoomPage cares about it.
@@ -332,10 +336,28 @@ export function RoomPage() {
   // NOTE: this covers SPA navigation only — a hard unload (address-bar nav to
   // /lobby, refresh, tab close) does NOT run React cleanups; the `pagehide`
   // handler below covers that case with a keepalive request.
+  //
+  // The leave is DEFERRED by a macrotask instead of fired inline so it survives
+  // React StrictMode's dev-only setup→cleanup→setup remount: the synthetic
+  // cleanup schedules a leave, then the immediate re-setup (same id) cancels it
+  // before the timer runs. Without this, returning to a room you're still a
+  // member of (warm React-Query cache → `hasJoinedRef` set synchronously on
+  // mount) fired a spurious `/leave` that vacated your seat and transferred
+  // ownership away. A genuine unmount (or an id change A→B) has no matching
+  // re-setup, so the leave still fires.
   useEffect(() => {
+    const roomId = Number(id);
+    if (pendingLeaveRef.current && pendingLeaveRef.current.id === roomId) {
+      clearTimeout(pendingLeaveRef.current.timer);
+      pendingLeaveRef.current = null;
+    }
     return () => {
       if (id && hasJoinedRef.current && !hasLeftRef.current) {
-        leaveRoomMutation.mutate(Number(id));
+        const timer = setTimeout(() => {
+          pendingLeaveRef.current = null;
+          leaveRoomMutation.mutate(roomId);
+        }, 0);
+        pendingLeaveRef.current = { id: roomId, timer };
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
