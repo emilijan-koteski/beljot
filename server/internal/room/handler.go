@@ -258,6 +258,19 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		return apperr.ErrUnauthorized
 	}
 
+	// Reject if the user is already in an active room (mirrors JoinRoom /
+	// QuickPlay / QuickJoin). Without this guard a user already seated in a
+	// room — e.g. a second device, or a client that drifted onto the lobby —
+	// could spin up a brand-new room and orphan the old one (observed in
+	// production as duplicate/ownerless rooms).
+	existingRoom, err := h.repo.FindPlayerRoom(userID)
+	if err != nil {
+		return fmt.Errorf("checking existing room: %w", err)
+	}
+	if existingRoom != nil {
+		return apperr.ErrAlreadyInRoom
+	}
+
 	var req CreateRoomRequest
 	if err := c.Bind(&req); err != nil {
 		return apperr.ErrBadRequest
@@ -640,6 +653,7 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 	}
 
 	var newOwnerID *uint
+	var roomClosed bool
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
 		// Story 8.5-1 AC3: row-lock the room INSIDE the tx so the status check
 		// is serialized against any concurrent auto-start tx that flips status
@@ -677,17 +691,49 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 			if err != nil {
 				return fmt.Errorf("finding remaining players: %w", err)
 			}
-			if len(players) > 0 {
-				freshRoom.OwnerID = players[0].UserID
-				newOwnerID = &players[0].UserID
+			// Promote the first SEATED human. An unseated member must never
+			// inherit ownership: they can't start the match, and with bots
+			// filling the remaining seats the room would limp on as a dead
+			// "unseated owner + bots" shell (observed in production). If no
+			// seated human remains, close the room for everyone — bots can't
+			// sustain a room on their own.
+			var nextOwner *RoomPlayer
+			for i := range players {
+				if players[i].Seat != nil {
+					nextOwner = &players[i]
+					break
+				}
+			}
+			if nextOwner != nil {
+				freshRoom.OwnerID = nextOwner.UserID
+				newOwnerID = &nextOwner.UserID
 				if err := tx.Update(freshRoom); err != nil {
 					return fmt.Errorf("transferring room ownership: %w", err)
 				}
 			} else {
+				// No seated human left (only unseated humans and/or bots):
+				// close the room and evict the stragglers + bots so nobody is
+				// stranded as a member of a dead room and it can't be reopened
+				// into a broken, owner-less state.
 				freshRoom.Status = "completed"
 				if err := tx.Update(freshRoom); err != nil {
-					return fmt.Errorf("closing empty room: %w", err)
+					return fmt.Errorf("closing ownerless room: %w", err)
 				}
+				for i := range players {
+					if err := tx.RemovePlayer(uint(roomID), players[i].UserID); err != nil {
+						return fmt.Errorf("evicting unseated member on close: %w", err)
+					}
+				}
+				bots, err := tx.FindBotsByRoomID(uint(roomID))
+				if err != nil {
+					return fmt.Errorf("finding bots on close: %w", err)
+				}
+				for i := range bots {
+					if err := tx.RemoveBot(uint(roomID), bots[i].Seat); err != nil {
+						return fmt.Errorf("clearing bot on close: %w", err)
+					}
+				}
+				roomClosed = true
 			}
 		}
 		return nil
@@ -703,6 +749,11 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 	// Drop the leaver's presence. Remove auto-clears the room's whole presence
 	// entry once the last present user leaves (empty-room close).
 	h.presence.Remove(uint(roomID), userID)
+	// When the owner-leave closed the room (no seated human remained), wipe the
+	// whole presence entry — the evicted stragglers are no longer members.
+	if roomClosed {
+		h.presence.Clear(uint(roomID))
+	}
 
 	// Broadcast system:player_left to remaining room participants (not the leaving player)
 	remainingPlayers, broadcastErr := h.repo.FindPlayersByRoomID(uint(roomID))

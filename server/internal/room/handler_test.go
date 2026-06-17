@@ -573,7 +573,9 @@ func TestCreateRoom_DuplicateName(t *testing.T) {
 	rec := doCreateRoom(e, body, token)
 	assert.Equal(t, http.StatusCreated, rec.Code)
 
-	rec2 := doCreateRoom(e, body, token)
+	// A DIFFERENT user attempts the same name — user 1 is now in their room and
+	// would (correctly) hit the already-in-room guard first.
+	rec2 := doCreateRoom(e, body, validToken(2))
 	assert.Equal(t, http.StatusConflict, rec2.Code)
 
 	var errResp map[string]map[string]string
@@ -1189,9 +1191,11 @@ func TestLeaveRoom_OwnerTransfersOwnership(t *testing.T) {
 
 	seedRoom(repo, "Owner Leave", "waiting")
 	repo.rooms[0].PlayerCount = 2
+	// The inheritor must be SEATED — an unseated member never inherits ownership
+	// (see TestLeaveRoom_Owner_NoSeatedHuman_ClosesRoom).
 	repo.players = append(repo.players,
-		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, CreatedAt: time.Now()},
-		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)},
+		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
+		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, Seat: intPtr(1), CreatedAt: time.Now().Add(time.Second)},
 	)
 
 	rec := doLeaveRoom(e, "1", token)
@@ -1215,12 +1219,75 @@ func TestLeaveRoom_OwnerAloneClosesRoom(t *testing.T) {
 	assert.Equal(t, "completed", repo.rooms[0].Status)
 }
 
+// When the owner leaves and the only remaining member is UNSEATED (with bots
+// filling seats), the room must CLOSE for everyone — never hand ownership to an
+// unseated player. Reproduces the production "unseated owner + 2 bots" zombie.
+func TestLeaveRoom_Owner_NoSeatedHuman_ClosesRoom(t *testing.T) {
+	e, repo := setupTest()
+
+	seedRoom(repo, "Zombie Guard", "waiting")
+	repo.rooms[0].PlayerCount = 2
+	repo.players = append(repo.players,
+		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
+		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)}, // unseated
+	)
+	repo.bots = append(repo.bots, &room.RoomBot{ID: 1, RoomID: 1, Seat: 2, CreatedAt: time.Now()})
+
+	rec := doLeaveRoom(e, "1", validToken(1))
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "completed", repo.rooms[0].Status, "room must close when no seated human remains")
+	assert.NotEqual(t, uint(20), repo.rooms[0].OwnerID, "unseated member must not inherit ownership")
+	for _, p := range repo.players {
+		assert.NotEqual(t, uint(20), p.UserID, "unseated straggler must be evicted on close")
+	}
+	assert.Empty(t, repo.bots, "bots must be cleared on close")
+}
+
+// Ownership must skip an unseated member and go to a seated one, even when the
+// unseated member is listed first.
+func TestLeaveRoom_OwnerTransfersToSeated_NotUnseated(t *testing.T) {
+	e, repo := setupTest()
+
+	seedRoom(repo, "Prefer Seated", "waiting")
+	repo.rooms[0].PlayerCount = 3
+	repo.players = append(repo.players,
+		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
+		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)},                     // unseated, first
+		&room.RoomPlayer{ID: 3, RoomID: 1, UserID: 30, Seat: intPtr(2), CreatedAt: time.Now().Add(2 * time.Second)}, // seated
+	)
+
+	rec := doLeaveRoom(e, "1", validToken(1))
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "waiting", repo.rooms[0].Status)
+	assert.Equal(t, uint(30), repo.rooms[0].OwnerID, "ownership must skip the unseated member for the seated one")
+}
+
 func TestLeaveRoom_Unauthorized(t *testing.T) {
 	e, _ := setupTest()
 
 	rec := doLeaveRoom(e, "1", "")
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// A user already in an active room cannot CREATE another (orphan-room guard,
+// mirrors JoinRoom / QuickPlay / QuickJoin).
+func TestCreateRoom_AlreadyInRoom_Rejected(t *testing.T) {
+	e, repo := setupTest()
+
+	seedRoom(repo, "Existing", "waiting")
+	repo.players = append(repo.players,
+		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
+	)
+
+	rec := doCreateRoom(e, `{"name":"Second Room","variant":"bitola","matchMode":"501","timerStyle":"relaxed"}`, validToken(1))
+
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	var errResp map[string]map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
+	assert.Equal(t, "ALREADY_IN_ROOM", errResp["error"]["code"])
 }
 
 // --- SelectSeat Tests ---
@@ -2649,10 +2716,10 @@ func TestLeaveRoom_OwnerTransfer_BroadcastsNewOwner(t *testing.T) {
 
 	ownerRoom := &room.Room{Name: "Owner Leave", OwnerID: 100, Status: "waiting", PlayerCount: 2}
 	_ = repo.Create(ownerRoom)
-	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 100, Username: "Owner"})
-	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 200, Username: "Player2"})
+	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 100, Username: "Owner", Seat: intPtr(0)})
+	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 200, Username: "Player2", Seat: intPtr(1)})
 
-	// Owner (100) leaves — ownership should transfer to 200
+	// Owner (100) leaves — ownership should transfer to seated player 200
 	token := validToken(100)
 	rec := doLeaveRoom(e, "1", token)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -3017,11 +3084,11 @@ func TestKickPlayer_PreviousOwnerLosesPermission(t *testing.T) {
 
 	r := &room.Room{Name: "Kick Race", OwnerID: 100, Status: "waiting", PlayerCount: 3}
 	require.NoError(t, repo.Create(r))
-	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 100, Username: "A"}))
-	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "B"}))
-	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 300, Username: "C"}))
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 100, Username: "A", Seat: intPtr(0)}))
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "B", Seat: intPtr(1)}))
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 300, Username: "C", Seat: intPtr(2)}))
 
-	// A leaves first — ownership transfers to B (200)
+	// A leaves first — ownership transfers to seated player B (200)
 	leaveRec := doLeaveRoom(e, "1", validToken(100))
 	require.Equal(t, http.StatusOK, leaveRec.Code)
 	updated, _ := repo.FindByID(r.ID)
