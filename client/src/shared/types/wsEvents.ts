@@ -296,10 +296,19 @@ export interface RoomUpdatedPayload {
 export const SYSTEM_PLAYER_JOINED = "system:player_joined" as const;
 export const SYSTEM_PLAYER_LEFT = "system:player_left" as const;
 export const SYSTEM_ROOM_KICKED = "system:room_kicked" as const;
+// Broadcast to a reopened room's members when a player re-enters after a match
+// (via "Return to room"). Drives the RoomPage "waiting to return" presence
+// state. Keep in sync with server events.go (SystemPlayerReturned).
+export const SYSTEM_PLAYER_RETURNED = "system:player_returned" as const;
 
 export interface RoomKickedPayload {
   roomId: number;
   reason: string;
+}
+
+export interface PlayerReturnedPayload {
+  roomId: number;
+  userId: number;
 }
 
 export interface PlayerJoinedPayload {

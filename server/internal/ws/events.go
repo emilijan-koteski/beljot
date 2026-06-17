@@ -217,6 +217,17 @@ type RoomKickedPayload struct {
 	Reason string `json:"reason"`
 }
 
+// SystemPlayerReturned is broadcast to a reopened room's members when a player
+// re-enters it after a match (via "Return to room"). It drives the lobby
+// "waiting to return" presence state — keep in sync with wsEvents.ts.
+const SystemPlayerReturned = "system:player_returned"
+
+// PlayerReturnedPayload is the typed payload for SystemPlayerReturned events.
+type PlayerReturnedPayload struct {
+	RoomID uint `json:"roomId"`
+	UserID uint `json:"userId"`
+}
+
 // --- Seat and game events ---
 const SystemSeatUpdated = "system:seat_updated"
 const SystemMatchStarted = "system:match_started"

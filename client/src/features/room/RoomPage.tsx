@@ -143,12 +143,17 @@ export function RoomPage() {
   const storePlayers = useRoomStore((s) => s.players);
   const matchStarted = useRoomStore((s) => s.matchStarted);
   const kickedFromRoomId = useRoomStore((s) => s.kickedFromRoomId);
+  const returnedUserIds = useRoomStore((s) => s.returnedUserIds);
 
   const hasLeftRef = useRef(false);
   const hasJoinedRef = useRef(false);
   // Guards the deep-link auto-join below to a single attempt (the query data
   // changes on refetch, and React StrictMode double-invokes effects in dev).
   const joinAttemptedRef = useRef(false);
+  // Holds a deferred unmount-leave ({ id, timer }) so React StrictMode's dev-only
+  // setup→cleanup→setup cycle can cancel it before it fires — see the leave-on-
+  // unmount effect below.
+  const pendingLeaveRef = useRef<{ id: number; timer: ReturnType<typeof setTimeout> } | null>(null);
 
   // Owner-only transient UI state — kept local instead of pushed into a store
   // because nothing outside RoomPage cares about it.
@@ -182,6 +187,7 @@ export function RoomPage() {
       const store = useRoomStore.getState();
       store.setRoom(roomQuery.data.room);
       store.setPlayers(roomQuery.data.players);
+      store.setReturnedUserIds(roomQuery.data.returnedUserIds ?? []);
       store.setCurrentRoomId(roomQuery.data.room.id);
       const userId = useAuthStore.getState().user?.id;
       if (userId && roomQuery.data.players.some((p) => p.userId === userId)) {
@@ -330,10 +336,28 @@ export function RoomPage() {
   // NOTE: this covers SPA navigation only — a hard unload (address-bar nav to
   // /lobby, refresh, tab close) does NOT run React cleanups; the `pagehide`
   // handler below covers that case with a keepalive request.
+  //
+  // The leave is DEFERRED by a macrotask instead of fired inline so it survives
+  // React StrictMode's dev-only setup→cleanup→setup remount: the synthetic
+  // cleanup schedules a leave, then the immediate re-setup (same id) cancels it
+  // before the timer runs. Without this, returning to a room you're still a
+  // member of (warm React-Query cache → `hasJoinedRef` set synchronously on
+  // mount) fired a spurious `/leave` that vacated your seat and transferred
+  // ownership away. A genuine unmount (or an id change A→B) has no matching
+  // re-setup, so the leave still fires.
   useEffect(() => {
+    const roomId = Number(id);
+    if (pendingLeaveRef.current && pendingLeaveRef.current.id === roomId) {
+      clearTimeout(pendingLeaveRef.current.timer);
+      pendingLeaveRef.current = null;
+    }
     return () => {
       if (id && hasJoinedRef.current && !hasLeftRef.current) {
-        leaveRoomMutation.mutate(Number(id));
+        const timer = setTimeout(() => {
+          pendingLeaveRef.current = null;
+          leaveRoomMutation.mutate(roomId);
+        }, 0);
+        pendingLeaveRef.current = { id: roomId, timer };
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -664,6 +688,21 @@ export function RoomPage() {
   const seatedCount = players.filter((p) => p.seat !== null).length;
   const allSeated = seatedCount === 4;
 
+  // Presence gate (v2): every seated HUMAN must be "back" in the room (returned
+  // after a match, or freshly joined) before the owner can start — so an
+  // ex-player still on the previous match's result dialog is never pulled in.
+  // Bots are never gated. Gating only engages once presence is tracked for the
+  // room (returnedUserIds non-empty) — always true in production for a waiting
+  // room since the owner/reopener is present and create/join mark presence; an
+  // empty set means "no presence info", so fall back to the plain seated check
+  // and show no "waiting to return" badges.
+  const seatedHumans = players.filter((p) => p.seat !== null && p.isBot !== true);
+  const presenceTracked = returnedUserIds.length > 0;
+  const allReturned =
+    !presenceTracked || seatedHumans.every((p) => returnedUserIds.includes(p.userId));
+  const isWaitingToReturn = (p: RoomPlayer): boolean =>
+    presenceTracked && p.seat !== null && p.isBot !== true && !returnedUserIds.includes(p.userId);
+
   const ownerPlayer = players.find((p) => p.userId === room.ownerId);
   const ownerUsername = ownerPlayer?.username ?? t("room.seatOwner");
   const isRelaxed = room.timerStyle === "relaxed";
@@ -754,13 +793,15 @@ export function RoomPage() {
     ctaLabel = allSeated ? t("room.autoStarting") : t("room.waitingForPlayers");
   } else if (isOwner) {
     ctaTestId = "start-game";
-    ctaDisabled = !allSeated || startGameMutation.isPending;
+    ctaDisabled = !allSeated || !allReturned || startGameMutation.isPending;
     ctaOnClick = ctaDisabled ? undefined : handleStartGame;
     ctaLabel = startGameMutation.isPending
       ? t("room.matchStarting")
-      : allSeated
-        ? t("room.startMatch")
-        : t("room.waitingForPlayers");
+      : !allSeated
+        ? t("room.waitingForPlayers")
+        : !allReturned
+          ? t("room.waitingForReturn")
+          : t("room.startMatch");
   } else {
     ctaLabel = allSeated ? t("room.waitingForOwner") : t("room.waitingForPlayers");
   }
@@ -1119,6 +1160,7 @@ export function RoomPage() {
                   swapMode={inSwapMode}
                   isClickable={isClickable}
                   isPending={isPendingForThisSeat}
+                  waitingToReturn={isWaiting && player !== undefined && isWaitingToReturn(player)}
                   ownerCanActOnRow={ownerCanKick}
                   onSelect={() => {
                     if (inSwapMode) {

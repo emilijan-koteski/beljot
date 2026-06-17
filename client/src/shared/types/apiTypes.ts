@@ -72,6 +72,10 @@ export interface RoomPlayer {
 export interface RoomDetail {
   room: Room;
   players: RoomPlayer[];
+  // User IDs currently "present" in a reopened room (returned via "Return to
+  // room" or freshly joined) vs ex-players still on the match result dialog.
+  // Drives the "waiting to return" seat state and the owner Start gate.
+  returnedUserIds: number[];
 }
 
 export interface SelectSeatResponse {

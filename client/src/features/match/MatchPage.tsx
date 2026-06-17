@@ -10,7 +10,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router";
 
-import { getRoom } from "@/shared/api/rooms";
+import { FetchError } from "@/shared/api/axiosClient";
+import { getRoom, leaveRoom, returnToRoom } from "@/shared/api/rooms";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
@@ -831,6 +832,20 @@ export function MatchPage() {
     }
   }, [matchEndData, overlayPhase, scoreRevealData, pendingResolvedTrick]);
 
+  // D145a: a NEW match started under a stale result overlay. matchEndData is set
+  // only after match_end (which also sets phase "match_end"); once the room
+  // reopens and a fresh match's match_state arrives with any live phase, the old
+  // result is stale — clear it + drop the overlay so the new table renders
+  // instead of the lingering "match over" dialog. Gating on matchEndData !== null
+  // keeps this inert during normal play and on the legitimate end state.
+  useEffect(() => {
+    const phase = matchState?.phase;
+    if (matchEndData !== null && phase !== undefined && phase !== "match_end") {
+      setMatchEndData(null);
+      setOverlayPhase("normal");
+    }
+  }, [matchState?.phase, matchEndData, setMatchEndData]);
+
   // Detect reshuffle: bidding → dealing transition within same match
   const currentPhase = matchState?.phase;
   useEffect(() => {
@@ -1101,10 +1116,59 @@ export function MatchPage() {
   }, [matchEndData, sendMessage, setScoreRevealData]);
 
   const handleReturnToLobby = useCallback(() => {
+    // Leave the room before navigating: otherwise our room_players row lingers,
+    // and once a teammate clicks "Return to room" (flipping it back to waiting)
+    // our stale membership traps us in ALREADY_IN_ROOM on any future join/create
+    // — and if we were the owner, ownership never transfers. Best-effort: the
+    // lobby navigation proceeds regardless of the leave result.
+    if (roomIdNum !== null) {
+      void leaveRoom(roomIdNum).catch(() => {
+        // best-effort cleanup — a failed leave must not block returning to lobby
+      });
+    }
     setMatchEndData(null);
     clearGame();
     navigate("/lobby");
-  }, [clearGame, navigate, setMatchEndData]);
+  }, [roomIdNum, clearGame, navigate, setMatchEndData]);
+
+  // "Return to room" — reopen the same room (status completed → waiting) and go
+  // back to the room lobby on the original seat so the group can play again.
+  // On rejection (kicked/left, or the room is gone) keep the player on the
+  // result overlay and surface a toast so they can still choose "Return to
+  // lobby" — rather than navigating to a notice that unmounts instantly.
+  const handleReturnToRoom = useCallback(async () => {
+    if (roomIdNum === null) {
+      setMatchEndData(null);
+      clearGame();
+      navigate("/lobby");
+      return;
+    }
+    try {
+      await returnToRoom(roomIdNum);
+      setMatchEndData(null);
+      clearGame();
+      navigate(`/rooms/${roomIdNum}`);
+    } catch (err) {
+      if (errorToastTimerRef.current !== null) {
+        clearTimeout(errorToastTimerRef.current);
+      }
+      // D146: distinct copy per failure — 409 the next match already started,
+      // 404 we're no longer a member (kicked/left). Anything else (network) keeps
+      // the generic message.
+      const code = err instanceof FetchError ? err.code : null;
+      const messageKey =
+        code === "MATCH_ALREADY_STARTED"
+          ? "match.matchResult.returnToRoomAlreadyStarted"
+          : code === "NOT_IN_ROOM"
+            ? "match.matchResult.returnToRoomNotInRoom"
+            : "match.matchResult.returnToRoomError";
+      setErrorToast(t(messageKey));
+      errorToastTimerRef.current = window.setTimeout(() => {
+        setErrorToast(null);
+        errorToastTimerRef.current = null;
+      }, MOTION.TOAST_ERROR);
+    }
+  }, [roomIdNum, clearGame, navigate, setMatchEndData, t]);
 
   const handleAbandonReturnToLobby = useCallback(() => {
     setMatchAbandonedData(null);
@@ -1943,6 +2007,7 @@ export function MatchPage() {
           data={matchEndData}
           viewerTeam={viewerTeam}
           onReturnToLobby={handleReturnToLobby}
+          onReturnToRoom={handleReturnToRoom}
           surrenderedByUsername={surrenderedByUsername}
         />
       )}

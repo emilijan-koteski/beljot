@@ -16,10 +16,11 @@ const lobbyDisconnectTimeout = 10 * time.Second
 // their seat is freed after a short timeout (10 seconds). If they
 // reconnect within the window, the timer is cancelled.
 type LobbyDisconnectHandler struct {
-	repo    RoomRepository
-	hub     *ws.Hub
-	mu      sync.Mutex
-	pending map[uint]*lobbyDisconnect // userID → pending disconnect
+	repo     RoomRepository
+	hub      *ws.Hub
+	presence *PresenceRegistry
+	mu       sync.Mutex
+	pending  map[uint]*lobbyDisconnect // userID → pending disconnect
 }
 
 type lobbyDisconnect struct {
@@ -28,11 +29,15 @@ type lobbyDisconnect struct {
 }
 
 // NewLobbyDisconnectHandler creates a new handler for lobby disconnect events.
-func NewLobbyDisconnectHandler(repo RoomRepository, hub *ws.Hub) *LobbyDisconnectHandler {
+func NewLobbyDisconnectHandler(repo RoomRepository, hub *ws.Hub, presence *PresenceRegistry) *LobbyDisconnectHandler {
+	if presence == nil {
+		presence = NewPresenceRegistry()
+	}
 	return &LobbyDisconnectHandler{
-		repo:    repo,
-		hub:     hub,
-		pending: make(map[uint]*lobbyDisconnect),
+		repo:     repo,
+		hub:      hub,
+		presence: presence,
+		pending:  make(map[uint]*lobbyDisconnect),
 	}
 }
 
@@ -149,6 +154,10 @@ func (h *LobbyDisconnectHandler) handleTimeout(userID uint, roomID uint) {
 	}
 
 	slog.Info("room: lobby player removed after disconnect timeout", "userID", userID, "roomID", roomID)
+
+	// Drop their presence (auto-clears the room entry when the last present
+	// member times out).
+	h.presence.Remove(roomID, userID)
 
 	// Broadcast player_left to remaining room participants
 	remainingPlayers, err := h.repo.FindPlayersByRoomID(roomID)

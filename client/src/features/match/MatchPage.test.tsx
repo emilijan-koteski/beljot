@@ -2,9 +2,10 @@ import "@/shared/i18n/i18n";
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
-import { BrowserRouter, MemoryRouter } from "react-router";
+import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FetchError } from "@/shared/api/axiosClient";
 import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -25,6 +26,20 @@ vi.mock("@/shared/providers/WebSocketContext", () => ({
 vi.mock("@/shared/providers/WebSocketProvider", () => ({
   WebSocketProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
+
+// Rooms API — controllable so the return-to-room flow (D146) can assert distinct
+// error copy. getRoom resolves to a healthy membership so the on-mount splash
+// check stays quiet when a room param is present.
+vi.mock("@/shared/api/rooms", () => ({
+  getRoom: vi.fn(),
+  leaveRoom: vi.fn(),
+  returnToRoom: vi.fn(),
+}));
+
+import { getRoom, returnToRoom } from "@/shared/api/rooms";
+
+const mockGetRoom = vi.mocked(getRoom);
+const mockReturnToRoom = vi.mocked(returnToRoom);
 
 const mockMatchState: MatchState = {
   id: 1,
@@ -363,6 +378,94 @@ describe("MatchPage", () => {
     // Match result overlay should appear
     expect(screen.getByTestId("match-result")).toBeInTheDocument();
     expect(screen.getByTestId("match-result-team-a-score")).toHaveTextContent("1020");
+  });
+
+  // D145a: a new match's match_state (any live phase) must clear a stale result
+  // overlay left from the previous match.
+  it("clears a stale result overlay when a fresh match_state arrives", () => {
+    useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
+    useMatchStore.getState().setMyPlayerSeat(0);
+    useMatchStore.getState().setMatchEndData({
+      winnerTeam: 0,
+      teamAFinalScore: 1020,
+      teamBFinalScore: 850,
+      matchDurationSec: 300,
+    });
+
+    renderMatchPage();
+    expect(screen.getByTestId("match-result")).toBeInTheDocument();
+
+    // A new match begins → match_state arrives with a live phase.
+    act(() => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "dealing" });
+    });
+
+    expect(screen.queryByTestId("match-result")).not.toBeInTheDocument();
+    expect(useMatchStore.getState().matchEndData).toBeNull();
+  });
+
+  // D146: distinct return-to-room error copy per failure code.
+  it.each([
+    ["MATCH_ALREADY_STARTED", 409, "The next match already started without you."],
+    ["NOT_IN_ROOM", 404, "You're no longer in this room."],
+  ])("surfaces distinct copy when return-to-room fails with %s", async (code, status, message) => {
+    mockGetRoom.mockResolvedValue({
+      room: {
+        id: 1,
+        name: "R",
+        code: "ABC123",
+        ownerId: 10,
+        ownerUsername: "alice",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "in_progress",
+        playerCount: 4,
+        isQuickPlay: false,
+        createdAt: "",
+        updatedAt: "",
+      },
+      players: [
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "alice",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
+      ],
+      returnedUserIds: [],
+    });
+    mockReturnToRoom.mockRejectedValueOnce(new FetchError(status, code, "x"));
+
+    useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
+    useMatchStore.getState().setMyPlayerSeat(0);
+    useMatchStore.getState().setMatchEndData({
+      winnerTeam: 0,
+      teamAFinalScore: 1020,
+      teamBFinalScore: 850,
+      matchDurationSec: 300,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/match/1"]}>
+        <Routes>
+          <Route path="/match/:roomId" element={<MatchPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("match-result")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("match-result-room-btn"));
+    });
+
+    expect(screen.getByTestId("error-toast")).toHaveTextContent(message);
   });
 
   it("shows error toast when lastError is set and dismisses it on close button click", () => {
