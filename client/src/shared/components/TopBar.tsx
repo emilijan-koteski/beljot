@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Menu } from "lucide-react";
+import { ChevronDown, Coins, LogOut, Menu } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -100,6 +101,22 @@ export function TopBar({
       )}
 
       <div className="ml-auto flex items-center gap-2.5">
+        {/* Coin balance pill (Story 9.1). Sits left of the language selector.
+            Explicit number rendering — `0` is a real balance, never treated as
+            falsy. The login streak is surfaced in the daily-reward dialog and the
+            profile, not in the header. */}
+        {user && (
+          <div
+            className="bg-surface-elevated flex items-center gap-1.5 rounded-full border border-border py-1 pr-3 pl-2.5"
+            data-testid="coin-balance"
+          >
+            <Coins className="size-4" style={{ color: COIN_GOLD }} aria-hidden="true" />
+            <span className="text-ink text-sm font-semibold tabular-nums">
+              {user.walletBalance.toLocaleString()}
+            </span>
+          </div>
+        )}
+
         <LanguageSelector persistToServer={persistLanguage} testIdPrefix={languageTestIdPrefix} />
 
         {/* Desktop (≥md): username pill with a logout dropdown. */}

@@ -912,5 +912,20 @@
   "bots": {
     "seatName": "Bot {{n}}",
     "badge": "Bot"
+  },
+  "rewards": {
+    "dailyReward": {
+      "title": "Dnevna nagrada",
+      "streakMaxed": "Maksimalan niz",
+      "coinsAdded": "novčića dodano u tvoj novčanik",
+      "streak": "Dan {{streak}}",
+      "newBalance": "Novo stanje",
+      "collect": "Preuzmi"
+    }
+  },
+  "wallet": {
+    "balanceLabel": "Novčići",
+    "streakLabel": "Dana zaredom",
+    "streakTooltip": "Igra {{days}} dana zaredom"
   }
 }

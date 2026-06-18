@@ -76,13 +76,15 @@ export function LanguageSelector({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="text-ink-dim hover:bg-surface-sunken hover:text-ink inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-transparent px-2.5 text-sm font-medium transition-colors aria-expanded:bg-surface-sunken aria-expanded:text-ink"
+        className="text-ink-dim hover:bg-surface-sunken hover:text-ink aria-expanded:bg-surface-sunken aria-expanded:text-ink inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-transparent transition-colors md:w-auto md:justify-start md:gap-1.5 md:px-2.5 md:text-sm md:font-medium"
         aria-label={t("auth.languageSelector.label")}
         data-testid={triggerTestId}
       >
-        <Globe className="size-3.5" />
-        <span className="text-ink tracking-wider">{currentLang}</span>
-        <ChevronDown className="size-3 opacity-70" />
+        {/* Phones (<md): icon-only globe button, matching the hamburger menu —
+            the language code + chevron only appear from md up. */}
+        <Globe className="size-4.5 md:size-3.5" />
+        <span className="text-ink hidden tracking-wider md:inline">{currentLang}</span>
+        <ChevronDown className="hidden size-3 opacity-70 md:block" />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"

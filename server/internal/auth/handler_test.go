@@ -619,3 +619,72 @@ func TestLogout_Success(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	assert.Equal(t, "logged out", resp["data"]["message"])
 }
+
+// --- Wallet seeding / echo (Story 9.1) ---
+
+func TestRegister_SeedsWalletAndStampsLastLogin(t *testing.T) {
+	repo := newMockUserRepo()
+	handler := NewAuthHandler(repo, "test-jwt-secret", "development")
+	e := echo.New()
+	e.HTTPErrorHandler = testErrorHandler
+	e.POST("/api/v1/auth/register", handler.Register)
+
+	rec := doRegister(e, `{"email":"wallet@example.com","username":"walletuser","password":"password123"}`)
+	require.Equal(t, http.StatusCreated, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data RegisterResponseData
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	// Response seeds balance 5000 / streak 0 — no daily bonus at registration.
+	assert.Equal(t, 5000, data.WalletBalance)
+	assert.Equal(t, 0, data.LoginStreakDays)
+
+	// Stored user is stamped with today's UTC date so the day-1 bonus first
+	// becomes claimable on the next calendar day (no same-day grant).
+	require.Len(t, repo.users, 1)
+	u := repo.users[0]
+	require.NotNil(t, u.LastLoginAt, "registration must stamp last_login_at")
+	gotY, gotM, gotD := u.LastLoginAt.UTC().Date()
+	wantY, wantM, wantD := time.Now().UTC().Date()
+	assert.Equal(t, wantY, gotY)
+	assert.Equal(t, wantM, gotM)
+	assert.Equal(t, wantD, gotD)
+	assert.Equal(t, 5000, u.WalletBalance)
+	assert.Equal(t, 0, u.LoginStreakDays)
+}
+
+func TestLogin_EchoesWalletFields(t *testing.T) {
+	_, e := setupHandler()
+	registerUser(e)
+
+	rec := doLogin(e, `{"email":"test@example.com","password":"password123"}`)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data RegisterResponseData
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	// Echoes the seeded values from the loaded user — login never grants.
+	assert.Equal(t, 5000, data.WalletBalance)
+	assert.Equal(t, 0, data.LoginStreakDays)
+}
+
+func TestRefresh_EchoesWalletFields(t *testing.T) {
+	_, e := setupHandler()
+	regRec := registerUser(e)
+	cookies := regRec.Result().Cookies()
+
+	rec := doRefresh(e, cookies)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data RegisterResponseData
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, 5000, data.WalletBalance)
+	assert.Equal(t, 0, data.LoginStreakDays)
+}

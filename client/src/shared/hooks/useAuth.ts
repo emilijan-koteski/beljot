@@ -47,6 +47,8 @@ export function useAuthInit(): void {
           username: res.username,
           email: res.email,
           languagePreference: res.languagePreference,
+          walletBalance: res.walletBalance,
+          loginStreakDays: res.loginStreakDays,
           createdAt: res.createdAt,
         });
         // Await the language switch so the first paint after `setLoading(false)`

@@ -57,6 +57,8 @@ export function ProfilePage() {
         wins={wins}
         losses={losses}
         capots={career.data?.capots ?? 0}
+        walletBalance={user?.walletBalance ?? 0}
+        loginStreakDays={user?.loginStreakDays ?? 0}
         winRate={winRate}
       />
 

@@ -81,6 +81,8 @@ describe("ProfilePage", () => {
         username: "testuser",
         email: "test@example.com",
         languagePreference: "en",
+        walletBalance: 5000,
+        loginStreakDays: 1,
         createdAt: "2026-01-15T10:00:00Z",
       },
       isLoading: false,

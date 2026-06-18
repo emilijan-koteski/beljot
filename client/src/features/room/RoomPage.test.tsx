@@ -108,6 +108,8 @@ const defaultUser = {
   username: "alice",
   email: "a@b.com",
   languagePreference: "en",
+  walletBalance: 5000,
+  loginStreakDays: 1,
   createdAt: "",
 };
 
@@ -970,7 +972,15 @@ describe("RoomPage", () => {
 
   it("renders waiting message for non-owner when 4 players seated", async () => {
     useAuthStore.setState({
-      user: { id: 20, username: "bob", email: "b@b.com", languagePreference: "en", createdAt: "" },
+      user: {
+        id: 20,
+        username: "bob",
+        email: "b@b.com",
+        languagePreference: "en",
+        walletBalance: 5000,
+        loginStreakDays: 1,
+        createdAt: "",
+      },
       token: "tok",
     });
 
@@ -1032,7 +1042,15 @@ describe("RoomPage", () => {
 
   it("does not render Start Game button for non-owner", async () => {
     useAuthStore.setState({
-      user: { id: 20, username: "bob", email: "b@b.com", languagePreference: "en", createdAt: "" },
+      user: {
+        id: 20,
+        username: "bob",
+        email: "b@b.com",
+        languagePreference: "en",
+        walletBalance: 5000,
+        loginStreakDays: 1,
+        createdAt: "",
+      },
       token: "tok",
     });
 

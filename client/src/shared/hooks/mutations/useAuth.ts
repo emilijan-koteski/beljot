@@ -15,6 +15,8 @@ function setAuthState(res: {
   username: string;
   email: string;
   languagePreference: string;
+  walletBalance: number;
+  loginStreakDays: number;
   createdAt: string;
 }) {
   useAuthStore.getState().setToken(res.token);
@@ -23,6 +25,8 @@ function setAuthState(res: {
     username: res.username,
     email: res.email,
     languagePreference: res.languagePreference,
+    walletBalance: res.walletBalance,
+    loginStreakDays: res.loginStreakDays,
     createdAt: res.createdAt,
   });
 }

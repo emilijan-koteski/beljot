@@ -29,6 +29,8 @@ describe("authStore", () => {
         username: "test",
         email: "test@test.com",
         languagePreference: "en",
+        walletBalance: 5000,
+        loginStreakDays: 1,
         createdAt: "2026-01-01",
       },
     });

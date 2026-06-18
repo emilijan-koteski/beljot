@@ -28,6 +28,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/passwordreset"
 	"github.com/emilijan/beljot/server/internal/room"
 	"github.com/emilijan/beljot/server/internal/user"
+	"github.com/emilijan/beljot/server/internal/wallet"
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
@@ -117,6 +118,14 @@ func main() {
 	api.GET("/users/:id/career", userHandler.GetCareer)
 	api.GET("/users/:id/matches", userHandler.ListMatches)
 	api.PATCH("/users/:id/preferences", userHandler.UpdatePreferences)
+
+	// Wallet — daily-login bonus grant. POST (it mutates) on the authed group;
+	// the client calls it once per app session on bootstrap (covers explicit
+	// login and refresh-token auto-login). Idempotent: at most one grant per UTC day.
+	walletRepo := wallet.NewGormRepository(db)
+	walletService := wallet.NewService(walletRepo)
+	walletHandler := wallet.NewWalletHandler(walletService)
+	api.POST("/wallet/daily-login", walletHandler.ProcessDailyLogin)
 
 	// Lobby stats — wired after hub + sessionManager + roomRepo so the handler
 	// can read the four data sources it bucket-counts.

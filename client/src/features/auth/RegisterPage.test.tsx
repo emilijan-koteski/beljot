@@ -145,6 +145,8 @@ describe("RegisterPage", () => {
       username: "testuser",
       email: "test@example.com",
       languagePreference: "en",
+      walletBalance: 5000,
+      loginStreakDays: 1,
       createdAt: "2026-04-10T00:00:00Z",
     });
 
@@ -175,6 +177,8 @@ describe("RegisterPage", () => {
       username: "testuser",
       email: "test@example.com",
       languagePreference: "mk",
+      walletBalance: 5000,
+      loginStreakDays: 1,
       createdAt: "2026-04-10T00:00:00Z",
     });
 
@@ -338,6 +342,8 @@ describe("RegisterPage", () => {
       username: "testuser",
       email: "test@example.com",
       languagePreference: "en",
+      walletBalance: 5000,
+      loginStreakDays: 1,
       createdAt: "2026-04-10T00:00:00Z",
     });
   });

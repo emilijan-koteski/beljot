@@ -912,5 +912,20 @@
   "bots": {
     "seatName": "Бот {{n}}",
     "badge": "Бот"
+  },
+  "rewards": {
+    "dailyReward": {
+      "title": "Дневна награда",
+      "streakMaxed": "Максимална низа",
+      "coinsAdded": "парички додадени во твојот паричник",
+      "streak": "Ден {{streak}}",
+      "newBalance": "Нов биланс",
+      "collect": "Преземи"
+    }
+  },
+  "wallet": {
+    "balanceLabel": "Парички",
+    "streakLabel": "Денови по ред",
+    "streakTooltip": "Игра {{days}} дена по ред"
   }
 }

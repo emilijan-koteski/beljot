@@ -155,6 +155,8 @@ beforeEach(() => {
       username: "alice",
       email: "a@b.com",
       languagePreference: "en",
+      walletBalance: 5000,
+      loginStreakDays: 1,
       createdAt: "",
     },
     token: "tok",

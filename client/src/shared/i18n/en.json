@@ -912,5 +912,20 @@
   "bots": {
     "seatName": "Bot {{n}}",
     "badge": "Bot"
+  },
+  "rewards": {
+    "dailyReward": {
+      "title": "Daily reward",
+      "streakMaxed": "Streak maxed",
+      "coinsAdded": "coins added to your wallet",
+      "streak": "Day {{streak}}",
+      "newBalance": "New balance",
+      "collect": "Collect"
+    }
+  },
+  "wallet": {
+    "balanceLabel": "Coins",
+    "streakLabel": "Day streak",
+    "streakTooltip": "On a {{days}}-day play streak"
   }
 }
