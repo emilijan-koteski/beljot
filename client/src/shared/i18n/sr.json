@@ -915,10 +915,11 @@
   },
   "rewards": {
     "dailyReward": {
-      "title": "Dnevna nagrada!",
-      "amount": "+{{amount}} novčića",
+      "title": "Dnevna nagrada",
+      "streakMaxed": "Maksimalan niz",
+      "coinsAdded": "novčića dodato u tvoj novčanik",
       "streak": "Dan {{streak}}",
-      "balance": "Novo stanje: {{balance}}",
+      "newBalance": "Novo stanje",
       "collect": "Preuzmi"
     }
   },

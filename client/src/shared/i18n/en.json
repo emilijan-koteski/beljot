@@ -915,10 +915,11 @@
   },
   "rewards": {
     "dailyReward": {
-      "title": "Daily reward!",
-      "amount": "+{{amount}} coins",
+      "title": "Daily reward",
+      "streakMaxed": "Streak maxed",
+      "coinsAdded": "coins added to your wallet",
       "streak": "Day {{streak}}",
-      "balance": "New balance: {{balance}}",
+      "newBalance": "New balance",
       "collect": "Collect"
     }
   },

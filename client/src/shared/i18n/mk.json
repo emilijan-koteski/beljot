@@ -915,10 +915,11 @@
   },
   "rewards": {
     "dailyReward": {
-      "title": "Дневна награда!",
-      "amount": "+{{amount}} парички",
+      "title": "Дневна награда",
+      "streakMaxed": "Максимална низа",
+      "coinsAdded": "парички додадени во твојот паричник",
       "streak": "Ден {{streak}}",
-      "balance": "Нов биланс: {{balance}}",
+      "newBalance": "Нов биланс",
       "collect": "Преземи"
     }
   },
