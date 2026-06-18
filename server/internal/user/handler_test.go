@@ -393,6 +393,29 @@ func TestGetProfile_Success(t *testing.T) {
 	assert.NotEmpty(t, data.CreatedAt)
 }
 
+// TestGetProfile_IncludesWalletFields pins AC #4: the self-only profile carries
+// the private wallet balance + login streak from the loaded user.
+func TestGetProfile_IncludesWalletFields(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("walletuser", "wallet@example.com", "en")
+	u.WalletBalance = 7340
+	u.LoginStreakDays = 5
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, 7340, data.WalletBalance)
+	assert.Equal(t, 5, data.LoginStreakDays)
+}
+
 func TestGetProfile_UserNotFound(t *testing.T) {
 	_, e := setupUserHandler()
 

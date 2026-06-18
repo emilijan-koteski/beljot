@@ -12,10 +12,16 @@ import (
 	"github.com/emilijan/beljot/server/internal/match"
 )
 
+// ProfileResponse is the self-only profile DTO (GetProfile authorises
+// paramID == authUserID). WalletBalance and LoginStreakDays are PRIVATE figures
+// — when Epic 11 adds public player profiles, the public DTO must NOT include
+// them. Never add these fields to a shared/public response shape.
 type ProfileResponse struct {
 	ID                 uint      `json:"id"`
 	Username           string    `json:"username"`
 	LanguagePreference string    `json:"languagePreference"`
+	WalletBalance      int       `json:"walletBalance"`
+	LoginStreakDays    int       `json:"loginStreakDays"`
 	CreatedAt          time.Time `json:"createdAt"`
 	TotalGamesPlayed   int       `json:"totalGamesPlayed"`
 	Wins               int       `json:"wins"`
@@ -198,6 +204,8 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 			ID:                 u.ID,
 			Username:           u.Username,
 			LanguagePreference: u.LanguagePreference,
+			WalletBalance:      u.WalletBalance,
+			LoginStreakDays:    u.LoginStreakDays,
 			CreatedAt:          u.CreatedAt,
 			TotalGamesPlayed:   wins + losses + abandoned,
 			Wins:               wins,

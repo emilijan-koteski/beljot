@@ -16,6 +16,10 @@ export interface User {
   username: string;
   email: string;
   languagePreference: string;
+  // Wallet fields (Story 9.1). Go zero values (0) serialize as real numbers, not
+  // null — never use JS truthiness on these; compare explicitly (e.g. > 1).
+  walletBalance: number;
+  loginStreakDays: number;
   createdAt: string;
 }
 

@@ -73,17 +73,23 @@ async function doRefresh(): Promise<string> {
         username: string;
         email: string;
         languagePreference: string;
+        walletBalance: number;
+        loginStreakDays: number;
         createdAt: string;
       };
     }>("/auth/refresh")
     .then((res) => {
       const r = res.data.data;
       useAuthStore.getState().setToken(r.token);
+      // Re-hydrate the full user incl. wallet fields — a 401-retry refresh that
+      // dropped these would blank the header coin pill mid-session.
       useAuthStore.getState().setUser({
         id: r.id,
         username: r.username,
         email: r.email,
         languagePreference: r.languagePreference,
+        walletBalance: r.walletBalance,
+        loginStreakDays: r.loginStreakDays,
         createdAt: r.createdAt,
       });
       return r.token;

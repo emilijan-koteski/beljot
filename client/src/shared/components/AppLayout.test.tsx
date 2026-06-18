@@ -17,6 +17,18 @@ vi.mock("@/shared/api/profile", () => ({
   updatePreferences: vi.fn().mockResolvedValue({ languagePreference: "en" }),
 }));
 
+// The mounted DailyRewardGate fires claimDailyLogin on bootstrap — stub it so
+// these layout tests don't reach the network. granted:false → no dialog opens.
+vi.mock("@/shared/api/wallet", () => ({
+  claimDailyLogin: vi.fn().mockResolvedValue({
+    granted: false,
+    amount: 0,
+    streakDay: 1,
+    newBalance: 5000,
+    loginStreakDays: 1,
+  }),
+}));
+
 function renderWithRouter(initialPath: string) {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
@@ -40,6 +52,8 @@ describe("AppLayout", () => {
         username: "testuser",
         email: "test@example.com",
         languagePreference: "en",
+        walletBalance: 5000,
+        loginStreakDays: 1,
         createdAt: "2026-01-01T00:00:00Z",
       },
       isLoading: false,

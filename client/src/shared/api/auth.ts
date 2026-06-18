@@ -15,6 +15,8 @@ export interface RegisterResponse {
   username: string;
   email: string;
   languagePreference: string;
+  walletBalance: number;
+  loginStreakDays: number;
   createdAt: string;
 }
 
@@ -31,6 +33,8 @@ export interface RefreshResponse {
   username: string;
   email: string;
   languagePreference: string;
+  walletBalance: number;
+  loginStreakDays: number;
   createdAt: string;
 }
 

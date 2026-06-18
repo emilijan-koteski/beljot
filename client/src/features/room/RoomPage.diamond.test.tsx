@@ -140,6 +140,8 @@ describe("RoomPage diamond layout invariant", () => {
           username: ["alice", "bob", "carol", "dave"][viewerSeat]!,
           email: "v@b.com",
           languagePreference: "en",
+          walletBalance: 5000,
+          loginStreakDays: 1,
           createdAt: "",
         },
         token: "tok",

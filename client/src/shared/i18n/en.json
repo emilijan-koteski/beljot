@@ -912,5 +912,19 @@
   "bots": {
     "seatName": "Bot {{n}}",
     "badge": "Bot"
+  },
+  "rewards": {
+    "dailyReward": {
+      "title": "Daily reward!",
+      "amount": "+{{amount}} coins",
+      "streak": "Day {{streak}}",
+      "balance": "New balance: {{balance}}",
+      "collect": "Collect"
+    }
+  },
+  "wallet": {
+    "balanceLabel": "Coins",
+    "streakLabel": "Day streak",
+    "streakTooltip": "On a {{days}}-day play streak"
   }
 }

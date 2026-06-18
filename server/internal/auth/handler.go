@@ -26,11 +26,17 @@ type RegisterRequest struct {
 	LanguagePreference string `json:"languagePreference"`
 }
 
+// RegisterResponseData is shared by Register, Login, and Refresh. The wallet
+// fields are read-only echoes for immediate header display — NO auth handler
+// grants the daily bonus (that is the wallet endpoint's job). Register sets
+// balance 5000 / streak 0; Login and Refresh echo the loaded user's values.
 type RegisterResponseData struct {
 	ID                 uint      `json:"id"`
 	Username           string    `json:"username"`
 	Email              string    `json:"email"`
 	LanguagePreference string    `json:"languagePreference"`
+	WalletBalance      int       `json:"walletBalance"`
+	LoginStreakDays    int       `json:"loginStreakDays"`
 	CreatedAt          time.Time `json:"createdAt"`
 	Token              string    `json:"token"`
 }
@@ -112,11 +118,27 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		lang = req.LanguagePreference
 	}
 
+	// Seed the wallet at registration (Story 9.1): balance 5000, streak 0, and
+	// last_login stamped to today (UTC). Stamping today is what makes the
+	// same-day bootstrap a no-grant and the FIRST grant land on the next
+	// calendar day (day-1). No bonus is granted here — the grant is the wallet
+	// endpoint's job. 5000 mirrors wallet.StartingBalance and migration 000009;
+	// set explicitly so the response and the inserted row agree.
+	//
+	// Stamp the UTC calendar date (midnight), not the current instant: the
+	// last_login_at column is a DATE and the wallet daily-login path writes a
+	// date-truncated value too, so both write paths agree in intent (rather than
+	// relying on the DATE column to silently truncate a full timestamp).
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	u := &user.User{
 		Email:              req.Email,
 		Username:           req.Username,
 		PasswordHash:       hash,
 		LanguagePreference: lang,
+		WalletBalance:      5000,
+		LoginStreakDays:    0,
+		LastLoginAt:        &today,
 	}
 
 	if err := h.userRepo.Create(u); err != nil {
@@ -141,6 +163,8 @@ func (h *AuthHandler) Register(c echo.Context) error {
 			Username:           u.Username,
 			Email:              u.Email,
 			LanguagePreference: u.LanguagePreference,
+			WalletBalance:      u.WalletBalance,
+			LoginStreakDays:    u.LoginStreakDays,
 			CreatedAt:          u.CreatedAt,
 			Token:              accessToken,
 		},
@@ -197,6 +221,8 @@ func (h *AuthHandler) Login(c echo.Context) error {
 			Username:           u.Username,
 			Email:              u.Email,
 			LanguagePreference: u.LanguagePreference,
+			WalletBalance:      u.WalletBalance,
+			LoginStreakDays:    u.LoginStreakDays,
 			CreatedAt:          u.CreatedAt,
 			Token:              accessToken,
 		},
@@ -247,6 +273,8 @@ func (h *AuthHandler) Refresh(c echo.Context) error {
 			Username:           u.Username,
 			Email:              u.Email,
 			LanguagePreference: u.LanguagePreference,
+			WalletBalance:      u.WalletBalance,
+			LoginStreakDays:    u.LoginStreakDays,
 			CreatedAt:          u.CreatedAt,
 			Token:              accessToken,
 		},
