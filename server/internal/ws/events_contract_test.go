@@ -224,6 +224,15 @@ func TestEventsJSONContract(t *testing.T) {
 			goldenFile: "auto_action.json",
 		},
 		{
+			name: "CoinSettlementPayload",
+			sample: ws.CoinSettlementPayload{
+				CoinDelta:  500,
+				NewBalance: 5500,
+				Pot:        2000,
+			},
+			goldenFile: "coin_settlement.json",
+		},
+		{
 			name: "PlayerDisconnectedPayload",
 			sample: ws.PlayerDisconnectedPayload{
 				PlayerSeat:         3,

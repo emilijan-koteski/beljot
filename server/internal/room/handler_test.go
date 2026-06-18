@@ -372,7 +372,7 @@ func testErrorHandler(err error, c echo.Context) {
 
 func setupTest() (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, nil, nil, nil)
+	handler := room.NewRoomHandler(repo, nil, nil, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -401,7 +401,7 @@ func setupTest() (*echo.Echo, *mockRoomRepo) {
 func setupTestWithBroadcast() (*echo.Echo, *mockRoomRepo, *mockBroadcaster) {
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
-	handler := room.NewRoomHandler(repo, nil, broadcaster, nil)
+	handler := room.NewRoomHandler(repo, nil, broadcaster, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -1253,7 +1253,7 @@ func TestLeaveRoom_OwnerTransfersToSeated_NotUnseated(t *testing.T) {
 	repo.rooms[0].PlayerCount = 3
 	repo.players = append(repo.players,
 		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
-		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)},                     // unseated, first
+		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)},                      // unseated, first
 		&room.RoomPlayer{ID: 3, RoomID: 1, UserID: 30, Seat: intPtr(2), CreatedAt: time.Now().Add(2 * time.Second)}, // seated
 	)
 
@@ -1727,16 +1727,16 @@ func seedQuickPlayRoom(repo *mockRoomRepo, code string, seatedUserIDs ...uint) *
 }
 
 func decodeQuickJoinData(t *testing.T, rec *httptest.ResponseRecorder) struct {
-	Room        room.Room `json:"room"`
-	Seat        int       `json:"seat"`
+	Room         room.Room `json:"room"`
+	Seat         int       `json:"seat"`
 	MatchStarted bool      `json:"matchStarted"`
 } {
 	t.Helper()
 	var resp map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -1886,8 +1886,8 @@ func TestQuickPlay_CreatesNewRoom(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -1943,8 +1943,8 @@ func TestQuickPlay_JoinsExistingRoom(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -2035,8 +2035,8 @@ func TestQuickPlay_SkipsNonQuickPlayRooms(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -2080,8 +2080,8 @@ func TestQuickPlay_FillsFirstEmptySeat(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -2137,8 +2137,8 @@ func TestQuickPlay_AutoStartsOnFourthJoiner(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -2228,22 +2228,24 @@ func TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying(t *testing.T) {
 // --- Test fakes for Story 8.5-1 AC2 (gameStarter) ---
 
 type fakeMatchStarter struct {
-	called      int
-	lastRoom    uint
-	lastPlayers [4]match.PlayerSeatInfo
-	err         error
+	called        int
+	lastRoom      uint
+	lastPlayers   [4]match.PlayerSeatInfo
+	lastCoinBuyIn int
+	err           error
 }
 
-func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [4]match.PlayerSeatInfo, _ string, _ int, _ uint, _ int) error {
+func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [4]match.PlayerSeatInfo, _ string, _ int, _ uint, _ int, coinBuyIn int) error {
 	g.called++
 	g.lastRoom = roomID
 	g.lastPlayers = players
+	g.lastCoinBuyIn = coinBuyIn
 	return g.err
 }
 
 func setupTestWithStarter(starter room.MatchStarter, broadcaster room.Broadcaster) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, starter, broadcaster, nil)
+	handler := room.NewRoomHandler(repo, starter, broadcaster, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -2482,8 +2484,8 @@ func TestQuickPlay_RetriesOnErrRoomFull(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))

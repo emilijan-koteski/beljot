@@ -192,6 +192,18 @@ export interface AutoActionPayload {
   type: AutoActionType;
 }
 
+// --- Economy events (Story 9.2) ---
+// Sent per-human at match end (after event:match_end) with that player's own
+// net coin delta and resulting wallet balance. Per-user, not broadcast, because
+// newBalance differs per player; pot is shared.
+export const EVENT_COIN_SETTLEMENT = "event:coin_settlement" as const;
+
+export interface CoinSettlementPayload {
+  coinDelta: number;
+  newBalance: number;
+  pot: number;
+}
+
 // --- Disconnect/reconnect events (server -> client) ---
 export const EVENT_PLAYER_DISCONNECTED = "event:player_disconnected" as const;
 export const EVENT_PLAYER_RECONNECTED = "event:player_reconnected" as const;

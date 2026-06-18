@@ -33,6 +33,7 @@ export function JoinByCodeTile() {
       const code = err instanceof FetchError ? err.code : null;
       if (code === "ROOM_NOT_FOUND") toast.error(t("lobby.errors.roomNotFound"));
       else if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
+      else if (code === "INSUFFICIENT_COINS") toast.error(t("room.errors.insufficientCoins"));
       else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
       else toast.error(t("lobby.errors.joinFailed"));
     }

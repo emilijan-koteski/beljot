@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { handleWsMessage as handleRoomListMessage } from "@/features/lobby/useRoomUpdates";
 import { MOTION } from "@/shared/lib/motion";
+import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
@@ -15,6 +16,7 @@ import type {
   BotRemovedPayload,
   CardPlayedPayload,
   ChatMessagePayload,
+  CoinSettlementPayload,
   DeclarationsResolvedPayload,
   EmotePayload,
   HandScoredPayload,
@@ -53,6 +55,7 @@ import {
   EVENT_AUTO_ACTION,
   EVENT_BELOT_ANNOUNCED,
   EVENT_CARD_PLAYED,
+  EVENT_COIN_SETTLEMENT,
   EVENT_DECLARATIONS_RESOLVED,
   EVENT_HAND_SCORED,
   EVENT_MATCH_ABANDONED,
@@ -258,6 +261,35 @@ function dispatchGameEvent(message: WsMessage): void {
       });
     }
     store.setMatchEndData(payload);
+    return;
+  }
+
+  if (type === EVENT_COIN_SETTLEMENT) {
+    // Story 9.2: per-human coin settlement, arriving right after match_end while
+    // still on the match page. Update the persisted wallet balance on authStore
+    // (balance lives on authStore.user, NOT gameStore — it must survive the
+    // later navigation away that wipes gameStore) and toast the win/loss.
+    const payload = message.payload as CoinSettlementPayload;
+    // Defensive validation — Go zero values are real values, so guard on type,
+    // not truthiness (a 0 delta/balance is legitimate).
+    if (!Number.isInteger(payload.coinDelta) || !Number.isInteger(payload.newBalance)) {
+      return;
+    }
+    const auth = useAuthStore.getState();
+    if (auth.user) {
+      auth.setUser({ ...auth.user, walletBalance: payload.newBalance });
+    }
+    if (payload.coinDelta > 0) {
+      toast.success(i18n.t("match.settlement.won", { amount: payload.coinDelta }), {
+        duration: MOTION.TOAST_INFO,
+      });
+    } else if (payload.coinDelta < 0) {
+      toast.info(i18n.t("match.settlement.lost", { amount: -payload.coinDelta }), {
+        duration: MOTION.TOAST_INFO,
+      });
+    }
+    // coinDelta === 0 (e.g. lone human winner who only recovers their stake):
+    // balance is unchanged, so no toast — silent.
     return;
   }
 

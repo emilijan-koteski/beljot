@@ -30,6 +30,31 @@ func (s *Service) ProcessDailyLogin(userID uint) (DailyLoginResult, error) {
 	return s.repo.ProcessDailyLogin(userID, time.Now().UTC())
 }
 
+// ChargeStakes atomically debits `amount` from every (human) userID at match
+// start. Returns the offending userID + apperr.ErrInsufficientCoins if any seat
+// is insolvent, with the whole charge rolled back (Story 9.2 AC #4, #5).
+func (s *Service) ChargeStakes(userIDs []uint, amount int) (uint, error) {
+	return s.repo.ChargeStakes(userIDs, amount)
+}
+
+// ApplySettlement atomically credits the winning human seats at match end
+// (Story 9.2 AC #6, #11). An empty map is a no-op (the no-human-winner sink).
+func (s *Service) ApplySettlement(credits map[uint]int) error {
+	return s.repo.ApplySettlement(credits)
+}
+
+// GetBalance reads a user's current wallet balance for the join affordability
+// check (Story 9.2 AC #2).
+func (s *Service) GetBalance(userID uint) (int, error) {
+	return s.repo.GetBalance(userID)
+}
+
+// GetBalances reads balances for many users (userID → balance) to populate the
+// per-human newBalance in event:coin_settlement.
+func (s *Service) GetBalances(userIDs []uint) (map[uint]int, error) {
+	return s.repo.GetBalances(userIDs)
+}
+
 // utcDate collapses a timestamp to its UTC calendar date (midnight UTC). Using
 // calendar components — not Truncate(24h) or duration math — keeps the
 // comparison correct across DST changes and non-UTC server time zones.

@@ -74,6 +74,7 @@ function fourSeatedRoom() {
       status: "waiting",
       playerCount: 4,
       isQuickPlay: false,
+      coinBuyIn: 0,
       createdAt: "",
       updatedAt: "",
     },

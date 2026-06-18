@@ -18,6 +18,7 @@ import {
 } from "@/shared/hooks/mutations/useRooms";
 import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room } from "@/shared/types/apiTypes";
 
 function filterAndSort(
@@ -118,7 +119,11 @@ export function LobbyPage() {
         goToMatchmaking(await quickJoinMutation.mutateAsync(room.id));
       } catch (err) {
         const code = err instanceof FetchError ? err.code : null;
+        // Quick-play rooms are free in Story 9.2, so INSUFFICIENT_COINS is not
+        // expected here — keep a generic fallback for forward-compat (Story 9.4).
         if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
+        else if (code === "INSUFFICIENT_COINS")
+          toast.error(t("room.errors.insufficientCoinsGeneric"));
         else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
         else toast.error(t("lobby.errors.joinFailed"));
       }
@@ -133,6 +138,15 @@ export function LobbyPage() {
       setToastMsg(null);
       const code = err instanceof FetchError ? err.code : null;
       if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
+      else if (code === "INSUFFICIENT_COINS")
+        // Compose the rich message locally — we know the room's buy-in and our
+        // own balance (Design Decision B: the error payload carries only a code).
+        toast.error(
+          t("room.errors.insufficientCoins", {
+            buyIn: room.coinBuyIn,
+            balance: useAuthStore.getState().user?.walletBalance ?? 0,
+          }),
+        );
       else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
       else toast.error(t("lobby.errors.joinFailed"));
     }

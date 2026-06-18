@@ -425,6 +425,7 @@ describe("MatchPage", () => {
         status: "in_progress",
         playerCount: 4,
         isQuickPlay: false,
+        coinBuyIn: 0,
         createdAt: "",
         updatedAt: "",
       },

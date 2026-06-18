@@ -46,6 +46,7 @@ describe("roomStore", () => {
       status: "waiting",
       playerCount: 1,
       isQuickPlay: false,
+      coinBuyIn: 0,
       createdAt: "2026-04-12T00:00:00Z",
       updatedAt: "2026-04-12T00:00:00Z",
     });
@@ -113,6 +114,7 @@ describe("roomStore", () => {
       status: "waiting",
       playerCount: 2,
       isQuickPlay: false,
+      coinBuyIn: 0,
       createdAt: "2026-04-12T00:00:00Z",
       updatedAt: "2026-04-12T00:00:00Z",
     });

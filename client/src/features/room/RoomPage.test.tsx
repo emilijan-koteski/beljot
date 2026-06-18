@@ -99,6 +99,7 @@ const defaultRoom = {
   status: "waiting",
   playerCount: 2,
   isQuickPlay: false,
+  coinBuyIn: 0,
   createdAt: "",
   updatedAt: "",
 };

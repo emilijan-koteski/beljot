@@ -105,6 +105,7 @@ describe("CreateRoomModal", () => {
         matchMode: "1001",
         timerStyle: "relaxed",
         timerDurationSeconds: null,
+        coinBuyIn: 500,
       });
     });
   });
@@ -140,6 +141,7 @@ describe("CreateRoomModal", () => {
         matchMode: "501",
         timerStyle: "relaxed",
         timerDurationSeconds: null,
+        coinBuyIn: 500,
       });
     });
   });
@@ -207,6 +209,62 @@ describe("CreateRoomModal", () => {
 
     // Timer duration slider should now be present
     expect(screen.getByTestId("timer-duration-slider")).toBeInTheDocument();
+  });
+
+  it("defaults the coin buy-in field to 500 and shows it in the preview", () => {
+    renderModal(true);
+
+    const buyInInput = screen.getByTestId("coin-buy-in-input") as HTMLInputElement;
+    expect(buyInInput.value).toBe("500");
+    // Preview mirrors the chosen stake.
+    expect(screen.getByTestId("preview-buy-in")).toHaveTextContent("500");
+  });
+
+  it("submits the chosen coin buy-in value", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 7,
+      name: "Stake Room",
+      code: "STK001",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      coinBuyIn: 1500,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-06-18T14:30:00Z",
+      updatedAt: "2026-06-18T14:30:00Z",
+    });
+
+    renderModal(true);
+    await user.type(screen.getByTestId("room-name-input"), "Stake Room");
+
+    const buyInInput = screen.getByTestId("coin-buy-in-input");
+    await user.clear(buyInInput);
+    await user.type(buyInInput, "1500");
+
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Stake Room", coinBuyIn: 1500 }),
+      );
+    });
+  });
+
+  it("clamps a negative buy-in to zero (cosmetic guard; server is authority)", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    const buyInInput = screen.getByTestId("coin-buy-in-input") as HTMLInputElement;
+    await user.clear(buyInInput);
+    await user.type(buyInInput, "-50");
+
+    // The onChange clamps to >= 0 — the field never holds a negative value.
+    expect(Number(buyInInput.value)).toBeGreaterThanOrEqual(0);
   });
 
   it("calls onOpenChange with false when cancel is clicked", async () => {

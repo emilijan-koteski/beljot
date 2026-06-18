@@ -16,10 +16,11 @@ import { toast } from "sonner";
 
 import { queryClient } from "@/shared/api/queryClient";
 import { queryKeys } from "@/shared/api/queryKeys";
+import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
-import type { Room } from "@/shared/types/apiTypes";
+import type { Room, User } from "@/shared/types/apiTypes";
 import type { MatchState } from "@/shared/types/matchTypes";
 import type { WsMessage } from "@/shared/types/wsEvents";
 
@@ -176,6 +177,7 @@ describe("useWsDispatch", () => {
         status: "waiting",
         playerCount: 1,
         isQuickPlay: false,
+        coinBuyIn: 0,
         createdAt: "2026-04-12T00:00:00Z",
         updatedAt: "2026-04-12T00:00:00Z",
       },
@@ -224,6 +226,7 @@ describe("useWsDispatch", () => {
         status: "waiting",
         playerCount: 4,
         isQuickPlay: false,
+        coinBuyIn: 0,
         createdAt: "2026-04-12T00:00:00Z",
         updatedAt: "2026-04-12T00:00:00Z",
       },
@@ -1360,5 +1363,77 @@ describe("useWsDispatch", () => {
       2: null,
       3: null,
     });
+  });
+});
+
+describe("useWsDispatch — coin settlement (Story 9.2)", () => {
+  const baseUser: User = {
+    id: 10,
+    username: "Alice",
+    email: "alice@test.dev",
+    languagePreference: "en",
+    walletBalance: 5000,
+    loginStreakDays: 0,
+    createdAt: "2026-06-18T00:00:00Z",
+  };
+
+  beforeEach(() => {
+    useMatchStore.getState().reset();
+    __resetWsDispatchStateForTests();
+    vi.restoreAllMocks();
+    useAuthStore.setState({ user: { ...baseUser } });
+  });
+
+  it("updates authStore walletBalance and toasts a win on positive delta", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:coin_settlement",
+      payload: { coinDelta: 500, newBalance: 5500, pot: 2000 },
+    });
+
+    expect(useAuthStore.getState().user?.walletBalance).toBe(5500);
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("updates balance and toasts a loss on negative delta", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:coin_settlement",
+      payload: { coinDelta: -500, newBalance: 4500, pot: 2000 },
+    });
+
+    expect(useAuthStore.getState().user?.walletBalance).toBe(4500);
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("updates balance but shows no toast on a zero delta", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:coin_settlement",
+      payload: { coinDelta: 0, newBalance: 5000, pot: 1000 },
+    });
+
+    expect(useAuthStore.getState().user?.walletBalance).toBe(5000);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("ignores a malformed settlement payload without touching the balance", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const malformed = [
+      { coinDelta: "500", newBalance: 5500, pot: 2000 },
+      { coinDelta: 500, newBalance: null, pot: 2000 },
+      { coinDelta: 1.5, newBalance: 5500, pot: 2000 },
+      {},
+    ];
+    for (const payload of malformed) {
+      result.current({ type: "event:coin_settlement", payload });
+    }
+
+    expect(useAuthStore.getState().user?.walletBalance).toBe(5000);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
   });
 });

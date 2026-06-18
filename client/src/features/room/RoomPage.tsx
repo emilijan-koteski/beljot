@@ -2,6 +2,7 @@ import {
   Bot,
   ChevronDown,
   Clock,
+  Coins,
   Crown,
   Shuffle,
   Sparkles,
@@ -46,6 +47,7 @@ import {
 } from "@/shared/hooks/mutations/useRooms";
 import { useRoomDetailQuery } from "@/shared/hooks/queries/useRooms";
 import { botDisplayName } from "@/shared/lib/botName";
+import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -232,7 +234,14 @@ export function RoomPage() {
         }
         hasLeftRef.current = true; // suppress the unmount cleanup-leave
         toast.error(
-          code === "ROOM_FULL" ? t("lobby.errors.roomFull") : t("lobby.errors.joinFailed"),
+          code === "ROOM_FULL"
+            ? t("lobby.errors.roomFull")
+            : code === "INSUFFICIENT_COINS"
+              ? t("room.errors.insufficientCoins", {
+                  buyIn: room.coinBuyIn,
+                  balance: useAuthStore.getState().user?.walletBalance ?? 0,
+                })
+              : t("lobby.errors.joinFailed"),
         );
         navigate("/lobby", { replace: true });
       });
@@ -623,6 +632,11 @@ export function RoomPage() {
         toast.error(t("room.errors.notOwner"));
       } else if (err instanceof FetchError && err.code === "NOT_ALL_SEATED") {
         toast.error(t("room.errors.notAllSeated"));
+      } else if (err instanceof FetchError && err.code === "INSUFFICIENT_COINS") {
+        // A seated human went insolvent at the instant of start; the server
+        // rolled back the charge and reverted the room to waiting. (Full
+        // per-player ejection UX lands in Story 9.3.)
+        toast.error(t("room.errors.insufficientCoinsStart"));
       } else {
         toast.error(t("room.errors.startFailed"));
       }
@@ -1022,6 +1036,16 @@ export function RoomPage() {
                 </Badge>
                 <Badge tone={isRelaxed ? "accent" : "neutral"} icon={<Clock className="size-3" />}>
                   <span data-testid="badge-timer">{timerLabel}</span>
+                </Badge>
+                <Badge
+                  tone="brass"
+                  icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}
+                >
+                  <span data-testid="badge-buy-in">
+                    {room.coinBuyIn > 0
+                      ? t("lobby.card.buyInAmount", { amount: room.coinBuyIn })
+                      : t("lobby.card.buyInFree")}
+                  </span>
                 </Badge>
                 {room.isQuickPlay && (
                   <Badge tone="accent" icon={<Zap className="size-3" />}>

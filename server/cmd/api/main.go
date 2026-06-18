@@ -151,6 +151,9 @@ func main() {
 	roomRepo := room.NewGormRepository(db)
 	sessionManager := match.NewManager(hub, matchRepo)
 	sessionManager.SetRoomUpdater(&room.RoomStatusAdapter{Repo: roomRepo})
+	// Story 9.2: the match manager credits winning human seats + reads balances
+	// at match end via the wallet service.
+	sessionManager.SetWalletSettler(walletService)
 
 	// Reconcile rooms left in status="playing" by a previous process. Sessions
 	// live only in process memory, so any "playing" row at boot has no live
@@ -208,7 +211,7 @@ func main() {
 	})
 
 	// Room routes
-	roomHandler := room.NewRoomHandler(roomRepo, sessionManager, hub, presenceRegistry)
+	roomHandler := room.NewRoomHandler(roomRepo, sessionManager, hub, presenceRegistry, walletService)
 	api.POST("/rooms", roomHandler.CreateRoom)
 	api.GET("/rooms", roomHandler.ListRooms)
 	api.POST("/rooms/quick-play", roomHandler.QuickPlay)

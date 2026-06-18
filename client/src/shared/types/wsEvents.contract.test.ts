@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import autoActionGolden from "../../../../server/internal/ws/testdata/events/auto_action.json";
 import belotAnnouncedGolden from "../../../../server/internal/ws/testdata/events/belot_announced.json";
 import cardPlayedGolden from "../../../../server/internal/ws/testdata/events/card_played.json";
+import coinSettlementGolden from "../../../../server/internal/ws/testdata/events/coin_settlement.json";
 import declarationsResolvedGolden from "../../../../server/internal/ws/testdata/events/declarations_resolved.json";
 import eventHandScoredGolden from "../../../../server/internal/ws/testdata/events/event_hand_scored.json";
 import eventMatchStateGolden from "../../../../server/internal/ws/testdata/events/event_match_state.json";
@@ -34,6 +35,7 @@ import {
   AutoActionPayloadSchema,
   BelotAnnouncedPayloadSchema,
   CardPlayedPayloadSchema,
+  CoinSettlementPayloadSchema,
   DeclarationsResolvedPayloadSchema,
   EventMatchStateSchema,
   HandScoredPayloadSchema,
@@ -71,6 +73,7 @@ const cases = [
   ["MatchPausedPayload", MatchPausedPayloadSchema, matchPausedGolden],
   ["MatchResumedPayload", MatchResumedPayloadSchema, matchResumedGolden],
   ["AutoActionPayload", AutoActionPayloadSchema, autoActionGolden],
+  ["CoinSettlementPayload", CoinSettlementPayloadSchema, coinSettlementGolden],
   ["PlayerDisconnectedPayload", PlayerDisconnectedPayloadSchema, playerDisconnectedGolden],
   ["PlayerReconnectedPayload", PlayerReconnectedPayloadSchema, playerReconnectedGolden],
   ["SurrenderProposedPayload", SurrenderProposedPayloadSchema, surrenderProposedGolden],

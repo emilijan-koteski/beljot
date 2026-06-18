@@ -40,11 +40,25 @@ type CreateRoomRequest struct {
 	TimerStyle           string `json:"timerStyle"`
 	TimerDurationSeconds *int   `json:"timerDurationSeconds"`
 	ReconnectWindowSec   *int   `json:"reconnectWindowSec"`
+	// CoinBuyIn is a pointer so "omitted" (nil → default 500) is distinguishable
+	// from an explicit 0 (a free room). min 0, no maximum (Story 9.2 AC #1).
+	CoinBuyIn *int `json:"coinBuyIn"`
 }
 
 // MatchStarter is the interface the room handler uses to start a live match.
+// coinBuyIn (Story 9.2) is the per-human stake captured onto the session.
 type MatchStarter interface {
-	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int) error
+	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int) error
+}
+
+// WalletService is the subset of *wallet.Service the room handler needs: the
+// join-time affordability read and the atomic match-start stake charge (Story
+// 9.2). An interface (not a concrete dependency) keeps room decoupled from
+// wallet internals and lets handler tests inject a stub. Optional — nil means
+// no economy enforcement (legacy / tests that don't exercise coins).
+type WalletService interface {
+	GetBalance(userID uint) (int, error)
+	ChargeStakes(userIDs []uint, amount int) (insolventUserID uint, err error)
 }
 
 // RoomStatusAdapter implements match.RoomStatusUpdater using the room repository.
@@ -64,19 +78,20 @@ type Broadcaster interface {
 }
 
 type RoomHandler struct {
-	repo         RoomRepository
-	matchStarter MatchStarter
-	hub          Broadcaster
-	presence     *PresenceRegistry
+	repo          RoomRepository
+	matchStarter  MatchStarter
+	hub           Broadcaster
+	presence      *PresenceRegistry
+	walletService WalletService
 }
 
-func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster, presence *PresenceRegistry) *RoomHandler {
+func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster, presence *PresenceRegistry, walletService WalletService) *RoomHandler {
 	// Default to a private registry when none is injected (keeps test setups
 	// that don't exercise presence working without threading a registry).
 	if presence == nil {
 		presence = NewPresenceRegistry()
 	}
-	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence}
+	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence, walletService: walletService}
 }
 
 // broadcastToRoom sends a WebSocket message to all players in a room.
@@ -225,6 +240,7 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		"matchMode":            r.MatchMode,
 		"timerStyle":           r.TimerStyle,
 		"timerDurationSeconds": r.TimerDurationSeconds,
+		"coinBuyIn":            r.CoinBuyIn,
 		"playerCount":          r.PlayerCount,
 		"status":               r.Status,
 		"isQuickPlay":          r.IsQuickPlay,
@@ -329,6 +345,17 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		reconnectWindow = req.ReconnectWindowSec
 	}
 
+	// Coin buy-in (Story 9.2 AC #1): nil → default 500; explicit value must be
+	// >= 0 (no maximum — owner freedom). Server is the authority; the client's
+	// field is cosmetic.
+	coinBuyIn := 500
+	if req.CoinBuyIn != nil {
+		coinBuyIn = *req.CoinBuyIn
+		if coinBuyIn < 0 {
+			return apperr.ErrBadRequest
+		}
+	}
+
 	code, err := generateRoomCode()
 	if err != nil {
 		return fmt.Errorf("generating room code: %w", err)
@@ -343,6 +370,7 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		TimerStyle:           timerStyle,
 		TimerDurationSeconds: timerDuration,
 		ReconnectWindowSec:   reconnectWindow,
+		CoinBuyIn:            coinBuyIn,
 		Status:               "waiting",
 		PlayerCount:          1,
 	}
@@ -567,6 +595,21 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 	}
 	if existingRoom != nil {
 		return apperr.ErrAlreadyInRoom
+	}
+
+	// Coin affordability check (Story 9.2 AC #2). Check-only — NO coins are
+	// deducted at join; the authoritative charge is the atomic re-validation in
+	// StartMatch (Decision A). A short balance rejects with INSUFFICIENT_COINS;
+	// the client composes the user-facing message locally from its own balance
+	// and the room's coinBuyIn (Decision B).
+	if room.CoinBuyIn > 0 && h.walletService != nil {
+		balance, balErr := h.walletService.GetBalance(userID)
+		if balErr != nil {
+			return fmt.Errorf("reading wallet balance: %w", balErr)
+		}
+		if balance < room.CoinBuyIn {
+			return apperr.ErrInsufficientCoins
+		}
 	}
 
 	var updatedRoom *Room
@@ -1106,7 +1149,9 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 		timerDuration = *autoStartRoom.TimerDurationSeconds
 	}
 	reconnectWindow := resolveReconnectWindow(autoStartRoom.ReconnectWindowSec)
-	return h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow)
+	// Quick-play rooms carry CoinBuyIn == 0 in Story 9.2 (no stake; bracketed
+	// buy-ins arrive in Story 9.4), so no charge happens on this auto-start path.
+	return h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn)
 }
 
 // revertAutoStart compensates for a failed matchStarter.StartMatch: it flips
@@ -2118,12 +2163,39 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 					}
 				}
 			}
+
+			// Story 9.2 (AC #4, #5): charge each human seat the buy-in atomically
+			// BEFORE the session goes live, so a failed charge never leaves a live
+			// match with an unpaid stake. Bots never pay — `players` is the
+			// room_players (humans only); bot seats live in `bots`. The room is
+			// already row-locked to "playing", so the seat picture is settled.
+			// On insolvency the match must NOT start: revert the room to "waiting"
+			// and surface INSUFFICIENT_COINS to the owner. (Story 9.3 replaces this
+			// fail-safe with per-player ejection.)
+			if updatedRoom.CoinBuyIn > 0 && h.walletService != nil {
+				humanIDs := make([]uint, 0, len(players))
+				for _, p := range players {
+					humanIDs = append(humanIDs, p.UserID)
+				}
+				if _, chargeErr := h.walletService.ChargeStakes(humanIDs, updatedRoom.CoinBuyIn); chargeErr != nil {
+					if uerr := h.repo.UpdateStatus(uint(roomID), "waiting"); uerr != nil {
+						slog.Error("failed to revert room status after insolvent start", "roomID", roomID, "error", uerr)
+					}
+					updatedRoom.Status = "waiting"
+					h.broadcastRoomUpdated(updatedRoom)
+					if errors.Is(chargeErr, apperr.ErrInsufficientCoins) {
+						return apperr.ErrInsufficientCoins
+					}
+					return fmt.Errorf("charging stakes: %w", chargeErr)
+				}
+			}
+
 			timerDuration := 0
 			if updatedRoom.TimerDurationSeconds != nil {
 				timerDuration = *updatedRoom.TimerDurationSeconds
 			}
 			reconnectWindow := resolveReconnectWindow(updatedRoom.ReconnectWindowSec)
-			if err := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow); err != nil {
+			if err := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn); err != nil {
 				slog.Error("failed to start game session", "roomID", roomID, "error", err)
 			}
 		}
@@ -2202,6 +2274,10 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				MatchMode:   "1001",
 				TimerStyle:  "relaxed",
 				IsQuickPlay: true,
+				// Story 9.2 AC #1: quick-play rooms are free (no stake) in this
+				// story; bracketed buy-ins are Story 9.4's job. Set explicitly so
+				// a future default change can't silently stake quick-play.
+				CoinBuyIn:   0,
 				Status:      "waiting",
 				PlayerCount: 1,
 			}
@@ -2267,6 +2343,7 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 			"matchMode":            resultRoom.MatchMode,
 			"timerStyle":           resultRoom.TimerStyle,
 			"timerDurationSeconds": resultRoom.TimerDurationSeconds,
+			"coinBuyIn":            resultRoom.CoinBuyIn,
 			"playerCount":          resultRoom.PlayerCount,
 			"status":               resultRoom.Status,
 			"isQuickPlay":          resultRoom.IsQuickPlay,

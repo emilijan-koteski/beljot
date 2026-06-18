@@ -44,6 +44,21 @@ const EventMatchPaused = "event:match_paused"
 const EventMatchResumed = "event:match_resumed"
 const EventAutoAction = "event:auto_action"
 
+// --- Economy events (Story 9.2) ---
+// EventCoinSettlement is sent per-human at match end (after event:match_end)
+// carrying that player's own net coin delta and resulting wallet balance. Sent
+// per-user (not broadcast) because NewBalance differs per player; Pot is shared.
+const EventCoinSettlement = "event:coin_settlement"
+
+// CoinSettlementPayload is the typed payload for EventCoinSettlement events.
+// CoinDelta is the net wallet change for the match (winner: +winnings,
+// loser: -buyIn, net-zero possible); NewBalance is the post-settlement balance.
+type CoinSettlementPayload struct {
+	CoinDelta  int `json:"coinDelta"`
+	NewBalance int `json:"newBalance"`
+	Pot        int `json:"pot"`
+}
+
 // --- Game event payload structs ---
 
 // CardPlayedPayload is the typed payload for EventCardPlayed events.

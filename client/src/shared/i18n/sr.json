@@ -228,7 +228,10 @@
       "promoteNotInRoom": "Taj igrač više nije u sobi.",
       "addBotFailed": "Dodavanje bota nije uspelo. Pokušaj ponovo",
       "removeBotFailed": "Uklanjanje bota nije uspelo. Pokušaj ponovo",
-      "botsNotAllowed": "U ovu sobu ne mogu da se dodaju botovi"
+      "botsNotAllowed": "U ovu sobu ne mogu da se dodaju botovi",
+      "insufficientCoins": "Potrebno je {{buyIn}} novčića za ulazak u sobu — tvoje stanje: {{balance}}.",
+      "insufficientCoinsGeneric": "Nemaš dovoljno novčića za ulazak u sobu.",
+      "insufficientCoinsStart": "Igrač na mestu ne može da pokrije ulog — meč nije započet."
     },
     "waitingForPlayers": "Čekanje igrača",
     "waitingForReturn": "Čekanje da se igrači vrate",
@@ -403,7 +406,9 @@
         "step1": "Ulaziš u novu sobu kao <strong>domaćin</strong> na 1. mestu.",
         "step2": "Podeli <code>KOD</code> sa prijateljima, ili sačekaj da te pronađu u lobiju.",
         "step3": "Kad se popune sva četiri mesta, krećeš sa mečom."
-      }
+      },
+      "coinBuyIn": "Ulog u novčićima",
+      "coinBuyInHint": "Svaki igrač ulaže ovoliko za partiju · podrazumevano 500"
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · uživo se osvežava",
     "actions": {
@@ -452,7 +457,9 @@
       "joining": "Pridruživanje sobi \"{{name}}\"…",
       "variantBitola": "Bitola",
       "matchMode1001": "1001 bod",
-      "matchMode501": "501 bod"
+      "matchMode501": "501 bod",
+      "buyInAmount": "{{amount}} novčića",
+      "buyInFree": "Besplatno"
     },
     "chat": {
       "title": "Lobi chat",
@@ -718,6 +725,10 @@
       "title": "Podešavanja",
       "languageHeading": "Jezik",
       "close": "Zatvori"
+    },
+    "settlement": {
+      "won": "Osvojio si {{amount}} novčića",
+      "lost": "Izgubio si {{amount}} novčića"
     }
   },
   "auth": {

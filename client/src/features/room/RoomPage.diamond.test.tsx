@@ -93,6 +93,7 @@ function fourSeated(viewerSeat: number) {
       status: "waiting",
       playerCount: 4,
       isQuickPlay: false,
+      coinBuyIn: 0,
       createdAt: "",
       updatedAt: "",
     },

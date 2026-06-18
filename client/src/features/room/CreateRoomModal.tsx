@@ -1,4 +1,4 @@
-import { ArrowRight, Clock, KeyRound, Users, Zap } from "lucide-react";
+import { ArrowRight, Clock, Coins, KeyRound, Users, Zap } from "lucide-react";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -13,6 +13,7 @@ import { Field } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
 import { Segmented } from "@/shared/components/ui/segmented";
 import { useCreateRoomMutation } from "@/shared/hooks/mutations/useRooms";
+import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -23,6 +24,7 @@ interface CreateRoomModalProps {
 
 const MIN_NAME = 3;
 const MAX_NAME = 32;
+const DEFAULT_BUY_IN = 500; // mirrors the server default (Story 9.2)
 
 /**
  * Split-panel create-room modal. Left = form (name, variant, match mode,
@@ -46,6 +48,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [matchMode, setMatchMode] = useState<"1001" | "501">("1001");
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
   const [timerDuration, setTimerDuration] = useState(30);
+  const [coinBuyIn, setCoinBuyIn] = useState(DEFAULT_BUY_IN);
   const [error, setError] = useState<string | null>(null);
 
   const trimmed = name.trim();
@@ -73,6 +76,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         matchMode,
         timerStyle,
         timerDurationSeconds: timerStyle === "per-move" ? timerDuration : null,
+        coinBuyIn: Math.max(0, Math.floor(coinBuyIn || 0)),
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
@@ -98,6 +102,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setMatchMode("1001");
       setTimerStyle("relaxed");
       setTimerDuration(30);
+      setCoinBuyIn(DEFAULT_BUY_IN);
       setError(null);
       createRoomMutation.reset();
     }
@@ -245,6 +250,26 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   />
                 </Field>
               )}
+
+              <Field
+                label={t("lobby.createRoomModal.coinBuyIn")}
+                htmlFor="coin-buy-in"
+                hint={t("lobby.createRoomModal.coinBuyInHint")}
+              >
+                <Input
+                  id="coin-buy-in"
+                  type="number"
+                  min={0}
+                  step={50}
+                  inputMode="numeric"
+                  value={coinBuyIn}
+                  onChange={(e) =>
+                    setCoinBuyIn(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                  }
+                  data-testid="coin-buy-in-input"
+                  className="h-11"
+                />
+              </Field>
             </div>
 
             <footer className="border-border bg-surface flex shrink-0 items-center justify-between gap-2 border-t px-8 py-3.5">
@@ -285,6 +310,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               matchMode={matchMode}
               timerStyle={timerStyle}
               timerDuration={timerDuration}
+              coinBuyIn={coinBuyIn}
               hostUsername={meUsername || "host"}
             />
 
@@ -323,6 +349,7 @@ function PreviewCard({
   matchMode,
   timerStyle,
   timerDuration,
+  coinBuyIn,
   hostUsername,
 }: {
   name: string;
@@ -330,6 +357,7 @@ function PreviewCard({
   matchMode: "1001" | "501";
   timerStyle: "relaxed" | "per-move";
   timerDuration: number;
+  coinBuyIn: number;
   hostUsername: string;
 }) {
   const { t } = useTranslation();
@@ -379,7 +407,12 @@ function PreviewCard({
             {timerLabel}
           </span>
           <Dot />
-          <span>{t("lobby.createRoomModal.preview.justNow")}</span>
+          <span className="inline-flex items-center gap-1" data-testid="preview-buy-in">
+            <Coins className="size-3" style={{ color: COIN_GOLD }} />
+            {coinBuyIn > 0
+              ? t("lobby.card.buyInAmount", { amount: coinBuyIn })
+              : t("lobby.card.buyInFree")}
+          </span>
         </div>
       </div>
 
