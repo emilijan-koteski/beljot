@@ -75,13 +75,14 @@ FR49: Players can earn and display achievements and badges on their profile
 FR50: Players can purchase cosmetic items (card backs, table themes) that have no effect on gameplay
 FR51: Players can participate in bracket-style tournament events with seasonal scheduling
 FR52: Players can access the platform via a mobile-optimized experience (progressive web app or native client)
-FR53: Rooms have an owner-configurable coin buy-in (min 0, no maximum). Players must have sufficient wallet balance to join; stake is deducted on join, refunded on leave before game starts, and settled per match-end pot rules: winners split the pot; losers forfeit stake; surrender settles as a loss; abandonment — abandoner forfeits, teammate is refunded, winners split the reduced 3× stake pot
+FR53: Rooms have an owner-configurable coin buy-in (min 0, no maximum). Players must have sufficient wallet balance to join; stake is deducted on join, refunded on leave before game starts, and settled per match-end pot rules: the pot is the sum of human stakes (bots never stake or receive); human winners split the pot; losers forfeit stake; surrender and abandonment both settle as a full loss for the entire team (no teammate refund); if the winning team has no human player the forfeited stakes are removed from circulation (coin sink)
 FR54: Players receive 5 000 coins on registration and a daily login bonus (1 000 on day 1, increasing linearly by +162/day to 3 100 on day 14 of an uninterrupted streak; streak resets on a missed day)
 FR55: Quick Play stakes default to 500 coins; if a player's balance is below 500, they are matched into a balance-proximity bracket with a reduced stake (floor 0)
-FR56: The system computes and displays a public honor score (0–100) based on match-completion behavior — `honor = 100 × completed / (completed + 2.0·rage_quits + 1.5·timeout_abandons + 0.3·dc_abandons)` — with a "New Player" label for players with fewer than 20 completed matches regardless of score
+FR56: The system computes and displays a public honor score (0–100) based on match-completion behavior — `honor = 100 × completed / (completed + 2.0·rage_quits + 1.5·timeout_abandons + 0.3·dc_abandons)` — with a "New Player" label for players with fewer than 5 completed matches regardless of score
 FR57: Room owners can optionally require a minimum honor score (0–100) and toggle `allow_new_players` for room access; players failing the check receive `error:honor_too_low` or `error:new_player_not_allowed`
 FR58: Room owners can kick seated players and swap seat assignments while the room is in `waiting` status; controls are disabled once the game starts and rejected for non-owners
 FR59: Room owners can seat server-controlled bot players on empty seats while the room is in `waiting` status (1, 2, or 3 bots — any combination of free seats), swap them with seated players or move them between seats, and remove them before game start. Bots play autonomously server-side with competent heuristic strategy and humanized response timing (never instantaneous). Matches that include at least one bot are flagged as bot-inclusive in persistence and visibly marked in match previews/history. Bots never replace disconnected human players — the reconnect/abandon flow is unchanged
+FR60: Rooms can be marked private with an owner-set password (stored hashed; nullable = public). Private rooms remain listed but shown as locked; joining one — via its locked room card or its join code — requires entering the correct password before the join proceeds. Owners can change the password or revert to public; Quick Play rooms are never private
 
 ### NonFunctional Requirements
 
@@ -165,7 +166,7 @@ NFR17: A single player's disconnection must not affect game state integrity or c
 **From Architecture — Phase Scoping:**
 
 - Phase 1: ~25 FRs (auth, Bitola variant only, lobby/rooms, real-time session, chat, disconnect handling, basic match history, i18n EN+SR, desktop web)
-- Phase 2: Coin economy (FR53–55), XP/lifetime level (FR33–34), honor system (FR56–57), room owner kick/seat (FR58), team surrender (FR28a), in-game emotes (FR32), additional languages MK+HR (FR45), 501 mode (FR15 — moved from Phase 3 on 2026-06-11, see sprint-change-proposal-2026-06-11.md)
+- Phase 2: Coin economy (FR53–55), XP/lifetime level (FR33–34), honor system (FR56–57), private rooms (FR60), room owner kick/seat (FR58), team surrender (FR28a), in-game emotes (FR32), additional languages MK+HR (FR45), 501 mode (FR15 — moved from Phase 3 on 2026-06-11, see sprint-change-proposal-2026-06-11.md)
 - Phase 3: Player search (FR5), friends (FR6), public profiles (FR47), Croatian variant (FR8), in-app rules reference (FR29)
 - Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40), social login (FR3), mobile (FR52)
 - Phase 5: Spectator (FR48), achievements (FR49), cosmetics (FR50), tournaments (FR51)
@@ -251,6 +252,7 @@ FR56: Epic 9 — Honor score calculation and display
 FR57: Epic 9 — Honor-gated rooms (min_honor + allow_new_players)
 FR58: Epic 8 — Room owner pre-game kick + seat swap
 FR59: Epic 10 — Bot players (owner-seated, server-controlled; added 2026-06-11)
+FR60: Epic 9 — Private rooms (password-gated entry; added 2026-06-18)
 
 ## Epic List
 
@@ -319,9 +321,9 @@ Engineering-quality epic batching open code-review deferreds before Phase 2 econ
 
 ### Epic 9: Player Economy & Progression
 
-Players earn and spend coins (room buy-in, per-match settlement, daily/streak rewards), accumulate lifetime XP/level as a career signal, and build a public honor score that reflects match-completion reliability. Rooms may optionally gate by a minimum honor threshold.
+Players earn and spend coins (room buy-in, per-match settlement, daily/streak rewards), accumulate lifetime XP/level as a career signal, and build a public honor score that reflects match-completion reliability. Rooms can be made private with a password, and may optionally gate by a minimum honor threshold.
 
-**FRs covered:** FR33, FR34, FR42, FR43, FR53, FR54, FR55, FR56, FR57
+**FRs covered:** FR33, FR34, FR42, FR43, FR53, FR54, FR55, FR56, FR57, FR60
 **Phase:** 2
 
 ### Epic 10: Additional Languages, 501 Mode & Bot Players
@@ -1509,7 +1511,7 @@ So that we can end a hopeless game without waiting for it to finish.
 **Then** the match ends immediately as a win for the opposing team
 **And** all players receive `event:match_end` with surrender status
 **And** the match record is persisted with surrender outcome
-**And** coin settlement treats the surrendering team as the losing team — surrendering team forfeits stake, winners split the pot (see Epic 9 / Story 9.1 for pot math)
+**And** coin settlement treats the surrendering team as the losing team — surrendering team forfeits stake, winners split the pot (see Epic 9 / Story 9.2 for pot math)
 
 **Given** the teammate declines the surrender
 **When** `action:surrender_decline` is submitted
@@ -1717,7 +1719,7 @@ The following items are NOT discrete ACs in 8.5-1/2/3 but are claimed by whichev
 
 ## Epic 9: Player Economy & Progression
 
-Players earn and spend coins (room buy-in, per-match settlement, daily/streak rewards), accumulate lifetime XP/level as a career signal, and build a public honor score that reflects match-completion reliability. Rooms may optionally gate by a minimum honor threshold.
+Players earn and spend coins (room buy-in, per-match settlement, daily/streak rewards), accumulate lifetime XP/level as a career signal, and build a public honor score that reflects match-completion reliability. Rooms can be made private with a password, and may optionally gate by a minimum honor threshold.
 
 ### Story 9.1: Coin Wallet Foundation
 
@@ -1782,29 +1784,36 @@ So that each game carries real economic meaning.
 **When** `action:leave_room` is processed
 **Then** their stake is refunded in full to their wallet
 
+**Given** stakes are collected for a match
+**When** the pot is formed
+**Then** the pot equals the sum of the stakes of the **human** players only — each human staked the room `coin_buy_in` (S)
+**And** bots never stake: a seated bot contributes 0 to the pot and is never charged or paid
+
 **Given** a match ends with a normal win/loss outcome
 **When** coin settlement runs
-**Then** all four stakes form the pot (4S)
-**And** the winning team splits the pot equally (each winner gains 2S, net +S)
-**And** the losing team's stakes remain in the pot (net -S each)
-**And** all players receive `event:coin_settlement` with their delta; UI shows a settlement toast
+**Then** each human player on the losing team forfeits their stake (net -S); their stakes stay in the pot
+**And** the pot is split equally among the **human players on the winning team** (bots on the winning team receive nothing)
+**And** in an all-human 2v2 this is the classic split: pot = 4S, each winner gains 2S (net +S), each loser net -S
+**And** all human players receive `event:coin_settlement` with their delta; UI shows a settlement toast
 
 **Given** a match ends by surrender
 **When** coin settlement runs
-**Then** the surrendering team is treated as the losing team — settlement identical to normal loss outcome
+**Then** the surrendering team is treated as the losing team — settlement identical to a normal loss outcome
 
-**Given** a match ends by abandonment (one player does not reconnect within the window)
+**Given** a match ends by abandonment (a player does not reconnect within the window, or is auto-played to match end)
 **When** coin settlement runs
-**Then** the abandoning player forfeits their stake (−S)
-**And** the abandoning player's teammate is refunded their stake (net 0)
-**And** the winning team splits the reduced pot of 3S (each winner gains 1.5S, net +0.5S)
-**And** the match record records the abandonment outcome and per-player coin deltas
+**Then** the **entire abandoning team is treated as the losing team** — both members forfeit their stake (each net -S), with no teammate refund (partnering with an unreliable player is the partner's own risk)
+**And** settlement is otherwise identical to a normal loss outcome
+
+**Given** the winning team contains no human player (e.g. Human + Bot vs Bot + Bot, and the bots win)
+**When** coin settlement runs
+**Then** there is no human winner to receive the pot, so the losing humans' forfeited stakes are removed from circulation — a coin sink the house keeps
+**And** the match record still records each human's -S delta
 
 **Given** a match ends
 **When** post-match cleanup runs
 **Then** the room status returns to `waiting`
-**And** all remaining seated players retain their seat for a possible next match
-**And** each seated player's wallet is re-checked against the room `coin_buy_in` before the next match starts (see Story 9.3)
+**And** all remaining seated players retain their seat for a possible next match (see Story 9.3 for the return-to-room affordability gate)
 
 **Given** the coin settlement code
 **When** it executes
@@ -1814,32 +1823,37 @@ So that each game carries real economic meaning.
 ### Story 9.3: Insolvency Ejection & Room Persistence Between Matches
 
 As a player,
-I want to be clearly notified and ejected from a room when I can no longer afford the buy-in,
-So that I'm not stuck at a seat I cannot use and the room can continue for others.
+I want to be cleanly redirected to the lobby when I can no longer afford a room's buy-in,
+So that I'm never stuck at a seat I can't use and the room can keep going for those who can.
+
+This story extends the existing **Return to Room** flow (`spec-return-to-room-after-match.md` / `spec-return-to-room-presence-v2.md`): the affordability check fires at the moment a player attempts to return, and — for the insolvency / owner-leave case only — it supersedes v2's "no auto-transfer of ownership from an absent owner" rule.
 
 **Acceptance Criteria:**
 
-**Given** a match has just ended and coin settlement is complete
-**When** the room prepares for a next match
-**Then** each seated player's wallet is checked against `coin_buy_in`
-**And** players with balance < buy-in receive `event:insolvent_kick` and are returned to the lobby
-**And** a modal on their screen shows: "You do not have enough coins for the next match in this room. Current balance: [balance]. Room buy-in: [buy_in]."
-**And** their seat is cleared and broadcast to remaining occupants
+**Given** a player clicks "Return to room" after a match (`POST /rooms/:id/return`)
+**When** the request is processed
+**Then** the server checks their wallet balance against the room `coin_buy_in`
+**And** if balance ≥ buy-in, the existing return / re-seat / presence behavior proceeds unchanged
+**And** if balance < buy-in, the return is rejected with `error:insufficient_coins`, their `room_players` seat is freed and broadcast, and the client routes them to the lobby with a modal: "You don't have enough coins to rejoin this room. Balance: [balance]. Buy-in: [buy_in]."
 
-**Given** some players are ejected for insolvency
-**When** the room state updates
-**Then** remaining players keep their seats
-**And** the room status stays `waiting`
-**And** the owner can invite or accept new players into the freed seats as normal
+**Given** the room `coin_buy_in` is 0
+**When** the affordability check runs
+**Then** it always passes (balance ≥ 0) — no one is ever barred for insolvency
 
-**Given** the room owner is ejected for insolvency
-**When** ownership would be lost
-**Then** ownership transfers to the next-seated player (seat order ascending) who has sufficient funds
-**And** if no remaining player can afford the buy-in, the room is closed and all remaining seated players are returned to the lobby with `event:room_closed_insolvent`
+**Given** a player has not yet acted on the result dialog (neither returned nor left)
+**When** the room state is evaluated
+**Then** they remain **held as seated** (their `room_players` row survives) until they return or pick "Return to lobby" — they are not pre-emptively ejected
 
-**Given** the coin buy-in is 0
-**When** the insolvency check runs
-**Then** no ejections occur (balance ≥ 0 always passes)
+**Given** the room owner is barred for insolvency, or the owner picks "Return to lobby"
+**When** ownership must move
+**Then** ownership transfers to the first seated player (seat order ascending) who is **both present (has returned) and solvent** (balance ≥ buy-in)
+**And** if no present-and-solvent player remains, the room is closed and everyone still seated is routed to the lobby with `event:room_closed_insolvent`
+**And** a player who later attempts to return to a now-closed room hits the existing non-member / closed-room path and is routed to the lobby
+
+**Given** the stake is actually deducted at match start (`StartMatch`)
+**When** the charge transaction runs
+**Then** it re-validates `balance ≥ coin_buy_in` atomically as part of the deduction — the authoritative money guard that never trusts the prior return-time check
+**And** if a seated player is insolvent at that instant (race, or presence cleared by a server restart), they are routed through this same ejection flow rather than starting the match with an unpaid stake
 
 ### Story 9.4: Quick Play Coin Bracketing
 
@@ -1897,7 +1911,47 @@ So that I have a lifetime career signal independent of seasonal competitive stan
 **When** I inspect the database schema
 **Then** the `users` table has `total_xp` (integer, default 0, non-negative) and a derived `level` value computed from total_xp
 
-### Story 9.6: Honor Score System
+### Story 9.6: Private Rooms
+
+As a room owner,
+I want to protect my room with a password so only people I share it with can enter,
+So that I can host a closed table for friends without it being publicly joinable.
+
+**Acceptance Criteria:**
+
+**Given** a room owner is configuring a new room
+**When** the create-room modal is open
+**Then** a "Private room" toggle is available (default off)
+**And** enabling it reveals a required "Room password" field (non-empty, with basic length/charset validation)
+**And** on save the password is stored **hashed** (bcrypt) on the `rooms` table as `password_hash` (nullable; null = public room)
+**And** the room keeps its normal join code — privacy is orthogonal to the existing code-based discovery/identity
+
+**Given** the room browse / search list
+**When** a private room is rendered
+**Then** it is **still listed** but shown as locked (a lock indicator on the room card)
+**And** the password is never included in any API response
+
+**Given** a player attempts to join a private room — either by clicking its locked card in the list **or** by entering its join code
+**When** the join is initiated
+**Then** a password dialog is prompted **before** the join proceeds
+**And** the entered password is verified server-side against `password_hash` on `action:join_room`
+**And** a correct password lets the join continue through the normal seating flow
+**And** an incorrect password is rejected with `error:wrong_room_password` and the dialog shows: "Incorrect room password."
+
+**Given** a private room's owner
+**When** they edit the room
+**Then** they can change the password or make the room public again (clearing `password_hash`)
+**And** changing the password does not eject players already seated
+
+**Given** a room with no password (`password_hash` is null)
+**When** a player joins by card or code
+**Then** no password dialog appears — behavior is unchanged from today
+
+**Given** Quick Play matchmaking
+**When** rooms are synthesized
+**Then** synthesized Quick Play rooms are never private (password gating applies only to user-created rooms)
+
+### Story 9.7: Honor Score System
 
 As a player,
 I want to see a public honor score that reflects how reliable a player is at completing matches,
@@ -1916,12 +1970,12 @@ So that I can decide whom to play with and whether to stay in a room.
 
 **And** all counters persist as integers on the user record
 
-**Given** a player has completed fewer than 20 matches
+**Given** a player has completed fewer than 5 matches
 **When** the honor score is rendered anywhere in the UI
 **Then** the profile and lobby UI label them "New Player" regardless of score value
 **And** the raw counts are still shown
 
-**Given** a player has ≥ 20 completed matches
+**Given** a player has ≥ 5 completed matches
 **When** the score is rendered
 **Then** it is shown as a numeric value 0–100 with a tier label:
 
@@ -1945,7 +1999,7 @@ So that I can decide whom to play with and whether to stay in a room.
 **When** honor counters update after match end
 **Then** no penalty is applied (reconnected DCs do not count toward any abandonment bucket)
 
-### Story 9.7: Honor-Gated Rooms
+### Story 9.8: Honor-Gated Rooms
 
 As a room owner,
 I want to optionally require a minimum honor score to join my room,
@@ -1962,8 +2016,8 @@ So that I can self-select into a community of reliable players.
 **Given** a player attempts to join a room with `min_honor > 0`
 **When** `action:join_room` is processed
 **Then** the server checks the player's honor status
-**And** if the player has < 20 completed matches ("New Player") and `allow_new_players = false`, the join is rejected with `error:new_player_not_allowed`
-**And** if the player has ≥ 20 completed matches and their honor score < `min_honor`, the join is rejected with `error:honor_too_low` with a modal: "This room requires honor ≥ [min_honor]. Your honor: [score]."
+**And** if the player has < 5 completed matches ("New Player") and `allow_new_players = false`, the join is rejected with `error:new_player_not_allowed`
+**And** if the player has ≥ 5 completed matches and their honor score < `min_honor`, the join is rejected with `error:honor_too_low` with a modal: "This room requires honor ≥ [min_honor]. Your honor: [score]."
 
 **Given** a room list shows a honor-gated room
 **When** the room card renders
@@ -2140,9 +2194,9 @@ So that I can see their reliability, progression, and competitive history.
 **Then** public information is returned: username, level, total_xp, honor score + tier label + raw counts + recent-trend indicator, current seasonal rank (if Epic 13 live), prior-season rank archive (zero-game seasons skipped), win/loss record, total game points scored career, member-since date
 **And** private information (email, language preference, wallet balance, streak counter) is NOT included
 
-**Given** the requested player has < 20 completed matches
+**Given** the requested player has < 5 completed matches
 **When** the profile renders
-**Then** the honor section shows the "New Player" label (per Epic 9 Story 9.6) in place of a tier
+**Then** the honor section shows the "New Player" label (per Epic 9 Story 9.7) in place of a tier
 **And** raw counts are still shown
 
 **Given** the public profile renders
