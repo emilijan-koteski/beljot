@@ -5,9 +5,24 @@ import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAuthStore } from "@/shared/stores/authStore";
 import { QueryWrapper } from "@/test-utils";
 
 import { CreateRoomModal } from "./CreateRoomModal";
+
+function setBalance(walletBalance: number) {
+  useAuthStore.setState({
+    user: {
+      id: 5,
+      username: "owner",
+      email: "owner@test.dev",
+      languagePreference: "en",
+      walletBalance,
+      loginStreakDays: 0,
+      createdAt: "2026-06-18T00:00:00Z",
+    },
+  });
+}
 
 const mockCreateRoom = vi.fn();
 const mockNavigate = vi.fn();
@@ -41,6 +56,9 @@ function renderModal(open = true) {
 describe("CreateRoomModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Ample balance by default so submit-path tests aren't blocked by the
+    // create-time affordability guard; individual tests override as needed.
+    setBalance(1_000_000);
   });
 
   it("renders modal with form controls when open", () => {
@@ -197,6 +215,28 @@ describe("CreateRoomModal", () => {
     });
   });
 
+  it("shows ALREADY_IN_ROOM in the general banner, not under the room name", async () => {
+    const user = userEvent.setup();
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    mockCreateRoom.mockRejectedValueOnce(
+      // raw server message that must NOT leak into the name field
+      new FetchError(409, "ALREADY_IN_ROOM", "player is already in a room"),
+    );
+
+    renderModal(true);
+    await user.type(screen.getByTestId("room-name-input"), "My Room");
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("create-room-form-error")).toBeInTheDocument();
+    });
+    // The misplaced raw error is gone from the name field.
+    expect(screen.queryByTestId("room-name-error")).toBeNull();
+    expect(screen.getByTestId("create-room-form-error")).not.toHaveTextContent(
+      "player is already in a room",
+    );
+  });
+
   it("shows timer duration slider when per-move selected and hides for relaxed", async () => {
     const user = userEvent.setup();
     renderModal(true);
@@ -265,6 +305,26 @@ describe("CreateRoomModal", () => {
 
     // The onChange clamps to >= 0 — the field never holds a negative value.
     expect(Number(buyInInput.value)).toBeGreaterThanOrEqual(0);
+  });
+
+  it("blocks creating a room with a buy-in above the creator's balance", async () => {
+    const user = userEvent.setup();
+    setBalance(100);
+    renderModal(true);
+    await user.type(screen.getByTestId("room-name-input"), "High Roller");
+
+    const buyInInput = screen.getByTestId("coin-buy-in-input");
+    await user.clear(buyInInput);
+    await user.type(buyInInput, "500");
+
+    expect(screen.getByTestId("buy-in-error")).toBeInTheDocument();
+    expect(screen.getByTestId("create-room-button")).toBeDisabled();
+
+    // Lowering the stake to within balance clears the guard.
+    await user.clear(buyInInput);
+    await user.type(buyInInput, "100");
+    expect(screen.queryByTestId("buy-in-error")).toBeNull();
+    expect(screen.getByTestId("create-room-button")).toBeEnabled();
   });
 
   it("calls onOpenChange with false when cancel is clicked", async () => {

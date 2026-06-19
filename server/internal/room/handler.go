@@ -356,6 +356,20 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		}
 	}
 
+	// The creator is auto-seated and will be charged the buy-in at match start,
+	// so block creating a room they can't afford — mirrors the JoinRoom
+	// affordability check (check-only; no coins move here). Server is the
+	// authority; the modal's disabled-button guard is cosmetic.
+	if coinBuyIn > 0 && h.walletService != nil {
+		balance, balErr := h.walletService.GetBalance(userID)
+		if balErr != nil {
+			return fmt.Errorf("reading wallet balance: %w", balErr)
+		}
+		if balance < coinBuyIn {
+			return apperr.ErrInsufficientCoins
+		}
+	}
+
 	code, err := generateRoomCode()
 	if err != nil {
 		return fmt.Errorf("generating room code: %w", err)

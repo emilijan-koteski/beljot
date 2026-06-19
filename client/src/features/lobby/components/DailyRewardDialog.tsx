@@ -8,6 +8,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
 
 interface DailyRewardDialogProps {
@@ -224,7 +225,7 @@ export function DailyRewardDialog({
                 milestone ? "text-team-a" : "text-ink",
               )}
             >
-              +{amount.toLocaleString()}
+              +{formatCoins(amount)}
             </div>
             <DialogDescription className="text-ink-dim mt-1 text-sm tracking-[0.3px]">
               {t("rewards.dailyReward.coinsAdded")}
@@ -247,7 +248,7 @@ export function DailyRewardDialog({
               {t("rewards.dailyReward.newBalance")}
             </span>
             <span className="font-display tabular text-ink text-[18px] font-bold">
-              {newBalance.toLocaleString()}
+              {formatCoins(newBalance)}
             </span>
           </div>
 

@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type { MatchState, TrickCard } from "@/shared/types/matchTypes";
 import type {
   BelotAnnouncedPayload,
+  CoinSettlementPayload,
   DeclarationsResolvedPayload,
   EmoteID,
   HandScoredPayload,
@@ -69,6 +70,11 @@ export interface MatchStoreState {
   trumpReveal: TrumpSelectedPayload | null;
   scoreRevealData: HandScoredPayload | null;
   matchEndData: MatchEndPayload | null;
+  // Story 9.2: the per-human coin settlement that arrives right after
+  // event:match_end. Stored (rather than toasted) so the won/lost amount can
+  // be shown inside the end-of-match score dialog. Null for free (0 buy-in)
+  // matches, which emit no settlement event.
+  coinSettlement: CoinSettlementPayload | null;
   matchAbandonedData: MatchAbandonedPayload | null;
   surrenderProposed: SurrenderProposedPayload | null;
   surrenderDeclined: SurrenderDeclinedPayload | null;
@@ -92,6 +98,7 @@ export interface MatchStoreState {
   setTrumpReveal: (payload: TrumpSelectedPayload | null) => void;
   setScoreRevealData: (data: HandScoredPayload | null) => void;
   setMatchEndData: (data: MatchEndPayload | null) => void;
+  setCoinSettlement: (payload: CoinSettlementPayload | null) => void;
   setMatchAbandonedData: (data: MatchAbandonedPayload | null) => void;
   setSurrenderProposed: (payload: SurrenderProposedPayload | null) => void;
   setSurrenderDeclined: (payload: SurrenderDeclinedPayload | null) => void;
@@ -130,6 +137,7 @@ const initialState = {
   trumpReveal: null,
   scoreRevealData: null,
   matchEndData: null,
+  coinSettlement: null,
   matchAbandonedData: null,
   surrenderProposed: null,
   surrenderDeclined: null,
@@ -161,6 +169,8 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
   setScoreRevealData: (scoreRevealData) => set({ scoreRevealData }),
 
   setMatchEndData: (matchEndData) => set({ matchEndData }),
+
+  setCoinSettlement: (coinSettlement) => set({ coinSettlement }),
 
   setMatchAbandonedData: (matchAbandonedData) => set({ matchAbandonedData }),
 

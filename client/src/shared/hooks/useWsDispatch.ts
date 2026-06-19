@@ -261,6 +261,10 @@ function dispatchGameEvent(message: WsMessage): void {
       });
     }
     store.setMatchEndData(payload);
+    // Reset any prior settlement so the result dialog never shows a stale
+    // coin delta — the matching event:coin_settlement (if this match had a
+    // buy-in) arrives immediately after per the ordering contract and sets it.
+    store.setCoinSettlement(null);
     return;
   }
 
@@ -268,7 +272,9 @@ function dispatchGameEvent(message: WsMessage): void {
     // Story 9.2: per-human coin settlement, arriving right after match_end while
     // still on the match page. Update the persisted wallet balance on authStore
     // (balance lives on authStore.user, NOT gameStore — it must survive the
-    // later navigation away that wipes gameStore) and toast the win/loss.
+    // later navigation away that wipes gameStore) and stash the settlement on
+    // the match store so the end-of-match score dialog reports the won/lost
+    // amount. No toast — the result dialog is the single place that shows it.
     const payload = message.payload as CoinSettlementPayload;
     // Defensive validation — Go zero values are real values, so guard on type,
     // not truthiness (a 0 delta/balance is legitimate).
@@ -283,17 +289,7 @@ function dispatchGameEvent(message: WsMessage): void {
     if (auth.user) {
       auth.setUser({ ...auth.user, walletBalance: payload.newBalance });
     }
-    if (payload.coinDelta > 0) {
-      toast.success(i18n.t("match.settlement.won", { amount: payload.coinDelta }), {
-        duration: MOTION.TOAST_INFO,
-      });
-    } else if (payload.coinDelta < 0) {
-      toast.info(i18n.t("match.settlement.lost", { amount: -payload.coinDelta }), {
-        duration: MOTION.TOAST_INFO,
-      });
-    }
-    // coinDelta === 0 (e.g. lone human winner who only recovers their stake):
-    // balance is unchanged, so no toast — silent.
+    store.setCoinSettlement(payload);
     return;
   }
 

@@ -102,6 +102,30 @@ func TestCreateRoom_NegativeBuyInRejected(t *testing.T) {
 	assert.Equal(t, "BAD_REQUEST", errCodeOf(t, rec))
 }
 
+func TestCreateRoom_InsufficientCoinsRejected(t *testing.T) {
+	// Creator is auto-seated and charged at start, so a buy-in above their
+	// balance is rejected at create time (mirrors the join check).
+	e, repo := setupCoinTest(nil, &stubWallet{balance: 100})
+	body := `{"name":"High Roller","variant":"bitola","matchMode":"1001","timerStyle":"relaxed","coinBuyIn":500}`
+	rec := doCreateRoom(e, body, validToken(5))
+	require.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, "INSUFFICIENT_COINS", errCodeOf(t, rec))
+
+	persisted, _ := repo.FindByID(1)
+	assert.Nil(t, persisted, "no room is created when the creator can't afford the buy-in")
+}
+
+func TestCreateRoom_SufficientCoinsAllowed(t *testing.T) {
+	e, repo := setupCoinTest(nil, &stubWallet{balance: 500})
+	body := `{"name":"Affordable","variant":"bitola","matchMode":"1001","timerStyle":"relaxed","coinBuyIn":500}`
+	rec := doCreateRoom(e, body, validToken(5))
+	require.Equal(t, http.StatusCreated, rec.Code)
+
+	persisted, _ := repo.FindByID(1)
+	require.NotNil(t, persisted)
+	assert.Equal(t, 500, persisted.CoinBuyIn)
+}
+
 func TestQuickPlay_RoomIsFree(t *testing.T) {
 	e, repo := setupCoinTest(&fakeMatchStarter{}, &stubWallet{balance: 5000})
 	rec := doQuickPlay(e, validToken(7))

@@ -48,6 +48,7 @@ import {
 import { useRoomDetailQuery } from "@/shared/hooks/queries/useRooms";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -238,8 +239,8 @@ export function RoomPage() {
             ? t("lobby.errors.roomFull")
             : code === "INSUFFICIENT_COINS"
               ? t("room.errors.insufficientCoins", {
-                  buyIn: room.coinBuyIn,
-                  balance: useAuthStore.getState().user?.walletBalance ?? 0,
+                  buyIn: formatCoins(room.coinBuyIn),
+                  balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
                 })
               : t("lobby.errors.joinFailed"),
         );
@@ -1042,9 +1043,8 @@ export function RoomPage() {
                   icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}
                 >
                   <span data-testid="badge-buy-in">
-                    {room.coinBuyIn > 0
-                      ? t("lobby.card.buyInAmount", { amount: room.coinBuyIn })
-                      : t("lobby.card.buyInFree")}
+                    {/* Icon-only unit — the brass coin badge conveys "coins". */}
+                    {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
                   </span>
                 </Badge>
                 {room.isQuickPlay && (

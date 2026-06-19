@@ -234,6 +234,7 @@ export function MatchPage() {
   const setScoreRevealData = useMatchStore((s) => s.setScoreRevealData);
   const matchEndData = useMatchStore((s) => s.matchEndData);
   const setMatchEndData = useMatchStore((s) => s.setMatchEndData);
+  const coinSettlement = useMatchStore((s) => s.coinSettlement);
   const matchAbandonedData = useMatchStore((s) => s.matchAbandonedData);
   const setMatchAbandonedData = useMatchStore((s) => s.setMatchAbandonedData);
   const activeEmotes = useMatchStore((s) => s.activeEmotes);
@@ -2009,6 +2010,7 @@ export function MatchPage() {
           onReturnToLobby={handleReturnToLobby}
           onReturnToRoom={handleReturnToRoom}
           surrenderedByUsername={surrenderedByUsername}
+          coinDelta={coinSettlement?.coinDelta}
         />
       )}
 

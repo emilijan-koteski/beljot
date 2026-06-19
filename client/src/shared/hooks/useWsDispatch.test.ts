@@ -1384,7 +1384,7 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     useAuthStore.setState({ user: { ...baseUser } });
   });
 
-  it("updates authStore walletBalance and toasts a win on positive delta", () => {
+  it("updates authStore walletBalance and stores the settlement on a positive delta (no toast)", () => {
     const { result } = renderHook(() => useWsDispatch());
     result.current({
       type: "event:coin_settlement",
@@ -1392,11 +1392,17 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     });
 
     expect(useAuthStore.getState().user?.walletBalance).toBe(5500);
-    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(useMatchStore.getState().coinSettlement).toEqual({
+      coinDelta: 500,
+      newBalance: 5500,
+      pot: 2000,
+    });
+    // The win/loss amount now lives in the result dialog, not a toast.
+    expect(toast.success).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
   });
 
-  it("updates balance and toasts a loss on negative delta", () => {
+  it("updates balance and stores the settlement on a negative delta (no toast)", () => {
     const { result } = renderHook(() => useWsDispatch());
     result.current({
       type: "event:coin_settlement",
@@ -1404,11 +1410,12 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     });
 
     expect(useAuthStore.getState().user?.walletBalance).toBe(4500);
-    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(useMatchStore.getState().coinSettlement?.coinDelta).toBe(-500);
+    expect(toast.info).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it("updates balance but shows no toast on a zero delta", () => {
+  it("stores a zero-delta settlement (dialog decides not to render it)", () => {
     const { result } = renderHook(() => useWsDispatch());
     result.current({
       type: "event:coin_settlement",
@@ -1416,11 +1423,12 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     });
 
     expect(useAuthStore.getState().user?.walletBalance).toBe(5000);
+    expect(useMatchStore.getState().coinSettlement?.coinDelta).toBe(0);
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
   });
 
-  it("ignores a malformed settlement payload without touching the balance", () => {
+  it("ignores a malformed settlement payload without touching balance or store", () => {
     const { result } = renderHook(() => useWsDispatch());
     const malformed = [
       { coinDelta: "500", newBalance: 5500, pot: 2000 },
@@ -1433,7 +1441,31 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     }
 
     expect(useAuthStore.getState().user?.walletBalance).toBe(5000);
+    expect(useMatchStore.getState().coinSettlement).toBeNull();
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("clears a prior settlement when a new match_end arrives", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:coin_settlement",
+      payload: { coinDelta: 500, newBalance: 5500, pot: 2000 },
+    });
+    expect(useMatchStore.getState().coinSettlement).not.toBeNull();
+
+    result.current({
+      type: "event:match_end",
+      payload: {
+        winnerTeam: 0,
+        teamAFinalScore: 1001,
+        teamBFinalScore: 700,
+        matchDurationSec: 120,
+      },
+    });
+
+    // match_end resets the settlement so a subsequent free match can't show
+    // the previous match's coin delta in the result dialog.
+    expect(useMatchStore.getState().coinSettlement).toBeNull();
   });
 });

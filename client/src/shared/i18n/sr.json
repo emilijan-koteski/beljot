@@ -229,9 +229,9 @@
       "addBotFailed": "Dodavanje bota nije uspelo. Pokušaj ponovo",
       "removeBotFailed": "Uklanjanje bota nije uspelo. Pokušaj ponovo",
       "botsNotAllowed": "U ovu sobu ne mogu da se dodaju botovi",
-      "insufficientCoins": "Potrebno je {{buyIn}} novčića za ulazak u sobu — tvoje stanje: {{balance}}.",
+      "insufficientCoins": "Potrebno je {{buyIn}} novčića za ulazak u sobu. Tvoje stanje: {{balance}}.",
       "insufficientCoinsGeneric": "Nemaš dovoljno novčića za ulazak u sobu.",
-      "insufficientCoinsStart": "Igrač na mestu ne može da pokrije ulog — meč nije započet."
+      "insufficientCoinsStart": "Igrač ne može da uloži toliko. Meč nije počeo."
     },
     "waitingForPlayers": "Čekanje igrača",
     "waitingForReturn": "Čekanje da se igrači vrate",
@@ -379,7 +379,9 @@
         "nameRequired": "Naziv sobe je obavezan",
         "nameTaken": "Naziv je već u upotrebi",
         "unexpected": "Kreiranje sobe nije uspelo. Pokušaj ponovo.",
-        "nameTooShort": "Naziv mora imati bar {{min}} znakova"
+        "nameTooShort": "Naziv mora imati bar {{min}} znakova",
+        "buyInTooHigh": "Ulog premašuje tvoje stanje od {{balance}}",
+        "alreadyInRoom": "Već si u sobi, napusti je pre nego što napraviš novu"
       },
       "eyebrow": "Nova soba",
       "headline": "Kreiraj sobu",
@@ -407,7 +409,7 @@
         "step2": "Podeli <code>KOD</code> sa prijateljima, ili sačekaj da te pronađu u lobiju.",
         "step3": "Kad se popune sva četiri mesta, krećeš sa mečom."
       },
-      "coinBuyIn": "Ulog u novčićima",
+      "coinBuyIn": "Ulog",
       "coinBuyInHint": "Svaki igrač ulaže ovoliko za partiju · podrazumevano 500"
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · uživo se osvežava",
@@ -458,8 +460,7 @@
       "variantBitola": "Bitola",
       "matchMode1001": "1001 bod",
       "matchMode501": "501 bod",
-      "buyInAmount": "{{amount}} novčića",
-      "buyInFree": "Besplatno"
+      "buyInFree": "Bez uloga"
     },
     "chat": {
       "title": "Lobi chat",
@@ -643,7 +644,7 @@
       "duration": "Trajanje meča",
       "returnToLobby": "Nazad u lobi",
       "returnToRoom": "Nazad u sobu",
-      "returnToRoomError": "Povratak u sobu nije uspeo — možda više nije dostupna.",
+      "returnToRoomError": "Povratak u sobu nije uspeo. Možda više nije dostupna.",
       "returnToRoomAlreadyStarted": "Sledeći meč je već počeo bez tebe.",
       "returnToRoomNotInRoom": "Više nisi u ovoj sobi.",
       "surrenderNote": "{{username}} je predao meč"
@@ -825,7 +826,7 @@
       "confirmPlaceholder": "Ponovo unesi lozinku",
       "submitButton": "Resetuj lozinku",
       "submitting": "Resetovanje…",
-      "success": "Lozinka je ažurirana — prijavi se.",
+      "success": "Lozinka je ažurirana. Prijavi se.",
       "invalidTitle": "Link je istekao",
       "invalidBody": "Ovaj link za reset je nevažeći ili je istekao. Zatraži novi da nastaviš.",
       "requestNewLink": "Zatraži novi link",

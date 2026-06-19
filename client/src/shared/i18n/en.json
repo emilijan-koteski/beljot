@@ -231,7 +231,7 @@
       "botsNotAllowed": "Bots can't be added to this room",
       "insufficientCoins": "You need {{buyIn}} coins to join this room — your balance: {{balance}}.",
       "insufficientCoinsGeneric": "You don't have enough coins to join this room.",
-      "insufficientCoinsStart": "A seated player can't cover the buy-in — the match didn't start."
+      "insufficientCoinsStart": "A player can't stake that much — the match didn't start."
     },
     "waitingForPlayers": "Waiting for players",
     "waitingForReturn": "Waiting for players to return",
@@ -379,7 +379,9 @@
         "nameRequired": "Room name is required",
         "nameTaken": "That name is taken",
         "unexpected": "Could not create room. Try again.",
-        "nameTooShort": "Name needs at least {{min}} characters"
+        "nameTooShort": "Name needs at least {{min}} characters",
+        "buyInTooHigh": "Buy-in exceeds your balance of {{balance}}",
+        "alreadyInRoom": "You're already in a room — leave it before creating a new one"
       },
       "eyebrow": "New room",
       "headline": "Create a room",
@@ -407,7 +409,7 @@
         "step2": "Share the <code>CODE</code> with friends — or wait for them to find you in the lobby.",
         "step3": "Once all four seats are filled, you start the match."
       },
-      "coinBuyIn": "Coin buy-in",
+      "coinBuyIn": "Buy-in",
       "coinBuyInHint": "Each player stakes this to play · default 500"
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
@@ -458,8 +460,7 @@
       "variantBitola": "Bitola",
       "matchMode1001": "1001 pts",
       "matchMode501": "501 pts",
-      "buyInAmount": "{{amount}} coins",
-      "buyInFree": "Free"
+      "buyInFree": "No stake"
     },
     "chat": {
       "title": "Lobby chat",

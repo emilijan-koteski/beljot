@@ -18,6 +18,7 @@ import {
 } from "@/shared/hooks/mutations/useRooms";
 import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room } from "@/shared/types/apiTypes";
 
@@ -143,8 +144,8 @@ export function LobbyPage() {
         // own balance (Design Decision B: the error payload carries only a code).
         toast.error(
           t("room.errors.insufficientCoins", {
-            buyIn: room.coinBuyIn,
-            balance: useAuthStore.getState().user?.walletBalance ?? 0,
+            buyIn: formatCoins(room.coinBuyIn),
+            balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
           }),
         );
       else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
