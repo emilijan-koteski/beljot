@@ -223,6 +223,7 @@ export function MatchmakingPage() {
       data-testid="matchmaking-page"
     >
       <MatchmakingDiagram
+        room={room}
         found={found}
         players={players}
         viewerSeat={viewerSeat}

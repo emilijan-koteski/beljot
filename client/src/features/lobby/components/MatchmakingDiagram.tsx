@@ -1,13 +1,18 @@
-import { Clock, Trophy, X } from "lucide-react";
+import { Clock, Coins, Trophy, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { modeLabel, variantLabel } from "@/features/lobby/lib/roomLabels";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
-import type { RoomPlayer } from "@/shared/types/apiTypes";
+import { COIN_GOLD } from "@/shared/lib/coinGold";
+import { formatCoins } from "@/shared/lib/formatCoins";
+import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
 type Props = {
+  /** The room being matched — drives the variant / mode / timer / stake chips. */
+  room: Room;
   /** Number of seated players (1..4) — the viewer is always one of them. */
   found: number;
   /** All players currently in the room (seated and not). */
@@ -40,6 +45,7 @@ const ORBIT_OFFSETS = [
  * silver = opponents), matching RoomPage's seat convention.
  */
 export function MatchmakingDiagram({
+  room,
   found,
   players,
   viewerSeat,
@@ -77,14 +83,21 @@ export function MatchmakingDiagram({
         {t("lobby.matchmaking.subtitle")}
       </p>
 
-      {/* Fixed-rules + elapsed strip */}
+      {/* Match-rules + elapsed strip — derived from the actual room config
+          (variant, mode, per-move timer, and the coin stake) rather than fixed
+          assumptions, so it matches the room the player is queued into. */}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
         <Badge tone="neutral" icon={<Trophy className="size-3 text-(--accent)" />}>
-          {t("lobby.card.variantBitola")}
+          {variantLabel(t, room.variant)}
         </Badge>
-        <Badge tone="neutral">{t("lobby.card.matchMode1001")}</Badge>
+        <Badge tone="neutral">{modeLabel(t, room.matchMode)}</Badge>
         <Badge tone="accent" icon={<Clock className="size-3 text-(--accent)" />}>
-          {t("lobby.card.relaxed")}
+          {room.timerStyle === "relaxed"
+            ? t("lobby.card.relaxed")
+            : t("lobby.card.timerSeconds", { seconds: room.timerDurationSeconds })}
+        </Badge>
+        <Badge tone="neutral" icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}>
+          {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
         </Badge>
         <span className="text-ink-mute font-mono text-[11.5px] tracking-[0.5px]">
           {t("lobby.matchmaking.elapsed")}{" "}

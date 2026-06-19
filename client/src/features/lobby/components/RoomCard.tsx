@@ -3,26 +3,13 @@ import { ArrowRight, Clock, Coins, KeyRound, Users, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
+import { modeLabel, variantLabel } from "@/features/lobby/lib/roomLabels";
 import { RelativeTime } from "@/shared/components/RelativeTime";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
-
-// Variant + match-mode labels resolved through i18n so locale picks them
-// (e.g. "Битола · 1001 поен" in MK). Unknown server values fall back to a
-// title-cased / "N pts" approximation so a new variant added on the server
-// doesn't require a frontend change before it can be displayed at all.
-function variantLabel(t: (key: string) => string, v: string): string {
-  if (v === "bitola") return t("lobby.card.variantBitola");
-  return v ? v.charAt(0).toUpperCase() + v.slice(1) : "—";
-}
-function modeLabel(t: (key: string) => string, m: string): string {
-  if (m === "1001") return t("lobby.card.matchMode1001");
-  if (m === "501") return t("lobby.card.matchMode501");
-  return /^\d+$/.test(m) ? `${m} pts` : m || "—";
-}
 
 type Props = {
   room: Room;
