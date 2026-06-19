@@ -91,6 +91,13 @@ func (m *Manager) reconcileStaleRoom(roomRepo StaleRoomRepository, r StaleRoom) 
 		}
 	}
 	if m.matchRepo != nil && seatedCount == 4 {
+		// Story 9.2: NO coin settlement here, by design. This boot-time path has
+		// no surviving in-memory session, so the per-match coinBuyIn captured at
+		// StartMatch is gone and there is no determinable winner. Any stakes
+		// debited before the crash simply stay out of circulation (a sink, the
+		// same fail-safe spirit as the no-human-winner case). The record persists
+		// 0 deltas / 0 buy-in (the actually-charged amount is unrecoverable).
+		//
 		// No precise game-start timestamp survives the restart — the room's
 		// UpdatedAt is the best proxy (StartMatch is the last writer for a
 		// "playing" row that hasn't moved on).

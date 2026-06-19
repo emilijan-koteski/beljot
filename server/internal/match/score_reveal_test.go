@@ -48,7 +48,7 @@ func TestHandComplete_ErroredActionDoesNotKillAutoContinue(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0))
 
 	injectHandCompletePause(t, mgr, time.Now().Add(600*time.Millisecond))
 
@@ -75,7 +75,7 @@ func TestHandComplete_LateContinueIsSilentlyIgnored(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	// 1s per-move window so the auto-pass assertion below stays fast.
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0))
 
 	// Fallback far away: the advance must come from the four acknowledgements.
 	injectHandCompletePause(t, mgr, time.Now().Add(time.Hour))
@@ -120,7 +120,7 @@ func TestSyncStateOnConnect_PushesSnapshotToSessionMember(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0))
 
 	before := len(hub.snapshot())
 	mgr.SyncStateOnConnect(20)
@@ -143,7 +143,7 @@ func TestSyncStateOnConnect_NoOpForNonSessionUser(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0))
 
 	before := len(hub.snapshot())
 	mgr.SyncStateOnConnect(999) // lobby user, not in any session

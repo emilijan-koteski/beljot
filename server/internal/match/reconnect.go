@@ -556,6 +556,7 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	playerIDs := session.playerIDs
 	roomID := session.roomID
 	startedAt := session.startedAt
+	coinBuyIn := session.coinBuyIn
 	teamAScore := gs.TeamScores[game.TeamA]
 	teamBScore := gs.TeamScores[game.TeamB]
 	variant := string(gs.Variant)
@@ -580,9 +581,20 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 
 	session.mu.Unlock()
 
+	// Story 9.2 (AC #8): the WHOLE abandoning team forfeits (both −S, no
+	// teammate refund); the winner is the NON-abandoning team — NOT the record's
+	// hardcoded WinnerTeam (0). Settle against that computed winner. No-op when
+	// coinBuyIn == 0. Deltas ride the match row below; settlement events are sent
+	// after event:match_abandoned, before the trailing event:match_state.
+	winningTeam := 1 - game.TeamForSeat(abandonedSeat)
+	deltas, settlementMsgs := m.settleMatch(roomID, playerIDs, botSeats, winningTeam, coinBuyIn)
+
 	// Broadcast to all human players (disconnected player gets it if they reconnect to WS later)
 	userIDs := humanUserIDs(playerIDs)
 	m.hub.BroadcastToUsers(userIDs, abandonedMsg)
+	for _, sm := range settlementMsgs {
+		m.hub.SendToUser(sm.userID, sm.msg)
+	}
 	m.hub.BroadcastToUsers(userIDs, stateMsg)
 
 	slog.Info("session: match abandoned due to reconnect timeout",
@@ -607,13 +619,21 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		HasBots:      hasBots,
 		TeamAScore:   teamAScore,
 		TeamBScore:   teamBScore,
-		WinnerTeam:   0,
-		Variant:      variant,
-		MatchMode:    matchMode,
-		StartedAt:    startedAt,
-		CompletedAt:  time.Now(),
-		Status:       "abandoned",
-		AbandonedBy:  &abandonedPlayerID,
+		// WinnerTeam stays 0 on the abandoned record (existing semantics; the
+		// abandoned status is the load-bearing signal). Settlement above uses the
+		// computed non-abandoning team, NOT this column.
+		WinnerTeam:       0,
+		Variant:          variant,
+		MatchMode:        matchMode,
+		StartedAt:        startedAt,
+		CompletedAt:      time.Now(),
+		Status:           "abandoned",
+		AbandonedBy:      &abandonedPlayerID,
+		CoinBuyIn:        coinBuyIn,
+		Player1CoinDelta: deltas[0],
+		Player2CoinDelta: deltas[1],
+		Player3CoinDelta: deltas[2],
+		Player4CoinDelta: deltas[3],
 	}
 
 	if err := m.matchRepo.CreateWithHands(matchRecord, handsCopy); err != nil {

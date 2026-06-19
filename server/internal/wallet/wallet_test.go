@@ -11,6 +11,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
@@ -190,6 +191,140 @@ func TestGormRepository_ProcessDailyLogin_ConsecutiveDayIncrements(t *testing.T)
 	assert.Equal(t, 2, res.StreakDay)
 	assert.Equal(t, 1162, res.Amount)
 	assert.Equal(t, 5000+1000+1162, res.NewBalance)
+}
+
+// --- Story 9.2 wallet primitives: ChargeStakes / ApplySettlement / balances ---
+
+func TestGormRepository_ChargeStakes_HappyPathDebitsAll(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormRepository(db)
+	a := createTestUser(t, db, "csa@w.t", 1000, 0, nil)
+	b := createTestUser(t, db, "csb@w.t", 1000, 0, nil)
+
+	insolvent, err := repo.ChargeStakes([]uint{a.ID, b.ID}, 500)
+	require.NoError(t, err)
+	assert.Equal(t, uint(0), insolvent)
+
+	ba, _ := repo.GetBalance(a.ID)
+	bb, _ := repo.GetBalance(b.ID)
+	assert.Equal(t, 500, ba)
+	assert.Equal(t, 500, bb)
+}
+
+func TestGormRepository_ChargeStakes_InsolventRollsBackWholeTx(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormRepository(db)
+	// rich is created first → lower ID → locked/debited first; poor then fails,
+	// which must roll back rich's debit too (all-or-nothing).
+	rich := createTestUser(t, db, "csrich@w.t", 1000, 0, nil)
+	poor := createTestUser(t, db, "cspoor@w.t", 100, 0, nil)
+
+	insolvent, err := repo.ChargeStakes([]uint{rich.ID, poor.ID}, 500)
+	require.ErrorIs(t, err, apperr.ErrInsufficientCoins)
+	assert.Equal(t, poor.ID, insolvent)
+
+	rb, _ := repo.GetBalance(rich.ID)
+	pb, _ := repo.GetBalance(poor.ID)
+	assert.Equal(t, 1000, rb, "rich must be untouched (rollback)")
+	assert.Equal(t, 100, pb, "poor must be untouched")
+}
+
+func TestGormRepository_ChargeStakes_NoOp(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormRepository(db)
+	u := createTestUser(t, db, "csnoop@w.t", 1000, 0, nil)
+
+	insolvent, err := repo.ChargeStakes([]uint{u.ID}, 0) // amount 0
+	require.NoError(t, err)
+	assert.Equal(t, uint(0), insolvent)
+
+	insolvent, err = repo.ChargeStakes(nil, 500) // empty list
+	require.NoError(t, err)
+	assert.Equal(t, uint(0), insolvent)
+
+	b, _ := repo.GetBalance(u.ID)
+	assert.Equal(t, 1000, b)
+}
+
+func TestGormRepository_ApplySettlement_CreditsWinners(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormRepository(db)
+	a := createTestUser(t, db, "asa@w.t", 500, 0, nil)
+	b := createTestUser(t, db, "asb@w.t", 500, 0, nil)
+
+	require.NoError(t, repo.ApplySettlement(map[uint]int{a.ID: 1000, b.ID: 0}))
+
+	ba, _ := repo.GetBalance(a.ID)
+	bb, _ := repo.GetBalance(b.ID)
+	assert.Equal(t, 1500, ba)
+	assert.Equal(t, 500, bb, "zero-amount credit is a no-op")
+
+	// Empty credits map is a no-op success (no-human-winner sink).
+	require.NoError(t, repo.ApplySettlement(map[uint]int{}))
+}
+
+func TestGormRepository_GetBalances(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormRepository(db)
+	a := createTestUser(t, db, "gba@w.t", 700, 0, nil)
+	b := createTestUser(t, db, "gbb@w.t", 800, 0, nil)
+
+	m, err := repo.GetBalances([]uint{a.ID, b.ID})
+	require.NoError(t, err)
+	assert.Equal(t, 700, m[a.ID])
+	assert.Equal(t, 800, m[b.ID])
+
+	empty, err := repo.GetBalances(nil)
+	require.NoError(t, err)
+	assert.Empty(t, empty)
+}
+
+// TestGormRepository_ChargeStakes_ConcurrentNoDeadlock verifies the ascending
+// userID lock order makes concurrent charges over the same two users
+// deadlock-free even when the caller passes the IDs in opposite orders. It needs
+// committed rows two SEPARATE transactions can contend on, so it uses a raw
+// connection and hard-deletes its rows on cleanup.
+func TestGormRepository_ChargeStakes_ConcurrentNoDeadlock(t *testing.T) {
+	dsn := os.Getenv("BELJOT_DB_URL")
+	if dsn == "" {
+		dsn = "postgres://beljot:beljot_dev_password@localhost:5433/beljot?sslmode=disable"
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Skip("skipping integration test: database not available")
+	}
+
+	u1 := &user.User{Email: "deadlock1@w.t", Username: "dl1_u", PasswordHash: "x", WalletBalance: 1000}
+	u2 := &user.User{Email: "deadlock2@w.t", Username: "dl2_u", PasswordHash: "x", WalletBalance: 1000}
+	require.NoError(t, db.Create(u1).Error)
+	require.NoError(t, db.Create(u2).Error)
+	t.Cleanup(func() {
+		db.Unscoped().Delete(&user.User{}, u1.ID)
+		db.Unscoped().Delete(&user.User{}, u2.ID)
+	})
+
+	repo := NewGormRepository(db)
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	// Opposite input orders; ChargeStakes sorts internally so both lock u1→u2.
+	inputs := [][]uint{{u1.ID, u2.ID}, {u2.ID, u1.ID}}
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			_, errs[idx] = repo.ChargeStakes(inputs[idx], 100)
+		}(i)
+	}
+	wg.Wait()
+
+	require.NoError(t, errs[0])
+	require.NoError(t, errs[1])
+
+	b1, _ := repo.GetBalance(u1.ID)
+	b2, _ := repo.GetBalance(u2.ID)
+	assert.Equal(t, 800, b1, "both charges of 100 applied")
+	assert.Equal(t, 800, b2)
 }
 
 // TestGormRepository_ProcessDailyLogin_ConcurrentGrantsOnce verifies the row

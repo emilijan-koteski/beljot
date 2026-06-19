@@ -18,6 +18,7 @@ import { AppLayout } from "@/shared/components/AppLayout";
 import { GuestRoute } from "@/shared/components/GuestRoute";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { PublicContentLayout } from "@/shared/components/PublicContentLayout";
+import { Toaster } from "@/shared/components/ui/sonner";
 import { useAuthInit } from "@/shared/hooks/useAuth";
 import { QueryProvider } from "@/shared/providers/QueryProvider";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -74,6 +75,11 @@ export function App() {
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>
+      {/* Single app-wide sonner host. Without this mounted, every toast.*()
+          call (join/settlement feedback, auth errors, etc.) is silently
+          invisible — the Toaster component existed but was never rendered.
+          Bottom-center keeps toasts clear of the bottom-right chat FAB. */}
+      <Toaster position="bottom-center" />
     </QueryProvider>
   );
 }

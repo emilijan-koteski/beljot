@@ -1,10 +1,12 @@
 import type { TFunction } from "i18next";
-import { ArrowRight, Clock, KeyRound, Users, Zap } from "lucide-react";
+import { ArrowRight, Clock, Coins, KeyRound, Users, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { RelativeTime } from "@/shared/components/RelativeTime";
 import { botDisplayName } from "@/shared/lib/botName";
+import { COIN_GOLD } from "@/shared/lib/coinGold";
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
@@ -96,6 +98,13 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
             {room.timerStyle === "relaxed"
               ? t("lobby.card.relaxed")
               : t("lobby.card.timerSeconds", { seconds: room.timerDurationSeconds })}
+          </span>
+          <Dot />
+          <span className="inline-flex items-center gap-1" data-testid="room-card-buy-in">
+            <Coins className="size-3" style={{ color: COIN_GOLD }} />
+            {/* Icon-only unit — the coin glyph conveys "coins", so the card
+                shows just the grouped number (or "Free" at 0). */}
+            {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
           </span>
           <Dot />
           <RelativeTime iso={room.createdAt} variant="compact" />

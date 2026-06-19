@@ -21,6 +21,7 @@ import { useWsConnectionState, useWsSendMessage } from "@/shared/providers/WebSo
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
+import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Suit, TeamString } from "@/shared/types/matchTypes";
 import {
   ACTION_ANNOUNCE_BELOT,
@@ -218,6 +219,7 @@ export function MatchPage() {
   const sendMessage = useWsSendMessage();
 
   const user = useAuthStore((s) => s.user);
+  const setInsolventEjection = useRoomStore((s) => s.setInsolventEjection);
   const matchState = useMatchStore((s) => s.matchState);
   const myPlayerSeat = useMatchStore((s) => s.myPlayerSeat);
   const setMyPlayerSeat = useMatchStore((s) => s.setMyPlayerSeat);
@@ -234,6 +236,7 @@ export function MatchPage() {
   const setScoreRevealData = useMatchStore((s) => s.setScoreRevealData);
   const matchEndData = useMatchStore((s) => s.matchEndData);
   const setMatchEndData = useMatchStore((s) => s.setMatchEndData);
+  const coinSettlement = useMatchStore((s) => s.coinSettlement);
   const matchAbandonedData = useMatchStore((s) => s.matchAbandonedData);
   const setMatchAbandonedData = useMatchStore((s) => s.setMatchAbandonedData);
   const activeEmotes = useMatchStore((s) => s.activeEmotes);
@@ -275,6 +278,11 @@ export function MatchPage() {
   const [showReshuffle, setShowReshuffle] = useState(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const errorToastTimerRef = useRef<number | null>(null);
+  // Story 9.3: the room's buy-in, captured from the mount-time getRoom fetch so
+  // the return-time 409 handler can seed the lobby insolvency modal locally if
+  // the system:insolvent_ejected WS frame is dropped/late (the WS event remains
+  // the canonical source and overwrites this when it lands).
+  const roomBuyInRef = useRef<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   // Mobile HUD: the bottom action buttons collapse into a top-right hamburger.
@@ -765,6 +773,8 @@ export function MatchPage() {
     getRoom(roomIdNum)
       .then((detail) => {
         if (cancelled) return;
+        // Cache the room's buy-in for the return-time insolvency fallback (P4).
+        roomBuyInRef.current = detail.room.coinBuyIn;
         const isPlayer = detail.players.some((p) => p.userId === user.id);
         if (!isPlayer) {
           setSplashIssue("notMember");
@@ -1152,10 +1162,37 @@ export function MatchPage() {
       if (errorToastTimerRef.current !== null) {
         clearTimeout(errorToastTimerRef.current);
       }
+      const code = err instanceof FetchError ? err.code : null;
+      // Story 9.3 AC1: insolvency — the seat is gone server-side, so (unlike the
+      // other return errors) we must NOT keep the player on the result overlay.
+      // Clear match state and route to the lobby; the per-user
+      // system:insolvent_ejected event populates the lobby's insolvency modal
+      // with the exact balance/buy-in (the client no longer holds the room).
+      if (code === "INSUFFICIENT_COINS") {
+        // Fallback: seed the lobby modal from locally-known numbers in case the
+        // per-user system:insolvent_ejected WS frame is dropped/late, so the
+        // player always learns WHY they were routed out. Only when nothing has
+        // set the signal yet — the WS event is canonical and must win if present.
+        if (
+          roomBuyInRef.current !== null &&
+          user !== null &&
+          useRoomStore.getState().insolventEjection === null
+        ) {
+          setInsolventEjection({
+            roomId: roomIdNum,
+            buyIn: roomBuyInRef.current,
+            balance: user.walletBalance,
+            reason: "ejected",
+          });
+        }
+        setMatchEndData(null);
+        clearGame();
+        navigate("/lobby");
+        return;
+      }
       // D146: distinct copy per failure — 409 the next match already started,
       // 404 we're no longer a member (kicked/left). Anything else (network) keeps
       // the generic message.
-      const code = err instanceof FetchError ? err.code : null;
       const messageKey =
         code === "MATCH_ALREADY_STARTED"
           ? "match.matchResult.returnToRoomAlreadyStarted"
@@ -1168,7 +1205,7 @@ export function MatchPage() {
         errorToastTimerRef.current = null;
       }, MOTION.TOAST_ERROR);
     }
-  }, [roomIdNum, clearGame, navigate, setMatchEndData, t]);
+  }, [roomIdNum, clearGame, navigate, setMatchEndData, setInsolventEjection, user, t]);
 
   const handleAbandonReturnToLobby = useCallback(() => {
     setMatchAbandonedData(null);
@@ -2009,6 +2046,7 @@ export function MatchPage() {
           onReturnToLobby={handleReturnToLobby}
           onReturnToRoom={handleReturnToRoom}
           surrenderedByUsername={surrenderedByUsername}
+          coinDelta={coinSettlement?.coinDelta}
         />
       )}
 

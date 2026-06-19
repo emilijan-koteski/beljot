@@ -192,6 +192,18 @@ export interface AutoActionPayload {
   type: AutoActionType;
 }
 
+// --- Economy events (Story 9.2) ---
+// Sent per-human at match end (after event:match_end) with that player's own
+// net coin delta and resulting wallet balance. Per-user, not broadcast, because
+// newBalance differs per player; pot is shared.
+export const EVENT_COIN_SETTLEMENT = "event:coin_settlement" as const;
+
+export interface CoinSettlementPayload {
+  coinDelta: number;
+  newBalance: number;
+  pot: number;
+}
+
 // --- Disconnect/reconnect events (server -> client) ---
 export const EVENT_PLAYER_DISCONNECTED = "event:player_disconnected" as const;
 export const EVENT_PLAYER_RECONNECTED = "event:player_reconnected" as const;
@@ -337,6 +349,28 @@ export interface RoomOwnerChangedPayload {
   newOwnerId: number;
   newOwnerUsername: string;
   previousOwnerId: number;
+}
+
+// Broadcast to every still-seated member when a room closes because no
+// present-and-solvent player remained to own it (Story 9.3 AC4). Recipients
+// route to the lobby with a "room closed" notice. Keep in sync with server
+// events.go (SystemRoomClosedInsolvent).
+export const SYSTEM_ROOM_CLOSED_INSOLVENT = "system:room_closed_insolvent" as const;
+
+export interface RoomClosedInsolventPayload {
+  roomId: number;
+}
+
+// Per-user push to a player ejected at match start because they could not
+// afford the buy-in at the authoritative charge (Story 9.3 AC5). Carries the
+// exact numbers so the lobby modal can show balance vs buy-in. Keep in sync
+// with server events.go (SystemInsolventEjected).
+export const SYSTEM_INSOLVENT_EJECTED = "system:insolvent_ejected" as const;
+
+export interface InsolventEjectedPayload {
+  roomId: number;
+  buyIn: number;
+  balance: number;
 }
 
 export interface SeatUpdatedPayload {

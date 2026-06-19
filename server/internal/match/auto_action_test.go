@@ -57,7 +57,7 @@ func TestPerMoveTimer_BiddingPhaseAutoPasses(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 
 	// 1-second timer so it expires quickly
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0))
 
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
@@ -101,7 +101,7 @@ func TestAutoAction_SkipDeclare_ChainsToAutoPlayWithoutExtension(t *testing.T) {
 	// timed-out seat), that fresh expiry would land ~60s in the future, far
 	// past the chained next-seat expiry (which sits ~60s after the chain
 	// runs but starts on the seat that just received the play, not seat 1).
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0))
 
 	// Inject a declaration-prompt state on seat 1 with an already-elapsed
 	// expiry. The next TriggerTimerExpiryForTest fires the auto-action.
@@ -147,7 +147,7 @@ func TestAutoAction_ChainedBelotPrompt_AdvancesPastDoomedSeat(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0))
 
 	// Seat 0 with hearts trump holds KH+QH. Force AutoPlay to land on KH by
 	// stripping all of seat 0's other cards down to just K and Q. Set
@@ -206,7 +206,7 @@ func TestAutoAction_SkipBelot_AdvancesSeatAndArmsFreshTimer(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0))
 
 	// Set up a belot-prompt state on seat 1, using diamonds trump so seat 1's
 	// fixture hand (KD, QD) qualifies. Seat 1 just played KD; PendingBelotSeat

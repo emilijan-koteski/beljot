@@ -31,6 +31,7 @@ import type {
   AutoActionPayload,
   BelotAnnouncedPayload,
   CardPlayedPayload,
+  CoinSettlementPayload,
   DeclarationsResolvedPayload,
   HandScoredPayload,
   MatchAbandonedPayload,
@@ -262,6 +263,13 @@ export const AutoActionPayloadSchema = z.strictObject({
   type: z.union([z.literal("pass_trump"), z.literal("skip_declare"), z.literal("skip_belot")]),
 });
 
+// Story 9.2: per-human match-end coin settlement.
+export const CoinSettlementPayloadSchema = z.strictObject({
+  coinDelta: z.number().int(),
+  newBalance: z.number().int(),
+  pot: z.number().int(),
+});
+
 export const PlayerDisconnectedPayloadSchema = z.strictObject({
   playerSeat: z.number(),
   username: z.string(),
@@ -367,6 +375,12 @@ type _AutoActionConformance = MutualExtends<
 >;
 const _autoActionConforms: _AutoActionConformance = true;
 
+type _CoinSettlementConformance = MutualExtends<
+  z.infer<typeof CoinSettlementPayloadSchema>,
+  CoinSettlementPayload
+>;
+const _coinSettlementConforms: _CoinSettlementConformance = true;
+
 type _PlayerDisconnectedConformance = MutualExtends<
   z.infer<typeof PlayerDisconnectedPayloadSchema>,
   PlayerDisconnectedPayload
@@ -407,6 +421,7 @@ export const _conformanceWitnesses = {
   _matchPausedConforms,
   _matchResumedConforms,
   _autoActionConforms,
+  _coinSettlementConforms,
   _playerDisconnectedConforms,
   _playerReconnectedConforms,
   _surrenderProposedConforms,

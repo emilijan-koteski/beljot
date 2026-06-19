@@ -5,6 +5,9 @@ import { useRoomStore } from "./roomStore";
 describe("roomStore", () => {
   beforeEach(() => {
     useRoomStore.getState().reset();
+    // reset() deliberately preserves insolventEjection (Story 9.3), so clear it
+    // explicitly between tests to keep them isolated.
+    useRoomStore.getState().setInsolventEjection(null);
   });
 
   it("initializes with null room, empty players, and matchStarted false", () => {
@@ -46,6 +49,7 @@ describe("roomStore", () => {
       status: "waiting",
       playerCount: 1,
       isQuickPlay: false,
+      coinBuyIn: 0,
       createdAt: "2026-04-12T00:00:00Z",
       updatedAt: "2026-04-12T00:00:00Z",
     });
@@ -113,6 +117,7 @@ describe("roomStore", () => {
       status: "waiting",
       playerCount: 2,
       isQuickPlay: false,
+      coinBuyIn: 0,
       createdAt: "2026-04-12T00:00:00Z",
       updatedAt: "2026-04-12T00:00:00Z",
     });
@@ -309,6 +314,45 @@ describe("roomStore", () => {
     store.setMatchStartedRoomId(9);
     store.reset();
     expect(useRoomStore.getState().returnedUserIds).toEqual([]);
+    expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
+  });
+
+  // --- Insolvency ejection (Story 9.3) ---
+
+  it("setInsolventEjection sets and clears the ejection notice", () => {
+    useRoomStore.getState().setInsolventEjection({
+      roomId: 7,
+      buyIn: 500,
+      balance: 100,
+      reason: "ejected",
+    });
+    expect(useRoomStore.getState().insolventEjection).toEqual({
+      roomId: 7,
+      buyIn: 500,
+      balance: 100,
+      reason: "ejected",
+    });
+
+    useRoomStore.getState().setInsolventEjection(null);
+    expect(useRoomStore.getState().insolventEjection).toBeNull();
+  });
+
+  it("reset PRESERVES the insolvency-ejection notice so the lobby modal survives RoomPage unmount", () => {
+    useRoomStore.getState().setInsolventEjection({
+      roomId: 7,
+      buyIn: 500,
+      balance: 100,
+      reason: "roomClosed",
+    });
+    useRoomStore.getState().reset();
+    // Survives reset (RoomPage calls reset() on unmount while navigating to lobby).
+    expect(useRoomStore.getState().insolventEjection).toEqual({
+      roomId: 7,
+      buyIn: 500,
+      balance: 100,
+      reason: "roomClosed",
+    });
+    // ...but other state is cleared as usual.
     expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
   });
 });

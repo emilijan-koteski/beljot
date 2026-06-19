@@ -44,6 +44,21 @@ const EventMatchPaused = "event:match_paused"
 const EventMatchResumed = "event:match_resumed"
 const EventAutoAction = "event:auto_action"
 
+// --- Economy events (Story 9.2) ---
+// EventCoinSettlement is sent per-human at match end (after event:match_end)
+// carrying that player's own net coin delta and resulting wallet balance. Sent
+// per-user (not broadcast) because NewBalance differs per player; Pot is shared.
+const EventCoinSettlement = "event:coin_settlement"
+
+// CoinSettlementPayload is the typed payload for EventCoinSettlement events.
+// CoinDelta is the net wallet change for the match (winner: +winnings,
+// loser: -buyIn, net-zero possible); NewBalance is the post-settlement balance.
+type CoinSettlementPayload struct {
+	CoinDelta  int `json:"coinDelta"`
+	NewBalance int `json:"newBalance"`
+	Pot        int `json:"pot"`
+}
+
 // --- Game event payload structs ---
 
 // CardPlayedPayload is the typed payload for EventCardPlayed events.
@@ -210,11 +225,39 @@ const SystemPlayerLeft = "system:player_left"
 const SystemRoomKicked = "system:room_kicked"
 const SystemRoomOwnerChanged = "system:room_owner_changed"
 
+// SystemRoomClosedInsolvent is broadcast to every still-seated member when a
+// room closes because no present-and-solvent player remained to own it (Story
+// 9.3 AC4) — the owner left or was barred for insolvency and no one could
+// inherit. Recipients route to the lobby with a "room closed" notice. Uses the
+// system: prefix like every sibling room-lifecycle event.
+const SystemRoomClosedInsolvent = "system:room_closed_insolvent"
+
+// SystemInsolventEjected is a per-user push (via the per-recipient broadcast,
+// like event:coin_settlement — not a room broadcast) to a player ejected at
+// match start because they could not afford the buy-in at the authoritative
+// charge (Story 9.3 AC5). Carries the exact numbers so the client modal can
+// show balance vs buy-in.
+const SystemInsolventEjected = "system:insolvent_ejected"
+
 // RoomKickedPayload is the typed payload for SystemRoomKicked events,
 // sent only to the kicked user's WebSocket connection.
 type RoomKickedPayload struct {
 	RoomID uint   `json:"roomId"`
 	Reason string `json:"reason"`
+}
+
+// RoomClosedInsolventPayload is the typed payload for SystemRoomClosedInsolvent
+// events (Story 9.3).
+type RoomClosedInsolventPayload struct {
+	RoomID uint `json:"roomId"`
+}
+
+// InsolventEjectedPayload is the typed payload for SystemInsolventEjected
+// events (Story 9.3). Balance and BuyIn drive the client modal's exact numbers.
+type InsolventEjectedPayload struct {
+	RoomID  uint `json:"roomId"`
+	BuyIn   int  `json:"buyIn"`
+	Balance int  `json:"balance"`
 }
 
 // SystemPlayerReturned is broadcast to a reopened room's members when a player

@@ -16,10 +16,15 @@ import (
 
 // LiveMatch holds the live game state and player mapping for one active game.
 type LiveMatch struct {
-	gameState        *game.GameState
-	playerIDs        [4]uint // index = seat
-	roomID           uint
-	startedAt        time.Time
+	gameState *game.GameState
+	playerIDs [4]uint // index = seat
+	roomID    uint
+	startedAt time.Time
+	// coinBuyIn is the per-human stake captured at StartMatch (Story 9.2). It is
+	// the settlement authority for this match — immune to later edits of
+	// rooms.coin_buy_in. 0 means no economy (quick-play / unstaked). Written once
+	// at StartMatch, read-only thereafter (safe to read without the lock).
+	coinBuyIn        int
 	timerStyle       string      // "relaxed" or "per-move"
 	timerDurationSec int         // seconds per move (only used when timerStyle == "per-move")
 	turnTimer        *time.Timer // current per-move timer (nil when inactive)
@@ -54,6 +59,17 @@ type RoomStatusUpdater interface {
 	UpdateRoomStatus(roomID uint, status string) error
 }
 
+// WalletSettler is the subset of *wallet.Service the match manager needs to
+// settle a match at end (Story 9.2): credit the winning human seats atomically
+// and read every human's resulting balance for event:coin_settlement. Injected
+// via SetWalletSettler so the match package stays decoupled from wallet
+// internals and tests can swap a stub. Nil → settlement is skipped (the manager
+// still computes/persists deltas; only the wallet write + event are no-ops).
+type WalletSettler interface {
+	ApplySettlement(credits map[uint]int) error
+	GetBalances(userIDs []uint) (map[uint]int, error)
+}
+
 // Broadcaster is the subset of *ws.Hub the manager depends on. Mirrors the
 // chat / emote pattern (chat/handler.go, emote/handler.go) so tests can swap
 // in a hubSpy without spinning up a real hub. *ws.Hub satisfies this directly.
@@ -70,6 +86,7 @@ type Manager struct {
 	hub              Broadcaster
 	matchRepo        MatchRepository
 	roomUpdater      RoomStatusUpdater
+	walletSettler    WalletSettler
 	userRemovedHooks []func(userID uint)
 	// Bot think-delay bounds (Story 10.3). Uniform random in [min, max] per
 	// decision; injectable so manager tests don't sleep for real. The 2.5 s
@@ -110,6 +127,12 @@ func (m *Manager) SetRoomUpdater(updater RoomStatusUpdater) {
 	m.roomUpdater = updater
 }
 
+// SetWalletSettler injects the wallet service used to settle coins at match end
+// (Story 9.2). Optional — when unset, settlement is skipped.
+func (m *Manager) SetWalletSettler(settler WalletSettler) {
+	m.walletSettler = settler
+}
+
 // AddUserRemovedHook registers fn to be called (outside the manager lock)
 // for each playerID when RemoveSession tears down a session.
 // Reusable for Epic 9 per-user state (wallet rate-limit, daily-claim cooldown).
@@ -119,8 +142,10 @@ func (m *Manager) AddUserRemovedHook(fn func(userID uint)) {
 	m.userRemovedHooks = append(m.userRemovedHooks, fn)
 }
 
-// StartMatch creates a new game session from room data and broadcasts the initial state.
-func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int) error {
+// StartMatch creates a new game session from room data and broadcasts the
+// initial state. coinBuyIn is the per-human stake to capture on the session for
+// match-end settlement (Story 9.2); 0 for no-economy / quick-play matches.
+func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int) error {
 	m.mu.Lock()
 	if _, exists := m.sessions[roomID]; exists {
 		m.mu.Unlock()
@@ -153,6 +178,7 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		playerIDs:          playerIDs,
 		roomID:             roomID,
 		startedAt:          time.Now(),
+		coinBuyIn:          coinBuyIn,
 		timerStyle:         timerStyle,
 		timerDurationSec:   timerDurationSec,
 		reconnectWindowSec: reconnectWindowSec,
@@ -1028,26 +1054,38 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	}
 	ids, botFlags, hasBots := matchSeatColumns(session.playerIDs, botSeats)
 
+	// Story 9.2: settle coins (no-op when coinBuyIn == 0). The winner is the
+	// normally-resolved WinnerTeam — surrender routes through here with the
+	// engine's non-surrendering team already set, so it needs no special case
+	// (AC #7). Deltas ride the match row; settlement events are sent below,
+	// after event:match_end (8.5-1 ordering contract).
+	deltas, settlementMsgs := m.settleMatch(session.roomID, session.playerIDs, botSeats, winnerTeam, session.coinBuyIn)
+
 	matchRecord := &Match{
-		RoomID:        session.roomID,
-		Player1ID:     ids[0],
-		Player2ID:     ids[1],
-		Player3ID:     ids[2],
-		Player4ID:     ids[3],
-		Player1IsBot:  botFlags[0],
-		Player2IsBot:  botFlags[1],
-		Player3IsBot:  botFlags[2],
-		Player4IsBot:  botFlags[3],
-		HasBots:       hasBots,
-		TeamAScore:    finalState.TeamScores[game.TeamA],
-		TeamBScore:    finalState.TeamScores[game.TeamB],
-		WinnerTeam:    winnerTeam,
-		Variant:       string(finalState.Variant),
-		MatchMode:     finalState.MatchMode,
-		StartedAt:     session.startedAt,
-		CompletedAt:   time.Now(),
-		Status:        "completed",
-		SurrenderedBy: surrenderedBy,
+		RoomID:           session.roomID,
+		Player1ID:        ids[0],
+		Player2ID:        ids[1],
+		Player3ID:        ids[2],
+		Player4ID:        ids[3],
+		Player1IsBot:     botFlags[0],
+		Player2IsBot:     botFlags[1],
+		Player3IsBot:     botFlags[2],
+		Player4IsBot:     botFlags[3],
+		HasBots:          hasBots,
+		TeamAScore:       finalState.TeamScores[game.TeamA],
+		TeamBScore:       finalState.TeamScores[game.TeamB],
+		WinnerTeam:       winnerTeam,
+		Variant:          string(finalState.Variant),
+		MatchMode:        finalState.MatchMode,
+		StartedAt:        session.startedAt,
+		CompletedAt:      time.Now(),
+		Status:           "completed",
+		SurrenderedBy:    surrenderedBy,
+		CoinBuyIn:        session.coinBuyIn,
+		Player1CoinDelta: deltas[0],
+		Player2CoinDelta: deltas[1],
+		Player3CoinDelta: deltas[2],
+		Player4CoinDelta: deltas[3],
 	}
 
 	// Copy buffered hand results under RLock to avoid holding the lock during I/O.
@@ -1069,10 +1107,16 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 		}
 	}
 
-	// Broadcast match_end → match_state AFTER persistence completes. Both fire
-	// regardless of persist outcome (clients must not be stranded on the table).
+	// Broadcast match_end → coin_settlement(s) → match_state AFTER persistence
+	// completes. All fire regardless of persist outcome (clients must not be
+	// stranded on the table). event:coin_settlement is slotted after match_end
+	// and before match_state, preserving the 8.5-1 (match_end → match_state)
+	// client-facing order while delivering each human their own delta/balance.
 	userIDs := humanUserIDs(session.playerIDs)
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchEnd, matchEndPayload))
+	for _, sm := range settlementMsgs {
+		m.hub.SendToUser(sm.userID, sm.msg)
+	}
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, finalState))
 
 	m.RemoveSession(session.roomID)

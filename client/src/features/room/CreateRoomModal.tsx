@@ -1,4 +1,4 @@
-import { ArrowRight, Clock, KeyRound, Users, Zap } from "lucide-react";
+import { ArrowRight, Clock, Coins, KeyRound, Users, Zap } from "lucide-react";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -13,6 +13,8 @@ import { Field } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
 import { Segmented } from "@/shared/components/ui/segmented";
 import { useCreateRoomMutation } from "@/shared/hooks/mutations/useRooms";
+import { COIN_GOLD } from "@/shared/lib/coinGold";
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -23,6 +25,7 @@ interface CreateRoomModalProps {
 
 const MIN_NAME = 3;
 const MAX_NAME = 32;
+const DEFAULT_BUY_IN = 500; // mirrors the server default (Story 9.2)
 
 /**
  * Split-panel create-room modal. Left = form (name, variant, match mode,
@@ -40,17 +43,28 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const navigate = useNavigate();
   const createRoomMutation = useCreateRoomMutation();
   const meUsername = useAuthStore((s) => s.user?.username ?? "");
+  const meBalance = useAuthStore((s) => s.user?.walletBalance ?? 0);
 
   const [name, setName] = useState("");
   const [variant, setVariant] = useState<"bitola" | "croatia">("bitola");
   const [matchMode, setMatchMode] = useState<"1001" | "501">("1001");
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
   const [timerDuration, setTimerDuration] = useState(30);
+  const [coinBuyIn, setCoinBuyIn] = useState(DEFAULT_BUY_IN);
+  // Field-level error shown under the room-name input (name validation only).
   const [error, setError] = useState<string | null>(null);
+  // General submit error (already-in-room, insolvency race, unexpected) shown
+  // in a pinned banner above the footer — NOT under the name field.
+  const [formError, setFormError] = useState<string | null>(null);
 
   const trimmed = name.trim();
   const nameValid = trimmed.length >= MIN_NAME && trimmed.length <= MAX_NAME;
   const submitting = createRoomMutation.isPending;
+
+  // The creator is auto-seated and charged the buy-in at match start, so a room
+  // they can't afford is un-startable — block it here too (server re-validates).
+  const effectiveBuyIn = Math.max(0, Math.floor(coinBuyIn || 0));
+  const buyInExceedsBalance = effectiveBuyIn > meBalance;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,6 +79,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     }
 
     setError(null);
+    setFormError(null);
 
     try {
       const room = await createRoomMutation.mutateAsync({
@@ -73,20 +88,30 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         matchMode,
         timerStyle,
         timerDurationSeconds: timerStyle === "per-move" ? timerDuration : null,
+        coinBuyIn: Math.max(0, Math.floor(coinBuyIn || 0)),
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
     } catch (err) {
       if (err instanceof FetchError) {
+        // Name-specific failures belong under the name field; everything else
+        // is a general failure shown in the form banner (never the raw server
+        // message — e.g. "player is already in a room" under the name input).
         if (err.code === "ROOM_NAME_TAKEN") {
           setError(t("lobby.createRoomModal.errors.nameTaken"));
         } else if (err.code === "ROOM_NAME_REQUIRED") {
           setError(t("lobby.createRoomModal.errors.nameRequired"));
+        } else if (err.code === "ALREADY_IN_ROOM") {
+          setFormError(t("lobby.createRoomModal.errors.alreadyInRoom"));
+        } else if (err.code === "INSUFFICIENT_COINS") {
+          setFormError(
+            t("lobby.createRoomModal.errors.buyInTooHigh", { balance: formatCoins(meBalance) }),
+          );
         } else {
-          setError(err.message);
+          setFormError(t("lobby.createRoomModal.errors.unexpected"));
         }
       } else {
-        setError(t("lobby.createRoomModal.errors.unexpected"));
+        setFormError(t("lobby.createRoomModal.errors.unexpected"));
       }
     }
   }
@@ -98,7 +123,9 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setMatchMode("1001");
       setTimerStyle("relaxed");
       setTimerDuration(30);
+      setCoinBuyIn(DEFAULT_BUY_IN);
       setError(null);
+      setFormError(null);
       createRoomMutation.reset();
     }
     onOpenChange(nextOpen);
@@ -134,7 +161,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="bg-surface border-border max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-0 overflow-y-auto rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_rgba(201,168,118,0.20)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))] md:overflow-hidden"
+        className="bg-surface border-border max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-0 overflow-y-auto rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_rgba(201,168,118,0.20)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:flex md:max-h-[min(720px,calc(100vh-4rem))] md:flex-col md:overflow-hidden"
         showCloseButton={false}
         data-testid="create-room-modal"
       >
@@ -146,7 +173,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
         <form
           onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:h-full md:min-h-0 md:grid-cols-[1.05fr_0.95fr]"
+          className="grid grid-cols-1 md:min-h-0 md:flex-1 md:grid-cols-[1.05fr_0.95fr] md:grid-rows-[minmax(0,1fr)]"
           noValidate
         >
           {/* ── Left: form ────────────────────────────────────────────── */}
@@ -245,7 +272,47 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   />
                 </Field>
               )}
+
+              <Field
+                label={t("lobby.createRoomModal.coinBuyIn")}
+                htmlFor="coin-buy-in"
+                hint={t("lobby.createRoomModal.coinBuyInHint")}
+                error={
+                  buyInExceedsBalance
+                    ? t("lobby.createRoomModal.errors.buyInTooHigh", {
+                        balance: formatCoins(meBalance),
+                      })
+                    : undefined
+                }
+                errorTestId="buy-in-error"
+              >
+                <Input
+                  id="coin-buy-in"
+                  type="number"
+                  min={0}
+                  step={50}
+                  inputMode="numeric"
+                  value={coinBuyIn}
+                  onChange={(e) =>
+                    setCoinBuyIn(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                  }
+                  data-testid="coin-buy-in-input"
+                  className="h-11"
+                />
+              </Field>
             </div>
+
+            {/* General submit error — pinned above the footer so it's always
+                visible (the form body scrolls independently on desktop). */}
+            {formError && (
+              <div
+                role="alert"
+                data-testid="create-room-form-error"
+                className="text-destructive border-border shrink-0 border-t px-8 py-2.5 text-sm font-medium"
+              >
+                {formError}
+              </div>
+            )}
 
             <footer className="border-border bg-surface flex shrink-0 items-center justify-between gap-2 border-t px-8 py-3.5">
               <Button
@@ -259,7 +326,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               <Button
                 type="submit"
                 size="cta"
-                disabled={!nameValid || submitting}
+                disabled={!nameValid || submitting || buyInExceedsBalance}
                 data-testid="create-room-button"
               >
                 {submitting
@@ -271,7 +338,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
           {/* ── Right: live preview pane ──────────────────────────────── */}
           <aside
-            className="border-border hidden flex-col gap-4 border-t px-9 py-7 md:flex md:overflow-y-auto md:border-t-0 md:border-l"
+            className="border-border hidden flex-col gap-4 border-t px-9 py-7 md:flex md:min-h-0 md:overflow-y-auto md:border-t-0 md:border-l"
             style={{
               background:
                 "radial-gradient(ellipse 90% 60% at 50% -10%, rgba(201,168,118,0.18), transparent 70%), var(--surface-3)",
@@ -285,6 +352,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               matchMode={matchMode}
               timerStyle={timerStyle}
               timerDuration={timerDuration}
+              coinBuyIn={coinBuyIn}
               hostUsername={meUsername || "host"}
             />
 
@@ -323,6 +391,7 @@ function PreviewCard({
   matchMode,
   timerStyle,
   timerDuration,
+  coinBuyIn,
   hostUsername,
 }: {
   name: string;
@@ -330,6 +399,7 @@ function PreviewCard({
   matchMode: "1001" | "501";
   timerStyle: "relaxed" | "per-move";
   timerDuration: number;
+  coinBuyIn: number;
   hostUsername: string;
 }) {
   const { t } = useTranslation();
@@ -379,7 +449,12 @@ function PreviewCard({
             {timerLabel}
           </span>
           <Dot />
-          <span>{t("lobby.createRoomModal.preview.justNow")}</span>
+          <span className="inline-flex items-center gap-1" data-testid="preview-buy-in">
+            <Coins className="size-3" style={{ color: COIN_GOLD }} />
+            {/* Icon-only unit — the coin glyph conveys "coins", so the preview
+                shows just the grouped number (or "Free" at 0). */}
+            {coinBuyIn > 0 ? formatCoins(coinBuyIn) : t("lobby.card.buyInFree")}
+          </span>
         </div>
       </div>
 

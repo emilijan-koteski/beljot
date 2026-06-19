@@ -60,6 +60,7 @@ const qpRoom = {
   status: "waiting",
   playerCount: 1,
   isQuickPlay: true,
+  coinBuyIn: 0,
   createdAt: "",
   updatedAt: "",
 };

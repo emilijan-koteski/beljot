@@ -372,7 +372,7 @@ func testErrorHandler(err error, c echo.Context) {
 
 func setupTest() (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, nil, nil, nil)
+	handler := room.NewRoomHandler(repo, nil, nil, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -401,7 +401,7 @@ func setupTest() (*echo.Echo, *mockRoomRepo) {
 func setupTestWithBroadcast() (*echo.Echo, *mockRoomRepo, *mockBroadcaster) {
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
-	handler := room.NewRoomHandler(repo, nil, broadcaster, nil)
+	handler := room.NewRoomHandler(repo, nil, broadcaster, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -425,6 +425,61 @@ func setupTestWithBroadcast() (*echo.Echo, *mockRoomRepo, *mockBroadcaster) {
 	api.DELETE("/rooms/:id/bots/:seat", handler.RemoveBot)
 
 	return e, repo, broadcaster
+}
+
+// registerRoomRoutes wires the full room route set onto api. Shared by the
+// presence-aware setup helpers (Story 9.3) so they don't re-list every route.
+func registerRoomRoutes(api *echo.Group, handler *room.RoomHandler) {
+	api.POST("/rooms", handler.CreateRoom)
+	api.GET("/rooms", handler.ListRooms)
+	api.POST("/rooms/quick-play", handler.QuickPlay)
+	api.GET("/rooms/code/:code", handler.GetRoomByCode)
+	api.GET("/rooms/:id", handler.GetRoom)
+	api.POST("/rooms/:id/join", handler.JoinRoom)
+	api.POST("/rooms/:id/quick-join", handler.QuickJoin)
+	api.POST("/rooms/:id/leave", handler.LeaveRoom)
+	api.POST("/rooms/:id/return", handler.ReturnToRoom)
+	api.POST("/rooms/:id/seat", handler.SelectSeat)
+	api.POST("/rooms/:id/leave-seat", handler.LeaveSeat)
+	api.POST("/rooms/:id/start", handler.StartMatch)
+	api.POST("/rooms/:id/kick", handler.KickPlayer)
+	api.POST("/rooms/:id/swap-seats", handler.SwapSeats)
+	api.POST("/rooms/:id/transfer-ownership", handler.TransferOwnership)
+	api.POST("/rooms/:id/bots", handler.AddBot)
+	api.DELETE("/rooms/:id/bots/:seat", handler.RemoveBot)
+}
+
+// setupTestWithPresence mirrors setupTest but injects a caller-controlled
+// presence registry so tests can mark seated members "present". Required since
+// Story 9.3 gates owner-transfer on present-AND-solvent and direct repo seeding
+// bypasses the join/return paths that populate presence in production.
+func setupTestWithPresence() (*echo.Echo, *mockRoomRepo, *room.PresenceRegistry) {
+	repo := newMockRoomRepo()
+	reg := room.NewPresenceRegistry()
+	handler := room.NewRoomHandler(repo, nil, &mockBroadcaster{}, reg, nil)
+
+	e := echo.New()
+	e.HTTPErrorHandler = testErrorHandler
+	api := e.Group("/api/v1", auth.AuthMiddleware("test-jwt-secret"))
+	registerRoomRoutes(api, handler)
+
+	return e, repo, reg
+}
+
+// setupTestWithBroadcastAndPresence is setupTestWithBroadcast plus a caller-
+// controlled presence registry (Story 9.3).
+func setupTestWithBroadcastAndPresence() (*echo.Echo, *mockRoomRepo, *mockBroadcaster, *room.PresenceRegistry) {
+	repo := newMockRoomRepo()
+	broadcaster := &mockBroadcaster{}
+	reg := room.NewPresenceRegistry()
+	handler := room.NewRoomHandler(repo, nil, broadcaster, reg, nil)
+
+	e := echo.New()
+	e.HTTPErrorHandler = testErrorHandler
+	api := e.Group("/api/v1", auth.AuthMiddleware("test-jwt-secret"))
+	registerRoomRoutes(api, handler)
+
+	return e, repo, broadcaster, reg
 }
 
 func doCreateRoom(e *echo.Echo, body string, token string) *httptest.ResponseRecorder {
@@ -1186,7 +1241,7 @@ func TestLeaveRoom_NotInRoom(t *testing.T) {
 }
 
 func TestLeaveRoom_OwnerTransfersOwnership(t *testing.T) {
-	e, repo := setupTest()
+	e, repo, reg := setupTestWithPresence()
 	token := validToken(1) // user 1 is the owner (seedRoom sets OwnerID=1)
 
 	seedRoom(repo, "Owner Leave", "waiting")
@@ -1197,6 +1252,11 @@ func TestLeaveRoom_OwnerTransfersOwnership(t *testing.T) {
 		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
 		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, Seat: intPtr(1), CreatedAt: time.Now().Add(time.Second)},
 	)
+	// Story 9.3: ownership transfers only to a PRESENT seated human. In
+	// production join/return populate presence; here the direct seeding does not,
+	// so mark the inheritor present explicitly. The room is free (CoinBuyIn 0) so
+	// solvency is trivially satisfied.
+	reg.Add(1, 20)
 
 	rec := doLeaveRoom(e, "1", token)
 
@@ -1247,15 +1307,18 @@ func TestLeaveRoom_Owner_NoSeatedHuman_ClosesRoom(t *testing.T) {
 // Ownership must skip an unseated member and go to a seated one, even when the
 // unseated member is listed first.
 func TestLeaveRoom_OwnerTransfersToSeated_NotUnseated(t *testing.T) {
-	e, repo := setupTest()
+	e, repo, reg := setupTestWithPresence()
 
 	seedRoom(repo, "Prefer Seated", "waiting")
 	repo.rooms[0].PlayerCount = 3
 	repo.players = append(repo.players,
 		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
-		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)},                     // unseated, first
+		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)},                      // unseated, first
 		&room.RoomPlayer{ID: 3, RoomID: 1, UserID: 30, Seat: intPtr(2), CreatedAt: time.Now().Add(2 * time.Second)}, // seated
 	)
+	// Both candidates present (Story 9.3); only the seated one (30) is eligible.
+	reg.Add(1, 20)
+	reg.Add(1, 30)
 
 	rec := doLeaveRoom(e, "1", validToken(1))
 
@@ -1727,16 +1790,16 @@ func seedQuickPlayRoom(repo *mockRoomRepo, code string, seatedUserIDs ...uint) *
 }
 
 func decodeQuickJoinData(t *testing.T, rec *httptest.ResponseRecorder) struct {
-	Room        room.Room `json:"room"`
-	Seat        int       `json:"seat"`
+	Room         room.Room `json:"room"`
+	Seat         int       `json:"seat"`
 	MatchStarted bool      `json:"matchStarted"`
 } {
 	t.Helper()
 	var resp map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -1886,8 +1949,8 @@ func TestQuickPlay_CreatesNewRoom(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -1943,8 +2006,8 @@ func TestQuickPlay_JoinsExistingRoom(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -2035,8 +2098,8 @@ func TestQuickPlay_SkipsNonQuickPlayRooms(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -2080,8 +2143,8 @@ func TestQuickPlay_FillsFirstEmptySeat(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -2137,8 +2200,8 @@ func TestQuickPlay_AutoStartsOnFourthJoiner(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -2228,22 +2291,24 @@ func TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying(t *testing.T) {
 // --- Test fakes for Story 8.5-1 AC2 (gameStarter) ---
 
 type fakeMatchStarter struct {
-	called      int
-	lastRoom    uint
-	lastPlayers [4]match.PlayerSeatInfo
-	err         error
+	called        int
+	lastRoom      uint
+	lastPlayers   [4]match.PlayerSeatInfo
+	lastCoinBuyIn int
+	err           error
 }
 
-func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [4]match.PlayerSeatInfo, _ string, _ int, _ uint, _ int) error {
+func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [4]match.PlayerSeatInfo, _ string, _ int, _ uint, _ int, coinBuyIn int) error {
 	g.called++
 	g.lastRoom = roomID
 	g.lastPlayers = players
+	g.lastCoinBuyIn = coinBuyIn
 	return g.err
 }
 
 func setupTestWithStarter(starter room.MatchStarter, broadcaster room.Broadcaster) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, starter, broadcaster, nil)
+	handler := room.NewRoomHandler(repo, starter, broadcaster, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -2482,8 +2547,8 @@ func TestQuickPlay_RetriesOnErrRoomFull(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 	var data struct {
-		Room        room.Room `json:"room"`
-		Seat        int       `json:"seat"`
+		Room         room.Room `json:"room"`
+		Seat         int       `json:"seat"`
 		MatchStarted bool      `json:"matchStarted"`
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
@@ -2712,12 +2777,13 @@ func TestLeaveRoom_BroadcastsPlayerLeft(t *testing.T) {
 }
 
 func TestLeaveRoom_OwnerTransfer_BroadcastsNewOwner(t *testing.T) {
-	e, repo, broadcaster := setupTestWithBroadcast()
+	e, repo, broadcaster, reg := setupTestWithBroadcastAndPresence()
 
 	ownerRoom := &room.Room{Name: "Owner Leave", OwnerID: 100, Status: "waiting", PlayerCount: 2}
 	_ = repo.Create(ownerRoom)
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 100, Username: "Owner", Seat: intPtr(0)})
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 200, Username: "Player2", Seat: intPtr(1)})
+	reg.Add(ownerRoom.ID, 200) // Story 9.3: heir must be present
 
 	// Owner (100) leaves — ownership should transfer to seated player 200
 	token := validToken(100)
@@ -3080,13 +3146,16 @@ func TestKickPlayer_NotInRoom(t *testing.T) {
 // after the original owner leaves and ownership transfers, the original
 // owner's authorization no longer survives the in-tx ownership re-check.
 func TestKickPlayer_PreviousOwnerLosesPermission(t *testing.T) {
-	e, repo := setupTest()
+	e, repo, reg := setupTestWithPresence()
 
 	r := &room.Room{Name: "Kick Race", OwnerID: 100, Status: "waiting", PlayerCount: 3}
 	require.NoError(t, repo.Create(r))
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 100, Username: "A", Seat: intPtr(0)}))
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "B", Seat: intPtr(1)}))
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 300, Username: "C", Seat: intPtr(2)}))
+	// Story 9.3: heir must be present for the transfer on owner-leave.
+	reg.Add(r.ID, 200)
+	reg.Add(r.ID, 300)
 
 	// A leaves first — ownership transfers to seated player B (200)
 	leaveRec := doLeaveRoom(e, "1", validToken(100))

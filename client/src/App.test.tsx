@@ -5,13 +5,16 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { App } from "@/App";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { LobbyPage } from "@/features/lobby/LobbyPage";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 vi.mock("@/shared/api/auth", () => ({
   login: vi.fn(),
-  refresh: vi.fn(),
+  // Reject so useAuthInit settles to the logged-out landing page when <App />
+  // is rendered (no real session in jsdom).
+  refresh: vi.fn(() => Promise.reject(new Error("no session"))),
   logout: vi.fn(),
 }));
 
@@ -60,5 +63,16 @@ describe("App routing", () => {
 
     expect(screen.getByTestId("quick-play-card")).toBeInTheDocument();
     expect(screen.getByTestId("create-room-card")).toBeInTheDocument();
+  });
+
+  // Regression guard: the sonner <Toaster> host must be mounted at the app
+  // root. Without it, every toast.*() call (join/settlement feedback, auth
+  // errors) is silently invisible even though the calls succeed — a bug that
+  // unit tests miss because they mock `toast`. The Toaster renders an
+  // aria-label="Notifications …" region regardless of route or auth state.
+  it("mounts the global sonner Toaster so toasts are visible app-wide", async () => {
+    render(<App />);
+
+    expect(await screen.findByRole("region", { name: /notifications/i })).toBeInTheDocument();
   });
 });

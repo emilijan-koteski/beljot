@@ -19,6 +19,8 @@ vi.mock("react-i18next", () => ({
       if (key === "match.matchResult.surrenderNote" && opts) {
         return `${opts.username} surrendered the match`;
       }
+      if (key === "match.settlement.won" && opts) return `You won ${opts.amount} coins`;
+      if (key === "match.settlement.lost" && opts) return `You lost ${opts.amount} coins`;
       return translations[key] ?? key;
     },
   }),
@@ -42,6 +44,7 @@ interface RenderOverrides {
   onReturnToLobby?: () => void;
   onReturnToRoom?: () => void;
   surrenderedByUsername?: string;
+  coinDelta?: number;
 }
 
 function renderResult(overrides: RenderOverrides = {}) {
@@ -51,6 +54,7 @@ function renderResult(overrides: RenderOverrides = {}) {
     onReturnToLobby: overrides.onReturnToLobby ?? vi.fn(),
     onReturnToRoom: overrides.onReturnToRoom ?? vi.fn(),
     surrenderedByUsername: overrides.surrenderedByUsername,
+    coinDelta: overrides.coinDelta,
   };
   return render(<MatchResult {...props} />);
 }
@@ -174,5 +178,30 @@ describe("MatchResult", () => {
     });
     const note = screen.getByTestId("match-result-surrender-note");
     expect(note).toHaveTextContent(/your opponent/);
+  });
+
+  // Story 9.2 — coin outcome moved from a transient toast into this dialog.
+  it("renders the won amount with a positive coin delta", () => {
+    renderResult({ coinDelta: 500 });
+    const coins = screen.getByTestId("match-result-coins");
+    expect(coins).toHaveTextContent("You won 500 coins");
+    expect(coins).toHaveAttribute("data-coin-delta", "500");
+  });
+
+  it("renders the lost amount (as a positive number) with a negative coin delta", () => {
+    renderResult({ coinDelta: -500 });
+    const coins = screen.getByTestId("match-result-coins");
+    expect(coins).toHaveTextContent("You lost 500 coins");
+    expect(coins).toHaveAttribute("data-coin-delta", "-500");
+  });
+
+  it("renders no coin line on a zero delta (lone winner who only recovers their stake)", () => {
+    renderResult({ coinDelta: 0 });
+    expect(screen.queryByTestId("match-result-coins")).toBeNull();
+  });
+
+  it("renders no coin line for a free match (coinDelta undefined)", () => {
+    renderResult({});
+    expect(screen.queryByTestId("match-result-coins")).toBeNull();
   });
 });

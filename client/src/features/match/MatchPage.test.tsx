@@ -425,6 +425,7 @@ describe("MatchPage", () => {
         status: "in_progress",
         playerCount: 4,
         isQuickPlay: false,
+        coinBuyIn: 0,
         createdAt: "",
         updatedAt: "",
       },
@@ -468,6 +469,73 @@ describe("MatchPage", () => {
     });
 
     expect(screen.getByTestId("error-toast")).toHaveTextContent(message);
+  });
+
+  // Story 9.3 AC1: an insolvent return is rejected with 409 INSUFFICIENT_COINS.
+  // Unlike the other return errors, the seat is gone server-side, so we clear
+  // match state and route to the lobby instead of keeping the result overlay.
+  it("routes to the lobby (no overlay toast) when return-to-room is rejected for insolvency", async () => {
+    mockGetRoom.mockResolvedValue({
+      room: {
+        id: 1,
+        name: "R",
+        code: "ABC123",
+        ownerId: 10,
+        ownerUsername: "alice",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "completed",
+        playerCount: 4,
+        isQuickPlay: false,
+        coinBuyIn: 500,
+        createdAt: "",
+        updatedAt: "",
+      },
+      players: [
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "alice",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
+      ],
+      returnedUserIds: [],
+    });
+    mockReturnToRoom.mockRejectedValueOnce(new FetchError(409, "INSUFFICIENT_COINS", "x"));
+
+    useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
+    useMatchStore.getState().setMyPlayerSeat(0);
+    useMatchStore.getState().setMatchEndData({
+      winnerTeam: 0,
+      teamAFinalScore: 1020,
+      teamBFinalScore: 850,
+      matchDurationSec: 300,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/match/1"]}>
+        <Routes>
+          <Route path="/match/:roomId" element={<MatchPage />} />
+          <Route path="/lobby" element={<div data-testid="lobby-marker" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("match-result")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("match-result-room-btn"));
+    });
+
+    expect(screen.getByTestId("lobby-marker")).toBeInTheDocument();
+    expect(screen.queryByTestId("error-toast")).not.toBeInTheDocument();
+    expect(useMatchStore.getState().matchEndData).toBeNull();
   });
 
   it("shows error toast when lastError is set and dismisses it on close button click", () => {

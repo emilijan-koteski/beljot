@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
 import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
+import { InsolventEjectionModal } from "@/features/lobby/components/InsolventEjectionModal";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
 import { Toast } from "@/features/lobby/components/Toast";
@@ -18,6 +19,8 @@ import {
 } from "@/shared/hooks/mutations/useRooms";
 import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
+import { formatCoins } from "@/shared/lib/formatCoins";
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room } from "@/shared/types/apiTypes";
 
 function filterAndSort(
@@ -118,7 +121,11 @@ export function LobbyPage() {
         goToMatchmaking(await quickJoinMutation.mutateAsync(room.id));
       } catch (err) {
         const code = err instanceof FetchError ? err.code : null;
+        // Quick-play rooms are free in Story 9.2, so INSUFFICIENT_COINS is not
+        // expected here — keep a generic fallback for forward-compat (Story 9.4).
         if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
+        else if (code === "INSUFFICIENT_COINS")
+          toast.error(t("room.errors.insufficientCoinsGeneric"));
         else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
         else toast.error(t("lobby.errors.joinFailed"));
       }
@@ -133,6 +140,15 @@ export function LobbyPage() {
       setToastMsg(null);
       const code = err instanceof FetchError ? err.code : null;
       if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
+      else if (code === "INSUFFICIENT_COINS")
+        // Compose the rich message locally — we know the room's buy-in and our
+        // own balance (Design Decision B: the error payload carries only a code).
+        toast.error(
+          t("room.errors.insufficientCoins", {
+            buyIn: formatCoins(room.coinBuyIn),
+            balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
+          }),
+        );
       else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
       else toast.error(t("lobby.errors.joinFailed"));
     }
@@ -170,6 +186,7 @@ export function LobbyPage() {
       </p>
 
       <CreateRoomModal open={showCreate} onOpenChange={setShowCreate} />
+      <InsolventEjectionModal />
       <LobbyChatDock />
       <Toast message={toastMsg} onClear={() => setToastMsg(null)} />
     </div>

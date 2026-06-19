@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { handleWsMessage as handleRoomListMessage } from "@/features/lobby/useRoomUpdates";
 import { MOTION } from "@/shared/lib/motion";
+import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
@@ -15,9 +16,11 @@ import type {
   BotRemovedPayload,
   CardPlayedPayload,
   ChatMessagePayload,
+  CoinSettlementPayload,
   DeclarationsResolvedPayload,
   EmotePayload,
   HandScoredPayload,
+  InsolventEjectedPayload,
   MatchAbandonedPayload,
   MatchEndPayload,
   MatchResumedPayload,
@@ -28,6 +31,7 @@ import type {
   PlayerLeftPayload,
   PlayerReconnectedPayload,
   PlayerReturnedPayload,
+  RoomClosedInsolventPayload,
   RoomKickedPayload,
   RoomOwnerChangedPayload,
   SeatUpdatedPayload,
@@ -53,6 +57,7 @@ import {
   EVENT_AUTO_ACTION,
   EVENT_BELOT_ANNOUNCED,
   EVENT_CARD_PLAYED,
+  EVENT_COIN_SETTLEMENT,
   EVENT_DECLARATIONS_RESOLVED,
   EVENT_HAND_SCORED,
   EVENT_MATCH_ABANDONED,
@@ -72,10 +77,12 @@ import {
   SYSTEM_BOT_REMOVED,
   SYSTEM_CHAT_MESSAGE,
   SYSTEM_EMOTE,
+  SYSTEM_INSOLVENT_EJECTED,
   SYSTEM_MATCH_STARTED,
   SYSTEM_PLAYER_JOINED,
   SYSTEM_PLAYER_LEFT,
   SYSTEM_PLAYER_RETURNED,
+  SYSTEM_ROOM_CLOSED_INSOLVENT,
   SYSTEM_ROOM_CREATED,
   SYSTEM_ROOM_KICKED,
   SYSTEM_ROOM_OWNER_CHANGED,
@@ -258,6 +265,35 @@ function dispatchGameEvent(message: WsMessage): void {
       });
     }
     store.setMatchEndData(payload);
+    // Reset any prior settlement so the result dialog never shows a stale
+    // coin delta — the matching event:coin_settlement (if this match had a
+    // buy-in) arrives immediately after per the ordering contract and sets it.
+    store.setCoinSettlement(null);
+    return;
+  }
+
+  if (type === EVENT_COIN_SETTLEMENT) {
+    // Story 9.2: per-human coin settlement, arriving right after match_end while
+    // still on the match page. Update the persisted wallet balance on authStore
+    // (balance lives on authStore.user, NOT gameStore — it must survive the
+    // later navigation away that wipes gameStore) and stash the settlement on
+    // the match store so the end-of-match score dialog reports the won/lost
+    // amount. No toast — the result dialog is the single place that shows it.
+    const payload = message.payload as CoinSettlementPayload;
+    // Defensive validation — Go zero values are real values, so guard on type,
+    // not truthiness (a 0 delta/balance is legitimate).
+    if (
+      !Number.isInteger(payload.coinDelta) ||
+      !Number.isInteger(payload.newBalance) ||
+      !Number.isInteger(payload.pot)
+    ) {
+      return;
+    }
+    const auth = useAuthStore.getState();
+    if (auth.user) {
+      auth.setUser({ ...auth.user, walletBalance: payload.newBalance });
+    }
+    store.setCoinSettlement(payload);
     return;
   }
 
@@ -553,6 +589,48 @@ function dispatchSystemEvent(message: WsMessage): void {
     // kickedFromRoomId that traps them on a later re-entry to the same room.
     if (store.currentRoomId !== payload.roomId) return;
     store.setKickedFromRoom(payload.roomId);
+    return;
+  }
+
+  // Story 9.3 AC5: per-user push to a player ejected at match start (or barred
+  // at return time) for insolvency. Gated on NOTHING — it is a direct per-user
+  // event (the player may be on the room page, the match result overlay, or
+  // elsewhere). Sets the single ejection signal that the always-mounted redirect
+  // routes to the lobby and the lobby modal consumes. Validate the shape first.
+  if (type === SYSTEM_INSOLVENT_EJECTED) {
+    const payload = message.payload as InsolventEjectedPayload;
+    if (
+      typeof payload?.roomId !== "number" ||
+      typeof payload?.buyIn !== "number" ||
+      typeof payload?.balance !== "number"
+    ) {
+      console.warn("WS: ignoring malformed system:insolvent_ejected payload", payload);
+      return;
+    }
+    useRoomStore.getState().setInsolventEjection({
+      roomId: payload.roomId,
+      buyIn: payload.buyIn,
+      balance: payload.balance,
+      reason: "ejected",
+    });
+    return;
+  }
+
+  // Story 9.3 AC4: the room closed because no present-and-solvent player could
+  // own it. Route every still-seated recipient to the lobby with the room-closed
+  // notice (balance/buy-in are not meaningful here, so they are zeroed).
+  if (type === SYSTEM_ROOM_CLOSED_INSOLVENT) {
+    const payload = message.payload as RoomClosedInsolventPayload;
+    if (typeof payload?.roomId !== "number") {
+      console.warn("WS: ignoring malformed system:room_closed_insolvent payload", payload);
+      return;
+    }
+    useRoomStore.getState().setInsolventEjection({
+      roomId: payload.roomId,
+      buyIn: 0,
+      balance: 0,
+      reason: "roomClosed",
+    });
     return;
   }
 

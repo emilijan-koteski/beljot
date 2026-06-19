@@ -84,6 +84,7 @@ const room = {
   status: "waiting",
   playerCount: 1,
   isQuickPlay: false,
+  coinBuyIn: 0,
   createdAt: "",
   updatedAt: "",
 };

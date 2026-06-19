@@ -28,6 +28,7 @@ function room(id: number, extra: Record<string, unknown> = {}): Room {
     status: "waiting",
     playerCount: 1,
     isQuickPlay: false,
+    coinBuyIn: 0,
     players: [],
     createdAt: "",
     updatedAt: "",

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { formatLocalizedDate } from "@/shared/lib/formatDate";
 
 import { daysSince } from "../lib/format";
@@ -149,7 +150,7 @@ export function IdentityHero({
             {/* Matches the header coin pill: neutral surface + border, ink
                 number, off-theme gold coin icon (see COIN_GOLD). */}
             <HeroPill
-              value={walletBalance.toLocaleString()}
+              value={formatCoins(walletBalance)}
               label={t("wallet.balanceLabel")}
               icon={<Coins className="size-3.5" style={{ color: COIN_GOLD }} aria-hidden="true" />}
               tone="neutral"

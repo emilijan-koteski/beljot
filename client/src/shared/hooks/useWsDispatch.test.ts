@@ -16,10 +16,11 @@ import { toast } from "sonner";
 
 import { queryClient } from "@/shared/api/queryClient";
 import { queryKeys } from "@/shared/api/queryKeys";
+import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
-import type { Room } from "@/shared/types/apiTypes";
+import type { Room, User } from "@/shared/types/apiTypes";
 import type { MatchState } from "@/shared/types/matchTypes";
 import type { WsMessage } from "@/shared/types/wsEvents";
 
@@ -176,6 +177,7 @@ describe("useWsDispatch", () => {
         status: "waiting",
         playerCount: 1,
         isQuickPlay: false,
+        coinBuyIn: 0,
         createdAt: "2026-04-12T00:00:00Z",
         updatedAt: "2026-04-12T00:00:00Z",
       },
@@ -224,6 +226,7 @@ describe("useWsDispatch", () => {
         status: "waiting",
         playerCount: 4,
         isQuickPlay: false,
+        coinBuyIn: 0,
         createdAt: "2026-04-12T00:00:00Z",
         updatedAt: "2026-04-12T00:00:00Z",
       },
@@ -995,6 +998,73 @@ describe("useWsDispatch", () => {
     expect(useRoomStore.getState().kickedFromRoomId).toBeNull();
   });
 
+  // --- Insolvency ejection (Story 9.3) ---
+
+  it("dispatches system:insolvent_ejected to roomStore as an 'ejected' signal", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:insolvent_ejected",
+      payload: { roomId: 7, buyIn: 500, balance: 120 },
+    });
+
+    expect(useRoomStore.getState().insolventEjection).toEqual({
+      roomId: 7,
+      buyIn: 500,
+      balance: 120,
+      reason: "ejected",
+    });
+  });
+
+  it("dispatches system:insolvent_ejected regardless of currentRoomId (direct per-user push)", () => {
+    // currentRoomId is null (player not on any room page) — the event must still
+    // set the signal because it is a direct per-user push.
+    expect(useRoomStore.getState().currentRoomId).toBeNull();
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:insolvent_ejected",
+      payload: { roomId: 3, buyIn: 1000, balance: 0 },
+    });
+
+    expect(useRoomStore.getState().insolventEjection?.reason).toBe("ejected");
+    expect(useRoomStore.getState().insolventEjection?.roomId).toBe(3);
+  });
+
+  it("ignores a malformed system:insolvent_ejected payload", () => {
+    // reset() deliberately preserves insolventEjection (so the lobby modal
+    // survives RoomPage's unmount), so clear it explicitly for this assertion.
+    useRoomStore.getState().setInsolventEjection(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:insolvent_ejected",
+      payload: { roomId: "7", buyIn: 500 } as never,
+    });
+
+    expect(useRoomStore.getState().insolventEjection).toBeNull();
+  });
+
+  it("dispatches system:room_closed_insolvent to roomStore as a 'roomClosed' signal", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:room_closed_insolvent",
+      payload: { roomId: 9 },
+    });
+
+    expect(useRoomStore.getState().insolventEjection).toEqual({
+      roomId: 9,
+      buyIn: 0,
+      balance: 0,
+      reason: "roomClosed",
+    });
+  });
+
   // --- Surrender (Story 8.2) ---
 
   it("dispatches event:surrender_proposed to matchStore.surrenderProposed", () => {
@@ -1360,5 +1430,109 @@ describe("useWsDispatch", () => {
       2: null,
       3: null,
     });
+  });
+});
+
+describe("useWsDispatch — coin settlement (Story 9.2)", () => {
+  const baseUser: User = {
+    id: 10,
+    username: "Alice",
+    email: "alice@test.dev",
+    languagePreference: "en",
+    walletBalance: 5000,
+    loginStreakDays: 0,
+    createdAt: "2026-06-18T00:00:00Z",
+  };
+
+  beforeEach(() => {
+    useMatchStore.getState().reset();
+    __resetWsDispatchStateForTests();
+    vi.restoreAllMocks();
+    useAuthStore.setState({ user: { ...baseUser } });
+  });
+
+  it("updates authStore walletBalance and stores the settlement on a positive delta (no toast)", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:coin_settlement",
+      payload: { coinDelta: 500, newBalance: 5500, pot: 2000 },
+    });
+
+    expect(useAuthStore.getState().user?.walletBalance).toBe(5500);
+    expect(useMatchStore.getState().coinSettlement).toEqual({
+      coinDelta: 500,
+      newBalance: 5500,
+      pot: 2000,
+    });
+    // The win/loss amount now lives in the result dialog, not a toast.
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("updates balance and stores the settlement on a negative delta (no toast)", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:coin_settlement",
+      payload: { coinDelta: -500, newBalance: 4500, pot: 2000 },
+    });
+
+    expect(useAuthStore.getState().user?.walletBalance).toBe(4500);
+    expect(useMatchStore.getState().coinSettlement?.coinDelta).toBe(-500);
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("stores a zero-delta settlement (dialog decides not to render it)", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:coin_settlement",
+      payload: { coinDelta: 0, newBalance: 5000, pot: 1000 },
+    });
+
+    expect(useAuthStore.getState().user?.walletBalance).toBe(5000);
+    expect(useMatchStore.getState().coinSettlement?.coinDelta).toBe(0);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("ignores a malformed settlement payload without touching balance or store", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const malformed = [
+      { coinDelta: "500", newBalance: 5500, pot: 2000 },
+      { coinDelta: 500, newBalance: null, pot: 2000 },
+      { coinDelta: 1.5, newBalance: 5500, pot: 2000 },
+      {},
+    ];
+    for (const payload of malformed) {
+      result.current({ type: "event:coin_settlement", payload });
+    }
+
+    expect(useAuthStore.getState().user?.walletBalance).toBe(5000);
+    expect(useMatchStore.getState().coinSettlement).toBeNull();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("clears a prior settlement when a new match_end arrives", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:coin_settlement",
+      payload: { coinDelta: 500, newBalance: 5500, pot: 2000 },
+    });
+    expect(useMatchStore.getState().coinSettlement).not.toBeNull();
+
+    result.current({
+      type: "event:match_end",
+      payload: {
+        winnerTeam: 0,
+        teamAFinalScore: 1001,
+        teamBFinalScore: 700,
+        matchDurationSec: 120,
+      },
+    });
+
+    // match_end resets the settlement so a subsequent free match can't show
+    // the previous match's coin delta in the result dialog.
+    expect(useMatchStore.getState().coinSettlement).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -112,7 +113,7 @@ export function TopBar({
           >
             <Coins className="size-4" style={{ color: COIN_GOLD }} aria-hidden="true" />
             <span className="text-ink text-sm font-semibold tabular-nums">
-              {user.walletBalance.toLocaleString()}
+              {formatCoins(user.walletBalance)}
             </span>
           </div>
         )}

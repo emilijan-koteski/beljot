@@ -45,6 +45,8 @@ export interface Room {
   matchMode: string;
   timerStyle: string;
   timerDurationSeconds: number | null;
+  /** Per-human coin stake paid at match start (Story 9.2). 0 = free room. */
+  coinBuyIn: number;
   status: string;
   playerCount: number;
   isQuickPlay: boolean;
@@ -58,6 +60,8 @@ export interface CreateRoomRequest {
   matchMode: string;
   timerStyle: string;
   timerDurationSeconds: number | null;
+  /** Per-human coin stake (Story 9.2). min 0, no max; omitted → server default 500. */
+  coinBuyIn: number;
 }
 
 export interface RoomPlayer {

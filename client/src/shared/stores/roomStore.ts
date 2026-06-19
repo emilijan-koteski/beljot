@@ -2,6 +2,18 @@ import { create } from "zustand";
 
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
+// Insolvency-ejection notice (Story 9.3). Set by the return-time 409 handler
+// (MatchPage), the per-user system:insolvent_ejected event, and the
+// system:room_closed_insolvent event — all three feed this single field so the
+// lobby arrival modal is the one consumer. `reason` selects the copy:
+// "ejected" shows balance vs buy-in; "roomClosed" shows the room-closed notice.
+export interface InsolventEjection {
+  roomId: number;
+  buyIn: number;
+  balance: number;
+  reason: "ejected" | "roomClosed";
+}
+
 export interface RoomState {
   room: Room | null;
   players: RoomPlayer[];
@@ -12,6 +24,8 @@ export interface RoomState {
   matchStartedRoomId: number | null;
   currentRoomId: number | null;
   kickedFromRoomId: number | null;
+  // Insolvency-ejection notice consumed by the lobby arrival modal (Story 9.3).
+  insolventEjection: InsolventEjection | null;
   // User IDs of players "present" in a reopened room (returned via "Return to
   // room" or freshly joined). The owner Start button is gated on every seated
   // human appearing here; seats whose human is absent show "waiting to return".
@@ -38,6 +52,7 @@ export interface RoomState {
   setMatchStarted: (started: boolean) => void;
   setMatchStartedRoomId: (roomId: number | null) => void;
   setKickedFromRoom: (roomId: number | null) => void;
+  setInsolventEjection: (ejection: InsolventEjection | null) => void;
   reset: () => void;
 }
 
@@ -48,6 +63,7 @@ const initialState = {
   matchStartedRoomId: null,
   currentRoomId: null,
   kickedFromRoomId: null,
+  insolventEjection: null as InsolventEjection | null,
   returnedUserIds: [] as number[],
 };
 
@@ -136,5 +152,11 @@ export const useRoomStore = create<RoomState>((set) => ({
 
   setKickedFromRoom: (kickedFromRoomId) => set({ kickedFromRoomId }),
 
-  reset: () => set(initialState),
+  setInsolventEjection: (insolventEjection) => set({ insolventEjection }),
+
+  // Preserve the insolvency-ejection notice across reset: RoomPage calls reset()
+  // on unmount, which fires while we are navigating the ejected player to the
+  // lobby — wiping it here would deny the lobby modal its one chance to render.
+  // The modal clears the field itself on close (Story 9.3).
+  reset: () => set((state) => ({ ...initialState, insolventEjection: state.insolventEjection })),
 }));

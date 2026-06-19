@@ -2,6 +2,7 @@ import {
   Bot,
   ChevronDown,
   Clock,
+  Coins,
   Crown,
   Shuffle,
   Sparkles,
@@ -46,6 +47,8 @@ import {
 } from "@/shared/hooks/mutations/useRooms";
 import { useRoomDetailQuery } from "@/shared/hooks/queries/useRooms";
 import { botDisplayName } from "@/shared/lib/botName";
+import { COIN_GOLD } from "@/shared/lib/coinGold";
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -143,6 +146,7 @@ export function RoomPage() {
   const storePlayers = useRoomStore((s) => s.players);
   const matchStarted = useRoomStore((s) => s.matchStarted);
   const kickedFromRoomId = useRoomStore((s) => s.kickedFromRoomId);
+  const insolventEjection = useRoomStore((s) => s.insolventEjection);
   const returnedUserIds = useRoomStore((s) => s.returnedUserIds);
 
   const hasLeftRef = useRef(false);
@@ -232,7 +236,14 @@ export function RoomPage() {
         }
         hasLeftRef.current = true; // suppress the unmount cleanup-leave
         toast.error(
-          code === "ROOM_FULL" ? t("lobby.errors.roomFull") : t("lobby.errors.joinFailed"),
+          code === "ROOM_FULL"
+            ? t("lobby.errors.roomFull")
+            : code === "INSUFFICIENT_COINS"
+              ? t("room.errors.insufficientCoins", {
+                  buyIn: formatCoins(room.coinBuyIn),
+                  balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
+                })
+              : t("lobby.errors.joinFailed"),
         );
         navigate("/lobby", { replace: true });
       });
@@ -303,6 +314,17 @@ export function RoomPage() {
       navigate("/lobby");
     }
   }, [kickedFromRoomId, id, navigate, storeRoom?.name, t]);
+
+  // Story 9.3: when WE are ejected for insolvency at match start, the server has
+  // already freed our seat, so suppress the unmount auto-leave (it would 404 and
+  // log a console error). The always-mounted useInsolventEjectRedirect handles
+  // the lobby navigation + modal; here we only quiet the cleanup-leave, mirroring
+  // the kick path above.
+  useEffect(() => {
+    if (insolventEjection !== null && id && insolventEjection.roomId === Number(id)) {
+      hasLeftRef.current = true;
+    }
+  }, [insolventEjection, id]);
 
   // Clear swap-mode whenever the room exits "waiting" status — owner controls
   // disappear in the same render, so a stale source-seat must not survive.
@@ -623,6 +645,11 @@ export function RoomPage() {
         toast.error(t("room.errors.notOwner"));
       } else if (err instanceof FetchError && err.code === "NOT_ALL_SEATED") {
         toast.error(t("room.errors.notAllSeated"));
+      } else if (err instanceof FetchError && err.code === "INSUFFICIENT_COINS") {
+        // A seated human went insolvent at the instant of start; the server
+        // rolled back the charge and reverted the room to waiting. (Full
+        // per-player ejection UX lands in Story 9.3.)
+        toast.error(t("room.errors.insufficientCoinsStart"));
       } else {
         toast.error(t("room.errors.startFailed"));
       }
@@ -1022,6 +1049,15 @@ export function RoomPage() {
                 </Badge>
                 <Badge tone={isRelaxed ? "accent" : "neutral"} icon={<Clock className="size-3" />}>
                   <span data-testid="badge-timer">{timerLabel}</span>
+                </Badge>
+                <Badge
+                  tone="brass"
+                  icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}
+                >
+                  <span data-testid="badge-buy-in">
+                    {/* Icon-only unit — the brass coin badge conveys "coins". */}
+                    {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
+                  </span>
                 </Badge>
                 {room.isQuickPlay && (
                   <Badge tone="accent" icon={<Zap className="size-3" />}>

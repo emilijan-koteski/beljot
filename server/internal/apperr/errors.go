@@ -88,6 +88,11 @@ var (
 	ErrBotsNotAllowed            = NewAppError("BOTS_NOT_ALLOWED", "bots cannot be added to this room", http.StatusConflict)
 	ErrNoBotOnSeat               = NewAppError("NO_BOT_ON_SEAT", "no bot occupies this seat", http.StatusNotFound)
 
+	// Economy domain errors (Epic 9). 409 Conflict (not 402) — the project's
+	// status set is 200/201/400/401/403/404/409/500. Surfaces from the join
+	// affordability check and the atomic match-start stake charge.
+	ErrInsufficientCoins = NewAppError("INSUFFICIENT_COINS", "insufficient coins", http.StatusConflict)
+
 	// Game domain errors
 	ErrWrongPhase              = NewAppError("WRONG_PHASE", "action not valid in current game phase", http.StatusBadRequest)
 	ErrNotYourTurn             = NewAppError("NOT_YOUR_TURN", "it is not your turn", http.StatusForbidden)

@@ -44,6 +44,10 @@ vi.mock("@/shared/providers/WebSocketContext", () => ({
   useWsConnectionState: () => "connected" as const,
 }));
 
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+
 afterEach(() => {
   vi.clearAllMocks();
 });
@@ -171,6 +175,7 @@ describe("LobbyPage", () => {
         status: "waiting",
         playerCount: 1,
         isQuickPlay: true,
+        coinBuyIn: 0,
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
         players: [
@@ -209,6 +214,7 @@ describe("LobbyPage", () => {
         status: "waiting",
         playerCount: 1,
         isQuickPlay: false,
+        coinBuyIn: 0,
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
         players: [
@@ -225,5 +231,60 @@ describe("LobbyPage", () => {
     await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9));
     expect(mockNavigate).toHaveBeenCalledWith("/rooms/9");
     expect(mockQuickJoin).not.toHaveBeenCalled();
+  });
+
+  it("shows the composed insufficient-coins toast when a join is rejected", async () => {
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    const { useAuthStore } = await import("@/shared/stores/authStore");
+    useAuthStore.setState({
+      user: {
+        id: 1,
+        username: "me",
+        email: "me@test.dev",
+        languagePreference: "en",
+        walletBalance: 300,
+        loginStreakDays: 0,
+        createdAt: "2026-06-18T00:00:00Z",
+      },
+    });
+
+    mockGetRooms.mockResolvedValueOnce([
+      {
+        id: 9,
+        name: "High Stakes",
+        code: "HIS123",
+        ownerId: 2,
+        ownerUsername: "host",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "waiting",
+        playerCount: 1,
+        isQuickPlay: false,
+        coinBuyIn: 500,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        players: [
+          { id: 1, roomId: 9, userId: 2, username: "host", seat: 0, team: "teamA", createdAt: "" },
+        ],
+      },
+    ]);
+    mockJoinRoom.mockRejectedValueOnce(
+      new FetchError(409, "INSUFFICIENT_COINS", "insufficient coins"),
+    );
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9));
+    // Message is composed locally from the room's buy-in (500) and our balance (300).
+    const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("500");
+    expect(msg).toContain("300");
+    expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
   });
 });
