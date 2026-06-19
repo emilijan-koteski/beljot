@@ -738,6 +738,9 @@
     "settlement": {
       "won": "You won {{amount}} coins",
       "lost": "You lost {{amount}} coins"
+    },
+    "stake": {
+      "label": "Stake"
     }
   },
   "auth": {

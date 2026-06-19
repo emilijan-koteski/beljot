@@ -31,6 +31,11 @@ export const Z = {
   TRICK: 10,
   /** Seats: avatars, names, opponent card-backs, and the resting hand. */
   SEATS: 20,
+  /** Persistent corner HUD chrome: scoreboard, trump indicator, match stake.
+   *  Above seat avatars (so a seat that drifts into a corner on small screens
+   *  can't occlude it — the score panel vs. the north partner avatar on phones),
+   *  but below flying cards and every dialog. */
+  HUD: 25,
   /** Flying cards — throws + the trick-collect sweep. Above seats so a card is
    *  never hidden by an avatar, but below every dialog. */
   CARD_FLIGHT: 30,

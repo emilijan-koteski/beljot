@@ -738,6 +738,9 @@
     "settlement": {
       "won": "Освои {{amount}} парички",
       "lost": "Изгуби {{amount}} парички"
+    },
+    "stake": {
+      "label": "Влог"
     }
   },
   "auth": {

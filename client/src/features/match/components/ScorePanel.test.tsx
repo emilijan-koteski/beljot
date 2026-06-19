@@ -21,6 +21,8 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+import { Z } from "@/shared/lib/zLayers";
+
 import { ScorePanel } from "./ScorePanel";
 
 describe("ScorePanel", () => {
@@ -57,6 +59,23 @@ describe("ScorePanel", () => {
     // Viewer is teamA, so the team-A row says "Us" and team-B says "Them"
     expect(screen.getByTestId("score-label-a")).toHaveTextContent("Us");
     expect(screen.getByTestId("score-label-b")).toHaveTextContent("Them");
+  });
+
+  it("renders the mobile scoreboard above the seat avatars (HUD z-tier)", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={100}
+        teamBScore={80}
+        teamATricks={1}
+        teamBTricks={0}
+      />,
+    );
+
+    // The north partner avatar sits at Z.SEATS; on phones the top-left panel
+    // overlaps it, so it must outrank the seats or it gets painted over.
+    expect(screen.getByTestId("score-panel-mobile").style.zIndex).toBe(String(Z.HUD));
+    expect(Z.HUD).toBeGreaterThan(Z.SEATS);
   });
 
   it("renders the 501 target next to scores when matchTarget is 501", () => {

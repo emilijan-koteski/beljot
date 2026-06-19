@@ -738,6 +738,9 @@
     "settlement": {
       "won": "Osvojio si {{amount}} novčića",
       "lost": "Izgubio si {{amount}} novčića"
+    },
+    "stake": {
+      "label": "Ulog"
     }
   },
   "auth": {

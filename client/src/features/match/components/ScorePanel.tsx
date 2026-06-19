@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION, motionDuration } from "@/shared/lib/motion";
+import { Z } from "@/shared/lib/zLayers";
 import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
@@ -222,8 +223,9 @@ export function ScorePanel({
           this-hand points (+N) and total / target. No heading, momentum bars,
           trick counts or hand/variant metadata; the desktop panel keeps those. */}
       <div
-        className="fixed top-3 left-3 z-10 flex flex-col gap-0.5 rounded-lg px-2.5 py-1.5 md:hidden"
+        className="fixed top-3 left-3 flex flex-col gap-0.5 rounded-lg px-2.5 py-1.5 md:hidden"
         style={{
+          zIndex: Z.HUD,
           background: PANEL_BG,
           border: PANEL_BORDER,
           boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
@@ -271,8 +273,9 @@ export function ScorePanel({
 
       {/* Desktop (md+): full felt scoreboard panel. */}
       <div
-        className="fixed top-4 left-4 z-10 hidden overflow-hidden rounded-xl md:block"
+        className="fixed top-4 left-4 hidden overflow-hidden rounded-xl md:block"
         style={{
+          zIndex: Z.HUD,
           background: PANEL_BG,
           border: PANEL_BORDER,
           boxShadow: "0 8px 24px rgba(0,0,0,0.3)",

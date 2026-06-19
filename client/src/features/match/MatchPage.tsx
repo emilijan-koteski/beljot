@@ -64,6 +64,7 @@ import { RulesDialog } from "./components/RulesDialog";
 import { ScorePanel } from "./components/ScorePanel";
 import { ScoreReveal } from "./components/ScoreReveal";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { StakePill } from "./components/StakePill";
 import { SurrenderButton, SurrenderConfirmDialog } from "./components/SurrenderButton";
 import { SurrenderOpponentBanner } from "./components/SurrenderOpponentBanner";
 import { SurrenderPrompt } from "./components/SurrenderPrompt";
@@ -283,6 +284,10 @@ export function MatchPage() {
   // the system:insolvent_ejected WS frame is dropped/late (the WS event remains
   // the canonical source and overwrites this when it lands).
   const roomBuyInRef = useRef<number | null>(null);
+  // Same buy-in lifted into state so the match-stake (pot) HUD can render it.
+  // The ref above stays the synchronous source for the return-time insolvency
+  // fallback; this drives a re-render once the mount-time getRoom resolves.
+  const [roomBuyIn, setRoomBuyIn] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   // Mobile HUD: the bottom action buttons collapse into a top-right hamburger.
@@ -773,8 +778,10 @@ export function MatchPage() {
     getRoom(roomIdNum)
       .then((detail) => {
         if (cancelled) return;
-        // Cache the room's buy-in for the return-time insolvency fallback (P4).
+        // Cache the room's buy-in for the return-time insolvency fallback (P4)
+        // and surface it to the match-stake HUD.
         roomBuyInRef.current = detail.room.coinBuyIn;
+        setRoomBuyIn(detail.room.coinBuyIn);
         const isPlayer = detail.players.some((p) => p.userId === user.id);
         if (!isPlayer) {
           setSplashIssue("notMember");
@@ -1281,6 +1288,13 @@ export function MatchPage() {
   // match-end decision itself is exclusively server-side.
   const matchTarget = matchState.matchMode === "501" ? 501 : 1001;
 
+  // Total match stake (the pot) — every human player's buy-in summed. Mirrors
+  // the server settlement math (computeSettlement: pot = numHumans × buyIn);
+  // bots never contribute. roomBuyIn is null until the mount-time getRoom
+  // resolves, so the stake reads 0 (pill hidden) until then. Display-only.
+  const matchStake =
+    roomBuyIn !== null ? matchState.players.filter((p) => !p.isBot).length * roomBuyIn : 0;
+
   // Pause state
   const isRoomOwner = myPlayerSeat !== null && matchState.ownerSeat === myPlayerSeat;
   const isPaused = matchState.phase === "paused";
@@ -1431,15 +1445,21 @@ export function MatchPage() {
         matchTarget={matchTarget}
       />
 
-      {/* Trump indicator - top right. Gated to play phases (AC 4.4.5) and
-          hidden behind any active overlay. The dealer is now indicated by a
-          chip on the dealer's avatar (Stage 2), so the standalone dealer pill
-          is no longer rendered here. */}
-      {!isOverlayActive &&
-        matchState.trumpSuit &&
-        matchState.phase !== "dealing" &&
-        matchState.phase !== "bidding" && (
-          <div className="absolute top-4 right-4 z-10 hidden md:block">
+      {/* Top-right HUD column (desktop): the trump indicator (gated to play
+          phases per AC 4.4.5, hidden behind any active overlay) with the
+          match-stake pill beneath it. The column is top-anchored and grows
+          downward — before trump is taken it holds only the stake, so the
+          stake sits at the top; once the indicator appears the stake drops
+          directly beneath it. The dealer is indicated by a chip on the dealer's
+          avatar (Stage 2), so no standalone dealer pill is rendered here. */}
+      <div
+        className="absolute top-4 right-4 hidden flex-col items-end gap-2 md:flex"
+        style={{ zIndex: Z.HUD }}
+      >
+        {!isOverlayActive &&
+          matchState.trumpSuit &&
+          matchState.phase !== "dealing" &&
+          matchState.phase !== "bidding" && (
             <TrumpIndicator
               trumpSuit={matchState.trumpSuit}
               trumpCallerSeat={matchState.trumpCallerSeat}
@@ -1453,8 +1473,9 @@ export function MatchPage() {
               }
               viewerTeam={viewerTeam}
             />
-          </div>
-        )}
+          )}
+        {matchStake > 0 && <StakePill amount={matchStake} />}
+      </div>
 
       {/* Player seats at compass positions */}
       {matchState.players.map((player) => {
@@ -1625,6 +1646,16 @@ export function MatchPage() {
             matchState.phase === "playing") &&
             matchEndData === null &&
             matchAbandonedData === null && <EmotePickerButton onSend={handleSendEmote} />}
+        </div>
+      )}
+
+      {/* Match-stake pill (mobile) — top-right, just left of the hamburger
+          (right-3 + size-9). Its own block, not gated on overlayPhase, so it
+          persists like the score panel; Z.HUD keeps it under dialogs/blockers
+          but above the partner avatar. */}
+      {matchStake > 0 && (
+        <div className="absolute top-3 right-14 md:hidden" style={{ zIndex: Z.HUD }}>
+          <StakePill amount={matchStake} />
         </div>
       )}
 

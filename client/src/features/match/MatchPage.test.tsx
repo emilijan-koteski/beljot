@@ -6,6 +6,7 @@ import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -193,6 +194,107 @@ describe("MatchPage", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  describe("match stake (pot) HUD", () => {
+    // Minimal room detail; userId 10 (the beforeEach user) is seated so the
+    // mount-time membership check passes and the table renders.
+    const roomDetail = (coinBuyIn: number) => ({
+      room: {
+        id: 1,
+        name: "R",
+        code: "ABC123",
+        ownerId: 10,
+        ownerUsername: "Alice",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "in_progress",
+        playerCount: 4,
+        isQuickPlay: false,
+        coinBuyIn,
+        createdAt: "",
+        updatedAt: "",
+      },
+      players: [
+        {
+          id: 1,
+          roomId: 1,
+          userId: 10,
+          username: "Alice",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
+      ],
+      returnedUserIds: [],
+    });
+
+    const renderAtRoom1 = () =>
+      render(
+        <MemoryRouter initialEntries={["/match/1"]}>
+          <Routes>
+            <Route path="/match/:roomId" element={<MatchPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+
+    it("shows the pot (humans × buy-in) once the room buy-in loads", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockGetRoom.mockResolvedValue(roomDetail(500) as any);
+      useMatchStore.getState().setMatchState(mockMatchState); // 4 humans
+      useMatchStore.getState().setMyPlayerSeat(0);
+
+      renderAtRoom1();
+      await act(async () => {});
+
+      // Both breakpoints render a pill in jsdom (CSS toggles visibility); each
+      // shows 4 × 500 = 2,000.
+      const amounts = screen.getAllByTestId("match-stake-amount");
+      expect(amounts.length).toBeGreaterThan(0);
+      for (const node of amounts) {
+        expect(node).toHaveTextContent(formatCoins(2000));
+      }
+    });
+
+    it("excludes bots from the pot", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockGetRoom.mockResolvedValue(roomDetail(500) as any);
+      const withBots: MatchState = {
+        ...mockMatchState,
+        players: [
+          mockMatchState.players[0],
+          { ...mockMatchState.players[1], isBot: true, userId: 0, username: "" },
+          mockMatchState.players[2],
+          { ...mockMatchState.players[3], isBot: true, userId: 0, username: "" },
+        ],
+      };
+      useMatchStore.getState().setMatchState(withBots);
+      useMatchStore.getState().setMyPlayerSeat(0);
+
+      renderAtRoom1();
+      await act(async () => {});
+
+      const amounts = screen.getAllByTestId("match-stake-amount");
+      expect(amounts.length).toBeGreaterThan(0);
+      for (const node of amounts) {
+        expect(node).toHaveTextContent(formatCoins(1000)); // 2 humans × 500
+      }
+    });
+
+    it("renders no stake pill for a free room (buy-in 0)", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockGetRoom.mockResolvedValue(roomDetail(0) as any);
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+
+      renderAtRoom1();
+      await act(async () => {});
+
+      expect(screen.queryAllByTestId("match-stake")).toHaveLength(0);
+    });
   });
 
   it("renders loading splash when matchState is null", () => {
