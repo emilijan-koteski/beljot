@@ -349,6 +349,14 @@
       "inMatch": "igraju",
       "online": "online"
     },
+    "insolventEjection": {
+      "eyebrow": "Pažnja",
+      "ejectedTitle": "Nemaš dovoljno novčića",
+      "ejectedBody": "Nemaš dovoljno novčića za ulog ove sobe. Stanje: {{balance}}. Ulog: {{buyIn}}.",
+      "roomClosedTitle": "Soba je zatvorena",
+      "roomClosedBody": "Ova soba je zatvorena jer nijedan preostali igrač nije mogao biti domaćin.",
+      "action": "U redu"
+    },
     "matchmaking": {
       "title": "Brza igra",
       "subtitle": "Smjestit ćemo te čim budu spremna još tri igrača. Meč počinje čim se popuni zadnje mjesto.",

@@ -998,6 +998,73 @@ describe("useWsDispatch", () => {
     expect(useRoomStore.getState().kickedFromRoomId).toBeNull();
   });
 
+  // --- Insolvency ejection (Story 9.3) ---
+
+  it("dispatches system:insolvent_ejected to roomStore as an 'ejected' signal", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:insolvent_ejected",
+      payload: { roomId: 7, buyIn: 500, balance: 120 },
+    });
+
+    expect(useRoomStore.getState().insolventEjection).toEqual({
+      roomId: 7,
+      buyIn: 500,
+      balance: 120,
+      reason: "ejected",
+    });
+  });
+
+  it("dispatches system:insolvent_ejected regardless of currentRoomId (direct per-user push)", () => {
+    // currentRoomId is null (player not on any room page) — the event must still
+    // set the signal because it is a direct per-user push.
+    expect(useRoomStore.getState().currentRoomId).toBeNull();
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:insolvent_ejected",
+      payload: { roomId: 3, buyIn: 1000, balance: 0 },
+    });
+
+    expect(useRoomStore.getState().insolventEjection?.reason).toBe("ejected");
+    expect(useRoomStore.getState().insolventEjection?.roomId).toBe(3);
+  });
+
+  it("ignores a malformed system:insolvent_ejected payload", () => {
+    // reset() deliberately preserves insolventEjection (so the lobby modal
+    // survives RoomPage's unmount), so clear it explicitly for this assertion.
+    useRoomStore.getState().setInsolventEjection(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:insolvent_ejected",
+      payload: { roomId: "7", buyIn: 500 } as never,
+    });
+
+    expect(useRoomStore.getState().insolventEjection).toBeNull();
+  });
+
+  it("dispatches system:room_closed_insolvent to roomStore as a 'roomClosed' signal", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:room_closed_insolvent",
+      payload: { roomId: 9 },
+    });
+
+    expect(useRoomStore.getState().insolventEjection).toEqual({
+      roomId: 9,
+      buyIn: 0,
+      balance: 0,
+      reason: "roomClosed",
+    });
+  });
+
   // --- Surrender (Story 8.2) ---
 
   it("dispatches event:surrender_proposed to matchStore.surrenderProposed", () => {

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
 import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
+import { InsolventEjectionModal } from "@/features/lobby/components/InsolventEjectionModal";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
 import { Toast } from "@/features/lobby/components/Toast";
@@ -185,6 +186,7 @@ export function LobbyPage() {
       </p>
 
       <CreateRoomModal open={showCreate} onOpenChange={setShowCreate} />
+      <InsolventEjectionModal />
       <LobbyChatDock />
       <Toast message={toastMsg} onClear={() => setToastMsg(null)} />
     </div>

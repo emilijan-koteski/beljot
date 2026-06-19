@@ -20,6 +20,7 @@ import type {
   DeclarationsResolvedPayload,
   EmotePayload,
   HandScoredPayload,
+  InsolventEjectedPayload,
   MatchAbandonedPayload,
   MatchEndPayload,
   MatchResumedPayload,
@@ -30,6 +31,7 @@ import type {
   PlayerLeftPayload,
   PlayerReconnectedPayload,
   PlayerReturnedPayload,
+  RoomClosedInsolventPayload,
   RoomKickedPayload,
   RoomOwnerChangedPayload,
   SeatUpdatedPayload,
@@ -75,10 +77,12 @@ import {
   SYSTEM_BOT_REMOVED,
   SYSTEM_CHAT_MESSAGE,
   SYSTEM_EMOTE,
+  SYSTEM_INSOLVENT_EJECTED,
   SYSTEM_MATCH_STARTED,
   SYSTEM_PLAYER_JOINED,
   SYSTEM_PLAYER_LEFT,
   SYSTEM_PLAYER_RETURNED,
+  SYSTEM_ROOM_CLOSED_INSOLVENT,
   SYSTEM_ROOM_CREATED,
   SYSTEM_ROOM_KICKED,
   SYSTEM_ROOM_OWNER_CHANGED,
@@ -585,6 +589,48 @@ function dispatchSystemEvent(message: WsMessage): void {
     // kickedFromRoomId that traps them on a later re-entry to the same room.
     if (store.currentRoomId !== payload.roomId) return;
     store.setKickedFromRoom(payload.roomId);
+    return;
+  }
+
+  // Story 9.3 AC5: per-user push to a player ejected at match start (or barred
+  // at return time) for insolvency. Gated on NOTHING — it is a direct per-user
+  // event (the player may be on the room page, the match result overlay, or
+  // elsewhere). Sets the single ejection signal that the always-mounted redirect
+  // routes to the lobby and the lobby modal consumes. Validate the shape first.
+  if (type === SYSTEM_INSOLVENT_EJECTED) {
+    const payload = message.payload as InsolventEjectedPayload;
+    if (
+      typeof payload?.roomId !== "number" ||
+      typeof payload?.buyIn !== "number" ||
+      typeof payload?.balance !== "number"
+    ) {
+      console.warn("WS: ignoring malformed system:insolvent_ejected payload", payload);
+      return;
+    }
+    useRoomStore.getState().setInsolventEjection({
+      roomId: payload.roomId,
+      buyIn: payload.buyIn,
+      balance: payload.balance,
+      reason: "ejected",
+    });
+    return;
+  }
+
+  // Story 9.3 AC4: the room closed because no present-and-solvent player could
+  // own it. Route every still-seated recipient to the lobby with the room-closed
+  // notice (balance/buy-in are not meaningful here, so they are zeroed).
+  if (type === SYSTEM_ROOM_CLOSED_INSOLVENT) {
+    const payload = message.payload as RoomClosedInsolventPayload;
+    if (typeof payload?.roomId !== "number") {
+      console.warn("WS: ignoring malformed system:room_closed_insolvent payload", payload);
+      return;
+    }
+    useRoomStore.getState().setInsolventEjection({
+      roomId: payload.roomId,
+      buyIn: 0,
+      balance: 0,
+      reason: "roomClosed",
+    });
     return;
   }
 

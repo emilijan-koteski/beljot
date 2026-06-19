@@ -349,6 +349,14 @@
       "inMatch": "playing",
       "online": "online"
     },
+    "insolventEjection": {
+      "eyebrow": "Heads up",
+      "ejectedTitle": "Not enough coins",
+      "ejectedBody": "You don't have enough coins to cover this room's buy-in. Balance: {{balance}}. Buy-in: {{buyIn}}.",
+      "roomClosedTitle": "Room closed",
+      "roomClosedBody": "This room closed — no remaining player could afford to host it.",
+      "action": "Got it"
+    },
     "matchmaking": {
       "title": "Quick Play",
       "subtitle": "You'll be seated as soon as three other players are ready. The match starts the moment the last seat fills.",

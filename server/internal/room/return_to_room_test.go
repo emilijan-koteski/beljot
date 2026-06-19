@@ -263,6 +263,122 @@ func TestReturnToRoom_LeaveRemovesPresence(t *testing.T) {
 	assert.Equal(t, []uint{100}, detail.ReturnedUserIds, "leaver should be dropped from presence")
 }
 
+// --- Story 9.3: return-time affordability gate ---
+
+// AC1: a returner who can still afford the buy-in reopens the room normally —
+// the gate is transparent on the solvent path.
+func TestReturnToRoom_SufficientBalance_Proceeds(t *testing.T) {
+	wallet := &stubWallet{balance: 5000}
+	e, repo, _, _ := setupCoinTestBC(nil, wallet)
+	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
+	r.CoinBuyIn = 500
+
+	rec := doReturnToRoom(e, "1", validToken(200))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	persisted, _ := repo.FindByID(1)
+	assert.Equal(t, "waiting", persisted.Status, "solvent returner reopens the room")
+	players, _ := repo.FindPlayersByRoomID(1)
+	assert.Len(t, players, 2, "no seat is freed on the solvent path")
+}
+
+// AC1: an insolvent returner is rejected with 409, their seat is freed, and the
+// room + lobby are told (system:player_left + system:room_updated).
+func TestReturnToRoom_Insolvent_RejectedAndSeatFreed(t *testing.T) {
+	wallet := &stubWallet{balance: 0} // returner can no longer afford the buy-in
+	e, repo, broadcaster, _ := setupCoinTestBC(nil, wallet)
+	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
+	r.CoinBuyIn = 500
+
+	rec := doReturnToRoom(e, "1", validToken(200))
+	require.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, "INSUFFICIENT_COINS", errorCodeOf(t, rec.Body.Bytes()))
+
+	// 200's seat is freed; only the owner remains.
+	players, _ := repo.FindPlayersByRoomID(1)
+	require.Len(t, players, 1)
+	assert.Equal(t, uint(100), players[0].UserID)
+
+	// Room stays completed (an insolvent return never reopens it).
+	persisted, _ := repo.FindByID(1)
+	assert.Equal(t, "completed", persisted.Status)
+
+	// The room hears player_left; the lobby hears room_updated.
+	require.Len(t, broadcastsOfType(t, broadcaster, "system:player_left"), 1)
+	require.Len(t, broadcaster.allCalls, 1)
+	assert.Equal(t, "system:room_updated", msgTypeOf(t, broadcaster.allCalls[0].msg))
+
+	// The ejected returner gets a per-user system:insolvent_ejected with numbers.
+	ejects := broadcastsOfType(t, broadcaster, "system:insolvent_ejected")
+	require.Len(t, ejects, 1)
+	assert.Equal(t, []uint{200}, ejects[0].userIDs)
+	var payload struct {
+		RoomID  uint `json:"roomId"`
+		BuyIn   int  `json:"buyIn"`
+		Balance int  `json:"balance"`
+	}
+	require.NoError(t, json.Unmarshal(payloadOf(t, ejects[0].msg), &payload))
+	assert.Equal(t, 500, payload.BuyIn)
+	assert.Equal(t, 0, payload.Balance)
+}
+
+// AC2: a free room (coin_buy_in == 0) never bars — even a zero balance returns
+// successfully and no seat is freed (byte-for-byte the legacy path).
+func TestReturnToRoom_ZeroBuyIn_NeverBars(t *testing.T) {
+	wallet := &stubWallet{balance: 0}
+	e, repo, _, _ := setupCoinTestBC(nil, wallet)
+	seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil) // CoinBuyIn defaults to 0
+
+	rec := doReturnToRoom(e, "1", validToken(200))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	players, _ := repo.FindPlayersByRoomID(1)
+	assert.Len(t, players, 2, "free room never frees a seat for insolvency")
+}
+
+// AC4: an insolvent OWNER returning hands ownership to the first present-and-
+// solvent seated human.
+func TestReturnToRoom_InsolventOwner_TransfersOwnership(t *testing.T) {
+	// Owner (100) reads as balance 0 (GetBalance); candidate 200 is solvent
+	// (GetBalances map). Both differ because the gate reads GetBalance and the
+	// heir check reads GetBalances.
+	wallet := &stubWallet{balance: 0, balances: map[uint]int{200: 5000}}
+	e, repo, _, reg := setupCoinTestBC(nil, wallet)
+	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
+	r.CoinBuyIn = 500
+	reg.Add(1, 200) // 200 has returned (present)
+
+	rec := doReturnToRoom(e, "1", validToken(100))
+	require.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, "INSUFFICIENT_COINS", errorCodeOf(t, rec.Body.Bytes()))
+
+	persisted, _ := repo.FindByID(1)
+	assert.Equal(t, uint(200), persisted.OwnerID, "ownership moves to the present-and-solvent seat")
+	players, _ := repo.FindPlayersByRoomID(1)
+	require.Len(t, players, 1)
+	assert.Equal(t, uint(200), players[0].UserID, "the insolvent owner's seat is freed")
+}
+
+// AC4: an insolvent owner with no present-and-solvent heir closes the room and
+// the still-seated members are told via system:room_closed_insolvent.
+func TestReturnToRoom_InsolventOwner_NoHeir_ClosesRoom(t *testing.T) {
+	// 200 is solvent but NOT present (never returned), so not a valid heir.
+	wallet := &stubWallet{balance: 0, balances: map[uint]int{200: 5000}}
+	e, repo, broadcaster, _ := setupCoinTestBC(nil, wallet)
+	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
+	r.CoinBuyIn = 500
+
+	rec := doReturnToRoom(e, "1", validToken(100))
+	require.Equal(t, http.StatusConflict, rec.Code)
+
+	persisted, _ := repo.FindByID(1)
+	assert.Equal(t, "completed", persisted.Status, "no eligible heir → room closes")
+
+	closed := broadcastsOfType(t, broadcaster, "system:room_closed_insolvent")
+	require.Len(t, closed, 1)
+	assert.Equal(t, []uint{200}, closed[0].userIDs, "the still-seated member is routed to the lobby")
+}
+
 // v2 presence: starting the match clears the room's presence set so the next
 // reopen starts from an empty "who's back" state.
 func TestReturnToRoom_StartClearsPresence(t *testing.T) {

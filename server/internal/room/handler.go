@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math/big"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -51,14 +52,21 @@ type MatchStarter interface {
 	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int) error
 }
 
-// WalletService is the subset of *wallet.Service the room handler needs: the
-// join-time affordability read and the atomic match-start stake charge (Story
-// 9.2). An interface (not a concrete dependency) keeps room decoupled from
-// wallet internals and lets handler tests inject a stub. Optional — nil means
-// no economy enforcement (legacy / tests that don't exercise coins).
+// WalletService is the subset of *wallet.Service the room handler needs. Story
+// 9.2 added the join-time affordability read (GetBalance) and the atomic
+// match-start stake charge (ChargeStakes). Story 9.3 widens it with the batch
+// solvency read (GetBalances — for ownership-transfer candidate selection and
+// the start-time insolvency prefilter) and the refund path (ApplySettlement —
+// credits back charged stakes when matchStarter.StartMatch fails). An interface
+// (not a concrete dependency) keeps room decoupled from wallet internals and
+// lets handler tests inject a stub. Import direction stays acyclic (room →
+// wallet). Optional — nil means no economy enforcement (legacy / tests that
+// don't exercise coins).
 type WalletService interface {
 	GetBalance(userID uint) (int, error)
+	GetBalances(userIDs []uint) (map[uint]int, error)
 	ChargeStakes(userIDs []uint, amount int) (insolventUserID uint, err error)
+	ApplySettlement(credits map[uint]int) error
 }
 
 // RoomStatusAdapter implements match.RoomStatusUpdater using the room repository.
@@ -680,6 +688,360 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": updatedRoom})
 }
 
+// transferOwnershipOrClose reassigns room ownership away from a departing owner
+// (who must ALREADY be removed from room_players before this is called) to the
+// first seated human — in seat order ascending — for whom isEligible reports
+// true, or closes the room when none qualifies. Bots (UserID 0) never inherit.
+//
+// It runs INSIDE the caller's transaction (tx) and performs NO broadcasts:
+// best-effort WS fan-out must happen post-commit, so the caller acts on the
+// returned values. On transfer it sets room.OwnerID + persists and returns the
+// new owner's ID. On close it flips the room to "completed", evicts every
+// remaining member + bot (mirroring the legacy owner-leave close) and returns
+// closed=true plus seatedNotify — the seated human IDs still in the room when it
+// closed, so the caller can route them to the lobby via system:room_closed_insolvent.
+//
+// Shared by LeaveRoom's owner branch (Task 3), the return-time insolvency eject
+// (Task 1), and the StartMatch insolvency eject (Task 4). Eligibility is the
+// CALLER's policy: present-AND-solvent for the return/leave paths; solvent-only
+// for the start path, where presence is already cleared (see StartMatch). Story 9.3.
+func (h *RoomHandler) transferOwnershipOrClose(tx RoomRepository, room *Room, isEligible func(candidateID uint) bool) (newOwnerID *uint, closed bool, seatedNotify []uint, err error) {
+	players, err := tx.FindPlayersByRoomID(room.ID)
+	if err != nil {
+		return nil, false, nil, fmt.Errorf("finding remaining players: %w", err)
+	}
+
+	// Seated humans in seat order ascending make the transfer choice
+	// deterministic (AC4). room_players are humans only, so the UserID != 0
+	// guard is belt-and-suspenders against a stray bot/zero row.
+	seated := make([]RoomPlayer, 0, len(players))
+	for _, p := range players {
+		if p.Seat != nil && p.UserID != 0 {
+			seated = append(seated, p)
+		}
+	}
+	sort.Slice(seated, func(i, j int) bool { return *seated[i].Seat < *seated[j].Seat })
+
+	for _, p := range seated {
+		if isEligible(p.UserID) {
+			room.OwnerID = p.UserID
+			if err := tx.Update(room); err != nil {
+				return nil, false, nil, fmt.Errorf("transferring room ownership: %w", err)
+			}
+			uid := p.UserID
+			return &uid, false, nil, nil
+		}
+	}
+
+	// No eligible candidate: close the room and evict everyone so nobody is
+	// stranded in a dead room and it can't reopen into a broken, owner-less
+	// state. The seated humans are the ones who need routing to the lobby.
+	for _, p := range seated {
+		seatedNotify = append(seatedNotify, p.UserID)
+	}
+	room.Status = "completed"
+	if err := tx.Update(room); err != nil {
+		return nil, false, nil, fmt.Errorf("closing ownerless room: %w", err)
+	}
+	for _, p := range players {
+		if err := tx.RemovePlayer(room.ID, p.UserID); err != nil {
+			return nil, false, nil, fmt.Errorf("evicting member on close: %w", err)
+		}
+	}
+	bots, err := tx.FindBotsByRoomID(room.ID)
+	if err != nil {
+		return nil, false, nil, fmt.Errorf("finding bots on close: %w", err)
+	}
+	for _, b := range bots {
+		if err := tx.RemoveBot(room.ID, b.Seat); err != nil {
+			return nil, false, nil, fmt.Errorf("clearing bot on close: %w", err)
+		}
+	}
+	return nil, true, seatedNotify, nil
+}
+
+// ejectInsolventReturner frees an insolvent returner's seat (transferring or
+// closing the room if they were the owner), fans out the room + lobby updates,
+// and returns apperr.ErrInsufficientCoins (HTTP 409) so the client routes them
+// to the lobby with the insolvency modal (Story 9.3 AC1, AC4). The seat-free +
+// ownership move run in one row-locked tx to serialize against concurrent
+// returns/leaves; broadcasts fan out post-commit (best-effort, never in-tx).
+func (h *RoomHandler) ejectInsolventReturner(roomID, userID uint, balance int, room *Room, members []RoomPlayer) error {
+	var leavingUsername string
+	for _, p := range members {
+		if p.UserID == userID {
+			leavingUsername = p.Username
+			break
+		}
+	}
+
+	// Ownership eligibility (present-AND-solvent) computed before the tx so no
+	// wallet read runs inside the lock — only needed when the OWNER is ejected.
+	var ownerEligible func(candidateID uint) bool
+	if room.OwnerID == userID {
+		presentSet := make(map[uint]bool)
+		for _, id := range h.presence.Present(roomID) {
+			presentSet[id] = true
+		}
+		var balances map[uint]int
+		if room.CoinBuyIn > 0 && h.walletService != nil {
+			seatedHumanIDs := make([]uint, 0, len(members))
+			for _, p := range members {
+				if p.UserID != userID && p.Seat != nil && p.UserID != 0 {
+					seatedHumanIDs = append(seatedHumanIDs, p.UserID)
+				}
+			}
+			b, berr := h.walletService.GetBalances(seatedHumanIDs)
+			if berr != nil {
+				return fmt.Errorf("reading candidate balances for ownership transfer: %w", berr)
+			}
+			balances = b
+		}
+		buyIn := room.CoinBuyIn
+		ownerEligible = func(candidateID uint) bool {
+			if !presentSet[candidateID] {
+				return false
+			}
+			return buyIn == 0 || (balances != nil && balances[candidateID] >= buyIn)
+		}
+	}
+
+	var newOwnerID *uint
+	var roomClosed bool
+	var closedNotify []uint
+	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
+		freshRoom, err := tx.FindByIDForUpdate(roomID)
+		if err != nil {
+			return fmt.Errorf("re-fetching room for insolvent eject: %w", err)
+		}
+		if freshRoom == nil {
+			return apperr.ErrRoomNotFound
+		}
+		if err := tx.RemovePlayer(roomID, userID); err != nil {
+			return err
+		}
+		if err := tx.DecrementPlayerCount(roomID); err != nil {
+			return fmt.Errorf("decrementing player count: %w", err)
+		}
+		if freshRoom.OwnerID == userID {
+			refetched, err := tx.FindByID(roomID)
+			if err != nil {
+				return fmt.Errorf("re-fetching room: %w", err)
+			}
+			no, didClose, notify, terr := h.transferOwnershipOrClose(tx, refetched, ownerEligible)
+			if terr != nil {
+				return terr
+			}
+			newOwnerID = no
+			roomClosed = didClose
+			closedNotify = notify
+		}
+		return nil
+	}); err != nil {
+		if errors.Is(err, apperr.ErrNotInRoom) || errors.Is(err, apperr.ErrRoomNotFound) {
+			return err
+		}
+		return fmt.Errorf("ejecting insolvent returner: %w", err)
+	}
+
+	h.presence.Remove(roomID, userID)
+	if roomClosed {
+		h.presence.Clear(roomID)
+	}
+
+	remainingPlayers, rerr := h.repo.FindPlayersByRoomID(roomID)
+	postRoom, perr := h.repo.FindByID(roomID)
+	if rerr == nil && len(remainingPlayers) > 0 {
+		actualPlayerCount := len(remainingPlayers)
+		if perr == nil && postRoom != nil {
+			actualPlayerCount = postRoom.PlayerCount
+		}
+		userIDs := make([]uint, 0, len(remainingPlayers))
+		for _, p := range remainingPlayers {
+			userIDs = append(userIDs, p.UserID)
+		}
+		payload := map[string]interface{}{
+			"roomId":      roomID,
+			"userId":      userID,
+			"username":    leavingUsername,
+			"playerCount": actualPlayerCount,
+		}
+		if newOwnerID != nil {
+			payload["newOwnerId"] = *newOwnerID
+		}
+		h.broadcastToUsers(userIDs, ws.SystemPlayerLeft, payload)
+	}
+	if perr == nil && postRoom != nil {
+		h.broadcastRoomUpdated(postRoom)
+	}
+	if roomClosed && len(closedNotify) > 0 {
+		h.broadcastToUsers(closedNotify, ws.SystemRoomClosedInsolvent, ws.RoomClosedInsolventPayload{RoomID: roomID})
+	}
+
+	// Tell the ejected returner directly so their client routes to the lobby with
+	// the exact balance/buy-in modal. The HTTP 409 can't carry the numbers, and
+	// the client no longer holds the room (roomStore resets on RoomPage unmount),
+	// so this per-user event is the modal's data source — the same event the
+	// start-time eject uses (Story 9.3 AC1, AC5).
+	h.broadcastToUsers([]uint{userID}, ws.SystemInsolventEjected, ws.InsolventEjectedPayload{
+		RoomID:  roomID,
+		BuyIn:   room.CoinBuyIn,
+		Balance: balance,
+	})
+
+	return apperr.ErrInsufficientCoins
+}
+
+// ejectInsolventAtStart frees every insolvent seat at match start (Story 9.3
+// AC5), pushes system:insolvent_ejected to each ejected player, and — when the
+// owner is among them — transfers ownership or closes the room via the shared
+// helper. The match does NOT start (a freed seat means not-all-seated), so the
+// room is reverted to "waiting" (unless closed) and the lobby refreshed. Best-
+// effort: any DB error is logged and the per-user pushes still fan out so no one
+// is left believing a match is about to start.
+//
+// presence was already cleared at start, so ownership eligibility here is
+// solvent-only (no presence requirement — see the StartMatch ejection note).
+// balances carries the just-read balance per seated human for the modal numbers.
+func (h *RoomHandler) ejectInsolventAtStart(roomID uint, room *Room, insolventIDs []uint, balances map[uint]int, members []RoomPlayer) {
+	insolventSet := make(map[uint]bool, len(insolventIDs))
+	for _, id := range insolventIDs {
+		insolventSet[id] = true
+	}
+
+	// Solvent-only eligibility: presence is cleared at start, and an insolvent
+	// candidate is never a valid heir. balances holds every seated human read for
+	// the prefilter, so a solvent seated human resolves to a >= buyIn value here.
+	buyIn := room.CoinBuyIn
+	startEligible := func(candidateID uint) bool {
+		if insolventSet[candidateID] {
+			return false
+		}
+		return buyIn == 0 || balances[candidateID] >= buyIn
+	}
+
+	var newOwnerID *uint
+	var roomClosed bool
+	var closedNotify []uint
+	txErr := h.repo.RunInTransaction(func(tx RoomRepository) error {
+		freshRoom, err := tx.FindByIDForUpdate(roomID)
+		if err != nil {
+			return fmt.Errorf("re-fetching room for start eject: %w", err)
+		}
+		if freshRoom == nil {
+			return apperr.ErrRoomNotFound
+		}
+		ownerEjected := false
+		for _, id := range insolventIDs {
+			if rmErr := tx.RemovePlayer(roomID, id); rmErr != nil {
+				// A concurrent leave may already have freed the seat — tolerate it.
+				if !errors.Is(rmErr, apperr.ErrNotInRoom) {
+					return fmt.Errorf("freeing insolvent seat %d: %w", id, rmErr)
+				}
+				continue
+			}
+			if err := tx.DecrementPlayerCount(roomID); err != nil {
+				return fmt.Errorf("decrementing player count: %w", err)
+			}
+			if freshRoom.OwnerID == id {
+				ownerEjected = true
+			}
+		}
+
+		if ownerEjected {
+			refetched, err := tx.FindByID(roomID)
+			if err != nil {
+				return fmt.Errorf("re-fetching room: %w", err)
+			}
+			no, didClose, notify, terr := h.transferOwnershipOrClose(tx, refetched, startEligible)
+			if terr != nil {
+				return terr
+			}
+			newOwnerID = no
+			roomClosed = didClose
+			closedNotify = notify
+			if !didClose {
+				refetched.Status = "waiting"
+				if err := tx.Update(refetched); err != nil {
+					return fmt.Errorf("reverting room to waiting: %w", err)
+				}
+			}
+		} else if err := tx.UpdateStatus(roomID, "waiting"); err != nil {
+			return fmt.Errorf("reverting room to waiting: %w", err)
+		}
+		return nil
+	})
+	if txErr != nil {
+		slog.Error("failed to eject insolvent seats at start", "roomID", roomID, "error", txErr)
+		// The revert-to-"waiting" lived inside the rolled-back tx, so the room is
+		// still "playing" (set by the committed outer StartMatch tx) with no live
+		// session. Un-brick it with a best-effort out-of-tx revert, mirroring the
+		// charge-failure branches. roomClosed can't be true here (the close path is
+		// inside the same rolled-back tx).
+		if uerr := h.repo.UpdateStatus(roomID, "waiting"); uerr != nil {
+			slog.Error("failed to revert room to waiting after eject failure", "roomID", roomID, "error", uerr)
+		}
+		// Fall through: still push the per-user ejections + lobby refresh below.
+	}
+
+	// Per-user ejection push (Story 9.3 AC5) — each ejected player's client
+	// routes to the lobby with the exact balance/buy-in modal.
+	for _, id := range insolventIDs {
+		h.broadcastToUsers([]uint{id}, ws.SystemInsolventEjected, ws.InsolventEjectedPayload{
+			RoomID:  roomID,
+			BuyIn:   room.CoinBuyIn,
+			Balance: balances[id],
+		})
+	}
+
+	if roomClosed {
+		h.presence.Clear(roomID)
+	}
+
+	postRoom, perr := h.repo.FindByID(roomID)
+	if perr == nil && postRoom != nil {
+		h.broadcastRoomUpdated(postRoom)
+	}
+	if roomClosed && len(closedNotify) > 0 {
+		h.broadcastToUsers(closedNotify, ws.SystemRoomClosedInsolvent, ws.RoomClosedInsolventPayload{RoomID: roomID})
+	}
+
+	// Tell the REMAINING in-room players each freed seat is gone (and who the new
+	// owner is, if it transferred). system:room_updated only refreshes the lobby
+	// grid — not the in-room roster — so without a player_left the ejected seat and
+	// stale host badge linger on RoomPage. Skip on close (room_closed_insolvent
+	// routes everyone) and on tx failure (the seats were not actually freed).
+	if txErr == nil && !roomClosed {
+		usernames := make(map[uint]string, len(members))
+		for _, p := range members {
+			usernames[p.UserID] = p.Username
+		}
+		remainingPlayers, rerr := h.repo.FindPlayersByRoomID(roomID)
+		if rerr == nil && len(remainingPlayers) > 0 {
+			remainingIDs := make([]uint, 0, len(remainingPlayers))
+			for _, p := range remainingPlayers {
+				remainingIDs = append(remainingIDs, p.UserID)
+			}
+			playerCount := len(remainingPlayers)
+			if postRoom != nil {
+				playerCount = postRoom.PlayerCount
+			}
+			for _, id := range insolventIDs {
+				payload := map[string]interface{}{
+					"roomId":      roomID,
+					"userId":      id,
+					"username":    usernames[id],
+					"playerCount": playerCount,
+				}
+				if newOwnerID != nil {
+					payload["newOwnerId"] = *newOwnerID
+				}
+				h.broadcastToUsers(remainingIDs, ws.SystemPlayerLeft, payload)
+			}
+		}
+	}
+}
+
 func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 	userID, err := auth.GetUserID(c)
 	if err != nil {
@@ -709,8 +1071,45 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 		}
 	}
 
+	// When the OWNER leaves, ownership moves to a present-AND-solvent seated
+	// human (Story 9.3 AC4 — supersedes v2's "no auto-transfer from an absent
+	// owner"). Compute eligibility BEFORE the tx so no wallet read runs inside
+	// the locked transaction. presentSet is the room's live presence (populated
+	// on join/return; empty only after a restart, in which case the room closes
+	// — acceptable per the best-effort presence contract); balances gates
+	// solvency for staked rooms (a free room is trivially solvent).
+	var ownerEligible func(candidateID uint) bool
+	if room.OwnerID == userID {
+		presentSet := make(map[uint]bool)
+		for _, id := range h.presence.Present(uint(roomID)) {
+			presentSet[id] = true
+		}
+		var balances map[uint]int
+		if room.CoinBuyIn > 0 && h.walletService != nil {
+			seatedHumanIDs := make([]uint, 0, len(prePlayers))
+			for _, p := range prePlayers {
+				if p.UserID != userID && p.Seat != nil && p.UserID != 0 {
+					seatedHumanIDs = append(seatedHumanIDs, p.UserID)
+				}
+			}
+			b, berr := h.walletService.GetBalances(seatedHumanIDs)
+			if berr != nil {
+				return fmt.Errorf("reading candidate balances for ownership transfer: %w", berr)
+			}
+			balances = b
+		}
+		buyIn := room.CoinBuyIn
+		ownerEligible = func(candidateID uint) bool {
+			if !presentSet[candidateID] {
+				return false
+			}
+			return buyIn == 0 || (balances != nil && balances[candidateID] >= buyIn)
+		}
+	}
+
 	var newOwnerID *uint
 	var roomClosed bool
+	var closedNotify []uint
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
 		// Story 8.5-1 AC3: row-lock the room INSIDE the tx so the status check
 		// is serialized against any concurrent auto-start tx that flips status
@@ -739,59 +1138,19 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 			return fmt.Errorf("decrementing player count: %w", err)
 		}
 		if room.OwnerID == userID {
-			// Re-fetch room inside tx to get current state after decrement
+			// Re-fetch room inside tx to get current state after decrement, then
+			// hand off to the shared transfer-or-close helper (present-and-solvent).
 			freshRoom, err := tx.FindByID(uint(roomID))
 			if err != nil {
 				return fmt.Errorf("re-fetching room: %w", err)
 			}
-			players, err := tx.FindPlayersByRoomID(uint(roomID))
-			if err != nil {
-				return fmt.Errorf("finding remaining players: %w", err)
+			no, didClose, notify, terr := h.transferOwnershipOrClose(tx, freshRoom, ownerEligible)
+			if terr != nil {
+				return terr
 			}
-			// Promote the first SEATED human. An unseated member must never
-			// inherit ownership: they can't start the match, and with bots
-			// filling the remaining seats the room would limp on as a dead
-			// "unseated owner + bots" shell (observed in production). If no
-			// seated human remains, close the room for everyone — bots can't
-			// sustain a room on their own.
-			var nextOwner *RoomPlayer
-			for i := range players {
-				if players[i].Seat != nil {
-					nextOwner = &players[i]
-					break
-				}
-			}
-			if nextOwner != nil {
-				freshRoom.OwnerID = nextOwner.UserID
-				newOwnerID = &nextOwner.UserID
-				if err := tx.Update(freshRoom); err != nil {
-					return fmt.Errorf("transferring room ownership: %w", err)
-				}
-			} else {
-				// No seated human left (only unseated humans and/or bots):
-				// close the room and evict the stragglers + bots so nobody is
-				// stranded as a member of a dead room and it can't be reopened
-				// into a broken, owner-less state.
-				freshRoom.Status = "completed"
-				if err := tx.Update(freshRoom); err != nil {
-					return fmt.Errorf("closing ownerless room: %w", err)
-				}
-				for i := range players {
-					if err := tx.RemovePlayer(uint(roomID), players[i].UserID); err != nil {
-						return fmt.Errorf("evicting unseated member on close: %w", err)
-					}
-				}
-				bots, err := tx.FindBotsByRoomID(uint(roomID))
-				if err != nil {
-					return fmt.Errorf("finding bots on close: %w", err)
-				}
-				for i := range bots {
-					if err := tx.RemoveBot(uint(roomID), bots[i].Seat); err != nil {
-						return fmt.Errorf("clearing bot on close: %w", err)
-					}
-				}
-				roomClosed = true
-			}
+			newOwnerID = no
+			roomClosed = didClose
+			closedNotify = notify
 		}
 		return nil
 	}); err != nil {
@@ -806,7 +1165,7 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 	// Drop the leaver's presence. Remove auto-clears the room's whole presence
 	// entry once the last present user leaves (empty-room close).
 	h.presence.Remove(uint(roomID), userID)
-	// When the owner-leave closed the room (no seated human remained), wipe the
+	// When the owner-leave closed the room (no eligible human remained), wipe the
 	// whole presence entry — the evicted stragglers are no longer members.
 	if roomClosed {
 		h.presence.Clear(uint(roomID))
@@ -834,6 +1193,14 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 			payload["newOwnerId"] = *newOwnerID
 		}
 		h.broadcastToUsers(userIDs, ws.SystemPlayerLeft, payload)
+	}
+
+	// If the owner-leave closed the room for lack of an eligible heir, tell the
+	// seated humans who were still in it to route to the lobby (Story 9.3 AC4).
+	// In the legacy owner-alone / unseated-straggler closes this list is empty,
+	// so the broadcast is a silent no-op and LeaveRoom's prior behavior holds.
+	if roomClosed && len(closedNotify) > 0 {
+		h.broadcastToUsers(closedNotify, ws.SystemRoomClosedInsolvent, ws.RoomClosedInsolventPayload{RoomID: uint(roomID)})
 	}
 
 	// Broadcast system:room_updated to ALL lobby browsers — even when the
@@ -886,6 +1253,29 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 	}
 	if !isMember {
 		return apperr.ErrNotInRoom
+	}
+
+	// Story 9.3 AC1/AC2/AC3: return-time affordability gate. Load the room and,
+	// ONLY for a staked room with an economy wired, re-read the caller's balance.
+	// A free room (CoinBuyIn == 0) never bars (AC2) and skips this entire block,
+	// leaving the reopen/presence/broadcast path below byte-identical to today.
+	// A player who simply hasn't acted on the result dialog yet stays held-as-
+	// seated (AC3) — this gate fires only when they actually click "Return".
+	gateRoom, err := h.repo.FindByID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("finding room for return gate: %w", err)
+	}
+	if gateRoom == nil {
+		return apperr.ErrRoomNotFound
+	}
+	if gateRoom.CoinBuyIn > 0 && h.walletService != nil {
+		balance, berr := h.walletService.GetBalance(userID)
+		if berr != nil {
+			return fmt.Errorf("reading balance for return gate: %w", berr)
+		}
+		if balance < gateRoom.CoinBuyIn {
+			return h.ejectInsolventReturner(uint(roomID), userID, balance, gateRoom, members)
+		}
 	}
 
 	// clearedSeats records bot seats removed during the reopen so we can fan out
@@ -2178,30 +2568,78 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 				}
 			}
 
-			// Story 9.2 (AC #4, #5): charge each human seat the buy-in atomically
+			// Story 9.2/9.3 (AC5): charge each human seat the buy-in atomically
 			// BEFORE the session goes live, so a failed charge never leaves a live
 			// match with an unpaid stake. Bots never pay — `players` is the
 			// room_players (humans only); bot seats live in `bots`. The room is
 			// already row-locked to "playing", so the seat picture is settled.
-			// On insolvency the match must NOT start: revert the room to "waiting"
-			// and surface INSUFFICIENT_COINS to the owner. (Story 9.3 replaces this
-			// fail-safe with per-player ejection.)
+			// ChargeStakes is the AUTHORITATIVE money guard (FOR UPDATE re-
+			// validation) — the return-time gate (AC1) is never trusted here.
+			//
+			// Story 9.3 replaces 9.2's whole-table rollback with PER-PLAYER
+			// ejection. ChargeStakes reports only the first insolvent user and
+			// rolls back atomically, so a GetBalances prefilter is needed to find
+			// and eject EVERY insolvent seat. `charged` records whether stakes were
+			// actually debited so a later StartMatch failure can refund them.
+			charged := false
+			var chargedIDs []uint
 			if updatedRoom.CoinBuyIn > 0 && h.walletService != nil {
 				humanIDs := make([]uint, 0, len(players))
 				for _, p := range players {
 					humanIDs = append(humanIDs, p.UserID)
 				}
-				if _, chargeErr := h.walletService.ChargeStakes(humanIDs, updatedRoom.CoinBuyIn); chargeErr != nil {
+
+				balances, berr := h.walletService.GetBalances(humanIDs)
+				if berr != nil {
+					slog.Error("failed to read balances for start prefilter", "roomID", roomID, "error", berr)
 					if uerr := h.repo.UpdateStatus(uint(roomID), "waiting"); uerr != nil {
-						slog.Error("failed to revert room status after insolvent start", "roomID", roomID, "error", uerr)
+						slog.Error("failed to revert room status after balance-read failure", "roomID", roomID, "error", uerr)
 					}
 					updatedRoom.Status = "waiting"
 					h.broadcastRoomUpdated(updatedRoom)
+					return fmt.Errorf("reading balances for start: %w", berr)
+				}
+
+				insolvent := make([]uint, 0, len(humanIDs))
+				for _, id := range humanIDs {
+					if balances[id] < updatedRoom.CoinBuyIn {
+						insolvent = append(insolvent, id)
+					}
+				}
+				if len(insolvent) > 0 {
+					// Per-player ejection: free every insolvent seat, push
+					// system:insolvent_ejected to each, transfer/close if the owner
+					// was insolvent. The match does not start; the owner gets 409.
+					h.ejectInsolventAtStart(uint(roomID), updatedRoom, insolvent, balances, players)
+					return apperr.ErrInsufficientCoins
+				}
+
+				// Authoritative atomic charge. A TOCTOU race (a balance dropped
+				// between the prefilter read and the FOR UPDATE lock) can still
+				// surface ONE insolvent user — eject that user too and abort rather
+				// than start with an unpaid stake.
+				if insolventID, chargeErr := h.walletService.ChargeStakes(humanIDs, updatedRoom.CoinBuyIn); chargeErr != nil {
 					if errors.Is(chargeErr, apperr.ErrInsufficientCoins) {
+						// Refresh just the insolvent user's balance for an accurate modal
+						// number, but keep the FULL prefilter `balances` map: ownership
+						// eligibility in transferOwnershipOrClose reads every seated
+						// human's balance, so a one-entry map would make every solvent
+						// heir look broke and wrongly CLOSE a room that has a valid heir.
+						if fresh, ferr := h.walletService.GetBalances([]uint{insolventID}); ferr == nil {
+							balances[insolventID] = fresh[insolventID]
+						}
+						h.ejectInsolventAtStart(uint(roomID), updatedRoom, []uint{insolventID}, balances, players)
 						return apperr.ErrInsufficientCoins
 					}
+					if uerr := h.repo.UpdateStatus(uint(roomID), "waiting"); uerr != nil {
+						slog.Error("failed to revert room status after charge failure", "roomID", roomID, "error", uerr)
+					}
+					updatedRoom.Status = "waiting"
+					h.broadcastRoomUpdated(updatedRoom)
 					return fmt.Errorf("charging stakes: %w", chargeErr)
 				}
+				charged = true
+				chargedIDs = humanIDs
 			}
 
 			timerDuration := 0
@@ -2209,8 +2647,35 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 				timerDuration = *updatedRoom.TimerDurationSeconds
 			}
 			reconnectWindow := resolveReconnectWindow(updatedRoom.ReconnectWindowSec)
-			if err := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn); err != nil {
-				slog.Error("failed to start game session", "roomID", roomID, "error", err)
+			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn); serr != nil {
+				// Story 9.3 (deferred-work item 1): the charge succeeded but the
+				// session failed to start. Refund every charged human (no coins
+				// destroyed), revert the room to "waiting" (no room stranded in
+				// "playing"), and tell the four participants to stay on the room
+				// page via error:match_start_failed — do NOT broadcast match_started
+				// (the previous code did, leaving clients navigating to a dead
+				// match). Return an error so the owner's /start request does not
+				// resolve OK and auto-navigate into the dead match.
+				slog.Error("failed to start game session", "roomID", roomID, "error", serr)
+				if charged {
+					refund := make(map[uint]int, len(chargedIDs))
+					for _, id := range chargedIDs {
+						refund[id] = updatedRoom.CoinBuyIn
+					}
+					if rerr := h.walletService.ApplySettlement(refund); rerr != nil {
+						slog.Error("failed to refund stakes after start failure", "roomID", roomID, "error", rerr)
+					}
+				}
+				if uerr := h.repo.UpdateStatus(uint(roomID), "waiting"); uerr != nil {
+					slog.Error("failed to revert room status after start failure", "roomID", roomID, "error", uerr)
+				}
+				updatedRoom.Status = "waiting"
+				h.broadcastToRoom(uint(roomID), ws.ErrorMatchStartFailed, map[string]interface{}{
+					"roomId":  roomID,
+					"message": "Failed to start the game. Please try again.",
+				})
+				h.broadcastRoomUpdated(updatedRoom)
+				return fmt.Errorf("starting match session: %w", serr)
 			}
 		}
 	}
