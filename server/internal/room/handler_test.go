@@ -192,16 +192,17 @@ func (m *mockRoomRepo) FindPlayerBySeat(roomID uint, seat int) (*room.RoomPlayer
 	return nil, nil
 }
 
-func (m *mockRoomRepo) FindQuickPlayRoom() (*room.Room, error) {
-	return m.FindQuickPlayRoomExcluding(nil)
+func (m *mockRoomRepo) FindQuickPlayRoom(buyIn int) (*room.Room, error) {
+	return m.FindQuickPlayRoomExcluding(nil, buyIn)
 }
 
-func (m *mockRoomRepo) FindQuickPlayRoomExcluding(excluded map[uint]bool) (*room.Room, error) {
+func (m *mockRoomRepo) FindQuickPlayRoomExcluding(excluded map[uint]bool, buyIn int) (*room.Room, error) {
 	for _, r := range m.rooms {
 		if excluded[r.ID] {
 			continue
 		}
-		if r.IsQuickPlay && r.Status == "waiting" && r.PlayerCount < 4 {
+		// Story 9.4: only return a room in the caller's affordability bracket.
+		if r.IsQuickPlay && r.Status == "waiting" && r.PlayerCount < 4 && r.CoinBuyIn == buyIn {
 			return r, nil
 		}
 	}
@@ -1958,7 +1959,10 @@ func TestQuickPlay_CreatesNewRoom(t *testing.T) {
 	assert.True(t, data.Room.IsQuickPlay)
 	assert.Equal(t, "bitola", data.Room.Variant)
 	assert.Equal(t, "1001", data.Room.MatchMode)
-	assert.Equal(t, "relaxed", data.Room.TimerStyle)
+	// Story 9.4 (AC5): synthesized quick-play rooms default to per-move 30s.
+	assert.Equal(t, "per-move", data.Room.TimerStyle)
+	require.NotNil(t, data.Room.TimerDurationSeconds)
+	assert.Equal(t, 30, *data.Room.TimerDurationSeconds)
 	assert.Equal(t, "waiting", data.Room.Status)
 	assert.Equal(t, 1, data.Room.PlayerCount)
 	assert.Equal(t, uint(10), data.Room.OwnerID)
@@ -2291,18 +2295,22 @@ func TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying(t *testing.T) {
 // --- Test fakes for Story 8.5-1 AC2 (gameStarter) ---
 
 type fakeMatchStarter struct {
-	called        int
-	lastRoom      uint
-	lastPlayers   [4]match.PlayerSeatInfo
-	lastCoinBuyIn int
-	err           error
+	called               int
+	lastRoom             uint
+	lastPlayers          [4]match.PlayerSeatInfo
+	lastCoinBuyIn        int
+	lastTimerStyle       string
+	lastTimerDurationSec int
+	err                  error
 }
 
-func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [4]match.PlayerSeatInfo, _ string, _ int, _ uint, _ int, coinBuyIn int) error {
+func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int) error {
 	g.called++
 	g.lastRoom = roomID
 	g.lastPlayers = players
 	g.lastCoinBuyIn = coinBuyIn
+	g.lastTimerStyle = timerStyle
+	g.lastTimerDurationSec = timerDurationSec
 	return g.err
 }
 

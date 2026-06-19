@@ -69,8 +69,8 @@ func (r *fakeRoomRepo) ClearPlayerSeat(uint, uint) error               { panic("
 func (r *fakeRoomRepo) FindPlayerBySeat(uint, int) (*room.RoomPlayer, error) {
 	panic("unused")
 }
-func (r *fakeRoomRepo) FindQuickPlayRoom() (*room.Room, error) { panic("unused") }
-func (r *fakeRoomRepo) FindQuickPlayRoomExcluding(map[uint]bool) (*room.Room, error) {
+func (r *fakeRoomRepo) FindQuickPlayRoom(int) (*room.Room, error) { panic("unused") }
+func (r *fakeRoomRepo) FindQuickPlayRoomExcluding(map[uint]bool, int) (*room.Room, error) {
 	panic("unused")
 }
 func (r *fakeRoomRepo) UpdateStatus(uint, string) error                        { panic("unused") }
@@ -79,9 +79,9 @@ func (r *fakeRoomRepo) LoadOwnerUsernames([]*room.Room) error                  {
 func (r *fakeRoomRepo) FindPlayersByRoomIDs([]uint) (map[uint][]room.RoomPlayer, error) {
 	return map[uint][]room.RoomPlayer{}, nil
 }
-func (r *fakeRoomRepo) AddBot(uint, int) error                       { panic("unused") }
-func (r *fakeRoomRepo) RemoveBot(uint, int) error                    { panic("unused") }
-func (r *fakeRoomRepo) UpdateBotSeat(uint, int, int) error           { panic("unused") }
+func (r *fakeRoomRepo) AddBot(uint, int) error                        { panic("unused") }
+func (r *fakeRoomRepo) RemoveBot(uint, int) error                     { panic("unused") }
+func (r *fakeRoomRepo) UpdateBotSeat(uint, int, int) error            { panic("unused") }
 func (r *fakeRoomRepo) FindBotsByRoomID(uint) ([]room.RoomBot, error) { return nil, nil }
 func (r *fakeRoomRepo) FindBotsByRoomIDs([]uint) (map[uint][]room.RoomBot, error) {
 	return map[uint][]room.RoomBot{}, nil

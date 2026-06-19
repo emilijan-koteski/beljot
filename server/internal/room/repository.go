@@ -21,12 +21,17 @@ type RoomRepository interface {
 	UpdatePlayerSeat(roomID uint, userID uint, seat int, team string) error
 	ClearPlayerSeat(roomID uint, userID uint) error
 	FindPlayerBySeat(roomID uint, seat int) (*RoomPlayer, error)
-	FindQuickPlayRoom() (*Room, error)
+	// FindQuickPlayRoom finds the oldest waiting quick-play room in the given
+	// affordability bracket (buyIn ∈ {0, 500}, Story 9.4). buyIn keys the pool:
+	// players only ever match into a room whose coin_buy_in equals their own
+	// bracket, keeping the two pools strictly separate.
+	FindQuickPlayRoom(buyIn int) (*Room, error)
 	// FindQuickPlayRoomExcluding skips room IDs already attempted in the
 	// current retry loop. AC5: when counter drift traps the loop on the same
 	// drifted room, exclusion lets FindQuickPlayRoom return a different room
-	// or fall through to the create-new-room branch.
-	FindQuickPlayRoomExcluding(excludedRoomIDs map[uint]bool) (*Room, error)
+	// or fall through to the create-new-room branch. buyIn (Story 9.4) filters
+	// to the caller's affordability bracket.
+	FindQuickPlayRoomExcluding(excludedRoomIDs map[uint]bool, buyIn int) (*Room, error)
 	UpdateStatus(roomID uint, status string) error
 	// FindUserIDsByRoomStatus returns the user IDs of every player currently
 	// seated in a room whose status matches the provided value. Used by lobby

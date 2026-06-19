@@ -32,7 +32,28 @@ const (
 	codeChars  = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	codeLength = 6
 	maxRetries = 3
+	// quickPlayStandardBuyIn is the single Quick Play affordability threshold
+	// AND the default-bracket stake (Story 9.4, Decision D1/D2). A player who can
+	// afford this plays for it; everyone else plays free (0). It equals the
+	// create-room default buy-in so casual matchmade games carry the same stake
+	// as a hand-made standard room.
+	quickPlayStandardBuyIn = 500
+	// quickPlayTimerDurationSeconds is the per-move timer (seconds) stamped onto
+	// every synthesized Quick Play room (Story 9.4, Decision D5). Within the
+	// create-room [10,120] range; flows unchanged through StartMatch.
+	quickPlayTimerDurationSeconds = 30
 )
+
+// quickPlayBuyIn maps a wallet balance to the Quick Play bracket buy-in. The
+// model is binary (Story 9.4, Decision D1): balance >= 500 → 500, else 0. The
+// returned value is BOTH the matchmaking pool key (rooms.coin_buy_in) and the
+// per-human stake charged at auto-start — no min-of-balances, no extra column.
+func quickPlayBuyIn(balance int) int {
+	if balance >= quickPlayStandardBuyIn {
+		return quickPlayStandardBuyIn
+	}
+	return 0
+}
 
 type CreateRoomRequest struct {
 	Name                 string `json:"name"`
@@ -1548,14 +1569,92 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 			}
 		}
 	}
+
+	// Story 9.4 (AC2/AC3): charge the bracket stake atomically BEFORE the session
+	// goes live, mirroring the manual /start path (StartMatch). Quick Play always
+	// seats four humans (never bots), so every seat pays. The whole block is
+	// skipped for the free bracket (CoinBuyIn == 0). ChargeStakes is the
+	// AUTHORITATIVE money guard (FOR UPDATE) — the join-time bracket gate is never
+	// trusted here. `charged`/`chargedIDs` record the debit so a later StartMatch
+	// failure can refund it.
+	//
+	// Insolvency at quick-play auto-start is a near-impossible edge (a >=500
+	// player held by ALREADY_IN_ROOM cannot spend elsewhere, and balances only
+	// rise via the daily reward), but the eject path is wired as a defensive
+	// safety net. ejectInsolventAtStart reverts the room to "waiting" (or closes
+	// it) and fans out the per-player ejection itself, so this returns
+	// ErrInsufficientCoins to tell the caller (autoStartIfFull) NOT to run the
+	// generic revert — that would wrongly tell the remaining players the match
+	// "failed". Story 9.3 patch: pass the FULL prefilter balances map to the
+	// eject helper so a solvent heir is never mistaken for broke.
+	charged := false
+	var chargedIDs []uint
+	if autoStartRoom.CoinBuyIn > 0 && h.walletService != nil {
+		humanIDs := make([]uint, 0, len(players))
+		for _, p := range players {
+			humanIDs = append(humanIDs, p.UserID)
+		}
+
+		balances, berr := h.walletService.GetBalances(humanIDs)
+		if berr != nil {
+			// A generic failure — let the caller revert the room to "waiting" and
+			// broadcast error:match_start_failed.
+			return fmt.Errorf("reading balances for auto-start: %w", berr)
+		}
+
+		insolvent := make([]uint, 0, len(humanIDs))
+		for _, id := range humanIDs {
+			if balances[id] < autoStartRoom.CoinBuyIn {
+				insolvent = append(insolvent, id)
+			}
+		}
+		if len(insolvent) > 0 {
+			h.ejectInsolventAtStart(autoStartRoom.ID, autoStartRoom, insolvent, balances, players)
+			return apperr.ErrInsufficientCoins
+		}
+
+		// Authoritative atomic charge. A TOCTOU race can still surface ONE
+		// insolvent user — eject that user too and abort rather than start with
+		// an unpaid stake.
+		if insolventID, chargeErr := h.walletService.ChargeStakes(humanIDs, autoStartRoom.CoinBuyIn); chargeErr != nil {
+			if errors.Is(chargeErr, apperr.ErrInsufficientCoins) {
+				// Refresh just the insolvent user's balance for the modal number,
+				// but keep the FULL prefilter balances map (ownership eligibility
+				// reads every seated human; a one-entry map wrongly closes a room
+				// with a valid heir — Story 9.3 patch).
+				if fresh, ferr := h.walletService.GetBalances([]uint{insolventID}); ferr == nil {
+					balances[insolventID] = fresh[insolventID]
+				}
+				h.ejectInsolventAtStart(autoStartRoom.ID, autoStartRoom, []uint{insolventID}, balances, players)
+				return apperr.ErrInsufficientCoins
+			}
+			return fmt.Errorf("charging stakes for auto-start: %w", chargeErr)
+		}
+		charged = true
+		chargedIDs = humanIDs
+	}
+
 	timerDuration := 0
 	if autoStartRoom.TimerDurationSeconds != nil {
 		timerDuration = *autoStartRoom.TimerDurationSeconds
 	}
 	reconnectWindow := resolveReconnectWindow(autoStartRoom.ReconnectWindowSec)
-	// Quick-play rooms carry CoinBuyIn == 0 in Story 9.2 (no stake; bracketed
-	// buy-ins arrive in Story 9.4), so no charge happens on this auto-start path.
-	return h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn)
+	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn); serr != nil {
+		// Charge succeeded but the session failed to start: refund every charged
+		// human (no coins destroyed). The caller (autoStartIfFull) reverts the
+		// room to "waiting" and broadcasts error:match_start_failed.
+		if charged {
+			refund := make(map[uint]int, len(chargedIDs))
+			for _, id := range chargedIDs {
+				refund[id] = autoStartRoom.CoinBuyIn
+			}
+			if rerr := h.walletService.ApplySettlement(refund); rerr != nil {
+				slog.Error("failed to refund stakes after auto-start failure", "roomID", autoStartRoom.ID, "error", rerr)
+			}
+		}
+		return serr
+	}
+	return nil
 }
 
 // revertAutoStart compensates for a failed matchStarter.StartMatch: it flips
@@ -1717,7 +1816,14 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 		startErr := h.startAutoStartedMatch(autoStartRoom, autoStartPlayers)
 		if startErr != nil {
 			slog.Error("failed to start auto-started game session", "roomID", roomID, "error", startErr)
-			h.revertAutoStart(roomID, autoStartRoom, autoStartPlayers)
+			// Story 9.4: an insolvency at charge time was fully handled inside
+			// startAutoStartedMatch (room reverted to "waiting"/closed + per-player
+			// ejection broadcast). Running the generic revert here would wrongly
+			// broadcast error:match_start_failed to the remaining players, so skip
+			// it — only generic start failures (StartMatch/charge errors) revert.
+			if !errors.Is(startErr, apperr.ErrInsufficientCoins) {
+				h.revertAutoStart(roomID, autoStartRoom, autoStartPlayers)
+			}
 			matchStarted = false
 		} else {
 			// Match is live — clear presence (quick-play, but keep parity with
@@ -2705,6 +2811,20 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 		return apperr.ErrAlreadyInRoom
 	}
 
+	// Story 9.4 (AC1): bracket the caller by affordability BEFORE matchmaking so
+	// they can only match into — or synthesize — a room of their own bracket
+	// (500 if they can afford the standard stake, else the free 0 pool). A nil
+	// walletService (legacy setups / tests that don't exercise coins) degrades
+	// to the free bracket so the matchmaking path still runs.
+	buyIn := 0
+	if h.walletService != nil {
+		balance, berr := h.walletService.GetBalance(userID)
+		if berr != nil {
+			return fmt.Errorf("reading balance for quick play bracket: %w", berr)
+		}
+		buyIn = quickPlayBuyIn(balance)
+	}
+
 	var resultRoom *Room
 	var assignedSeat int
 	var assignedTeam string
@@ -2722,7 +2842,7 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 	for i := 0; i < maxRetries; i++ {
 		lastTriedRoomID = 0
 		createErr = h.repo.RunInTransaction(func(tx RoomRepository) error {
-			available, err := tx.FindQuickPlayRoomExcluding(triedRoomIDs)
+			available, err := tx.FindQuickPlayRoomExcluding(triedRoomIDs, buyIn)
 			if err != nil {
 				return fmt.Errorf("finding quick play room: %w", err)
 			}
@@ -2745,18 +2865,25 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				return fmt.Errorf("generating room code: %w", err)
 			}
 
+			timerDuration := quickPlayTimerDurationSeconds
 			newRoom := &Room{
-				Name:        "Quick Play " + code,
-				Code:        code,
-				OwnerID:     userID,
-				Variant:     "bitola",
-				MatchMode:   "1001",
-				TimerStyle:  "relaxed",
-				IsQuickPlay: true,
-				// Story 9.2 AC #1: quick-play rooms are free (no stake) in this
-				// story; bracketed buy-ins are Story 9.4's job. Set explicitly so
-				// a future default change can't silently stake quick-play.
-				CoinBuyIn:   0,
+				Name:      "Quick Play " + code,
+				Code:      code,
+				OwnerID:   userID,
+				Variant:   "bitola",
+				MatchMode: "1001",
+				// Story 9.4 (AC5, Decision D5): quick-play games default to a
+				// per-move 30s timer (was relaxed/no timer) so casual matchmade
+				// games keep moving. The value flows through StartMatch unchanged
+				// — the per-move timer UI already exists (Story 4.5).
+				TimerStyle:           "per-move",
+				TimerDurationSeconds: &timerDuration,
+				IsQuickPlay:          true,
+				// Story 9.4 (AC1, Decision D1): the caller's affordability bracket
+				// (500 or 0) IS the synthesized room's stake AND its matchmaking
+				// pool key — players who can afford 500 pool together, everyone
+				// else pools at 0 (free). Charged atomically at auto-start.
+				CoinBuyIn:   buyIn,
 				Status:      "waiting",
 				PlayerCount: 1,
 			}
@@ -2876,6 +3003,18 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		return apperr.ErrAlreadyInRoom
 	}
 
+	// Story 9.4 (AC4): bracket the caller so a cross-bracket tap can be rejected
+	// cleanly (read before the row-lock tx — no wallet call inside the lock). A
+	// nil walletService (legacy/tests) degrades to the free bracket.
+	callerBuyIn := 0
+	if h.walletService != nil {
+		balance, berr := h.walletService.GetBalance(userID)
+		if berr != nil {
+			return fmt.Errorf("reading balance for quick join bracket: %w", berr)
+		}
+		callerBuyIn = quickPlayBuyIn(balance)
+	}
+
 	var resultRoom *Room
 	var assignedSeat int
 	var assignedTeam string
@@ -2896,6 +3035,12 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		if r.Status != "waiting" {
 			return apperr.ErrRoomNotFound
 		}
+		// Story 9.4 (AC4): a cross-bracket tap never seats the player into a
+		// stake they don't belong to — reject before the capacity check so the
+		// player learns it's the wrong bracket, not merely "full".
+		if r.CoinBuyIn != callerBuyIn {
+			return apperr.ErrQuickPlayBracketMismatch
+		}
 		if r.PlayerCount >= 4 {
 			return apperr.ErrRoomFull
 		}
@@ -2913,7 +3058,8 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		// table, so we cannot retry into another — return ROOM_FULL honestly
 		// rather than an opaque 5xx.
 		if errors.Is(err, apperr.ErrAlreadyInRoom) || errors.Is(err, apperr.ErrRoomNotFound) ||
-			errors.Is(err, apperr.ErrRoomNotQuickPlay) || errors.Is(err, apperr.ErrRoomFull) {
+			errors.Is(err, apperr.ErrRoomNotQuickPlay) || errors.Is(err, apperr.ErrRoomFull) ||
+			errors.Is(err, apperr.ErrQuickPlayBracketMismatch) {
 			return err
 		}
 		return fmt.Errorf("quick joining room: %w", err)

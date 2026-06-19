@@ -81,12 +81,16 @@ var (
 	ErrNotSeated                 = NewAppError("NOT_SEATED", "player has no seat to leave", http.StatusConflict)
 	ErrQuickPlayLeaveSeatBlocked = NewAppError("QUICK_PLAY_LEAVE_SEAT_BLOCKED", "leaving a seat is not allowed in quick play rooms", http.StatusConflict)
 	ErrRoomNotQuickPlay          = NewAppError("ROOM_NOT_QUICK_PLAY", "this room is not a quick play room", http.StatusConflict)
-	ErrOwnerCannotLeaveSeat      = NewAppError("OWNER_CANNOT_LEAVE_SEAT", "the room owner cannot leave their seat — leave the room instead", http.StatusConflict)
-	ErrCannotTransferToSelf      = NewAppError("CANNOT_TRANSFER_TO_SELF", "ownership cannot be transferred to yourself", http.StatusBadRequest)
-	ErrCannotPromoteUnseated     = NewAppError("CANNOT_PROMOTE_UNSEATED", "the new owner must be seated", http.StatusConflict)
-	ErrMatchAlreadyStarted       = NewAppError("MATCH_ALREADY_STARTED", "the match has already started", http.StatusConflict)
-	ErrBotsNotAllowed            = NewAppError("BOTS_NOT_ALLOWED", "bots cannot be added to this room", http.StatusConflict)
-	ErrNoBotOnSeat               = NewAppError("NO_BOT_ON_SEAT", "no bot occupies this seat", http.StatusNotFound)
+	// ErrQuickPlayBracketMismatch (Story 9.4) — a player tapped a quick-play room
+	// whose coin bracket (its buy-in) doesn't match their own affordability
+	// bracket. 409 Conflict, consistent with the sibling quick-play guards.
+	ErrQuickPlayBracketMismatch = NewAppError("QUICK_PLAY_BRACKET_MISMATCH", "this quick play table is for a different coin bracket", http.StatusConflict)
+	ErrOwnerCannotLeaveSeat     = NewAppError("OWNER_CANNOT_LEAVE_SEAT", "the room owner cannot leave their seat — leave the room instead", http.StatusConflict)
+	ErrCannotTransferToSelf     = NewAppError("CANNOT_TRANSFER_TO_SELF", "ownership cannot be transferred to yourself", http.StatusBadRequest)
+	ErrCannotPromoteUnseated    = NewAppError("CANNOT_PROMOTE_UNSEATED", "the new owner must be seated", http.StatusConflict)
+	ErrMatchAlreadyStarted      = NewAppError("MATCH_ALREADY_STARTED", "the match has already started", http.StatusConflict)
+	ErrBotsNotAllowed           = NewAppError("BOTS_NOT_ALLOWED", "bots cannot be added to this room", http.StatusConflict)
+	ErrNoBotOnSeat              = NewAppError("NO_BOT_ON_SEAT", "no bot occupies this seat", http.StatusNotFound)
 
 	// Economy domain errors (Epic 9). 409 Conflict (not 402) — the project's
 	// status set is 200/201/400/401/403/404/409/500. Surfaces from the join

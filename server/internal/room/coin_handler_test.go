@@ -35,7 +35,18 @@ type stubWallet struct {
 	settledCredits map[uint]int
 }
 
-func (s *stubWallet) GetBalance(userID uint) (int, error) { return s.balance, s.balanceErr }
+func (s *stubWallet) GetBalance(userID uint) (int, error) {
+	// Mirror the real wallet: a per-user balance (when the `balances` map is set)
+	// is authoritative for that user; otherwise fall back to the uniform scalar.
+	// Keeps GetBalance and GetBalances consistent so the join-time bracket read
+	// and the charge-time prefilter agree on a user's balance.
+	if s.balances != nil {
+		if b, ok := s.balances[userID]; ok {
+			return b, s.balanceErr
+		}
+	}
+	return s.balance, s.balanceErr
+}
 
 func (s *stubWallet) GetBalances(userIDs []uint) (map[uint]int, error) {
 	if s.balancesErr != nil {
@@ -187,16 +198,297 @@ func TestCreateRoom_SufficientCoinsAllowed(t *testing.T) {
 	assert.Equal(t, 500, persisted.CoinBuyIn)
 }
 
-func TestQuickPlay_RoomIsFree(t *testing.T) {
-	e, repo := setupCoinTest(&fakeMatchStarter{}, &stubWallet{balance: 5000})
-	rec := doQuickPlay(e, validToken(7))
+// Story 9.4 (AC1, AC5): a synthesized quick-play room carries the caller's
+// affordability bracket as its stake — 500 for a player who can afford it, 0
+// for a player who cannot (including exactly 0) — and always defaults to the
+// per-move 30s timer regardless of bracket. (Supersedes 9.2's "quick-play is
+// always free" TestQuickPlay_RoomIsFree.)
+func TestQuickPlay_SynthesizedRoomCarriesBracketAndTimer(t *testing.T) {
+	tests := []struct {
+		name      string
+		balance   int
+		wantBuyIn int
+	}{
+		{"affordable player pools at 500", 5000, 500},
+		{"exactly at threshold pools at 500", 500, 500},
+		{"just under threshold pools free", 499, 0},
+		{"zero-coin player pools free", 0, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, repo := setupCoinTest(&fakeMatchStarter{}, &stubWallet{balance: tt.balance})
+			rec := doQuickPlay(e, validToken(7))
+			require.Equal(t, http.StatusOK, rec.Code)
+
+			// Quick-play synthesizes a brand-new room when none is available.
+			persisted, _ := repo.FindByID(1)
+			require.NotNil(t, persisted)
+			assert.True(t, persisted.IsQuickPlay)
+			assert.Equal(t, tt.wantBuyIn, persisted.CoinBuyIn, "stake matches the caller's bracket")
+			assert.Equal(t, "per-move", persisted.TimerStyle, "AC5: per-move timer on every synthesized room")
+			require.NotNil(t, persisted.TimerDurationSeconds)
+			assert.Equal(t, 30, *persisted.TimerDurationSeconds)
+		})
+	}
+}
+
+// Story 9.4 (AC4): tapping a quick-play room in the wrong coin bracket is
+// rejected with QUICK_PLAY_BRACKET_MISMATCH and the player is never seated; a
+// matching bracket seats normally.
+func TestQuickJoin_CrossBracketRejected(t *testing.T) {
+	tests := []struct {
+		name          string
+		roomBuyIn     int
+		callerBalance int
+		wantStatus    int
+		wantCode      string
+	}{
+		{"free player taps 500 table", 500, 100, http.StatusConflict, "QUICK_PLAY_BRACKET_MISMATCH"},
+		{"affordable player taps free table", 0, 5000, http.StatusConflict, "QUICK_PLAY_BRACKET_MISMATCH"},
+		{"matching 500 bracket seats", 500, 5000, http.StatusOK, ""},
+		{"matching free bracket seats", 0, 100, http.StatusOK, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, repo, _, _ := setupCoinTestBC(&fakeMatchStarter{}, &stubWallet{balance: tt.callerBalance})
+			r := &room.Room{
+				Name: "QP Table", Code: "QPJOIN", OwnerID: 20, Variant: "bitola", MatchMode: "1001",
+				TimerStyle: "per-move", IsQuickPlay: true, Status: "waiting", PlayerCount: 1,
+				CoinBuyIn: tt.roomBuyIn,
+			}
+			require.NoError(t, repo.Create(r))
+			seat := 0
+			team := teamNameForSeat(0)
+			require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 20, Username: "owner", Seat: &seat, Team: &team}))
+
+			rec := doQuickJoin(e, "1", validToken(30))
+			require.Equal(t, tt.wantStatus, rec.Code)
+
+			persisted, _ := repo.FindByID(1)
+			if tt.wantCode != "" {
+				assert.Equal(t, tt.wantCode, errCodeOf(t, rec))
+				assert.Equal(t, 1, persisted.PlayerCount, "rejected tap must not seat the player")
+			} else {
+				assert.Equal(t, 2, persisted.PlayerCount, "matching bracket seats the player")
+			}
+		})
+	}
+}
+
+// seedQuickPlayRoomWithStake creates a waiting quick-play room with the given
+// coin bracket + per-move/30s timer and seats the listed humans at the lowest
+// seats — mirroring the state a partially-filled Story 9.4 quick-play room is
+// left in. The first ID is the owner. Returns the room.
+func seedQuickPlayRoomWithStake(t *testing.T, repo *mockRoomRepo, code string, buyIn int, seatedUserIDs ...uint) *room.Room {
+	t.Helper()
+	dur := 30
+	r := &room.Room{
+		Name:                 "Quick Play " + code,
+		Code:                 code,
+		OwnerID:              seatedUserIDs[0],
+		Variant:              "bitola",
+		MatchMode:            "1001",
+		TimerStyle:           "per-move",
+		TimerDurationSeconds: &dur,
+		IsQuickPlay:          true,
+		Status:               "waiting",
+		PlayerCount:          len(seatedUserIDs),
+		CoinBuyIn:            buyIn,
+	}
+	require.NoError(t, repo.Create(r))
+	for i, uid := range seatedUserIDs {
+		seat := i
+		team := teamNameForSeat(i)
+		require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: uid, Username: "H", Seat: &seat, Team: &team}))
+	}
+	return r
+}
+
+// Story 9.4 (AC1): matchmaking keeps the two affordability pools strictly
+// separate — QuickPlay never seats a player into a room of the other bracket;
+// it synthesizes a fresh same-bracket room instead.
+func TestQuickPlay_BracketsKeepPoolsSeparate(t *testing.T) {
+	tests := []struct {
+		name             string
+		existingBuyIn    int
+		callerBalance    int
+		wantJoinExisting bool
+		wantNewBuyIn     int
+	}{
+		{"free player skips a 500 room", 500, 100, false, 0},
+		{"500 player skips a free room", 0, 5000, false, 500},
+		{"500 player joins a 500 room", 500, 5000, true, 500},
+		{"free player joins a free room", 0, 100, true, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, repo := setupCoinTest(&fakeMatchStarter{}, &stubWallet{balance: tt.callerBalance})
+			// A waiting, not-full quick-play room (1 seated) in the existing bracket.
+			existing := seedQuickPlayRoomWithStake(t, repo, "EXQP01", tt.existingBuyIn, 20)
+
+			rec := doQuickPlay(e, validToken(30))
+			require.Equal(t, http.StatusOK, rec.Code)
+
+			reloaded, _ := repo.FindByID(existing.ID)
+			newRoom, _ := repo.FindByID(2)
+			if tt.wantJoinExisting {
+				assert.Equal(t, 2, reloaded.PlayerCount, "joined the same-bracket room")
+				assert.Nil(t, newRoom, "no new room synthesized when a same-bracket room exists")
+			} else {
+				assert.Equal(t, 1, reloaded.PlayerCount, "cross-bracket room left untouched")
+				require.NotNil(t, newRoom, "a new same-bracket room is synthesized")
+				assert.True(t, newRoom.IsQuickPlay)
+				assert.Equal(t, tt.wantNewBuyIn, newRoom.CoinBuyIn)
+			}
+		})
+	}
+}
+
+// Story 9.4 (AC2, AC5): when the 4th joiner fills a default-bracket (500) quick-
+// play room, the auto-start path charges all four humans the stake atomically,
+// threads the stake into StartMatch (so 9.2 settlement applies), and forwards
+// the per-move 30s timer.
+func TestQuickJoin_AutoStartChargesDefaultBracket(t *testing.T) {
+	starter := &fakeMatchStarter{}
+	wallet := &stubWallet{balance: 5000} // all four afford 500
+	e, repo, broadcaster, _ := setupCoinTestBC(starter, wallet)
+	seedQuickPlayRoomWithStake(t, repo, "QP500A", 500, 100, 200, 300)
+
+	rec := doQuickJoin(e, "1", validToken(400))
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// Quick-play synthesizes a brand-new room when none is available.
+	require.Equal(t, 1, wallet.chargeCalls)
+	assert.Equal(t, 500, wallet.chargedAmount)
+	assert.ElementsMatch(t, []uint{100, 200, 300, 400}, wallet.chargedIDs, "all four humans pay the stake")
+
+	require.Equal(t, 1, starter.called)
+	assert.Equal(t, 500, starter.lastCoinBuyIn, "the bracket stake threads into the session for settlement")
+	assert.Equal(t, "per-move", starter.lastTimerStyle, "AC5: timer style reaches StartMatch on auto-start")
+	assert.Equal(t, 30, starter.lastTimerDurationSec, "AC5: per-move 30s duration reaches StartMatch")
+
 	persisted, _ := repo.FindByID(1)
-	require.NotNil(t, persisted)
-	assert.True(t, persisted.IsQuickPlay)
-	assert.Equal(t, 0, persisted.CoinBuyIn, "quick-play rooms are free in Story 9.2")
+	assert.Equal(t, "playing", persisted.Status)
+	assert.Empty(t, broadcastsOfType(t, broadcaster, "error:match_start_failed"))
+}
+
+// Story 9.4 (AC3): a free-bracket (0) quick-play match auto-starts with no
+// charge and no settlement — exactly as before the economy work, since the
+// charge block is skipped when CoinBuyIn == 0.
+func TestQuickJoin_AutoStartFreeBracketNoCharge(t *testing.T) {
+	starter := &fakeMatchStarter{}
+	wallet := &stubWallet{balance: 0} // free bracket
+	e, repo, _, _ := setupCoinTestBC(starter, wallet)
+	seedQuickPlayRoomWithStake(t, repo, "QPFREE", 0, 100, 200, 300)
+
+	rec := doQuickJoin(e, "1", validToken(400))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	assert.Equal(t, 0, wallet.chargeCalls, "free bracket charges nothing")
+	assert.Equal(t, 0, wallet.settleCalls, "free bracket settles nothing")
+	require.Equal(t, 1, starter.called)
+	assert.Equal(t, 0, starter.lastCoinBuyIn)
+
+	persisted, _ := repo.FindByID(1)
+	assert.Equal(t, "playing", persisted.Status)
+}
+
+// Story 9.4 (Task 5 safety net): if a seat is insolvent at charge time on the
+// auto-start path (a near-impossible edge), the eject path frees that seat,
+// reverts the room to waiting, pushes system:insolvent_ejected to the ejected
+// player only, and the match does not start. Critically, the generic
+// error:match_start_failed broadcast must NOT fire — the insolvency was handled.
+func TestQuickJoin_AutoStartInsolventSeatEjected(t *testing.T) {
+	starter := &fakeMatchStarter{}
+	wallet := &stubWallet{balances: map[uint]int{100: 5000, 200: 0, 300: 5000, 400: 5000}}
+	e, repo, broadcaster, _ := setupCoinTestBC(starter, wallet)
+	seedQuickPlayRoomWithStake(t, repo, "QP500B", 500, 100, 200, 300)
+
+	rec := doQuickJoin(e, "1", validToken(400))
+	require.Equal(t, http.StatusOK, rec.Code, "the solvent joiner seats fine; auto-start handles the insolvent seat")
+
+	assert.Equal(t, 0, starter.called, "the match must not start with an unpaid stake")
+	assert.Equal(t, 0, wallet.chargeCalls, "the prefilter ejects before any charge")
+
+	persisted, _ := repo.FindByID(1)
+	assert.Equal(t, "waiting", persisted.Status, "room reverts to waiting after eject")
+
+	players, _ := repo.FindPlayersByRoomID(1)
+	for _, p := range players {
+		assert.NotEqual(t, uint(200), p.UserID, "insolvent seat must be freed")
+	}
+
+	ejects := broadcastsOfType(t, broadcaster, "system:insolvent_ejected")
+	require.Len(t, ejects, 1)
+	assert.Equal(t, []uint{200}, ejects[0].userIDs)
+
+	assert.Empty(t, broadcastsOfType(t, broadcaster, "error:match_start_failed"),
+		"insolvency is handled by the eject path; the generic failure broadcast must not fire")
+}
+
+// Story 9.4 (Task 5, review patch): the TOCTOU branch — every seat clears the
+// prefilter (all >= 500), but the authoritative atomic ChargeStakes still
+// surfaces ONE insolvent user (a balance drop racing the charge). That seat
+// must be ejected and the room reverted, exactly like the prefilter path, but
+// here the charge IS attempted first. Distinct from
+// TestQuickJoin_AutoStartInsolventSeatEjected, where the prefilter ejects
+// before any charge (chargeCalls == 0).
+func TestQuickJoin_AutoStartChargeTOCTOUEjectsInsolventSeat(t *testing.T) {
+	starter := &fakeMatchStarter{}
+	// Prefilter sees all four solvent; the atomic charge then races and reports
+	// user 200 insolvent (chargeInsolvent + ErrInsufficientCoins).
+	wallet := &stubWallet{
+		balances:        map[uint]int{100: 5000, 200: 5000, 300: 5000, 400: 5000},
+		chargeErr:       apperr.ErrInsufficientCoins,
+		chargeInsolvent: 200,
+	}
+	e, repo, broadcaster, _ := setupCoinTestBC(starter, wallet)
+	seedQuickPlayRoomWithStake(t, repo, "QP500C", 500, 100, 200, 300)
+
+	rec := doQuickJoin(e, "1", validToken(400))
+	require.Equal(t, http.StatusOK, rec.Code, "the solvent joiner seats fine; auto-start handles the TOCTOU insolvency")
+
+	assert.Equal(t, 1, wallet.chargeCalls, "the atomic charge is attempted (prefilter passed), unlike the prefilter-eject path")
+	assert.Equal(t, 0, starter.called, "the match must not start with an unpaid stake")
+	assert.Equal(t, 0, wallet.settleCalls, "nothing was charged (atomic rollback), so nothing to refund")
+
+	persisted, _ := repo.FindByID(1)
+	assert.Equal(t, "waiting", persisted.Status, "room reverts to waiting after the TOCTOU eject")
+
+	players, _ := repo.FindPlayersByRoomID(1)
+	for _, p := range players {
+		assert.NotEqual(t, uint(200), p.UserID, "the TOCTOU-insolvent seat must be freed")
+	}
+
+	ejects := broadcastsOfType(t, broadcaster, "system:insolvent_ejected")
+	require.Len(t, ejects, 1)
+	assert.Equal(t, []uint{200}, ejects[0].userIDs)
+
+	assert.Empty(t, broadcastsOfType(t, broadcaster, "error:match_start_failed"),
+		"insolvency is handled by the eject path; the generic failure broadcast must not fire")
+}
+
+// Story 9.4 (Task 5): when the charge succeeds on the auto-start path but the
+// session fails to start, the charged stakes are refunded (no coins destroyed),
+// the room reverts to waiting, and error:match_start_failed is broadcast.
+func TestQuickJoin_AutoStartRefundOnStartFailure(t *testing.T) {
+	starter := &fakeMatchStarter{err: errors.New("session manager unavailable")}
+	wallet := &stubWallet{balance: 5000}
+	e, repo, broadcaster, _ := setupCoinTestBC(starter, wallet)
+	seedQuickPlayRoomWithStake(t, repo, "QP500C", 500, 100, 200, 300)
+
+	rec := doQuickJoin(e, "1", validToken(400))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	require.Equal(t, 1, starter.called)
+	require.Equal(t, 1, wallet.chargeCalls, "stakes were charged before the start failed")
+	require.Equal(t, 1, wallet.settleCalls, "charged stakes must be refunded")
+	assert.Equal(t, map[uint]int{100: 500, 200: 500, 300: 500, 400: 500}, wallet.settledCredits)
+
+	persisted, _ := repo.FindByID(1)
+	assert.Equal(t, "waiting", persisted.Status, "room reverted to waiting, never stranded in playing")
+
+	require.Len(t, broadcastsOfType(t, broadcaster, "error:match_start_failed"), 1)
+	assert.Empty(t, broadcastsOfType(t, broadcaster, "system:match_started"))
 }
 
 // --- Join affordability check (AC #2) ---

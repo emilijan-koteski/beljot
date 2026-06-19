@@ -1469,6 +1469,26 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     expect(toast.info).not.toHaveBeenCalled();
   });
 
+  it("renders the balance update + result settlement for a default-bracket Quick Play match (Story 9.4)", () => {
+    // Quick Play was free before Story 9.4, so event:coin_settlement never fired
+    // for a matchmade game. A default-bracket (500) Quick Play match now settles
+    // exactly like a manual staked room — pot = 4 humans × 500 = 2000, the winning
+    // pair splits it (+1000 each) — so the same handler must update the wallet
+    // balance and stash the delta for the end-of-match result dialog.
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:coin_settlement",
+      payload: { coinDelta: 1000, newBalance: 6000, pot: 2000 },
+    });
+
+    expect(useAuthStore.getState().user?.walletBalance).toBe(6000);
+    expect(useMatchStore.getState().coinSettlement).toEqual({
+      coinDelta: 1000,
+      newBalance: 6000,
+      pot: 2000,
+    });
+  });
+
   it("updates balance and stores the settlement on a negative delta (no toast)", () => {
     const { result } = renderHook(() => useWsDispatch());
     result.current({

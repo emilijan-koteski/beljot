@@ -482,7 +482,8 @@
       "roomNotFound": "Soba nije pronađena",
       "alreadyInRoom": "Već si u sobi",
       "joinFailed": "Pridruživanje nije uspjelo. Probaj drugu sobu.",
-      "matchmakingFailed": "Traženje meča nije uspjelo. Pokušaj ponovno."
+      "matchmakingFailed": "Traženje meča nije uspjelo. Pokušaj ponovno.",
+      "quickPlayBracketMismatch": "Ova soba je za drukčiji iznos novčića. Klikni Brza igra da nađeš odgovarajuću."
     }
   },
   "match": {

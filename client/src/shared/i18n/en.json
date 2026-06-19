@@ -482,7 +482,8 @@
       "roomNotFound": "Room not found",
       "alreadyInRoom": "You are already in a room",
       "joinFailed": "Could not join. Try another room.",
-      "matchmakingFailed": "Matchmaking failed. Try again."
+      "matchmakingFailed": "Matchmaking failed. Try again.",
+      "quickPlayBracketMismatch": "This room is for a different coin bracket — tap Quick Play to find yours."
     }
   },
   "match": {

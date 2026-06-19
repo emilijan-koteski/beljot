@@ -86,16 +86,16 @@ func (r *mockRepoForLobby) IncrementPlayerCount(_ uint) error                   
 func (r *mockRepoForLobby) UpdatePlayerSeat(_ uint, _ uint, _ int, _ string) error   { return nil }
 func (r *mockRepoForLobby) ClearPlayerSeat(_ uint, _ uint) error                     { return nil }
 func (r *mockRepoForLobby) FindPlayerBySeat(_ uint, _ int) (*room.RoomPlayer, error) { return nil, nil }
-func (r *mockRepoForLobby) FindQuickPlayRoom() (*room.Room, error)                   { return nil, nil }
-func (r *mockRepoForLobby) FindQuickPlayRoomExcluding(_ map[uint]bool) (*room.Room, error) {
+func (r *mockRepoForLobby) FindQuickPlayRoom(_ int) (*room.Room, error)              { return nil, nil }
+func (r *mockRepoForLobby) FindQuickPlayRoomExcluding(_ map[uint]bool, _ int) (*room.Room, error) {
 	return nil, nil
 }
-func (r *mockRepoForLobby) UpdateStatus(_ uint, _ string) error                      { return nil }
-func (r *mockRepoForLobby) FindUserIDsByRoomStatus(_ string) ([]uint, error)         { return nil, nil }
-func (r *mockRepoForLobby) AddBot(_ uint, _ int) error                               { return nil }
-func (r *mockRepoForLobby) RemoveBot(_ uint, _ int) error                            { return nil }
-func (r *mockRepoForLobby) UpdateBotSeat(_ uint, _ int, _ int) error                 { return nil }
-func (r *mockRepoForLobby) FindBotsByRoomID(_ uint) ([]room.RoomBot, error)          { return nil, nil }
+func (r *mockRepoForLobby) UpdateStatus(_ uint, _ string) error              { return nil }
+func (r *mockRepoForLobby) FindUserIDsByRoomStatus(_ string) ([]uint, error) { return nil, nil }
+func (r *mockRepoForLobby) AddBot(_ uint, _ int) error                       { return nil }
+func (r *mockRepoForLobby) RemoveBot(_ uint, _ int) error                    { return nil }
+func (r *mockRepoForLobby) UpdateBotSeat(_ uint, _ int, _ int) error         { return nil }
+func (r *mockRepoForLobby) FindBotsByRoomID(_ uint) ([]room.RoomBot, error)  { return nil, nil }
 func (r *mockRepoForLobby) FindBotsByRoomIDs(_ []uint) (map[uint][]room.RoomBot, error) {
 	return map[uint][]room.RoomBot{}, nil
 }

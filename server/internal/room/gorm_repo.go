@@ -219,14 +219,18 @@ func (r *GormRepository) FindPlayerBySeat(roomID uint, seat int) (*RoomPlayer, e
 	return &player, nil
 }
 
-func (r *GormRepository) FindQuickPlayRoom() (*Room, error) {
-	return r.FindQuickPlayRoomExcluding(nil)
+func (r *GormRepository) FindQuickPlayRoom(buyIn int) (*Room, error) {
+	return r.FindQuickPlayRoomExcluding(nil, buyIn)
 }
 
-func (r *GormRepository) FindQuickPlayRoomExcluding(excludedRoomIDs map[uint]bool) (*Room, error) {
+func (r *GormRepository) FindQuickPlayRoomExcluding(excludedRoomIDs map[uint]bool, buyIn int) (*Room, error) {
 	var room Room
+	// Story 9.4: coin_buy_in keys the affordability bracket — a player only ever
+	// matches into a room of their own bracket (0 or 500). The existing partial
+	// index idx_rooms_quick_play(is_quick_play, status, player_count) still
+	// serves this as a prefix; coin_buy_in is a low-cardinality residual filter.
 	q := r.db.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("is_quick_play = ? AND status = ? AND player_count < 4", true, "waiting")
+		Where("is_quick_play = ? AND status = ? AND player_count < 4 AND coin_buy_in = ?", true, "waiting", buyIn)
 	if len(excludedRoomIDs) > 0 {
 		ids := make([]uint, 0, len(excludedRoomIDs))
 		for id := range excludedRoomIDs {

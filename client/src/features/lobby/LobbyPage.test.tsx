@@ -198,6 +198,46 @@ describe("LobbyPage", () => {
     expect(mockJoinRoom).not.toHaveBeenCalled();
   });
 
+  it("shows the bracket-mismatch toast when a cross-bracket quick-play room is tapped (Story 9.4)", async () => {
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    mockGetRooms.mockResolvedValueOnce([
+      {
+        id: 5,
+        name: "Quick Play QPX",
+        code: "QPX123",
+        ownerId: 1,
+        ownerUsername: "host",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "per-move",
+        timerDurationSeconds: 30,
+        status: "waiting",
+        playerCount: 1,
+        isQuickPlay: true,
+        coinBuyIn: 500,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        players: [
+          { id: 1, roomId: 5, userId: 1, username: "host", seat: 0, team: "teamA", createdAt: "" },
+        ],
+      },
+    ]);
+    mockQuickJoin.mockRejectedValueOnce(
+      new FetchError(409, "QUICK_PLAY_BRACKET_MISMATCH", "different bracket"),
+    );
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+
+    await waitFor(() => expect(mockQuickJoin).toHaveBeenCalledWith(5));
+    const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("coin bracket");
+    expect(mockNavigate).not.toHaveBeenCalledWith("/matchmaking/5");
+  });
+
   it("sends a custom room join to the in-room lobby", async () => {
     const user = userEvent.setup();
     mockGetRooms.mockResolvedValueOnce([

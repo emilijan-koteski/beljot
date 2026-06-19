@@ -121,9 +121,13 @@ export function LobbyPage() {
         goToMatchmaking(await quickJoinMutation.mutateAsync(room.id));
       } catch (err) {
         const code = err instanceof FetchError ? err.code : null;
-        // Quick-play rooms are free in Story 9.2, so INSUFFICIENT_COINS is not
-        // expected here — keep a generic fallback for forward-compat (Story 9.4).
+        // Story 9.4: tapping a quick-play room in the wrong coin bracket is
+        // rejected with QUICK_PLAY_BRACKET_MISMATCH. The stake is charged at
+        // auto-start (not at join), so INSUFFICIENT_COINS isn't returned here —
+        // keep its handler as a forward-compat safety net.
         if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
+        else if (code === "QUICK_PLAY_BRACKET_MISMATCH")
+          toast.error(t("lobby.errors.quickPlayBracketMismatch"));
         else if (code === "INSUFFICIENT_COINS")
           toast.error(t("room.errors.insufficientCoinsGeneric"));
         else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
