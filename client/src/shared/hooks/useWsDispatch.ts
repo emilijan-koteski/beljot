@@ -272,7 +272,11 @@ function dispatchGameEvent(message: WsMessage): void {
     const payload = message.payload as CoinSettlementPayload;
     // Defensive validation — Go zero values are real values, so guard on type,
     // not truthiness (a 0 delta/balance is legitimate).
-    if (!Number.isInteger(payload.coinDelta) || !Number.isInteger(payload.newBalance)) {
+    if (
+      !Number.isInteger(payload.coinDelta) ||
+      !Number.isInteger(payload.newBalance) ||
+      !Number.isInteger(payload.pot)
+    ) {
       return;
     }
     const auth = useAuthStore.getState();

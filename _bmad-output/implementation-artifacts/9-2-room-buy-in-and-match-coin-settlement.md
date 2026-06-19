@@ -4,7 +4,7 @@ baseline_commit: dc66245
 
 # Story 9.2: Room Buy-In & Match Coin Settlement
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -203,6 +203,25 @@ The epic frames join as `action:join_room` returning `error:insufficient_coins`.
 - [x] i18n strings in **all** four translation files ✔
 - [x] Linter passes (`make lint`) — note `golangci-lint` may be CI-only locally; fall back to `gofmt -l` + `go vet` (per Story 9.1)
 - [x] All existing tests pass (`make test`) — and **update existing fixtures** for the new required `Room.coinBuyIn` / `Match` delta fields (Story 9.1 had to touch ~13 fixtures for a similar required-field addition — expect the same here)
+
+### Review Findings
+
+_Code review 2026-06-19 — 3-layer adversarial (Blind Hunter + Edge Case Hunter + Acceptance Auditor), full diff `dc66245..HEAD`. 24 raw findings → 2 decision-needed (resolved 2026-06-19), 3 patch, 6 deferred, 8 dismissed as noise/by-design. Decisions: D1 (charge-then-start-fails) deferred to Story 9.3; D2 (phantom deltas) patched — record true deltas._
+
+**Patch**
+
+- [x] [Review][Patch] `JoinByCodeTile` insufficient-coins toast renders empty `{{buyIn}}`/`{{balance}}` placeholders — calls `t("room.errors.insufficientCoins")` with no interpolation params; should use the param-less `room.errors.insufficientCoinsGeneric` (already added; used by the quick-join path) [client/src/features/lobby/components/JoinByCodeTile.tsx:36]
+- [x] [Review][Patch] `event:coin_settlement` coin fields accept fractional values — Zod schema uses `z.number()` (not `.int()`) for `coinDelta`/`newBalance`/`pot`, and the client dispatch guard validates `coinDelta`/`newBalance` integrality but skips `pot` [client/src/shared/types/wsEvents.schemas.ts:990; client/src/shared/hooks/useWsDispatch.ts]
+- [x] [Review][Patch] Wallet-settlement failure records phantom winner deltas on the match row (resolved from decision-needed) — `settleMatch` returns the optimistic computed `deltas` even when `ApplySettlement`/`GetBalances` errors ([settlement.go:41-51](../../server/internal/match/settlement.go#L41-L51)), and the finalize paths persist them to `matches.player{N}_coin_delta` though no wallet credit happened. Fix: on wallet-credit failure, record the **true** wallet outcome (all humans `−buyIn`, winners not credited) instead of the computed positive deltas, so the match ledger matches wallet reality. [server/internal/match/settlement.go:41-51]
+
+**Deferred**
+
+- [x] [Review][Defer] Successful stake charge followed by a failed match-start strands coins and the room (resolved from decision-needed) — charge commits ([handler.go:2180](../../server/internal/room/handler.go#L2180)) before `matchStarter.StartMatch` ([handler.go:2198](../../server/internal/room/handler.go#L2198)); a start error is only `slog`-logged with no revert/refund, so humans are debited, no match runs, and the room is stranded in `playing` [server/internal/room/handler.go:2198] — deferred to Story 9.3: 9.3 owns StartMatch hardening + insolvency/ejection; refund-on-start-failure folds into that work. StartMatch failure is rare (only "session already exists") and the room-stranding half is pre-existing.
+- [x] [Review][Defer] One insolvent (or post-join-spent) seat makes `ChargeStakes` roll back the whole table and blocks every start attempt — griefing/denial vector [server/internal/room/handler.go:2180] — deferred, Story 9.3 owns per-player ejection (9.2's "never start an unpaid match" fail-safe is satisfied)
+- [x] [Review][Defer] Boot-time reconcile of stale `playing` rooms sinks already-charged stakes with 0 recorded deltas (crash between charge and match-end) [server/internal/match/reconcile.go:91] — deferred, crash-recovery; documented inline as a deliberate limitation
+- [x] [Review][Defer] `GetBalances` post-credit read is a separate unlocked transaction → `newBalance` in the settlement event can be stale under a concurrent wallet write [server/internal/match/settlement.go:47] — deferred, spec-sanctioned design (Task 3 offered both options), self-correcting on next read
+- [x] [Review][Defer] Natural match-end with nil `WinnerTeam` defaults to TeamA and credits it the pot instead of a sink [server/internal/match/live_match.go handleMatchEnd] — deferred, defensive-only (the engine always sets a winner today)
+- [x] [Review][Defer] No maximum on `coinBuyIn`; `pot = numHumans × buyIn` can overflow the `INTEGER` column at extreme stakes [server/internal/match/settlement.go:113] — deferred, gated by the start-time affordability charge; AC1 mandates "no maximum"
 
 ---
 

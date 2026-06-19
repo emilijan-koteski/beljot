@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-06
-last_updated: "2026-06-18"  # epics 6, 7, 8, 8.5, 10 done; 12-3 done; Epic 9 restructured via correct-course (added 9-6 private-rooms; honor → 9-7/9-8); 9-1 code-reviewed (3-layer adversarial) and moved to done; 9-2 story created (create-story) → ready-for-dev
+last_updated: "2026-06-19"  # epics 6, 7, 8, 8.5, 10 done; 12-3 done; Epic 9 restructured via correct-course (added 9-6 private-rooms; honor → 9-7/9-8); 9-1 code-reviewed (3-layer adversarial) and moved to done; 9-2 story created (create-story) → ready-for-dev; 9-2 code-reviewed (3-layer adversarial), 3 patches applied, 6 items deferred to 9.3/crash-recovery → done
 project: beljot
 project_key: NOKEY
 tracking_system: file-system
@@ -132,7 +132,7 @@ development_status:
   # --- Epic 9: Player Economy & Progression (Phase 2) ---
   epic-9: in-progress
   9-1-coin-wallet-foundation: done
-  9-2-room-buy-in-and-match-coin-settlement: review
+  9-2-room-buy-in-and-match-coin-settlement: done
   9-3-insolvency-ejection-and-room-persistence: backlog
   9-4-quick-play-coin-bracketing: backlog
   9-5-xp-and-level-system: backlog

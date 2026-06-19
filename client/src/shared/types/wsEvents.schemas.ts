@@ -265,9 +265,9 @@ export const AutoActionPayloadSchema = z.strictObject({
 
 // Story 9.2: per-human match-end coin settlement.
 export const CoinSettlementPayloadSchema = z.strictObject({
-  coinDelta: z.number(),
-  newBalance: z.number(),
-  pot: z.number(),
+  coinDelta: z.number().int(),
+  newBalance: z.number().int(),
+  pot: z.number().int(),
 });
 
 export const PlayerDisconnectedPayloadSchema = z.strictObject({

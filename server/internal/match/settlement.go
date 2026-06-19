@@ -40,7 +40,19 @@ func (m *Manager) settleMatch(roomID uint, playerIDs [4]uint, botSeats [4]bool, 
 
 	if err := m.walletSettler.ApplySettlement(credits); err != nil {
 		slog.Error("session: failed to apply coin settlement", "roomID", roomID, "error", err)
-		return deltas, nil
+		// The credit transaction rolled back, so winners were NOT credited — but
+		// every human was already debited buyIn at StartMatch. Record the TRUE
+		// wallet outcome (all humans −buyIn, winners uncredited) instead of the
+		// optimistic computed deltas, so the match row matches wallet reality.
+		// No events are sent (no reliable newBalance to push).
+		var failedDeltas [4]int
+		for seat := 0; seat < 4; seat++ {
+			if botSeats[seat] || playerIDs[seat] == 0 {
+				continue
+			}
+			failedDeltas[seat] = -coinBuyIn
+		}
+		return failedDeltas, nil
 	}
 
 	humanIDs := humanUserIDs(playerIDs)

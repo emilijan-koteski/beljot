@@ -33,7 +33,10 @@ export function JoinByCodeTile() {
       const code = err instanceof FetchError ? err.code : null;
       if (code === "ROOM_NOT_FOUND") toast.error(t("lobby.errors.roomNotFound"));
       else if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
-      else if (code === "INSUFFICIENT_COINS") toast.error(t("room.errors.insufficientCoins"));
+      else if (code === "INSUFFICIENT_COINS")
+        // Join-by-code has no room object in scope, so it can't compose the
+        // {{buyIn}}/{{balance}} message — use the param-less generic variant.
+        toast.error(t("room.errors.insufficientCoinsGeneric"));
       else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
       else toast.error(t("lobby.errors.joinFailed"));
     }
