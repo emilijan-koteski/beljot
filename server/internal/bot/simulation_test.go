@@ -80,6 +80,12 @@ func playOneHand(t *testing.T, gs *game.GameState, mem *bot.Memory, rng *rand.Ra
 				mem.ObservePlay(seat, *action.Card, oldLead)
 			}
 			gs = next
+			// Mirror the match layer: once the contest resolves, fold the
+			// publicly revealed declarations into memory so the heuristic team
+			// actually exercises declaration awareness in this guard.
+			if gs.DeclarationsResolved {
+				mem.ObserveDeclarations(gs.Players)
+			}
 
 		case game.PhaseHandComplete:
 			require.NotNil(t, gs.LastHandResult)

@@ -37,6 +37,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		TricksWon:           gs.TricksWon,
 		PlayedCards:         mem.PlayedCards(),
 		KnownVoids:          mem.KnownVoids(),
+		KnownCards:          mem.KnownCards(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -226,7 +227,11 @@ func TestDecide_CardPlay(t *testing.T) {
 		trick      []game.TrickCard
 		callerSeat int // fixture default 1 (opponents); 0 = bot's team
 		played     []string
-		wantCard   string
+		// declaredBySeat maps a seat to the card ids it revealed via
+		// declarations (known holdings). The declaration type/value are
+		// immaterial to the bot, so the test wraps them in one Declaration.
+		declaredBySeat map[int][]string
+		wantCard       string
 	}{
 		{
 			name: "smear high points when partner trumped and bot closes the trick",
@@ -330,6 +335,43 @@ func TestDecide_CardPlay(t *testing.T) {
 			callerSeat: 0,
 			wantCard:   "7C",
 		},
+		{
+			// Partner declared the low trumps and opponents are void of trump,
+			// so there is nothing to draw — cash the side Ace, never lead the
+			// master JH at the partner. (Without declaration memory the bot
+			// would lead JH to "draw".)
+			name:           "declared: opponents void of trump, cash side ace not the master trump",
+			hand:           cards("JH", "AS", "7C"),
+			trick:          nil,
+			callerSeat:     0,
+			played:         []string{"QH", "KH", "AH"},
+			declaredBySeat: map[int][]string{2: {"7H", "8H", "9H", "TH"}},
+			wantCard:       "AS",
+		},
+		{
+			// Partner declared the master JH (and the rest of the top trumps);
+			// opponents still hold lower trumps. The bot now KNOWS the team
+			// controls the top, so it draws with its own best trump (9H).
+			// (Without declaration memory JH/QH/KH/AH look unseen and the bot
+			// would not draw.)
+			name:           "declared: partner holds the master so the bot draws with its best trump",
+			hand:           cards("9H", "7C"),
+			trick:          nil,
+			callerSeat:     0,
+			declaredBySeat: map[int][]string{2: {"JH", "QH", "KH", "AH"}},
+			wantCard:       "9H",
+		},
+		{
+			// Opponents won the contest and declared all four aces, so AS is a
+			// KNOWN opponent threat — the bot must not treat its KS as a boss.
+			// Guards against dropping known-opponent cards from the threat set.
+			name:           "declared: opponent ace keeps the king from being a false boss",
+			hand:           cards("KS", "7C", "8D"),
+			trick:          nil,
+			callerSeat:     1,
+			declaredBySeat: map[int][]string{1: {"AS", "AH", "AD", "AC"}},
+			wantCard:       "7C",
+		},
 	}
 
 	for _, tt := range tests {
@@ -349,6 +391,80 @@ func TestDecide_CardPlay(t *testing.T) {
 			for _, id := range tt.played {
 				mem.ObservePlay(1, card(id), nil)
 			}
+			for seat, ids := range tt.declaredBySeat {
+				gs.Players[seat].Declarations = []game.Declaration{{
+					Type:       game.DeclarationSequence,
+					Cards:      cards(ids...),
+					PlayerSeat: seat,
+				}}
+			}
+			if len(tt.declaredBySeat) > 0 {
+				mem.ObserveDeclarations(gs.Players)
+			}
+
+			action := bot.Decide(viewFromState(gs, 0, mem))
+
+			require.Equal(t, game.ActionPlayCard, action.Type)
+			require.NotNil(t, action.Card)
+			assert.Equal(t, tt.wantCard, action.Card.String())
+		})
+	}
+}
+
+// TestDecide_PartnerTakesTrick covers the follow-play "don't overtake a trick
+// the partner is guaranteed to take" branch. The bot (seat 0) plays second to
+// an AD lead from seat 3; its partner (seat 2, last to play) declared the top
+// trumps (9H–QH). The duck is sound ONLY when the partner is provably void in
+// the led suit, so it must ruff and — being last — wins. A partner that might
+// still have to follow diamonds could be forced under by the opponent between
+// them, so the bot must not duck on a mere declared beater.
+func TestDecide_PartnerTakesTrick(t *testing.T) {
+	tests := []struct {
+		name            string
+		partnerVoidDiam bool
+		playedHearts    []string // declared trumps the partner has already played
+		wantCard        string
+	}{
+		{
+			name:            "partner void in led with a threat-proof trump: smear the high card",
+			partnerVoidDiam: true,
+			wantCard:        "KD",
+		},
+		{
+			name:            "partner not provably void in led: do not duck, discard low",
+			partnerVoidDiam: false,
+			wantCard:        "7D",
+		},
+		{
+			name:            "partner's threat-proof trumps already played: do not duck on a stale holding",
+			partnerVoidDiam: true,
+			playedHearts:    []string{"JH", "9H"},
+			wantCard:        "7D",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := testfixtures.NewGameMidPlay(1) // trump = Hearts
+			gs.Players[0].Hand = cards("KD", "7D")
+			gs.CurrentTrick = []game.TrickCard{{Card: card("AD"), PlayerSeat: 3}}
+			lead := game.SuitDiamonds
+			gs.LeadSuit = &lead
+			gs.ActivePlayerSeat = 0
+			gs.Players[2].Declarations = []game.Declaration{{
+				Type:       game.DeclarationSequence,
+				Cards:      cards("9H", "TH", "JH", "QH"),
+				PlayerSeat: 2,
+			}}
+
+			mem := bot.NewMemory()
+			if tt.partnerVoidDiam {
+				mem.ObservePlay(2, card("8C"), &lead) // discarded a club on a diamond lead
+			}
+			for _, id := range tt.playedHearts {
+				mem.ObservePlay(2, card(id), nil)
+			}
+			mem.ObserveDeclarations(gs.Players)
 
 			action := bot.Decide(viewFromState(gs, 0, mem))
 

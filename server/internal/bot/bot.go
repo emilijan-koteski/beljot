@@ -1,6 +1,10 @@
 package bot
 
-import "github.com/emilijan/beljot/server/internal/game"
+import (
+	"slices"
+
+	"github.com/emilijan/beljot/server/internal/game"
+)
 
 // Decide maps a redacted View to the bot's next action. Pure and
 // deterministic — humanized randomness lives in the match-layer think delay,
@@ -222,12 +226,64 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 		return lowestValue(legal, trump)
 	}
 
+	// Opponent currently wins, but if our partner is yet to play and is KNOWN
+	// (from the reveal) to take this trick, it is effectively ours — don't spend
+	// a winner overtaking. Smear the highest-point non-overtaking card instead.
+	if partnerTakesTrick(v, trump) {
+		if c := highestPointNonOvertaking(v, legal, trump); c != nil {
+			return *c
+		}
+		return lowestValue(legal, trump)
+	}
+
 	// Opponent currently wins: take the trick as cheaply as possible.
 	if c := cheapestWinning(v, legal, trump); c != nil {
 		return *c
 	}
 	// Cannot win: discard the lowest-value card, preserving trump.
 	return lowestValue(legal, trump)
+}
+
+// partnerTakesTrick reports whether the bot's partner is GUARANTEED to take the
+// current (opponent-led) trick, so the bot must not spend a winner overtaking
+// it. The bot's partner (seat+2) is yet to play only when the bot sits at the
+// leader's left — and then the partner plays LAST, with exactly one opponent
+// acting between them. The take is sound only when the partner can LEGALLY play
+// the beater no matter what that opponent does: it must be provably void in the
+// led suit (so it is forced to ruff, not to follow suit into a loss) AND hold a
+// trump that beats the current winner and that no opponent-reachable card
+// (threats) can beat. A higher led-suit card is NOT enough — an intervening
+// opponent could ruff and force the suit-bound partner under.
+func partnerTakesTrick(v View, trump game.Suit) bool {
+	if len(v.CurrentTrick) == 0 {
+		return false // defensive: chooseFollow only runs mid-trick
+	}
+	partner := (v.Seat + 2) % 4
+	if !slices.Contains(seatsYetToPlay(v), partner) {
+		return false
+	}
+	led := v.CurrentTrick[0].Card.Suit
+	ledIdx := SuitIndex(led)
+	if ledIdx < 0 || !v.KnownVoids[partner][ledIdx] {
+		return false // partner might be forced to follow suit and lose
+	}
+	_, winning := trickWinner(v.CurrentTrick, trump)
+	for _, pc := range knownHeldBy(v, partner) {
+		if pc.Suit != trump || !beatsCard(pc, winning, led, trump) {
+			continue
+		}
+		safe := true
+		for _, t := range threats(v) {
+			if beatsCard(t, pc, led, trump) {
+				safe = false
+				break
+			}
+		}
+		if safe {
+			return true
+		}
+	}
+	return false
 }
 
 // --- Helpers (all pure) ---
@@ -237,13 +293,15 @@ func myTeamCalledTrump(v View) bool {
 		game.TeamForSeat(*v.TrumpCallerSeat) == game.TeamForSeat(v.Seat)
 }
 
-// trumpsRemainUnseen reports whether any trump cards are still in unknown
-// hands (not played, not held by this bot). Derived from unseenCards so the
-// PlayedCards/CurrentTrick overlap dedupes — memory records a card at play
-// time, so mid-trick it appears in BOTH sources, and a naive count would
-// declare trumps exhausted early.
+// trumpsRemainUnseen reports whether any trump could still be in an OPPONENT's
+// hand — an unknown hand, or a known opponent holding from the reveal. Scans
+// threats (not raw unseen) so a partner's declared trumps do NOT count: once
+// the opponents are provably void of trump, there is nothing to draw and the
+// bot stops leading trumps at its own partner. Derived from threats so the
+// PlayedCards/CurrentTrick overlap dedupes (memory records a card at play time,
+// so mid-trick it appears in both sources).
 func trumpsRemainUnseen(v View, trump game.Suit) bool {
-	for _, c := range unseenCards(v) {
+	for _, c := range threats(v) {
 		if c.Suit == trump {
 			return true
 		}
@@ -251,8 +309,9 @@ func trumpsRemainUnseen(v View, trump game.Suit) bool {
 	return false
 }
 
-// unseenCards returns the cards in unknown hands: the full deck minus this
-// hand's played cards, the bot's own hand, and the current trick.
+// unseenCards returns the cards in UNKNOWN hands: the full deck minus this
+// hand's played cards, the bot's own hand, the current trick, and any card the
+// declaration reveal lets us place in a specific seat (no longer unknown).
 func unseenCards(v View) []game.Card {
 	known := make(map[game.Card]bool, 32)
 	for _, c := range v.PlayedCards {
@@ -264,6 +323,11 @@ func unseenCards(v View) []game.Card {
 	for _, tc := range v.CurrentTrick {
 		known[tc.Card] = true
 	}
+	for seat := range 4 {
+		for _, c := range knownHeldBy(v, seat) {
+			known[c] = true
+		}
+	}
 	out := make([]game.Card, 0, 32-len(known))
 	for _, c := range game.NewDeck() {
 		if !known[c] {
@@ -273,16 +337,59 @@ func unseenCards(v View) []game.Card {
 	return out
 }
 
-// holdsMasterTrump reports whether the bot holds the master trump — the
-// highest trump still in play. True when no unseen trump outranks the bot's
-// best trump; false when the bot holds no trump. Gates the draw-trumps lead so
-// it fires only while the bot still controls the top of the suit.
+// knownHeldBy returns the cards we know seat still holds: its publicly revealed
+// declaration cards minus any already played this hand or sitting in the
+// current trick. A declared card that has since been played is no longer a
+// holding, so it drops out here.
+func knownHeldBy(v View, seat int) []game.Card {
+	if seat < 0 || seat > 3 || len(v.KnownCards[seat]) == 0 {
+		return nil
+	}
+	gone := make(map[game.Card]bool, len(v.PlayedCards)+len(v.CurrentTrick))
+	for _, c := range v.PlayedCards {
+		gone[c] = true
+	}
+	for _, tc := range v.CurrentTrick {
+		gone[tc.Card] = true
+	}
+	out := make([]game.Card, 0, len(v.KnownCards[seat]))
+	for _, c := range v.KnownCards[seat] {
+		if !gone[c] {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// threats returns the cards an OPPONENT could still play: cards in unknown
+// hands plus cards we KNOW an opponent holds (revealed declarations when the
+// opponents won the contest). A partner's known card is never a threat — the
+// bot does not fight it. With no reveal, threats == unseenCards, so every
+// heuristic below behaves exactly as before.
+func threats(v View) []game.Card {
+	out := unseenCards(v)
+	for seat := range 4 {
+		if game.TeamForSeat(seat) == game.TeamForSeat(v.Seat) {
+			continue
+		}
+		out = append(out, knownHeldBy(v, seat)...)
+	}
+	return out
+}
+
+// holdsMasterTrump reports whether the bot controls the top trump from the
+// OPPONENTS' side: true when no trump an opponent could play (threats) outranks
+// the bot's best trump; false when the bot holds no trump. Scanning threats
+// (not raw unseen) relaxes Goal A's conservatism — once the partner has
+// declared the high trumps, those cards leave the threat set, so the bot is
+// recognized as controlling the suit and may keep drawing with its own best
+// trump. Gates the draw-trumps lead.
 func holdsMasterTrump(v View, trump game.Suit) bool {
 	top := highestOfSuit(v.Hand, trump, game.TrumpRankOrder)
 	if top == nil {
 		return false
 	}
-	for _, u := range unseenCards(v) {
+	for _, u := range threats(v) {
 		if u.Suit == trump && game.TrumpRankOrder[u.Rank] > game.TrumpRankOrder[top.Rank] {
 			return false
 		}
@@ -290,10 +397,12 @@ func holdsMasterTrump(v View, trump game.Suit) bool {
 	return true
 }
 
-// isSuitBoss reports whether no unseen card of the same (non-trump) suit
-// outranks c.
+// isSuitBoss reports whether no card an OPPONENT could play (threats) of the
+// same (non-trump) suit outranks c. Scanning threats keeps a known opponent
+// holding (e.g. an Ace the opponents declared) a real threat, so the bot never
+// mistakes its King for a boss.
 func isSuitBoss(c game.Card, v View) bool {
-	for _, u := range unseenCards(v) {
+	for _, u := range threats(v) {
 		if u.Suit == c.Suit && game.NonTrumpRankOrder[u.Rank] > game.NonTrumpRankOrder[c.Rank] {
 			return false
 		}
@@ -345,8 +454,9 @@ func seatsYetToPlay(v View) []int {
 }
 
 // partnerWinIsSafe reports whether the partner's current trick win can no
-// longer be contested: the bot closes the trick, or no unseen card can
-// legally beat the partner's card. When only higher led-suit cards survive,
+// longer be contested: the bot closes the trick, or no card an opponent could
+// play (threats) can legally beat the partner's card. When only higher led-suit
+// cards survive,
 // known voids (the holders must cut, but no trump beats the partner) settle
 // it.
 func partnerWinIsSafe(v View, trump game.Suit) bool {
@@ -358,7 +468,7 @@ func partnerWinIsSafe(v View, trump game.Suit) bool {
 
 	higherLedUnseen := false
 	trumpThreatUnseen := false
-	for _, u := range unseenCards(v) {
+	for _, u := range threats(v) {
 		if !beatsCard(u, winning, led, trump) {
 			continue
 		}

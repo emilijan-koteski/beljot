@@ -229,14 +229,16 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	if mem != nil {
 		v.PlayedCards = mem.PlayedCards()
 		v.KnownVoids = mem.KnownVoids()
+		v.KnownCards = mem.KnownCards()
 	}
 	return v
 }
 
 // observeBotMemory keeps the per-match bot memory current after a successful
 // state transition: resolved card plays feed the seen-cards + void inference
-// (the OLD state's LeadSuit tells the void story), and a hand-number advance
-// resets the per-hand sets. No-op for human-only matches.
+// (the OLD state's LeadSuit tells the void story), a hand-number advance resets
+// the per-hand sets, and a resolved declaration contest records the publicly
+// revealed cards as known holdings. No-op for human-only matches.
 func (m *Manager) observeBotMemory(session *LiveMatch, oldState, newState *game.GameState, action game.Action) {
 	session.mu.Lock()
 	defer session.mu.Unlock()
@@ -248,4 +250,9 @@ func (m *Manager) observeBotMemory(session *LiveMatch, oldState, newState *game.
 		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit)
 	}
 	mem.SyncHand(newState.HandNumber)
+	// Once the contest resolves, the engine has nil'd the losing team's
+	// declarations, so this records only the publicly revealed winning cards.
+	if newState.DeclarationsResolved {
+		mem.ObserveDeclarations(newState.Players)
+	}
 }

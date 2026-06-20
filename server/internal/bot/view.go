@@ -43,6 +43,13 @@ type View struct {
 	// Memory); KnownVoids[seat][SuitIndex(suit)] marks inferred voids.
 	PlayedCards []game.Card
 	KnownVoids  [4][4]bool
+	// KnownCards[seat] holds the exact cards we KNOW that seat is holding,
+	// learned from the public declaration reveal. Only the winning declaration
+	// team's cards are ever populated (the engine clears the losing team's on
+	// resolution), so this never leaks the Bitola no-peeking rule. Empty before
+	// the reveal; cards already played stay listed here, so consumers must drop
+	// played/in-trick cards when reasoning about current holdings.
+	KnownCards [4][]game.Card
 }
 
 // SuitIndex maps a suit to its index in KnownVoids' second dimension.
