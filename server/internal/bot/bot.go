@@ -37,13 +37,18 @@ func Decide(v View) game.Action {
 // --- Bidding ---
 
 // wantsTrump is the hand-strength evaluator gate: call the suit as trump when
-// holding ≥4 cards of it, or 3 that include the Jack or the 9+Ace pair.
+// holding ≥4 cards of it; or exactly 3 that include the Jack (unless the other
+// two are 7 and 8, too weak to call); or exactly 3 with the 9+Ace pair, but
+// only when backed by an Ace of another suit. Used by both bidding rounds.
 // Bidding happens on the 5-card stage-1 hand.
 func wantsTrump(hand []game.Card, suit game.Suit) bool {
 	var count int
-	var hasJack, hasNine, hasAce bool
+	var hasJack, hasNine, hasAce, has7, has8, hasSideAce bool
 	for _, c := range hand {
 		if c.Suit != suit {
+			if c.Rank == game.RankAce {
+				hasSideAce = true
+			}
 			continue
 		}
 		count++
@@ -54,12 +59,24 @@ func wantsTrump(hand []game.Card, suit game.Suit) bool {
 			hasNine = true
 		case game.RankAce:
 			hasAce = true
+		case game.Rank7:
+			has7 = true
+		case game.Rank8:
+			has8 = true
 		}
 	}
 	if count >= 4 {
 		return true
 	}
-	return count == 3 && (hasJack || (hasNine && hasAce))
+	if count != 3 {
+		return false
+	}
+	// 3 trumps including the Jack — but a bare J+7+8 is too weak to call.
+	if hasJack && !(has7 && has8) {
+		return true
+	}
+	// 3 trumps with the 9+Ace pair — only with a side Ace to back it up.
+	return hasNine && hasAce && hasSideAce
 }
 
 // trumpSuitScore ranks qualifying suits in round 2: trump-order card points
@@ -124,16 +141,19 @@ func chooseCard(v View) game.Card {
 	return chooseFollow(v, legal)
 }
 
-// chooseLead picks the card to open a trick: draw trumps with J/9 while our
-// team called trump and trumps remain unseen, otherwise bank a side-suit
-// boss (Ace first), otherwise lead the strongest side card.
+// chooseLead picks the card to open a trick: draw trumps while our team called
+// trump, trumps remain unseen, and we still hold the master trump; otherwise
+// bank a side-suit boss (Ace first); otherwise lead the safest low card.
 func chooseLead(v View, legal []game.Card) game.Card {
 	if v.TrumpSuit == nil {
 		return legal[0] // defensive: unreachable in PhasePlaying
 	}
 	trump := *v.TrumpSuit
 
-	if myTeamCalledTrump(v) && trumpsRemainUnseen(v, trump) {
+	// Draw trumps to strip the opponents — but only while we still hold the
+	// master (top remaining) trump. Leading a high trump we cannot back with the
+	// master just hands it to whoever holds the Jack/9 above it.
+	if myTeamCalledTrump(v) && trumpsRemainUnseen(v, trump) && holdsMasterTrump(v, trump) {
 		if c := highestOfSuit(legal, trump, game.TrumpRankOrder); c != nil {
 			return *c
 		}
@@ -155,21 +175,17 @@ func chooseLead(v View, legal []game.Card) game.Card {
 		return *boss
 	}
 
-	// No boss: lead the strongest side card.
-	var best *game.Card
-	bestOrder := -1
-	for i := range legal {
-		c := legal[i]
-		if c.Suit == trump {
-			continue
-		}
-		if game.NonTrumpRankOrder[c.Rank] > bestOrder {
-			bestOrder = game.NonTrumpRankOrder[c.Rank]
-			best = &legal[i]
+	// No boss: lead the safest card — the lowest-value non-trump (a 0-point
+	// 7/8/9 when held). Avoids exposing a 10 or other high card into an unseen
+	// Ace whenever a cheaper non-trump exists, and never burns a trump here.
+	var nonTrump []game.Card
+	for _, c := range legal {
+		if c.Suit != trump {
+			nonTrump = append(nonTrump, c)
 		}
 	}
-	if best != nil {
-		return *best
+	if len(nonTrump) > 0 {
+		return lowestValue(nonTrump, trump)
 	}
 
 	// Only trumps left.
@@ -255,6 +271,23 @@ func unseenCards(v View) []game.Card {
 		}
 	}
 	return out
+}
+
+// holdsMasterTrump reports whether the bot holds the master trump — the
+// highest trump still in play. True when no unseen trump outranks the bot's
+// best trump; false when the bot holds no trump. Gates the draw-trumps lead so
+// it fires only while the bot still controls the top of the suit.
+func holdsMasterTrump(v View, trump game.Suit) bool {
+	top := highestOfSuit(v.Hand, trump, game.TrumpRankOrder)
+	if top == nil {
+		return false
+	}
+	for _, u := range unseenCards(v) {
+		if u.Suit == trump && game.TrumpRankOrder[u.Rank] > game.TrumpRankOrder[top.Rank] {
+			return false
+		}
+	}
+	return true
 }
 
 // isSuitBoss reports whether no unseen card of the same (non-trump) suit

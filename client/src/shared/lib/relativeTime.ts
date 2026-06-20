@@ -71,7 +71,7 @@ dayjs.updateLocale("mk", {
   relativeTime: {
     future: "за %s",
     past: "пред %s",
-    s: "штотуку",
+    s: "сега",
     m: "1 минута",
     mm: "%d минути",
     h: "1 час",
@@ -126,7 +126,7 @@ export function ageCompact(iso: string | number | Date, now: number = Date.now()
   const diff = now - d.valueOf();
   if (diff < MINUTE_MS) {
     // Localized "just now" — read the active dayjs locale's `s` token (set in
-    // the updateLocale calls above: en "just now", mk "штотуку", hr/sr
+    // the updateLocale calls above: en "just now", mk "сега", hr/sr
     // "upravo sad") so the compact form is localized, not a hardcoded "now".
     const justNow = dayjs.Ls[dayjs.locale()]?.relativeTime?.s;
     return typeof justNow === "string" ? justNow : "now";

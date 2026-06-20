@@ -90,16 +90,31 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType: game.ActionPickTrump,
 		},
 		{
-			name:     "round 1 three with jack picks",
+			name:     "round 1 three with jack but only 7+8 alongside passes",
 			seat:     1,
 			hand:     cards("JH", "8H", "7H", "7S", "8S"),
+			round:    1,
+			wantType: game.ActionPassTrump,
+		},
+		{
+			name:     "round 1 three with jack and a nine picks",
+			seat:     1,
+			hand:     cards("JH", "9H", "7H", "7S", "8S"),
 			round:    1,
 			wantType: game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 three with nine and ace picks",
+			name:      "round 1 nine and ace without a side ace passes",
 			seat:      1,
 			hand:      cards("9H", "AH", "7H", "7S", "8S"),
+			round:     1,
+			candidate: "QH",
+			wantType:  game.ActionPassTrump,
+		},
+		{
+			name:      "round 1 nine and ace with a side ace picks",
+			seat:      1,
+			hand:      cards("9H", "AH", "7H", "AS", "8S"),
 			round:     1,
 			candidate: "QH",
 			wantType:  game.ActionPickTrump,
@@ -206,12 +221,12 @@ func TestDecide_AcceptsPartnerSurrender(t *testing.T) {
 
 func TestDecide_CardPlay(t *testing.T) {
 	tests := []struct {
-		name        string
-		hand        []game.Card // bot seat 0
-		trick       []game.TrickCard
-		callerSeat  int // fixture default 1 (opponents); 0 = bot's team
-		played      []string
-		wantCard    string
+		name       string
+		hand       []game.Card // bot seat 0
+		trick      []game.TrickCard
+		callerSeat int // fixture default 1 (opponents); 0 = bot's team
+		played     []string
+		wantCard   string
 	}{
 		{
 			name: "smear high points when partner trumped and bot closes the trick",
@@ -287,12 +302,33 @@ func TestDecide_CardPlay(t *testing.T) {
 			wantCard:   "AS",
 		},
 		{
-			name:       "promoted king leads once the ace is gone",
+			name:       "promoted king leads once the ace and ten are gone",
 			hand:       cards("KS", "7C", "8H"),
 			trick:      nil,
 			callerSeat: 1,
-			played:     []string{"AS"},
+			played:     []string{"AS", "TS"},
 			wantCard:   "KS",
+		},
+		{
+			name:       "no boss with a ten leads a zero-point card not the ten",
+			hand:       cards("TS", "9C", "7D"),
+			trick:      nil,
+			callerSeat: 1,
+			wantCard:   "7D",
+		},
+		{
+			name:       "caller without the master trump cashes a side ace not the trump ace",
+			hand:       cards("AH", "AD", "7C"),
+			trick:      nil,
+			callerSeat: 0,
+			wantCard:   "AD",
+		},
+		{
+			name:       "caller without the master trump and no boss leads safe low not high trump",
+			hand:       cards("AH", "KD", "7C"),
+			trick:      nil,
+			callerSeat: 0,
+			wantCard:   "7C",
 		},
 	}
 
