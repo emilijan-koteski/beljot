@@ -475,6 +475,139 @@ func TestDecide_PartnerTakesTrick(t *testing.T) {
 	}
 }
 
+// TestDecide_LastTrickRetention covers endgame retention ("dix de der", +10):
+// at the second-to-last trick (two cards in hand) the bot keeps the master
+// trump back for the forced trick 8 instead of squandering it now. Bot is
+// seat 0 (team A); trump is Hearts in NewGameMidPlay.
+func TestDecide_LastTrickRetention(t *testing.T) {
+	tests := []struct {
+		name           string
+		hand           []game.Card
+		trick          []game.TrickCard
+		callerSeat     int
+		played         []string
+		declaredBySeat map[int][]string
+		wantCard       string
+	}{
+		{
+			// Without retention the bot would draw the JH on trick 7; instead it
+			// leads the junk and banks the JH for the forced trick 8.
+			name:       "lead retains the master trump and spends the junk",
+			hand:       cards("JH", "7C"),
+			trick:      nil,
+			callerSeat: 0,
+			wantCard:   "7C",
+		},
+		{
+			// 9H is the master once the only higher trump (JH) is gone — retain it.
+			name:       "non-absolute master is retained once higher trumps are played",
+			hand:       cards("9H", "7C"),
+			trick:      nil,
+			callerSeat: 0,
+			played:     []string{"JH"},
+			wantCard:   "7C",
+		},
+		{
+			// Void in the led suit forces a cut: the engine's legal set is {JH}
+			// only, so the master is played and retention cannot override it.
+			name:       "forced cut plays the master — retention never overrides a forced play",
+			hand:       cards("JH", "7C"),
+			trick:      []game.TrickCard{{Card: card("AD"), PlayerSeat: 3}},
+			callerSeat: 0,
+			wantCard:   "JH",
+		},
+		{
+			// Two trumps, forced to cut: spend the lower trump (it wins now) and
+			// keep the master JH for the last trick.
+			name:       "cut with the lower trump and keep the master",
+			hand:       cards("JH", "9H"),
+			trick:      []game.TrickCard{{Card: card("7D"), PlayerSeat: 3}},
+			callerSeat: 0,
+			wantCard:   "9H",
+		},
+		{
+			// Partner declared a trump (JH) above the bot's master (9H): the team
+			// already takes trick 8, so retention defers and the bot draws as
+			// before instead of fighting the partner.
+			name:           "partner controls the last trick so retention defers and the bot draws",
+			hand:           cards("9H", "7C"),
+			trick:          nil,
+			callerSeat:     0,
+			declaredBySeat: map[int][]string{2: {"JH", "QH", "KH", "AH"}},
+			wantCard:       "9H",
+		},
+		{
+			// Following trick 7 while the partner currently wins it (with 7H):
+			// the engine's over-trump rule forces the bot to beat its own
+			// partner, so it spends the lower trump (9H) — which wins now — and
+			// keeps the master JH for the forced trick 8.
+			name: "follow over a winning partner spends the lower trump and keeps the master",
+			hand: cards("JH", "9H"),
+			trick: []game.TrickCard{
+				{Card: card("8D"), PlayerSeat: 1},
+				{Card: card("7H"), PlayerSeat: 2},
+				{Card: card("9C"), PlayerSeat: 3},
+			},
+			callerSeat: 0,
+			wantCard:   "9H",
+		},
+		{
+			// Three cards — not the endgame decision point — so retention is
+			// gated out and the bot draws the master as usual.
+			name:       "not the endgame leaves draw behavior unchanged",
+			hand:       cards("JH", "AS", "7C"),
+			trick:      nil,
+			callerSeat: 0,
+			wantCard:   "JH",
+		},
+		{
+			// No trump held: side bosses are excluded from retention, so the bot
+			// cashes the Ace now exactly as before.
+			name:       "no master trump cashes the side boss now",
+			hand:       cards("AS", "7C"),
+			trick:      nil,
+			callerSeat: 1,
+			wantCard:   "AS",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := testfixtures.NewGameMidPlay(1)
+			gs.Players[0].Hand = tt.hand
+			gs.CurrentTrick = tt.trick
+			gs.ActivePlayerSeat = 0
+			caller := tt.callerSeat
+			gs.TrumpCallerSeat = &caller
+			if len(tt.trick) > 0 {
+				lead := tt.trick[0].Card.Suit
+				gs.LeadSuit = &lead
+			}
+
+			mem := bot.NewMemory()
+			for _, id := range tt.played {
+				mem.ObservePlay(1, card(id), nil)
+			}
+			for seat, ids := range tt.declaredBySeat {
+				gs.Players[seat].Declarations = []game.Declaration{{
+					Type:       game.DeclarationSequence,
+					Cards:      cards(ids...),
+					PlayerSeat: seat,
+				}}
+			}
+			if len(tt.declaredBySeat) > 0 {
+				mem.ObserveDeclarations(gs.Players)
+			}
+
+			action := bot.Decide(viewFromState(gs, 0, mem))
+
+			require.Equal(t, game.ActionPlayCard, action.Type)
+			require.NotNil(t, action.Card)
+			assert.Equal(t, tt.wantCard, action.Card.String())
+		})
+	}
+}
+
 // TestDecide_AlwaysLegal pins that every decision is drawn from the legal
 // set the engine itself computed.
 func TestDecide_AlwaysLegal(t *testing.T) {

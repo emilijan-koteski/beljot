@@ -139,10 +139,80 @@ func chooseCard(v View) game.Card {
 	if len(legal) == 1 {
 		return legal[0]
 	}
+	// Endgame retention: hold the master trump back for the forced last trick
+	// (+10 "dix de der") instead of squandering it now. Returns the card to
+	// spend this trick, or nil to defer to the normal lead/follow heuristics.
+	if v.TrumpSuit != nil {
+		if c := retainLastTrickWinner(v, legal, *v.TrumpSuit); c != nil {
+			return *c
+		}
+	}
 	if len(v.CurrentTrick) == 0 {
 		return chooseLead(v, legal)
 	}
 	return chooseFollow(v, legal)
+}
+
+// retainLastTrickWinner implements last-trick retention ("dix de der", +10).
+// At the second-to-last trick — exactly two cards in hand — the forced 8th
+// trick (one legal card each) goes to whoever RETAINS the best card through
+// trick 7. When the bot holds the master trump (a guaranteed trick-8 winner:
+// no card an opponent could play outranks it) it returns the OTHER card to
+// spend now, banking the master for the last trick. Whether the spare wins
+// trick 7 (the bot then leads trick 8 with the master) or loses it (an
+// opponent leads trick 8 and the forced master still beats everything), the
+// +10 is banked either way.
+//
+// Returns nil — deferring to the normal heuristics — unless every condition
+// holds:
+//   - exactly two cards remain (the endgame decision point);
+//   - the bot's best trump is the master (holdsMasterTrump): the only single
+//     card guaranteed to win the forced trick 8 under any lead. A non-trump
+//     "boss" wins trick 8 only when it is the led suit there, which the bot
+//     cannot guarantee at trick 7, so side bosses are intentionally excluded
+//     (the existing "cash the boss now" lead already handles them);
+//   - the spare is legal THIS trick. Follow-suit / over-trump rules can force
+//     the master out; when they do, len(legal)==1 already plays it above, and
+//     this guard means we never assume a card we cannot actually hold back;
+//   - the partner is not already known (from the declaration reveal) to hold a
+//     higher trump — if it does, the team controls trick 8 regardless, so we
+//     don't fight the partner and let the normal heuristics play (e.g. draw).
+func retainLastTrickWinner(v View, legal []game.Card, trump game.Suit) *game.Card {
+	if len(v.Hand) != 2 {
+		return nil
+	}
+	master := highestOfSuit(v.Hand, trump, game.TrumpRankOrder)
+	if master == nil || !holdsMasterTrump(v, trump) {
+		return nil
+	}
+	// The single other card is the spare we would spend now.
+	var spare *game.Card
+	for i := range v.Hand {
+		if v.Hand[i] != *master {
+			spare = &v.Hand[i]
+			break
+		}
+	}
+	if spare == nil {
+		return nil // defensive: two identical cards are impossible
+	}
+	// Soundness: only retain the master if the spare is a legal play this
+	// trick — never assume a card the engine would force out. With a two-card
+	// hand this is belt-and-suspenders (a forced follow/cut that makes the
+	// spare illegal leaves the master as the sole legal card, so len(legal)==1
+	// above already played it), but it pins the invariant retention relies on.
+	if !slices.Contains(legal, *spare) {
+		return nil
+	}
+	// Don't fight a partner who already secures the last trick: if the partner
+	// is known to hold a trump above our master, the team takes trick 8 anyway.
+	partner := (v.Seat + 2) % 4
+	for _, pc := range knownHeldBy(v, partner) {
+		if pc.Suit == trump && game.TrumpRankOrder[pc.Rank] > game.TrumpRankOrder[master.Rank] {
+			return nil
+		}
+	}
+	return spare
 }
 
 // chooseLead picks the card to open a trick: draw trumps while our team called
