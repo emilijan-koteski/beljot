@@ -75,6 +75,8 @@ async function doRefresh(): Promise<string> {
         languagePreference: string;
         walletBalance: number;
         loginStreakDays: number;
+        totalXp: number;
+        level: number;
         createdAt: string;
       };
     }>("/auth/refresh")
@@ -90,6 +92,8 @@ async function doRefresh(): Promise<string> {
         languagePreference: r.languagePreference,
         walletBalance: r.walletBalance,
         loginStreakDays: r.loginStreakDays,
+        totalXp: r.totalXp,
+        level: r.level,
         createdAt: r.createdAt,
       });
       return r.token;

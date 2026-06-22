@@ -233,6 +233,16 @@ func TestEventsJSONContract(t *testing.T) {
 			goldenFile: "coin_settlement.json",
 		},
 		{
+			name: "XPAwardedPayload",
+			sample: ws.XPAwardedPayload{
+				XPEarned:   99,
+				NewTotalXP: 1099,
+				NewLevel:   4,
+				LeveledUp:  true,
+			},
+			goldenFile: "xp_awarded.json",
+		},
+		{
 			name: "PlayerDisconnectedPayload",
 			sample: ws.PlayerDisconnectedPayload{
 				PlayerSeat:         3,

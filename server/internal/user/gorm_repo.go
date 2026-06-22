@@ -2,10 +2,12 @@ package user
 
 import (
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/emilijan/beljot/server/internal/apperr"
 )
@@ -106,4 +108,50 @@ func (r *GormUserRepository) UpdatePasswordHash(id uint, hash string) error {
 		return apperr.ErrUserNotFound
 	}
 	return nil
+}
+
+// AddXP adds each delta to the matching user's total_xp inside one transaction
+// and returns each user's resulting total (Story 9.5). Mirrors the wallet
+// repo's ChargeStakes/ApplySettlement discipline: rows are locked FOR UPDATE in
+// ascending userID order, so a concurrent wallet settlement (same order) and an
+// XP award can't deadlock. Zero-delta entries are skipped (never locked, never
+// returned). A missing row aborts and rolls back the whole batch with
+// ErrUserNotFound — all-or-nothing, like the wallet path.
+func (r *GormUserRepository) AddXP(awards map[uint]int) (map[uint]int, error) {
+	newTotals := make(map[uint]int, len(awards))
+
+	ids := make([]uint, 0, len(awards))
+	for id, delta := range awards {
+		if delta == 0 {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return newTotals, nil
+	}
+	slices.Sort(ids)
+
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		for _, id := range ids {
+			var u User
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, id).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return apperr.ErrUserNotFound
+				}
+				return err
+			}
+			newTotal := u.TotalXP + awards[id]
+			if err := tx.Model(&User{}).Where("id = ?", id).
+				Update("total_xp", newTotal).Error; err != nil {
+				return err
+			}
+			newTotals[id] = newTotal
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return newTotals, nil
 }

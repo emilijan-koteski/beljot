@@ -589,11 +589,21 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	winningTeam := 1 - game.TeamForSeat(abandonedSeat)
 	deltas, settlementMsgs := m.settleMatch(roomID, playerIDs, botSeats, winningTeam, coinBuyIn)
 
+	// Story 9.5: award XP for the abandonment. The WHOLE abandoning team forfeits
+	// (0 XP); only the non-abandoning team earns (points-so-far). Pass the real
+	// abandonedSeat + the snapshotted team scores ([A,B] index order). Best-effort
+	// like settlement — a failure logs and skips the events but never blocks the
+	// broadcasts. xp_awarded is slotted after coin_settlement, before match_state.
+	xpMsgs := m.awardXP(roomID, playerIDs, botSeats, [2]int{teamAScore, teamBScore}, abandonedSeat)
+
 	// Broadcast to all human players (disconnected player gets it if they reconnect to WS later)
 	userIDs := humanUserIDs(playerIDs)
 	m.hub.BroadcastToUsers(userIDs, abandonedMsg)
 	for _, sm := range settlementMsgs {
 		m.hub.SendToUser(sm.userID, sm.msg)
+	}
+	for _, xm := range xpMsgs {
+		m.hub.SendToUser(xm.userID, xm.msg)
 	}
 	m.hub.BroadcastToUsers(userIDs, stateMsg)
 

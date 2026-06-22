@@ -96,6 +96,8 @@ const owner = {
   languagePreference: "en",
   walletBalance: 5000,
   loginStreakDays: 1,
+  totalXp: 0,
+  level: 0,
   createdAt: "",
 };
 const guest = {
@@ -105,6 +107,8 @@ const guest = {
   languagePreference: "en",
   walletBalance: 5000,
   loginStreakDays: 1,
+  totalXp: 0,
+  level: 0,
   createdAt: "",
 };
 

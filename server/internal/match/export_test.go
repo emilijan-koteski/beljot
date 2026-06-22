@@ -47,6 +47,26 @@ func AutoActionTypeFor(actionType string) (ws.AutoActionType, bool) {
 	return autoActionTypeFor(actionType)
 }
 
+// AbandonSeatForTest drives the abandonment finalize path
+// (handleSeatReconnectTimeout) deterministically for Story 9.5 tests: it marks
+// the seat disconnected and reads the seat's current reconnect generation so the
+// staleness guard passes, then invokes the timeout handler directly — letting a
+// test assert the abandonment XP award + event ordering without waiting on a
+// real reconnect-window timer.
+func (m *Manager) AbandonSeatForTest(roomID uint, seat int) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.mu.Lock()
+	lm.gameState.Players[seat].Connected = false
+	gen := lm.seatReconnectGenerations[seat]
+	lm.mu.Unlock()
+	m.handleSeatReconnectTimeout(lm, seat, gen)
+}
+
 // BufferHandResultIfScored exposes bufferHandResultIfScored for tests in the
 // external session_test package.
 func (m *Manager) BufferHandResultIfScored(roomID uint, oldState, newState *game.GameState) {

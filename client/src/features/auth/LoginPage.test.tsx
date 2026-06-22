@@ -101,6 +101,8 @@ describe("LoginPage", () => {
       languagePreference: "en",
       walletBalance: 5000,
       loginStreakDays: 1,
+      totalXp: 0,
+      level: 0,
       createdAt: "2026-01-01T00:00:00Z",
     });
 
@@ -179,6 +181,8 @@ describe("LoginPage", () => {
       languagePreference: "en",
       walletBalance: 5000,
       loginStreakDays: 1,
+      totalXp: 0,
+      level: 0,
       createdAt: "2026-01-01",
     });
 
@@ -224,6 +228,8 @@ describe("LoginPage", () => {
         languagePreference,
         walletBalance: 5000,
         loginStreakDays: 1,
+        totalXp: 0,
+        level: 0,
         createdAt: "2026-01-01T00:00:00Z",
       };
     }

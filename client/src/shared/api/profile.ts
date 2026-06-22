@@ -9,6 +9,13 @@ export interface ProfileResponse {
   wins: number;
   losses: number;
   abandoned: number;
+  // XP & level (Story 9.5). level is derived server-side from totalXp;
+  // xpIntoLevel / xpForNextLevel drive the profile XP-bar fill
+  // (fill = xpIntoLevel / xpForNextLevel). Server-authoritative, never recomputed.
+  totalXp: number;
+  level: number;
+  xpIntoLevel: number;
+  xpForNextLevel: number;
 }
 
 export interface UpdatePreferencesRequest {

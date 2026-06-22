@@ -12,6 +12,7 @@ import type {
   SurrenderDeclinedPayload,
   SurrenderProposedPayload,
   TrumpSelectedPayload,
+  XpAwardedPayload,
 } from "@/shared/types/wsEvents";
 
 // Snapshot of the just-resolved trick. Captured by the EVENT_TRICK_RESOLVED
@@ -75,6 +76,12 @@ export interface MatchStoreState {
   // be shown inside the end-of-match score dialog. Null for free (0 buy-in)
   // matches, which emit no settlement event.
   coinSettlement: CoinSettlementPayload | null;
+  // Story 9.5: the per-human XP award that arrives right after
+  // event:coin_settlement. Stored (like coinSettlement) so the end-of-match
+  // score dialog can show XP earned + a level-up flourish. Null until the
+  // event:xp_awarded fires (every completed/abandoned match with points emits
+  // one per earning human).
+  xpAward: XpAwardedPayload | null;
   matchAbandonedData: MatchAbandonedPayload | null;
   surrenderProposed: SurrenderProposedPayload | null;
   surrenderDeclined: SurrenderDeclinedPayload | null;
@@ -99,6 +106,7 @@ export interface MatchStoreState {
   setScoreRevealData: (data: HandScoredPayload | null) => void;
   setMatchEndData: (data: MatchEndPayload | null) => void;
   setCoinSettlement: (payload: CoinSettlementPayload | null) => void;
+  setXpAward: (payload: XpAwardedPayload | null) => void;
   setMatchAbandonedData: (data: MatchAbandonedPayload | null) => void;
   setSurrenderProposed: (payload: SurrenderProposedPayload | null) => void;
   setSurrenderDeclined: (payload: SurrenderDeclinedPayload | null) => void;
@@ -138,6 +146,7 @@ const initialState = {
   scoreRevealData: null,
   matchEndData: null,
   coinSettlement: null,
+  xpAward: null,
   matchAbandonedData: null,
   surrenderProposed: null,
   surrenderDeclined: null,
@@ -171,6 +180,8 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
   setMatchEndData: (matchEndData) => set({ matchEndData }),
 
   setCoinSettlement: (coinSettlement) => set({ coinSettlement }),
+
+  setXpAward: (xpAward) => set({ xpAward }),
 
   setMatchAbandonedData: (matchAbandonedData) => set({ matchAbandonedData }),
 

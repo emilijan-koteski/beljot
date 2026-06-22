@@ -116,6 +116,28 @@ func (m *mockUserRepo) Count() (int64, error) {
 	return int64(len(m.users)), nil
 }
 
+func (m *mockUserRepo) AddXP(awards map[uint]int) (map[uint]int, error) {
+	newTotals := make(map[uint]int, len(awards))
+	for id, delta := range awards {
+		if delta == 0 {
+			continue
+		}
+		found := false
+		for _, u := range m.users {
+			if u.ID == id {
+				u.TotalXP += delta
+				newTotals[id] = u.TotalXP
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, apperr.ErrUserNotFound
+		}
+	}
+	return newTotals, nil
+}
+
 func testErrorHandler(err error, c echo.Context) {
 	if c.Response().Committed {
 		return

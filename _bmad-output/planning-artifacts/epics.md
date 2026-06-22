@@ -1899,8 +1899,9 @@ So that I have a lifetime career signal independent of seasonal competitive stan
 
 **Given** a player abandons a match
 **When** XP outcomes are applied
-**Then** the abandoning player receives 0 XP
-**And** the remaining three players receive partial XP proportional to the game progress at time of abandonment (placeholder formula with configurable constants)
+**Then** the entire abandoning team (both members) receives 0 XP
+**And** the non-abandoning team receives partial XP proportional to the game progress at time of abandonment (placeholder formula with configurable constants)
+**And** this mirrors coin settlement's team-based forfeit — the abandoning team taking no XP is the fair punishment (PO decision 2026-06-22, supersedes the earlier "abandoning player only" wording); note that a normal loss still earns XP, so abandonment is the punishment and a normal loss is not
 
 **Given** a player views their profile
 **When** the profile renders

@@ -19,6 +19,8 @@ function setBalance(walletBalance: number) {
       languagePreference: "en",
       walletBalance,
       loginStreakDays: 0,
+      totalXp: 0,
+      level: 0,
       createdAt: "2026-06-18T00:00:00Z",
     },
   });

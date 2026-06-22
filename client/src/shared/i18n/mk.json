@@ -951,5 +951,13 @@
     "balanceLabel": "Парички",
     "streakLabel": "Денови по ред",
     "streakTooltip": "Игра {{days}} дена по ред"
+  },
+  "xp": {
+    "short": "Нив. {{level}}",
+    "levelLabel": "Ниво {{level}}",
+    "progress": "{{current}} / {{next}} поени",
+    "progressLabel": "Ниво {{level}}, {{current}} / {{next}} поени",
+    "xpGained": "Освоивте {{amount}} искуствени поени",
+    "levelUp": "Напреднавте на ниво {{level}}!"
   }
 }

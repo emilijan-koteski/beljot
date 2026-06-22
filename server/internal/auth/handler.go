@@ -31,14 +31,20 @@ type RegisterRequest struct {
 // grants the daily bonus (that is the wallet endpoint's job). Register sets
 // balance 5000 / streak 0; Login and Refresh echo the loaded user's values.
 type RegisterResponseData struct {
-	ID                 uint      `json:"id"`
-	Username           string    `json:"username"`
-	Email              string    `json:"email"`
-	LanguagePreference string    `json:"languagePreference"`
-	WalletBalance      int       `json:"walletBalance"`
-	LoginStreakDays    int       `json:"loginStreakDays"`
-	CreatedAt          time.Time `json:"createdAt"`
-	Token              string    `json:"token"`
+	ID                 uint   `json:"id"`
+	Username           string `json:"username"`
+	Email              string `json:"email"`
+	LanguagePreference string `json:"languagePreference"`
+	WalletBalance      int    `json:"walletBalance"`
+	LoginStreakDays    int    `json:"loginStreakDays"`
+	// XP & level (Story 9.5) — read-only echoes so the top-nav banner has the
+	// level + XP immediately on auth, without a separate profile fetch. TotalXP
+	// is the loaded lifetime total (0 for a fresh registration); Level is derived
+	// from it via user.LevelForXP (never stored).
+	TotalXP   int       `json:"totalXp"`
+	Level     int       `json:"level"`
+	CreatedAt time.Time `json:"createdAt"`
+	Token     string    `json:"token"`
 }
 
 type AuthHandler struct {
@@ -165,6 +171,8 @@ func (h *AuthHandler) Register(c echo.Context) error {
 			LanguagePreference: u.LanguagePreference,
 			WalletBalance:      u.WalletBalance,
 			LoginStreakDays:    u.LoginStreakDays,
+			TotalXP:            u.TotalXP,
+			Level:              user.LevelForXP(u.TotalXP),
 			CreatedAt:          u.CreatedAt,
 			Token:              accessToken,
 		},
@@ -223,6 +231,8 @@ func (h *AuthHandler) Login(c echo.Context) error {
 			LanguagePreference: u.LanguagePreference,
 			WalletBalance:      u.WalletBalance,
 			LoginStreakDays:    u.LoginStreakDays,
+			TotalXP:            u.TotalXP,
+			Level:              user.LevelForXP(u.TotalXP),
 			CreatedAt:          u.CreatedAt,
 			Token:              accessToken,
 		},
@@ -275,6 +285,8 @@ func (h *AuthHandler) Refresh(c echo.Context) error {
 			LanguagePreference: u.LanguagePreference,
 			WalletBalance:      u.WalletBalance,
 			LoginStreakDays:    u.LoginStreakDays,
+			TotalXP:            u.TotalXP,
+			Level:              user.LevelForXP(u.TotalXP),
 			CreatedAt:          u.CreatedAt,
 			Token:              accessToken,
 		},

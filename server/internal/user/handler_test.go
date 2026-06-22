@@ -280,6 +280,28 @@ func (m *mockUserRepo) UpdatePasswordHash(id uint, hash string) error {
 	return gorm.ErrRecordNotFound
 }
 
+func (m *mockUserRepo) AddXP(awards map[uint]int) (map[uint]int, error) {
+	newTotals := make(map[uint]int, len(awards))
+	for id, delta := range awards {
+		if delta == 0 {
+			continue
+		}
+		found := false
+		for _, u := range m.users {
+			if u.ID == id {
+				u.TotalXP += delta
+				newTotals[id] = u.TotalXP
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, apperr.ErrUserNotFound
+		}
+	}
+	return newTotals, nil
+}
+
 func (m *mockUserRepo) addUser(username, email, lang string) *user.User {
 	u := &user.User{
 		ID:                 m.nextID,
@@ -414,6 +436,31 @@ func TestGetProfile_IncludesWalletFields(t *testing.T) {
 
 	assert.Equal(t, 7340, data.WalletBalance)
 	assert.Equal(t, 5, data.LoginStreakDays)
+}
+
+// TestGetProfile_IncludesXPAndLevel pins Story 9.5 AC4: the self-only profile
+// carries total XP, the derived level, and the per-level progress that drives
+// the XP bar. Level 3 band is threshold(3)=450 .. threshold(4)=800 (span 350).
+func TestGetProfile_IncludesXPAndLevel(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("xpuser", "xp@example.com", "en")
+	u.TotalXP = 600 // level 3; 150 into a 350-wide band
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, 600, data.TotalXP)
+	assert.Equal(t, 3, data.Level)
+	assert.Equal(t, 150, data.XPIntoLevel)
+	assert.Equal(t, 350, data.XPForNextLevel)
 }
 
 func TestGetProfile_UserNotFound(t *testing.T) {

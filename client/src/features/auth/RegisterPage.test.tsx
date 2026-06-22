@@ -147,6 +147,8 @@ describe("RegisterPage", () => {
       languagePreference: "en",
       walletBalance: 5000,
       loginStreakDays: 1,
+      totalXp: 0,
+      level: 0,
       createdAt: "2026-04-10T00:00:00Z",
     });
 
@@ -179,6 +181,8 @@ describe("RegisterPage", () => {
       languagePreference: "mk",
       walletBalance: 5000,
       loginStreakDays: 1,
+      totalXp: 0,
+      level: 0,
       createdAt: "2026-04-10T00:00:00Z",
     });
 
@@ -344,6 +348,8 @@ describe("RegisterPage", () => {
       languagePreference: "en",
       walletBalance: 5000,
       loginStreakDays: 1,
+      totalXp: 0,
+      level: 0,
       createdAt: "2026-04-10T00:00:00Z",
     });
   });

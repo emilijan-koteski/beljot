@@ -17,6 +17,10 @@ export interface RegisterResponse {
   languagePreference: string;
   walletBalance: number;
   loginStreakDays: number;
+  // XP & level (Story 9.5) — echoed on auth so the top-nav banner has them on
+  // load without a separate profile fetch. level is derived server-side.
+  totalXp: number;
+  level: number;
   createdAt: string;
 }
 
@@ -35,6 +39,9 @@ export interface RefreshResponse {
   languagePreference: string;
   walletBalance: number;
   loginStreakDays: number;
+  // XP & level (Story 9.5) — see RegisterResponse.
+  totalXp: number;
+  level: number;
   createdAt: string;
 }
 

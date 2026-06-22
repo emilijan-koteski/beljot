@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { MatchFilter } from "@/shared/api/matches";
 import { useCareerQuery } from "@/shared/hooks/queries/useCareer";
 import { useProfileQuery } from "@/shared/hooks/queries/useProfile";
+import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 import { IdentityHero } from "./components/IdentityHero";
@@ -40,6 +41,11 @@ export function ProfilePage() {
   const games = profile?.totalGamesPlayed ?? 0;
   const winRate = games === 0 ? null : Math.round((wins / games) * 100);
 
+  // When the profile query hasn't resolved (e.g. an error after the pending
+  // skeleton), fall back to the client XP curve anchored on the auth-store
+  // level so the bar stays consistent with the level shown — never "0 / 0 XP".
+  const xpFallback = xpBarFill(user?.totalXp ?? 0, user?.level ?? 0);
+
   const counts: Record<MatchFilter, number> = {
     all: games,
     win: wins,
@@ -59,6 +65,9 @@ export function ProfilePage() {
         capots={career.data?.capots ?? 0}
         walletBalance={user?.walletBalance ?? 0}
         loginStreakDays={user?.loginStreakDays ?? 0}
+        level={profile?.level ?? user?.level ?? 0}
+        xpIntoLevel={profile?.xpIntoLevel ?? xpFallback.xpIntoLevel}
+        xpForNextLevel={profile?.xpForNextLevel ?? xpFallback.xpForNextLevel}
         winRate={winRate}
       />
 

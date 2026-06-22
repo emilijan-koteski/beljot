@@ -154,6 +154,9 @@ func main() {
 	// Story 9.2: the match manager credits winning human seats + reads balances
 	// at match end via the wallet service.
 	sessionManager.SetWalletSettler(walletService)
+	// Story 9.5: the match manager awards lifetime XP at match end via the
+	// user-side XP service (built from the already-constructed userRepo).
+	sessionManager.SetXPAwarder(user.NewXPService(userRepo))
 
 	// Reconcile rooms left in status="playing" by a previous process. Sessions
 	// live only in process memory, so any "playing" row at boot has no live

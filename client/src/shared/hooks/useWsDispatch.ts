@@ -40,6 +40,7 @@ import type {
   TrickResolvedPayload,
   TrumpSelectedPayload,
   WsMessage,
+  XpAwardedPayload,
 } from "@/shared/types/wsEvents";
 import {
   EMOTE_IDS,
@@ -72,6 +73,7 @@ import {
   EVENT_SURRENDER_PROPOSED,
   EVENT_TRICK_RESOLVED,
   EVENT_TRUMP_SELECTED,
+  EVENT_XP_AWARDED,
   SYSTEM_AUTHENTICATED,
   SYSTEM_BOT_ADDED,
   SYSTEM_BOT_REMOVED,
@@ -265,10 +267,11 @@ function dispatchGameEvent(message: WsMessage): void {
       });
     }
     store.setMatchEndData(payload);
-    // Reset any prior settlement so the result dialog never shows a stale
-    // coin delta — the matching event:coin_settlement (if this match had a
-    // buy-in) arrives immediately after per the ordering contract and sets it.
+    // Reset any prior settlement/XP so the result dialog never shows stale
+    // values — the matching event:coin_settlement (if buy-in) and
+    // event:xp_awarded arrive immediately after per the ordering contract.
     store.setCoinSettlement(null);
+    store.setXpAward(null);
     return;
   }
 
@@ -294,6 +297,31 @@ function dispatchGameEvent(message: WsMessage): void {
       auth.setUser({ ...auth.user, walletBalance: payload.newBalance });
     }
     store.setCoinSettlement(payload);
+    return;
+  }
+
+  if (type === EVENT_XP_AWARDED) {
+    // Story 9.5: per-human XP award, arriving right after event:coin_settlement.
+    // Update the persisted level + totalXp on authStore.user (lives on authStore,
+    // NOT gameStore, so the top-nav level/XP bar survives navigation away that
+    // wipes gameStore) and stash the award on the match store so the end-of-match
+    // score dialog can report XP earned + a level-up flourish. No toast.
+    const payload = message.payload as XpAwardedPayload;
+    // Defensive validation — Go zero values are real values, so guard on type,
+    // not truthiness (a 0 xpEarned is legitimate).
+    if (
+      !Number.isInteger(payload.xpEarned) ||
+      !Number.isInteger(payload.newTotalXp) ||
+      !Number.isInteger(payload.newLevel) ||
+      typeof payload.leveledUp !== "boolean"
+    ) {
+      return;
+    }
+    const auth = useAuthStore.getState();
+    if (auth.user) {
+      auth.setUser({ ...auth.user, totalXp: payload.newTotalXp, level: payload.newLevel });
+    }
+    store.setXpAward(payload);
     return;
   }
 
@@ -419,6 +447,12 @@ function dispatchGameEvent(message: WsMessage): void {
   if (type === EVENT_MATCH_ABANDONED) {
     const payload = message.payload as MatchAbandonedPayload;
     store.setMatchAbandonedData(payload);
+    // Mirror the match_end reset: clear any prior settlement/XP so the result
+    // surface never shows stale values. The abandoning team forfeits XP (no
+    // event:xp_awarded follows for them), so without this their store could
+    // retain a previous match's award.
+    store.setCoinSettlement(null);
+    store.setXpAward(null);
     return;
   }
 

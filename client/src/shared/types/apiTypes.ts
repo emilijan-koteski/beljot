@@ -20,6 +20,11 @@ export interface User {
   // null — never use JS truthiness on these; compare explicitly (e.g. > 1).
   walletBalance: number;
   loginStreakDays: number;
+  // XP & level (Story 9.5). Both are server-authoritative; level is derived from
+  // totalXp server-side and is never recomputed on the client for any decision.
+  // Go zero values serialize as real 0s — compare explicitly, never truthiness.
+  totalXp: number;
+  level: number;
   createdAt: string;
 }
 

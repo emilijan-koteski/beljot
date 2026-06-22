@@ -238,6 +238,7 @@ export function MatchPage() {
   const matchEndData = useMatchStore((s) => s.matchEndData);
   const setMatchEndData = useMatchStore((s) => s.setMatchEndData);
   const coinSettlement = useMatchStore((s) => s.coinSettlement);
+  const xpAward = useMatchStore((s) => s.xpAward);
   const matchAbandonedData = useMatchStore((s) => s.matchAbandonedData);
   const setMatchAbandonedData = useMatchStore((s) => s.setMatchAbandonedData);
   const activeEmotes = useMatchStore((s) => s.activeEmotes);
@@ -2078,6 +2079,9 @@ export function MatchPage() {
           onReturnToRoom={handleReturnToRoom}
           surrenderedByUsername={surrenderedByUsername}
           coinDelta={coinSettlement?.coinDelta}
+          xpEarned={xpAward?.xpEarned}
+          newLevel={xpAward?.newLevel}
+          leveledUp={xpAward?.leveledUp}
         />
       )}
 

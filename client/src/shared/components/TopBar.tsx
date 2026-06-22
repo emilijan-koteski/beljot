@@ -9,9 +9,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import { XpBar } from "@/shared/components/XpBar";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
+import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 const navItems = [
@@ -102,6 +104,25 @@ export function TopBar({
       )}
 
       <div className="ml-auto flex items-center gap-2.5">
+        {/* Lifetime level + XP bar (Story 9.5). Level is server-authoritative
+            (user.level); the bar fill is cosmetic display math. Hidden on the
+            narrowest phones to keep the bar from crowding the coin pill. Live-
+            updates via the event:xp_awarded handler that writes user.level /
+            user.totalXp on the auth store. */}
+        {user && (
+          <div className="hidden items-center gap-2 sm:flex" data-testid="xp-indicator">
+            <span className="text-ink text-xs font-semibold tabular-nums" data-testid="xp-level">
+              {t("xp.short", { level: user.level })}
+            </span>
+            <XpBar
+              fraction={xpBarFill(user.totalXp, user.level).fraction}
+              label={t("xp.levelLabel", { level: user.level })}
+              className="w-14"
+              testId="xp-bar"
+            />
+          </div>
+        )}
+
         {/* Coin balance pill (Story 9.1). Sits left of the language selector.
             Explicit number rendering — `0` is a real balance, never treated as
             falsy. The login streak is surfaced in the daily-reward dialog and the

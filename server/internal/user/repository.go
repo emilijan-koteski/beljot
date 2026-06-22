@@ -15,4 +15,11 @@ type UserRepository interface {
 	// UpdatePasswordHash replaces the user's bcrypt password hash (used by the
 	// password-reset flow). Returns ErrUserNotFound when no row matches.
 	UpdatePasswordHash(id uint, hash string) error
+	// AddXP atomically adds each (userID -> delta) to that user's total_xp and
+	// returns each user's NEW total (Story 9.5). Mirrors the wallet charge/settle
+	// lock discipline (one transaction, FOR UPDATE, ascending userID order) so
+	// concurrent match-ends — or one user finishing back-to-back matches — are
+	// race-free. Zero-delta entries are skipped (absent from the result). Returns
+	// ErrUserNotFound (rolling the whole batch back) if any target row is missing.
+	AddXP(awards map[uint]int) (map[uint]int, error)
 }

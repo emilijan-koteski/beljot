@@ -1441,6 +1441,8 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     languagePreference: "en",
     walletBalance: 5000,
     loginStreakDays: 0,
+    totalXp: 100,
+    level: 1,
     createdAt: "2026-06-18T00:00:00Z",
   };
 
@@ -1554,5 +1556,95 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     // match_end resets the settlement so a subsequent free match can't show
     // the previous match's coin delta in the result dialog.
     expect(useMatchStore.getState().coinSettlement).toBeNull();
+  });
+});
+
+describe("useWsDispatch — XP awarded (Story 9.5)", () => {
+  const baseUser: User = {
+    id: 10,
+    username: "Alice",
+    email: "alice@test.dev",
+    languagePreference: "en",
+    walletBalance: 5000,
+    loginStreakDays: 0,
+    totalXp: 100,
+    level: 1,
+    createdAt: "2026-06-18T00:00:00Z",
+  };
+
+  beforeEach(() => {
+    useMatchStore.getState().reset();
+    __resetWsDispatchStateForTests();
+    vi.restoreAllMocks();
+    useAuthStore.setState({ user: { ...baseUser } });
+  });
+
+  it("updates authStore level + totalXp and stores the award on a level-up (no toast)", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:xp_awarded",
+      payload: { xpEarned: 101, newTotalXp: 201, newLevel: 2, leveledUp: true },
+    });
+
+    expect(useAuthStore.getState().user?.totalXp).toBe(201);
+    expect(useAuthStore.getState().user?.level).toBe(2);
+    expect(useMatchStore.getState().xpAward).toEqual({
+      xpEarned: 101,
+      newTotalXp: 201,
+      newLevel: 2,
+      leveledUp: true,
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("stores a zero-earned award (loser of a 0-point hand still gets the event)", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:xp_awarded",
+      payload: { xpEarned: 0, newTotalXp: 100, newLevel: 1, leveledUp: false },
+    });
+
+    expect(useAuthStore.getState().user?.totalXp).toBe(100);
+    expect(useMatchStore.getState().xpAward?.xpEarned).toBe(0);
+  });
+
+  it("ignores a malformed xp payload without touching the user or store", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const malformed = [
+      { xpEarned: "10", newTotalXp: 110, newLevel: 1, leveledUp: false },
+      { xpEarned: 10, newTotalXp: null, newLevel: 1, leveledUp: false },
+      { xpEarned: 1.5, newTotalXp: 110, newLevel: 1, leveledUp: false },
+      { xpEarned: 10, newTotalXp: 110, newLevel: 1, leveledUp: "yes" },
+      {},
+    ];
+    for (const payload of malformed) {
+      result.current({ type: "event:xp_awarded", payload });
+    }
+
+    expect(useAuthStore.getState().user?.totalXp).toBe(100);
+    expect(useAuthStore.getState().user?.level).toBe(1);
+    expect(useMatchStore.getState().xpAward).toBeNull();
+  });
+
+  it("clears a prior award when a new match_end arrives", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:xp_awarded",
+      payload: { xpEarned: 50, newTotalXp: 150, newLevel: 1, leveledUp: false },
+    });
+    expect(useMatchStore.getState().xpAward).not.toBeNull();
+
+    result.current({
+      type: "event:match_end",
+      payload: {
+        winnerTeam: 0,
+        teamAFinalScore: 1001,
+        teamBFinalScore: 700,
+        matchDurationSec: 120,
+      },
+    });
+
+    expect(useMatchStore.getState().xpAward).toBeNull();
   });
 });

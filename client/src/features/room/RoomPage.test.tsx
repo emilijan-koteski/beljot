@@ -111,6 +111,8 @@ const defaultUser = {
   languagePreference: "en",
   walletBalance: 5000,
   loginStreakDays: 1,
+  totalXp: 0,
+  level: 0,
   createdAt: "",
 };
 
@@ -980,6 +982,8 @@ describe("RoomPage", () => {
         languagePreference: "en",
         walletBalance: 5000,
         loginStreakDays: 1,
+        totalXp: 0,
+        level: 0,
         createdAt: "",
       },
       token: "tok",
@@ -1050,6 +1054,8 @@ describe("RoomPage", () => {
         languagePreference: "en",
         walletBalance: 5000,
         loginStreakDays: 1,
+        totalXp: 0,
+        level: 0,
         createdAt: "",
       },
       token: "tok",

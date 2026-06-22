@@ -1,0 +1,16 @@
+-- XP & lifetime level (Story 9.5): lifetime experience points live on the users
+-- table as a single additive column, mirroring the wallet_balance style in
+-- 000009. total_xp is a non-negative running total; the player's LEVEL is
+-- DERIVED from it (level = floor(sqrt(total_xp / 50))) and is NEVER stored.
+--
+-- NOT NULL DEFAULT 0 both seeds new rows and backfills any existing rows (a
+-- fresh player starts at Level 0). The CHECK guards the non-negative invariant —
+-- XP only ever accrues, it never decrements.
+--
+-- BIGINT (not INTEGER like wallet_balance): total_xp is a monotonic lifetime
+-- accumulator, so it must match the width of the Go field that sums into it
+-- (user.User.TotalXP is a Go `int` = 64-bit on the server; GORM also maps `int`
+-- to bigint by default). An INTEGER column would cap at ~2.1B and silently fail
+-- the additive UPDATE once a long-lived player crossed it. wallet_balance stays
+-- INTEGER because a coin balance is bounded, not a lifetime running total.
+ALTER TABLE users ADD COLUMN total_xp BIGINT NOT NULL DEFAULT 0 CHECK (total_xp >= 0);
