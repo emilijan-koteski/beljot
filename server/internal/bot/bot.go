@@ -41,18 +41,16 @@ func Decide(v View) game.Action {
 // --- Bidding ---
 
 // wantsTrump is the hand-strength evaluator gate: call the suit as trump when
-// holding ≥4 cards of it; or exactly 3 that include the Jack (unless the other
-// two are 7 and 8, too weak to call); or exactly 3 with the 9+Ace pair, but
-// only when backed by an Ace of another suit. Used by both bidding rounds.
-// Bidding happens on the 5-card stage-1 hand.
+// holding ≥4 cards of it; or exactly 3 that include the Jack (unless a 7 or 8
+// is among them — too weak); or exactly 3 with the 9+Ace pair, but only when
+// backed by a non-singleton side Ace (an Ace in another suit that holds at
+// least one more card). Used by both bidding rounds. Callers pass the
+// hand-plus-candidate the picker would actually hold (see decideBid).
 func wantsTrump(hand []game.Card, suit game.Suit) bool {
 	var count int
-	var hasJack, hasNine, hasAce, has7, has8, hasSideAce bool
+	var hasJack, hasNine, hasAce, has7, has8 bool
 	for _, c := range hand {
 		if c.Suit != suit {
-			if c.Rank == game.RankAce {
-				hasSideAce = true
-			}
 			continue
 		}
 		count++
@@ -75,12 +73,39 @@ func wantsTrump(hand []game.Card, suit game.Suit) bool {
 	if count != 3 {
 		return false
 	}
-	// 3 trumps including the Jack — but a bare J+7+8 is too weak to call.
-	if hasJack && !(has7 && has8) {
+	// 3 trumps including the Jack — but too weak if either the 7 or the 8 is
+	// among them; the other two trumps must both be 9-or-higher.
+	if hasJack && !has7 && !has8 {
 		return true
 	}
-	// 3 trumps with the 9+Ace pair — only with a side Ace to back it up.
-	return hasNine && hasAce && hasSideAce
+	// 3 trumps with the 9+Ace pair — only with a BACKED side Ace.
+	return hasNine && hasAce && hasBackedSideAce(hand, suit)
+}
+
+// hasBackedSideAce reports whether the hand holds an Ace in some non-trump suit
+// that also contains at least one more card of that suit — i.e. the side Ace is
+// not a lone singleton that an opponent can ruff away on the first round.
+func hasBackedSideAce(hand []game.Card, trump game.Suit) bool {
+	for _, s := range game.AllSuits {
+		if s == trump {
+			continue
+		}
+		var hasAce bool
+		var count int
+		for _, c := range hand {
+			if c.Suit != s {
+				continue
+			}
+			count++
+			if c.Rank == game.RankAce {
+				hasAce = true
+			}
+		}
+		if hasAce && count >= 2 {
+			return true
+		}
+	}
+	return false
 }
 
 // trumpSuitScore ranks qualifying suits in round 2: trump-order card points
@@ -99,10 +124,20 @@ func trumpSuitScore(hand []game.Card, suit game.Suit) int {
 }
 
 func decideBid(v View) game.Action {
+	// The picker ALWAYS receives the face-up trump candidate (engine appends it
+	// in handlePickTrump, both rounds), so the bid must be evaluated on the hand
+	// the bot would actually hold after picking: the 5 dealt cards PLUS the
+	// candidate. In round 1 the candidate is a trump (its suit IS the trump
+	// suit); in round 2 it is a guaranteed side card (its suit is locked out).
+	bidHand := v.Hand
+	if v.TrumpCandidate != nil {
+		bidHand = append(slices.Clone(v.Hand), *v.TrumpCandidate)
+	}
+
 	if v.BiddingRound == 1 {
 		// Round 1: the candidate's suit is the only option — pick or pass.
 		// A round-1 pick carries no Suit (the engine locks the candidate's).
-		if v.TrumpCandidate != nil && wantsTrump(v.Hand, v.TrumpCandidate.Suit) {
+		if v.TrumpCandidate != nil && wantsTrump(bidHand, v.TrumpCandidate.Suit) {
 			return game.Action{Type: game.ActionPickTrump, PlayerSeat: v.Seat}
 		}
 		return game.Action{Type: game.ActionPassTrump, PlayerSeat: v.Seat}
@@ -110,17 +145,19 @@ func decideBid(v View) game.Action {
 
 	// Round 2: evaluate the non-candidate suits with the same evaluator and
 	// pick the best one that clears the threshold, else pass. The candidate's
-	// suit is locked out by the engine (already spent in round 1).
+	// suit is locked out by the engine (already spent in round 1), but the
+	// candidate card itself still lands in the picker's hand as a side card, so
+	// it counts toward the side-Ace backup in wantsTrump.
 	var best *game.Suit
 	bestScore := -1
 	for _, suit := range game.AllSuits {
 		if v.TrumpCandidate != nil && suit == v.TrumpCandidate.Suit {
 			continue
 		}
-		if !wantsTrump(v.Hand, suit) {
+		if !wantsTrump(bidHand, suit) {
 			continue
 		}
-		if score := trumpSuitScore(v.Hand, suit); score > bestScore {
+		if score := trumpSuitScore(bidHand, suit); score > bestScore {
 			s := suit
 			best = &s
 			bestScore = score
@@ -233,6 +270,28 @@ func chooseLead(v View, legal []game.Card) game.Card {
 		}
 	}
 
+	// Draw trumps for the partner: when the PARTNER called trump, lead a trump to
+	// strip the opponents even though WE do not hold the master — the partner is
+	// assumed to hold the top trumps (J/9) and overtrumps to take the trick. We
+	// sacrifice the weakest honor first (Q, K, T, A) and never lead the 9 (a
+	// near-master kept as a winner, so the partner's Jack never gets stripped by
+	// our own draw) — see partnerDrawTrump. Skipped when the partner is void in
+	// trump (no overtrump to set up) or when a known opponent holding already
+	// outranks our best trump (the "partner has the top" assumption has been
+	// disproven by the reveal).
+	if myTeamCalledTrump(v) && trumpsRemainUnseen(v, trump) && !holdsMasterTrump(v, trump) {
+		partner := (v.Seat + 2) % 4
+		botTop := highestOfSuit(legal, trump, game.TrumpRankOrder)
+		if botTop != nil &&
+			v.TrumpCallerSeat != nil && *v.TrumpCallerSeat == partner &&
+			!partnerVoidInTrump(v, partner, trump) &&
+			!opponentKnownHoldsTrumpAbove(v, *botTop, trump) {
+			if c := partnerDrawTrump(legal, trump); c != nil {
+				return *c
+			}
+		}
+	}
+
 	// Side-suit boss (no unseen card of its suit beats it): cash the points,
 	// preferring the highest-value boss (Aces first).
 	var boss *game.Card
@@ -247,6 +306,13 @@ func chooseLead(v View, legal []game.Card) game.Card {
 	}
 	if boss != nil {
 		return *boss
+	}
+
+	// Feed the partner a ruff: with no boss to cash, if the partner is known
+	// void in a side suit (and not known void in trump, so it can still ruff),
+	// lead the lowest card of that suit so the partner trumps the trick and wins.
+	if c := leadIntoPartnerVoid(v, legal, trump); c != nil {
+		return *c
 	}
 
 	// No boss: lead the safest card — the lowest-value non-trump (a 0-point
@@ -287,8 +353,12 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 				return *c
 			}
 			// No non-overtaking card — every legal play would overtake the
-			// partner. The trick stays ours either way; spend the cheapest.
-			return lowestValue(legal, trump)
+			// partner. The trick stays ours either way, so capture it with our
+			// strongest card, but keep a boss/master back: if the strongest legal
+			// card is the boss of its suit, drop to the second strongest (still
+			// wins, since every legal card overtakes) and preserve the boss for a
+			// later trick.
+			return strongestPreservingBoss(v, legal, trump)
 		}
 		// Partner's card is still contestable — keep our points home. While the
 		// led suit can still win, the overplay rule auto-promotes us when we
@@ -304,6 +374,21 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 			return *c
 		}
 		return lowestValue(legal, trump)
+	}
+
+	// Opponent currently wins. When we are LAST to play and can win by FOLLOWING
+	// the led (non-trump) suit, bank the highest-point led-suit winner instead of
+	// the cheapest: kept and led next trick that high card risks being ruffed,
+	// but banked into this trick — which we are guaranteed to take as the last
+	// player — it is safe. Ruff wins (void in the led suit) and trump-led tricks
+	// fall through to cheapestWinning unchanged.
+	if len(v.CurrentTrick) == 3 {
+		led := v.CurrentTrick[0].Card.Suit
+		if led != trump {
+			if c := highestPointsLedSuitWinner(v, legal, led, trump); c != nil {
+				return *c
+			}
+		}
 	}
 
 	// Opponent currently wins: take the trick as cheaply as possible.
@@ -467,6 +552,106 @@ func holdsMasterTrump(v View, trump game.Suit) bool {
 	return true
 }
 
+// partnerVoidInTrump reports whether the partner is KNOWN void in the trump
+// suit (inferred from a prior non-follow). Shared by the partner trump-draw
+// (Rule 4) and the partner-void ruff feed (Rule 7).
+func partnerVoidInTrump(v View, partner int, trump game.Suit) bool {
+	idx := SuitIndex(trump)
+	return idx >= 0 && partner >= 0 && partner < 4 && v.KnownVoids[partner][idx]
+}
+
+// opponentKnownHoldsTrumpAbove reports whether a card we KNOW an opponent holds
+// (from the declaration reveal) is a trump that outranks ref. Used to abort the
+// partner trump-draw when the reveal proves the top trumps are NOT with the
+// partner.
+func opponentKnownHoldsTrumpAbove(v View, ref game.Card, trump game.Suit) bool {
+	for seat := range 4 {
+		if game.TeamForSeat(seat) == game.TeamForSeat(v.Seat) {
+			continue
+		}
+		for _, c := range knownHeldBy(v, seat) {
+			if c.Suit == trump && game.TrumpRankOrder[c.Rank] > game.TrumpRankOrder[ref.Rank] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// partnerDrawTrump picks the trump to lead when drawing for the partner
+// (Rule 4): sacrifice the weakest honor first — Queen, then King, then Ten, then
+// Ace — keeping the stronger trumps back. With no honor it leads the lowest
+// trump that is NOT the 9; the 9 is a near-master held back as a winner, and the
+// Jack is never a candidate here (holding it makes the bot the master, handled by
+// the draw-with-master lead). Returns nil when the only trump available to lead
+// would be the 9 — then the bot does not draw at all.
+func partnerDrawTrump(legal []game.Card, trump game.Suit) *game.Card {
+	for _, r := range []game.Rank{game.RankQueen, game.RankKing, game.RankTen, game.RankAce} {
+		for i := range legal {
+			if legal[i].Suit == trump && legal[i].Rank == r {
+				return &legal[i]
+			}
+		}
+	}
+	// No honor — lead the lowest trump that is not the 9.
+	var low *game.Card
+	for i := range legal {
+		c := legal[i]
+		if c.Suit != trump || c.Rank == game.Rank9 {
+			continue
+		}
+		if low == nil || game.TrumpRankOrder[c.Rank] < game.TrumpRankOrder[low.Rank] {
+			low = &legal[i]
+		}
+	}
+	return low
+}
+
+// leadIntoPartnerVoid returns the lowest-value card of a side suit the partner
+// is known void in (so the partner can ruff and win the trick), or nil when no
+// such lead applies. Requires the partner not to be known void in trump (else
+// it cannot ruff). Skips the trump suit and any suit the bot cannot lead. Among
+// several candidate void suits it picks the cheapest sacrifice (lowest card
+// value), breaking ties by AllSuits order for determinism. Only reached after
+// the boss step, so the bot holds no side boss to cash here.
+func leadIntoPartnerVoid(v View, legal []game.Card, trump game.Suit) *game.Card {
+	partner := (v.Seat + 2) % 4
+	if partnerVoidInTrump(v, partner, trump) {
+		return nil
+	}
+	var best *game.Card
+	for _, s := range game.AllSuits {
+		if s == trump {
+			continue
+		}
+		idx := SuitIndex(s)
+		if idx < 0 || !v.KnownVoids[partner][idx] {
+			continue
+		}
+		suitCards := cardsOfSuit(legal, s)
+		if len(suitCards) == 0 {
+			continue
+		}
+		low := lowestValue(suitCards, trump)
+		if best == nil || cardPoints(low, trump) < cardPoints(*best, trump) {
+			lc := low
+			best = &lc
+		}
+	}
+	return best
+}
+
+// cardsOfSuit returns the cards of the given suit.
+func cardsOfSuit(cards []game.Card, s game.Suit) []game.Card {
+	var out []game.Card
+	for _, c := range cards {
+		if c.Suit == s {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 // isSuitBoss reports whether no card an OPPONENT could play (threats) of the
 // same (non-trump) suit outranks c. Scanning threats keeps a known opponent
 // holding (e.g. an Ace the opponents declared) a real threat, so the bot never
@@ -615,6 +800,92 @@ func cheapestWinning(v View, legal []game.Card, trump game.Suit) *game.Card {
 		pts := cardPoints(c, trump)
 		strength := cardStrengthOf(c, trump)
 		if best == nil || pts < bestPts || (pts == bestPts && strength < bestStrength) {
+			best = &legal[i]
+			bestPts = pts
+			bestStrength = strength
+		}
+	}
+	return best
+}
+
+// strongestByTrickPower returns the card with the greatest trick-taking power
+// given the led and trump suits (any trump beats any non-trump; within a suit
+// class, rank order decides). Callers pass a SINGLE-suit slice (follow-suit or
+// ruff cards), where beatsCard is a total order and ties cannot occur.
+func strongestByTrickPower(cards []game.Card, led, trump game.Suit) game.Card {
+	best := cards[0]
+	for _, c := range cards[1:] {
+		if beatsCard(c, best, led, trump) {
+			best = c
+		}
+	}
+	return best
+}
+
+// isTrumpMaster reports whether c is a trump that no trump an OPPONENT could
+// play (threats) outranks.
+func isTrumpMaster(v View, c game.Card, trump game.Suit) bool {
+	if c.Suit != trump {
+		return false
+	}
+	for _, u := range threats(v) {
+		if u.Suit == trump && game.TrumpRankOrder[u.Rank] > game.TrumpRankOrder[c.Rank] {
+			return false
+		}
+	}
+	return true
+}
+
+// cardIsBoss reports whether c is the uncontested top of its suit from the
+// OPPONENTS' side: the trump master, or a non-trump suit boss.
+func cardIsBoss(v View, c game.Card, trump game.Suit) bool {
+	if c.Suit == trump {
+		return isTrumpMaster(v, c, trump)
+	}
+	return isSuitBoss(c, v)
+}
+
+// strongestPreservingBoss returns the strongest legal card by trick power, but
+// when that card is the boss/master of its suit it returns the SECOND strongest
+// instead — preserving the boss for a later trick. Used when every legal card
+// would overtake a partner who has safely won the trick: the team keeps the
+// trick regardless, so we capture it with a high (but not top) card. With a
+// single legal card there is nothing to preserve.
+func strongestPreservingBoss(v View, legal []game.Card, trump game.Suit) game.Card {
+	led := v.CurrentTrick[0].Card.Suit
+	strongest := strongestByTrickPower(legal, led, trump)
+	if len(legal) < 2 || !cardIsBoss(v, strongest, trump) {
+		return strongest
+	}
+	rest := make([]game.Card, 0, len(legal)-1)
+	removed := false
+	for _, c := range legal {
+		if !removed && c == strongest {
+			removed = true
+			continue
+		}
+		rest = append(rest, c)
+	}
+	return strongestByTrickPower(rest, led, trump)
+}
+
+// highestPointsLedSuitWinner returns the highest-point card of the led suit that
+// would overtake the current winner, or nil when none (void in the led suit, or
+// no led-suit card outranks the winner — e.g. a trump already cut a non-trump
+// trick). Ties broken by strength. The caller guarantees led != trump, so
+// NonTrumpCardPoints is the correct value table.
+func highestPointsLedSuitWinner(v View, legal []game.Card, led, trump game.Suit) *game.Card {
+	var best *game.Card
+	bestPts := -1
+	bestStrength := -1
+	for i := range legal {
+		c := legal[i]
+		if c.Suit != led || !wouldOvertake(c, v.CurrentTrick, trump) {
+			continue
+		}
+		pts := game.NonTrumpCardPoints[c.Rank]
+		strength := game.NonTrumpRankOrder[c.Rank]
+		if best == nil || pts > bestPts || (pts == bestPts && strength > bestStrength) {
 			best = &legal[i]
 			bestPts = pts
 			bestStrength = strength

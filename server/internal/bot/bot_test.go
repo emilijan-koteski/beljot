@@ -91,41 +91,61 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType: game.ActionPickTrump,
 		},
 		{
-			name:     "round 1 three with jack but only 7+8 alongside passes",
+			// Candidate inclusion (rule 1a): only 2 hearts in hand, but the
+			// face-up AH the picker would receive completes J+9+A — 3 trumps incl.
+			// the Jack with no 7/8 — so it is a take.
+			name:     "round 1 candidate completes jack+nine to a qualifying three picks",
 			seat:     1,
-			hand:     cards("JH", "8H", "7H", "7S", "8S"),
-			round:    1,
-			wantType: game.ActionPassTrump,
-		},
-		{
-			name:     "round 1 three with jack and a nine picks",
-			seat:     1,
-			hand:     cards("JH", "9H", "7H", "7S", "8S"),
+			hand:     cards("JH", "9H", "7S", "8S", "9S"),
 			round:    1,
 			wantType: game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 nine and ace without a side ace passes",
+			// Same two trumps, but the candidate is the 7H, so the completed three
+			// is J+9+7 — a 7 is present, so rule 1b makes it too weak to call.
+			name:      "round 1 candidate completes to three with a seven passes",
 			seat:      1,
-			hand:      cards("9H", "AH", "7H", "7S", "8S"),
+			hand:      cards("JH", "9H", "7S", "8S", "9S"),
 			round:     1,
-			candidate: "QH",
+			candidate: "7H",
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			name:      "round 1 nine and ace with a side ace picks",
+			// Rule 1b: J+7+8 (and any 7-or-8) is too weak. Candidate 8H completes
+			// J+7 in hand to the bare J+7+8 three.
+			name:      "round 1 three with jack and a seven and eight passes",
 			seat:      1,
-			hand:      cards("9H", "AH", "7H", "AS", "8S"),
+			hand:      cards("JH", "7H", "7S", "8S", "9S"),
+			round:     1,
+			candidate: "8H",
+			wantType:  game.ActionPassTrump,
+		},
+		{
+			// Rule 1c: 9+Ace pair with a BACKED side Ace (spades AS+8S) — take.
+			name:      "round 1 nine ace pair with a backed side ace picks",
+			seat:      1,
+			hand:      cards("9H", "AH", "AS", "8S", "KD"),
 			round:     1,
 			candidate: "QH",
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:     "round 1 three without jack or nine+ace passes",
-			seat:     1,
-			hand:     cards("KH", "QH", "TH", "7S", "8S"),
-			round:    1,
-			wantType: game.ActionPassTrump,
+			// Rule 1c: 9+Ace pair but the side Ace (AS) is a singleton — no backup,
+			// so pass.
+			name:      "round 1 nine ace pair with a singleton side ace passes",
+			seat:      1,
+			hand:      cards("9H", "AH", "AS", "8D", "KC"),
+			round:     1,
+			candidate: "QH",
+			wantType:  game.ActionPassTrump,
+		},
+		{
+			name:      "round 1 three without jack or nine+ace passes",
+			seat:      1,
+			hand:      cards("KH", "QH", "7S", "8S", "9S"),
+			round:     1,
+			candidate: "TH",
+			wantType:  game.ActionPassTrump,
 		},
 		{
 			name:     "round 1 junk hand passes",
@@ -141,6 +161,18 @@ func TestDecide_Bidding(t *testing.T) {
 			round:    2,
 			wantType: game.ActionPickTrump,
 			wantSuit: suitPtr(game.SuitSpades),
+		},
+		{
+			// Round-2 candidate awareness: diamonds is a 9+Ace pick whose side Ace
+			// (AC) is a singleton in hand — but the face-up candidate TC the picker
+			// receives backs it (clubs AC+TC), so the bid clears.
+			name:      "round 2 candidate side card backs a nine ace pick",
+			seat:      1,
+			hand:      cards("9D", "AD", "KD", "AC", "7H"),
+			round:     2,
+			candidate: "TC",
+			wantType:  game.ActionPickTrump,
+			wantSuit:  suitPtr(game.SuitDiamonds),
 		},
 		{
 			name:     "round 2 candidate suit locked out",
@@ -606,6 +638,310 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 			assert.Equal(t, tt.wantCard, action.Card.String())
 		})
 	}
+}
+
+// --- Card-play tweaks (Rules 4, 5.1.1, 6, 7) ---
+
+// obs is one observed play fed to bot Memory. lead is the OLD trick's lead suit
+// (nil when the card led the trick); a non-follow marks the seat void in lead.
+type obs struct {
+	seat int
+	card string
+	lead *game.Suit
+}
+
+// playTweakCase drives bot.Decide for seat 0 (team A) with trump = Hearts
+// (NewGameMidPlay), giving full control over the trick, the trump caller, the
+// observed plays (and thus inferred voids), and the public declarations.
+type playTweakCase struct {
+	name           string
+	hand           []game.Card
+	trick          []game.TrickCard
+	callerSeat     int
+	observes       []obs
+	declaredBySeat map[int][]string
+	wantCard       string
+}
+
+func runPlayTweakCases(t *testing.T, tests []playTweakCase) {
+	t.Helper()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := testfixtures.NewGameMidPlay(1) // trump = Hearts
+			gs.Players[0].Hand = tt.hand
+			gs.CurrentTrick = tt.trick
+			gs.ActivePlayerSeat = 0
+			caller := tt.callerSeat
+			gs.TrumpCallerSeat = &caller
+			if len(tt.trick) > 0 {
+				lead := tt.trick[0].Card.Suit
+				gs.LeadSuit = &lead
+			}
+
+			mem := bot.NewMemory()
+			for _, o := range tt.observes {
+				mem.ObservePlay(o.seat, card(o.card), o.lead)
+			}
+			for seat, ids := range tt.declaredBySeat {
+				gs.Players[seat].Declarations = []game.Declaration{{
+					Type:       game.DeclarationSequence,
+					Cards:      cards(ids...),
+					PlayerSeat: seat,
+				}}
+			}
+			if len(tt.declaredBySeat) > 0 {
+				mem.ObserveDeclarations(gs.Players)
+			}
+
+			action := bot.Decide(viewFromState(gs, 0, mem))
+			require.Equal(t, game.ActionPlayCard, action.Type)
+			require.NotNil(t, action.Card)
+			assert.Equal(t, tt.wantCard, action.Card.String())
+		})
+	}
+}
+
+// TestDecide_DrawTrumpsForPartner covers Rule 4: when the PARTNER (seat 2)
+// called trump and the bot leads without the master, it leads its highest trump
+// to strip opponents (assuming the partner holds the top trumps), unless the
+// partner is void in trump or a known opponent holding outranks the bot's best.
+func TestDecide_DrawTrumpsForPartner(t *testing.T) {
+	hearts := game.SuitHearts
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			// 9 + 8 trumps, no honor: sacrifice the low 8 and KEEP the 9 — never
+			// lead the 9 (a near-master) into the partner's Jack.
+			name:       "partner called with nine and junk: lead the low trump and keep the nine",
+			hand:       cards("9H", "8H", "AS", "7C"),
+			callerSeat: 2,
+			wantCard:   "8H",
+		},
+		{
+			// Honor order: Queen is the weakest honor, so it leads first.
+			name:       "partner called with honors: sacrifice the queen first",
+			hand:       cards("QH", "KH", "AS", "7C"),
+			callerSeat: 2,
+			wantCard:   "QH",
+		},
+		{
+			// Ten precedes the Ace in the honor order, so it leads before the ace.
+			name:       "partner called with ten and ace: lead the ten before the ace",
+			hand:       cards("TH", "AH", "8S", "7C"),
+			callerSeat: 2,
+			wantCard:   "TH",
+		},
+		{
+			// 9 + Ace: the Ace is an honor and leads; the 9 is kept back.
+			name:       "partner called with nine and ace: lead the ace and keep the nine",
+			hand:       cards("9H", "AH", "8S", "7C"),
+			callerSeat: 2,
+			wantCard:   "AH",
+		},
+		{
+			// The lone trump is the 9 — never lead it; fall through to the side boss.
+			name:       "partner called with a lone nine: do not draw, cash the side boss",
+			hand:       cards("9H", "AS", "8D", "7C"),
+			callerSeat: 2,
+			wantCard:   "AS",
+		},
+		{
+			name:       "partner void in trump: do not draw, cash the side boss",
+			hand:       cards("9H", "8H", "AS", "7C"),
+			callerSeat: 2,
+			observes:   []obs{{seat: 2, card: "8D", lead: &hearts}}, // void hearts
+			wantCard:   "AS",
+		},
+		{
+			name:           "opponent declared the jack: drop the draw, cash the side boss",
+			hand:           cards("9H", "8H", "AS", "7C"),
+			callerSeat:     2,
+			declaredBySeat: map[int][]string{1: {"JH", "JS", "JD", "JC"}},
+			wantCard:       "AS",
+		},
+		{
+			name:       "bot itself called: no partner-draw, cash the side boss",
+			hand:       cards("9H", "8H", "AS", "7C"),
+			callerSeat: 0,
+			wantCard:   "AS",
+		},
+		{
+			name:       "opponent called: not our trump, cash the side boss",
+			hand:       cards("9H", "8H", "AS", "7C"),
+			callerSeat: 1,
+			wantCard:   "AS",
+		},
+		{
+			name:       "bot holds the master: existing draw-with-master leads the jack",
+			hand:       cards("JH", "9H", "AS", "7C"),
+			callerSeat: 2,
+			wantCard:   "JH",
+		},
+		{
+			// No honor and no boss: lead the lowest non-9 trump (the 7).
+			name:       "partner called with low trumps and no boss: lead the lowest non-nine trump",
+			hand:       cards("8H", "7H", "KD", "7C"),
+			callerSeat: 2,
+			wantCard:   "7H",
+		},
+	})
+}
+
+// TestDecide_PreserveBossOnForcedOvertake covers Rule 5.1.1: when the partner
+// has safely won the trick but every legal card would overtake (e.g. the
+// overplay rule forces the bot higher), the bot captures with its strongest
+// card unless that card is the boss/master — then it drops to the second
+// strongest and keeps the boss for later.
+func TestDecide_PreserveBossOnForcedOvertake(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			// Partner (seat 2) wins with QS, bot closes the trick holding AS+TS,
+			// both forced over QS. AS is the suit boss → drop to TS.
+			name: "forced over partner with the ace boss drops to the ten",
+			hand: cards("AS", "TS", "7H"),
+			trick: []game.TrickCard{
+				{Card: card("8S"), PlayerSeat: 1},
+				{Card: card("QS"), PlayerSeat: 2},
+				{Card: card("7S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "TS",
+		},
+		{
+			// With AS and TS already gone, KS is now the boss → drop to QS.
+			name: "promoted king boss drops to the queen",
+			hand: cards("KS", "QS", "7H"),
+			trick: []game.TrickCard{
+				{Card: card("8S"), PlayerSeat: 1},
+				{Card: card("JS"), PlayerSeat: 2},
+				{Card: card("7S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "AS"}, {seat: 1, card: "TS"}},
+			wantCard:   "QS",
+		},
+		{
+			// AS still unseen, so KS is not the boss → play the strongest KS.
+			name: "strongest played when it is not the boss",
+			hand: cards("KS", "QS", "7H"),
+			trick: []game.TrickCard{
+				{Card: card("8S"), PlayerSeat: 1},
+				{Card: card("JS"), PlayerSeat: 2},
+				{Card: card("7S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "KS",
+		},
+		{
+			// Void in led: bot must cut over the partner's winning AD; both trumps
+			// overtake. JH is the trump master → drop to 9H.
+			name: "forced trump over partner keeps the master jack",
+			hand: cards("JH", "9H", "7C"),
+			trick: []game.TrickCard{
+				{Card: card("QD"), PlayerSeat: 1},
+				{Card: card("AD"), PlayerSeat: 2},
+				{Card: card("KD"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "9H",
+		},
+	})
+}
+
+// TestDecide_LastToPlayBanksHighest covers Rule 6: as the last player winning
+// over an opponent by following a non-trump led suit, the bot banks the
+// highest-point led-suit winner (safe now) instead of the cheapest (which it
+// would otherwise have to lead next trick into a possible ruff). Ruff wins and
+// non-last positions are unaffected.
+func TestDecide_LastToPlayBanksHighest(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name: "last with ace and ten over the king banks the ace",
+			hand: cards("AS", "TS", "7C"),
+			trick: []game.TrickCard{
+				{Card: card("KS"), PlayerSeat: 1},
+				{Card: card("7D"), PlayerSeat: 2},
+				{Card: card("8S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "AS",
+		},
+		{
+			// Leader is seat 3, so seat 0 plays SECOND (not last) — Rule 6 is gated
+			// out and the bot wins cheaply with the ten, keeping the ace.
+			name: "not last over the king wins cheaply with the ten",
+			hand: cards("AS", "TS", "7C"),
+			trick: []game.TrickCard{
+				{Card: card("KS"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "TS",
+		},
+		{
+			name: "last but only a ruff wins keeps the cheapest trump",
+			hand: cards("TH", "9H", "7C"),
+			trick: []game.TrickCard{
+				{Card: card("KS"), PlayerSeat: 1},
+				{Card: card("7D"), PlayerSeat: 2},
+				{Card: card("8S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "TH",
+		},
+		{
+			name: "last and cannot win discards the lowest",
+			hand: cards("7C", "8D", "9C"),
+			trick: []game.TrickCard{
+				{Card: card("AS"), PlayerSeat: 1},
+				{Card: card("7D"), PlayerSeat: 2},
+				{Card: card("8S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "7C",
+		},
+	})
+}
+
+// TestDecide_LeadIntoPartnerVoid covers Rule 7: with no boss to cash, the bot
+// leads the lowest card of a side suit the partner is known void in (and the
+// partner can still ruff, i.e. not void in trump) so the partner trumps and
+// wins. Opponents called trump in these cases, so the partner trump-draw is off.
+func TestDecide_LeadIntoPartnerVoid(t *testing.T) {
+	diamonds := game.SuitDiamonds
+	spades := game.SuitSpades
+	hearts := game.SuitHearts
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "partner void in diamonds with trump: lead the lowest diamond",
+			hand:       cards("7D", "KD", "9C"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 2, card: "7C", lead: &diamonds}}, // partner void diamonds
+			wantCard:   "7D",
+		},
+		{
+			name:       "partner also void in trump: cannot ruff, lead safe low",
+			hand:       cards("8C", "KD", "9S"),
+			callerSeat: 1,
+			observes: []obs{
+				{seat: 2, card: "7C", lead: &diamonds}, // void diamonds
+				{seat: 2, card: "8D", lead: &hearts},   // void trump
+			},
+			wantCard: "8C",
+		},
+		{
+			name:       "bot void in the partner's void suit: cannot feed, lead safe low",
+			hand:       cards("KD", "9C", "7H"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 2, card: "7C", lead: &spades}}, // partner void spades
+			wantCard:   "9C",
+		},
+		{
+			name:       "own boss outranks feeding the ruff: cash the ace first",
+			hand:       cards("AS", "7D", "9C"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 2, card: "7C", lead: &diamonds}}, // partner void diamonds
+			wantCard:   "AS",
+		},
+	})
 }
 
 // TestDecide_AlwaysLegal pins that every decision is drawn from the legal
