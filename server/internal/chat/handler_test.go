@@ -35,6 +35,10 @@ func (s *userRepoStub) FindManyByIDs([]uint) ([]user.User, error)   { return nil
 func (s *userRepoStub) Count() (int64, error)                       { return int64(len(s.users)), nil }
 func (s *userRepoStub) UpdateLanguagePreference(uint, string) error { return nil }
 func (s *userRepoStub) UpdatePasswordHash(uint, string) error       { return nil }
+func (s *userRepoStub) AddXP(map[uint]int) (map[uint]int, error)    { return nil, nil }
+func (s *userRepoStub) TotalXPForUsers([]uint) (map[uint]int, error) {
+	return nil, nil
+}
 func (s *userRepoStub) FindByID(id uint) (*user.User, error) {
 	if u, ok := s.users[id]; ok {
 		return u, nil
@@ -149,7 +153,7 @@ func TestHandler_GlobalMessage_BroadcastsToEligibleClients(t *testing.T) {
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
 	client := &ws.Client{UserID: 10}
-	h.HandleAction(client, chatActionMessage(t, "lobby","hello world"))
+	h.HandleAction(client, chatActionMessage(t, "lobby", "hello world"))
 
 	require.Equal(t, 1, hub.callCount())
 	call := hub.lastCall(t)
@@ -180,7 +184,7 @@ func TestHandler_GlobalMessage_ExcludesInGameUsers(t *testing.T) {
 	hub := &hubSpy{connected: []uint{10, 20, 30, 40}}
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
-	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby","hi"))
+	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", "hi"))
 
 	require.Equal(t, 1, hub.callCount())
 	call := hub.lastCall(t)
@@ -198,7 +202,7 @@ func TestHandler_GlobalMessage_DroppedWhenSenderInGame(t *testing.T) {
 	hub := &hubSpy{connected: []uint{10, 20}}
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
-	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby","hi"))
+	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", "hi"))
 
 	assert.Equal(t, 0, hub.callCount(), "no broadcast when sender is in a game")
 }
@@ -226,7 +230,7 @@ func TestHandler_GlobalMessage_SenderAlwaysReceivesOwnEcho(t *testing.T) {
 	// "dropped" test catches that path; for THIS test we verify the
 	// happy path includes the sender:
 	game.inGame[20] = true // unrelated player in a game
-	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby","hi"))
+	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", "hi"))
 
 	require.Equal(t, 1, hub.callCount())
 	call := hub.lastCall(t)
@@ -252,7 +256,7 @@ func TestHandler_RejectsEmpty(t *testing.T) {
 			hub := &hubSpy{connected: []uint{10, 20}}
 
 			h := chat.NewHandler(hub, repo, game, newFakeRoom())
-			h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby",tc.text))
+			h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", tc.text))
 
 			assert.Equal(t, 0, hub.callCount())
 		})
@@ -267,13 +271,13 @@ func TestHandler_RejectsTooLong(t *testing.T) {
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
 	tooLong := strings.Repeat("x", 501)
-	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby",tooLong))
+	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", tooLong))
 
 	assert.Equal(t, 0, hub.callCount(), "501-rune message rejected")
 
 	// 500 runes exactly should be allowed
 	exactly500 := strings.Repeat("y", 500)
-	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby",exactly500))
+	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", exactly500))
 	assert.Equal(t, 1, hub.callCount(), "500-rune message accepted (boundary)")
 }
 
@@ -291,12 +295,12 @@ func TestHandler_LengthCapIsRunesNotBytes(t *testing.T) {
 
 	// 500 Cyrillic "ч" runes = 1000 bytes — would be rejected by len() check
 	cyrillic500 := strings.Repeat("ч", 500)
-	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby",cyrillic500))
+	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", cyrillic500))
 	assert.Equal(t, 1, hub.callCount(), "500-rune Cyrillic message accepted")
 
 	// 501 Cyrillic runes — over the cap, must be rejected
 	cyrillic501 := strings.Repeat("ч", 501)
-	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby",cyrillic501))
+	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", cyrillic501))
 	assert.Equal(t, 1, hub.callCount(), "501-rune Cyrillic message rejected (no new broadcast)")
 }
 
@@ -667,7 +671,7 @@ func TestHandler_SenderNotFound_NoBroadcast(t *testing.T) {
 	hub := &hubSpy{connected: []uint{10, 20}}
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
-	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby","hi"))
+	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", "hi"))
 
 	assert.Equal(t, 0, hub.callCount())
 }

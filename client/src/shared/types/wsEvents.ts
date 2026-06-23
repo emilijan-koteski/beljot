@@ -204,6 +204,21 @@ export interface CoinSettlementPayload {
   pot: number;
 }
 
+// --- XP & progression events (Story 9.5) ---
+// Sent per-human at match end, slotted after event:coin_settlement and before
+// the trailing event:match_state. Carries that player's own XP earned this
+// match, new lifetime total, derived level, and whether they leveled up. The
+// level is server-authoritative (derived from totalXp) — never recomputed on the
+// client for any decision. Keep in sync with server events.go (EventXPAwarded).
+export const EVENT_XP_AWARDED = "event:xp_awarded" as const;
+
+export interface XpAwardedPayload {
+  xpEarned: number;
+  newTotalXp: number;
+  newLevel: number;
+  leveledUp: boolean;
+}
+
 // --- Disconnect/reconnect events (server -> client) ---
 export const EVENT_PLAYER_DISCONNECTED = "event:player_disconnected" as const;
 export const EVENT_PLAYER_RECONNECTED = "event:player_reconnected" as const;

@@ -33,6 +33,8 @@ function setAuthUser(overrides: Partial<import("@/shared/types/apiTypes").User> 
       languagePreference: "en",
       walletBalance: 5000,
       loginStreakDays: 1,
+      totalXp: 0,
+      level: 0,
       createdAt: "2026-01-01T00:00:00Z",
       ...overrides,
     },
@@ -94,5 +96,31 @@ describe("TopBar coin balance", () => {
 
     expect(screen.getByTestId("coin-balance")).toBeInTheDocument();
     expect(screen.queryByTestId("login-streak")).not.toBeInTheDocument();
+  });
+});
+
+describe("TopBar XP level (Story 9.5)", () => {
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  it("renders the level and XP bar from the store", () => {
+    // Level 3, 600 XP: band threshold(3)=450 .. threshold(4)=800 (span 350),
+    // 150 into the band → round(150/350*100) = 43%.
+    setAuthUser({ level: 3, totalXp: 600 });
+    renderWithRouter();
+
+    expect(screen.getByTestId("xp-level")).toHaveTextContent("Lvl 3");
+    const bar = screen.getByTestId("xp-bar");
+    expect(bar).toBeInTheDocument();
+    expect(bar).toHaveAttribute("aria-valuenow", "43");
+  });
+
+  it("renders Level 0 at an empty bar for a brand-new player", () => {
+    setAuthUser({ level: 0, totalXp: 0 });
+    renderWithRouter();
+
+    expect(screen.getByTestId("xp-level")).toHaveTextContent("Lvl 0");
+    expect(screen.getByTestId("xp-bar")).toHaveAttribute("aria-valuenow", "0");
   });
 });

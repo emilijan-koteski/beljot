@@ -951,5 +951,16 @@
     "balanceLabel": "Coins",
     "streakLabel": "Day streak",
     "streakTooltip": "On a {{days}}-day play streak"
+  },
+  "xp": {
+    "short": "Lvl {{level}}",
+    "levelLabel": "Level {{level}}",
+    "progress": "{{current}} / {{next}} XP",
+    "progressLabel": "Level {{level}}, {{current}} / {{next}} XP",
+    "levelUpDialog": {
+      "title": "Level Up!",
+      "earned": "+{{amount}} XP",
+      "continue": "Continue"
+    }
   }
 }

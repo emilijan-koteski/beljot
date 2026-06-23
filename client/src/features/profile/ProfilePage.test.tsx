@@ -51,6 +51,10 @@ function profileFixture(overrides: Partial<ProfileResponse> = {}): ProfileRespon
     wins: 0,
     losses: 0,
     abandoned: 0,
+    totalXp: 0,
+    level: 0,
+    xpIntoLevel: 0,
+    xpForNextLevel: 50,
     ...overrides,
   };
 }
@@ -83,6 +87,8 @@ describe("ProfilePage", () => {
         languagePreference: "en",
         walletBalance: 5000,
         loginStreakDays: 1,
+        totalXp: 0,
+        level: 0,
         createdAt: "2026-01-15T10:00:00Z",
       },
       isLoading: false,

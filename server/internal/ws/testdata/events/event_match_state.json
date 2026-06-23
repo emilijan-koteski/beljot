@@ -33,7 +33,8 @@
       "team": "teamA",
       "declarations": [],
       "connected": true,
-      "isBot": false
+      "isBot": false,
+      "level": 3
     },
     {
       "hand": [
@@ -48,7 +49,8 @@
       "team": "teamB",
       "declarations": [],
       "connected": true,
-      "isBot": false
+      "isBot": false,
+      "level": 1
     },
     {
       "hand": [
@@ -63,7 +65,8 @@
       "team": "teamA",
       "declarations": [],
       "connected": true,
-      "isBot": false
+      "isBot": false,
+      "level": 2
     },
     {
       "hand": [
@@ -78,7 +81,8 @@
       "team": "teamB",
       "declarations": [],
       "connected": true,
-      "isBot": false
+      "isBot": false,
+      "level": 0
     }
   ],
   "teamScores": [

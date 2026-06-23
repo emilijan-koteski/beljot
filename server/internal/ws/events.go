@@ -59,6 +59,27 @@ type CoinSettlementPayload struct {
 	Pot        int `json:"pot"`
 }
 
+// --- XP & progression events (Story 9.5) ---
+// EventXPAwarded is sent per-human at match end, slotted AFTER
+// event:coin_settlement and BEFORE the trailing event:match_state (preserving
+// the Story 8.5-1 ordering contract). It carries that player's own XP earned
+// this match, their new lifetime total, the derived level, and whether they
+// leveled up. Sent per-user (not broadcast) because the values differ per
+// player. The level is server-authoritative (derived from total_xp); the client
+// never decides it.
+const EventXPAwarded = "event:xp_awarded"
+
+// XPAwardedPayload is the typed payload for EventXPAwarded events. XPEarned is
+// the XP gained this match (>= 0); NewTotalXP is the post-award lifetime total;
+// NewLevel is the level derived from NewTotalXP; LeveledUp is true when NewLevel
+// exceeds the pre-award level (drives the optional level-up flourish).
+type XPAwardedPayload struct {
+	XPEarned   int  `json:"xpEarned"`
+	NewTotalXP int  `json:"newTotalXp"`
+	NewLevel   int  `json:"newLevel"`
+	LeveledUp  bool `json:"leveledUp"`
+}
+
 // --- Game event payload structs ---
 
 // CardPlayedPayload is the typed payload for EventCardPlayed events.

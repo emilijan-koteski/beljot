@@ -26,6 +26,7 @@ function player(seat: number, cards: Card[]): PlayerState {
     declarations: [],
     connected: true,
     isBot: false,
+    level: 1,
   };
 }
 

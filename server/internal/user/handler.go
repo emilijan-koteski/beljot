@@ -17,16 +17,24 @@ import (
 // — when Epic 11 adds public player profiles, the public DTO must NOT include
 // them. Never add these fields to a shared/public response shape.
 type ProfileResponse struct {
-	ID                 uint      `json:"id"`
-	Username           string    `json:"username"`
-	LanguagePreference string    `json:"languagePreference"`
-	WalletBalance      int       `json:"walletBalance"`
-	LoginStreakDays    int       `json:"loginStreakDays"`
-	CreatedAt          time.Time `json:"createdAt"`
-	TotalGamesPlayed   int       `json:"totalGamesPlayed"`
-	Wins               int       `json:"wins"`
-	Losses             int       `json:"losses"`
-	Abandoned          int       `json:"abandoned"`
+	ID                 uint   `json:"id"`
+	Username           string `json:"username"`
+	LanguagePreference string `json:"languagePreference"`
+	WalletBalance      int    `json:"walletBalance"`
+	LoginStreakDays    int    `json:"loginStreakDays"`
+	// XP & level (Story 9.5). TotalXP is the lifetime total; Level is derived
+	// from it (never stored); XPIntoLevel/XPForNextLevel drive the profile XP
+	// bar (fill = XPIntoLevel / XPForNextLevel). These are PRIVATE self-only
+	// figures like WalletBalance — keep them off any future public profile DTO.
+	TotalXP          int       `json:"totalXp"`
+	Level            int       `json:"level"`
+	XPIntoLevel      int       `json:"xpIntoLevel"`
+	XPForNextLevel   int       `json:"xpForNextLevel"`
+	CreatedAt        time.Time `json:"createdAt"`
+	TotalGamesPlayed int       `json:"totalGamesPlayed"`
+	Wins             int       `json:"wins"`
+	Losses           int       `json:"losses"`
+	Abandoned        int       `json:"abandoned"`
 }
 
 type UpdatePreferencesRequest struct {
@@ -199,6 +207,8 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		return fmt.Errorf("fetching profile stats: %w", err)
 	}
 
+	level, xpIntoLevel, xpForNextLevel := LevelProgress(u.TotalXP)
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": ProfileResponse{
 			ID:                 u.ID,
@@ -206,6 +216,10 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 			LanguagePreference: u.LanguagePreference,
 			WalletBalance:      u.WalletBalance,
 			LoginStreakDays:    u.LoginStreakDays,
+			TotalXP:            u.TotalXP,
+			Level:              level,
+			XPIntoLevel:        xpIntoLevel,
+			XPForNextLevel:     xpForNextLevel,
 			CreatedAt:          u.CreatedAt,
 			TotalGamesPlayed:   wins + losses + abandoned,
 			Wins:               wins,

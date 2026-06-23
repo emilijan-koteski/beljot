@@ -18,6 +18,7 @@ function makePlayers(): PlayerState[] {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [],
@@ -28,6 +29,7 @@ function makePlayers(): PlayerState[] {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [],
@@ -38,6 +40,7 @@ function makePlayers(): PlayerState[] {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [],
@@ -48,6 +51,7 @@ function makePlayers(): PlayerState[] {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
   ];
 }

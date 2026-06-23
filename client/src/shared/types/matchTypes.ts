@@ -80,6 +80,9 @@ export interface PlayerState {
   // localized seat-derived bot name. Check with `isBot === true`, never
   // truthiness on userId/username.
   isBot: boolean;
+  // Server-authoritative lifetime level (derived from total_xp), captured once
+  // at match start and static for the whole match. Bot seats are 0.
+  level: number;
 }
 
 export interface HandResult {

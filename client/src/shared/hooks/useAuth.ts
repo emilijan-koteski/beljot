@@ -49,6 +49,8 @@ export function useAuthInit(): void {
           languagePreference: res.languagePreference,
           walletBalance: res.walletBalance,
           loginStreakDays: res.loginStreakDays,
+          totalXp: res.totalXp,
+          level: res.level,
           createdAt: res.createdAt,
         });
         // Await the language switch so the first paint after `setLoading(false)`

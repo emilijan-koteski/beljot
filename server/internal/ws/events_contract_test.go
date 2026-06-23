@@ -233,6 +233,16 @@ func TestEventsJSONContract(t *testing.T) {
 			goldenFile: "coin_settlement.json",
 		},
 		{
+			name: "XPAwardedPayload",
+			sample: ws.XPAwardedPayload{
+				XPEarned:   99,
+				NewTotalXP: 1099,
+				NewLevel:   4,
+				LeveledUp:  true,
+			},
+			goldenFile: "xp_awarded.json",
+		},
+		{
 			name: "PlayerDisconnectedPayload",
 			sample: ws.PlayerDisconnectedPayload{
 				PlayerSeat:         3,
@@ -330,6 +340,7 @@ func sampleFourPlayers() [4]game.PlayerState {
 			Hand:         []game.Card{{Rank: game.Rank7, Suit: game.SuitClubs}},
 			Declarations: []game.Declaration{},
 			Connected:    true,
+			Level:        3,
 		},
 		{
 			Seat:         1,
@@ -339,6 +350,7 @@ func sampleFourPlayers() [4]game.PlayerState {
 			Hand:         []game.Card{{Rank: game.Rank8, Suit: game.SuitHearts}},
 			Declarations: []game.Declaration{},
 			Connected:    true,
+			Level:        1,
 		},
 		{
 			Seat:         2,
@@ -348,6 +360,7 @@ func sampleFourPlayers() [4]game.PlayerState {
 			Hand:         []game.Card{{Rank: game.Rank9, Suit: game.SuitDiamonds}},
 			Declarations: []game.Declaration{},
 			Connected:    true,
+			Level:        2,
 		},
 		{
 			Seat:         3,
@@ -357,6 +370,7 @@ func sampleFourPlayers() [4]game.PlayerState {
 			Hand:         []game.Card{{Rank: game.RankAce, Suit: game.SuitSpades}},
 			Declarations: []game.Declaration{},
 			Connected:    true,
+			Level:        0,
 		},
 	}
 }

@@ -3,15 +3,18 @@ import { useTranslation } from "react-i18next";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
+import { LevelRing } from "@/shared/components/LevelRing";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import { XpBar } from "@/shared/components/XpBar";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
+import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 const navItems = [
@@ -46,6 +49,11 @@ export function TopBar({
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
 
+  // Lifetime XP progress for the header level indicators (cosmetic fill; level
+  // itself is server-authoritative). Computed once and shared by the phone ring
+  // and the ≥sm "Lvl N + bar".
+  const xp = user ? xpBarFill(user.totalXp, user.level) : null;
+
   // Clear auth state, then land on the public landing page ("/"). Without the
   // explicit navigate, ProtectedRoute would only fall back to /login.
   function handleLogout() {
@@ -71,8 +79,12 @@ export function TopBar({
           className="size-7 shrink-0"
           data-testid="app-logo"
         />
+        {/* Wordmark hides below md (the burger-header / mobile range) so the
+            logo alone holds the left edge — freeing width for a large coin
+            balance + level + language + burger. The Link's aria-label still
+            carries "Beljot" for assistive tech. */}
         <span
-          className="font-display text-ink text-xl font-semibold tracking-tight"
+          className="font-display text-ink text-xl font-semibold tracking-tight hidden md:inline"
           data-testid="app-name"
         >
           {t("nav.appName")}
@@ -102,6 +114,42 @@ export function TopBar({
       )}
 
       <div className="ml-auto flex items-center gap-2.5">
+        {/* Lifetime level + XP progress (Story 9.5). Level is server-authoritative
+            (user.level); the fill is cosmetic display math. Live-updates via the
+            event:xp_awarded handler that writes user.level / user.totalXp on the
+            auth store. Two responsive treatments: a compact ring on phones, and
+            the wider "Lvl N + bar" from the sm breakpoint up. */}
+        {user && xp && (
+          <>
+            {/* Phones (<sm): compact level ring with the level centered, so the
+                wider Lvl+bar doesn't crowd the coin pill on narrow screens. */}
+            <div className="flex sm:hidden">
+              <LevelRing
+                level={user.level}
+                fraction={xp.fraction}
+                label={t("xp.progressLabel", {
+                  level: user.level,
+                  current: xp.xpIntoLevel,
+                  next: xp.xpForNextLevel,
+                })}
+                testId="xp-ring"
+              />
+            </div>
+            {/* ≥sm: level text + linear XP bar. */}
+            <div className="hidden items-center gap-2 sm:flex" data-testid="xp-indicator">
+              <span className="text-ink text-xs font-semibold tabular-nums" data-testid="xp-level">
+                {t("xp.short", { level: user.level })}
+              </span>
+              <XpBar
+                fraction={xp.fraction}
+                label={t("xp.levelLabel", { level: user.level })}
+                className="w-14"
+                testId="xp-bar"
+              />
+            </div>
+          </>
+        )}
+
         {/* Coin balance pill (Story 9.1). Sits left of the language selector.
             Explicit number rendering — `0` is a real balance, never treated as
             falsy. The login streak is surfaced in the daily-reward dialog and the

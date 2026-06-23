@@ -20,6 +20,11 @@ type PlayerState struct {
 	// shows for them. A field, not a rule — the engine treats bot seats
 	// exactly like human seats.
 	IsBot bool `json:"isBot"`
+	// Level is the player's server-authoritative lifetime level, derived from
+	// total_xp via the pure XP curve (user.LevelForXP) and captured ONCE at
+	// match start. It is static for the duration of a match (XP is only awarded
+	// at match end), so the match engine never recomputes it. Bot seats are 0.
+	Level int `json:"level"`
 }
 
 // TrickCard represents a single card played in a trick, with the player who played it.

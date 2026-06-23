@@ -951,5 +951,16 @@
     "balanceLabel": "Novčići",
     "streakLabel": "Dana zaredom",
     "streakTooltip": "Igra {{days}} dana zaredom"
+  },
+  "xp": {
+    "short": "Nivo {{level}}",
+    "levelLabel": "Nivo {{level}}",
+    "progress": "{{current}} / {{next}} XP",
+    "progressLabel": "Nivo {{level}}, {{current}} / {{next}} XP",
+    "levelUpDialog": {
+      "title": "Novi nivo!",
+      "earned": "+{{amount}} XP",
+      "continue": "Nastavi"
+    }
   }
 }

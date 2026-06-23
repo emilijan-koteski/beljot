@@ -45,6 +45,7 @@ import type {
   SurrenderProposedPayload,
   TrickResolvedPayload,
   TrumpSelectedPayload,
+  XpAwardedPayload,
 } from "./wsEvents";
 
 // --- Card / declaration sub-schemas (used by MatchState + DeclarationsResolved) ---
@@ -72,6 +73,9 @@ const PlayerStateSchema = z.strictObject({
   // Story 10.3: bot seats. Strict schema — this entry must land in the same
   // commit as the Go PlayerState.IsBot field or every snapshot hard-fails.
   isBot: z.boolean(),
+  // Server-authoritative lifetime level (from total_xp), captured at match
+  // start and static for the match. Must match the Go PlayerState.Level field.
+  level: z.number().int(),
 });
 
 const TrickCardSchema = z.strictObject({
@@ -270,6 +274,14 @@ export const CoinSettlementPayloadSchema = z.strictObject({
   pot: z.number().int(),
 });
 
+// Story 9.5: per-human match-end XP award.
+export const XpAwardedPayloadSchema = z.strictObject({
+  xpEarned: z.number().int(),
+  newTotalXp: z.number().int(),
+  newLevel: z.number().int(),
+  leveledUp: z.boolean(),
+});
+
 export const PlayerDisconnectedPayloadSchema = z.strictObject({
   playerSeat: z.number(),
   username: z.string(),
@@ -381,6 +393,12 @@ type _CoinSettlementConformance = MutualExtends<
 >;
 const _coinSettlementConforms: _CoinSettlementConformance = true;
 
+type _XpAwardedConformance = MutualExtends<
+  z.infer<typeof XpAwardedPayloadSchema>,
+  XpAwardedPayload
+>;
+const _xpAwardedConforms: _XpAwardedConformance = true;
+
 type _PlayerDisconnectedConformance = MutualExtends<
   z.infer<typeof PlayerDisconnectedPayloadSchema>,
   PlayerDisconnectedPayload
@@ -422,6 +440,7 @@ export const _conformanceWitnesses = {
   _matchResumedConforms,
   _autoActionConforms,
   _coinSettlementConforms,
+  _xpAwardedConforms,
   _playerDisconnectedConforms,
   _playerReconnectedConforms,
   _surrenderProposedConforms,

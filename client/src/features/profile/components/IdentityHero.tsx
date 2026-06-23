@@ -4,9 +4,11 @@ import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
+import { XpBar } from "@/shared/components/XpBar";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { formatLocalizedDate } from "@/shared/lib/formatDate";
+import { xpFraction } from "@/shared/lib/xpLevel";
 
 import { daysSince } from "../lib/format";
 import { WinRateRing } from "./WinRateRing";
@@ -24,6 +26,12 @@ type IdentityHeroProps = {
   walletBalance: number;
   /** Daily-login streak (Story 9.1) — distinct from the win/loss streak. */
   loginStreakDays: number;
+  /** Lifetime level (Story 9.5) — server-derived from total XP. */
+  level: number;
+  /** XP earned past the current level's threshold (server-provided). */
+  xpIntoLevel: number;
+  /** Size of the current level's XP band (server-provided). */
+  xpForNextLevel: number;
   /** 0–100, or null with no games. */
   winRate: number | null;
 };
@@ -99,6 +107,9 @@ export function IdentityHero({
   capots,
   walletBalance,
   loginStreakDays,
+  level,
+  xpIntoLevel,
+  xpForNextLevel,
   winRate,
 }: IdentityHeroProps) {
   const { t } = useTranslation();
@@ -143,6 +154,8 @@ export function IdentityHero({
             {lastPlayed && <span>{lastPlayed}</span>}
           </div>
           <div className="mt-1.5 flex flex-wrap gap-2">
+            {/* The lifetime level (Story 9.5) is shown in the labelled XP-progress
+                block just below, so no separate level pill is repeated here. */}
             <HeroPill value={games} label={t("profile.hero.games")} tone="neutral" />
             <HeroPill value={wins} label={t("profile.hero.wins")} tone="accent" />
             <HeroPill value={losses} label={t("profile.hero.losses")} tone="neutral" />
@@ -168,6 +181,30 @@ export function IdentityHero({
                 tone="neutral"
               />
             )}
+          </div>
+
+          {/* Lifetime XP progress bar (Story 9.5, AC4). Level + numeric progress
+              on top, the bar below. xpIntoLevel / xpForNextLevel are server-
+              provided; the bar fill is cosmetic. Leaves room for the not-yet-
+              built honor / prior-season rank surfaces — render nothing for them. */}
+          <div className="mt-1 flex max-w-xs flex-col gap-1" data-testid="profile-xp">
+            <div className="flex items-baseline justify-between gap-2 text-[13px]">
+              <span className="text-ink font-semibold" data-testid="profile-level">
+                {t("xp.levelLabel", { level })}
+              </span>
+              <span className="text-ink-dim tabular-nums">
+                {t("xp.progress", { current: xpIntoLevel, next: xpForNextLevel })}
+              </span>
+            </div>
+            <XpBar
+              fraction={xpFraction(xpIntoLevel, xpForNextLevel)}
+              label={t("xp.progressLabel", {
+                level,
+                current: xpIntoLevel,
+                next: xpForNextLevel,
+              })}
+              testId="profile-xp-bar"
+            />
           </div>
         </div>
       </div>

@@ -17,6 +17,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     declarations: [],
     connected: true,
     isBot: false,
+    level: 1,
     ...overrides,
   };
 }
@@ -52,6 +53,23 @@ describe("PlayerSeat", () => {
     const seat = screen.getByTestId("player-seat-0");
     expect(seat).toHaveAttribute("data-seat-team", "gold");
     expect(seat).toHaveAttribute("data-active", "false");
+  });
+
+  it("renders the player's level in the name pill (not the team label)", () => {
+    render(
+      <PlayerSeat
+        player={makePlayer({ level: 7 })}
+        isSelf={false}
+        isActive={false}
+        seatTeam="gold"
+      />,
+    );
+
+    expect(screen.getByTestId("player-seat-level")).toHaveTextContent("Lvl 7");
+    // The visible pill no longer shows the team label "Us".
+    expect(screen.queryByTestId("player-seat-name-pill")).not.toHaveTextContent("Us");
+    // Team is still announced to screen readers via the seat aria-label.
+    expect(screen.getByTestId("player-seat-0")).toHaveAttribute("aria-label", "Alice, Us, waiting");
   });
 
   it("renders silver seat-team for opponents", () => {

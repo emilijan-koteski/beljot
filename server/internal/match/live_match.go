@@ -70,6 +70,24 @@ type WalletSettler interface {
 	GetBalances(userIDs []uint) (map[uint]int, error)
 }
 
+// XPAwarder is the subset of the user-side XP service the match manager needs to
+// award lifetime XP at match end (Story 9.5). ApplyXPAwards atomically adds each
+// (userID -> delta) to total_xp and returns the new totals; LevelForXP derives a
+// level from a total. LevelForXP is on the interface (not imported directly) so
+// the manager can compute NewLevel/LeveledUp for event:xp_awarded WITHOUT
+// importing the user package — user imports match, so match must never import
+// user (Story 9.5 Design Decision D1). Injected via SetXPAwarder; nil → XP is
+// skipped (no mutation, no event), mirroring walletSettler's nil-tolerance.
+type XPAwarder interface {
+	ApplyXPAwards(awards map[uint]int) (map[uint]int, error)
+	LevelForXP(totalXP int) int
+	// LevelsForUsers returns each given userID's current lifetime level
+	// (total_xp run through LevelForXP). Captured at match start to stamp each
+	// human seat's static level on the game state. Unknown IDs and the bot
+	// placeholder (0) are skipped/omitted from the result.
+	LevelsForUsers(ids []uint) (map[uint]int, error)
+}
+
 // Broadcaster is the subset of *ws.Hub the manager depends on. Mirrors the
 // chat / emote pattern (chat/handler.go, emote/handler.go) so tests can swap
 // in a hubSpy without spinning up a real hub. *ws.Hub satisfies this directly.
@@ -87,6 +105,7 @@ type Manager struct {
 	matchRepo        MatchRepository
 	roomUpdater      RoomStatusUpdater
 	walletSettler    WalletSettler
+	xpAwarder        XPAwarder
 	userRemovedHooks []func(userID uint)
 	// Bot think-delay bounds (Story 10.3). Uniform random in [min, max] per
 	// decision; injectable so manager tests don't sleep for real. The 2.5 s
@@ -133,6 +152,12 @@ func (m *Manager) SetWalletSettler(settler WalletSettler) {
 	m.walletSettler = settler
 }
 
+// SetXPAwarder injects the user-side XP service used to award lifetime XP at
+// match end (Story 9.5). Optional — when unset, XP awards are skipped.
+func (m *Manager) SetXPAwarder(awarder XPAwarder) {
+	m.xpAwarder = awarder
+}
+
 // AddUserRemovedHook registers fn to be called (outside the manager lock)
 // for each playerID when RemoveSession tears down a session.
 // Reusable for Epic 9 per-user state (wallet rate-limit, daily-claim cooldown).
@@ -162,6 +187,28 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 	}
 
 	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID)
+
+	// Stamp each human seat's static lifetime level (Story: level-in-match).
+	// Levels derive from total_xp via the XP service and are captured ONCE here
+	// — XP only changes at match end, so they never drift mid-match. Best-effort,
+	// mirroring awardXP's degradation: a lookup failure logs and leaves every
+	// level at 0 rather than blocking match start. Bot seats (UserID 0) stay 0.
+	if m.xpAwarder != nil {
+		humanLevelIDs := humanUserIDs(playerIDs)
+		if len(humanLevelIDs) > 0 {
+			levels, err := m.xpAwarder.LevelsForUsers(humanLevelIDs)
+			if err != nil {
+				slog.Error("session: failed to load player levels", "roomID", roomID, "error", err)
+			} else {
+				for seat, uid := range playerIDs {
+					if uid == 0 {
+						continue
+					}
+					gs.Players[seat].Level = levels[uid]
+				}
+			}
+		}
+	}
 
 	// Map room owner to seat index for pause override validation.
 	// Default to -1 (no owner override available) if ownerID not found among players.
@@ -1061,6 +1108,13 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	// after event:match_end (8.5-1 ordering contract).
 	deltas, settlementMsgs := m.settleMatch(session.roomID, session.playerIDs, botSeats, winnerTeam, session.coinBuyIn)
 
+	// Story 9.5: award lifetime XP (no-op when no awarder wired). Normal end →
+	// abandonedSeat -1; every human seat earns floor(teamScores[team]/10), losers
+	// included. Best-effort like settlement — a failure logs and skips the events
+	// but never blocks the broadcasts below. The xp_awarded messages are slotted
+	// after coin_settlement and before match_state (8.5-1 ordering contract).
+	xpMsgs := m.awardXP(session.roomID, session.playerIDs, botSeats, finalState.TeamScores, -1)
+
 	matchRecord := &Match{
 		RoomID:           session.roomID,
 		Player1ID:        ids[0],
@@ -1116,6 +1170,9 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchEnd, matchEndPayload))
 	for _, sm := range settlementMsgs {
 		m.hub.SendToUser(sm.userID, sm.msg)
+	}
+	for _, xm := range xpMsgs {
+		m.hub.SendToUser(xm.userID, xm.msg)
 	}
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, finalState))
 

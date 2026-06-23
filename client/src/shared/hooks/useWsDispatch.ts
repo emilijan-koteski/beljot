@@ -6,6 +6,7 @@ import { handleWsMessage as handleRoomListMessage } from "@/features/lobby/useRo
 import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
+import { useLevelUpStore } from "@/shared/stores/levelUpStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { MatchState } from "@/shared/types/matchTypes";
@@ -40,6 +41,7 @@ import type {
   TrickResolvedPayload,
   TrumpSelectedPayload,
   WsMessage,
+  XpAwardedPayload,
 } from "@/shared/types/wsEvents";
 import {
   EMOTE_IDS,
@@ -72,6 +74,7 @@ import {
   EVENT_SURRENDER_PROPOSED,
   EVENT_TRICK_RESOLVED,
   EVENT_TRUMP_SELECTED,
+  EVENT_XP_AWARDED,
   SYSTEM_AUTHENTICATED,
   SYSTEM_BOT_ADDED,
   SYSTEM_BOT_REMOVED,
@@ -265,9 +268,9 @@ function dispatchGameEvent(message: WsMessage): void {
       });
     }
     store.setMatchEndData(payload);
-    // Reset any prior settlement so the result dialog never shows a stale
-    // coin delta — the matching event:coin_settlement (if this match had a
-    // buy-in) arrives immediately after per the ordering contract and sets it.
+    // Reset any prior settlement so the result dialog never shows a stale coin
+    // amount — the matching event:coin_settlement (if buy-in) arrives
+    // immediately after per the ordering contract.
     store.setCoinSettlement(null);
     return;
   }
@@ -294,6 +297,40 @@ function dispatchGameEvent(message: WsMessage): void {
       auth.setUser({ ...auth.user, walletBalance: payload.newBalance });
     }
     store.setCoinSettlement(payload);
+    return;
+  }
+
+  if (type === EVENT_XP_AWARDED) {
+    // Story 9.5: per-human XP award, arriving right after event:coin_settlement.
+    // Always update the persisted level + totalXp on authStore.user (lives on
+    // authStore, NOT gameStore, so the top-nav level/XP bar survives the
+    // navigation away that wipes gameStore). When the award crossed a level
+    // boundary, stash a pending level-up on the navigation-surviving
+    // levelUpStore so the dedicated dialog can celebrate it once the player
+    // lands back in the lobby/room (AppLayout). No toast; non-level-up matches
+    // surface nothing.
+    const payload = message.payload as XpAwardedPayload;
+    // Defensive validation — Go zero values are real values, so guard on type,
+    // not truthiness (a 0 xpEarned is legitimate).
+    if (
+      !Number.isInteger(payload.xpEarned) ||
+      !Number.isInteger(payload.newTotalXp) ||
+      !Number.isInteger(payload.newLevel) ||
+      typeof payload.leveledUp !== "boolean"
+    ) {
+      return;
+    }
+    const auth = useAuthStore.getState();
+    if (auth.user) {
+      auth.setUser({ ...auth.user, totalXp: payload.newTotalXp, level: payload.newLevel });
+    }
+    if (payload.leveledUp) {
+      useLevelUpStore.getState().setPending({
+        newLevel: payload.newLevel,
+        newTotalXp: payload.newTotalXp,
+        xpEarned: payload.xpEarned,
+      });
+    }
     return;
   }
 
@@ -419,6 +456,9 @@ function dispatchGameEvent(message: WsMessage): void {
   if (type === EVENT_MATCH_ABANDONED) {
     const payload = message.payload as MatchAbandonedPayload;
     store.setMatchAbandonedData(payload);
+    // Mirror the match_end reset: clear any prior settlement so the result
+    // surface never shows a stale coin amount.
+    store.setCoinSettlement(null);
     return;
   }
 

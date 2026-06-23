@@ -18,6 +18,7 @@ import { queryClient } from "@/shared/api/queryClient";
 import { queryKeys } from "@/shared/api/queryKeys";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
+import { useLevelUpStore } from "@/shared/stores/levelUpStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room, User } from "@/shared/types/apiTypes";
@@ -57,6 +58,7 @@ const mockMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [{ rank: "7", suit: "H" }],
@@ -67,6 +69,7 @@ const mockMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [{ rank: "A", suit: "D" }],
@@ -77,6 +80,7 @@ const mockMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [{ rank: "9", suit: "C" }],
@@ -87,6 +91,7 @@ const mockMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
   ],
   teamScores: [0, 0],
@@ -1441,6 +1446,8 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     languagePreference: "en",
     walletBalance: 5000,
     loginStreakDays: 0,
+    totalXp: 100,
+    level: 1,
     createdAt: "2026-06-18T00:00:00Z",
   };
 
@@ -1554,5 +1561,96 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
     // match_end resets the settlement so a subsequent free match can't show
     // the previous match's coin delta in the result dialog.
     expect(useMatchStore.getState().coinSettlement).toBeNull();
+  });
+});
+
+describe("useWsDispatch — XP awarded (Story 9.5)", () => {
+  const baseUser: User = {
+    id: 10,
+    username: "Alice",
+    email: "alice@test.dev",
+    languagePreference: "en",
+    walletBalance: 5000,
+    loginStreakDays: 0,
+    totalXp: 100,
+    level: 1,
+    createdAt: "2026-06-18T00:00:00Z",
+  };
+
+  beforeEach(() => {
+    useMatchStore.getState().reset();
+    __resetWsDispatchStateForTests();
+    vi.restoreAllMocks();
+    useAuthStore.setState({ user: { ...baseUser } });
+    useLevelUpStore.getState().clear();
+  });
+
+  it("updates authStore level + totalXp and opens a level-up dialog on a level-up (no toast)", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:xp_awarded",
+      payload: { xpEarned: 101, newTotalXp: 201, newLevel: 2, leveledUp: true },
+    });
+
+    expect(useAuthStore.getState().user?.totalXp).toBe(201);
+    expect(useAuthStore.getState().user?.level).toBe(2);
+    expect(useLevelUpStore.getState().pending).toEqual({
+      newLevel: 2,
+      newTotalXp: 201,
+      xpEarned: 101,
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("updates XP but opens no dialog when the award did not level the player up", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:xp_awarded",
+      payload: { xpEarned: 50, newTotalXp: 150, newLevel: 1, leveledUp: false },
+    });
+
+    expect(useAuthStore.getState().user?.totalXp).toBe(150);
+    expect(useAuthStore.getState().user?.level).toBe(1);
+    expect(useLevelUpStore.getState().pending).toBeNull();
+  });
+
+  it("ignores a malformed xp payload without touching the user or the dialog", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const malformed = [
+      { xpEarned: "10", newTotalXp: 110, newLevel: 1, leveledUp: false },
+      { xpEarned: 10, newTotalXp: null, newLevel: 1, leveledUp: false },
+      { xpEarned: 1.5, newTotalXp: 110, newLevel: 1, leveledUp: false },
+      { xpEarned: 10, newTotalXp: 110, newLevel: 1, leveledUp: "yes" },
+      {},
+    ];
+    for (const payload of malformed) {
+      result.current({ type: "event:xp_awarded", payload });
+    }
+
+    expect(useAuthStore.getState().user?.totalXp).toBe(100);
+    expect(useAuthStore.getState().user?.level).toBe(1);
+    expect(useLevelUpStore.getState().pending).toBeNull();
+  });
+
+  it("keeps a pending level-up across a subsequent match_end (cleared only on dismiss)", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:xp_awarded",
+      payload: { xpEarned: 120, newTotalXp: 820, newLevel: 4, leveledUp: true },
+    });
+    expect(useLevelUpStore.getState().pending).not.toBeNull();
+
+    result.current({
+      type: "event:match_end",
+      payload: {
+        winnerTeam: 0,
+        teamAFinalScore: 1001,
+        teamBFinalScore: 700,
+        matchDurationSec: 120,
+      },
+    });
+
+    expect(useLevelUpStore.getState().pending).not.toBeNull();
   });
 });

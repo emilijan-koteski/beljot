@@ -98,6 +98,7 @@ describe("gameTypes", () => {
             declarations: [],
             connected: true,
             isBot: false,
+            level: 1,
           },
           {
             hand: [],
@@ -108,6 +109,7 @@ describe("gameTypes", () => {
             declarations: [],
             connected: true,
             isBot: false,
+            level: 1,
           },
           {
             hand: [],
@@ -118,6 +120,7 @@ describe("gameTypes", () => {
             declarations: [],
             connected: true,
             isBot: false,
+            level: 1,
           },
           {
             hand: [],
@@ -128,6 +131,7 @@ describe("gameTypes", () => {
             declarations: [],
             connected: true,
             isBot: false,
+            level: 1,
           },
         ],
         teamScores: [0, 0],

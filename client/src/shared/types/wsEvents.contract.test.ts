@@ -31,6 +31,7 @@ import surrenderDeclinedGolden from "../../../../server/internal/ws/testdata/eve
 import surrenderProposedGolden from "../../../../server/internal/ws/testdata/events/surrender_proposed.json";
 import trickResolvedGolden from "../../../../server/internal/ws/testdata/events/trick_resolved.json";
 import trumpSelectedGolden from "../../../../server/internal/ws/testdata/events/trump_selected.json";
+import xpAwardedGolden from "../../../../server/internal/ws/testdata/events/xp_awarded.json";
 import {
   AutoActionPayloadSchema,
   BelotAnnouncedPayloadSchema,
@@ -50,6 +51,7 @@ import {
   SurrenderProposedPayloadSchema,
   TrickResolvedPayloadSchema,
   TrumpSelectedPayloadSchema,
+  XpAwardedPayloadSchema,
 } from "./wsEvents.schemas";
 
 // Each row pairs a Zod schema with its golden. `it.each` over the table
@@ -74,6 +76,7 @@ const cases = [
   ["MatchResumedPayload", MatchResumedPayloadSchema, matchResumedGolden],
   ["AutoActionPayload", AutoActionPayloadSchema, autoActionGolden],
   ["CoinSettlementPayload", CoinSettlementPayloadSchema, coinSettlementGolden],
+  ["XpAwardedPayload", XpAwardedPayloadSchema, xpAwardedGolden],
   ["PlayerDisconnectedPayload", PlayerDisconnectedPayloadSchema, playerDisconnectedGolden],
   ["PlayerReconnectedPayload", PlayerReconnectedPayloadSchema, playerReconnectedGolden],
   ["SurrenderProposedPayload", SurrenderProposedPayloadSchema, surrenderProposedGolden],
