@@ -73,6 +73,9 @@ const PlayerStateSchema = z.strictObject({
   // Story 10.3: bot seats. Strict schema — this entry must land in the same
   // commit as the Go PlayerState.IsBot field or every snapshot hard-fails.
   isBot: z.boolean(),
+  // Server-authoritative lifetime level (from total_xp), captured at match
+  // start and static for the match. Must match the Go PlayerState.Level field.
+  level: z.number().int(),
 });
 
 const TrickCardSchema = z.strictObject({

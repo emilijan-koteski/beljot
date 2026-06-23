@@ -6,6 +6,7 @@ import { handleWsMessage as handleRoomListMessage } from "@/features/lobby/useRo
 import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
+import { useLevelUpStore } from "@/shared/stores/levelUpStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { MatchState } from "@/shared/types/matchTypes";
@@ -267,11 +268,10 @@ function dispatchGameEvent(message: WsMessage): void {
       });
     }
     store.setMatchEndData(payload);
-    // Reset any prior settlement/XP so the result dialog never shows stale
-    // values — the matching event:coin_settlement (if buy-in) and
-    // event:xp_awarded arrive immediately after per the ordering contract.
+    // Reset any prior settlement so the result dialog never shows a stale coin
+    // amount — the matching event:coin_settlement (if buy-in) arrives
+    // immediately after per the ordering contract.
     store.setCoinSettlement(null);
-    store.setXpAward(null);
     return;
   }
 
@@ -302,10 +302,13 @@ function dispatchGameEvent(message: WsMessage): void {
 
   if (type === EVENT_XP_AWARDED) {
     // Story 9.5: per-human XP award, arriving right after event:coin_settlement.
-    // Update the persisted level + totalXp on authStore.user (lives on authStore,
-    // NOT gameStore, so the top-nav level/XP bar survives navigation away that
-    // wipes gameStore) and stash the award on the match store so the end-of-match
-    // score dialog can report XP earned + a level-up flourish. No toast.
+    // Always update the persisted level + totalXp on authStore.user (lives on
+    // authStore, NOT gameStore, so the top-nav level/XP bar survives the
+    // navigation away that wipes gameStore). When the award crossed a level
+    // boundary, stash a pending level-up on the navigation-surviving
+    // levelUpStore so the dedicated dialog can celebrate it once the player
+    // lands back in the lobby/room (AppLayout). No toast; non-level-up matches
+    // surface nothing.
     const payload = message.payload as XpAwardedPayload;
     // Defensive validation — Go zero values are real values, so guard on type,
     // not truthiness (a 0 xpEarned is legitimate).
@@ -321,7 +324,13 @@ function dispatchGameEvent(message: WsMessage): void {
     if (auth.user) {
       auth.setUser({ ...auth.user, totalXp: payload.newTotalXp, level: payload.newLevel });
     }
-    store.setXpAward(payload);
+    if (payload.leveledUp) {
+      useLevelUpStore.getState().setPending({
+        newLevel: payload.newLevel,
+        newTotalXp: payload.newTotalXp,
+        xpEarned: payload.xpEarned,
+      });
+    }
     return;
   }
 
@@ -447,12 +456,9 @@ function dispatchGameEvent(message: WsMessage): void {
   if (type === EVENT_MATCH_ABANDONED) {
     const payload = message.payload as MatchAbandonedPayload;
     store.setMatchAbandonedData(payload);
-    // Mirror the match_end reset: clear any prior settlement/XP so the result
-    // surface never shows stale values. The abandoning team forfeits XP (no
-    // event:xp_awarded follows for them), so without this their store could
-    // retain a previous match's award.
+    // Mirror the match_end reset: clear any prior settlement so the result
+    // surface never shows a stale coin amount.
     store.setCoinSettlement(null);
-    store.setXpAward(null);
     return;
   }
 

@@ -22,4 +22,10 @@ type UserRepository interface {
 	// race-free. Zero-delta entries are skipped (absent from the result). Returns
 	// ErrUserNotFound (rolling the whole batch back) if any target row is missing.
 	AddXP(awards map[uint]int) (map[uint]int, error)
+	// TotalXPForUsers returns the total_xp of each requested user, keyed by ID.
+	// A read-only batch lookup used at match start to stamp each seat's static
+	// level. Returns an empty map (no DB round-trip) when ids is empty; unknown
+	// IDs are simply absent from the result (no error). Soft-deleted users are
+	// excluded via GORM's default scope.
+	TotalXPForUsers(ids []uint) (map[uint]int, error)
 }

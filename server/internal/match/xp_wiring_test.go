@@ -21,6 +21,8 @@ type stubXPAwarder struct {
 	applyCalls int
 	lastAwards map[uint]int
 	newTotals  map[uint]int
+	// totalXP feeds LevelsForUsers (userID -> total_xp); unset IDs report 0.
+	totalXP map[uint]int
 }
 
 func (s *stubXPAwarder) ApplyXPAwards(awards map[uint]int) (map[uint]int, error) {
@@ -38,6 +40,14 @@ func (s *stubXPAwarder) ApplyXPAwards(awards map[uint]int) (map[uint]int, error)
 }
 
 func (s *stubXPAwarder) LevelForXP(totalXP int) int { return user.LevelForXP(totalXP) }
+
+func (s *stubXPAwarder) LevelsForUsers(ids []uint) (map[uint]int, error) {
+	out := make(map[uint]int, len(ids))
+	for _, id := range ids {
+		out[id] = user.LevelForXP(s.totalXP[id])
+	}
+	return out, nil
+}
 
 // decodeXPAwarded extracts the typed payload from an event:xp_awarded envelope.
 func decodeXPAwarded(t *testing.T, msg []byte) ws.XPAwardedPayload {

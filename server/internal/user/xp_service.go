@@ -29,3 +29,22 @@ func (s *XPService) ApplyXPAwards(awards map[uint]int) (map[uint]int, error) {
 func (s *XPService) LevelForXP(totalXP int) int {
 	return LevelForXP(totalXP)
 }
+
+// LevelsForUsers returns each given userID's current lifetime level by reading
+// their total_xp and applying the pure LevelForXP curve. The match manager
+// calls this at match start to stamp each human seat's static level onto the
+// game state (XP only changes at match end, so the level can't drift mid-match).
+// Bot id 0 and any unknown id are absent from both the repo lookup and the
+// result. A zero/empty input is a no-op. Part of the match-side XPAwarder
+// interface (match must not import user; Story 9.5 D1).
+func (s *XPService) LevelsForUsers(ids []uint) (map[uint]int, error) {
+	totals, err := s.repo.TotalXPForUsers(ids)
+	if err != nil {
+		return nil, err
+	}
+	levels := make(map[uint]int, len(totals))
+	for id, total := range totals {
+		levels[id] = LevelForXP(total)
+	}
+	return levels, nil
+}

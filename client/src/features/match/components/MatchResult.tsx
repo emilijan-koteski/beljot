@@ -1,4 +1,4 @@
-import { Coins, Sparkles } from "lucide-react";
+import { Coins } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -31,14 +31,6 @@ interface MatchResultProps {
    *  matches and omitted while the settlement event is still in flight; a 0
    *  delta (e.g. a lone winner who only recovers their stake) renders nothing. */
   coinDelta?: number;
-  /** Story 9.5: XP the viewer earned this match (from event:xp_awarded).
-   *  Undefined while in flight or for the abandoning team (0 XP); a 0 earned
-   *  renders nothing. */
-  xpEarned?: number;
-  /** Story 9.5: the viewer's level after this match (for the level-up flourish). */
-  newLevel?: number;
-  /** Story 9.5: whether this match pushed the viewer to a new level. */
-  leveledUp?: boolean;
 }
 
 // Loss accent — the soft red shared with the surrender overlay, kept local
@@ -59,16 +51,11 @@ export function MatchResult({
   onReturnToRoom,
   surrenderedByUsername,
   coinDelta,
-  xpEarned,
-  newLevel,
-  leveledUp,
 }: MatchResultProps) {
   const { t } = useTranslation();
 
   const showCoins = typeof coinDelta === "number" && coinDelta !== 0;
   const coinWon = (coinDelta ?? 0) > 0;
-
-  const showXp = typeof xpEarned === "number" && xpEarned > 0;
 
   const winnerTeamString = teamStringForIndex(data.winnerTeam === 0 ? 0 : 1);
   const isUs = winnerTeamString === viewerTeam;
@@ -188,31 +175,6 @@ export function MatchResult({
                   {coinWon
                     ? t("match.settlement.won", { amount: formatCoins(coinDelta ?? 0) })
                     : t("match.settlement.lost", { amount: formatCoins(-(coinDelta ?? 0)) })}
-                </span>
-              </div>
-            )}
-
-            {/* XP outcome (Story 9.5) — lightweight accent pill showing the XP
-                earned this match, with a level-up line when the match pushed the
-                viewer to a new level. Hidden for the abandoning team (0 XP) and
-                free-of-points matches. */}
-            {showXp && (
-              <div
-                className="font-display inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
-                style={{
-                  color: "var(--accent-on-dark, #7fd6a0)",
-                  border: "1px solid rgba(127,214,160,0.4)",
-                  background: "rgba(127,214,160,0.10)",
-                }}
-                data-testid="match-result-xp"
-                data-xp-earned={xpEarned}
-                data-leveled-up={leveledUp ? "true" : "false"}
-              >
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
-                <span className="text-base font-semibold tabular-nums">
-                  {leveledUp && typeof newLevel === "number"
-                    ? t("xp.levelUp", { level: newLevel })
-                    : t("xp.xpGained", { amount: xpEarned })}
                 </span>
               </div>
             )}

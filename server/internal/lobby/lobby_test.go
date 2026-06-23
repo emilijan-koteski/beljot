@@ -105,6 +105,9 @@ func (u *fakeUserRepo) FindManyByIDs([]uint) ([]user.User, error)   { panic("unu
 func (u *fakeUserRepo) UpdateLanguagePreference(uint, string) error { panic("unused") }
 func (u *fakeUserRepo) UpdatePasswordHash(uint, string) error       { panic("unused") }
 func (u *fakeUserRepo) AddXP(map[uint]int) (map[uint]int, error)    { panic("unused") }
+func (u *fakeUserRepo) TotalXPForUsers([]uint) (map[uint]int, error) {
+	panic("unused")
+}
 
 func decodeStats(t *testing.T, body []byte) lobby.StatsResponse {
 	t.Helper()

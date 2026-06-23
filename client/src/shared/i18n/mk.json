@@ -953,11 +953,14 @@
     "streakTooltip": "Игра {{days}} дена по ред"
   },
   "xp": {
-    "short": "Нив. {{level}}",
+    "short": "Ниво {{level}}",
     "levelLabel": "Ниво {{level}}",
     "progress": "{{current}} / {{next}} поени",
     "progressLabel": "Ниво {{level}}, {{current}} / {{next}} поени",
-    "xpGained": "Освоивте {{amount}} искуствени поени",
-    "levelUp": "Напреднавте на ниво {{level}}!"
+    "levelUpDialog": {
+      "title": "Ново ниво!",
+      "earned": "+{{amount}} поени",
+      "continue": "Продолжи"
+    }
   }
 }

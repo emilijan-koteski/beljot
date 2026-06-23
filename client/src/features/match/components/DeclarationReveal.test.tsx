@@ -44,6 +44,7 @@ function testPlayer(seat: number, username: string): PlayerState {
     declarations: [],
     connected: true,
     isBot: false,
+    level: 1,
   };
 }
 

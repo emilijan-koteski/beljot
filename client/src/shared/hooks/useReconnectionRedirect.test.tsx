@@ -62,6 +62,7 @@ const minimalMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [],
@@ -72,6 +73,7 @@ const minimalMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [],
@@ -82,6 +84,7 @@ const minimalMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [],
@@ -92,6 +95,7 @@ const minimalMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
   ],
   teamScores: [0, 0],

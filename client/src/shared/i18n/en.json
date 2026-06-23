@@ -957,7 +957,10 @@
     "levelLabel": "Level {{level}}",
     "progress": "{{current}} / {{next}} XP",
     "progressLabel": "Level {{level}}, {{current}} / {{next}} XP",
-    "xpGained": "You earned {{amount}} XP",
-    "levelUp": "Leveled up to {{level}}!"
+    "levelUpDialog": {
+      "title": "Level Up!",
+      "earned": "+{{amount}} XP",
+      "continue": "Continue"
+    }
   }
 }

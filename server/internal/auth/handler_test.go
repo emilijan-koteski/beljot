@@ -138,6 +138,19 @@ func (m *mockUserRepo) AddXP(awards map[uint]int) (map[uint]int, error) {
 	return newTotals, nil
 }
 
+func (m *mockUserRepo) TotalXPForUsers(ids []uint) (map[uint]int, error) {
+	totals := make(map[uint]int, len(ids))
+	for _, id := range ids {
+		for _, u := range m.users {
+			if u.ID == id {
+				totals[id] = u.TotalXP
+				break
+			}
+		}
+	}
+	return totals, nil
+}
+
 func testErrorHandler(err error, c echo.Context) {
 	if c.Response().Committed {
 		return

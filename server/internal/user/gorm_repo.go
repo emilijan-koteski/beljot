@@ -155,3 +155,28 @@ func (r *GormUserRepository) AddXP(awards map[uint]int) (map[uint]int, error) {
 	}
 	return newTotals, nil
 }
+
+// TotalXPForUsers reads each requested user's total_xp in a single query and
+// returns them keyed by ID. Read-only — used at match start to stamp static
+// per-seat levels (Story: level-in-match). An empty input is a no-op (no DB
+// round-trip); unknown IDs are simply absent from the result (no error).
+func (r *GormUserRepository) TotalXPForUsers(ids []uint) (map[uint]int, error) {
+	totals := make(map[uint]int, len(ids))
+	if len(ids) == 0 {
+		return totals, nil
+	}
+	var rows []struct {
+		ID      uint
+		TotalXP int
+	}
+	if err := r.db.Model(&User{}).
+		Select("id", "total_xp").
+		Where("id IN ?", ids).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		totals[row.ID] = row.TotalXP
+	}
+	return totals, nil
+}

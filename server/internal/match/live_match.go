@@ -81,6 +81,11 @@ type WalletSettler interface {
 type XPAwarder interface {
 	ApplyXPAwards(awards map[uint]int) (map[uint]int, error)
 	LevelForXP(totalXP int) int
+	// LevelsForUsers returns each given userID's current lifetime level
+	// (total_xp run through LevelForXP). Captured at match start to stamp each
+	// human seat's static level on the game state. Unknown IDs and the bot
+	// placeholder (0) are skipped/omitted from the result.
+	LevelsForUsers(ids []uint) (map[uint]int, error)
 }
 
 // Broadcaster is the subset of *ws.Hub the manager depends on. Mirrors the
@@ -182,6 +187,28 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 	}
 
 	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID)
+
+	// Stamp each human seat's static lifetime level (Story: level-in-match).
+	// Levels derive from total_xp via the XP service and are captured ONCE here
+	// — XP only changes at match end, so they never drift mid-match. Best-effort,
+	// mirroring awardXP's degradation: a lookup failure logs and leaves every
+	// level at 0 rather than blocking match start. Bot seats (UserID 0) stay 0.
+	if m.xpAwarder != nil {
+		humanLevelIDs := humanUserIDs(playerIDs)
+		if len(humanLevelIDs) > 0 {
+			levels, err := m.xpAwarder.LevelsForUsers(humanLevelIDs)
+			if err != nil {
+				slog.Error("session: failed to load player levels", "roomID", roomID, "error", err)
+			} else {
+				for seat, uid := range playerIDs {
+					if uid == 0 {
+						continue
+					}
+					gs.Players[seat].Level = levels[uid]
+				}
+			}
+		}
+	}
 
 	// Map room owner to seat index for pause override validation.
 	// Default to -1 (no owner override available) if ownerID not found among players.

@@ -18,6 +18,7 @@ import { queryClient } from "@/shared/api/queryClient";
 import { queryKeys } from "@/shared/api/queryKeys";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
+import { useLevelUpStore } from "@/shared/stores/levelUpStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room, User } from "@/shared/types/apiTypes";
@@ -57,6 +58,7 @@ const mockMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [{ rank: "7", suit: "H" }],
@@ -67,6 +69,7 @@ const mockMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [{ rank: "A", suit: "D" }],
@@ -77,6 +80,7 @@ const mockMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
     {
       hand: [{ rank: "9", suit: "C" }],
@@ -87,6 +91,7 @@ const mockMatchState: MatchState = {
       declarations: [],
       connected: true,
       isBot: false,
+      level: 1,
     },
   ],
   teamScores: [0, 0],
@@ -1577,9 +1582,10 @@ describe("useWsDispatch — XP awarded (Story 9.5)", () => {
     __resetWsDispatchStateForTests();
     vi.restoreAllMocks();
     useAuthStore.setState({ user: { ...baseUser } });
+    useLevelUpStore.getState().clear();
   });
 
-  it("updates authStore level + totalXp and stores the award on a level-up (no toast)", () => {
+  it("updates authStore level + totalXp and opens a level-up dialog on a level-up (no toast)", () => {
     const { result } = renderHook(() => useWsDispatch());
     result.current({
       type: "event:xp_awarded",
@@ -1588,28 +1594,28 @@ describe("useWsDispatch — XP awarded (Story 9.5)", () => {
 
     expect(useAuthStore.getState().user?.totalXp).toBe(201);
     expect(useAuthStore.getState().user?.level).toBe(2);
-    expect(useMatchStore.getState().xpAward).toEqual({
-      xpEarned: 101,
-      newTotalXp: 201,
+    expect(useLevelUpStore.getState().pending).toEqual({
       newLevel: 2,
-      leveledUp: true,
+      newTotalXp: 201,
+      xpEarned: 101,
     });
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
   });
 
-  it("stores a zero-earned award (loser of a 0-point hand still gets the event)", () => {
+  it("updates XP but opens no dialog when the award did not level the player up", () => {
     const { result } = renderHook(() => useWsDispatch());
     result.current({
       type: "event:xp_awarded",
-      payload: { xpEarned: 0, newTotalXp: 100, newLevel: 1, leveledUp: false },
+      payload: { xpEarned: 50, newTotalXp: 150, newLevel: 1, leveledUp: false },
     });
 
-    expect(useAuthStore.getState().user?.totalXp).toBe(100);
-    expect(useMatchStore.getState().xpAward?.xpEarned).toBe(0);
+    expect(useAuthStore.getState().user?.totalXp).toBe(150);
+    expect(useAuthStore.getState().user?.level).toBe(1);
+    expect(useLevelUpStore.getState().pending).toBeNull();
   });
 
-  it("ignores a malformed xp payload without touching the user or store", () => {
+  it("ignores a malformed xp payload without touching the user or the dialog", () => {
     const { result } = renderHook(() => useWsDispatch());
     const malformed = [
       { xpEarned: "10", newTotalXp: 110, newLevel: 1, leveledUp: false },
@@ -1624,16 +1630,16 @@ describe("useWsDispatch — XP awarded (Story 9.5)", () => {
 
     expect(useAuthStore.getState().user?.totalXp).toBe(100);
     expect(useAuthStore.getState().user?.level).toBe(1);
-    expect(useMatchStore.getState().xpAward).toBeNull();
+    expect(useLevelUpStore.getState().pending).toBeNull();
   });
 
-  it("clears a prior award when a new match_end arrives", () => {
+  it("keeps a pending level-up across a subsequent match_end (cleared only on dismiss)", () => {
     const { result } = renderHook(() => useWsDispatch());
     result.current({
       type: "event:xp_awarded",
-      payload: { xpEarned: 50, newTotalXp: 150, newLevel: 1, leveledUp: false },
+      payload: { xpEarned: 120, newTotalXp: 820, newLevel: 4, leveledUp: true },
     });
-    expect(useMatchStore.getState().xpAward).not.toBeNull();
+    expect(useLevelUpStore.getState().pending).not.toBeNull();
 
     result.current({
       type: "event:match_end",
@@ -1645,6 +1651,6 @@ describe("useWsDispatch — XP awarded (Story 9.5)", () => {
       },
     });
 
-    expect(useMatchStore.getState().xpAward).toBeNull();
+    expect(useLevelUpStore.getState().pending).not.toBeNull();
   });
 });

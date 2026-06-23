@@ -64,6 +64,7 @@ describe("BelotReveal", () => {
             declarations: [],
             connected: true,
             isBot: false,
+            level: 1,
           },
           {
             seat: 1,
@@ -74,6 +75,7 @@ describe("BelotReveal", () => {
             declarations: [],
             connected: true,
             isBot: false,
+            level: 1,
           },
           {
             seat: 2,
@@ -84,6 +86,7 @@ describe("BelotReveal", () => {
             declarations: [],
             connected: true,
             isBot: false,
+            level: 1,
           },
           {
             seat: 3,
@@ -94,6 +97,7 @@ describe("BelotReveal", () => {
             declarations: [],
             connected: true,
             isBot: false,
+            level: 1,
           },
         ]}
         onComplete={vi.fn()}

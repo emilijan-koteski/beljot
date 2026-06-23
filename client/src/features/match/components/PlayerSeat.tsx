@@ -445,21 +445,18 @@ export function PlayerSeat({
         >
           {displayName}
         </span>
-        {!compact && (
+        {/* Humans only: the lifetime level (replacing the old team label) plus
+            the live seconds counter. Bots get a name-only pill on desktop — no
+            level, no seconds — and phones drop this row for everyone (compact).
+            Team identity is still announced to screen readers via aria-label. */}
+        {!compact && player.isBot !== true && (
           <span
             className="font-body text-[10px] tabular-nums flex items-center gap-1.5"
             style={{ color: "rgba(245,242,232,0.6)" }}
           >
-            <span
-              className="rounded-full"
-              style={{
-                width: 5,
-                height: 5,
-                background: teamGradient[0],
-              }}
-              aria-hidden
-            />
-            <span style={{ letterSpacing: 0.6, opacity: 0.7 }}>{teamLabel}</span>
+            <span style={{ letterSpacing: 0.6, opacity: 0.7 }} data-testid="player-seat-level">
+              {t("xp.short", { level: player.level })}
+            </span>
             {showRing && (
               <span
                 className="font-body font-semibold tabular-nums"

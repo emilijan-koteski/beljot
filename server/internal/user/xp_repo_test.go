@@ -76,6 +76,33 @@ func TestGormUserRepository_AddXP_EmptyMapIsNoOp(t *testing.T) {
 	assert.Empty(t, newTotals)
 }
 
+func TestGormUserRepository_TotalXPForUsers_ReturnsTotals(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormUserRepository(db)
+
+	a := seedXPUser(t, repo, "xp_total_a", 250)
+	b := seedXPUser(t, repo, "xp_total_b", 0)
+	const missingID = uint(999999)
+
+	totals, err := repo.TotalXPForUsers([]uint{a.ID, b.ID, missingID})
+	require.NoError(t, err)
+
+	assert.Equal(t, 250, totals[a.ID])
+	assert.Equal(t, 0, totals[b.ID])
+	// Unknown IDs are simply absent — no error, no zero-keyed entry.
+	_, present := totals[missingID]
+	assert.False(t, present, "unknown user must be absent from the result")
+}
+
+func TestGormUserRepository_TotalXPForUsers_EmptyIsNoOp(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormUserRepository(db)
+
+	totals, err := repo.TotalXPForUsers(nil)
+	require.NoError(t, err)
+	assert.Empty(t, totals)
+}
+
 func TestGormUserRepository_AddXP_MissingUserRollsBack(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormUserRepository(db)

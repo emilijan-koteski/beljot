@@ -21,8 +21,6 @@ vi.mock("react-i18next", () => ({
       }
       if (key === "match.settlement.won" && opts) return `You won ${opts.amount} coins`;
       if (key === "match.settlement.lost" && opts) return `You lost ${opts.amount} coins`;
-      if (key === "xp.xpGained" && opts) return `You earned ${opts.amount} XP`;
-      if (key === "xp.levelUp" && opts) return `Leveled up to ${opts.level}!`;
       return translations[key] ?? key;
     },
   }),
@@ -47,9 +45,6 @@ interface RenderOverrides {
   onReturnToRoom?: () => void;
   surrenderedByUsername?: string;
   coinDelta?: number;
-  xpEarned?: number;
-  newLevel?: number;
-  leveledUp?: boolean;
 }
 
 function renderResult(overrides: RenderOverrides = {}) {
@@ -60,9 +55,6 @@ function renderResult(overrides: RenderOverrides = {}) {
     onReturnToRoom: overrides.onReturnToRoom ?? vi.fn(),
     surrenderedByUsername: overrides.surrenderedByUsername,
     coinDelta: overrides.coinDelta,
-    xpEarned: overrides.xpEarned,
-    newLevel: overrides.newLevel,
-    leveledUp: overrides.leveledUp,
   };
   return render(<MatchResult {...props} />);
 }
@@ -211,32 +203,5 @@ describe("MatchResult", () => {
   it("renders no coin line for a free match (coinDelta undefined)", () => {
     renderResult({});
     expect(screen.queryByTestId("match-result-coins")).toBeNull();
-  });
-
-  // --- XP flourish (Story 9.5) ---
-
-  it("renders the XP earned line when xpEarned > 0 and no level-up", () => {
-    renderResult({ xpEarned: 101, newLevel: 1, leveledUp: false });
-    const xp = screen.getByTestId("match-result-xp");
-    expect(xp).toHaveTextContent("You earned 101 XP");
-    expect(xp).toHaveAttribute("data-xp-earned", "101");
-    expect(xp).toHaveAttribute("data-leveled-up", "false");
-  });
-
-  it("shows the level-up message when the match pushed the viewer to a new level", () => {
-    renderResult({ xpEarned: 120, newLevel: 4, leveledUp: true });
-    const xp = screen.getByTestId("match-result-xp");
-    expect(xp).toHaveTextContent("Leveled up to 4!");
-    expect(xp).toHaveAttribute("data-leveled-up", "true");
-  });
-
-  it("renders no XP line when xpEarned is 0 (abandoning team forfeit)", () => {
-    renderResult({ xpEarned: 0 });
-    expect(screen.queryByTestId("match-result-xp")).toBeNull();
-  });
-
-  it("renders no XP line for a match still awaiting the xp_awarded event", () => {
-    renderResult({});
-    expect(screen.queryByTestId("match-result-xp")).toBeNull();
   });
 });

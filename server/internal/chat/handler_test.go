@@ -36,6 +36,9 @@ func (s *userRepoStub) Count() (int64, error)                       { return int
 func (s *userRepoStub) UpdateLanguagePreference(uint, string) error { return nil }
 func (s *userRepoStub) UpdatePasswordHash(uint, string) error       { return nil }
 func (s *userRepoStub) AddXP(map[uint]int) (map[uint]int, error)    { return nil, nil }
+func (s *userRepoStub) TotalXPForUsers([]uint) (map[uint]int, error) {
+	return nil, nil
+}
 func (s *userRepoStub) FindByID(id uint) (*user.User, error) {
 	if u, ok := s.users[id]; ok {
 		return u, nil
