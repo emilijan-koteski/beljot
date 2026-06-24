@@ -393,6 +393,7 @@ func setupTest() (*echo.Echo, *mockRoomRepo) {
 	api.POST("/rooms/:id/kick", handler.KickPlayer)
 	api.POST("/rooms/:id/swap-seats", handler.SwapSeats)
 	api.POST("/rooms/:id/transfer-ownership", handler.TransferOwnership)
+	api.POST("/rooms/:id/privacy", handler.UpdateRoomPrivacy)
 	api.POST("/rooms/:id/bots", handler.AddBot)
 	api.DELETE("/rooms/:id/bots/:seat", handler.RemoveBot)
 
@@ -422,6 +423,7 @@ func setupTestWithBroadcast() (*echo.Echo, *mockRoomRepo, *mockBroadcaster) {
 	api.POST("/rooms/:id/kick", handler.KickPlayer)
 	api.POST("/rooms/:id/swap-seats", handler.SwapSeats)
 	api.POST("/rooms/:id/transfer-ownership", handler.TransferOwnership)
+	api.POST("/rooms/:id/privacy", handler.UpdateRoomPrivacy)
 	api.POST("/rooms/:id/bots", handler.AddBot)
 	api.DELETE("/rooms/:id/bots/:seat", handler.RemoveBot)
 
@@ -446,6 +448,7 @@ func registerRoomRoutes(api *echo.Group, handler *room.RoomHandler) {
 	api.POST("/rooms/:id/kick", handler.KickPlayer)
 	api.POST("/rooms/:id/swap-seats", handler.SwapSeats)
 	api.POST("/rooms/:id/transfer-ownership", handler.TransferOwnership)
+	api.POST("/rooms/:id/privacy", handler.UpdateRoomPrivacy)
 	api.POST("/rooms/:id/bots", handler.AddBot)
 	api.DELETE("/rooms/:id/bots/:seat", handler.RemoveBot)
 }

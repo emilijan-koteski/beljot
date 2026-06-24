@@ -9,6 +9,7 @@ import { useChatStore } from "@/shared/stores/chatStore";
 import { useLevelUpStore } from "@/shared/stores/levelUpStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
+import type { Room } from "@/shared/types/apiTypes";
 import type { MatchState } from "@/shared/types/matchTypes";
 import type {
   AutoActionPayload,
@@ -35,6 +36,7 @@ import type {
   RoomClosedInsolventPayload,
   RoomKickedPayload,
   RoomOwnerChangedPayload,
+  RoomUpdatedPayload,
   SeatUpdatedPayload,
   SurrenderDeclinedPayload,
   SurrenderProposedPayload,
@@ -490,6 +492,18 @@ function dispatchSystemEvent(message: WsMessage): void {
   // Room list updates — delegate to existing useRoomUpdates handler
   if (type === SYSTEM_ROOM_CREATED || type === SYSTEM_ROOM_UPDATED) {
     handleRoomListMessage(new MessageEvent("message", { data: JSON.stringify(message) }));
+    // The handler above only touches the lobby grid cache. A room_updated for
+    // the room the viewer is currently sitting in (e.g. the owner flipping
+    // privacy) must also refresh the in-room view, which renders from the
+    // roomStore — otherwise a seated player keeps seeing the stale privacy
+    // badge. Merge the changed fields into the store's room.
+    if (type === SYSTEM_ROOM_UPDATED) {
+      const payload = message.payload as RoomUpdatedPayload;
+      const store = useRoomStore.getState();
+      if (store.room && store.currentRoomId === payload.id) {
+        store.setRoom({ ...store.room, ...(payload as Partial<Room>) });
+      }
+    }
     return;
   }
 

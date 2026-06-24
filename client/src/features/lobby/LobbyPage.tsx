@@ -8,6 +8,7 @@ import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
 import { InsolventEjectionModal } from "@/features/lobby/components/InsolventEjectionModal";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
+import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
 import { Toast } from "@/features/lobby/components/Toast";
 import { CreateRoomModal } from "@/features/room/CreateRoomModal";
@@ -76,6 +77,10 @@ export function LobbyPage() {
   const [sort, setSort] = useState<LobbySort>("filling");
   const [showCreate, setShowCreate] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  // Private-room join (Story 9.6): the room awaiting a password prompt + the
+  // current prompt error key (set on WRONG_ROOM_PASSWORD so the dialog stays open).
+  const [pendingPrivateRoom, setPendingPrivateRoom] = useState<Room | null>(null);
+  const [passwordErrorKey, setPasswordErrorKey] = useState<string | null>(null);
 
   // Stabilise the array reference: `roomsQuery.data ?? []` would mint a fresh
   // `[]` every render while data is undefined, busting the useMemos below.
@@ -136,13 +141,39 @@ export function LobbyPage() {
       return;
     }
 
-    setToastMsg(t("lobby.card.joining", { name: room.name }));
+    // Private rooms (Story 9.6): prompt for the password before joining. The
+    // client knows the room is private from room.isPrivate; the server verifies.
+    if (room.isPrivate) {
+      setPasswordErrorKey(null);
+      setPendingPrivateRoom(room);
+      return;
+    }
+
+    await joinRoomFlow(room);
+  }
+
+  // Shared join → navigate path for a non-quick-play room. `password` is sent
+  // only for private rooms (via the prompt). Errors are surfaced as toasts,
+  // except WRONG_ROOM_PASSWORD which the private-room prompt handles inline.
+  async function joinRoomFlow(room: Room, password?: string) {
+    // The "Joining…" toast is only for the public path. For a private room the
+    // password prompt's own pending state covers the in-flight feedback and a
+    // wrong password is shown inline in the dialog — showing the toast first
+    // would flash "Joining…" and then a wrong-password error (confusing).
+    if (password === undefined) setToastMsg(t("lobby.card.joining", { name: room.name }));
     try {
-      await joinRoomMutation.mutateAsync(room.id);
+      await joinRoomMutation.mutateAsync({ id: room.id, password });
+      setPendingPrivateRoom(null);
       navigate(`/rooms/${room.id}`);
     } catch (err) {
       setToastMsg(null);
       const code = err instanceof FetchError ? err.code : null;
+      if (code === "WRONG_ROOM_PASSWORD") {
+        // Keep the prompt open and show the inline error so the player can retry.
+        setPasswordErrorKey("room.errors.wrongPassword");
+        return;
+      }
+      setPendingPrivateRoom(null);
       if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
       else if (code === "INSUFFICIENT_COINS")
         // Compose the rich message locally — we know the room's buy-in and our
@@ -190,6 +221,23 @@ export function LobbyPage() {
       </p>
 
       <CreateRoomModal open={showCreate} onOpenChange={setShowCreate} />
+      <PasswordPromptDialog
+        open={pendingPrivateRoom !== null}
+        roomName={pendingPrivateRoom?.name ?? ""}
+        pending={joinRoomMutation.isPending}
+        errorKey={passwordErrorKey}
+        onSubmit={(password) => {
+          if (pendingPrivateRoom) {
+            setPasswordErrorKey(null);
+            void joinRoomFlow(pendingPrivateRoom, password);
+          }
+        }}
+        onClose={() => {
+          setPendingPrivateRoom(null);
+          setPasswordErrorKey(null);
+          setToastMsg(null);
+        }}
+      />
       <InsolventEjectionModal />
       <LobbyChatDock />
       <Toast message={toastMsg} onClear={() => setToastMsg(null)} />

@@ -268,7 +268,7 @@ describe("LobbyPage", () => {
     await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
     await user.click(screen.getByTestId("room-card-join"));
 
-    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9));
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9, undefined));
     expect(mockNavigate).toHaveBeenCalledWith("/rooms/9");
     expect(mockQuickJoin).not.toHaveBeenCalled();
   });
@@ -322,11 +322,74 @@ describe("LobbyPage", () => {
     await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
     await user.click(screen.getByTestId("room-card-join"));
 
-    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9));
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9, undefined));
     // Message is composed locally from the room's buy-in (500) and our balance (300).
     const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
     expect(msg).toContain("500");
     expect(msg).toContain("300");
+    expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
+  });
+
+  // --- Private rooms (Story 9.6) ---
+
+  const privateRoom = {
+    id: 9,
+    name: "Private Table",
+    code: "PRV123",
+    ownerId: 1,
+    ownerUsername: "host",
+    variant: "bitola",
+    matchMode: "1001",
+    timerStyle: "relaxed",
+    timerDurationSeconds: null,
+    status: "waiting",
+    playerCount: 1,
+    isQuickPlay: false,
+    coinBuyIn: 0,
+    isPrivate: true,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    players: [
+      { id: 1, roomId: 9, userId: 1, username: "host", seat: 0, team: "teamA", createdAt: "" },
+    ],
+  };
+
+  it("prompts for a password before joining a private room", async () => {
+    const user = userEvent.setup();
+    mockGetRooms.mockResolvedValueOnce([{ ...privateRoom }]);
+    mockJoinRoom.mockResolvedValueOnce({ id: 9 });
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+
+    // The dialog opens; no join fires until the password is submitted.
+    expect(await screen.findByTestId("password-prompt-dialog")).toBeInTheDocument();
+    expect(mockJoinRoom).not.toHaveBeenCalled();
+
+    await user.type(screen.getByTestId("password-prompt-input"), "secret");
+    await user.click(screen.getByTestId("password-prompt-submit"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9, "secret"));
+    expect(mockNavigate).toHaveBeenCalledWith("/rooms/9");
+  });
+
+  it("keeps the password dialog open and shows an error on a wrong password", async () => {
+    const user = userEvent.setup();
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    mockGetRooms.mockResolvedValueOnce([{ ...privateRoom }]);
+    mockJoinRoom.mockRejectedValueOnce(
+      new FetchError(409, "WRONG_ROOM_PASSWORD", "incorrect room password"),
+    );
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+    await user.type(await screen.findByTestId("password-prompt-input"), "nope");
+    await user.click(screen.getByTestId("password-prompt-submit"));
+
+    await waitFor(() => expect(screen.getByTestId("password-prompt-error")).toBeInTheDocument());
+    expect(screen.getByTestId("password-prompt-dialog")).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
   });
 });

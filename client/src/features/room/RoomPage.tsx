@@ -4,6 +4,8 @@ import {
   Clock,
   Coins,
   Crown,
+  Lock,
+  LockOpen,
   Shuffle,
   Sparkles,
   Trophy,
@@ -16,6 +18,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
+import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { RoomChatDock } from "@/features/room/components/RoomChatDock";
 import { SeatTile } from "@/features/room/components/SeatTile";
 import {
@@ -23,6 +26,7 @@ import {
   RemoveBotDialog,
   TransferOwnershipDialog,
 } from "@/features/room/OwnerConfirmDialogs";
+import { RoomPrivacyDialog } from "@/features/room/RoomPrivacyDialog";
 import { FetchError } from "@/shared/api/axiosClient";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
@@ -54,7 +58,7 @@ import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
-import type { RoomPlayer } from "@/shared/types/apiTypes";
+import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
 const variantKeys: Record<string, string> = {
   bitola: "lobby.card.variantBitola",
@@ -172,6 +176,14 @@ export function RoomPage() {
     username: string;
   } | null>(null);
   const [removeBotConfirm, setRemoveBotConfirm] = useState<{ seat: number } | null>(null);
+  // Story 9.6: owner privacy edit dialog open state.
+  const [showPrivacy, setShowPrivacy] = useState(false);
+
+  // Deep-link / refresh to a private room the viewer isn't seated in: the
+  // auto-join below must prompt for the password instead of joining blind
+  // (Story 9.6 review patch). null = no prompt; errorKey keeps it open on retry.
+  const [deepLinkPrivateRoom, setDeepLinkPrivateRoom] = useState<Room | null>(null);
+  const [deepLinkPasswordError, setDeepLinkPasswordError] = useState<string | null>(null);
 
   // Mutations
   const joinRoomMutation = useJoinRoomMutation();
@@ -208,6 +220,14 @@ export function RoomPage() {
   // mirroring what the lobby's Join does — then refetch to pick up membership.
   useEffect(() => {
     if (!roomQuery.isSuccess || !roomQuery.data || !id) return;
+    // Judge membership ONLY on data fetched fresh after this mount. With
+    // refetchOnMount:"always" React Query still serves the cached snapshot
+    // synchronously while the forced refetch runs in the background; that stale
+    // snapshot can omit a viewer who just joined (e.g. via join-by-code or the
+    // lobby card) and navigated straight here. Acting on it would spuriously
+    // re-open the private-room password prompt — or blind-join a public room —
+    // for someone who is already a member. Wait for the post-mount fetch.
+    if (!roomQuery.isFetchedAfterMount) return;
     if (joinAttemptedRef.current) return;
     const { room, players } = roomQuery.data;
     const userId = useAuthStore.getState().user?.id;
@@ -218,9 +238,19 @@ export function RoomPage() {
     // handled by their own guards. Only a joinable waiting room is auto-joined.
     if (room.isQuickPlay || room.status !== "waiting") return;
 
+    // Private room (Story 9.6): a passwordless auto-join is rejected with
+    // WRONG_ROOM_PASSWORD. Prompt for the password instead — the prompt's submit
+    // drives the join. Mark the attempt so this effect doesn't re-fire.
+    if (room.isPrivate) {
+      joinAttemptedRef.current = true;
+      setDeepLinkPasswordError(null);
+      setDeepLinkPrivateRoom(room);
+      return;
+    }
+
     joinAttemptedRef.current = true;
     joinRoomMutation
-      .mutateAsync(Number(id))
+      .mutateAsync({ id: Number(id) })
       .then(() => {
         hasJoinedRef.current = true;
         void roomQuery.refetch();
@@ -248,7 +278,48 @@ export function RoomPage() {
         navigate("/lobby", { replace: true });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomQuery.isSuccess, roomQuery.data, id]);
+  }, [roomQuery.isSuccess, roomQuery.isFetchedAfterMount, roomQuery.data, id]);
+
+  // Drives the private-room deep-link join from the password prompt. Mirrors the
+  // auto-join then/catch above but threads the entered password and keeps the
+  // prompt open with an inline error on a wrong password (Story 9.6, AC4).
+  function joinDeepLinkPrivate(room: Room, password: string) {
+    setDeepLinkPasswordError(null);
+    joinRoomMutation
+      .mutateAsync({ id: room.id, password })
+      .then(() => {
+        hasJoinedRef.current = true;
+        setDeepLinkPrivateRoom(null);
+        void roomQuery.refetch();
+      })
+      .catch((err) => {
+        const code = err instanceof FetchError ? err.code : null;
+        if (code === "WRONG_ROOM_PASSWORD") {
+          // Keep the prompt open with the inline error so the player can retry.
+          setDeepLinkPasswordError("room.errors.wrongPassword");
+          return;
+        }
+        if (code === "ALREADY_IN_ROOM") {
+          hasJoinedRef.current = true;
+          setDeepLinkPrivateRoom(null);
+          void roomQuery.refetch();
+          return;
+        }
+        hasLeftRef.current = true; // suppress the unmount cleanup-leave
+        setDeepLinkPrivateRoom(null);
+        toast.error(
+          code === "ROOM_FULL"
+            ? t("lobby.errors.roomFull")
+            : code === "INSUFFICIENT_COINS"
+              ? t("room.errors.insufficientCoins", {
+                  buyIn: formatCoins(room.coinBuyIn),
+                  balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
+                })
+              : t("lobby.errors.joinFailed"),
+        );
+        navigate("/lobby", { replace: true });
+      });
+  }
 
   // Quick-play rooms have their own dedicated matchmaking screen — a deep link
   // or refresh that lands here must redirect to /matchmaking/:id. Gate on the
@@ -1026,7 +1097,25 @@ export function RoomPage() {
               {/* On mobile the chip floats to the card's top-right so it shares
                   the title's row (the card is `relative`); at md it returns to
                   static flow above the badges — desktop layout unchanged. */}
-              <div className="absolute top-6 right-6 md:static md:top-auto md:right-auto">
+              {/* Owner-only privacy control sits to the LEFT of the copy-code
+                  chip (Story 9.6) — waiting rooms only, mirroring the other
+                  owner-gated actions. */}
+              <div className="absolute top-6 right-6 flex items-center gap-2 md:static md:top-auto md:right-auto">
+                {isOwner && room.status === "waiting" && !room.isQuickPlay && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPrivacy(true)}
+                    data-testid="room-privacy-control"
+                    className="whitespace-nowrap"
+                  >
+                    <Lock className="size-3.5" />
+                    {room.isPrivate
+                      ? t("room.privacy.manageButtonPrivate")
+                      : t("room.privacy.manageButtonPublic")}
+                  </Button>
+                )}
                 <CodeChip
                   code={room.code}
                   variant="compact"
@@ -1062,6 +1151,15 @@ export function RoomPage() {
                 {room.isQuickPlay && (
                   <Badge tone="accent" icon={<Zap className="size-3" />}>
                     <span data-testid="badge-quick-play">{t("lobby.quickPlay")}</span>
+                  </Badge>
+                )}
+                {room.isPrivate ? (
+                  <Badge tone="neutral" icon={<Lock className="size-3" />}>
+                    <span data-testid="badge-private">{t("room.privacy.privateBadge")}</span>
+                  </Badge>
+                ) : (
+                  <Badge tone="neutral" icon={<LockOpen className="size-3" />}>
+                    <span data-testid="badge-public">{t("room.privacy.publicBadge")}</span>
                   </Badge>
                 )}
               </div>
@@ -1388,6 +1486,28 @@ export function RoomPage() {
                 ? "A"
                 : "B"
               : null,
+        }}
+      />
+
+      {/* Owner privacy edit dialog (Story 9.6) */}
+      <RoomPrivacyDialog open={showPrivacy} room={room} onClose={() => setShowPrivacy(false)} />
+
+      {/* Private-room password prompt for a deep-link / refresh join (Story 9.6 review patch) */}
+      <PasswordPromptDialog
+        open={deepLinkPrivateRoom !== null}
+        roomName={deepLinkPrivateRoom?.name ?? ""}
+        pending={joinRoomMutation.isPending}
+        errorKey={deepLinkPasswordError}
+        onSubmit={(password) => {
+          if (deepLinkPrivateRoom) joinDeepLinkPrivate(deepLinkPrivateRoom, password);
+        }}
+        onClose={() => {
+          // Declining the prompt: a private room can't be viewed without joining,
+          // so bounce to the lobby (suppress the unmount auto-leave first).
+          setDeepLinkPrivateRoom(null);
+          setDeepLinkPasswordError(null);
+          hasLeftRef.current = true;
+          navigate("/lobby", { replace: true });
         }}
       />
     </div>

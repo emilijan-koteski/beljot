@@ -126,6 +126,8 @@ describe("CreateRoomModal", () => {
         timerStyle: "relaxed",
         timerDurationSeconds: null,
         coinBuyIn: 500,
+        isPrivate: false,
+        password: undefined,
       });
     });
   });
@@ -162,6 +164,8 @@ describe("CreateRoomModal", () => {
         timerStyle: "relaxed",
         timerDurationSeconds: null,
         coinBuyIn: 500,
+        isPrivate: false,
+        password: undefined,
       });
     });
   });
@@ -337,5 +341,47 @@ describe("CreateRoomModal", () => {
     await user.click(cancelButton);
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  // --- Private rooms (Story 9.6) ---
+
+  it("reveals the password field when the private toggle is on", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    expect(screen.queryByTestId("room-password-input")).toBeNull();
+    await user.click(screen.getByTestId("private-room-toggle-private"));
+    expect(screen.getByTestId("room-password-input")).toBeInTheDocument();
+  });
+
+  it("blocks submit when private is on but the password is too short", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Secret Room");
+    await user.click(screen.getByTestId("private-room-toggle-private"));
+    // Empty password — submit disabled.
+    expect(screen.getByTestId("create-room-button")).toBeDisabled();
+    await user.type(screen.getByTestId("room-password-input"), "ab");
+    expect(screen.getByTestId("create-room-button")).toBeDisabled();
+    await user.type(screen.getByTestId("room-password-input"), "cd");
+    expect(screen.getByTestId("create-room-button")).toBeEnabled();
+  });
+
+  it("includes isPrivate and the password in the create payload", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({ id: 3 });
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Secret Room");
+    await user.click(screen.getByTestId("private-room-toggle-private"));
+    await user.type(screen.getByTestId("room-password-input"), "hunter2");
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ isPrivate: true, password: "hunter2" }),
+      );
+    });
   });
 });

@@ -297,6 +297,8 @@ export interface RoomCreatedPayload {
   status: string;
   playerCount: number;
   isQuickPlay: boolean;
+  /** Derived privacy flag (Story 9.6) so the lobby card lock indicator stays live. */
+  isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -315,6 +317,8 @@ export interface RoomUpdatedPayload {
   status: string;
   playerCount: number;
   isQuickPlay: boolean;
+  /** Derived privacy flag (Story 9.6) so the lobby card lock indicator stays live. */
+  isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/labstack/echo/v4"
 
@@ -42,7 +43,33 @@ const (
 	// every synthesized Quick Play room (Story 9.4, Decision D5). Within the
 	// create-room [10,120] range; flows unchanged through StartMatch.
 	quickPlayTimerDurationSeconds = 30
+	// roomPasswordMinLength / roomPasswordMaxBytes bound a private-room password
+	// (Story 9.6, FR60). Min 4 is intentionally lower-friction than the 8-char
+	// account minimum — room passwords are shared casually among friends. Max 72
+	// bytes is bcrypt's hard input limit: bcrypt silently ignores input past 72
+	// bytes, so rejecting longer input keeps two passwords differing only past
+	// byte 72 from hashing equal. Both are tunable placeholders.
+	roomPasswordMinLength = 4
+	roomPasswordMaxBytes  = 72
 )
+
+// validateRoomPassword enforces the private-room password rules (Story 9.6).
+// Non-empty, >= roomPasswordMinLength characters (runes, matching the "characters"
+// wording and the client's per-character minimum), <= roomPasswordMaxBytes bytes
+// (the bcrypt input limit, which is byte-bound). Server is the authority; the
+// client's field validation is cosmetic.
+func validateRoomPassword(pw string) error {
+	if pw == "" {
+		return apperr.ErrRoomPasswordRequired
+	}
+	if utf8.RuneCountInString(pw) < roomPasswordMinLength {
+		return apperr.ErrRoomPasswordTooShort
+	}
+	if len(pw) > roomPasswordMaxBytes {
+		return apperr.ErrRoomPasswordTooLong
+	}
+	return nil
+}
 
 // quickPlayBuyIn maps a wallet balance to the Quick Play bracket buy-in. The
 // model is binary (Story 9.4, Decision D1): balance >= 500 → 500, else 0. The
@@ -65,6 +92,11 @@ type CreateRoomRequest struct {
 	// CoinBuyIn is a pointer so "omitted" (nil → default 500) is distinguishable
 	// from an explicit 0 (a free room). min 0, no maximum (Story 9.2 AC #1).
 	CoinBuyIn *int `json:"coinBuyIn"`
+	// IsPrivate + Password configure a private room (Story 9.6, FR60). Password is
+	// required only when IsPrivate is true; it is bcrypt-hashed into
+	// rooms.password_hash and never stored or logged in plaintext.
+	IsPrivate bool   `json:"isPrivate"`
+	Password  string `json:"password"`
 }
 
 // MatchStarter is the interface the room handler uses to start a live match.
@@ -270,11 +302,14 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		"timerStyle":           r.TimerStyle,
 		"timerDurationSeconds": r.TimerDurationSeconds,
 		"coinBuyIn":            r.CoinBuyIn,
-		"playerCount":          r.PlayerCount,
-		"status":               r.Status,
-		"isQuickPlay":          r.IsQuickPlay,
-		"createdAt":            r.CreatedAt.UTC().Format(time.RFC3339),
-		"updatedAt":            r.UpdatedAt.UTC().Format(time.RFC3339),
+		// Derived privacy flag (Story 9.6) — this map is hand-built, so the
+		// Room.IsPrivate struct tag / AfterFind hook don't apply; compute it here.
+		"isPrivate":   r.PasswordHash != nil,
+		"playerCount": r.PlayerCount,
+		"status":      r.Status,
+		"isQuickPlay": r.IsQuickPlay,
+		"createdAt":   r.CreatedAt.UTC().Format(time.RFC3339),
+		"updatedAt":   r.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -399,6 +434,22 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		}
 	}
 
+	// Private room (Story 9.6, FR60): when requested, validate + bcrypt-hash the
+	// password into PasswordHash (nil = public). Reuse the auth bcrypt helper — do
+	// not import bcrypt directly here. Server is the authority; the modal's toggle
+	// is cosmetic.
+	var passwordHash *string
+	if req.IsPrivate {
+		if err := validateRoomPassword(req.Password); err != nil {
+			return err
+		}
+		hashed, hashErr := auth.HashPassword(req.Password)
+		if hashErr != nil {
+			return fmt.Errorf("hashing room password: %w", hashErr)
+		}
+		passwordHash = &hashed
+	}
+
 	code, err := generateRoomCode()
 	if err != nil {
 		return fmt.Errorf("generating room code: %w", err)
@@ -414,6 +465,7 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		TimerDurationSeconds: timerDuration,
 		ReconnectWindowSec:   reconnectWindow,
 		CoinBuyIn:            coinBuyIn,
+		PasswordHash:         passwordHash,
 		Status:               "waiting",
 		PlayerCount:          1,
 	}
@@ -459,6 +511,12 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 	// reopened-room Start gate (all seated humans present) would block the owner
 	// on the very first match.
 	h.presence.Add(room.ID, userID)
+
+	// Derive IsPrivate on the in-memory room before the response/broadcast: GORM's
+	// AfterFind hook does NOT fire on a freshly-Created struct (Create fires
+	// AfterCreate), so without this the just-created room would serialize
+	// isPrivate=false even when private (Story 9.6, Decision D4).
+	room.IsPrivate = room.PasswordHash != nil
 
 	// Broadcast system:room_created to all connected clients (lobby-wide).
 	// roomLifecyclePayload also populates room.OwnerUsername so the JSON
@@ -593,6 +651,14 @@ func (h *RoomHandler) GetRoomByCode(c echo.Context) error {
 	})
 }
 
+// JoinRoomRequest carries the optional private-room password (Story 9.6). The
+// body is optional: public-room joins send none, so a bind failure on an empty
+// body is tolerated (req stays zero-value → empty password → harmless for public
+// rooms, treated as a wrong password for private ones).
+type JoinRoomRequest struct {
+	Password string `json:"password"`
+}
+
 func (h *RoomHandler) JoinRoom(c echo.Context) error {
 	userID, err := auth.GetUserID(c)
 	if err != nil {
@@ -604,6 +670,11 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		return apperr.ErrRoomNotFound
 	}
 
+	// Public-room joins send no body; tolerate a bind error so an empty body
+	// never 400s the request (Story 9.6, AC5).
+	var req JoinRoomRequest
+	_ = c.Bind(&req)
+
 	room, err := h.repo.FindByID(uint(roomID))
 	if err != nil {
 		return fmt.Errorf("finding room: %w", err)
@@ -614,6 +685,18 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 
 	if room.Status != "waiting" {
 		return apperr.ErrRoomNotFound
+	}
+
+	// Private-room gate (Story 9.6, AC4): the authoritative password check fires
+	// at exactly one place — the seat-granting join. A nil hash (public room)
+	// skips it entirely (AC5). A wrong OR missing password both yield
+	// ErrWrongRoomPassword — the two are indistinguishable, and the attempted
+	// password is never logged. bcrypt's CheckPassword compares against the salt,
+	// so this must never be a plain string equality.
+	if room.PasswordHash != nil {
+		if auth.CheckPassword(*room.PasswordHash, req.Password) != nil {
+			return apperr.ErrWrongRoomPassword
+		}
 	}
 
 	if room.PlayerCount >= 4 {
@@ -707,6 +790,81 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 	h.broadcastRoomUpdated(updatedRoom)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": updatedRoom})
+}
+
+// UpdateRoomPrivacyRequest is the body of POST /rooms/:id/privacy (Story 9.6).
+// IsPrivate true requires a non-empty Password (re-hashed and stored); false
+// clears password_hash to NULL, making the room public again.
+type UpdateRoomPrivacyRequest struct {
+	IsPrivate bool   `json:"isPrivate"`
+	Password  string `json:"password"`
+}
+
+// UpdateRoomPrivacy lets a room owner set/change the password or revert the room
+// to public, while the room is still in waiting status (Story 9.6, AC6). It is a
+// new action-style endpoint (mirroring /kick, /transfer-ownership) rather than a
+// generic PATCH. Changing or clearing the password does NOT eject seated players
+// — the privacy gate is join-time only, and nothing here re-checks seated players.
+func (h *RoomHandler) UpdateRoomPrivacy(c echo.Context) error {
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		return apperr.ErrUnauthorized
+	}
+
+	roomID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return apperr.ErrRoomNotFound
+	}
+
+	room, err := h.repo.FindByID(uint(roomID))
+	if err != nil {
+		return fmt.Errorf("finding room: %w", err)
+	}
+	if room == nil {
+		return apperr.ErrRoomNotFound
+	}
+	if room.OwnerID != userID {
+		return apperr.ErrNotRoomOwner
+	}
+	if room.Status != "waiting" {
+		return apperr.ErrRoomNotWaiting
+	}
+	// Defense-in-depth for AC7: quick-play rooms are structurally public and
+	// must never be privatized. The UI hides this control for quick-play rooms,
+	// so this rejects only a direct/crafted API call.
+	if room.IsQuickPlay {
+		return apperr.ErrQuickPlayRoomPrivacy
+	}
+
+	var req UpdateRoomPrivacyRequest
+	if err := c.Bind(&req); err != nil {
+		return apperr.ErrBadRequest
+	}
+
+	if req.IsPrivate {
+		if err := validateRoomPassword(req.Password); err != nil {
+			return err
+		}
+		hashed, hashErr := auth.HashPassword(req.Password)
+		if hashErr != nil {
+			return fmt.Errorf("hashing room password: %w", hashErr)
+		}
+		room.PasswordHash = &hashed
+	} else {
+		room.PasswordHash = nil
+	}
+
+	if err := h.repo.Update(room); err != nil {
+		return fmt.Errorf("updating room privacy: %w", err)
+	}
+
+	// Surface the derived flag on the in-memory room (no DB read-back fires
+	// AfterFind here) and broadcast system:room_updated so every lobby card flips
+	// its lock indicator live. Seats/presence are deliberately untouched (AC6).
+	room.IsPrivate = room.PasswordHash != nil
+	h.broadcastRoomUpdated(room)
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": room})
 }
 
 // transferOwnershipOrClose reassigns room ownership away from a departing owner
@@ -2883,7 +3041,10 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				// (500 or 0) IS the synthesized room's stake AND its matchmaking
 				// pool key — players who can afford 500 pool together, everyone
 				// else pools at 0 (free). Charged atomically at auto-start.
-				CoinBuyIn:   buyIn,
+				CoinBuyIn: buyIn,
+				// PasswordHash stays nil — quick-play rooms are never private
+				// (Story 9.6, AC7). The QuickPlay/QuickJoin paths never prompt for
+				// or accept a password, so synthesized rooms are always public.
 				Status:      "waiting",
 				PlayerCount: 1,
 			}

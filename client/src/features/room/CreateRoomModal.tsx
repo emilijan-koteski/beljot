@@ -1,4 +1,15 @@
-import { ArrowRight, Clock, Coins, KeyRound, Users, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  Clock,
+  Coins,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
+  LockOpen,
+  Users,
+  Zap,
+} from "lucide-react";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -26,6 +37,10 @@ interface CreateRoomModalProps {
 const MIN_NAME = 3;
 const MAX_NAME = 32;
 const DEFAULT_BUY_IN = 500; // mirrors the server default (Story 9.2)
+// Private-room password bounds (Story 9.6). Cosmetic client guards; the server
+// is authoritative (apperr ROOM_PASSWORD_TOO_SHORT / ROOM_PASSWORD_TOO_LONG).
+const MIN_ROOM_PASSWORD = 4;
+const MAX_ROOM_PASSWORD = 72;
 
 /**
  * Split-panel create-room modal. Left = form (name, variant, match mode,
@@ -51,6 +66,9 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
   const [timerDuration, setTimerDuration] = useState(30);
   const [coinBuyIn, setCoinBuyIn] = useState(DEFAULT_BUY_IN);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [roomPassword, setRoomPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   // Field-level error shown under the room-name input (name validation only).
   const [error, setError] = useState<string | null>(null);
   // General submit error (already-in-room, insolvency race, unexpected) shown
@@ -59,6 +77,14 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
   const trimmed = name.trim();
   const nameValid = trimmed.length >= MIN_NAME && trimmed.length <= MAX_NAME;
+  // A private room needs a password within bounds; a public room ignores it.
+  // MIN is per-character (matches the server's rune count); MAX is the bcrypt
+  // byte limit, so measure UTF-8 bytes — not UTF-16 .length — to agree with the
+  // server and never accept a multibyte password it would reject as too long.
+  const passwordValid =
+    !isPrivate ||
+    (roomPassword.length >= MIN_ROOM_PASSWORD &&
+      new TextEncoder().encode(roomPassword).length <= MAX_ROOM_PASSWORD);
   const submitting = createRoomMutation.isPending;
 
   // The creator is auto-seated and charged the buy-in at match start, so a room
@@ -89,6 +115,9 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         timerStyle,
         timerDurationSeconds: timerStyle === "per-move" ? timerDuration : null,
         coinBuyIn: Math.max(0, Math.floor(coinBuyIn || 0)),
+        isPrivate,
+        // Only send the password for a private room (Story 9.6).
+        password: isPrivate ? roomPassword : undefined,
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
@@ -107,6 +136,16 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
           setFormError(
             t("lobby.createRoomModal.errors.buyInTooHigh", { balance: formatCoins(meBalance) }),
           );
+        } else if (err.code === "ROOM_PASSWORD_REQUIRED") {
+          setFormError(t("lobby.createRoomModal.errors.passwordRequired"));
+        } else if (err.code === "ROOM_PASSWORD_TOO_SHORT") {
+          setFormError(
+            t("lobby.createRoomModal.errors.passwordTooShort", { min: MIN_ROOM_PASSWORD }),
+          );
+        } else if (err.code === "ROOM_PASSWORD_TOO_LONG") {
+          setFormError(
+            t("lobby.createRoomModal.errors.passwordTooLong", { max: MAX_ROOM_PASSWORD }),
+          );
         } else {
           setFormError(t("lobby.createRoomModal.errors.unexpected"));
         }
@@ -124,6 +163,9 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setTimerStyle("relaxed");
       setTimerDuration(30);
       setCoinBuyIn(DEFAULT_BUY_IN);
+      setIsPrivate(false);
+      setRoomPassword("");
+      setShowPassword(false);
       setError(null);
       setFormError(null);
       createRoomMutation.reset();
@@ -300,6 +342,66 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   className="h-11"
                 />
               </Field>
+
+              <Field
+                label={t("lobby.createRoomModal.privateRoom")}
+                hint={t("lobby.createRoomModal.privateRoomHint")}
+              >
+                <Segmented
+                  value={isPrivate ? "private" : "public"}
+                  onValueChange={(v) => {
+                    setIsPrivate(v === "private");
+                    if (v === "public") setRoomPassword("");
+                  }}
+                  options={[
+                    {
+                      value: "public",
+                      label: t("lobby.createRoomModal.privacyPublic"),
+                      icon: <LockOpen className="size-3.5" />,
+                    },
+                    {
+                      value: "private",
+                      label: t("lobby.createRoomModal.privacyPrivate"),
+                      icon: <Lock className="size-3.5" />,
+                    },
+                  ]}
+                  testId="private-room-toggle"
+                  ariaLabel={t("lobby.createRoomModal.privateRoom")}
+                />
+              </Field>
+
+              {isPrivate && (
+                <Field
+                  label={t("lobby.createRoomModal.roomPassword")}
+                  htmlFor="room-password"
+                  hint={t("lobby.createRoomModal.roomPasswordHint", { min: MIN_ROOM_PASSWORD })}
+                  required
+                >
+                  <div className="relative">
+                    <Input
+                      id="room-password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder={t("lobby.createRoomModal.roomPasswordPlaceholder")}
+                      value={roomPassword}
+                      onChange={(e) => setRoomPassword(e.target.value.slice(0, MAX_ROOM_PASSWORD))}
+                      maxLength={MAX_ROOM_PASSWORD}
+                      data-testid="room-password-input"
+                      className="h-11 pr-10"
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
+                      onClick={() => setShowPassword(!showPassword)}
+                      data-testid="room-password-toggle"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                </Field>
+              )}
             </div>
 
             {/* General submit error — pinned above the footer so it's always
@@ -326,7 +428,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               <Button
                 type="submit"
                 size="cta"
-                disabled={!nameValid || submitting || buyInExceedsBalance}
+                disabled={!nameValid || submitting || buyInExceedsBalance || !passwordValid}
                 data-testid="create-room-button"
               >
                 {submitting
@@ -353,6 +455,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               timerStyle={timerStyle}
               timerDuration={timerDuration}
               coinBuyIn={coinBuyIn}
+              isPrivate={isPrivate}
               hostUsername={meUsername || "host"}
             />
 
@@ -392,6 +495,7 @@ function PreviewCard({
   timerStyle,
   timerDuration,
   coinBuyIn,
+  isPrivate,
   hostUsername,
 }: {
   name: string;
@@ -400,6 +504,7 @@ function PreviewCard({
   timerStyle: "relaxed" | "per-move";
   timerDuration: number;
   coinBuyIn: number;
+  isPrivate: boolean;
   hostUsername: string;
 }) {
   const { t } = useTranslation();
@@ -455,6 +560,26 @@ function PreviewCard({
                 shows just the grouped number (or "Free" at 0). */}
             {coinBuyIn > 0 ? formatCoins(coinBuyIn) : t("lobby.card.buyInFree")}
           </span>
+          <Dot />
+          {isPrivate ? (
+            <span
+              className="inline-flex items-center gap-1"
+              data-testid="preview-lock"
+              aria-label={t("lobby.card.privateLockAriaLabel")}
+            >
+              <Lock className="size-3" />
+              {t("lobby.card.private")}
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1"
+              data-testid="preview-public"
+              aria-label={t("lobby.card.publicAriaLabel")}
+            >
+              <LockOpen className="size-3" />
+              {t("lobby.card.public")}
+            </span>
+          )}
         </div>
       </div>
 

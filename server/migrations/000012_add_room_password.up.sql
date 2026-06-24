@@ -1,0 +1,11 @@
+-- Private rooms (Story 9.6, FR60): a per-room bcrypt password hash. Additive
+-- ALTER style, mirroring 000010_add_coin_economy_columns / 000009_add_wallet_columns_to_users.
+--
+-- Nullable with no default: existing rows backfill to NULL, and NULL is the
+-- public-room sentinel (NULL = public, a 60-char bcrypt hash = private). The
+-- derived wire-facing `isPrivate` boolean is computed as (password_hash IS NOT
+-- NULL) and never stored. The plaintext password is never persisted.
+--
+-- VARCHAR(60) because a bcrypt hash is exactly 60 characters. No NOT NULL, no
+-- CHECK — the column's nullability IS the public/private distinction.
+ALTER TABLE rooms ADD COLUMN password_hash VARCHAR(60);

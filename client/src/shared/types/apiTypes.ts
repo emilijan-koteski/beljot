@@ -52,6 +52,12 @@ export interface Room {
   timerDurationSeconds: number | null;
   /** Per-human coin stake paid at match start (Story 9.2). 0 = free room. */
   coinBuyIn: number;
+  /**
+   * Derived privacy flag (Story 9.6). Server-computed from password_hash != nil;
+   * the password hash itself is never sent to the client. Drives the lobby lock
+   * indicator and the join-time password prompt.
+   */
+  isPrivate: boolean;
   status: string;
   playerCount: number;
   isQuickPlay: boolean;
@@ -67,6 +73,10 @@ export interface CreateRoomRequest {
   timerDurationSeconds: number | null;
   /** Per-human coin stake (Story 9.2). min 0, no max; omitted → server default 500. */
   coinBuyIn: number;
+  /** Private-room toggle (Story 9.6). Requires `password` when true. */
+  isPrivate: boolean;
+  /** Plaintext room password — sent only when `isPrivate` is true; never stored client-side. */
+  password?: string;
 }
 
 export interface RoomPlayer {

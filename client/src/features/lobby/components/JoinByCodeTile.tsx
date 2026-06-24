@@ -4,9 +4,12 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
+import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { FetchError } from "@/shared/api/axiosClient";
-import { useJoinByCodeMutation } from "@/shared/hooks/mutations/useRooms";
+import { getRoomByCode } from "@/shared/api/rooms";
+import { useJoinRoomMutation } from "@/shared/hooks/mutations/useRooms";
 import { cn } from "@/shared/lib/utils";
+import type { Room } from "@/shared/types/apiTypes";
 
 const CODE_LENGTH = 6;
 
@@ -14,31 +17,70 @@ const CODE_LENGTH = 6;
  * 6-char uppercase code input + Join button inline. Replaces the older
  * <JoinByCode> sidebar tile; mirrors the design's hero action rail. Submits
  * on Enter and on button click.
+ *
+ * Story 9.6: a code can resolve to a private room. We resolve the code first
+ * (getRoomByCode exposes room.isPrivate but never demands the password), then
+ * prompt for the password before joining when the room is private.
  */
 export function JoinByCodeTile() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [code, setCode] = useState("");
-  const joinByCodeMutation = useJoinByCodeMutation();
+  const [resolving, setResolving] = useState(false);
+  const [pendingPrivateRoom, setPendingPrivateRoom] = useState<Room | null>(null);
+  const [passwordErrorKey, setPasswordErrorKey] = useState<string | null>(null);
+  const joinRoomMutation = useJoinRoomMutation();
   const isValid = code.trim().length === CODE_LENGTH;
+  const busy = resolving || joinRoomMutation.isPending;
+
+  // Maps a join/lookup failure to a toast. WRONG_ROOM_PASSWORD is handled inline
+  // by the prompt, never here.
+  function toastError(err: unknown) {
+    const c = err instanceof FetchError ? err.code : null;
+    if (c === "ROOM_NOT_FOUND") toast.error(t("lobby.errors.roomNotFound"));
+    else if (c === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
+    else if (c === "INSUFFICIENT_COINS")
+      // Join-by-code has no room object in scope, so it can't compose the
+      // {{buyIn}}/{{balance}} message — use the param-less generic variant.
+      toast.error(t("room.errors.insufficientCoinsGeneric"));
+    else if (c === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
+    else toast.error(t("lobby.errors.joinFailed"));
+  }
+
+  async function joinResolvedRoom(room: Room, password?: string) {
+    try {
+      await joinRoomMutation.mutateAsync({ id: room.id, password });
+      setPendingPrivateRoom(null);
+      navigate(`/rooms/${room.id}`);
+    } catch (err) {
+      const c = err instanceof FetchError ? err.code : null;
+      if (c === "WRONG_ROOM_PASSWORD") {
+        // Keep the prompt open with the inline error for a retry (AC4).
+        setPasswordErrorKey("room.errors.wrongPassword");
+        return;
+      }
+      setPendingPrivateRoom(null);
+      toastError(err);
+    }
+  }
 
   async function submit() {
     const trimmed = code.trim().toUpperCase();
-    if (trimmed.length !== CODE_LENGTH || joinByCodeMutation.isPending) return;
+    if (trimmed.length !== CODE_LENGTH || busy) return;
 
+    setResolving(true);
     try {
-      const room = await joinByCodeMutation.mutateAsync(trimmed);
-      navigate(`/rooms/${room.id}`);
+      const { room } = await getRoomByCode(trimmed);
+      setResolving(false);
+      if (room.isPrivate) {
+        setPasswordErrorKey(null);
+        setPendingPrivateRoom(room);
+        return;
+      }
+      await joinResolvedRoom(room);
     } catch (err) {
-      const code = err instanceof FetchError ? err.code : null;
-      if (code === "ROOM_NOT_FOUND") toast.error(t("lobby.errors.roomNotFound"));
-      else if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
-      else if (code === "INSUFFICIENT_COINS")
-        // Join-by-code has no room object in scope, so it can't compose the
-        // {{buyIn}}/{{balance}} message — use the param-less generic variant.
-        toast.error(t("room.errors.insufficientCoinsGeneric"));
-      else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
-      else toast.error(t("lobby.errors.joinFailed"));
+      setResolving(false);
+      toastError(err);
     }
   }
 
@@ -59,17 +101,34 @@ export function JoinByCodeTile() {
       />
       <button
         onClick={submit}
-        disabled={!isValid || joinByCodeMutation.isPending}
+        disabled={!isValid || busy}
         data-testid="join-by-code-button"
         className={cn(
           "rounded-[10px] border border-transparent px-3.5 py-2 text-xs font-semibold transition-colors",
           isValid
-            ? "bg-ink text-bg cursor-pointer"
+            ? "bg-ink text-background cursor-pointer"
             : "bg-surface-sunken text-ink-mute cursor-default opacity-80",
         )}
       >
         {t("lobby.actions.joinByCode.cta")}
       </button>
+
+      <PasswordPromptDialog
+        open={pendingPrivateRoom !== null}
+        roomName={pendingPrivateRoom?.name ?? ""}
+        pending={joinRoomMutation.isPending}
+        errorKey={passwordErrorKey}
+        onSubmit={(password) => {
+          if (pendingPrivateRoom) {
+            setPasswordErrorKey(null);
+            void joinResolvedRoom(pendingPrivateRoom, password);
+          }
+        }}
+        onClose={() => {
+          setPendingPrivateRoom(null);
+          setPasswordErrorKey(null);
+        }}
+      />
     </div>
   );
 }

@@ -183,6 +183,7 @@ describe("useWsDispatch", () => {
         playerCount: 1,
         isQuickPlay: false,
         coinBuyIn: 0,
+        isPrivate: false,
         createdAt: "2026-04-12T00:00:00Z",
         updatedAt: "2026-04-12T00:00:00Z",
       },
@@ -216,6 +217,104 @@ describe("useWsDispatch", () => {
     expect(rooms![0]!.playerCount).toBe(2);
   });
 
+  it("updates the in-room store when system:room_updated targets the current room", () => {
+    // The viewer is seated in room 2, which is currently private.
+    const store = useRoomStore.getState();
+    store.setRoom({
+      id: 2,
+      name: "Friends Table",
+      code: "XYZ789",
+      ownerId: 42,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      status: "waiting",
+      playerCount: 2,
+      isQuickPlay: false,
+      coinBuyIn: 0,
+      isPrivate: true,
+      createdAt: "2026-04-12T00:00:00Z",
+      updatedAt: "2026-04-12T00:00:00Z",
+    });
+    store.setCurrentRoomId(2);
+
+    const { result } = renderHook(() => useWsDispatch());
+    // Owner flips the room to public — broadcast reaches the seated viewer.
+    result.current({
+      type: "system:room_updated",
+      payload: {
+        id: 2,
+        name: "Friends Table",
+        code: "XYZ789",
+        ownerId: 42,
+        ownerUsername: "owner",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "waiting",
+        playerCount: 2,
+        isQuickPlay: false,
+        isPrivate: false,
+        createdAt: "2026-04-12T00:00:00Z",
+        updatedAt: "2026-04-12T00:02:00Z",
+      },
+    });
+
+    // The in-room view (roomStore) must reflect the flip, not just the lobby grid.
+    expect(useRoomStore.getState().room?.isPrivate).toBe(false);
+  });
+
+  it("ignores system:room_updated for a room the viewer is not in", () => {
+    const store = useRoomStore.getState();
+    store.setRoom({
+      id: 2,
+      name: "Friends Table",
+      code: "XYZ789",
+      ownerId: 42,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      status: "waiting",
+      playerCount: 2,
+      isQuickPlay: false,
+      coinBuyIn: 0,
+      isPrivate: true,
+      createdAt: "2026-04-12T00:00:00Z",
+      updatedAt: "2026-04-12T00:00:00Z",
+    });
+    store.setCurrentRoomId(2);
+
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "system:room_updated",
+      payload: {
+        id: 99,
+        name: "Some Other Room",
+        code: "OTH999",
+        ownerId: 7,
+        ownerUsername: "stranger",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "waiting",
+        playerCount: 1,
+        isQuickPlay: false,
+        isPrivate: false,
+        createdAt: "2026-04-12T00:00:00Z",
+        updatedAt: "2026-04-12T00:02:00Z",
+      },
+    });
+
+    // A different room's update must not mutate the current room's view.
+    expect(useRoomStore.getState().room?.isPrivate).toBe(true);
+  });
+
   it("removes room from cache when status is not waiting", () => {
     queryClient.setQueryData<Room[]>(queryKeys.rooms.list("waiting"), [
       {
@@ -232,6 +331,7 @@ describe("useWsDispatch", () => {
         playerCount: 4,
         isQuickPlay: false,
         coinBuyIn: 0,
+        isPrivate: false,
         createdAt: "2026-04-12T00:00:00Z",
         updatedAt: "2026-04-12T00:00:00Z",
       },

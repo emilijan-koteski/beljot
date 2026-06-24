@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { ArrowRight, Clock, Coins, KeyRound, Users, Zap } from "lucide-react";
+import { ArrowRight, Clock, Coins, KeyRound, Lock, LockOpen, Users, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
@@ -93,6 +93,26 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
                 shows just the grouped number (or "Free" at 0). */}
             {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
           </span>
+          <Dot />
+          {room.isPrivate ? (
+            <span
+              className="inline-flex items-center gap-1"
+              data-testid="room-card-lock"
+              aria-label={t("lobby.card.privateLockAriaLabel")}
+            >
+              <Lock className="size-3" />
+              {t("lobby.card.private")}
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1"
+              data-testid="room-card-public"
+              aria-label={t("lobby.card.publicAriaLabel")}
+            >
+              <LockOpen className="size-3" />
+              {t("lobby.card.public")}
+            </span>
+          )}
           <Dot />
           <RelativeTime iso={room.createdAt} variant="compact" />
         </div>

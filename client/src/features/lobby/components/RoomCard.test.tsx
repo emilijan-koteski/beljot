@@ -21,6 +21,7 @@ const baseRoom: Room = {
   playerCount: 1,
   isQuickPlay: false,
   coinBuyIn: 0,
+  isPrivate: false,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   players: [
@@ -91,5 +92,15 @@ describe("RoomCard", () => {
     const join = screen.getByTestId("room-card-join");
     expect(join).toHaveTextContent("Join");
     expect(join).not.toHaveTextContent("Join queue");
+  });
+
+  it("renders a lock indicator for a private room", () => {
+    render(<RoomCard room={{ ...baseRoom, isPrivate: true }} onJoin={() => {}} />);
+    expect(screen.getByTestId("room-card-lock")).toBeInTheDocument();
+  });
+
+  it("does not render the lock indicator for a public room", () => {
+    render(<RoomCard room={baseRoom} onJoin={() => {}} />);
+    expect(screen.queryByTestId("room-card-lock")).toBeNull();
   });
 });

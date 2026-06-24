@@ -28,13 +28,34 @@ type Room struct {
 	// CoinBuyIn is the per-human stake (coins) each seated human pays at match
 	// start (Story 9.2). min 0, no maximum (owner freedom); create-room defaults
 	// to 500, quick-play rooms persist 0. DB CHECK enforces >= 0.
-	CoinBuyIn   int            `gorm:"not null;default:0" json:"coinBuyIn"`
+	CoinBuyIn int `gorm:"not null;default:0" json:"coinBuyIn"`
+	// PasswordHash is the bcrypt hash of a private room's password (Story 9.6,
+	// FR60). NULL (nil pointer) is the public-room sentinel; a non-nil hash means
+	// the room is private. `json:"-"` keeps the hash strictly server-side — it is
+	// NEVER serialized to any client, WS payload, or log line.
+	PasswordHash *string `gorm:"size:60" json:"-"`
+	// IsPrivate is the derived, wire-facing privacy flag (Story 9.6). It is NOT a
+	// column (`gorm:"-"`) — it is computed from PasswordHash != nil so the boolean
+	// can never drift from the hash. Auto-populated on every DB read by the
+	// AfterFind hook below; CreateRoom and the hand-built roomLifecyclePayload set
+	// it explicitly because those paths don't read back through GORM.
+	IsPrivate   bool           `gorm:"-" json:"isPrivate"`
 	Status      string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
 	PlayerCount int            `gorm:"not null;default:1" json:"playerCount"`
 	IsQuickPlay bool           `gorm:"not null;default:false" json:"isQuickPlay"`
 	CreatedAt   time.Time      `json:"createdAt"`
 	UpdatedAt   time.Time      `json:"updatedAt"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// AfterFind derives the wire-facing IsPrivate flag from PasswordHash on every
+// GORM read (FindByID / FindByCode / FindByStatus / FindPlayerRoom, list and
+// detail queries), so no per-handler edit is needed to surface privacy. Paths
+// that don't read back through GORM — the freshly-Created room in CreateRoom and
+// the hand-built roomLifecyclePayload map — set IsPrivate explicitly (Story 9.6).
+func (r *Room) AfterFind(tx *gorm.DB) error {
+	r.IsPrivate = r.PasswordHash != nil
+	return nil
 }
 
 type RoomPlayer struct {
