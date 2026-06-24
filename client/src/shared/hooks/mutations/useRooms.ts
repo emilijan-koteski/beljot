@@ -4,7 +4,6 @@ import { queryKeys } from "@/shared/api/queryKeys";
 import {
   addBot,
   createRoom,
-  getRoomByCode,
   joinRoom,
   kickPlayer,
   leaveRoom,
@@ -16,6 +15,7 @@ import {
   startMatch,
   swapSeats,
   transferOwnership,
+  updateRoomPrivacy,
 } from "@/shared/api/rooms";
 import type {
   CreateRoomRequest,
@@ -37,8 +37,10 @@ export function useCreateRoomMutation() {
 
 export function useJoinRoomMutation() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) => joinRoom(id),
+  // Story 9.6: threads an optional private-room password through to joinRoom.
+  // Public-room joins pass `{ id }` with no password (unchanged request shape).
+  return useMutation<Room, Error, { id: number; password?: string }>({
+    mutationFn: ({ id, password }) => joinRoom(id, password),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all });
     },
@@ -123,14 +125,12 @@ export function useSwapSeatsMutation() {
   });
 }
 
-export function useJoinByCodeMutation() {
+// Owner privacy edit (Story 9.6): set/change the password or revert to public.
+export function useUpdateRoomPrivacyMutation() {
   const queryClient = useQueryClient();
-  return useMutation<Room, Error, string>({
-    mutationFn: async (code: string) => {
-      const { room } = await getRoomByCode(code);
-      await joinRoom(room.id);
-      return room;
-    },
+  return useMutation<Room, Error, { roomId: number; isPrivate: boolean; password?: string }>({
+    mutationFn: ({ roomId, isPrivate, password }) =>
+      updateRoomPrivacy(roomId, { isPrivate, password }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all });
     },

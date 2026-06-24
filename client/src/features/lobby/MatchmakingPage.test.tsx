@@ -61,6 +61,7 @@ const qpRoom = {
   playerCount: 1,
   isQuickPlay: true,
   coinBuyIn: 0,
+  isPrivate: false,
   createdAt: "",
   updatedAt: "",
 };

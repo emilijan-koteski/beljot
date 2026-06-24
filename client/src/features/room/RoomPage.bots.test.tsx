@@ -85,6 +85,7 @@ const room = {
   playerCount: 1,
   isQuickPlay: false,
   coinBuyIn: 0,
+  isPrivate: false,
   createdAt: "",
   updatedAt: "",
 };

@@ -1,11 +1,13 @@
 import "@/shared/i18n/i18n";
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
+import { queryKeys } from "@/shared/api/queryKeys";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { QueryWrapper } from "@/test-utils";
@@ -100,6 +102,7 @@ const defaultRoom = {
   playerCount: 2,
   isQuickPlay: false,
   coinBuyIn: 0,
+  isPrivate: false,
   createdAt: "",
   updatedAt: "",
 };
@@ -368,7 +371,7 @@ describe("RoomPage", () => {
     renderRoomPage();
 
     await waitFor(() => {
-      expect(mockJoinRoom).toHaveBeenCalledWith(1);
+      expect(mockJoinRoom).toHaveBeenCalledWith(1, undefined);
     });
   });
 
@@ -396,6 +399,116 @@ describe("RoomPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("room-page")).toBeInTheDocument();
     });
+    expect(mockJoinRoom).not.toHaveBeenCalled();
+  });
+
+  it("prompts for a password instead of blind-joining on a deep link to a private room", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+
+    // Viewer alice (id 10) deep-links to a PRIVATE room she isn't seated in. A
+    // blind auto-join would be rejected with WRONG_ROOM_PASSWORD, so the page
+    // must prompt for the password and only join once she submits it.
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, ownerId: 20, playerCount: 1, isPrivate: true },
+      players: [
+        {
+          id: 1,
+          roomId: 1,
+          userId: 20,
+          username: "bob",
+          seat: 0,
+          team: "teamA",
+          isBot: false,
+          createdAt: "",
+        },
+      ],
+    });
+    mockJoinRoom.mockResolvedValue({
+      ...defaultRoom,
+      ownerId: 20,
+      playerCount: 2,
+      isPrivate: true,
+    });
+
+    const user = userEvent.setup();
+    renderRoomPage();
+
+    // The prompt appears and no blind join has fired.
+    await waitFor(() => {
+      expect(screen.getByTestId("password-prompt-dialog")).toBeInTheDocument();
+    });
+    expect(mockJoinRoom).not.toHaveBeenCalled();
+
+    // Submitting the password joins with it.
+    await user.type(screen.getByTestId("password-prompt-input"), "sesame");
+    await user.click(screen.getByTestId("password-prompt-submit"));
+
+    await waitFor(() => {
+      expect(mockJoinRoom).toHaveBeenCalledWith(1, "sesame");
+    });
+  });
+
+  it("does not re-prompt for the password when a stale cache omits a just-joined member", async () => {
+    // Regression: re-entering a private room right after joining elsewhere (e.g.
+    // join-by-code → navigate here) used to spuriously re-open the password
+    // prompt. refetchOnMount:"always" still serves the cached snapshot
+    // synchronously, and that snapshot can omit the just-joined viewer; the
+    // auto-join effect must wait for the post-mount fetch (isFetchedAfterMount)
+    // before judging membership.
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+
+    const privateRoom = { ...defaultRoom, ownerId: 20, isPrivate: true, playerCount: 2 };
+    const bob = {
+      id: 1,
+      roomId: 1,
+      userId: 20,
+      username: "bob",
+      seat: 0,
+      team: "teamA",
+      isBot: false,
+      createdAt: "",
+    };
+    // alice (the viewer) is a member but not yet seated (seat null).
+    const aliceMember = {
+      id: 2,
+      roomId: 1,
+      userId: 10,
+      username: "alice",
+      seat: null,
+      team: null,
+      isBot: false,
+      createdAt: "",
+    };
+
+    // Seed the detail cache with a STALE snapshot that omits alice...
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    client.setQueryData(queryKeys.rooms.detail(1), {
+      room: privateRoom,
+      players: [bob],
+      returnedUserIds: [],
+    });
+    // ...while the fresh post-mount fetch shows alice IS a member.
+    mockGetRoom.mockResolvedValue({
+      room: privateRoom,
+      players: [bob, aliceMember],
+      returnedUserIds: [],
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <BrowserRouter>
+          <RoomPage />
+        </BrowserRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(mockGetRoom).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("room-page")).toBeInTheDocument());
+
+    // Membership is judged on the fresh data (alice present) → no prompt, no join.
+    expect(screen.queryByTestId("password-prompt-dialog")).not.toBeInTheDocument();
     expect(mockJoinRoom).not.toHaveBeenCalled();
   });
 

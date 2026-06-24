@@ -50,6 +50,7 @@ describe("roomStore", () => {
       playerCount: 1,
       isQuickPlay: false,
       coinBuyIn: 0,
+      isPrivate: false,
       createdAt: "2026-04-12T00:00:00Z",
       updatedAt: "2026-04-12T00:00:00Z",
     });
@@ -118,6 +119,7 @@ describe("roomStore", () => {
       playerCount: 2,
       isQuickPlay: false,
       coinBuyIn: 0,
+      isPrivate: false,
       createdAt: "2026-04-12T00:00:00Z",
       updatedAt: "2026-04-12T00:00:00Z",
     });

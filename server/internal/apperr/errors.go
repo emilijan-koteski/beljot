@@ -92,6 +92,21 @@ var (
 	ErrBotsNotAllowed           = NewAppError("BOTS_NOT_ALLOWED", "bots cannot be added to this room", http.StatusConflict)
 	ErrNoBotOnSeat              = NewAppError("NO_BOT_ON_SEAT", "no bot occupies this seat", http.StatusNotFound)
 
+	// Private-room errors (Story 9.6, FR60). The privacy gate is HTTP-only —
+	// mirroring ErrInsufficientCoins below, NOT a WS error event. ErrWrongRoomPassword
+	// is 409 (matching the INSUFFICIENT_COINS precedent) and is returned for BOTH a
+	// wrong and a missing password on a private room — the two are deliberately
+	// indistinguishable to the client (no oracle beyond the public isPrivate flag).
+	ErrWrongRoomPassword    = NewAppError("WRONG_ROOM_PASSWORD", "incorrect room password", http.StatusConflict)
+	ErrRoomPasswordRequired = NewAppError("ROOM_PASSWORD_REQUIRED", "a password is required for a private room", http.StatusBadRequest)
+	ErrRoomPasswordTooShort = NewAppError("ROOM_PASSWORD_TOO_SHORT", "room password must be at least 4 characters", http.StatusBadRequest)
+	ErrRoomPasswordTooLong  = NewAppError("ROOM_PASSWORD_TOO_LONG", "room password must be at most 72 characters", http.StatusBadRequest)
+	// ErrQuickPlayRoomPrivacy guards the AC7 invariant server-side: quick-play
+	// rooms are structurally public and can never be privatized. The UI hides the
+	// owner privacy control for quick-play rooms, so this is reached only by a
+	// direct API call; 409 matches the sibling quick-play guards.
+	ErrQuickPlayRoomPrivacy = NewAppError("QUICK_PLAY_ROOM_PRIVACY", "quick play rooms cannot be made private", http.StatusConflict)
+
 	// Economy domain errors (Epic 9). 409 Conflict (not 402) — the project's
 	// status set is 200/201/400/401/403/404/409/500. Surfaces from the join
 	// affordability check and the atomic match-start stake charge.

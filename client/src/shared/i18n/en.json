@@ -231,7 +231,43 @@
       "botsNotAllowed": "Bots can't be added to this room",
       "insufficientCoins": "You need {{buyIn}} coins to join this room — your balance: {{balance}}.",
       "insufficientCoinsGeneric": "You don't have enough coins to join this room.",
-      "insufficientCoinsStart": "A player can't stake that much — the match didn't start."
+      "insufficientCoinsStart": "A player can't stake that much — the match didn't start.",
+      "wrongPassword": "Incorrect room password."
+    },
+    "passwordPrompt": {
+      "title": "Private room",
+      "description": "Enter the password to join \"{{name}}\".",
+      "placeholder": "Room password",
+      "submit": "Join",
+      "submitting": "Joining…",
+      "cancel": "Cancel"
+    },
+    "privacy": {
+      "dialogTitle": "Room privacy",
+      "dialogDescription": "Make this room private with a password, or open it to everyone. Seated players are never removed.",
+      "modeLabel": "Access",
+      "public": "Public",
+      "private": "Private",
+      "passwordLabel": "Room password",
+      "passwordPlaceholder": "Share this with your friends",
+      "passwordHint": "At least {{min}} characters",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "toastPrivate": "Room is now private.",
+      "toastPublic": "Room is now public.",
+      "privateBadge": "Private",
+      "publicBadge": "Public",
+      "manageButtonPrivate": "Privacy: Private",
+      "manageButtonPublic": "Privacy: Public",
+      "errors": {
+        "passwordRequired": "Set a password for the private room",
+        "passwordTooShort": "Password needs at least 4 characters",
+        "passwordTooLong": "Password must be at most 72 characters",
+        "notOwner": "Only the host can change room privacy",
+        "notWaiting": "Privacy can only change before the match starts",
+        "unexpected": "Could not update privacy. Try again."
+      }
     },
     "waitingForPlayers": "Waiting for players",
     "waitingForReturn": "Waiting for players to return",
@@ -389,7 +425,10 @@
         "unexpected": "Could not create room. Try again.",
         "nameTooShort": "Name needs at least {{min}} characters",
         "buyInTooHigh": "Buy-in exceeds your balance of {{balance}}",
-        "alreadyInRoom": "You're already in a room — leave it before creating a new one"
+        "alreadyInRoom": "You're already in a room — leave it before creating a new one",
+        "passwordRequired": "Set a password for the private room",
+        "passwordTooShort": "Password needs at least {{min}} characters",
+        "passwordTooLong": "Password must be at most {{max}} characters"
       },
       "eyebrow": "New room",
       "headline": "Create a room",
@@ -418,7 +457,14 @@
         "step3": "Once all four seats are filled, you start the match."
       },
       "coinBuyIn": "Buy-in",
-      "coinBuyInHint": "Each player stakes this to play · default 500"
+      "coinBuyInHint": "Each player stakes this to play · default 500",
+      "privateRoom": "Private room",
+      "privateRoomHint": "Private rooms stay listed but need a password to join",
+      "privacyPublic": "Public",
+      "privacyPrivate": "Private",
+      "roomPassword": "Room password",
+      "roomPasswordPlaceholder": "Share this with your friends",
+      "roomPasswordHint": "At least {{min}} characters"
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
     "actions": {
@@ -468,7 +514,11 @@
       "variantBitola": "Bitola",
       "matchMode1001": "1001 pts",
       "matchMode501": "501 pts",
-      "buyInFree": "No stake"
+      "buyInFree": "No stake",
+      "private": "Private",
+      "privateLockAriaLabel": "Private room — password required to join",
+      "public": "Public",
+      "publicAriaLabel": "Public room — anyone can join"
     },
     "chat": {
       "title": "Lobby chat",

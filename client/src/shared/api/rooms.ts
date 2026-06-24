@@ -24,8 +24,19 @@ export function getRoomByCode(code: string): Promise<RoomDetail> {
   return axiosClient.get(`/rooms/code/${encodeURIComponent(code)}`);
 }
 
-export function joinRoom(id: number): Promise<Room> {
-  return axiosClient.post(`/rooms/${id}/join`);
+// joinRoom posts an optional private-room password (Story 9.6). Public-room
+// joins pass no password and send no body, preserving the pre-9.6 request shape.
+export function joinRoom(id: number, password?: string): Promise<Room> {
+  return axiosClient.post(`/rooms/${id}/join`, password !== undefined ? { password } : undefined);
+}
+
+// updateRoomPrivacy sets/changes the room password or reverts the room to public
+// (Story 9.6). Owner-only + waiting-only server-side. Does not eject seated players.
+export function updateRoomPrivacy(
+  roomId: number,
+  body: { isPrivate: boolean; password?: string },
+): Promise<Room> {
+  return axiosClient.post(`/rooms/${roomId}/privacy`, body);
 }
 
 export function leaveRoom(id: number): Promise<void> {

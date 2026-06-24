@@ -231,7 +231,43 @@
       "botsNotAllowed": "U ovu sobu se ne mogu dodavati botovi",
       "insufficientCoins": "Potrebno je {{buyIn}} novčića za ulazak u sobu. Tvoje stanje: {{balance}}.",
       "insufficientCoinsGeneric": "Nemaš dovoljno novčića za ulazak u sobu.",
-      "insufficientCoinsStart": "Igrač ne može uložiti toliko. Meč nije počeo."
+      "insufficientCoinsStart": "Igrač ne može uložiti toliko. Meč nije počeo.",
+      "wrongPassword": "Pogrešna lozinka sobe."
+    },
+    "passwordPrompt": {
+      "title": "Privatna soba",
+      "description": "Unesi lozinku za ulazak u \"{{name}}\".",
+      "placeholder": "Lozinka sobe",
+      "submit": "Uđi",
+      "submitting": "Pridruživanje…",
+      "cancel": "Odustani"
+    },
+    "privacy": {
+      "dialogTitle": "Privatnost sobe",
+      "dialogDescription": "Učini sobu privatnom uz lozinku ili je otvori svima. Igrači koji već sjede nikada se ne izbacuju.",
+      "modeLabel": "Pristup",
+      "public": "Javna",
+      "private": "Privatna",
+      "passwordLabel": "Lozinka sobe",
+      "passwordPlaceholder": "Podijeli je s prijateljima",
+      "passwordHint": "Najmanje {{min}} znakova",
+      "cancel": "Odustani",
+      "save": "Spremi",
+      "saving": "Spremanje…",
+      "toastPrivate": "Soba je sada privatna.",
+      "toastPublic": "Soba je sada javna.",
+      "privateBadge": "Privatna",
+      "publicBadge": "Javna",
+      "manageButtonPrivate": "Privatnost: privatna",
+      "manageButtonPublic": "Privatnost: javna",
+      "errors": {
+        "passwordRequired": "Postavi lozinku za privatnu sobu",
+        "passwordTooShort": "Lozinka mora imati barem 4 znaka",
+        "passwordTooLong": "Lozinka može imati najviše 72 znaka",
+        "notOwner": "Samo domaćin može promijeniti privatnost sobe",
+        "notWaiting": "Privatnost se može promijeniti samo prije početka meča",
+        "unexpected": "Promjena privatnosti nije uspjela. Pokušaj ponovno."
+      }
     },
     "waitingForPlayers": "Čekanje igrača",
     "waitingForReturn": "Čekanje da se igrači vrate",
@@ -389,7 +425,10 @@
         "unexpected": "Stvaranje sobe nije uspjelo. Pokušaj ponovno.",
         "nameTooShort": "Naziv mora imati barem {{min}} znakova",
         "buyInTooHigh": "Ulog premašuje tvoje stanje od {{balance}}",
-        "alreadyInRoom": "Već si u sobi, napusti je prije nego što napraviš novu"
+        "alreadyInRoom": "Već si u sobi, napusti je prije nego što napraviš novu",
+        "passwordRequired": "Postavi lozinku za privatnu sobu",
+        "passwordTooShort": "Lozinka mora imati barem {{min}} znakova",
+        "passwordTooLong": "Lozinka može imati najviše {{max}} znakova"
       },
       "eyebrow": "Nova soba",
       "headline": "Stvori sobu",
@@ -418,7 +457,14 @@
         "step3": "Kad se popune sva četiri mjesta, krećeš s mečom."
       },
       "coinBuyIn": "Ulog",
-      "coinBuyInHint": "Svaki igrač ulaže ovoliko za partiju · zadano 500"
+      "coinBuyInHint": "Svaki igrač ulaže ovoliko za partiju · zadano 500",
+      "privateRoom": "Privatna soba",
+      "privateRoomHint": "Privatne sobe ostaju na popisu, ali traže lozinku za ulazak",
+      "privacyPublic": "Javna",
+      "privacyPrivate": "Privatna",
+      "roomPassword": "Lozinka sobe",
+      "roomPasswordPlaceholder": "Podijeli je s prijateljima",
+      "roomPasswordHint": "Najmanje {{min}} znakova"
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · živo se osvježava",
     "actions": {
@@ -468,7 +514,11 @@
       "variantBitola": "Bitola",
       "matchMode1001": "1001 bod",
       "matchMode501": "501 bod",
-      "buyInFree": "Bez uloga"
+      "buyInFree": "Bez uloga",
+      "private": "Privatna",
+      "privateLockAriaLabel": "Privatna soba, za ulazak je potrebna lozinka",
+      "public": "Javna",
+      "publicAriaLabel": "Javna soba, svatko može ući"
     },
     "chat": {
       "title": "Lobi chat",
