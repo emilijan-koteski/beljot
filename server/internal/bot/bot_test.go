@@ -944,6 +944,110 @@ func TestDecide_LeadIntoPartnerVoid(t *testing.T) {
 	})
 }
 
+// TestDecide_SmearOntoPartnerBoss covers Rule 8: when the partner LEADS the
+// boss of a non-trump suit (e.g. the Ace) and the bot follows 3rd with one
+// opponent still to play, the bot smears high points onto the trick instead of
+// dumping a 7/8 — accepting the unknown ruff risk. It keeps points home only
+// when the last opponent is KNOWN void in the led suit (near-certain ruff).
+// Seating: partner (seat 2) leads, opp (seat 3) follows, bot (seat 0) is 3rd,
+// opp (seat 1) is the 4th still to play. Trump = Hearts.
+func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
+	spades := game.SuitSpades
+	hearts := game.SuitHearts
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			// Partner's Ace is the boss; the last opponent's void is unknown.
+			name: "smear the high spade onto the partner ace",
+			hand: cards("TS", "7S", "8C"),
+			trick: []game.TrickCard{
+				{Card: card("AS"), PlayerSeat: 2},
+				{Card: card("8S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "TS",
+		},
+		{
+			// Void in led and in trump: smear the highest-point card of another
+			// suit (the owner's "if doesn't have of that suit, some other suit").
+			name: "smear a high card from another suit when void in led and trump",
+			hand: cards("AD", "7C", "8C"),
+			trick: []game.TrickCard{
+				{Card: card("AS"), PlayerSeat: 2},
+				{Card: card("8S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "AD",
+		},
+		{
+			// The last opponent (seat 1) is KNOWN void in spades and trumps still
+			// remain it could hold — near-certain ruff, so keep points home.
+			name: "keep points home when the void opponent can still ruff",
+			hand: cards("TS", "7S", "8C"),
+			trick: []game.TrickCard{
+				{Card: card("AS"), PlayerSeat: 2},
+				{Card: card("8S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "7C", lead: &spades}}, // seat 1 void spades
+			wantCard:   "7S",
+		},
+		{
+			// Last opponent (seat 1) is void in spades BUT also known void in trump,
+			// so it cannot ruff — smear anyway even into the led-suit void.
+			name: "smear into a void opponent that cannot ruff",
+			hand: cards("TS", "7S", "8C"),
+			trick: []game.TrickCard{
+				{Card: card("AS"), PlayerSeat: 2},
+				{Card: card("8S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			observes: []obs{
+				{seat: 1, card: "7C", lead: &spades}, // seat 1 void spades
+				{seat: 1, card: "8D", lead: &hearts}, // seat 1 void trump -> cannot ruff
+			},
+			wantCard: "TS",
+		},
+		{
+			// Partner is winning with the Ten but the Ace is still unseen — not the
+			// boss, so don't smear; keep points home. (Bot's K+7 are both below the
+			// Ten, so no overplay is forced and the choice is free.)
+			name: "keep points home when the partner card is not the boss",
+			hand: cards("KS", "7S", "8C"),
+			trick: []game.TrickCard{
+				{Card: card("TS"), PlayerSeat: 2},
+				{Card: card("8S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "7S",
+		},
+		{
+			// Void in led but HOLDING trump: forced to ruff the partner (Bitola has
+			// no exemption). Nothing to smear, so the cheap ruff is played.
+			name: "forced ruff over the partner plays the cheap trump",
+			hand: cards("JH", "9H", "7C"),
+			trick: []game.TrickCard{
+				{Card: card("AS"), PlayerSeat: 2},
+				{Card: card("8S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "9H",
+		},
+		{
+			// Regression: when the partner's win is already SAFE (bot closes the
+			// trick), the existing safe-smear still fires.
+			name: "safe partner win still smears the high card",
+			hand: cards("TS", "9S"),
+			trick: []game.TrickCard{
+				{Card: card("8S"), PlayerSeat: 1},
+				{Card: card("AS"), PlayerSeat: 2},
+				{Card: card("7S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "TS",
+		},
+	})
+}
+
 // TestDecide_AlwaysLegal pins that every decision is drawn from the legal
 // set the engine itself computed.
 func TestDecide_AlwaysLegal(t *testing.T) {

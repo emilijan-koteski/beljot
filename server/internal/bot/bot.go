@@ -360,9 +360,21 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 			// later trick.
 			return strongestPreservingBoss(v, legal, trump)
 		}
-		// Partner's card is still contestable — keep our points home. While the
-		// led suit can still win, the overplay rule auto-promotes us when we
-		// hold the boss.
+		// Risk-smear (Rule 8): the partner holds the uncatchable top of a
+		// non-trump led suit (e.g. the Ace). The only thing that can beat it is a
+		// ruff from the one opponent still to play, and that opponent is NOT known
+		// void in the led suit — so the ruff is only a possibility. Take the
+		// calculated risk and pile high points onto the trick. If every legal play
+		// would overtake (a forced ruff with no card to spare), there is nothing to
+		// smear and we fall through to the cheap ruff below.
+		if shouldSmearOntoPartnerBoss(v, trump) {
+			if c := highestPointNonOvertaking(v, legal, trump); c != nil {
+				return *c
+			}
+		}
+		// Partner's card is still genuinely contestable (or a known ruff looms) —
+		// keep our points home. While the led suit can still win, the overplay rule
+		// auto-promotes us when we hold the boss.
 		return lowestValue(legal, trump)
 	}
 
@@ -748,6 +760,72 @@ func partnerWinIsSafe(v View, trump game.Suit) bool {
 			continue
 		}
 		if ledIdx < 0 || !v.KnownVoids[seat][ledIdx] {
+			return false
+		}
+	}
+	return true
+}
+
+// opponentMayHoldTrump reports whether the given opponent seat could still play
+// a trump, and therefore ruff. True when it is known to hold a trump (revealed
+// and not yet played); false when it is known void in trump; otherwise true only
+// if some trump is still unseen (could be in its hand). When every trump is
+// accounted for, a seat void in the led suit cannot ruff.
+func opponentMayHoldTrump(v View, seat int, trump game.Suit) bool {
+	for _, c := range knownHeldBy(v, seat) {
+		if c.Suit == trump {
+			return true
+		}
+	}
+	if tIdx := SuitIndex(trump); tIdx >= 0 && v.KnownVoids[seat][tIdx] {
+		return false
+	}
+	for _, c := range unseenCards(v) {
+		if c.Suit == trump {
+			return true
+		}
+	}
+	return false
+}
+
+// shouldSmearOntoPartnerBoss reports whether the partner's currently-winning
+// card is the uncatchable top of a NON-TRUMP led suit (only a ruff could beat
+// it) and no yet-to-play opponent can still ruff it. When true, the bot piles
+// high points onto the trick, accepting the unknown ruff risk (Rule 8). Reached
+// only from the partner-winning branch after partnerWinIsSafe is false, i.e.
+// some unseen trump could ruff — but here that ruff is only a possibility.
+//
+// The only thing that keeps points home is a yet-to-play opponent that is known
+// void in the led suit AND can still hold a trump (a near-certain ruff). If that
+// opponent is also out of trump — known void in trump, or every trump already
+// accounted for — it cannot ruff, so we still smear.
+func shouldSmearOntoPartnerBoss(v View, trump game.Suit) bool {
+	if len(v.CurrentTrick) == 0 {
+		return false // defensive: chooseFollow only runs mid-trick
+	}
+	led := v.CurrentTrick[0].Card.Suit
+	if led == trump {
+		return false // non-trump scenario only
+	}
+	_, winning := trickWinner(v.CurrentTrick, trump)
+	if winning.Suit != led {
+		return false // partner won by ruff, not by following the led suit
+	}
+	// Boss: no card an opponent could play of the led suit beats the partner's.
+	for _, u := range threats(v) {
+		if u.Suit == led && beatsCard(u, winning, led, trump) {
+			return false
+		}
+	}
+	// Don't donate into a near-certain ruff: a yet-to-play opponent known void in
+	// the led suit that can still hold a trump keeps our points home. A void
+	// opponent that cannot possibly ruff (out of trump) does not block the smear.
+	ledIdx := SuitIndex(led)
+	for _, seat := range seatsYetToPlay(v) {
+		if game.TeamForSeat(seat) == game.TeamForSeat(v.Seat) {
+			continue
+		}
+		if ledIdx >= 0 && v.KnownVoids[seat][ledIdx] && opponentMayHoldTrump(v, seat, trump) {
 			return false
 		}
 	}
