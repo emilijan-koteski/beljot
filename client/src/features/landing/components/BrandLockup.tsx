@@ -12,9 +12,20 @@ type BrandLockupProps = {
   size?: number;
   wordmarkSize?: number;
   className?: string;
+  /**
+   * Append a ".online" suffix after the wordmark, rendered in the muted
+   * silver (`text-ink-dim`) that matches the nav's Login link on felt. Used
+   * by the landing header for the complete "Beljot.online" brand lockup.
+   */
+  showSuffix?: boolean;
 };
 
-export function BrandLockup({ size = 34, wordmarkSize = 22, className }: BrandLockupProps) {
+export function BrandLockup({
+  size = 34,
+  wordmarkSize = 22,
+  className,
+  showSuffix = false,
+}: BrandLockupProps) {
   const to = useAuthStore((s) => s.user) ? "/lobby" : "/";
   return (
     <Link
@@ -37,6 +48,7 @@ export function BrandLockup({ size = 34, wordmarkSize = 22, className }: BrandLo
         style={{ fontSize: wordmarkSize }}
       >
         Beljot
+        {showSuffix && <span className="text-ink-dim font-medium">.online</span>}
       </span>
     </Link>
   );
