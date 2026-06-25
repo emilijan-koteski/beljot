@@ -432,7 +432,6 @@
       },
       "eyebrow": "New room",
       "headline": "Create a room",
-      "subhead": "Give the room a name, pick a pace, then share the join code with friends. The list of rooms in the lobby updates the moment you create the room.",
       "roomNameHint": "{{min}}–{{max}} characters",
       "variantCroatia": "Croatian",
       "matchMode501": "501 points",
@@ -475,7 +474,7 @@
       },
       "createRoom": {
         "title": "Create room",
-        "subtitle": "Set your own rules & timer"
+        "subtitle": "Set your own rules"
       },
       "joinByCode": {
         "placeholder": "Have a code?",

@@ -432,7 +432,6 @@
       },
       "eyebrow": "Nova soba",
       "headline": "Kreiraj sobu",
-      "subhead": "Daj sobi naziv, izaberi tempo, pa podeli pristupni kod sa prijateljima. Spisak soba u lobiju se osvežava čim kreiraš sobu.",
       "roomNameHint": "{{min}}–{{max}} znakova",
       "variantCroatia": "Hrvatska",
       "matchMode501": "501 bod",
@@ -475,7 +474,7 @@
       },
       "createRoom": {
         "title": "Kreiraj sobu",
-        "subtitle": "Podesi svoja pravila i tajmer"
+        "subtitle": "Podesi svoja pravila"
       },
       "joinByCode": {
         "placeholder": "Imaš kod?",
