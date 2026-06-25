@@ -6,6 +6,7 @@ import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
+import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
@@ -27,15 +28,18 @@ type Props = {
   cancelDisabled?: boolean;
 };
 
-// Orbit slot geometry — west, north, east around the centred "You". Offsets are
-// percentages of the (square) orbit box so the whole diagram scales down with
-// the box on narrow screens; at the 380px design size these resolve to ±130px,
-// matching MatchmakingSearching in room-flow-scenes-1.jsx.
+// Ring slot geometry — the four cardinal points around the (now empty) table
+// centre, where the search sweep spins. The viewer ("you") takes the south
+// seat; the other three fill west / north / east in ascending order, becoming
+// real opponents as they join. Offsets are percentages of the (square) orbit
+// box so the whole diagram scales with it; at the 380px design size these
+// resolve to ±130px, matching MatchmakingSearching in room-flow-scenes-1.jsx.
 const ORBIT_OFFSETS = [
-  { x: -34.21, y: 0 },
-  { x: 0, y: -34.21 },
-  { x: 34.21, y: 0 },
+  { x: -34.21, y: 0 }, // west
+  { x: 0, y: -34.21 }, // north
+  { x: 34.21, y: 0 }, // east
 ] as const;
+const YOU_OFFSET = { x: 0, y: 34.21 } as const; // south
 
 /**
  * The Quick Play "finding a table" diagram: the viewer sits at the centre of a
@@ -55,6 +59,15 @@ export function MatchmakingDiagram({
   cancelDisabled,
 }: Props) {
   const { t } = useTranslation();
+
+  // Phones (<md) can't fit the full 380px orbit plus the title/badges/progress
+  // chrome without the cancel button slipping below the fold, so shrink the
+  // table, the avatars and the vertical rhythm on compact widths. Returns false
+  // without matchMedia (tests/SSR), so the full desktop geometry renders there.
+  const isCompact = useMediaQuery("(max-width: 767px)");
+  const youSize = isCompact ? 48 : 64;
+  const orbitSize = isCompact ? 40 : 52;
+  const orbitBox = isCompact ? "min(240px, calc(100vw - 72px))" : "min(380px, calc(100vw - 72px))";
 
   // The three seats other than the viewer's, in ascending order, mapped onto
   // the orbit's west/north/east positions.
@@ -76,7 +89,7 @@ export function MatchmakingDiagram({
         {t("lobby.matchmaking.eyebrow")}
       </Eyebrow>
 
-      <h1 className="font-display text-ink mt-2.5 mb-1.5 text-center text-[34px] font-bold tracking-[-0.8px]">
+      <h1 className="font-display text-ink mt-2.5 mb-1.5 text-center text-[26px] font-bold tracking-[-0.8px] md:text-[34px]">
         {t("lobby.matchmaking.title")}
       </h1>
       <p className="text-ink-dim m-0 max-w-130 text-center text-[14.5px] leading-relaxed">
@@ -86,7 +99,7 @@ export function MatchmakingDiagram({
       {/* Match-rules + elapsed strip — derived from the actual room config
           (variant, mode, per-move timer, and the coin stake) rather than fixed
           assumptions, so it matches the room the player is queued into. */}
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 md:mt-4">
         <Badge tone="neutral" icon={<Trophy className="size-3 text-(--accent)" />}>
           {variantLabel(t, room.variant)}
         </Badge>
@@ -112,10 +125,10 @@ export function MatchmakingDiagram({
           Capped at the 380px design size, shrinking to fit narrow screens; the
           inner geometry is percentage-based so it scales with the box. */}
       <div
-        className="relative mt-7"
+        className="relative mt-4 md:mt-7"
         style={{
-          width: "min(380px, calc(100vw - 72px))",
-          height: "min(380px, calc(100vw - 72px))",
+          width: orbitBox,
+          height: orbitBox,
         }}
       >
         {/* Brass ring — the table edge */}
@@ -143,10 +156,16 @@ export function MatchmakingDiagram({
           }}
         />
 
-        {/* You — centre */}
-        <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5">
+        {/* You — south seat on the ring (the centre now holds only the sweep). */}
+        <div
+          className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5"
+          style={{
+            left: `calc(50% + ${YOU_OFFSET.x}%)`,
+            top: `calc(50% + ${YOU_OFFSET.y}%)`,
+          }}
+        >
           <div className="relative">
-            <Avatar name={currentUsername} size={64} you />
+            <Avatar name={currentUsername} size={youSize} you />
             <span
               className="border-accent absolute rounded-full border-2 opacity-40 animate-[pulse-dot_1.6s_ease-in-out_infinite]"
               style={{ inset: -6 }}
@@ -172,10 +191,12 @@ export function MatchmakingDiagram({
               style={{ left: `calc(50% + ${offset.x}%)`, top: `calc(50% + ${offset.y}%)` }}
             >
               {occupant ? (
-                <Avatar name={occupant.username} size={52} team={team} />
+                <Avatar name={occupant.username} size={orbitSize} team={team} />
               ) : (
                 <div
-                  className="bg-surface-elevated flex size-13 items-center justify-center rounded-full border-2 border-dashed"
+                  className={`bg-surface-elevated flex items-center justify-center rounded-full border-2 border-dashed ${
+                    isCompact ? "size-10" : "size-13"
+                  }`}
                   style={{
                     borderColor: isUs ? "var(--team-a-edge-soft)" : "var(--team-b-edge-soft)",
                   }}
@@ -200,7 +221,7 @@ export function MatchmakingDiagram({
       </div>
 
       {/* Progress line + cancel */}
-      <div className="mt-7 flex w-105 max-w-full flex-col items-center gap-4">
+      <div className="mt-4 flex w-105 max-w-full flex-col items-center gap-3 md:mt-7 md:gap-4">
         <div
           className="bg-surface-sunken border-border relative h-1.5 w-full overflow-hidden rounded-full border"
           role="progressbar"

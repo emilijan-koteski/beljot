@@ -219,7 +219,7 @@ export function MatchmakingPage() {
 
   return (
     <div
-      className="mx-auto flex min-h-[calc(100vh-160px)] max-w-330 flex-col items-center justify-center px-7 py-10"
+      className="mx-auto flex min-h-[calc(100vh-160px)] max-w-330 flex-col items-center justify-center px-7 py-6 md:py-10"
       data-testid="matchmaking-page"
     >
       <MatchmakingDiagram
