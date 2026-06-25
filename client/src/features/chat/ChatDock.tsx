@@ -216,7 +216,9 @@ export function ChatDock(props: ChatDockProps) {
     <aside
       data-testid={`${testIdRoot}-dock`}
       className={cn(
-        "bg-surface fixed right-4.5 bottom-4.5 z-40 flex h-120 w-85 flex-col overflow-hidden rounded-lg border border-border shadow-(--chat-shadow-panel) animate-[card-in_.18s_ease_both]",
+        // Full-screen overlay on phones so chat is comfortable to read/type;
+        // the docked 340×480 corner panel returns at sm+ (desktop treatment).
+        "bg-surface fixed inset-0 z-50 flex flex-col overflow-hidden sm:inset-auto sm:right-4.5 sm:bottom-4.5 sm:h-120 sm:w-85 sm:animate-[card-in_.18s_ease_both] sm:rounded-lg sm:border sm:border-border sm:shadow-(--chat-shadow-panel)",
         frosted,
         skin,
         className,
