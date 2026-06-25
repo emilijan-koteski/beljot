@@ -249,7 +249,7 @@
       "public": "Javna",
       "private": "Privatna",
       "passwordLabel": "Lozinka sobe",
-      "passwordPlaceholder": "Podijeli je s prijateljima",
+      "passwordPlaceholder": "Unesi lozinku",
       "passwordHint": "Najmanje {{min}} znakova",
       "cancel": "Odustani",
       "save": "Spremi",
@@ -343,11 +343,6 @@
     "legendThem": "Oni",
     "actionBarSwap": "Zamjena · odaberi mjesto",
     "actionBarFinishSwap": "Završi zamjenu za početak",
-    "tip": {
-      "unseated": "Zauzmi bilo koje mjesto, partner sjedi dijagonalno nasuprot.",
-      "owner": "Klikni sjedećeg igrača, pa drugo mjesto za zamjenu, ili prazno mjesto da ga premjestiš. Zadrži pokazivač nad igračem za izbacivanje ili postavljanje domaćina.",
-      "seated": "Smjesti se, chat je dolje desno. Upiši nešto."
-    },
     "tableCenter": "Soba",
     "seatTile": {
       "takeSeat": "Zauzmi ovo mjesto",
@@ -462,7 +457,7 @@
       "privacyPublic": "Javna",
       "privacyPrivate": "Privatna",
       "roomPassword": "Lozinka sobe",
-      "roomPasswordPlaceholder": "Podijeli je s prijateljima",
+      "roomPasswordPlaceholder": "Unesi lozinku",
       "roomPasswordHint": "Najmanje {{min}} znakova"
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · živo se osvježava",
