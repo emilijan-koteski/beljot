@@ -249,7 +249,7 @@
       "public": "Public",
       "private": "Private",
       "passwordLabel": "Room password",
-      "passwordPlaceholder": "Share this with your friends",
+      "passwordPlaceholder": "Enter password",
       "passwordHint": "At least {{min}} characters",
       "cancel": "Cancel",
       "save": "Save",
@@ -343,11 +343,6 @@
     "legendThem": "Them",
     "actionBarSwap": "Swap mode · pick a seat",
     "actionBarFinishSwap": "Finish swap to start",
-    "tip": {
-      "unseated": "Take any seat to join — your partner sits diagonally across.",
-      "owner": "Click a seated player, then another seat to swap them — or an empty seat to move them. Hover a player to kick or make host.",
-      "seated": "Settle in — chat lives in the bottom-right. Type something."
-    },
     "tableCenter": "Room",
     "seatTile": {
       "takeSeat": "Take this seat",
@@ -432,7 +427,6 @@
       },
       "eyebrow": "New room",
       "headline": "Create a room",
-      "subhead": "Give the room a name, pick a pace, then share the join code with friends. The list of rooms in the lobby updates the moment you create the room.",
       "roomNameHint": "{{min}}–{{max}} characters",
       "variantCroatia": "Croatian",
       "matchMode501": "501 points",
@@ -463,7 +457,7 @@
       "privacyPublic": "Public",
       "privacyPrivate": "Private",
       "roomPassword": "Room password",
-      "roomPasswordPlaceholder": "Share this with your friends",
+      "roomPasswordPlaceholder": "Enter password",
       "roomPasswordHint": "At least {{min}} characters"
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
@@ -475,7 +469,7 @@
       },
       "createRoom": {
         "title": "Create room",
-        "subtitle": "Set your own rules & timer"
+        "subtitle": "Set your own rules"
       },
       "joinByCode": {
         "placeholder": "Have a code?",

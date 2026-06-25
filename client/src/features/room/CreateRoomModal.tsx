@@ -203,7 +203,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="bg-surface border-border max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-0 overflow-y-auto rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_rgba(201,168,118,0.20)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:flex md:max-h-[min(720px,calc(100vh-4rem))] md:flex-col md:overflow-hidden"
+        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_rgba(201,168,118,0.20)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
         showCloseButton={false}
         data-testid="create-room-modal"
       >
@@ -215,11 +215,11 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
         <form
           onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:min-h-0 md:flex-1 md:grid-cols-[1.05fr_0.95fr] md:grid-rows-[minmax(0,1fr)]"
+          className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] md:grid-cols-[1.05fr_0.95fr]"
           noValidate
         >
           {/* ── Left: form ────────────────────────────────────────────── */}
-          <div className="bg-surface flex flex-col md:min-h-0">
+          <div className="bg-surface flex min-h-0 flex-col">
             <header className="flex shrink-0 flex-col gap-2 px-8 pt-7 pb-1.5">
               <Eyebrow tone="accent">
                 <span className="bg-accent inline-block size-1.5 rounded-full" />
@@ -228,12 +228,9 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               <h2 className="font-display text-ink m-0 text-[26px] leading-tight font-bold tracking-[-0.6px]">
                 {t("lobby.createRoomModal.headline")}
               </h2>
-              <p className="text-ink-dim m-0 text-[13.5px] leading-[1.55]">
-                {t("lobby.createRoomModal.subhead")}
-              </p>
             </header>
 
-            <div className="flex flex-col gap-4 px-8 py-4 md:min-h-0 md:flex-1 md:overflow-y-auto">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-4">
               <Field
                 label={t("lobby.createRoomModal.roomName")}
                 htmlFor="room-name"
@@ -328,19 +325,28 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 }
                 errorTestId="buy-in-error"
               >
-                <Input
-                  id="coin-buy-in"
-                  type="number"
-                  min={0}
-                  step={50}
-                  inputMode="numeric"
-                  value={coinBuyIn}
-                  onChange={(e) =>
-                    setCoinBuyIn(Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                  }
-                  data-testid="coin-buy-in-input"
-                  className="h-11"
-                />
+                <div className="relative">
+                  {/* Gold coin glyph anchored left to signal the value is coins
+                      (matches the preview pill / header balance treatment). */}
+                  <Coins
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                    style={{ color: COIN_GOLD }}
+                    aria-hidden="true"
+                  />
+                  <Input
+                    id="coin-buy-in"
+                    type="number"
+                    min={0}
+                    step={50}
+                    inputMode="numeric"
+                    value={coinBuyIn}
+                    onChange={(e) =>
+                      setCoinBuyIn(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                    }
+                    data-testid="coin-buy-in-input"
+                    className="h-11 pl-9"
+                  />
+                </div>
               </Field>
 
               <Field
@@ -405,7 +411,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
             </div>
 
             {/* General submit error — pinned above the footer so it's always
-                visible (the form body scrolls independently on desktop). */}
+                visible (the form body scrolls independently). */}
             {formError && (
               <div
                 role="alert"

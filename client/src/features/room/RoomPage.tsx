@@ -4,10 +4,10 @@ import {
   Clock,
   Coins,
   Crown,
+  DoorOpen,
   Lock,
   LockOpen,
   Shuffle,
-  Sparkles,
   Trophy,
   Users,
   UserX,
@@ -78,7 +78,13 @@ const matchModeKeys: Record<string, string> = {
 // target.
 type CardinalPosition = "south" | "east" | "north" | "west";
 
-const SEAT_INDEXES = [0, 1, 2, 3] as const;
+// Render order for the seat tiles. Seats are partnered by parity (0 & 2 are
+// one team, 1 & 3 the other). On mobile the tiles flow into a 2-column grid in
+// this order, so each ROW is a team — row 1 = seats 0 & 2 (teammates side by
+// side), row 2 = seats 1 & 3 (opponents) — instead of teams stacked as columns.
+// On sm+ every tile is explicitly placed by its cardinal grid-area, so this
+// order has no effect on the desktop diamond.
+const SEAT_RENDER_ORDER = [0, 2, 1, 3] as const;
 
 const SEAT_TO_CARDINAL: Record<number, CardinalPosition> = {
   0: "south",
@@ -783,6 +789,11 @@ export function RoomPage() {
       : t("lobby.card.timerSeconds", { seconds: room.timerDurationSeconds ?? "?" });
 
   const isOwner = currentUser !== null && currentUser.id === room.ownerId;
+  // Owner-only privacy edit control — waiting, non-quick-play rooms only.
+  // Also decides the header layout: when present it widens the right-hand
+  // group too much to float over the title on mobile, so the group drops into
+  // normal flow instead (see the card header below).
+  const canEditPrivacy = isOwner && room.status === "waiting" && !room.isQuickPlay;
   const seatedCount = players.filter((p) => p.seat !== null).length;
   const allSeated = seatedCount === 4;
 
@@ -872,10 +883,6 @@ export function RoomPage() {
     ? (players.find((p) => p.userId === transferConfirm.userId) ?? null)
     : null;
 
-  // Contextual tip under the seat diamond, keyed to the viewer's role.
-  const tipKey =
-    viewerSeat === null ? "room.tip.unseated" : isOwner ? "room.tip.owner" : "room.tip.seated";
-
   // Action-bar CTA — one primary felt-green button whose label/enabled state is
   // driven by swap mode, quick-play auto-start, and ownership. Only the owner's
   // "Start match" (all seated, not swapping) is interactive; everything else is
@@ -912,7 +919,7 @@ export function RoomPage() {
             Right: game-mode badges + copy-code chip. No top back button —
             the bottom "Leave room" action returns to the lobby. */}
         <div
-          className="bg-surface border-border relative mb-6 rounded-lg border p-6 shadow-[0_18px_44px_-28px_rgba(14,58,36,0.32),0_2px_0_rgba(255,255,255,0.6)_inset]"
+          className="bg-surface border-border relative mb-4 rounded-lg border p-4 shadow-[0_18px_44px_-28px_rgba(14,58,36,0.32),0_2px_0_rgba(255,255,255,0.6)_inset] md:mb-6 md:p-6"
           data-testid="room-info-card"
         >
           <div
@@ -920,19 +927,24 @@ export function RoomPage() {
             className="pointer-events-none absolute -top-px right-7 left-7 h-0.5 bg-[linear-gradient(90deg,transparent,var(--brass)_50%,transparent)] opacity-70"
           />
 
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
             {/* Left — name + meta row */}
             <div className="flex min-w-0 flex-col gap-1.5">
               <h1
                 // pr reserves room for the code chip that floats onto this row
                 // on mobile (absolute, top-right of the card); cleared at md
-                // where the chip returns to the right column.
-                className="font-display text-ink m-0 truncate pr-28 text-[28px] leading-tight font-bold tracking-[-0.6px] md:pr-0"
+                // where the chip returns to the right column. When the owner
+                // privacy control is shown the group no longer floats (it would
+                // be too wide and cover the name), so no reservation is needed.
+                className={cn(
+                  "font-display text-ink m-0 truncate text-[20px] leading-tight font-bold tracking-[-0.6px] md:pr-0 md:text-[28px]",
+                  canEditPrivacy ? "pr-0" : "pr-28",
+                )}
                 data-testid="room-info-name"
               >
                 {room.name}
               </h1>
-              <div className="text-ink-dim flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
+              <div className="text-ink-dim flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] md:text-[13px]">
                 <span className="inline-flex items-center gap-1.5">
                   <Crown className="text-brass-deep size-3" aria-hidden />
                   <Trans
@@ -1093,27 +1105,49 @@ export function RoomPage() {
             </div>
 
             {/* Right — copy-code chip on top, game-mode badges below. */}
-            <div className="flex flex-col items-start gap-2 md:items-end">
-              {/* On mobile the chip floats to the card's top-right so it shares
-                  the title's row (the card is `relative`); at md it returns to
-                  static flow above the badges — desktop layout unchanged. */}
+            <div className="flex flex-col items-start gap-1.5 md:items-end md:gap-2">
               {/* Owner-only privacy control sits to the LEFT of the copy-code
                   chip (Story 9.6) — waiting rooms only, mirroring the other
-                  owner-gated actions. */}
-              <div className="absolute top-6 right-6 flex items-center gap-2 md:static md:top-auto md:right-auto">
-                {isOwner && room.status === "waiting" && !room.isQuickPlay && (
+                  owner-gated actions.
+
+                  On mobile, with no privacy control the lone code chip floats
+                  to the card's top-right so it shares the title's row (the card
+                  is `relative`). When the privacy control IS shown the group is
+                  too wide to float without covering the name, so it stays in
+                  normal flow (dropping below the name/meta). At md the group is
+                  always static in the right column — desktop layout unchanged. */}
+              <div
+                className={cn(
+                  // flex-wrap so the privacy button + code chip drop onto
+                  // separate lines when the card is too narrow for both
+                  // (mirrors the badges row below), rather than the chip
+                  // overflowing the card edge.
+                  "flex flex-wrap items-center gap-2 md:static md:top-auto md:right-auto",
+                  canEditPrivacy ? "" : "absolute top-6 right-6",
+                )}
+              >
+                {canEditPrivacy && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => setShowPrivacy(true)}
                     data-testid="room-privacy-control"
-                    className="whitespace-nowrap"
+                    aria-label={
+                      room.isPrivate
+                        ? t("room.privacy.manageButtonPrivate")
+                        : t("room.privacy.manageButtonPublic")
+                    }
+                    // Icon-only square on mobile (label hidden, aria-label keeps
+                    // the accessible name); full labelled button from md up.
+                    className="w-7 px-0 whitespace-nowrap md:w-auto md:px-2.5"
                   >
                     <Lock className="size-3.5" />
-                    {room.isPrivate
-                      ? t("room.privacy.manageButtonPrivate")
-                      : t("room.privacy.manageButtonPublic")}
+                    <span className="hidden md:inline">
+                      {room.isPrivate
+                        ? t("room.privacy.manageButtonPrivate")
+                        : t("room.privacy.manageButtonPublic")}
+                    </span>
                   </Button>
                 )}
                 <CodeChip
@@ -1124,10 +1158,14 @@ export function RoomPage() {
                   ariaLabel={t("room.copyLinkAriaLabel", { code: room.code })}
                   testId="copy-link"
                   codeTestId="room-code"
+                  // Tighter on mobile to trim card height; desktop unchanged.
+                  className="px-2.5 py-1 text-[12px] md:px-3 md:py-2 md:text-[13px]"
                 />
               </div>
               <div
-                className="flex flex-wrap items-center gap-2 md:justify-end"
+                // Shrink every chip on mobile (smaller padding + text) to trim
+                // the card height; `md:` restores the desktop badge sizing.
+                className="flex flex-wrap items-center gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-[11px] md:justify-end md:gap-2 md:[&>span]:px-2.5 md:[&>span]:py-1 md:[&>span]:text-xs"
                 data-testid="room-info-badges"
               >
                 <Badge tone="brass" icon={<Trophy className="size-3" />}>
@@ -1167,21 +1205,74 @@ export function RoomPage() {
           </div>
         </div>
 
+        {/* Action bar — sits directly under the info card (second block) so the
+            primary action is reachable without scrolling past the legend/seats.
+            Leave-room (and, in swap mode, a "pick a target" chip) on the left;
+            one primary CTA on the right whose state is resolved above (Start
+            match / Finish swap to start / Waiting …). */}
+        <div
+          // Single row on every size: Leave on the left (a compact door icon on
+          // phones, labelled button at sm+), the primary CTA pushed to the right
+          // via justify-between. The CTA sizes to its label (not full width); a
+          // long label wraps rather than clipping.
+          className="border-border bg-surface mb-4 flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 sm:mb-6 sm:gap-3 sm:px-4 sm:py-3"
+          data-testid="action-bar"
+        >
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <Button
+              variant="ghost"
+              onClick={handleLeaveRoom}
+              data-testid="leave-room"
+              aria-label={t("room.leaveRoom")}
+              // Door icon-only on phones (label hidden; aria-label keeps the
+              // accessible name); labelled text button from sm up.
+              className="text-destructive hover:text-destructive size-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
+            >
+              <DoorOpen className="size-5 sm:size-4" />
+              <span className="hidden sm:inline">{t("room.leaveRoom")}</span>
+            </Button>
+            {inSwapMode && (
+              <span
+                className="border-accent bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+                data-testid="swap-mode-banner"
+              >
+                <Shuffle className="size-3" />
+                {t("room.actionBarSwap")}
+              </span>
+            )}
+          </div>
+          <Button
+            size="cta"
+            onClick={ctaOnClick}
+            disabled={ctaDisabled}
+            title={!inSwapMode && isOwner && !allSeated ? t("room.startMatchDisabled") : undefined}
+            data-testid={ctaTestId}
+            // Sized to its label (not full width); whitespace-normal + a min
+            // height lets an unusually long label wrap instead of clipping (the
+            // cta size is fixed-height + nowrap by default). Single-line pill at sm.
+            className="h-auto min-h-11.5 py-2.5 leading-tight whitespace-normal sm:h-11.5 sm:py-0 sm:leading-normal sm:whitespace-nowrap"
+          >
+            {ctaLabel}
+          </Button>
+        </div>
+
         {/* Team legend — dashed parchment card in every state. Unseated: a
             single neutral square indicator + "open seats" copy. Seated: the
             two diagonal pairs read "Us {you + open} vs Them {open + open}",
             centred, with solid gold/silver square indicators. */}
         <div
-          className="border-border-2 bg-surface mb-3 rounded-lg border border-dashed px-4 py-3"
+          className="border-border-2 bg-surface mb-3 rounded-lg border border-dashed px-3 py-2 sm:px-4 sm:py-3"
           data-testid="team-legend"
         >
           {viewerSeat === null ? (
-            <div className="flex items-center justify-center gap-2.5">
+            <div className="flex items-center justify-center gap-2 sm:gap-2.5">
               <LegendIndicator variant="neutral" />
-              <span className="text-ink-dim text-[12.5px]">{t("room.legendNeutral")}</span>
+              <span className="text-ink-dim text-[11px] sm:text-[12.5px]">
+                {t("room.legendNeutral")}
+              </span>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[12.5px]">
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] sm:gap-x-4 sm:gap-y-2 sm:text-[12.5px]">
               <span className="inline-flex items-center gap-2" data-team="teamA">
                 <LegendIndicator variant="us" />
                 <span className="text-team-a font-semibold">{t("room.legendUs")}</span>
@@ -1204,11 +1295,11 @@ export function RoomPage() {
             NOT rotate. Visual mode is viewer-relative: once the viewer sits,
             same-parity tiles become "us" (gold tint) and the other parity
             become "them" (silver tint). When unseated everything is neutral. */}
-        <div className="relative" data-testid="seats-grid">
-          {/* Partner connectors — vertical for the Team A pair, horizontal for
-              the Team B pair. Sit behind seat tiles via z-index. Hidden on
-              the <sm stacked layout where row/column position already conveys
-              partnership. Color follows the viewer's perspective when seated. */}
+        <div className="relative mb-4 sm:mb-6" data-testid="seats-grid">
+          {/* Partner connectors (sm+ diamond) — vertical for the Team A pair,
+              horizontal for the Team B pair. Sit behind seat tiles via z-index.
+              The stacked mobile layout has its own horizontal connectors (added
+              just below). Color follows the viewer's perspective when seated. */}
           <div aria-hidden className="pointer-events-none absolute inset-0 z-0 hidden sm:block">
             <div
               className="absolute top-[12%] left-1/2 h-[76%] w-0.5 -translate-x-1/2 opacity-50"
@@ -1234,8 +1325,38 @@ export function RoomPage() {
             />
           </div>
 
-          <div className="relative z-10 mb-4 grid grid-cols-2 gap-3 sm:mb-6 sm:grid-cols-[1fr_1fr_1fr] sm:gap-5 sm:[grid-template-areas:'._north_.''west_center_east''._south_.']">
-            {SEAT_INDEXES.map((seatIndex) => {
+          {/* Partner connectors (mobile stacked layout) — here each team is a
+              ROW (teammates side by side), so both connectors are horizontal:
+              one across the top row (seats 0 & 2), one across the bottom row
+              (seats 1 & 3). Behind the tiles via z-0; colour viewer-relative,
+              mirroring the diamond connectors above. */}
+          <div aria-hidden className="pointer-events-none absolute inset-0 z-0 block sm:hidden">
+            <div
+              className="absolute top-1/4 left-[12%] h-0.5 w-[76%] -translate-y-1/2 opacity-50"
+              style={{
+                background:
+                  viewerSeat === null
+                    ? "linear-gradient(90deg, transparent 0%, var(--border-2) 25%, var(--border-2) 75%, transparent 100%)"
+                    : viewerSeat % 2 === 0
+                      ? "linear-gradient(90deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
+                      : "linear-gradient(90deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
+              }}
+            />
+            <div
+              className="absolute top-3/4 left-[12%] h-0.5 w-[76%] -translate-y-1/2 opacity-50"
+              style={{
+                background:
+                  viewerSeat === null
+                    ? "linear-gradient(90deg, transparent 0%, var(--border-2) 25%, var(--border-2) 75%, transparent 100%)"
+                    : viewerSeat % 2 === 1
+                      ? "linear-gradient(90deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
+                      : "linear-gradient(90deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
+              }}
+            />
+          </div>
+
+          <div className="relative z-10 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1fr] sm:gap-5 sm:[grid-template-areas:'._north_.''west_center_east''._south_.']">
+            {SEAT_RENDER_ORDER.map((seatIndex) => {
               const player = getPlayerAtSeat(players, seatIndex);
               const cardinal = SEAT_TO_CARDINAL[seatIndex] as CardinalPosition;
               const isBotSeat = player?.isBot === true;
@@ -1378,61 +1499,6 @@ export function RoomPage() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Contextual tip — guidance keyed to the viewer's role, sitting between
-            the diamond and the action bar. */}
-        <div
-          className="text-ink-mute mb-4 flex items-center justify-center gap-2 px-2 text-center text-[12px]"
-          data-testid="room-tip"
-        >
-          <Sparkles className="text-brass-deep size-3 shrink-0" aria-hidden />
-          <span>{t(tipKey)}</span>
-        </div>
-
-        {/* Action bar — leave-room (and, in swap mode, a "pick a target" chip)
-            on the left; one primary CTA on the right whose state is resolved
-            above (Start match / Finish swap to start / Waiting …). */}
-        <div
-          // Stack on phones: the long "waiting for host" CTA label can't shrink
-          // (fixed-height, nowrap button), so a single justify-between row made
-          // it overlap the Leave button. flex-col puts Leave on top + a
-          // full-width CTA below; the original row returns at sm.
-          className="border-border bg-surface flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-          data-testid="action-bar"
-        >
-          <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <Button
-              variant="ghost"
-              onClick={handleLeaveRoom}
-              data-testid="leave-room"
-              className="text-destructive hover:text-destructive shrink-0"
-            >
-              {t("room.leaveRoom")}
-            </Button>
-            {inSwapMode && (
-              <span
-                className="border-accent bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-                data-testid="swap-mode-banner"
-              >
-                <Shuffle className="size-3" />
-                {t("room.actionBarSwap")}
-              </span>
-            )}
-          </div>
-          <Button
-            size="cta"
-            onClick={ctaOnClick}
-            disabled={ctaDisabled}
-            title={!inSwapMode && isOwner && !allSeated ? t("room.startMatchDisabled") : undefined}
-            data-testid={ctaTestId}
-            // Full-width on phones; let the long "waiting for host" label wrap
-            // (the cta size is fixed-height + nowrap by default) so it never
-            // clips. Original single-line pill returns at sm.
-            className="h-auto min-h-11.5 w-full py-2.5 leading-tight whitespace-normal sm:h-11.5 sm:w-auto sm:py-0 sm:leading-normal sm:whitespace-nowrap"
-          >
-            {ctaLabel}
-          </Button>
         </div>
       </div>
 

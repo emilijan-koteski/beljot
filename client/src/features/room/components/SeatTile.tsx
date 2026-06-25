@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
+import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { botDisplayName } from "@/shared/lib/botName";
 import { cn } from "@/shared/lib/utils";
 import type { RoomPlayer } from "@/shared/types/apiTypes";
@@ -76,6 +77,11 @@ export function SeatTile({
   onRemoveBot,
 }: SeatTileProps) {
   const { t } = useTranslation();
+  // Size the seated avatar to match the empty-seat placeholder circle
+  // (size-9 / sm:size-10) so a filled seat doesn't bulge larger than an empty
+  // one. Compact = below the sm breakpoint where the layout stacks.
+  const isCompact = useMediaQuery("(max-width: 639px)");
+  const avatarSize = isCompact ? 36 : 40;
   const filled = Boolean(player);
   const isBot = player?.isBot === true;
   // Bot identity is seat-derived and rendered client-side — an empty wire
@@ -122,7 +128,7 @@ export function SeatTile({
         disabled={!isClickable || isPending}
         data-testid={`player-seat-${seatIndex}`}
         className={cn(
-          "flex min-h-26 w-full flex-col items-center justify-center gap-1.5 rounded-2xl p-3 transition-all sm:min-h-32.5 sm:gap-2 sm:p-3.5",
+          "flex min-h-22 w-full flex-col items-center justify-center gap-1 rounded-2xl p-2.5 transition-all sm:min-h-32.5 sm:gap-2 sm:p-3.5",
           isClickable && !isPending ? "cursor-pointer" : "cursor-default",
           isPending && "pointer-events-none opacity-60",
         )}
@@ -132,7 +138,7 @@ export function SeatTile({
           <>
             <Avatar
               name={displayName}
-              size={46}
+              size={avatarSize}
               team={mode === "us" ? "A" : mode === "them" ? "B" : null}
               you={isYou}
               owner={isHost}
@@ -140,7 +146,7 @@ export function SeatTile({
             />
             <div className="flex flex-col items-center gap-1">
               <span
-                className="font-display text-ink inline-flex items-center gap-1 text-[14.5px] font-semibold tracking-[-0.2px]"
+                className="font-display text-ink inline-flex items-center gap-1 text-[13px] font-semibold tracking-[-0.2px] sm:text-[14.5px]"
                 data-testid={isBot ? `bot-name-${seatIndex}` : undefined}
               >
                 {isHost && <Crown className="text-brass-deep size-3.25" aria-hidden="true" />}
@@ -186,7 +192,7 @@ export function SeatTile({
         ) : (
           <>
             <div
-              className="bg-surface-elevated mt-1.5 flex size-10 items-center justify-center rounded-full"
+              className="bg-surface-elevated mt-1 flex size-9 items-center justify-center rounded-full sm:mt-1.5 sm:size-10"
               style={{ border: `1.5px dashed ${tokens.edgeSoft}` }}
             >
               <span
@@ -195,10 +201,10 @@ export function SeatTile({
               />
             </div>
             <div className="text-center">
-              <div className="font-display text-ink-dim text-[13.5px] font-semibold">
+              <div className="font-display text-ink-dim text-[12px] font-semibold sm:text-[13.5px]">
                 {swapMode ? t("room.seatTile.moveHere") : t("room.seatTile.takeSeat")}
               </div>
-              <div className="text-ink-mute mt-0.5 text-[11px]">
+              <div className="text-ink-mute mt-0.5 text-[10.5px] sm:text-[11px]">
                 {mode === "us"
                   ? t("room.seatTile.partnerSeat")
                   : mode === "them"
@@ -223,12 +229,15 @@ export function SeatTile({
           aria-label={t("room.addBot")}
           title={t("room.addBot")}
           data-testid={`add-bot-seat-${seatIndex}`}
-          className="bg-surface-elevated border-border text-ink-dim hover:border-brass hover:text-brass-deep absolute top-2 right-2 z-10 inline-flex size-6.5 items-center justify-center rounded-md border disabled:opacity-40"
+          // Larger tap target on phones (was size-6.5): too small to hit
+          // reliably, so taps fell through to the seat's take-seat handler.
+          // Desktop keeps the compact size.
+          className="bg-surface-elevated border-border text-ink-dim hover:border-brass hover:text-brass-deep absolute top-2 right-2 z-10 inline-flex size-9 items-center justify-center rounded-md border disabled:opacity-40 md:size-6.5"
         >
           {/* Nudged up 5%: the lucide Bot glyph's visual mass (the robot
               head) sits low in its viewBox, so true geometric centering
               reads as off-center. Same rule as the avatar bot glyphs. */}
-          <Bot className="size-3.5 -translate-y-[5%]" />
+          <Bot className="size-4.5 -translate-y-[5%] md:size-3.5" />
         </button>
       )}
 

@@ -35,6 +35,12 @@ type TopBarProps = {
   persistLanguage?: boolean;
   /** Override the LanguageSelector's test-id prefix to preserve auth tests. */
   languageTestIdPrefix?: string;
+  /**
+   * Render the full "Beljot.online" wordmark and keep it visible at every
+   * breakpoint (including phones). AuthLayout passes this so the pre-auth
+   * screens show the complete brand instead of a logo-only mobile header.
+   */
+  showFullBrand?: boolean;
 };
 
 export function TopBar({
@@ -42,6 +48,7 @@ export function TopBar({
   showUserMenu = false,
   persistLanguage = false,
   languageTestIdPrefix,
+  showFullBrand = false,
 }: TopBarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -79,15 +86,23 @@ export function TopBar({
           className="size-7 shrink-0"
           data-testid="app-logo"
         />
-        {/* Wordmark hides below md (the burger-header / mobile range) so the
-            logo alone holds the left edge — freeing width for a large coin
-            balance + level + language + burger. The Link's aria-label still
-            carries "Beljot" for assistive tech. */}
+        {/* Full "Beljot.online" wordmark — the ".online" suffix is brass, the
+            same gold as the logo's border. By default it hides below md (the
+            burger-header / mobile range) so the logo alone holds the left edge,
+            freeing width for the coin balance + level + language + burger; the
+            Link's aria-label still carries "Beljot" for assistive tech.
+
+            showFullBrand keeps it visible at every breakpoint — used by the
+            pre-auth screens, where the bar is otherwise empty. */}
         <span
-          className="font-display text-ink text-xl font-semibold tracking-tight hidden md:inline"
+          className={cn(
+            "font-display text-ink text-xl font-semibold tracking-tight",
+            showFullBrand ? "inline" : "hidden md:inline",
+          )}
           data-testid="app-name"
         >
           {t("nav.appName")}
+          <span className="text-brass font-medium">.online</span>
         </span>
       </Link>
 

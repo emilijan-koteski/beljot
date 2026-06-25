@@ -31,7 +31,10 @@ export function FilterRail({ search, setSearch, filter, setFilter, sort, setSort
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("lobby.search.placeholder")}
           data-testid="room-list-search"
-          className="text-ink min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-off"
+          // `truncate` (overflow-hidden + nowrap + text-ellipsis) makes the
+          // placeholder ellipsize instead of hard-clipping when the field is
+          // too narrow for it — width-driven, so it adapts to any viewport.
+          className="text-ink min-w-0 flex-1 truncate bg-transparent text-sm outline-none placeholder:text-ink-off"
         />
         {search && (
           <button

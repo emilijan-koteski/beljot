@@ -17,7 +17,7 @@ const LINKEDIN_URL = "https://www.linkedin.com/in/emilijan-koteski/";
 export function AuthLayout() {
   return (
     <div className="text-ink font-body relative flex min-h-screen flex-col overflow-hidden">
-      <TopBar languageTestIdPrefix="auth-language" />
+      <TopBar languageTestIdPrefix="auth-language" showFullBrand />
 
       <main className="flex flex-1 items-center justify-center px-6 py-8">
         <Outlet />
