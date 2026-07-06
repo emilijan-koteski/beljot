@@ -48,21 +48,6 @@ func TestGenerateAccessToken_AndValidateRoundTrip(t *testing.T) {
 	assert.NotNil(t, claims.IssuedAt)
 }
 
-func TestGenerateRefreshToken_AndValidateRoundTrip(t *testing.T) {
-	secret := "test-secret-key"
-	userID := uint(99)
-
-	token, err := GenerateRefreshToken(userID, secret)
-	require.NoError(t, err)
-	assert.NotEmpty(t, token)
-
-	claims, err := ValidateToken(token, secret)
-	require.NoError(t, err)
-	assert.Equal(t, "99", claims.Subject)
-	assert.Contains(t, []string(claims.Audience), "refresh")
-	assert.NotNil(t, claims.ExpiresAt)
-}
-
 func TestValidateToken_FailsWithWrongSecret(t *testing.T) {
 	token, err := GenerateAccessToken(1, "correct-secret")
 	require.NoError(t, err)
@@ -76,22 +61,14 @@ func TestValidateToken_FailsWithInvalidTokenString(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestValidateToken_AudienceDistinguishesAccessFromRefresh(t *testing.T) {
+func TestGenerateAccessToken_HasAccessAudience(t *testing.T) {
 	secret := "test-secret"
 
 	accessToken, err := GenerateAccessToken(1, secret)
-	require.NoError(t, err)
-
-	refreshToken, err := GenerateRefreshToken(1, secret)
 	require.NoError(t, err)
 
 	accessClaims, err := ValidateToken(accessToken, secret)
 	require.NoError(t, err)
 	assert.Contains(t, []string(accessClaims.Audience), "access")
 	assert.NotContains(t, []string(accessClaims.Audience), "refresh")
-
-	refreshClaims, err := ValidateToken(refreshToken, secret)
-	require.NoError(t, err)
-	assert.Contains(t, []string(refreshClaims.Audience), "refresh")
-	assert.NotContains(t, []string(refreshClaims.Audience), "access")
 }

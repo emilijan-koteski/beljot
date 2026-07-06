@@ -26,6 +26,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/mailer"
 	"github.com/emilijan/beljot/server/internal/match"
 	"github.com/emilijan/beljot/server/internal/passwordreset"
+	"github.com/emilijan/beljot/server/internal/refreshtoken"
 	"github.com/emilijan/beljot/server/internal/room"
 	"github.com/emilijan/beljot/server/internal/user"
 	"github.com/emilijan/beljot/server/internal/wallet"
@@ -53,7 +54,8 @@ func main() {
 		os.Exit(1)
 	}
 	userRepo := user.NewGormUserRepository(db)
-	authHandler := auth.NewAuthHandler(userRepo, cfg.JWTSecret, cfg.Environment)
+	refreshRepo := refreshtoken.NewGormRepository(db)
+	authHandler := auth.NewAuthHandler(userRepo, refreshRepo, cfg.JWTSecret, cfg.Environment, cfg.AccessTokenTTL, cfg.RefreshIdleTTL, cfg.RefreshAbsoluteTTL)
 
 	// Mailer: real SMTP when fully configured, otherwise a log-only fallback so
 	// the forgot-password flow stays testable in dev without SMTP credentials.
