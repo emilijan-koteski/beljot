@@ -28,6 +28,11 @@ type Config struct {
 	// to build absolute links in outgoing email (e.g. the password-reset link).
 	AppBaseURL string
 
+	// GoogleClientID is the Google OAuth client ID used to verify GIS ID tokens
+	// (the token audience). Empty means the google SSO provider is simply not
+	// registered — the client hides the button independently via its own env.
+	GoogleClientID string
+
 	// SMTP settings for outgoing transactional email. When SMTPConfigured() is
 	// false the app falls back to a log-only mailer (see cmd/api wiring).
 	SMTPHost     string
@@ -59,6 +64,8 @@ func Load() *Config {
 
 		AppBaseURL: strings.TrimRight(getEnv("BELJOT_APP_BASE_URL", "http://localhost:5173"), "/"),
 
+		GoogleClientID: strings.TrimSpace(getEnv("BELJOT_GOOGLE_CLIENT_ID", "")),
+
 		SMTPHost:     strings.TrimSpace(getEnv("BELJOT_SMTP_HOST", "")),
 		SMTPPort:     getEnvInt("BELJOT_SMTP_PORT", 587),
 		SMTPUsername: strings.TrimSpace(getEnv("BELJOT_SMTP_USERNAME", "")),
@@ -80,6 +87,10 @@ func Load() *Config {
 
 	if cfg.Environment != "development" && (cfg.AppBaseURL == "" || strings.Contains(cfg.AppBaseURL, "localhost")) {
 		slog.Warn("BELJOT_APP_BASE_URL is unset or points at localhost in a non-development environment — password reset links will be broken", "appBaseURL", cfg.AppBaseURL)
+	}
+
+	if cfg.Environment != "development" && cfg.GoogleClientID == "" {
+		slog.Warn("BELJOT_GOOGLE_CLIENT_ID is not set in a non-development environment — Google sign-in will be unavailable")
 	}
 
 	// The idle window should not exceed the absolute cap; otherwise the cap is

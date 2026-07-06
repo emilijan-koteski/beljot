@@ -1,7 +1,9 @@
 {
   "common": {
     "appName": "Beljot",
-    "close": "Zatvori"
+    "close": "Zatvori",
+    "showPassword": "Prikaži lozinku",
+    "hidePassword": "Sakrij lozinku"
   },
   "team": {
     "us": "Mi",
@@ -849,6 +851,34 @@
       "subtitle": "Odaberi ime, dobij mjesto. Četiri igrača za stolom, dva u ekipi.",
       "altPrompt": "Već imaš račun?",
       "altCta": "Prijavi se"
+    },
+    "sso": {
+      "divider": "ili",
+      "consent": {
+        "prefix": "Nastavkom s Google računom prihvaćaš ",
+        "termsLink": "Uvjete korištenja",
+        "and": " i ",
+        "privacyLink": "Pravila privatnosti",
+        "suffix": "."
+      },
+      "linkDialog": {
+        "title": "Poveži svoj račun",
+        "description": "Račun za {{email}} već postoji. Unesi njegovu lozinku da povežeš Google prijavu. Idući put ulaziš jednim klikom.",
+        "descriptionNoEmail": "Račun s ovom email adresom već postoji. Unesi njegovu lozinku da povežeš Google prijavu. Idući put ulaziš jednim klikom.",
+        "passwordPlaceholder": "Lozinka računa",
+        "cancel": "Odustani",
+        "submit": "Poveži i prijavi se",
+        "submitting": "Povezivanje…",
+        "errors": {
+          "wrongPassword": "Pogrešna lozinka. Pokušaj ponovno.",
+          "linkFailed": "Povezivanje nije uspjelo. Pokušaj ponovno."
+        }
+      },
+      "errors": {
+        "emailUnverified": "Email tvog Google računa nije potvrđen. Potvrdi ga pa pokušaj ponovno.",
+        "ssoFailed": "Google prijava nije uspjela. Pokušaj ponovno.",
+        "credentialExpired": "Google prijava je istekla. Klikni gumb Google i pokušaj ponovno."
+      }
     },
     "footer": {
       "credit": "Izradio <name>Emilijan Koteski</name> s <suit>♣</suit>"

@@ -22,6 +22,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/chat"
 	"github.com/emilijan/beljot/server/internal/config"
 	"github.com/emilijan/beljot/server/internal/emote"
+	"github.com/emilijan/beljot/server/internal/identity"
 	"github.com/emilijan/beljot/server/internal/lobby"
 	"github.com/emilijan/beljot/server/internal/mailer"
 	"github.com/emilijan/beljot/server/internal/match"
@@ -55,7 +56,20 @@ func main() {
 	}
 	userRepo := user.NewGormUserRepository(db)
 	refreshRepo := refreshtoken.NewGormRepository(db)
-	authHandler := auth.NewAuthHandler(userRepo, refreshRepo, cfg.JWTSecret, cfg.Environment, cfg.AccessTokenTTL, cfg.RefreshIdleTTL, cfg.RefreshAbsoluteTTL)
+	identityRepo := identity.NewGormRepository(db)
+
+	// SSO provider registry — a provider is registered only when its config is
+	// present; the handlers stay provider-agnostic and future providers are a
+	// new identity.Provider impl plus an entry here.
+	ssoProviders := identity.Registry{}
+	if cfg.GoogleClientID != "" {
+		google := identity.NewGoogleProvider(cfg.GoogleClientID)
+		ssoProviders[google.Name()] = google
+	} else {
+		slog.Warn("BELJOT_GOOGLE_CLIENT_ID not set — Google sign-in disabled")
+	}
+
+	authHandler := auth.NewAuthHandler(userRepo, refreshRepo, identityRepo, ssoProviders, cfg.JWTSecret, cfg.Environment, cfg.AccessTokenTTL, cfg.RefreshIdleTTL, cfg.RefreshAbsoluteTTL)
 
 	// Mailer: real SMTP when fully configured, otherwise a log-only fallback so
 	// the forgot-password flow stays testable in dev without SMTP credentials.
@@ -111,6 +125,8 @@ func main() {
 	authGroup.POST("/logout", authHandler.Logout)
 	authGroup.POST("/forgot-password", passwordResetHandler.ForgotPassword)
 	authGroup.POST("/reset-password", passwordResetHandler.ResetPassword)
+	authGroup.POST("/sso/:provider", authHandler.SSOLogin)
+	authGroup.POST("/sso/:provider/link", authHandler.SSOLink)
 
 	// Authenticated route group
 	matchRepo := match.NewGormMatchRepository(db)

@@ -29,6 +29,7 @@ func (s *userRepoStub) add(id uint, username string) {
 }
 
 func (s *userRepoStub) Create(*user.User) error                     { return nil }
+func (s *userRepoStub) Delete(uint) error                           { return nil }
 func (s *userRepoStub) FindByEmail(string) (*user.User, error)      { return nil, nil }
 func (s *userRepoStub) FindByUsername(string) (*user.User, error)   { return nil, nil }
 func (s *userRepoStub) FindManyByIDs([]uint) ([]user.User, error)   { return nil, nil }

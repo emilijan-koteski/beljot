@@ -2,6 +2,12 @@ package user
 
 type UserRepository interface {
 	Create(user *User) error
+	// Delete soft-deletes the user (GORM DeletedAt). The users unique indexes
+	// are partial (WHERE deleted_at IS NULL), so a soft-deleted row frees its
+	// email and username again. Used as the compensating action when SSO
+	// registration fails after the user insert. Returns ErrUserNotFound when
+	// no live row matches.
+	Delete(id uint) error
 	FindByEmail(email string) (*User, error)
 	FindByUsername(username string) (*User, error)
 	FindByID(id uint) (*User, error)

@@ -415,3 +415,23 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A �
 ## Deferred from: code review of 9-6-private-rooms (2026-06-24)
 
 - **`UpdateRoomPrivacy` is a non-transactional read-modify-write with a full-row save.** The handler does `room, _ := h.repo.FindByID(id)` → mutate `room.PasswordHash` → `h.repo.Update(room)` (which is `db.Save`, persisting ALL columns), with no row lock and no enclosing transaction (server/internal/room/handler.go:816-850). A concurrent join (`PlayerCount` increment) or `StartMatch` (`Status` waiting→playing) that commits between the read and the save can be clobbered by the stale full-row write — a classic TOCTOU / lost-update window. **Not new to this story:** it mirrors the codebase-wide room-mutation pattern, and Story 9.6 was explicitly told (Dev Notes, 9.3 intelligence) NOT to refactor the shared join/seat/transfer machinery; a `FindByIDForUpdate`-in-a-tx primitive already exists for the paths that need it. The owner-only + waiting-only guard makes the window narrow, and subsequent `system:room_updated` / seat broadcasts self-heal the transient drift, so it is deferred, not shipped-broken. **Fix when room concurrency is hardened:** route the privacy edit through `FindByIDForUpdate` inside a transaction (or re-check `Status == "waiting"` and use a column-scoped `Updates` instead of `Save`), covering this endpoint alongside the other owner-action mutations. Surfaced by the blind reviewer during the 9.6 review. [server/internal/room/handler.go:816-850 UpdateRoomPrivacy; server/internal/room/gorm_repo.go:97 FindByIDForUpdate, :108 Update]
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-google-sso.md`
+  summary: Profile "Linked accounts" management — authed `GET/POST/DELETE /api/v1/users/:id/identities(/:provider)` endpoints (incl. `hasPassword` exposure and the unlink-blocked-when-passwordless guard) plus the `LinkedAccounts` profile section UI with link/unlink dialogs and i18n.
+  evidence: Split from the Google SSO spec at the step-02 token checkpoint (~3,000 tokens vs 1,600 ceiling); profile-side management is independently shippable once SSO login/register and the identity infrastructure land, and reuses the same `user_identities` table, provider registry, and `LinkAccountDialog`.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-google-sso.md`
+  summary: Bind GIS credentials to the browser session with a `nonce` (one-shot, server-verified) so an exfiltrated Google ID token cannot be replayed against `/auth/sso/:provider(/link)` during its ~1h lifetime.
+  evidence: Blind-reviewer hardening finding — verification checks signature/audience/issuer/expiry but nothing ties the token to the requesting session; GIS supports `nonce` for exactly this. Needs a server-side one-shot nonce store, so out of patch scope.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-google-sso.md`
+  summary: Soft-deleted users permanently squat their `(provider, provider_user_id)` identity — `user_identities` unique index is unconditional and FK cascade fires only on hard delete, so their Google sub can never log in or relink; handle identity cleanup when an account-deletion feature ships.
+  evidence: Latent schema interaction found in review — `users` uses soft delete with partial unique indexes, `user_identities` does not; no deletion feature exists today so nothing is user-visible yet.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-google-sso.md`
+  summary: No rate limiting on unauthenticated auth endpoints (`/auth/login`, `/auth/sso/:provider`, `/auth/sso/:provider/link`) — each request costs a bcrypt compare and/or an outbound Google validation.
+  evidence: Pre-existing platform gap (login was already unthrottled) widened by the two new SSO endpoints; needs a middleware decision, not a story-scoped patch.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-google-sso.md`
+  summary: Pre-existing auth pages (LoginPage, RegisterPage, ResetPasswordPage) hardcode English "Hide/Show password" aria-labels; move them to i18n keys across all four locales.
+  evidence: Surfaced while reviewing the new LinkAccountDialog (whose labels are being fixed in-story); screen-reader users in mk/hr/sr currently hear English.

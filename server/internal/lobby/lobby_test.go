@@ -98,6 +98,7 @@ func (u *fakeUserRepo) Count() (int64, error) {
 
 // Unused — panic to surface accidental coupling.
 func (u *fakeUserRepo) Create(*user.User) error                     { panic("unused") }
+func (u *fakeUserRepo) Delete(uint) error                           { panic("unused") }
 func (u *fakeUserRepo) FindByEmail(string) (*user.User, error)      { panic("unused") }
 func (u *fakeUserRepo) FindByUsername(string) (*user.User, error)   { panic("unused") }
 func (u *fakeUserRepo) FindByID(uint) (*user.User, error)           { panic("unused") }

@@ -5,13 +5,14 @@ import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { AltLink, AuthCard, Field } from "@/features/auth/components/AuthCard";
+import { GoogleSignInButton } from "@/features/auth/components/GoogleSignInButton";
+import { LinkAccountDialog } from "@/features/auth/components/LinkAccountDialog";
+import { reconcileLanguagePreference } from "@/features/auth/reconcileLanguage";
+import { useGoogleSso } from "@/features/auth/useGoogleSso";
 import { FetchError } from "@/shared/api/axiosClient";
-import { updatePreferences } from "@/shared/api/profile";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { useLoginMutation } from "@/shared/hooks/mutations/useAuth";
-import { normalizeLanguage } from "@/shared/i18n/i18n";
-import { useAuthStore } from "@/shared/stores/authStore";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -24,6 +25,7 @@ export function LoginPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const loginMutation = useLoginMutation();
+  const { handleGoogleCredential, linkDialogProps } = useGoogleSso();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -66,29 +68,7 @@ export function LoginPage() {
 
     try {
       const res = await loginMutation.mutateAsync({ email, password });
-      // If the visitor picked a different language on the auth page than the
-      // one stored on their profile, push the picked language to the server
-      // and reconcile the auth store. Mirrors LanguageSelector's
-      // optimistic-with-rollback pattern; UI language stays as picked.
-      // Normalize i18n.language to the short code so region-tagged values
-      // like "en-US" don't trigger a futile PATCH the server would reject.
-      const picked = normalizeLanguage(i18n.language);
-      if (picked && picked !== res.languagePreference) {
-        try {
-          await updatePreferences(res.id, { languagePreference: picked });
-          const current = useAuthStore.getState().user;
-          if (current?.id === res.id) {
-            useAuthStore.getState().setUser({ ...current, languagePreference: picked });
-          }
-        } catch {
-          const current = useAuthStore.getState().user;
-          if (current?.id === res.id) {
-            useAuthStore
-              .getState()
-              .setUser({ ...current, languagePreference: res.languagePreference });
-          }
-        }
-      }
+      await reconcileLanguagePreference(res, i18n.language);
       navigate("/lobby");
     } catch (err) {
       if (err instanceof FetchError) {
@@ -175,7 +155,7 @@ export function LoginPage() {
               className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
               onClick={() => setShowPassword(!showPassword)}
               data-testid="password-toggle"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? t("common.hidePassword") : t("common.showPassword")}
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
@@ -203,6 +183,47 @@ export function LoginPage() {
           </Button>
         </div>
       </form>
+
+      <div className="mt-4.5 mb-3.5 flex items-center gap-3" data-testid="sso-divider">
+        <div className="bg-border h-px flex-1" />
+        <span className="text-ink-mute text-[11.5px] font-medium tracking-[1.6px] uppercase">
+          {t("auth.sso.divider")}
+        </span>
+        <div className="bg-border h-px flex-1" />
+      </div>
+
+      <GoogleSignInButton onCredential={handleGoogleCredential} />
+
+      {/* The Google button on /login can REGISTER a brand-new account, so the
+          same ToS/privacy small-print as on the register page applies here. */}
+      <p
+        className="text-ink-mute mt-3 text-center text-xs leading-normal"
+        data-testid="sso-consent-note"
+      >
+        {t("auth.sso.consent.prefix")}
+        <Link
+          to="/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent border-accent/30 border-b hover:underline"
+          data-testid="sso-terms-link"
+        >
+          {t("auth.sso.consent.termsLink")}
+        </Link>
+        {t("auth.sso.consent.and")}
+        <Link
+          to="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent border-accent/30 border-b hover:underline"
+          data-testid="sso-privacy-link"
+        >
+          {t("auth.sso.consent.privacyLink")}
+        </Link>
+        {t("auth.sso.consent.suffix")}
+      </p>
+
+      <LinkAccountDialog {...linkDialogProps} />
     </AuthCard>
   );
 }

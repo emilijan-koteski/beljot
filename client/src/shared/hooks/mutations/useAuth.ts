@@ -6,7 +6,14 @@ import type {
   RegisterRequest,
   ResetPasswordRequest,
 } from "@/shared/api/auth";
-import { forgotPassword, login, register, resetPassword } from "@/shared/api/auth";
+import {
+  forgotPassword,
+  login,
+  register,
+  resetPassword,
+  ssoLink,
+  ssoLogin,
+} from "@/shared/api/auth";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 function setAuthState(res: {
@@ -45,6 +52,34 @@ export function useLoginMutation() {
 export function useRegisterMutation() {
   return useMutation({
     mutationFn: (data: RegisterRequest) => register(data),
+    onSuccess: setAuthState,
+  });
+}
+
+export interface SSOLoginVariables {
+  provider: string;
+  credential: string;
+}
+
+export interface SSOLinkVariables {
+  provider: string;
+  credential: string;
+  password: string;
+}
+
+// SSO mutations mirror login/register: on success the server envelope is the
+// same auth payload, so the same setAuthState hydrates token + user.
+export function useSSOLoginMutation() {
+  return useMutation({
+    mutationFn: ({ provider, credential }: SSOLoginVariables) => ssoLogin(provider, { credential }),
+    onSuccess: setAuthState,
+  });
+}
+
+export function useSSOLinkMutation() {
+  return useMutation({
+    mutationFn: ({ provider, credential, password }: SSOLinkVariables) =>
+      ssoLink(provider, { credential, password }),
     onSuccess: setAuthState,
   });
 }

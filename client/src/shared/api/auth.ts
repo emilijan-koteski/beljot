@@ -45,6 +45,18 @@ export interface RefreshResponse {
   createdAt: string;
 }
 
+export interface SSOLoginRequest {
+  credential: string;
+}
+
+export interface SSOLinkRequest {
+  credential: string;
+  password: string;
+}
+
+// SSO issues the exact same session + auth envelope as password login.
+export type SSOResponse = RegisterResponse;
+
 export interface ForgotPasswordRequest {
   email: string;
 }
@@ -93,6 +105,45 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
       "UNKNOWN_ERROR",
       err.response?.statusText ?? "Login failed",
     );
+  }
+}
+
+// toFetchError maps an axios failure onto the standard error envelope, falling
+// back to UNKNOWN_ERROR when the response carries no { error } body.
+function toFetchError(e: unknown, fallbackMessage: string): FetchError {
+  const err = e as AxiosError<{ error: { code: string; message: string } }>;
+  if (err.response?.data?.error) {
+    return new FetchError(
+      err.response.status,
+      err.response.data.error.code,
+      err.response.data.error.message,
+    );
+  }
+  return new FetchError(
+    err.response?.status ?? 0,
+    "UNKNOWN_ERROR",
+    err.response?.statusText ?? fallbackMessage,
+  );
+}
+
+export async function ssoLogin(provider: string, data: SSOLoginRequest): Promise<SSOResponse> {
+  try {
+    const response = await axiosPublic.post<{ data: SSOResponse }>(`/auth/sso/${provider}`, data);
+    return response.data.data;
+  } catch (e) {
+    throw toFetchError(e, "Sign-in failed");
+  }
+}
+
+export async function ssoLink(provider: string, data: SSOLinkRequest): Promise<SSOResponse> {
+  try {
+    const response = await axiosPublic.post<{ data: SSOResponse }>(
+      `/auth/sso/${provider}/link`,
+      data,
+    );
+    return response.data.data;
+  } catch (e) {
+    throw toFetchError(e, "Sign-in failed");
   }
 }
 
