@@ -55,7 +55,7 @@ Greet `{user_name}`, speaking in `{communication_language}`.
 
 Execute each entry in `{workflow.activation_steps_append}` in order.
 
-Activation is complete. Begin the workflow below.
+Activation is complete. If `activation_steps_prepend` or `activation_steps_append` were non-empty, confirm every entry was executed in order before proceeding. Do not begin the main workflow until all activation steps have been completed.
 
 ## WORKFLOW ARCHITECTURE
 
@@ -89,6 +89,7 @@ Load ONLY the fragment matching the engine selected during execution. These comp
 - `knowledge_fragments.unity` = `{installed_path}/knowledge/unity-engine.md`
 - `knowledge_fragments.unreal` = `{installed_path}/knowledge/unreal-engine.md`
 - `knowledge_fragments.phaser` = `{installed_path}/knowledge/phaser-engine.md`
+- `knowledge_fragments.roblox` = `{installed_path}/knowledge/roblox-engine.md`
 
 ---
 
