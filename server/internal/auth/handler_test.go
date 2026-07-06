@@ -280,7 +280,10 @@ func TestRegister_SetsRefreshCookie(t *testing.T) {
 	assert.False(t, refreshCookie.Secure, "Secure should be false in development environment")
 	assert.Equal(t, http.SameSiteStrictMode, refreshCookie.SameSite)
 	assert.Equal(t, "/api/v1/auth", refreshCookie.Path)
-	assert.Equal(t, int(testIdleTTL.Seconds()), refreshCookie.MaxAge)
+	// MaxAge is derived from time.Until(exp), which floors to just under the
+	// nominal idle TTL because the clock advances between setting exp and
+	// computing the cookie lifetime; allow a small tolerance for elapsed time.
+	assert.InDelta(t, testIdleTTL.Seconds(), refreshCookie.MaxAge, 60)
 }
 
 func TestRegister_DuplicateEmail(t *testing.T) {
