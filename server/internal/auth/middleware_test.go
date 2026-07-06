@@ -106,11 +106,18 @@ func TestMiddleware_RejectsNonBearerScheme(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
-func TestMiddleware_RejectsRefreshToken_WrongAudience(t *testing.T) {
+func TestMiddleware_RejectsNonAccessAudience(t *testing.T) {
 	e := setupMiddlewareTest()
 
-	// Generate a refresh token — middleware should reject it (audience != "access")
-	token, err := GenerateRefreshToken(1, testSecret)
+	// A validly-signed, unexpired JWT whose audience is NOT "access" must be
+	// rejected — the middleware gates on the access audience, not just signature.
+	claims := jwt.RegisteredClaims{
+		Subject:   "1",
+		Audience:  jwt.ClaimStrings{"refresh"},
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testSecret))
 	require.NoError(t, err)
 
 	rec := doProtectedRequest(e, "Bearer "+token)

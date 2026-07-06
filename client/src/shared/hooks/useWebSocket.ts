@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { refresh } from "@/shared/api/auth";
+import { refreshAccessToken } from "@/shared/api/axiosClient";
 import { recordServerNow } from "@/shared/lib/clockSync";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { AuthenticatedPayload, AuthFailedPayload, WsMessage } from "@/shared/types/wsEvents";
@@ -150,8 +150,10 @@ export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketRe
 
   const handleAuthFailure = useCallback(async () => {
     try {
-      const res = await refresh();
-      useAuthStore.getState().setToken(res.token);
+      // Coordinated singleton refresh: sets + broadcasts the new access token
+      // (and re-hydrates the user), shared with the 401 interceptor and the
+      // proactive scheduler so a WS auth failure never spawns a second refresh.
+      await refreshAccessToken();
       // Retry connection with fresh token
       reconnectAttemptRef.current = 0;
       scheduleReconnect();

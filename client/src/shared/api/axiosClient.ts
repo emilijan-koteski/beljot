@@ -55,10 +55,51 @@ function redirectToLogin(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Cross-tab auth coordination
+// ---------------------------------------------------------------------------
+// When one tab refreshes the access token, it broadcasts the new value so
+// sibling tabs adopt it instead of each calling /auth/refresh. With refresh
+// rotation on the server, N tabs each refreshing would rotate the token N times
+// and risk tripping reuse detection; adopting a broadcast token keeps one tab as
+// the de-facto refresh leader. Guarded — BroadcastChannel is absent in jsdom/SSR.
+const authChannel: BroadcastChannel | null =
+  typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("beljot-auth") : null;
+
+interface TokenBroadcast {
+  type: "token";
+  token: string;
+}
+
+function broadcastToken(token: string): void {
+  authChannel?.postMessage({ type: "token", token } satisfies TokenBroadcast);
+}
+
+// subscribeToTokenBroadcast invokes onToken when a sibling tab refreshes. Returns
+// an unsubscribe fn (a no-op where BroadcastChannel is unavailable).
+export function subscribeToTokenBroadcast(onToken: (token: string) => void): () => void {
+  if (!authChannel) return () => {};
+  const handler = (e: MessageEvent<TokenBroadcast>) => {
+    if (e.data?.type === "token" && typeof e.data.token === "string") {
+      onToken(e.data.token);
+    }
+  };
+  authChannel.addEventListener("message", handler);
+  return () => authChannel.removeEventListener("message", handler);
+}
+
+// ---------------------------------------------------------------------------
 // Singleton refresh — deduplicates concurrent 401 refresh attempts
 // ---------------------------------------------------------------------------
 
 let refreshPromise: Promise<string> | null = null;
+
+// refreshAccessToken is the single coordinated entry point for obtaining a fresh
+// access token: it dedupes concurrent callers (401 interceptor, proactive
+// scheduler, WS re-auth) and broadcasts the result cross-tab. Callers should not
+// call the /auth/refresh endpoint directly.
+export function refreshAccessToken(): Promise<string> {
+  return doRefresh();
+}
 
 async function doRefresh(): Promise<string> {
   if (refreshPromise) {
@@ -96,6 +137,8 @@ async function doRefresh(): Promise<string> {
         level: r.level,
         createdAt: r.createdAt,
       });
+      // Tell sibling tabs so they adopt this token rather than each refreshing.
+      broadcastToken(r.token);
       return r.token;
     })
     .finally(() => {

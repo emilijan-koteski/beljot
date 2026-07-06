@@ -20,6 +20,7 @@ import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { PublicContentLayout } from "@/shared/components/PublicContentLayout";
 import { Toaster } from "@/shared/components/ui/sonner";
 import { useAuthInit } from "@/shared/hooks/useAuth";
+import { useTokenRefresh } from "@/shared/hooks/useTokenRefresh";
 import { QueryProvider } from "@/shared/providers/QueryProvider";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -30,6 +31,7 @@ function AuthAwareRedirect() {
 
 function AppRoutes() {
   useAuthInit();
+  useTokenRefresh();
 
   const isLoading = useAuthStore((s) => s.isLoading);
 

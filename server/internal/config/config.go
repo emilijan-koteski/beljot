@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -14,6 +15,14 @@ type Config struct {
 	Port        string
 	CORSOrigins []string
 	Environment string
+
+	// Token lifetimes. AccessTokenTTL keeps access JWTs short (default 15m).
+	// RefreshIdleTTL is the sliding window an active session may go unused
+	// before it dies (default 30d); RefreshAbsoluteTTL is the hard cap from
+	// login regardless of activity (default 180d), forcing a periodic re-login.
+	AccessTokenTTL     time.Duration
+	RefreshIdleTTL     time.Duration
+	RefreshAbsoluteTTL time.Duration
 
 	// AppBaseURL is the public origin of the frontend (no trailing slash). Used
 	// to build absolute links in outgoing email (e.g. the password-reset link).
@@ -44,6 +53,10 @@ func Load() *Config {
 		CORSOrigins: parseOrigins(getEnv("BELJOT_CORS_ORIGINS", "http://localhost:5173")),
 		Environment: getEnv("BELJOT_ENV", "development"),
 
+		AccessTokenTTL:     getEnvDuration("BELJOT_ACCESS_TOKEN_TTL", 15*time.Minute),
+		RefreshIdleTTL:     getEnvDuration("BELJOT_REFRESH_IDLE_TTL", 30*24*time.Hour),
+		RefreshAbsoluteTTL: getEnvDuration("BELJOT_REFRESH_ABSOLUTE_TTL", 180*24*time.Hour),
+
 		AppBaseURL: strings.TrimRight(getEnv("BELJOT_APP_BASE_URL", "http://localhost:5173"), "/"),
 
 		SMTPHost:     strings.TrimSpace(getEnv("BELJOT_SMTP_HOST", "")),
@@ -69,6 +82,14 @@ func Load() *Config {
 		slog.Warn("BELJOT_APP_BASE_URL is unset or points at localhost in a non-development environment — password reset links will be broken", "appBaseURL", cfg.AppBaseURL)
 	}
 
+	// The idle window should not exceed the absolute cap; otherwise the cap is
+	// the only thing that ever ends an active session and the sliding idle
+	// window is meaningless.
+	if cfg.RefreshIdleTTL > cfg.RefreshAbsoluteTTL {
+		slog.Warn("BELJOT_REFRESH_IDLE_TTL exceeds BELJOT_REFRESH_ABSOLUTE_TTL — idle expiry will never fire before the absolute cap",
+			"idleTTL", cfg.RefreshIdleTTL, "absoluteTTL", cfg.RefreshAbsoluteTTL)
+	}
+
 	return cfg
 }
 
@@ -85,6 +106,21 @@ func getEnvInt(key string, fallback int) int {
 			return n
 		}
 		slog.Warn("invalid integer env var, using fallback", "key", key, "value", value, "fallback", fallback)
+	}
+	return fallback
+}
+
+// getEnvDuration parses a Go duration string (e.g. "15m", "720h") from the
+// environment, falling back to the default on absence, a parse error, or a
+// non-positive value (a zero/negative TTL would mint already-expired tokens).
+// Note Go's time.ParseDuration has no day unit — express days as hours
+// (30d = 720h).
+func getEnvDuration(key string, fallback time.Duration) time.Duration {
+	if value, ok := os.LookupEnv(key); ok {
+		if d, err := time.ParseDuration(strings.TrimSpace(value)); err == nil && d > 0 {
+			return d
+		}
+		slog.Warn("invalid or non-positive duration env var, using fallback", "key", key, "value", value, "fallback", fallback)
 	}
 	return fallback
 }
