@@ -1,7 +1,9 @@
 {
   "common": {
     "appName": "Beljot",
-    "close": "Zatvori"
+    "close": "Zatvori",
+    "showPassword": "Prikaži lozinku",
+    "hidePassword": "Sakrij lozinku"
   },
   "team": {
     "us": "Mi",
@@ -144,6 +146,35 @@
       "eyebrow": "Rivalstvo",
       "title": "S druge strane stola",
       "empty": "Još nema rivala. Odigraj nekoliko mečeva."
+    },
+    "linkedAccounts": {
+      "eyebrow": "Nalog",
+      "title": "Povezani nalozi",
+      "description": "Povežite nalog za prijavu jednim klikom.",
+      "google": "Google",
+      "linkedAs": "Povezano kao {{email}}",
+      "notLinked": "Nije povezano",
+      "unlink": "Ukloni",
+      "passwordlessHint": "Postavite lozinku pre uklanjanja jedinog načina prijave.",
+      "loadError": "Nije moguće učitati povezane naloge. Pokušajte ponovo.",
+      "linkedToast": "Google nalog povezan.",
+      "unlinkedToast": "Google nalog uklonjen.",
+      "unlinkDialog": {
+        "title": "Ukloniti {{provider}}?",
+        "description": "Uklonite {{provider}} ({{email}}) sa svog naloga. Možete ga ponovo povezati bilo kada.",
+        "descriptionNoEmail": "Uklonite {{provider}} sa svog naloga. Možete ga ponovo povezati bilo kada.",
+        "cancel": "Odustani",
+        "confirm": "Ukloni",
+        "submitting": "Uklanjanje…"
+      },
+      "errors": {
+        "alreadyLinked": "Taj Google nalog je već povezan sa drugim nalogom.",
+        "emailUnverified": "Vaša Google e-pošta nije potvrđena. Potvrdite je na Google-u i pokušajte ponovo.",
+        "credentialExpired": "Vaša Google prijava je istekla. Dodirnite dugme Google i pokušajte ponovo.",
+        "linkFailed": "Povezivanje naloga nije uspelo. Pokušajte ponovo.",
+        "cannotUnlinkLast": "Postavite lozinku pre uklanjanja jedinog načina prijave.",
+        "unlinkFailed": "Uklanjanje naloga nije uspelo. Pokušajte ponovo."
+      }
     },
     "milestones": {
       "eyebrow": "Prekretnice",
@@ -849,6 +880,34 @@
       "subtitle": "Izaberi ime, dobij mesto. Četiri igrača za stolom, dva u timu.",
       "altPrompt": "Već imaš nalog?",
       "altCta": "Prijavi se"
+    },
+    "sso": {
+      "divider": "ili",
+      "consent": {
+        "prefix": "Nastavkom sa Google nalogom prihvataš ",
+        "termsLink": "Uslove korišćenja",
+        "and": " i ",
+        "privacyLink": "Politiku privatnosti",
+        "suffix": "."
+      },
+      "linkDialog": {
+        "title": "Poveži svoj nalog",
+        "description": "Nalog za {{email}} već postoji. Unesi njegovu lozinku da povežeš Google prijavu. Sledeći put ulaziš jednim klikom.",
+        "descriptionNoEmail": "Nalog sa ovom email adresom već postoji. Unesi njegovu lozinku da povežeš Google prijavu. Sledeći put ulaziš jednim klikom.",
+        "passwordPlaceholder": "Lozinka naloga",
+        "cancel": "Otkaži",
+        "submit": "Poveži i prijavi se",
+        "submitting": "Povezivanje…",
+        "errors": {
+          "wrongPassword": "Pogrešna lozinka. Pokušaj ponovo.",
+          "linkFailed": "Povezivanje nije uspelo. Pokušaj ponovo."
+        }
+      },
+      "errors": {
+        "emailUnverified": "Email tvog Google naloga nije potvrđen. Potvrdi ga pa pokušaj ponovo.",
+        "ssoFailed": "Google prijava nije uspela. Pokušaj ponovo.",
+        "credentialExpired": "Google prijava je istekla. Klikni na Google dugme i pokušaj ponovo."
+      }
     },
     "footer": {
       "credit": "Napravio <name>Emilijan Koteski</name> sa <suit>♣</suit>"

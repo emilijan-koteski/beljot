@@ -1,7 +1,9 @@
 {
   "common": {
     "appName": "Beljot",
-    "close": "Close"
+    "close": "Close",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "team": {
     "us": "Us",
@@ -144,6 +146,35 @@
       "eyebrow": "Rivalry",
       "title": "Across the table",
       "empty": "No rivals yet — play a few matches."
+    },
+    "linkedAccounts": {
+      "eyebrow": "Account",
+      "title": "Linked accounts",
+      "description": "Link an account to sign in with one click.",
+      "google": "Google",
+      "linkedAs": "Linked as {{email}}",
+      "notLinked": "Not linked",
+      "unlink": "Unlink",
+      "passwordlessHint": "Set a password before unlinking your only sign-in method.",
+      "loadError": "Could not load linked accounts. Try again.",
+      "linkedToast": "Google account linked.",
+      "unlinkedToast": "Google account unlinked.",
+      "unlinkDialog": {
+        "title": "Unlink {{provider}}?",
+        "description": "Remove {{provider}} ({{email}}) from your account. You can link it again anytime.",
+        "descriptionNoEmail": "Remove {{provider}} from your account. You can link it again anytime.",
+        "cancel": "Cancel",
+        "confirm": "Unlink",
+        "submitting": "Unlinking…"
+      },
+      "errors": {
+        "alreadyLinked": "That Google account is already linked to another account.",
+        "emailUnverified": "Your Google email isn't verified. Verify it with Google and try again.",
+        "credentialExpired": "Your Google sign-in expired. Tap the Google button and try again.",
+        "linkFailed": "Couldn't link your account. Please try again.",
+        "cannotUnlinkLast": "Set a password before unlinking your only sign-in method.",
+        "unlinkFailed": "Couldn't unlink your account. Please try again."
+      }
     },
     "milestones": {
       "eyebrow": "Milestones",
@@ -849,6 +880,34 @@
       "subtitle": "Pick a name, get a seat. Four players to a table, two to a team.",
       "altPrompt": "Already have an account?",
       "altCta": "Log in"
+    },
+    "sso": {
+      "divider": "or",
+      "consent": {
+        "prefix": "By continuing with Google, you agree to the ",
+        "termsLink": "Terms of Service",
+        "and": " and ",
+        "privacyLink": "Privacy Policy",
+        "suffix": "."
+      },
+      "linkDialog": {
+        "title": "Link your account",
+        "description": "An account for {{email}} already exists. Enter its password to link Google sign-in — next time you're in with one tap.",
+        "descriptionNoEmail": "An account with this email already exists. Enter its password to link Google sign-in — next time you're in with one tap.",
+        "passwordPlaceholder": "Account password",
+        "cancel": "Cancel",
+        "submit": "Link and log in",
+        "submitting": "Linking…",
+        "errors": {
+          "wrongPassword": "Incorrect password. Try again.",
+          "linkFailed": "Couldn't link your account. Please try again."
+        }
+      },
+      "errors": {
+        "emailUnverified": "Your Google email isn't verified. Verify it with Google and try again.",
+        "ssoFailed": "Google sign-in failed. Please try again.",
+        "credentialExpired": "Your Google sign-in expired. Tap the Google button and try again."
+      }
     },
     "footer": {
       "credit": "Crafted with <suit>♣</suit> by <name>Emilijan Koteski</name>"

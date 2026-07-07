@@ -7,6 +7,7 @@ import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 import { IdentityHero } from "./components/IdentityHero";
+import { LinkedAccounts } from "./components/LinkedAccounts";
 import { Milestones } from "./components/Milestones";
 import { PartnerSpotlight } from "./components/PartnerSpotlight";
 import { Rivalries } from "./components/Rivalries";
@@ -90,6 +91,8 @@ export function ProfilePage() {
         <MatchHistory userId={user?.id} counts={counts} />
 
         <aside className="flex flex-col gap-3.5 lg:sticky lg:top-20" data-testid="profile-sidebar">
+          <LinkedAccounts userId={user?.id} />
+
           {career.isError ? (
             <p className="text-ink-mute text-sm" data-testid="profile-career-error">
               {t("profile.careerError")}

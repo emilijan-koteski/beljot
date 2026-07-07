@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/emilijan/beljot/server/internal/identity"
 	"github.com/emilijan/beljot/server/internal/refreshtoken"
 )
 
@@ -169,7 +170,7 @@ func (m *mockRefreshRepo) firstFamilyID() string {
 func setupAuthServer() (*echo.Echo, *mockUserRepo, *mockRefreshRepo) {
 	ur := newMockUserRepo()
 	rr := newMockRefreshRepo()
-	h := NewAuthHandler(ur, rr, "test-jwt-secret", "development", testAccessTTL, testIdleTTL, testAbsoluteTTL)
+	h := NewAuthHandler(ur, rr, newMockIdentityRepo(), identity.Registry{}, "test-jwt-secret", "development", testAccessTTL, testIdleTTL, testAbsoluteTTL)
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
 	e.POST("/api/v1/auth/register", h.Register)

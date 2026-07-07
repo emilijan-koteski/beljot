@@ -212,6 +212,16 @@ func (m *mockUserRepo) Create(u *user.User) error {
 	return nil
 }
 
+func (m *mockUserRepo) Delete(id uint) error {
+	for i, u := range m.users {
+		if u.ID == id {
+			m.users = append(m.users[:i], m.users[i+1:]...)
+			return nil
+		}
+	}
+	return apperr.ErrUserNotFound
+}
+
 func (m *mockUserRepo) FindByEmail(email string) (*user.User, error) {
 	for _, u := range m.users {
 		if u.Email == email {

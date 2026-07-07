@@ -50,6 +50,24 @@ var (
 	// and already-used reset tokens alike so the response never reveals which.
 	ErrInvalidResetToken = NewAppError("INVALID_RESET_TOKEN", "reset link is invalid or has expired", http.StatusBadRequest)
 
+	// SSO domain errors. ErrSSOInvalidCredential is deliberately generic —
+	// expired, forged, and wrong-audience tokens are indistinguishable to the
+	// client (details are logged server-side). ErrSSOLinkRequired discloses
+	// account existence, which is acceptable because it is only ever returned
+	// to a provider-verified owner of that email.
+	ErrSSOInvalidCredential = NewAppError("SSO_INVALID_CREDENTIAL", "sign-in credential is invalid or expired", http.StatusUnauthorized)
+	ErrSSOLinkRequired      = NewAppError("SSO_LINK_REQUIRED", "an account with this email already exists — confirm its password to link", http.StatusConflict)
+	ErrSSOEmailUnverified   = NewAppError("SSO_EMAIL_UNVERIFIED", "the email on this sign-in account is not verified", http.StatusForbidden)
+	ErrSSOIdentityInUse     = NewAppError("SSO_IDENTITY_IN_USE", "this sign-in identity is already linked to an account", http.StatusConflict)
+	ErrSSOUnknownProvider   = NewAppError("SSO_UNKNOWN_PROVIDER", "unknown sign-in provider", http.StatusBadRequest)
+	// ErrSSOIdentityNotFound is returned when unlinking a provider the account
+	// has no identity for. ErrSSOCannotUnlinkLast guards the invariant that an
+	// account must always keep at least one way to sign in: a passwordless
+	// (SSO-only) account cannot unlink its sole remaining identity. 409 matches
+	// the project's Conflict convention for state guards.
+	ErrSSOIdentityNotFound = NewAppError("SSO_IDENTITY_NOT_FOUND", "no linked account for this provider", http.StatusNotFound)
+	ErrSSOCannotUnlinkLast = NewAppError("SSO_CANNOT_UNLINK_LAST", "cannot unlink your only sign-in method — set a password first", http.StatusConflict)
+
 	// User domain errors
 	ErrUserNotFound    = NewAppError("USER_NOT_FOUND", "user not found", http.StatusNotFound)
 	ErrInvalidLanguage = NewAppError("INVALID_LANGUAGE", "language must be one of: en, sr, mk, hr", http.StatusBadRequest)

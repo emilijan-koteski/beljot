@@ -36,6 +36,21 @@ func (r *GormUserRepository) Create(user *User) error {
 	return nil
 }
 
+// Delete soft-deletes the user (GORM stamps DeletedAt). The partial unique
+// indexes on users (WHERE deleted_at IS NULL) mean the row's email and
+// username become free again — exactly what the SSO-registration compensation
+// path relies on.
+func (r *GormUserRepository) Delete(id uint) error {
+	result := r.db.Delete(&User{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return apperr.ErrUserNotFound
+	}
+	return nil
+}
+
 func (r *GormUserRepository) FindByEmail(email string) (*User, error) {
 	var u User
 	if err := r.db.Where("email = ?", email).First(&u).Error; err != nil {

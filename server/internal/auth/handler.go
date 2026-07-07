@@ -13,6 +13,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 
 	"github.com/emilijan/beljot/server/internal/apperr"
+	"github.com/emilijan/beljot/server/internal/identity"
 	"github.com/emilijan/beljot/server/internal/refreshtoken"
 	"github.com/emilijan/beljot/server/internal/user"
 )
@@ -54,18 +55,22 @@ type RegisterResponseData struct {
 }
 
 type AuthHandler struct {
-	userRepo    user.UserRepository
-	refreshRepo refreshtoken.Repository
-	jwtSecret   string
-	env         string
-	accessTTL   time.Duration
-	idleTTL     time.Duration
-	absoluteTTL time.Duration
+	userRepo     user.UserRepository
+	refreshRepo  refreshtoken.Repository
+	identityRepo identity.Repository
+	providers    identity.Registry
+	jwtSecret    string
+	env          string
+	accessTTL    time.Duration
+	idleTTL      time.Duration
+	absoluteTTL  time.Duration
 }
 
 func NewAuthHandler(
 	userRepo user.UserRepository,
 	refreshRepo refreshtoken.Repository,
+	identityRepo identity.Repository,
+	providers identity.Registry,
 	jwtSecret string,
 	env string,
 	accessTTL time.Duration,
@@ -73,13 +78,15 @@ func NewAuthHandler(
 	absoluteTTL time.Duration,
 ) *AuthHandler {
 	return &AuthHandler{
-		userRepo:    userRepo,
-		refreshRepo: refreshRepo,
-		jwtSecret:   jwtSecret,
-		env:         env,
-		accessTTL:   accessTTL,
-		idleTTL:     idleTTL,
-		absoluteTTL: absoluteTTL,
+		userRepo:     userRepo,
+		refreshRepo:  refreshRepo,
+		identityRepo: identityRepo,
+		providers:    providers,
+		jwtSecret:    jwtSecret,
+		env:          env,
+		accessTTL:    accessTTL,
+		idleTTL:      idleTTL,
+		absoluteTTL:  absoluteTTL,
 	}
 }
 

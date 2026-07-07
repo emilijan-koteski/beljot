@@ -1,12 +1,13 @@
 import "@/shared/i18n/i18n";
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { i18n } from "@/shared/i18n/i18n";
+import { useAuthStore } from "@/shared/stores/authStore";
 import { QueryWrapper } from "@/test-utils";
 
 import { AuthLayout } from "./AuthLayout";
@@ -22,8 +23,28 @@ vi.mock("react-router", async () => {
 });
 
 const mockRegister = vi.fn();
+const mockSsoLogin = vi.fn();
+const mockSsoLink = vi.fn();
 vi.mock("@/shared/api/auth", () => ({
   register: (...args: unknown[]) => mockRegister(...args),
+  ssoLogin: (...args: unknown[]) => mockSsoLogin(...args),
+  ssoLink: (...args: unknown[]) => mockSsoLink(...args),
+  logout: vi.fn(),
+}));
+
+const mockUpdatePreferences = vi.fn();
+vi.mock("@/shared/api/profile", () => ({
+  updatePreferences: (...args: unknown[]) => mockUpdatePreferences(...args),
+}));
+
+// GIS never loads in tests — the mock captures the onCredential callback so
+// tests can hand the page a fake Google credential.
+const mockRenderGoogleButton = vi.fn();
+let mockClientId = "test-client-id";
+vi.mock("@/shared/lib/googleIdentity", () => ({
+  getGoogleClientId: () => mockClientId,
+  renderGoogleButton: (...args: unknown[]) => mockRenderGoogleButton(...args),
+  decodeCredentialEmail: () => "match@example.com",
 }));
 
 function renderRegisterPage() {
@@ -40,10 +61,19 @@ function renderRegisterPage() {
   );
 }
 
+let capturedOnCredential: ((credential: string) => void) | undefined;
+
 describe("RegisterPage", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
     await i18n.changeLanguage("en");
+    mockClientId = "test-client-id";
+    capturedOnCredential = undefined;
+    mockRenderGoogleButton.mockImplementation((options: unknown) => {
+      capturedOnCredential = (options as { onCredential: (c: string) => void }).onCredential;
+      return Promise.resolve(true);
+    });
   });
 
   afterEach(async () => {
@@ -351,6 +381,137 @@ describe("RegisterPage", () => {
       totalXp: 0,
       level: 0,
       createdAt: "2026-04-10T00:00:00Z",
+    });
+  });
+
+  describe("Google SSO", () => {
+    function ssoResponse() {
+      return {
+        token: "sso-token",
+        id: 7,
+        username: "googler",
+        email: "match@example.com",
+        languagePreference: "en",
+        walletBalance: 5000,
+        loginStreakDays: 0,
+        totalXp: 0,
+        level: 0,
+        createdAt: "2026-01-01T00:00:00Z",
+      };
+    }
+
+    async function emitCredential(credential: string) {
+      await waitFor(() => {
+        expect(capturedOnCredential).toBeDefined();
+      });
+      await act(async () => {
+        capturedOnCredential!(credential);
+      });
+    }
+
+    it("renders the Google button slot with the ToS/privacy small-print", async () => {
+      renderRegisterPage();
+
+      expect(screen.getByTestId("google-signin-button")).toBeInTheDocument();
+      expect(screen.getByTestId("sso-divider")).toBeInTheDocument();
+      expect(screen.getByTestId("sso-consent-note")).toBeInTheDocument();
+      expect(screen.getByTestId("sso-terms-link")).toHaveAttribute("href", "/terms");
+      expect(screen.getByTestId("sso-privacy-link")).toHaveAttribute("href", "/privacy");
+      await waitFor(() => {
+        expect(mockRenderGoogleButton).toHaveBeenCalled();
+      });
+    });
+
+    it("hides the Google button when no client id is configured", () => {
+      mockClientId = "";
+      renderRegisterPage();
+
+      expect(screen.queryByTestId("google-signin-button")).not.toBeInTheDocument();
+      expect(mockRenderGoogleButton).not.toHaveBeenCalled();
+    });
+
+    it("stores the session and navigates to /lobby on SSO success", async () => {
+      mockSsoLogin.mockResolvedValueOnce(ssoResponse());
+      renderRegisterPage();
+
+      await emitCredential("google-credential");
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+      });
+      expect(mockSsoLogin).toHaveBeenCalledWith("google", { credential: "google-credential" });
+      expect(useAuthStore.getState().token).toBe("sso-token");
+    });
+
+    it("reconciles the picked language after an SSO registration", async () => {
+      await i18n.changeLanguage("mk");
+      // SSO registration always seeds "en" server-side — the page must PATCH
+      // the picked language just like the login page does.
+      mockSsoLogin.mockResolvedValueOnce(ssoResponse());
+      mockUpdatePreferences.mockResolvedValueOnce({ languagePreference: "mk" });
+      renderRegisterPage();
+
+      await emitCredential("google-credential");
+
+      await waitFor(() => {
+        expect(mockUpdatePreferences).toHaveBeenCalledWith(7, { languagePreference: "mk" });
+      });
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+      });
+    });
+
+    it("links via the dialog when the email matches a password account", async () => {
+      const user = userEvent.setup();
+      mockSsoLogin.mockRejectedValueOnce(
+        new FetchError(409, "SSO_LINK_REQUIRED", "account exists"),
+      );
+      mockSsoLink.mockResolvedValueOnce(ssoResponse());
+      renderRegisterPage();
+
+      await emitCredential("google-credential");
+      await waitFor(() => {
+        expect(screen.getByTestId("link-account-dialog")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("link-account-email")).toHaveTextContent("match@example.com");
+
+      await user.type(screen.getByTestId("link-account-password-input"), "password123");
+      await user.click(screen.getByTestId("link-account-submit"));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+      });
+      expect(mockSsoLink).toHaveBeenCalledWith("google", {
+        credential: "google-credential",
+        password: "password123",
+      });
+    });
+
+    it("shows an inline error in the dialog on a wrong password", async () => {
+      const user = userEvent.setup();
+      mockSsoLogin.mockRejectedValueOnce(
+        new FetchError(409, "SSO_LINK_REQUIRED", "account exists"),
+      );
+      mockSsoLink.mockRejectedValueOnce(
+        new FetchError(401, "INVALID_CREDENTIALS", "invalid email or password"),
+      );
+      renderRegisterPage();
+
+      await emitCredential("google-credential");
+      await waitFor(() => {
+        expect(screen.getByTestId("link-account-dialog")).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByTestId("link-account-password-input"), "wrongpassword");
+      await user.click(screen.getByTestId("link-account-submit"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("link-account-error")).toHaveTextContent(
+          "Incorrect password. Try again.",
+        );
+      });
+      expect(screen.getByTestId("link-account-dialog")).toBeInTheDocument();
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
   });
 });

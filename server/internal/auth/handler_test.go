@@ -15,12 +15,17 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/emilijan/beljot/server/internal/apperr"
+	"github.com/emilijan/beljot/server/internal/identity"
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
 type mockUserRepo struct {
 	users  []*user.User
 	nextID uint
+	// createErrs, when non-empty, are consumed (front first) by Create before
+	// any insert happens — lets tests inject insert-time unique violations the
+	// in-memory pre-checks can't produce naturally (concurrency races).
+	createErrs []error
 }
 
 func newMockUserRepo() *mockUserRepo {
@@ -28,11 +33,28 @@ func newMockUserRepo() *mockUserRepo {
 }
 
 func (m *mockUserRepo) Create(u *user.User) error {
+	if len(m.createErrs) > 0 {
+		err := m.createErrs[0]
+		m.createErrs = m.createErrs[1:]
+		if err != nil {
+			return err
+		}
+	}
 	u.ID = m.nextID
 	u.CreatedAt = time.Now()
 	m.nextID++
 	m.users = append(m.users, u)
 	return nil
+}
+
+func (m *mockUserRepo) Delete(id uint) error {
+	for i, u := range m.users {
+		if u.ID == id {
+			m.users = append(m.users[:i], m.users[i+1:]...)
+			return nil
+		}
+	}
+	return apperr.ErrUserNotFound
 }
 
 func (m *mockUserRepo) FindByEmail(email string) (*user.User, error) {
@@ -164,7 +186,7 @@ func testErrorHandler(err error, c echo.Context) {
 
 func setupHandler() (*AuthHandler, *echo.Echo) {
 	repo := newMockUserRepo()
-	handler := NewAuthHandler(repo, newMockRefreshRepo(), "test-jwt-secret", "development", testAccessTTL, testIdleTTL, testAbsoluteTTL)
+	handler := NewAuthHandler(repo, newMockRefreshRepo(), newMockIdentityRepo(), identity.Registry{}, "test-jwt-secret", "development", testAccessTTL, testIdleTTL, testAbsoluteTTL)
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
 	e.POST("/api/v1/auth/register", handler.Register)
@@ -604,7 +626,7 @@ func TestLogout_Success(t *testing.T) {
 
 func TestRegister_SeedsWalletAndStampsLastLogin(t *testing.T) {
 	repo := newMockUserRepo()
-	handler := NewAuthHandler(repo, newMockRefreshRepo(), "test-jwt-secret", "development", testAccessTTL, testIdleTTL, testAbsoluteTTL)
+	handler := NewAuthHandler(repo, newMockRefreshRepo(), newMockIdentityRepo(), identity.Registry{}, "test-jwt-secret", "development", testAccessTTL, testIdleTTL, testAbsoluteTTL)
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
 	e.POST("/api/v1/auth/register", handler.Register)

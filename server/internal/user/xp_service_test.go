@@ -30,6 +30,7 @@ func (f *fakeLevelRepo) TotalXPForUsers(ids []uint) (map[uint]int, error) {
 }
 
 func (f *fakeLevelRepo) Create(*User) error                          { panic("unused") }
+func (f *fakeLevelRepo) Delete(uint) error                           { panic("unused") }
 func (f *fakeLevelRepo) FindByEmail(string) (*User, error)           { panic("unused") }
 func (f *fakeLevelRepo) FindByUsername(string) (*User, error)        { panic("unused") }
 func (f *fakeLevelRepo) FindByID(uint) (*User, error)                { panic("unused") }
