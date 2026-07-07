@@ -104,6 +104,57 @@ func TestGormRepo_DuplicateUserProviderConflicts(t *testing.T) {
 	assert.ErrorIs(t, err, apperr.ErrSSOIdentityInUse)
 }
 
+func TestGormRepo_FindByUserID(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormRepository(db)
+	u := makeUser(t, db, "list@id.test")
+	other := makeUser(t, db, "other@id.test")
+
+	require.NoError(t, repo.Create(makeIdentity(u.ID, "google", "sub-g", "list@id.test")))
+	require.NoError(t, repo.Create(makeIdentity(u.ID, "facebook", "sub-f", "list@id.test")))
+	require.NoError(t, repo.Create(makeIdentity(other.ID, "google", "sub-o", "other@id.test")))
+
+	got, err := repo.FindByUserID(u.ID)
+	require.NoError(t, err)
+	require.Len(t, got, 2, "only this user's identities")
+	for _, id := range got {
+		assert.Equal(t, u.ID, id.UserID)
+	}
+
+	// A user with no identities gets an empty slice, not an error.
+	none, err := repo.FindByUserID(999999)
+	require.NoError(t, err)
+	assert.Empty(t, none)
+}
+
+func TestGormRepo_DeleteByUserProvider(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormRepository(db)
+	u1 := makeUser(t, db, "del1@id.test")
+	u2 := makeUser(t, db, "del2@id.test")
+	require.NoError(t, repo.Create(makeIdentity(u1.ID, "google", "sub-1", "del1@id.test")))
+	require.NoError(t, repo.Create(makeIdentity(u2.ID, "google", "sub-2", "del2@id.test")))
+
+	// Deletes exactly the target user's provider row.
+	n, err := repo.DeleteByUserProvider(u1.ID, "google")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), n)
+
+	gone, err := repo.FindByUserID(u1.ID)
+	require.NoError(t, err)
+	assert.Empty(t, gone)
+
+	// The other user's identity for the same provider is untouched.
+	remaining, err := repo.FindByUserID(u2.ID)
+	require.NoError(t, err)
+	assert.Len(t, remaining, 1)
+
+	// Deleting a provider the user has no identity for removes nothing.
+	n, err = repo.DeleteByUserProvider(u1.ID, "google")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), n)
+}
+
 func TestGormRepo_CascadeDeletesWithUser(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormRepository(db)

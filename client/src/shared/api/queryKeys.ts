@@ -11,6 +11,9 @@ export const queryKeys = {
   career: {
     detail: (userId: number) => ["career", userId] as const,
   },
+  identities: {
+    detail: (userId: number) => ["identities", userId] as const,
+  },
   matches: {
     byUser: (userId: number, outcome: string, sort: string) =>
       ["matches", "byUser", userId, outcome, sort] as const,

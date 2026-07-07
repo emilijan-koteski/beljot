@@ -61,6 +61,26 @@ func (m *mockIdentityRepo) FindByProviderSubject(provider, subject string) (*ide
 	return nil, nil
 }
 
+func (m *mockIdentityRepo) FindByUserID(userID uint) ([]identity.Identity, error) {
+	out := make([]identity.Identity, 0)
+	for _, ex := range m.identities {
+		if ex.UserID == userID {
+			out = append(out, *ex)
+		}
+	}
+	return out, nil
+}
+
+func (m *mockIdentityRepo) DeleteByUserProvider(userID uint, provider string) (int64, error) {
+	for i, ex := range m.identities {
+		if ex.UserID == userID && ex.Provider == provider {
+			m.identities = append(m.identities[:i], m.identities[i+1:]...)
+			return 1, nil
+		}
+	}
+	return 0, nil
+}
+
 // --- fake SSO provider — the reason the Provider interface exists: handler
 // tests exercise the full flow without ever talking to Google ---
 

@@ -147,6 +147,35 @@
       "title": "S druge strane stola",
       "empty": "Još nema rivala. Odigraj nekoliko mečeva."
     },
+    "linkedAccounts": {
+      "eyebrow": "Nalog",
+      "title": "Povezani nalozi",
+      "description": "Povežite nalog za prijavu jednim klikom.",
+      "google": "Google",
+      "linkedAs": "Povezano kao {{email}}",
+      "notLinked": "Nije povezano",
+      "unlink": "Ukloni",
+      "passwordlessHint": "Postavite lozinku pre uklanjanja jedinog načina prijave.",
+      "loadError": "Nije moguće učitati povezane naloge. Pokušajte ponovo.",
+      "linkedToast": "Google nalog povezan.",
+      "unlinkedToast": "Google nalog uklonjen.",
+      "unlinkDialog": {
+        "title": "Ukloniti {{provider}}?",
+        "description": "Uklonite {{provider}} ({{email}}) sa svog naloga. Možete ga ponovo povezati bilo kada.",
+        "descriptionNoEmail": "Uklonite {{provider}} sa svog naloga. Možete ga ponovo povezati bilo kada.",
+        "cancel": "Odustani",
+        "confirm": "Ukloni",
+        "submitting": "Uklanjanje…"
+      },
+      "errors": {
+        "alreadyLinked": "Taj Google nalog je već povezan sa drugim nalogom.",
+        "emailUnverified": "Vaša Google e-pošta nije potvrđena. Potvrdite je na Google-u i pokušajte ponovo.",
+        "credentialExpired": "Vaša Google prijava je istekla. Dodirnite dugme Google i pokušajte ponovo.",
+        "linkFailed": "Povezivanje naloga nije uspelo. Pokušajte ponovo.",
+        "cannotUnlinkLast": "Postavite lozinku pre uklanjanja jedinog načina prijave.",
+        "unlinkFailed": "Uklanjanje naloga nije uspelo. Pokušajte ponovo."
+      }
+    },
     "milestones": {
       "eyebrow": "Prekretnice",
       "title": "Vrhunci karijere",

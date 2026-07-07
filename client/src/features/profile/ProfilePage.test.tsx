@@ -31,6 +31,13 @@ vi.mock("@/shared/api/matches", () => ({
   getUserMatches: (...args: unknown[]) => mockGetUserMatches(...args),
 }));
 
+const mockGetIdentities = vi.fn();
+vi.mock("@/shared/api/identities", () => ({
+  getIdentities: (...args: unknown[]) => mockGetIdentities(...args),
+  linkIdentity: vi.fn(),
+  unlinkIdentity: vi.fn(),
+}));
+
 function renderProfilePage() {
   return render(
     <QueryWrapper>
@@ -75,9 +82,12 @@ describe("ProfilePage", () => {
     mockGetProfile.mockReset();
     mockGetCareer.mockReset();
     mockGetUserMatches.mockReset();
+    mockGetIdentities.mockReset();
     mockGetCareer.mockResolvedValue(careerFixture());
     // Default: MatchHistory renders the empty state so existing tests need no per-case setup.
     mockGetUserMatches.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
+    // Default: LinkedAccounts panel resolves to "no linked accounts".
+    mockGetIdentities.mockResolvedValue({ hasPassword: true, identities: [] });
     useAuthStore.setState({
       token: "test-token",
       user: {

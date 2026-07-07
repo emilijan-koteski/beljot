@@ -10,4 +10,12 @@ type Repository interface {
 	// FindByProviderSubject returns the identity for (provider, subject), or
 	// (nil, nil) when no row matches.
 	FindByProviderSubject(provider, subject string) (*Identity, error)
+	// FindByUserID returns all identities linked to a user, oldest first. An
+	// empty slice (not an error) means the user has no linked identities.
+	FindByUserID(userID uint) ([]Identity, error)
+	// DeleteByUserProvider hard-deletes the user's identity for the given
+	// provider and returns the number of rows removed (0 when nothing was
+	// linked). The row is hard-deleted — user_identities has no soft-delete —
+	// so the freed (provider, provider_user_id) unique slot can be relinked.
+	DeleteByUserProvider(userID uint, provider string) (int64, error)
 }

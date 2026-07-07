@@ -147,6 +147,35 @@
       "title": "Across the table",
       "empty": "No rivals yet — play a few matches."
     },
+    "linkedAccounts": {
+      "eyebrow": "Account",
+      "title": "Linked accounts",
+      "description": "Link an account to sign in with one click.",
+      "google": "Google",
+      "linkedAs": "Linked as {{email}}",
+      "notLinked": "Not linked",
+      "unlink": "Unlink",
+      "passwordlessHint": "Set a password before unlinking your only sign-in method.",
+      "loadError": "Could not load linked accounts. Try again.",
+      "linkedToast": "Google account linked.",
+      "unlinkedToast": "Google account unlinked.",
+      "unlinkDialog": {
+        "title": "Unlink {{provider}}?",
+        "description": "Remove {{provider}} ({{email}}) from your account. You can link it again anytime.",
+        "descriptionNoEmail": "Remove {{provider}} from your account. You can link it again anytime.",
+        "cancel": "Cancel",
+        "confirm": "Unlink",
+        "submitting": "Unlinking…"
+      },
+      "errors": {
+        "alreadyLinked": "That Google account is already linked to another account.",
+        "emailUnverified": "Your Google email isn't verified. Verify it with Google and try again.",
+        "credentialExpired": "Your Google sign-in expired. Tap the Google button and try again.",
+        "linkFailed": "Couldn't link your account. Please try again.",
+        "cannotUnlinkLast": "Set a password before unlinking your only sign-in method.",
+        "unlinkFailed": "Couldn't unlink your account. Please try again."
+      }
+    },
     "milestones": {
       "eyebrow": "Milestones",
       "title": "Career highlights",

@@ -147,6 +147,35 @@
       "title": "S druge strane stola",
       "empty": "Još nema rivala. Odigraj nekoliko mečeva."
     },
+    "linkedAccounts": {
+      "eyebrow": "Račun",
+      "title": "Povezani računi",
+      "description": "Povežite račun za prijavu jednim klikom.",
+      "google": "Google",
+      "linkedAs": "Povezano kao {{email}}",
+      "notLinked": "Nije povezano",
+      "unlink": "Odspoji",
+      "passwordlessHint": "Postavite lozinku prije odspajanja jedinog načina prijave.",
+      "loadError": "Nije moguće učitati povezane račune. Pokušajte ponovno.",
+      "linkedToast": "Google račun povezan.",
+      "unlinkedToast": "Google račun odspojen.",
+      "unlinkDialog": {
+        "title": "Odspojiti {{provider}}?",
+        "description": "Uklonite {{provider}} ({{email}}) sa svog računa. Možete ga ponovno povezati bilo kada.",
+        "descriptionNoEmail": "Uklonite {{provider}} sa svog računa. Možete ga ponovno povezati bilo kada.",
+        "cancel": "Odustani",
+        "confirm": "Odspoji",
+        "submitting": "Odspajanje…"
+      },
+      "errors": {
+        "alreadyLinked": "Taj Google račun već je povezan s drugim računom.",
+        "emailUnverified": "Vaša Google e-pošta nije potvrđena. Potvrdite je na Googleu i pokušajte ponovno.",
+        "credentialExpired": "Vaša Google prijava je istekla. Dodirnite gumb Google i pokušajte ponovno.",
+        "linkFailed": "Povezivanje računa nije uspjelo. Pokušajte ponovno.",
+        "cannotUnlinkLast": "Postavite lozinku prije odspajanja jedinog načina prijave.",
+        "unlinkFailed": "Odspajanje računa nije uspjelo. Pokušajte ponovno."
+      }
+    },
     "milestones": {
       "eyebrow": "Prekretnice",
       "title": "Vrhunci karijere",

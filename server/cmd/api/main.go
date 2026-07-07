@@ -136,6 +136,12 @@ func main() {
 	api.GET("/users/:id/career", userHandler.GetCareer)
 	api.GET("/users/:id/matches", userHandler.ListMatches)
 	api.PATCH("/users/:id/preferences", userHandler.UpdatePreferences)
+	// Profile-side SSO identity management (authed, self-only). The public
+	// /auth/sso/* routes handle login/register/link-during-login; these manage
+	// an already-authenticated user's linked accounts.
+	api.GET("/users/:id/identities", authHandler.ListIdentities)
+	api.POST("/users/:id/identities/:provider", authHandler.LinkIdentity)
+	api.DELETE("/users/:id/identities/:provider", authHandler.UnlinkIdentity)
 
 	// Wallet — daily-login bonus grant. POST (it mutates) on the authed group;
 	// the client calls it once per app session on bootstrap (covers explicit
