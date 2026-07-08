@@ -2,8 +2,10 @@
 
 This document describes exactly how the bot decides, across every scenario, what it
 considers, and with examples. It reflects the current logic including the latest tuning
-(candidate-aware bidding, partner trump-draw, boss preservation, last-trick banking,
-leading into a partner's void, and smearing onto a partner's boss).
+(candidate-aware bidding, unbacked side-Ace and two-trump Jack+9 bids, partner trump-draw,
+boss preservation, uncuttable-boss last-trick retention, Ace/Ten boss handling, suppressing
+trump draws once the opponents are void of trump, leading into a partner's void, and smearing
+onto a partner's boss).
 
 Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, J, T (ten), 9, 8, 7.
 
@@ -72,46 +74,71 @@ picking: `hand + candidate` (built in `decideBid`).
   count. The 3-card rules now apply to **2 in hand + candidate**; the 4-card rule to
   **3 in hand + candidate**.
 - **Round 2**: the candidate is a side card (its suit is locked out), so it can supply a
-  backing side Ace for rule 4.3.
+  side Ace for rules 4.3 / 4.4.
 
 Example: hand J♥ 9♥, candidate A♥ -> 3 trumps (J, 9, A) -> take.
+Example: hand J♥ + side A♣, candidate 9♥ -> 2 trumps (J, 9) + a side Ace -> take (rule 4.4).
 
 ### The hand-strength gate: `wantsTrump`
 
 A single yes/no evaluator used in both rounds. For a given suit, the bot wants it as trump if:
 
 - it holds **4 or more** cards of that suit -> yes (unconditional), or
-- it holds **exactly 3** including the **Jack**, and **neither a 7 nor an 8** is among them
-  (the other two trumps must both be 9 or higher), or
-- it holds **exactly 3** with the **9 + Ace** pair, and also holds a **backed side Ace**
-  (an Ace in another suit that has at least one more card of that suit), or
+- it holds **exactly 3** including the **Jack** with **neither a 7 nor an 8** among them (the
+  other two trumps both 9 or higher); or exactly 3 including the **Jack** with a 7 or 8 among
+  them **plus a side Ace** (the outside winner rescues the weaker holding), or
+- it holds **exactly 3** with the **9 + Ace** pair, and also holds a **side Ace** (any Ace in
+  another suit; it need not be backed by a second card of its suit), or
+- it holds **exactly 2** trumps that are the **Jack and the 9** (the two strongest trumps),
+  and also holds a **side Ace**, or
 - otherwise: no.
 
 #### 4.1 Four or more trumps -> unconditional take.
 
-#### 4.2 Three trumps including the Jack (tightened)
+#### 4.2 Three trumps including the Jack (tightened, with a side-Ace rescue)
 
-Take only if the other two trumps are both 9 or higher. If a 7 **or** an 8 is among the three,
-pass.
+Take if the other two trumps are both 9 or higher. If a 7 **or** an 8 is among the three the
+hand is weaker — but it **still calls when the hand holds a side Ace** (an Ace in another suit,
+an outside winner). With a 7/8 and no side Ace, pass.
 
-| 3 trumps (incl. candidate) | Take? | Why |
-|---|---|---|
-| J♥ 9♥ A♥ | yes | Jack, other two (9, A) are above 8 |
-| J♥ K♥ Q♥ | yes | Jack, K and Q are above 8 |
-| J♥ 9♥ 7♥ | no | contains a 7 |
-| J♥ 8♥ K♥ | no | contains an 8 |
-| J♥ 7♥ 8♥ | no | contains both 7 and 8 |
+| 3 trumps (incl. candidate) | Side Ace? | Take? | Why |
+|---|---|---|---|
+| J♥ 9♥ A♥ | — | yes | Jack, other two (9, A) are above 8 |
+| J♥ K♥ Q♥ | — | yes | Jack, K and Q are above 8 |
+| J♥ 9♥ 7♥ | no | no | contains a 7, no outside Ace |
+| J♥ 8♥ K♥ | no | no | contains an 8, no outside Ace |
+| J♥ 7♥ 8♥ | no | no | contains both 7 and 8, no outside Ace |
+| J♥ 8♥ 7♥ + A♠ | yes | yes | weak three, but the side A♠ rescues it |
 
-#### 4.3 Pair 9 + Ace with a BACKED side Ace (tightened)
+#### 4.3 Pair 9 + Ace with a side Ace
 
-A lone side Ace is not enough; that Ace must have **at least one more card of its suit**
-(so it is not a singleton an opponent immediately ruffs). Logic: `hasBackedSideAce`.
+The 9 + Ace trump pair calls with any **side Ace** — an Ace in another suit. The Ace does
+**not** need a second card of its suit to back it: a lone side Ace is enough. Logic:
+`hasSideAce`.
 
 | Hand (incl. candidate) | Take? | Why |
 |---|---|---|
-| 9♥ A♥ Q♥ + A♣ T♣ | yes | pair 9+A, side A♣ backed by T♣ |
-| 9♥ A♥ Q♥ + A♣ 7♣ | yes | any second card of the suit counts as backup |
-| 9♥ A♥ Q♥ + A♣ K♦ | no | A♣ is a singleton (no other club) |
+| 9♥ A♥ Q♥ + A♣ T♣ | yes | pair 9+A, side A♣ |
+| 9♥ A♥ Q♥ + A♣ K♦ | yes | a lone side A♣ is enough (no backing needed) |
+| 9♥ A♥ Q♥ + K♣ K♦ | no | no side Ace at all |
+
+#### 4.4 Two trumps: the Jack and the 9 with a side Ace
+
+Exactly two trumps call **only** when they are the **Jack and the 9** — the two strongest
+trumps (J=20, 9=14) — and the hand also holds a **side Ace**. Any other two-trump holding
+passes. Logic: the `count == 2` branch in `wantsTrump` (`hasJack && hasNine && hasSideAce`).
+
+| Hand (incl. candidate) | Take? | Why |
+|---|---|---|
+| J♥ 9♥ + A♣ | yes | the two strongest trumps, backed by a side Ace |
+| J♥ 9♥ | no | no side Ace |
+| J♥ A♥ + A♣ | no | two trumps but not the Jack **and** the 9 |
+| J♥ T♥ + A♣ | no | the second trump is the Ten, not the 9 |
+
+Note: this rule targets **exactly two** trumps; adding a third trump makes it a *three*-trump
+hand judged by rule 4.2. With the side-Ace rescue in 4.2, the two rules now agree — J♥ 9♥ +
+side Ace calls (4.4), and so does J♥ 9♥ 7♥ + side Ace (4.2). A Jack plus a side Ace is enough
+whether the hand holds two or three trumps.
 
 ### Round 1 (`decideBid`)
 
@@ -145,7 +172,8 @@ Entry: `chooseCard`. Decision tree:
 
 ```
 1. Only one legal card?            -> play it (forced).
-2. Endgame retention (dix de der)? -> retainLastTrickWinner (hold the master for +10).
+2. Endgame retention (dix de der)? -> retainLastTrickWinner (hold a guaranteed trick-8 winner
+   for +10).
 3. Trick is empty (leading)?       -> chooseLead.
 4. Trick in progress (following)?  -> chooseFollow.
 ```
@@ -156,23 +184,41 @@ engine already filtered (follow suit, must-overplay / iber, must-cut, over-trump
 ### B1. Endgame retention "dix de der" (+10)
 
 Fires only at the second-to-last trick (exactly 2 cards in hand). The forced 8th trick goes to
-whoever retains the best card; its winner gets +10. If the bot holds the **master trump**
-(no opponent can beat it), it spends its other card now and banks the master for trick 8.
+whoever retains the best card; its winner gets +10. The bot must hold the **master trump**
+(no opponent can beat it) — a guaranteed trick-8 winner under **any** lead: it wins whether led
+or forced in as a follow. It normally spends its other card now and banks the master for trick 8.
 
 Defers (back to normal heuristics) unless all hold: exactly 2 cards left; the bot's best trump
-is the master; the spare is legal this trick; and the partner is not already known to hold a
-higher trump (do not fight the partner).
+is the master; the card it would spend is legal this trick; and the partner is not already known
+to hold a higher trump (do not fight the partner).
 
 Example: trump ♠, hand J♠ + 7♥, all other trumps gone -> play 7♥ now, keep J♠ for trick 8.
 
-This rule is unchanged.
+**Generalization — an uncuttable non-trump boss is also a guaranteed trick-8 winner**
+(`isUncuttableBoss`): a non-trump card that is the boss of its suit **and** cannot be ruffed
+(the opponents are out of trump, so no one can cut it — `opponentsOutOfTrump`). Such a card wins
+trick 8 **only when the bot leads trick 8**. So when the bot holds the master trump **plus** an
+uncuttable boss, both cards win the last trick, and the bot spends the **master trump first**
+(leading the trump wins trick 7 and hands the bot the lead into trick 8, where the boss then
+wins) and keeps the boss for last. The outcome is identical to keeping the master, but the trump
+is led first and the side winner is held in reserve.
+
+Example: trump ♠, hand J♠ + A♥, opponents out of trump -> lead J♠ now (win trick 7), keep A♥ for
+trick 8 (it wins uncut). Previously the bot led A♥ first and kept J♠.
+
+**Why the non-master case is *not* re-ordered**: if the bot holds a *lower* trump plus an
+uncuttable boss, spending that trump first would only hand the lead — and the master trump — to
+the partner, who then leads an unknown card into trick 8. Cashing the boss now is at least as
+good: the partner still controls trick 8 either way, so the +10 stays with the team. Only the
+master-trump holder gains from re-ordering. This case therefore defers, exactly as before.
 
 ### B2. Leading a trick (`chooseLead`)
 
 In priority order:
 
-1. **Draw trumps with the master**: lead the highest trump, but only if all three hold: my
-   team called trump, trumps still sit with opponents, and **I still hold the master trump**.
+1. **Draw trumps with the master**: lead the highest trump, but only if all four hold: my
+   team called trump, trumps still sit with opponents, **I still hold the master trump**, and
+   the **opponents are not already out of trump** (`opponentsOutOfTrump`) — see the note below.
 
 2. **Draw trumps for the partner** (`partnerDrawTrump`): when the **partner** called trump and
    I do **not** hold the master, still lead a trump to strip opponents. The partner is assumed
@@ -183,8 +229,21 @@ In priority order:
    Jack never appears here (holding it makes the bot the master, handled by step 1).
 
    Skipped if: the partner is void in trump (no overtrump to set up), a **known** opponent
-   holds a trump above the bot's best (the "partner has the top" assumption is disproven), or
-   the only trump available to lead would be the 9 (then the bot does not draw).
+   holds a trump above the bot's best (the "partner has the top" assumption is disproven), the
+   only trump available to lead would be the 9 (then the bot does not draw), or the **opponents
+   are already out of trump** (see the note below).
+
+   > **Opponents out of trump -> do not draw, let the partner lead** (`opponentsOutOfTrump`):
+   > once **both** opponents are known void in trump (or every trump is otherwise accounted
+   > for), the remaining trumps sit only with the bot and its partner. Leading a trump then
+   > "draws" nothing — it only strips the partner's own trump control — so both draw steps are
+   > skipped and the bot leads a side suit instead (cash a boss, feed a ruff, or lead safe),
+   > handing the lead to the partner who holds the trump control. This matters because
+   > `trumpsRemainUnseen` cannot tell the **partner's unknown** trumps from an opponent's, so on
+   > its own it would still report trumps outstanding and keep the bot drawing at its own partner.
+   > Example: the partner leads trump twice, the opponents cannot follow the second time (marking
+   > them void), the bot wins with a bigger trump — now on lead, the bot leads a **side suit**,
+   > not another trump.
 
    | Trumps in hand (partner called) | Leads | Why |
    |---|---|---|
@@ -197,6 +256,13 @@ In priority order:
 3. **Cash a side-suit boss**: a non-trump card no opponent can beat. Prefers the highest-value
    boss (Aces first).
 
+   **Ace + Ten exception**: when the chosen boss is the **Ace** and the bot **also holds that
+   suit's Ten**, it cashes the **Ten** first (the lower one) and keeps the Ace. Holding the Ace
+   makes the Ten a boss too, so the Ten still wins the trick, and the Ace stays back as the
+   suit's guaranteed master. This applies **only** to the Ace + Ten pair — not to other touching
+   honors (e.g. holding K + Q, it still cashes the King, the general highest-value rule).
+   Example: opponents called, hand A♠ T♠ 7♣ -> lead **T♠**, keep A♠.
+
 4. **Lead into the partner's void** (`leadIntoPartnerVoid`): with no boss to cash, if the
    partner is known void in a side suit (and not known void in trump, so it can still ruff),
    lead the lowest card of that suit so the partner ruffs and wins. With several void suits,
@@ -205,7 +271,11 @@ In priority order:
 5. **Lead safe**: no boss and no ruff to feed -> lead the lowest-value non-trump (a 0-point
    7/8/9 when held). Never burn a trump here.
 
-6. **Only trumps left** -> lead the highest trump.
+6. **Only trumps left** -> lead the highest trump **only if it is the master** (a winner worth
+   cashing); otherwise lead the **lowest** (weakest) trump. Leading a high non-master trump just
+   donates it to whoever holds the master above it, so the stronger trumps are kept back.
+   Example: only trumps left, hand 9♥ 8♥ 7♥ with the J♥ still out -> lead **7♥** (9♥ is not the
+   master); but hand J♥ 9♥ 7♥ -> lead **J♥** (the master).
 
 Example (step 2): trump ♥, partner called. Hand Q♥ K♥ A♠ 7♣ -> lead **Q♥** (weakest honor),
 keep the K; the partner overtrumps with J/9.
@@ -220,10 +290,15 @@ First it computes who currently wins. Branches:
 **My partner currently wins:**
 
 - If the win is **safe** (no opponent can still beat it): **smear** the highest-point card that
-  does not overtake the partner (dump an Ace/Ten onto the guaranteed trick). If every legal
-  card would overtake (e.g. a forced over-play), play the **strongest** card, unless it is the
-  boss/master of its suit, then play the **second strongest** and keep the boss for later
-  (`strongestPreservingBoss`).
+  does not overtake the partner (dump an Ace/Ten onto the guaranteed trick — the highest-point
+  non-overtaking card already prefers the Ace over the Ten). If every legal card would overtake
+  (e.g. a forced over-play), play the **strongest** card, unless it is the boss/master of its
+  suit, then play the **second strongest** and keep the boss for later
+  (`strongestPreservingBoss`). **Ace + Ten exception**: if that boss is a non-trump **Ace** and
+  the bot **also holds that suit's Ten**, smear the **Ace** instead — spending it surrenders no
+  control (the Ten becomes the suit's new boss), so the higher points are banked now onto the
+  already-won trick. Example: partner safely won, bot forced over holding A♠ + T♠ -> play **A♠**
+  (the Ten stays as the new boss).
 - If the win is **not provably safe**, but the partner holds the **boss of a non-trump led
   suit** (only a ruff could beat it) and the one remaining opponent cannot certainly ruff:
   **risk-smear** the high points anyway (`shouldSmearOntoPartnerBoss`). See the rule below.
@@ -262,8 +337,9 @@ First it computes who currently wins. Branches:
 Example (smear): trump ♥, partner led A♥ (safe). Hand ♥T ♥7 ♣K -> play **♥T** (10 points onto
 the partner's trick), not ♥7.
 
-Example (preserve boss, 5.1.1): partner wins with Q♠, bot forced over with A♠ and T♠ -> A♠ is
-the boss, so play **T♠** and keep A♠.
+Example (preserve boss, 5.1.1): partner wins with Q♠, bot forced over with K♠ and Q♠ (A♠/T♠
+gone) -> K♠ is the boss, so play **Q♠** and keep K♠. (With A♠ + T♠ instead, the Ace + Ten
+exception applies: play **A♠** and keep T♠ as the new boss.)
 
 Example (risk-smear, Rule 8): partner leads A♠, opponent follows low, bot third with T♠ and a
 7♠, last opponent's void unknown -> play **T♠** (smear), not 7♠.
@@ -312,13 +388,14 @@ No bearing on which card, only when:
 
 By impact:
 
-1. `wantsTrump` and `hasBackedSideAce`: bidding aggressiveness (the biggest dial).
+1. `wantsTrump` and `hasSideAce`: bidding aggressiveness (the biggest dial).
 2. `trumpSuitScore` + `trumpLengthBonus`: round-2 suit preference (length vs. points).
-3. `chooseLead` priority: when to draw trumps (with the master or for the partner), cash a
-   boss, feed a partner ruff, or lead safe.
+3. `chooseLead` priority: when to draw trumps (with the master or for the partner, and
+   `opponentsOutOfTrump` stops the draw once opponents are void), cash a boss (Ace/Ten handling),
+   feed a partner ruff, or lead safe.
 4. `chooseFollow`: smear, risk-smear, banking, and point management.
 5. `partnerDrawTrump`: the Q/K/T/A order and the "never the 9" rule.
-6. `retainLastTrickWinner`: capturing the +10 in the last trick.
+6. `retainLastTrickWinner` + `isUncuttableBoss`: capturing the +10 in the last trick.
 
 Blind spots if you want a stronger bot:
 
@@ -334,13 +411,16 @@ Blind spots if you want a stronger bot:
 
 | Behavior | Function | File |
 |---|---|---|
-| Bidding aggressiveness | `wantsTrump`, `hasBackedSideAce` | `server/internal/bot/bot.go` |
+| Bidding aggressiveness | `wantsTrump`, `hasSideAce` | `server/internal/bot/bot.go` |
 | Round-2 suit preference | `trumpSuitScore`, `trumpLengthBonus` | `server/internal/bot/bot.go` |
 | Draw trumps for partner (Q/K/T/A, never 9) | `partnerDrawTrump` + block in `chooseLead` | `server/internal/bot/bot.go` |
-| Preserve the boss on a forced overtake | `strongestPreservingBoss` | `server/internal/bot/bot.go` |
+| Stop drawing once opponents are void of trump | `opponentsOutOfTrump` + blocks in `chooseLead` | `server/internal/bot/bot.go` |
+| Cash a side boss (Ace/Ten: cash the Ten, keep the Ace) | boss block in `chooseLead`, `findRankOfSuit` | `server/internal/bot/bot.go` |
+| Only trumps left: highest if master, else lowest | `chooseLead` only-trumps branch, `isTrumpMaster` | `server/internal/bot/bot.go` |
+| Preserve the boss on a forced overtake (Ace/Ten: smear the Ace) | `strongestPreservingBoss` | `server/internal/bot/bot.go` |
 | Bank the high card as last player | `highestPointsLedSuitWinner` + `chooseFollow` | `server/internal/bot/bot.go` |
 | Lead into the partner's void | `leadIntoPartnerVoid` | `server/internal/bot/bot.go` |
 | Smear onto the partner's boss (risk) | `shouldSmearOntoPartnerBoss`, `opponentMayHoldTrump` | `server/internal/bot/bot.go` |
-| Endgame +10 retention | `retainLastTrickWinner` | `server/internal/bot/bot.go` |
+| Endgame +10 retention (master trump or uncuttable boss) | `retainLastTrickWinner`, `isUncuttableBoss` | `server/internal/bot/bot.go` |
 | Unit tests for all of the above | `TestDecide_*` | `server/internal/bot/bot_test.go` |
 | Strength check (bot vs. random) | `TestSimulation_*` | `server/internal/bot/simulation_test.go` |

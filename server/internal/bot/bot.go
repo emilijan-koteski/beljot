@@ -41,10 +41,12 @@ func Decide(v View) game.Action {
 // --- Bidding ---
 
 // wantsTrump is the hand-strength evaluator gate: call the suit as trump when
-// holding ≥4 cards of it; or exactly 3 that include the Jack (unless a 7 or 8
-// is among them — too weak); or exactly 3 with the 9+Ace pair, but only when
-// backed by a non-singleton side Ace (an Ace in another suit that holds at
-// least one more card). Used by both bidding rounds. Callers pass the
+// holding ≥4 cards of it; or exactly 3 that include the Jack (if a 7 or 8 is
+// among them a side Ace is required, otherwise unconditional); or exactly 3 with
+// the 9+Ace pair plus a side Ace; or exactly 2 that are the Jack AND the 9 plus
+// a side Ace (the two strongest trumps, worth a call when backed by an outside
+// winner). A side Ace is any Ace in another suit — it need not be backed by a
+// second card of its suit. Used by both bidding rounds. Callers pass the
 // hand-plus-candidate the picker would actually hold (see decideBid).
 func wantsTrump(hand []game.Card, suit game.Suit) bool {
 	var count int
@@ -70,38 +72,30 @@ func wantsTrump(hand []game.Card, suit game.Suit) bool {
 	if count >= 4 {
 		return true
 	}
-	if count != 3 {
-		return false
+	if count == 3 {
+		if hasJack {
+			// 3 trumps including the Jack: a take when the other two are both
+			// 9-or-higher. A 7 or 8 among them makes the hand weaker, but a side
+			// Ace (an outside winner) still makes it worth calling.
+			return (!has7 && !has8) || hasSideAce(hand, suit)
+		}
+		// 3 trumps without the Jack: the 9+Ace pair with a side Ace.
+		return hasNine && hasAce && hasSideAce(hand, suit)
 	}
-	// 3 trumps including the Jack — but too weak if either the 7 or the 8 is
-	// among them; the other two trumps must both be 9-or-higher.
-	if hasJack && !has7 && !has8 {
-		return true
+	// Exactly 2 trumps: a call only when they are the two strongest trumps (the
+	// Jack and the 9) and an outside Ace backs the hand.
+	if count == 2 {
+		return hasJack && hasNine && hasSideAce(hand, suit)
 	}
-	// 3 trumps with the 9+Ace pair — only with a BACKED side Ace.
-	return hasNine && hasAce && hasBackedSideAce(hand, suit)
+	return false
 }
 
-// hasBackedSideAce reports whether the hand holds an Ace in some non-trump suit
-// that also contains at least one more card of that suit — i.e. the side Ace is
-// not a lone singleton that an opponent can ruff away on the first round.
-func hasBackedSideAce(hand []game.Card, trump game.Suit) bool {
-	for _, s := range game.AllSuits {
-		if s == trump {
-			continue
-		}
-		var hasAce bool
-		var count int
-		for _, c := range hand {
-			if c.Suit != s {
-				continue
-			}
-			count++
-			if c.Rank == game.RankAce {
-				hasAce = true
-			}
-		}
-		if hasAce && count >= 2 {
+// hasSideAce reports whether the hand holds an Ace in some non-trump suit. The
+// Ace need not be backed by a second card of its suit — a lone side Ace still
+// counts as an outside winner.
+func hasSideAce(hand []game.Card, trump game.Suit) bool {
+	for _, c := range hand {
+		if c.Suit != trump && c.Rank == game.RankAce {
 			return true
 		}
 	}
@@ -193,24 +187,32 @@ func chooseCard(v View) game.Card {
 // retainLastTrickWinner implements last-trick retention ("dix de der", +10).
 // At the second-to-last trick — exactly two cards in hand — the forced 8th
 // trick (one legal card each) goes to whoever RETAINS the best card through
-// trick 7. When the bot holds the master trump (a guaranteed trick-8 winner:
-// no card an opponent could play outranks it) it returns the OTHER card to
-// spend now, banking the master for the last trick. Whether the spare wins
-// trick 7 (the bot then leads trick 8 with the master) or loses it (an
-// opponent leads trick 8 and the forced master still beats everything), the
-// +10 is banked either way.
+// trick 7. The bot must hold the master trump: it is a guaranteed trick-8
+// winner under ANY lead (no card an opponent could play outranks it, and it
+// wins whether led or forced in as a follow). It normally spends the OTHER
+// card now and banks the master for the last trick.
+//
+// Generalization: when the other card is ITSELF a guaranteed trick-8 winner —
+// an uncuttable non-trump boss (a suit boss no opponent can ruff, because the
+// opponents are out of trump; see isUncuttableBoss) — the bot instead spends
+// the MASTER TRUMP now and keeps the boss for trick 8. Leading the master wins
+// trick 7 and hands the bot the lead into trick 8, where the uncuttable boss
+// then wins. The outcome is identical (the team takes both tricks either way),
+// but the trump is led first, keeping the side winner in reserve.
+//
+// Note the non-master case is deliberately NOT handled here: if the bot holds a
+// lower trump plus an uncuttable boss, spending that trump first would only hand
+// the lead (and the master trump) to the partner, so the current "cash the boss
+// now" lead is already at least as good — the team keeps trick-8 control either
+// way. Only the master-trump holder gains from re-ordering.
 //
 // Returns nil — deferring to the normal heuristics — unless every condition
 // holds:
 //   - exactly two cards remain (the endgame decision point);
-//   - the bot's best trump is the master (holdsMasterTrump): the only single
-//     card guaranteed to win the forced trick 8 under any lead. A non-trump
-//     "boss" wins trick 8 only when it is the led suit there, which the bot
-//     cannot guarantee at trick 7, so side bosses are intentionally excluded
-//     (the existing "cash the boss now" lead already handles them);
-//   - the spare is legal THIS trick. Follow-suit / over-trump rules can force
-//     the master out; when they do, len(legal)==1 already plays it above, and
-//     this guard means we never assume a card we cannot actually hold back;
+//   - the bot's best trump is the master (holdsMasterTrump);
+//   - the card it would spend is legal THIS trick. Follow-suit / over-trump
+//     rules can force a card out; when they do, len(legal)==1 already plays it
+//     above, and this guard means we never assume a card we cannot hold back;
 //   - the partner is not already known (from the declaration reveal) to hold a
 //     higher trump — if it does, the team controls trick 8 regardless, so we
 //     don't fight the partner and let the normal heuristics play (e.g. draw).
@@ -222,7 +224,7 @@ func retainLastTrickWinner(v View, legal []game.Card, trump game.Suit) *game.Car
 	if master == nil || !holdsMasterTrump(v, trump) {
 		return nil
 	}
-	// The single other card is the spare we would spend now.
+	// The single other card is the spare we would normally spend now.
 	var spare *game.Card
 	for i := range v.Hand {
 		if v.Hand[i] != *master {
@@ -233,14 +235,6 @@ func retainLastTrickWinner(v View, legal []game.Card, trump game.Suit) *game.Car
 	if spare == nil {
 		return nil // defensive: two identical cards are impossible
 	}
-	// Soundness: only retain the master if the spare is a legal play this
-	// trick — never assume a card the engine would force out. With a two-card
-	// hand this is belt-and-suspenders (a forced follow/cut that makes the
-	// spare illegal leaves the master as the sole legal card, so len(legal)==1
-	// above already played it), but it pins the invariant retention relies on.
-	if !slices.Contains(legal, *spare) {
-		return nil
-	}
 	// Don't fight a partner who already secures the last trick: if the partner
 	// is known to hold a trump above our master, the team takes trick 8 anyway.
 	partner := (v.Seat + 2) % 4
@@ -249,7 +243,39 @@ func retainLastTrickWinner(v View, legal []game.Card, trump game.Suit) *game.Car
 			return nil
 		}
 	}
+	// Both cards guaranteed to win trick 8: spend the master trump first and keep
+	// the uncuttable boss for the last trick (provided the master is legal now).
+	if isUncuttableBoss(v, *spare, trump) && slices.Contains(legal, *master) {
+		return master
+	}
+	// Otherwise keep the master and spend the spare — only when the spare is a
+	// legal play this trick.
+	if !slices.Contains(legal, *spare) {
+		return nil
+	}
 	return spare
+}
+
+// isUncuttableBoss reports whether c is a non-trump card that is the boss of its
+// suit AND cannot be ruffed — the opponents are out of trump, so no one can cut
+// it. Such a card is a guaranteed trick-8 winner WHEN THE BOT LEADS trick 8.
+func isUncuttableBoss(v View, c game.Card, trump game.Suit) bool {
+	return c.Suit != trump && isSuitBoss(c, v) && opponentsOutOfTrump(v, trump)
+}
+
+// opponentsOutOfTrump reports whether NEITHER opponent could still play a trump
+// (both known void in trump, or every trump is otherwise accounted for). When
+// true the remaining trumps sit only with the bot and its partner, so there is
+// nothing to draw and no opponent can ruff. Distinct from trumpsRemainUnseen,
+// which counts the partner's UNKNOWN trumps as if they were an opponent's and so
+// still reports trumps outstanding here.
+func opponentsOutOfTrump(v View, trump game.Suit) bool {
+	for _, seat := range []int{(v.Seat + 1) % 4, (v.Seat + 3) % 4} {
+		if opponentMayHoldTrump(v, seat, trump) {
+			return false
+		}
+	}
+	return true
 }
 
 // chooseLead picks the card to open a trick: draw trumps while our team called
@@ -263,8 +289,12 @@ func chooseLead(v View, legal []game.Card) game.Card {
 
 	// Draw trumps to strip the opponents — but only while we still hold the
 	// master (top remaining) trump. Leading a high trump we cannot back with the
-	// master just hands it to whoever holds the Jack/9 above it.
-	if myTeamCalledTrump(v) && trumpsRemainUnseen(v, trump) && holdsMasterTrump(v, trump) {
+	// master just hands it to whoever holds the Jack/9 above it. Skipped once the
+	// opponents are out of trump (opponentsOutOfTrump): with only teammates
+	// holding trumps there is nothing to draw, and leading trump would just strip
+	// the partner's control — lead a side suit instead and let the partner lead.
+	if myTeamCalledTrump(v) && trumpsRemainUnseen(v, trump) && holdsMasterTrump(v, trump) &&
+		!opponentsOutOfTrump(v, trump) {
 		if c := highestOfSuit(legal, trump, game.TrumpRankOrder); c != nil {
 			return *c
 		}
@@ -276,10 +306,12 @@ func chooseLead(v View, legal []game.Card) game.Card {
 	// sacrifice the weakest honor first (Q, K, T, A) and never lead the 9 (a
 	// near-master kept as a winner, so the partner's Jack never gets stripped by
 	// our own draw) — see partnerDrawTrump. Skipped when the partner is void in
-	// trump (no overtrump to set up) or when a known opponent holding already
+	// trump (no overtrump to set up), when a known opponent holding already
 	// outranks our best trump (the "partner has the top" assumption has been
-	// disproven by the reveal).
-	if myTeamCalledTrump(v) && trumpsRemainUnseen(v, trump) && !holdsMasterTrump(v, trump) {
+	// disproven by the reveal), or when the opponents are already out of trump
+	// (nothing left to draw — let the partner keep the lead).
+	if myTeamCalledTrump(v) && trumpsRemainUnseen(v, trump) && !holdsMasterTrump(v, trump) &&
+		!opponentsOutOfTrump(v, trump) {
 		partner := (v.Seat + 2) % 4
 		botTop := highestOfSuit(legal, trump, game.TrumpRankOrder)
 		if botTop != nil &&
@@ -305,6 +337,15 @@ func chooseLead(v View, legal []game.Card) game.Card {
 		}
 	}
 	if boss != nil {
+		// Ace+Ten exception: when the chosen boss is the Ace and we also hold that
+		// suit's Ten, cash the Ten first. Holding the Ace makes the Ten a boss too,
+		// so it still wins the trick — and we keep the Ace as the guaranteed master
+		// of the suit. Applies ONLY to the Ace+Ten pair, not other touching honors.
+		if boss.Rank == game.RankAce {
+			if ten := findRankOfSuit(legal, boss.Suit, game.RankTen); ten != nil {
+				return *ten
+			}
+		}
 		return *boss
 	}
 
@@ -328,9 +369,15 @@ func chooseLead(v View, legal []game.Card) game.Card {
 		return lowestValue(nonTrump, trump)
 	}
 
-	// Only trumps left.
+	// Only trumps left: lead the highest trump ONLY when it is the master (no
+	// opponent can beat it) — a winner worth cashing. Otherwise lead the lowest
+	// (weakest) trump; leading a high non-master trump just donates it to the
+	// opponent's master, so keep the stronger trumps back.
 	if c := highestOfSuit(legal, trump, game.TrumpRankOrder); c != nil {
-		return *c
+		if isTrumpMaster(v, *c, trump) {
+			return *c
+		}
+		return lowestValue(legal, trump)
 	}
 	return legal[0]
 }
@@ -653,6 +700,17 @@ func leadIntoPartnerVoid(v View, legal []game.Card, trump game.Suit) *game.Card 
 	return best
 }
 
+// findRankOfSuit returns a pointer to the card of the given suit and rank in
+// cards, or nil when it is not present.
+func findRankOfSuit(cards []game.Card, suit game.Suit, rank game.Rank) *game.Card {
+	for i := range cards {
+		if cards[i].Suit == suit && cards[i].Rank == rank {
+			return &cards[i]
+		}
+	}
+	return nil
+}
+
 // cardsOfSuit returns the cards of the given suit.
 func cardsOfSuit(cards []game.Card, s game.Suit) []game.Card {
 	var out []game.Card
@@ -933,6 +991,14 @@ func strongestPreservingBoss(v View, legal []game.Card, trump game.Suit) game.Ca
 	led := v.CurrentTrick[0].Card.Suit
 	strongest := strongestByTrickPower(legal, led, trump)
 	if len(legal) < 2 || !cardIsBoss(v, strongest, trump) {
+		return strongest
+	}
+	// Ace+Ten exception: when the boss is a non-trump Ace and we also hold that
+	// suit's Ten, smear the Ace onto this (already-won) trick instead of keeping
+	// it. Spending the Ace surrenders no control — the Ten becomes the suit's new
+	// boss — so we bank the higher points now and still keep a winner.
+	if strongest.Suit != trump && strongest.Rank == game.RankAce &&
+		findRankOfSuit(legal, strongest.Suit, game.RankTen) != nil {
 		return strongest
 	}
 	rest := make([]game.Card, 0, len(legal)-1)

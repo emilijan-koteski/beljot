@@ -121,8 +121,27 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			// Rule 1c: 9+Ace pair with a BACKED side Ace (spades AS+8S) — take.
-			name:      "round 1 nine ace pair with a backed side ace picks",
+			// Rule 1b exception: the weak J+8+7 three still calls when the hand
+			// holds a side Ace (AS) as an outside winner.
+			name:      "round 1 three with jack and a seven and eight but a side ace picks",
+			seat:      1,
+			hand:      cards("JH", "8H", "AS", "7C", "8C"),
+			round:     1,
+			candidate: "7H",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			// Same weak three but no side Ace anywhere — still a pass.
+			name:      "round 1 three with jack and a seven and eight and no side ace passes",
+			seat:      1,
+			hand:      cards("JH", "8H", "KS", "7C", "8C"),
+			round:     1,
+			candidate: "7H",
+			wantType:  game.ActionPassTrump,
+		},
+		{
+			// Rule 1c: 9+Ace pair with a side Ace (spades AS) — take.
+			name:      "round 1 nine ace pair with a side ace picks",
 			seat:      1,
 			hand:      cards("9H", "AH", "AS", "8S", "KD"),
 			round:     1,
@@ -130,13 +149,51 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			// Rule 1c: 9+Ace pair but the side Ace (AS) is a singleton — no backup,
-			// so pass.
-			name:      "round 1 nine ace pair with a singleton side ace passes",
+			// Point 1: a lone side Ace is now enough — the Ace no longer needs a
+			// second card of its suit to back it, so a singleton AS still calls.
+			name:      "round 1 nine ace pair with a lone side ace picks",
 			seat:      1,
 			hand:      cards("9H", "AH", "AS", "8D", "KC"),
 			round:     1,
 			candidate: "QH",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			// Rule 1c still needs a side Ace: 9+Ace pair with no outside Ace passes.
+			name:      "round 1 nine ace pair with no side ace passes",
+			seat:      1,
+			hand:      cards("9H", "AH", "KS", "8D", "KC"),
+			round:     1,
+			candidate: "QH",
+			wantType:  game.ActionPassTrump,
+		},
+		{
+			// Point 2: exactly two trumps that are the Jack and the 9, plus a side
+			// Ace — a take. Candidate 9H completes JH-in-hand to the {J,9} pair.
+			name:      "round 1 two trumps jack and nine with a side ace picks",
+			seat:      1,
+			hand:      cards("JH", "AS", "7C", "8C", "7D"),
+			round:     1,
+			candidate: "9H",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			// Point 2: {J,9} but no side Ace anywhere — pass.
+			name:      "round 1 two trumps jack and nine without a side ace passes",
+			seat:      1,
+			hand:      cards("JH", "7C", "8C", "7D", "8D"),
+			round:     1,
+			candidate: "9H",
+			wantType:  game.ActionPassTrump,
+		},
+		{
+			// Point 2 is {J,9}-only: two trumps that are the Jack and Ace (not the
+			// 9) do not qualify, even with a side Ace.
+			name:      "round 1 two trumps jack and ace does not qualify",
+			seat:      1,
+			hand:      cards("JH", "AS", "7C", "8C", "7D"),
+			round:     1,
+			candidate: "AH",
 			wantType:  game.ActionPassTrump,
 		},
 		{
@@ -163,10 +220,10 @@ func TestDecide_Bidding(t *testing.T) {
 			wantSuit: suitPtr(game.SuitSpades),
 		},
 		{
-			// Round-2 candidate awareness: diamonds is a 9+Ace pick whose side Ace
-			// (AC) is a singleton in hand — but the face-up candidate TC the picker
-			// receives backs it (clubs AC+TC), so the bid clears.
-			name:      "round 2 candidate side card backs a nine ace pick",
+			// Round-2 candidate awareness: diamonds is a 9+Ace pick and the club Ace
+			// supplies the side Ace. The face-up candidate TC still lands in the
+			// picker's hand as a side card, but a lone side Ace already suffices.
+			name:      "round 2 candidate side card completes a nine ace pick",
 			seat:      1,
 			hand:      cards("9D", "AD", "KD", "AC", "7H"),
 			round:     2,
@@ -794,9 +851,11 @@ func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 func TestDecide_PreserveBossOnForcedOvertake(t *testing.T) {
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// Partner (seat 2) wins with QS, bot closes the trick holding AS+TS,
-			// both forced over QS. AS is the suit boss → drop to TS.
-			name: "forced over partner with the ace boss drops to the ten",
+			// Point 7: partner (seat 2) wins with QS, bot closes the trick holding
+			// AS+TS, both forced over QS. Holding BOTH the Ace and Ten, the bot
+			// smears the AS — the TS becomes the suit's new boss, so no control is
+			// lost — banking the higher points now.
+			name: "forced over partner with ace and ten smears the ace",
 			hand: cards("AS", "TS", "7H"),
 			trick: []game.TrickCard{
 				{Card: card("8S"), PlayerSeat: 1},
@@ -804,7 +863,20 @@ func TestDecide_PreserveBossOnForcedOvertake(t *testing.T) {
 				{Card: card("7S"), PlayerSeat: 3},
 			},
 			callerSeat: 1,
-			wantCard:   "TS",
+			wantCard:   "AS",
+		},
+		{
+			// The Ace+Ten exception is exactly that pair: with the Ace boss but no
+			// Ten held, preserve the Ace and drop to the King.
+			name: "forced over partner with the ace boss but no ten keeps the ace",
+			hand: cards("AS", "KS", "7H"),
+			trick: []game.TrickCard{
+				{Card: card("8S"), PlayerSeat: 1},
+				{Card: card("QS"), PlayerSeat: 2},
+				{Card: card("7S"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "KS",
 		},
 		{
 			// With AS and TS already gone, KS is now the boss → drop to QS.
@@ -1044,6 +1116,128 @@ func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
 			},
 			callerSeat: 1,
 			wantCard:   "TS",
+		},
+	})
+}
+
+// TestDecide_RetainUncuttableBoss covers the endgame-retention generalization
+// (Point 3): an uncuttable non-trump boss is a guaranteed trick-8 winner too.
+// Holding the master trump PLUS such a boss, the bot spends the master first
+// (leads the trump) and keeps the boss for the last trick. Holding only a LOWER
+// trump plus the boss, it defers — cashing the boss now is already best, since
+// the partner keeps trick-8 control. Trump = Hearts; both opponents (seats 1, 3)
+// are marked void in trump so the side boss cannot be ruffed.
+func TestDecide_RetainUncuttableBoss(t *testing.T) {
+	hearts := game.SuitHearts
+	oppsVoidTrump := []obs{
+		{seat: 1, card: "7C", lead: &hearts},
+		{seat: 3, card: "8C", lead: &hearts},
+	}
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			// Master JH + uncuttable boss AS: lead the master first, keep the AS.
+			// (The old rule spent the AS first and banked the JH.)
+			name:       "master trump plus uncuttable boss leads the trump first",
+			hand:       cards("JH", "AS"),
+			callerSeat: 0,
+			observes:   oppsVoidTrump,
+			wantCard:   "JH",
+		},
+		{
+			// Lower trump 9H + boss AS: JH is still out, so 9H is not the master —
+			// defer and cash the boss now (the partner secures trick 8).
+			name:       "lower trump plus boss cashes the boss now",
+			hand:       cards("9H", "AS"),
+			callerSeat: 0,
+			observes:   oppsVoidTrump,
+			wantCard:   "AS",
+		},
+	})
+}
+
+// TestDecide_CashBossPrefersTenWithAceTen covers Point 4: when cashing a side
+// boss and holding BOTH the Ace and Ten of that suit, the bot leads the Ten
+// (also a boss, since it holds the Ace) and keeps the Ace as the guaranteed
+// master. The exception is the Ace+Ten pair only. Opponents (seat 1) called
+// trump, so the trump-draw leads are off.
+func TestDecide_CashBossPrefersTenWithAceTen(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "ace and ten of a boss suit leads the ten and keeps the ace",
+			hand:       cards("AS", "TS", "7C"),
+			callerSeat: 1,
+			wantCard:   "TS",
+		},
+		{
+			name:       "ace without the ten cashes the ace",
+			hand:       cards("AS", "KS", "7C"),
+			callerSeat: 1,
+			wantCard:   "AS",
+		},
+		{
+			// King+Queen is not the Ace+Ten pair — cash the higher (promoted) boss.
+			name:       "king and queen boss cashes the king not the queen",
+			hand:       cards("KS", "QS", "7C"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "AS"}, {seat: 1, card: "TS"}},
+			wantCard:   "KS",
+		},
+	})
+}
+
+// TestDecide_OnlyTrumpsLeadMasterElseLowest covers Point 5: with only trumps in
+// hand the bot leads the highest trump ONLY when it is the master; otherwise it
+// leads the lowest trump, keeping its stronger trumps back. Opponents (seat 1)
+// called trump so the trump-draw leads are off and the "only trumps left" branch
+// is reached; three trumps keep it out of the two-card retention path.
+func TestDecide_OnlyTrumpsLeadMasterElseLowest(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			// JH is the absolute master → lead it.
+			name:       "master in hand leads the highest trump",
+			hand:       cards("JH", "9H", "7H"),
+			callerSeat: 1,
+			wantCard:   "JH",
+		},
+		{
+			// JH still out, so 9H is not the master → lead the lowest trump (7H).
+			name:       "no master leads the lowest trump",
+			hand:       cards("9H", "8H", "7H"),
+			callerSeat: 1,
+			wantCard:   "7H",
+		},
+	})
+}
+
+// TestDecide_NoDrawWhenOpponentsOutOfTrump covers Point 6: once BOTH opponents
+// are known void in trump, the remaining trumps are split between the bot and
+// its partner, so leading trump to "draw" only strips the partner's control. The
+// bot leads a side suit instead (cashing a boss / leading safe) and lets the
+// partner keep the trump lead. Without this the partner's UNKNOWN trumps look
+// unseen and the bot would lead its master trump. Our team called trump.
+func TestDecide_NoDrawWhenOpponentsOutOfTrump(t *testing.T) {
+	hearts := game.SuitHearts
+	oppsVoidTrump := []obs{
+		{seat: 1, card: "7C", lead: &hearts},
+		{seat: 3, card: "8C", lead: &hearts},
+	}
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			// Holds the master JH, but opponents are out of trump — cash the side
+			// boss AS rather than lead the master into the partner.
+			name:       "opponents out of trump cash the side boss not the master",
+			hand:       cards("JH", "AS", "KD", "7C"),
+			callerSeat: 0,
+			observes:   oppsVoidTrump,
+			wantCard:   "AS",
+		},
+		{
+			// No side boss either — lead a safe low side card, still never the trump.
+			name:       "opponents out of trump and no boss lead safe low not the trump",
+			hand:       cards("JH", "KD", "8D", "7C"),
+			callerSeat: 0,
+			observes:   oppsVoidTrump,
+			wantCard:   "7C",
 		},
 	})
 }
