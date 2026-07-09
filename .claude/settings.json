@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "defaultMode": "default",
 
@@ -177,5 +178,8 @@
     ]
   },
 
-  "includeCoAuthoredBy": true
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  }
 }
