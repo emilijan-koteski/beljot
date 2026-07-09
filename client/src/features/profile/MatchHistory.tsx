@@ -485,6 +485,25 @@ function MatchRow({ match, username, isOpen, onToggle }: MatchRowProps) {
 
         {/* Outcome + chevron */}
         <div className="flex items-center gap-2.5 self-start md:self-center">
+          {/* Muted early-end marker for the players who did NOT abandon —
+              the abandoner's own row (outcome "abandoned") and legacy rows
+              without an attributable abandoner already say it via the chip.
+              Wording is distinct per reason: abandonment vs surrender.
+              Positive matching on the two known reasons only: an older server
+              (or cached response) sends no endReason, and unknown future
+              values must render nothing. */}
+          {(match.endReason === "abandonment" || match.endReason === "surrender") &&
+            match.outcome !== "abandoned" && (
+              <span
+                className="text-ink-mute text-[11px] italic"
+                data-testid="match-history-ended-early"
+                data-end-reason={match.endReason}
+              >
+                {match.endReason === "abandonment"
+                  ? t("profile.matchHistory.endedEarlyAbandonment")
+                  : t("profile.matchHistory.endedEarlySurrender")}
+              </span>
+            )}
           {match.hasBots === true && (
             <span
               className="text-ink-dim inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[10.5px] font-semibold tracking-[0.4px] uppercase"

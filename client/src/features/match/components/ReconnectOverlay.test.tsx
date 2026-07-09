@@ -13,6 +13,8 @@ vi.mock("react-i18next", () => ({
         "match.disconnect.returningToLobby": "Returning to lobby...",
         "match.disconnect.matchEnded": "Match has ended",
         "match.disconnect.reconnectFailed": "Reconnection failed — the match may have ended",
+        "match.disconnect.abandonCountsWin": "Counts as a win for your team",
+        "match.disconnect.abandonCountsLoss": "Counts as a loss for your team",
         "match.matchResult.title": "Match Complete",
         "team.us": "Us",
         "team.them": "Them",
@@ -155,6 +157,153 @@ describe("ReconnectOverlay", () => {
 
     // Viewer on teamB → Us=380 (b), Them=450 (a)
     expect(screen.getByTestId("abandon-scores")).toHaveTextContent("Final: Us 380 : Them 450");
+  });
+
+  it("shows the loss result line when the viewer shares the abandoner's team", () => {
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
+    // Abandoner seat 2 → team A; viewer seat 0 → team A → partner → loss.
+    const abandonedData = {
+      abandonedByPlayer: 2,
+      teamAFinalScore: 450,
+      teamBFinalScore: 380,
+      matchDurationSec: 600,
+    };
+
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={expiresAt}
+        abandonedData={abandonedData}
+        viewerTeam="teamA"
+        viewerSeat={0}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    const line = screen.getByTestId("abandon-result-line");
+    expect(line).toHaveAttribute("data-result", "loss");
+    expect(line).toHaveTextContent("Counts as a loss for your team");
+  });
+
+  it("shows the win result line when the viewer is on the opposing team", () => {
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
+    // Abandoner seat 1 → team B; viewer seat 0 → team A → opponent → win.
+    const abandonedData = {
+      abandonedByPlayer: 1,
+      teamAFinalScore: 450,
+      teamBFinalScore: 380,
+      matchDurationSec: 600,
+    };
+
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={expiresAt}
+        abandonedData={abandonedData}
+        viewerTeam="teamA"
+        viewerSeat={0}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    const line = screen.getByTestId("abandon-result-line");
+    expect(line).toHaveAttribute("data-result", "win");
+    expect(line).toHaveTextContent("Counts as a win for your team");
+  });
+
+  it("flips the result line for a teamB viewer (seat parity, not raw team A/B)", () => {
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
+    // Abandoner seat 0 → team A; viewer seat 1 → team B → opponents win.
+    const abandonedData = {
+      abandonedByPlayer: 0,
+      teamAFinalScore: 450,
+      teamBFinalScore: 380,
+      matchDurationSec: 600,
+    };
+
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={expiresAt}
+        abandonedData={abandonedData}
+        viewerTeam="teamB"
+        viewerSeat={1}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("abandon-result-line")).toHaveAttribute("data-result", "win");
+  });
+
+  it("omits the result line when the viewer IS the abandoner (late reconnect)", () => {
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
+    // Viewer seat 2 abandoned — their record says "abandoned", not "loss",
+    // so no win/loss line even though the rest of the panel renders.
+    const abandonedData = {
+      abandonedByPlayer: 2,
+      teamAFinalScore: 450,
+      teamBFinalScore: 380,
+      matchDurationSec: 600,
+    };
+
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={expiresAt}
+        abandonedData={abandonedData}
+        viewerTeam="teamA"
+        viewerSeat={2}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("abandon-title")).toBeInTheDocument();
+    expect(screen.queryByTestId("abandon-result-line")).not.toBeInTheDocument();
+  });
+
+  it("omits the result line when abandonedByPlayer is out of range", () => {
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
+    const abandonedData = {
+      abandonedByPlayer: 7,
+      teamAFinalScore: 450,
+      teamBFinalScore: 380,
+      matchDurationSec: 600,
+    };
+
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={expiresAt}
+        abandonedData={abandonedData}
+        viewerTeam="teamA"
+        viewerSeat={0}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("abandon-result-line")).not.toBeInTheDocument();
+  });
+
+  it("omits the result line when the viewer seat is unknown", () => {
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
+    const abandonedData = {
+      abandonedByPlayer: 0,
+      teamAFinalScore: 200,
+      teamBFinalScore: 300,
+      matchDurationSec: 120,
+    };
+
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Frank"
+        reconnectExpiresAt={expiresAt}
+        abandonedData={abandonedData}
+        viewerTeam="teamA"
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("abandon-result-line")).not.toBeInTheDocument();
   });
 
   it("auto-redirects to lobby after 3 seconds when abandoned", () => {

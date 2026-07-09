@@ -84,18 +84,23 @@ func (r *mockMatchRepo) GetMatchesForUser(userID uint, limit, offset int, outcom
 		if seatID(m.Player1ID) != userID && seatID(m.Player2ID) != userID && seatID(m.Player3ID) != userID && seatID(m.Player4ID) != userID {
 			continue
 		}
-		// Viewer-relative outcome filter mirroring the production SQL.
+		// Viewer-relative outcome filter mirroring the production SQL:
+		// attributable abandoned rows (abandoned_by set, not the viewer) count
+		// win/loss by winner_team; the abandoner and NULL-abandoner legacy rows
+		// stay "abandoned".
+		countsWinLoss := m.Status == "completed" ||
+			(m.Status == "abandoned" && m.AbandonedBy != nil && *m.AbandonedBy != userID)
 		switch outcome {
 		case "win":
-			if m.Status != "completed" || !viewerWon(m) {
+			if !countsWinLoss || !viewerWon(m) {
 				continue
 			}
 		case "loss":
-			if m.Status != "completed" || viewerWon(m) {
+			if !countsWinLoss || viewerWon(m) {
 				continue
 			}
 		case "abandoned":
-			if m.Status != "abandoned" {
+			if m.Status != "abandoned" || (m.AbandonedBy != nil && *m.AbandonedBy != userID) {
 				continue
 			}
 		}
@@ -183,7 +188,16 @@ func (r *mockMatchRepo) GetStatsForUser(userID uint) (int, int, int, error) {
 		}
 		switch m.Status {
 		case "abandoned":
-			abandoned++
+			// Per-player: only the abandoner (or every participant of a
+			// NULL-abandoner legacy row) counts "abandoned"; the rest score
+			// win/loss by winner_team — mirroring the production SQL gate.
+			if m.AbandonedBy == nil || *m.AbandonedBy == userID {
+				abandoned++
+			} else if m.WinnerTeam == viewerSeat%2 {
+				wins++
+			} else {
+				losses++
+			}
 		case "completed":
 			if m.WinnerTeam == viewerSeat%2 {
 				wins++
@@ -727,12 +741,13 @@ func TestListMatches_WinLossAbandonedOutcomes(t *testing.T) {
 
 	// Completed, team A wins -> outcome "win".
 	// Completed, team B wins -> outcome "loss".
-	// Abandoned (regardless of winnerTeam) -> outcome "abandoned".
-	abandoner := opp1.ID
+	// Abandoned BY THE VIEWER -> outcome "abandoned" (non-abandoners get
+	// win/loss instead — covered by TestListMatches_PerPlayerAbandonment).
+	abandoner := viewer.ID
 	matchRepo.matches = []match.Match{
 		seedMatch(1, base, base.Add(25*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1010, 640, nil),
 		seedMatch(2, base.Add(-24*time.Hour), base.Add(-24*time.Hour).Add(31*time.Minute), seats, "completed", 1, nil, "bitola", "1001", 820, 1020, nil),
-		seedMatch(3, base.Add(-48*time.Hour), base.Add(-48*time.Hour).Add(9*time.Minute), seats, "abandoned", 0, &abandoner, "bitola", "1001", 320, 410, nil),
+		seedMatch(3, base.Add(-48*time.Hour), base.Add(-48*time.Hour).Add(9*time.Minute), seats, "abandoned", 1, &abandoner, "bitola", "1001", 320, 410, nil),
 	}
 
 	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
@@ -750,6 +765,11 @@ func TestListMatches_WinLossAbandonedOutcomes(t *testing.T) {
 	assert.Equal(t, "loss", resp.Items[1].Outcome)
 	assert.Equal(t, "abandoned", resp.Items[2].Outcome)
 
+	// endReason: natural completions vs the abandoned row.
+	assert.Equal(t, "natural", resp.Items[0].EndReason)
+	assert.Equal(t, "natural", resp.Items[1].EndReason)
+	assert.Equal(t, "abandonment", resp.Items[2].EndReason)
+
 	// Viewer seat is always 0 in this setup.
 	for _, item := range resp.Items {
 		assert.Equal(t, 0, item.ViewerSeat)
@@ -765,7 +785,7 @@ func TestListMatches_WinLossAbandonedOutcomes(t *testing.T) {
 
 	// Abandoned row carries abandonedBy.
 	require.NotNil(t, resp.Items[2].AbandonedBy)
-	assert.Equal(t, opp1.ID, *resp.Items[2].AbandonedBy)
+	assert.Equal(t, viewer.ID, *resp.Items[2].AbandonedBy)
 }
 
 func TestListMatches_PaginationBounds(t *testing.T) {
@@ -1187,11 +1207,17 @@ func TestListMatches_OutcomeFilter(t *testing.T) {
 
 	seats := [4]uint{viewer.ID, 2, 3, 4} // viewer seat 0 → team A
 	base := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
-	ab := uint(2)
+	// Per-player abandonment semantics: the opponent's abandonment (match 4)
+	// counts as a viewer win; the viewer's own (match 3) and the legacy
+	// NULL-abandoner row (match 5) stay "abandoned".
+	viewerAb := viewer.ID
+	oppAb := uint(2) // seat 1, team B → winner_team 0 = viewer's team
 	matchRepo.matches = []match.Match{
-		seedMatch(1, base, base.Add(20*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1010, 600, nil),                                // win
-		seedMatch(2, base.Add(-1*time.Hour), base.Add(-1*time.Hour+20*time.Minute), seats, "completed", 1, nil, "bitola", "1001", 700, 1010, nil), // loss
-		seedMatch(3, base.Add(-2*time.Hour), base.Add(-2*time.Hour+5*time.Minute), seats, "abandoned", 0, &ab, "bitola", "1001", 300, 200, nil),   // abandoned
+		seedMatch(1, base, base.Add(20*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1010, 600, nil),                                    // win
+		seedMatch(2, base.Add(-1*time.Hour), base.Add(-1*time.Hour+20*time.Minute), seats, "completed", 1, nil, "bitola", "1001", 700, 1010, nil),     // loss
+		seedMatch(3, base.Add(-2*time.Hour), base.Add(-2*time.Hour+5*time.Minute), seats, "abandoned", 1, &viewerAb, "bitola", "1001", 300, 200, nil), // abandoned (own)
+		seedMatch(4, base.Add(-3*time.Hour), base.Add(-3*time.Hour+5*time.Minute), seats, "abandoned", 0, &oppAb, "bitola", "1001", 400, 300, nil),    // win (opponent abandoned)
+		seedMatch(5, base.Add(-4*time.Hour), base.Add(-4*time.Hour+5*time.Minute), seats, "abandoned", 0, nil, "bitola", "1001", 0, 0, nil),           // abandoned (legacy NULL)
 	}
 
 	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
@@ -1202,11 +1228,11 @@ func TestListMatches_OutcomeFilter(t *testing.T) {
 		want    int
 		expect  string
 	}{
-		{"win", 1, "win"},
+		{"win", 2, "win"},
 		{"loss", 1, "loss"},
-		{"abandoned", 1, "abandoned"},
-		{"all", 3, ""},
-		{"", 3, ""},
+		{"abandoned", 2, "abandoned"},
+		{"all", 5, ""},
+		{"", 5, ""},
 	}
 	for _, tc := range cases {
 		t.Run("outcome="+tc.outcome, func(t *testing.T) {
@@ -1217,6 +1243,83 @@ func TestListMatches_OutcomeFilter(t *testing.T) {
 			assert.Equal(t, int64(tc.want), resp.Total)
 			if tc.expect != "" {
 				assert.Equal(t, tc.expect, resp.Items[0].Outcome)
+			}
+		})
+	}
+}
+
+// TestListMatches_PerPlayerAbandonment pins the full I/O matrix of the
+// per-player outcome + endReason mapping across all four perspectives on one
+// abandoned match (abandoner / partner / two opponents), the legacy
+// NULL-abandoner row, and the surrender/natural completed variants.
+func TestListMatches_PerPlayerAbandonment(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	p1 := repo.addUser("p1", "p1@example.com", "en") // seat 0, team A
+	p2 := repo.addUser("p2", "p2@example.com", "en") // seat 1, team B
+	p3 := repo.addUser("p3", "p3@example.com", "en") // seat 2, team A
+	p4 := repo.addUser("p4", "p4@example.com", "en") // seat 3, team B
+
+	seats := [4]uint{p1.ID, p2.ID, p3.ID, p4.ID}
+	base := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	abandoner := p1.ID   // team A abandons → winner_team 1
+	surrenderer := p2.ID // team B surrenders → completed, winner_team 0
+
+	surrendered := seedMatch(3, base.Add(-2*time.Hour), base.Add(-2*time.Hour+15*time.Minute),
+		seats, "completed", 0, nil, "bitola", "1001", 720, 430, nil)
+	surrendered.SurrenderedBy = &surrenderer
+
+	matchRepo.matches = []match.Match{
+		seedMatch(1, base, base.Add(10*time.Minute), seats, "abandoned", 1, &abandoner, "bitola", "1001", 300, 260, nil),
+		seedMatch(2, base.Add(-1*time.Hour), base.Add(-1*time.Hour+10*time.Minute), seats, "abandoned", 0, nil, "bitola", "1001", 0, 0, nil),
+		surrendered,
+		seedMatch(4, base.Add(-3*time.Hour), base.Add(-3*time.Hour+25*time.Minute), seats, "completed", 1, nil, "bitola", "1001", 600, 1010, nil),
+	}
+
+	cases := []struct {
+		name   string
+		viewer uint
+		// Expected per match ID: outcome + endReason.
+		want map[uint][2]string
+	}{
+		{name: "abandoner", viewer: p1.ID, want: map[uint][2]string{
+			1: {"abandoned", "abandonment"},
+			2: {"abandoned", "abandonment"},
+			3: {"win", "surrender"},
+			4: {"loss", "natural"},
+		}},
+		{name: "opponent of abandoner", viewer: p2.ID, want: map[uint][2]string{
+			1: {"win", "abandonment"},
+			2: {"abandoned", "abandonment"},
+			3: {"loss", "surrender"},
+			4: {"win", "natural"},
+		}},
+		{name: "partner of abandoner", viewer: p3.ID, want: map[uint][2]string{
+			1: {"loss", "abandonment"},
+			2: {"abandoned", "abandonment"},
+			3: {"win", "surrender"},
+			4: {"loss", "natural"},
+		}},
+		{name: "second opponent", viewer: p4.ID, want: map[uint][2]string{
+			1: {"win", "abandonment"},
+			2: {"abandoned", "abandonment"},
+			3: {"loss", "surrender"},
+			4: {"win", "natural"},
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			token, err := auth.GenerateAccessToken(tc.viewer, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doListMatches(e, strconvUint(tc.viewer), "", token)
+			require.Equal(t, http.StatusOK, rec.Code)
+			resp := decodeMatchesResponse(t, rec.Body.Bytes())
+			require.Len(t, resp.Items, len(tc.want))
+			for _, item := range resp.Items {
+				want, ok := tc.want[item.ID]
+				require.True(t, ok, "unexpected match %d", item.ID)
+				assert.Equal(t, want[0], item.Outcome, "match %d outcome", item.ID)
+				assert.Equal(t, want[1], item.EndReason, "match %d endReason", item.ID)
 			}
 		})
 	}

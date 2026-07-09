@@ -99,8 +99,12 @@ type MatchListItem struct {
 	AbandonedBy *uint           `json:"abandonedBy,omitempty"`
 	ViewerSeat  int             `json:"viewerSeat"`
 	Outcome     string          `json:"outcome"`
-	Players     []MatchPlayer   `json:"players"`
-	Hands       []MatchHandView `json:"hands"`
+	// EndReason says why the match ended: "abandonment" (abandoned rows),
+	// "surrender" (completed via an accepted surrender), or "natural". The
+	// client renders the muted "ended early" history marker from it.
+	EndReason string          `json:"endReason"`
+	Players   []MatchPlayer   `json:"players"`
+	Hands     []MatchHandView `json:"hands"`
 }
 
 // MatchesListResponse is the envelope returned by GET /users/:id/matches.
@@ -556,11 +560,31 @@ func buildMatchListItem(m match.Match, viewerID uint, usernames map[uint]string)
 		players = append(players, p)
 	}
 
+	// Outcome is per-player on abandoned rows: the abandoner keeps "abandoned";
+	// partner/opponents get loss/win from winner_team (the non-abandoning team,
+	// persisted live and backfilled by migration 000015). winner_team is only
+	// meaningful when AbandonedBy is set — NULL-abandoner rows (boot-reconcile)
+	// stay "abandoned" for all four seats.
+	// Invariant: win/loss is derived from winner_team ONLY for "completed" rows
+	// and attributable "abandoned" rows — the repository returns no other
+	// status, and any unexpected value must never invent a win (it keeps the
+	// safe "loss" default rather than reading a meaningless winner_team).
 	outcome := "loss"
-	if m.Status == "abandoned" {
+	switch {
+	case m.Status == "abandoned" && (m.AbandonedBy == nil || *m.AbandonedBy == viewerID):
 		outcome = "abandoned"
-	} else if m.Status == "completed" && m.WinnerTeam == teamForSeat(viewerSeat) {
+	case (m.Status == "completed" || m.Status == "abandoned") &&
+		m.WinnerTeam == teamForSeat(viewerSeat):
 		outcome = "win"
+	}
+
+	// Why the match ended — drives the client's "ended early" marker with
+	// distinct abandonment/surrender wording.
+	endReason := "natural"
+	if m.Status == "abandoned" {
+		endReason = "abandonment"
+	} else if m.SurrenderedBy != nil {
+		endReason = "surrender"
 	}
 
 	hands := make([]MatchHandView, 0, len(m.Hands))
@@ -602,6 +626,7 @@ func buildMatchListItem(m match.Match, viewerID uint, usernames map[uint]string)
 		AbandonedBy: m.AbandonedBy,
 		ViewerSeat:  viewerSeat,
 		Outcome:     outcome,
+		EndReason:   endReason,
 		Players:     players,
 		Hands:       hands,
 	}

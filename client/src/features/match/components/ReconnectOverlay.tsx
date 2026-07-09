@@ -47,6 +47,12 @@ interface ReconnectOverlayProps {
   // reconnect countdown (no abandonedData), this prop is unused and may be
   // omitted.
   viewerTeam?: TeamString | null;
+  /** Viewer's own seat (0-3) — required for the abandoned panel's per-player
+   *  result line. The abandoner can see this overlay too (late reconnect after
+   *  the match ended), and their record says "abandoned", not "loss" — the
+   *  team alone can't tell abandoner from partner, only the seat can. When
+   *  omitted/null, the result line is not rendered. */
+  viewerSeat?: number | null;
   onReturnToLobby?: () => void;
   /** Total reconnect window in seconds — used to drive the progress ring's
    *  sweep. Defaults to 120 (server default). Custom rooms with a different
@@ -86,6 +92,7 @@ export function ReconnectOverlay({
   reconnectExpiresAt,
   abandonedData,
   viewerTeam = null,
+  viewerSeat = null,
   onReturnToLobby,
   totalSeconds = RECONNECT_TOTAL_SECONDS_DEFAULT,
 }: ReconnectOverlayProps) {
@@ -138,6 +145,24 @@ export function ReconnectOverlay({
     const teamBValue = abandonedData.teamBFinalScore;
     const usValue = viewerTeam === "teamA" ? teamAValue : teamBValue;
     const themValue = viewerTeam === "teamA" ? teamBValue : teamAValue;
+    // Per-player result line — pure display derivation from seat parity
+    // (seats 0/2 → teamA, 1/3 → teamB, mirroring game.TeamForSeat). Sharing
+    // the abandoner's team means the match counts as a loss for the viewer,
+    // otherwise a win. Never shown to the abandoner themselves (their record
+    // says "abandoned", not "loss" — and they see this overlay on a late
+    // reconnect), when the viewer's seat is unknown, or when the payload's
+    // seat is out of range.
+    const abandonerSeat = abandonedData.abandonedByPlayer;
+    const abandonerSeatValid =
+      Number.isInteger(abandonerSeat) && abandonerSeat >= 0 && abandonerSeat <= 3;
+    const showResultLine =
+      abandonerSeatValid &&
+      viewerSeat !== null &&
+      Number.isInteger(viewerSeat) &&
+      viewerSeat >= 0 &&
+      viewerSeat <= 3 &&
+      viewerSeat !== abandonerSeat;
+    const viewerLost = showResultLine && viewerSeat % 2 === abandonerSeat % 2;
 
     return (
       <div
@@ -190,6 +215,19 @@ export function ReconnectOverlay({
                   })}
                 </span>
               </div>
+
+              {showResultLine && (
+                <p
+                  className="font-body text-sm"
+                  style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.8 }}
+                  data-testid="abandon-result-line"
+                  data-result={viewerLost ? "loss" : "win"}
+                >
+                  {viewerLost
+                    ? t("match.disconnect.abandonCountsLoss")
+                    : t("match.disconnect.abandonCountsWin")}
+                </p>
+              )}
 
               <p
                 className="font-body text-xs mt-1 animate-pulse"

@@ -85,6 +85,8 @@
       "outcomeWin": "Win",
       "outcomeLoss": "Loss",
       "outcomeAbandoned": "Abandoned",
+      "endedEarlyAbandonment": "Ended early — a player abandoned",
+      "endedEarlySurrender": "Ended early by surrender",
       "expandRow": "Show hand details",
       "collapseRow": "Hide hand details",
       "filter": {
@@ -798,6 +800,8 @@
       "reconnectFailed": "Reconnection failed — the match may have ended",
       "matchAbandoned": "{{player}} disconnected — match ended",
       "matchAbandonedScores": "Final: Us {{us}} : Them {{them}}",
+      "abandonCountsWin": "Counts as a win for your team",
+      "abandonCountsLoss": "Counts as a loss for your team",
       "returningToLobby": "Returning to lobby…",
       "matchEnded": "Match has ended"
     },

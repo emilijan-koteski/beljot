@@ -58,7 +58,13 @@ func (r *GormMatchRepository) CreateWithHands(match *Match, hands []HandResult) 
 func (r *GormMatchRepository) GetStatsForUser(userID uint) (wins, losses, abandoned int, err error) {
 	// Single round-trip: FILTER aggregation over matches the user participates
 	// in. The viewer's team per row is derived from their seat via a CASE
-	// (seat 0/2 → 0 team A; 1/3 → 1 team B) matching game.TeamForSeat. A user with
+	// (seat 0/2 → 0 team A; 1/3 → 1 team B) matching game.TeamForSeat.
+	//
+	// Abandoned matches score per player: the abandoner (and every participant
+	// of a NULL-abandoner boot-reconcile row) counts "abandoned"; the other
+	// three count win/loss by winner_team — the non-abandoning team, persisted
+	// live and backfilled by migration 000015. winner_team on abandoned rows is
+	// meaningful ONLY when abandoned_by IS NOT NULL, hence the gate. A user with
 	// zero matches yields (0, 0, 0, nil) — GORM's Scan into zero-valued struct.
 	var row struct {
 		Wins      int
@@ -68,27 +74,22 @@ func (r *GormMatchRepository) GetStatsForUser(userID uint) (wins, losses, abando
 	err = r.db.Raw(`
 SELECT
   COUNT(*) FILTER (
-    WHERE status = 'completed' AND winner_team = CASE
-      WHEN player1_id = ? THEN 0
-      WHEN player2_id = ? THEN 1
-      WHEN player3_id = ? THEN 0
-      WHEN player4_id = ? THEN 1
-    END
+    WHERE (status = 'completed' OR (status = 'abandoned' AND abandoned_by IS NOT NULL AND abandoned_by <> ?))
+      AND winner_team = `+viewerTeamCase+`
   ) AS wins,
   COUNT(*) FILTER (
-    WHERE status = 'completed' AND winner_team <> CASE
-      WHEN player1_id = ? THEN 0
-      WHEN player2_id = ? THEN 1
-      WHEN player3_id = ? THEN 0
-      WHEN player4_id = ? THEN 1
-    END
+    WHERE (status = 'completed' OR (status = 'abandoned' AND abandoned_by IS NOT NULL AND abandoned_by <> ?))
+      AND winner_team <> `+viewerTeamCase+`
   ) AS losses,
-  COUNT(*) FILTER (WHERE status = 'abandoned') AS abandoned
+  COUNT(*) FILTER (
+    WHERE status = 'abandoned' AND (abandoned_by = ? OR abandoned_by IS NULL)
+  ) AS abandoned
 FROM matches
 WHERE player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?
 `,
-		userID, userID, userID, userID,
-		userID, userID, userID, userID,
+		userID, userID, userID, userID, userID,
+		userID, userID, userID, userID, userID,
+		userID,
 		userID, userID, userID, userID,
 	).Scan(&row).Error
 	if err != nil {
@@ -107,20 +108,24 @@ func (r *GormMatchRepository) GetMatchesForUser(userID uint, limit, offset int, 
 
 	// Viewer-relative outcome filter. The viewer's team per row is derived from
 	// their seat via the same CASE used by GetStatsForUser (seats 0/2 → 0,
-	// 1/3 → 1). Unknown / empty outcome leaves the completed+abandoned set.
+	// 1/3 → 1). Mirrors GetStatsForUser's per-player abandonment semantics:
+	// attributable abandoned rows (abandoned_by IS NOT NULL) count as win/loss
+	// by winner_team for the three non-abandoners, while the abandoner and all
+	// participants of NULL-abandoner rows keep "abandoned". Unknown / empty
+	// outcome leaves the completed+abandoned set.
 	switch outcome {
 	case "win":
 		query = query.Where(
-			"status = 'completed' AND winner_team = "+viewerTeamCase,
-			userID, userID, userID, userID,
+			"(status = 'completed' OR (status = 'abandoned' AND abandoned_by IS NOT NULL AND abandoned_by <> ?)) AND winner_team = "+viewerTeamCase,
+			userID, userID, userID, userID, userID,
 		)
 	case "loss":
 		query = query.Where(
-			"status = 'completed' AND winner_team <> "+viewerTeamCase,
-			userID, userID, userID, userID,
+			"(status = 'completed' OR (status = 'abandoned' AND abandoned_by IS NOT NULL AND abandoned_by <> ?)) AND winner_team <> "+viewerTeamCase,
+			userID, userID, userID, userID, userID,
 		)
 	case "abandoned":
-		query = query.Where("status = 'abandoned'")
+		query = query.Where("status = 'abandoned' AND (abandoned_by = ? OR abandoned_by IS NULL)", userID)
 	}
 
 	var total int64

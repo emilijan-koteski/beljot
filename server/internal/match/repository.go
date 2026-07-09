@@ -57,20 +57,28 @@ type MatchRepository interface {
 	// of all matching rows (after the outcome filter), regardless of
 	// limit/offset.
 	//
-	// outcome filters the result set viewer-relative: "win"/"loss" (completed
-	// matches where the viewer's team did / did not win), "abandoned", or "" /
-	// "all" for the unfiltered completed+abandoned set. sort controls ordering:
+	// outcome filters the result set viewer-relative with per-player
+	// abandonment semantics: "win"/"loss" match completed rows AND attributable
+	// abandoned rows (abandoned_by set to someone other than the viewer) by
+	// whether winnerTeam is the viewer's team; "abandoned" matches only the
+	// viewer's own abandonments plus NULL-abandoner legacy rows; "" / "all"
+	// leaves the completed+abandoned set unfiltered. sort controls ordering:
 	// "old" → completed_at ASC, anything else (default "new") → completed_at
 	// DESC, both tie-broken by id in the same direction.
 	GetMatchesForUser(userID uint, limit, offset int, outcome, sort string) (items []Match, total int64, err error)
 
 	// GetStatsForUser counts matches where userID appears in any of
-	// player1..player4 seats. wins = completed AND winnerTeam matches the
-	// viewer's team (seats 0/2 → team A index 0; seats 1/3 → team B
-	// index 1, mirroring game.TeamForSeat). losses = completed AND mismatched.
-	// abandoned = any abandoned match regardless of winnerTeam. Executed in a
-	// single round-trip via PostgreSQL FILTER aggregation so wins + losses +
-	// abandoned is a consistent snapshot of participation count.
+	// player1..player4 seats, with per-player abandonment semantics. The
+	// viewer's team derives from their seat (seats 0/2 → team A index 0; seats
+	// 1/3 → team B index 1, mirroring game.TeamForSeat).
+	// wins/losses = completed rows PLUS attributable abandoned rows (abandoned
+	// by someone other than the viewer) where winnerTeam does / does not match
+	// the viewer's team — winnerTeam on abandoned rows is the non-abandoning
+	// team, meaningful only when abandoned_by is set (migration 000015).
+	// abandoned = the viewer's own abandonments plus NULL-abandoner legacy
+	// rows. Executed in a single round-trip via PostgreSQL FILTER aggregation
+	// so wins + losses + abandoned is a consistent snapshot of participation
+	// count.
 	GetStatsForUser(userID uint) (wins, losses, abandoned int, err error)
 
 	// GetCareerAggregatesForUser computes the viewer-relative career metrics

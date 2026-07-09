@@ -69,6 +69,7 @@ function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
     abandonedBy: undefined,
     viewerSeat: 0,
     outcome: "win",
+    endReason: "natural",
     players: [
       { seat: 0, userId: 10, username: "viewer", isBot: false },
       { seat: 1, userId: 11, username: "opp1", isBot: false },
@@ -224,6 +225,67 @@ describe("MatchHistory", () => {
       "loss",
       "abandoned",
     ]);
+  });
+
+  it("shows the ended-early marker with abandonment wording for a non-abandoner", async () => {
+    // Opponent's abandonment counts as a win for the viewer — the row carries
+    // the muted abandonment marker next to the outcome chip.
+    mockGetUserMatches.mockResolvedValueOnce(
+      makeResponse(
+        [makeMatch({ status: "abandoned", outcome: "win", endReason: "abandonment" })],
+        1,
+      ),
+    );
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    const marker = within(row).getByTestId("match-history-ended-early");
+    expect(marker).toHaveAttribute("data-end-reason", "abandonment");
+    expect(marker).toHaveTextContent("Ended early — a player abandoned");
+  });
+
+  it("shows the ended-early marker with distinct surrender wording", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(
+      makeResponse([makeMatch({ outcome: "loss", endReason: "surrender" })], 1),
+    );
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    const marker = within(row).getByTestId("match-history-ended-early");
+    expect(marker).toHaveAttribute("data-end-reason", "surrender");
+    expect(marker).toHaveTextContent("Ended early by surrender");
+  });
+
+  it("hides the ended-early marker on naturally completed rows", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    expect(within(row).queryByTestId("match-history-ended-early")).not.toBeInTheDocument();
+  });
+
+  it("hides the ended-early marker when endReason is missing (older server response)", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(
+      makeResponse([makeMatch({ endReason: undefined })], 1),
+    );
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    expect(within(row).queryByTestId("match-history-ended-early")).not.toBeInTheDocument();
+  });
+
+  it("hides the ended-early marker on the abandoner's own row (outcome abandoned)", async () => {
+    // The abandoner (and legacy NULL-abandoner rows) already say it via the
+    // "Abandoned" chip — no duplicate marker.
+    mockGetUserMatches.mockResolvedValueOnce(
+      makeResponse(
+        [makeMatch({ status: "abandoned", outcome: "abandoned", endReason: "abandonment" })],
+        1,
+      ),
+    );
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    expect(within(row).getByTestId("match-history-outcome")).toHaveAttribute(
+      "data-outcome",
+      "abandoned",
+    );
+    expect(within(row).queryByTestId("match-history-ended-early")).not.toBeInTheDocument();
   });
 
   it("toggles detail view on row click with correct aria state", async () => {

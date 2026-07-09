@@ -85,6 +85,8 @@
       "outcomeWin": "Победа",
       "outcomeLoss": "Пораз",
       "outcomeAbandoned": "Напуштено",
+      "endedEarlyAbandonment": "Заврши предвреме бидејќи играч го напушти мечот",
+      "endedEarlySurrender": "Заврши предвреме со предавање",
       "expandRow": "Прикажи детали за делењата",
       "collapseRow": "Сокриј детали за делењата",
       "filter": {
@@ -798,6 +800,8 @@
       "reconnectFailed": "Повторното поврзување не успеа. Мечот можеби заврши",
       "matchAbandoned": "{{player}} ја прекина врската. Мечот заврши",
       "matchAbandonedScores": "Финале: Ние {{us}} : Тие {{them}}",
+      "abandonCountsWin": "Се смета како победа за твојот тим",
+      "abandonCountsLoss": "Се смета како пораз за твојот тим",
       "returningToLobby": "Враќање во лоби…",
       "matchEnded": "Мечот заврши"
     },
