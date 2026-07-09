@@ -562,9 +562,34 @@ func TestReconnectTimeout_PersistsAbandonedMatch(t *testing.T) {
 	assert.Equal(t, "abandoned", m.Status)
 	assert.NotNil(t, m.AbandonedBy)
 	assert.Equal(t, uint(30), *m.AbandonedBy) // seat 2 = userID 30
+	// The record carries the real non-abandoning team, not a filler 0:
+	// seat 2 = team 0 abandoned, so team 1 is the winner.
+	assert.Equal(t, 1, m.WinnerTeam, "winner is the non-abandoning team")
 	assert.Equal(t, uint(100), m.RoomID)
 	assert.Equal(t, "bitola", m.Variant)
 	assert.Equal(t, "1001", m.MatchMode)
+}
+
+// TestReconnectTimeout_PersistsWinnerTeamOppositeParity covers the other seat
+// parity: a team-1 seat abandons, so team 0 must be persisted as the winner.
+func TestReconnectTimeout_PersistsWinnerTeamOppositeParity(t *testing.T) {
+	hub := ws.NewHub()
+	go hub.Run()
+	defer hub.Shutdown()
+
+	_, repo, _ := setupDisconnectedGameShortWindow(t, hub, 3)
+
+	// Wait for the 1-second reconnect window to expire
+	time.Sleep(2200 * time.Millisecond)
+
+	matches := repo.getMatches()
+	require.Len(t, matches, 1, "one match should be persisted")
+	m := matches[0]
+	assert.Equal(t, "abandoned", m.Status)
+	assert.NotNil(t, m.AbandonedBy)
+	assert.Equal(t, uint(40), *m.AbandonedBy) // seat 3 = userID 40
+	// Seat 3 = team 1 abandoned, so team 0 is the winner.
+	assert.Equal(t, 0, m.WinnerTeam, "winner is the non-abandoning team")
 }
 
 func TestReconnectTimeout_NoOpWhenReconnected(t *testing.T) {

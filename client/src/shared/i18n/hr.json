@@ -85,6 +85,8 @@
       "outcomeWin": "Pobjeda",
       "outcomeLoss": "Poraz",
       "outcomeAbandoned": "Prekinut",
+      "endedEarlyAbandonment": "Završen ranije jer je igrač napustio meč",
+      "endedEarlySurrender": "Završen ranije predajom",
       "expandRow": "Prikaži detalje dijeljenja",
       "collapseRow": "Sakrij detalje dijeljenja",
       "filter": {
@@ -798,6 +800,8 @@
       "reconnectFailed": "Ponovno povezivanje nije uspjelo, meč je možda završio",
       "matchAbandoned": "{{player}} je prekinuo vezu, meč završio",
       "matchAbandonedScores": "Konačno: Mi {{us}} : Oni {{them}}",
+      "abandonCountsWin": "Računa se kao pobjeda za tvoj tim",
+      "abandonCountsLoss": "Računa se kao poraz za tvoj tim",
       "returningToLobby": "Povratak u lobi…",
       "matchEnded": "Meč je završio"
     },

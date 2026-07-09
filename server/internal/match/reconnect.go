@@ -582,10 +582,11 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	session.mu.Unlock()
 
 	// Story 9.2 (AC #8): the WHOLE abandoning team forfeits (both −S, no
-	// teammate refund); the winner is the NON-abandoning team — NOT the record's
-	// hardcoded WinnerTeam (0). Settle against that computed winner. No-op when
-	// coinBuyIn == 0. Deltas ride the match row below; settlement events are sent
-	// after event:match_abandoned, before the trailing event:match_state.
+	// teammate refund); the winner is the NON-abandoning team. Settle against
+	// that computed winner (also persisted as the record's WinnerTeam below).
+	// No-op when coinBuyIn == 0. Deltas ride the match row below; settlement
+	// events are sent after event:match_abandoned, before the trailing
+	// event:match_state.
 	winningTeam := 1 - game.TeamForSeat(abandonedSeat)
 	deltas, settlementMsgs := m.settleMatch(roomID, playerIDs, botSeats, winningTeam, coinBuyIn)
 
@@ -629,10 +630,11 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		HasBots:      hasBots,
 		TeamAScore:   teamAScore,
 		TeamBScore:   teamBScore,
-		// WinnerTeam stays 0 on the abandoned record (existing semantics; the
-		// abandoned status is the load-bearing signal). Settlement above uses the
-		// computed non-abandoning team, NOT this column.
-		WinnerTeam:       0,
+		// The real non-abandoning team — the same value settlement used above.
+		// Meaningful because AbandonedBy is set: stats/history read win/loss for
+		// the three non-abandoners off this column, gated on abandoned_by IS NOT
+		// NULL (boot-reconcile rows keep a filler 0 and stay plain "abandoned").
+		WinnerTeam:       winningTeam,
 		Variant:          variant,
 		MatchMode:        matchMode,
 		StartedAt:        startedAt,

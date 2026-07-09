@@ -1862,6 +1862,7 @@ export function MatchPage() {
           reconnectExpiresAt={matchState.reconnectExpiresAt ?? ""}
           abandonedData={matchAbandonedData}
           viewerTeam={viewerTeam}
+          viewerSeat={myPlayerSeat}
           onReturnToLobby={handleAbandonReturnToLobby}
         />
       )}

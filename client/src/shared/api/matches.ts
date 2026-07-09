@@ -2,6 +2,10 @@ import { axiosClient } from "@/shared/api/axiosClient";
 
 export type MatchOutcome = "win" | "loss" | "abandoned";
 
+/** Why the match ended — "surrender" and "abandonment" rows carry a muted
+ *  "ended early" marker in history, with distinct wording per reason. */
+export type MatchEndReason = "natural" | "surrender" | "abandonment";
+
 export interface MatchPlayer {
   seat: number;
   // Bot seats arrive as {userId: 0, username: "", isBot: true} — check with
@@ -44,6 +48,9 @@ export interface MatchListItem {
   abandonedBy?: number;
   viewerSeat: number;
   outcome: MatchOutcome;
+  /** Optional: an older server (or a cached response) may not send it —
+   *  consumers must treat a missing value as "no early-end marker". */
+  endReason?: MatchEndReason;
   players: MatchPlayer[];
   hands: MatchHandView[];
 }
