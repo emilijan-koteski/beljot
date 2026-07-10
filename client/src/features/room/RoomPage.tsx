@@ -927,285 +927,255 @@ export function RoomPage() {
             className="pointer-events-none absolute -top-px right-7 left-7 h-0.5 bg-[linear-gradient(90deg,transparent,var(--brass)_50%,transparent)] opacity-70"
           />
 
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
-            {/* Left — name + meta row */}
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <h1
-                // pr reserves room for the code chip that floats onto this row
-                // on mobile (absolute, top-right of the card); cleared at md
-                // where the chip returns to the right column. When the owner
-                // privacy control is shown the group no longer floats (it would
-                // be too wide and cover the name), so no reservation is needed.
-                className={cn(
-                  "font-display text-ink m-0 truncate text-[20px] leading-tight font-bold tracking-[-0.6px] md:pr-0 md:text-[28px]",
-                  canEditPrivacy ? "pr-0" : "pr-28",
-                )}
-                data-testid="room-info-name"
-              >
-                {room.name}
-              </h1>
-              <div className="text-ink-dim flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] md:text-[13px]">
-                <span className="inline-flex items-center gap-1.5">
-                  <Crown className="text-brass-deep size-3" aria-hidden />
-                  <Trans
-                    i18nKey="room.ownerLine"
-                    values={{ owner: ownerUsername }}
-                    components={{ name: <span className="text-ink font-semibold" /> }}
-                  />
-                </span>
-                <span className="text-ink-off" aria-hidden>
-                  ·
-                </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    className="text-ink hover:bg-surface-sunken focus-visible:ring-accent inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 outline-none transition-colors focus-visible:ring-2"
-                    aria-label={t("room.inRoomList.ariaLabel")}
-                    data-testid="in-room-count"
-                  >
-                    <Users className="text-ink-dim size-3.5" />
-                    <span>{t("room.inRoomCount", { count: players.length })}</span>
-                    <ChevronDown className="text-ink-mute size-3" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="bg-surface-elevated min-w-64"
-                    data-testid="in-room-list"
-                  >
-                    <div className="text-brass-deep px-2 pt-1.5 pb-1 font-mono text-[10.5px] font-semibold tracking-[1.8px] uppercase">
-                      {t("room.inRoomList.title")}
-                    </div>
-                    {players.length === 0 ? (
-                      <p className="text-ink-mute px-2 py-1.5 text-xs">
-                        {t("room.inRoomList.empty")}
-                      </p>
-                    ) : (
-                      <ul className="flex flex-col">
-                        {players.map((p) => {
-                          const isBotRow = p.isBot === true;
-                          const isYou = !isBotRow && currentUser?.id === p.userId;
-                          const isRoomOwner = !isBotRow && p.userId === room.ownerId;
-                          const isWaiting = room.status === "waiting";
-                          // Kick/promote act on user accounts — bot rows are
-                          // managed from their seat tile's remove control.
-                          const ownerCanActOnRow =
-                            isOwner && isWaiting && !isRoomOwner && !isYou && !isBotRow;
-                          const ownerCanKickRow = ownerCanActOnRow;
-                          const ownerCanPromoteRow = ownerCanActOnRow && p.seat !== null;
-                          const seated = p.seat !== null;
-                          const rowName = isBotRow ? botDisplayName(t, p.seat) : p.username;
-                          const seatLabel = seated
-                            ? t("room.inRoomList.seated", {
-                                seat: (p.seat as number) + 1,
-                              })
-                            : t("room.inRoomList.notSeated");
-                          return (
-                            <li
-                              key={isBotRow ? `bot-${p.seat}` : p.userId}
-                              className="flex items-center gap-2 px-2 py-1.5 text-sm"
-                              data-testid={
-                                isBotRow
-                                  ? `in-room-list-bot-${p.seat}`
-                                  : `in-room-list-item-${p.userId}`
-                              }
-                            >
-                              <Avatar
-                                name={rowName}
-                                size={22}
-                                team={rosterTeam(p)}
-                                you={isYou}
-                                owner={isRoomOwner}
-                                icon={isBotRow ? <Bot aria-hidden="true" /> : undefined}
-                              />
-                              <span className="text-ink flex min-w-0 flex-1 items-center gap-1">
-                                {isRoomOwner && (
-                                  <Crown className="text-brass-deep size-3 shrink-0" aria-hidden />
-                                )}
-                                <span className="truncate font-medium">{rowName}</span>
-                                {isYou && (
-                                  <span className="text-accent shrink-0 text-xs font-semibold">
-                                    · {t("room.seatYouInline")}
-                                  </span>
-                                )}
-                              </span>
-                              <span
-                                className={cn(
-                                  "shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.4px] uppercase",
-                                  seated
-                                    ? "border-accent bg-accent-soft text-accent-deep"
-                                    : "border-border bg-surface-sunken text-ink-mute",
-                                )}
-                              >
-                                {seatLabel}
-                              </span>
-                              {ownerCanPromoteRow && (
-                                <button
-                                  type="button"
-                                  className="text-ink-mute hover:bg-surface-sunken hover:text-brass-deep rounded p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                                  aria-label={t("room.promoteIconLabel", {
-                                    username: p.username,
-                                  })}
-                                  title={t("room.promoteIconLabel", {
-                                    username: p.username,
-                                  })}
-                                  data-testid={`promote-player-${p.userId}`}
-                                  disabled={transferOwnershipMutation.isPending}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setTransferConfirm({
-                                      userId: p.userId,
-                                      username: p.username,
-                                    });
-                                  }}
-                                >
-                                  <Crown className="size-3.5" />
-                                </button>
-                              )}
-                              {ownerCanKickRow && (
-                                <button
-                                  type="button"
-                                  className="text-ink-mute hover:bg-surface-sunken hover:text-destructive rounded p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                                  aria-label={t("room.kickIconLabel", {
-                                    username: p.username,
-                                  })}
-                                  title={t("room.kickIconLabel", {
-                                    username: p.username,
-                                  })}
-                                  data-testid={`kick-list-${p.userId}`}
-                                  disabled={kickPlayerMutation.isPending}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSwapSourceSeat(null);
-                                    setKickConfirm({
-                                      seat: p.seat ?? -1,
-                                      userId: p.userId,
-                                      username: p.username,
-                                    });
-                                  }}
-                                >
-                                  <UserX className="size-3.5" />
-                                </button>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <span className="text-ink-off" aria-hidden>
-                  ·
-                </span>
-                <span
-                  className={seatedCount === 4 ? "text-accent font-semibold" : undefined}
-                  data-testid="seated-count"
+          {/* Row 1 — title (truncates when the row runs out of space) with the
+              owner-only privacy control + copy-code chip pinned to its right, at
+              every breakpoint. */}
+          <div className="flex items-center gap-3">
+            <h1
+              className="font-display text-ink m-0 min-w-0 flex-1 truncate text-[20px] leading-tight font-bold tracking-[-0.6px] md:text-[28px]"
+              data-testid="room-info-name"
+            >
+              {room.name}
+            </h1>
+            <div className="flex shrink-0 items-center gap-2">
+              {canEditPrivacy && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPrivacy(true)}
+                  data-testid="room-privacy-control"
+                  aria-label={
+                    room.isPrivate
+                      ? t("room.privacy.manageButtonPrivate")
+                      : t("room.privacy.manageButtonPublic")
+                  }
+                  // Icon-only square on mobile (label hidden, aria-label keeps
+                  // the accessible name); full labelled button from md up.
+                  className="w-7 px-0 whitespace-nowrap md:w-auto md:px-2.5"
                 >
-                  {t("room.seatedCount", { current: seatedCount, max: 4 })}
-                </span>
-              </div>
-            </div>
-
-            {/* Right — copy-code chip on top, game-mode badges below. */}
-            <div className="flex flex-col items-start gap-1.5 md:items-end md:gap-2">
-              {/* Owner-only privacy control sits to the LEFT of the copy-code
-                  chip (Story 9.6) — waiting rooms only, mirroring the other
-                  owner-gated actions.
-
-                  On mobile, with no privacy control the lone code chip floats
-                  to the card's top-right so it shares the title's row (the card
-                  is `relative`). When the privacy control IS shown the group is
-                  too wide to float without covering the name, so it stays in
-                  normal flow (dropping below the name/meta). At md the group is
-                  always static in the right column — desktop layout unchanged. */}
-              <div
-                className={cn(
-                  // flex-wrap so the privacy button + code chip drop onto
-                  // separate lines when the card is too narrow for both
-                  // (mirrors the badges row below), rather than the chip
-                  // overflowing the card edge.
-                  "flex flex-wrap items-center gap-2 md:static md:top-auto md:right-auto",
-                  canEditPrivacy ? "" : "absolute top-6 right-6",
-                )}
-              >
-                {canEditPrivacy && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowPrivacy(true)}
-                    data-testid="room-privacy-control"
-                    aria-label={
-                      room.isPrivate
-                        ? t("room.privacy.manageButtonPrivate")
-                        : t("room.privacy.manageButtonPublic")
-                    }
-                    // Icon-only square on mobile (label hidden, aria-label keeps
-                    // the accessible name); full labelled button from md up.
-                    className="w-7 px-0 whitespace-nowrap md:w-auto md:px-2.5"
-                  >
-                    <Lock className="size-3.5" />
-                    <span className="hidden md:inline">
-                      {room.isPrivate
-                        ? t("room.privacy.manageButtonPrivate")
-                        : t("room.privacy.manageButtonPublic")}
-                    </span>
-                  </Button>
-                )}
-                <CodeChip
-                  code={room.code}
-                  variant="compact"
-                  copied={justCopied}
-                  onCopy={handleCopyLink}
-                  ariaLabel={t("room.copyLinkAriaLabel", { code: room.code })}
-                  testId="copy-link"
-                  codeTestId="room-code"
-                  // Tighter on mobile to trim card height; desktop unchanged.
-                  className="px-2.5 py-1 text-[12px] md:px-3 md:py-2 md:text-[13px]"
-                />
-              </div>
-              <div
-                // Shrink every chip on mobile (smaller padding + text) to trim
-                // the card height; `md:` restores the desktop badge sizing.
-                className="flex flex-wrap items-center gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-[11px] md:justify-end md:gap-2 md:[&>span]:px-2.5 md:[&>span]:py-1 md:[&>span]:text-xs"
-                data-testid="room-info-badges"
-              >
-                <Badge tone="brass" icon={<Trophy className="size-3" />}>
-                  <span data-testid="badge-variant">{variantLabel}</span>
-                </Badge>
-                <Badge tone="brass">
-                  <span data-testid="badge-match-mode">{matchModeLabel}</span>
-                </Badge>
-                <Badge tone={isRelaxed ? "accent" : "neutral"} icon={<Clock className="size-3" />}>
-                  <span data-testid="badge-timer">{timerLabel}</span>
-                </Badge>
-                <Badge
-                  tone="brass"
-                  icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}
-                >
-                  <span data-testid="badge-buy-in">
-                    {/* Icon-only unit — the brass coin badge conveys "coins". */}
-                    {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
+                  <Lock className="size-3.5" />
+                  <span className="hidden md:inline">
+                    {room.isPrivate
+                      ? t("room.privacy.manageButtonPrivate")
+                      : t("room.privacy.manageButtonPublic")}
                   </span>
+                </Button>
+              )}
+              <CodeChip
+                code={room.code}
+                variant="compact"
+                copied={justCopied}
+                onCopy={handleCopyLink}
+                ariaLabel={t("room.copyLinkAriaLabel", { code: room.code })}
+                testId="copy-link"
+                codeTestId="room-code"
+                className="px-2.5 py-1 text-[12px] md:px-3 md:py-2 md:text-[13px]"
+              />
+            </div>
+          </div>
+
+          {/* Row 2 — host / occupancy / seated meta on the left, game-mode chips
+              on the right (stacked on mobile, split apart at md). */}
+          <div className="mt-3 flex flex-col gap-3 md:mt-4 md:flex-row md:items-center md:justify-between md:gap-4">
+            <div className="text-ink-dim flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] md:text-[13px]">
+              <span className="inline-flex items-center gap-1.5">
+                <Crown className="text-brass-deep size-3" aria-hidden />
+                <Trans
+                  i18nKey="room.ownerLine"
+                  values={{ owner: ownerUsername }}
+                  components={{ name: <span className="text-ink font-semibold" /> }}
+                />
+              </span>
+              <span className="text-ink-off" aria-hidden>
+                ·
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="text-ink hover:bg-surface-sunken focus-visible:ring-accent inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 outline-none transition-colors focus-visible:ring-2"
+                  aria-label={t("room.inRoomList.ariaLabel")}
+                  data-testid="in-room-count"
+                >
+                  <Users className="text-ink-dim size-3.5" />
+                  <span>{t("room.inRoomCount", { count: players.length })}</span>
+                  <ChevronDown className="text-ink-mute size-3" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="bg-surface-elevated min-w-64"
+                  data-testid="in-room-list"
+                >
+                  <div className="text-brass-deep px-2 pt-1.5 pb-1 font-mono text-[10.5px] font-semibold tracking-[1.8px] uppercase">
+                    {t("room.inRoomList.title")}
+                  </div>
+                  {players.length === 0 ? (
+                    <p className="text-ink-mute px-2 py-1.5 text-xs">
+                      {t("room.inRoomList.empty")}
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col">
+                      {players.map((p) => {
+                        const isBotRow = p.isBot === true;
+                        const isYou = !isBotRow && currentUser?.id === p.userId;
+                        const isRoomOwner = !isBotRow && p.userId === room.ownerId;
+                        const isWaiting = room.status === "waiting";
+                        // Kick/promote act on user accounts — bot rows are
+                        // managed from their seat tile's remove control.
+                        const ownerCanActOnRow =
+                          isOwner && isWaiting && !isRoomOwner && !isYou && !isBotRow;
+                        const ownerCanKickRow = ownerCanActOnRow;
+                        const ownerCanPromoteRow = ownerCanActOnRow && p.seat !== null;
+                        const seated = p.seat !== null;
+                        const rowName = isBotRow ? botDisplayName(t, p.seat) : p.username;
+                        const seatLabel = seated
+                          ? t("room.inRoomList.seated", {
+                              seat: (p.seat as number) + 1,
+                            })
+                          : t("room.inRoomList.notSeated");
+                        return (
+                          <li
+                            key={isBotRow ? `bot-${p.seat}` : p.userId}
+                            className="flex items-center gap-2 px-2 py-1.5 text-sm"
+                            data-testid={
+                              isBotRow
+                                ? `in-room-list-bot-${p.seat}`
+                                : `in-room-list-item-${p.userId}`
+                            }
+                          >
+                            <Avatar
+                              name={rowName}
+                              size={22}
+                              team={rosterTeam(p)}
+                              you={isYou}
+                              owner={isRoomOwner}
+                              icon={isBotRow ? <Bot aria-hidden="true" /> : undefined}
+                            />
+                            <span className="text-ink flex min-w-0 flex-1 items-center gap-1">
+                              {isRoomOwner && (
+                                <Crown className="text-brass-deep size-3 shrink-0" aria-hidden />
+                              )}
+                              <span className="truncate font-medium">{rowName}</span>
+                              {isYou && (
+                                <span className="text-accent shrink-0 text-xs font-semibold">
+                                  · {t("room.seatYouInline")}
+                                </span>
+                              )}
+                            </span>
+                            <span
+                              className={cn(
+                                "shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.4px] uppercase",
+                                seated
+                                  ? "border-accent bg-accent-soft text-accent-deep"
+                                  : "border-border bg-surface-sunken text-ink-mute",
+                              )}
+                            >
+                              {seatLabel}
+                            </span>
+                            {ownerCanPromoteRow && (
+                              <button
+                                type="button"
+                                className="text-ink-mute hover:bg-surface-sunken hover:text-brass-deep rounded p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={t("room.promoteIconLabel", {
+                                  username: p.username,
+                                })}
+                                title={t("room.promoteIconLabel", {
+                                  username: p.username,
+                                })}
+                                data-testid={`promote-player-${p.userId}`}
+                                disabled={transferOwnershipMutation.isPending}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTransferConfirm({
+                                    userId: p.userId,
+                                    username: p.username,
+                                  });
+                                }}
+                              >
+                                <Crown className="size-3.5" />
+                              </button>
+                            )}
+                            {ownerCanKickRow && (
+                              <button
+                                type="button"
+                                className="text-ink-mute hover:bg-surface-sunken hover:text-destructive rounded p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={t("room.kickIconLabel", {
+                                  username: p.username,
+                                })}
+                                title={t("room.kickIconLabel", {
+                                  username: p.username,
+                                })}
+                                data-testid={`kick-list-${p.userId}`}
+                                disabled={kickPlayerMutation.isPending}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSwapSourceSeat(null);
+                                  setKickConfirm({
+                                    seat: p.seat ?? -1,
+                                    userId: p.userId,
+                                    username: p.username,
+                                  });
+                                }}
+                              >
+                                <UserX className="size-3.5" />
+                              </button>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <span className="text-ink-off" aria-hidden>
+                ·
+              </span>
+              <span
+                className={seatedCount === 4 ? "text-accent font-semibold" : undefined}
+                data-testid="seated-count"
+              >
+                {t("room.seatedCount", { current: seatedCount, max: 4 })}
+              </span>
+            </div>
+            <div
+              // Shrink every chip on mobile (smaller padding + text) to trim
+              // the card height; `md:` restores the desktop badge sizing.
+              className="flex flex-wrap items-center gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-[11px] md:justify-end md:gap-2 md:[&>span]:px-2.5 md:[&>span]:py-1 md:[&>span]:text-xs"
+              data-testid="room-info-badges"
+            >
+              <Badge tone="brass" icon={<Trophy className="size-3" />}>
+                <span data-testid="badge-variant">{variantLabel}</span>
+              </Badge>
+              <Badge tone="brass">
+                <span data-testid="badge-match-mode">{matchModeLabel}</span>
+              </Badge>
+              <Badge tone={isRelaxed ? "accent" : "neutral"} icon={<Clock className="size-3" />}>
+                <span data-testid="badge-timer">{timerLabel}</span>
+              </Badge>
+              <Badge tone="brass" icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}>
+                <span data-testid="badge-buy-in">
+                  {/* Icon-only unit — the brass coin badge conveys "coins". */}
+                  {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
+                </span>
+              </Badge>
+              {room.isQuickPlay && (
+                <Badge tone="accent" icon={<Zap className="size-3" />}>
+                  <span data-testid="badge-quick-play">{t("lobby.quickPlay")}</span>
                 </Badge>
-                {room.isQuickPlay && (
-                  <Badge tone="accent" icon={<Zap className="size-3" />}>
-                    <span data-testid="badge-quick-play">{t("lobby.quickPlay")}</span>
-                  </Badge>
-                )}
-                {room.isPrivate ? (
-                  <Badge tone="neutral" icon={<Lock className="size-3" />}>
-                    <span data-testid="badge-private">{t("room.privacy.privateBadge")}</span>
-                  </Badge>
-                ) : (
-                  <Badge tone="neutral" icon={<LockOpen className="size-3" />}>
-                    <span data-testid="badge-public">{t("room.privacy.publicBadge")}</span>
-                  </Badge>
-                )}
-                {players.some((p) => p.isBot === true) && (
-                  <Badge tone="bot" icon={<Bot className="size-3" />}>
-                    <span data-testid="badge-bots">{t("bots.withBots")}</span>
-                  </Badge>
-                )}
-              </div>
+              )}
+              {room.isPrivate ? (
+                <Badge tone="neutral" icon={<Lock className="size-3" />}>
+                  <span data-testid="badge-private">{t("room.privacy.privateBadge")}</span>
+                </Badge>
+              ) : (
+                <Badge tone="neutral" icon={<LockOpen className="size-3" />}>
+                  <span data-testid="badge-public">{t("room.privacy.publicBadge")}</span>
+                </Badge>
+              )}
+              {players.some((p) => p.isBot === true) && (
+                <Badge tone="bot" icon={<Bot className="size-3" />}>
+                  <span data-testid="badge-bots">{t("bots.withBots")}</span>
+                </Badge>
+              )}
             </div>
           </div>
         </div>
