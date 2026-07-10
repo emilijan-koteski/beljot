@@ -1200,6 +1200,11 @@ export function RoomPage() {
                     <span data-testid="badge-public">{t("room.privacy.publicBadge")}</span>
                   </Badge>
                 )}
+                {players.some((p) => p.isBot === true) && (
+                  <Badge tone="bot" icon={<Bot className="size-3" />}>
+                    <span data-testid="badge-bots">{t("bots.withBots")}</span>
+                  </Badge>
+                )}
               </div>
             </div>
           </div>

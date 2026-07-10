@@ -1060,7 +1060,8 @@
   },
   "bots": {
     "seatName": "Bot {{n}}",
-    "badge": "Bot"
+    "badge": "Bot",
+    "withBots": "With bots"
   },
   "rewards": {
     "dailyReward": {

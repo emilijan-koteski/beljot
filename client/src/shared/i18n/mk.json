@@ -1060,7 +1060,8 @@
   },
   "bots": {
     "seatName": "Бот {{n}}",
-    "badge": "Бот"
+    "badge": "Бот",
+    "withBots": "Со ботови"
   },
   "rewards": {
     "dailyReward": {
