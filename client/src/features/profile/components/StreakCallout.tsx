@@ -35,7 +35,7 @@ export function StreakCallout({ streak }: StreakCalloutProps) {
 
   return (
     <div
-      className="border-border mb-5 flex items-start gap-3.5 rounded-lg border p-3.5"
+      className="border-border mb-5 flex items-center gap-3.5 rounded-lg border p-3.5"
       style={{
         background: isWin ? "var(--accent-soft)" : ICE.fill,
         borderColor: isWin ? "rgba(25,101,54,0.33)" : ICE.border,
