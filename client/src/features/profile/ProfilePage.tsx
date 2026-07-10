@@ -58,6 +58,8 @@ export function ProfilePage() {
     <div className="mx-auto max-w-330 px-4 py-8 pb-32 md:px-7" data-testid="profile-page">
       <IdentityHero
         username={username}
+        userId={user?.id}
+        usernameChangedAt={profile?.usernameChangedAt}
         createdAt={createdAt}
         lastPlayedAt={career.data?.lastPlayedAt}
         games={games}

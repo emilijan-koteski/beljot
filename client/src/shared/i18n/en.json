@@ -38,6 +38,24 @@
       "losses": "losses",
       "capots": "capots"
     },
+    "editUsername": {
+      "edit": "Edit username",
+      "save": "Save",
+      "cancel": "Cancel",
+      "inputLabel": "Username",
+      "success": "Username updated",
+      "cooldownHint": "You can change your username again on {{date}}",
+      "errors": {
+        "tooShort": "Username must be at least 3 characters",
+        "tooLong": "Username must be at most 20 characters",
+        "invalidChars": "Only letters, numbers, and underscores are allowed",
+        "taken": "That username is already taken",
+        "unchanged": "That is already your username",
+        "tooSoon": "You changed your username too recently — you can try again on {{date}}",
+        "tooSoonGeneric": "You changed your username too recently — please try again later",
+        "generic": "Could not update username — please try again"
+      }
+    },
     "streak": {
       "winTitle": "Win streak — {{count}} in a row",
       "lossTitle": "Cold streak — {{count}} losses in a row",

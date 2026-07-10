@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/mail"
-	"regexp"
 	"strings"
 	"time"
 
@@ -17,8 +16,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/refreshtoken"
 	"github.com/emilijan/beljot/server/internal/user"
 )
-
-var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
 // reuseGracePeriod is how long after a token is rotated an already-rotated
 // token may still be presented without being treated as a stolen-token replay.
@@ -476,16 +473,11 @@ func validateRegisterRequest(req *RegisterRequest) error {
 	}
 	req.Email = strings.ToLower(norm.NFC.String(addr.Address))
 
-	req.Username = strings.TrimSpace(req.Username)
-	if len(req.Username) < 3 {
-		return apperr.ErrUsernameTooShort
+	username, err := user.ValidateUsername(req.Username)
+	if err != nil {
+		return err
 	}
-	if len(req.Username) > 20 {
-		return apperr.ErrUsernameTooLong
-	}
-	if !usernameRegex.MatchString(req.Username) {
-		return apperr.ErrUsernameInvalidChars
-	}
+	req.Username = username
 
 	if len(req.Password) < 8 {
 		return apperr.ErrPasswordTooShort

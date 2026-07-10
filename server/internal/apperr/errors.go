@@ -71,6 +71,12 @@ var (
 	// User domain errors
 	ErrUserNotFound    = NewAppError("USER_NOT_FOUND", "user not found", http.StatusNotFound)
 	ErrInvalidLanguage = NewAppError("INVALID_LANGUAGE", "language must be one of: en, sr, mk, hr", http.StatusBadRequest)
+	// Change-username errors. ErrUsernameUnchanged guards the no-op case (new
+	// name equals current) so a redundant submit never consumes the cooldown.
+	// ErrUsernameChangeTooSoon is 429 Too Many Requests — a rate limit, not a
+	// conflict; the client computes the next-allowed date from usernameChangedAt.
+	ErrUsernameUnchanged     = NewAppError("USERNAME_UNCHANGED", "new username is the same as the current one", http.StatusBadRequest)
+	ErrUsernameChangeTooSoon = NewAppError("USERNAME_CHANGE_TOO_SOON", "username was changed too recently", http.StatusTooManyRequests)
 
 	// Room domain errors
 	ErrRoomNameRequired          = NewAppError("ROOM_NAME_REQUIRED", "room name is required", http.StatusBadRequest)

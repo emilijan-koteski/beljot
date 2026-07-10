@@ -3,6 +3,8 @@ import "@/shared/i18n/i18n";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { QueryWrapper } from "@/test-utils";
+
 import { IdentityHero } from "./IdentityHero";
 
 type HeroProps = Parameters<typeof IdentityHero>[0];
@@ -23,7 +25,13 @@ function renderHero(overrides: Partial<HeroProps> = {}) {
     winRate: 60,
     ...overrides,
   };
-  return render(<IdentityHero {...props} />);
+  // IdentityHero now hosts EditableUsername, whose mutation hook needs a
+  // QueryClient in context.
+  return render(
+    <QueryWrapper>
+      <IdentityHero {...props} />
+    </QueryWrapper>,
+  );
 }
 
 describe("IdentityHero XP (Story 9.5)", () => {

@@ -26,8 +26,13 @@ type User struct {
 	// camelCase JSON tag. DB column total_xp is BIGINT (a lifetime accumulator,
 	// width-matched to this 64-bit Go int) with a CHECK (total_xp >= 0); XP only
 	// ever accrues. (Unlike WalletBalance, which is a bounded INTEGER balance.)
-	TotalXP   int            `gorm:"not null;default:0" json:"totalXp"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	TotalXP int `gorm:"not null;default:0" json:"totalXp"`
+	// UsernameChangedAt records when the user last changed their username. It is
+	// a pointer because it is nullable — NULL (never changed) serializes as null,
+	// not time.Time's "0001-01-01T00:00:00Z" zero value. Drives the 30-day change
+	// cooldown (see UsernameChangeCooldownDays). DB column is TIMESTAMPTZ.
+	UsernameChangedAt *time.Time     `gorm:"column:username_changed_at" json:"usernameChangedAt,omitempty"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
 }

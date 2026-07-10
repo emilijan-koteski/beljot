@@ -11,10 +11,15 @@ import { formatLocalizedDate } from "@/shared/lib/formatDate";
 import { xpFraction } from "@/shared/lib/xpLevel";
 
 import { daysSince } from "../lib/format";
+import { EditableUsername } from "./EditableUsername";
 import { WinRateRing } from "./WinRateRing";
 
 type IdentityHeroProps = {
   username: string;
+  /** Authenticated self's id — enables username edit-in-place (undefined = read-only). */
+  userId?: number;
+  /** When the username was last changed; drives the edit cooldown. */
+  usernameChangedAt?: string | null;
   createdAt: string;
   /** Completed-at of the most recent match, if any, for the "last played" line. */
   lastPlayedAt?: string;
@@ -99,6 +104,8 @@ function HeroPill({
  */
 export function IdentityHero({
   username,
+  userId,
+  usernameChangedAt,
   createdAt,
   lastPlayedAt,
   games,
@@ -142,12 +149,11 @@ export function IdentityHero({
         <Avatar name={username} size={96} halo="profile" />
         <div className="flex min-w-0 flex-col gap-2">
           <Eyebrow>{t("profile.eyebrow")}</Eyebrow>
-          <h1
-            className="text-ink font-display m-0 text-[clamp(32px,6vw,48px)] leading-[1.05] font-bold tracking-[-1.2px]"
-            data-testid="profile-username"
-          >
-            {username}
-          </h1>
+          <EditableUsername
+            username={username}
+            userId={userId}
+            usernameChangedAt={usernameChangedAt}
+          />
           <div className="text-ink-dim flex flex-wrap items-center gap-2 text-[13px]">
             {memberSince && <span data-testid="profile-member-since">{memberSince}</span>}
             {memberSince && lastPlayed && <span className="text-ink-off">·</span>}

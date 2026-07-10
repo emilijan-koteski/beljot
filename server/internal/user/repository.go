@@ -1,5 +1,7 @@
 package user
 
+import "time"
+
 type UserRepository interface {
 	Create(user *User) error
 	// Delete soft-deletes the user (GORM DeletedAt). The users unique indexes
@@ -21,6 +23,14 @@ type UserRepository interface {
 	// UpdatePasswordHash replaces the user's bcrypt password hash (used by the
 	// password-reset flow). Returns ErrUserNotFound when no row matches.
 	UpdatePasswordHash(id uint, hash string) error
+	// UpdateUsername sets the user's username and stamps username_changed_at to
+	// now (UTC), returning that stamp. Cooldown enforcement is atomic: the write
+	// only lands when the row is outside the change cooldown, so concurrent
+	// requests cannot both succeed — a lost cooldown race returns
+	// ErrUsernameChangeTooSoon. A duplicate username maps the pg 23505
+	// unique-violation to ErrUsernameTaken (mirroring Create) so a lost
+	// uniqueness race returns 409, not a raw 500.
+	UpdateUsername(id uint, username string) (time.Time, error)
 	// AddXP atomically adds each (userID -> delta) to that user's total_xp and
 	// returns each user's NEW total (Story 9.5). Mirrors the wallet charge/settle
 	// lock discipline (one transaction, FOR UPDATE, ascending userID order) so

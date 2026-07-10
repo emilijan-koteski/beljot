@@ -38,6 +38,24 @@
       "losses": "porazi",
       "capots": "štiglje"
     },
+    "editUsername": {
+      "edit": "Uredi korisničko ime",
+      "save": "Spremi",
+      "cancel": "Odustani",
+      "inputLabel": "Korisničko ime",
+      "success": "Korisničko ime je ažurirano",
+      "cooldownHint": "Korisničko ime možeš ponovno promijeniti {{date}}",
+      "errors": {
+        "tooShort": "Korisničko ime mora imati najmanje 3 znaka",
+        "tooLong": "Korisničko ime može imati najviše 20 znakova",
+        "invalidChars": "Dopušteni su samo slova, brojevi i donje crte",
+        "taken": "To korisničko ime je već zauzeto",
+        "unchanged": "To je već tvoje korisničko ime",
+        "tooSoon": "Nedavno si promijenio korisničko ime, pokušaj ponovno {{date}}",
+        "tooSoonGeneric": "Nedavno si promijenio korisničko ime, pokušaj kasnije",
+        "generic": "Nije moguće ažurirati korisničko ime, pokušaj ponovno"
+      }
+    },
     "streak": {
       "winTitle": "Niz pobjeda, {{count}} zaredom",
       "lossTitle": "Hladni niz, {{count}} poraza zaredom",
