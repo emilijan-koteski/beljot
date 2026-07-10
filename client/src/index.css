@@ -75,6 +75,12 @@
   --color-brass-ink: var(--brass-ink);
   --color-brass-soft: var(--brass-soft);
 
+  /* Bot (off-palette frost blue) — the shared "this is a bot" marker */
+  --color-bot: var(--bot);
+  --color-bot-deep: var(--bot-deep);
+  --color-bot-soft: var(--bot-soft);
+  --color-bot-edge: var(--bot-edge);
+
   /* Shadcn surfaces */
   --color-secondary: var(--surface-3);
   --color-secondary-foreground: var(--ink);
@@ -135,6 +141,19 @@
   --brass-deep: #9c7d4e;
   --brass-ink: #2a1a08;
   --brass-soft: rgba(201, 168, 118, 0.18);
+
+  /* ── Bot (frost-blue) ─────────────────────────────────────────────────
+     The single source of truth for "this is a bot". Shared by every bot
+     marker — the match-history "with bots" chip, the seated-bot badge, and
+     the add-bot spawn icon in the waiting room. Deliberately the same cool
+     frost-blue family as the cold-streak callout's ICE tone
+     (StreakCallout.tsx): an off-palette accent that reads distinct from the
+     warm felt-green / brass UI and never says "player". Fixed across scopes
+     (not re-rooted for felt/dark), mirroring the ICE exception. ── */
+  --bot: #2c82ad;
+  --bot-deep: #1f5e80;
+  --bot-soft: #eaf4fa;
+  --bot-edge: rgba(46, 131, 176, 0.32);
 
   /* ── Teams — viewer-relative (Us = gold, Them = silver) ───────────── */
   --team-a: #a07d1a;
