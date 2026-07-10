@@ -156,7 +156,7 @@ export function SeatTile({
                 {/* Bots never show You/Host badges — the bot marker takes their place. */}
                 {isBot && (
                   <span data-testid={`bot-badge-${seatIndex}`}>
-                    <Badge tone="neutral" icon={<Bot className="size-2.5" aria-hidden="true" />}>
+                    <Badge tone="bot" icon={<Bot className="size-2.5" aria-hidden="true" />}>
                       {t("bots.badge")}
                     </Badge>
                   </span>
@@ -232,7 +232,7 @@ export function SeatTile({
           // Larger tap target on phones (was size-6.5): too small to hit
           // reliably, so taps fell through to the seat's take-seat handler.
           // Desktop keeps the compact size.
-          className="bg-surface-elevated border-border text-ink-dim hover:border-brass hover:text-brass-deep absolute top-2 right-2 z-10 inline-flex size-9 items-center justify-center rounded-md border disabled:opacity-40 md:size-6.5"
+          className="bg-bot-soft border-bot-edge text-bot hover:border-bot hover:text-bot-deep absolute top-2 right-2 z-10 inline-flex size-9 items-center justify-center rounded-md border disabled:opacity-40 md:size-6.5"
         >
           {/* Nudged up 5%: the lucide Bot glyph's visual mass (the robot
               head) sits low in its viewBox, so true geometric centering

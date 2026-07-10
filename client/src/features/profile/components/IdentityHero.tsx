@@ -145,7 +145,11 @@ export function IdentityHero({
       }}
       data-testid="profile-identity-hero"
     >
-      <div className="flex min-w-0 items-center gap-5">
+      {/* Left region is a 2-col grid: [avatar | identity]. The stat pills and XP
+          block break to a full-width row beneath the avatar on mobile
+          (col-span-2, flush to the left edge) and tuck into the identity column
+          to the right of the avatar on sm+ (col-start-2). */}
+      <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-5 gap-y-4">
         <Avatar name={username} size={96} halo="profile" />
         <div className="flex min-w-0 flex-col gap-2">
           <Eyebrow>{t("profile.eyebrow")}</Eyebrow>
@@ -159,59 +163,63 @@ export function IdentityHero({
             {memberSince && lastPlayed && <span className="text-ink-off">·</span>}
             {lastPlayed && <span>{lastPlayed}</span>}
           </div>
-          <div className="mt-1.5 flex flex-wrap gap-2">
-            {/* The lifetime level (Story 9.5) is shown in the labelled XP-progress
-                block just below, so no separate level pill is repeated here. */}
-            <HeroPill value={games} label={t("profile.hero.games")} tone="neutral" />
-            <HeroPill value={wins} label={t("profile.hero.wins")} tone="accent" />
-            <HeroPill value={losses} label={t("profile.hero.losses")} tone="neutral" />
-            <HeroPill value={capots} label={t("profile.hero.capots")} tone="brass" />
-            {/* Matches the header coin pill: neutral surface + border, ink
-                number, off-theme gold coin icon (see COIN_GOLD). */}
+        </div>
+
+        <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:col-start-2">
+          {/* The lifetime level (Story 9.5) is shown in the labelled XP-progress
+              block just below, so no separate level pill is repeated here. */}
+          <HeroPill value={games} label={t("profile.hero.games")} tone="neutral" />
+          <HeroPill value={wins} label={t("profile.hero.wins")} tone="accent" />
+          <HeroPill value={losses} label={t("profile.hero.losses")} tone="neutral" />
+          <HeroPill value={capots} label={t("profile.hero.capots")} tone="brass" />
+          {/* Matches the header coin pill: neutral surface + border, ink
+              number, off-theme gold coin icon (see COIN_GOLD). */}
+          <HeroPill
+            value={formatCoins(walletBalance)}
+            label={t("wallet.balanceLabel")}
+            icon={<Coins className="size-3.5" style={{ color: COIN_GOLD }} aria-hidden="true" />}
+            tone="neutral"
+          />
+          {loginStreakDays > 1 && (
             <HeroPill
-              value={formatCoins(walletBalance)}
-              label={t("wallet.balanceLabel")}
-              icon={<Coins className="size-3.5" style={{ color: COIN_GOLD }} aria-hidden="true" />}
+              value={loginStreakDays}
+              label={t("wallet.streakLabel")}
+              titleText={t("wallet.streakTooltip", { days: loginStreakDays })}
+              icon={
+                <span className="text-[13px] leading-none" aria-hidden="true">
+                  🔥
+                </span>
+              }
               tone="neutral"
             />
-            {loginStreakDays > 1 && (
-              <HeroPill
-                value={loginStreakDays}
-                label={t("wallet.streakLabel")}
-                titleText={t("wallet.streakTooltip", { days: loginStreakDays })}
-                icon={
-                  <span className="text-[13px] leading-none" aria-hidden="true">
-                    🔥
-                  </span>
-                }
-                tone="neutral"
-              />
-            )}
-          </div>
+          )}
+        </div>
 
-          {/* Lifetime XP progress bar (Story 9.5, AC4). Level + numeric progress
-              on top, the bar below. xpIntoLevel / xpForNextLevel are server-
-              provided; the bar fill is cosmetic. Leaves room for the not-yet-
-              built honor / prior-season rank surfaces — render nothing for them. */}
-          <div className="mt-1 flex max-w-xs flex-col gap-1" data-testid="profile-xp">
-            <div className="flex items-baseline justify-between gap-2 text-[13px]">
-              <span className="text-ink font-semibold" data-testid="profile-level">
-                {t("xp.levelLabel", { level })}
-              </span>
-              <span className="text-ink-dim tabular-nums">
-                {t("xp.progress", { current: xpIntoLevel, next: xpForNextLevel })}
-              </span>
-            </div>
-            <XpBar
-              fraction={xpFraction(xpIntoLevel, xpForNextLevel)}
-              label={t("xp.progressLabel", {
-                level,
-                current: xpIntoLevel,
-                next: xpForNextLevel,
-              })}
-              testId="profile-xp-bar"
-            />
+        {/* Lifetime XP progress bar (Story 9.5, AC4). Level + numeric progress
+            on top, the bar below. xpIntoLevel / xpForNextLevel are server-
+            provided; the bar fill is cosmetic. Leaves room for the not-yet-
+            built honor / prior-season rank surfaces (render nothing for them). */}
+        <div
+          className="col-span-2 flex max-w-xs flex-col gap-1 sm:col-span-1 sm:col-start-2"
+          data-testid="profile-xp"
+        >
+          <div className="flex items-baseline justify-between gap-2 text-[13px]">
+            <span className="text-ink font-semibold" data-testid="profile-level">
+              {t("xp.levelLabel", { level })}
+            </span>
+            <span className="text-ink-dim tabular-nums">
+              {t("xp.progress", { current: xpIntoLevel, next: xpForNextLevel })}
+            </span>
           </div>
+          <XpBar
+            fraction={xpFraction(xpIntoLevel, xpForNextLevel)}
+            label={t("xp.progressLabel", {
+              level,
+              current: xpIntoLevel,
+              next: xpForNextLevel,
+            })}
+            testId="profile-xp-bar"
+          />
         </div>
       </div>
 

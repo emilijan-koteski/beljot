@@ -1,4 +1,4 @@
-import { Bot, Crown, Settings, Shuffle, UserX, X, Zap } from "lucide-react";
+import { Bot, Crown, Lock, Shuffle, UserX, X, Zap } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -64,11 +64,11 @@ function DialogButton({
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
-        padding: "11px 18px",
-        borderRadius: 10,
+        gap: 7,
+        padding: "8px 14px",
+        borderRadius: 9,
         fontFamily: "var(--font-body)",
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 600,
         letterSpacing: -0.1,
         lineHeight: 1.2,
@@ -181,7 +181,7 @@ function OwnerConfirmDialog({
         </DialogClose>
 
         {/* Header */}
-        <div style={{ display: "flex", gap: 16, padding: "26px 28px 6px" }}>
+        <div style={{ display: "flex", gap: 16, padding: "26px clamp(18px, 5vw, 28px) 6px" }}>
           <div
             style={{
               flexShrink: 0,
@@ -217,7 +217,7 @@ function OwnerConfirmDialog({
                 margin: "6px 0 0",
                 fontFamily: "var(--font-display)",
                 fontWeight: 700,
-                fontSize: 23,
+                fontSize: "clamp(18px, 4.8vw, 23px)",
                 letterSpacing: -0.5,
                 color: "var(--ink)",
                 lineHeight: 1.15,
@@ -232,8 +232,8 @@ function OwnerConfirmDialog({
         <p
           style={{
             margin: 0,
-            padding: "10px 28px 0",
-            fontSize: 14,
+            padding: "10px clamp(18px, 5vw, 28px) 0",
+            fontSize: "clamp(13px, 3.6vw, 14px)",
             color: "var(--ink-dim)",
             lineHeight: 1.6,
           }}
@@ -242,7 +242,7 @@ function OwnerConfirmDialog({
         </p>
 
         {/* Body */}
-        <div style={{ padding: "18px 28px 4px" }}>{children}</div>
+        <div style={{ padding: "18px clamp(18px, 5vw, 28px) 4px" }}>{children}</div>
 
         {/* Footer */}
         <div
@@ -252,7 +252,7 @@ function OwnerConfirmDialog({
             alignItems: "center",
             justifyContent: "flex-end",
             gap: 10,
-            padding: "16px 28px",
+            padding: "16px clamp(18px, 5vw, 28px)",
             borderTop: "1px solid var(--border)",
             background: "color-mix(in srgb, var(--surface-3) 45%, transparent)",
           }}
@@ -435,20 +435,27 @@ export function TransferOwnershipDialog({
   const { t } = useTranslation();
   const capabilities = [
     {
-      icon: <Zap size={13} color="var(--brass-deep)" />,
+      icon: <Zap size={14} color="var(--brass-deep)" />,
       label: t("room.ownerConfirm.capabilities.start"),
     },
     {
-      icon: <Shuffle size={13} color="var(--brass-deep)" />,
+      icon: <Shuffle size={14} color="var(--brass-deep)" />,
       label: t("room.ownerConfirm.capabilities.seats"),
     },
     {
-      icon: <UserX size={13} color="var(--brass-deep)" />,
+      icon: <UserX size={14} color="var(--brass-deep)" />,
       label: t("room.ownerConfirm.capabilities.players"),
     },
+    // Add/remove bots + room privacy are the owner powers actually available in
+    // a waiting room; the old "room name, pace & settings" item was misleading
+    // (name/timer aren't editable after creation).
     {
-      icon: <Settings size={13} color="var(--brass-deep)" />,
-      label: t("room.ownerConfirm.capabilities.settings"),
+      icon: <Bot size={14} color="var(--brass-deep)" />,
+      label: t("room.ownerConfirm.capabilities.bots"),
+    },
+    {
+      icon: <Lock size={14} color="var(--brass-deep)" />,
+      label: t("room.ownerConfirm.capabilities.privacy"),
     },
   ];
   const captionStyle: CSSProperties = {
@@ -591,28 +598,48 @@ export function TransferOwnershipDialog({
       >
         {t("room.ownerConfirm.handOver")}
       </span>
-      <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      {/* Simple icon-bulleted list (was a 2-col card grid that couldn't align
+          on narrow screens): the capability icon replaces the bullet dot, then
+          the label. One column at every width. */}
+      <ul
+        style={{
+          margin: "10px 0 0",
+          padding: 0,
+          listStyle: "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: 9,
+        }}
+      >
         {capabilities.map((c) => (
-          <div
+          <li
             key={c.label}
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "9px 11px",
-              borderRadius: 10,
-              background: "color-mix(in srgb, var(--brass-soft) 60%, var(--surface-2))",
-              border: "1px solid var(--border)",
-              fontSize: 12.5,
+              gap: 10,
+              fontSize: 13,
+              lineHeight: 1.3,
               color: "var(--ink-dim)",
               fontWeight: 500,
             }}
           >
-            {c.icon}
+            <span
+              aria-hidden
+              style={{
+                flexShrink: 0,
+                width: 18,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {c.icon}
+            </span>
             <span style={{ minWidth: 0 }}>{c.label}</span>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </OwnerConfirmDialog>
   );
 }

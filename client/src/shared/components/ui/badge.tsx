@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-type BadgeTone = "neutral" | "accent" | "brass" | "teamA" | "teamB" | "danger";
+type BadgeTone = "neutral" | "accent" | "brass" | "bot" | "teamA" | "teamB" | "danger";
 
 type BadgeProps = {
   tone?: BadgeTone;
@@ -26,6 +26,12 @@ const toneStyles: Record<BadgeTone, { bg: string; color: string; border: string 
     bg: "var(--brass-soft)",
     color: "var(--brass-deep)",
     border: "color-mix(in srgb, var(--brass) 40%, transparent)",
+  },
+  // Frost-blue bot marker — see the --bot token block in index.css.
+  bot: {
+    bg: "var(--bot-soft)",
+    color: "var(--bot-deep)",
+    border: "var(--bot-edge)",
   },
   teamA: {
     bg: "var(--team-a-tint)",

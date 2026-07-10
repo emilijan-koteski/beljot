@@ -506,8 +506,12 @@ function MatchRow({ match, username, isOpen, onToggle }: MatchRowProps) {
             )}
           {match.hasBots === true && (
             <span
-              className="text-ink-dim inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
-              style={{ borderColor: "var(--border)", background: "var(--surface-3)" }}
+              className="inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              style={{
+                color: "var(--bot-deep)",
+                borderColor: "var(--bot-edge)",
+                background: "var(--bot-soft)",
+              }}
               data-testid="match-history-bots-marker"
             >
               <Bot className="size-3" aria-hidden="true" />

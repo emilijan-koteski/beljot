@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { ArrowRight, Clock, Coins, KeyRound, Lock, LockOpen, Users, Zap } from "lucide-react";
+import { ArrowRight, Bot, Clock, Coins, KeyRound, Lock, LockOpen, Users, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
@@ -39,6 +39,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
   const { t } = useTranslation();
   const seated = room.playerCount;
   const full = seated >= 4;
+  const hasBots = room.players?.some((p) => p.isBot === true) ?? false;
   const delay = `${Math.min(index * 28, 320)}ms`;
 
   return (
@@ -70,6 +71,15 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
             >
               <Zap className="size-2.5" strokeWidth={2.4} />
               {t("lobby.card.quickPlay")}
+            </span>
+          )}
+          {hasBots && (
+            <span
+              data-testid="room-card-bots"
+              className="border-bot-edge bg-bot-soft text-bot-deep inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-[0.6px] uppercase"
+            >
+              <Bot className="size-2.5" strokeWidth={2.4} />
+              {t("bots.withBots")}
             </span>
           )}
           <CodeChip code={room.code} />
