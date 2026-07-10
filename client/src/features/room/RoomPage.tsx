@@ -1222,12 +1222,14 @@ export function RoomPage() {
             disabled={ctaDisabled}
             title={!inSwapMode && isOwner && !allSeated ? t("room.startMatchDisabled") : undefined}
             data-testid={ctaTestId}
-            // Sized to its label (not full width); whitespace-normal + a min
-            // height lets an unusually long label wrap instead of clipping (the
-            // cta size is fixed-height + nowrap by default). Single-line pill at sm.
-            className="h-auto min-h-11.5 py-2.5 leading-tight whitespace-normal sm:h-11.5 sm:py-0 sm:leading-normal sm:whitespace-nowrap"
+            // Single-line pill that shares the row: min-w-0 + shrink override the
+            // button's default shrink-0 so a long (usually disabled "waiting …")
+            // label truncates with an ellipsis when the action bar runs out of
+            // space, instead of wrapping into a tall block or shoving Leave.
+            // Tighter height/padding/type on mobile; full cta size from sm up.
+            className="h-9 min-w-0 shrink px-3.5 text-[13px] sm:h-11.5 sm:px-5.5 sm:text-[14.5px]"
           >
-            {ctaLabel}
+            <span className="min-w-0 truncate">{ctaLabel}</span>
           </Button>
         </div>
 
