@@ -212,6 +212,10 @@ func (r *mockMatchRepo) GetStatsForUser(userID uint) (int, int, int, error) {
 type mockUserRepo struct {
 	users  []*user.User
 	nextID uint
+	// updateUsernameErr, when set, forces UpdateUsername to return it — used to
+	// simulate the DB unique-index race (pg 23505 → ErrUsernameTaken) that the
+	// handler's pre-check can't otherwise reproduce.
+	updateUsernameErr error
 }
 
 func newMockUserRepo() *mockUserRepo {
@@ -302,6 +306,27 @@ func (m *mockUserRepo) UpdatePasswordHash(id uint, hash string) error {
 		}
 	}
 	return gorm.ErrRecordNotFound
+}
+
+func (m *mockUserRepo) UpdateUsername(id uint, username string) (time.Time, error) {
+	if m.updateUsernameErr != nil {
+		return time.Time{}, m.updateUsernameErr
+	}
+	// Emulate the DB unique index: a live row owned by another user blocks it.
+	for _, u := range m.users {
+		if u.Username == username && u.ID != id {
+			return time.Time{}, apperr.ErrUsernameTaken
+		}
+	}
+	for _, u := range m.users {
+		if u.ID == id {
+			now := time.Now().UTC()
+			u.Username = username
+			u.UsernameChangedAt = &now
+			return now, nil
+		}
+	}
+	return time.Time{}, gorm.ErrRecordNotFound
 }
 
 func (m *mockUserRepo) AddXP(awards map[uint]int) (map[uint]int, error) {
@@ -395,6 +420,7 @@ func setupUserHandlerWithMatches() (*mockUserRepo, *mockMatchRepo, *echo.Echo) {
 	api.GET("/users/:id/career", handler.GetCareer)
 	api.GET("/users/:id/matches", handler.ListMatches)
 	api.PATCH("/users/:id/preferences", handler.UpdatePreferences)
+	api.PATCH("/users/:id/username", handler.UpdateUsername)
 
 	return repo, matchRepo, e
 }
@@ -601,6 +627,195 @@ func TestUpdatePreferences_MissingAuth(t *testing.T) {
 
 	rec := doUpdatePreferences(e, "1", `{"languagePreference":"sr"}`, "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// --- UpdateUsername tests (Change Username feature) ---
+
+func doUpdateUsername(e *echo.Echo, userID, body, token string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/users/"+userID+"/username", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+func errCode(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	var errResp map[string]map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
+	return errResp["error"]["code"]
+}
+
+func TestUpdateUsername_Success(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("oldname", "u@example.com", "en")
+	require.Nil(t, u.UsernameChangedAt)
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdateUsername(e, strconvUint(u.ID), `{"username":"newname"}`, token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp struct {
+		Data struct {
+			Username          string     `json:"username"`
+			UsernameChangedAt *time.Time `json:"usernameChangedAt"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.Equal(t, "newname", resp.Data.Username)
+	require.NotNil(t, resp.Data.UsernameChangedAt)
+
+	// Row mutated and cooldown stamp set.
+	assert.Equal(t, "newname", repo.users[0].Username)
+	require.NotNil(t, repo.users[0].UsernameChangedAt)
+}
+
+// Whitespace is trimmed before validation and persistence.
+func TestUpdateUsername_TrimsWhitespace(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("oldname", "u@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdateUsername(e, strconvUint(u.ID), `{"username":"  trimmed  "}`, token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "trimmed", repo.users[0].Username)
+}
+
+func TestUpdateUsername_Taken(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("mine", "mine@example.com", "en")
+	repo.addUser("taken", "other@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdateUsername(e, strconvUint(u.ID), `{"username":"taken"}`, token)
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, "USERNAME_TAKEN", errCode(t, rec))
+	assert.Equal(t, "mine", repo.users[0].Username, "username must be unchanged on conflict")
+}
+
+// A lost uniqueness race (pre-check passes, the write hits pg 23505) surfaces as
+// 409 because the repo maps it to ErrUsernameTaken.
+func TestUpdateUsername_RaceMapsToTaken(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("mine", "mine@example.com", "en")
+	repo.updateUsernameErr = apperr.ErrUsernameTaken
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdateUsername(e, strconvUint(u.ID), `{"username":"newname"}`, token)
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, "USERNAME_TAKEN", errCode(t, rec))
+}
+
+func TestUpdateUsername_ValidationErrors(t *testing.T) {
+	cases := []struct {
+		name     string
+		username string
+		wantCode string
+	}{
+		{"too short", "ab", "USERNAME_TOO_SHORT"},
+		{"too long", "abcdefghijklmnopqrstu", "USERNAME_TOO_LONG"},
+		{"invalid chars", "bad name!", "USERNAME_INVALID_CHARS"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("oldname", "u@example.com", "en")
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdateUsername(e, strconvUint(u.ID), `{"username":"`+tc.username+`"}`, token)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+			assert.Equal(t, tc.wantCode, errCode(t, rec))
+			assert.Equal(t, "oldname", repo.users[0].Username, "username must be unchanged on validation failure")
+		})
+	}
+}
+
+// Submitting the current name is a no-op that must NOT consume the cooldown.
+func TestUpdateUsername_Unchanged(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("sameuser", "u@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdateUsername(e, strconvUint(u.ID), `{"username":"sameuser"}`, token)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, "USERNAME_UNCHANGED", errCode(t, rec))
+	assert.Nil(t, repo.users[0].UsernameChangedAt, "cooldown clock must not start on a no-op")
+}
+
+func TestUpdateUsername_WithinCooldown(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("oldname", "u@example.com", "en")
+	recent := time.Now().Add(-1 * time.Hour)
+	u.UsernameChangedAt = &recent
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdateUsername(e, strconvUint(u.ID), `{"username":"newname"}`, token)
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.Equal(t, "USERNAME_CHANGE_TOO_SOON", errCode(t, rec))
+	assert.Equal(t, "oldname", repo.users[0].Username, "username must be unchanged during cooldown")
+}
+
+// Once the cooldown window has elapsed the change is allowed again.
+func TestUpdateUsername_CooldownElapsed(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("oldname", "u@example.com", "en")
+	past := time.Now().Add(-(user.UsernameChangeCooldown + 24*time.Hour))
+	u.UsernameChangedAt = &past
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdateUsername(e, strconvUint(u.ID), `{"username":"newname"}`, token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "newname", repo.users[0].Username)
+}
+
+func TestUpdateUsername_Forbidden(t *testing.T) {
+	repo, e := setupUserHandler()
+	repo.addUser("alice", "alice@example.com", "en")
+	repo.addUser("bob", "bob@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(1, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdateUsername(e, "2", `{"username":"newname"}`, token)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestUpdateUsername_MissingAuth(t *testing.T) {
+	_, e := setupUserHandler()
+
+	rec := doUpdateUsername(e, "1", `{"username":"newname"}`, "")
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestUpdateUsername_BadRequestInvalidID(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("alice", "alice@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	for _, pathID := range []string{"abc", "0"} {
+		rec := doUpdateUsername(e, pathID, `{"username":"newname"}`, token)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, "pathID %q should be 400", pathID)
+	}
 }
 
 // --- ListMatches tests (Story 7.1) ---

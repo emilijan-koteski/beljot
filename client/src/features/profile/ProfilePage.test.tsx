@@ -19,6 +19,7 @@ const mockGetProfile = vi.fn();
 vi.mock("@/shared/api/profile", () => ({
   getProfile: (...args: unknown[]) => mockGetProfile(...args),
   updatePreferences: vi.fn().mockResolvedValue({ languagePreference: "en" }),
+  updateUsername: vi.fn().mockResolvedValue({ username: "testuser", usernameChangedAt: null }),
 }));
 
 const mockGetCareer = vi.fn();

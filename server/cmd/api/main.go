@@ -136,6 +136,7 @@ func main() {
 	api.GET("/users/:id/career", userHandler.GetCareer)
 	api.GET("/users/:id/matches", userHandler.ListMatches)
 	api.PATCH("/users/:id/preferences", userHandler.UpdatePreferences)
+	api.PATCH("/users/:id/username", userHandler.UpdateUsername)
 	// Profile-side SSO identity management (authed, self-only). The public
 	// /auth/sso/* routes handle login/register/link-during-login; these manage
 	// an already-authenticated user's linked accounts.

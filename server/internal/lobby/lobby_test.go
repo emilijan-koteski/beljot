@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
@@ -97,15 +98,16 @@ func (u *fakeUserRepo) Count() (int64, error) {
 }
 
 // Unused — panic to surface accidental coupling.
-func (u *fakeUserRepo) Create(*user.User) error                     { panic("unused") }
-func (u *fakeUserRepo) Delete(uint) error                           { panic("unused") }
-func (u *fakeUserRepo) FindByEmail(string) (*user.User, error)      { panic("unused") }
-func (u *fakeUserRepo) FindByUsername(string) (*user.User, error)   { panic("unused") }
-func (u *fakeUserRepo) FindByID(uint) (*user.User, error)           { panic("unused") }
-func (u *fakeUserRepo) FindManyByIDs([]uint) ([]user.User, error)   { panic("unused") }
-func (u *fakeUserRepo) UpdateLanguagePreference(uint, string) error { panic("unused") }
-func (u *fakeUserRepo) UpdatePasswordHash(uint, string) error       { panic("unused") }
-func (u *fakeUserRepo) AddXP(map[uint]int) (map[uint]int, error)    { panic("unused") }
+func (u *fakeUserRepo) Create(*user.User) error                        { panic("unused") }
+func (u *fakeUserRepo) Delete(uint) error                              { panic("unused") }
+func (u *fakeUserRepo) FindByEmail(string) (*user.User, error)         { panic("unused") }
+func (u *fakeUserRepo) FindByUsername(string) (*user.User, error)      { panic("unused") }
+func (u *fakeUserRepo) FindByID(uint) (*user.User, error)              { panic("unused") }
+func (u *fakeUserRepo) FindManyByIDs([]uint) ([]user.User, error)      { panic("unused") }
+func (u *fakeUserRepo) UpdateLanguagePreference(uint, string) error    { panic("unused") }
+func (u *fakeUserRepo) UpdatePasswordHash(uint, string) error          { panic("unused") }
+func (u *fakeUserRepo) UpdateUsername(uint, string) (time.Time, error) { panic("unused") }
+func (u *fakeUserRepo) AddXP(map[uint]int) (map[uint]int, error)       { panic("unused") }
 func (u *fakeUserRepo) TotalXPForUsers([]uint) (map[uint]int, error) {
 	panic("unused")
 }

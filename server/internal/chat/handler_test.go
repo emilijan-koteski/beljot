@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,15 +29,16 @@ func (s *userRepoStub) add(id uint, username string) {
 	s.users[id] = &user.User{ID: id, Username: username}
 }
 
-func (s *userRepoStub) Create(*user.User) error                     { return nil }
-func (s *userRepoStub) Delete(uint) error                           { return nil }
-func (s *userRepoStub) FindByEmail(string) (*user.User, error)      { return nil, nil }
-func (s *userRepoStub) FindByUsername(string) (*user.User, error)   { return nil, nil }
-func (s *userRepoStub) FindManyByIDs([]uint) ([]user.User, error)   { return nil, nil }
-func (s *userRepoStub) Count() (int64, error)                       { return int64(len(s.users)), nil }
-func (s *userRepoStub) UpdateLanguagePreference(uint, string) error { return nil }
-func (s *userRepoStub) UpdatePasswordHash(uint, string) error       { return nil }
-func (s *userRepoStub) AddXP(map[uint]int) (map[uint]int, error)    { return nil, nil }
+func (s *userRepoStub) Create(*user.User) error                        { return nil }
+func (s *userRepoStub) Delete(uint) error                              { return nil }
+func (s *userRepoStub) FindByEmail(string) (*user.User, error)         { return nil, nil }
+func (s *userRepoStub) FindByUsername(string) (*user.User, error)      { return nil, nil }
+func (s *userRepoStub) FindManyByIDs([]uint) ([]user.User, error)      { return nil, nil }
+func (s *userRepoStub) Count() (int64, error)                          { return int64(len(s.users)), nil }
+func (s *userRepoStub) UpdateLanguagePreference(uint, string) error    { return nil }
+func (s *userRepoStub) UpdatePasswordHash(uint, string) error          { return nil }
+func (s *userRepoStub) UpdateUsername(uint, string) (time.Time, error) { return time.Time{}, nil }
+func (s *userRepoStub) AddXP(map[uint]int) (map[uint]int, error)       { return nil, nil }
 func (s *userRepoStub) TotalXPForUsers([]uint) (map[uint]int, error) {
 	return nil, nil
 }

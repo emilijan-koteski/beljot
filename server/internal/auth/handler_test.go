@@ -104,6 +104,16 @@ func (m *mockUserRepo) UpdatePasswordHash(id uint, hash string) error {
 	return gorm.ErrRecordNotFound
 }
 
+func (m *mockUserRepo) UpdateUsername(id uint, username string) (time.Time, error) {
+	for _, u := range m.users {
+		if u.ID == id {
+			u.Username = username
+			return time.Now().UTC(), nil
+		}
+	}
+	return time.Time{}, gorm.ErrRecordNotFound
+}
+
 func (m *mockUserRepo) FindManyByIDs(ids []uint) ([]user.User, error) {
 	if len(ids) == 0 {
 		return []user.User{}, nil

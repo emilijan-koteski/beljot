@@ -3,6 +3,7 @@ package user
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,16 +30,17 @@ func (f *fakeLevelRepo) TotalXPForUsers(ids []uint) (map[uint]int, error) {
 	return out, nil
 }
 
-func (f *fakeLevelRepo) Create(*User) error                          { panic("unused") }
-func (f *fakeLevelRepo) Delete(uint) error                           { panic("unused") }
-func (f *fakeLevelRepo) FindByEmail(string) (*User, error)           { panic("unused") }
-func (f *fakeLevelRepo) FindByUsername(string) (*User, error)        { panic("unused") }
-func (f *fakeLevelRepo) FindByID(uint) (*User, error)                { panic("unused") }
-func (f *fakeLevelRepo) FindManyByIDs([]uint) ([]User, error)        { panic("unused") }
-func (f *fakeLevelRepo) Count() (int64, error)                       { panic("unused") }
-func (f *fakeLevelRepo) UpdateLanguagePreference(uint, string) error { panic("unused") }
-func (f *fakeLevelRepo) UpdatePasswordHash(uint, string) error       { panic("unused") }
-func (f *fakeLevelRepo) AddXP(map[uint]int) (map[uint]int, error)    { panic("unused") }
+func (f *fakeLevelRepo) Create(*User) error                             { panic("unused") }
+func (f *fakeLevelRepo) Delete(uint) error                              { panic("unused") }
+func (f *fakeLevelRepo) FindByEmail(string) (*User, error)              { panic("unused") }
+func (f *fakeLevelRepo) FindByUsername(string) (*User, error)           { panic("unused") }
+func (f *fakeLevelRepo) FindByID(uint) (*User, error)                   { panic("unused") }
+func (f *fakeLevelRepo) FindManyByIDs([]uint) ([]User, error)           { panic("unused") }
+func (f *fakeLevelRepo) Count() (int64, error)                          { panic("unused") }
+func (f *fakeLevelRepo) UpdateLanguagePreference(uint, string) error    { panic("unused") }
+func (f *fakeLevelRepo) UpdatePasswordHash(uint, string) error          { panic("unused") }
+func (f *fakeLevelRepo) UpdateUsername(uint, string) (time.Time, error) { panic("unused") }
+func (f *fakeLevelRepo) AddXP(map[uint]int) (map[uint]int, error)       { panic("unused") }
 
 func TestXPService_LevelsForUsers_AppliesCurve(t *testing.T) {
 	repo := &fakeLevelRepo{totals: map[uint]int{

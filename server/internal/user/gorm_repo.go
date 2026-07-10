@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
@@ -123,6 +124,39 @@ func (r *GormUserRepository) UpdatePasswordHash(id uint, hash string) error {
 		return apperr.ErrUserNotFound
 	}
 	return nil
+}
+
+func (r *GormUserRepository) UpdateUsername(id uint, username string) (time.Time, error) {
+	now := time.Now().UTC()
+	// The cooldown predicate lives in the WHERE clause so enforcement is atomic:
+	// the handler's pre-check is a fast, friendly path, but two concurrent
+	// requests that both pass it cannot both write — only one satisfies the
+	// "not within cooldown" condition once the first commits. Returns the stamp
+	// so the handler echoes the persisted value (not a slightly-later one).
+	cutoff := now.Add(-UsernameChangeCooldown)
+	result := r.db.Model(&User{}).
+		Where("id = ? AND (username_changed_at IS NULL OR username_changed_at < ?)", id, cutoff).
+		Updates(map[string]interface{}{
+			"username":            username,
+			"username_changed_at": now,
+		})
+	if err := result.Error; err != nil {
+		// A concurrent change that took this username between the handler's
+		// pre-check and this write surfaces as pg 23505 on the username unique
+		// index — map it to ErrUsernameTaken (409), mirroring Create.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && strings.Contains(pgErr.ConstraintName, "username") {
+			return time.Time{}, apperr.ErrUsernameTaken
+		}
+		return time.Time{}, err
+	}
+	if result.RowsAffected == 0 {
+		// The handler loaded the row and validated the name just before this
+		// call, so a no-op update means a concurrent change consumed the
+		// cooldown window in between — enforce it here (the race backstop).
+		return time.Time{}, apperr.ErrUsernameChangeTooSoon
+	}
+	return now, nil
 }
 
 // AddXP adds each delta to the matching user's total_xp inside one transaction

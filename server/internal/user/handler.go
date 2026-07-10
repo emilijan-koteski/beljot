@@ -17,11 +17,14 @@ import (
 // — when Epic 11 adds public player profiles, the public DTO must NOT include
 // them. Never add these fields to a shared/public response shape.
 type ProfileResponse struct {
-	ID                 uint   `json:"id"`
-	Username           string `json:"username"`
-	LanguagePreference string `json:"languagePreference"`
-	WalletBalance      int    `json:"walletBalance"`
-	LoginStreakDays    int    `json:"loginStreakDays"`
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+	// UsernameChangedAt is when the username was last changed (null if never).
+	// The client derives the change-cooldown state / next-allowed date from it.
+	UsernameChangedAt  *time.Time `json:"usernameChangedAt,omitempty"`
+	LanguagePreference string     `json:"languagePreference"`
+	WalletBalance      int        `json:"walletBalance"`
+	LoginStreakDays    int        `json:"loginStreakDays"`
 	// XP & level (Story 9.5). TotalXP is the lifetime total; Level is derived
 	// from it (never stored); XPIntoLevel/XPForNextLevel drive the profile XP
 	// bar (fill = XPIntoLevel / XPForNextLevel). These are PRIVATE self-only
@@ -86,19 +89,19 @@ type MatchHandView struct {
 
 // MatchListItem is the per-match DTO returned by GET /users/:id/matches.
 type MatchListItem struct {
-	ID          uint            `json:"id"`
-	Variant     string          `json:"variant"`
-	MatchMode   string          `json:"matchMode"`
-	StartedAt   time.Time       `json:"startedAt"`
-	CompletedAt time.Time       `json:"completedAt"`
-	Status      string          `json:"status"`
-	WinnerTeam  int             `json:"winnerTeam"`
-	TeamAScore  int             `json:"teamAScore"`
-	TeamBScore  int             `json:"teamBScore"`
-	HasBots     bool            `json:"hasBots"`
-	AbandonedBy *uint           `json:"abandonedBy,omitempty"`
-	ViewerSeat  int             `json:"viewerSeat"`
-	Outcome     string          `json:"outcome"`
+	ID          uint      `json:"id"`
+	Variant     string    `json:"variant"`
+	MatchMode   string    `json:"matchMode"`
+	StartedAt   time.Time `json:"startedAt"`
+	CompletedAt time.Time `json:"completedAt"`
+	Status      string    `json:"status"`
+	WinnerTeam  int       `json:"winnerTeam"`
+	TeamAScore  int       `json:"teamAScore"`
+	TeamBScore  int       `json:"teamBScore"`
+	HasBots     bool      `json:"hasBots"`
+	AbandonedBy *uint     `json:"abandonedBy,omitempty"`
+	ViewerSeat  int       `json:"viewerSeat"`
+	Outcome     string    `json:"outcome"`
 	// EndReason says why the match ended: "abandonment" (abandoned rows),
 	// "surrender" (completed via an accepted surrender), or "natural". The
 	// client renders the muted "ended early" history marker from it.
@@ -217,6 +220,7 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		"data": ProfileResponse{
 			ID:                 u.ID,
 			Username:           u.Username,
+			UsernameChangedAt:  u.UsernameChangedAt,
 			LanguagePreference: u.LanguagePreference,
 			WalletBalance:      u.WalletBalance,
 			LoginStreakDays:    u.LoginStreakDays,
@@ -387,6 +391,82 @@ func (h *UserHandler) UpdatePreferences(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": map[string]string{
 			"languagePreference": req.LanguagePreference,
+		},
+	})
+}
+
+type UpdateUsernameRequest struct {
+	Username string `json:"username"`
+}
+
+// UpdateUsername changes the authenticated user's username. Authorisation
+// mirrors GetProfile (self-only: :id must equal the authenticated user).
+// Checks run in a deliberate order so a redundant or premature request never
+// touches the cooldown clock or leaks a uniqueness oracle beyond what register
+// already exposes: validate → load → unchanged → cooldown → taken → write.
+// The repo write independently maps a lost uniqueness race to ErrUsernameTaken.
+func (h *UserHandler) UpdateUsername(c echo.Context) error {
+	authUserID, err := getUserID(c)
+	if err != nil {
+		return apperr.ErrUnauthorized
+	}
+
+	paramID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || paramID == 0 {
+		return apperr.ErrBadRequest
+	}
+	if paramID != uint64(authUserID) {
+		return apperr.ErrForbidden
+	}
+
+	var req UpdateUsernameRequest
+	if err := c.Bind(&req); err != nil {
+		return apperr.ErrBadRequest
+	}
+
+	username, err := ValidateUsername(req.Username)
+	if err != nil {
+		return err
+	}
+
+	u, err := h.userRepo.FindByID(authUserID)
+	if err != nil {
+		return fmt.Errorf("finding user: %w", err)
+	}
+	if u == nil {
+		return apperr.ErrUserNotFound
+	}
+
+	// No-op: changing to the exact current name never consumes the cooldown.
+	if username == u.Username {
+		return apperr.ErrUsernameUnchanged
+	}
+
+	// Cooldown: enforced against the LAST change only. A never-changed user
+	// (NULL username_changed_at) may always change.
+	if u.UsernameChangedAt != nil && time.Since(*u.UsernameChangedAt) < UsernameChangeCooldown {
+		return apperr.ErrUsernameChangeTooSoon
+	}
+
+	// Uniqueness pre-check (case-sensitive, matching registration). A row owned
+	// by a different live user means the name is taken.
+	existing, err := h.userRepo.FindByUsername(username)
+	if err != nil {
+		return fmt.Errorf("checking username: %w", err)
+	}
+	if existing != nil && existing.ID != authUserID {
+		return apperr.ErrUsernameTaken
+	}
+
+	changedAt, err := h.userRepo.UpdateUsername(authUserID, username)
+	if err != nil {
+		return fmt.Errorf("updating username: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": map[string]interface{}{
+			"username":          username,
+			"usernameChangedAt": changedAt,
 		},
 	})
 }
