@@ -384,7 +384,8 @@
         "start": "Pokretanje meča",
         "seats": "Zamenu i raspored mesta",
         "players": "Izbacivanje i postavljanje igrača",
-        "settings": "Naziv sobe, tempo i podešavanja"
+        "bots": "Dodavanje i uklanjanje botova",
+        "privacy": "Privatnost sobe"
       }
     },
     "legendNeutral": "Slobodna mesta · timovi se otkrivaju kad sedneš",

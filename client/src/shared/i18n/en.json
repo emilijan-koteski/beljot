@@ -384,7 +384,8 @@
         "start": "Starting the match",
         "seats": "Swapping & arranging seats",
         "players": "Kicking & promoting players",
-        "settings": "Room name, pace & settings"
+        "bots": "Adding & removing bots",
+        "privacy": "Room privacy"
       }
     },
     "legendNeutral": "Open seats · teams reveal once you sit down",
