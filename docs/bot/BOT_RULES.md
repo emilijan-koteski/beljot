@@ -4,8 +4,10 @@ This document describes exactly how the bot decides, across every scenario, what
 considers, and with examples. It reflects the current logic including the latest tuning
 (candidate-aware bidding, unbacked side-Ace and two-trump Jack+9 bids, partner trump-draw,
 boss preservation, uncuttable-boss last-trick retention, Ace/Ten boss handling, suppressing
-trump draws once the opponents are void of trump, leading into a partner's void, and smearing
-onto a partner's boss).
+trump draws once the opponents are void of trump, leading into a partner's void, smearing
+onto a partner's boss, seat-aware **secure trick takes** with a material-stake gate, the
+**boss-preserving smear** with its endgame/dead-suit exceptions, and never fighting a partner
+who is **forced to win a trump-led trick**).
 
 Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, J, T (ten), 9, 8, 7.
 
@@ -289,20 +291,48 @@ First it computes who currently wins. Branches:
 
 **My partner currently wins:**
 
-- If the win is **safe** (no opponent can still beat it): **smear** the highest-point card that
-  does not overtake the partner (dump an Ace/Ten onto the guaranteed trick — the highest-point
-  non-overtaking card already prefers the Ace over the Ten). If every legal card would overtake
-  (e.g. a forced over-play), play the **strongest** card, unless it is the boss/master of its
-  suit, then play the **second strongest** and keep the boss for later
-  (`strongestPreservingBoss`). **Ace + Ten exception**: if that boss is a non-trump **Ace** and
-  the bot **also holds that suit's Ten**, smear the **Ace** instead — spending it surrenders no
-  control (the Ten becomes the suit's new boss), so the higher points are banked now onto the
-  already-won trick. Example: partner safely won, bot forced over holding A♠ + T♠ -> play **A♠**
-  (the Ten stays as the new boss).
+- If the win is **safe** (no opponent can still beat it): **smear** points onto the guaranteed
+  trick via `bestSmear` — the highest-point non-overtaking card that is **boss-safe** (see "The
+  boss-preserving smear" below). If every legal card would overtake (e.g. a forced over-play),
+  play the **strongest** card, unless it is the boss/master of its suit, then play the
+  **second strongest** and keep the boss for later (`strongestPreservingBoss`). **Ace + Ten
+  exception**: if that boss is a non-trump **Ace** and the bot **also holds that suit's Ten**,
+  smear the **Ace** instead — spending it surrenders no control (the Ten becomes the suit's new
+  boss), so the higher points are banked now onto the already-won trick. Example: partner safely
+  won, bot forced over holding A♠ + T♠ -> play **A♠** (the Ten stays as the new boss).
 - If the win is **not provably safe**, but the partner holds the **boss of a non-trump led
   suit** (only a ruff could beat it) and the one remaining opponent cannot certainly ruff:
-  **risk-smear** the high points anyway (`shouldSmearOntoPartnerBoss`). See the rule below.
-- Otherwise: keep points home with the lowest value.
+  **risk-smear** high points anyway (`shouldSmearOntoPartnerBoss`), again picking the card via
+  `bestSmear`. See the rule below.
+- Otherwise: keep points home with the lowest value — with one exception, the **secure take**:
+  when **every legal card overtakes** (a forced overplay or forced ruff leaves nothing to duck)
+  **and** there are points at stake (trick points + the donation's own points > 0), picking the
+  donation by points alone can hand the trick away. If some legal card **takes the trick beyond
+  doubt** (`securelyWins`, below), the bot secures it with the **cheapest such card**; if
+  nothing is provably secure, it donates the cheapest as before.
+
+  Example (the classic leak this fixes): trump ♥, partner leads **Q♥**, opponent plays 8♥, bot
+  third holds K♥ A♥ 9♥ J♥ with the **T♥ unseen**. The overplay rule forces all four; the old
+  bot played K♥ (cheapest) and the T♥ holder took the trick. Now it plays **A♥** — the cheapest
+  card the unseen Ten cannot beat — keeping 9♥ and J♥ as masters.
+
+**The "secure winner" concept (`securelyWins`)** — a card takes the trick beyond doubt when it
+overtakes the current winner AND either the bot closes the trick, or **no yet-to-play OPPONENT
+could still play a card that beats it**. The check is per remaining opponent seat:
+
+- cards that seat **provably holds** (declaration reveal, minus already-played) count;
+- **unseen** cards count only for suits that seat is **not known void in** (`KnownVoids`);
+- a seat revealed to still hold a **led-suit card must follow suit** (`seatKnownHoldsSuit`) —
+  its trumps are unplayable this trick and do not veto security;
+- the partner is never a threat, and neither are cards pinned to a seat that already acted.
+
+So: forced over the partner's Q♥ holding K♥ A♥ J♥ with the one remaining opponent **known void
+in trump**, the bot plays **K♥** — it is already guaranteed; the Jack is not burnt.
+
+**The material-stake gate** — the secure upgrade only fires when securing wins something:
+current trick points plus the cheap take's own points must be **> 0**. On a pointless trick
+(e.g. forced ruff of a 7♦ lead holding J♥ + 8♥) the bot ruffs **cheap** (8♥) and accepts the
+gamble — the master is never burnt to secure nothing.
 
 - **Risk-smear detail** (`shouldSmearOntoPartnerBoss`): when the partner leads a non-trump
   **Ace** (or the current top of the suit), an opponent follows suit, and the bot sits third
@@ -326,23 +356,71 @@ First it computes who currently wins. Branches:
 **An opponent currently wins:**
 
 - If the partner is yet to play and is **guaranteed** to take the trick (`partnerTakesTrick`):
-  smear the highest-point non-overtaking card, else lowest value.
+  smear via `bestSmear`; if every legal card overtakes (the card lands in the team's trick
+  anyway), bank high while preserving a boss/master via `strongestPreservingBoss` — never dump
+  the minimum into a guaranteed team trick.
+
+  `partnerTakesTrick` covers two shapes now:
+  - **Non-trump lead** (unchanged): the partner must be **provably void** in the led suit (so
+    it is forced to ruff, not follow into a loss) and hold a trump beater no opponent-reachable
+    card beats.
+  - **Trump lead** (new): no void proof needed — the partner must follow trump, and the
+    overplay rule **forces** its known threat-proof beater out. Example: opponent leads **K♥**,
+    partner declared **J♥** and plays last; bot holds 9♥ + T♥ (both forced overplays). The J♥
+    wins no matter what, so the bot dumps **T♥** (banks 10 into the partner's trick) and keeps
+    the 9♥ — it never "secures" with the 14-point 9. A declared beater that is **not**
+    threat-proof (say the partner declared only A♥ while J♥/9♥ are unseen) does NOT trigger
+    this — the bot takes normally.
 - **Last to play and can win by following the led non-trump suit**: bank the
   **highest-points** led-suit winner instead of the cheapest (`highestPointsLedSuitWinner`).
   Banked into this trick (guaranteed as last player) it is safe; kept and led next trick it
   risks a ruff. Ruff wins (void in led) and trump-led tricks fall through unchanged.
-- Otherwise: take the trick **as cheaply as possible** (`cheapestWinning`).
+- Otherwise: take the trick — with points at stake (trick + cheap winner > 0), prefer the
+  **cheapest secure winner** (`cheapestSecureWinning`); if nothing is provably secure, or the
+  trick is pointless, take **as cheaply as possible** (`cheapestWinning`) as before.
 - Cannot win: **discard** the lowest value, preserving trump.
 
-Example (smear): trump ♥, partner led A♥ (safe). Hand ♥T ♥7 ♣K -> play **♥T** (10 points onto
-the partner's trick), not ♥7.
+**The boss-preserving smear (`bestSmear` + `bossWorthGuarding`)** — used at all three smear
+sites (safe smear, risk-smear, partner-takes-trick). Among non-overtaking legal cards it picks
+the highest-point card that is **boss-safe**; on a points tie it smears the **weaker** rank
+(keep the stronger card). A card is NOT boss-safe when it is the boss/master of its suit
+(`cardIsBoss`) **without a backup** — another held card of the same suit that is also a boss
+once it leaves (`heldSameSuitBoss`; the Ace backed by the Ten, generalized to any promoted
+top). An unprotected boss is kept home and the best non-boss card is smeared instead. Two
+exceptions un-guard a non-trump boss whose "control" is illusory:
+
+- **Endgame** (2 cards in hand): if the opponents are **not provably out of trump**, a hoarded
+  boss just dies to the trick-8 ruff — smear it now and bank the points. Only a provably
+  **uncuttable** boss is kept for trick 8.
+- **Dead suit**: an opponent **known void** in the boss's suit that **may still hold a trump**
+  (`opponentMayHoldTrump`) means any lead of that suit gets ruffed — the boss can never cash,
+  so it is banked, not hoarded.
+
+Trump **masters** are always guarded (nothing ruffs a trump). When **every** candidate is an
+unprotected boss (one must be given), the bot smears the **highest-point** one — the plain
+old behavior, by explicit product decision.
+
+Example (boss-guard): partner trumped and safely won, bot last holding **A♠ Q♠ 7♠** (no T♠) ->
+smear **Q♠** and keep the Ace as the master of spades. Old behavior threw the Ace.
+
+Example (protected boss): same trick, holding **A♠ + T♠** -> smear **A♠** (the Ten stays boss).
+
+Example (endgame exception): trick 7, hand **A♠ + 8♣**, partner safely won, an opponent may
+still hold a trump -> smear **A♠** (bank 11; keeping it donates it to the trick-8 ruff). With
+both opponents provably out of trump -> smear 8♣ and keep A♠ to win trick 8.
+
+Example (smear, trump master kept): trump ♥, partner's **J♥** ruff safely won the closed trick,
+bot void in the led suit holding 9♥ Q♥ 8♥ (forced to cut) -> smear **Q♥**; the 9♥ — the master
+once the Jack cashes — is kept. Holding 9♥ + A♥ instead (each protects the other): smear **9♥**,
+the canonical 9-under-the-partner's-Jack.
 
 Example (preserve boss, 5.1.1): partner wins with Q♠, bot forced over with K♠ and Q♠ (A♠/T♠
 gone) -> K♠ is the boss, so play **Q♠** and keep K♠. (With A♠ + T♠ instead, the Ace + Ten
 exception applies: play **A♠** and keep T♠ as the new boss.)
 
-Example (risk-smear, Rule 8): partner leads A♠, opponent follows low, bot third with T♠ and a
-7♠, last opponent's void unknown -> play **T♠** (smear), not 7♠.
+Example (risk-smear, Rule 8): partner leads A♠, opponent follows low, bot third with T♠ J♠ 7♠,
+last opponent's void unknown -> play **J♠** (2 points smeared); the T♠ — promoted to boss once
+the Ace cashes — is kept, and 7♠ stays for a later duck.
 
 Example (bank highest as last, Rule 6): opponent wins with ♠K, bot is last holding A♠ and T♠ ->
 play **A♠** now (banks 11 safely) instead of T♠ (which would later lead into a ruff).
@@ -371,6 +449,10 @@ Reasoning helpers (all pure, in `bot.go`):
   never a threat. Most heuristics (`holdsMasterTrump`, `isSuitBoss`, `trumpsRemainUnseen`,
   `partnerWinIsSafe`, `shouldSmearOntoPartnerBoss`) scan `threats`, so once the partner has
   declared the high cards they leave the threat set and the bot stops fighting the partner.
+- `securelyWins` goes **further** than the raw `threats` scan: it reasons **per yet-to-play
+  opponent seat** — known holdings per seat, unseen cards filtered by that seat's known voids,
+  and the follow-suit pin (`seatKnownHoldsSuit`: a seat revealed to hold the led suit cannot
+  play its trumps this trick). Cards pinned to seats that already acted are not threats.
 
 ---
 
@@ -394,11 +476,24 @@ By impact:
    `opponentsOutOfTrump` stops the draw once opponents are void), cash a boss (Ace/Ten handling),
    feed a partner ruff, or lead safe.
 4. `chooseFollow`: smear, risk-smear, banking, and point management.
-5. `partnerDrawTrump`: the Q/K/T/A order and the "never the 9" rule.
-6. `retainLastTrickWinner` + `isUncuttableBoss`: capturing the +10 in the last trick.
+5. `securelyWins` + the material-stake gate (`trickPoints + cardPoints > 0`): when the bot
+   pays up for a guaranteed take vs. contests cheaply. The `> 0` threshold is the dial.
+6. `bestSmear` / `bossWorthGuarding`: what counts as control worth hoarding (backup test,
+   endgame and dead-suit exceptions, the all-unprotected fallback).
+7. `partnerDrawTrump`: the Q/K/T/A order and the "never the 9" rule.
+8. `retainLastTrickWinner` + `isUncuttableBoss`: capturing the +10 in the last trick.
 
-Blind spots if you want a stronger bot:
+Blind spots if you want a stronger bot (the first four are logged in
+`_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass):
 
+- The stake gate has **no cost/benefit weighing** — any > 0 stake can spend a 20-point master
+  to secure a 3-point trick.
+- The endgame boss-guard ignores **who leads trick 8** — a hoarded uncuttable boss converts
+  for sure only when the bot itself leads it.
+- `partnerWinIsSafe`'s trump-threat leg is still a **raw unseen scan** (not seat-aware like
+  `securelyWins`), so the bot sometimes ducks a smear onto a provably safe partner ruff.
+- No arbitration between a mid-hand secure-spend of the master trump and the trick-7 retention
+  logic that prices last-trick control at +10.
 - `TeamScores` / `HandPoints` / `TricksWon` are in the View but **never consulted**: no
   "we are behind, play aggressive" or "the contract is secured, coast" logic.
 - No signalling or inference from the **partner's** discards (only voids are used).
@@ -418,6 +513,9 @@ Blind spots if you want a stronger bot:
 | Cash a side boss (Ace/Ten: cash the Ten, keep the Ace) | boss block in `chooseLead`, `findRankOfSuit` | `server/internal/bot/bot.go` |
 | Only trumps left: highest if master, else lowest | `chooseLead` only-trumps branch, `isTrumpMaster` | `server/internal/bot/bot.go` |
 | Preserve the boss on a forced overtake (Ace/Ten: smear the Ace) | `strongestPreservingBoss` | `server/internal/bot/bot.go` |
+| Secure take: cheapest guaranteed winner when points are at stake | `securelyWins`, `cheapestSecureWinning`, `trickPoints`, `seatKnownHoldsSuit` | `server/internal/bot/bot.go` |
+| Boss-preserving smear (backup test, endgame/dead-suit exceptions) | `bestSmear`, `bossWorthGuarding`, `heldSameSuitBoss` | `server/internal/bot/bot.go` |
+| Never fight a partner forced to win a trump-led trick | `partnerTakesTrick` (trump-led branch) | `server/internal/bot/bot.go` |
 | Bank the high card as last player | `highestPointsLedSuitWinner` + `chooseFollow` | `server/internal/bot/bot.go` |
 | Lead into the partner's void | `leadIntoPartnerVoid` | `server/internal/bot/bot.go` |
 | Smear onto the partner's boss (risk) | `shouldSmearOntoPartnerBoss`, `opponentMayHoldTrump` | `server/internal/bot/bot.go` |
