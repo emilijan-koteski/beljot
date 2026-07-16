@@ -6,18 +6,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/apperr"
 )
 
-// Natural rank order for sequences: 7 < 8 < 9 < T < J < Q < K < A.
-var naturalRankIndex = map[Rank]int{
-	Rank7:     0,
-	Rank8:     1,
-	Rank9:     2,
-	RankTen:   3,
-	RankJack:  4,
-	RankQueen: 5,
-	RankKing:  6,
-	RankAce:   7,
-}
-
 // sequencePoints maps sequence length to point value.
 var sequencePoints = map[int]int{
 	3: 20,
@@ -55,14 +43,14 @@ func detectDeclarations(hand []Card) []Declaration {
 		}
 		// Sort by natural rank order
 		sort.Slice(cards, func(i, j int) bool {
-			return naturalRankIndex[cards[i].Rank] < naturalRankIndex[cards[j].Rank]
+			return NaturalRankOrder[cards[i].Rank] < NaturalRankOrder[cards[j].Rank]
 		})
 
 		// Find maximal consecutive sequences
 		seqStart := 0
 		for i := 1; i <= len(cards); i++ {
 			consecutive := i < len(cards) &&
-				naturalRankIndex[cards[i].Rank] == naturalRankIndex[cards[i-1].Rank]+1
+				NaturalRankOrder[cards[i].Rank] == NaturalRankOrder[cards[i-1].Rank]+1
 			if !consecutive {
 				seqLen := i - seqStart
 				if seqLen >= 3 {
@@ -237,8 +225,8 @@ func declarationBeats(a *Declaration, seatA int, b *Declaration, seatB int, trum
 	if a.Type == DeclarationSequence && b.Type == DeclarationSequence {
 		topA := sequenceTopCard(a.Cards)
 		topB := sequenceTopCard(b.Cards)
-		orderA := naturalRankIndex[topA]
-		orderB := naturalRankIndex[topB]
+		orderA := NaturalRankOrder[topA]
+		orderB := NaturalRankOrder[topB]
 		if orderA != orderB {
 			return orderA > orderB
 		}
@@ -261,7 +249,7 @@ func declarationBeats(a *Declaration, seatA int, b *Declaration, seatB int, trum
 func sequenceTopCard(cards []Card) Rank {
 	best := cards[0].Rank
 	for _, c := range cards[1:] {
-		if naturalRankIndex[c.Rank] > naturalRankIndex[best] {
+		if NaturalRankOrder[c.Rank] > NaturalRankOrder[best] {
 			best = c.Rank
 		}
 	}
