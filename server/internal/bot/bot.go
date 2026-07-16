@@ -395,8 +395,9 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 	if game.TeamForSeat(winnerSeat) == game.TeamForSeat(v.Seat) {
 		if partnerWinIsSafe(v, trump) {
 			// Smear: the highest-point card that does not overtake the
-			// partner's already-won trick.
-			if c := highestPointNonOvertaking(v, legal, trump); c != nil {
+			// partner's already-won trick — but never a boss worth keeping
+			// (bestSmear guards the control card of a suit).
+			if c := bestSmear(v, legal, trump); c != nil {
 				return *c
 			}
 			// No non-overtaking card — every legal play would overtake the
@@ -415,24 +416,42 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 		// would overtake (a forced ruff with no card to spare), there is nothing to
 		// smear and we fall through to the cheap ruff below.
 		if shouldSmearOntoPartnerBoss(v, trump) {
-			if c := highestPointNonOvertaking(v, legal, trump); c != nil {
+			if c := bestSmear(v, legal, trump); c != nil {
 				return *c
 			}
 		}
-		// Partner's card is still genuinely contestable (or a known ruff looms) —
-		// keep our points home. While the led suit can still win, the overplay rule
-		// auto-promotes us when we hold the boss.
-		return lowestValue(legal, trump)
+		// Partner's card is still genuinely contestable, a known ruff looms, or
+		// the risk-smear found nothing to give (every legal card overtakes) —
+		// keep our points home. One exception: when EVERY legal card overtakes
+		// (the overplay rule or a forced ruff leaves nothing to duck) and there
+		// are points at stake, picking the donation by points alone can hand the
+		// trick away — forced over a partner's trump Queen, the King (4 pts)
+		// loses to the unseen Ten. Then, if some legal card takes the trick
+		// beyond doubt (no yet-to-play opponent can beat it), secure the take
+		// with the cheapest such card. On a pointless trick the cheap donation
+		// stands — a master is never burnt to secure nothing.
+		duck := lowestValue(legal, trump)
+		if highestPointNonOvertaking(v, legal, trump) == nil &&
+			trickPoints(v, trump)+cardPoints(duck, trump) > 0 {
+			if c := cheapestSecureWinning(v, legal, trump); c != nil {
+				return *c
+			}
+		}
+		return duck
 	}
 
 	// Opponent currently wins, but if our partner is yet to play and is KNOWN
 	// (from the reveal) to take this trick, it is effectively ours — don't spend
-	// a winner overtaking. Smear the highest-point non-overtaking card instead.
+	// a winner overtaking. Smear the best boss-safe high-point card instead.
 	if partnerTakesTrick(v, trump) {
-		if c := highestPointNonOvertaking(v, legal, trump); c != nil {
+		if c := bestSmear(v, legal, trump); c != nil {
 			return *c
 		}
-		return lowestValue(legal, trump)
+		// Every legal card overtakes, but the partner still takes the trick in
+		// the end — whatever we play lands in the team's pile. Bank the high
+		// points while keeping a boss/master back, exactly as over a safely
+		// winning partner.
+		return strongestPreservingBoss(v, legal, trump)
 	}
 
 	// Opponent currently wins. When we are LAST to play and can win by FOLLOWING
@@ -450,9 +469,21 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 		}
 	}
 
-	// Opponent currently wins: take the trick as cheaply as possible.
-	if c := cheapestWinning(v, legal, trump); c != nil {
-		return *c
+	// Opponent currently wins: when there is material at stake — points already
+	// on the table, or points the cheapest take itself would add — prefer the
+	// cheapest winner no yet-to-play opponent can beat. A cheaper but beatable
+	// winner risks donating the trick (and the card) to an unseen higher card
+	// or a ruff. On a pointless trick securing gains nothing, so the bot
+	// contests cheaply as before and never burns a master to win nothing.
+	if cheap := cheapestWinning(v, legal, trump); cheap != nil {
+		if trickPoints(v, trump)+cardPoints(*cheap, trump) > 0 {
+			if c := cheapestSecureWinning(v, legal, trump); c != nil {
+				return *c
+			}
+		}
+		// Nothing secure, or nothing at stake: take the trick as cheaply as
+		// possible and accept the gamble.
+		return *cheap
 	}
 	// Cannot win: discard the lowest-value card, preserving trump.
 	return lowestValue(legal, trump)
@@ -463,11 +494,14 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 // it. The bot's partner (seat+2) is yet to play only when the bot sits at the
 // leader's left — and then the partner plays LAST, with exactly one opponent
 // acting between them. The take is sound only when the partner can LEGALLY play
-// the beater no matter what that opponent does: it must be provably void in the
-// led suit (so it is forced to ruff, not to follow suit into a loss) AND hold a
-// trump that beats the current winner and that no opponent-reachable card
-// (threats) can beat. A higher led-suit card is NOT enough — an intervening
-// opponent could ruff and force the suit-bound partner under.
+// the beater no matter what that opponent does: on a non-trump lead it must be
+// provably void in the led suit (so it is forced to ruff, not to follow suit
+// into a loss) AND hold a trump that beats the current winner and that no
+// opponent-reachable card (threats) can beat. A higher led-suit card is NOT
+// enough — an intervening opponent could ruff and force the suit-bound partner
+// under. On a TRUMP lead no void proof is needed: the partner must follow
+// trump, and the overplay rule forces it above the current winner whenever it
+// can go higher — so a known threat-proof beater is forced out and wins.
 func partnerTakesTrick(v View, trump game.Suit) bool {
 	if len(v.CurrentTrick) == 0 {
 		return false // defensive: chooseFollow only runs mid-trick
@@ -477,9 +511,11 @@ func partnerTakesTrick(v View, trump game.Suit) bool {
 		return false
 	}
 	led := v.CurrentTrick[0].Card.Suit
-	ledIdx := SuitIndex(led)
-	if ledIdx < 0 || !v.KnownVoids[partner][ledIdx] {
-		return false // partner might be forced to follow suit and lose
+	if led != trump {
+		ledIdx := SuitIndex(led)
+		if ledIdx < 0 || !v.KnownVoids[partner][ledIdx] {
+			return false // partner might be forced to follow suit and lose
+		}
 	}
 	_, winning := trickWinner(v.CurrentTrick, trump)
 	for _, pc := range knownHeldBy(v, partner) {
@@ -942,6 +978,205 @@ func cheapestWinning(v View, legal []game.Card, trump game.Suit) *game.Card {
 		}
 	}
 	return best
+}
+
+// securelyWins reports whether c takes the trick beyond doubt: it overtakes
+// the current winner, and either the bot closes the trick (nobody plays after
+// it) or no card a yet-to-play OPPONENT could still play beats it. The check
+// is per remaining seat — going further than partnerWinIsSafe, whose
+// trump-threat leg still scans raw unseen cards: a card an opponent revealed
+// via declarations is only a danger while that opponent has not yet acted
+// this trick; an unseen card cannot sit with a seat that is provably void in
+// its suit; and a seat revealed to still hold a led-suit card is FORCED by
+// the follow-suit rule to play that suit — its trumps and side cards are
+// unplayable this trick. Ruffs are covered automatically — a trump the seat
+// could play beats any non-trump candidate via beatsCard.
+func securelyWins(v View, c game.Card, trump game.Suit) bool {
+	if len(v.CurrentTrick) == 0 {
+		return false // defensive: securing is a follow-play notion
+	}
+	if !wouldOvertake(c, v.CurrentTrick, trump) {
+		return false
+	}
+	if len(v.CurrentTrick) == 3 {
+		return true
+	}
+	led := v.CurrentTrick[0].Card.Suit
+	unseen := unseenCards(v)
+	for _, seat := range seatsYetToPlay(v) {
+		if game.TeamForSeat(seat) == game.TeamForSeat(v.Seat) {
+			continue // the partner never beats us on purpose — not a threat
+		}
+		// A revealed led-suit holding pins the seat: only its led-suit cards
+		// can legally land on this trick.
+		mustFollow := seatKnownHoldsSuit(v, seat, led)
+		for _, t := range knownHeldBy(v, seat) {
+			if mustFollow && t.Suit != led {
+				continue
+			}
+			if beatsCard(t, c, led, trump) {
+				return false
+			}
+		}
+		for _, t := range unseen {
+			if mustFollow && t.Suit != led {
+				continue
+			}
+			if idx := SuitIndex(t.Suit); idx >= 0 && v.KnownVoids[seat][idx] {
+				continue // provably void in the suit — this seat cannot hold t
+			}
+			if beatsCard(t, c, led, trump) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// seatKnownHoldsSuit reports whether the reveal proves seat still holds a
+// card of the given suit — and is therefore forced to follow while that suit
+// is led.
+func seatKnownHoldsSuit(v View, seat int, suit game.Suit) bool {
+	for _, c := range knownHeldBy(v, seat) {
+		if c.Suit == suit {
+			return true
+		}
+	}
+	return false
+}
+
+// cheapestSecureWinning returns the lowest-point (then weakest) legal card
+// that takes the trick beyond doubt (securelyWins), or nil when no winner is
+// provably safe — the caller then falls back to the cheapest-winner gamble or
+// the duck, so the bot is never worse off than before. Callers pass
+// follow-position legal sets, which under Bitola's LegalCards are always one
+// suit class (follow-suit cards, all trumps on a forced cut, or an
+// all-non-trump hand when void in led and trump) — the cardStrengthOf
+// tie-break therefore compares within a single rank order, never across
+// classes.
+func cheapestSecureWinning(v View, legal []game.Card, trump game.Suit) *game.Card {
+	var best *game.Card
+	bestPts := -1
+	bestStrength := -1
+	for i := range legal {
+		c := legal[i]
+		if !securelyWins(v, c, trump) {
+			continue
+		}
+		pts := cardPoints(c, trump)
+		strength := cardStrengthOf(c, trump)
+		if best == nil || pts < bestPts || (pts == bestPts && strength < bestStrength) {
+			best = &legal[i]
+			bestPts = pts
+			bestStrength = strength
+		}
+	}
+	return best
+}
+
+// trickPoints sums the card points already lying in the current trick — the
+// material an opponent would walk away with, before anything we add. Gates
+// the secure-take upgrade: with nothing on the table and a pointless cheapest
+// winner, there is nothing worth spending a better card to secure.
+func trickPoints(v View, trump game.Suit) int {
+	pts := 0
+	for _, tc := range v.CurrentTrick {
+		pts += cardPoints(tc.Card, trump)
+	}
+	return pts
+}
+
+// bestSmear picks the card to throw onto a trick the team is taking: the
+// highest-point non-overtaking card that does not surrender control of a
+// suit. A boss (the uncontested top of its suit from the opponents' side) is
+// smeared only when ANOTHER held card of the same suit is also a boss once it
+// leaves — the Ace backed by the Ten, generalized to any promoted top — or
+// when the boss cannot convert to a future trick anyway (bossWorthGuarding).
+// Since c sits in our own hand, cardIsBoss already ignores it as a threat
+// when judging the backup. Among the boss-safe candidates, ties on points
+// smear the WEAKER rank — the stronger card is kept, consistent with
+// cheapestSecureWinning. When every candidate is an unprotected boss there is
+// no control worth hoarding over the points on the table, so the plain
+// highestPointNonOvertaking pick stands unchanged (first highest-point card,
+// old behavior). Returns nil when every legal card would overtake, or on an
+// empty trick (defensive — smearing needs a trick to smear onto). Callers
+// pass follow-position legal sets, which under Bitola's LegalCards are always
+// one suit class (follow-suit cards, all trumps on a forced cut, or an
+// all-non-trump hand when void in led and trump) — the cardStrengthOf
+// tie-break therefore compares within a single rank order, never across
+// classes.
+func bestSmear(v View, legal []game.Card, trump game.Suit) *game.Card {
+	if len(v.CurrentTrick) == 0 {
+		return nil
+	}
+	var best *game.Card
+	bestPts := -1
+	bestStrength := -1
+	hasCandidate := false
+	for i := range legal {
+		c := legal[i]
+		if wouldOvertake(c, v.CurrentTrick, trump) {
+			continue
+		}
+		hasCandidate = true
+		if cardIsBoss(v, c, trump) && !heldSameSuitBoss(v, c, trump) &&
+			bossWorthGuarding(v, c, trump) {
+			continue // unprotected boss: keep the suit's control card home
+		}
+		pts := cardPoints(c, trump)
+		strength := cardStrengthOf(c, trump)
+		if pts > bestPts || (pts == bestPts && strength < bestStrength) {
+			best = &legal[i]
+			bestPts = pts
+			bestStrength = strength
+		}
+	}
+	if best == nil && hasCandidate {
+		// Only unprotected bosses to give: smearing one is still better than
+		// overtaking the partner, so fall back to the plain highest-point pick.
+		return highestPointNonOvertaking(v, legal, trump)
+	}
+	return best
+}
+
+// heldSameSuitBoss reports whether the hand holds another card of c's suit
+// that is itself a boss — the backup that makes c safe to spend without
+// giving up control of the suit.
+func heldSameSuitBoss(v View, c game.Card, trump game.Suit) bool {
+	for _, d := range v.Hand {
+		if d != c && d.Suit == c.Suit && cardIsBoss(v, d, trump) {
+			return true
+		}
+	}
+	return false
+}
+
+// bossWorthGuarding reports whether an unprotected boss can still convert to
+// a future trick and is therefore worth keeping out of the smear. Two
+// situations make hoarding it strictly worse than banking its points now:
+//   - endgame: at the second-to-last trick (two cards in hand) a non-trump
+//     boss wins the forced trick 8 only if nobody can ruff it; while an
+//     opponent may still hold a trump, keeping the boss just donates its
+//     points to that ruff;
+//   - dead suit: an opponent already void in the boss's suit that can still
+//     hold a trump ruffs the boss the moment its suit is led — the same
+//     near-certain-ruff test shouldSmearOntoPartnerBoss applies.
+//
+// A trump master is always worth guarding — nothing ruffs a trump.
+func bossWorthGuarding(v View, c game.Card, trump game.Suit) bool {
+	if c.Suit == trump {
+		return true
+	}
+	if len(v.Hand) == 2 && !opponentsOutOfTrump(v, trump) {
+		return false
+	}
+	idx := SuitIndex(c.Suit)
+	for _, seat := range []int{(v.Seat + 1) % 4, (v.Seat + 3) % 4} {
+		if idx >= 0 && v.KnownVoids[seat][idx] && opponentMayHoldTrump(v, seat, trump) {
+			return false
+		}
+	}
+	return true
 }
 
 // strongestByTrickPower returns the card with the greatest trick-taking power
