@@ -317,7 +317,8 @@ func chooseLead(v View, legal []game.Card) game.Card {
 		if botTop != nil &&
 			v.TrumpCallerSeat != nil && *v.TrumpCallerSeat == partner &&
 			!partnerVoidInTrump(v, partner, trump) &&
-			!opponentKnownHoldsTrumpAbove(v, *botTop, trump) {
+			!opponentKnownHoldsTrumpAbove(v, *botTop, trump) &&
+			!opponentHoldsMasterTrump(v, trump) {
 			if c := partnerDrawTrump(legal, trump); c != nil {
 				return *c
 			}
@@ -671,6 +672,103 @@ func opponentKnownHoldsTrumpAbove(v View, ref game.Card, trump game.Suit) bool {
 		}
 	}
 	return false
+}
+
+// trumpRanksProvablyAbsentFromPartner returns the trump ranks the partner
+// provably does NOT hold, inferred from the boundaries of its revealed
+// sequences. A declared sequence is a MAXIMAL consecutive run in natural order
+// (detectDeclarations), so the rank immediately above its top and immediately
+// below its bottom cannot be in the hand — either would have extended the run.
+// Runs are reconstructed from the RAW reveal (v.KnownCards, not knownHeldBy) so a
+// card played after declaring cannot split a run and fake a boundary. Sound for
+// the flat card list: a false run of length >=3 would require >=3 four-of-a-kinds
+// (>=12 cards) contiguous in one suit, which no hand can hold.
+func trumpRanksProvablyAbsentFromPartner(v View, partner int, trump game.Suit) map[game.Rank]bool {
+	absent := map[game.Rank]bool{}
+	if partner < 0 || partner > 3 {
+		return absent
+	}
+	var present [8]bool
+	any := false
+	for _, c := range v.KnownCards[partner] {
+		if c.Suit == trump {
+			present[game.NaturalRankOrder[c.Rank]] = true
+			any = true
+		}
+	}
+	if !any {
+		return absent
+	}
+	for i := 0; i < 8; {
+		if !present[i] {
+			i++
+			continue
+		}
+		j := i
+		for j+1 < 8 && present[j+1] {
+			j++
+		}
+		if j-i+1 >= 3 { // a genuine declared run
+			if i-1 >= 0 {
+				absent[game.NaturalRankSequence[i-1]] = true
+			}
+			if j+1 < 8 {
+				absent[game.NaturalRankSequence[j+1]] = true
+			}
+		}
+		i = j + 1
+	}
+	return absent
+}
+
+// opponentHoldsMasterTrump reports whether the top OUTSTANDING trump — the
+// highest by trick strength that is neither in the bot's hand nor already played
+// — is provably an OPPONENT's: not in the partner's revealed holdings, and either
+// provably absent from the partner (a declared-sequence boundary) or already
+// known to sit with an opponent. When true, "drawing for the partner" only feeds
+// a trick to the opponents' master. Inconclusive cases return false, preserving
+// the existing optimistic partner-draw.
+func opponentHoldsMasterTrump(v View, trump game.Suit) bool {
+	gone := make(map[game.Card]bool, len(v.PlayedCards)+len(v.Hand))
+	for _, c := range v.PlayedCards {
+		gone[c] = true
+	}
+	for _, c := range v.Hand {
+		gone[c] = true
+	}
+	var top *game.Card
+	bestOrder := -1
+	for _, r := range game.NaturalRankSequence {
+		c := game.Card{Suit: trump, Rank: r}
+		if gone[c] {
+			continue
+		}
+		if game.TrumpRankOrder[r] > bestOrder {
+			bestOrder = game.TrumpRankOrder[r]
+			cc := c
+			top = &cc
+		}
+	}
+	if top == nil {
+		return false
+	}
+	partner := (v.Seat + 2) % 4
+	for _, pc := range knownHeldBy(v, partner) {
+		if pc == *top {
+			return false // partner holds the master — drawing for it is sound
+		}
+	}
+	for seat := 0; seat < 4; seat++ {
+		if game.TeamForSeat(seat) == game.TeamForSeat(v.Seat) {
+			continue
+		}
+		for _, oc := range knownHeldBy(v, seat) {
+			if oc == *top {
+				return true // a known opponent holds it
+			}
+		}
+	}
+	return trumpRanksProvablyAbsentFromPartner(v, partner, trump)[top.Rank]
 }
 
 // partnerDrawTrump picks the trump to lead when drawing for the partner

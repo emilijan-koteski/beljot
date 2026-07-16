@@ -863,6 +863,28 @@ func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 			callerSeat: 2,
 			wantCard:   "7H",
 		},
+		{
+			// Partner (seat 2) called and declared the 8-9-10 trump tierce — a
+			// MAXIMAL run, so it provably lacks the JH (it would have shown the
+			// quarte J-10-9-8). The bot lacks it too, so an opponent holds the
+			// master: drawing a trump only donates the trick to it. Skip the draw
+			// and cash the side Ace instead.
+			name:           "partner's declared tierce proves the opponents hold the master: do not draw",
+			hand:           cards("QH", "KH", "AS", "7C"),
+			callerSeat:     2,
+			declaredBySeat: map[int][]string{2: {"8H", "9H", "TH"}},
+			wantCard:       "AS",
+		},
+		{
+			// Control: the partner's declared run INCLUDES the Jack (J-10-9), so the
+			// team controls the master — the bot still draws, sacrificing its
+			// weakest honor (the Queen).
+			name:           "partner's declared run includes the jack: still draw for the partner",
+			hand:           cards("QH", "KH", "AS", "7C"),
+			callerSeat:     2,
+			declaredBySeat: map[int][]string{2: {"JH", "TH", "9H"}},
+			wantCard:       "QH",
+		},
 	})
 }
 
