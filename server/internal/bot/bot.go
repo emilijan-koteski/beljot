@@ -728,6 +728,11 @@ func trumpRanksProvablyAbsentFromPartner(v View, partner int, trump game.Suit) m
 // known to sit with an opponent. When true, "drawing for the partner" only feeds
 // a trick to the opponents' master. Inconclusive cases return false, preserving
 // the existing optimistic partner-draw.
+//
+// Sound only at an EMPTY trick — its sole caller (chooseLead) runs when
+// len(v.CurrentTrick) == 0, so the "gone" set need not account for cards in the
+// current trick. A future mid-trick caller must add v.CurrentTrick to `gone`,
+// else a trump already on the table would be miscounted as outstanding.
 func opponentHoldsMasterTrump(v View, trump game.Suit) bool {
 	gone := make(map[game.Card]bool, len(v.PlayedCards)+len(v.Hand))
 	for _, c := range v.PlayedCards {
