@@ -197,6 +197,21 @@ var NonTrumpRankOrder = map[Rank]int{
 	Rank7:     0,
 }
 
+// NaturalRankSequence lists ranks low-to-high in declaration (sequence) order:
+// 7 < 8 < 9 < T < J < Q < K < A. This is the meld ordering (Jack outranks Ten),
+// distinct from the trick-taking orders above. Source of truth for both the
+// declaration engine and the bot's sequence-adjacency reasoning.
+var NaturalRankSequence = []Rank{Rank7, Rank8, Rank9, RankTen, RankJack, RankQueen, RankKing, RankAce}
+
+// NaturalRankOrder maps a rank to its index in NaturalRankSequence.
+var NaturalRankOrder = func() map[Rank]int {
+	m := make(map[Rank]int, len(NaturalRankSequence))
+	for i, r := range NaturalRankSequence {
+		m[r] = i
+	}
+	return m
+}()
+
 // NewDeck returns a full 32-card deck (7 through Ace in all 4 suits).
 func NewDeck() []Card {
 	deck := make([]Card, 0, 32)

@@ -863,6 +863,28 @@ func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 			callerSeat: 2,
 			wantCard:   "7H",
 		},
+		{
+			// Partner (seat 2) called and declared the 8-9-10 trump tierce — a
+			// MAXIMAL run, so it provably lacks the JH (it would have shown the
+			// quarte J-10-9-8). The bot lacks it too, so an opponent holds the
+			// master: drawing a trump only donates the trick to it. Skip the draw
+			// and cash the side Ace instead.
+			name:           "partner's declared tierce proves the opponents hold the master: do not draw",
+			hand:           cards("QH", "KH", "AS", "7C"),
+			callerSeat:     2,
+			declaredBySeat: map[int][]string{2: {"8H", "9H", "TH"}},
+			wantCard:       "AS",
+		},
+		{
+			// Control: the partner's declared run INCLUDES the Jack (J-10-9), so the
+			// team controls the master — the bot still draws, sacrificing its
+			// weakest honor (the Queen).
+			name:           "partner's declared run includes the jack: still draw for the partner",
+			hand:           cards("QH", "KH", "AS", "7C"),
+			callerSeat:     2,
+			declaredBySeat: map[int][]string{2: {"JH", "TH", "9H"}},
+			wantCard:       "QH",
+		},
 	})
 }
 
@@ -1193,18 +1215,18 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 			wantCard:   "QH",
 		},
 		{
-			// Opponent leads the KS (4 pts at stake) and the bot must ruff. The
-			// 8H is the cheapest winner but any unseen higher trump overtakes it;
-			// with the JH already played the bot's 9H is the master trump — the
-			// cheapest card that provably takes the trick.
-			name: "ruff over an opponent prefers the secure trump over the beatable cheap one",
+			// Opponent leads the KS (4 pts) and the bot must ruff, holding the master
+			// 9H (JH already played) and the junk 8H. On a low-stake (4 < 14) ruff
+			// the bot KEEPS the master and cuts with the expendable 8H, accepting the
+			// speculative over-ruff — no opponent is known void in spades.
+			name: "low-stake ruff keeps the master nine and cuts with the low trump",
 			hand: cards("9H", "8H", "7C"),
 			trick: []game.TrickCard{
 				{Card: card("KS"), PlayerSeat: 3},
 			},
 			callerSeat: 1,
 			observes:   []obs{{seat: 1, card: "JH"}},
-			wantCard:   "9H",
+			wantCard:   "8H",
 		},
 		{
 			// Seat-aware security: the TH and 9H are still unseen, but the only
@@ -1223,19 +1245,19 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 			wantCard:   "KH",
 		},
 		{
-			// Seat-aware security: seat 3 declared the JH but has ALREADY acted
-			// this trick (it led the KS), so the Jack can no longer fall on it —
-			// the bot's 9H is effectively the master and ruffs securely. A raw
-			// threat scan would let the dead Jack veto the 9H and dump the
-			// beatable 8H instead.
-			name: "declared jack behind the leader does not veto the master ruff",
+			// Seat 3 declared the JH but has ALREADY acted (it led the KS), so the
+			// 9H is effectively the master. Still, the 4-pt trick is not worth the
+			// master on a speculative over-ruff, so the bot keeps the 9H and cuts
+			// with the 8H (the security detection is exercised by the fat-trick and
+			// forced-overplay cases, where the secure card is a non-control trump).
+			name: "low-stake ruff keeps the effective master behind the acted leader",
 			hand: cards("9H", "8H", "7C"),
 			trick: []game.TrickCard{
 				{Card: card("KS"), PlayerSeat: 3},
 			},
 			callerSeat:     1,
 			declaredBySeat: map[int][]string{3: {"JH", "JS", "JD", "JC"}},
-			wantCard:       "9H",
+			wantCard:       "8H",
 		},
 		{
 			// Material-stake gate: a pointless 7D lead is ruffed with the 8H even
@@ -1268,6 +1290,72 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 			observes:       []obs{{seat: 1, card: "JH"}},
 			declaredBySeat: map[int][]string{1: {"TS", "JS", "QS", "KH"}},
 			wantCard:       "8H",
+		},
+	})
+}
+
+// TestDecide_TrumpEconomyTake covers preserving the control trumps (J, 9) on the
+// take: bank the highest expendable trump that is safe against KNOWN over-ruffs
+// (2a), and burn a control trump to secure only when the pot is worth at least
+// its value or a known over-ruff makes a cheap take a certain loss (2b).
+// Trump = Hearts; bot = seat 0, partner = seat 2, opponents = seats 1 & 3.
+func TestDecide_TrumpEconomyTake(t *testing.T) {
+	spades := game.SuitSpades
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			// 2a: early ruff of the opponent's TS (10 pts). The 9H is unseen, so the
+			// AH is not ABSOLUTELY secure (an unseen 9H could over-ruff) and only the
+			// JH is guaranteed — but no opponent is known void in spades, so the
+			// over-ruff is purely speculative. Bank the AH; keep the master JH.
+			name: "early ruff banks the ace and keeps the master",
+			hand: cards("JH", "AH", "7C"),
+			trick: []game.TrickCard{
+				{Card: card("TS"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "AH",
+		},
+		{
+			// 2b (pot worth the master): the bot is third; the partner (seat 2) led
+			// the AS (11), the opponent (seat 3) ruffed with the TH (10) — 21 points
+			// on the table. Forced to over-ruff, the bot has AH and JH; the AH is
+			// only speculatively safe, but 21 >= 20 (the Jack's value), so it locks
+			// the fat trick with the master JH.
+			name: "fat trick worth the master is secured with the jack",
+			hand: cards("JH", "AH", "8H"),
+			trick: []game.TrickCard{
+				{Card: card("AS"), PlayerSeat: 2},
+				{Card: card("TH"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "JH",
+		},
+		{
+			// 2b boundary (pot NOT worth the master): same shape but the partner led
+			// the 8S (0), so only the opponent's TH (10) is on the table — 10 < 20.
+			// The bot keeps the master and over-ruffs with the expendable AH.
+			name: "small trick keeps the master and over-ruffs with the ace",
+			hand: cards("JH", "AH", "8H"),
+			trick: []game.TrickCard{
+				{Card: card("8S"), PlayerSeat: 2},
+				{Card: card("TH"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "AH",
+		},
+		{
+			// Known over-ruff on a small trick: seat 1 (yet to play) is known void in
+			// spades and may still hold a trump, so the AH would likely be over-ruffed
+			// and donated. The 4-pt trick is not worth the master, so the bot ruffs
+			// cheaply (8H) and concedes — neither burning the JH nor donating the AH.
+			name: "known over-ruff on a small trick ruffs cheap and concedes",
+			hand: cards("JH", "AH", "8H", "7C"),
+			trick: []game.TrickCard{
+				{Card: card("KS"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "8D", lead: &spades}}, // seat 1 void in spades
+			wantCard:   "8H",
 		},
 	})
 }

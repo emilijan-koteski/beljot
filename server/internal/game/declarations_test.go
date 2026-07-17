@@ -974,6 +974,17 @@ func TestDedupBitola(t *testing.T) {
 	})
 }
 
+// TestNaturalRankOrder_Values verifies that NaturalRankSequence and NaturalRankOrder
+// correctly expose the declaration sequence ordering (7 < 8 < 9 < T < J < Q < K < A).
+func TestNaturalRankOrder_Values(t *testing.T) {
+	seq := []game.Rank{game.Rank7, game.Rank8, game.Rank9, game.RankTen, game.RankJack, game.RankQueen, game.RankKing, game.RankAce}
+	require.Len(t, game.NaturalRankSequence, 8)
+	for i, r := range seq {
+		assert.Equal(t, r, game.NaturalRankSequence[i], "sequence index %d", i)
+		assert.Equal(t, i, game.NaturalRankOrder[r], "order of %v", r)
+	}
+}
+
 // makeCards is a test helper that creates cards from 2-char IDs.
 func makeCards(ids ...string) []game.Card {
 	cards := make([]game.Card, len(ids))

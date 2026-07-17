@@ -2,10 +2,11 @@
 
 This document describes exactly how the bot decides, across every scenario, what it
 considers, and with examples. It reflects the current logic including the latest tuning
-(candidate-aware bidding, unbacked side-Ace and two-trump Jack+9 bids, partner trump-draw,
-boss preservation, uncuttable-boss last-trick retention, Ace/Ten boss handling, suppressing
-trump draws once the opponents are void of trump, leading into a partner's void, smearing
-onto a partner's boss, seat-aware **secure trick takes** with a material-stake gate, the
+(candidate-aware bidding, unbacked side-Ace and two-trump Jack+9 bids, partner trump-draw with
+a declaration-inference abort when the opponents provably hold the master, boss preservation,
+uncuttable-boss last-trick retention, Ace/Ten boss handling, suppressing trump draws once the
+opponents are void of trump, leading into a partner's void, smearing onto a partner's boss,
+seat-aware **secure trick takes** with a material-stake gate and control-trump economy, the
 **boss-preserving smear** with its endgame/dead-suit exceptions, and never fighting a partner
 who is **forced to win a trump-led trick**).
 
@@ -232,8 +233,9 @@ In priority order:
 
    Skipped if: the partner is void in trump (no overtrump to set up), a **known** opponent
    holds a trump above the bot's best (the "partner has the top" assumption is disproven), the
-   only trump available to lead would be the 9 (then the bot does not draw), or the **opponents
-   are already out of trump** (see the note below).
+   only trump available to lead would be the 9 (then the bot does not draw), the **opponents
+   are already out of trump** (see the note below), or the **opponents provably hold the master
+   trump** (`opponentHoldsMasterTrump`; see "Declaration-inference draw abort" below).
 
    > **Opponents out of trump -> do not draw, let the partner lead** (`opponentsOutOfTrump`):
    > once **both** opponents are known void in trump (or every trump is otherwise accounted
@@ -254,6 +256,23 @@ In priority order:
    | T♥ A♥ | T♥ | T before A in the order |
    | 9♥ A♥ | A♥ | A is an honor; the 9 is kept |
    | only 9♥ | does not draw | never lead a lone 9; move to the next step |
+
+   > **Declaration-inference draw abort -> do not draw into the opponents' master**
+   > (`opponentHoldsMasterTrump`): the "partner holds the top trumps" assumption above is an
+   > optimistic default. It can be disproven not only by a known opponent holding a higher
+   > trump, but by a **negative** inference from the partner's own declaration
+   > (`trumpRanksProvablyAbsentFromPartner`): a declared sequence is a MAXIMAL consecutive run
+   > in natural rank order, so the rank immediately above its top and immediately below its
+   > bottom cannot be in that hand — either would have extended the run. When the top
+   > OUTSTANDING trump (not played, not in the bot's own hand) is provably absent from the
+   > partner this way, or is already known to sit with an opponent, drawing would only feed a
+   > trick to that master — the bot aborts the draw entirely and falls through to cashing a
+   > boss, feeding a partner ruff, or leading safe.
+   >
+   > Example (declaration inference): trump ♥, partner called and declared the tierce
+   > 8♥ 9♥ T♥. The run is maximal, so the partner cannot hold J♥ (it would have shown
+   > J-T-9-8); the bot lacks it too, so an opponent holds the master. The bot does NOT
+   > draw — it cashes a side boss / leads safe instead of donating a trick to the J♥.
 
 3. **Cash a side-suit boss**: a non-trump card no opponent can beat. Prefers the highest-value
    boss (Aces first).
@@ -308,13 +327,16 @@ First it computes who currently wins. Branches:
   when **every legal card overtakes** (a forced overplay or forced ruff leaves nothing to duck)
   **and** there are points at stake (trick points + the donation's own points > 0), picking the
   donation by points alone can hand the trick away. If some legal card **takes the trick beyond
-  doubt** (`securelyWins`, below), the bot secures it with the **cheapest such card**; if
+  doubt** (`securelyWins`, below), the bot calls `trumpEconomyTake` (see "Trump economy on the
+  take" below) to secure it while preserving the control trumps **J/9** — this is the
+  forced-overplay/forced-ruff shape of the same take used against a winning opponent; if
   nothing is provably secure, it donates the cheapest as before.
 
   Example (the classic leak this fixes): trump ♥, partner leads **Q♥**, opponent plays 8♥, bot
   third holds K♥ A♥ 9♥ J♥ with the **T♥ unseen**. The overplay rule forces all four; the old
   bot played K♥ (cheapest) and the T♥ holder took the trick. Now it plays **A♥** — the cheapest
-  card the unseen Ten cannot beat — keeping 9♥ and J♥ as masters.
+  card the unseen Ten cannot beat, and not a control trump, so `trumpEconomyTake` takes it
+  immediately — keeping 9♥ and J♥ as masters.
 
 **The "secure winner" concept (`securelyWins`)** — a card takes the trick beyond doubt when it
 overtakes the current winner AND either the bot closes the trick, or **no yet-to-play OPPONENT
@@ -333,6 +355,48 @@ in trump**, the bot plays **K♥** — it is already guaranteed; the Jack is not
 current trick points plus the cheap take's own points must be **> 0**. On a pointless trick
 (e.g. forced ruff of a 7♦ lead holding J♥ + 8♥) the bot ruffs **cheap** (8♥) and accepts the
 gamble — the master is never burnt to secure nothing.
+
+**Trump economy on the take** (`trumpEconomyTake`) — used at **both** secure-take call sites
+above: the forced-overplay/forced-ruff take over a partner, and the "otherwise, take the
+trick" case over a winning opponent. Once the material-stake gate has passed, the bot does not
+simply grab the cheapest provably-secure card (`cheapestSecureWinning`) — it holds back the
+**control trumps**, the Jack and the 9 (`isControlTrump`), whenever a cheaper path to the trick
+exists. It computes two candidates and chooses between them by pot size:
+
+- `secure`: the cheapest legal card that provably `securelyWins` (may or may not be a control
+  trump).
+- On a **ruff** of a non-trump lead only: `preserve`, the highest-point non-control trump that
+  overtakes the current winner and beats every **KNOWN** over-ruff threat
+  (`knownSafeRuff` / `highestExpendableKnownSafeRuff`) — a revealed higher trump a yet-to-play
+  opponent holds, or an unseen higher trump from a seat **known void** in the led suit that may
+  still hold trump. A seat not yet proven void in the led suit is assumed to have to follow
+  suit, so its unseen trumps are not counted here — a lighter bar than `securelyWins`, which
+  treats any not-provably-void seat's unseen trump as a live threat. A card can therefore be
+  "known safe" here while not being strictly `securelyWins`.
+
+Then: (1) if `secure` is **not** a control trump, take it immediately — nothing to preserve.
+(2) Else, when ruffing and `preserve` exists, bank `preserve` instead — **unless** the pot
+already justifies spending the control trump (below), in which case the mathematically
+guaranteed control-trump win is taken over the merely known-safe cheaper trump. (3) Else, if
+`secure` is a control trump and the pot is worth **at least its own value**
+(`trickPoints(v, trump) >= controlTrumpValue`: the Jack needs >= 20, the 9 needs >= 14), spend
+it. (4) Otherwise `trumpEconomyTake` returns nil: the caller falls through to its cheap
+take/duck and accepts the speculative over-ruff — the master is never burnt for less than it
+is worth.
+
+Example (bank the ace): trump ♥, opponent leads T♦ (10 pts), bot void in ♦ (must cut) holding
+J♥ A♥ 7♣, early hand — legal cards are J♥ and A♥. No opponent is known void in ♦ or in trump,
+so an unseen 9♥ could in principle over-ruff the A♥: only the J♥ satisfies `securelyWins`. But
+the A♥ beats every KNOWN threat — nobody is revealed to hold a bigger trump, and nobody is
+provably void in ♦ to make the unseen 9♥ a live threat — so the bot cuts with the **A♥**,
+banking 11 points and keeping the J♥ master. Old behavior cut with the J♥.
+
+Example (value-gated master): the bot is third; partner led A♠ (11), an opponent ruffed T♥
+(10) — 21 points on the table. Forced to over-ruff with only J♥ and A♥ available, the A♥ is
+again only known-safe (an unseen 9♥ is unresolved), so the sole `securelyWins` candidate is the
+J♥. Since 21 >= 20 (the Jack's own value), the bot spends the master **J♥**. With only 10 on
+the table (10 < 20) it would keep the J♥ and over-ruff with the **A♥** instead, accepting the
+gamble.
 
 - **Risk-smear detail** (`shouldSmearOntoPartnerBoss`): when the partner leads a non-trump
   **Ace** (or the current top of the suit), an opponent follows suit, and the bot sits third
@@ -375,9 +439,11 @@ gamble — the master is never burnt to secure nothing.
   **highest-points** led-suit winner instead of the cheapest (`highestPointsLedSuitWinner`).
   Banked into this trick (guaranteed as last player) it is safe; kept and led next trick it
   risks a ruff. Ruff wins (void in led) and trump-led tricks fall through unchanged.
-- Otherwise: take the trick — with points at stake (trick + cheap winner > 0), prefer the
-  **cheapest secure winner** (`cheapestSecureWinning`); if nothing is provably secure, or the
-  trick is pointless, take **as cheaply as possible** (`cheapestWinning`) as before.
+- Otherwise: take the trick — with points at stake (trick + cheap winner > 0), the bot calls
+  `trumpEconomyTake` (see "Trump economy on the take" below), which secures the trick while
+  preserving the control trumps **J/9** whenever the pot doesn't justify spending one; if
+  nothing is provably secure, or the trick is pointless, take **as cheaply as possible**
+  (`cheapestWinning`) as before.
 - Cannot win: **discard** the lowest value, preserving trump.
 
 **The boss-preserving smear (`bestSmear` + `bossWorthGuarding`)** — used at all three smear
@@ -453,6 +519,12 @@ Reasoning helpers (all pure, in `bot.go`):
   opponent seat** — known holdings per seat, unseen cards filtered by that seat's known voids,
   and the follow-suit pin (`seatKnownHoldsSuit`: a seat revealed to hold the led suit cannot
   play its trumps this trick). Cards pinned to seats that already acted are not threats.
+- `trumpRanksProvablyAbsentFromPartner` is a **negative** inference from the same reveal: a
+  declared trump sequence is a MAXIMAL consecutive run in natural rank order, so the rank just
+  above its top and just below its bottom cannot be in that hand — either would have extended
+  the run. `opponentHoldsMasterTrump` uses this (plus a direct known-held check) to prove the
+  top outstanding trump sits with an opponent even when no card has been directly revealed in
+  an opponent's own hand, aborting the partner trump-draw in `chooseLead`.
 
 ---
 
@@ -474,10 +546,17 @@ By impact:
 2. `trumpSuitScore` + `trumpLengthBonus`: round-2 suit preference (length vs. points).
 3. `chooseLead` priority: when to draw trumps (with the master or for the partner, and
    `opponentsOutOfTrump` stops the draw once opponents are void), cash a boss (Ace/Ten handling),
-   feed a partner ruff, or lead safe.
+   feed a partner ruff, or lead safe. The partner draw also aborts on
+   `opponentHoldsMasterTrump` / `trumpRanksProvablyAbsentFromPartner` — a declared sequence's
+   maximal-run boundary that proves the opponents (not the partner) hold the top trump.
 4. `chooseFollow`: smear, risk-smear, banking, and point management.
 5. `securelyWins` + the material-stake gate (`trickPoints + cardPoints > 0`): when the bot
    pays up for a guaranteed take vs. contests cheaply. The `> 0` threshold is the dial.
+   `trumpEconomyTake` layers control-trump economy on top: the control-trump set **{J, 9}**
+   (`isControlTrump`), the known-over-ruff signal (`knownSafeRuff` /
+   `highestExpendableKnownSafeRuff`) that lets it bank a cheaper trump instead, and the value
+   gate `trickPoints(v, trump) >= controlTrumpValue` that decides whether a pot is fat enough to
+   spend a control trump at all.
 6. `bestSmear` / `bossWorthGuarding`: what counts as control worth hoarding (backup test,
    endgame and dead-suit exceptions, the all-unprotected fallback).
 7. `partnerDrawTrump`: the Q/K/T/A order and the "never the 9" rule.
@@ -486,8 +565,11 @@ By impact:
 Blind spots if you want a stronger bot (the first four are logged in
 `_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass):
 
-- The stake gate has **no cost/benefit weighing** — any > 0 stake can spend a 20-point master
-  to secure a 3-point trick.
+- **Addressed** — the stake gate used to have no cost/benefit weighing (any > 0 stake could
+  spend a 20-point master to secure a 3-point trick). `trumpEconomyTake` now gates a control
+  trump (J/9) spend on `trickPoints(v, trump) >= controlTrumpValue` (J needs >= 20, 9 needs
+  >= 14); below that threshold it banks a cheaper known-safe trump (`knownSafeRuff`) or accepts
+  the speculative over-ruff instead.
 - The endgame boss-guard ignores **who leads trick 8** — a hoarded uncuttable boss converts
   for sure only when the bot itself leads it.
 - `partnerWinIsSafe`'s trump-threat leg is still a **raw unseen scan** (not seat-aware like
@@ -509,11 +591,13 @@ Blind spots if you want a stronger bot (the first four are logged in
 | Bidding aggressiveness | `wantsTrump`, `hasSideAce` | `server/internal/bot/bot.go` |
 | Round-2 suit preference | `trumpSuitScore`, `trumpLengthBonus` | `server/internal/bot/bot.go` |
 | Draw trumps for partner (Q/K/T/A, never 9) | `partnerDrawTrump` + block in `chooseLead` | `server/internal/bot/bot.go` |
+| Don't draw into the opponents' master (declaration inference) | `opponentHoldsMasterTrump`, `trumpRanksProvablyAbsentFromPartner` + block in `chooseLead` | `server/internal/bot/bot.go` |
 | Stop drawing once opponents are void of trump | `opponentsOutOfTrump` + blocks in `chooseLead` | `server/internal/bot/bot.go` |
 | Cash a side boss (Ace/Ten: cash the Ten, keep the Ace) | boss block in `chooseLead`, `findRankOfSuit` | `server/internal/bot/bot.go` |
 | Only trumps left: highest if master, else lowest | `chooseLead` only-trumps branch, `isTrumpMaster` | `server/internal/bot/bot.go` |
 | Preserve the boss on a forced overtake (Ace/Ten: smear the Ace) | `strongestPreservingBoss` | `server/internal/bot/bot.go` |
 | Secure take: cheapest guaranteed winner when points are at stake | `securelyWins`, `cheapestSecureWinning`, `trickPoints`, `seatKnownHoldsSuit` | `server/internal/bot/bot.go` |
+| Preserve control trumps on the take (bank the ace, value-gate the master) | `trumpEconomyTake`, `isControlTrump`, `controlTrumpValue`, `knownSafeRuff`, `highestExpendableKnownSafeRuff` | `server/internal/bot/bot.go` |
 | Boss-preserving smear (backup test, endgame/dead-suit exceptions) | `bestSmear`, `bossWorthGuarding`, `heldSameSuitBoss` | `server/internal/bot/bot.go` |
 | Never fight a partner forced to win a trump-led trick | `partnerTakesTrick` (trump-led branch) | `server/internal/bot/bot.go` |
 | Bank the high card as last player | `highestPointsLedSuitWinner` + `chooseFollow` | `server/internal/bot/bot.go` |

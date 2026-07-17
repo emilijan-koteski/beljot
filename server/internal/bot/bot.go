@@ -317,7 +317,8 @@ func chooseLead(v View, legal []game.Card) game.Card {
 		if botTop != nil &&
 			v.TrumpCallerSeat != nil && *v.TrumpCallerSeat == partner &&
 			!partnerVoidInTrump(v, partner, trump) &&
-			!opponentKnownHoldsTrumpAbove(v, *botTop, trump) {
+			!opponentKnownHoldsTrumpAbove(v, *botTop, trump) &&
+			!opponentHoldsMasterTrump(v, trump) {
 			if c := partnerDrawTrump(legal, trump); c != nil {
 				return *c
 			}
@@ -433,7 +434,7 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 		duck := lowestValue(legal, trump)
 		if highestPointNonOvertaking(v, legal, trump) == nil &&
 			trickPoints(v, trump)+cardPoints(duck, trump) > 0 {
-			if c := cheapestSecureWinning(v, legal, trump); c != nil {
+			if c := trumpEconomyTake(v, legal, trump); c != nil {
 				return *c
 			}
 		}
@@ -477,7 +478,7 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 	// contests cheaply as before and never burns a master to win nothing.
 	if cheap := cheapestWinning(v, legal, trump); cheap != nil {
 		if trickPoints(v, trump)+cardPoints(*cheap, trump) > 0 {
-			if c := cheapestSecureWinning(v, legal, trump); c != nil {
+			if c := trumpEconomyTake(v, legal, trump); c != nil {
 				return *c
 			}
 		}
@@ -671,6 +672,108 @@ func opponentKnownHoldsTrumpAbove(v View, ref game.Card, trump game.Suit) bool {
 		}
 	}
 	return false
+}
+
+// trumpRanksProvablyAbsentFromPartner returns the trump ranks the partner
+// provably does NOT hold, inferred from the boundaries of its revealed
+// sequences. A declared sequence is a MAXIMAL consecutive run in natural order
+// (detectDeclarations), so the rank immediately above its top and immediately
+// below its bottom cannot be in the hand — either would have extended the run.
+// Runs are reconstructed from the RAW reveal (v.KnownCards, not knownHeldBy) so a
+// card played after declaring cannot split a run and fake a boundary. Sound for
+// the flat card list: a false run of length >=3 would require >=3 four-of-a-kinds
+// (>=12 cards) contiguous in one suit, which no hand can hold.
+func trumpRanksProvablyAbsentFromPartner(v View, partner int, trump game.Suit) map[game.Rank]bool {
+	absent := map[game.Rank]bool{}
+	if partner < 0 || partner > 3 {
+		return absent
+	}
+	var present [8]bool
+	any := false
+	for _, c := range v.KnownCards[partner] {
+		if c.Suit == trump {
+			present[game.NaturalRankOrder[c.Rank]] = true
+			any = true
+		}
+	}
+	if !any {
+		return absent
+	}
+	for i := 0; i < 8; {
+		if !present[i] {
+			i++
+			continue
+		}
+		j := i
+		for j+1 < 8 && present[j+1] {
+			j++
+		}
+		if j-i+1 >= 3 { // a genuine declared run
+			if i-1 >= 0 {
+				absent[game.NaturalRankSequence[i-1]] = true
+			}
+			if j+1 < 8 {
+				absent[game.NaturalRankSequence[j+1]] = true
+			}
+		}
+		i = j + 1
+	}
+	return absent
+}
+
+// opponentHoldsMasterTrump reports whether the top OUTSTANDING trump — the
+// highest by trick strength that is neither in the bot's hand nor already played
+// — is provably an OPPONENT's: not in the partner's revealed holdings, and either
+// provably absent from the partner (a declared-sequence boundary) or already
+// known to sit with an opponent. When true, "drawing for the partner" only feeds
+// a trick to the opponents' master. Inconclusive cases return false, preserving
+// the existing optimistic partner-draw.
+//
+// Sound only at an EMPTY trick — its sole caller (chooseLead) runs when
+// len(v.CurrentTrick) == 0, so the "gone" set need not account for cards in the
+// current trick. A future mid-trick caller must add v.CurrentTrick to `gone`,
+// else a trump already on the table would be miscounted as outstanding.
+func opponentHoldsMasterTrump(v View, trump game.Suit) bool {
+	gone := make(map[game.Card]bool, len(v.PlayedCards)+len(v.Hand))
+	for _, c := range v.PlayedCards {
+		gone[c] = true
+	}
+	for _, c := range v.Hand {
+		gone[c] = true
+	}
+	var top *game.Card
+	bestOrder := -1
+	for _, r := range game.NaturalRankSequence {
+		c := game.Card{Suit: trump, Rank: r}
+		if gone[c] {
+			continue
+		}
+		if game.TrumpRankOrder[r] > bestOrder {
+			bestOrder = game.TrumpRankOrder[r]
+			cc := c
+			top = &cc
+		}
+	}
+	if top == nil {
+		return false
+	}
+	partner := (v.Seat + 2) % 4
+	for _, pc := range knownHeldBy(v, partner) {
+		if pc == *top {
+			return false // partner holds the master — drawing for it is sound
+		}
+	}
+	for seat := 0; seat < 4; seat++ {
+		if game.TeamForSeat(seat) == game.TeamForSeat(v.Seat) {
+			continue
+		}
+		for _, oc := range knownHeldBy(v, seat) {
+			if oc == *top {
+				return true // a known opponent holds it
+			}
+		}
+	}
+	return trumpRanksProvablyAbsentFromPartner(v, partner, trump)[top.Rank]
 }
 
 // partnerDrawTrump picks the trump to lead when drawing for the partner
@@ -1072,6 +1175,103 @@ func cheapestSecureWinning(v View, legal []game.Card, trump game.Suit) *game.Car
 		}
 	}
 	return best
+}
+
+// isControlTrump reports whether c is one of the two "control" trumps — the Jack
+// or the 9 — kept back rather than spent merely to secure a low-value trick.
+func isControlTrump(c game.Card, trump game.Suit) bool {
+	return c.Suit == trump && (c.Rank == game.RankJack || c.Rank == game.Rank9)
+}
+
+// controlTrumpValue is the trump point value of a control trump (J=20, 9=14): the
+// minimum trick pot worth spending it to guarantee a take.
+func controlTrumpValue(c game.Card) int {
+	return game.TrumpCardPoints[c.Rank]
+}
+
+// knownSafeRuff reports whether trump card c, played as a ruff on a NON-trump led
+// trick, beats every KNOWN over-ruff threat: no yet-to-play OPPONENT can beat it
+// with a card we can pin to that seat — a revealed higher trump, or an unseen
+// higher trump when that seat is known void in the led suit (so it may legally
+// ruff) and may still hold a trump. Speculative unseen trumps from a seat not
+// known void in the led suit are ignored: that seat will almost certainly have to
+// follow suit and cannot over-ruff.
+func knownSafeRuff(v View, c game.Card, trump game.Suit) bool {
+	led := v.CurrentTrick[0].Card.Suit
+	ledIdx := SuitIndex(led)
+	for _, seat := range seatsYetToPlay(v) {
+		if game.TeamForSeat(seat) == game.TeamForSeat(v.Seat) {
+			continue // the partner never over-ruffs on purpose
+		}
+		for _, t := range knownHeldBy(v, seat) {
+			if beatsCard(t, c, led, trump) {
+				return false
+			}
+		}
+		voidInLed := ledIdx >= 0 && v.KnownVoids[seat][ledIdx]
+		if voidInLed && opponentMayHoldTrump(v, seat, trump) {
+			for _, t := range unseenCards(v) {
+				if t.Suit == trump && beatsCard(t, c, led, trump) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// highestExpendableKnownSafeRuff returns the highest-POINT non-control trump that
+// overtakes the current winner and is safe against every KNOWN over-ruff
+// (knownSafeRuff), or nil when none. Banking it wins the trick while keeping the
+// control trumps (J, 9). Meaningful only for a ruff (led != trump).
+func highestExpendableKnownSafeRuff(v View, legal []game.Card, trump game.Suit) *game.Card {
+	var best *game.Card
+	bestPts := -1
+	for i := range legal {
+		c := legal[i]
+		if c.Suit != trump || isControlTrump(c, trump) {
+			continue
+		}
+		if !wouldOvertake(c, v.CurrentTrick, trump) {
+			continue
+		}
+		if !knownSafeRuff(v, c, trump) {
+			continue
+		}
+		if pts := game.TrumpCardPoints[c.Rank]; pts > bestPts {
+			bestPts = pts
+			best = &legal[i]
+		}
+	}
+	return best
+}
+
+// trumpEconomyTake decides how to TAKE the trick while preserving the control
+// trumps (J, 9). Returns the card to play, or nil to let the caller fall through
+// to its existing cheapest-winner / duck logic. Priority:
+//  1. a NON-control card that securely wins — take it (unchanged behavior; e.g.
+//     the Ace/King that provably beats the field);
+//  2. ruffing a side suit — bank the highest expendable trump that is safe
+//     against known over-ruffs (keep J/9), unless the pot is worth the master;
+//  3. only a control trump can securely win — spend it only when the pot
+//     (trickPoints) is at least its own value; otherwise return nil so the caller
+//     takes/ruffs cheaply and accepts the speculative gamble.
+func trumpEconomyTake(v View, legal []game.Card, trump game.Suit) *game.Card {
+	secure := cheapestSecureWinning(v, legal, trump)
+	if secure != nil && !isControlTrump(*secure, trump) {
+		return secure
+	}
+	if v.CurrentTrick[0].Card.Suit != trump { // ruff of a side suit
+		if preserve := highestExpendableKnownSafeRuff(v, legal, trump); preserve != nil {
+			if secure == nil || trickPoints(v, trump) < controlTrumpValue(*secure) {
+				return preserve
+			}
+		}
+	}
+	if secure != nil && trickPoints(v, trump) >= controlTrumpValue(*secure) {
+		return secure
+	}
+	return nil
 }
 
 // trickPoints sums the card points already lying in the current trick — the
