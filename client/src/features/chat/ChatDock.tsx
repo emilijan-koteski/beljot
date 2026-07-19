@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { RelativeTime } from "@/shared/components/RelativeTime";
+import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
+import { useVisualViewport } from "@/shared/hooks/useVisualViewport";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState, useWsSendMessage } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -126,11 +128,31 @@ export function ChatDock(props: ChatDockProps) {
     }
   }, [open]);
 
-  // Auto-scroll to the bottom when new messages arrive (open state only).
+  // Phone treatment: the open panel is a full-screen overlay, but `fixed
+  // inset-0` sizes to the LAYOUT viewport, which the mobile on-screen keyboard
+  // does not shrink on iOS — the browser pans to the focused input and drags
+  // the header off-screen. Pin the panel to the VISUAL viewport instead
+  // (height + top offset) so header and composer stay visible above the
+  // keyboard. Android is handled by `interactive-widget=resizes-content`
+  // (index.html); desktop (sm+) keeps the corner panel untouched.
+  const isPhone = useMediaQuery("(max-width: 639px)");
+  const viewportBox = useVisualViewport(open && isPhone);
+
+  // Keep the newest message in view (open state only). Smooth-scroll ONLY for
+  // messages arriving while the panel is open — a short, watchable hop. Every
+  // other trigger (opening the panel, keyboard show/hide resizing it) jumps
+  // instantly: animating from the top through a long history on open is slow
+  // and annoying. `prevCountRef` also tracks while closed, so history that
+  // accumulated in the closed state doesn't smooth-scroll on open.
   const listEndRef = useRef<HTMLDivElement | null>(null);
+  const prevCountRef = useRef(messages.length);
   useEffect(() => {
-    if (open) listEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [open, messages.length]);
+    const prevCount = prevCountRef.current;
+    prevCountRef.current = messages.length;
+    if (!open) return;
+    const newMessageWhileOpen = messages.length > prevCount;
+    listEndRef.current?.scrollIntoView({ behavior: newMessageWhileOpen ? "smooth" : "instant" });
+  }, [open, messages.length, viewportBox?.height]);
 
   function send() {
     const text = draft.trim();
@@ -223,6 +245,13 @@ export function ChatDock(props: ChatDockProps) {
         skin,
         className,
       )}
+      // Present only on phones with the VisualViewport API (see above): sizes
+      // the overlay to the visible area, overriding inset-0's top/bottom.
+      style={
+        viewportBox
+          ? { top: viewportBox.offsetTop, height: viewportBox.height, bottom: "auto" }
+          : undefined
+      }
     >
       <div className="flex items-center gap-2 border-b border-border px-3.5 py-3">
         <MessageSquare className="text-accent size-3.5" />
@@ -238,7 +267,7 @@ export function ChatDock(props: ChatDockProps) {
       </div>
 
       <div
-        className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-3.5 py-3"
+        className="flex flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain px-3.5 py-3"
         data-testid={`${testIdRoot}-list`}
       >
         {messages.map((m) => (
