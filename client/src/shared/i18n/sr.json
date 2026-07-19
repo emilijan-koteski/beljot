@@ -721,8 +721,8 @@
     "scoreReveal": {
       "title": "Rezultat deljenja",
       "titleWithHand": "Deljenje {{hand}} · rezultat",
-      "subtitleHeldYour": "Prošli · tvoj tim je zvao {{suit}}",
-      "subtitleHeldTheir": "Prošli · njihov tim je zvao {{suit}}",
+      "subtitleHeldYour": "Prošli · vi ste zvali adut {{suit}}",
+      "subtitleHeldTheir": "Prošli · oni su zvali adut {{suit}}",
       "subtitleFailedUs": "Pali · svi poeni za nas",
       "subtitleFailedThem": "Pali · svi poeni za njih",
       "cardPoints": "Poeni karata",

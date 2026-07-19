@@ -12,7 +12,11 @@ interface ClassicPanelProps {
    * declarations, belot reveals, hand-end + match-end overlays.
    */
   glowColor?: string;
-  /** Inner padding override for the body (default 24 px). */
+  /**
+   * Inner padding override for the body (default 16 px on phones, 24 px from
+   * `sm` up). Note: an explicit value applies at ALL breakpoints — it opts the
+   * panel out of the responsive phone reduction.
+   */
   bodyPadding?: number | string;
   className?: string;
   style?: CSSProperties;
@@ -34,7 +38,7 @@ export function ClassicPanel({
   title,
   subtitle,
   glowColor,
-  bodyPadding = 24,
+  bodyPadding,
   className = "",
   style,
   children,
@@ -62,15 +66,17 @@ export function ClassicPanel({
     >
       {title && (
         <div
+          className="px-4 pt-3.5 pb-2.5 sm:px-6 sm:pt-4.5"
           style={{
-            padding: "18px 24px 10px",
             borderBottom: "1px solid rgba(201,168,118,0.22)",
           }}
         >
+          {/* Type scale steps down one notch below `sm` so phone-width panels
+              don't blow the header out of proportion. */}
           <div
+            className="text-[17px] sm:text-[20px]"
             style={{
               fontFamily: "var(--font-body)",
-              fontSize: 20,
               fontWeight: 600,
               letterSpacing: 0.3,
               color: "var(--ink-light, #f5f2e8)",
@@ -78,10 +84,19 @@ export function ClassicPanel({
           >
             {title}
           </div>
-          {subtitle && <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>{subtitle}</div>}
+          {subtitle && (
+            <div className="text-[11px] sm:text-[12px]" style={{ opacity: 0.65, marginTop: 2 }}>
+              {subtitle}
+            </div>
+          )}
         </div>
       )}
-      <div style={{ padding: bodyPadding }}>{children}</div>
+      <div
+        className={bodyPadding === undefined ? "p-4 sm:p-6" : undefined}
+        style={bodyPadding === undefined ? undefined : { padding: bodyPadding }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

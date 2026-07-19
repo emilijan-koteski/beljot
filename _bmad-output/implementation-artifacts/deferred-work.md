@@ -457,3 +457,12 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A �
 - source_spec: `_bmad-output/implementation-artifacts/spec-bot-secure-take-and-boss-preserving-smear.md`
   summary: Simulation-gated tuning pass over the new secure-take/boss-guard heuristics; four review-surfaced refinements rejected or out of scope for the spec but worth A/B-ing against the simulation harness - (1) cost/benefit threshold on the material-stake gate (today any >0 stake can spend a 20-pt master to secure a 3-pt trick), (2) endgame uncuttable-boss guard ignores WHO leads trick 8 (partner-led trick 8 makes the hoarded boss a coin flip), (3) partnerWinIsSafe's trump-threat leg is a raw unseen scan while securelyWins is seat-aware (bot ducks smears onto provably safe partner ruffs), (4) no arbitration between mid-hand secure-spend of the master and trick-7 retention pricing last-trick control at +10.
   evidence: Blind Hunter round 3 (2026-07-16) probe-verified each scenario against LegalCards; none regress the approved behavior vs baseline in a way the PO wanted changed now, but all four are measurable strategy dials the ≥60% simulation guard could adjudicate.
+
+## Deferred from: code review of spec-mobile-dialog-font-i18n-fixes (2026-07-19)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-mobile-dialog-font-i18n-fixes.md`
+  summary: Suit names interpolate title-cased mid-sentence in mk/hr/sr score-reveal subtitles ("зедовте адут на Пик" / "zvali adut Pik") — non-standard orthography; would need lowercase suit-name variants in i18n.
+  evidence: Pre-existing pattern (the old "твојот тим зеде {{suit}}" had it too); `match.suits.*` values are standalone title-cased labels reused mid-sentence. Fixing means new lowercase i18n entries and auditing every mid-sentence interpolation site, out of scope for this polish pass.
+- source_spec: `_bmad-output/implementation-artifacts/spec-mobile-dialog-font-i18n-fixes.md`
+  summary: Pre-existing `npx tsc --noEmit` failure on the branch — MatchmakingPage.test.tsx and RoomPage.bots.test.tsx RoomDetail mocks are missing the required `returnedUserIds` field.
+  evidence: Blind Hunter reproduced it on files untouched by this spec; vitest and eslint gates pass, but any future type-check gate will trip on it. Introduced whenever `returnedUserIds` was added to RoomDetail without updating these two test mocks.
