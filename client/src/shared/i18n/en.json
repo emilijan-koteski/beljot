@@ -1071,7 +1071,7 @@
       "coinsAdded": "coins added to your wallet",
       "streak": "Day {{streak}}",
       "newBalance": "New balance",
-      "collect": "Collect"
+      "continue": "Continue"
     }
   },
   "wallet": {

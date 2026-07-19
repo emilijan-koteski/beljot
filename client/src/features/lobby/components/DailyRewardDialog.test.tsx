@@ -38,11 +38,11 @@ describe("DailyRewardDialog", () => {
     expect(screen.getByTestId("daily-reward-dialog")).toBeInTheDocument();
   });
 
-  it("closes when the player clicks Collect", async () => {
+  it("closes when the player clicks Continue", async () => {
     const user = userEvent.setup();
     render(<Harness initialOpen={true} />);
 
-    await user.click(screen.getByTestId("daily-reward-collect"));
+    await user.click(screen.getByTestId("daily-reward-continue"));
 
     await waitFor(() => {
       expect(screen.queryByTestId("daily-reward-dialog")).not.toBeInTheDocument();

@@ -1071,7 +1071,7 @@
       "coinsAdded": "парички додадени во твојот паричник",
       "streak": "Ден {{streak}}",
       "newBalance": "Нов биланс",
-      "collect": "Преземи"
+      "continue": "Продолжи"
     }
   },
   "wallet": {

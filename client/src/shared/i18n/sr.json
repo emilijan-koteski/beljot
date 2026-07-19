@@ -1071,7 +1071,7 @@
       "coinsAdded": "novčića dodato u tvoj novčanik",
       "streak": "Dan {{streak}}",
       "newBalance": "Novo stanje",
-      "collect": "Preuzmi"
+      "continue": "Nastavi"
     }
   },
   "wallet": {

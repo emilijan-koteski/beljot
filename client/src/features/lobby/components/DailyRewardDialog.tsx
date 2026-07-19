@@ -164,14 +164,16 @@ function StreakTrack({ day, total = STREAK_MAX }: { day: number; total?: number 
 /**
  * DailyRewardDialog is the persistent daily-login reward modal (AC #2). It is
  * fully controlled and opened programmatically by the gate — never via a
- * trigger. It stays open until the player clicks Collect: `disablePointerDismissal`
+ * trigger. It stays open until the player clicks Continue: `disablePointerDismissal`
  * blocks outside-click dismissal and the no-op `onOpenChange` swallows every
  * library-initiated close (outside press / Escape / focus-out), so the only
- * close path is the explicit Collect button. There is no auto-dismiss timer.
+ * close path is the explicit Continue button. There is no auto-dismiss timer.
+ * The button only dismisses — the coins are already credited server-side by
+ * the time the dialog opens (hence "Continue", not "Collect").
  *
  * Visual: the "Medallion" direction from the Daily Reward redesign — a struck
  * coin hero, the 14-day streak track, a wallet-balance ledger row, and the
- * felt-green Collect CTA, on the lobby's parchment + brass system.
+ * felt-green Continue CTA, on the lobby's parchment + brass system.
  */
 export function DailyRewardDialog({
   open,
@@ -256,9 +258,9 @@ export function DailyRewardDialog({
             onClick={onClose}
             size="cta"
             className="w-full"
-            data-testid="daily-reward-collect"
+            data-testid="daily-reward-continue"
           >
-            {t("rewards.dailyReward.collect")}
+            {t("rewards.dailyReward.continue")}
           </Button>
         </div>
       </DialogContent>
