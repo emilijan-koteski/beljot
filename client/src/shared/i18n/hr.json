@@ -639,7 +639,7 @@
       "titleRound1": "Zovi aduta ili dalje",
       "titleRound2": "Odaberi bilo koju boju ili dalje",
       "subtitleRound1": "Prihvati ovu boju ili prepusti sljedećem igraču.",
-      "subtitleRound2": "Drugi krug · bilo koja boja osim kandidata.",
+      "subtitleRound2": "Bilo koja boja osim kandidata.",
       "bodyRound1": "Karta kandidat je okrenuta. Prihvati je kao aduta za svoj tim, ili prepusti sljedećem igraču.",
       "roundLabel": "Krug {{round}} / 2",
       "pick": "Zovi",
