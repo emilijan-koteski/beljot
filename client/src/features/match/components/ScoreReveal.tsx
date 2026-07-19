@@ -21,7 +21,7 @@ interface ScoreRevealProps {
   handNumber?: number;
   /** Trump suit for the just-finished hand (used in the subtitle). */
   trumpSuit?: Suit | null;
-  /** Seat that called the trump (used for "your team called X" wording). */
+  /** Seat that called the trump (used for "you took trump on X" wording). */
   trumpCallerSeat?: number | null;
   /**
    * True once the local player has clicked Continue and the server is waiting
@@ -211,8 +211,8 @@ export function ScoreReveal({
 
   const hasDeclarations = data.teamADeclPoints > 0 || data.teamBDeclPoints > 0;
 
-  // Title + contract subtitle per design ("Hand N — results / Contract held ·
-  // your team called Spades"). When handNumber / trumpSuit aren't passed
+  // Title + outcome subtitle per design ("Hand N — results / Pulled it off ·
+  // you took trump on Spades"). When handNumber / trumpSuit aren't passed
   // (legacy callers, test renders) we fall back to a plain "Hand Score".
   const title =
     handNumber !== undefined
@@ -233,7 +233,7 @@ export function ScoreReveal({
   // team LABEL, because "all points to {{team}}" reads ungrammatically after
   // the preposition in mk/hr/sr: the nominative label ("за Тие" / "za Oni")
   // must be the oblique pronoun ("за нив" / "za njih"). Held = "Pulled it off
-  // · your team took Spades"; went down = "Went down · all points to us/them".
+  // · you took trump on Spades"; went down = "Went down · all points to us/them".
   let subtitle: string | null = null;
   if (data.failedContract) {
     const beneficiary: TeamString = data.contractingTeam === 0 ? "teamB" : "teamA";
@@ -334,7 +334,7 @@ export function ScoreReveal({
                 left and the Continue button on the right. Combining them
                 keeps the dialog footprint tight. */}
             <div
-              className="rounded-lg px-4 py-3 mt-4 flex items-center justify-between gap-4"
+              className="rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 mt-4 flex flex-wrap items-center justify-between gap-3 sm:gap-4"
               style={{
                 background: "rgba(201,168,118,0.1)",
                 border: "1px solid rgba(201,168,118,0.3)",
@@ -348,7 +348,9 @@ export function ScoreReveal({
                 >
                   {t("match.scoreReveal.matchTotal")}
                 </span>
-                <div className="flex items-baseline gap-2 font-display text-lg font-bold tabular-nums">
+                {/* nowrap: the "/ 1001" target must never split off onto its own
+                    line when the Continue button squeezes the strip on phones. */}
+                <div className="flex items-baseline gap-1.5 sm:gap-2 font-display text-[16px] sm:text-[18px] font-bold tabular-nums whitespace-nowrap">
                   <span style={{ color: teamAGradient[0] }} data-team="teamA">
                     {data.teamAMatchScore}
                   </span>
@@ -357,14 +359,17 @@ export function ScoreReveal({
                     {data.teamBMatchScore}
                   </span>
                   <span
-                    className="text-[12px] font-body font-normal"
+                    className="text-[11px] sm:text-[12px] font-body font-normal"
                     style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.5 }}
                   >
                     / {matchTarget}
                   </span>
                 </div>
               </div>
-              <span className="relative inline-flex">
+              {/* ml-auto keeps the CTA pinned right if the strip ever wraps on
+                  ultra-narrow screens (justify-between alone would drop a lone
+                  wrapped item to the left edge). */}
+              <span className="relative inline-flex ml-auto">
                 <ClassicButton
                   variant="ghost"
                   onClick={onContinue}
@@ -409,7 +414,7 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
       data-testid={testId}
     >
       <span
-        className="font-body text-sm"
+        className="font-body text-[13px] sm:text-[14px]"
         style={{
           color: "var(--ink-light, #f5f2e8)",
           opacity: bold ? 1 : 0.85,
@@ -419,10 +424,9 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
         {label}
       </span>
       <span
-        className="font-display text-right tabular-nums"
+        className={`font-display text-right tabular-nums ${bold ? "text-[16px] sm:text-[18px]" : "text-[14px] sm:text-[15px]"}`}
         style={{
           color: "var(--ink-light, #f5f2e8)",
-          fontSize: bold ? 18 : 15,
           fontWeight: bold ? 700 : 500,
         }}
         data-team="teamA"
@@ -430,10 +434,9 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
         {teamAValue}
       </span>
       <span
-        className="font-display text-right tabular-nums"
+        className={`font-display text-right tabular-nums ${bold ? "text-[16px] sm:text-[18px]" : "text-[14px] sm:text-[15px]"}`}
         style={{
           color: "var(--ink-light, #f5f2e8)",
-          fontSize: bold ? 18 : 15,
           fontWeight: bold ? 700 : 500,
         }}
         data-team="teamB"
@@ -458,8 +461,8 @@ function BonusRow({ label, amount, team, teamGradient, testId }: BonusRowProps) 
   // (team A = left, team B = right) instead of always hugging the right edge.
   const value = (
     <span
-      className="font-display text-right tabular-nums"
-      style={{ color: teamGradient[0], fontSize: 15, fontWeight: 500 }}
+      className="font-display text-right tabular-nums text-sm sm:text-[15px]"
+      style={{ color: teamGradient[0], fontWeight: 500 }}
       data-team={teamString}
     >
       +{amount}
@@ -476,7 +479,7 @@ function BonusRow({ label, amount, team, teamGradient, testId }: BonusRowProps) 
       }}
       data-testid={testId}
     >
-      <span className="font-body text-sm">{label}</span>
+      <span className="font-body text-[13px] sm:text-[14px]">{label}</span>
       {team === 0 ? value : <span />}
       {team === 1 ? value : <span />}
     </div>

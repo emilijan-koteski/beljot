@@ -26,8 +26,11 @@ type EditableUsernameProps = {
 
 // Matches the static hero title previously rendered inline by IdentityHero, so
 // swapping in the editable version leaves the visual identity unchanged.
+// min-w-0 + overflow-wrap let a long unbroken username (up to 20 chars) wrap
+// onto a second line instead of overflowing the hero and pushing the edit
+// pencil out of view on phones.
 const TITLE_CLASS =
-  "text-ink font-display m-0 text-[clamp(32px,6vw,48px)] leading-[1.05] font-bold tracking-[-1.2px]";
+  "text-ink font-display m-0 min-w-0 [overflow-wrap:anywhere] text-[clamp(32px,6vw,48px)] leading-[1.05] font-bold tracking-[-1.2px]";
 
 /**
  * The profile identity title with edit-in-place. Display mode shows the
@@ -130,8 +133,8 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
     const trimmed = draft.trim();
     const saveDisabled = mutation.isPending || trimmed.length === 0 || trimmed === username;
     return (
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex min-w-0 items-center gap-2">
           <Input
             autoFocus
             value={draft}
@@ -145,12 +148,13 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
             disabled={mutation.isPending}
             aria-label={t("profile.editUsername.inputLabel")}
             aria-invalid={error ? true : undefined}
-            className="font-display h-auto max-w-60 py-1 text-2xl font-bold"
+            className="font-display h-auto min-w-0 max-w-60 py-1 text-2xl font-bold"
             data-testid="profile-username-input"
           />
           <Button
             variant="ghost"
             size="icon-sm"
+            className="shrink-0"
             onClick={submit}
             disabled={saveDisabled}
             aria-label={t("profile.editUsername.save")}
@@ -161,6 +165,7 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
           <Button
             variant="ghost"
             size="icon-sm"
+            className="shrink-0"
             onClick={cancelEdit}
             disabled={mutation.isPending}
             aria-label={t("profile.editUsername.cancel")}
@@ -183,8 +188,8 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex min-w-0 items-center gap-2">
         <h1 className={TITLE_CLASS} data-testid="profile-username">
           {username}
         </h1>
@@ -192,6 +197,7 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
           <Button
             variant="ghost"
             size="icon-sm"
+            className="shrink-0"
             onClick={startEdit}
             disabled={onCooldown}
             title={onCooldown ? cooldownHint : t("profile.editUsername.edit")}

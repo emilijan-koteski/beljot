@@ -639,7 +639,7 @@
       "titleRound1": "Take trump or pass",
       "titleRound2": "Choose any suit — or pass",
       "subtitleRound1": "Adopt this suit, or pass to the next player.",
-      "subtitleRound2": "Round 2 · any suit except the candidate.",
+      "subtitleRound2": "Any suit except the candidate.",
       "bodyRound1": "The candidate card was turned face-up. Take it as trump for your team, or pass to the next player.",
       "roundLabel": "Round {{round}} / 2",
       "pick": "Take",
@@ -721,8 +721,8 @@
     "scoreReveal": {
       "title": "Hand Score",
       "titleWithHand": "Hand {{hand}} — results",
-      "subtitleHeldYour": "Pulled it off · your team took {{suit}}",
-      "subtitleHeldTheir": "Pulled it off · their team took {{suit}}",
+      "subtitleHeldYour": "Pulled it off · you took trump on {{suit}}",
+      "subtitleHeldTheir": "Pulled it off · they took trump on {{suit}}",
       "subtitleFailedUs": "Went down · all points to us",
       "subtitleFailedThem": "Went down · all points to them",
       "cardPoints": "Card Points",
@@ -1071,7 +1071,7 @@
       "coinsAdded": "coins added to your wallet",
       "streak": "Day {{streak}}",
       "newBalance": "New balance",
-      "collect": "Collect"
+      "continue": "Continue"
     }
   },
   "wallet": {

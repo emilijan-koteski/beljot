@@ -195,6 +195,10 @@ export function CardLadder({ title, accent, rows, suit, testId }: Props) {
                 </span>
                 {r.note && (
                   <span
+                    // The strongest/weakest annotations wrap awkwardly beside
+                    // the card name on phones — hidden below sm (the tinted
+                    // top row and the rank order carry the meaning there).
+                    className="hidden sm:inline"
                     style={{
                       fontSize: 11.5,
                       color: top ? accent.ink : "var(--ink-mute)",

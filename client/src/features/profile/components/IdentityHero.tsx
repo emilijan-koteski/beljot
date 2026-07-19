@@ -158,9 +158,12 @@ export function IdentityHero({
             userId={userId}
             usernameChangedAt={usernameChangedAt}
           />
-          <div className="text-ink-dim flex flex-wrap items-center gap-2 text-[13px]">
+          {/* Below sm the two meta lines stack on their own rows (no middot) —
+              the inline pair wraps unpredictably next to long usernames on
+              phones. sm+ keeps the single "member since · played" line. */}
+          <div className="text-ink-dim flex flex-col gap-0.5 text-[13px] sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
             {memberSince && <span data-testid="profile-member-since">{memberSince}</span>}
-            {memberSince && lastPlayed && <span className="text-ink-off">·</span>}
+            {memberSince && lastPlayed && <span className="text-ink-off hidden sm:inline">·</span>}
             {lastPlayed && <span>{lastPlayed}</span>}
           </div>
         </div>

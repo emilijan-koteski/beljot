@@ -22,10 +22,10 @@ vi.mock("react-i18next", () => ({
         "match.scoreReveal.subtitleFailedThem": "Went down · all points to them",
       };
       if (key === "match.scoreReveal.subtitleHeldYour" && opts) {
-        return `Contract held · your team called ${opts.suit}`;
+        return `Pulled it off · you took trump on ${opts.suit}`;
       }
       if (key === "match.scoreReveal.subtitleHeldTheir" && opts) {
-        return `Contract held · their team called ${opts.suit}`;
+        return `Pulled it off · they took trump on ${opts.suit}`;
       }
       return translations[key] ?? key;
     },
@@ -175,7 +175,7 @@ describe("ScoreReveal", () => {
         trumpCallerSeat={0}
       />,
     );
-    expect(container.textContent).toContain("Contract held · your team called");
+    expect(container.textContent).toContain("Pulled it off · you took trump on");
   });
 
   it("Continue button is enabled from the start (no read-delay gate)", () => {

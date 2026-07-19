@@ -238,19 +238,23 @@ LIMIT 1`,
 		agg.BestHandAt = bh.CompletedAt
 	}
 
-	// Current streak — leading run of identical outcomes over completed matches,
-	// newest first. Abandoned matches are excluded (status filter), matching the
-	// client's historical streak rule. The 200-row window is far beyond any real
-	// streak length while keeping the query cheap.
+	// Current streak — leading run of identical outcomes, newest first, with the
+	// same per-player abandonment semantics as GetStatsForUser: completed
+	// matches plus attributable abandoned rows (abandoned_by set, not the
+	// viewer) count win/loss via the persisted winner_team. The viewer's own
+	// abandonments and NULL-abandoner legacy rows are neither win nor loss —
+	// they are skipped, so a streak continues across them. The 200-row window
+	// is far beyond any real streak length while keeping the query cheap.
 	var outcomes []struct{ Won bool }
 	if err := r.db.Raw(`
 SELECT (winner_team = `+viewerTeamCase+`) AS won
 FROM matches
-WHERE status = 'completed'
+WHERE (status = 'completed' OR (status = 'abandoned' AND abandoned_by IS NOT NULL AND abandoned_by <> ?))
   AND (player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?)
 ORDER BY completed_at DESC, id DESC
 LIMIT 200`,
 		userID, userID, userID, userID,
+		userID,
 		userID, userID, userID, userID,
 	).Scan(&outcomes).Error; err != nil {
 		return CareerAggregates{}, err
@@ -278,8 +282,10 @@ LIMIT 200`,
 }
 
 // GetTopPartnersForUser returns the most-played teammates — the same-team seat
-// across each match — ordered by matches played together. wins counts only
-// completed matches the viewer's team won.
+// across each match — ordered by matches played together. wins mirrors
+// GetStatsForUser's per-player semantics: completed wins plus attributable
+// abandoned rows the viewer's team won; the viewer's own abandonments and
+// NULL-abandoner legacy rows never count as wins (but do count as played).
 func (r *GormMatchRepository) GetTopPartnersForUser(userID uint, limit int) ([]PartnerAggregate, error) {
 	var rows []PartnerAggregate
 	err := r.db.Raw(`
@@ -293,6 +299,7 @@ WITH um AS (
      END) AS teammate_id,
     `+viewerTeamCase+` AS viewer_team,
     status,
+    abandoned_by,
     winner_team
   FROM matches
   WHERE (player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?)
@@ -300,7 +307,10 @@ WITH um AS (
 )
 SELECT teammate_id AS user_id,
        COUNT(*) AS played,
-       COUNT(*) FILTER (WHERE status = 'completed' AND winner_team = viewer_team) AS wins
+       COUNT(*) FILTER (
+         WHERE (status = 'completed' OR (status = 'abandoned' AND abandoned_by IS NOT NULL AND abandoned_by <> ?))
+           AND winner_team = viewer_team
+       ) AS wins
 FROM um
 WHERE teammate_id IS NOT NULL
 GROUP BY teammate_id
@@ -309,6 +319,7 @@ LIMIT ?`,
 		userID, userID, userID, userID,
 		userID, userID, userID, userID,
 		userID, userID, userID, userID,
+		userID,
 		limit,
 	).Scan(&rows).Error
 	if err != nil {
@@ -318,8 +329,11 @@ LIMIT ?`,
 }
 
 // GetTopRivalsForUser returns the most-faced opponents — the two opposite-team
-// seats, unpivoted into one row each — ordered by completed matches played
-// against them. wins/losses are viewer-relative.
+// seats, unpivoted into one row each — ordered by matches played against them.
+// wins/losses are viewer-relative and mirror GetStatsForUser's per-player
+// semantics: completed matches plus attributable abandoned rows (abandoned_by
+// set, not the viewer); the viewer's own abandonments and NULL-abandoner
+// legacy rows are excluded entirely.
 func (r *GormMatchRepository) GetTopRivalsForUser(userID uint, limit int) ([]RivalAggregate, error) {
 	var rows []RivalAggregate
 	err := r.db.Raw(`
@@ -330,7 +344,7 @@ WITH um AS (
     winner_team
   FROM matches
   WHERE (player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?)
-    AND status = 'completed'
+    AND (status = 'completed' OR (status = 'abandoned' AND abandoned_by IS NOT NULL AND abandoned_by <> ?))
 ),
 opp AS (
   SELECT (CASE WHEN viewer_team = 0 THEN player2_id ELSE player1_id END) AS opponent_id,
@@ -351,6 +365,7 @@ ORDER BY COUNT(*) DESC, wins DESC
 LIMIT ?`,
 		userID, userID, userID, userID,
 		userID, userID, userID, userID,
+		userID,
 		limit,
 	).Scan(&rows).Error
 	if err != nil {

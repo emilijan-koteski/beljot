@@ -193,6 +193,29 @@ func TestHandScoring_TieFailsTrumpCaller(t *testing.T) {
 	assert.Equal(t, 0, result.TeamScores[game.TeamB], "caller scores 0 on the tie")
 }
 
+func TestHandScoring_TieWithDeclarationsFailsTrumpCaller(t *testing.T) {
+	gs := testfixtures.NewGameLastTrick()
+	// Tie where declarations are part of both the totals and the transferred
+	// pool: 162 base points + 20 declarations = 182 in play. Team B (seat 1) is
+	// the trump caller. Trick 8 (7H trump wins) gives team B 21 card pts + 10
+	// last-trick bonus. Team A holds a tierce (+20): A = 71 + 20 = 91,
+	// B = 60 + 21 + 10 = 91 — a 91:91 tie.
+	gs.HandPoints = [2]int{71, 60}
+	gs.DeclarationPoints = [2]int{20, 0}
+	gs.TeamScores = [2]int{0, 0}
+
+	result := playTrick8(t, gs)
+
+	// 91:91 — the caller fails and the opponents collect the ENTIRE pool,
+	// declarations included: 0:182.
+	require.NotNil(t, result.LastHandResult)
+	assert.True(t, result.LastHandResult.FailedContract, "91:91 is a failed hand for the caller")
+	assert.Equal(t, 182, result.TeamScores[game.TeamA], "opponents win all 182 points incl. declarations")
+	assert.Equal(t, 0, result.TeamScores[game.TeamB], "caller scores 0 on the tie")
+	assert.Equal(t, 182, result.LastHandResult.TeamAHandTotal, "broadcast total mirrors the transfer")
+	assert.Equal(t, 0, result.LastHandResult.TeamBHandTotal, "broadcast total mirrors the transfer")
+}
+
 func TestHandScoring_NormalScoring(t *testing.T) {
 	gs := testfixtures.NewGameLastTrick()
 	// Team B is contracting. Set points so team B wins comfortably after trick 8.

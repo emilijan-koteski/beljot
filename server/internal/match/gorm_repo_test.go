@@ -246,3 +246,144 @@ WHERE status = 'abandoned'
 	require.NoError(t, db.Raw(`SELECT winner_team FROM matches WHERE id = ?`, f.m3).Scan(&winner).Error)
 	assert.Equal(t, 0, winner, "NULL-abandoner row keeps the filler 0")
 }
+
+// TestGormMatchRepository_GetCareerAggregatesForUser_StreakPerPlayerAbandonment
+// pins the streak's mirror of the stats semantics: attributable abandoned rows
+// count win/loss via winner_team, while the viewer's own abandonments and
+// NULL-abandoner legacy rows are skipped (the run continues across them).
+func TestGormMatchRepository_GetCareerAggregatesForUser_StreakPerPlayerAbandonment(t *testing.T) {
+	db := getRepoTestDB(t)
+	f := seedAbandonedFixture(t, db)
+
+	cases := []struct {
+		name   string
+		viewer uint
+		kind   string
+		length int
+	}{
+		// a (newest first): m1 win, m2 own abandonment (skipped), m3 legacy
+		// (skipped), m4 win — the run continues across the skipped rows.
+		{name: "abandoner skips own rows", viewer: f.a, kind: "win", length: 2},
+		// b: m1 loss breaks at the m2 abandonment win.
+		{name: "opponent of abandoner", viewer: f.b, kind: "loss", length: 1},
+		// c: m1 win breaks at m2 — the partner-of-abandoner LOSS now counts
+		// (completed-only would have run m1+m4 for a win streak of 2).
+		{name: "partner loss breaks streak", viewer: f.c, kind: "win", length: 1},
+		// d: mirrors b.
+		{name: "second opponent", viewer: f.d, kind: "loss", length: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			agg, err := f.repo.GetCareerAggregatesForUser(tc.viewer)
+			require.NoError(t, err)
+			assert.Equal(t, tc.kind, agg.StreakKind, "streak kind")
+			assert.Equal(t, tc.length, agg.StreakLength, "streak length")
+		})
+	}
+}
+
+// TestGormMatchRepository_GetCareerAggregatesForUser_StreakCountsAbandonmentWin
+// reproduces the reported profile bug: a completed loss followed by a newer win
+// via opponent abandonment must read as a win streak of 1, not resurface the
+// older loss as "loss streak 1" (which is what the completed-only filter did).
+func TestGormMatchRepository_GetCareerAggregatesForUser_StreakCountsAbandonmentWin(t *testing.T) {
+	db := getRepoTestDB(t)
+	repo := match.NewGormMatchRepository(db)
+
+	suffix := repoFixtureSuffix()
+	w := seedRepoUser(t, db, "rs"+suffix+"w")
+	x := seedRepoUser(t, db, "rs"+suffix+"x")
+	y := seedRepoUser(t, db, "rs"+suffix+"y")
+	z := seedRepoUser(t, db, "rs"+suffix+"z")
+	roomID := seedRepoRoom(t, db, w, suffix)
+
+	base := time.Date(2026, 6, 2, 12, 0, 0, 0, time.UTC)
+	newMatch := func(offset time.Duration, status string, winnerTeam int, abandonedBy *uint) *match.Match {
+		wID, xID, yID, zID := w, x, y, z
+		return &match.Match{
+			RoomID:      roomID,
+			Player1ID:   &wID,
+			Player2ID:   &xID,
+			Player3ID:   &yID,
+			Player4ID:   &zID,
+			TeamAScore:  500,
+			TeamBScore:  400,
+			WinnerTeam:  winnerTeam,
+			Variant:     "bitola",
+			MatchMode:   "1001",
+			StartedAt:   base.Add(offset - 20*time.Minute),
+			CompletedAt: base.Add(offset),
+			Status:      status,
+			AbandonedBy: abandonedBy,
+		}
+	}
+
+	// Older: completed loss for w (team 0). Newest: opponent x abandons,
+	// winner_team 0 — an abandonment-derived win for w.
+	older := newMatch(-1*time.Hour, "completed", 1, nil)
+	newest := newMatch(0, "abandoned", 0, &x)
+	require.NoError(t, repo.Create(older))
+	require.NoError(t, repo.Create(newest))
+
+	agg, err := repo.GetCareerAggregatesForUser(w)
+	require.NoError(t, err)
+	assert.Equal(t, "win", agg.StreakKind, "abandonment win must lead the streak")
+	assert.Equal(t, 1, agg.StreakLength, "streak length")
+}
+
+// TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment pins the
+// partner/rival mirrors of the stats semantics: attributable abandoned rows
+// count viewer-relative wins/losses; the viewer's own abandonments and
+// NULL-abandoner rows contribute no win/loss (partners still count them as
+// played; rivals exclude them entirely).
+func TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment(t *testing.T) {
+	db := getRepoTestDB(t)
+	f := seedAbandonedFixture(t, db)
+
+	t.Run("partner wins include abandonment win", func(t *testing.T) {
+		// b + d: played all 4; the only win is m2 via a's abandonment.
+		rows, err := f.repo.GetTopPartnersForUser(f.b, 5)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, f.d, rows[0].UserID, "teammate")
+		assert.Equal(t, 4, rows[0].Played, "played")
+		assert.Equal(t, 1, rows[0].Wins, "wins")
+	})
+
+	t.Run("partner wins exclude viewer's own abandonment", func(t *testing.T) {
+		// a + c: m1 and m4 wins; m2 is a's own abandonment (no win), m3 legacy.
+		rows, err := f.repo.GetTopPartnersForUser(f.a, 5)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, f.c, rows[0].UserID, "teammate")
+		assert.Equal(t, 4, rows[0].Played, "played")
+		assert.Equal(t, 2, rows[0].Wins, "wins")
+	})
+
+	t.Run("rival record includes abandonment outcomes", func(t *testing.T) {
+		// b vs a and c: m1 loss, m2 abandonment win, m4 loss; m3 excluded.
+		rows, err := f.repo.GetTopRivalsForUser(f.b, 5)
+		require.NoError(t, err)
+		require.Len(t, rows, 2)
+		byID := map[uint]match.RivalAggregate{}
+		for _, r := range rows {
+			byID[r.UserID] = r
+		}
+		for _, opp := range []uint{f.a, f.c} {
+			require.Contains(t, byID, opp, "opponent row")
+			assert.Equal(t, 1, byID[opp].Wins, "wins vs opponent")
+			assert.Equal(t, 2, byID[opp].Losses, "losses vs opponent")
+		}
+	})
+
+	t.Run("rival record excludes viewer's own abandonment", func(t *testing.T) {
+		// a vs b and d: m1 + m4 wins; m2 (own abandonment) and m3 excluded.
+		rows, err := f.repo.GetTopRivalsForUser(f.a, 5)
+		require.NoError(t, err)
+		require.Len(t, rows, 2)
+		for _, r := range rows {
+			assert.Equal(t, 2, r.Wins, "wins vs opponent")
+			assert.Equal(t, 0, r.Losses, "losses vs opponent")
+		}
+	})
+}

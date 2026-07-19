@@ -1,11 +1,43 @@
 import type { Declaration } from "@/features/rules/content/types";
 import { useRules } from "@/features/rules/RulesContext";
 
-// Visual differentiation by point tier — small / mid / jackpot.
-const TIER_STYLES: Record<0 | 1 | 2, { eyebrow: string; border: string; tint: string }> = {
-  0: { eyebrow: "var(--brass-deep)", border: "var(--border)", tint: "var(--surface)" },
-  1: { eyebrow: "var(--brass-deep)", border: "var(--border-2)", tint: "var(--surface)" },
-  2: { eyebrow: "var(--accent)", border: "var(--accent)", tint: "rgba(25,101,54,0.05)" },
+// Visual differentiation by point tier — small / mid / jackpot / match-winner.
+// `pts` colors the "+N" figure and `text` the meld title + summary, so each
+// tier's text matches its chrome.
+const TIER_STYLES: Record<
+  0 | 1 | 2 | 3,
+  { eyebrow: string; border: string; tint: string; pts: string; text: string }
+> = {
+  0: {
+    eyebrow: "var(--brass-deep)",
+    border: "var(--border)",
+    tint: "var(--surface)",
+    pts: "var(--ink)",
+    text: "var(--ink)",
+  },
+  1: {
+    eyebrow: "var(--brass-deep)",
+    border: "var(--border-2)",
+    tint: "var(--surface)",
+    pts: "var(--ink)",
+    text: "var(--ink)",
+  },
+  2: {
+    eyebrow: "var(--accent)",
+    border: "var(--accent)",
+    tint: "rgba(25,101,54,0.05)",
+    pts: "var(--accent)",
+    text: "var(--ink)",
+  },
+  // The instant-win bela (+1001) — dark-red treatment so the card that ends
+  // the whole match on the spot reads apart from the green jackpot melds.
+  3: {
+    eyebrow: "var(--danger)",
+    border: "var(--danger)",
+    tint: "rgba(139,42,31,0.05)",
+    pts: "var(--danger)",
+    text: "var(--danger)",
+  },
 };
 
 function MeldCard({ meld }: { meld: Declaration }) {
@@ -30,7 +62,7 @@ function MeldCard({ meld }: { meld: Declaration }) {
           style={{
             fontSize: 16,
             fontWeight: 600,
-            color: "var(--ink)",
+            color: tier.text,
             letterSpacing: -0.2,
             flex: "1 1 auto",
             minWidth: 0,
@@ -45,7 +77,7 @@ function MeldCard({ meld }: { meld: Declaration }) {
             style={{
               fontSize: 22,
               fontWeight: 700,
-              color: meld.tier === 2 ? "var(--accent)" : "var(--ink)",
+              color: tier.pts,
               letterSpacing: -0.5,
             }}
           >
@@ -66,7 +98,7 @@ function MeldCard({ meld }: { meld: Declaration }) {
       >
         {ui.meldKinds[meld.kind]}
       </div>
-      <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--ink)" }}>{meld.summary}</div>
+      <div style={{ fontSize: 13.5, lineHeight: 1.5, color: tier.text }}>{meld.summary}</div>
       <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--ink-dim)" }}>{meld.detail}</div>
     </div>
   );

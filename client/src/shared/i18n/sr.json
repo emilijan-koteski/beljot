@@ -639,7 +639,7 @@
       "titleRound1": "Zovi adut ili dalje",
       "titleRound2": "Izaberi bilo koju boju ili dalje",
       "subtitleRound1": "Prihvati ovu boju ili prepusti sledećem igraču.",
-      "subtitleRound2": "Drugi krug · bilo koja boja osim kandidata.",
+      "subtitleRound2": "Bilo koja boja osim kandidata.",
       "bodyRound1": "Kandidat karta je okrenuta. Prihvati je kao adut za svoj tim, ili prepusti sledećem igraču.",
       "roundLabel": "Krug {{round}} / 2",
       "pick": "Zovi",
@@ -721,8 +721,8 @@
     "scoreReveal": {
       "title": "Rezultat deljenja",
       "titleWithHand": "Deljenje {{hand}} · rezultat",
-      "subtitleHeldYour": "Prošli · tvoj tim je zvao {{suit}}",
-      "subtitleHeldTheir": "Prošli · njihov tim je zvao {{suit}}",
+      "subtitleHeldYour": "Prošli · vi ste zvali adut {{suit}}",
+      "subtitleHeldTheir": "Prošli · oni su zvali adut {{suit}}",
       "subtitleFailedUs": "Pali · svi poeni za nas",
       "subtitleFailedThem": "Pali · svi poeni za njih",
       "cardPoints": "Poeni karata",
@@ -1071,7 +1071,7 @@
       "coinsAdded": "novčića dodato u tvoj novčanik",
       "streak": "Dan {{streak}}",
       "newBalance": "Novo stanje",
-      "collect": "Preuzmi"
+      "continue": "Nastavi"
     }
   },
   "wallet": {

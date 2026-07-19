@@ -20,8 +20,9 @@ type CareerAggregates struct {
 }
 
 // PartnerAggregate is one most-played teammate row: matches played together and
-// wins together (completed matches the viewer's team won). UserID still needs a
-// username lookup by the caller.
+// wins together (matches the viewer's team won — completed plus attributable
+// abandoned rows, per-player semantics). UserID still needs a username lookup
+// by the caller.
 type PartnerAggregate struct {
 	UserID uint
 	Played int
@@ -29,8 +30,9 @@ type PartnerAggregate struct {
 }
 
 // RivalAggregate is one most-faced opponent row: the viewer's wins and losses
-// against that opponent across completed matches. UserID still needs a username
-// lookup by the caller.
+// against that opponent across completed matches plus attributable abandoned
+// rows (per-player semantics). UserID still needs a username lookup by the
+// caller.
 type RivalAggregate struct {
 	UserID uint
 	Wins   int

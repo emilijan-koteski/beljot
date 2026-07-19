@@ -237,7 +237,7 @@ export const en: RulesLangData = {
     noteLabel: "Note",
     pts: "pts",
     ladderTrumpTitle: "In the trump suit",
-    ladderTrumpEyebrow: "Trump · adut",
+    ladderTrumpEyebrow: "Trump",
     ladderPlainTitle: "In every other suit",
     ladderPlainEyebrow: "Off-trump",
     colCard: "Card",
