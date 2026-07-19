@@ -13,10 +13,13 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { useRegisterMutation } from "@/shared/hooks/mutations/useAuth";
 import { normalizeLanguage } from "@/shared/i18n/i18n";
+import {
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_REGEX,
+} from "@/shared/lib/usernameChange";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
-const USERNAME_MAX = 20;
 
 interface FieldErrors {
   email?: string;
@@ -46,8 +49,8 @@ export function RegisterPage() {
 
   function validateUsername(value: string): string | undefined {
     if (!value) return t("auth.register.errors.usernameRequired");
-    if (value.length < 3) return t("auth.register.errors.usernameTooShort");
-    if (value.length > USERNAME_MAX) return t("auth.register.errors.usernameTooLong");
+    if (value.length < USERNAME_MIN_LENGTH) return t("auth.register.errors.usernameTooShort");
+    if (value.length > USERNAME_MAX_LENGTH) return t("auth.register.errors.usernameTooLong");
     if (!USERNAME_REGEX.test(value)) return t("auth.register.errors.usernameInvalidChars");
     return undefined;
   }
@@ -169,7 +172,7 @@ export function RegisterPage() {
           htmlFor="username"
           hint={
             <span className="tabular-nums">
-              {username.length}/{USERNAME_MAX}
+              {username.length}/{USERNAME_MAX_LENGTH}
             </span>
           }
           error={errors.username}
@@ -179,6 +182,7 @@ export function RegisterPage() {
             id="username"
             type="text"
             className="h-10.5"
+            maxLength={USERNAME_MAX_LENGTH}
             placeholder={t("auth.register.usernamePlaceholder")}
             value={username}
             onChange={(e) => setUsername(e.target.value)}

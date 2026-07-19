@@ -32,7 +32,12 @@ export const PLAIN_ROWS: CardBase[] = [
   { rank: "7", pts: 0, strength: 8 },
 ];
 
-export type DeclarationBase = { id: string; pts: number; tier: 0 | 1 | 2; kind: DeclarationKind };
+export type DeclarationBase = {
+  id: string;
+  pts: number;
+  tier: 0 | 1 | 2 | 3;
+  kind: DeclarationKind;
+};
 
 export const DECLARATIONS_BASE: DeclarationBase[] = [
   { id: "belot", pts: 20, tier: 0, kind: "belot" },
@@ -44,5 +49,6 @@ export const DECLARATIONS_BASE: DeclarationBase[] = [
   { id: "carreJ", pts: 200, tier: 2, kind: "set" },
   // Belote / Bela — all eight cards of one suit: instant 1001-point win.
   // Documentation only; engine detection/scoring is deferred (see deferred-work.md).
-  { id: "bela", pts: 1001, tier: 2, kind: "run" },
+  // Tier 3 = its own "wins the match on the spot" visual treatment.
+  { id: "bela", pts: 1001, tier: 3, kind: "run" },
 ];

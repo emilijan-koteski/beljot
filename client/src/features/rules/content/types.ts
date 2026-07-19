@@ -23,7 +23,7 @@ export type DeclarationKind = "belot" | "run" | "set";
 export type Declaration = {
   id: string;
   pts: number;
-  tier: 0 | 1 | 2; // visual grouping: small / mid / jackpot
+  tier: 0 | 1 | 2 | 3; // visual grouping: small / mid / jackpot / match-winner
   kind: DeclarationKind;
   name: string; // localized
   summary: string; // localized
