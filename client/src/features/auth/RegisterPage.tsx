@@ -101,7 +101,8 @@ export function RegisterPage() {
         // already display.
         languagePreference: normalizeLanguage(i18n.language) ?? "en",
       });
-      navigate("/lobby");
+      // Replace: /lobby is the app root — back must not return to the form.
+      navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError) {
         if (err.code === "EMAIL_TAKEN") {

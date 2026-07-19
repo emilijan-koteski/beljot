@@ -131,7 +131,18 @@ describe("useReconnectionRedirect", () => {
     useMatchStore.setState({ matchState: null, roomId: null });
   });
 
-  it("redirects to game page when game state arrives while on lobby", () => {
+  it("redirects to game page when game state arrives while on lobby (push, so back can pop)", () => {
+    useMatchStore.setState({ matchState: minimalMatchState, roomId: 42 });
+
+    renderHook(() => useReconnectionRedirect(), { wrapper });
+
+    // From the lobby the redirect PUSHES so the stack becomes [lobby, match]
+    // and a later return to the lobby can pop back to the live entry.
+    expect(mockNavigate).toHaveBeenCalledWith("/match/42", { replace: false });
+  });
+
+  it("redirects with replace when game state arrives away from the lobby", () => {
+    currentPathname = "/profile";
     useMatchStore.setState({ matchState: minimalMatchState, roomId: 42 });
 
     renderHook(() => useReconnectionRedirect(), { wrapper });

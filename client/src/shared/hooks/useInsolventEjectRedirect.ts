@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation } from "react-router";
 
+import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { useRoomStore } from "@/shared/stores/roomStore";
 
 /**
@@ -17,13 +18,13 @@ import { useRoomStore } from "@/shared/stores/roomStore";
  */
 export function useInsolventEjectRedirect(): void {
   const insolventEjection = useRoomStore((s) => s.insolventEjection);
-  const navigate = useNavigate();
+  const returnToLobby = useLobbyReturn();
   const location = useLocation();
 
   useEffect(() => {
     if (insolventEjection === null) return;
     if (location.pathname !== "/lobby") {
-      navigate("/lobby");
+      returnToLobby();
     }
-  }, [insolventEjection, location.pathname, navigate]);
+  }, [insolventEjection, location.pathname, returnToLobby]);
 }

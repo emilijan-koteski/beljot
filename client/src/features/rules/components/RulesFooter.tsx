@@ -2,11 +2,25 @@ import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { useRules } from "@/features/rules/RulesContext";
+import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
+import { useAuthStore } from "@/shared/stores/authStore";
 
 /** "Ready for your first hand?" closer with a Play CTA back to the lobby. */
 export function RulesFooter() {
   const { ui } = useRules();
+  const returnToLobby = useLobbyReturn();
   const navigate = useNavigate();
+  const isAuthed = useAuthStore((s) => s.token !== null);
+  // Authed users pop/replace back to the lobby root. Guests keep the plain
+  // push: ProtectedRoute bounces them to the landing page, and the push
+  // preserves the rules page in history so back returns them to their reading.
+  const handlePlay = () => {
+    if (isAuthed) {
+      returnToLobby();
+    } else {
+      void navigate("/lobby");
+    }
+  };
   return (
     <footer
       style={{
@@ -32,7 +46,7 @@ export function RulesFooter() {
       </div>
       <button
         type="button"
-        onClick={() => navigate("/lobby")}
+        onClick={handlePlay}
         data-testid="rules-play-cta"
         className="inline-flex cursor-pointer items-center gap-2 rounded-[10px] border border-transparent px-4.5 py-2.75 text-sm font-semibold transition-transform active:scale-[0.98]"
         style={{

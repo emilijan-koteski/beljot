@@ -8,10 +8,18 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation, useNavigate, useParams } from "react-router";
+import {
+  type BlockerFunction,
+  NavigationType,
+  useBlocker,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { getRoom, leaveRoom, returnToRoom } from "@/shared/api/rooms";
+import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
@@ -210,6 +218,7 @@ const SEAT_ORIENTATIONS: Record<number, SeatOrientation> = {
 export function MatchPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const returnToLobby = useLobbyReturn();
   const { roomId: roomIdParam } = useParams<{ roomId: string }>();
   const parsedRoomId = roomIdParam ? Number(roomIdParam) : null;
   const roomIdNum =
@@ -925,28 +934,66 @@ export function MatchPage() {
     };
   }, []);
 
-  // Browser back-button interception — push sentinel entry only once
-  const historyPushedRef = useRef(false);
+  // Browser back-button interception via the data router's blocker (replaces
+  // the old pushState-sentinel + popstate listener). Armed only for POPs while
+  // the match is genuinely live — on the end/abandon overlays back must go
+  // straight out with no confirm. Pushes/replaces (our own redirects and
+  // laterals) are never blocked.
+  const matchActive =
+    matchState !== null &&
+    matchState.phase !== "match_end" &&
+    matchEndData === null &&
+    matchAbandonedData === null;
+  const shouldBlockBack = useCallback<BlockerFunction>(
+    ({ historyAction }) => matchActive && historyAction === NavigationType.Pop,
+    [matchActive],
+  );
+  const backBlocker = useBlocker(shouldBlockBack);
   useEffect(() => {
-    if (!matchState) return;
-
-    const handlePopState = () => {
-      const leave = window.confirm(t("match.leaveConfirm"));
-      if (leave) {
-        clearGame();
-        navigate("/lobby");
+    if (backBlocker.state !== "blocked") return;
+    if (window.confirm(t("match.leaveConfirm"))) {
+      clearGame();
+      // Decide via the blocked navigation's own target — NOT by probing
+      // window.history.state at confirm time: the router's URL revert for a
+      // blocked POP is async, so the live history entry is indeterminate
+      // here. blocker.location is stable, and also handles multi-entry jumps
+      // (history long-press): proceed only when the pop actually lands on
+      // the lobby.
+      if (backBlocker.location.pathname === "/lobby") {
+        backBlocker.proceed();
       } else {
-        window.history.pushState(null, "", window.location.href);
+        // Deep link / fresh reconnect / jump elsewhere: cancel the pop and
+        // replace the match entry with the lobby.
+        backBlocker.reset();
+        navigate("/lobby", { replace: true });
+      }
+    } else {
+      backBlocker.reset();
+    }
+  }, [backBlocker, clearGame, navigate, t]);
+
+  // Back-pop off the result/abandon overlay unmounts the page without going
+  // through the explicit "Return to lobby/room" buttons (which wipe the store
+  // themselves). Clear the ended match on unmount so its stale end state can't
+  // leak into the next mount. Mid-match unmounts must NOT clear — reconnection
+  // (useReconnectionRedirect) depends on the live matchState surviving.
+  useEffect(() => {
+    return () => {
+      // StrictMode guard: the dev-only probe unmount runs this cleanup while
+      // the URL is still on the match page — clearing then would wipe a
+      // result overlay the user never saw. Only a real navigation away (URL
+      // already off /match when unmount cleanups run) clears.
+      if (window.location.pathname.startsWith("/match")) return;
+      const store = useMatchStore.getState();
+      if (
+        store.matchEndData !== null ||
+        store.matchAbandonedData !== null ||
+        store.matchState?.phase === "match_end"
+      ) {
+        store.clearGame();
       }
     };
-
-    if (!historyPushedRef.current) {
-      window.history.pushState(null, "", window.location.href);
-      historyPushedRef.current = true;
-    }
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [matchState, clearGame, navigate, t]);
+  }, []);
 
   // --- Action handlers ---
   const executePlayCard = useCallback(
@@ -1145,8 +1192,8 @@ export function MatchPage() {
     }
     setMatchEndData(null);
     clearGame();
-    navigate("/lobby");
-  }, [roomIdNum, clearGame, navigate, setMatchEndData]);
+    returnToLobby();
+  }, [roomIdNum, clearGame, returnToLobby, setMatchEndData]);
 
   // "Return to room" — reopen the same room (status completed → waiting) and go
   // back to the room lobby on the original seat so the group can play again.
@@ -1157,14 +1204,16 @@ export function MatchPage() {
     if (roomIdNum === null) {
       setMatchEndData(null);
       clearGame();
-      navigate("/lobby");
+      returnToLobby();
       return;
     }
     try {
       await returnToRoom(roomIdNum);
       setMatchEndData(null);
       clearGame();
-      navigate(`/rooms/${roomIdNum}`);
+      // Lateral within the flow (match → room lobby): replace so the dead
+      // match entry doesn't linger beneath the reopened room.
+      navigate(`/rooms/${roomIdNum}`, { replace: true });
     } catch (err) {
       if (errorToastTimerRef.current !== null) {
         clearTimeout(errorToastTimerRef.current);
@@ -1194,7 +1243,7 @@ export function MatchPage() {
         }
         setMatchEndData(null);
         clearGame();
-        navigate("/lobby");
+        returnToLobby();
         return;
       }
       // D146: distinct copy per failure — 409 the next match already started,
@@ -1212,13 +1261,22 @@ export function MatchPage() {
         errorToastTimerRef.current = null;
       }, MOTION.TOAST_ERROR);
     }
-  }, [roomIdNum, clearGame, navigate, setMatchEndData, setInsolventEjection, user, t]);
+  }, [
+    roomIdNum,
+    clearGame,
+    navigate,
+    returnToLobby,
+    setMatchEndData,
+    setInsolventEjection,
+    user,
+    t,
+  ]);
 
   const handleAbandonReturnToLobby = useCallback(() => {
     setMatchAbandonedData(null);
     clearGame();
-    navigate("/lobby");
-  }, [clearGame, navigate, setMatchAbandonedData]);
+    returnToLobby();
+  }, [clearGame, returnToLobby, setMatchAbandonedData]);
 
   // Loading state — themed with the in-game felt + brass palette so the
   // transition into the table doesn't flash a generic dark splash. We can't

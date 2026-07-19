@@ -192,7 +192,7 @@ describe("RegisterPage", () => {
     await user.click(screen.getByTestId("submit-button"));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+      expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
     });
   });
 
@@ -437,7 +437,7 @@ describe("RegisterPage", () => {
       await emitCredential("google-credential");
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
       });
       expect(mockSsoLogin).toHaveBeenCalledWith("google", { credential: "google-credential" });
       expect(useAuthStore.getState().token).toBe("sso-token");
@@ -457,7 +457,7 @@ describe("RegisterPage", () => {
         expect(mockUpdatePreferences).toHaveBeenCalledWith(7, { languagePreference: "mk" });
       });
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
       });
     });
 
@@ -479,7 +479,7 @@ describe("RegisterPage", () => {
       await user.click(screen.getByTestId("link-account-submit"));
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
       });
       expect(mockSsoLink).toHaveBeenCalledWith("google", {
         credential: "google-credential",

@@ -1,4 +1,12 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { useState } from "react";
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Navigate,
+  Outlet,
+  Route,
+  RouterProvider,
+} from "react-router";
 
 import { AuthLayout } from "@/features/auth/AuthLayout";
 import { ForgotPasswordPage } from "@/features/auth/ForgotPasswordPage";
@@ -29,7 +37,12 @@ function AuthAwareRedirect() {
   return <Navigate to={token ? "/lobby" : "/"} replace />;
 }
 
-function AppRoutes() {
+/**
+ * Root layout route: runs the app-wide auth bootstrap hooks and gates the
+ * whole route tree while the initial session refresh is in flight — the same
+ * behavior the pre-data-router AppRoutes component had.
+ */
+function AppShell() {
   useAuthInit();
   useTokenRefresh();
 
@@ -39,44 +52,55 @@ function AppRoutes() {
     return null;
   }
 
-  return (
-    <Routes>
-      <Route path="/terms" element={<TermsPage />} />
-      <Route path="/privacy" element={<PrivacyPage />} />
-      <Route element={<GuestRoute />}>
-        <Route path="/" element={<LandingPage />} />
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+  return <Outlet />;
+}
+
+// Data router (createBrowserRouter) — required for useBlocker (MatchPage's
+// mid-match back-press confirmation). The route tree is unchanged from the
+// previous <BrowserRouter>+<Routes> setup, wrapped under the AppShell layout.
+// Built lazily inside App() (not at module scope): createBrowserRouter writes
+// to window.history on construction, and importing a component must not have
+// side effects.
+function createAppRouter() {
+  return createBrowserRouter(
+    createRoutesFromElements(
+      <Route element={<AppShell />}>
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route element={<GuestRoute />}>
+          <Route path="/" element={<LandingPage />} />
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+          </Route>
         </Route>
-      </Route>
-      {/* Public reference pages — reachable by guests (from the landing footer)
+        {/* Public reference pages — reachable by guests (from the landing footer)
           and authed users alike. The layout adapts to auth state. */}
-      <Route element={<PublicContentLayout />}>
-        <Route path="/rules" element={<RulesPage />} />
-      </Route>
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          <Route path="/lobby" element={<LobbyPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/rooms/:id" element={<RoomPage />} />
-          <Route path="/matchmaking/:id" element={<MatchmakingPage />} />
+        <Route element={<PublicContentLayout />}>
+          <Route path="/rules" element={<RulesPage />} />
         </Route>
-        <Route path="/match/:roomId" element={<MatchPage />} />
-      </Route>
-      <Route path="*" element={<AuthAwareRedirect />} />
-    </Routes>
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route path="/lobby" element={<LobbyPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/rooms/:id" element={<RoomPage />} />
+            <Route path="/matchmaking/:id" element={<MatchmakingPage />} />
+          </Route>
+          <Route path="/match/:roomId" element={<MatchPage />} />
+        </Route>
+        <Route path="*" element={<AuthAwareRedirect />} />
+      </Route>,
+    ),
   );
 }
 
 export function App() {
+  const [router] = useState(createAppRouter);
   return (
     <QueryProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <RouterProvider router={router} />
       {/* Single app-wide sonner host. Without this mounted, every toast.*()
           call (join/settlement feedback, auth errors, etc.) is silently
           invisible — the Toaster component existed but was never rendered.

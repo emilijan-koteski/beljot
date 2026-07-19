@@ -26,7 +26,12 @@ export function useMatchStartRedirect(): void {
     if (matchStartedRoomId === null) return;
     const target = `/match/${matchStartedRoomId}`;
     if (location.pathname !== target) {
-      navigate(target, { state: { fromRoom: true } });
+      // Push only when leaving from the lobby (stack becomes [lobby, match]);
+      // from anywhere else replace, so no dead entry lingers beneath the match.
+      navigate(target, {
+        replace: location.pathname !== "/lobby",
+        state: { fromRoom: true },
+      });
     }
     // Consume the signal: clear matchStartedRoomId AND the sticky matchStarted
     // flag. Without clearing matchStarted, a player who received match_started

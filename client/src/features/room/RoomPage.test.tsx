@@ -341,7 +341,7 @@ describe("RoomPage", () => {
     await user.click(screen.getByTestId("leave-room"));
 
     expect(mockLeaveRoom).toHaveBeenCalledWith(1);
-    expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
   });
 
   it("auto-joins when arriving via direct URL as a non-member (deep link)", async () => {
@@ -1083,7 +1083,10 @@ describe("RoomPage", () => {
     await user.click(screen.getByTestId("start-game"));
 
     expect(mockStartGame).toHaveBeenCalledWith(1);
-    expect(mockNavigate).toHaveBeenCalledWith("/match/1", { state: { fromRoom: true } });
+    expect(mockNavigate).toHaveBeenCalledWith("/match/1", {
+      replace: true,
+      state: { fromRoom: true },
+    });
   });
 
   it("renders waiting message for non-owner when 4 players seated", async () => {
@@ -1874,7 +1877,7 @@ describe("RoomPage", () => {
         expect.stringContaining("removed from room Test Room"),
       );
     });
-    expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
     // The flag is cleared so the effect doesn't re-fire on a future mount.
     expect(useRoomStore.getState().kickedFromRoomId).toBeNull();
   });

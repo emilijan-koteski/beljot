@@ -467,3 +467,12 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A �
 - source_spec: `_bmad-output/implementation-artifacts/spec-mobile-dialog-font-i18n-fixes.md`
   summary: Pre-existing `npx tsc --noEmit` failure on the branch — MatchmakingPage.test.tsx and RoomPage.bots.test.tsx RoomDetail mocks are missing the required `returnedUserIds` field.
   evidence: Blind Hunter reproduced it on files untouched by this spec; vitest and eslint gates pass, but any future type-check gate will trip on it. Introduced whenever `returnedUserIds` was added to RoomDetail without updating these two test mocks.
+
+## Deferred from: code review of spec-mobile-back-history-shaping (2026-07-19)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-mobile-back-history-shaping.md`
+  summary: A match opened as the tab's first in-app history entry (manually typed/bookmarked /match/:id URL) has no back-press leave confirmation — the pop is a cross-document navigation that useBlocker cannot intercept, and the spec's frozen constraints ban the sentinel-entry and beforeunload workarounds.
+  evidence: Both review agents confirmed the old pushState sentinel covered this case and useBlocker cannot. Residual risk is small (normal reconnect flows land on /lobby first and push into the match, so the blocker works there; server-side disconnect pause still protects the match). A spec-compliant fix exists — on deep-link match mounts, rewrite the entry to /lobby and push the match on top — but needs its own design pass against the splash/guard effects.
+- source_spec: `_bmad-output/implementation-artifacts/spec-mobile-back-history-shaping.md`
+  summary: The pre-existing error/guard redirects (RoomPage 284/326/377/1553, MatchmakingPage 119/135/145, MatchPage 754/826) still use navigate("/lobby", { replace: true }), which from a [lobby, page] stack leaves a duplicate [lobby, lobby] — one ghost back-press after rare error bounces.
+  evidence: Blind Hunter traced the stack shapes. The spec deliberately kept these guards untouched as safety nets; converting them to returnToLobby() is safe only with per-site reasoning about their delayed timers and hasLeftRef unmount guards, so it was split out rather than patched blind.

@@ -150,7 +150,10 @@ describe("MatchmakingPage", () => {
       useRoomStore.getState().setMatchStarted(true);
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith("/match/1", { state: { fromRoom: true } });
+    expect(mockNavigate).toHaveBeenCalledWith("/match/1", {
+      replace: true,
+      state: { fromRoom: true },
+    });
   });
 
   it("redirects a non-quick-play room to the in-room lobby", async () => {
@@ -201,7 +204,7 @@ describe("MatchmakingPage", () => {
     await user.click(screen.getByTestId("matchmaking-cancel"));
 
     await waitFor(() => expect(mockLeaveRoom).toHaveBeenCalledWith(1));
-    expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
   });
 
   it("keeps the player on cancel when the game already started", async () => {
@@ -232,7 +235,9 @@ describe("MatchmakingPage", () => {
 
     await waitFor(() => expect(mockLeaveRoom).toHaveBeenCalledWith(1));
     expect(toast.error).toHaveBeenCalled();
-    expect(mockNavigate).not.toHaveBeenCalledWith("/lobby");
+    // "Stays on the page" means no navigation of any kind — a targeted
+    // not.toHaveBeenCalledWith would let a differently-shaped call slip by.
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   // Regression: re-entering a recently-visited room serves a STALE cached

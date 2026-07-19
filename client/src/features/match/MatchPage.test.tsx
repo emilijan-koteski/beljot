@@ -2,7 +2,7 @@ import "@/shared/i18n/i18n";
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
-import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
@@ -142,24 +142,27 @@ const mockMatchState: MatchState = {
 // matching the reload / WS-reconnect remount path. `skipSplash` defaults to
 // advancing past the hold so existing table-level assertions are unaffected;
 // pass `false` when the test itself drives timer progression.
+//
+// MatchPage uses useBlocker, which only works inside a data router — hence
+// createMemoryRouter + RouterProvider. The `path: "*"` route deliberately has
+// no `:roomId` param (mirroring the old plain-BrowserRouter helper), so
+// roomIdNum stays null and the mount-time getRoom splash check is skipped;
+// tests that need the param use an explicit `/match/:roomId` route instead.
+function createMatchPageRouter({ fromRoom = false } = {}) {
+  return createMemoryRouter([{ path: "*", element: <MatchPage /> }], {
+    initialEntries: [fromRoom ? { pathname: "/match/1", state: { fromRoom: true } } : "/match/1"],
+  });
+}
+
 function renderMatchPage({ fromRoom = false, skipSplash = true } = {}) {
-  const result = render(
-    fromRoom ? (
-      <MemoryRouter initialEntries={[{ pathname: "/match/1", state: { fromRoom: true } }]}>
-        <MatchPage />
-      </MemoryRouter>
-    ) : (
-      <BrowserRouter>
-        <MatchPage />
-      </BrowserRouter>
-    ),
-  );
+  const router = createMatchPageRouter({ fromRoom });
+  const result = render(<RouterProvider router={router} />);
   if (fromRoom && skipSplash) {
     act(() => {
       vi.advanceTimersByTime(MOTION.GAME_STARTING_SPLASH);
     });
   }
-  return result;
+  return { ...result, router };
 }
 
 describe("MatchPage", () => {
@@ -241,11 +244,11 @@ describe("MatchPage", () => {
 
     const renderAtRoom1 = () =>
       render(
-        <MemoryRouter initialEntries={["/match/1"]}>
-          <Routes>
-            <Route path="/match/:roomId" element={<MatchPage />} />
-          </Routes>
-        </MemoryRouter>,
+        <RouterProvider
+          router={createMemoryRouter([{ path: "/match/:roomId", element: <MatchPage /> }], {
+            initialEntries: ["/match/1"],
+          })}
+        />,
       );
 
     it("shows the pot (humans × buy-in) once the room buy-in loads", async () => {
@@ -565,11 +568,11 @@ describe("MatchPage", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/match/1"]}>
-        <Routes>
-          <Route path="/match/:roomId" element={<MatchPage />} />
-        </Routes>
-      </MemoryRouter>,
+      <RouterProvider
+        router={createMemoryRouter([{ path: "/match/:roomId", element: <MatchPage /> }], {
+          initialEntries: ["/match/1"],
+        })}
+      />,
     );
 
     expect(screen.getByTestId("match-result")).toBeInTheDocument();
@@ -630,12 +633,15 @@ describe("MatchPage", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/match/1"]}>
-        <Routes>
-          <Route path="/match/:roomId" element={<MatchPage />} />
-          <Route path="/lobby" element={<div data-testid="lobby-marker" />} />
-        </Routes>
-      </MemoryRouter>,
+      <RouterProvider
+        router={createMemoryRouter(
+          [
+            { path: "/match/:roomId", element: <MatchPage /> },
+            { path: "/lobby", element: <div data-testid="lobby-marker" /> },
+          ],
+          { initialEntries: ["/match/1"] },
+        )}
+      />,
     );
 
     expect(screen.getByTestId("match-result")).toBeInTheDocument();
@@ -711,7 +717,7 @@ describe("MatchPage", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
 
-    const { rerender } = renderMatchPage();
+    const { rerender, router } = renderMatchPage();
     expect(screen.getByTestId("surrender-button")).toBeInTheDocument();
 
     act(() => {
@@ -723,11 +729,7 @@ describe("MatchPage", () => {
         matchDurationSec: 300,
       });
     });
-    rerender(
-      <BrowserRouter>
-        <MatchPage />
-      </BrowserRouter>,
-    );
+    rerender(<RouterProvider router={router} />);
 
     expect(screen.queryByTestId("surrender-button")).not.toBeInTheDocument();
   });
@@ -841,7 +843,7 @@ describe("MatchPage", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
 
-    const { rerender } = renderMatchPage();
+    const { rerender, router } = renderMatchPage();
 
     act(() => {
       useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
@@ -852,11 +854,7 @@ describe("MatchPage", () => {
         matchDurationSec: 300,
       });
     });
-    rerender(
-      <BrowserRouter>
-        <MatchPage />
-      </BrowserRouter>,
-    );
+    rerender(<RouterProvider router={router} />);
 
     expect(screen.queryByTestId("emote-toggle")).not.toBeInTheDocument();
   });
@@ -922,7 +920,7 @@ describe("MatchPage", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
 
-    const { rerender } = renderMatchPage();
+    const { rerender, router } = renderMatchPage();
 
     act(() => {
       useMatchStore.getState().setActiveEmote(2, "laugh");
@@ -934,11 +932,7 @@ describe("MatchPage", () => {
         matchDurationSec: 300,
       });
     });
-    rerender(
-      <BrowserRouter>
-        <MatchPage />
-      </BrowserRouter>,
-    );
+    rerender(<RouterProvider router={router} />);
 
     expect(screen.queryByTestId("emote-bubble-2")).not.toBeInTheDocument();
   });
@@ -1007,7 +1001,7 @@ describe("MatchPage", () => {
       cardId: "QS",
     });
 
-    const { rerender } = renderMatchPage();
+    const { rerender, router } = renderMatchPage();
 
     act(() => {
       useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
@@ -1018,11 +1012,7 @@ describe("MatchPage", () => {
         matchDurationSec: 300,
       });
     });
-    rerender(
-      <BrowserRouter>
-        <MatchPage />
-      </BrowserRouter>,
-    );
+    rerender(<RouterProvider router={router} />);
 
     expect(screen.queryByTestId("belot-reveal")).not.toBeInTheDocument();
   });
@@ -1214,25 +1204,134 @@ describe("MatchPage", () => {
     });
   });
 
-  it("shows confirm dialog on browser back button and stays if declined", () => {
-    useMatchStore.getState().setMatchState(mockMatchState);
-    useMatchStore.getState().setMyPlayerSeat(0);
+  describe("mid-match back-press blocker", () => {
+    // Stack [lobby, match] with the match on top — router.navigate(-1) is the
+    // data-router equivalent of the browser back button (a POP), which the
+    // useBlocker predicate intercepts while the match is active.
+    function renderWithHistoryBeneath() {
+      const router = createMemoryRouter([{ path: "*", element: <MatchPage /> }], {
+        initialEntries: ["/lobby", "/match/1"],
+        initialIndex: 1,
+      });
+      render(<RouterProvider router={router} />);
+      return router;
+    }
 
-    renderMatchPage();
+    it("shows confirm dialog on browser back button and stays if declined", async () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
 
-    // Mock window.confirm to decline leaving
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+      const router = renderWithHistoryBeneath();
 
-    // Simulate popstate event (browser back button)
-    act(() => {
-      window.dispatchEvent(new PopStateEvent("popstate"));
+      // Mock window.confirm to decline leaving
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+      await act(async () => {
+        await router.navigate(-1);
+      });
+
+      expect(confirmSpy).toHaveBeenCalledWith("Leave the game? You may lose your progress.");
+      // Game state should not be cleared and the pop is cancelled
+      expect(useMatchStore.getState().matchState).not.toBeNull();
+      expect(router.state.location.pathname).toBe("/match/1");
+
+      confirmSpy.mockRestore();
     });
 
-    expect(confirmSpy).toHaveBeenCalledWith("Leave the game? You may lose your progress.");
-    // Game state should not be cleared
-    expect(useMatchStore.getState().matchState).not.toBeNull();
+    it("clears the game and routes to the lobby when the back confirm is accepted", async () => {
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
 
-    confirmSpy.mockRestore();
+      const router = renderWithHistoryBeneath();
+
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+      await act(async () => {
+        await router.navigate(-1);
+      });
+
+      expect(confirmSpy).toHaveBeenCalledWith("Leave the game? You may lose your progress.");
+      // Game store wiped; the blocked pop targeted /lobby, so the blocker
+      // takes the proceed() path — the pop itself completes onto the lobby
+      // entry beneath.
+      expect(useMatchStore.getState().matchState).toBeNull();
+      expect(router.state.location.pathname).toBe("/lobby");
+
+      confirmSpy.mockRestore();
+    });
+
+    it("does not block the back button once the match has ended", async () => {
+      // Distinct routes (not "*") so the pop actually unmounts MatchPage —
+      // that unmount is what triggers the end-state store cleanup.
+      mockGetRoom.mockResolvedValue({
+        room: {
+          id: 1,
+          name: "R",
+          code: "ABC123",
+          ownerId: 10,
+          ownerUsername: "alice",
+          variant: "bitola",
+          matchMode: "1001",
+          timerStyle: "relaxed",
+          timerDurationSeconds: null,
+          status: "in_progress",
+          playerCount: 4,
+          isQuickPlay: false,
+          coinBuyIn: 0,
+          isPrivate: false,
+          createdAt: "",
+          updatedAt: "",
+        },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+        returnedUserIds: [],
+      });
+
+      useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      useMatchStore.getState().setMatchEndData({
+        winnerTeam: 0,
+        teamAFinalScore: 1020,
+        teamBFinalScore: 850,
+        matchDurationSec: 300,
+      });
+
+      const router = createMemoryRouter(
+        [
+          { path: "/match/:roomId", element: <MatchPage /> },
+          { path: "/lobby", element: <div data-testid="lobby-after-back" /> },
+        ],
+        { initialEntries: ["/lobby", "/match/1"], initialIndex: 1 },
+      );
+      render(<RouterProvider router={router} />);
+      expect(screen.getByTestId("match-result")).toBeInTheDocument();
+
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+      await act(async () => {
+        await router.navigate(-1);
+      });
+
+      // No confirm — the pop goes straight through to the entry beneath, and
+      // the unmount cleanup wipes the ended match from the store.
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(router.state.location.pathname).toBe("/lobby");
+      expect(screen.getByTestId("lobby-after-back")).toBeInTheDocument();
+      expect(useMatchStore.getState().matchEndData).toBeNull();
+      expect(useMatchStore.getState().matchState).toBeNull();
+
+      confirmSpy.mockRestore();
+    });
   });
 
   describe("opponent throw flight timing", () => {

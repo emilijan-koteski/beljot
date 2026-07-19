@@ -1,11 +1,12 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TopBar } from "@/shared/components/TopBar";
+import { resetLobbyReturnGuardForTests } from "@/shared/hooks/useLobbyReturn";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 vi.mock("@/shared/api/auth", () => ({
@@ -122,5 +123,88 @@ describe("TopBar XP level (Story 9.5)", () => {
 
     expect(screen.getByTestId("xp-level")).toHaveTextContent("Lvl 0");
     expect(screen.getByTestId("xp-bar")).toHaveAttribute("aria-valuenow", "0");
+  });
+});
+
+describe("TopBar history-stack shaping", () => {
+  beforeEach(() => {
+    setAuthUser();
+  });
+
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+    sessionStorage.clear();
+    resetLobbyReturnGuardForTests();
+    window.history.replaceState(null, "");
+  });
+
+  // TopBar on every route; distinct landing pads so pathname assertions are
+  // unambiguous. Stack starts as [/lobby, <initialPath>].
+  function renderAtWithRouter(initialPath: string) {
+    const router = createMemoryRouter([{ path: "*", element: <TopBar showNav showUserMenu /> }], {
+      initialEntries: ["/lobby", initialPath],
+      initialIndex: 1,
+    });
+    render(<RouterProvider router={router} />);
+    return router;
+  }
+
+  it("replaces the current entry when navigating between non-lobby pages", async () => {
+    const router = renderAtWithRouter("/profile");
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("nav-rules"));
+    });
+    expect(router.state.location.pathname).toBe("/rules");
+
+    // /profile was replaced — back skips it and lands on the lobby root.
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    expect(router.state.location.pathname).toBe("/lobby");
+  });
+
+  it("pops back to the recorded lobby root when the Play link is clicked", async () => {
+    const router = renderAtWithRouter("/profile");
+
+    // Simulate the react-router history idx bookkeeping jsdom lacks: the
+    // lobby root was recorded at idx 0 and the current entry sits at idx 1.
+    window.history.replaceState({ idx: 1 }, "");
+    sessionStorage.setItem("beljot:lobby-idx", "0");
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("nav-play"));
+    });
+    expect(router.state.location.pathname).toBe("/lobby");
+
+    // A pop keeps /profile in FORWARD history; a push or replace would not.
+    await act(async () => {
+      await router.navigate(1);
+    });
+    expect(router.state.location.pathname).toBe("/profile");
+  });
+
+  it("falls back to replacing with /lobby when no lobby root is recorded", async () => {
+    const router = renderAtWithRouter("/profile");
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("nav-play"));
+    });
+    expect(router.state.location.pathname).toBe("/lobby");
+
+    // The /profile entry was replaced — back lands on the original root.
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    expect(router.state.location.pathname).toBe("/lobby");
+  });
+
+  it("keeps native behavior for modified clicks on the Play link", () => {
+    renderAtWithRouter("/profile");
+
+    // fireEvent returns false when preventDefault was called — a ctrl+click
+    // must pass through untouched for open-in-new-tab.
+    const passedThrough = fireEvent.click(screen.getByTestId("nav-play"), { ctrlKey: true });
+    expect(passedThrough).toBe(true);
   });
 });

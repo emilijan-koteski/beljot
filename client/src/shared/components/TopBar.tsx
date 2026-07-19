@@ -1,4 +1,5 @@
 import { ChevronDown, Coins, LogOut, Menu } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
@@ -11,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { XpBar } from "@/shared/components/XpBar";
+import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
@@ -53,8 +55,22 @@ export function TopBar({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const returnToLobby = useLobbyReturn();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+
+  // History-stack shaping: navigating between the top-level pages must not
+  // grow the stack — only the lobby → X hop is a push. Links whose target is
+  // the lobby itself go through returnToLobby() (pop back to the live lobby
+  // entry when it sits beneath, replace otherwise) while keeping their real
+  // href for a11y / open-in-new-tab; modified clicks keep native behavior.
+  const onLobbyPath = location.pathname === "/lobby";
+  function handleLobbyLinkClick(e: ReactMouseEvent<HTMLAnchorElement>) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+      return;
+    e.preventDefault();
+    returnToLobby();
+  }
 
   // Lifetime XP progress for the header level indicators (cosmetic fill; level
   // itself is server-authoritative). Computed once and shared by the phone ring
@@ -75,6 +91,7 @@ export function TopBar({
     >
       <Link
         to={user ? "/lobby" : "/"}
+        onClick={user ? handleLobbyLinkClick : undefined}
         data-testid="app-brand"
         aria-label={t("nav.appName")}
         className="flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:ring-accent/50 focus-visible:outline-none focus-visible:ring-2"
@@ -112,6 +129,8 @@ export function TopBar({
             <NavLink
               key={item.path}
               to={item.path}
+              replace={!onLobbyPath}
+              onClick={item.path === "/lobby" ? handleLobbyLinkClick : undefined}
               className={({ isActive }) =>
                 cn(
                   "flex h-full items-center px-4 text-sm font-medium transition-colors",
@@ -250,7 +269,13 @@ export function TopBar({
                   return (
                     <DropdownMenuItem
                       key={item.path}
-                      render={<Link to={item.path} />}
+                      render={
+                        <Link
+                          to={item.path}
+                          replace={!onLobbyPath}
+                          onClick={item.path === "/lobby" ? handleLobbyLinkClick : undefined}
+                        />
+                      }
                       data-testid={`nav-menu-${item.labelKey.split(".")[1]}`}
                       className={cn(
                         "rounded-md px-2.5 py-2 text-sm",

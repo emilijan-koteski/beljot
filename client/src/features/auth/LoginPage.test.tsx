@@ -135,7 +135,7 @@ describe("LoginPage", () => {
     await user.click(screen.getByTestId("submit-button"));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+      expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
     });
 
     expect(useAuthStore.getState().token).toBe("access-token");
@@ -275,7 +275,7 @@ describe("LoginPage", () => {
         expect(mockUpdatePreferences).toHaveBeenCalledWith(42, { languagePreference: "sr" });
       });
       expect(useAuthStore.getState().user?.languagePreference).toBe("sr");
-      expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+      expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
     });
 
     it("does not fire PATCH when the picked language matches the stored one", async () => {
@@ -287,7 +287,7 @@ describe("LoginPage", () => {
       await submitLogin(user);
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
       });
       expect(mockUpdatePreferences).not.toHaveBeenCalled();
       expect(useAuthStore.getState().user?.languagePreference).toBe("en");
@@ -306,7 +306,7 @@ describe("LoginPage", () => {
         expect(mockUpdatePreferences).toHaveBeenCalled();
       });
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
       });
       expect(useAuthStore.getState().user?.languagePreference).toBe("en");
       expect(i18n.language).toBe("mk");
@@ -365,7 +365,7 @@ describe("LoginPage", () => {
       await emitCredential("google-credential");
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
       });
       expect(mockSsoLogin).toHaveBeenCalledWith("google", { credential: "google-credential" });
       expect(useAuthStore.getState().token).toBe("sso-token");
@@ -403,7 +403,7 @@ describe("LoginPage", () => {
       await user.click(screen.getByTestId("link-account-submit"));
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
       });
       expect(mockSsoLink).toHaveBeenCalledWith("google", {
         credential: "google-credential",
@@ -483,7 +483,7 @@ describe("LoginPage", () => {
         resolveSso!(ssoResponse());
       });
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
       });
       expect(mockSsoLogin).toHaveBeenCalledTimes(1);
     });
@@ -573,7 +573,7 @@ describe("LoginPage", () => {
         resolveLink!(ssoResponse());
       });
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/lobby");
+        expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
       });
     });
   });

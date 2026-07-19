@@ -20,6 +20,7 @@ import {
 } from "@/shared/hooks/mutations/useRooms";
 import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
+import { useMarkLobbyRoot } from "@/shared/hooks/useLobbyReturn";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room } from "@/shared/types/apiTypes";
@@ -64,6 +65,10 @@ function deriveCounts(rooms: Room[]): FilterCounts {
 export function LobbyPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  // Record this history entry as the app root so every "return to lobby"
+  // (match end, room leave, TopBar "Play") can pop back to it instead of
+  // stacking a fresh entry.
+  useMarkLobbyRoot();
 
   // Lobby grid is always-on now — no separate "options" vs "browse" view.
   const roomsQuery = useRoomsQuery("waiting", true);

@@ -7,6 +7,7 @@ import { MatchmakingDiagram } from "@/features/lobby/components/MatchmakingDiagr
 import { FetchError } from "@/shared/api/axiosClient";
 import { useLeaveRoomMutation } from "@/shared/hooks/mutations/useRooms";
 import { useRoomDetailQuery } from "@/shared/hooks/queries/useRooms";
+import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
@@ -30,6 +31,7 @@ export function MatchmakingPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const returnToLobby = useLobbyReturn();
   const currentUser = useAuthStore((s) => s.user);
 
   const roomQuery = useRoomDetailQuery(id ? Number(id) : undefined);
@@ -102,7 +104,9 @@ export function MatchmakingPage() {
   useEffect(() => {
     if (matchStarted && id) {
       hasLeftRef.current = true;
-      navigate(`/match/${id}`, { state: { fromRoom: true } });
+      // Lateral within the flow (queue → match): replace so back from the
+      // match (or after it) never lands on the dead matchmaking entry.
+      navigate(`/match/${id}`, { replace: true, state: { fromRoom: true } });
     }
   }, [matchStarted, id, navigate]);
 
@@ -152,9 +156,9 @@ export function MatchmakingPage() {
     if (kickedFromRoomId !== null && id && kickedFromRoomId === Number(id)) {
       hasLeftRef.current = true;
       useRoomStore.getState().setKickedFromRoom(null);
-      navigate("/lobby");
+      returnToLobby();
     }
-  }, [kickedFromRoomId, id, navigate]);
+  }, [kickedFromRoomId, id, returnToLobby]);
 
   // Reset the store on unmount / :id change (mirrors RoomPage).
   useEffect(() => {
@@ -187,7 +191,7 @@ export function MatchmakingPage() {
         return;
       }
     }
-    navigate("/lobby");
+    returnToLobby();
   };
 
   // Loading skeleton — also shown until the fresh post-mount fetch settles, so

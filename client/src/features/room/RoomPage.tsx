@@ -50,6 +50,7 @@ import {
   useTransferOwnershipMutation,
 } from "@/shared/hooks/mutations/useRooms";
 import { useRoomDetailQuery } from "@/shared/hooks/queries/useRooms";
+import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
@@ -142,6 +143,7 @@ export function RoomPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const returnToLobby = useLobbyReturn();
   const currentUser = useAuthStore((s) => s.user);
 
   // TanStack Query for initial REST fetch
@@ -354,7 +356,9 @@ export function RoomPage() {
   useEffect(() => {
     if (matchStarted && id) {
       hasLeftRef.current = true; // Prevent cleanup leave on navigation
-      navigate(`/match/${id}`, { state: { fromRoom: true } });
+      // Lateral within the flow (room → match): replace so the back button
+      // never lands on the dead room entry once the match is over.
+      navigate(`/match/${id}`, { replace: true, state: { fromRoom: true } });
     }
   }, [matchStarted, id, navigate]);
 
@@ -388,9 +392,9 @@ export function RoomPage() {
       hasLeftRef.current = true;
       toast.error(t("room.kickedToast", { name: storeRoom?.name ?? "" }));
       useRoomStore.getState().setKickedFromRoom(null);
-      navigate("/lobby");
+      returnToLobby();
     }
-  }, [kickedFromRoomId, id, navigate, storeRoom?.name, t]);
+  }, [kickedFromRoomId, id, returnToLobby, storeRoom?.name, t]);
 
   // Story 9.3: when WE are ejected for insolvency at match start, the server has
   // already freed our seat, so suppress the unmount auto-leave (it would 404 and
@@ -520,7 +524,7 @@ export function RoomPage() {
       }
       // Other errors: still navigate back (preserves prior UX).
     }
-    navigate("/lobby");
+    returnToLobby();
   };
 
   const handleSelectSeat = async (seatIndex: number) => {
@@ -537,7 +541,7 @@ export function RoomPage() {
       useRoomStore.getState().setPlayers(data.players);
       if (data.matchStarted) {
         hasLeftRef.current = true;
-        navigate(`/match/${storeRoom.id}`, { state: { fromRoom: true } });
+        navigate(`/match/${storeRoom.id}`, { replace: true, state: { fromRoom: true } });
         return;
       }
     } catch (err) {
@@ -716,7 +720,7 @@ export function RoomPage() {
     try {
       await startGameMutation.mutateAsync(storeRoom.id);
       hasLeftRef.current = true; // Prevent cleanup leave on navigation
-      navigate(`/match/${storeRoom.id}`, { state: { fromRoom: true } });
+      navigate(`/match/${storeRoom.id}`, { replace: true, state: { fromRoom: true } });
     } catch (err) {
       if (err instanceof FetchError && err.code === "NOT_ROOM_OWNER") {
         toast.error(t("room.errors.notOwner"));
@@ -754,7 +758,7 @@ export function RoomPage() {
     return (
       <div className="mx-auto max-w-330 px-8 py-12 text-center" data-testid="room-page-error">
         <p className="text-ink-dim mb-4 text-sm">{t("room.notFound")}</p>
-        <Button variant="ghost" onClick={() => navigate("/lobby")} data-testid="back-to-lobby">
+        <Button variant="ghost" onClick={() => returnToLobby()} data-testid="back-to-lobby">
           {t("room.notFoundAction")}
         </Button>
       </div>

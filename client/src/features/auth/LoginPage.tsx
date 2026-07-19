@@ -69,7 +69,9 @@ export function LoginPage() {
     try {
       const res = await loginMutation.mutateAsync({ email, password });
       await reconcileLanguagePreference(res, i18n.language);
-      navigate("/lobby");
+      // Replace: /lobby is the app root — back from it must exit the app,
+      // never return to the login form.
+      navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError) {
         if (err.status === 401) {

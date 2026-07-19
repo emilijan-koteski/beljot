@@ -53,7 +53,8 @@ export function useGoogleSso(): UseGoogleSsoResult {
     try {
       const res = await ssoLoginMutation.mutateAsync({ provider: "google", credential });
       await reconcileLanguagePreference(res, i18n.language);
-      navigate("/lobby");
+      // Replace: /lobby is the app root — back must not return to the auth page.
+      navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError && err.code === "SSO_LINK_REQUIRED") {
         // An account with this email already exists — confirm its password
@@ -84,7 +85,7 @@ export function useGoogleSso(): UseGoogleSsoResult {
       });
       setLinkCredential(null);
       await reconcileLanguagePreference(res, i18n.language);
-      navigate("/lobby");
+      navigate("/lobby", { replace: true });
     } catch (err) {
       // Discriminate by code, never by status: INVALID_CREDENTIALS and
       // SSO_INVALID_CREDENTIAL are both 401s, but only the first one is

@@ -21,7 +21,9 @@ export function useReconnectionRedirect(): void {
       matchState.phase !== "match_end" &&
       !location.pathname.startsWith("/match/")
     ) {
-      navigate(`/match/${matchState.roomId}`, { replace: true });
+      // Push only when leaving from the lobby (stack becomes [lobby, match] so
+      // a later return can pop); from anywhere else replace as before.
+      navigate(`/match/${matchState.roomId}`, { replace: location.pathname !== "/lobby" });
     }
   }, [matchState, location.pathname, navigate]);
 }
