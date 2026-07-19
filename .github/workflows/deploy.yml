@@ -55,11 +55,14 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: true
-          # Only the web (Vite) image consumes a client ID; empty string = no
-          # build-args for api/migrate (so no "unused build-arg" warning). The
-          # Google OAuth client ID is public by design, so it lives in an
-          # Actions *variable*, not a secret.
-          build-args: ${{ matrix.name == 'web' && format('VITE_GOOGLE_CLIENT_ID={0}', vars.VITE_GOOGLE_CLIENT_ID) || '' }}
+          # Only the web (Vite) image consumes build-args; empty lines = none
+          # for api/migrate (so no "unused build-arg" warning). The Google
+          # OAuth client ID is public by design, so it lives in an Actions
+          # *variable*, not a secret. APP_VERSION bakes the commit SHA into the
+          # bundle + /version.json so stale tabs can detect the new deploy.
+          build-args: |
+            ${{ matrix.name == 'web' && format('VITE_GOOGLE_CLIENT_ID={0}', vars.VITE_GOOGLE_CLIENT_ID) || '' }}
+            ${{ matrix.name == 'web' && format('APP_VERSION={0}', github.sha) || '' }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/beljot-${{ matrix.name }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/beljot-${{ matrix.name }}:latest

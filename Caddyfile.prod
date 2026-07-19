@@ -25,6 +25,12 @@ beljot.online {
 
 	handle {
 		root * /srv
+
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@unhashed not path /assets/*
+		header @unhashed Cache-Control "no-cache"
+
 		try_files {path} /index.html
 		file_server
 	}

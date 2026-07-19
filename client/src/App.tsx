@@ -29,6 +29,7 @@ import { PublicContentLayout } from "@/shared/components/PublicContentLayout";
 import { Toaster } from "@/shared/components/ui/sonner";
 import { useAuthInit } from "@/shared/hooks/useAuth";
 import { useTokenRefresh } from "@/shared/hooks/useTokenRefresh";
+import { useVersionCheck } from "@/shared/hooks/useVersionCheck";
 import { QueryProvider } from "@/shared/providers/QueryProvider";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -45,6 +46,7 @@ function AuthAwareRedirect() {
 function AppShell() {
   useAuthInit();
   useTokenRefresh();
+  useVersionCheck();
 
   const isLoading = useAuthStore((s) => s.isLoading);
 
