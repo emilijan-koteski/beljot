@@ -78,6 +78,31 @@
       "legendLosses": "{{count}} poraza",
       "legendAbandoned": "{{count}} prekinutih"
     },
+    "honor": {
+      "eyebrow": "Pouzdanost",
+      "heading": "Skor časti",
+      "sub": "Koliko pouzdano završavaš mečeve koje započneš. Stara napuštanja vremenom blede.",
+      "outOf": "od {{max}}",
+      "meterLabel": "Čast {{score}} od 100, {{tier}}",
+      "completedLabel": "Tvoji završeni",
+      "abandonedLabel": "Tvoji prekinuti",
+      "trendTooltip": "Tvojih poslednjih {{window}} mečeva u poređenju sa prethodnih {{window}}.",
+      "newPlayerChip": "Novi igrač",
+      "newPlayerHint": "Odigraj 5 mečeva da bi zaradio skor časti.",
+      "topBarLabel": "Čast",
+      "tier": {
+        "exemplary": "Uzoran",
+        "trusted": "Pouzdan",
+        "fair": "Solidan",
+        "unreliable": "Nepouzdan",
+        "problematic": "Problematičan"
+      },
+      "trend": {
+        "up": "U usponu",
+        "flat": "Stabilno",
+        "down": "U padu"
+      }
+    },
     "matchHistory": {
       "eyebrow": "Aktivnost",
       "title": "Istorija mečeva",

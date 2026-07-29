@@ -200,8 +200,11 @@ export function IdentityHero({
 
         {/* Lifetime XP progress bar (Story 9.5, AC4). Level + numeric progress
             on top, the bar below. xpIntoLevel / xpForNextLevel are server-
-            provided; the bar fill is cosmetic. Leaves room for the not-yet-
-            built honor / prior-season rank surfaces (render nothing for them). */}
+            provided; the bar fill is cosmetic. Leaves room for the not-yet-built
+            prior-season rank surface (render nothing for it). Honor shipped in
+            Story 9.7 as its own full-width HonorPanel section in ProfilePage,
+            NOT in this slot — the score, tier badge, meter, trend and two count
+            tiles need more width than this narrow column beside the XP bar. */}
         <div
           className="col-span-2 flex max-w-xs flex-col gap-1 sm:col-span-1 sm:col-start-2"
           data-testid="profile-xp"

@@ -98,6 +98,68 @@ WHERE player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?
 	return row.Wins, row.Losses, row.Abandoned, nil
 }
 
+// GetHonorTrendWindowsForUser splits the user's most recent 2*limit matches into
+// the newest `limit` and the `limit` before those, counting completions vs
+// abandonments in each (Story 9.7 trend). The windows themselves ARE the recency
+// mechanism, so no half-life decay is applied to these counts.
+//
+// The inner SELECT picks one bounded window of 2*limit rows (newest first, LIMIT
+// with no OFFSET — see deferred item D82) and stamps each with a ROW_NUMBER; the
+// outer FILTER aggregation buckets by rn <= limit vs rn > limit. One round-trip,
+// no pagination, and the split cannot tear under a concurrent completion the way
+// two separate OFFSET queries could.
+//
+// Both buckets use the canonical viewer gate verbatim —
+// `abandoned_by IS NOT NULL AND abandoned_by <> ?` for someone else's
+// abandonment — so a future grep for that predicate finds this site too. Rows
+// with abandoned_by IS NULL are excluded by the inner WHERE: a boot-reconcile row
+// is a server fault, not a player signal.
+func (r *GormMatchRepository) GetHonorTrendWindowsForUser(userID uint, limit int) (HonorTrendWindows, error) {
+	var w HonorTrendWindows
+	if limit <= 0 {
+		return w, nil
+	}
+	var row struct {
+		RecentCompleted int
+		RecentAbandoned int
+		PriorCompleted  int
+		PriorAbandoned  int
+	}
+	err := r.db.Raw(`
+SELECT
+  COUNT(*) FILTER (WHERE rn <= ? AND (status = 'completed' OR (abandoned_by IS NOT NULL AND abandoned_by <> ?))) AS recent_completed,
+  COUNT(*) FILTER (WHERE rn <= ? AND abandoned_by = ?)                                                           AS recent_abandoned,
+  COUNT(*) FILTER (WHERE rn >  ? AND (status = 'completed' OR (abandoned_by IS NOT NULL AND abandoned_by <> ?))) AS prior_completed,
+  COUNT(*) FILTER (WHERE rn >  ? AND abandoned_by = ?)                                                           AS prior_abandoned
+FROM (
+  SELECT
+    status,
+    abandoned_by,
+    ROW_NUMBER() OVER (ORDER BY completed_at DESC, id DESC) AS rn
+  FROM matches
+  WHERE (player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?)
+    AND (status = 'completed' OR (status = 'abandoned' AND abandoned_by IS NOT NULL))
+  ORDER BY completed_at DESC, id DESC
+  LIMIT ?
+) AS window_rows
+`,
+		limit, userID,
+		limit, userID,
+		limit, userID,
+		limit, userID,
+		userID, userID, userID, userID,
+		2*limit,
+	).Scan(&row).Error
+	if err != nil {
+		return w, err
+	}
+	w.RecentCompleted = row.RecentCompleted
+	w.RecentAbandoned = row.RecentAbandoned
+	w.PriorCompleted = row.PriorCompleted
+	w.PriorAbandoned = row.PriorAbandoned
+	return w, nil
+}
+
 func (r *GormMatchRepository) GetMatchesForUser(userID uint, limit, offset int, outcome, sort string) ([]Match, int64, error) {
 	query := r.db.Model(&Match{}).
 		Where("status IN ?", []string{"completed", "abandoned"}).

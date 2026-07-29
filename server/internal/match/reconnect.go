@@ -562,8 +562,22 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	variant := string(gs.Variant)
 	matchMode := gs.MatchMode
 	var botSeats [4]bool
+	// Presence snapshot for honor (Story 9.7 + code review 2026-07-29): captured
+	// here under the session lock, because by the time recordHonor runs the lock
+	// is released. Seat `abandonedSeat` is false by definition (that is why its
+	// timer fired); any OTHER false seat is a player who was not at the table when
+	// the match ended, and is charged an abandonment rather than credited.
+	//
+	// The implication runs ONE WAY ONLY: false reliably means absent, but true
+	// does NOT reliably mean present. HandleDisconnect maintains Connected for
+	// drops observed in four phases (reconnect.go:92-109); a socket reaped during
+	// a transient phase leaves the seat reading true for the rest of the match.
+	// So this gate fails OPEN — it under-charges, never over-charges. Pre-existing
+	// disconnect-tracking gap, recorded in deferred-work.md.
+	var connected [4]bool
 	for i := range gs.Players {
 		botSeats[i] = gs.Players[i].IsBot
+		connected[i] = gs.Players[i].Connected
 	}
 	// Snapshot any hands scored before the abandonment so they persist alongside
 	// the match row. Empty when abandonment fires before hand 1 completed.
@@ -597,6 +611,22 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	// broadcasts. xp_awarded is slotted after coin_settlement, before match_state.
 	xpMsgs := m.awardXP(roomID, playerIDs, botSeats, [2]int{teamAScore, teamBScore}, abandonedSeat)
 
+	// Story 9.7: record honor. Every human seat that was NOT at the table when
+	// the match ended is charged an abandonment — the seat whose window expired
+	// plus any other seat still absent inside its own window (PO decision
+	// 2026-07-29 review pass 2; see computeHonorEvents for the two rules this
+	// replaced and why). Human seats that were still CONNECTED are credited a
+	// completion — including the abandoner's own teammate, who is not punished for
+	// their partner's disconnect, unlike coins and XP which forfeit team-wide.
+	//
+	// Computed from the IN-MEMORY session snapshot above, never by reading the
+	// match row back: unlike the natural-end path, this finalizer broadcasts
+	// BEFORE it persists, so that row does not exist yet.
+	//
+	// Best-effort like settlement and XP. honor_updated is slotted after
+	// xp_awarded, before the trailing match_state.
+	honorMsgs := m.recordHonor(roomID, playerIDs, botSeats, connected, abandonedSeat)
+
 	// Broadcast to all human players (disconnected player gets it if they reconnect to WS later)
 	userIDs := humanUserIDs(playerIDs)
 	m.hub.BroadcastToUsers(userIDs, abandonedMsg)
@@ -605,6 +635,9 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	}
 	for _, xm := range xpMsgs {
 		m.hub.SendToUser(xm.userID, xm.msg)
+	}
+	for _, hm := range honorMsgs {
+		m.hub.SendToUser(hm.userID, hm.msg)
 	}
 	m.hub.BroadcastToUsers(userIDs, stateMsg)
 

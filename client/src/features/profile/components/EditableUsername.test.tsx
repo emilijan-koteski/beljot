@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FetchError } from "@/shared/api/axiosClient";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { User } from "@/shared/types/apiTypes";
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { EditableUsername } from "./EditableUsername";
 
@@ -18,18 +18,12 @@ vi.mock("@/shared/api/profile", () => ({
 }));
 
 function userFixture(overrides: Partial<User> = {}): User {
-  return {
-    id: 1,
+  return makeUser({
     username: "oldname",
     email: "u@example.com",
-    languagePreference: "en",
-    walletBalance: 5000,
-    loginStreakDays: 0,
-    totalXp: 0,
-    level: 0,
     createdAt: "2026-01-15T10:00:00Z",
     ...overrides,
-  };
+  });
 }
 
 type Props = Parameters<typeof EditableUsername>[0];

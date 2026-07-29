@@ -219,6 +219,31 @@ export interface XpAwardedPayload {
   leveledUp: boolean;
 }
 
+// --- Honor events (Story 9.7) ---
+// Sent per-human at match end, slotted after event:xp_awarded and before the
+// trailing event:match_state. Carries that player's own recomputed honor score
+// and its tier bucket. The score and tier are server-authoritative — the client
+// mirror in shared/lib/honor.ts is presentation only and never decides access.
+//
+// honorTier is a STABLE MACHINE TOKEN ("exemplary" | "trusted" | "fair" |
+// "unreliable" | "problematic") that the client maps to an i18n label and
+// colour; a display string never crosses the wire.
+//
+// isNewPlayer is a presentation hint: below the matches-played floor
+// (completed + abandoned < 5 — it counts experience, not successes) the UI
+// hides the score and tier behind a "New Player" chip, but honorScore and
+// honorTier are still populated. Keep in sync with server events.go
+// (EventHonorUpdated).
+export const EVENT_HONOR_UPDATED = "event:honor_updated" as const;
+
+export interface HonorUpdatedPayload {
+  honorScore: number;
+  honorTier: string;
+  honorCompletedTotal: number;
+  honorAbandonedTotal: number;
+  isNewPlayer: boolean;
+}
+
 // --- Disconnect/reconnect events (server -> client) ---
 export const EVENT_PLAYER_DISCONNECTED = "event:player_disconnected" as const;
 export const EVENT_PLAYER_RECONNECTED = "event:player_reconnected" as const;

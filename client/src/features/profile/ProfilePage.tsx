@@ -6,6 +6,7 @@ import { useProfileQuery } from "@/shared/hooks/queries/useProfile";
 import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
+import { HonorPanel } from "./components/HonorPanel";
 import { IdentityHero } from "./components/IdentityHero";
 import { LinkedAccounts } from "./components/LinkedAccounts";
 import { Milestones } from "./components/Milestones";
@@ -75,6 +76,25 @@ export function ProfilePage() {
       />
 
       {career.data && <StreakCallout streak={career.data.streak} />}
+
+      {/* Honor (Story 9.7). Rendered as a full-width section between the streak
+          callout and the stats grid rather than squeezed into the hero's
+          reserved slot — it carries a score, a tier, a meter, a trend and two
+          counts, which needs the width of a section with its own header.
+          Gated on `profile` so the loading transient never mixes a real value
+          with a 0 fallback (the Story 9.5 review caught exactly that on the XP
+          bar): with no profile there is simply no honor surface. */}
+      {profile && (
+        <HonorPanel
+          score={profile.honorScore}
+          tier={profile.honorTier}
+          completedTotal={profile.honorCompletedTotal}
+          abandonedTotal={profile.honorAbandonedTotal}
+          isNewPlayer={profile.isNewPlayer}
+          trendDelta={profile.honorTrendDelta}
+          trendDirection={profile.honorTrendDirection}
+        />
+      )}
 
       {isError ? (
         <section

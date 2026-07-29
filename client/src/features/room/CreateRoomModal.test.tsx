@@ -6,23 +6,19 @@ import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { CreateRoomModal } from "./CreateRoomModal";
 
 function setBalance(walletBalance: number) {
   useAuthStore.setState({
-    user: {
+    user: makeUser({
       id: 5,
       username: "owner",
       email: "owner@test.dev",
-      languagePreference: "en",
       walletBalance,
-      loginStreakDays: 0,
-      totalXp: 0,
-      level: 0,
       createdAt: "2026-06-18T00:00:00Z",
-    },
+    }),
   });
 }
 

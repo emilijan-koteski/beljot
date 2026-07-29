@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -136,17 +136,13 @@ describe("RoomPage diamond layout invariant", () => {
     "viewerSeat=%i → seats are pinned to fixed cardinals (0=south, 1=east, 2=north, 3=west)",
     async (viewerSeat) => {
       useAuthStore.setState({
-        user: {
+        user: makeUser({
           id: 100,
           username: ["alice", "bob", "carol", "dave"][viewerSeat]!,
           email: "v@b.com",
-          languagePreference: "en",
-          walletBalance: 5000,
           loginStreakDays: 1,
-          totalXp: 0,
-          level: 0,
           createdAt: "",
-        },
+        }),
         token: "tok",
       });
 

@@ -21,7 +21,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { i18n } from "@/shared/i18n/i18n";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -151,17 +151,13 @@ beforeEach(() => {
     })),
   });
   useAuthStore.setState({
-    user: {
+    user: makeUser({
       id: 100,
       username: "alice",
       email: "a@b.com",
-      languagePreference: "en",
-      walletBalance: 5000,
       loginStreakDays: 1,
-      totalXp: 0,
-      level: 0,
       createdAt: "",
-    },
+    }),
     token: "tok",
   });
   mockGetRoom.mockResolvedValue(fourSeatedRoom());

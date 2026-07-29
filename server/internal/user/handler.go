@@ -2,6 +2,7 @@ package user
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -29,15 +30,38 @@ type ProfileResponse struct {
 	// from it (never stored); XPIntoLevel/XPForNextLevel drive the profile XP
 	// bar (fill = XPIntoLevel / XPForNextLevel). These are PRIVATE self-only
 	// figures like WalletBalance — keep them off any future public profile DTO.
-	TotalXP          int       `json:"totalXp"`
-	Level            int       `json:"level"`
-	XPIntoLevel      int       `json:"xpIntoLevel"`
-	XPForNextLevel   int       `json:"xpForNextLevel"`
-	CreatedAt        time.Time `json:"createdAt"`
-	TotalGamesPlayed int       `json:"totalGamesPlayed"`
-	Wins             int       `json:"wins"`
-	Losses           int       `json:"losses"`
-	Abandoned        int       `json:"abandoned"`
+	TotalXP        int `json:"totalXp"`
+	Level          int `json:"level"`
+	XPIntoLevel    int `json:"xpIntoLevel"`
+	XPForNextLevel int `json:"xpForNextLevel"`
+	// Honor (Story 9.7). Unlike every private field above, these are
+	// PUBLIC-SAFE: honor exists precisely so other players can judge whether to
+	// play with you, and Story 9.8 gates room access on it. When Epic 11 builds
+	// the public player-profile DTO it can lift these seven fields verbatim
+	// without re-litigating the privacy question.
+	//
+	// HonorScore is the AUTHORITATIVE recomputed value, never the lagging
+	// users.honor_score snapshot column. HonorTier is a stable machine token
+	// the client maps to an i18n label. The Completed/Abandoned totals are RAW
+	// undecayed lifetime counts. IsNewPlayer is presentation-only suppression:
+	// the score and tier are still populated and still authoritative when it is
+	// true. HonorTrendDelta/Direction compare the last honorTrendWindow matches
+	// against the honorTrendWindow matches BEFORE those (never against the
+	// lifetime score — different sample sizes carry different Bayesian prior drag,
+	// which made flawless players read "Slipping"). The one honor figure that
+	// costs a query.
+	HonorScore          int       `json:"honorScore"`
+	HonorTier           string    `json:"honorTier"`
+	HonorCompletedTotal int64     `json:"honorCompletedTotal"`
+	HonorAbandonedTotal int64     `json:"honorAbandonedTotal"`
+	IsNewPlayer         bool      `json:"isNewPlayer"`
+	HonorTrendDelta     int       `json:"honorTrendDelta"`
+	HonorTrendDirection string    `json:"honorTrendDirection"`
+	CreatedAt           time.Time `json:"createdAt"`
+	TotalGamesPlayed    int       `json:"totalGamesPlayed"`
+	Wins                int       `json:"wins"`
+	Losses              int       `json:"losses"`
+	Abandoned           int       `json:"abandoned"`
 }
 
 type UpdatePreferencesRequest struct {
@@ -216,23 +240,66 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 
 	level, xpIntoLevel, xpForNextLevel := LevelProgress(u.TotalXP)
 
+	// Honor (Story 9.7). The lifetime score is recomputed from the stored
+	// weights at request time — that recompute IS the authority, so it can
+	// never be stale no matter how long ago the row was last written.
+	now := time.Now().UTC()
+	honor := NewHonorSnapshot(
+		u.HonorCompletedWeight, u.HonorAbandonedWeight, u.HonorDecayedAt,
+		u.HonorCompletedTotal, u.HonorAbandonedTotal, now,
+	)
+
+	// The trend is the ONE honor figure that must query `matches`: the stored
+	// weights are running aggregates and cannot be windowed. It runs here, on
+	// the profile read path only — never on the auth envelope and never in
+	// Story 9.8's join gate. Both windows are undecayed; the windows themselves
+	// are the recency mechanism.
+	//
+	// It compares the newest window against the one before it, NOT against the
+	// lifetime score — comparing a 20-match window to a lifetime aggregate mixed
+	// two different Bayesian prior drags and made flawless active players read
+	// "Slipping" forever (code review 2026-07-29). HonorTrendWindowed enforces
+	// the equal-sample-size precondition and returns flat when it does not hold.
+	//
+	// Best-effort: a failed trend query degrades to a flat trend rather than
+	// failing the whole profile, which would take the far more important
+	// score/tier/counters down with it.
+	trendDelta, trendDirection := 0, HonorTrendFlat
+	windows, err := h.matchRepo.GetHonorTrendWindowsForUser(authUserID, HonorTrendWindow())
+	if err != nil {
+		slog.Error("profile: failed to read honor trend windows", "userID", authUserID, "error", err)
+	} else {
+		trendDelta, trendDirection = HonorTrendWindowed(
+			windows.RecentCompleted, windows.RecentAbandoned,
+			windows.PriorCompleted, windows.PriorAbandoned,
+			now,
+		)
+	}
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": ProfileResponse{
-			ID:                 u.ID,
-			Username:           u.Username,
-			UsernameChangedAt:  u.UsernameChangedAt,
-			LanguagePreference: u.LanguagePreference,
-			WalletBalance:      u.WalletBalance,
-			LoginStreakDays:    u.LoginStreakDays,
-			TotalXP:            u.TotalXP,
-			Level:              level,
-			XPIntoLevel:        xpIntoLevel,
-			XPForNextLevel:     xpForNextLevel,
-			CreatedAt:          u.CreatedAt,
-			TotalGamesPlayed:   wins + losses + abandoned,
-			Wins:               wins,
-			Losses:             losses,
-			Abandoned:          abandoned,
+			ID:                  u.ID,
+			Username:            u.Username,
+			UsernameChangedAt:   u.UsernameChangedAt,
+			LanguagePreference:  u.LanguagePreference,
+			WalletBalance:       u.WalletBalance,
+			LoginStreakDays:     u.LoginStreakDays,
+			TotalXP:             u.TotalXP,
+			Level:               level,
+			XPIntoLevel:         xpIntoLevel,
+			XPForNextLevel:      xpForNextLevel,
+			HonorScore:          honor.Score,
+			HonorTier:           honor.Tier,
+			HonorCompletedTotal: honor.CompletedTotal,
+			HonorAbandonedTotal: honor.AbandonedTotal,
+			IsNewPlayer:         honor.IsNewPlayer,
+			HonorTrendDelta:     trendDelta,
+			HonorTrendDirection: trendDirection,
+			CreatedAt:           u.CreatedAt,
+			TotalGamesPlayed:    wins + losses + abandoned,
+			Wins:                wins,
+			Losses:              losses,
+			Abandoned:           abandoned,
 		},
 	})
 }

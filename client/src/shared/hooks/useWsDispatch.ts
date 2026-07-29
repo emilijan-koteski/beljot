@@ -22,6 +22,7 @@ import type {
   DeclarationsResolvedPayload,
   EmotePayload,
   HandScoredPayload,
+  HonorUpdatedPayload,
   InsolventEjectedPayload,
   MatchAbandonedPayload,
   MatchEndPayload,
@@ -64,6 +65,7 @@ import {
   EVENT_COIN_SETTLEMENT,
   EVENT_DECLARATIONS_RESOLVED,
   EVENT_HAND_SCORED,
+  EVENT_HONOR_UPDATED,
   EVENT_MATCH_ABANDONED,
   EVENT_MATCH_END,
   EVENT_MATCH_PAUSED,
@@ -331,6 +333,45 @@ function dispatchGameEvent(message: WsMessage): void {
         newLevel: payload.newLevel,
         newTotalXp: payload.newTotalXp,
         xpEarned: payload.xpEarned,
+      });
+    }
+    return;
+  }
+
+  if (type === EVENT_HONOR_UPDATED) {
+    // Story 9.7: per-human honor update, arriving right after
+    // event:xp_awarded and before the trailing event:match_state.
+    //
+    // It writes ONLY to authStore.user, which survives the navigation away
+    // that wipes the match store — so the top-nav honor chip is correct the
+    // moment the player lands back in the lobby. There is deliberately NO
+    // per-match honor stash to reset in the match_end / match_abandoned
+    // handlers (unlike coinSettlement): honor has no end-of-match dialog, so
+    // there is no transient state that could go stale. If a future story adds
+    // an honor flourish to the result dialog, it MUST reset in BOTH handlers —
+    // the abandoning player is precisely the one who gets no follow-up event.
+    const payload = message.payload as HonorUpdatedPayload;
+    // Defensive validation — Go zero values are real values, so guard on type,
+    // not truthiness. A score of 0 ("Problematic") and isNewPlayer false are
+    // both legitimate, and both are falsy.
+    if (
+      !Number.isInteger(payload.honorScore) ||
+      typeof payload.honorTier !== "string" ||
+      payload.honorTier === "" ||
+      !Number.isInteger(payload.honorCompletedTotal) ||
+      !Number.isInteger(payload.honorAbandonedTotal) ||
+      typeof payload.isNewPlayer !== "boolean"
+    ) {
+      console.warn("WS: ignoring malformed event:honor_updated payload", payload);
+      return;
+    }
+    const authState = useAuthStore.getState();
+    if (authState.user) {
+      authState.setUser({
+        ...authState.user,
+        honorScore: payload.honorScore,
+        honorTier: payload.honorTier,
+        isNewPlayer: payload.isNewPlayer,
       });
     }
     return;

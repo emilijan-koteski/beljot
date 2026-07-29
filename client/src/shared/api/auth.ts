@@ -21,6 +21,12 @@ export interface RegisterResponse {
   // load without a separate profile fetch. level is derived server-side.
   totalXp: number;
   level: number;
+  // Honor (Story 9.7) — echoed for the same reason, so the top-nav honor chip
+  // renders on first paint. The TREND is deliberately absent: it needs a
+  // windowed query over matches and only the profile endpoint carries it.
+  honorScore: number;
+  honorTier: string;
+  isNewPlayer: boolean;
   createdAt: string;
 }
 
@@ -42,6 +48,10 @@ export interface RefreshResponse {
   // XP & level (Story 9.5) — see RegisterResponse.
   totalXp: number;
   level: number;
+  // Honor (Story 9.7) — see RegisterResponse.
+  honorScore: number;
+  honorTier: string;
+  isNewPlayer: boolean;
   createdAt: string;
 }
 

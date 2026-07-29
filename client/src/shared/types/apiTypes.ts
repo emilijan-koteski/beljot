@@ -25,6 +25,18 @@ export interface User {
   // Go zero values serialize as real 0s — compare explicitly, never truthiness.
   totalXp: number;
   level: number;
+  // Honor (Story 9.7). Server-authoritative: honorScore is recomputed from the
+  // stored decayed weights on every response, and honorTier is a stable machine
+  // token the client maps to an i18n label — never a display string on the wire.
+  // isNewPlayer suppresses the score/tier in favour of a "New Player" chip, but
+  // the real values are still present (Story 9.8's join gate reads them).
+  //
+  // Go zero values serialize as real 0s / false — compare explicitly, never
+  // truthiness. In particular `honorScore || 80` is WRONG: a legitimate score of
+  // 0 ("Problematic") would silently render as 80 ("Fair").
+  honorScore: number;
+  honorTier: string;
+  isNewPlayer: boolean;
   createdAt: string;
 }
 

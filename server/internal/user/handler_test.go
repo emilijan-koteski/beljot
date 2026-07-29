@@ -44,6 +44,21 @@ type mockMatchRepo struct {
 	rivals         []match.RivalAggregate
 	rivalsErr      error
 	getCareerCalls int
+
+	// Honor trend-window overrides (Story 9.7). lastHonorWindowLimit records
+	// the limit the handler asked for, so a test can assert it matches the
+	// server-side window constant rather than a hard-coded literal.
+	//
+	// honorWindow* is the RECENT window and honorPrior* the one before it. The
+	// trend only renders when both hold the same match count (code review
+	// 2026-07-29), so a test that wants a non-flat trend must populate both.
+	honorWindowCompleted int
+	honorWindowAbandoned int
+	honorPriorCompleted  int
+	honorPriorAbandoned  int
+	honorWindowErr       error
+	honorWindowCalls     int
+	lastHonorWindowLimit int
 }
 
 func newMockMatchRepo() *mockMatchRepo {
@@ -157,6 +172,20 @@ func (r *mockMatchRepo) GetTopRivalsForUser(userID uint, limit int) ([]match.Riv
 		return r.rivals[:limit], nil
 	}
 	return r.rivals, nil
+}
+
+func (r *mockMatchRepo) GetHonorTrendWindowsForUser(userID uint, limit int) (match.HonorTrendWindows, error) {
+	r.honorWindowCalls++
+	r.lastHonorWindowLimit = limit
+	if r.honorWindowErr != nil {
+		return match.HonorTrendWindows{}, r.honorWindowErr
+	}
+	return match.HonorTrendWindows{
+		RecentCompleted: r.honorWindowCompleted,
+		RecentAbandoned: r.honorWindowAbandoned,
+		PriorCompleted:  r.honorPriorCompleted,
+		PriorAbandoned:  r.honorPriorAbandoned,
+	}, nil
 }
 
 // GetStatsForUser returns the test-controlled stats override if set, else
@@ -364,6 +393,59 @@ func (m *mockUserRepo) TotalXPForUsers(ids []uint) (map[uint]int, error) {
 	return totals, nil
 }
 
+// ApplyHonorEvents mirrors the real repository's decay-forward-then-add
+// arithmetic in memory (Story 9.7). A missing user aborts the whole batch.
+func (m *mockUserRepo) ApplyHonorEvents(events map[uint]user.HonorEvent, now time.Time) (map[uint]user.HonorSnapshot, error) {
+	snapshots := make(map[uint]user.HonorSnapshot, len(events))
+	for id, ev := range events {
+		if id == 0 {
+			continue
+		}
+		found := false
+		for _, u := range m.users {
+			if u.ID != id {
+				continue
+			}
+			f := user.DecayFactor(u.HonorDecayedAt, now)
+			u.HonorCompletedWeight *= f
+			u.HonorAbandonedWeight *= f
+			if ev.Abandoned {
+				u.HonorAbandonedWeight++
+				u.HonorAbandonedTotal++
+			} else {
+				u.HonorCompletedWeight++
+				u.HonorCompletedTotal++
+			}
+			stamp := now
+			u.HonorDecayedAt = &stamp
+			snap := user.NewHonorSnapshot(u.HonorCompletedWeight, u.HonorAbandonedWeight, &stamp, u.HonorCompletedTotal, u.HonorAbandonedTotal, now)
+			u.HonorScoreSnapshot = snap.Score
+			snapshots[id] = snap
+			found = true
+			break
+		}
+		if !found {
+			return nil, apperr.ErrUserNotFound
+		}
+	}
+	return snapshots, nil
+}
+
+func (m *mockUserRepo) ResetHonor(userID uint) error {
+	for _, u := range m.users {
+		if u.ID == userID {
+			u.HonorCompletedWeight = 0
+			u.HonorAbandonedWeight = 0
+			u.HonorDecayedAt = nil
+			u.HonorCompletedTotal = 0
+			u.HonorAbandonedTotal = 0
+			u.HonorScoreSnapshot = user.HonorScore(0, 0, nil, time.Time{})
+			return nil
+		}
+	}
+	return apperr.ErrUserNotFound
+}
+
 func (m *mockUserRepo) addUser(username, email, lang string) *user.User {
 	u := &user.User{
 		ID:                 m.nextID,
@@ -524,6 +606,212 @@ func TestGetProfile_IncludesXPAndLevel(t *testing.T) {
 	assert.Equal(t, 3, data.Level)
 	assert.Equal(t, 150, data.XPIntoLevel)
 	assert.Equal(t, 350, data.XPForNextLevel)
+}
+
+// TestGetProfile_IncludesHonor pins Story 9.7 AC8: the self-only profile
+// carries the recomputed score, the tier token, the raw lifetime counts, the
+// New Player flag and the trend — and the trend asks the repository for exactly
+// the server-side window size rather than a hard-coded 20.
+func TestGetProfile_IncludesHonor(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	u := repo.addUser("honoruser", "honor@example.com", "en")
+	// 20 completed / 1 abandoned, written just now: 100*24/29 = 82.8 -> 83.
+	now := time.Now().UTC()
+	u.HonorCompletedWeight = 20
+	u.HonorAbandonedWeight = 1
+	u.HonorDecayedAt = &now
+	u.HonorCompletedTotal = 20
+	u.HonorAbandonedTotal = 1
+
+	// The trend compares the two 20-match windows against each other, NOT
+	// against the lifetime score. Recent: 20/0 -> 100*24/25 = 96. Prior: 18/2 ->
+	// 100*22/31 = 70.97 -> 71. Delta +25, comfortably past the threshold. Both
+	// windows hold 20 matches, which is what makes them comparable at all.
+	matchRepo.honorWindowCompleted = 20
+	matchRepo.honorWindowAbandoned = 0
+	matchRepo.honorPriorCompleted = 18
+	matchRepo.honorPriorAbandoned = 2
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, 83, data.HonorScore)
+	assert.Equal(t, "fair", data.HonorTier)
+	assert.Equal(t, int64(20), data.HonorCompletedTotal)
+	assert.Equal(t, int64(1), data.HonorAbandonedTotal)
+	assert.False(t, data.IsNewPlayer, "21 finished matches is well past the floor of 5")
+	assert.Equal(t, 25, data.HonorTrendDelta)
+	assert.Equal(t, "up", data.HonorTrendDirection)
+
+	assert.Equal(t, 1, matchRepo.honorWindowCalls)
+	assert.Equal(t, user.HonorTrendWindow(), matchRepo.lastHonorWindowLimit,
+		"the handler must ask for the server-side window size, not a literal")
+}
+
+// TestGetProfile_FlawlessActivePlayerReadsFlat is the regression test for the
+// 2026-07-29 code-review finding: the trend used to compare a 20-match window
+// (whose arithmetic maximum is 96, because the Beta(4,1) prior's 4
+// pseudo-completions are a heavy drag at n=20) against the LIFETIME score
+// (98-100 for an active player, computed from an unbounded decayed weight). A
+// player who had never abandoned a single match therefore rendered a red
+// "Slipping -2/-3/-4" forever.
+//
+// With two equal windows the prior drag cancels, so a spotless record reads flat.
+func TestGetProfile_FlawlessActivePlayerReadsFlat(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	u := repo.addUser("flawless", "flawless@example.com", "en")
+	now := time.Now().UTC()
+	// 60 clean matches inside one half-life: lifetime 100*64/65 = 98.5 -> 98,
+	// which is ABOVE the 96 window cap. This is the exact shape that inverted.
+	u.HonorCompletedWeight = 60
+	u.HonorAbandonedWeight = 0
+	u.HonorDecayedAt = &now
+	u.HonorCompletedTotal = 60
+	u.HonorAbandonedTotal = 0
+
+	// Never abandoned anything in either window.
+	matchRepo.honorWindowCompleted = 20
+	matchRepo.honorWindowAbandoned = 0
+	matchRepo.honorPriorCompleted = 20
+	matchRepo.honorPriorAbandoned = 0
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, 98, data.HonorScore, "the lifetime score is above the window cap")
+	assert.Equal(t, 0, data.HonorTrendDelta)
+	assert.Equal(t, "flat", data.HonorTrendDirection,
+		"a player who has never abandoned a match must never read as Slipping")
+}
+
+// A trend needs two windows of the SAME size to be meaningful, so a player with
+// fewer than 2*window finished matches reads flat rather than being compared
+// against a short, differently-biased sample.
+func TestGetProfile_PartialPriorWindowReadsFlat(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	u := repo.addUser("halfway", "halfway@example.com", "en")
+	now := time.Now().UTC()
+	u.HonorCompletedWeight = 25
+	u.HonorDecayedAt = &now
+	u.HonorCompletedTotal = 25
+
+	// 25 finished matches: a full recent window of 20, but only 5 behind it.
+	matchRepo.honorWindowCompleted = 20
+	matchRepo.honorWindowAbandoned = 0
+	matchRepo.honorPriorCompleted = 5
+	matchRepo.honorPriorAbandoned = 0
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, 0, data.HonorTrendDelta)
+	assert.Equal(t, "flat", data.HonorTrendDirection,
+		"unequal windows carry different prior drag and must not be compared")
+}
+
+// A player under the completed-match floor is flagged New Player, but the
+// server STILL returns the real score and tier — suppression is presentation
+// only, and Story 9.8's join gate reads these fields.
+func TestGetProfile_NewPlayerStillCarriesScoreAndTier(t *testing.T) {
+	repo, _, e := setupUserHandlerWithMatches()
+	u := repo.addUser("freshuser", "fresh@example.com", "en")
+	now := time.Now().UTC()
+	u.HonorCompletedWeight = 2
+	u.HonorDecayedAt = &now
+	u.HonorCompletedTotal = 2
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.True(t, data.IsNewPlayer)
+	assert.Equal(t, 86, data.HonorScore, "100*6/7 = 85.7 -> 86")
+	assert.Equal(t, "trusted", data.HonorTier)
+	assert.Equal(t, int64(2), data.HonorCompletedTotal)
+}
+
+// A player with no history sits at the Beta(4,1) prior of 80, not at 0 — the
+// whole point of the pseudo-count. A zero honorScore in the JSON would be a
+// real 0 (Go zero values serialize as real values), so this also guards the
+// client's "never use truthiness" rule from the server side.
+func TestGetProfile_NoHistorySitsAtThePrior(t *testing.T) {
+	repo, _, e := setupUserHandlerWithMatches()
+	u := repo.addUser("blankuser", "blank@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, 80, data.HonorScore)
+	assert.Equal(t, "fair", data.HonorTier)
+	assert.True(t, data.IsNewPlayer)
+	assert.Equal(t, int64(0), data.HonorCompletedTotal)
+	assert.Equal(t, int64(0), data.HonorAbandonedTotal)
+}
+
+// A failed trend query must degrade to a flat trend, not fail the profile —
+// the score, tier and counters are far more important than the arrow.
+func TestGetProfile_TrendQueryFailureDegradesToFlat(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	u := repo.addUser("trenduser", "trend@example.com", "en")
+	now := time.Now().UTC()
+	u.HonorCompletedWeight = 20
+	u.HonorDecayedAt = &now
+	u.HonorCompletedTotal = 20
+	matchRepo.honorWindowErr = errors.New("db down")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code, "a trend failure must not fail the profile")
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, 96, data.HonorScore, "the real score still renders")
+	assert.Equal(t, 0, data.HonorTrendDelta)
+	assert.Equal(t, "flat", data.HonorTrendDirection)
 }
 
 func TestGetProfile_UserNotFound(t *testing.T) {

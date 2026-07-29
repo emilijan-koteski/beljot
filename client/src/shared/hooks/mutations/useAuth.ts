@@ -26,6 +26,9 @@ function setAuthState(res: {
   loginStreakDays: number;
   totalXp: number;
   level: number;
+  honorScore: number;
+  honorTier: string;
+  isNewPlayer: boolean;
   createdAt: string;
 }) {
   useAuthStore.getState().setToken(res.token);
@@ -38,6 +41,9 @@ function setAuthState(res: {
     loginStreakDays: res.loginStreakDays,
     totalXp: res.totalXp,
     level: res.level,
+    honorScore: res.honorScore,
+    honorTier: res.honorTier,
+    isNewPlayer: res.isNewPlayer,
     createdAt: res.createdAt,
   });
 }

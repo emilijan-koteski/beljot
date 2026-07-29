@@ -157,6 +157,60 @@ func (m *mockUserRepo) AddXP(awards map[uint]int) (map[uint]int, error) {
 	return newTotals, nil
 }
 
+// ApplyHonorEvents mirrors the real repository's decay-forward-then-add
+// arithmetic in memory so auth-envelope tests can assert honor fields
+// (Story 9.7). A missing user aborts the whole batch, like the real one.
+func (m *mockUserRepo) ApplyHonorEvents(events map[uint]user.HonorEvent, now time.Time) (map[uint]user.HonorSnapshot, error) {
+	snapshots := make(map[uint]user.HonorSnapshot, len(events))
+	for id, ev := range events {
+		if id == 0 {
+			continue
+		}
+		found := false
+		for _, u := range m.users {
+			if u.ID != id {
+				continue
+			}
+			f := user.DecayFactor(u.HonorDecayedAt, now)
+			u.HonorCompletedWeight *= f
+			u.HonorAbandonedWeight *= f
+			if ev.Abandoned {
+				u.HonorAbandonedWeight++
+				u.HonorAbandonedTotal++
+			} else {
+				u.HonorCompletedWeight++
+				u.HonorCompletedTotal++
+			}
+			stamp := now
+			u.HonorDecayedAt = &stamp
+			snap := user.NewHonorSnapshot(u.HonorCompletedWeight, u.HonorAbandonedWeight, &stamp, u.HonorCompletedTotal, u.HonorAbandonedTotal, now)
+			u.HonorScoreSnapshot = snap.Score
+			snapshots[id] = snap
+			found = true
+			break
+		}
+		if !found {
+			return nil, apperr.ErrUserNotFound
+		}
+	}
+	return snapshots, nil
+}
+
+func (m *mockUserRepo) ResetHonor(userID uint) error {
+	for _, u := range m.users {
+		if u.ID == userID {
+			u.HonorCompletedWeight = 0
+			u.HonorAbandonedWeight = 0
+			u.HonorDecayedAt = nil
+			u.HonorCompletedTotal = 0
+			u.HonorAbandonedTotal = 0
+			u.HonorScoreSnapshot = user.HonorScore(0, 0, nil, time.Time{})
+			return nil
+		}
+	}
+	return apperr.ErrUserNotFound
+}
+
 func (m *mockUserRepo) TotalXPForUsers(ids []uint) (map[uint]int, error) {
 	totals := make(map[uint]int, len(ids))
 	for _, id := range ids {
@@ -234,6 +288,60 @@ func TestRegister_Success(t *testing.T) {
 	assert.Equal(t, "en", data.LanguagePreference)
 	assert.NotEmpty(t, data.Token)
 	assert.False(t, data.CreatedAt.IsZero(), "createdAt should be set")
+}
+
+// TestAuthEnvelope_CarriesHonor pins Story 9.7 AC7/AC8: honor rides the shared
+// auth envelope so the TopBar chip renders on first paint without a second
+// fetch. A fresh registration sits at the Beta(4,1) prior (80 / "fair") and is
+// flagged New Player; a returning login echoes that user's real stored state.
+//
+// The TREND is deliberately absent from this envelope — it needs a windowed
+// query over `matches` and the auth path stays a single-row read.
+func TestAuthEnvelope_CarriesHonor(t *testing.T) {
+	t.Run("a fresh registration sits at the prior", func(t *testing.T) {
+		_, e := setupHandler()
+
+		rec := doRegister(e, `{"email":"h@example.com","username":"honornew","password":"password123"}`)
+		require.Equal(t, http.StatusCreated, rec.Code)
+
+		var resp map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+		var data RegisterResponseData
+		require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+		assert.Equal(t, 80, data.HonorScore, "no history is the 80 prior, not 0")
+		assert.Equal(t, "fair", data.HonorTier)
+		assert.True(t, data.IsNewPlayer)
+	})
+
+	t.Run("login echoes the user's stored honor state", func(t *testing.T) {
+		handler, e := setupHandler()
+		registerUser(e)
+
+		repo, ok := handler.userRepo.(*mockUserRepo)
+		require.True(t, ok)
+
+		// 20 completed / 1 abandoned as of now -> 100*24/29 = 82.8 -> 83.
+		now := time.Now().UTC()
+		require.Len(t, repo.users, 1)
+		repo.users[0].HonorCompletedWeight = 20
+		repo.users[0].HonorAbandonedWeight = 1
+		repo.users[0].HonorDecayedAt = &now
+		repo.users[0].HonorCompletedTotal = 20
+		repo.users[0].HonorAbandonedTotal = 1
+
+		rec := doLogin(e, `{"email":"test@example.com","password":"password123"}`)
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+		var data RegisterResponseData
+		require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+		assert.Equal(t, 83, data.HonorScore)
+		assert.Equal(t, "fair", data.HonorTier)
+		assert.False(t, data.IsNewPlayer)
+	})
 }
 
 func TestRegister_LanguagePreference(t *testing.T) {

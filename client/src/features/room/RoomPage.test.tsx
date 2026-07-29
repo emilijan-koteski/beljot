@@ -10,7 +10,7 @@ import { FetchError } from "@/shared/api/axiosClient";
 import { queryKeys } from "@/shared/api/queryKeys";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -107,17 +107,13 @@ const defaultRoom = {
   updatedAt: "",
 };
 
-const defaultUser = {
+const defaultUser = makeUser({
   id: 10,
   username: "alice",
   email: "a@b.com",
-  languagePreference: "en",
-  walletBalance: 5000,
   loginStreakDays: 1,
-  totalXp: 0,
-  level: 0,
   createdAt: "",
-};
+});
 
 beforeEach(() => {
   mockLeaveRoom.mockResolvedValue(undefined);
@@ -1091,17 +1087,13 @@ describe("RoomPage", () => {
 
   it("renders waiting message for non-owner when 4 players seated", async () => {
     useAuthStore.setState({
-      user: {
+      user: makeUser({
         id: 20,
         username: "bob",
         email: "b@b.com",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "",
-      },
+      }),
       token: "tok",
     });
 
@@ -1163,17 +1155,13 @@ describe("RoomPage", () => {
 
   it("does not render Start Game button for non-owner", async () => {
     useAuthStore.setState({
-      user: {
+      user: makeUser({
         id: 20,
         username: "bob",
         email: "b@b.com",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "",
-      },
+      }),
       token: "tok",
     });
 

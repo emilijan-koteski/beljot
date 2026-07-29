@@ -182,6 +182,11 @@ func main() {
 	// Story 9.5: the match manager awards lifetime XP at match end via the
 	// user-side XP service (built from the already-constructed userRepo).
 	sessionManager.SetXPAwarder(user.NewXPService(userRepo))
+	// Story 9.7: the match manager records honor (completed vs abandoned) at
+	// match end via the user-side honor service. Same injection shape as the XP
+	// awarder above, and for the same reason — user imports match, so match
+	// must never import user.
+	sessionManager.SetHonorRecorder(user.NewHonorService(userRepo))
 
 	// Reconcile rooms left in status="playing" by a previous process. Sessions
 	// live only in process memory, so any "playing" row at boot has no live

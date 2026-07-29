@@ -80,6 +80,46 @@ type XPAwardedPayload struct {
 	LeveledUp  bool `json:"leveledUp"`
 }
 
+// --- Honor events (Story 9.7) ---
+
+// EventHonorUpdated is sent per-human at match end, slotted AFTER
+// event:xp_awarded and BEFORE the trailing event:match_state. The full
+// ordering contract on both finalizers is therefore:
+//
+//	match_end | match_abandoned
+//	  -> coin_settlement
+//	  -> xp_awarded
+//	  -> honor_updated
+//	  -> match_state
+//
+// It is a NEW event type rather than extra fields on an existing payload, on
+// purpose: the client's payload schemas are z.strictObject, so widening an
+// existing event breaks stale tabs that are still running the old bundle,
+// whereas an unknown event type is simply ignored by them.
+//
+// Sent per-user (not broadcast) because the values differ per player — in an
+// abandoned match one seat's honor drops while the other three rise.
+const EventHonorUpdated = "event:honor_updated"
+
+// HonorUpdatedPayload is the typed payload for EventHonorUpdated events.
+//
+// HonorScore is the AUTHORITATIVE recomputed value (0-100), not the lagging
+// users.honor_score snapshot column. HonorTier is a stable machine token
+// ("exemplary" | "trusted" | "fair" | "unreliable" | "problematic") that the
+// client maps to an i18n label and colour — a display string must never cross
+// the wire. HonorCompletedTotal / HonorAbandonedTotal are RAW undecayed
+// lifetime counts. IsNewPlayer is true below the matches-played floor
+// (completed + abandoned < 5 — it counts experience, not successes), and is
+// a PRESENTATION hint only: the score and tier are still populated and are
+// still what any future gate reads.
+type HonorUpdatedPayload struct {
+	HonorScore          int    `json:"honorScore"`
+	HonorTier           string `json:"honorTier"`
+	HonorCompletedTotal int64  `json:"honorCompletedTotal"`
+	HonorAbandonedTotal int64  `json:"honorAbandonedTotal"`
+	IsNewPlayer         bool   `json:"isNewPlayer"`
+}
+
 // --- Game event payload structs ---
 
 // CardPlayedPayload is the typed payload for EventCardPlayed events.

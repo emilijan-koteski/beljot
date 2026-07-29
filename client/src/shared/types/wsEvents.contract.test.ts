@@ -20,6 +20,7 @@ import coinSettlementGolden from "../../../../server/internal/ws/testdata/events
 import declarationsResolvedGolden from "../../../../server/internal/ws/testdata/events/declarations_resolved.json";
 import eventHandScoredGolden from "../../../../server/internal/ws/testdata/events/event_hand_scored.json";
 import eventMatchStateGolden from "../../../../server/internal/ws/testdata/events/event_match_state.json";
+import honorUpdatedGolden from "../../../../server/internal/ws/testdata/events/honor_updated.json";
 import matchAbandonedGolden from "../../../../server/internal/ws/testdata/events/match_abandoned.json";
 import matchEndGolden from "../../../../server/internal/ws/testdata/events/match_end.json";
 import matchPausedGolden from "../../../../server/internal/ws/testdata/events/match_paused.json";
@@ -40,6 +41,7 @@ import {
   DeclarationsResolvedPayloadSchema,
   EventMatchStateSchema,
   HandScoredPayloadSchema,
+  HonorUpdatedPayloadSchema,
   MatchAbandonedPayloadSchema,
   MatchEndPayloadSchema,
   MatchPausedPayloadSchema,
@@ -77,6 +79,7 @@ const cases = [
   ["AutoActionPayload", AutoActionPayloadSchema, autoActionGolden],
   ["CoinSettlementPayload", CoinSettlementPayloadSchema, coinSettlementGolden],
   ["XpAwardedPayload", XpAwardedPayloadSchema, xpAwardedGolden],
+  ["HonorUpdatedPayload", HonorUpdatedPayloadSchema, honorUpdatedGolden],
   ["PlayerDisconnectedPayload", PlayerDisconnectedPayloadSchema, playerDisconnectedGolden],
   ["PlayerReconnectedPayload", PlayerReconnectedPayloadSchema, playerReconnectedGolden],
   ["SurrenderProposedPayload", SurrenderProposedPayloadSchema, surrenderProposedGolden],

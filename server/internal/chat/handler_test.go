@@ -42,6 +42,10 @@ func (s *userRepoStub) AddXP(map[uint]int) (map[uint]int, error)       { return 
 func (s *userRepoStub) TotalXPForUsers([]uint) (map[uint]int, error) {
 	return nil, nil
 }
+func (s *userRepoStub) ApplyHonorEvents(map[uint]user.HonorEvent, time.Time) (map[uint]user.HonorSnapshot, error) {
+	return nil, nil
+}
+func (s *userRepoStub) ResetHonor(uint) error { return nil }
 func (s *userRepoStub) FindByID(id uint) (*user.User, error) {
 	if u, ok := s.users[id]; ok {
 		return u, nil

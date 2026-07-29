@@ -31,8 +31,47 @@ type User struct {
 	// a pointer because it is nullable — NULL (never changed) serializes as null,
 	// not time.Time's "0001-01-01T00:00:00Z" zero value. Drives the 30-day change
 	// cooldown (see UsernameChangeCooldownDays). DB column is TIMESTAMPTZ.
-	UsernameChangedAt *time.Time     `gorm:"column:username_changed_at" json:"usernameChangedAt,omitempty"`
-	CreatedAt         time.Time      `json:"createdAt"`
-	UpdatedAt         time.Time      `json:"updatedAt"`
-	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
+	UsernameChangedAt *time.Time `gorm:"column:username_changed_at" json:"usernameChangedAt,omitempty"`
+	// Honor score storage (Story 9.7, migration 000017). Six columns, all
+	// json:"-" — the API never serializes the raw storage, it serializes the
+	// computed DTO fields in ProfileResponse / RegisterResponseData.
+	//
+	// HonorCompletedWeight / HonorAbandonedWeight are DECAYED running weights:
+	// each finished match contributes 0.5^(age_days/90), so old events fade.
+	// They are only meaningful together with HonorDecayedAt, the timestamp they
+	// were last decayed to. DB type is NUMERIC(14,6), not a float, because
+	// binary float drift in an access-gating trust signal is unacceptable.
+	HonorCompletedWeight float64 `gorm:"column:honor_completed_weight;not null;default:0" json:"-"`
+	HonorAbandonedWeight float64 `gorm:"column:honor_abandoned_weight;not null;default:0" json:"-"`
+	// HonorDecayedAt is a pointer because the column is nullable: NULL means
+	// "never decayed" and DecayFactor treats it as exactly 1.0. (Also avoids
+	// time.Time's zero value serializing as "0001-01-01T00:00:00Z".)
+	HonorDecayedAt *time.Time `gorm:"column:honor_decayed_at" json:"-"`
+	// Raw, UNDECAYED lifetime counts. Their SUM drives the "New Player"
+	// suppression: IsNewPlayer is (completed + abandoned) < 5, i.e. the floor
+	// counts EXPERIENCE, not successes. Do NOT gate on HonorCompletedTotal alone
+	// — that let a 0-completed / 20-abandoned account (real score 5,
+	// "problematic") hide behind the newcomer chip forever, and Story 9.8's join
+	// gate reads isNewPlayer off the same envelope. Always compare against these
+	// raw totals, never the decayed weights, or a returning veteran gets
+	// relabelled a newcomer. BIGINT columns, width-matched to these 64-bit Go
+	// ints.
+	//
+	// HonorCompletedTotal deliberately SURVIVES ResetHonor — a pardon clears the
+	// penalty, not the experience. See ResetHonor in gorm_repo.go.
+	HonorCompletedTotal int64 `gorm:"column:honor_completed_total;not null;default:0" json:"-"`
+	HonorAbandonedTotal int64 `gorm:"column:honor_abandoned_total;not null;default:0" json:"-"`
+	// HonorScoreSnapshot is the DENORMALIZED honor_score column. It exists ONLY
+	// so operators can filter/sort in SQL (WHERE honor_score < 50) and it is
+	// ALLOWED TO LAG — decay means the true score moves as time passes even
+	// when nothing is written.
+	//
+	// NEVER render this and NEVER gate on it. The authoritative value is always
+	// HonorScore(HonorCompletedWeight, HonorAbandonedWeight, HonorDecayedAt,
+	// now) — pure arithmetic on a row you have already loaded. The Go field is
+	// deliberately named ...Snapshot so a misuse reads wrong at the call site.
+	HonorScoreSnapshot int            `gorm:"column:honor_score;not null;default:80" json:"-"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	UpdatedAt          time.Time      `json:"updatedAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
 }

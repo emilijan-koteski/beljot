@@ -78,6 +78,31 @@
       "legendLosses": "{{count}} losses",
       "legendAbandoned": "{{count}} abandoned"
     },
+    "honor": {
+      "eyebrow": "Reliability",
+      "heading": "Honor score",
+      "sub": "How reliably you finish the matches you start. Old abandonments fade over time.",
+      "outOf": "of {{max}}",
+      "meterLabel": "Honor {{score}} of 100, {{tier}}",
+      "completedLabel": "Finished by you",
+      "abandonedLabel": "Abandoned by you",
+      "trendTooltip": "Your last {{window}} matches compared with the {{window}} before them.",
+      "newPlayerChip": "New Player",
+      "newPlayerHint": "Play 5 matches to earn an honor score.",
+      "topBarLabel": "Honor",
+      "tier": {
+        "exemplary": "Exemplary",
+        "trusted": "Trusted",
+        "fair": "Fair",
+        "unreliable": "Unreliable",
+        "problematic": "Problematic"
+      },
+      "trend": {
+        "up": "Improving",
+        "flat": "Steady",
+        "down": "Slipping"
+      }
+    },
     "matchHistory": {
       "eyebrow": "Activity",
       "title": "Match history",

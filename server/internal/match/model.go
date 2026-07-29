@@ -17,7 +17,7 @@ type PlayerSeatInfo struct {
 // Player IDs are nullable: bot seats persist NULL (the users FK forbids fake
 // accounts) plus a per-seat IsBot flag; HasBots marks the match bot-inclusive
 // for previews/history (Story 10.3) and is the rule Epic 9 inherits as
-// "ignore bot seats" for XP/coins/honor/stats.
+// "ignore bot seats" for XP/coins/honor/stats (honor shipped in Story 9.7).
 type Match struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
 	RoomID        uint      `gorm:"not null;index" json:"roomId"`

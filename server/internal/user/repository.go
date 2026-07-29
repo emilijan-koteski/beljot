@@ -44,4 +44,27 @@ type UserRepository interface {
 	// IDs are simply absent from the result (no error). Soft-deleted users are
 	// excluded via GORM's default scope.
 	TotalXPForUsers(ids []uint) (map[uint]int, error)
+	// ApplyHonorEvents records exactly ONE finished match per listed user and
+	// returns each user's resulting honor state (Story 9.7). For every user it
+	// decays the stored weights forward to `now` FIRST, then adds the new
+	// event's full weight of 1.0 — which is algebraically identical to summing
+	// every match's decayed weight from scratch, so the running totals stay
+	// exact rather than approximate.
+	//
+	// It also stamps honor_decayed_at = now, bumps the matching raw lifetime
+	// total, and refreshes the denormalized honor_score snapshot.
+	//
+	// Same lock discipline as AddXP and the wallet settlement it races with:
+	// one transaction, FOR UPDATE, ascending userID order. User id 0 (the bot
+	// placeholder) is skipped. An empty map is a no-op with no DB round-trip. A
+	// missing row returns ErrUserNotFound and rolls the WHOLE batch back.
+	ApplyHonorEvents(events map[uint]HonorEvent, now time.Time) (map[uint]HonorSnapshot, error)
+	// ResetHonor is the operator forgiveness hook (Story 9.7 AC9): it clears
+	// one user's weights, raw totals and decay stamp, returning them to the
+	// state of a player with no history (honor_score back to the 80 prior), in
+	// one transaction. Deliberately has NO endpoint and NO admin UI — Story 9.7
+	// D7 ships the capability, not an operator surface. The equivalent hand-run
+	// SQL is documented in the 000017 migration header. Returns ErrUserNotFound
+	// when no live row matches.
+	ResetHonor(userID uint) error
 }

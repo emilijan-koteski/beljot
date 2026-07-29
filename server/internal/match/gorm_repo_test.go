@@ -387,3 +387,87 @@ func TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment(t *testin
 		}
 	})
 }
+
+// TestGormMatchRepository_GetHonorTrendWindowsForUser pins the Story 9.7 trend
+// windows against the shared abandonment fixture. The canonical viewer gate
+// applies: your OWN abandonment counts against you, someone ELSE's abandonment
+// counts as a completion for you (you stayed), and a NULL-abandoner
+// boot-reconcile row is excluded entirely rather than consuming a window slot.
+//
+// The two-window split (code review 2026-07-29) is done by ROW_NUMBER inside one
+// bounded 2*limit fetch, so it is also asserting that rn <= limit and rn > limit
+// partition the same ordering the single-window version used.
+func TestGormMatchRepository_GetHonorTrendWindowsForUser(t *testing.T) {
+	db := getRepoTestDB(t)
+	f := seedAbandonedFixture(t, db)
+
+	t.Run("a window wider than the history puts everything in recent", func(t *testing.T) {
+		cases := []struct {
+			name                 string
+			viewer               uint
+			completed, abandoned int
+		}{
+			// a: m1 completed, m2 own abandonment, m3 EXCLUDED, m4 completed.
+			{name: "abandoner is charged only their own", viewer: f.a, completed: 2, abandoned: 1},
+			// b: m1 + m4 completed, m2 someone else's abandonment -> completed
+			// (b stayed), m3 EXCLUDED.
+			{name: "opponent of abandoner completed all three", viewer: f.b, completed: 3, abandoned: 0},
+			// c: the abandoner's PARTNER. Honor does not punish the teammate.
+			{name: "partner of abandoner is not charged", viewer: f.c, completed: 3, abandoned: 0},
+			{name: "second opponent mirrors the first", viewer: f.d, completed: 3, abandoned: 0},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				w, err := f.repo.GetHonorTrendWindowsForUser(tc.viewer, 20)
+				require.NoError(t, err)
+				assert.Equal(t, tc.completed, w.RecentCompleted, "recent completed")
+				assert.Equal(t, tc.abandoned, w.RecentAbandoned, "recent abandoned")
+				assert.Zero(t, w.PriorCompleted, "only three eligible rows exist, so nothing spills over")
+				assert.Zero(t, w.PriorAbandoned)
+			})
+		}
+	})
+
+	t.Run("the limit splits newest from next-newest", func(t *testing.T) {
+		// limit 1 fetches 2 rows: m1 (completed) then m2 (abandoned by a).
+		w, err := f.repo.GetHonorTrendWindowsForUser(f.a, 1)
+		require.NoError(t, err)
+		assert.Equal(t, 1, w.RecentCompleted, "m1 is the newest eligible row")
+		assert.Equal(t, 0, w.RecentAbandoned)
+		assert.Equal(t, 0, w.PriorCompleted)
+		assert.Equal(t, 1, w.PriorAbandoned, "m2 is a's own abandonment, one slot back")
+
+		// Same two rows from b's side: b stayed through both.
+		w, err = f.repo.GetHonorTrendWindowsForUser(f.b, 1)
+		require.NoError(t, err)
+		assert.Equal(t, 1, w.RecentCompleted)
+		assert.Equal(t, 0, w.RecentAbandoned)
+		assert.Equal(t, 1, w.PriorCompleted, "someone else's abandonment is a completion for b")
+		assert.Equal(t, 0, w.PriorAbandoned)
+	})
+
+	t.Run("a partial prior window reports its real size", func(t *testing.T) {
+		// limit 2 fetches up to 4 rows; only 3 are eligible, so recent holds
+		// m1+m2 and prior holds just m4. The caller (HonorTrendWindowed) is what
+		// refuses to compare unequal windows — the repo reports honestly.
+		w, err := f.repo.GetHonorTrendWindowsForUser(f.a, 2)
+		require.NoError(t, err)
+		assert.Equal(t, 1, w.RecentCompleted)
+		assert.Equal(t, 1, w.RecentAbandoned)
+		assert.Equal(t, 1, w.PriorCompleted, "m4 is the only row past the recent window")
+		assert.Equal(t, 0, w.PriorAbandoned)
+	})
+
+	t.Run("a non-positive limit is a no-op", func(t *testing.T) {
+		w, err := f.repo.GetHonorTrendWindowsForUser(f.a, 0)
+		require.NoError(t, err)
+		assert.Equal(t, match.HonorTrendWindows{}, w)
+	})
+
+	t.Run("a user with no matches yields zeroes, not an error", func(t *testing.T) {
+		stranger := seedRepoUser(t, db, "rt"+repoFixtureSuffix()+"z")
+		w, err := f.repo.GetHonorTrendWindowsForUser(stranger, 20)
+		require.NoError(t, err)
+		assert.Equal(t, match.HonorTrendWindows{}, w)
+	})
+}

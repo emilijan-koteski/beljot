@@ -88,6 +88,42 @@ type XPAwarder interface {
 	LevelsForUsers(ids []uint) (map[uint]int, error)
 }
 
+// HonorEvent is one finished match's honor contribution for one player
+// (Story 9.7). Abandoned is true only for the seat whose reconnect window
+// expired; every other human seat that reached a terminal state gets false
+// (a completion), including the three innocents in an abandoned match.
+type HonorEvent struct {
+	Abandoned bool
+}
+
+// HonorSnapshot is one player's honor state immediately after the match-end
+// write, as returned by HonorRecorder. Score is the AUTHORITATIVE recomputed
+// value (never the lagging honor_score column), Tier is a stable machine token
+// the client maps to an i18n label, and IsNewPlayer drives client-side
+// suppression of the score for players under the matches-played floor
+// (completed + abandoned < 5 — it counts experience, not successes).
+type HonorSnapshot struct {
+	Score          int
+	Tier           string
+	CompletedTotal int64
+	AbandonedTotal int64
+	IsNewPlayer    bool
+}
+
+// HonorRecorder is the subset of the user-side honor service the match manager
+// needs at match end (Story 9.7). It mirrors XPAwarder's shape and exists for
+// exactly the same reason: user imports match, so MATCH MUST NEVER IMPORT USER
+// (Story 9.7 D4 / Story 9.5 D1). Both HonorEvent and HonorSnapshot are declared
+// HERE, in match, so the interface is satisfiable by a user.HonorService
+// without match taking a dependency on the user package — the score and tier
+// arrive precomputed rather than the manager calling honor math it cannot see.
+//
+// Injected via SetHonorRecorder; nil → honor is skipped entirely (no mutation,
+// no event), mirroring walletSettler's and xpAwarder's nil-tolerance.
+type HonorRecorder interface {
+	ApplyHonorEvents(events map[uint]HonorEvent, now time.Time) (map[uint]HonorSnapshot, error)
+}
+
 // Broadcaster is the subset of *ws.Hub the manager depends on. Mirrors the
 // chat / emote pattern (chat/handler.go, emote/handler.go) so tests can swap
 // in a hubSpy without spinning up a real hub. *ws.Hub satisfies this directly.
@@ -106,6 +142,7 @@ type Manager struct {
 	roomUpdater      RoomStatusUpdater
 	walletSettler    WalletSettler
 	xpAwarder        XPAwarder
+	honorRecorder    HonorRecorder
 	userRemovedHooks []func(userID uint)
 	// Bot think-delay bounds (Story 10.3). Uniform random in [min, max] per
 	// decision; injectable so manager tests don't sleep for real. The 2.5 s
@@ -156,6 +193,13 @@ func (m *Manager) SetWalletSettler(settler WalletSettler) {
 // match end (Story 9.5). Optional — when unset, XP awards are skipped.
 func (m *Manager) SetXPAwarder(awarder XPAwarder) {
 	m.xpAwarder = awarder
+}
+
+// SetHonorRecorder injects the user-side honor service used to record match
+// completions and abandonments at match end (Story 9.7). Optional — when unset,
+// honor is skipped entirely (no mutation, no event).
+func (m *Manager) SetHonorRecorder(recorder HonorRecorder) {
+	m.honorRecorder = recorder
 }
 
 // AddUserRemovedHook registers fn to be called (outside the manager lock)
@@ -1075,7 +1119,8 @@ func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newStat
 // Uses the passed finalState (not session.gameState) to avoid data races.
 // surrenderedBy is the userID of the player who initiated the accepted surrender,
 // or nil for natural match-end. The match Status stays "completed" in both cases —
-// the column is the load-bearing signal Story 9.6 (honor system) will consume.
+// the column is the load-bearing signal the honor system consumes (Story 9.7:
+// both a natural end and an accepted surrender credit every seat a completion).
 //
 // Story 8.5-1 AC4 ordering contract:
 //
@@ -1114,6 +1159,22 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	// but never blocks the broadcasts below. The xp_awarded messages are slotted
 	// after coin_settlement and before match_state (8.5-1 ordering contract).
 	xpMsgs := m.awardXP(session.roomID, session.playerIDs, botSeats, finalState.TeamScores, -1)
+
+	// Story 9.7: record honor (no-op when no recorder wired). Natural end AND
+	// accepted surrender both route through here, and both count as COMPLETED
+	// for every human seat — abandonedSeat -1. Best-effort like settlement and
+	// XP: a failure logs and skips the events but never blocks the broadcasts
+	// below. The honor_updated messages are slotted after xp_awarded and before
+	// match_state (8.5-1 ordering contract).
+	//
+	// The presence snapshot is passed for symmetry with the abandonment
+	// finalizer, but computeHonorEvents only consults it when abandonedSeat >= 0:
+	// this path reached a real terminal state, so every human seat is credited.
+	var connected [4]bool
+	for i := range finalState.Players {
+		connected[i] = finalState.Players[i].Connected
+	}
+	honorMsgs := m.recordHonor(session.roomID, session.playerIDs, botSeats, connected, -1)
 
 	matchRecord := &Match{
 		RoomID:           session.roomID,
@@ -1173,6 +1234,9 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	}
 	for _, xm := range xpMsgs {
 		m.hub.SendToUser(xm.userID, xm.msg)
+	}
+	for _, hm := range honorMsgs {
+		m.hub.SendToUser(hm.userID, hm.msg)
 	}
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, finalState))
 

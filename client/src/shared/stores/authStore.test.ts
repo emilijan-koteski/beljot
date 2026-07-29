@@ -5,6 +5,8 @@ vi.mock("@/shared/api/auth", () => ({
   logout: (...args: unknown[]) => mockLogoutApi(...args),
 }));
 
+import { makeUser } from "@/test-utils";
+
 import { useAuthStore } from "./authStore";
 import { useChatStore } from "./chatStore";
 import { useMatchStore } from "./matchStore";
@@ -24,15 +26,12 @@ describe("authStore", () => {
   it("logout clears token and user from store", () => {
     useAuthStore.setState({
       token: "test-token",
-      user: {
-        id: 1,
+      user: makeUser({
         username: "test",
         email: "test@test.com",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
         createdAt: "2026-01-01",
-      },
+      }),
     });
 
     useAuthStore.getState().logout();

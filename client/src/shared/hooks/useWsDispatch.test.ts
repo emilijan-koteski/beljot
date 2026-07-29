@@ -24,6 +24,7 @@ import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room, User } from "@/shared/types/apiTypes";
 import type { MatchState } from "@/shared/types/matchTypes";
 import type { WsMessage } from "@/shared/types/wsEvents";
+import { makeUser } from "@/test-utils";
 
 import { __resetWsDispatchStateForTests, useWsDispatch } from "./useWsDispatch";
 
@@ -1539,17 +1540,14 @@ describe("useWsDispatch", () => {
 });
 
 describe("useWsDispatch — coin settlement (Story 9.2)", () => {
-  const baseUser: User = {
+  const baseUser: User = makeUser({
     id: 10,
     username: "Alice",
     email: "alice@test.dev",
-    languagePreference: "en",
-    walletBalance: 5000,
-    loginStreakDays: 0,
     totalXp: 100,
     level: 1,
     createdAt: "2026-06-18T00:00:00Z",
-  };
+  });
 
   beforeEach(() => {
     useMatchStore.getState().reset();
@@ -1665,17 +1663,14 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
 });
 
 describe("useWsDispatch — XP awarded (Story 9.5)", () => {
-  const baseUser: User = {
+  const baseUser: User = makeUser({
     id: 10,
     username: "Alice",
     email: "alice@test.dev",
-    languagePreference: "en",
-    walletBalance: 5000,
-    loginStreakDays: 0,
     totalXp: 100,
     level: 1,
     createdAt: "2026-06-18T00:00:00Z",
-  };
+  });
 
   beforeEach(() => {
     useMatchStore.getState().reset();
@@ -1752,5 +1747,106 @@ describe("useWsDispatch — XP awarded (Story 9.5)", () => {
     });
 
     expect(useLevelUpStore.getState().pending).not.toBeNull();
+  });
+});
+
+describe("useWsDispatch — honor updated (Story 9.7)", () => {
+  const baseUser: User = makeUser({
+    id: 10,
+    username: "Alice",
+    email: "alice@test.dev",
+    honorScore: 90,
+    honorTier: "trusted",
+    isNewPlayer: false,
+    createdAt: "2026-06-18T00:00:00Z",
+  });
+
+  const validPayload = {
+    honorScore: 73,
+    honorTier: "fair",
+    honorCompletedTotal: 20,
+    honorAbandonedTotal: 2,
+    isNewPlayer: false,
+  };
+
+  beforeEach(() => {
+    useMatchStore.getState().reset();
+    __resetWsDispatchStateForTests();
+    vi.restoreAllMocks();
+    useAuthStore.setState({ user: { ...baseUser } });
+  });
+
+  it("writes the new score and tier onto the auth store", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "event:honor_updated", payload: validPayload });
+
+    expect(useAuthStore.getState().user?.honorScore).toBe(73);
+    expect(useAuthStore.getState().user?.honorTier).toBe("fair");
+    expect(useAuthStore.getState().user?.isNewPlayer).toBe(false);
+  });
+
+  it("preserves every unrelated user field", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "event:honor_updated", payload: validPayload });
+
+    const user = useAuthStore.getState().user;
+    expect(user?.username).toBe("Alice");
+    expect(user?.walletBalance).toBe(baseUser.walletBalance);
+    expect(user?.totalXp).toBe(baseUser.totalXp);
+    expect(user?.level).toBe(baseUser.level);
+  });
+
+  it("accepts a legitimate zero score and a false isNewPlayer", () => {
+    // Go zero values serialize as real values — the handler must not guard on
+    // truthiness, or a Problematic player's 0 would be silently dropped.
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:honor_updated",
+      payload: { ...validPayload, honorScore: 0, honorTier: "problematic" },
+    });
+
+    expect(useAuthStore.getState().user?.honorScore).toBe(0);
+    expect(useAuthStore.getState().user?.honorTier).toBe("problematic");
+  });
+
+  it("flips the user to New Player when the server says so", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:honor_updated",
+      payload: { ...validPayload, isNewPlayer: true },
+    });
+
+    expect(useAuthStore.getState().user?.isNewPlayer).toBe(true);
+  });
+
+  it("ignores a malformed honor payload without touching the user", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const malformed = [
+      { ...validPayload, honorScore: "73" },
+      { ...validPayload, honorScore: 73.5 },
+      { ...validPayload, honorScore: null },
+      { ...validPayload, honorTier: 4 },
+      { ...validPayload, honorTier: "" },
+      { ...validPayload, honorCompletedTotal: "20" },
+      { ...validPayload, honorAbandonedTotal: null },
+      { ...validPayload, isNewPlayer: "no" },
+      {},
+    ];
+    for (const payload of malformed) {
+      result.current({ type: "event:honor_updated", payload });
+    }
+
+    expect(useAuthStore.getState().user?.honorScore).toBe(90);
+    expect(useAuthStore.getState().user?.honorTier).toBe("trusted");
+  });
+
+  it("is a no-op when no user is signed in", () => {
+    useAuthStore.setState({ user: null });
+    const { result } = renderHook(() => useWsDispatch());
+
+    expect(() =>
+      result.current({ type: "event:honor_updated", payload: validPayload }),
+    ).not.toThrow();
+    expect(useAuthStore.getState().user).toBeNull();
   });
 });

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -90,28 +90,20 @@ const room = {
   updatedAt: "",
 };
 
-const owner = {
+const owner = makeUser({
   id: 10,
   username: "alice",
   email: "a@b.com",
-  languagePreference: "en",
-  walletBalance: 5000,
   loginStreakDays: 1,
-  totalXp: 0,
-  level: 0,
   createdAt: "",
-};
-const guest = {
+});
+const guest = makeUser({
   id: 20,
   username: "bob",
   email: "b@b.com",
-  languagePreference: "en",
-  walletBalance: 5000,
   loginStreakDays: 1,
-  totalXp: 0,
-  level: 0,
   createdAt: "",
-};
+});
 
 function human(userId: number, username: string, seat: number): RoomPlayer {
   return {

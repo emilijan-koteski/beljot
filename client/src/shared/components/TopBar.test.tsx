@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TopBar } from "@/shared/components/TopBar";
 import { resetLobbyReturnGuardForTests } from "@/shared/hooks/useLobbyReturn";
 import { useAuthStore } from "@/shared/stores/authStore";
+import type { User } from "@/shared/types/apiTypes";
+import { makeUser } from "@/test-utils";
 
 vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
@@ -24,21 +26,22 @@ function renderWithRouter() {
   );
 }
 
-function setAuthUser(overrides: Partial<import("@/shared/types/apiTypes").User> = {}) {
+function setAuthUser(overrides: Partial<User> = {}) {
   useAuthStore.setState({
     token: "test-token",
-    user: {
-      id: 1,
+    // Routed through the shared makeUser fixture so the next additive User field
+    // is a one-line change here too (code review 2026-07-29 — this file was the
+    // last one still hand-building the literal). The honor defaults describe an
+    // established player so the chip renders its numeric branch; New Player
+    // suppression is exercised explicitly below.
+    user: makeUser({
       username: "kiro",
       email: "kiro@example.com",
-      languagePreference: "en",
-      walletBalance: 5000,
-      loginStreakDays: 1,
-      totalXp: 0,
-      level: 0,
-      createdAt: "2026-01-01T00:00:00Z",
+      honorScore: 90,
+      honorTier: "trusted",
+      isNewPlayer: false,
       ...overrides,
-    },
+    }),
     isLoading: false,
   });
 }
@@ -123,6 +126,120 @@ describe("TopBar XP level (Story 9.5)", () => {
 
     expect(screen.getByTestId("xp-level")).toHaveTextContent("Lvl 0");
     expect(screen.getByTestId("xp-bar")).toHaveAttribute("aria-valuenow", "0");
+  });
+});
+
+describe("TopBar honor chip (Story 9.7)", () => {
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  it("renders the score and tier from the store", () => {
+    setAuthUser({ honorScore: 96, honorTier: "exemplary" });
+    renderWithRouter();
+
+    expect(screen.getByTestId("honor-score")).toHaveTextContent("96");
+    expect(screen.getByTestId("honor-tier")).toHaveTextContent("Exemplary");
+    expect(screen.getByTestId("honor-chip")).toHaveAttribute("data-tier", "exemplary");
+  });
+
+  it("renders a zero score as a real 0, not as a fallback", () => {
+    // Go zero values serialize as real values — `honorScore || 80` would
+    // silently promote a Problematic player to Fair.
+    setAuthUser({ honorScore: 0, honorTier: "problematic" });
+    renderWithRouter();
+
+    expect(screen.getByTestId("honor-score")).toHaveTextContent("0");
+    expect(screen.getByTestId("honor-chip")).toHaveAttribute("data-tier", "problematic");
+  });
+
+  it("suppresses the number for a New Player", () => {
+    setAuthUser({ honorScore: 80, honorTier: "fair", isNewPlayer: true });
+    renderWithRouter();
+
+    expect(screen.getByTestId("honor-chip")).toHaveAttribute("data-new-player", "true");
+    expect(screen.getByTestId("honor-new-player")).toHaveTextContent("New Player");
+    expect(screen.queryByTestId("honor-score")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the score's own band for an unknown tier token", () => {
+    setAuthUser({ honorScore: 55, honorTier: "legendary" });
+    renderWithRouter();
+
+    expect(screen.getByTestId("honor-chip")).toHaveAttribute("data-tier", "unreliable");
+  });
+
+  it("live-updates when event:honor_updated writes a new score to the store", () => {
+    setAuthUser({ honorScore: 90, honorTier: "trusted" });
+    renderWithRouter();
+    expect(screen.getByTestId("honor-score")).toHaveTextContent("90");
+
+    // Exactly what the useWsDispatch honor handler does.
+    act(() => {
+      const current = useAuthStore.getState().user!;
+      useAuthStore
+        .getState()
+        .setUser({ ...current, honorScore: 73, honorTier: "fair", isNewPlayer: false });
+    });
+
+    expect(screen.getByTestId("honor-score")).toHaveTextContent("73");
+    expect(screen.getByTestId("honor-chip")).toHaveAttribute("data-tier", "fair");
+  });
+
+  it("renders no honor chip when signed out", () => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+    renderWithRouter();
+
+    expect(screen.queryByTestId("honor-chip")).not.toBeInTheDocument();
+  });
+
+  // jsdom applies no Tailwind CSS, so the class list is the only thing a unit
+  // test can assert here. It is worth asserting: the chip shipped as
+  // `hidden ... sm:flex`, which made honor invisible on every phone while the
+  // coin pill beside it had no breakpoint gate at all (code review 2026-07-29).
+  it("stays visible at phone widths, like the coin pill beside it", () => {
+    setAuthUser({ honorScore: 96, honorTier: "exemplary" });
+    renderWithRouter();
+
+    const chip = screen.getByTestId("honor-chip");
+    expect(chip.className).not.toMatch(/\bhidden\b/);
+    expect(chip.className).toMatch(/\bflex\b/);
+
+    // The coin pill is the reference: same unconditional visibility.
+    expect(screen.getByTestId("coin-balance").className).not.toMatch(/\bhidden\b/);
+  });
+
+  it("names the chip for assistive tech instead of announcing a bare number", () => {
+    setAuthUser({ honorScore: 96, honorTier: "exemplary" });
+    renderWithRouter();
+
+    // Without the label, a screen reader reads "96 Exemplary" next to the coin
+    // balance with no indication that it is an honor score.
+    expect(screen.getByTestId("honor-chip")).toHaveTextContent("Honor");
+  });
+
+  it("renders the 80 prior rather than a blank danger chip when the score is absent", () => {
+    // A bundle newer than the server: the refresh envelope has no honorScore, and
+    // unlike the WS payload that HTTP path is not type-guarded. NaN used to fall
+    // through every tier floor to "problematic".
+    setAuthUser({ honorScore: undefined as unknown as number, honorTier: "" });
+    renderWithRouter();
+
+    expect(screen.getByTestId("honor-score")).toHaveTextContent("80");
+    expect(screen.getByTestId("honor-chip")).toHaveAttribute("data-tier", "fair");
+  });
+
+  it("suppresses the score when isNewPlayer is absent rather than showing a confident one", () => {
+    // Same version-skew input as above, but for the flag. `undefined` used to be
+    // falsy and take the NUMERIC branch, so a server that had not shipped the
+    // honor fields showed every account a confident 80/"Fair" — newcomers
+    // included. Absent must mean suppressed (review pass 2).
+    setAuthUser({ isNewPlayer: undefined as unknown as boolean });
+    renderWithRouter();
+
+    expect(screen.getByTestId("honor-chip")).toHaveAttribute("data-new-player", "true");
+    expect(screen.getByTestId("honor-new-player")).toBeInTheDocument();
+    expect(screen.queryByTestId("honor-score")).not.toBeInTheDocument();
   });
 });
 

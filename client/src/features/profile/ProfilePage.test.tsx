@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CareerResponse } from "@/shared/api/career";
 import type { ProfileResponse } from "@/shared/api/profile";
 import { useAuthStore } from "@/shared/stores/authStore";
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { ProfilePage } from "./ProfilePage";
 
@@ -63,6 +63,15 @@ function profileFixture(overrides: Partial<ProfileResponse> = {}): ProfileRespon
     level: 0,
     xpIntoLevel: 0,
     xpForNextLevel: 50,
+    // Honor (Story 9.7). Defaults describe a brand-new player: the Beta(4,1)
+    // prior of 80 with no history, so isNewPlayer is true.
+    honorScore: 80,
+    honorTier: "fair",
+    honorCompletedTotal: 0,
+    honorAbandonedTotal: 0,
+    isNewPlayer: true,
+    honorTrendDelta: 0,
+    honorTrendDirection: "flat",
     ...overrides,
   };
 }
@@ -91,17 +100,10 @@ describe("ProfilePage", () => {
     mockGetIdentities.mockResolvedValue({ hasPassword: true, identities: [] });
     useAuthStore.setState({
       token: "test-token",
-      user: {
-        id: 1,
-        username: "testuser",
-        email: "test@example.com",
-        languagePreference: "en",
-        walletBalance: 5000,
+      user: makeUser({
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "2026-01-15T10:00:00Z",
-      },
+      }),
       isLoading: false,
     });
   });

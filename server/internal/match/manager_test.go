@@ -98,6 +98,12 @@ func (r *mockMatchRepo) GetTopRivalsForUser(uint, int) ([]match.RivalAggregate, 
 	return nil, r.err
 }
 
+func (r *mockMatchRepo) GetHonorTrendWindowsForUser(uint, int) (match.HonorTrendWindows, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return match.HonorTrendWindows{}, r.err
+}
+
 func (r *mockMatchRepo) getMatches() []*match.Match {
 	r.mu.Lock()
 	defer r.mu.Unlock()

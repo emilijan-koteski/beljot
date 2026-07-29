@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { LobbyPage } from "./LobbyPage";
 
@@ -279,17 +279,12 @@ describe("LobbyPage", () => {
     const { FetchError } = await import("@/shared/api/axiosClient");
     const { useAuthStore } = await import("@/shared/stores/authStore");
     useAuthStore.setState({
-      user: {
-        id: 1,
+      user: makeUser({
         username: "me",
         email: "me@test.dev",
-        languagePreference: "en",
         walletBalance: 300,
-        loginStreakDays: 0,
-        totalXp: 0,
-        level: 0,
         createdAt: "2026-06-18T00:00:00Z",
-      },
+      }),
     });
 
     mockGetRooms.mockResolvedValueOnce([

@@ -78,6 +78,31 @@
       "legendLosses": "{{count}} порази",
       "legendAbandoned": "{{count}} напуштени"
     },
+    "honor": {
+      "eyebrow": "Доверливост",
+      "heading": "Оценка на чест",
+      "sub": "Колку доверливо ги завршуваш мечевите што ги започнуваш. Старите напуштања бледнеат со текот на времето.",
+      "outOf": "од {{max}}",
+      "meterLabel": "Чест {{score}} од 100, {{tier}}",
+      "completedLabel": "Твои завршени",
+      "abandonedLabel": "Твои напуштени",
+      "trendTooltip": "Твоите последни {{window}} мечеви споредени со претходните {{window}}.",
+      "newPlayerChip": "Нов играч",
+      "newPlayerHint": "Одиграј 5 мечеви за да заслужиш оценка на чест.",
+      "topBarLabel": "Чест",
+      "tier": {
+        "exemplary": "Примерен",
+        "trusted": "Доверлив",
+        "fair": "Солиден",
+        "unreliable": "Недоверлив",
+        "problematic": "Проблематичен"
+      },
+      "trend": {
+        "up": "Во подем",
+        "flat": "Стабилно",
+        "down": "Во пад"
+      }
+    },
     "matchHistory": {
       "eyebrow": "Активност",
       "title": "Историја на мечеви",
