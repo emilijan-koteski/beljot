@@ -241,6 +241,38 @@ describe("TopBar honor chip (Story 9.7)", () => {
     expect(screen.getByTestId("honor-new-player")).toBeInTheDocument();
     expect(screen.queryByTestId("honor-score")).not.toBeInTheDocument();
   });
+
+  // "New Player" / "Нов играч" is the widest content this chip can hold, and it
+  // applies to every account's first five matches. Measured in the 2026-07-29 E2E
+  // pass: while the words were visible from sm up they WRAPPED to a second line
+  // in the 768..1023px band (chip 88x50px inside a 30px row of pills) and pushed
+  // the whole nav into horizontal scroll. The label is sr-only below lg — the
+  // shield alone carries the state — which also matches the scored branch, whose
+  // tier word is sr-only at every width. Pinned because the class list is the
+  // only thing preventing the regression, and jsdom cannot measure the wrap.
+  it("keeps the New Player words sr-only below lg so the chip cannot wrap", () => {
+    setAuthUser({ isNewPlayer: true });
+    renderWithRouter();
+
+    const label = screen.getByTestId("honor-new-player");
+    expect(label).toHaveClass("sr-only");
+    expect(label).toHaveClass("lg:not-sr-only");
+    expect(label.className).not.toMatch(/\bsm:not-sr-only\b/);
+    // Still announced at every width, so nothing is lost below lg.
+    expect(label).toHaveTextContent("New Player");
+    expect(screen.getByTestId("honor-chip")).toHaveClass("whitespace-nowrap");
+  });
+
+  it("never renders the tier word visibly, at any width", () => {
+    setAuthUser({ honorScore: 96, honorTier: "exemplary", isNewPlayer: false });
+    renderWithRouter();
+
+    // The tone + number carry the tier visually; the word is for assistive tech
+    // and the tooltip only. If this ever becomes visible it is the widest thing
+    // in the bar again.
+    expect(screen.getByTestId("honor-tier")).toHaveClass("sr-only");
+    expect(screen.getByTestId("honor-tier").className).not.toMatch(/not-sr-only/);
+  });
 });
 
 describe("TopBar history-stack shaping", () => {

@@ -76,7 +76,7 @@ export function LanguageSelector({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="text-ink-dim hover:bg-surface-sunken hover:text-ink aria-expanded:bg-surface-sunken aria-expanded:text-ink inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-transparent transition-colors md:w-auto md:justify-start md:gap-1.5 md:px-2.5 md:text-sm md:font-medium"
+        className="text-ink-dim hover:bg-surface-sunken hover:text-ink aria-expanded:bg-surface-sunken aria-expanded:text-ink inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-transparent transition-colors md:w-auto md:justify-start md:gap-1.5 md:px-2.5 md:text-sm md:font-medium"
         aria-label={t("auth.languageSelector.label")}
         data-testid={triggerTestId}
       >
