@@ -3,6 +3,7 @@ package room_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"testing"
@@ -55,6 +56,16 @@ func (s *stubHonor) HonorForUsers(userIDs []uint) (map[uint]user.HonorSnapshot, 
 // honorOf is shorthand for an EXPERIENCED player's snapshot at a given score.
 // The raw totals are what make IsNewPlayer false, so they are set past the
 // 5-match floor rather than left at zero.
+// CAVEAT on both helpers: the totals below are DECORATIVE. They exist only to make
+// IsNewPlayer coherent (>= 5 finished here, < 5 in newPlayerHonorOf) and are NOT
+// the counts that would actually produce the given score — honorOf(5) carries 20/2,
+// which really computes to ~96. Nothing reads them: honorGateError consults only
+// Score and IsNewPlayer, so no assertion depends on the totals.
+//
+// What DOES matter, and is honoured at every call site, is that each
+// (IsNewPlayer, Score) PAIR is reachable in production — a fixture pinning an
+// impossible state proves nothing. Hence newPlayerHonorOf(19) for the newcomer
+// worst case and honorOf(5) for the experienced pure-abandoner.
 func honorOf(score int) user.HonorSnapshot {
 	return user.HonorSnapshot{
 		Score:          score,
@@ -393,20 +404,66 @@ func TestCreateRoom_CreatorMustSatisfyOwnGate(t *testing.T) {
 	}
 }
 
-// D7 + D1: a NEW PLAYER creator may still set a high minHonor for others, because
-// a New Player is never score-checked against it. The self-gate must not reject
-// them for a bar the gate would never apply to them.
-func TestCreateRoom_NewPlayerCreatorMaySetHighThreshold(t *testing.T) {
-	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{5: newPlayerHonorOf(80)}}
+// D7 + review 2026-07-30 (PO decision): a NEW PLAYER creator IS score-checked
+// against their own score at create time — the one place the self-gate diverges
+// from the join gate, where D1 deliberately never score-checks a newcomer.
+//
+// This pins the D1 x D7 hole the review closed, and it replaces an earlier test
+// (TestCreateRoom_NewPlayerCreatorMaySetHighThreshold) that asserted the opposite.
+// Before the fix a newcomer could set ANY bar: an account at 0 completed /
+// 4 abandoned holds 19, could create a min_honor = 80 room, and ONE finished match
+// made them experienced at 100x5/22 = 23 — at which point the AC6 re-check ejected
+// them from the room they had just made, transferring ownership or closing it.
+//
+// Note the last two rows: capping at the fixed 80 prior would NOT have closed this.
+// The bar has to be the creator's own current score.
+func TestCreateRoom_NewPlayerCreatorCannotSetBarAboveOwnScore(t *testing.T) {
+	tests := []struct {
+		name     string
+		snap     user.HonorSnapshot
+		minHonor int
+		wantHTTP int
+	}{
+		{"newcomer on the prior cannot bar above it", newPlayerHonorOf(80), 95, http.StatusConflict},
+		{"newcomer on the prior may bar AT it (inclusive)", newPlayerHonorOf(80), 80, http.StatusCreated},
+		{"newcomer on the prior may bar below it", newPlayerHonorOf(80), 50, http.StatusCreated},
+		{"the 0-completed/4-abandoned case the review found", newPlayerHonorOf(19), 80, http.StatusConflict},
+		{"...who may still gate at their real standing", newPlayerHonorOf(19), 19, http.StatusCreated},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{5: tt.snap}}
+			e, repo, _, _ := setupHonorTest(nil, nil, honor)
+			body := fmt.Sprintf(
+				`{"name":"Bar","variant":"bitola","matchMode":"1001","timerStyle":"relaxed","minHonor":%d,"allowNewPlayers":true}`,
+				tt.minHonor,
+			)
+
+			rec := doCreateRoom(e, body, validToken(5))
+			require.Equal(t, tt.wantHTTP, rec.Code)
+
+			persisted, _ := repo.FindByID(1)
+			if tt.wantHTTP == http.StatusCreated {
+				require.NotNil(t, persisted)
+				assert.Equal(t, tt.minHonor, persisted.MinHonor)
+				return
+			}
+			assert.Equal(t, "HONOR_TOO_LOW", errCodeOf(t, rec))
+			assert.Nil(t, persisted, "the room must not exist if its owner cannot enter it")
+		})
+	}
+}
+
+// The join gate is UNCHANGED by the above: a New Player joining someone else's
+// gated room is still never score-checked (D1, truth-table rows 4 and 5). The
+// create-time divergence must not leak into JoinRoom.
+func TestJoinRoom_NewPlayerStillNotScoreCheckedAtJoin(t *testing.T) {
+	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{7: newPlayerHonorOf(19)}}
 	e, repo, _, _ := setupHonorTest(nil, nil, honor)
-	body := `{"name":"High Bar","variant":"bitola","matchMode":"1001","timerStyle":"relaxed","minHonor":95,"allowNewPlayers":true}`
+	seedGatedRoom(t, repo, 95, true)
 
-	rec := doCreateRoom(e, body, validToken(5))
-	require.Equal(t, http.StatusCreated, rec.Code)
-
-	persisted, _ := repo.FindByID(1)
-	require.NotNil(t, persisted)
-	assert.Equal(t, 95, persisted.MinHonor)
+	rec := doJoinRoom(e, "1", validToken(7))
+	require.Equal(t, http.StatusOK, rec.Code, "a newcomer enters a min_honor 95 room on the toggle alone")
 }
 
 // D5: creating an ungated room performs no honor read.
@@ -737,6 +794,19 @@ func TestStartMatch_HonorReadErrorDoesNotEject(t *testing.T) {
 	players, _ := repo.FindPlayersByRoomID(1)
 	assert.Len(t, players, 4, "nobody is ejected on a read failure")
 	assert.Empty(t, broadcastsOfType(t, broadcaster, "system:honor_ejected"))
+
+	// The room must NOT be left in "playing". The outer StartMatch tx has already
+	// committed that status, and on a read failure no seat is ejected — so
+	// ejectSeatsAtStart, which normally owns the revert, never runs. Without an
+	// explicit un-brick here the room is stranded "playing" with no live session:
+	// it drops out of the lobby, and JoinRoom / StartMatch / ReturnToRoom /
+	// LeaveRoom all refuse, trapping every seated player until the next boot
+	// reconcile. This assertion is the whole point of the test and was missing —
+	// the three sibling failure paths (balance-read, charge, session-start) all
+	// revert, and this one silently did not.
+	persisted, _ := repo.FindByID(1)
+	require.NotNil(t, persisted)
+	assert.Equal(t, "waiting", persisted.Status, "a honor-read failure must un-brick the room")
 }
 
 // --- Quick Play (AC12) ---------------------------------------------------

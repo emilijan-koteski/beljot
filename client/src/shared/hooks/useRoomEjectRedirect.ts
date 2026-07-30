@@ -7,9 +7,10 @@ import { useRoomStore } from "@/shared/stores/roomStore";
 /**
  * Story 9.3: always-mounted navigator that routes an ejected player to the lobby
  * from wherever they are (the room page, a match result overlay, or elsewhere)
- * the instant the ejection signal is set — by the return-time 409 (MatchPage),
- * the per-user `system:insolvent_ejected` push, or
- * `system:room_closed_insolvent`.
+ * the instant the ejection signal is set — by the return-time 409 (MatchPage, which
+ * seeds a fallback notice for both insolvency and honor), the per-user
+ * `system:insolvent_ejected` or `system:honor_ejected` push (Story 9.8), or
+ * `system:room_closed_insolvent` (reused for honor closes).
  *
  * It fires on ANY non-null notice, so a new ejection reason needs no change here.
  *

@@ -79,6 +79,18 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   // confident "80 / Fair" for accounts the server had said nothing about.
   const meHonor = useAuthStore((s) => honorScoreOrPrior(s.user?.honorScore));
   const meIsNewPlayer = useAuthStore((s) => honorIsNewPlayer(s.user?.isNewPlayer));
+  // ...but those guards' defaults are calibrated for DISPLAY, not for a capability
+  // gate. honorIsNewPlayer(undefined) is `true` (suppress the score) and
+  // honorScoreOrPrior(undefined) is 80 — both correct when rendering an unknown,
+  // both wrong when deciding what the owner may configure, because they turn
+  // "unknown" into "denied": with the flag absent, a 200-match veteran could not
+  // create a veterans-only room at all, and the submit button offered no override
+  // for a request the SERVER would have accepted. So when the envelope carries no
+  // honor (an old server, or user === null) skip the cosmetic mirror entirely and
+  // let the authority decide.
+  const honorKnown = useAuthStore(
+    (s) => typeof s.user?.isNewPlayer === "boolean" && typeof s.user?.honorScore === "number",
+  );
 
   const [name, setName] = useState("");
   const [variant, setVariant] = useState<"bitola" | "croatia">("bitola");
@@ -116,16 +128,23 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
   // Honor self-gate (Story 9.8 D7), same shape and same reason as
   // buyInExceedsBalance above: the creator is auto-seated, so a gate they cannot
-  // pass would eject them from their own room at the first Start. This mirrors the
-  // server's gate exactly — a New Player is checked ONLY against the toggle and is
-  // never score-checked, which is what makes the toggle meaningful. Cosmetic:
-  // the server is the authority and re-validates.
+  // pass would eject them from their own room at the first Start. Cosmetic: the
+  // server is the authority and re-validates.
+  //
+  // The score check applies to a New Player TOO, and this is the one place it
+  // deliberately diverges from the join gate (review 2026-07-30, PO decision).
+  // At the join gate D1 is right: a newcomer is never score-checked, because the
+  // toggle is the owner's "I'll take an unknown" switch. Mirrored onto the CREATOR
+  // it made D7 a no-op for exactly the accounts whose score is about to move — a
+  // newcomer at 0 completed / 4 abandoned holds 19, could set a bar of 80, and one
+  // finished match would put them at 23 and eject them from their own room. So a
+  // creator may only set a bar they satisfy RIGHT NOW, newcomer or not.
   const effectiveMinHonor = Math.min(
     MIN_HONOR_CEILING,
     Math.max(MIN_HONOR_FLOOR, Math.floor(minHonor || 0)),
   );
-  const failsOwnNewPlayerGate = meIsNewPlayer && !allowNewPlayers;
-  const failsOwnHonorGate = !meIsNewPlayer && meHonor < effectiveMinHonor;
+  const failsOwnNewPlayerGate = honorKnown && meIsNewPlayer && !allowNewPlayers;
+  const failsOwnHonorGate = honorKnown && meHonor < effectiveMinHonor;
   const failsOwnGate = failsOwnNewPlayerGate || failsOwnHonorGate;
 
   async function handleSubmit(e: React.FormEvent) {

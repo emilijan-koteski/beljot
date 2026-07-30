@@ -311,7 +311,8 @@
       "wrongPassword": "Pogrešna lozinka sobe.",
       "honorTooLow": "Ova soba traži čast {{minHonor}} ili više. Tvoja je {{honor}}. Odigraj još nekoliko mečeva da je podigneš.",
       "honorTooLowGeneric": "Tvoj skor časti je ispod minimuma ove sobe.",
-      "newPlayerNotAllowed": "Ova soba je za iskusne igrače. Odigraj 5 mečeva da otvoriš takve sobe."
+      "newPlayerNotAllowed": "Ova soba je za iskusne igrače. Odigraj 5 mečeva da otvoriš takve sobe.",
+      "honorGateStart": "Igrač ne ispunjava uslov časti ove sobe. Meč nije počeo."
     },
     "passwordPrompt": {
       "title": "Privatna soba",

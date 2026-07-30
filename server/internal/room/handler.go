@@ -561,6 +561,26 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 			if gateErr := honorGateError(gateProbe, snap); gateErr != nil {
 				return gateErr
 			}
+			// Review 2026-07-30 (PO decision) — the self-gate goes one step FURTHER
+			// than honorGateError, and deliberately so.
+			//
+			// honorGateError never score-checks a New Player (D1), which is right for
+			// JOINING: the toggle is the owner's "I'll take an unknown" switch. But
+			// applied to the CREATOR it made the D7 self-gate a no-op for exactly the
+			// accounts whose score is about to move. A newcomer at 0 completed /
+			// 4 abandoned holds 19 and could set min_honor = 80; one finished match
+			// makes them experienced at 100x5/22 = 23, and the AC6 re-check then
+			// ejects them from the room they just made, transferring ownership or
+			// closing it. Capping at the fixed 80 prior would NOT have closed that —
+			// the bar has to be their own current score.
+			//
+			// So: a creator may only set a bar they satisfy RIGHT NOW, newcomer or
+			// not. This mirrors the buy-in affordability check above (you cannot
+			// create a room you cannot afford to sit in) and changes nothing about
+			// D1 at the join gate.
+			if snap.IsNewPlayer && snap.Score < minHonor {
+				return apperr.ErrHonorTooLow
+			}
 		}
 	}
 
@@ -1070,7 +1090,18 @@ func (h *RoomHandler) honorSnapshotFor(userID uint) (snap user.HonorSnapshot, en
 	if err != nil || !enforced {
 		return user.HonorSnapshot{}, enforced, err
 	}
-	return snaps[userID], true, nil
+	snap, ok := snaps[userID]
+	if !ok {
+		// Reachable only with userID 0, which honorSnapshotsFor filters out — it then
+		// short-circuits on the now-empty request and returns an empty map with NO
+		// error, so a bare snaps[userID] would hand back the zero snapshot. A zero
+		// snapshot reads as an EXPERIENCED player with score 0 and sails straight
+		// through a min_honor 0 / allow_new_players false room. That is verbatim the
+		// hazard honorSnapshotsFor's own doc comment closes for missing rows, so close
+		// it here too rather than trusting every caller to pre-validate the ID.
+		return user.HonorSnapshot{}, true, fmt.Errorf("reading honor for room gate: no honor row for user %d", userID)
+	}
+	return snap, true, nil
 }
 
 // honorCandidateSnapshots reads honor for OWNERSHIP-HEIR CANDIDATES, and is
@@ -1387,7 +1418,13 @@ func (h *RoomHandler) ejectReturner(roomID, userID uint, notice ejectNotice, rej
 			if !presentSet[candidateID] {
 				return false
 			}
-			if buyIn > 0 && !(balances != nil && balances[candidateID] >= buyIn) {
+			// A nil balances map means solvency was neither read nor readable (a free
+			// room, or no wallet service wired) — so it is simply not a requirement,
+			// exactly as startEligible treats it. The previous shape inverted this and
+			// judged EVERY candidate ineligible on a nil map, which is 9.3's
+			// "closed a room that had solvent heirs" finding in a new costume.
+			// Behaviour is unchanged wherever balances is non-nil.
+			if buyIn > 0 && balances != nil && balances[candidateID] < buyIn {
 				return false
 			}
 			// Story 9.8 AC7: an heir must ALSO pass the honor gate, on top of the
@@ -1915,22 +1952,32 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 				// and cover ALL of them, not just the failing seat. A one-entry map is
 				// the bug 9.3's review found for balances: it made every candidate look
 				// ineligible and closed rooms that had valid heirs.
-				candidateIDs := make([]uint, 0, len(members))
-				for _, p := range members {
-					if p.UserID != userID && p.Seat != nil && p.UserID != 0 {
-						candidateIDs = append(candidateIDs, p.UserID)
+				//
+				// Only read when ownership can actually move. ejectReturner consults
+				// extraEligible solely inside its `room.OwnerID == userID` branch, so
+				// for a non-owner returner this was a wasted round-trip — and a failure
+				// in it returned 500 out of an ejection whose outcome it could not
+				// influence, leaving a barred player seated. nil = no extra requirement,
+				// which ejectReturner already handles.
+				var honorEligible func(candidateID uint) bool
+				if gateRoom.OwnerID == userID {
+					candidateIDs := make([]uint, 0, len(members))
+					for _, p := range members {
+						if p.UserID != userID && p.Seat != nil && p.UserID != 0 {
+							candidateIDs = append(candidateIDs, p.UserID)
+						}
 					}
-				}
-				candidateSnaps, cerr := h.honorCandidateSnapshots(candidateIDs)
-				if cerr != nil {
-					return cerr
-				}
-				honorEligible := func(candidateID uint) bool {
-					cs, ok := candidateSnaps[candidateID]
-					if !ok {
-						return false
+					candidateSnaps, cerr := h.honorCandidateSnapshots(candidateIDs)
+					if cerr != nil {
+						return cerr
 					}
-					return honorGateError(gateRoom, cs) == nil
+					honorEligible = func(candidateID uint) bool {
+						cs, ok := candidateSnaps[candidateID]
+						if !ok {
+							return false
+						}
+						return honorGateError(gateRoom, cs) == nil
+					}
 				}
 				return h.ejectReturner(uint(roomID), userID, honorNotice(gateRoom.MinHonor, snap.Score), gateErr, honorEligible, gateRoom, members)
 			}
@@ -2219,7 +2266,7 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 	// Insolvency at quick-play auto-start is a near-impossible edge (a >=500
 	// player held by ALREADY_IN_ROOM cannot spend elsewhere, and balances only
 	// rise via the daily reward), but the eject path is wired as a defensive
-	// safety net. ejectInsolventAtStart reverts the room to "waiting" (or closes
+	// safety net. ejectSeatsAtStart reverts the room to "waiting" (or closes
 	// it) and fans out the per-player ejection itself, so this returns
 	// ErrInsufficientCoins to tell the caller (autoStartIfFull) NOT to run the
 	// generic revert — that would wrongly tell the remaining players the match
@@ -3338,6 +3385,28 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 			// the only thing that trips this is an abandonment in the previous match:
 			// a completed match raises honor, and decay only lowers it over months.
 			if honorErr := h.honorPrefilterAtStart(uint(roomID), updatedRoom, players); honorErr != nil {
+				// Two very different failures come back here, and only one of them
+				// has already cleaned up.
+				//
+				// A 409 gate rejection means seats WERE ejected, and ejectSeatsAtStart
+				// owns the revert-to-"waiting" or the room close (including the
+				// out-of-tx un-brick when its own tx rolls back). Nothing to do.
+				//
+				// Anything else is a honor READ failure with no ejection at all — and
+				// the outer tx has already committed Status = "playing", so returning
+				// bare would strand the room in "playing" with no live session: it
+				// vanishes from the lobby, and JoinRoom / StartMatch / ReturnToRoom /
+				// LeaveRoom all then refuse, trapping every seated player until the
+				// next boot reconcile. Un-brick it exactly as the balance-read and
+				// charge failures below do.
+				if !errors.Is(honorErr, apperr.ErrHonorTooLow) && !errors.Is(honorErr, apperr.ErrNewPlayerNotAllowed) {
+					slog.Error("failed to read honor for start prefilter", "roomID", roomID, "error", honorErr)
+					if uerr := h.repo.UpdateStatus(uint(roomID), "waiting"); uerr != nil {
+						slog.Error("failed to revert room status after honor-read failure", "roomID", roomID, "error", uerr)
+					}
+					updatedRoom.Status = "waiting"
+					h.broadcastRoomUpdated(updatedRoom)
+				}
 				return honorErr
 			}
 

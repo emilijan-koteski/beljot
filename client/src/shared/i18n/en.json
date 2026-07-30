@@ -311,7 +311,8 @@
       "wrongPassword": "Incorrect room password.",
       "honorTooLow": "This room asks for honor {{minHonor}} or higher. Yours is {{honor}} — finish a few matches to bring it up.",
       "honorTooLowGeneric": "Your honor score is below this room's minimum.",
-      "newPlayerNotAllowed": "This room is for experienced players. Finish 5 matches to unlock rooms like it."
+      "newPlayerNotAllowed": "This room is for experienced players. Finish 5 matches to unlock rooms like it.",
+      "honorGateStart": "A player doesn't meet this room's honor requirement — the match didn't start."
     },
     "passwordPrompt": {
       "title": "Private room",
@@ -467,7 +468,7 @@
       "honorTitle": "Honor below the room's bar",
       "honorBody": "Your honor dropped below this room's minimum of {{minHonor}} — it's now {{honor}}. Finish your next matches and it climbs back.",
       "roomClosedTitle": "Room closed",
-      "roomClosedBody": "This room closed — no remaining player could afford to host it.",
+      "roomClosedBody": "This room closed — no remaining player could be its host.",
       "action": "Got it"
     },
     "matchmaking": {

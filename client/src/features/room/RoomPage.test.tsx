@@ -542,6 +542,45 @@ describe("RoomPage", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
   });
 
+  // Completes the 2 codes x 2 call paths matrix. Both paths route through the same
+  // joinFailureMessage(code, room) helper, which is the structural fix AC9 asked
+  // for — but "they share a helper" is exactly the assumption 9.6 made before its
+  // deep-link path turned out to need the identical fix, so the fourth cell is
+  // asserted rather than inferred.
+  it("surfaces the newcomer gate on the private deep-link path too", async () => {
+    useAuthStore.setState({
+      user: makeUser({ id: 10, username: "alice", isNewPlayer: true }),
+      token: "tok",
+    });
+
+    mockGetRoom.mockResolvedValue({
+      room: {
+        ...defaultRoom,
+        ownerId: 20,
+        playerCount: 1,
+        isPrivate: true,
+        allowNewPlayers: false,
+      },
+      players: [bobSeated],
+    });
+    mockJoinRoom.mockRejectedValue(
+      new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "new players not allowed"),
+    );
+
+    const user = userEvent.setup();
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("password-prompt-dialog")).toBeInTheDocument());
+    await user.type(screen.getByTestId("password-prompt-input"), "sesame");
+    await user.click(screen.getByTestId("password-prompt-submit"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(1, "sesame"));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(i18n.t("room.errors.newPlayerNotAllowed")),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
+  });
+
   it("does not re-prompt for the password when a stale cache omits a just-joined member", async () => {
     // Regression: re-entering a private room right after joining elsewhere (e.g.
     // join-by-code → navigate here) used to spuriously re-open the password

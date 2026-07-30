@@ -44,9 +44,13 @@ export function JoinByCodeTile() {
       // {{buyIn}}/{{balance}} message — use the param-less generic variant.
       toast.error(t("room.errors.insufficientCoinsGeneric"));
     else if (c === "HONOR_TOO_LOW")
-      // Same reason as INSUFFICIENT_COINS above: the public by-code path can fail
-      // at lookup time with no room object in scope, so there is no {{minHonor}}
-      // to interpolate — use the param-less generic variant (Story 9.8 AC9).
+      // Param-less generic variant, per Story 9.8 AC9. To be precise about WHY,
+      // since the neighbouring INSUFFICIENT_COINS rationale does not transfer
+      // verbatim: HONOR_TOO_LOW can only originate inside joinResolvedRoom, which
+      // does hold the resolved room (a lookup failure yields ROOM_NOT_FOUND, never
+      // this). The constraint is that toastError is shared by both call paths and
+      // takes no room, so the numbers are not in scope HERE. Threading the room in
+      // would let this interpolate {{minHonor}}/{{honor}} like the lobby card does.
       toast.error(t("room.errors.honorTooLowGeneric"));
     else if (c === "NEW_PLAYER_NOT_ALLOWED") toast.error(t("room.errors.newPlayerNotAllowed"));
     else if (c === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));

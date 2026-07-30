@@ -495,10 +495,13 @@ describe("CreateRoomModal", () => {
     expect(screen.getByTestId("allow-new-players-error")).toBeInTheDocument();
   });
 
-  // D1: a New Player is NEVER score-checked, so a newcomer owner may still set a
-  // high threshold for everyone else. The self-gate must not reject them for a bar
-  // that would never be applied to them.
-  it("lets a new-player owner set a high threshold as long as newcomers are welcome", async () => {
+  // Review 2026-07-30 (PO decision), replacing a test that asserted the opposite:
+  // a New Player creator IS score-checked against their own score, mirroring the
+  // server. D1's "never score-check a newcomer" is right at the JOIN gate but made
+  // D7's self-gate a no-op for exactly the accounts whose score is about to move —
+  // a newcomer could set a bar of 95, then graduate below it and be ejected from
+  // their own room.
+  it("disables submit when a new-player owner sets a bar above their own score", async () => {
     const user = userEvent.setup();
     useAuthStore.setState({
       user: makeUser({ id: 5, username: "owner", honorScore: 80, isNewPlayer: true }),
@@ -509,8 +512,40 @@ describe("CreateRoomModal", () => {
     await user.clear(screen.getByTestId("min-honor-input"));
     await user.type(screen.getByTestId("min-honor-input"), "95");
 
+    expect(screen.getByTestId("create-room-button")).toBeDisabled();
+    expect(screen.getByTestId("min-honor-error")).toBeInTheDocument();
+  });
+
+  it("lets a new-player owner set a bar at or below their own score", async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      user: makeUser({ id: 5, username: "owner", honorScore: 80, isNewPlayer: true }),
+    });
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Fair Bar");
+    await user.clear(screen.getByTestId("min-honor-input"));
+    await user.type(screen.getByTestId("min-honor-input"), "80");
+
     expect(screen.getByTestId("create-room-button")).toBeEnabled();
     expect(screen.queryByTestId("min-honor-error")).toBeNull();
+  });
+
+  // The cosmetic mirror must not turn "unknown" into "denied". honorIsNewPlayer and
+  // honorScoreOrPrior default to suppressed/80 for DISPLAY, which would have blocked
+  // a veteran from creating a veterans-only room on a request the server allows.
+  it("does not gate the owner when the auth envelope carries no honor", async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      user: makeUser({ id: 5, username: "owner", honorScore: undefined, isNewPlayer: undefined }),
+    });
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Unknown Honor");
+    await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
+
+    expect(screen.getByTestId("create-room-button")).toBeEnabled();
+    expect(screen.queryByTestId("allow-new-players-error")).toBeNull();
   });
 
   it("keeps submit enabled for an owner who clears their own threshold", async () => {

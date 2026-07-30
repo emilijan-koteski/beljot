@@ -324,6 +324,21 @@ export interface RoomCreatedPayload {
   isQuickPlay: boolean;
   /** Derived privacy flag (Story 9.6) so the lobby card lock indicator stays live. */
   isPrivate: boolean;
+  /**
+   * Honor gate (Story 9.8), declared for the same reason as isPrivate above: the
+   * server's roomLifecyclePayload sends both keys, and the lobby card's honor and
+   * veterans-only chips read them, so the declared contract has to carry them or
+   * the next author gets a tsc error on a field the server is actually sending.
+   *
+   * Caveat, recorded rather than hidden: the QuickPlay system:room_created map is
+   * hand-built separately and omits these two (as it already omits isPrivate,
+   * coinBuyIn and players). Harmless today — a synthesized quick-play room IS
+   * ungated, so absent reads as ungated, which is correct — and tracked in
+   * deferred-work.md, where the real fix is routing that map through
+   * roomLifecyclePayload instead of maintaining a third key list.
+   */
+  minHonor: number;
+  allowNewPlayers: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -344,6 +359,21 @@ export interface RoomUpdatedPayload {
   isQuickPlay: boolean;
   /** Derived privacy flag (Story 9.6) so the lobby card lock indicator stays live. */
   isPrivate: boolean;
+  /**
+   * Honor gate (Story 9.8), declared for the same reason as isPrivate above: the
+   * server's roomLifecyclePayload sends both keys, and the lobby card's honor and
+   * veterans-only chips read them, so the declared contract has to carry them or
+   * the next author gets a tsc error on a field the server is actually sending.
+   *
+   * Caveat, recorded rather than hidden: the QuickPlay system:room_created map is
+   * hand-built separately and omits these two (as it already omits isPrivate,
+   * coinBuyIn and players). Harmless today — a synthesized quick-play room IS
+   * ungated, so absent reads as ungated, which is correct — and tracked in
+   * deferred-work.md, where the real fix is routing that map through
+   * roomLifecyclePayload instead of maintaining a third key list.
+   */
+  minHonor: number;
+  allowNewPlayers: boolean;
   createdAt: string;
   updatedAt: string;
 }

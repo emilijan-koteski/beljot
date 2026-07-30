@@ -742,6 +742,18 @@ export function RoomPage() {
         // rolled back the charge and reverted the room to waiting. (Full
         // per-player ejection UX lands in Story 9.3.)
         toast.error(t("room.errors.insufficientCoinsStart"));
+      } else if (
+        err instanceof FetchError &&
+        (err.code === "HONOR_TOO_LOW" || err.code === "NEW_PLAYER_NOT_ALLOWED")
+      ) {
+        // Story 9.8 AC6: a seated human failed the honor re-check, so the server
+        // ejected that seat and refused the start. Without this branch the owner
+        // fell through to "try again" — advice that fails identically every time,
+        // since a seat is now empty. Deliberately NON-DISCLOSING: it never says
+        // which player or which of the two gates, mirroring how
+        // insufficientCoinsStart withholds whose balance was short. Per-seat
+        // disclosure is Open Question 5 / Epic 11, and is a separate decision.
+        toast.error(t("room.errors.honorGateStart"));
       } else {
         toast.error(t("room.errors.startFailed"));
       }
