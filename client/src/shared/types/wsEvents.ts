@@ -399,6 +399,10 @@ export interface RoomOwnerChangedPayload {
 // present-and-solvent player remained to own it (Story 9.3 AC4). Recipients
 // route to the lobby with a "room closed" notice. Keep in sync with server
 // events.go (SystemRoomClosedInsolvent).
+//
+// Story 9.8 REUSES this event for honor closes (an owner honor-ejected with no
+// eligible heir). The payload and the reason-agnostic client copy already cover
+// both, so the wire string is deliberately unchanged.
 export const SYSTEM_ROOM_CLOSED_INSOLVENT = "system:room_closed_insolvent" as const;
 
 export interface RoomClosedInsolventPayload {
@@ -415,6 +419,28 @@ export interface InsolventEjectedPayload {
   roomId: number;
   buyIn: number;
   balance: number;
+}
+
+// Per-user push to a player ejected from a room because their honor score no
+// longer clears the room's gate (Story 9.8 AC6). Sibling of
+// SYSTEM_INSOLVENT_EJECTED above: same shape, same delivery, same client
+// pipeline (roomStore.roomEjection -> RoomEjectionModal). Keep in sync with
+// server events.go (SystemHonorEjected).
+//
+// The system: prefix is deliberate — this is a pre-match, room-lifecycle push,
+// not an in-match game-state event — and it means the event has ZERO WS
+// drift-gate touchpoints: no Zod schema, no golden, no conformance witness, no
+// contract-test row. Every system:* payload in this file is likewise outside the
+// gate. Do not add any of those for it (Story 9.8 D4).
+export const SYSTEM_HONOR_EJECTED = "system:honor_ejected" as const;
+
+export interface HonorEjectedPayload {
+  roomId: number;
+  // The room's threshold, and the player's own authoritative recomputed score.
+  // Both are real Go ints: a score of 0 is legitimate, so validate with
+  // typeof === "number", never JS truthiness.
+  minHonor: number;
+  honor: number;
 }
 
 export interface SeatUpdatedPayload {

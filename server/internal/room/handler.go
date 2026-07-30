@@ -19,6 +19,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/auth"
 	"github.com/emilijan/beljot/server/internal/match"
+	"github.com/emilijan/beljot/server/internal/user"
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
@@ -71,6 +72,53 @@ func validateRoomPassword(pw string) error {
 	return nil
 }
 
+// honorGated reports whether this room enforces an honor requirement at all.
+//
+// A room is ungated only when BOTH gates are off, which is the overwhelmingly
+// common case. Every call site short-circuits on this so an ungated join performs
+// NO honor read whatsoever (Story 9.8 D5) — JoinRoom is a hot path. Declared as a
+// method so no call site re-spells the condition and they cannot drift apart.
+func (r *Room) honorGated() bool {
+	return r.MinHonor > 0 || !r.AllowNewPlayers
+}
+
+// honorGateError evaluates the honor gate for one player against one room and
+// returns nil to admit, or the apperr to reject with (Story 9.8, FR57). Pure —
+// all four call sites (CreateRoom's creator self-gate, JoinRoom, ReturnToRoom,
+// StartMatch) share this one implementation and one table-driven test.
+//
+// The two gates are INDEPENDENT (D1 — this overrides the epic, which nested both
+// rejections under min_honor > 0 and would have made allow_new_players dead in a
+// 0-gate room):
+//
+//	if isNewPlayer: admit iff AllowNewPlayers   // the score is NOT consulted
+//	else:           admit iff Score >= MinHonor // MinHonor 0 => always true
+//
+// The non-obvious half is the first branch: a New Player is never score-checked,
+// so with AllowNewPlayers a newcomer enters a MinHonor = 95 room on the 80 prior.
+// That is the entire purpose of the toggle — it is the owner's explicit "I'll take
+// an unknown" switch, and removing the branch would make the toggle meaningless.
+//
+// isNewPlayer is evaluated FIRST, so a New Player in a MinHonor > 0 /
+// AllowNewPlayers = false room gets ErrNewPlayerNotAllowed, never ErrHonorTooLow.
+//
+// snap must come from user.NewHonorSnapshot (the recomputed, authoritative score),
+// never from users.honor_score (the lagging filter-only column) — see D5 and the
+// HonorScoreSnapshot field comment in user/model.go. The boundary is inclusive:
+// Score == MinHonor admits.
+func honorGateError(r *Room, snap user.HonorSnapshot) error {
+	if snap.IsNewPlayer {
+		if r.AllowNewPlayers {
+			return nil
+		}
+		return apperr.ErrNewPlayerNotAllowed
+	}
+	if snap.Score < r.MinHonor {
+		return apperr.ErrHonorTooLow
+	}
+	return nil
+}
+
 // quickPlayBuyIn maps a wallet balance to the Quick Play bracket buy-in. The
 // model is binary (Story 9.4, Decision D1): balance >= 500 → 500, else 0. The
 // returned value is BOTH the matchmaking pool key (rooms.coin_buy_in) and the
@@ -97,6 +145,13 @@ type CreateRoomRequest struct {
 	// rooms.password_hash and never stored or logged in plaintext.
 	IsPrivate bool   `json:"isPrivate"`
 	Password  string `json:"password"`
+	// MinHonor + AllowNewPlayers configure the honor gate (Story 9.8, FR57). BOTH
+	// are pointers, mirroring CoinBuyIn above, so "omitted" is distinguishable from
+	// an explicit 0 / false: nil MinHonor defaults to 0 (ungated) and nil
+	// AllowNewPlayers defaults to TRUE (open), whereas an explicit false is a
+	// deliberate veterans-only room and must survive.
+	MinHonor        *int  `json:"minHonor"`
+	AllowNewPlayers *bool `json:"allowNewPlayers"`
 }
 
 // MatchStarter is the interface the room handler uses to start a live match.
@@ -122,6 +177,34 @@ type WalletService interface {
 	ApplySettlement(credits map[uint]int) error
 }
 
+// HonorService is the subset of *user.HonorService the room handler needs for the
+// honor gate (Story 9.8, FR57). It is declared HERE, in room, and satisfied by the
+// concrete service injected from main.go — the same narrow-interface pattern as
+// WalletService above, which keeps room decoupled from user's internals and lets
+// handler tests inject a stub with a call counter.
+//
+// Optional: nil means NO honor enforcement (legacy setups / tests that don't
+// exercise honor), mirroring the nil-walletService affordance. A read ERROR,
+// however, is never treated as nil — it fails the request, because a failed honor
+// read must never open a closed door.
+//
+// IMPORT DIRECTION (Story 9.8 D6) — the one thing to get right here. `user` must
+// NEVER import `room`: room -> auth -> user already exists, so user -> room would
+// close the cycle. The DTO crossing this interface is therefore a `user`-owned type
+// (user.HonorSnapshot) and `room` imports `user`. Verified acyclic: room -> user ->
+// match, and match does not import room.
+//
+// Deliberately NOT added to user.UserRepository: HonorForUsers is a pure addition
+// to the concrete *user.HonorService built on the existing FindManyByIDs, so no
+// repository mock anywhere in the tree needs a new method.
+type HonorService interface {
+	// HonorForUsers returns each requested user's AUTHORITATIVE honor snapshot
+	// (score recomputed at read time, plus the isNewPlayer flag the gate needs),
+	// keyed by user ID. Unknown IDs — and bot id 0 — are simply absent from the
+	// result rather than an error.
+	HonorForUsers(userIDs []uint) (map[uint]user.HonorSnapshot, error)
+}
+
 // RoomStatusAdapter implements match.RoomStatusUpdater using the room repository.
 type RoomStatusAdapter struct {
 	Repo RoomRepository
@@ -144,15 +227,16 @@ type RoomHandler struct {
 	hub           Broadcaster
 	presence      *PresenceRegistry
 	walletService WalletService
+	honorService  HonorService
 }
 
-func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster, presence *PresenceRegistry, walletService WalletService) *RoomHandler {
+func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster, presence *PresenceRegistry, walletService WalletService, honorService HonorService) *RoomHandler {
 	// Default to a private registry when none is injected (keeps test setups
 	// that don't exercise presence working without threading a registry).
 	if presence == nil {
 		presence = NewPresenceRegistry()
 	}
-	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence, walletService: walletService}
+	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence, walletService: walletService, honorService: honorService}
 }
 
 // broadcastToRoom sends a WebSocket message to all players in a room.
@@ -304,12 +388,19 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		"coinBuyIn":            r.CoinBuyIn,
 		// Derived privacy flag (Story 9.6) — this map is hand-built, so the
 		// Room.IsPrivate struct tag / AfterFind hook don't apply; compute it here.
-		"isPrivate":   r.PasswordHash != nil,
-		"playerCount": r.PlayerCount,
-		"status":      r.Status,
-		"isQuickPlay": r.IsQuickPlay,
-		"createdAt":   r.CreatedAt.UTC().Format(time.RFC3339),
-		"updatedAt":   r.UpdatedAt.UTC().Format(time.RFC3339),
+		"isPrivate": r.PasswordHash != nil,
+		// Honor gate (Story 9.8) — same hand-built-map trap as isPrivate above, and
+		// invisible in every HTTP test because those serialize the struct instead.
+		// system:room_created and system:room_updated both flow through here, so
+		// omitting these two keys would leave a live lobby card rendering a gated
+		// room as ungated until the next full refetch.
+		"minHonor":        r.MinHonor,
+		"allowNewPlayers": r.AllowNewPlayers,
+		"playerCount":     r.PlayerCount,
+		"status":          r.Status,
+		"isQuickPlay":     r.IsQuickPlay,
+		"createdAt":       r.CreatedAt.UTC().Format(time.RFC3339),
+		"updatedAt":       r.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -434,6 +525,45 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		}
 	}
 
+	// Honor gate (Story 9.8 AC3, FR57): nil MinHonor → 0 (no bar); an explicit value
+	// outside [0,100] rejects — the same interval the rooms.min_honor CHECK enforces,
+	// in the same unit on both sides of the wire (9.6 shipped a min in runes and a
+	// max in bytes and needed a review patch; a plain integer range stays symmetric).
+	// nil AllowNewPlayers → true, so an old client that never sends the field keeps
+	// creating open rooms.
+	minHonor := 0
+	if req.MinHonor != nil {
+		minHonor = *req.MinHonor
+		if minHonor < 0 || minHonor > 100 {
+			return apperr.ErrInvalidMinHonor
+		}
+	}
+	allowNewPlayers := true
+	if req.AllowNewPlayers != nil {
+		allowNewPlayers = *req.AllowNewPlayers
+	}
+
+	// The creator must satisfy their OWN gate (Story 9.8 D7). CreateRoom auto-seats
+	// the creator, so an owner who sets min_honor = 95 while sitting at 60 — or
+	// allow_new_players = false while being a New Player themselves — would be
+	// ejected from their own room by the AC6 re-check at the first Start, taking
+	// ownership transfer or a room close with them. This mirrors the buy-in
+	// affordability check immediately above, which exists for the identical reason,
+	// and rejects with the same code the join gate would have returned. Server is the
+	// authority; the modal's disabled-submit guard is cosmetic.
+	gateProbe := &Room{MinHonor: minHonor, AllowNewPlayers: allowNewPlayers}
+	if gateProbe.honorGated() {
+		snap, enforced, herr := h.honorSnapshotFor(userID)
+		if herr != nil {
+			return herr
+		}
+		if enforced {
+			if gateErr := honorGateError(gateProbe, snap); gateErr != nil {
+				return gateErr
+			}
+		}
+	}
+
 	// Private room (Story 9.6, FR60): when requested, validate + bcrypt-hash the
 	// password into PasswordHash (nil = public). Reuse the auth bcrypt helper — do
 	// not import bcrypt directly here. Server is the authority; the modal's toggle
@@ -466,8 +596,14 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		ReconnectWindowSec:   reconnectWindow,
 		CoinBuyIn:            coinBuyIn,
 		PasswordHash:         passwordHash,
-		Status:               "waiting",
-		PlayerCount:          1,
+		MinHonor:             minHonor,
+		// Set EXPLICITLY, always. room.Room declares AllowNewPlayers without a GORM
+		// `default` tag (see its field comment: a default tag would make `false`
+		// uninsertable), which means a hand-built &Room{} that omits the field
+		// inserts false — a silently veterans-only room.
+		AllowNewPlayers: allowNewPlayers,
+		Status:          "waiting",
+		PlayerCount:     1,
 	}
 
 	var createErr error
@@ -738,6 +874,27 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		}
 	}
 
+	// Honor gate (Story 9.8 AC4, FR57). Deliberately APPENDED LAST, after the coin
+	// check: the password / capacity / already-in-room / coin sequence above is a
+	// hardened order, and appending keeps this diff reviewable rather than reshuffling
+	// it. The visible consequence is that a player who is both broke and short on
+	// honor gets INSUFFICIENT_COINS — intentional, and harmless (they cannot join
+	// either way).
+	//
+	// An ungated room performs NO honor read at all: JoinRoom is a hot path and
+	// almost every room is ungated (D5).
+	if room.honorGated() {
+		snap, enforced, herr := h.honorSnapshotFor(userID)
+		if herr != nil {
+			return herr
+		}
+		if enforced {
+			if gateErr := honorGateError(room, snap); gateErr != nil {
+				return gateErr
+			}
+		}
+	}
+
 	var updatedRoom *Room
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
 		rp := &RoomPlayer{RoomID: uint(roomID), UserID: userID}
@@ -867,6 +1024,182 @@ func (h *RoomHandler) UpdateRoomPrivacy(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": room})
 }
 
+// honorSnapshotsFor reads the AUTHORITATIVE honor snapshots for the given users
+// (Story 9.8). `enforced` is false when no honor service is wired, which is the
+// nil-walletService affordance: the caller then skips the gate entirely.
+//
+// A read ERROR is never treated as "not enforced" — it is returned, and every
+// caller fails the request with it (a wrapped 500). A failed honor read must never
+// open a closed door. A requested user whose row is MISSING is likewise an error,
+// not an admit: the zero-value snapshot has IsNewPlayer false and Score 0, which
+// would silently sail through an allow_new_players = false / min_honor = 0 room.
+//
+// Call this only after Room.honorGated() has returned true — on an ungated room the
+// correct number of honor reads is zero (D5). Bot seats (UserID 0) are filtered
+// out; room_players holds humans only, so this is belt-and-braces.
+func (h *RoomHandler) honorSnapshotsFor(userIDs []uint) (snaps map[uint]user.HonorSnapshot, enforced bool, err error) {
+	if h.honorService == nil {
+		return nil, false, nil
+	}
+	wanted := make([]uint, 0, len(userIDs))
+	for _, id := range userIDs {
+		if id != 0 {
+			wanted = append(wanted, id)
+		}
+	}
+	if len(wanted) == 0 {
+		return map[uint]user.HonorSnapshot{}, true, nil
+	}
+	read, rerr := h.honorService.HonorForUsers(wanted)
+	if rerr != nil {
+		return nil, true, fmt.Errorf("reading honor for room gate: %w", rerr)
+	}
+	for _, id := range wanted {
+		if _, ok := read[id]; !ok {
+			return nil, true, fmt.Errorf("reading honor for room gate: no honor row for user %d", id)
+		}
+	}
+	return read, true, nil
+}
+
+// honorSnapshotFor is the single-user form of honorSnapshotsFor, for the three
+// gates that check exactly one player (CreateRoom's creator self-gate, JoinRoom,
+// ReturnToRoom).
+func (h *RoomHandler) honorSnapshotFor(userID uint) (snap user.HonorSnapshot, enforced bool, err error) {
+	snaps, enforced, err := h.honorSnapshotsFor([]uint{userID})
+	if err != nil || !enforced {
+		return user.HonorSnapshot{}, enforced, err
+	}
+	return snaps[userID], true, nil
+}
+
+// honorCandidateSnapshots reads honor for OWNERSHIP-HEIR CANDIDATES, and is
+// deliberately more forgiving than honorSnapshotsFor: a candidate whose row is
+// missing is simply absent from the result, and the eligibility closure then
+// treats them as ineligible.
+//
+// The distinction matters. For the gate's SUBJECT a missing row must fail the
+// request, because a zero-value snapshot reads as an experienced player with a
+// score of 0 and would sail through a min_honor 0 / veterans-only room. But a
+// missing CANDIDATE row must not fail the whole ejection — the subject has
+// already failed the gate and their seat has to be freed either way, so 500ing
+// out would leave a barred player seated. Skipping that one candidate is the
+// conservative choice, and the map still covers EVERY other seated human, which
+// is what keeps this clear of 9.3's one-entry-map finding.
+//
+// A read ERROR is still returned: that is a systemic failure, not one absent row.
+func (h *RoomHandler) honorCandidateSnapshots(userIDs []uint) (map[uint]user.HonorSnapshot, error) {
+	if h.honorService == nil || len(userIDs) == 0 {
+		return map[uint]user.HonorSnapshot{}, nil
+	}
+	wanted := make([]uint, 0, len(userIDs))
+	for _, id := range userIDs {
+		if id != 0 {
+			wanted = append(wanted, id)
+		}
+	}
+	if len(wanted) == 0 {
+		return map[uint]user.HonorSnapshot{}, nil
+	}
+	read, err := h.honorService.HonorForUsers(wanted)
+	if err != nil {
+		return nil, fmt.Errorf("reading candidate honor for ownership transfer: %w", err)
+	}
+	return read, nil
+}
+
+// honorPrefilterAtStart re-evaluates the honor gate for every seated human at match
+// start and ejects each failing seat through the shared start-path eject flow (Story
+// 9.8 AC6/AC7). It returns nil when the match may proceed, or the 409 apperr the
+// owner should receive when at least one seat was ejected (the match then does NOT
+// start; ejectSeatsAtStart owns the revert-to-"waiting" or the room close).
+//
+// It MUST be called before any money moves — see the call site in StartMatch.
+// `players` is room_players for the room (humans only; bots never hold honor).
+func (h *RoomHandler) honorPrefilterAtStart(roomID uint, room *Room, players []RoomPlayer) error {
+	if !room.honorGated() {
+		return nil
+	}
+
+	humanIDs := make([]uint, 0, len(players))
+	for _, p := range players {
+		if p.UserID != 0 {
+			humanIDs = append(humanIDs, p.UserID)
+		}
+	}
+	snaps, enforced, err := h.honorSnapshotsFor(humanIDs)
+	if err != nil {
+		return err
+	}
+	if !enforced {
+		return nil
+	}
+
+	// Collect EVERY failing seat, not just the first. An abandonment charges every
+	// absent human seat (9.7 AC3, review pass 2), so a single match end can push
+	// several seats below the threshold at once — including the owner plus another
+	// player, which is what makes the AC7 ownership-transfer path reachable.
+	notices := make(map[uint]ejectNotice)
+	rejectByUser := make(map[uint]error)
+	for _, id := range humanIDs {
+		if gateErr := honorGateError(room, snaps[id]); gateErr != nil {
+			notices[id] = honorNotice(room.MinHonor, snaps[id].Score)
+			rejectByUser[id] = gateErr
+		}
+	}
+	if len(notices) == 0 {
+		return nil
+	}
+
+	// An heir must pass the honor gate too (AC7). snaps already covers every seated
+	// human, so no second read and no one-entry map.
+	honorEligible := func(candidateID uint) bool {
+		cs, ok := snaps[candidateID]
+		if !ok {
+			return false
+		}
+		return honorGateError(room, cs) == nil
+	}
+
+	// Heir eligibility is present-agnostic here (presence is cleared at start) but
+	// still solvency-aware, mirroring the insolvency path: the heir is the player who
+	// will be charged at the next start attempt. Read balances only when the room is
+	// actually staked and a wallet is wired; a nil map means "solvency not evaluated"
+	// (see startEligible), never "everyone is broke".
+	var balances map[uint]int
+	if room.CoinBuyIn > 0 && h.walletService != nil {
+		seatedIDs := make([]uint, 0, len(humanIDs))
+		for _, id := range humanIDs {
+			if _, ejected := notices[id]; !ejected {
+				seatedIDs = append(seatedIDs, id)
+			}
+		}
+		if b, berr := h.walletService.GetBalances(seatedIDs); berr == nil {
+			balances = b
+		} else {
+			// Degrade to honor-only heir selection rather than skipping the ejection.
+			// The next StartMatch re-runs the authoritative solvency prefilter anyway,
+			// so an insolvent heir cannot actually start a match unpaid.
+			slog.Error("failed to read balances for honor-eject heir selection", "roomID", roomID, "error", berr)
+		}
+	}
+
+	h.ejectSeatsAtStart(roomID, room, notices, balances, honorEligible, players)
+
+	// Report the OWNER's own rejection when the owner was ejected — that is whose
+	// request this is. Otherwise report the lowest-ID ejected seat's code, so the
+	// response is deterministic rather than dependent on map iteration order.
+	if ownerErr, ok := rejectByUser[room.OwnerID]; ok {
+		return ownerErr
+	}
+	ejected := make([]uint, 0, len(rejectByUser))
+	for id := range rejectByUser {
+		ejected = append(ejected, id)
+	}
+	sort.Slice(ejected, func(i, j int) bool { return ejected[i] < ejected[j] })
+	return rejectByUser[ejected[0]]
+}
+
 // transferOwnershipOrClose reassigns room ownership away from a departing owner
 // (who must ALREADY be removed from room_players before this is called) to the
 // first seated human — in seat order ascending — for whom isEligible reports
@@ -939,13 +1272,85 @@ func (h *RoomHandler) transferOwnershipOrClose(tx RoomRepository, room *Room, is
 	return nil, true, seatedNotify, nil
 }
 
-// ejectInsolventReturner frees an insolvent returner's seat (transferring or
-// closing the room if they were the owner), fans out the room + lobby updates,
-// and returns apperr.ErrInsufficientCoins (HTTP 409) so the client routes them
-// to the lobby with the insolvency modal (Story 9.3 AC1, AC4). The seat-free +
-// ownership move run in one row-locked tx to serialize against concurrent
-// returns/leaves; broadcasts fan out post-commit (best-effort, never in-tx).
-func (h *RoomHandler) ejectInsolventReturner(roomID, userID uint, balance int, room *Room, members []RoomPlayer) error {
+// ejectKind names WHY a seat was ejected. It selects the per-user WS push and the
+// returned apperr, and nothing else: the seat free, the ownership move, the
+// revert-to-"waiting", the player_left / room_updated / room_closed_insolvent
+// fan-out and the failure logging are byte-identical for both reasons. That is why
+// the two helpers below are parameterized rather than duplicated (Story 9.8 D8) —
+// they are ~140 lines of review-hardened transaction each, and copy-pasting them
+// would double the surface of the two functions most likely to regress.
+type ejectKind int
+
+const (
+	ejectKindInsolvent ejectKind = iota
+	ejectKindHonor
+)
+
+// ejectNotice describes one seat's ejection: the reason plus the numbers that
+// reason's per-user push carries. Only the fields belonging to `kind` are read.
+type ejectNotice struct {
+	kind ejectKind
+	// buyIn / balance feed system:insolvent_ejected (Story 9.3).
+	buyIn   int
+	balance int
+	// minHonor / honor feed system:honor_ejected (Story 9.8). honor is the player's
+	// AUTHORITATIVE recomputed score, never users.honor_score.
+	minHonor int
+	honor    int
+}
+
+// push resolves this notice into the (message type, typed payload) pair for the
+// per-user WS push — the single point where the two ejection reasons diverge.
+func (n ejectNotice) push(roomID uint) (string, any) {
+	if n.kind == ejectKindHonor {
+		return ws.SystemHonorEjected, ws.HonorEjectedPayload{
+			RoomID:   roomID,
+			MinHonor: n.minHonor,
+			Honor:    n.honor,
+		}
+	}
+	return ws.SystemInsolventEjected, ws.InsolventEjectedPayload{
+		RoomID:  roomID,
+		BuyIn:   n.buyIn,
+		Balance: n.balance,
+	}
+}
+
+// insolventNotice builds the Story 9.3 ejection notice for one seat.
+func insolventNotice(buyIn, balance int) ejectNotice {
+	return ejectNotice{kind: ejectKindInsolvent, buyIn: buyIn, balance: balance}
+}
+
+// honorNotice builds the Story 9.8 ejection notice for one seat.
+func honorNotice(minHonor, honor int) ejectNotice {
+	return ejectNotice{kind: ejectKindHonor, minHonor: minHonor, honor: honor}
+}
+
+// insolventNotices builds the per-seat notices for an insolvency eject at start:
+// every listed user gets the room's buy-in and their own just-read balance. Keeps
+// the four start-path call sites one-liners after the Story 9.8 generalization.
+func insolventNotices(ids []uint, buyIn int, balances map[uint]int) map[uint]ejectNotice {
+	out := make(map[uint]ejectNotice, len(ids))
+	for _, id := range ids {
+		out[id] = insolventNotice(buyIn, balances[id])
+	}
+	return out
+}
+
+// ejectReturner frees a barred returner's seat (transferring or closing the room if
+// they were the owner), fans out the room + lobby updates, pushes `notice` to the
+// ejected player, and returns rejectWith (an HTTP 409 apperr) so their client routes
+// to the lobby with the ejection modal (Story 9.3 AC1/AC4; Story 9.8 AC6/AC7). The
+// seat-free + ownership move run in one row-locked tx to serialize against
+// concurrent returns/leaves; broadcasts fan out post-commit (best-effort, never
+// in-tx).
+//
+// `notice` and `rejectWith` are the ONLY reason-dependent inputs — insolvency passes
+// insolventNotice + ErrInsufficientCoins, honor passes honorNotice + ErrHonorTooLow
+// or ErrNewPlayerNotAllowed. extraEligible lets the caller AND an additional
+// predicate into the ownership-eligibility check (Story 9.8 AC7 widens it with the
+// honor gate); nil means no extra requirement.
+func (h *RoomHandler) ejectReturner(roomID, userID uint, notice ejectNotice, rejectWith error, extraEligible func(candidateID uint) bool, room *Room, members []RoomPlayer) error {
 	var leavingUsername string
 	for _, p := range members {
 		if p.UserID == userID {
@@ -954,8 +1359,9 @@ func (h *RoomHandler) ejectInsolventReturner(roomID, userID uint, balance int, r
 		}
 	}
 
-	// Ownership eligibility (present-AND-solvent) computed before the tx so no
-	// wallet read runs inside the lock — only needed when the OWNER is ejected.
+	// Ownership eligibility (present-AND-solvent, plus the caller's extra predicate)
+	// computed before the tx so no wallet or honor read runs inside the lock — only
+	// needed when the OWNER is ejected.
 	var ownerEligible func(candidateID uint) bool
 	if room.OwnerID == userID {
 		presentSet := make(map[uint]bool)
@@ -981,7 +1387,12 @@ func (h *RoomHandler) ejectInsolventReturner(roomID, userID uint, balance int, r
 			if !presentSet[candidateID] {
 				return false
 			}
-			return buyIn == 0 || (balances != nil && balances[candidateID] >= buyIn)
+			if buyIn > 0 && !(balances != nil && balances[candidateID] >= buyIn) {
+				return false
+			}
+			// Story 9.8 AC7: an heir must ALSO pass the honor gate, on top of the
+			// present-AND-solvent requirement. nil = no extra requirement.
+			return extraEligible == nil || extraEligible(candidateID)
 		}
 	}
 
@@ -991,7 +1402,7 @@ func (h *RoomHandler) ejectInsolventReturner(roomID, userID uint, balance int, r
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
 		freshRoom, err := tx.FindByIDForUpdate(roomID)
 		if err != nil {
-			return fmt.Errorf("re-fetching room for insolvent eject: %w", err)
+			return fmt.Errorf("re-fetching room for returner eject: %w", err)
 		}
 		if freshRoom == nil {
 			return apperr.ErrRoomNotFound
@@ -1020,7 +1431,7 @@ func (h *RoomHandler) ejectInsolventReturner(roomID, userID uint, balance int, r
 		if errors.Is(err, apperr.ErrNotInRoom) || errors.Is(err, apperr.ErrRoomNotFound) {
 			return err
 		}
-		return fmt.Errorf("ejecting insolvent returner: %w", err)
+		return fmt.Errorf("ejecting barred returner: %w", err)
 	}
 
 	h.presence.Remove(roomID, userID)
@@ -1058,21 +1469,18 @@ func (h *RoomHandler) ejectInsolventReturner(roomID, userID uint, balance int, r
 	}
 
 	// Tell the ejected returner directly so their client routes to the lobby with
-	// the exact balance/buy-in modal. The HTTP 409 can't carry the numbers, and
-	// the client no longer holds the room (roomStore resets on RoomPage unmount),
-	// so this per-user event is the modal's data source — the same event the
-	// start-time eject uses (Story 9.3 AC1, AC5).
-	h.broadcastToUsers([]uint{userID}, ws.SystemInsolventEjected, ws.InsolventEjectedPayload{
-		RoomID:  roomID,
-		BuyIn:   room.CoinBuyIn,
-		Balance: balance,
-	})
+	// the exact numbers for their reason's modal. The HTTP 409 can't carry them, and
+	// the client no longer holds the room (roomStore resets on RoomPage unmount), so
+	// this per-user event is the modal's data source — the same event the start-time
+	// eject uses (Story 9.3 AC1/AC5; Story 9.8 AC6).
+	msgType, payload := notice.push(roomID)
+	h.broadcastToUsers([]uint{userID}, msgType, payload)
 
-	return apperr.ErrInsufficientCoins
+	return rejectWith
 }
 
-// ejectInsolventAtStart frees every insolvent seat at match start (Story 9.3
-// AC5), pushes system:insolvent_ejected to each ejected player, and — when the
+// ejectSeatsAtStart frees every barred seat at match start (Story 9.3 AC5; Story
+// 9.8 AC6), pushes each ejected player their reason's per-user event, and — when the
 // owner is among them — transfers ownership or closes the room via the shared
 // helper. The match does NOT start (a freed seat means not-all-seated), so the
 // room is reverted to "waiting" (unless closed) and the lobby refreshed. Best-
@@ -1080,23 +1488,52 @@ func (h *RoomHandler) ejectInsolventReturner(roomID, userID uint, balance int, r
 // is left believing a match is about to start.
 //
 // presence was already cleared at start, so ownership eligibility here is
-// solvent-only (no presence requirement — see the StartMatch ejection note).
-// balances carries the just-read balance per seated human for the modal numbers.
-func (h *RoomHandler) ejectInsolventAtStart(roomID uint, room *Room, insolventIDs []uint, balances map[uint]int, members []RoomPlayer) {
-	insolventSet := make(map[uint]bool, len(insolventIDs))
-	for _, id := range insolventIDs {
-		insolventSet[id] = true
+// solvent-only (no presence requirement — see the StartMatch ejection note),
+// widened by the caller's extraEligible (Story 9.8 AC7 adds the honor gate; nil
+// means no extra requirement).
+//
+// notices is keyed by ejected user ID and carries both the reason and the numbers
+// that reason's push needs — it replaces 9.3's (insolventIDs, balances) pair.
+// Iteration order over a map is random, so the DB work below is order-independent
+// by construction (each seat is freed individually and the owner check is a
+// per-seat comparison). balances still carries every seated human's balance for
+// the solvency half of eligibility — a one-entry map would make every solvent heir
+// look broke and wrongly close a room that has a valid heir (Story 9.3's review
+// finding).
+func (h *RoomHandler) ejectSeatsAtStart(roomID uint, room *Room, notices map[uint]ejectNotice, balances map[uint]int, extraEligible func(candidateID uint) bool, members []RoomPlayer) {
+	ejectedIDs := make([]uint, 0, len(notices))
+	for id := range notices {
+		ejectedIDs = append(ejectedIDs, id)
+	}
+	// Sort so the seat-freeing loop, the logs and the fan-out are deterministic
+	// (map iteration order is randomized in Go, which would make a failure
+	// mid-loop non-reproducible).
+	sort.Slice(ejectedIDs, func(i, j int) bool { return ejectedIDs[i] < ejectedIDs[j] })
+
+	ejectedSet := make(map[uint]bool, len(ejectedIDs))
+	for _, id := range ejectedIDs {
+		ejectedSet[id] = true
 	}
 
-	// Solvent-only eligibility: presence is cleared at start, and an insolvent
+	// Solvent-only eligibility: presence is cleared at start, and an already-ejected
 	// candidate is never a valid heir. balances holds every seated human read for
 	// the prefilter, so a solvent seated human resolves to a >= buyIn value here.
 	buyIn := room.CoinBuyIn
 	startEligible := func(candidateID uint) bool {
-		if insolventSet[candidateID] {
+		if ejectedSet[candidateID] {
 			return false
 		}
-		return buyIn == 0 || balances[candidateID] >= buyIn
+		// A nil balances map means the caller neither read nor could read balances —
+		// a free room, or no wallet service wired — so solvency is simply not a
+		// requirement here. Treating nil as "everybody is broke" would close rooms
+		// that have perfectly valid heirs, which is 9.3's review finding in a new
+		// costume. Every insolvency caller passes a freshly-read non-nil map, so
+		// their behaviour is unchanged.
+		if buyIn > 0 && balances != nil && balances[candidateID] < buyIn {
+			return false
+		}
+		// Story 9.8 AC7: an heir must ALSO pass the honor gate.
+		return extraEligible == nil || extraEligible(candidateID)
 	}
 
 	var newOwnerID *uint
@@ -1111,11 +1548,11 @@ func (h *RoomHandler) ejectInsolventAtStart(roomID uint, room *Room, insolventID
 			return apperr.ErrRoomNotFound
 		}
 		ownerEjected := false
-		for _, id := range insolventIDs {
+		for _, id := range ejectedIDs {
 			if rmErr := tx.RemovePlayer(roomID, id); rmErr != nil {
 				// A concurrent leave may already have freed the seat — tolerate it.
 				if !errors.Is(rmErr, apperr.ErrNotInRoom) {
-					return fmt.Errorf("freeing insolvent seat %d: %w", id, rmErr)
+					return fmt.Errorf("freeing ejected seat %d: %w", id, rmErr)
 				}
 				continue
 			}
@@ -1151,7 +1588,7 @@ func (h *RoomHandler) ejectInsolventAtStart(roomID uint, room *Room, insolventID
 		return nil
 	})
 	if txErr != nil {
-		slog.Error("failed to eject insolvent seats at start", "roomID", roomID, "error", txErr)
+		slog.Error("failed to eject barred seats at start", "roomID", roomID, "error", txErr)
 		// The revert-to-"waiting" lived inside the rolled-back tx, so the room is
 		// still "playing" (set by the committed outer StartMatch tx) with no live
 		// session. Un-brick it with a best-effort out-of-tx revert, mirroring the
@@ -1163,14 +1600,11 @@ func (h *RoomHandler) ejectInsolventAtStart(roomID uint, room *Room, insolventID
 		// Fall through: still push the per-user ejections + lobby refresh below.
 	}
 
-	// Per-user ejection push (Story 9.3 AC5) — each ejected player's client
-	// routes to the lobby with the exact balance/buy-in modal.
-	for _, id := range insolventIDs {
-		h.broadcastToUsers([]uint{id}, ws.SystemInsolventEjected, ws.InsolventEjectedPayload{
-			RoomID:  roomID,
-			BuyIn:   room.CoinBuyIn,
-			Balance: balances[id],
-		})
+	// Per-user ejection push (Story 9.3 AC5; Story 9.8 AC6) — each ejected player's
+	// client routes to the lobby with the exact numbers for their reason's modal.
+	for _, id := range ejectedIDs {
+		msgType, payload := notices[id].push(roomID)
+		h.broadcastToUsers([]uint{id}, msgType, payload)
 	}
 
 	if roomClosed {
@@ -1205,7 +1639,7 @@ func (h *RoomHandler) ejectInsolventAtStart(roomID uint, room *Room, insolventID
 			if postRoom != nil {
 				playerCount = postRoom.PlayerCount
 			}
-			for _, id := range insolventIDs {
+			for _, id := range ejectedIDs {
 				payload := map[string]interface{}{
 					"roomId":      roomID,
 					"userId":      id,
@@ -1453,7 +1887,53 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 			return fmt.Errorf("reading balance for return gate: %w", berr)
 		}
 		if balance < gateRoom.CoinBuyIn {
-			return h.ejectInsolventReturner(uint(roomID), userID, balance, gateRoom, members)
+			return h.ejectReturner(uint(roomID), userID, insolventNotice(gateRoom.CoinBuyIn, balance), apperr.ErrInsufficientCoins, nil, gateRoom, members)
+		}
+	}
+
+	// Story 9.8 AC6/AC7: return-time HONOR gate, immediately after the insolvency
+	// gate above and through the same ejection flow.
+	//
+	// This is the checkpoint that actually fires in practice (D3). Honor only moves
+	// at match end, and an abandoning player's room_players row survives — 9.3 AC3
+	// holds them as seated — so the realistic sequence is abandon -> reconnect ->
+	// "Return to room" -> gate. Gating only at StartMatch would leave the
+	// ejected-to-be player sitting in the room until the owner clicks Start, at which
+	// point the match would refuse to start for no visible reason.
+	//
+	// An ungated room performs NO honor read at all (D5).
+	if gateRoom.honorGated() {
+		snap, enforced, herr := h.honorSnapshotFor(userID)
+		if herr != nil {
+			return herr
+		}
+		if enforced {
+			if gateErr := honorGateError(gateRoom, snap); gateErr != nil {
+				// Ownership eligibility is widened with the honor gate (AC7): an heir
+				// must pass it too. Read every OTHER seated human's honor once, here,
+				// outside the transaction — exactly as GetBalances is hoisted above —
+				// and cover ALL of them, not just the failing seat. A one-entry map is
+				// the bug 9.3's review found for balances: it made every candidate look
+				// ineligible and closed rooms that had valid heirs.
+				candidateIDs := make([]uint, 0, len(members))
+				for _, p := range members {
+					if p.UserID != userID && p.Seat != nil && p.UserID != 0 {
+						candidateIDs = append(candidateIDs, p.UserID)
+					}
+				}
+				candidateSnaps, cerr := h.honorCandidateSnapshots(candidateIDs)
+				if cerr != nil {
+					return cerr
+				}
+				honorEligible := func(candidateID uint) bool {
+					cs, ok := candidateSnaps[candidateID]
+					if !ok {
+						return false
+					}
+					return honorGateError(gateRoom, cs) == nil
+				}
+				return h.ejectReturner(uint(roomID), userID, honorNotice(gateRoom.MinHonor, snap.Score), gateErr, honorEligible, gateRoom, members)
+			}
 		}
 	}
 
@@ -1767,7 +2247,10 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 			}
 		}
 		if len(insolvent) > 0 {
-			h.ejectInsolventAtStart(autoStartRoom.ID, autoStartRoom, insolvent, balances, players)
+			// extraEligible is nil: a Quick Play room is ungated by construction
+			// (Story 9.8 AC12 — the synthesis sets min_honor 0 / allow_new_players
+			// true explicitly), so there is no honor requirement for an heir to meet.
+			h.ejectSeatsAtStart(autoStartRoom.ID, autoStartRoom, insolventNotices(insolvent, autoStartRoom.CoinBuyIn, balances), balances, nil, players)
 			return apperr.ErrInsufficientCoins
 		}
 
@@ -1783,7 +2266,7 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 				if fresh, ferr := h.walletService.GetBalances([]uint{insolventID}); ferr == nil {
 					balances[insolventID] = fresh[insolventID]
 				}
-				h.ejectInsolventAtStart(autoStartRoom.ID, autoStartRoom, []uint{insolventID}, balances, players)
+				h.ejectSeatsAtStart(autoStartRoom.ID, autoStartRoom, insolventNotices([]uint{insolventID}, autoStartRoom.CoinBuyIn, balances), balances, nil, players)
 				return apperr.ErrInsufficientCoins
 			}
 			return fmt.Errorf("charging stakes for auto-start: %w", chargeErr)
@@ -2845,6 +3328,19 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 			// rolls back atomically, so a GetBalances prefilter is needed to find
 			// and eject EVERY insolvent seat. `charged` records whether stakes were
 			// actually debited so a later StartMatch failure can refund them.
+			// Story 9.8 AC6: mid-session HONOR re-check, run BEFORE the coin block
+			// below. The ordering is load-bearing, not stylistic: ChargeStakes commits
+			// money, so an honor ejection discovered after it would need a refund.
+			// Gate first, charge second — no stake is ever charged and refunded for a
+			// player who was about to be ejected.
+			//
+			// An ungated room short-circuits with zero honor reads (D5). In practice
+			// the only thing that trips this is an abandonment in the previous match:
+			// a completed match raises honor, and decay only lowers it over months.
+			if honorErr := h.honorPrefilterAtStart(uint(roomID), updatedRoom, players); honorErr != nil {
+				return honorErr
+			}
+
 			charged := false
 			var chargedIDs []uint
 			if updatedRoom.CoinBuyIn > 0 && h.walletService != nil {
@@ -2874,7 +3370,12 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 					// Per-player ejection: free every insolvent seat, push
 					// system:insolvent_ejected to each, transfer/close if the owner
 					// was insolvent. The match does not start; the owner gets 409.
-					h.ejectInsolventAtStart(uint(roomID), updatedRoom, insolvent, balances, players)
+					//
+					// extraEligible is nil, and that is sound rather than an omission:
+					// the honor prefilter above runs BEFORE this whole block and returns
+					// early on any failing seat, so reaching here proves every seated
+					// human already passes the room's honor gate (Story 9.8 AC7).
+					h.ejectSeatsAtStart(uint(roomID), updatedRoom, insolventNotices(insolvent, updatedRoom.CoinBuyIn, balances), balances, nil, players)
 					return apperr.ErrInsufficientCoins
 				}
 
@@ -2892,7 +3393,7 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 						if fresh, ferr := h.walletService.GetBalances([]uint{insolventID}); ferr == nil {
 							balances[insolventID] = fresh[insolventID]
 						}
-						h.ejectInsolventAtStart(uint(roomID), updatedRoom, []uint{insolventID}, balances, players)
+						h.ejectSeatsAtStart(uint(roomID), updatedRoom, insolventNotices([]uint{insolventID}, updatedRoom.CoinBuyIn, balances), balances, nil, players)
 						return apperr.ErrInsufficientCoins
 					}
 					if uerr := h.repo.UpdateStatus(uint(roomID), "waiting"); uerr != nil {
@@ -3045,8 +3546,18 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				// PasswordHash stays nil — quick-play rooms are never private
 				// (Story 9.6, AC7). The QuickPlay/QuickJoin paths never prompt for
 				// or accept a password, so synthesized rooms are always public.
-				Status:      "waiting",
-				PlayerCount: 1,
+				//
+				// Both honor-gate columns are set EXPLICITLY to their open values
+				// (Story 9.8 AC12): quick play is ungated by construction, has no
+				// honor bracket, and QuickPlay/QuickJoin gain no honor gate and no new
+				// error code. AllowNewPlayers in particular MUST be spelled out here —
+				// room.Room declares it without a GORM `default` tag (that tag would
+				// make `false` uninsertable), so omitting it would insert false and
+				// turn every Quick Play table veterans-only.
+				MinHonor:        0,
+				AllowNewPlayers: true,
+				Status:          "waiting",
+				PlayerCount:     1,
 			}
 			if err := tx.Create(newRoom); err != nil {
 				return err

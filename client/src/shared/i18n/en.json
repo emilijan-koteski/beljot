@@ -308,7 +308,10 @@
       "insufficientCoins": "You need {{buyIn}} coins to join this room — your balance: {{balance}}.",
       "insufficientCoinsGeneric": "You don't have enough coins to join this room.",
       "insufficientCoinsStart": "A player can't stake that much — the match didn't start.",
-      "wrongPassword": "Incorrect room password."
+      "wrongPassword": "Incorrect room password.",
+      "honorTooLow": "This room asks for honor {{minHonor}} or higher. Yours is {{honor}} — finish a few matches to bring it up.",
+      "honorTooLowGeneric": "Your honor score is below this room's minimum.",
+      "newPlayerNotAllowed": "This room is for experienced players. Finish 5 matches to unlock rooms like it."
     },
     "passwordPrompt": {
       "title": "Private room",
@@ -461,6 +464,8 @@
       "eyebrow": "Heads up",
       "insolventTitle": "Not enough coins",
       "insolventBody": "You don't have enough coins to cover this room's buy-in. Balance: {{balance}}. Buy-in: {{buyIn}}.",
+      "honorTitle": "Honor below the room's bar",
+      "honorBody": "Your honor dropped below this room's minimum of {{minHonor}} — it's now {{honor}}. Finish your next matches and it climbs back.",
       "roomClosedTitle": "Room closed",
       "roomClosedBody": "This room closed — no remaining player could afford to host it.",
       "action": "Got it"
@@ -500,7 +505,10 @@
         "alreadyInRoom": "You're already in a room — leave it before creating a new one",
         "passwordRequired": "Set a password for the private room",
         "passwordTooShort": "Password needs at least {{min}} characters",
-        "passwordTooLong": "Password must be at most {{max}} characters"
+        "passwordTooLong": "Password must be at most {{max}} characters",
+        "invalidMinHonor": "Minimum honor must be between {{min}} and {{max}}.",
+        "ownHonorTooLow": "You wouldn't meet this bar yourself: it asks for {{minHonor}} and your honor is {{honor}}. Lower it to continue.",
+        "ownNewPlayerNotAllowed": "You're still a new player, so this would lock you out of your own room. Welcome new players to continue."
       },
       "eyebrow": "New room",
       "headline": "Create a room",
@@ -535,6 +543,12 @@
       "privacyPrivate": "Private",
       "roomPassword": "Room password",
       "roomPasswordPlaceholder": "Enter password",
+      "minHonor": "Minimum honor",
+      "minHonorHint": "0 lets anyone in. A realistic bar is 85 to 95 — a fresh account starts at 80, and almost nobody reaches 100.",
+      "allowNewPlayers": "New players",
+      "allowNewPlayersHint": "A new player has fewer than 5 finished matches, so they have no score yet. Welcoming them lets a newcomer in whatever the minimum above says.",
+      "allowNewPlayersYes": "Welcome",
+      "allowNewPlayersNo": "Veterans only",
       "roomPasswordHint": "At least {{min}} characters"
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
@@ -589,7 +603,11 @@
       "private": "Private",
       "privateLockAriaLabel": "Private room — password required to join",
       "public": "Public",
-      "publicAriaLabel": "Public room — anyone can join"
+      "publicAriaLabel": "Public room — anyone can join",
+      "minHonor": "{{minHonor}}+",
+      "minHonorAriaLabel": "Minimum honor {{minHonor}}",
+      "veteransOnly": "Veterans only",
+      "veteransOnlyAriaLabel": "This room does not admit new players"
     },
     "chat": {
       "title": "Lobby chat",

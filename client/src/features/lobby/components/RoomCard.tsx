@@ -1,5 +1,17 @@
 import type { TFunction } from "i18next";
-import { ArrowRight, Bot, Clock, Coins, KeyRound, Lock, LockOpen, Users, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  Bot,
+  Clock,
+  Coins,
+  KeyRound,
+  Lock,
+  LockOpen,
+  ShieldCheck,
+  UserCheck,
+  Users,
+  Zap,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
@@ -122,6 +134,41 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               <LockOpen className="size-3" />
               {t("lobby.card.public")}
             </span>
+          )}
+          {/* Honor gate (Story 9.8 AC5). Both chips are CONDITIONAL: an ungated
+              room's card is visually unchanged from before this story, and every
+              ungated card would otherwise grow two chips carrying no information.
+              Gated rooms stay LISTED and labelled — mirroring 9.6's "listed but
+              locked" decision, the player sees the requirement and decides.
+              Compared explicitly (> 0, === false), never by truthiness: a real 0
+              and a real false are legitimate Go values. Each chip carries text
+              plus a glyph, so colour is never the only signal. */}
+          {room.minHonor > 0 && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="room-card-min-honor"
+                data-min-honor={room.minHonor}
+                aria-label={t("lobby.card.minHonorAriaLabel", { minHonor: room.minHonor })}
+              >
+                <ShieldCheck className="size-3" />
+                {t("lobby.card.minHonor", { minHonor: room.minHonor })}
+              </span>
+            </>
+          )}
+          {room.allowNewPlayers === false && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="room-card-veterans-only"
+                aria-label={t("lobby.card.veteransOnlyAriaLabel")}
+              >
+                <UserCheck className="size-3" />
+                {t("lobby.card.veteransOnly")}
+              </span>
+            </>
           )}
           <Dot />
           <RelativeTime iso={room.createdAt} variant="compact" />

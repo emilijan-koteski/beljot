@@ -1171,6 +1171,84 @@ describe("useWsDispatch", () => {
     });
   });
 
+  // --- Honor ejection (Story 9.8 AC6/AC8) ---
+
+  it("dispatches system:honor_ejected to roomStore as an 'honor' signal", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 7, minHonor: 80, honor: 55 },
+    });
+
+    expect(useRoomStore.getState().roomEjection).toEqual({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 80,
+      honor: 55,
+      reason: "honor",
+    });
+  });
+
+  it("dispatches system:honor_ejected regardless of currentRoomId (direct per-user push)", () => {
+    useRoomStore.getState().setRoomEjection(null);
+    expect(useRoomStore.getState().currentRoomId).toBeNull();
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 3, minHonor: 95, honor: 40 },
+    });
+
+    expect(useRoomStore.getState().roomEjection?.reason).toBe("honor");
+    expect(useRoomStore.getState().roomEjection?.roomId).toBe(3);
+  });
+
+  it("accepts an honor score of 0 rather than rejecting it as falsy", () => {
+    // A real Go 0 must survive: the guard is typeof === "number", never
+    // truthiness. Same for a minHonor of 0.
+    useRoomStore.getState().setRoomEjection(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 4, minHonor: 0, honor: 0 },
+    });
+
+    expect(useRoomStore.getState().roomEjection?.honor).toBe(0);
+    expect(useRoomStore.getState().roomEjection?.minHonor).toBe(0);
+  });
+
+  it("ignores a malformed system:honor_ejected payload", () => {
+    useRoomStore.getState().setRoomEjection(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 7, minHonor: "80", honor: 55 } as never,
+    });
+
+    expect(useRoomStore.getState().roomEjection).toBeNull();
+  });
+
+  it("ignores a system:honor_ejected payload missing the honor score entirely", () => {
+    useRoomStore.getState().setRoomEjection(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 7, minHonor: 80 } as never,
+    });
+
+    expect(useRoomStore.getState().roomEjection).toBeNull();
+  });
+
   // --- Surrender (Story 8.2) ---
 
   it("dispatches event:surrender_proposed to matchStore.surrenderProposed", () => {

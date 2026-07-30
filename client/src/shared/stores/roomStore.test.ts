@@ -319,7 +319,7 @@ describe("roomStore", () => {
     expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
   });
 
-  // --- Insolvency ejection (Story 9.3) ---
+  // --- Room ejection (Story 9.3, widened by Story 9.8) ---
 
   it("setRoomEjection sets and clears the ejection notice", () => {
     useRoomStore.getState().setRoomEjection({
@@ -337,6 +337,41 @@ describe("roomStore", () => {
 
     useRoomStore.getState().setRoomEjection(null);
     expect(useRoomStore.getState().roomEjection).toBeNull();
+  });
+
+  it("setRoomEjection carries the honor numbers for an honor ejection", () => {
+    useRoomStore.getState().setRoomEjection({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 85,
+      honor: 42,
+      reason: "honor",
+    });
+    expect(useRoomStore.getState().roomEjection).toEqual({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 85,
+      honor: 42,
+      reason: "honor",
+    });
+  });
+
+  it("reset PRESERVES an honor-ejection notice too, not just the insolvency one", () => {
+    // The preservation is reason-agnostic by construction; pinned so a future
+    // narrowing of reset() cannot silently drop the honor branch.
+    useRoomStore.getState().setRoomEjection({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 85,
+      honor: 42,
+      reason: "honor",
+    });
+    useRoomStore.getState().reset();
+    expect(useRoomStore.getState().roomEjection?.reason).toBe("honor");
+    expect(useRoomStore.getState().roomEjection?.honor).toBe(42);
   });
 
   it("reset PRESERVES the insolvency-ejection notice so the lobby modal survives RoomPage unmount", () => {

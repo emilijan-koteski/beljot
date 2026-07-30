@@ -1,4 +1,4 @@
-import { Coins, DoorOpen } from "lucide-react";
+import { Coins, DoorOpen, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Dialog, DialogClose, DialogContent } from "@/shared/components/ui/dialog";
@@ -8,9 +8,13 @@ import { useRoomStore } from "@/shared/stores/roomStore";
 /**
  * Story 9.3: lobby arrival modal for a room ejection. It is the single consumer
  * of roomStore.roomEjection — set by the return-time 409 (MatchPage), the
- * per-user system:insolvent_ejected push, and system:room_closed_insolvent.
- * Calm, non-panic copy with one clear action so the player is never left at a
- * dead end (per the UX "no dead ends" rule).
+ * per-user system:insolvent_ejected and system:honor_ejected pushes, and
+ * system:room_closed_insolvent. Calm, non-panic copy with one clear action so
+ * the player is never left at a dead end (per the UX "no dead ends" rule).
+ *
+ * Three copy branches, selected by `reason`: insolvency (balance vs buy-in),
+ * honor (Story 9.8 — the player's score vs the room's minimum), and the
+ * reason-agnostic room-closed notice.
  */
 export function RoomEjectionModal() {
   const { t } = useTranslation();
@@ -19,6 +23,7 @@ export function RoomEjectionModal() {
 
   const open = ejection !== null;
   const roomClosed = ejection?.reason === "roomClosed";
+  const honor = ejection?.reason === "honor";
 
   const close = () => setRoomEjection(null);
 
@@ -67,6 +72,8 @@ export function RoomEjectionModal() {
           >
             {roomClosed ? (
               <DoorOpen size={24} color="var(--brass-deep)" />
+            ) : honor ? (
+              <ShieldAlert size={24} color="var(--brass-deep)" />
             ) : (
               <Coins size={24} color="var(--brass-deep)" />
             )}
@@ -98,7 +105,9 @@ export function RoomEjectionModal() {
             >
               {roomClosed
                 ? t("lobby.roomEjection.roomClosedTitle")
-                : t("lobby.roomEjection.insolventTitle")}
+                : honor
+                  ? t("lobby.roomEjection.honorTitle")
+                  : t("lobby.roomEjection.insolventTitle")}
             </h2>
           </div>
         </div>
@@ -106,6 +115,10 @@ export function RoomEjectionModal() {
         {/* Body */}
         <p
           data-testid="room-ejection-body"
+          // Expose the honor numbers as data-* so tests assert the computed values
+          // without depending on i18n wording. Absent on the other two branches.
+          data-min-honor={honor ? ejection?.minHonor : undefined}
+          data-honor={honor ? ejection?.honor : undefined}
           style={{
             margin: 0,
             padding: "12px 28px 0",
@@ -116,10 +129,18 @@ export function RoomEjectionModal() {
         >
           {roomClosed
             ? t("lobby.roomEjection.roomClosedBody")
-            : t("lobby.roomEjection.insolventBody", {
-                balance: formatCoins(ejection?.balance ?? 0),
-                buyIn: formatCoins(ejection?.buyIn ?? 0),
-              })}
+            : honor
+              ? // ?? 0 is a fallback for a malformed notice only. The dispatch
+                // handler rejects any payload whose numbers are not typeof
+                // "number", so a real 0 arrives as 0 and renders as 0.
+                t("lobby.roomEjection.honorBody", {
+                  minHonor: ejection?.minHonor ?? 0,
+                  honor: ejection?.honor ?? 0,
+                })
+              : t("lobby.roomEjection.insolventBody", {
+                  balance: formatCoins(ejection?.balance ?? 0),
+                  buyIn: formatCoins(ejection?.buyIn ?? 0),
+                })}
         </p>
 
         {/* Footer */}

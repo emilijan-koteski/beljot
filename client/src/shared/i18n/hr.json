@@ -308,7 +308,10 @@
       "insufficientCoins": "Potrebno je {{buyIn}} novčića za ulazak u sobu. Tvoje stanje: {{balance}}.",
       "insufficientCoinsGeneric": "Nemaš dovoljno novčića za ulazak u sobu.",
       "insufficientCoinsStart": "Igrač ne može uložiti toliko. Meč nije počeo.",
-      "wrongPassword": "Pogrešna lozinka sobe."
+      "wrongPassword": "Pogrešna lozinka sobe.",
+      "honorTooLow": "Ova soba traži čast {{minHonor}} ili više. Tvoja je {{honor}}. Odigraj još nekoliko mečeva da je podigneš.",
+      "honorTooLowGeneric": "Tvoja ocjena časti je ispod minimuma ove sobe.",
+      "newPlayerNotAllowed": "Ova soba je za iskusne igrače. Odigraj 5 mečeva da otvoriš takve sobe."
     },
     "passwordPrompt": {
       "title": "Privatna soba",
@@ -461,6 +464,8 @@
       "eyebrow": "Pažnja",
       "insolventTitle": "Nemaš dovoljno novčića",
       "insolventBody": "Nemaš dovoljno novčića za ulog ove sobe. Stanje: {{balance}}. Ulog: {{buyIn}}.",
+      "honorTitle": "Čast ispod granice sobe",
+      "honorBody": "Tvoja čast je pala ispod minimuma ove sobe ({{minHonor}}), sada je {{honor}}. Odigraj sljedeće mečeve i vratit će se.",
       "roomClosedTitle": "Soba je zatvorena",
       "roomClosedBody": "Ova soba je zatvorena jer nijedan preostali igrač nije mogao biti domaćin.",
       "action": "U redu"
@@ -500,7 +505,10 @@
         "alreadyInRoom": "Već si u sobi, napusti je prije nego što napraviš novu",
         "passwordRequired": "Postavi lozinku za privatnu sobu",
         "passwordTooShort": "Lozinka mora imati barem {{min}} znakova",
-        "passwordTooLong": "Lozinka može imati najviše {{max}} znakova"
+        "passwordTooLong": "Lozinka može imati najviše {{max}} znakova",
+        "invalidMinHonor": "Minimalna čast mora biti između {{min}} i {{max}}.",
+        "ownHonorTooLow": "Ti sam ne bi prošao ovu granicu: traži {{minHonor}}, a tvoja čast je {{honor}}. Smanji je da nastaviš.",
+        "ownNewPlayerNotAllowed": "Još si novi igrač, pa bi se ovime zaključao iz vlastite sobe. Primi nove igrače da nastaviš."
       },
       "eyebrow": "Nova soba",
       "headline": "Stvori sobu",
@@ -535,6 +543,12 @@
       "privacyPrivate": "Privatna",
       "roomPassword": "Lozinka sobe",
       "roomPasswordPlaceholder": "Unesi lozinku",
+      "minHonor": "Minimalna čast",
+      "minHonorHint": "0 pušta svakoga. Realna granica je 85 do 95: novi račun počinje na 80, a do 100 gotovo nitko ne dođe.",
+      "allowNewPlayers": "Novi igrači",
+      "allowNewPlayersHint": "Novi igrač ima manje od 5 odigranih mečeva, pa još nema ocjenu. Ako ih primaš, novak ulazi bez obzira na minimum iznad.",
+      "allowNewPlayersYes": "Primaj",
+      "allowNewPlayersNo": "Samo iskusni",
       "roomPasswordHint": "Najmanje {{min}} znakova"
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · živo se osvježava",
@@ -589,7 +603,11 @@
       "private": "Privatna",
       "privateLockAriaLabel": "Privatna soba, za ulazak je potrebna lozinka",
       "public": "Javna",
-      "publicAriaLabel": "Javna soba, svatko može ući"
+      "publicAriaLabel": "Javna soba, svatko može ući",
+      "minHonor": "{{minHonor}}+",
+      "minHonorAriaLabel": "Minimalna čast {{minHonor}}",
+      "veteransOnly": "Samo iskusni",
+      "veteransOnlyAriaLabel": "Ova soba ne prima nove igrače"
     },
     "chat": {
       "title": "Lobi chat",

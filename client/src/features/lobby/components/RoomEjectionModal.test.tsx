@@ -61,4 +61,69 @@ describe("RoomEjectionModal", () => {
     await userEvent.click(screen.getByTestId("room-ejection-action"));
     expect(useRoomStore.getState().roomEjection).toBeNull();
   });
+
+  // Honor ejection (Story 9.8 AC6/AC10) — the third copy branch.
+  it("renders the honor variant with the room's threshold and the player's score", () => {
+    useRoomStore.getState().setRoomEjection({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 80,
+      honor: 55,
+      reason: "honor",
+    });
+    render(<RoomEjectionModal />);
+
+    expect(screen.getByTestId("room-ejection-modal")).toBeInTheDocument();
+    // Numbers asserted through data-*, so the test stays i18n-independent.
+    const body = screen.getByTestId("room-ejection-body");
+    expect(body).toHaveAttribute("data-min-honor", "80");
+    expect(body).toHaveAttribute("data-honor", "55");
+  });
+
+  it("renders a real honor score of 0 rather than treating it as absent", () => {
+    // A score of 0 is a legitimate Go value. A truthiness check anywhere in this
+    // path would swallow it.
+    useRoomStore.getState().setRoomEjection({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 50,
+      honor: 0,
+      reason: "honor",
+    });
+    render(<RoomEjectionModal />);
+
+    expect(screen.getByTestId("room-ejection-body")).toHaveAttribute("data-honor", "0");
+  });
+
+  it("does not expose honor attributes on the insolvency branch", () => {
+    useRoomStore.getState().setRoomEjection({
+      roomId: 7,
+      buyIn: 1500,
+      balance: 200,
+      reason: "insolvent",
+    });
+    render(<RoomEjectionModal />);
+
+    const body = screen.getByTestId("room-ejection-body");
+    expect(body).not.toHaveAttribute("data-min-honor");
+    expect(body).not.toHaveAttribute("data-honor");
+  });
+
+  it("clears an honor notice when the action is clicked", () => {
+    useRoomStore.getState().setRoomEjection({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 80,
+      honor: 55,
+      reason: "honor",
+    });
+    render(<RoomEjectionModal />);
+
+    expect(screen.getByTestId("room-ejection-action")).toBeInTheDocument();
+    useRoomStore.getState().setRoomEjection(null);
+    expect(useRoomStore.getState().roomEjection).toBeNull();
+  });
 });

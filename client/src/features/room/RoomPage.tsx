@@ -54,6 +54,7 @@ import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import { honorScoreOrPrior } from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -226,6 +227,33 @@ export function RoomPage() {
   // the page looks dead, you can only leave. When the fetched room shows we are
   // NOT yet a member of an open (waiting, non-quick-play) room, join it here —
   // mirroring what the lobby's Join does — then refetch to pick up membership.
+  // Maps a deep-link join failure to its toast copy. Shared by BOTH of this page's
+  // join call paths — the public auto-join effect below and joinDeepLinkPrivate —
+  // deliberately: 9.6's review found the deep-link path needed the identical fix
+  // the lobby path had received, and it surfaced only in manual E2E. One function
+  // means a new error code cannot be added to one path and forgotten on the other.
+  //
+  // The numbers are composed LOCALLY (Story 9.2 Decision B): the server's error
+  // payload carries only a code, and we hold the room plus our own auth envelope.
+  function joinFailureMessage(code: string | null, room: Room): string {
+    if (code === "ROOM_FULL") return t("lobby.errors.roomFull");
+    if (code === "INSUFFICIENT_COINS") {
+      return t("room.errors.insufficientCoins", {
+        buyIn: formatCoins(room.coinBuyIn),
+        balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
+      });
+    }
+    if (code === "HONOR_TOO_LOW") {
+      // honorScoreOrPrior, never `|| 80` — a real score of 0 must survive.
+      return t("room.errors.honorTooLow", {
+        minHonor: room.minHonor,
+        honor: honorScoreOrPrior(useAuthStore.getState().user?.honorScore),
+      });
+    }
+    if (code === "NEW_PLAYER_NOT_ALLOWED") return t("room.errors.newPlayerNotAllowed");
+    return t("lobby.errors.joinFailed");
+  }
+
   useEffect(() => {
     if (!roomQuery.isSuccess || !roomQuery.data || !id) return;
     // Judge membership ONLY on data fetched fresh after this mount. With
@@ -273,16 +301,7 @@ export function RoomPage() {
           return;
         }
         hasLeftRef.current = true; // suppress the unmount cleanup-leave
-        toast.error(
-          code === "ROOM_FULL"
-            ? t("lobby.errors.roomFull")
-            : code === "INSUFFICIENT_COINS"
-              ? t("room.errors.insufficientCoins", {
-                  buyIn: formatCoins(room.coinBuyIn),
-                  balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
-                })
-              : t("lobby.errors.joinFailed"),
-        );
+        toast.error(joinFailureMessage(code, room));
         navigate("/lobby", { replace: true });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -315,16 +334,7 @@ export function RoomPage() {
         }
         hasLeftRef.current = true; // suppress the unmount cleanup-leave
         setDeepLinkPrivateRoom(null);
-        toast.error(
-          code === "ROOM_FULL"
-            ? t("lobby.errors.roomFull")
-            : code === "INSUFFICIENT_COINS"
-              ? t("room.errors.insufficientCoins", {
-                  buyIn: formatCoins(room.coinBuyIn),
-                  balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
-                })
-              : t("lobby.errors.joinFailed"),
-        );
+        toast.error(joinFailureMessage(code, room));
         navigate("/lobby", { replace: true });
       });
   }

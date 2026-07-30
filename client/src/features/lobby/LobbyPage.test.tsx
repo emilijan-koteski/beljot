@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { i18n } from "@/shared/i18n/i18n";
 import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { LobbyPage } from "./LobbyPage";
@@ -322,6 +323,109 @@ describe("LobbyPage", () => {
     const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
     expect(msg).toContain("500");
     expect(msg).toContain("300");
+    expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
+  });
+
+  // --- Honor gate (Story 9.8 AC9) ---
+
+  const gatedRoom = {
+    id: 9,
+    name: "Veterans Table",
+    code: "VET123",
+    ownerId: 2,
+    ownerUsername: "host",
+    variant: "bitola",
+    matchMode: "1001",
+    timerStyle: "relaxed",
+    timerDurationSeconds: null,
+    status: "waiting",
+    playerCount: 1,
+    isQuickPlay: false,
+    coinBuyIn: 0,
+    isPrivate: false,
+    minHonor: 85,
+    allowNewPlayers: false,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    players: [
+      { id: 1, roomId: 9, userId: 2, username: "host", seat: 0, team: "teamA", createdAt: "" },
+    ],
+  };
+
+  it("labels a gated room's card with both honor chips", async () => {
+    mockGetRooms.mockResolvedValueOnce([gatedRoom]);
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card")).toBeInTheDocument());
+    // AC5: gated rooms stay LISTED and labelled, never filtered out.
+    expect(screen.getByTestId("room-card-min-honor")).toHaveAttribute("data-min-honor", "85");
+    expect(screen.getByTestId("room-card-veterans-only")).toBeInTheDocument();
+    expect(screen.getByTestId("room-card-join")).toBeInTheDocument();
+  });
+
+  it("composes the HONOR_TOO_LOW toast from the room's threshold and the viewer's score", async () => {
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    const { useAuthStore } = await import("@/shared/stores/authStore");
+    useAuthStore.setState({
+      user: makeUser({ username: "me", honorScore: 42, isNewPlayer: false }),
+    });
+
+    mockGetRooms.mockResolvedValueOnce([gatedRoom]);
+    mockJoinRoom.mockRejectedValueOnce(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9, undefined));
+    // Composed locally (Decision B: the error payload carries only the code).
+    const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("85");
+    expect(msg).toContain("42");
+    expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
+  });
+
+  it("renders a real honor score of 0 in the HONOR_TOO_LOW toast", async () => {
+    // honorScoreOrPrior, never `|| 80`: a score of 0 is a legitimate Go value and
+    // must not be replaced by the prior. This exact bug was patched in 9.7.
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    const { useAuthStore } = await import("@/shared/stores/authStore");
+    useAuthStore.setState({
+      user: makeUser({ username: "me", honorScore: 0, isNewPlayer: false }),
+    });
+
+    mockGetRooms.mockResolvedValueOnce([{ ...gatedRoom, minHonor: 50 }]);
+    mockJoinRoom.mockRejectedValueOnce(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalled());
+    const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("0");
+    expect(msg).not.toContain("80");
+  });
+
+  it("shows the veterans-only toast for NEW_PLAYER_NOT_ALLOWED", async () => {
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    mockGetRooms.mockResolvedValueOnce([gatedRoom]);
+    mockJoinRoom.mockRejectedValueOnce(
+      new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "new players not allowed"),
+    );
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9, undefined));
+    expect(toast.error).toHaveBeenLastCalledWith(i18n.t("room.errors.newPlayerNotAllowed"));
     expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
   });
 

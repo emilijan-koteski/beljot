@@ -43,6 +43,12 @@ export function JoinByCodeTile() {
       // Join-by-code has no room object in scope, so it can't compose the
       // {{buyIn}}/{{balance}} message — use the param-less generic variant.
       toast.error(t("room.errors.insufficientCoinsGeneric"));
+    else if (c === "HONOR_TOO_LOW")
+      // Same reason as INSUFFICIENT_COINS above: the public by-code path can fail
+      // at lookup time with no room object in scope, so there is no {{minHonor}}
+      // to interpolate — use the param-less generic variant (Story 9.8 AC9).
+      toast.error(t("room.errors.honorTooLowGeneric"));
+    else if (c === "NEW_PLAYER_NOT_ALLOWED") toast.error(t("room.errors.newPlayerNotAllowed"));
     else if (c === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
     else toast.error(t("lobby.errors.joinFailed"));
   }

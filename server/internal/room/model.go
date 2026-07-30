@@ -39,13 +39,49 @@ type Room struct {
 	// can never drift from the hash. Auto-populated on every DB read by the
 	// AfterFind hook below; CreateRoom and the hand-built roomLifecyclePayload set
 	// it explicitly because those paths don't read back through GORM.
-	IsPrivate   bool           `gorm:"-" json:"isPrivate"`
-	Status      string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
-	PlayerCount int            `gorm:"not null;default:1" json:"playerCount"`
-	IsQuickPlay bool           `gorm:"not null;default:false" json:"isQuickPlay"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	IsPrivate bool `gorm:"-" json:"isPrivate"`
+	// MinHonor is the minimum honor score an EXPERIENCED player must clear to join
+	// (Story 9.8, FR57). 0 means no bar, and is the default. The DB CHECK bounds it
+	// to [0,100]; the handler range-validates the same interval so client and server
+	// agree in the same unit (a plain integer — no rune/byte asymmetry like 9.6's
+	// password bounds had).
+	//
+	// The value the gate compares against is NEVER users.honor_score (the lagging
+	// snapshot column) — it is the score recomputed at request time through
+	// user.NewHonorSnapshot. See honorGateError in handler.go.
+	MinHonor int `gorm:"not null;default:0" json:"minHonor"`
+	// AllowNewPlayers is whether players with no established track record
+	// (user.IsNewPlayer — fewer than 5 finished-or-abandoned matches) may join at
+	// all (Story 9.8, FR57). It is INDEPENDENT of MinHonor (D1): a New Player is
+	// never score-checked, so this toggle is the owner's explicit "I'll take an
+	// unknown" switch, and it applies even in a MinHonor == 0 room.
+	//
+	// NO `default` TAG, DELIBERATELY — this is a silent-data-corruption trap, not a
+	// style preference. GORM does not send a zero-valued field (0, "", false) in an
+	// INSERT when that field declares a `default` tag; it lets the database apply
+	// the default instead. With `gorm:"default:true"` it would be IMPOSSIBLE to
+	// create a room with allow_new_players = false: the value would silently flip
+	// to true. (Per the GORM docs: "any zero value fields like 0, '', false won't
+	// be saved into the database for those fields defined default value … you might
+	// want to use a pointer type or Scanner/Valuer to avoid this.") Omitting the tag
+	// makes GORM send the real boolean every time; the DB-side DEFAULT TRUE in
+	// migration 000018 still covers the backfill and any raw insert.
+	//
+	// The inverse trap is closed by construction: with no GORM default, a hand-built
+	// &Room{...} that FORGETS this field inserts false (veterans-only). Both &Room{}
+	// sites therefore set it explicitly — CreateRoom and the Quick Play synthesis.
+	//
+	// Rejected alternatives: *bool (drags nil-handling into every read path for what
+	// is only a write-path problem) and inverting the column to `veterans_only`
+	// (deviates from the AC-mandated column name and installs a permanent double
+	// negative at every call site).
+	AllowNewPlayers bool           `gorm:"not null" json:"allowNewPlayers"`
+	Status          string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
+	PlayerCount     int            `gorm:"not null;default:1" json:"playerCount"`
+	IsQuickPlay     bool           `gorm:"not null;default:false" json:"isQuickPlay"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	UpdatedAt       time.Time      `json:"updatedAt"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // AfterFind derives the wire-facing IsPrivate flag from PasswordHash on every

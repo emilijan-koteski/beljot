@@ -291,6 +291,12 @@ const SystemRoomOwnerChanged = "system:room_owner_changed"
 // 9.3 AC4) — the owner left or was barred for insolvency and no one could
 // inherit. Recipients route to the lobby with a "room closed" notice. Uses the
 // system: prefix like every sibling room-lifecycle event.
+//
+// Story 9.8 REUSES this event for honor closes: when an owner is honor-ejected
+// and no eligible heir remains, every still-seated member receives this same
+// event. The payload is {roomId} and the client copy is already reason-agnostic,
+// so it is behaviourally correct for both reasons. The WIRE STRING IS DELIBERATELY
+// UNCHANGED — renaming it would break stale tabs for zero user-visible gain.
 const SystemRoomClosedInsolvent = "system:room_closed_insolvent"
 
 // SystemInsolventEjected is a per-user push (via the per-recipient broadcast,
@@ -319,6 +325,37 @@ type InsolventEjectedPayload struct {
 	RoomID  uint `json:"roomId"`
 	BuyIn   int  `json:"buyIn"`
 	Balance int  `json:"balance"`
+}
+
+// SystemHonorEjected is a per-user push to a player ejected from a room because
+// their honor score no longer clears the room's gate (Story 9.8 AC6). Its sibling
+// is SystemInsolventEjected: same shape, same delivery, same client pipeline —
+// a pre-match, room-lifecycle, per-user notice.
+//
+// The system: prefix is DELIBERATE and load-bearing (Story 9.8 D4). The epic wrote
+// `event:honor_eject`, which is wrong twice over: event: is reserved for in-match
+// game-state events with an ordering contract inside the match finalizers, and this
+// fires pre-match at the room level. It also has a mechanical consequence — the WS
+// drift gate (events_contract_test.go's `cases` table, the Zod schemas, the golden
+// files, the MutualExtends witnesses) covers ONLY event:* typed payloads. Every
+// system:* sibling here (InsolventEjectedPayload, RoomClosedInsolventPayload,
+// PlayerReturnedPayload) is absent from it. So this event has ZERO drift-gate
+// touchpoints, and the correct diff is two files: this one and wsEvents.ts. A
+// contributor adding a golden or a `cases` row for it has misread the gate's scope.
+//
+// Note also that an honor ejection NEVER produces a match_abandoned: it is
+// pre-match and room-level, so epics.md's predicted "honor_eject" addition to that
+// event's reason union does not apply (9.3 never appended "insolvency" either).
+const SystemHonorEjected = "system:honor_ejected"
+
+// HonorEjectedPayload is the typed payload for SystemHonorEjected events (Story
+// 9.8). MinHonor is the room's threshold; Honor is the ejected player's own
+// AUTHORITATIVE recomputed score (never the lagging users.honor_score column), so
+// the client modal can state both numbers. Not drift-gated — see SystemHonorEjected.
+type HonorEjectedPayload struct {
+	RoomID   uint `json:"roomId"`
+	MinHonor int  `json:"minHonor"`
+	Honor    int  `json:"honor"`
 }
 
 // SystemPlayerReturned is broadcast to a reopened room's members when a player

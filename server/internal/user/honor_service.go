@@ -66,6 +66,50 @@ func (s *HonorService) ApplyHonorEvents(events map[uint]match.HonorEvent, now ti
 	return out, nil
 }
 
+// HonorForUsers returns each requested user's AUTHORITATIVE honor snapshot, keyed
+// by user ID. It is the read path Story 9.8's room gate goes through.
+//
+// Two things it deliberately does NOT do:
+//
+//  1. It never reads users.honor_score. That column is the lagging, filter-only
+//     snapshot (see its comment in model.go and the 000017 header) — a decayed score
+//     moves with wall-clock time even when nothing is written. Every row is passed
+//     through NewHonorSnapshot instead, recomputing from the three source columns of
+//     a row already in hand.
+//  2. It adds NOTHING to the UserRepository interface. FindManyByIDs already returns
+//     every honor column, so this is a pure addition to the concrete service — which
+//     is what keeps the ~20 repository mocks across user/, match/, auth/, chat/ and
+//     lobby/ untouched (Story 9.8 D6).
+//
+// `now` is stamped ONCE for the whole batch so two seats checked in the same request
+// cannot be decayed to different instants. Empty input is a no-op with no DB
+// round-trip (mirroring LevelsForUsers). Unknown IDs — and bot id 0 — are simply
+// absent from the result; the caller decides whether that is an error (the room gate
+// treats it as one, because a zero-value snapshot would read as an experienced player
+// with a score of 0).
+func (s *HonorService) HonorForUsers(userIDs []uint) (map[uint]HonorSnapshot, error) {
+	if len(userIDs) == 0 {
+		return map[uint]HonorSnapshot{}, nil
+	}
+	users, err := s.repo.FindManyByIDs(userIDs)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	out := make(map[uint]HonorSnapshot, len(users))
+	for _, u := range users {
+		out[u.ID] = NewHonorSnapshot(
+			u.HonorCompletedWeight,
+			u.HonorAbandonedWeight,
+			u.HonorDecayedAt,
+			u.HonorCompletedTotal,
+			u.HonorAbandonedTotal,
+			now,
+		)
+	}
+	return out, nil
+}
+
 // ResetHonor is the operator forgiveness hook (Story 9.7 AC9 / D7). It is
 // deliberately NOT reachable over HTTP: there is no admin system in this
 // project, so 9.7 ships the capability and the migration header documents the

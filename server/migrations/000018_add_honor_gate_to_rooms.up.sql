@@ -1,0 +1,59 @@
+-- Honor-gated rooms (Story 9.8, FR57): two per-room access controls that let an
+-- owner self-select into a table of people who finish the matches they start.
+-- Additive ALTER style, mirroring 000012_add_room_password.
+--
+-- THE TWO GATES ARE INDEPENDENT (Story 9.8 D1). They are not one setting with a
+-- flag; they answer two different questions, and either can be set alone:
+--
+--     min_honor         -> the bar an EXPERIENCED player's honor must clear
+--     allow_new_players -> whether a player with no track record may enter AT ALL
+--
+-- The gate is exactly:
+--
+--     if is_new_player: admit iff allow_new_players   -- the score is NOT consulted
+--     else:             admit iff honor_score >= min_honor
+--
+-- A New Player is never score-checked, which is the whole point of the toggle:
+-- it is the owner's explicit "I'll take an unknown" switch. A room is therefore
+-- ungated only when min_honor = 0 AND allow_new_players = TRUE, which is the
+-- overwhelmingly common case and the one the join hot path short-circuits on.
+--
+-- WHICH HONOR VALUE THE GATE READS. Not users.honor_score. That column is the
+-- deliberately-lagging denormalized snapshot documented in 000017 ("NEVER render
+-- this column and NEVER gate on it") — decay moves the true score with wall-clock
+-- time even when nothing is written. The gate recomputes from the three source
+-- columns via user.NewHonorSnapshot on every check.
+--
+-- NO BACKFILL IS NEEDED. Unlike 000017, both defaults are already correct for
+-- every existing row: min_honor 0 means "no bar", allow_new_players TRUE means
+-- "everyone welcome". Together they reproduce today's behaviour exactly, so no
+-- live room silently becomes veterans-only at deploy and no ALTER needs a
+-- companion UPDATE.
+
+-- The minimum honor score an experienced player must have to join, 0 = ungated.
+--
+-- SMALLINT because the value is bounded 0-100, the same reasoning as
+-- users.honor_score in 000017. The CHECK enforces the range at the DB level so a
+-- raw insert cannot install a bar no player could ever clear.
+--
+-- Worth knowing before tuning: because honor carries a Beta(4,1) prior, a fresh
+-- account sits at 80, a flawless 20-match record caps at 96, and 100 needs ~195
+-- decayed completions inside a single 90-day half-life. So min_honor above ~95 is
+-- effectively "nobody", and anything at or below 80 admits every newcomer by
+-- default. The full 0-100 range is accepted anyway (owner freedom, same stance as
+-- rooms.coin_buy_in having no maximum).
+ALTER TABLE rooms ADD COLUMN min_honor SMALLINT NOT NULL DEFAULT 0 CHECK (min_honor BETWEEN 0 AND 100);
+
+-- Whether players with no established track record (fewer than 5 finished-or-
+-- abandoned matches — user.IsNewPlayer) may join.
+--
+-- DEFAULT TRUE is load-bearing, not cosmetic: it is what backfills every existing
+-- room as open. A DEFAULT FALSE here would flip every live room to veterans-only
+-- the moment this migration ran.
+--
+-- Note for the Go side: room.Room deliberately declares this field WITHOUT a
+-- GORM `default` tag, because GORM omits zero-valued fields (false) from an
+-- INSERT when they declare one — which would make allow_new_players = FALSE
+-- literally uninsertable. This DB-side default still covers the backfill above
+-- and any raw insert. See the field comment in internal/room/model.go.
+ALTER TABLE rooms ADD COLUMN allow_new_players BOOLEAN NOT NULL DEFAULT TRUE;

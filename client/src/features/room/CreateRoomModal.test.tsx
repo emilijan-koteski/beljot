@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FetchError } from "@/shared/api/axiosClient";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { makeUser, QueryWrapper } from "@/test-utils";
 
@@ -124,6 +125,11 @@ describe("CreateRoomModal", () => {
         coinBuyIn: 500,
         isPrivate: false,
         password: undefined,
+        // Story 9.8: the ungated defaults are always sent, so the wire is
+        // explicit about what the modal chose rather than relying on the
+        // server's nil-pointer fallbacks.
+        minHonor: 0,
+        allowNewPlayers: true,
       });
     });
   });
@@ -162,6 +168,11 @@ describe("CreateRoomModal", () => {
         coinBuyIn: 500,
         isPrivate: false,
         password: undefined,
+        // Story 9.8: the ungated defaults are always sent, so the wire is
+        // explicit about what the modal chose rather than relying on the
+        // server's nil-pointer fallbacks.
+        minHonor: 0,
+        allowNewPlayers: true,
       });
     });
   });
@@ -379,5 +390,163 @@ describe("CreateRoomModal", () => {
         expect.objectContaining({ isPrivate: true, password: "hunter2" }),
       );
     });
+  });
+  // --- Honor gate (Story 9.8 AC3/AC5, D7) ---
+
+  it("renders the honor-gate controls", () => {
+    renderModal(true);
+
+    expect(screen.getByTestId("min-honor-input")).toBeInTheDocument();
+    expect(screen.getByTestId("allow-new-players-toggle")).toBeInTheDocument();
+  });
+
+  it("defaults to an ungated room and shows neither preview chip", () => {
+    renderModal(true);
+
+    expect(screen.getByTestId("min-honor-input")).toHaveValue(0);
+    expect(screen.queryByTestId("preview-min-honor")).toBeNull();
+    expect(screen.queryByTestId("preview-veterans-only")).toBeNull();
+  });
+
+  it("mirrors the honor threshold into the live preview card", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    await user.clear(screen.getByTestId("min-honor-input"));
+    await user.type(screen.getByTestId("min-honor-input"), "85");
+
+    expect(screen.getByTestId("preview-min-honor")).toHaveAttribute("data-min-honor", "85");
+    expect(screen.queryByTestId("preview-veterans-only")).toBeNull();
+  });
+
+  it("mirrors the veterans-only toggle into the live preview card", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
+
+    expect(screen.getByTestId("preview-veterans-only")).toBeInTheDocument();
+    // Independent gates: barring newcomers does not imply a threshold.
+    expect(screen.queryByTestId("preview-min-honor")).toBeNull();
+  });
+
+  it("submits the configured honor gate", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({ id: 4 });
+    // The owner must clear their OWN threshold (D7), or the cosmetic self-gate
+    // disables submit and nothing is sent — which is the correct behaviour, just
+    // not what this test is about.
+    useAuthStore.setState({
+      user: makeUser({ id: 5, username: "owner", honorScore: 96, isNewPlayer: false }),
+    });
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Veterans Table");
+    await user.clear(screen.getByTestId("min-honor-input"));
+    await user.type(screen.getByTestId("min-honor-input"), "90");
+    await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ minHonor: 90, allowNewPlayers: false }),
+      );
+    });
+  });
+
+  it("clamps the threshold to the 0-100 range the server validates", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    const input = screen.getByTestId("min-honor-input");
+    await user.clear(input);
+    await user.type(input, "150");
+    expect(input).toHaveValue(100);
+  });
+
+  // D7: the creator is auto-seated, so a gate they cannot pass would eject them
+  // from their own room at the first Start. Cosmetic guard; the server re-checks.
+  it("disables submit when the owner's own honor is below their chosen threshold", async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      user: makeUser({ id: 5, username: "owner", honorScore: 60, isNewPlayer: false }),
+    });
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Self Locked");
+    await user.clear(screen.getByTestId("min-honor-input"));
+    await user.type(screen.getByTestId("min-honor-input"), "95");
+
+    expect(screen.getByTestId("create-room-button")).toBeDisabled();
+    expect(screen.getByTestId("min-honor-error")).toBeInTheDocument();
+  });
+
+  it("disables submit when a new-player owner bars new players", async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      user: makeUser({ id: 5, username: "owner", isNewPlayer: true }),
+    });
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Self Barred");
+    await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
+
+    expect(screen.getByTestId("create-room-button")).toBeDisabled();
+    expect(screen.getByTestId("allow-new-players-error")).toBeInTheDocument();
+  });
+
+  // D1: a New Player is NEVER score-checked, so a newcomer owner may still set a
+  // high threshold for everyone else. The self-gate must not reject them for a bar
+  // that would never be applied to them.
+  it("lets a new-player owner set a high threshold as long as newcomers are welcome", async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      user: makeUser({ id: 5, username: "owner", honorScore: 80, isNewPlayer: true }),
+    });
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "High Bar");
+    await user.clear(screen.getByTestId("min-honor-input"));
+    await user.type(screen.getByTestId("min-honor-input"), "95");
+
+    expect(screen.getByTestId("create-room-button")).toBeEnabled();
+    expect(screen.queryByTestId("min-honor-error")).toBeNull();
+  });
+
+  it("keeps submit enabled for an owner who clears their own threshold", async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      user: makeUser({ id: 5, username: "owner", honorScore: 95, isNewPlayer: false }),
+    });
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Fine");
+    await user.clear(screen.getByTestId("min-honor-input"));
+    await user.type(screen.getByTestId("min-honor-input"), "95");
+
+    // The boundary is inclusive on both sides of the wire.
+    expect(screen.getByTestId("create-room-button")).toBeEnabled();
+  });
+
+  it("surfaces the server's INVALID_MIN_HONOR rejection in the form banner", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockRejectedValueOnce(new FetchError(400, "INVALID_MIN_HONOR", "bad"));
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Bad Gate");
+    await user.click(screen.getByTestId("create-room-button"));
+
+    expect(await screen.findByTestId("create-room-form-error")).toBeInTheDocument();
+  });
+
+  it("surfaces the server's own-gate rejections in the form banner", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockRejectedValueOnce(new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "nope"));
+    renderModal(true);
+
+    await user.type(screen.getByTestId("room-name-input"), "Server Says No");
+    await user.click(screen.getByTestId("create-room-button"));
+
+    expect(await screen.findByTestId("create-room-form-error")).toBeInTheDocument();
   });
 });

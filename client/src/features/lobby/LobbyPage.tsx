@@ -6,9 +6,9 @@ import { toast } from "sonner";
 import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
 import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
-import { RoomEjectionModal } from "@/features/lobby/components/RoomEjectionModal";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
+import { RoomEjectionModal } from "@/features/lobby/components/RoomEjectionModal";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
 import { Toast } from "@/features/lobby/components/Toast";
 import { CreateRoomModal } from "@/features/room/CreateRoomModal";
@@ -22,6 +22,7 @@ import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
 import { useMarkLobbyRoot } from "@/shared/hooks/useLobbyReturn";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import { honorScoreOrPrior } from "@/shared/lib/honor";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room } from "@/shared/types/apiTypes";
 
@@ -189,6 +190,18 @@ export function LobbyPage() {
             balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
           }),
         );
+      else if (code === "HONOR_TOO_LOW")
+        // Same local-composition rule as INSUFFICIENT_COINS above (Story 9.8): the
+        // error payload carries only the code, and we hold both numbers — the room's
+        // threshold and the viewer's own score. honorScoreOrPrior, never `|| 80`,
+        // so a real score of 0 renders as 0.
+        toast.error(
+          t("room.errors.honorTooLow", {
+            minHonor: room.minHonor,
+            honor: honorScoreOrPrior(useAuthStore.getState().user?.honorScore),
+          }),
+        );
+      else if (code === "NEW_PLAYER_NOT_ALLOWED") toast.error(t("room.errors.newPlayerNotAllowed"));
       else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
       else toast.error(t("lobby.errors.joinFailed"));
     }

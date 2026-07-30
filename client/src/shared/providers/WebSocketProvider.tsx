@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
-import { useRoomEjectRedirect } from "@/shared/hooks/useRoomEjectRedirect";
 import { useMatchStartRedirect } from "@/shared/hooks/useMatchStartRedirect";
+import { useRoomEjectRedirect } from "@/shared/hooks/useRoomEjectRedirect";
 import { useWebSocket } from "@/shared/hooks/useWebSocket";
 import { useWsDispatch } from "@/shared/hooks/useWsDispatch";
 

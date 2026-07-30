@@ -7,6 +7,9 @@ import {
   KeyRound,
   Lock,
   LockOpen,
+  ShieldCheck,
+  UserCheck,
+  UserPlus,
   Users,
   Zap,
 } from "lucide-react";
@@ -26,6 +29,7 @@ import { Segmented } from "@/shared/components/ui/segmented";
 import { useCreateRoomMutation } from "@/shared/hooks/mutations/useRooms";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import { honorIsNewPlayer, honorScoreOrPrior } from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -41,6 +45,15 @@ const DEFAULT_BUY_IN = 500; // mirrors the server default (Story 9.2)
 // is authoritative (apperr ROOM_PASSWORD_TOO_SHORT / ROOM_PASSWORD_TOO_LONG).
 const MIN_ROOM_PASSWORD = 4;
 const MAX_ROOM_PASSWORD = 72;
+// Honor-gate bounds (Story 9.8). The same [0,100] interval, in the same unit (a
+// plain integer), that the server validates and the rooms.min_honor CHECK
+// enforces — 9.6 shipped a min in runes and a max in bytes and needed a review
+// patch to align them, so keep this symmetric and boring.
+const MIN_HONOR_FLOOR = 0;
+const MIN_HONOR_CEILING = 100;
+// The default is UNGATED: min 0, newcomers welcome. Creating a gated room is an
+// opt-in, so the modal must never nudge an owner into one by default.
+const DEFAULT_MIN_HONOR = 0;
 
 /**
  * Split-panel create-room modal. Left = form (name, variant, match mode,
@@ -59,6 +72,13 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const createRoomMutation = useCreateRoomMutation();
   const meUsername = useAuthStore((s) => s.user?.username ?? "");
   const meBalance = useAuthStore((s) => s.user?.walletBalance ?? 0);
+  // The creator's own honor, read through the shared guards (Story 9.8 D7's
+  // self-gate). honorScoreOrPrior, never `?? 80` or `|| 80` — a real score of 0
+  // must survive; honorIsNewPlayer defaults to SUPPRESSED when the flag is absent.
+  // Both were added in 9.7 precisely because the unguarded versions rendered a
+  // confident "80 / Fair" for accounts the server had said nothing about.
+  const meHonor = useAuthStore((s) => honorScoreOrPrior(s.user?.honorScore));
+  const meIsNewPlayer = useAuthStore((s) => honorIsNewPlayer(s.user?.isNewPlayer));
 
   const [name, setName] = useState("");
   const [variant, setVariant] = useState<"bitola" | "croatia">("bitola");
@@ -69,6 +89,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [isPrivate, setIsPrivate] = useState(false);
   const [roomPassword, setRoomPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [minHonor, setMinHonor] = useState(DEFAULT_MIN_HONOR);
+  const [allowNewPlayers, setAllowNewPlayers] = useState(true);
   // Field-level error shown under the room-name input (name validation only).
   const [error, setError] = useState<string | null>(null);
   // General submit error (already-in-room, insolvency race, unexpected) shown
@@ -91,6 +113,20 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   // they can't afford is un-startable — block it here too (server re-validates).
   const effectiveBuyIn = Math.max(0, Math.floor(coinBuyIn || 0));
   const buyInExceedsBalance = effectiveBuyIn > meBalance;
+
+  // Honor self-gate (Story 9.8 D7), same shape and same reason as
+  // buyInExceedsBalance above: the creator is auto-seated, so a gate they cannot
+  // pass would eject them from their own room at the first Start. This mirrors the
+  // server's gate exactly — a New Player is checked ONLY against the toggle and is
+  // never score-checked, which is what makes the toggle meaningful. Cosmetic:
+  // the server is the authority and re-validates.
+  const effectiveMinHonor = Math.min(
+    MIN_HONOR_CEILING,
+    Math.max(MIN_HONOR_FLOOR, Math.floor(minHonor || 0)),
+  );
+  const failsOwnNewPlayerGate = meIsNewPlayer && !allowNewPlayers;
+  const failsOwnHonorGate = !meIsNewPlayer && meHonor < effectiveMinHonor;
+  const failsOwnGate = failsOwnNewPlayerGate || failsOwnHonorGate;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -118,6 +154,12 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         isPrivate,
         // Only send the password for a private room (Story 9.6).
         password: isPrivate ? roomPassword : undefined,
+        // Honor gate (Story 9.8). Always sent, including the ungated 0 / true
+        // defaults — the server treats them as pointers so an explicit false is
+        // distinguishable from omitted, and sending both keeps the wire honest
+        // about what the modal chose.
+        minHonor: effectiveMinHonor,
+        allowNewPlayers,
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
@@ -146,6 +188,25 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
           setFormError(
             t("lobby.createRoomModal.errors.passwordTooLong", { max: MAX_ROOM_PASSWORD }),
           );
+        } else if (err.code === "INVALID_MIN_HONOR") {
+          setFormError(
+            t("lobby.createRoomModal.errors.invalidMinHonor", {
+              min: MIN_HONOR_FLOOR,
+              max: MIN_HONOR_CEILING,
+            }),
+          );
+        } else if (err.code === "HONOR_TOO_LOW") {
+          // The creator's own gate rejected them (Story 9.8 D7). Compose the copy
+          // locally from the requested minimum and the viewer's own score — the
+          // server error deliberately carries only the code, no numbers.
+          setFormError(
+            t("lobby.createRoomModal.errors.ownHonorTooLow", {
+              minHonor: effectiveMinHonor,
+              honor: meHonor,
+            }),
+          );
+        } else if (err.code === "NEW_PLAYER_NOT_ALLOWED") {
+          setFormError(t("lobby.createRoomModal.errors.ownNewPlayerNotAllowed"));
         } else {
           setFormError(t("lobby.createRoomModal.errors.unexpected"));
         }
@@ -166,6 +227,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setIsPrivate(false);
       setRoomPassword("");
       setShowPassword(false);
+      setMinHonor(DEFAULT_MIN_HONOR);
+      setAllowNewPlayers(true);
       setError(null);
       setFormError(null);
       createRoomMutation.reset();
@@ -376,6 +439,77 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 />
               </Field>
 
+              <Field
+                label={t("lobby.createRoomModal.minHonor")}
+                htmlFor="min-honor"
+                hint={t("lobby.createRoomModal.minHonorHint")}
+                error={
+                  failsOwnHonorGate
+                    ? t("lobby.createRoomModal.errors.ownHonorTooLow", {
+                        minHonor: effectiveMinHonor,
+                        honor: meHonor,
+                      })
+                    : undefined
+                }
+                errorTestId="min-honor-error"
+              >
+                <div className="relative">
+                  <ShieldCheck
+                    className="text-ink-mute pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    id="min-honor"
+                    type="number"
+                    min={MIN_HONOR_FLOOR}
+                    max={MIN_HONOR_CEILING}
+                    step={5}
+                    inputMode="numeric"
+                    value={minHonor}
+                    onChange={(e) =>
+                      setMinHonor(
+                        Math.min(
+                          MIN_HONOR_CEILING,
+                          Math.max(MIN_HONOR_FLOOR, Math.floor(Number(e.target.value) || 0)),
+                        ),
+                      )
+                    }
+                    data-testid="min-honor-input"
+                    className="h-11 pl-9"
+                  />
+                </div>
+              </Field>
+
+              <Field
+                label={t("lobby.createRoomModal.allowNewPlayers")}
+                hint={t("lobby.createRoomModal.allowNewPlayersHint")}
+                error={
+                  failsOwnNewPlayerGate
+                    ? t("lobby.createRoomModal.errors.ownNewPlayerNotAllowed")
+                    : undefined
+                }
+                errorTestId="allow-new-players-error"
+              >
+                <Segmented
+                  value={allowNewPlayers ? "allow" : "veterans"}
+                  onValueChange={(v) => setAllowNewPlayers(v === "allow")}
+                  options={[
+                    {
+                      value: "allow",
+                      label: t("lobby.createRoomModal.allowNewPlayersYes"),
+                      icon: <UserPlus className="size-3.5" />,
+                    },
+                    {
+                      value: "veterans",
+                      label: t("lobby.createRoomModal.allowNewPlayersNo"),
+                      icon: <UserCheck className="size-3.5" />,
+                    },
+                  ]}
+                  testId="allow-new-players-toggle"
+                  ariaLabel={t("lobby.createRoomModal.allowNewPlayers")}
+                />
+              </Field>
+
               {isPrivate && (
                 <Field
                   label={t("lobby.createRoomModal.roomPassword")}
@@ -434,7 +568,9 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               <Button
                 type="submit"
                 size="cta"
-                disabled={!nameValid || submitting || buyInExceedsBalance || !passwordValid}
+                disabled={
+                  !nameValid || submitting || buyInExceedsBalance || !passwordValid || failsOwnGate
+                }
                 data-testid="create-room-button"
               >
                 {submitting
@@ -462,6 +598,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               timerDuration={timerDuration}
               coinBuyIn={coinBuyIn}
               isPrivate={isPrivate}
+              minHonor={effectiveMinHonor}
+              allowNewPlayers={allowNewPlayers}
               hostUsername={meUsername || "host"}
             />
 
@@ -502,6 +640,8 @@ function PreviewCard({
   timerDuration,
   coinBuyIn,
   isPrivate,
+  minHonor,
+  allowNewPlayers,
   hostUsername,
 }: {
   name: string;
@@ -511,6 +651,8 @@ function PreviewCard({
   timerDuration: number;
   coinBuyIn: number;
   isPrivate: boolean;
+  minHonor: number;
+  allowNewPlayers: boolean;
   hostUsername: string;
 }) {
   const { t } = useTranslation();
@@ -585,6 +727,36 @@ function PreviewCard({
               <LockOpen className="size-3" />
               {t("lobby.card.public")}
             </span>
+          )}
+          {/* Honor-gate chips, mirroring RoomCard exactly so the preview keeps its
+              "this is what the lobby will show" promise honest — including the
+              conditionality: an ungated room's preview shows neither chip. */}
+          {minHonor > 0 && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="preview-min-honor"
+                data-min-honor={minHonor}
+                aria-label={t("lobby.card.minHonorAriaLabel", { minHonor })}
+              >
+                <ShieldCheck className="size-3" />
+                {t("lobby.card.minHonor", { minHonor })}
+              </span>
+            </>
+          )}
+          {allowNewPlayers === false && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="preview-veterans-only"
+                aria-label={t("lobby.card.veteransOnlyAriaLabel")}
+              >
+                <UserCheck className="size-3" />
+                {t("lobby.card.veteransOnly")}
+              </span>
+            </>
           )}
         </div>
       </div>

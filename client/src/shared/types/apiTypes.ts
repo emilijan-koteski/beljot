@@ -70,6 +70,19 @@ export interface Room {
    * indicator and the join-time password prompt.
    */
   isPrivate: boolean;
+  /**
+   * Honor gate (Story 9.8, FR57). `minHonor` is the score an EXPERIENCED player
+   * must clear, 0 = no bar; `allowNewPlayers` is whether a player with no track
+   * record may enter at all. The two are INDEPENDENT — a room can be
+   * `minHonor: 0, allowNewPlayers: false` ("anyone experienced"), and a New Player
+   * is never score-checked.
+   *
+   * Both are Go zero values on the wire, so compare EXPLICITLY: `minHonor > 0` and
+   * `allowNewPlayers === false`. A truthiness check on either is a bug (a real 0
+   * and a real false are legitimate values, not "absent").
+   */
+  minHonor: number;
+  allowNewPlayers: boolean;
   status: string;
   playerCount: number;
   isQuickPlay: boolean;
@@ -89,6 +102,15 @@ export interface CreateRoomRequest {
   isPrivate: boolean;
   /** Plaintext room password — sent only when `isPrivate` is true; never stored client-side. */
   password?: string;
+  /**
+   * Honor gate at create time (Story 9.8, FR57). Server-side both are optional
+   * pointers: omitted `minHonor` defaults to 0 and omitted `allowNewPlayers`
+   * defaults to true, so an explicit `false` is distinguishable from "not sent".
+   * `minHonor` must be within [0,100] — the same interval, in the same unit, that
+   * the server validates and the DB CHECK enforces.
+   */
+  minHonor: number;
+  allowNewPlayers: boolean;
 }
 
 export interface RoomPlayer {

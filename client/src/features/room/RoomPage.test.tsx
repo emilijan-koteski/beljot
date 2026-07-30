@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { queryKeys } from "@/shared/api/queryKeys";
+import { i18n } from "@/shared/i18n/i18n";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { makeUser, QueryWrapper } from "@/test-utils";
@@ -103,6 +104,9 @@ const defaultRoom = {
   isQuickPlay: false,
   coinBuyIn: 0,
   isPrivate: false,
+  // Ungated by default (Story 9.8).
+  minHonor: 0,
+  allowNewPlayers: true,
   createdAt: "",
   updatedAt: "",
 };
@@ -442,6 +446,100 @@ describe("RoomPage", () => {
     await waitFor(() => {
       expect(mockJoinRoom).toHaveBeenCalledWith(1, "sesame");
     });
+  });
+
+  // --- Honor gate on the deep-link paths (Story 9.8 AC9) ---
+  //
+  // RoomPage has TWO join call paths: the public auto-join effect and
+  // joinDeepLinkPrivate. 9.6's review found the deep-link path needed the
+  // identical fix the lobby path had received, and it surfaced only in manual
+  // E2E — so both are covered here.
+
+  const bobSeated = {
+    id: 1,
+    roomId: 1,
+    userId: 20,
+    username: "bob",
+    seat: 0,
+    team: "teamA",
+    isBot: false,
+    createdAt: "",
+  };
+
+  it("toasts the composed honor message and bounces to the lobby when the public auto-join is gated", async () => {
+    useAuthStore.setState({
+      user: makeUser({ id: 10, username: "alice", honorScore: 42, isNewPlayer: false }),
+      token: "tok",
+    });
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, ownerId: 20, playerCount: 1, minHonor: 85 },
+      players: [bobSeated],
+    });
+    mockJoinRoom.mockRejectedValue(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
+
+    renderRoomPage();
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(1, undefined));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+
+    // Composed locally from the room's threshold and the viewer's own score.
+    const msg = vi.mocked(toast.error).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("85");
+    expect(msg).toContain("42");
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
+  });
+
+  it("toasts the veterans-only message when the public auto-join hits the newcomer gate", async () => {
+    useAuthStore.setState({
+      user: makeUser({ id: 10, username: "alice", isNewPlayer: true }),
+      token: "tok",
+    });
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, ownerId: 20, playerCount: 1, allowNewPlayers: false },
+      players: [bobSeated],
+    });
+    mockJoinRoom.mockRejectedValue(
+      new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "new players not allowed"),
+    );
+
+    renderRoomPage();
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(1, undefined));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(i18n.t("room.errors.newPlayerNotAllowed")),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
+  });
+
+  it("surfaces the honor gate on the private deep-link path too, not just the public one", async () => {
+    useAuthStore.setState({
+      user: makeUser({ id: 10, username: "alice", honorScore: 30, isNewPlayer: false }),
+      token: "tok",
+    });
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, ownerId: 20, playerCount: 1, isPrivate: true, minHonor: 90 },
+      players: [bobSeated],
+    });
+    mockJoinRoom.mockRejectedValue(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
+
+    const user = userEvent.setup();
+    renderRoomPage();
+
+    // The private room prompts first; the honor gate only bites on submit.
+    await waitFor(() => expect(screen.getByTestId("password-prompt-dialog")).toBeInTheDocument());
+    await user.type(screen.getByTestId("password-prompt-input"), "sesame");
+    await user.click(screen.getByTestId("password-prompt-submit"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(1, "sesame"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+
+    const msg = vi.mocked(toast.error).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("90");
+    expect(msg).toContain("30");
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
   });
 
   it("does not re-prompt for the password when a stale cache omits a just-joined member", async () => {

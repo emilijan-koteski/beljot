@@ -22,6 +22,7 @@ import type {
   DeclarationsResolvedPayload,
   EmotePayload,
   HandScoredPayload,
+  HonorEjectedPayload,
   HonorUpdatedPayload,
   InsolventEjectedPayload,
   MatchAbandonedPayload,
@@ -84,6 +85,7 @@ import {
   SYSTEM_BOT_REMOVED,
   SYSTEM_CHAT_MESSAGE,
   SYSTEM_EMOTE,
+  SYSTEM_HONOR_EJECTED,
   SYSTEM_INSOLVENT_EJECTED,
   SYSTEM_MATCH_STARTED,
   SYSTEM_PLAYER_JOINED,
@@ -711,9 +713,41 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
+  // Story 9.8 AC6: per-user push to a player ejected because their honor score no
+  // longer clears the room's gate (in practice: they abandoned the previous match
+  // in this room). Sibling of the insolvency handler above — same ungated per-user
+  // delivery, same single ejection signal, same redirect + modal pipeline.
+  //
+  // All three numbers are validated with typeof === "number" and never with JS
+  // truthiness: a real honor score of 0 is a legitimate Go value, and `!payload.honor`
+  // would silently reject it.
+  if (type === SYSTEM_HONOR_EJECTED) {
+    const payload = message.payload as HonorEjectedPayload;
+    if (
+      typeof payload?.roomId !== "number" ||
+      typeof payload?.minHonor !== "number" ||
+      typeof payload?.honor !== "number"
+    ) {
+      console.warn("WS: ignoring malformed system:honor_ejected payload", payload);
+      return;
+    }
+    useRoomStore.getState().setRoomEjection({
+      roomId: payload.roomId,
+      // Not meaningful for an honor ejection; the modal reads minHonor/honor.
+      buyIn: 0,
+      balance: 0,
+      minHonor: payload.minHonor,
+      honor: payload.honor,
+      reason: "honor",
+    });
+    return;
+  }
+
   // Story 9.3 AC4: the room closed because no present-and-solvent player could
-  // own it. Route every still-seated recipient to the lobby with the room-closed
-  // notice (balance/buy-in are not meaningful here, so they are zeroed).
+  // own it — or (Story 9.8) because an honor-ejected owner left no eligible heir.
+  // The event and its copy are deliberately reason-agnostic. Route every
+  // still-seated recipient to the lobby with the room-closed notice (balance/buy-in
+  // are not meaningful here, so they are zeroed).
   if (type === SYSTEM_ROOM_CLOSED_INSOLVENT) {
     const payload = message.payload as RoomClosedInsolventPayload;
     if (typeof payload?.roomId !== "number") {
