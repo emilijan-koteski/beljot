@@ -71,7 +71,7 @@
       "losses": "Porazi",
       "abandoned": "Prekinuti",
       "winRate": "Procenat pobeda",
-      "winRateEmpty": "—",
+      "winRateEmpty": "–",
       "error": "Neuspešno učitavanje statistike. Pokušaj ponovo",
       "outcomeSplit": "Odnos ishoda",
       "legendWins": "{{count}} pobeda",
@@ -229,7 +229,7 @@
       "bestHandLabel": "Najbolja ruka",
       "bestHandHint": "Ruka {{hand}} · {{date}}",
       "bestHandHintEmpty": "još nema ruku",
-      "bestHandEmpty": "—",
+      "bestHandEmpty": "–",
       "avgLengthLabel": "Pros. trajanje meča",
       "avgLengthValue": "{{minutes}}m",
       "avgLengthHint": "završeni mečevi"

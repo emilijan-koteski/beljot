@@ -71,7 +71,7 @@
       "losses": "Порази",
       "abandoned": "Напуштени",
       "winRate": "Процент на победи",
-      "winRateEmpty": "—",
+      "winRateEmpty": "–",
       "error": "Не успеа да се вчитаат статистиките. Обиди се повторно",
       "outcomeSplit": "Однос на исходи",
       "legendWins": "{{count}} победи",
@@ -229,7 +229,7 @@
       "bestHandLabel": "Најдобра рака",
       "bestHandHint": "Рака {{hand}} · {{date}}",
       "bestHandHintEmpty": "сè уште нема раце",
-      "bestHandEmpty": "—",
+      "bestHandEmpty": "–",
       "avgLengthLabel": "Просечно траење на меч",
       "avgLengthValue": "{{minutes}}м",
       "avgLengthHint": "завршени мечеви"

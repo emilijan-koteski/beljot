@@ -71,7 +71,7 @@
       "losses": "Losses",
       "abandoned": "Abandoned",
       "winRate": "Win rate",
-      "winRateEmpty": "—",
+      "winRateEmpty": "–",
       "error": "Could not load stats — try again",
       "outcomeSplit": "Outcome split",
       "legendWins": "{{count}} wins",
@@ -229,7 +229,7 @@
       "bestHandLabel": "Best hand",
       "bestHandHint": "Hand {{hand}} · {{date}}",
       "bestHandHintEmpty": "no hands yet",
-      "bestHandEmpty": "—",
+      "bestHandEmpty": "–",
       "avgLengthLabel": "Avg. match length",
       "avgLengthValue": "{{minutes}}m",
       "avgLengthHint": "completed matches"
