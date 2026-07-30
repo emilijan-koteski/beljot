@@ -2,16 +2,31 @@ import { create } from "zustand";
 
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
-// Insolvency-ejection notice (Story 9.3). Set by the return-time 409 handler
-// (MatchPage), the per-user system:insolvent_ejected event, and the
-// system:room_closed_insolvent event — all three feed this single field so the
-// lobby arrival modal is the one consumer. `reason` selects the copy:
-// "ejected" shows balance vs buy-in; "roomClosed" shows the room-closed notice.
-export interface InsolventEjection {
+// Room-ejection notice (Story 9.3, widened by Story 9.8). Set by the return-time
+// 409 handler (MatchPage), the per-user system:insolvent_ejected and
+// system:honor_ejected events, and the system:room_closed_insolvent event — they
+// all feed this single field so the lobby arrival modal is the one consumer.
+//
+// `reason` selects the copy:
+//   "insolvent"  -> balance vs buy-in (Story 9.3)
+//   "honor"      -> the player's honor vs the room's minimum (Story 9.8)
+//   "roomClosed" -> the reason-agnostic room-closed notice
+//
+// The type is named for the ROOM EJECTION it represents rather than for
+// insolvency, one of its three reasons: a field called `insolventEjection`
+// holding `reason: "honor"` is a name that has stopped telling the truth, and
+// 9.7's review spent ten patches undoing exactly that class of drift.
+export interface RoomEjection {
   roomId: number;
+  // Insolvency numbers — meaningful when reason === "insolvent".
   buyIn: number;
   balance: number;
-  reason: "ejected" | "roomClosed";
+  // Honor numbers — present only when reason === "honor". Optional rather than
+  // defaulted, because a real honor score of 0 is legitimate and must never be
+  // confused with "not supplied".
+  minHonor?: number;
+  honor?: number;
+  reason: "insolvent" | "roomClosed" | "honor";
 }
 
 export interface RoomState {
@@ -24,8 +39,8 @@ export interface RoomState {
   matchStartedRoomId: number | null;
   currentRoomId: number | null;
   kickedFromRoomId: number | null;
-  // Insolvency-ejection notice consumed by the lobby arrival modal (Story 9.3).
-  insolventEjection: InsolventEjection | null;
+  // Room-ejection notice consumed by the lobby arrival modal (Story 9.3, 9.8).
+  roomEjection: RoomEjection | null;
   // User IDs of players "present" in a reopened room (returned via "Return to
   // room" or freshly joined). The owner Start button is gated on every seated
   // human appearing here; seats whose human is absent show "waiting to return".
@@ -52,7 +67,7 @@ export interface RoomState {
   setMatchStarted: (started: boolean) => void;
   setMatchStartedRoomId: (roomId: number | null) => void;
   setKickedFromRoom: (roomId: number | null) => void;
-  setInsolventEjection: (ejection: InsolventEjection | null) => void;
+  setRoomEjection: (ejection: RoomEjection | null) => void;
   reset: () => void;
 }
 
@@ -63,7 +78,7 @@ const initialState = {
   matchStartedRoomId: null,
   currentRoomId: null,
   kickedFromRoomId: null,
-  insolventEjection: null as InsolventEjection | null,
+  roomEjection: null as RoomEjection | null,
   returnedUserIds: [] as number[],
 };
 
@@ -152,11 +167,11 @@ export const useRoomStore = create<RoomState>((set) => ({
 
   setKickedFromRoom: (kickedFromRoomId) => set({ kickedFromRoomId }),
 
-  setInsolventEjection: (insolventEjection) => set({ insolventEjection }),
+  setRoomEjection: (roomEjection) => set({ roomEjection }),
 
-  // Preserve the insolvency-ejection notice across reset: RoomPage calls reset()
-  // on unmount, which fires while we are navigating the ejected player to the
+  // Preserve the room-ejection notice across reset: RoomPage calls reset() on
+  // unmount, which fires while we are navigating the ejected player to the
   // lobby — wiping it here would deny the lobby modal its one chance to render.
   // The modal clears the field itself on close (Story 9.3).
-  reset: () => set((state) => ({ ...initialState, insolventEjection: state.insolventEjection })),
+  reset: () => set((state) => ({ ...initialState, roomEjection: state.roomEjection })),
 }));

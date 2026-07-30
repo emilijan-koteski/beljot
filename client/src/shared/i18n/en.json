@@ -457,10 +457,10 @@
       "inMatch": "playing",
       "online": "online"
     },
-    "insolventEjection": {
+    "roomEjection": {
       "eyebrow": "Heads up",
-      "ejectedTitle": "Not enough coins",
-      "ejectedBody": "You don't have enough coins to cover this room's buy-in. Balance: {{balance}}. Buy-in: {{buyIn}}.",
+      "insolventTitle": "Not enough coins",
+      "insolventBody": "You don't have enough coins to cover this room's buy-in. Balance: {{balance}}. Buy-in: {{buyIn}}.",
       "roomClosedTitle": "Room closed",
       "roomClosedBody": "This room closed — no remaining player could afford to host it.",
       "action": "Got it"

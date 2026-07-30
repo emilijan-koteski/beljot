@@ -158,7 +158,7 @@ export function RoomPage() {
   const storePlayers = useRoomStore((s) => s.players);
   const matchStarted = useRoomStore((s) => s.matchStarted);
   const kickedFromRoomId = useRoomStore((s) => s.kickedFromRoomId);
-  const insolventEjection = useRoomStore((s) => s.insolventEjection);
+  const roomEjection = useRoomStore((s) => s.roomEjection);
   const returnedUserIds = useRoomStore((s) => s.returnedUserIds);
 
   const hasLeftRef = useRef(false);
@@ -396,16 +396,17 @@ export function RoomPage() {
     }
   }, [kickedFromRoomId, id, returnToLobby, storeRoom?.name, t]);
 
-  // Story 9.3: when WE are ejected for insolvency at match start, the server has
-  // already freed our seat, so suppress the unmount auto-leave (it would 404 and
-  // log a console error). The always-mounted useInsolventEjectRedirect handles
-  // the lobby navigation + modal; here we only quiet the cleanup-leave, mirroring
-  // the kick path above.
+  // Story 9.3: when WE are ejected at match start — for insolvency, or (Story 9.8)
+  // for honor — the server has already freed our seat, so suppress the unmount
+  // auto-leave (it would 404 and log a console error). The always-mounted
+  // useRoomEjectRedirect handles the lobby navigation + modal; here we only quiet
+  // the cleanup-leave, mirroring the kick path above. Reason-agnostic by design:
+  // any non-null notice means our seat is already gone.
   useEffect(() => {
-    if (insolventEjection !== null && id && insolventEjection.roomId === Number(id)) {
+    if (roomEjection !== null && id && roomEjection.roomId === Number(id)) {
       hasLeftRef.current = true;
     }
-  }, [insolventEjection, id]);
+  }, [roomEjection, id]);
 
   // Clear swap-mode whenever the room exits "waiting" status — owner controls
   // disappear in the same render, so a stale source-seat must not survive.

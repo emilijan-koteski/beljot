@@ -5,9 +5,9 @@ import { useRoomStore } from "./roomStore";
 describe("roomStore", () => {
   beforeEach(() => {
     useRoomStore.getState().reset();
-    // reset() deliberately preserves insolventEjection (Story 9.3), so clear it
+    // reset() deliberately preserves roomEjection (Story 9.3), so clear it
     // explicitly between tests to keep them isolated.
-    useRoomStore.getState().setInsolventEjection(null);
+    useRoomStore.getState().setRoomEjection(null);
   });
 
   it("initializes with null room, empty players, and matchStarted false", () => {
@@ -321,26 +321,26 @@ describe("roomStore", () => {
 
   // --- Insolvency ejection (Story 9.3) ---
 
-  it("setInsolventEjection sets and clears the ejection notice", () => {
-    useRoomStore.getState().setInsolventEjection({
+  it("setRoomEjection sets and clears the ejection notice", () => {
+    useRoomStore.getState().setRoomEjection({
       roomId: 7,
       buyIn: 500,
       balance: 100,
-      reason: "ejected",
+      reason: "insolvent",
     });
-    expect(useRoomStore.getState().insolventEjection).toEqual({
+    expect(useRoomStore.getState().roomEjection).toEqual({
       roomId: 7,
       buyIn: 500,
       balance: 100,
-      reason: "ejected",
+      reason: "insolvent",
     });
 
-    useRoomStore.getState().setInsolventEjection(null);
-    expect(useRoomStore.getState().insolventEjection).toBeNull();
+    useRoomStore.getState().setRoomEjection(null);
+    expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 
   it("reset PRESERVES the insolvency-ejection notice so the lobby modal survives RoomPage unmount", () => {
-    useRoomStore.getState().setInsolventEjection({
+    useRoomStore.getState().setRoomEjection({
       roomId: 7,
       buyIn: 500,
       balance: 100,
@@ -348,7 +348,7 @@ describe("roomStore", () => {
     });
     useRoomStore.getState().reset();
     // Survives reset (RoomPage calls reset() on unmount while navigating to lobby).
-    expect(useRoomStore.getState().insolventEjection).toEqual({
+    expect(useRoomStore.getState().roomEjection).toEqual({
       roomId: 7,
       buyIn: 500,
       balance: 100,

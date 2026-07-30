@@ -229,7 +229,7 @@ export function MatchPage() {
   const sendMessage = useWsSendMessage();
 
   const user = useAuthStore((s) => s.user);
-  const setInsolventEjection = useRoomStore((s) => s.setInsolventEjection);
+  const setRoomEjection = useRoomStore((s) => s.setRoomEjection);
   const matchState = useMatchStore((s) => s.matchState);
   const myPlayerSeat = useMatchStore((s) => s.myPlayerSeat);
   const setMyPlayerSeat = useMatchStore((s) => s.setMyPlayerSeat);
@@ -1232,13 +1232,13 @@ export function MatchPage() {
         if (
           roomBuyInRef.current !== null &&
           user !== null &&
-          useRoomStore.getState().insolventEjection === null
+          useRoomStore.getState().roomEjection === null
         ) {
-          setInsolventEjection({
+          setRoomEjection({
             roomId: roomIdNum,
             buyIn: roomBuyInRef.current,
             balance: user.walletBalance,
-            reason: "ejected",
+            reason: "insolvent",
           });
         }
         setMatchEndData(null);
@@ -1261,16 +1261,7 @@ export function MatchPage() {
         errorToastTimerRef.current = null;
       }, MOTION.TOAST_ERROR);
     }
-  }, [
-    roomIdNum,
-    clearGame,
-    navigate,
-    returnToLobby,
-    setMatchEndData,
-    setInsolventEjection,
-    user,
-    t,
-  ]);
+  }, [roomIdNum, clearGame, navigate, returnToLobby, setMatchEndData, setRoomEjection, user, t]);
 
   const handleAbandonReturnToLobby = useCallback(() => {
     setMatchAbandonedData(null);

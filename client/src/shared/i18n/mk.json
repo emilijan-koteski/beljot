@@ -457,10 +457,10 @@
       "inMatch": "играат",
       "online": "онлајн"
     },
-    "insolventEjection": {
+    "roomEjection": {
       "eyebrow": "Внимание",
-      "ejectedTitle": "Немаш доволно парички",
-      "ejectedBody": "Немаш доволно парички за влогот на оваа соба. Салдо: {{balance}}. Влог: {{buyIn}}.",
+      "insolventTitle": "Немаш доволно парички",
+      "insolventBody": "Немаш доволно парички за влогот на оваа соба. Салдо: {{balance}}. Влог: {{buyIn}}.",
       "roomClosedTitle": "Собата е затворена",
       "roomClosedBody": "Оваа соба е затворена бидејќи ниту еден преостанат играч не можеше да биде домаќин.",
       "action": "Во ред"

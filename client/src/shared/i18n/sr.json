@@ -457,10 +457,10 @@
       "inMatch": "igraju",
       "online": "online"
     },
-    "insolventEjection": {
+    "roomEjection": {
       "eyebrow": "Pažnja",
-      "ejectedTitle": "Nemaš dovoljno novčića",
-      "ejectedBody": "Nemaš dovoljno novčića za ulog ove sobe. Stanje: {{balance}}. Ulog: {{buyIn}}.",
+      "insolventTitle": "Nemaš dovoljno novčića",
+      "insolventBody": "Nemaš dovoljno novčića za ulog ove sobe. Stanje: {{balance}}. Ulog: {{buyIn}}.",
       "roomClosedTitle": "Soba je zatvorena",
       "roomClosedBody": "Ova soba je zatvorena jer nijedan preostali igrač nije mogao da bude domaćin.",
       "action": "U redu"

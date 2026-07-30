@@ -702,11 +702,11 @@ function dispatchSystemEvent(message: WsMessage): void {
       console.warn("WS: ignoring malformed system:insolvent_ejected payload", payload);
       return;
     }
-    useRoomStore.getState().setInsolventEjection({
+    useRoomStore.getState().setRoomEjection({
       roomId: payload.roomId,
       buyIn: payload.buyIn,
       balance: payload.balance,
-      reason: "ejected",
+      reason: "insolvent",
     });
     return;
   }
@@ -720,7 +720,7 @@ function dispatchSystemEvent(message: WsMessage): void {
       console.warn("WS: ignoring malformed system:room_closed_insolvent payload", payload);
       return;
     }
-    useRoomStore.getState().setInsolventEjection({
+    useRoomStore.getState().setRoomEjection({
       roomId: payload.roomId,
       buyIn: 0,
       balance: 0,

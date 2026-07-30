@@ -6,27 +6,27 @@ import { formatCoins } from "@/shared/lib/formatCoins";
 import { useRoomStore } from "@/shared/stores/roomStore";
 
 /**
- * Story 9.3: lobby arrival modal for an insolvency ejection. It is the single
- * consumer of roomStore.insolventEjection — set by the return-time 409
- * (MatchPage), the per-user system:insolvent_ejected push, and
- * system:room_closed_insolvent. Calm, non-panic copy with one clear action so
- * the player is never left at a dead end (per the UX "no dead ends" rule).
+ * Story 9.3: lobby arrival modal for a room ejection. It is the single consumer
+ * of roomStore.roomEjection — set by the return-time 409 (MatchPage), the
+ * per-user system:insolvent_ejected push, and system:room_closed_insolvent.
+ * Calm, non-panic copy with one clear action so the player is never left at a
+ * dead end (per the UX "no dead ends" rule).
  */
-export function InsolventEjectionModal() {
+export function RoomEjectionModal() {
   const { t } = useTranslation();
-  const ejection = useRoomStore((s) => s.insolventEjection);
-  const setInsolventEjection = useRoomStore((s) => s.setInsolventEjection);
+  const ejection = useRoomStore((s) => s.roomEjection);
+  const setRoomEjection = useRoomStore((s) => s.setRoomEjection);
 
   const open = ejection !== null;
   const roomClosed = ejection?.reason === "roomClosed";
 
-  const close = () => setInsolventEjection(null);
+  const close = () => setRoomEjection(null);
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
       <DialogContent
         showCloseButton={false}
-        data-testid="insolvent-ejection-modal"
+        data-testid="room-ejection-modal"
         style={{
           display: "block",
           width: 460,
@@ -82,10 +82,10 @@ export function InsolventEjectionModal() {
                 color: "var(--brass-deep)",
               }}
             >
-              {t("lobby.insolventEjection.eyebrow")}
+              {t("lobby.roomEjection.eyebrow")}
             </span>
             <h2
-              data-testid="insolvent-ejection-title"
+              data-testid="room-ejection-title"
               style={{
                 margin: "6px 0 0",
                 fontFamily: "var(--font-display)",
@@ -97,15 +97,15 @@ export function InsolventEjectionModal() {
               }}
             >
               {roomClosed
-                ? t("lobby.insolventEjection.roomClosedTitle")
-                : t("lobby.insolventEjection.ejectedTitle")}
+                ? t("lobby.roomEjection.roomClosedTitle")
+                : t("lobby.roomEjection.insolventTitle")}
             </h2>
           </div>
         </div>
 
         {/* Body */}
         <p
-          data-testid="insolvent-ejection-body"
+          data-testid="room-ejection-body"
           style={{
             margin: 0,
             padding: "12px 28px 0",
@@ -115,8 +115,8 @@ export function InsolventEjectionModal() {
           }}
         >
           {roomClosed
-            ? t("lobby.insolventEjection.roomClosedBody")
-            : t("lobby.insolventEjection.ejectedBody", {
+            ? t("lobby.roomEjection.roomClosedBody")
+            : t("lobby.roomEjection.insolventBody", {
                 balance: formatCoins(ejection?.balance ?? 0),
                 buyIn: formatCoins(ejection?.buyIn ?? 0),
               })}
@@ -134,7 +134,7 @@ export function InsolventEjectionModal() {
           }}
         >
           <DialogClose
-            data-testid="insolvent-ejection-action"
+            data-testid="room-ejection-action"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -155,7 +155,7 @@ export function InsolventEjectionModal() {
                 "0 6px 16px -8px rgba(156,125,78,0.65), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
-            {t("lobby.insolventEjection.action")}
+            {t("lobby.roomEjection.action")}
           </DialogClose>
         </div>
       </DialogContent>

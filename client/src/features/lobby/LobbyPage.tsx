@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
 import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
-import { InsolventEjectionModal } from "@/features/lobby/components/InsolventEjectionModal";
+import { RoomEjectionModal } from "@/features/lobby/components/RoomEjectionModal";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
@@ -243,7 +243,7 @@ export function LobbyPage() {
           setToastMsg(null);
         }}
       />
-      <InsolventEjectionModal />
+      <RoomEjectionModal />
       <LobbyChatDock />
       <Toast message={toastMsg} onClear={() => setToastMsg(null)} />
     </div>

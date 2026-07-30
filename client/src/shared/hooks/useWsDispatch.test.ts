@@ -1115,11 +1115,11 @@ describe("useWsDispatch", () => {
       payload: { roomId: 7, buyIn: 500, balance: 120 },
     });
 
-    expect(useRoomStore.getState().insolventEjection).toEqual({
+    expect(useRoomStore.getState().roomEjection).toEqual({
       roomId: 7,
       buyIn: 500,
       balance: 120,
-      reason: "ejected",
+      reason: "insolvent",
     });
   });
 
@@ -1135,14 +1135,14 @@ describe("useWsDispatch", () => {
       payload: { roomId: 3, buyIn: 1000, balance: 0 },
     });
 
-    expect(useRoomStore.getState().insolventEjection?.reason).toBe("ejected");
-    expect(useRoomStore.getState().insolventEjection?.roomId).toBe(3);
+    expect(useRoomStore.getState().roomEjection?.reason).toBe("insolvent");
+    expect(useRoomStore.getState().roomEjection?.roomId).toBe(3);
   });
 
   it("ignores a malformed system:insolvent_ejected payload", () => {
-    // reset() deliberately preserves insolventEjection (so the lobby modal
+    // reset() deliberately preserves roomEjection (so the lobby modal
     // survives RoomPage's unmount), so clear it explicitly for this assertion.
-    useRoomStore.getState().setInsolventEjection(null);
+    useRoomStore.getState().setRoomEjection(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
@@ -1151,7 +1151,7 @@ describe("useWsDispatch", () => {
       payload: { roomId: "7", buyIn: 500 } as never,
     });
 
-    expect(useRoomStore.getState().insolventEjection).toBeNull();
+    expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 
   it("dispatches system:room_closed_insolvent to roomStore as a 'roomClosed' signal", () => {
@@ -1163,7 +1163,7 @@ describe("useWsDispatch", () => {
       payload: { roomId: 9 },
     });
 
-    expect(useRoomStore.getState().insolventEjection).toEqual({
+    expect(useRoomStore.getState().roomEjection).toEqual({
       roomId: 9,
       buyIn: 0,
       balance: 0,
