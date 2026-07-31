@@ -218,12 +218,12 @@ export const sr: RulesLangData = {
     {
       id: "honour",
       label: "Čast",
-      title: "Čast: završi ono što započneš",
-      lede: "Beljot je igra u parovima. Igrač koji napusti meč u toku kvari ga za još tri osobe. Čast je način na koji se sto štiti sam.",
+      title: "Završi ono što započneš",
+      lede: "Beljot je igra u parovima. Igrač koji napusti meč u toku kvari ga za još tri igrača. Čast pokazuje koliko si pouzdan saigrač.",
       blocks: [
         {
           kind: "p",
-          text: "Skor časti je udeo mečeva koje si završio, s tim da skoriji mečevi vrede mnogo više od stare istorije. Nov račun počinje na 80 i ne prikazuje skor dok ne odigra 5 mečeva, jer pre toga nema šta da se meri.",
+          text: "Skor časti je udeo mečeva koje si završio, s tim da skoriji mečevi vrede mnogo više od stare istorije. Nov igrač počinje na 80, a skor se ne prikazuje dok ne odigra 5 mečeva, jer pre toga nema šta da se meri.",
         },
         {
           kind: "steps",
@@ -242,14 +242,21 @@ export const sr: RulesLangData = {
             },
             {
               t: "Vreme ga popravlja",
-              d: "Stara napuštanja blede. Loš niz od pre nekoliko meseci vredi vrlo malo prema mečevima koje si završio posle toga.",
+              d: "Stara napuštanja blede. Loš niz od pre nekoliko meseci vredi vrlo malo prema mečevima koje si skorije završio.",
             },
           ],
         },
         {
-          kind: "rule",
+          kind: "tiers",
           title: "Pet nivoa",
-          text: "Uzoran (95-100) skoro nikad ne odustaje. Pouzdan (85-94) je pouzdan partner. Solidan (70-84) je uobičajen nivo. Nepouzdan (50-69) je zaključan za neke stolove, a Problematičan (0-49) za većinu. Domaćin sobe može da postavi minimum i da posebno odluči da li su dobrodošli igrači koji još nemaju skor.",
+          items: [
+            { tier: "exemplary", d: "skoro nikad ne odustaje." },
+            { tier: "trusted", d: "je pouzdan partner." },
+            { tier: "fair", d: "je uobičajen nivo." },
+            { tier: "unreliable", d: "je zaključan za neke stolove." },
+            { tier: "problematic", d: "je zaključan za većinu stolova." },
+          ],
+          text: "Domaćin sobe može da postavi minimum i da posebno odluči da li su dobrodošli igrači koji još nemaju skor.",
         },
         {
           kind: "note",

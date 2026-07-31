@@ -11,7 +11,10 @@ const LANGS: RulesLang[] = ["en", "mk", "hr", "sr"];
 const reference = RULES_CONTENT.en;
 
 function blockShape(b: RuleBlock): string {
-  return b.kind === "steps" ? `steps:${b.items.length}` : b.kind;
+  if (b.kind === "steps") return `steps:${b.items.length}`;
+  // Tier tokens are structure, not translation — the shape pins their order.
+  if (b.kind === "tiers") return `tiers:${b.items.map((i) => i.tier).join(",")}`;
+  return b.kind;
 }
 
 // Walk every leaf string in a content object and collect empties.

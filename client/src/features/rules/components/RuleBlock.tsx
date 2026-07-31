@@ -1,7 +1,10 @@
+import { useTranslation } from "react-i18next";
+
 import { CardLadder } from "@/features/rules/components/CardLadder";
 import { MeldsGrid } from "@/features/rules/components/MeldsGrid";
 import type { RuleBlock as RuleBlockType } from "@/features/rules/content/types";
 import { useRules } from "@/features/rules/RulesContext";
+import { HONOR_TIER_BANDS, HONOR_TIER_COLOR, type HonorTier } from "@/shared/lib/honor";
 
 function NoteBlock({ text }: { text: string }) {
   const { ui } = useRules();
@@ -35,6 +38,72 @@ function NoteBlock({ text }: { text: string }) {
         {ui.noteLabel}
       </span>
       <span>{text}</span>
+    </div>
+  );
+}
+
+/** "95-100" / "85-94" … derived from the single client copy of the tier bands. */
+function tierRange(tier: HonorTier): string {
+  const band = HONOR_TIER_BANDS.find((b) => b.tier === tier);
+  if (!band) return "";
+  return `${band.from}-${band.to === 100 ? 100 : band.to - 1}`;
+}
+
+/**
+ * The honour-tier ladder. Names come from the shared `profile.honor.tier.*`
+ * i18n keys (the same strings every badge and meter shows — the rules must
+ * never call a tier by a different word), coloured with the tier's own ramp
+ * hue; ranges are derived from HONOR_TIER_BANDS. Only the sentence tails and
+ * the host note are authored per locale.
+ */
+function TiersBlock({ block }: { block: Extract<RuleBlockType, { kind: "tiers" }> }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      style={{
+        padding: "14px 16px 14px 18px",
+        background: "var(--surface-2)",
+        border: "1px solid var(--border)",
+        borderLeft: "3px solid var(--accent)",
+        borderRadius: 12,
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+      }}
+    >
+      <div
+        className="font-display"
+        style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)", letterSpacing: -0.1 }}
+      >
+        {block.title}
+      </div>
+      <ul
+        style={{
+          margin: 0,
+          padding: 0,
+          listStyle: "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: 3,
+        }}
+      >
+        {block.items.map((it) => (
+          <li
+            key={it.tier}
+            data-testid={`rules-tier-${it.tier}`}
+            style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-dim)" }}
+          >
+            <strong style={{ fontWeight: 700, color: HONOR_TIER_COLOR[it.tier] }}>
+              {t(`profile.honor.tier.${it.tier}`)}
+            </strong>{" "}
+            <span className="font-mono" style={{ fontSize: 12 }}>
+              ({tierRange(it.tier)})
+            </span>{" "}
+            {it.d}
+          </li>
+        ))}
+      </ul>
+      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-dim)" }}>{block.text}</div>
     </div>
   );
 }
@@ -111,6 +180,9 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
 
     case "note":
       return <NoteBlock text={block.text} />;
+
+    case "tiers":
+      return <TiersBlock block={block} />;
 
     case "steps":
       return (
