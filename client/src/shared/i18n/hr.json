@@ -98,7 +98,7 @@
         "surrenderBody": "Završen meč je završen meč.",
         "decayLabel": "Stara napuštanja blijede.",
         "decayBody": "Noviji mečevi vrijede mnogo više.",
-        "standing": "Trenutno si na {{score}}, {{tier}}.",
+        "standing": "Trenutno si na {{score}}, <tierWord>{{tier}}</tierWord>.",
         "standingNew": "Odigraj 5 mečeva i tvoja ocjena pojavit će se ovdje.",
         "fullRules": "Sva pravila",
         "close": "Razumijem"

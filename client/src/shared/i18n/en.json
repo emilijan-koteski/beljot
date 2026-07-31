@@ -98,7 +98,7 @@
         "surrenderBody": "A finished match is a finished match.",
         "decayLabel": "Old abandonments fade.",
         "decayBody": "Recent matches count for far more.",
-        "standing": "You're at {{score}} — {{tier}}.",
+        "standing": "You're at {{score}} — <tierWord>{{tier}}</tierWord>.",
         "standingNew": "Finish 5 matches and your score appears here.",
         "fullRules": "Full rules",
         "close": "Got it"

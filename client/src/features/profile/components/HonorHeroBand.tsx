@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { HonorBandMeter } from "@/shared/components/HonorBandMeter";
 import { HonorExplainerDialog } from "@/shared/components/HonorExplainerDialog";
 import { HonorShield } from "@/shared/components/HonorShield";
-import { Badge } from "@/shared/components/ui/badge";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import {
   HONOR_NEW_PLAYER_MIN_MATCHES,
@@ -152,12 +151,16 @@ export function HonorHeroBand({
               >
                 {score}
               </span>
-              {/* Badge takes no arbitrary props, so the testid rides a wrapper
-                  — same shape HonorPanel used. Tone stays NEUTRAL: across this
-                  redesign only the shield is ever tinted, so the tier word does
+              {/* Plain brass mono caps, the same treatment as the create-room
+                  slider's tier caption (user decision 2026-07-31, replacing the
+                  neutral Badge chip). Still not tier-tinted: across this redesign
+                  only the shield ever carries the tier colour, so the word does
                   not compete with it for the same signal. */}
-              <span data-testid="profile-honor-tier">
-                <Badge tone="neutral">{t(`profile.honor.tier.${resolvedTier}`)}</Badge>
+              <span
+                className="text-brass-deep font-mono text-[11px] font-semibold tracking-[1px] uppercase"
+                data-testid="profile-honor-tier"
+              >
+                {t(`profile.honor.tier.${resolvedTier}`)}
               </span>
             </div>
           )}

@@ -1,10 +1,16 @@
 import { ArrowRight, Clock, Flag, Info, LogOut, ShieldCheck } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
 import { HonorBandMeter } from "@/shared/components/HonorBandMeter";
+import { HonorShield } from "@/shared/components/HonorShield";
 import { Dialog, DialogClose, DialogContent } from "@/shared/components/ui/dialog";
-import { honorIsNewPlayer, honorScoreOrPrior, normalizeHonorTier } from "@/shared/lib/honor";
+import {
+  HONOR_TIER_COLOR,
+  honorIsNewPlayer,
+  honorScoreOrPrior,
+  normalizeHonorTier,
+} from "@/shared/lib/honor";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 type HonorExplainerDialogProps = {
@@ -138,7 +144,7 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
                   aria-hidden="true"
                   strokeWidth={2.25}
                 />
-                <span className="text-ink-dim text-[13.5px] leading-[1.5]">
+                <span className="text-ink-dim text-[13.5px] leading-normal">
                   <strong className="text-ink font-semibold">
                     {t(`profile.honor.explainer.${key}Label`)}
                   </strong>{" "}
@@ -156,42 +162,47 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
             />
           </div>
 
-          {isNew ? (
-            // A newcomer has no standing to state, so the line becomes a callout:
-            // "how to get a score" is an instruction, not a fact like the list
-            // above, and boxing it keeps it from reading as one more body line.
-            // Brass tint + hairline, same mix vocabulary as the shell around it.
-            <div
-              role="note"
-              data-testid="honor-explainer-standing"
-              className="mt-4 flex items-start gap-2.5 px-3.5 py-3"
-              style={{
-                borderRadius: 10,
-                background: "color-mix(in srgb, var(--brass-soft) 60%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--brass) 35%, transparent)",
-              }}
-            >
+          {/* Your standing, boxed as a callout in BOTH states (user decision
+              2026-07-31): the newcomer variant is an instruction, the scored
+              variant is the dialog's one personal fact, and either would
+              otherwise read as one more body line. Brass tint + hairline, same
+              mix vocabulary as the shell around it. */}
+          <div
+            role="note"
+            data-testid="honor-explainer-standing"
+            data-honor={isNew ? undefined : score}
+            className="mt-4 flex items-start gap-2.5 px-3.5 py-3"
+            style={{
+              borderRadius: 10,
+              background: "color-mix(in srgb, var(--brass-soft) 60%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--brass) 35%, transparent)",
+            }}
+          >
+            {isNew ? (
               <Info
                 className="text-brass-deep mt-0.5 size-4 shrink-0"
                 aria-hidden="true"
                 strokeWidth={2.25}
               />
-              <p className="text-ink m-0 text-[13.5px] leading-normal font-semibold">
-                {t("profile.honor.explainer.standingNew")}
-              </p>
-            </div>
-          ) : (
-            <p
-              className="text-ink mt-4 mb-0 text-[13.5px] font-semibold"
-              data-testid="honor-explainer-standing"
-              data-honor={score}
-            >
-              {t("profile.honor.explainer.standing", {
-                score,
-                tier: t(`profile.honor.tier.${tier}`),
-              })}
+            ) : (
+              // The tier's own glyph and colour — the same mark every other
+              // honour surface draws for this player.
+              <HonorShield tier={tier} size={16} className="mt-0.5 shrink-0" />
+            )}
+            <p className="text-ink m-0 text-[13.5px] leading-normal font-semibold">
+              {isNew ? (
+                t("profile.honor.explainer.standingNew")
+              ) : (
+                <Trans
+                  i18nKey="profile.honor.explainer.standing"
+                  values={{ score, tier: t(`profile.honor.tier.${tier}`) }}
+                  components={{
+                    tierWord: <strong style={{ color: HONOR_TIER_COLOR[tier] }} />,
+                  }}
+                />
+              )}
             </p>
-          )}
+          </div>
         </div>
 
         <div
