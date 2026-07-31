@@ -215,6 +215,48 @@ export const hr: RulesLangData = {
         },
       ],
     },
+    {
+      id: "honour",
+      label: "Čast",
+      title: "Čast: završi ono što započneš",
+      lede: "Beljot je igra u parovima. Igrač koji napusti meč u tijeku pokvari ga za još tri osobe. Čast je način na koji se stol štiti sam.",
+      blocks: [
+        {
+          kind: "p",
+          text: "Ocjena časti je udio mečeva koje si završio, pri čemu noviji mečevi vrijede mnogo više od stare povijesti. Novi račun počinje na 80 i ne prikazuje ocjenu dok ne odigra 5 mečeva, jer prije toga nema što mjeriti.",
+        },
+        {
+          kind: "steps",
+          items: [
+            {
+              t: "Završen meč podiže ocjenu",
+              d: "Bez obzira na pobjedu ili poraz. Čast ne mjeri vještinu, samo jesi li bio za stolom do kraja.",
+            },
+            {
+              t: "Predaja se i dalje računa kao završeno",
+              d: "Predan meč je završen meč. Dogovor s partnerom da se meč završi suprotnost je napuštanju i podiže ocjenu kao i svaki drugi završetak.",
+            },
+            {
+              t: "Napuštanje bez vraćanja je snižava",
+              d: "To je jedino što je snižava. Ako izgubiš vezu, imaš puni prozor za ponovno povezivanje, a vraćanje te ne košta ništa.",
+            },
+            {
+              t: "Vrijeme je popravlja",
+              d: "Stara napuštanja blijede. Loš niz od prije nekoliko mjeseci vrijedi vrlo malo prema mečevima koje si završio nakon toga.",
+            },
+          ],
+        },
+        {
+          kind: "rule",
+          title: "Pet razina",
+          text: "Uzoran (95-100) gotovo nikad ne odustaje. Pouzdan (85-94) je pouzdan partner. Solidan (70-84) je uobičajena razina. Nepouzdan (50-69) zaključan je za neke stolove, a Problematičan (0-49) za većinu. Domaćin sobe može postaviti minimum i posebno odlučiti jesu li dobrodošli igrači koji još nemaju ocjenu.",
+        },
+        {
+          kind: "note",
+          text: "Dvije stvari koje igrači najčešće pogrešno razumiju: predaja ne šteti tvojoj časti, i jedna loša večer ne prati te zauvijek. Ponovno povezivanje nakon prekida veze uvijek je besplatno.",
+        },
+      ],
+    },
   ],
 
   ui: {

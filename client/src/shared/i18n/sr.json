@@ -80,16 +80,32 @@
     },
     "honor": {
       "eyebrow": "Pouzdanost",
-      "heading": "Skor časti",
-      "sub": "Koliko pouzdano završavaš mečeve koje započneš. Stara napuštanja vremenom blede.",
-      "outOf": "od {{max}}",
       "meterLabel": "Čast {{score}} od 100, {{tier}}",
-      "completedLabel": "Tvoji završeni",
-      "abandonedLabel": "Tvoji prekinuti",
+      "completedLabel": "Završeni",
+      "abandonedLabel": "Prekinuti",
+      "lastWindow": "Zadnjih {{window}}",
       "trendTooltip": "Tvojih poslednjih {{window}} mečeva u poređenju sa prethodnih {{window}}.",
       "newPlayerChip": "Novi igrač",
+      "newPlayerProgress": "{{played}} / {{total}}",
       "newPlayerHint": "Odigraj 5 mečeva da bi zaradio skor časti.",
       "topBarLabel": "Čast",
+      "explainer": {
+        "open": "Kako funkcioniše",
+        "title": "Kako funkcioniše čast",
+        "lede": "Meri jednu stvar: da li završavaš mečeve koje započneš.",
+        "finishLabel": "Završi meč",
+        "finishBody": "i skor raste, bez obzira na pobedu ili poraz.",
+        "dropLabel": "Napusti i ne vrati se",
+        "dropBody": "to je jedino što ga snižava.",
+        "surrenderLabel": "Predaja se ne računa.",
+        "surrenderBody": "Završen meč je završen meč.",
+        "decayLabel": "Stara napuštanja blede.",
+        "decayBody": "Skoriji mečevi vrede mnogo više.",
+        "standing": "Trenutno si na {{score}}, {{tier}}.",
+        "standingNew": "Odigraj 5 mečeva i tvoj skor će se pojaviti ovde.",
+        "fullRules": "Sva pravila",
+        "close": "Razumem"
+      },
       "tier": {
         "exemplary": "Uzoran",
         "trusted": "Pouzdan",
@@ -374,6 +390,7 @@
     "returningToLobby": "Povratak u lobi…",
     "startMatch": "Započni meč",
     "startMatchDisabled": "Sva 4 igrača moraju da sednu",
+    "startBlockedByHonor": "Jedan igrač za stolom je ispod minimuma ove sobe ({{minHonor}}).",
     "waitingForOwner": "Čekanje da domaćin započne meč",
     "seatTaken": "To mesto je zauzeto",
     "matchStarting": "Meč počinje…",
@@ -469,7 +486,10 @@
       "honorBody": "Tvoja čast je pala ispod minimuma ove sobe ({{minHonor}}), sada je {{honor}}. Odigraj sledeće mečeve i vratiće se.",
       "roomClosedTitle": "Soba je zatvorena",
       "roomClosedBody": "Ova soba je zatvorena jer nijedan preostali igrač nije mogao da bude domaćin.",
-      "action": "U redu"
+      "action": "U redu",
+      "youLabel": "Ti",
+      "tableLabel": "Sto",
+      "browseQualifying": "Sobe za mene"
     },
     "matchmaking": {
       "title": "Brza igra",
@@ -544,10 +564,10 @@
       "privacyPrivate": "Privatna",
       "roomPassword": "Lozinka sobe",
       "roomPasswordPlaceholder": "Unesi lozinku",
-      "minHonor": "Minimalna čast",
-      "minHonorHint": "0 pušta svakoga. Realna granica je 85 do 95: nov račun počinje na 80, a do 100 skoro niko ne stigne.",
+      "minHonor": "Ko može da sedne",
+      "minHonorAnyone": "Svako",
+      "minHonorYou": "ti {{honor}}",
       "allowNewPlayers": "Novi igrači",
-      "allowNewPlayersHint": "Nov igrač ima manje od 5 odigranih mečeva, pa još nema skor. Ako ih primaš, novajlija ulazi bez obzira na minimum iznad.",
       "allowNewPlayersYes": "Primaj",
       "allowNewPlayersNo": "Samo iskusni",
       "roomPasswordHint": "Najmanje {{min}} znakova"
@@ -570,6 +590,7 @@
     },
     "filters": {
       "all": "Sve",
+      "qualify": "Ispunjavam uslov",
       "open": "Ima mesta",
       "relaxed": "Opušteno",
       "timed": "Sa tajmerom"
@@ -608,7 +629,9 @@
       "minHonor": "{{minHonor}}+",
       "minHonorAriaLabel": "Minimalna čast {{minHonor}}",
       "veteransOnly": "Samo iskusni",
-      "veteransOnlyAriaLabel": "Ova soba ne prima nove igrače"
+      "veteransOnlyAriaLabel": "Ova soba ne prima nove igrače",
+      "locked": "Zaključano",
+      "minHonorLockedTitle": "Traži čast {{minHonor}}, ti si na {{honor}}."
     },
     "chat": {
       "title": "Lobi chat",
@@ -860,6 +883,8 @@
       "waitingMessage": "Igra je pauzirana dok čekamo da se {{player}} vrati.",
       "waitingMessageMany": "Igra je pauzirana dok čekamo da se {{count}} igrača vrate.",
       "countdownLabel": "Preostalo vreme",
+      "honorNoteOther": "Ako vreme istekne, računa se kao napuštanje: njegova čast pada, ne tvoja.",
+      "honorNoteSelf": "Ostani na ovoj stranici. Ponovno povezivanje te ne košta ništa, ali istek vremena se računa kao napuštanje i tvoja čast pada.",
       "reconnectFailed": "Ponovno povezivanje nije uspelo, meč je možda završen",
       "matchAbandoned": "{{player}} je prekinuo vezu, meč završen",
       "matchAbandonedScores": "Rezultat: Mi {{us}} : Oni {{them}}",
@@ -880,7 +905,9 @@
     },
     "settlement": {
       "won": "Osvojio si {{amount}} novčića",
-      "lost": "Izgubio si {{amount}} novčića"
+      "lost": "Izgubio si {{amount}} novčića",
+      "honorMoved": "Čast {{before}} → {{after}}",
+      "honorUnchanged": "Čast nepromenjena · {{score}}"
     },
     "stake": {
       "label": "Ulog"

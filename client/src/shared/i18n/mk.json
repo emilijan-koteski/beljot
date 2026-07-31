@@ -80,16 +80,32 @@
     },
     "honor": {
       "eyebrow": "Доверливост",
-      "heading": "Оценка на чест",
-      "sub": "Колку доверливо ги завршуваш мечевите што ги започнуваш. Старите напуштања бледнеат со текот на времето.",
-      "outOf": "од {{max}}",
       "meterLabel": "Чест {{score}} од 100, {{tier}}",
-      "completedLabel": "Твои завршени",
-      "abandonedLabel": "Твои напуштени",
+      "completedLabel": "Завршени",
+      "abandonedLabel": "Напуштени",
+      "lastWindow": "Последни {{window}}",
       "trendTooltip": "Твоите последни {{window}} мечеви споредени со претходните {{window}}.",
       "newPlayerChip": "Нов играч",
+      "newPlayerProgress": "{{played}} / {{total}}",
       "newPlayerHint": "Одиграј 5 мечеви за да заслужиш оценка на чест.",
       "topBarLabel": "Чест",
+      "explainer": {
+        "open": "Како функционира",
+        "title": "Како функционира честа",
+        "lede": "Мери едно нешто: дали ги завршуваш мечевите што ги започнуваш.",
+        "finishLabel": "Заврши меч",
+        "finishBody": "и оценката расте, без разлика на победа или загуба.",
+        "dropLabel": "Напушти и не се врати",
+        "dropBody": "тоа е единственото што ја намалува.",
+        "surrenderLabel": "Предавањето не се смета.",
+        "surrenderBody": "Завршен меч е завршен меч.",
+        "decayLabel": "Старите напуштања бледнеат.",
+        "decayBody": "Поскорешните мечеви вредат многу повеќе.",
+        "standing": "Моментално си на {{score}}, {{tier}}.",
+        "standingNew": "Одиграј 5 мечеви и твојата оценка ќе се појави тука.",
+        "fullRules": "Сите правила",
+        "close": "Разбрано"
+      },
       "tier": {
         "exemplary": "Примерен",
         "trusted": "Доверлив",
@@ -374,6 +390,7 @@
     "returningToLobby": "Враќање во лоби…",
     "startMatch": "Започни меч",
     "startMatchDisabled": "Сите 4 играчи мора да седнат",
+    "startBlockedByHonor": "Еден играч на масата е под минимумот на оваа соба ({{minHonor}}).",
     "waitingForOwner": "Се чека домаќинот да го започне мечот",
     "seatTaken": "Тоа место е зафатено",
     "matchStarting": "Мечот започнува…",
@@ -469,7 +486,10 @@
       "honorBody": "Твојата чест падна под минимумот на оваа соба ({{minHonor}}), сега е {{honor}}. Одиграј ги следните мечеви и ќе се врати.",
       "roomClosedTitle": "Собата е затворена",
       "roomClosedBody": "Оваа соба е затворена бидејќи ниту еден преостанат играч не можеше да биде домаќин.",
-      "action": "Во ред"
+      "action": "Во ред",
+      "youLabel": "Ти",
+      "tableLabel": "Маса",
+      "browseQualifying": "Соби за мене"
     },
     "matchmaking": {
       "title": "Брза игра",
@@ -544,10 +564,10 @@
       "privacyPrivate": "Приватна",
       "roomPassword": "Лозинка на собата",
       "roomPasswordPlaceholder": "Внеси лозинка",
-      "minHonor": "Минимална чест",
-      "minHonorHint": "0 пушта секого. Реална граница е 85 до 95: нова сметка почнува на 80, а до 100 речиси никој не стигнува.",
+      "minHonor": "Кој може да седне",
+      "minHonorAnyone": "Секој",
+      "minHonorYou": "ти {{honor}}",
       "allowNewPlayers": "Нови играчи",
-      "allowNewPlayersHint": "Нов играч има помалку од 5 одиграни мечеви, па уште нема оценка. Ако ги примаш, новајлија влегува без оглед на минимумот погоре.",
       "allowNewPlayersYes": "Примај",
       "allowNewPlayersNo": "Само искусни",
       "roomPasswordHint": "Најмалку {{min}} знаци"
@@ -570,6 +590,7 @@
     },
     "filters": {
       "all": "Сите",
+      "qualify": "Ги исполнувам",
       "open": "Има места",
       "relaxed": "Опуштено",
       "timed": "Со тајмер"
@@ -608,7 +629,9 @@
       "minHonor": "{{minHonor}}+",
       "minHonorAriaLabel": "Минимална чест {{minHonor}}",
       "veteransOnly": "Само искусни",
-      "veteransOnlyAriaLabel": "Оваа соба не прима нови играчи"
+      "veteransOnlyAriaLabel": "Оваа соба не прима нови играчи",
+      "locked": "Заклучено",
+      "minHonorLockedTitle": "Бара чест {{minHonor}}, ти си на {{honor}}."
     },
     "chat": {
       "title": "Лоби чет",
@@ -860,6 +883,8 @@
       "waitingMessage": "Играта е на пауза додека чекаме {{player}} да се поврзе повторно.",
       "waitingMessageMany": "Играта е на пауза додека чекаме {{count}} играчи да се поврзат повторно.",
       "countdownLabel": "Преостанато време",
+      "honorNoteOther": "Ако времето истече, се смета за напуштање: неговата чест паѓа, не твојата.",
+      "honorNoteSelf": "Остани на оваа страница. Повторното поврзување не те чини ништо, но истекот на времето се смета за напуштање и твојата чест паѓа.",
       "reconnectFailed": "Повторното поврзување не успеа. Мечот можеби заврши",
       "matchAbandoned": "{{player}} ја прекина врската. Мечот заврши",
       "matchAbandonedScores": "Финале: Ние {{us}} : Тие {{them}}",
@@ -880,7 +905,9 @@
     },
     "settlement": {
       "won": "Освои {{amount}} парички",
-      "lost": "Изгуби {{amount}} парички"
+      "lost": "Изгуби {{amount}} парички",
+      "honorMoved": "Чест {{before}} → {{after}}",
+      "honorUnchanged": "Честа е непроменета · {{score}}"
     },
     "stake": {
       "label": "Влог"

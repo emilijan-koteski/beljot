@@ -1,9 +1,83 @@
 import { Coins, DoorOpen, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router";
 
 import { Dialog, DialogClose, DialogContent } from "@/shared/components/ui/dialog";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import { HONOR_TIER_COLOR, honorTierForScore } from "@/shared/lib/honor";
 import { useRoomStore } from "@/shared/stores/roomStore";
+
+/**
+ * One bar of the honour comparison, on a shared 0-100 axis so the two rows are
+ * directly comparable. The number is always alongside the bar — the bar is the
+ * quick read, not the only one.
+ */
+function ComparisonRow({
+  label,
+  value,
+  color,
+  testId,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  testId: string;
+}) {
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 10 }}
+      data-testid={testId}
+      data-value={value}
+    >
+      <span
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: 1.2,
+          textTransform: "uppercase",
+          color: "var(--ink-mute)",
+          width: 52,
+          flexShrink: 0,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          position: "relative",
+          flex: 1,
+          height: 8,
+          borderRadius: 4,
+          background: "var(--surface-3)",
+          overflow: "hidden",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            inset: "0 auto 0 0",
+            width: `${Math.min(100, Math.max(0, value))}%`,
+            borderRadius: 4,
+            background: color,
+          }}
+        />
+      </span>
+      <span
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 15,
+          fontWeight: 700,
+          color: "var(--ink)",
+          fontVariantNumeric: "tabular-nums",
+          width: 28,
+          textAlign: "right",
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
 /**
  * Story 9.3: lobby arrival modal for a room ejection. It is the single consumer
@@ -18,6 +92,7 @@ import { useRoomStore } from "@/shared/stores/roomStore";
  */
 export function RoomEjectionModal() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const ejection = useRoomStore((s) => s.roomEjection);
   const setRoomEjection = useRoomStore((s) => s.setRoomEjection);
 
@@ -143,17 +218,56 @@ export function RoomEjectionModal() {
                 })}
         </p>
 
-        {/* Footer */}
+        {/* The comparison, DRAWN TO SCALE. A sentence with two numbers in it makes
+            the player do the arithmetic; two bars on a shared 0-100 axis show at a
+            glance how far off they are — which is the difference between "I'm
+            locked out" and "I'm four matches away". Numbers stay alongside, so this
+            never depends on the bars alone. */}
+        {honor && typeof ejection?.honor === "number" && typeof ejection?.minHonor === "number" && (
+          <div style={{ padding: "16px 28px 0", display: "flex", flexDirection: "column", gap: 8 }}>
+            <ComparisonRow
+              label={t("lobby.roomEjection.youLabel")}
+              value={ejection.honor}
+              color={HONOR_TIER_COLOR[honorTierForScore(ejection.honor)]}
+              testId="room-ejection-you"
+            />
+            <ComparisonRow
+              label={t("lobby.roomEjection.tableLabel")}
+              value={ejection.minHonor}
+              color="var(--ink-off)"
+              testId="room-ejection-table"
+            />
+          </div>
+        )}
+
+        {/* Footer. Stacks below sm so two actions never squeeze on a phone. */}
         <div
+          className="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center sm:justify-end"
           style={{
             marginTop: 18,
-            display: "flex",
-            justifyContent: "flex-end",
             padding: "16px 28px",
             borderTop: "1px solid var(--border)",
             background: "color-mix(in srgb, var(--surface-3) 45%, transparent)",
           }}
         >
+          {/* A DOOR OUT, not just an acknowledgement. The honour branch is the one
+              that removed something from the player, so it is the one that has to
+              offer somewhere to go — the lobby, pre-filtered to rooms they can
+              actually join. Without this the modal is a dead end, which is exactly
+              what turns a nudge into a churn moment. */}
+          {honor && (
+            <button
+              type="button"
+              onClick={() => {
+                close();
+                navigate("/lobby", { state: { lobbyFilter: "qualify" } });
+              }}
+              data-testid="room-ejection-browse"
+              className="text-ink-dim hover:text-ink border-border hover:border-border-2 inline-flex cursor-pointer items-center justify-center gap-2 rounded-[10px] border px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              {t("lobby.roomEjection.browseQualifying")}
+            </button>
+          )}
           <DialogClose
             data-testid="room-ejection-action"
             style={{

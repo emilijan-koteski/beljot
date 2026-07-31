@@ -216,6 +216,48 @@ export const en: RulesLangData = {
         },
       ],
     },
+    {
+      id: "honour",
+      label: "Honour",
+      title: "Honour — finishing what you start",
+      lede: "Beljot is a partnership game: a player who walks out mid-match ruins it for three other people. Honour is how the table protects itself.",
+      blocks: [
+        {
+          kind: "p",
+          text: "Your honour score is the share of matches you finish, weighted so recent play counts for far more than old history. A fresh account starts at 80 and shows no score at all until it has played 5 matches — there is nothing meaningful to measure before that.",
+        },
+        {
+          kind: "steps",
+          items: [
+            {
+              t: "Finishing a match lifts it",
+              d: "Win or lose. Honour is not a measure of skill — it only asks whether you were still at the table at the end.",
+            },
+            {
+              t: "Surrendering still counts as finished",
+              d: "A surrendered match is a completed match. Agreeing to end it with your partner is the opposite of walking out, and it lifts your score exactly like any other finish.",
+            },
+            {
+              t: "Dropping out and not returning lowers it",
+              d: "This is the only thing that does. If you lose connection you have the full reconnect window to come back, and coming back costs you nothing.",
+            },
+            {
+              t: "Time repairs it",
+              d: "Old abandonments fade. A bad run months ago counts for very little against matches you have finished since.",
+            },
+          ],
+        },
+        {
+          kind: "rule",
+          title: "The five tiers",
+          text: "Exemplary (95-100) practically never quits. Trusted (85-94) is a reliable partner. Fair (70-84) is the usual range. Unreliable (50-69) is locked out of some tables, and Problematic (0-49) out of most. A room's host can require a minimum, and can separately decide whether players with no score yet are welcome.",
+        },
+        {
+          kind: "note",
+          text: "Two things players most often get wrong: surrendering does not hurt your honour, and a single bad night does not follow you around. Reconnecting after a dropped connection is always free.",
+        },
+      ],
+    },
   ],
 
   ui: {

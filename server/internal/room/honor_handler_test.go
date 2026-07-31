@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -987,4 +988,147 @@ func TestRoom_MinHonorCheckConstraintRejectsOutOfRange(t *testing.T) {
 		owner.ID,
 	).Error
 	require.Error(t, err, "min_honor 101 must violate the CHECK (min_honor BETWEEN 0 AND 100)")
+}
+
+// --- Per-seat honour on the room roster (honour redesign R6) -----------------
+
+// doGetRoom lives in handler_test.go — reused here rather than redeclared.
+
+// rosterOf pulls the players array out of a room-detail response.
+func rosterOf(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
+	t.Helper()
+	var body struct {
+		Data struct {
+			Players []map[string]any `json:"players"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	return body.Data.Players
+}
+
+// The waiting room showed NO honour at all before this: the lobby card carried
+// both chips, then the gate vanished the moment you were inside. Per-seat honour
+// is what makes the roster answer "who am I about to partner with".
+func TestGetRoom_AttachesHonorToHumanSeats(t *testing.T) {
+	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{
+		100: honorOf(96),
+		7:   honorOf(71),
+	}}
+	e, repo, _, _ := setupHonorTest(nil, nil, honor)
+	r := seedGatedRoom(t, repo, 85, true)
+	seat := 1
+	team := teamNameForSeat(1)
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{
+		RoomID: r.ID, UserID: 7, Username: "peer", Seat: &seat, Team: &team,
+	}))
+
+	rec := doGetRoom(e, "1", validToken(100))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	roster := rosterOf(t, rec)
+	require.Len(t, roster, 2)
+	byUser := map[float64]map[string]any{}
+	for _, p := range roster {
+		byUser[p["userId"].(float64)] = p
+	}
+	assert.Equal(t, float64(96), byUser[100]["honorScore"])
+	assert.Equal(t, "exemplary", byUser[100]["honorTier"])
+	assert.Equal(t, float64(71), byUser[7]["honorScore"])
+	assert.Equal(t, "fair", byUser[7]["honorTier"])
+}
+
+// A score of 0 is a legitimate value ("Problematic"). The field is a POINTER so
+// it survives serialization instead of being indistinguishable from "not read" —
+// with `omitempty` on a plain int it would have vanished from the wire entirely.
+func TestGetRoom_ZeroHonorScoreSurvivesAsRealZero(t *testing.T) {
+	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{100: honorOf(0)}}
+	e, repo, _, _ := setupHonorTest(nil, nil, honor)
+	seedGatedRoom(t, repo, 0, true)
+
+	rec := doGetRoom(e, "1", validToken(100))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	roster := rosterOf(t, rec)
+	require.Len(t, roster, 1)
+	score, present := roster[0]["honorScore"]
+	require.True(t, present, "a real 0 must be on the wire, not omitted")
+	assert.Equal(t, float64(0), score)
+	assert.Equal(t, "problematic", roster[0]["honorTier"])
+}
+
+// LENIENT, unlike the gate's reader. Honour on the roster is decoration; taking
+// the whole waiting room down because a shield could not be drawn would be a far
+// worse failure than drawing no shield.
+func TestGetRoom_HonorReadFailureStillServesTheRoom(t *testing.T) {
+	honor := &stubHonor{err: errors.New("db unavailable")}
+	e, repo, _, _ := setupHonorTest(nil, nil, honor)
+	seedGatedRoom(t, repo, 85, true)
+
+	rec := doGetRoom(e, "1", validToken(100))
+	require.Equal(t, http.StatusOK, rec.Code, "a failed honor read must not fail the request")
+
+	roster := rosterOf(t, rec)
+	require.Len(t, roster, 1)
+	_, present := roster[0]["honorScore"]
+	assert.False(t, present, "no shield rather than a wrong one")
+}
+
+// A seat whose row is simply absent gets no shield; its neighbours keep theirs.
+func TestGetRoom_MissingHonorRowOnlyAffectsThatSeat(t *testing.T) {
+	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{100: honorOf(90)}}
+	e, repo, _, _ := setupHonorTest(nil, nil, honor)
+	r := seedGatedRoom(t, repo, 0, true)
+	seat := 1
+	team := teamNameForSeat(1)
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{
+		RoomID: r.ID, UserID: 7, Username: "peer", Seat: &seat, Team: &team,
+	}))
+
+	rec := doGetRoom(e, "1", validToken(100))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	for _, p := range rosterOf(t, rec) {
+		_, present := p["honorScore"]
+		if p["userId"].(float64) == 100 {
+			assert.True(t, present)
+		} else {
+			assert.False(t, present)
+		}
+	}
+}
+
+// Bots have no account, and a bot seat can never be what blocks Start on honour.
+func TestGetRoom_BotSeatsAreNeverGivenHonor(t *testing.T) {
+	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{100: honorOf(90)}}
+	e, repo, _, _ := setupHonorTest(nil, nil, honor)
+	r := seedGatedRoom(t, repo, 0, true)
+	require.NoError(t, repo.AddBot(r.ID, 2))
+
+	rec := doGetRoom(e, "1", validToken(100))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	for _, p := range rosterOf(t, rec) {
+		if p["isBot"] == true {
+			_, present := p["honorScore"]
+			assert.False(t, present, "a bot seat carries no honour")
+			// And the read never asked for user 0.
+			for _, batch := range honor.requestedBy {
+				assert.NotContains(t, batch, uint(0))
+			}
+		}
+	}
+}
+
+// A room with no honour service wired serves normally, shields absent.
+func TestGetRoom_NilHonorServiceServesTheRoom(t *testing.T) {
+	e, repo, _, _ := setupHonorTest(nil, nil, nil)
+	seedGatedRoom(t, repo, 0, true)
+
+	rec := doGetRoom(e, "1", validToken(100))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	roster := rosterOf(t, rec)
+	require.Len(t, roster, 1)
+	_, present := roster[0]["honorScore"]
+	assert.False(t, present)
 }

@@ -215,6 +215,48 @@ export const sr: RulesLangData = {
         },
       ],
     },
+    {
+      id: "honour",
+      label: "Čast",
+      title: "Čast: završi ono što započneš",
+      lede: "Beljot je igra u parovima. Igrač koji napusti meč u toku kvari ga za još tri osobe. Čast je način na koji se sto štiti sam.",
+      blocks: [
+        {
+          kind: "p",
+          text: "Skor časti je udeo mečeva koje si završio, s tim da skoriji mečevi vrede mnogo više od stare istorije. Nov račun počinje na 80 i ne prikazuje skor dok ne odigra 5 mečeva, jer pre toga nema šta da se meri.",
+        },
+        {
+          kind: "steps",
+          items: [
+            {
+              t: "Završen meč podiže skor",
+              d: "Bez obzira na pobedu ili poraz. Čast ne meri veštinu, samo da li si bio za stolom do kraja.",
+            },
+            {
+              t: "Predaja se i dalje računa kao završeno",
+              d: "Predat meč je završen meč. Dogovor s partnerom da se meč završi je suprotnost napuštanju i podiže skor kao i svaki drugi završetak.",
+            },
+            {
+              t: "Napuštanje bez vraćanja ga snižava",
+              d: "To je jedino što ga snižava. Ako izgubiš vezu, imaš pun prozor za ponovno povezivanje, a vraćanje te ne košta ništa.",
+            },
+            {
+              t: "Vreme ga popravlja",
+              d: "Stara napuštanja blede. Loš niz od pre nekoliko meseci vredi vrlo malo prema mečevima koje si završio posle toga.",
+            },
+          ],
+        },
+        {
+          kind: "rule",
+          title: "Pet nivoa",
+          text: "Uzoran (95-100) skoro nikad ne odustaje. Pouzdan (85-94) je pouzdan partner. Solidan (70-84) je uobičajen nivo. Nepouzdan (50-69) je zaključan za neke stolove, a Problematičan (0-49) za većinu. Domaćin sobe može da postavi minimum i da posebno odluči da li su dobrodošli igrači koji još nemaju skor.",
+        },
+        {
+          kind: "note",
+          text: "Dve stvari koje igrači najčešće pogrešno razumeju: predaja ne šteti tvojoj časti, i jedno loše veče te ne prati zauvek. Ponovno povezivanje posle prekida veze je uvek besplatno.",
+        },
+      ],
+    },
   ],
 
   ui: {

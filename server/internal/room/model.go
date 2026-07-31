@@ -106,8 +106,25 @@ type RoomPlayer struct {
 	// room_bots and enter players arrays only via mergeBotPlayers as
 	// {id:0, userId:0, username:"", seat, team, isBot:true}. Humans always
 	// serialize isBot:false.
-	IsBot     bool      `gorm:"-" json:"isBot"`
-	CreatedAt time.Time `json:"createdAt"`
+	IsBot bool `gorm:"-" json:"isBot"`
+	// Honour, attached for the waiting-room roster (honour redesign R6). Not a
+	// column — hydrated per-request from user.HonorService.HonorForUsers, which
+	// recomputes from the stored weights.
+	//
+	// POINTERS so "not read" is distinguishable from a real 0: an honour score of
+	// 0 is a legitimate value ("Problematic"), and a plain int would make the
+	// two indistinguishable — the exact class of bug the 9.7/9.8 reviews closed
+	// repeatedly. nil means "no honour available for this seat" (a bot, an honour
+	// service that is not wired, or a read that failed) and the client renders no
+	// shield rather than a wrong one.
+	//
+	// Public-safe: the profile response already exposes the same score and tier
+	// to anyone, so the roster reveals nothing new. It is deliberately NOT the
+	// counts or the trend — a seatmate needs to know how reliable someone is, not
+	// their history.
+	HonorScore *int      `gorm:"-" json:"honorScore,omitempty"`
+	HonorTier  *string   `gorm:"-" json:"honorTier,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 // RoomBot is a bot occupying a seat in a waiting room. Bots have no user

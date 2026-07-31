@@ -123,6 +123,16 @@ export interface RoomPlayer {
   // Synthetic bot entries arrive as {id:0, userId:0, username:"", isBot:true}.
   // Always check with `isBot === true` — never infer from a falsy userId.
   isBot: boolean;
+  /**
+   * Per-seat honour for the waiting-room roster (honour redesign R6). OPTIONAL and
+   * nullable on purpose: the server omits both when the seat is a bot, when no
+   * honour service is wired, or when the read failed — so `undefined` means "no
+   * shield", never "score 0". A real 0 is a legitimate value and arrives as 0.
+   *
+   * Test with `typeof honorScore === "number"`, never truthiness.
+   */
+  honorScore?: number;
+  honorTier?: string;
   createdAt: string;
 }
 

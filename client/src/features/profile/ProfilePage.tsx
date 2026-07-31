@@ -7,7 +7,6 @@ import { useProfileQuery } from "@/shared/hooks/queries/useProfile";
 import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-import { HonorPanel } from "./components/HonorPanel";
 import { IdentityHero } from "./components/IdentityHero";
 import { LinkedAccounts } from "./components/LinkedAccounts";
 import { Milestones } from "./components/Milestones";
@@ -31,9 +30,10 @@ export function ProfilePage() {
   // got worse is the only one never told. Hub.SendToUser is a silent no-op with
   // no queue, so that event is gone for good. Without this effect the header chip
   // kept rendering the pre-abandonment score until the next token refresh or a
-  // reload, which let /profile show a real 44 in HonorPanel beside a stale 90 in
-  // the chip directly above it — two different numbers for the same quantity on
-  // one screen.
+  // reload, which let /profile show a real 44 in the hero's honour band beside a
+  // stale 90 in the chip directly above it — two different numbers for the same
+  // quantity on one screen. (The band was a standalone HonorPanel section when
+  // this was written; the contradiction it closes is unchanged.)
   //
   // GET /users/:id/profile recomputes honor from the stored weights on every
   // read, so it is authoritative by the same rule the WS event is; adopting it
@@ -123,28 +123,27 @@ export function ProfilePage() {
         xpIntoLevel={profile?.xpIntoLevel ?? xpFallback.xpIntoLevel}
         xpForNextLevel={profile?.xpForNextLevel ?? xpFallback.xpForNextLevel}
         winRate={winRate}
+        // Honour rides the hero as its bottom band rather than a section of its
+        // own (redesign R3). Still gated on `profile`: with no profile there is
+        // simply no honour band, so the loading transient can never mix a real
+        // value with a 0 fallback — the bug the Story 9.5 review caught on the
+        // XP bar.
+        honor={
+          profile
+            ? {
+                score: profile.honorScore,
+                tier: profile.honorTier,
+                completedTotal: profile.honorCompletedTotal,
+                abandonedTotal: profile.honorAbandonedTotal,
+                isNewPlayer: profile.isNewPlayer,
+                trendDelta: profile.honorTrendDelta,
+                trendDirection: profile.honorTrendDirection,
+              }
+            : undefined
+        }
       />
 
       {career.data && <StreakCallout streak={career.data.streak} />}
-
-      {/* Honor (Story 9.7). Rendered as a full-width section between the streak
-          callout and the stats grid rather than squeezed into the hero's
-          reserved slot — it carries a score, a tier, a meter, a trend and two
-          counts, which needs the width of a section with its own header.
-          Gated on `profile` so the loading transient never mixes a real value
-          with a 0 fallback (the Story 9.5 review caught exactly that on the XP
-          bar): with no profile there is simply no honor surface. */}
-      {profile && (
-        <HonorPanel
-          score={profile.honorScore}
-          tier={profile.honorTier}
-          completedTotal={profile.honorCompletedTotal}
-          abandonedTotal={profile.honorAbandonedTotal}
-          isNewPlayer={profile.isNewPlayer}
-          trendDelta={profile.honorTrendDelta}
-          trendDirection={profile.honorTrendDirection}
-        />
-      )}
 
       {isError ? (
         <section

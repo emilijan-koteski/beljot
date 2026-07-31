@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
@@ -22,7 +22,7 @@ import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
 import { useMarkLobbyRoot } from "@/shared/hooks/useLobbyReturn";
 import { formatCoins } from "@/shared/lib/formatCoins";
-import { honorScoreOrPrior } from "@/shared/lib/honor";
+import { type HonorGateViewer, honorQualifies, honorScoreOrPrior } from "@/shared/lib/honor";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room } from "@/shared/types/apiTypes";
 
@@ -31,6 +31,7 @@ function filterAndSort(
   search: string,
   filter: LobbyFilter,
   sort: LobbySort,
+  viewer: HonorGateViewer,
 ): Room[] {
   const q = search.trim().toLowerCase();
   const filtered = rooms.filter((r) => {
@@ -38,6 +39,10 @@ function filterAndSort(
     if (filter === "open" && r.playerCount >= 4) return false;
     if (filter === "relaxed" && r.timerStyle !== "relaxed") return false;
     if (filter === "timed" && r.timerStyle === "relaxed") return false;
+    // Purely client-side: the room's gate and the viewer's score are both already
+    // on hand, so this needs no request. Cosmetic like every other honour mirror —
+    // the server re-validates the actual join.
+    if (filter === "qualify" && !honorQualifies(r, viewer)) return false;
     return true;
   });
   const sorted = [...filtered];
@@ -54,9 +59,10 @@ function filterAndSort(
   return sorted;
 }
 
-function deriveCounts(rooms: Room[]): FilterCounts {
+function deriveCounts(rooms: Room[], viewer: HonorGateViewer): FilterCounts {
   return {
     all: rooms.length,
+    qualify: rooms.filter((r) => honorQualifies(r, viewer)).length,
     open: rooms.filter((r) => r.playerCount < 4).length,
     relaxed: rooms.filter((r) => r.timerStyle === "relaxed").length,
     timed: rooms.filter((r) => r.timerStyle !== "relaxed").length,
@@ -79,7 +85,16 @@ export function LobbyPage() {
   const joinRoomMutation = useJoinRoomMutation();
 
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<LobbyFilter>("all");
+  // The ejection modal's "Rooms I qualify for" action routes here with this state,
+  // so an ejected player lands on a shorter list instead of the wall they just hit.
+  // Read once as the initial value: the filter is the user's afterwards, and
+  // re-applying it on every render would fight them.
+  const location = useLocation();
+  const [filter, setFilter] = useState<LobbyFilter>(() =>
+    (location.state as { lobbyFilter?: LobbyFilter } | null)?.lobbyFilter === "qualify"
+      ? "qualify"
+      : "all",
+  );
   const [sort, setSort] = useState<LobbySort>("filling");
   const [showCreate, setShowCreate] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -91,10 +106,18 @@ export function LobbyPage() {
   // Stabilise the array reference: `roomsQuery.data ?? []` would mint a fresh
   // `[]` every render while data is undefined, busting the useMemos below.
   const rooms = useMemo(() => roomsQuery.data ?? [], [roomsQuery.data]);
-  const counts = useMemo(() => deriveCounts(rooms), [rooms]);
+  // Narrowed to just the two fields the gate reads, so the memos below re-run when
+  // honour changes but not on every unrelated auth-store write (wallet, XP…).
+  const viewerHonorScore = useAuthStore((s) => s.user?.honorScore);
+  const viewerIsNewPlayer = useAuthStore((s) => s.user?.isNewPlayer);
+  const honorViewer = useMemo(
+    () => ({ honorScore: viewerHonorScore, isNewPlayer: viewerIsNewPlayer }),
+    [viewerHonorScore, viewerIsNewPlayer],
+  );
+  const counts = useMemo(() => deriveCounts(rooms, honorViewer), [rooms, honorViewer]);
   const filtered = useMemo(
-    () => filterAndSort(rooms, search, filter, sort),
-    [rooms, search, filter, sort],
+    () => filterAndSort(rooms, search, filter, sort, honorViewer),
+    [rooms, search, filter, sort, honorViewer],
   );
 
   // Routes a quick-play response (from either Quick Play or a quick-join) to the

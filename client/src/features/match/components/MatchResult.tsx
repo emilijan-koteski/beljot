@@ -2,8 +2,10 @@ import { Coins } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { HonorShield } from "@/shared/components/HonorShield";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import { HONOR_TIER_COLOR, normalizeHonorTier } from "@/shared/lib/honor";
 import { Z } from "@/shared/lib/zLayers";
 import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 import type { MatchEndPayload } from "@/shared/types/wsEvents";
@@ -31,6 +33,11 @@ interface MatchResultProps {
    *  matches and omitted while the settlement event is still in flight; a 0
    *  delta (e.g. a lone winner who only recovers their stake) renders nothing. */
   coinDelta?: number;
+  /** Honour movement for this match (honour redesign R7). Undefined for a New
+   *  Player, whose score is deliberately not shown, and while the honour event is
+   *  still in flight. An unchanged score still renders — "untouched" is itself
+   *  information when someone else abandoned. */
+  honorSettlement?: { before: number; after: number; tier: string } | null;
 }
 
 // Loss accent — the soft red shared with the surrender overlay, kept local
@@ -51,6 +58,7 @@ export function MatchResult({
   onReturnToRoom,
   surrenderedByUsername,
   coinDelta,
+  honorSettlement,
 }: MatchResultProps) {
   const { t } = useTranslation();
 
@@ -175,6 +183,47 @@ export function MatchResult({
                   {coinWon
                     ? t("match.settlement.won", { amount: formatCoins(coinDelta ?? 0) })
                     : t("match.settlement.lost", { amount: formatCoins(-(coinDelta ?? 0)) })}
+                </span>
+              </div>
+            )}
+
+            {/* Honour movement (honour redesign R7). event:honor_updated lands at
+                exactly this moment and was previously discarded visually — the
+                score moved and nothing on screen said so.
+
+                It rises on a LOSS as well as a win, which is the clearest possible
+                statement that honour is not a measure of skill: you finished, so it
+                went up. No scolding copy on the way down either — the number is the
+                consequence, and adding a sentence would make it a telling-off.
+
+                Tier colour comes from HONOR_TIER_COLOR, whose values re-root inside
+                .game-table, so this reads correctly on dark felt with no branch. */}
+            {honorSettlement && (
+              <div
+                className="font-display inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
+                style={{
+                  color:
+                    HONOR_TIER_COLOR[
+                      normalizeHonorTier(honorSettlement.tier, honorSettlement.after)
+                    ],
+                  border: "1px solid rgba(201,168,118,0.35)",
+                  background: "rgba(201,168,118,0.08)",
+                }}
+                data-testid="match-result-honor"
+                data-honor-before={honorSettlement.before}
+                data-honor-after={honorSettlement.after}
+              >
+                <HonorShield
+                  tier={normalizeHonorTier(honorSettlement.tier, honorSettlement.after)}
+                  size={16}
+                />
+                <span className="text-base font-semibold tabular-nums">
+                  {honorSettlement.after === honorSettlement.before
+                    ? t("match.settlement.honorUnchanged", { score: honorSettlement.after })
+                    : t("match.settlement.honorMoved", {
+                        before: honorSettlement.before,
+                        after: honorSettlement.after,
+                      })}
                 </span>
               </div>
             )}

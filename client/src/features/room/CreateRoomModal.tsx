@@ -21,7 +21,7 @@ import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { FetchError } from "@/shared/api/axiosClient";
 import { Button } from "@/shared/components/ui/button";
 import { Dialog, DialogContent } from "@/shared/components/ui/dialog";
-import { DurationSlider } from "@/shared/components/ui/duration-slider";
+import { DurationSlider, type SliderTick } from "@/shared/components/ui/duration-slider";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { Field } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
@@ -29,7 +29,13 @@ import { Segmented } from "@/shared/components/ui/segmented";
 import { useCreateRoomMutation } from "@/shared/hooks/mutations/useRooms";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
-import { honorIsNewPlayer, honorScoreOrPrior } from "@/shared/lib/honor";
+import {
+  HONOR_TIER_BANDS,
+  HONOR_TIER_COLOR,
+  honorIsNewPlayer,
+  honorScoreOrPrior,
+  honorTierForScore,
+} from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -54,6 +60,25 @@ const MIN_HONOR_CEILING = 100;
 // The default is UNGATED: min 0, newcomers welcome. Creating a gated room is an
 // opt-in, so the modal must never nudge an owner into one by default.
 const DEFAULT_MIN_HONOR = 0;
+
+/**
+ * Slider marks on the TIER BOUNDARIES, derived from the bands themselves rather
+ * than restated — retuning a floor server-side moves these with it.
+ *
+ * The ends are labelled and unemphasised; the four interior boundaries are
+ * emphasised, because those are the positions that change what the number MEANS.
+ * A host picking "85" is really picking Trusted, and the ticks are what make that
+ * visible without a sentence of hint copy.
+ */
+const MIN_HONOR_TICKS: SliderTick[] = [
+  { value: MIN_HONOR_FLOOR, label: String(MIN_HONOR_FLOOR) },
+  ...HONOR_TIER_BANDS.filter((b) => b.from > 0).map((b) => ({
+    value: b.from,
+    label: String(b.from),
+    emphasis: true,
+  })),
+  { value: MIN_HONOR_CEILING, label: String(MIN_HONOR_CEILING) },
+];
 
 /**
  * Split-panel create-room modal. Left = form (name, variant, match mode,
@@ -458,10 +483,20 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 />
               </Field>
 
+              {/* A discrete slider over the tier bands, not a free-typed number.
+                  Three things it teaches for free that the number field could not:
+                  the ticks sit on TIER BOUNDARIES so the host picks a tier rather
+                  than a digit, the fill takes that tier's colour, and the host's
+                  OWN score is marked on the track — which turns the D7 self-gate
+                  from an error you trip into a place you can see.
+
+                  Both hints are deleted with nothing put back: the ticks and the
+                  "min. honour · trusted" caption say what the number means, and
+                  Welcome / Veterans only needs no explaining. Everything else lives
+                  one tap away in the explainer. The modal already carries seven
+                  fields of copy. */}
               <Field
                 label={t("lobby.createRoomModal.minHonor")}
-                htmlFor="min-honor"
-                hint={t("lobby.createRoomModal.minHonorHint")}
                 error={
                   failsOwnHonorGate
                     ? t("lobby.createRoomModal.errors.ownHonorTooLow", {
@@ -472,36 +507,46 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 }
                 errorTestId="min-honor-error"
               >
-                <div className="relative">
-                  <ShieldCheck
-                    className="text-ink-mute pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-                    aria-hidden="true"
-                  />
-                  <Input
-                    id="min-honor"
-                    type="number"
-                    min={MIN_HONOR_FLOOR}
-                    max={MIN_HONOR_CEILING}
-                    step={5}
-                    inputMode="numeric"
-                    value={minHonor}
-                    onChange={(e) =>
-                      setMinHonor(
-                        Math.min(
-                          MIN_HONOR_CEILING,
-                          Math.max(MIN_HONOR_FLOOR, Math.floor(Number(e.target.value) || 0)),
-                        ),
-                      )
-                    }
-                    data-testid="min-honor-input"
-                    className="h-11 pl-9"
-                  />
-                </div>
+                <DurationSlider
+                  value={effectiveMinHonor}
+                  onChange={setMinHonor}
+                  min={MIN_HONOR_FLOOR}
+                  max={MIN_HONOR_CEILING}
+                  step={5}
+                  // 0 reads as a word, so the default looks like a choice rather
+                  // than an empty field.
+                  valueText={
+                    effectiveMinHonor === 0 ? t("lobby.createRoomModal.minHonorAnyone") : undefined
+                  }
+                  unitLabel={
+                    effectiveMinHonor === 0
+                      ? ""
+                      : t(`profile.honor.tier.${honorTierForScore(effectiveMinHonor)}`)
+                  }
+                  ticks={MIN_HONOR_TICKS}
+                  fillStyle={
+                    effectiveMinHonor === 0
+                      ? undefined
+                      : HONOR_TIER_COLOR[honorTierForScore(effectiveMinHonor)]
+                  }
+                  // Only when the envelope actually carries honour — the same
+                  // honorKnown guard the self-gate uses, for the same reason: a
+                  // marker at the 80 prior would be a claim about a score the
+                  // server never sent.
+                  marker={
+                    honorKnown
+                      ? {
+                          value: meHonor,
+                          label: t("lobby.createRoomModal.minHonorYou", { honor: meHonor }),
+                        }
+                      : undefined
+                  }
+                  testId="min-honor-input"
+                />
               </Field>
 
               <Field
                 label={t("lobby.createRoomModal.allowNewPlayers")}
-                hint={t("lobby.createRoomModal.allowNewPlayersHint")}
                 error={
                   failsOwnNewPlayerGate
                     ? t("lobby.createRoomModal.errors.ownNewPlayerNotAllowed")

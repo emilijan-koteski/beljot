@@ -2047,3 +2047,116 @@ describe("RoomPage", () => {
     expect(mockLeaveRoom).not.toHaveBeenCalled();
   });
 });
+
+// --- Honour in the waiting room (honour redesign R6) ------------------------
+//
+// The waiting room showed honour NOWHERE before this: the lobby card carried both
+// chips, then they vanished the moment you were inside the room they described.
+
+describe("RoomPage honour", () => {
+  const seat = (
+    userId: number,
+    username: string,
+    s: number,
+    honor?: { honorScore: number; honorTier: string },
+  ) => ({
+    id: userId,
+    roomId: 1,
+    userId,
+    username,
+    seat: s,
+    team: s % 2 === 0 ? "teamA" : "teamB",
+    isBot: false,
+    createdAt: "",
+    ...honor,
+  });
+
+  it("shows the gate in the badges row, and not at all when ungated", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1, minHonor: 85, allowNewPlayers: false },
+      players: [seat(10, "alice", 0)],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("badge-min-honor")).toHaveAttribute("data-min-honor", "85"),
+    );
+    expect(screen.getByTestId("badge-veterans-only")).toBeInTheDocument();
+  });
+
+  it("renders no honour badges on an ungated room", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1 },
+      players: [seat(10, "alice", 0)],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("player-seat-0")).toBeInTheDocument());
+    expect(screen.queryByTestId("badge-min-honor")).toBeNull();
+    expect(screen.queryByTestId("badge-veterans-only")).toBeNull();
+  });
+
+  it("shows each seat its own tier, and rings only the seat under the room's bar", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 2, minHonor: 85 },
+      players: [
+        seat(10, "alice", 0, { honorScore: 96, honorTier: "exemplary" }),
+        // 71 is Fair — the seat gets the STONE shield, not a red X. Being under
+        // this room's bar is drawn by the tile's ring instead.
+        seat(20, "bob", 1, { honorScore: 71, honorTier: "fair" }),
+      ],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("seat-honor-0")).toBeInTheDocument());
+    expect(screen.getByTestId("seat-honor-0")).toHaveAttribute("data-honor", "96");
+    expect(screen.getByTestId("seat-honor-1")).toHaveAttribute("data-honor", "71");
+    // The shield states the PLAYER's tier, never a verdict about the room.
+    expect(within(screen.getByTestId("seat-honor-1")).getByTestId("honor-shield")).toHaveAttribute(
+      "data-tier",
+      "fair",
+    );
+
+    // Only the below-bar seat's tile is ringed.
+    expect(screen.getByTestId("seat-position-east")).toHaveAttribute(
+      "data-below-honor-bar",
+      "true",
+    );
+    expect(screen.getByTestId("seat-position-south")).not.toHaveAttribute("data-below-honor-bar");
+  });
+
+  it("renders a real honour score of 0 rather than omitting it", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1 },
+      players: [seat(10, "alice", 0, { honorScore: 0, honorTier: "problematic" })],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("seat-honor-0")).toBeInTheDocument());
+    expect(screen.getByTestId("seat-honor-0")).toHaveAttribute("data-honor", "0");
+  });
+
+  it("shows no shield for a seat whose honour did not arrive", async () => {
+    // A degraded honour read must never make a seat look like it has score 0.
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1, minHonor: 85 },
+      players: [seat(10, "alice", 0)],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("player-seat-0")).toBeInTheDocument());
+    expect(screen.queryByTestId("seat-honor-0")).toBeNull();
+    // And it is never treated as the blocking seat.
+    expect(screen.getByTestId("seat-position-south")).not.toHaveAttribute("data-below-honor-bar");
+  });
+});

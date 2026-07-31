@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { TeamString } from "@/shared/types/matchTypes";
 import type { MatchAbandonedPayload } from "@/shared/types/wsEvents";
 
@@ -105,6 +106,14 @@ export function ReconnectOverlay({
   // Per-row countdowns inside `DisconnectedPlayerRow` track each seat's own
   // expiry independently. The shared hook measures against the server's clock
   // (clockSync) with deadline-aligned ticks, same as the in-game TimerRing.
+  // Is the viewer one of the seats being waited on? Derived by username rather
+  // than seat because `disconnectedPlayers` carries names only, and usernames are
+  // unique in this app. Used solely to pick which side of the honour note to show,
+  // so a miss degrades to the reassuring copy rather than to anything wrong.
+  const viewerUsername = useAuthStore((s) => s.user?.username);
+  const viewerIsDisconnected =
+    viewerUsername !== undefined && chipPlayers.some((p) => p.name === viewerUsername);
+
   const remainingSeconds = useTurnCountdown(reconnectExpiresAt);
   const prefersReducedMotion = useReducedMotion();
   // Deadline-anchored sweep — empties exactly at the abandon deadline. Must
@@ -400,6 +409,28 @@ export function ReconnectOverlay({
               style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.55 }}
             >
               {t("match.disconnect.countdownLabel")}
+            </p>
+
+            {/* Honour consequence (honour redesign R7). This is the ONE screen where
+                the cost is still avoidable, and players currently cannot tell whether
+                a dropped connection costs them anything — so the panic answer is to
+                close the tab, which is the outcome honour exists to discourage.
+
+                Viewer-relative on purpose: if it is someone else, the line reassures
+                you that THEIR score is at stake and not yours; if it is you, it is a
+                reason to keep the tab open. Same information, opposite motivation.
+
+                `viewerIsWaiting` is derived from the existing seat data — no new prop
+                and no new event. */}
+            <p
+              className="font-body text-center text-xs"
+              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.75, maxWidth: 340 }}
+              data-testid="reconnect-honor-note"
+              data-viewer-dropped={viewerIsDisconnected ? "true" : "false"}
+            >
+              {viewerIsDisconnected
+                ? t("match.disconnect.honorNoteSelf")
+                : t("match.disconnect.honorNoteOther")}
             </p>
           </div>
         </ClassicPanel>

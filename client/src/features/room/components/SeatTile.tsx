@@ -1,10 +1,12 @@
 import { Bot, Crown, Hourglass, Shuffle, UserX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { HonorShield } from "@/shared/components/HonorShield";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { botDisplayName } from "@/shared/lib/botName";
+import { normalizeHonorTier } from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import type { RoomPlayer } from "@/shared/types/apiTypes";
 
@@ -36,6 +38,13 @@ type SeatTileProps = {
    * to return" badge; the owner Start button is gated until none remain.
    */
   waitingToReturn?: boolean;
+  /**
+   * This seat's human is below the room's honour bar, so they are what will block
+   * Start (honour redesign R6). Draws an ember ring on the TILE — deliberately not
+   * on the shield, because the shield states the player's own tier and this states
+   * a fact about the room. Cosmetic: the server re-checks at start and return.
+   */
+  belowHonorBar?: boolean;
   ownerCanActOnRow: boolean;
   onSelect: () => void;
   onKick?: () => void;
@@ -69,6 +78,7 @@ export function SeatTile({
   isClickable,
   isPending,
   waitingToReturn = false,
+  belowHonorBar = false,
   ownerCanActOnRow,
   onSelect,
   onKick,
@@ -101,14 +111,23 @@ export function SeatTile({
   const tokens = MODE_TOKENS[mode];
   const tileStyle: React.CSSProperties = {
     background: filled ? tokens.fill : "transparent",
-    border: filled ? `2px solid ${tokens.edge}` : `2px dashed ${tokens.edgeSoft}`,
-    boxShadow: isSwapSource
-      ? `0 0 0 3px var(--accent-soft), 0 0 0 1.5px var(--accent)`
-      : isYou
-        ? `0 0 0 1.5px var(--accent), 0 8px 22px -16px var(--accent)`
-        : filled
-          ? "0 4px 14px -12px rgba(14,58,36,0.20)"
-          : "none",
+    // The ember ring outranks the team edge and the swap/you rings: it is the one
+    // thing on this tile that says "the match cannot start because of this seat",
+    // which is more urgent than whose team it is or that you are mid-swap.
+    border: belowHonorBar
+      ? "2px solid var(--h1-line)"
+      : filled
+        ? `2px solid ${tokens.edge}`
+        : `2px dashed ${tokens.edgeSoft}`,
+    boxShadow: belowHonorBar
+      ? `0 0 0 3px var(--h1-soft)`
+      : isSwapSource
+        ? `0 0 0 3px var(--accent-soft), 0 0 0 1.5px var(--accent)`
+        : isYou
+          ? `0 0 0 1.5px var(--accent), 0 8px 22px -16px var(--accent)`
+          : filled
+            ? "0 4px 14px -12px rgba(14,58,36,0.20)"
+            : "none",
   };
 
   return (
@@ -121,6 +140,7 @@ export function SeatTile({
       className={cn("group relative", SEAT_AREA_CLASS[cardinal])}
       data-testid={`seat-position-${cardinal}`}
       data-team={seatIndex % 2 === 0 ? "teamA" : "teamB"}
+      data-below-honor-bar={belowHonorBar ? "true" : undefined}
     >
       <button
         type="button"
@@ -152,6 +172,38 @@ export function SeatTile({
                 {isHost && <Crown className="text-brass-deep size-3.25" aria-hidden="true" />}
                 {displayName}
               </span>
+              {/* This player's OWN honour (redesign R6). Honour is public by design
+                  — the profile response already exposes the same score and tier to
+                  anyone — and in the roster it finally pays off: you can see who you
+                  are about to partner with.
+
+                  The shield always shows THAT PLAYER'S tier, never a verdict about
+                  this room: a seat at 71 is Fair, so it gets the stone shield, not a
+                  red X. Being under the room's bar is a property of the ROOM, and it
+                  is drawn by the tile's ember ring instead. Two different facts, two
+                  different marks.
+
+                  The number renders in normal seat ink like the name above it —
+                  across the whole redesign only the shield is ever tinted. */}
+              {typeof player.honorScore === "number" && !isBot && (
+                <span
+                  className="text-ink-dim inline-flex items-center gap-1 text-[11.5px] font-bold tabular-nums"
+                  data-testid={`seat-honor-${seatIndex}`}
+                  data-honor={player.honorScore}
+                  title={t("profile.honor.meterLabel", {
+                    score: player.honorScore,
+                    tier: t(
+                      `profile.honor.tier.${normalizeHonorTier(player.honorTier ?? "", player.honorScore)}`,
+                    ),
+                  })}
+                >
+                  <HonorShield
+                    tier={normalizeHonorTier(player.honorTier ?? "", player.honorScore)}
+                    size={12}
+                  />
+                  {player.honorScore}
+                </span>
+              )}
               <div className="flex flex-wrap items-center justify-center gap-1">
                 {/* Bots never show You/Host badges — the bot marker takes their place. */}
                 {isBot && (

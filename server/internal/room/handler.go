@@ -762,10 +762,13 @@ func (h *RoomHandler) GetRoom(c echo.Context) error {
 		slog.Error("get room: failed to load owner username", "roomID", room.ID, "error", err)
 	}
 
+	roster := mergeBotPlayers(players, bots)
+	h.attachPlayerHonor(roster)
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": RoomDetailResponse{
 			Room:            room,
-			Players:         mergeBotPlayers(players, bots),
+			Players:         roster,
 			ReturnedUserIds: h.presence.Present(uint(roomID)),
 		},
 	})
@@ -798,10 +801,13 @@ func (h *RoomHandler) GetRoomByCode(c echo.Context) error {
 		slog.Error("get room by code: failed to load owner username", "roomID", room.ID, "error", err)
 	}
 
+	roster := mergeBotPlayers(players, bots)
+	h.attachPlayerHonor(roster)
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": RoomDetailResponse{
 			Room:            room,
-			Players:         mergeBotPlayers(players, bots),
+			Players:         roster,
 			ReturnedUserIds: h.presence.Present(room.ID),
 		},
 	})
@@ -1080,6 +1086,50 @@ func (h *RoomHandler) honorSnapshotsFor(userIDs []uint) (snaps map[uint]user.Hon
 		}
 	}
 	return read, true, nil
+}
+
+// attachPlayerHonor hydrates HonorScore / HonorTier on each HUMAN seat for the
+// waiting-room roster (honour redesign R6). Mutates in place and returns nothing:
+// it is presentation, and there is no caller that wants a value back.
+//
+// DELIBERATELY LENIENT, unlike honorSnapshotsFor. That reader is the GATE's, where
+// a missing row must fail the request — a zero-value snapshot reads as an
+// experienced player with score 0 and would sail through a veterans-only room. Here
+// the honour is decoration on a roster: if the read fails, or the service is not
+// wired, or one row is absent, the seat simply gets no shield. Failing a room-detail
+// request because a shield could not be drawn would take the whole waiting room
+// down for a cosmetic reason.
+//
+// Bots (UserID 0) are skipped: they have no account, and a bot seat can never be
+// the thing that blocks Start on honour.
+func (h *RoomHandler) attachPlayerHonor(players []RoomPlayer) {
+	if h.honorService == nil || len(players) == 0 {
+		return
+	}
+	ids := make([]uint, 0, len(players))
+	for _, p := range players {
+		if p.UserID != 0 && !p.IsBot {
+			ids = append(ids, p.UserID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	snaps, err := h.honorService.HonorForUsers(ids)
+	if err != nil {
+		slog.Error("failed to read honor for room roster", "error", err)
+		return
+	}
+	for i := range players {
+		snap, ok := snaps[players[i].UserID]
+		if !ok {
+			continue
+		}
+		score := snap.Score
+		tier := string(snap.Tier)
+		players[i].HonorScore = &score
+		players[i].HonorTier = &tier
+	}
 }
 
 // honorSnapshotFor is the single-user form of honorSnapshotsFor, for the three

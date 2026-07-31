@@ -9,6 +9,7 @@ import {
   LockOpen,
   Shuffle,
   Trophy,
+  UserCheck,
   Users,
   UserX,
   Zap,
@@ -28,6 +29,7 @@ import {
 } from "@/features/room/OwnerConfirmDialogs";
 import { RoomPrivacyDialog } from "@/features/room/RoomPrivacyDialog";
 import { FetchError } from "@/shared/api/axiosClient";
+import { HonorShield } from "@/shared/components/HonorShield";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -54,7 +56,12 @@ import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
-import { honorScoreOrPrior } from "@/shared/lib/honor";
+import {
+  honorQualifies,
+  honorRoomIsGated,
+  honorScoreOrPrior,
+  honorTierForScore,
+} from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -839,6 +846,21 @@ export function RoomPage() {
   const isWaitingToReturn = (p: RoomPlayer): boolean =>
     presenceTracked && p.seat !== null && p.isBot !== true && !returnedUserIds.includes(p.userId);
 
+  // Honour gate, per seat (redesign R6). Cosmetic — the server re-checks at both
+  // return and start, and it is the authority — but marking the blocking seat BEFORE
+  // the owner presses Start is the whole point: previously the owner clicked, a seat
+  // silently vanished, and they got a 409 with no way to know which one or why.
+  //
+  // Only decides for seats whose honour actually arrived. A seat with no score
+  // (a bot, or a read that failed) is never marked as blocking, so a degraded
+  // honour read can never make the room look un-startable.
+  const isBelowHonorBar = (p: RoomPlayer): boolean =>
+    honorRoomIsGated(room) &&
+    p.isBot !== true &&
+    typeof p.honorScore === "number" &&
+    !honorQualifies(room, { honorScore: p.honorScore, isNewPlayer: false });
+  const blockedSeats = players.filter(isBelowHonorBar);
+
   const ownerPlayer = players.find((p) => p.userId === room.ownerId);
   const ownerUsername = ownerPlayer?.username ?? t("room.seatOwner");
   const isRelaxed = room.timerStyle === "relaxed";
@@ -925,7 +947,12 @@ export function RoomPage() {
     ctaLabel = allSeated ? t("room.autoStarting") : t("room.waitingForPlayers");
   } else if (isOwner) {
     ctaTestId = "start-game";
-    ctaDisabled = !allSeated || !allReturned || startGameMutation.isPending;
+    // A blocked seat disables Start but does NOT relabel it: the CTA keeps saying
+    // "Start match" and the ember-ringed seat is the explanation. Stuffing the
+    // reason into the button would say it in the one place that cannot show WHICH
+    // seat, and the reason sits in the title for anyone who wants words.
+    ctaDisabled =
+      !allSeated || !allReturned || blockedSeats.length > 0 || startGameMutation.isPending;
     ctaOnClick = ctaDisabled ? undefined : handleStartGame;
     ctaLabel = startGameMutation.isPending
       ? t("room.matchStarting")
@@ -1184,6 +1211,26 @@ export function RoomPage() {
                   {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
                 </span>
               </Badge>
+              {/* Honour gate (redesign R6). The waiting room showed the gate
+                  NOWHERE before this: the lobby card carried both chips, then they
+                  vanished the moment you were inside the room they described. Same
+                  Badge component and sizing as its neighbours, so it is a room
+                  property like Bitola or 1001 — not a scoreboard. */}
+              {room.minHonor > 0 && (
+                <Badge
+                  tone="neutral"
+                  icon={<HonorShield tier={honorTierForScore(room.minHonor)} size={12} />}
+                >
+                  <span data-testid="badge-min-honor" data-min-honor={room.minHonor}>
+                    {t("lobby.card.minHonor", { minHonor: room.minHonor })}
+                  </span>
+                </Badge>
+              )}
+              {room.allowNewPlayers === false && (
+                <Badge tone="neutral" icon={<UserCheck className="size-3" />}>
+                  <span data-testid="badge-veterans-only">{t("lobby.card.veteransOnly")}</span>
+                </Badge>
+              )}
               {room.isQuickPlay && (
                 <Badge tone="accent" icon={<Zap className="size-3" />}>
                   <span data-testid="badge-quick-play">{t("lobby.quickPlay")}</span>
@@ -1247,7 +1294,13 @@ export function RoomPage() {
             size="cta"
             onClick={ctaOnClick}
             disabled={ctaDisabled}
-            title={!inSwapMode && isOwner && !allSeated ? t("room.startMatchDisabled") : undefined}
+            title={
+              !inSwapMode && isOwner && blockedSeats.length > 0
+                ? t("room.startBlockedByHonor", { minHonor: room.minHonor })
+                : !inSwapMode && isOwner && !allSeated
+                  ? t("room.startMatchDisabled")
+                  : undefined
+            }
             data-testid={ctaTestId}
             // Single-line pill that shares the row: min-w-0 + shrink override the
             // button's default shrink-0 so a long (usually disabled "waiting …")
@@ -1420,6 +1473,7 @@ export function RoomPage() {
                   isClickable={isClickable}
                   isPending={isPendingForThisSeat}
                   waitingToReturn={isWaiting && player !== undefined && isWaitingToReturn(player)}
+                  belowHonorBar={isWaiting && player !== undefined && isBelowHonorBar(player)}
                   ownerCanActOnRow={ownerCanKick}
                   onSelect={() => {
                     if (inSwapMode) {

@@ -7,7 +7,6 @@ import {
   KeyRound,
   Lock,
   LockOpen,
-  ShieldCheck,
   UserCheck,
   Users,
   Zap,
@@ -16,11 +15,14 @@ import { useTranslation } from "react-i18next";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { modeLabel, variantLabel } from "@/features/lobby/lib/roomLabels";
+import { HonorShield } from "@/shared/components/HonorShield";
 import { RelativeTime } from "@/shared/components/RelativeTime";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import { honorQualifies, honorScoreOrPrior, honorTierForScore } from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
 type Props = {
@@ -53,6 +55,17 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
   const full = seated >= 4;
   const hasBots = room.players?.some((p) => p.isBot === true) ?? false;
   const delay = `${Math.min(index * 28, 320)}ms`;
+
+  // Honour gate, cosmetic mirror of the server's. `honorQualifies` treats absent
+  // room fields as ungated, which is what the QuickPlay system:room_created
+  // payload needs (it is hand-built and omits both keys, and a synthesized
+  // quick-play room genuinely is ungated).
+  const viewer = useAuthStore((s) => s.user);
+  const viewerHonor = honorScoreOrPrior(viewer?.honorScore);
+  const qualifies = honorQualifies(room, viewer ?? {});
+  const locked = !qualifies;
+  // The shield's tone describes the REQUIREMENT's tier, not the viewer's.
+  const requirementTier = honorTierForScore(room.minHonor);
 
   return (
     <article
@@ -151,8 +164,27 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
                 data-testid="room-card-min-honor"
                 data-min-honor={room.minHonor}
                 aria-label={t("lobby.card.minHonorAriaLabel", { minHonor: room.minHonor })}
+                // The numbers live in the tooltip, never as copy on the card — the
+                // card says what the ROOM asks for; the button says whether you
+                // pass. A viewer-specific sentence on every card would be noise on
+                // the many they do qualify for.
+                title={
+                  qualifies
+                    ? undefined
+                    : t("lobby.card.minHonorLockedTitle", {
+                        minHonor: room.minHonor,
+                        honor: viewerHonor,
+                      })
+                }
               >
-                <ShieldCheck className="size-3" />
+                {/* Tinted by the tier the REQUIREMENT falls in, not by the viewer's
+                    standing: 85+ is Trusted, so this shield is felt green on every
+                    card whether you hold 96 or 42. That keeps the chip a property
+                    of the room, and stops the lobby looking like a scoreboard of
+                    the viewer. The "85+" itself stays the same muted ink as the
+                    timer and buy-in beside it, so the chip weighs what its
+                    neighbours weigh. */}
+                <HonorShield tier={requirementTier} size={12} />
                 {t("lobby.card.minHonor", { minHonor: room.minHonor })}
               </span>
             </>
@@ -195,23 +227,43 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
           <Users className="size-3" />
           {t("lobby.card.occupancy", { seated })}
         </span>
+        {/* The gate's verdict lives HERE, not on the card. Not qualifying changes
+            exactly one thing: Join becomes Locked. The numbers sit in the honour
+            chip's title and in the toast that still fires on a genuine race.
+
+            Still cosmetic — the server re-validates every join, so this only
+            spares the player a click that was always going to 409. `full` wins
+            over `locked` because a full room cannot be joined for any reason. */}
         <button
-          onClick={() => !full && onJoin(room)}
-          disabled={full}
+          onClick={() => !full && !locked && onJoin(room)}
+          disabled={full || locked}
           data-testid="room-card-join"
+          data-locked={locked ? "true" : undefined}
+          title={
+            locked
+              ? t("lobby.card.minHonorLockedTitle", {
+                  minHonor: room.minHonor,
+                  honor: viewerHonor,
+                })
+              : undefined
+          }
           className={cn(
             "ml-auto inline-flex items-center gap-1.5 rounded-[10px] border border-transparent px-3.5 py-2 text-xs font-semibold transition-transform active:scale-[0.97]",
-            full
+            full || locked
               ? "bg-surface-sunken text-ink-mute cursor-default"
               : "bg-accent text-accent-ink cursor-pointer",
           )}
         >
           {full
             ? t("lobby.card.full")
-            : room.isQuickPlay
-              ? t("lobby.card.joinQueue")
-              : t("lobby.card.join")}
+            : locked
+              ? t("lobby.card.locked")
+              : room.isQuickPlay
+                ? t("lobby.card.joinQueue")
+                : t("lobby.card.join")}
+          {locked && <Lock className="size-3.5" strokeWidth={2.2} />}
           {!full &&
+            !locked &&
             (room.isQuickPlay ? (
               <Zap className="size-3.5" strokeWidth={2.4} />
             ) : (

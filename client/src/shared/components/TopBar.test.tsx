@@ -263,15 +263,47 @@ describe("TopBar honor chip (Story 9.7)", () => {
     expect(screen.getByTestId("honor-chip")).toHaveClass("whitespace-nowrap");
   });
 
-  it("never renders the tier word visibly, at any width", () => {
+  it("reveals the tier word from lg up, and only from lg", () => {
     setAuthUser({ honorScore: 96, honorTier: "exemplary", isNewPlayer: false });
     renderWithRouter();
 
-    // The tone + number carry the tier visually; the word is for assistive tech
-    // and the tooltip only. If this ever becomes visible it is the widest thing
-    // in the bar again.
-    expect(screen.getByTestId("honor-tier")).toHaveClass("sr-only");
-    expect(screen.getByTestId("honor-tier").className).not.toMatch(/not-sr-only/);
+    // The redesign makes the tier VISIBLE on desktop — hiding it in a tooltip is
+    // why a declining score used to look identical to a healthy one, which defeats
+    // the point of having five tiers.
+    //
+    // But it takes the same lg gate as the "New Player" words above, and for the
+    // same measured reason: at 640..1023px the row already carries nav links and
+    // the username pill, and adding a word there made the chip wrap onto a second
+    // line inside a 30px row. Below lg the shield's tone AND SHAPE carry the tier
+    // (HonorShield varies the glyph), so nothing is lost visually and the sr-only
+    // text keeps the accessible reading identical at every width.
+    const tier = screen.getByTestId("honor-tier");
+    expect(tier).toHaveClass("sr-only");
+    expect(tier).toHaveClass("lg:not-sr-only");
+    expect(tier.className).not.toMatch(/\bsm:not-sr-only\b/);
+    expect(tier).toHaveTextContent("Exemplary");
+    expect(screen.getByTestId("honor-chip")).toHaveClass("whitespace-nowrap");
+  });
+
+  it("makes the chip a button that opens the explainer", async () => {
+    setAuthUser({ honorScore: 96, honorTier: "exemplary", isNewPlayer: false });
+    renderWithRouter();
+
+    // Nothing in the product said what honour measures; the chip is the surface
+    // every signed-in player sees, so it is the entry point.
+    const chip = screen.getByTestId("honor-chip");
+    expect(chip.tagName).toBe("BUTTON");
+    expect(screen.queryByTestId("honor-explainer")).not.toBeInTheDocument();
+
+    await userEvent.click(chip);
+    expect(await screen.findByTestId("honor-explainer")).toBeInTheDocument();
+  });
+
+  it("varies the shield glyph with the tier, so colour is never the only signal", () => {
+    setAuthUser({ honorScore: 20, honorTier: "problematic", isNewPlayer: false });
+    renderWithRouter();
+
+    expect(screen.getByTestId("honor-shield")).toHaveAttribute("data-tier", "problematic");
   });
 });
 

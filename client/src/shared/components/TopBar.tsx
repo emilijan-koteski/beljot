@@ -1,8 +1,10 @@
-import { ChevronDown, Coins, LogOut, Menu, ShieldCheck } from "lucide-react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import { ChevronDown, Coins, LogOut, Menu } from "lucide-react";
+import { type MouseEvent as ReactMouseEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
+import { HonorExplainerDialog } from "@/shared/components/HonorExplainerDialog";
+import { HonorShield } from "@/shared/components/HonorShield";
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { LevelRing } from "@/shared/components/LevelRing";
 import {
@@ -15,25 +17,10 @@ import { XpBar } from "@/shared/components/XpBar";
 import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
-import {
-  honorIsNewPlayer,
-  honorScoreOrPrior,
-  type HonorTier,
-  normalizeHonorTier,
-} from "@/shared/lib/honor";
+import { honorIsNewPlayer, honorScoreOrPrior, normalizeHonorTier } from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
-
-// Honor tier tones for the header chip (Story 9.7). Same token vocabulary as
-// the profile's HonorPanel — existing design tokens only, no new gold token.
-const HONOR_TIER_COLOR: Record<HonorTier, string> = {
-  exemplary: "var(--brass-deep)",
-  trusted: "var(--accent)",
-  fair: "var(--ink-off)",
-  unreliable: "var(--ink-dim)",
-  problematic: "var(--danger)",
-};
 
 const navItems = [
   { path: "/lobby", labelKey: "nav.play" },
@@ -109,6 +96,11 @@ export function TopBar({
   const honorScore = honorScoreOrPrior(user?.honorScore);
   const honorIsNew = honorIsNewPlayer(user?.isNewPlayer);
   const honorTier = user ? normalizeHonorTier(user.honorTier, honorScore) : "fair";
+
+  // The explainer is opened from the honor chip. Local state rather than a shared
+  // store: several surfaces open this dialog, but none of them needs to know that
+  // another one is open, so a store would be machinery for nothing.
+  const [explainerOpen, setExplainerOpen] = useState(false);
 
   // Clear auth state, then land on the public landing page ("/"). Without the
   // explicit navigate, ProtectedRoute would only fall back to /login.
@@ -270,66 +262,92 @@ export function TopBar({
             stays sr-only there rather than being dropped, so the accessible
             reading is identical at both widths.
 
-            The scored branch NEVER renders its tier word visibly — the shield's
-            tone plus the number carry it, and the word lives in the tooltip and
-            the sr-only span. The New Player branch now matches that restraint and
-            only reveals its words at lg.
+            The chip is a BUTTON that opens the "how honour works" explainer.
+            Nothing in the product previously said what honour measures, and the
+            chip is the surface every signed-in player sees — so it is the natural
+            entry point. It keeps the coin pill's neutral parchment ground and
+            border, and only the shield carries tier colour, so the row of pills
+            stays one visual family rather than growing a coloured outlier.
 
-            Why lg and not sm (2026-07-29 E2E pass): "New Player" / "Нов играч" is
-            the widest content this chip can hold, and it applies to every
-            account's first five matches. Review pass 2 sent it sr-only below sm,
-            which fixed phones but left 640..1023px showing the words — where the
-            row is at its most crowded (nav links + username pill are both on).
-            Measured there, the chip became 88x50px, i.e. it WRAPPED onto a second
-            line inside a 30px-tall row of pills, and it alone pushed 900px from a
-            1px overflow to 29px. Below lg the shield alone carries the state; the
-            tooltip, the sr-only name and the profile's HonorPanel are unchanged,
-            and the chip can no longer be the widest thing in the bar. */}
+            The tier WORD is now visible from lg up rather than sr-only at every
+            width: the shipped chip hid the tier in a tooltip, so a declining score
+            was indistinguishable from a healthy one at a glance, and the whole
+            point of a five-tier scale was invisible.
+
+            Why lg for BOTH words (2026-07-29 E2E measurement, still binding):
+            "New Player" / "Нов играч" is the widest content this chip can hold and
+            applies to every account's first five matches. Review pass 2 sent it
+            sr-only below sm, which fixed phones but left 640..1023px showing the
+            words — where the row is at its most crowded (nav links + username pill
+            both on). Measured there the chip became 88x50px, i.e. it WRAPPED onto
+            a second line inside a 30px row of pills, and alone pushed 900px from
+            1px of overflow to 29px. The tier word is comparable in width, so it
+            takes the same gate; below lg the shield's tone and SHAPE carry the
+            state, which is why HonorShield varies the glyph per tier and not just
+            the colour. Verify at 1024/1280 after any change here — at lg the brand
+            wordmark also becomes visible, so lg is the tightest desktop case. */}
         {user && (
-          <div
-            className="bg-surface-elevated flex shrink-0 items-center gap-1.5 rounded-full border border-border py-1 pr-2.5 pl-2 whitespace-nowrap sm:pr-3 sm:pl-2.5"
-            data-testid="honor-chip"
-            data-tier={honorTier}
-            data-new-player={String(honorIsNew)}
-            title={
-              honorIsNew
-                ? t("profile.honor.newPlayerHint")
-                : t("profile.honor.meterLabel", {
-                    score: honorScore,
-                    tier: t(`profile.honor.tier.${honorTier}`),
-                  })
-            }
-          >
-            <ShieldCheck
-              className="size-4 shrink-0"
-              style={{ color: HONOR_TIER_COLOR[honorTier] }}
-              aria-hidden="true"
-            />
-            {/* Names the chip for assistive tech, which would otherwise announce
-                a bare "96 Exemplary" next to the coin balance with no clue that
-                it is an honor score. The visible label is the icon. */}
-            <span className="sr-only">{t("profile.honor.topBarLabel")}</span>
-            {honorIsNew ? (
-              <span
-                className="text-ink-dim sr-only text-sm font-semibold whitespace-nowrap lg:not-sr-only"
-                data-testid="honor-new-player"
-              >
-                {t("profile.honor.newPlayerChip")}
-              </span>
-            ) : (
-              <>
+          <>
+            <button
+              type="button"
+              onClick={() => setExplainerOpen(true)}
+              className="bg-surface-elevated border-border hover:border-border-2 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border py-1 pr-2.5 pl-2 whitespace-nowrap transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:pr-3 sm:pl-2.5"
+              data-testid="honor-chip"
+              data-tier={honorTier}
+              data-new-player={String(honorIsNew)}
+              style={
+                // Exemplary's prestige cue. Gold is deliberately NOT the tier hue
+                // (a gold top tier sat one hue from the amber warning tier and the
+                // two were mistakable at 16px), so it survives here as ornament
+                // only: a brass hairline on the chip, carrying no meaning that the
+                // glyph and number do not already carry.
+                honorTier === "exemplary" && !honorIsNew
+                  ? {
+                      boxShadow:
+                        "inset 0 0 0 1px var(--brass-soft), 0 0 0 1px rgba(201,168,118,.35)",
+                    }
+                  : undefined
+              }
+              title={
+                honorIsNew
+                  ? t("profile.honor.newPlayerHint")
+                  : t("profile.honor.meterLabel", {
+                      score: honorScore,
+                      tier: t(`profile.honor.tier.${honorTier}`),
+                    })
+              }
+            >
+              <HonorShield tier={honorTier} size={16} className="shrink-0" />
+              {/* Names the chip for assistive tech, which would otherwise announce
+                  a bare "96 Exemplary" next to the coin balance with no clue that
+                  it is an honor score. The visible label is the icon. */}
+              <span className="sr-only">{t("profile.honor.topBarLabel")}</span>
+              {honorIsNew ? (
                 <span
-                  className="text-ink text-sm font-semibold whitespace-nowrap tabular-nums"
-                  data-testid="honor-score"
+                  className="text-ink-dim sr-only text-sm font-semibold whitespace-nowrap lg:not-sr-only"
+                  data-testid="honor-new-player"
                 >
-                  {honorScore}
+                  {t("profile.honor.newPlayerChip")}
                 </span>
-                <span className="sr-only" data-testid="honor-tier">
-                  {t(`profile.honor.tier.${honorTier}`)}
-                </span>
-              </>
-            )}
-          </div>
+              ) : (
+                <>
+                  <span
+                    className="text-ink text-sm font-semibold whitespace-nowrap tabular-nums"
+                    data-testid="honor-score"
+                  >
+                    {honorScore}
+                  </span>
+                  <span
+                    className="text-ink-dim sr-only text-[12.5px] font-semibold whitespace-nowrap lg:not-sr-only"
+                    data-testid="honor-tier"
+                  >
+                    {t(`profile.honor.tier.${honorTier}`)}
+                  </span>
+                </>
+              )}
+            </button>
+            <HonorExplainerDialog open={explainerOpen} onOpenChange={setExplainerOpen} />
+          </>
         )}
 
         <LanguageSelector persistToServer={persistLanguage} testIdPrefix={languageTestIdPrefix} />

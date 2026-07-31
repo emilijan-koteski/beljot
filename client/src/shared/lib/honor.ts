@@ -47,6 +47,20 @@ export const HONOR_PRIOR_SCORE = 80;
 export const HONOR_TREND_WINDOW = 20;
 
 /**
+ * How many FINISHED-OR-ABANDONED matches an account needs before it earns a
+ * score. Mirrors `honorNewPlayerMinMatches` in server/internal/user/honor.go —
+ * same manual-sync rule as the tier bands and the trend window above.
+ *
+ * Display only, and only ever as a denominator: it renders the newcomer's
+ * "2 / 5" progress so the New Player state says how to LEAVE it, instead of
+ * being a label that explains nothing. The server owns the decision — always
+ * branch on its `isNewPlayer` flag, never on `completed + abandoned < 5`
+ * computed here. That floor counts experience, not successes, and re-deriving it
+ * client-side is exactly the bypass two review passes closed on the server.
+ */
+export const HONOR_NEW_PLAYER_MIN_MATCHES = 5;
+
+/**
  * Coerce a possibly-absent honor score into a renderable number.
  *
  * The WS handler type-guards every field before it reaches the store, but the
@@ -121,6 +135,112 @@ export function honorCountOrZero(value: number | null | undefined): number {
  */
 export function honorIsNewPlayer(value: boolean | null | undefined): boolean {
   return typeof value === "boolean" ? value : true;
+}
+
+/**
+ * The five bands as half-open [from, to) ranges over 0-100, ascending.
+ *
+ * DERIVED from HONOR_TIER_FLOORS rather than restated, so the banded meter's
+ * gradient stops, its tick labels and the tier a score buckets into can never
+ * disagree. Retuning a floor moves all three at once.
+ */
+const HONOR_FLOORS_ASCENDING = [...HONOR_TIER_FLOORS].reverse();
+
+export const HONOR_TIER_BANDS: ReadonlyArray<{ tier: HonorTier; from: number; to: number }> =
+  HONOR_FLOORS_ASCENDING.map(([tier, from], i) => {
+    const next = HONOR_FLOORS_ASCENDING[i + 1];
+    return { tier, from, to: next ? next[1] : 100 };
+  });
+
+/**
+ * Tier → colour, the ONLY copy. Values are `var()` references into the honour
+ * ramp declared in index.css (`--h1`…`--h5`, worst→best), so they re-root
+ * automatically inside `.game-table` and every honour surface themes itself on
+ * felt with no fork.
+ *
+ * Centralised here for the reason coinGold.ts states for COIN_GOLD: before this,
+ * the map was duplicated in HonorPanel.tsx and TopBar.tsx and the two had
+ * ALREADY drifted — they disagreed on `fair` — with nothing in TypeScript able
+ * to notice. The redesign adds five more consumers (the room badge, the seat
+ * shield, the ejection meter, the slider fill, the reconnect line), so the
+ * duplication had to stop before it multiplied.
+ *
+ * Prefer `<HonorShield>` (shared/components/HonorShield.tsx) over reading these
+ * directly: it pairs the colour with the tier's GLYPH, which is what keeps the
+ * scale legible without relying on colour alone.
+ */
+export const HONOR_TIER_COLOR: Record<HonorTier, string> = {
+  exemplary: "var(--h5)",
+  trusted: "var(--h4)",
+  fair: "var(--h3)",
+  unreliable: "var(--h2)",
+  problematic: "var(--h1)",
+};
+
+/** Tier → low-alpha fill, for badge/chip grounds and meter bands. */
+export const HONOR_TIER_SOFT: Record<HonorTier, string> = {
+  exemplary: "var(--h5-soft)",
+  trusted: "var(--h4-soft)",
+  fair: "var(--h3-soft)",
+  unreliable: "var(--h2-soft)",
+  problematic: "var(--h1-soft)",
+};
+
+/** Tier → hairline/border tone, for outlined variants. */
+export const HONOR_TIER_LINE: Record<HonorTier, string> = {
+  exemplary: "var(--h5-line)",
+  trusted: "var(--h4-line)",
+  fair: "var(--h3-line)",
+  unreliable: "var(--h2-line)",
+  problematic: "var(--h1-line)",
+};
+
+/** The subset of a room the honour gate reads. Structural, so both the API
+ *  `Room` type and a hand-built preview object satisfy it. */
+export type HonorGateRoom = {
+  minHonor?: number | null;
+  allowNewPlayers?: boolean | null;
+};
+
+/** The subset of the viewer the honour gate reads. */
+export type HonorGateViewer = {
+  honorScore?: number | null;
+  isNewPlayer?: boolean | null;
+};
+
+/**
+ * Does this room enforce an honour requirement at all? Mirrors
+ * `(*Room).honorGated()` in server/internal/room/handler.go.
+ *
+ * Absent fields read as UNGATED, which matters in practice: the QuickPlay
+ * `system:room_created` payload is hand-built and omits both keys, and a
+ * synthesized quick-play room genuinely is ungated.
+ */
+export function honorRoomIsGated(room: HonorGateRoom): boolean {
+  return honorCountOrZero(room.minHonor) > 0 || room.allowNewPlayers === false;
+}
+
+/**
+ * Would this viewer pass this room's honour gate? Mirrors `honorGateError` in
+ * server/internal/room/handler.go — isNewPlayer is evaluated FIRST and a New
+ * Player is never score-checked, which is the counter-intuitive half of Story
+ * 9.8 D1 (the toggle is the owner's explicit "I'll take an unknown" switch).
+ *
+ * COSMETIC ONLY. The server re-validates on every join, return and start; this
+ * exists so the lobby can render a Locked button and an "I qualify" filter
+ * instead of making the player discover the gate by clicking. Never use it to
+ * suppress a request — send it and let the 409 be authoritative.
+ *
+ * Note the deliberate asymmetry with CreateRoomModal's `honorKnown` check: there
+ * an unknown envelope must NOT deny (a capability gate turning "unknown" into
+ * "denied" would lock a veteran out of their own room), whereas here an unknown
+ * viewer resolves through `honorIsNewPlayer`'s suppressed default and so is
+ * treated leniently. Both err toward letting the player try.
+ */
+export function honorQualifies(room: HonorGateRoom, viewer: HonorGateViewer): boolean {
+  if (!honorRoomIsGated(room)) return true;
+  if (honorIsNewPlayer(viewer.isNewPlayer)) return room.allowNewPlayers !== false;
+  return honorScoreOrPrior(viewer.honorScore) >= honorCountOrZero(room.minHonor);
 }
 
 /** The three stable trend-direction tokens the server emits. */

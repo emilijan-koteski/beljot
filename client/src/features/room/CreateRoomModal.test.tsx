@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -391,7 +391,17 @@ describe("CreateRoomModal", () => {
       );
     });
   });
-  // --- Honor gate (Story 9.8 AC3/AC5, D7) ---
+  // --- Honor gate (Story 9.8 AC3/AC5, D7; slider per the honour redesign R5) ---
+
+  /**
+   * Drive the honour threshold. It is a range input now, not a text field, so
+   * clear()/type() do not apply — a range is not an editable element. fireEvent
+   * .change is the standard way to move a slider in jsdom, and it exercises the
+   * same onChange the thumb and the arrow keys do.
+   */
+  function setMinHonor(value: number) {
+    fireEvent.change(screen.getByTestId("min-honor-input"), { target: { value: String(value) } });
+  }
 
   it("renders the honor-gate controls", () => {
     renderModal(true);
@@ -403,17 +413,42 @@ describe("CreateRoomModal", () => {
   it("defaults to an ungated room and shows neither preview chip", () => {
     renderModal(true);
 
-    expect(screen.getByTestId("min-honor-input")).toHaveValue(0);
+    // Read .value off the element rather than via toHaveValue: for type="range"
+    // jest-dom reports a string, so a numeric matcher is misleading here.
+    expect((screen.getByTestId("min-honor-input") as HTMLInputElement).value).toBe("0");
+    // 0 reads as a WORD, so the default looks like a deliberate choice rather than
+    // an empty field waiting to be filled in.
+    expect(screen.getByTestId("min-honor-input-value")).toHaveTextContent("Anyone");
     expect(screen.queryByTestId("preview-min-honor")).toBeNull();
     expect(screen.queryByTestId("preview-veterans-only")).toBeNull();
   });
 
-  it("mirrors the honor threshold into the live preview card", async () => {
-    const user = userEvent.setup();
+  it("labels the chosen threshold with the tier it falls in", () => {
     renderModal(true);
 
-    await user.clear(screen.getByTestId("min-honor-input"));
-    await user.type(screen.getByTestId("min-honor-input"), "85");
+    // The ticks sit on tier boundaries and the caption names the tier, so a host
+    // picks a TIER rather than a digit — which is what replaced the deleted hint.
+    setMinHonor(85);
+    expect(screen.getByTestId("min-honor-input-value")).toHaveAttribute("data-value", "85");
+    expect(screen.getByTestId("min-honor-input").parentElement?.parentElement).toHaveTextContent(
+      "Trusted",
+    );
+  });
+
+  it("marks the owner's own score on the track", () => {
+    useAuthStore.setState({
+      user: makeUser({ id: 5, username: "owner", honorScore: 96, isNewPlayer: false }),
+    });
+    renderModal(true);
+
+    // The self-gate becomes a place you can see rather than an error you trip.
+    expect(screen.getByTestId("min-honor-input-marker")).toHaveAttribute("data-value", "96");
+  });
+
+  it("mirrors the honor threshold into the live preview card", () => {
+    renderModal(true);
+
+    setMinHonor(85);
 
     expect(screen.getByTestId("preview-min-honor")).toHaveAttribute("data-min-honor", "85");
     expect(screen.queryByTestId("preview-veterans-only")).toBeNull();
@@ -442,8 +477,7 @@ describe("CreateRoomModal", () => {
     renderModal(true);
 
     await user.type(screen.getByTestId("room-name-input"), "Veterans Table");
-    await user.clear(screen.getByTestId("min-honor-input"));
-    await user.type(screen.getByTestId("min-honor-input"), "90");
+    setMinHonor(90);
     await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
     await user.click(screen.getByTestId("create-room-button"));
 
@@ -454,14 +488,19 @@ describe("CreateRoomModal", () => {
     });
   });
 
-  it("clamps the threshold to the 0-100 range the server validates", async () => {
-    const user = userEvent.setup();
+  it("clamps the threshold to the 0-100 range the server validates", () => {
     renderModal(true);
 
-    const input = screen.getByTestId("min-honor-input");
-    await user.clear(input);
-    await user.type(input, "150");
-    expect(input).toHaveValue(100);
+    // The slider cannot express an out-of-range value at all — min/max are wired
+    // to the same interval the server validates and the rooms.min_honor CHECK
+    // enforces. Belt and braces: effectiveMinHonor also clamps in JS.
+    const input = screen.getByTestId("min-honor-input") as HTMLInputElement;
+    expect(input.min).toBe("0");
+    expect(input.max).toBe("100");
+    expect(input.step).toBe("5");
+
+    setMinHonor(150);
+    expect(screen.getByTestId("min-honor-input-value")).toHaveAttribute("data-value", "100");
   });
 
   // D7: the creator is auto-seated, so a gate they cannot pass would eject them
@@ -474,8 +513,7 @@ describe("CreateRoomModal", () => {
     renderModal(true);
 
     await user.type(screen.getByTestId("room-name-input"), "Self Locked");
-    await user.clear(screen.getByTestId("min-honor-input"));
-    await user.type(screen.getByTestId("min-honor-input"), "95");
+    setMinHonor(95);
 
     expect(screen.getByTestId("create-room-button")).toBeDisabled();
     expect(screen.getByTestId("min-honor-error")).toBeInTheDocument();
@@ -509,8 +547,7 @@ describe("CreateRoomModal", () => {
     renderModal(true);
 
     await user.type(screen.getByTestId("room-name-input"), "High Bar");
-    await user.clear(screen.getByTestId("min-honor-input"));
-    await user.type(screen.getByTestId("min-honor-input"), "95");
+    setMinHonor(95);
 
     expect(screen.getByTestId("create-room-button")).toBeDisabled();
     expect(screen.getByTestId("min-honor-error")).toBeInTheDocument();
@@ -524,8 +561,7 @@ describe("CreateRoomModal", () => {
     renderModal(true);
 
     await user.type(screen.getByTestId("room-name-input"), "Fair Bar");
-    await user.clear(screen.getByTestId("min-honor-input"));
-    await user.type(screen.getByTestId("min-honor-input"), "80");
+    setMinHonor(80);
 
     expect(screen.getByTestId("create-room-button")).toBeEnabled();
     expect(screen.queryByTestId("min-honor-error")).toBeNull();
@@ -556,8 +592,7 @@ describe("CreateRoomModal", () => {
     renderModal(true);
 
     await user.type(screen.getByTestId("room-name-input"), "Fine");
-    await user.clear(screen.getByTestId("min-honor-input"));
-    await user.type(screen.getByTestId("min-honor-input"), "95");
+    setMinHonor(95);
 
     // The boundary is inclusive on both sides of the wire.
     expect(screen.getByTestId("create-room-button")).toBeEnabled();
