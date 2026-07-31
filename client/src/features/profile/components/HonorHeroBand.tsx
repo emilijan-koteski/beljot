@@ -208,7 +208,6 @@ export function HonorHeroBand({
             </span>
           </div>
         )}
-
       </div>
 
       <HonorExplainerDialog open={explainerOpen} onOpenChange={setExplainerOpen} />
