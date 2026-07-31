@@ -911,8 +911,7 @@
     "settlement": {
       "won": "Освои {{amount}} парички",
       "lost": "Изгуби {{amount}} парички",
-      "honorMoved": "Чест {{before}} → {{after}}",
-      "honorUnchanged": "Честа е непроменета · {{score}}"
+      "honorTierChanged": "{{before}} → {{after}}"
     },
     "stake": {
       "label": "Влог"

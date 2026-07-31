@@ -911,8 +911,7 @@
     "settlement": {
       "won": "You won {{amount}} coins",
       "lost": "You lost {{amount}} coins",
-      "honorMoved": "Honor {{before}} → {{after}}",
-      "honorUnchanged": "Honor untouched · {{score}}"
+      "honorTierChanged": "{{before}} → {{after}}"
     },
     "stake": {
       "label": "Stake"

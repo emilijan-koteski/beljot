@@ -911,8 +911,7 @@
     "settlement": {
       "won": "Osvojio si {{amount}} novčića",
       "lost": "Izgubio si {{amount}} novčića",
-      "honorMoved": "Čast {{before}} → {{after}}",
-      "honorUnchanged": "Čast nepromenjena · {{score}}"
+      "honorTierChanged": "{{before}} → {{after}}"
     },
     "stake": {
       "label": "Ulog"
