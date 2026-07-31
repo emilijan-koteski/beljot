@@ -7,7 +7,6 @@ import {
   KeyRound,
   Lock,
   LockOpen,
-  ShieldCheck,
   UserCheck,
   UserPlus,
   Users,
@@ -19,6 +18,7 @@ import { useNavigate } from "react-router";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { FetchError } from "@/shared/api/axiosClient";
+import { HonorShield } from "@/shared/components/HonorShield";
 import { Button } from "@/shared/components/ui/button";
 import { Dialog, DialogContent } from "@/shared/components/ui/dialog";
 import { DurationSlider, type SliderTick } from "@/shared/components/ui/duration-slider";
@@ -32,6 +32,7 @@ import { formatCoins } from "@/shared/lib/formatCoins";
 import {
   HONOR_TIER_BANDS,
   HONOR_TIER_COLOR,
+  honorFloorLabel,
   honorIsNewPlayer,
   honorScoreOrPrior,
   honorTierForScore,
@@ -65,20 +66,16 @@ const DEFAULT_MIN_HONOR = 0;
  * Slider marks on the TIER BOUNDARIES, derived from the bands themselves rather
  * than restated — retuning a floor server-side moves these with it.
  *
- * The ends are labelled and unemphasised; the four interior boundaries are
- * emphasised, because those are the positions that change what the number MEANS.
- * A host picking "85" is really picking Trusted, and the ticks are what make that
- * visible without a sentence of hint copy.
+ * Boundary marks only, with no numeric labels under the track: the readout
+ * above already carries the chosen number and tier, and dropping the label row
+ * keeps the slider box short (user decision 2026-07-31). The boundaries are
+ * emphasised because those are the positions that change what the number MEANS
+ * — a host picking "85" is really picking Trusted.
  */
-const MIN_HONOR_TICKS: SliderTick[] = [
-  { value: MIN_HONOR_FLOOR, label: String(MIN_HONOR_FLOOR) },
-  ...HONOR_TIER_BANDS.filter((b) => b.from > 0).map((b) => ({
-    value: b.from,
-    label: String(b.from),
-    emphasis: true,
-  })),
-  { value: MIN_HONOR_CEILING, label: String(MIN_HONOR_CEILING) },
-];
+const MIN_HONOR_TICKS: SliderTick[] = HONOR_TIER_BANDS.filter((b) => b.from > 0).map((b) => ({
+  value: b.from,
+  emphasis: true,
+}));
 
 /**
  * Split-panel create-room modal. Left = form (name, variant, match mode,
@@ -497,6 +494,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   fields of copy. */}
               <Field
                 label={t("lobby.createRoomModal.minHonor")}
+                hint={t("lobby.createRoomModal.minHonorHint")}
                 error={
                   failsOwnHonorGate
                     ? t("lobby.createRoomModal.errors.ownHonorTooLow", {
@@ -514,14 +512,21 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   max={MIN_HONOR_CEILING}
                   step={5}
                   // 0 reads as a word, so the default looks like a choice rather
-                  // than an empty field.
+                  // than an empty field. Above that, honorFloorLabel renders the
+                  // floor ("60+", bare "100" at the ceiling) — the same label the
+                  // lobby chip shows.
                   valueText={
-                    effectiveMinHonor === 0 ? t("lobby.createRoomModal.minHonorAnyone") : undefined
+                    effectiveMinHonor === 0
+                      ? t("lobby.createRoomModal.minHonorAnyone")
+                      : honorFloorLabel(effectiveMinHonor)
                   }
+                  // PLURAL tier word: this caption describes the players who may
+                  // sit, not one player's standing — the singular tier.* keys
+                  // stay untouched for badges and the rules ladder.
                   unitLabel={
                     effectiveMinHonor === 0
                       ? ""
-                      : t(`profile.honor.tier.${honorTierForScore(effectiveMinHonor)}`)
+                      : t(`profile.honor.tierPlural.${honorTierForScore(effectiveMinHonor)}`)
                   }
                   ticks={MIN_HONOR_TICKS}
                   fillStyle={
@@ -804,8 +809,11 @@ function PreviewCard({
                 data-min-honor={minHonor}
                 aria-label={t("lobby.card.minHonorAriaLabel", { minHonor })}
               >
-                <ShieldCheck className="size-3" />
-                {t("lobby.card.minHonor", { minHonor })}
+                {/* Same tier-tinted shield as RoomCard — tinted by the tier the
+                    REQUIREMENT falls in, so the preview's promise of "this is
+                    what the lobby will show" covers the colour too. */}
+                <HonorShield tier={honorTierForScore(minHonor)} size={12} />
+                {t("lobby.card.minHonor", { minHonor: honorFloorLabel(minHonor) })}
               </span>
             </>
           )}

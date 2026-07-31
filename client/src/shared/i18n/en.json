@@ -110,6 +110,13 @@
         "unreliable": "Unreliable",
         "problematic": "Problematic"
       },
+      "tierPlural": {
+        "exemplary": "Exemplary",
+        "trusted": "Trusted",
+        "fair": "Fair",
+        "unreliable": "Unreliable",
+        "problematic": "Problematic"
+      },
       "trend": {
         "up": "Improving",
         "flat": "Steady",
@@ -525,8 +532,8 @@
         "passwordTooShort": "Password needs at least {{min}} characters",
         "passwordTooLong": "Password must be at most {{max}} characters",
         "invalidMinHonor": "Minimum honor must be between {{min}} and {{max}}.",
-        "ownHonorTooLow": "You wouldn't meet this bar yourself: it asks for {{minHonor}} and your honor is {{honor}}. Lower it to continue.",
-        "ownNewPlayerNotAllowed": "You're still a new player, so this would lock you out of your own room. Welcome new players to continue."
+        "ownHonorTooLow": "Your honor is {{honor}}, so you can't sit in a room with a minimum of {{minHonor}}. Lower the minimum to continue.",
+        "ownNewPlayerNotAllowed": "You're still a new player, so you can't sit in your own room. Welcome new players to continue."
       },
       "eyebrow": "New room",
       "headline": "Create a room",
@@ -562,6 +569,7 @@
       "roomPassword": "Room password",
       "roomPasswordPlaceholder": "Enter password",
       "minHonor": "Who can sit down",
+      "minHonorHint": "Players with this honor score or higher",
       "minHonorAnyone": "Anyone",
       "minHonorYou": "you {{honor}}",
       "allowNewPlayers": "New players",
@@ -623,7 +631,7 @@
       "privateLockAriaLabel": "Private room — password required to join",
       "public": "Public",
       "publicAriaLabel": "Public room — anyone can join",
-      "minHonor": "{{minHonor}}+",
+      "minHonor": "{{minHonor}}",
       "minHonorAriaLabel": "Minimum honor {{minHonor}}",
       "veteransOnly": "Veterans only",
       "veteransOnlyAriaLabel": "This room does not admit new players",

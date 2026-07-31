@@ -20,7 +20,12 @@ import { RelativeTime } from "@/shared/components/RelativeTime";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
-import { honorQualifies, honorScoreOrPrior, honorTierForScore } from "@/shared/lib/honor";
+import {
+  honorFloorLabel,
+  honorQualifies,
+  honorScoreOrPrior,
+  honorTierForScore,
+} from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
@@ -185,7 +190,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
                     timer and buy-in beside it, so the chip weighs what its
                     neighbours weigh. */}
                 <HonorShield tier={requirementTier} size={12} />
-                {t("lobby.card.minHonor", { minHonor: room.minHonor })}
+                {t("lobby.card.minHonor", { minHonor: honorFloorLabel(room.minHonor) })}
               </span>
             </>
           )}

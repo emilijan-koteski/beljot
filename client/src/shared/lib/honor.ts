@@ -195,6 +195,17 @@ export const HONOR_TIER_LINE: Record<HonorTier, string> = {
   problematic: "var(--h1-line)",
 };
 
+/**
+ * Label for a room's honour floor: "60+" below the top of the scale, a bare
+ * "100" at it — a plus at the ceiling would promise scores that cannot exist
+ * (user decision 2026-07-31). The ONLY copy of this rule; the lobby card, the
+ * create-room preview, the room-page badge and the gate slider all render it.
+ */
+export function honorFloorLabel(minHonor: number | null | undefined): string {
+  const floor = honorCountOrZero(minHonor);
+  return floor >= 100 ? String(floor) : `${floor}+`;
+}
+
 /** The subset of a room the honour gate reads. Structural, so both the API
  *  `Room` type and a hand-built preview object satisfy it. */
 export type HonorGateRoom = {

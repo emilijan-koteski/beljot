@@ -428,11 +428,12 @@ describe("CreateRoomModal", () => {
 
     // The ticks sit on tier boundaries and the caption names the tier, so a host
     // picks a TIER rather than a digit — which is what replaced the deleted hint.
+    // The tier word is the readout value's sibling unit label, so anchor there
+    // rather than walking a parent chain from the input (which breaks whenever
+    // the slider's internal DOM gains a wrapper).
     setMinHonor(85);
     expect(screen.getByTestId("min-honor-input-value")).toHaveAttribute("data-value", "85");
-    expect(screen.getByTestId("min-honor-input").parentElement?.parentElement).toHaveTextContent(
-      "Trusted",
-    );
+    expect(screen.getByTestId("min-honor-input-value").parentElement).toHaveTextContent("Trusted");
   });
 
   it("marks the owner's own score on the track", () => {

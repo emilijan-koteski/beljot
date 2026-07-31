@@ -101,82 +101,95 @@ export function DurationSlider({
       <div
         className={cn(
           "bg-surface-elevated border-border relative rounded-[10px] border px-3 py-3.5",
-          // Room for the marker's caption above the track.
-          marker?.label && "pt-7",
           hasTickLabels && "pb-6",
         )}
       >
-        <div className="bg-surface-sunken border-border relative h-1.5 overflow-hidden rounded-[3px] border">
-          <div
-            className="absolute inset-y-0 left-0"
-            style={{
-              width: `${pct}%`,
-              background:
-                fillStyle ?? "linear-gradient(90deg, var(--brass) 0%, var(--accent) 100%)",
-            }}
-          />
-        </div>
-        <div className="pointer-events-none absolute inset-x-3 top-0 bottom-0">
-          {resolvedTicks.map((tk) => {
-            const tickPct = ((tk.value - min) / span) * 100;
-            return (
-              <span key={tk.value}>
-                <span
-                  className={cn(
-                    "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[1px]",
-                    tk.emphasis ? "bg-brass-deep opacity-70" : "bg-ink-off opacity-45",
-                  )}
-                  style={{
-                    left: `${tickPct}%`,
-                    width: tk.emphasis ? 2 : 1,
-                    height: tk.emphasis ? 12 : 7,
-                  }}
-                />
-                {tk.label !== undefined && (
+        {/* Everything below anchors on the TRACK's own box, never the padded
+            shell: the caption (pt-7) and tick-label (pb-6) paddings are
+            asymmetric, so centring ticks or the native thumb on the shell put
+            them visibly off the track line the moment one padding was present
+            without the other. */}
+        <div className="relative">
+          <div className="bg-surface-sunken border-border relative h-1.5 overflow-hidden rounded-[3px] border">
+            <div
+              className="absolute inset-y-0 left-0"
+              style={{
+                width: `${pct}%`,
+                background:
+                  fillStyle ?? "linear-gradient(90deg, var(--brass) 0%, var(--accent) 100%)",
+              }}
+            />
+          </div>
+          <div className="pointer-events-none absolute inset-x-0 top-0 bottom-0">
+            {resolvedTicks.map((tk) => {
+              const tickPct = ((tk.value - min) / span) * 100;
+              return (
+                <span key={tk.value}>
                   <span
-                    className="text-ink-mute absolute -translate-x-1/2 font-mono text-[9.5px] tracking-[0.4px] tabular-nums"
-                    style={{ left: `${tickPct}%`, top: "calc(50% + 10px)" }}
+                    className={cn(
+                      "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[1px]",
+                      tk.emphasis ? "bg-brass-deep opacity-70" : "bg-ink-off opacity-45",
+                    )}
+                    style={{
+                      left: `${tickPct}%`,
+                      width: tk.emphasis ? 2 : 1,
+                      height: tk.emphasis ? 12 : 7,
+                    }}
+                  />
+                  {tk.label !== undefined && (
+                    <span
+                      className="text-ink-mute absolute -translate-x-1/2 font-mono text-[9.5px] tracking-[0.4px] tabular-nums"
+                      style={{ left: `${tickPct}%`, top: "calc(50% + 10px)" }}
+                    >
+                      {tk.label}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+
+            {/* Read-only second marker. Drawn in ink so it never competes with the
+              thumb for "this is the value you are setting". */}
+            {markerPct !== null && (
+              <span
+                data-testid={testId ? `${testId}-marker` : undefined}
+                data-value={marker?.value}
+              >
+                <span
+                  className="bg-ink absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-[1px]"
+                  style={{ left: `${markerPct}%` }}
+                />
+                {marker?.label && (
+                  // Floats OUTSIDE the shell, just above its top edge, instead of
+                  // renting box height via extra top padding — the shell stays the
+                  // same height with or without a caption (user decision
+                  // 2026-07-31). Nothing up the chain clips: only the track itself
+                  // is overflow-hidden.
+                  <span
+                    className="bg-surface-elevated border-border text-ink absolute -translate-x-1/2 rounded-[4px] border px-1 py-px font-mono text-[9.5px] font-semibold whitespace-nowrap"
+                    style={{ left: `${markerPct}%`, bottom: "calc(100% + 16px)" }}
                   >
-                    {tk.label}
+                    {marker.label}
                   </span>
                 )}
               </span>
-            );
-          })}
-
-          {/* Read-only second marker. Drawn in ink so it never competes with the
-              thumb for "this is the value you are setting". */}
-          {markerPct !== null && (
-            <span data-testid={testId ? `${testId}-marker` : undefined} data-value={marker?.value}>
-              <span
-                className="bg-ink absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-[1px]"
-                style={{ left: `${markerPct}%` }}
-              />
-              {marker?.label && (
-                <span
-                  className="bg-surface-elevated border-border text-ink absolute -translate-x-1/2 rounded-[4px] border px-1 py-px font-mono text-[9.5px] font-semibold whitespace-nowrap"
-                  style={{ left: `${markerPct}%`, top: "calc(50% - 22px)" }}
-                >
-                  {marker.label}
-                </span>
-              )}
-            </span>
-          )}
+            )}
+          </div>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            aria-valuemin={min}
+            aria-valuemax={max}
+            aria-valuenow={value}
+            aria-valuetext={valueText}
+            data-testid={testId}
+            className="absolute inset-x-0 top-1/2 h-9 w-full -translate-y-1/2 cursor-pointer appearance-none bg-transparent outline-none focus-visible:[&::-webkit-slider-thumb]:shadow-[0_0_0_4px_var(--accent-soft)] [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-accent [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:shadow-[0_4px_12px_-4px_rgba(25,101,54,0.45),inset_0_0_0_3px_var(--accent)] [&::-moz-range-thumb]:size-5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-accent [&::-moz-range-thumb]:bg-surface"
+          />
         </div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          aria-valuemin={min}
-          aria-valuemax={max}
-          aria-valuenow={value}
-          aria-valuetext={valueText}
-          data-testid={testId}
-          className="absolute inset-0 size-full cursor-pointer appearance-none bg-transparent outline-none focus-visible:[&::-webkit-slider-thumb]:shadow-[0_0_0_4px_var(--accent-soft)] [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-accent [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:shadow-[0_4px_12px_-4px_rgba(25,101,54,0.45),inset_0_0_0_3px_var(--accent)] [&::-moz-range-thumb]:size-5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-accent [&::-moz-range-thumb]:bg-surface"
-        />
       </div>
     </div>
   );

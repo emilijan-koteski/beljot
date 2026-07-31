@@ -110,6 +110,13 @@
         "unreliable": "Недоверлив",
         "problematic": "Проблематичен"
       },
+      "tierPlural": {
+        "exemplary": "Примерни",
+        "trusted": "Доверливи",
+        "fair": "Солидни",
+        "unreliable": "Недоверливи",
+        "problematic": "Проблематични"
+      },
       "trend": {
         "up": "Во подем",
         "flat": "Стабилно",
@@ -525,8 +532,8 @@
         "passwordTooShort": "Лозинката мора да има најмалку {{min}} знаци",
         "passwordTooLong": "Лозинката може да има најмногу {{max}} знаци",
         "invalidMinHonor": "Минималната чест мора да биде помеѓу {{min}} и {{max}}.",
-        "ownHonorTooLow": "Ти самиот не би ја поминал оваа граница: бара {{minHonor}}, а твојата чест е {{honor}}. Намали ја за да продолжиш.",
-        "ownNewPlayerNotAllowed": "Уште си нов играч, па со ова би се заклучил од сопствената соба. Примај нови играчи за да продолжиш."
+        "ownHonorTooLow": "Твојата чест е {{honor}}, па не можеш да седнеш во соба со минимум {{minHonor}}. Спушти го минимумот за да продолжиш.",
+        "ownNewPlayerNotAllowed": "Уште си нов играч и не можеш да седнеш во сопствената соба. Дозволи нови играчи за да продолжиш."
       },
       "eyebrow": "Нова соба",
       "headline": "Креирај соба",
@@ -562,10 +569,11 @@
       "roomPassword": "Лозинка на собата",
       "roomPasswordPlaceholder": "Внеси лозинка",
       "minHonor": "Кој може да седне",
+      "minHonorHint": "Играчи со толкава или повисока оценка на чест",
       "minHonorAnyone": "Секој",
       "minHonorYou": "ти {{honor}}",
       "allowNewPlayers": "Нови играчи",
-      "allowNewPlayersYes": "Примај",
+      "allowNewPlayersYes": "Дозволи",
       "allowNewPlayersNo": "Само искусни",
       "roomPasswordHint": "Најмалку {{min}} знаци"
     },
@@ -623,7 +631,7 @@
       "privateLockAriaLabel": "Приватна соба, за влез е потребна лозинка",
       "public": "Јавна",
       "publicAriaLabel": "Јавна соба, секој може да влезе",
-      "minHonor": "{{minHonor}}+",
+      "minHonor": "{{minHonor}}",
       "minHonorAriaLabel": "Минимална чест {{minHonor}}",
       "veteransOnly": "Само искусни",
       "veteransOnlyAriaLabel": "Оваа соба не прима нови играчи",

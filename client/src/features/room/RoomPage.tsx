@@ -57,6 +57,7 @@ import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import {
+  honorFloorLabel,
   honorQualifies,
   honorRoomIsGated,
   honorScoreOrPrior,
@@ -1222,7 +1223,7 @@ export function RoomPage() {
                   icon={<HonorShield tier={honorTierForScore(room.minHonor)} size={12} />}
                 >
                   <span data-testid="badge-min-honor" data-min-honor={room.minHonor}>
-                    {t("lobby.card.minHonor", { minHonor: room.minHonor })}
+                    {t("lobby.card.minHonor", { minHonor: honorFloorLabel(room.minHonor) })}
                   </span>
                 </Badge>
               )}

@@ -110,6 +110,13 @@
         "unreliable": "Nepouzdan",
         "problematic": "Problematičan"
       },
+      "tierPlural": {
+        "exemplary": "Uzorni",
+        "trusted": "Pouzdani",
+        "fair": "Solidni",
+        "unreliable": "Nepouzdani",
+        "problematic": "Problematični"
+      },
       "trend": {
         "up": "U usponu",
         "flat": "Stabilno",
@@ -525,8 +532,8 @@
         "passwordTooShort": "Lozinka mora imati barem {{min}} znakova",
         "passwordTooLong": "Lozinka može imati najviše {{max}} znakova",
         "invalidMinHonor": "Minimalna čast mora biti između {{min}} i {{max}}.",
-        "ownHonorTooLow": "Ti sam ne bi prošao ovu granicu: traži {{minHonor}}, a tvoja čast je {{honor}}. Smanji je da nastaviš.",
-        "ownNewPlayerNotAllowed": "Još si novi igrač, pa bi se ovime zaključao iz vlastite sobe. Primi nove igrače da nastaviš."
+        "ownHonorTooLow": "Tvoja čast je {{honor}}, pa ne možeš sjesti u sobu s minimumom {{minHonor}}. Spusti minimum da nastaviš.",
+        "ownNewPlayerNotAllowed": "Još si novi igrač i ne možeš sjesti u vlastitu sobu. Dozvoli nove igrače da nastaviš."
       },
       "eyebrow": "Nova soba",
       "headline": "Stvori sobu",
@@ -562,10 +569,11 @@
       "roomPassword": "Lozinka sobe",
       "roomPasswordPlaceholder": "Unesi lozinku",
       "minHonor": "Tko može sjesti",
+      "minHonorHint": "Igrači s ovolikom ili višom ocjenom časti",
       "minHonorAnyone": "Svatko",
       "minHonorYou": "ti {{honor}}",
       "allowNewPlayers": "Novi igrači",
-      "allowNewPlayersYes": "Primaj",
+      "allowNewPlayersYes": "Dozvoli",
       "allowNewPlayersNo": "Samo iskusni",
       "roomPasswordHint": "Najmanje {{min}} znakova"
     },
@@ -623,7 +631,7 @@
       "privateLockAriaLabel": "Privatna soba, za ulazak je potrebna lozinka",
       "public": "Javna",
       "publicAriaLabel": "Javna soba, svatko može ući",
-      "minHonor": "{{minHonor}}+",
+      "minHonor": "{{minHonor}}",
       "minHonorAriaLabel": "Minimalna čast {{minHonor}}",
       "veteransOnly": "Samo iskusni",
       "veteransOnlyAriaLabel": "Ova soba ne prima nove igrače",
