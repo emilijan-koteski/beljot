@@ -133,6 +133,13 @@ export interface RoomPlayer {
    */
   honorScore?: number;
   honorTier?: string;
+  /**
+   * Lifetime level, hydrated alongside honour from the same roster read and
+   * rendered before the shield on each seat tile. Same semantics as honorScore:
+   * `undefined` means "not read" (a bot, or the hydration failed) and renders
+   * nothing, while a real level 0 — a brand-new account — arrives as 0.
+   */
+  level?: number;
   createdAt: string;
 }
 

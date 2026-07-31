@@ -172,38 +172,62 @@ export function SeatTile({
                 {isHost && <Crown className="text-brass-deep size-3.25" aria-hidden="true" />}
                 {displayName}
               </span>
-              {/* This player's OWN honour (redesign R6). Honour is public by design
-                  — the profile response already exposes the same score and tier to
-                  anyone — and in the roster it finally pays off: you can see who you
-                  are about to partner with.
+              {/* Level, then this player's OWN honour (redesign R6), on one row.
+
+                  Honour is public by design — the profile response already exposes
+                  the same score and tier to anyone — and in the roster it finally
+                  pays off: you can see who you are about to partner with. The level
+                  rides the same roster read and renders FIRST (user decision
+                  2026-07-31), so a seat reads experience, then reliability.
 
                   The shield always shows THAT PLAYER'S tier, never a verdict about
-                  this room: a seat at 71 is Fair, so it gets the stone shield, not a
+                  this room: a seat at 71 is Fair, so it gets the olive shield, not a
                   red X. Being under the room's bar is a property of the ROOM, and it
                   is drawn by the tile's ember ring instead. Two different facts, two
                   different marks.
 
-                  The number renders in normal seat ink like the name above it —
-                  across the whole redesign only the shield is ever tinted. */}
-              {typeof player.honorScore === "number" && !isBot && (
-                <span
-                  className="text-ink-dim inline-flex items-center gap-1 text-[11.5px] font-bold tabular-nums"
-                  data-testid={`seat-honor-${seatIndex}`}
-                  data-honor={player.honorScore}
-                  title={t("profile.honor.meterLabel", {
-                    score: player.honorScore,
-                    tier: t(
-                      `profile.honor.tier.${normalizeHonorTier(player.honorTier ?? "", player.honorScore)}`,
-                    ),
-                  })}
-                >
-                  <HonorShield
-                    tier={normalizeHonorTier(player.honorTier ?? "", player.honorScore)}
-                    size={12}
-                  />
-                  {player.honorScore}
-                </span>
-              )}
+                  The numbers render in normal seat ink like the name above them —
+                  across the whole redesign only the shield is ever tinted. Both
+                  checks are typeof, never truthiness: level 0 and honour 0 are real
+                  values a brand-new or Problematic seat legitimately holds. */}
+              {!isBot &&
+                (typeof player.level === "number" || typeof player.honorScore === "number") && (
+                  <div className="flex items-center gap-2">
+                    {typeof player.level === "number" && (
+                      <span
+                        className="text-ink-dim text-[11.5px] leading-none font-bold whitespace-nowrap tabular-nums"
+                        data-testid={`seat-level-${seatIndex}`}
+                        data-level={player.level}
+                        title={t("xp.levelLabel", { level: player.level })}
+                      >
+                        {t("xp.short", { level: player.level })}
+                      </span>
+                    )}
+                    {typeof player.honorScore === "number" && (
+                      <span
+                        // leading-none so the number's line box hugs its digits —
+                        // with the inherited line-height the box was ~1.5x the
+                        // font and items-center left the shield riding visibly
+                        // high of the digits' optical centre.
+                        className="text-ink-dim inline-flex items-center gap-1 text-[11.5px] leading-none font-bold tabular-nums"
+                        data-testid={`seat-honor-${seatIndex}`}
+                        data-honor={player.honorScore}
+                        title={t("profile.honor.meterLabel", {
+                          score: player.honorScore,
+                          tier: t(
+                            `profile.honor.tier.${normalizeHonorTier(player.honorTier ?? "", player.honorScore)}`,
+                          ),
+                        })}
+                      >
+                        <HonorShield
+                          tier={normalizeHonorTier(player.honorTier ?? "", player.honorScore)}
+                          size={12}
+                        />
+                        {player.honorScore}
+                      </span>
+                    )}
+                  </div>
+                )}
               <div className="flex flex-wrap items-center justify-center gap-1">
                 {/* Bots never show You/Host badges — the bot marker takes their place. */}
                 {isBot && (

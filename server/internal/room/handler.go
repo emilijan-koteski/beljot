@@ -337,7 +337,13 @@ func (h *RoomHandler) playersWithBots(roomID uint) []RoomPlayer {
 		slog.Error("failed to load room bots", "roomID", roomID, "error", err)
 		bots = nil
 	}
-	return mergeBotPlayers(players, bots)
+	roster := mergeBotPlayers(players, bots)
+	// Every response built from this helper (seat select, swap, promote, leave,
+	// bot add/remove) REPLACES the client's whole roster, so it must carry the
+	// same honour/level decoration as the GET detail — without this, taking a
+	// seat wiped every seat's shield and level until the next full refetch.
+	h.attachPlayerHonor(roster)
+	return roster
 }
 
 // roomLifecyclePayload builds the WS payload shared by `system:room_created`
@@ -950,10 +956,15 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 	// Broadcast system:player_joined to room participants
 	players, broadcastErr := h.repo.FindPlayersByRoomID(uint(roomID))
 	if broadcastErr == nil {
-		var username string
-		for _, p := range players {
-			if p.UserID == userID {
-				username = p.Username
+		// Hydrate honour/level so already-seated viewers can draw the joiner's
+		// chips immediately — the payload is the only thing they receive (no
+		// roster refetch happens on a join). Lenient like every roster
+		// decoration: on a failed read the fields are simply absent.
+		h.attachPlayerHonor(players)
+		var joiner *RoomPlayer
+		for i := range players {
+			if players[i].UserID == userID {
+				joiner = &players[i]
 				break
 			}
 		}
@@ -961,12 +972,26 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		for _, p := range players {
 			userIDs = append(userIDs, p.UserID)
 		}
-		h.broadcastToUsers(userIDs, ws.SystemPlayerJoined, map[string]interface{}{
+		payload := map[string]interface{}{
 			"roomId":      roomID,
 			"userId":      userID,
-			"username":    username,
 			"playerCount": updatedRoom.PlayerCount,
-		})
+		}
+		if joiner != nil {
+			payload["username"] = joiner.Username
+			if joiner.HonorScore != nil {
+				payload["honorScore"] = *joiner.HonorScore
+			}
+			if joiner.HonorTier != nil {
+				payload["honorTier"] = *joiner.HonorTier
+			}
+			if joiner.Level != nil {
+				payload["level"] = *joiner.Level
+			}
+		} else {
+			payload["username"] = ""
+		}
+		h.broadcastToUsers(userIDs, ws.SystemPlayerJoined, payload)
 	}
 
 	// Broadcast system:room_updated to lobby browse page
@@ -1088,7 +1113,7 @@ func (h *RoomHandler) honorSnapshotsFor(userIDs []uint) (snaps map[uint]user.Hon
 	return read, true, nil
 }
 
-// attachPlayerHonor hydrates HonorScore / HonorTier on each HUMAN seat for the
+// attachPlayerHonor hydrates HonorScore / HonorTier / Level on each HUMAN seat for the
 // waiting-room roster (honour redesign R6). Mutates in place and returns nothing:
 // it is presentation, and there is no caller that wants a value back.
 //
@@ -1127,8 +1152,10 @@ func (h *RoomHandler) attachPlayerHonor(players []RoomPlayer) {
 		}
 		score := snap.Score
 		tier := string(snap.Tier)
+		level := snap.Level
 		players[i].HonorScore = &score
 		players[i].HonorTier = &tier
+		players[i].Level = &level
 	}
 }
 
@@ -2125,10 +2152,13 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		slog.Error("return to room: failed to load owner username", "roomID", postRoom.ID, "error", err)
 	}
 
+	roster := mergeBotPlayers(players, bots)
+	h.attachPlayerHonor(roster)
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"data": RoomDetailResponse{
 			Room:            postRoom,
-			Players:         mergeBotPlayers(players, bots),
+			Players:         roster,
 			ReturnedUserIds: h.presence.Present(uint(roomID)),
 		},
 	})

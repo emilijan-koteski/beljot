@@ -603,6 +603,13 @@ function dispatchSystemEvent(message: WsMessage): void {
         seat: null,
         team: null,
         isBot: false,
+        // typeof guards, never truthiness: level 0 and honour 0 are real values.
+        // Room-lobby events are not zod-validated (see the coverage note below),
+        // so a payload from a server without these fields degrades to "no chips"
+        // rather than bogus zeros.
+        honorScore: typeof payload.honorScore === "number" ? payload.honorScore : undefined,
+        honorTier: typeof payload.honorTier === "string" ? payload.honorTier : undefined,
+        level: typeof payload.level === "number" ? payload.level : undefined,
         createdAt: new Date().toISOString(),
       },
       payload.playerCount,

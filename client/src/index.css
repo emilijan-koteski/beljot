@@ -200,19 +200,19 @@
      the tier is a runtime value and cannot be a static class name. ── */
   --h5: #0b5a55; /* exemplary  95-100 · deep teal */
   --h4: #17703d; /* trusted    85-94  · felt      */
-  --h3: #5f7268; /* fair       70-84  · stone     */
+  --h3: #6f7d1f; /* fair       70-84  · olive     */
   --h2: #9a5713; /* unreliable 50-69  · amber     */
   --h1: #93291c; /* problematic 0-49  · ember     */
 
   --h5-soft: rgba(11, 90, 85, 0.12);
   --h4-soft: rgba(23, 112, 61, 0.11);
-  --h3-soft: rgba(95, 114, 104, 0.12);
+  --h3-soft: rgba(111, 125, 31, 0.12);
   --h2-soft: rgba(154, 87, 19, 0.13);
   --h1-soft: rgba(147, 41, 28, 0.11);
 
   --h5-line: rgba(11, 90, 85, 0.32);
   --h4-line: rgba(23, 112, 61, 0.3);
-  --h3-line: rgba(95, 114, 104, 0.3);
+  --h3-line: rgba(111, 125, 31, 0.3);
   --h2-line: rgba(154, 87, 19, 0.42);
   --h1-line: rgba(147, 41, 28, 0.28);
 
@@ -411,19 +411,19 @@
      itself with no fork and no per-component branch. */
   --h5: #58c3b1;
   --h4: #7fd39b;
-  --h3: #9fb0a6;
+  --h3: #c6c96e;
   --h2: #e0a05a;
   --h1: #ff8585;
 
   --h5-soft: rgba(88, 195, 177, 0.16);
   --h4-soft: rgba(127, 211, 155, 0.16);
-  --h3-soft: rgba(159, 176, 166, 0.16);
+  --h3-soft: rgba(198, 201, 110, 0.16);
   --h2-soft: rgba(224, 160, 90, 0.18);
   --h1-soft: rgba(255, 133, 133, 0.16);
 
   --h5-line: rgba(88, 195, 177, 0.45);
   --h4-line: rgba(127, 211, 155, 0.45);
-  --h3-line: rgba(159, 176, 166, 0.4);
+  --h3-line: rgba(198, 201, 110, 0.4);
   --h2-line: rgba(224, 160, 90, 0.5);
   --h1-line: rgba(255, 133, 133, 0.45);
 }

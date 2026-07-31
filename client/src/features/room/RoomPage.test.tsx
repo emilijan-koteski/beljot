@@ -2106,7 +2106,7 @@ describe("RoomPage honour", () => {
       room: { ...defaultRoom, playerCount: 2, minHonor: 85 },
       players: [
         seat(10, "alice", 0, { honorScore: 96, honorTier: "exemplary" }),
-        // 71 is Fair — the seat gets the STONE shield, not a red X. Being under
+        // 71 is Fair — the seat gets the OLIVE shield, not a red X. Being under
         // this room's bar is drawn by the tile's ring instead.
         seat(20, "bob", 1, { honorScore: 71, honorTier: "fair" }),
       ],
@@ -2142,6 +2142,45 @@ describe("RoomPage honour", () => {
 
     await waitFor(() => expect(screen.getByTestId("seat-honor-0")).toBeInTheDocument());
     expect(screen.getByTestId("seat-honor-0")).toHaveAttribute("data-honor", "0");
+  });
+
+  it("renders the seat's level before the honour", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1 },
+      players: [seat(10, "alice", 0, { level: 7, honorScore: 96, honorTier: "exemplary" })],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("seat-level-0")).toBeInTheDocument());
+    expect(screen.getByTestId("seat-level-0")).toHaveAttribute("data-level", "7");
+    expect(screen.getByTestId("seat-level-0")).toHaveTextContent("Lvl 7");
+    // Level and honour share one row, level FIRST (user decision 2026-07-31).
+    const row = screen.getByTestId("seat-level-0").parentElement;
+    expect(within(row as HTMLElement).getByTestId("seat-honor-0")).toBeInTheDocument();
+    expect(row?.firstElementChild).toBe(screen.getByTestId("seat-level-0"));
+  });
+
+  it("renders a real level 0, and no level chip for a seat whose level did not arrive", async () => {
+    // Same coercion rule as honour: 0 is a legitimate value (a brand-new
+    // account), while `undefined` means "not read" and renders nothing.
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 2 },
+      players: [
+        seat(10, "alice", 0, { level: 0, honorScore: 80, honorTier: "fair" }),
+        seat(20, "bob", 1, { honorScore: 80, honorTier: "fair" }),
+      ],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("seat-level-0")).toBeInTheDocument());
+    expect(screen.getByTestId("seat-level-0")).toHaveAttribute("data-level", "0");
+    expect(screen.queryByTestId("seat-level-1")).toBeNull();
+    // The level-less seat still shows its honour.
+    expect(screen.getByTestId("seat-honor-1")).toBeInTheDocument();
   });
 
   it("shows no shield for a seat whose honour did not arrive", async () => {

@@ -158,11 +158,14 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 		wantHonorReads  int
 	}{
 		{
-			// Row 1: ungated room. No honor read is performed at all (D5).
-			name:     "row 1: ungated room admits anyone with no honor read",
+			// Row 1: ungated room. The GATE performs no honor read at all (D5);
+			// the single read below is the lenient roster decoration the join
+			// broadcast carries (level + shield for the joiner's seat), which can
+			// never reject anyone.
+			name:     "row 1: ungated room admits anyone with no gate read",
 			minHonor: 0, allowNewPlayers: true,
 			snap:       newPlayerHonorOf(19),
-			wantStatus: http.StatusOK, wantHonorReads: 0,
+			wantStatus: http.StatusOK, wantHonorReads: 1,
 		},
 		{
 			// Row 2: the newcomer bar bites even at minHonor 0 — the epic's
@@ -176,7 +179,7 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 			name:     "row 3: experienced player admitted at minHonor 0 whatever the score",
 			minHonor: 0, allowNewPlayers: false,
 			snap:       honorOf(5),
-			wantStatus: http.StatusOK, wantHonorReads: 1,
+			wantStatus: http.StatusOK, wantHonorReads: 2,
 		},
 		{
 			// Rows 4-5: a New Player is NEVER score-checked. This is the whole
@@ -184,13 +187,13 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 			name:     "row 4: new player admitted in a minHonor 80 room on the prior",
 			minHonor: 80, allowNewPlayers: true,
 			snap:       newPlayerHonorOf(80),
-			wantStatus: http.StatusOK, wantHonorReads: 1,
+			wantStatus: http.StatusOK, wantHonorReads: 2,
 		},
 		{
 			name:     "row 5: new player admitted at the worst score a newcomer can hold",
 			minHonor: 80, allowNewPlayers: true,
 			snap:       newPlayerHonorOf(19),
-			wantStatus: http.StatusOK, wantHonorReads: 1,
+			wantStatus: http.StatusOK, wantHonorReads: 2,
 		},
 		{
 			// Row 6: precedence — isNewPlayer is evaluated FIRST, so this is
@@ -210,7 +213,7 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 			name:     "row 8: the threshold boundary is inclusive",
 			minHonor: 80, allowNewPlayers: true,
 			snap:       honorOf(80),
-			wantStatus: http.StatusOK, wantHonorReads: 1,
+			wantStatus: http.StatusOK, wantHonorReads: 2,
 		},
 		{
 			// Row 9: a minHonor of 100 is very nearly a closed room — reaching a
@@ -225,7 +228,7 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 			name:     "row 10: the newcomer bar does not apply to an experienced player",
 			minHonor: 80, allowNewPlayers: false,
 			snap:       honorOf(95),
-			wantStatus: http.StatusOK, wantHonorReads: 1,
+			wantStatus: http.StatusOK, wantHonorReads: 2,
 		},
 	}
 
@@ -241,7 +244,8 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 				assert.Equal(t, tt.wantCode, errCodeOf(t, rec))
 			}
 			assert.Equal(t, tt.wantHonorReads, honor.calls,
-				"an ungated room must perform ZERO honor reads; a gated one exactly one")
+				"the GATE reads zero times on an ungated room and exactly once on a gated one; "+
+					"every SUCCESSFUL join adds one lenient roster-decoration read for the broadcast")
 
 			players, _ := repo.FindPlayersByRoomID(1)
 			if tt.wantStatus == http.StatusOK {
@@ -542,7 +546,10 @@ func TestReturnToRoom_NewPlayerEjectedWithItsOwnCode(t *testing.T) {
 	assert.Equal(t, "NEW_PLAYER_NOT_ALLOWED", errorCodeOf(t, rec.Body.Bytes()))
 }
 
-// AC6: an ungated room skips the re-check entirely, with no honor read.
+// AC6: an ungated room skips the re-check entirely — a returner at score 5 is
+// admitted, which no gated recheck would allow. The one read that DOES happen is
+// the response's lenient roster decoration (level + shield per seat), which can
+// never 409.
 func TestReturnToRoom_UngatedRoomSkipsHonorRecheck(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{200: honorOf(5)}}
 	e, repo, _, _ := setupHonorTest(nil, nil, honor)
@@ -556,7 +563,7 @@ func TestReturnToRoom_UngatedRoomSkipsHonorRecheck(t *testing.T) {
 
 	rec := doReturnToRoom(e, "1", validToken(200))
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, 0, honor.calls)
+	assert.Equal(t, 1, honor.calls, "no GATE read — the single read is the roster decoration")
 
 	players, _ := repo.FindPlayersByRoomID(1)
 	assert.Len(t, players, 2, "an ungated room never frees a seat for honor")
@@ -1010,8 +1017,12 @@ func rosterOf(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
 // both chips, then the gate vanished the moment you were inside. Per-seat honour
 // is what makes the roster answer "who am I about to partner with".
 func TestGetRoom_AttachesHonorToHumanSeats(t *testing.T) {
+	// Level rides the same hydration as honour (rendered before the shield on
+	// the seat tile), so this fixture carries one to prove it reaches the wire.
+	withLevel := honorOf(96)
+	withLevel.Level = 7
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{
-		100: honorOf(96),
+		100: withLevel,
 		7:   honorOf(71),
 	}}
 	e, repo, _, _ := setupHonorTest(nil, nil, honor)
@@ -1033,8 +1044,12 @@ func TestGetRoom_AttachesHonorToHumanSeats(t *testing.T) {
 	}
 	assert.Equal(t, float64(96), byUser[100]["honorScore"])
 	assert.Equal(t, "exemplary", byUser[100]["honorTier"])
+	assert.Equal(t, float64(7), byUser[100]["level"])
 	assert.Equal(t, float64(71), byUser[7]["honorScore"])
 	assert.Equal(t, "fair", byUser[7]["honorTier"])
+	// A real level 0 stays on the wire — the pointer field serializes &0, and
+	// only a nil ("not read") is omitted. Same rule as honorScore.
+	assert.Equal(t, float64(0), byUser[7]["level"])
 }
 
 // A score of 0 is a legitimate value ("Problematic"). The field is a POINTER so

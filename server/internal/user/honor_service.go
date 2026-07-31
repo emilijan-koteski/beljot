@@ -98,7 +98,7 @@ func (s *HonorService) HonorForUsers(userIDs []uint) (map[uint]HonorSnapshot, er
 	now := time.Now().UTC()
 	out := make(map[uint]HonorSnapshot, len(users))
 	for _, u := range users {
-		out[u.ID] = NewHonorSnapshot(
+		snap := NewHonorSnapshot(
 			u.HonorCompletedWeight,
 			u.HonorAbandonedWeight,
 			u.HonorDecayedAt,
@@ -106,6 +106,10 @@ func (s *HonorService) HonorForUsers(userIDs []uint) (map[uint]HonorSnapshot, er
 			u.HonorAbandonedTotal,
 			now,
 		)
+		// The row is already in hand, so the roster's level costs no extra read.
+		// See HonorSnapshot.Level — only this constructor populates it.
+		snap.Level = LevelForXP(u.TotalXP)
+		out[u.ID] = snap
 	}
 	return out, nil
 }

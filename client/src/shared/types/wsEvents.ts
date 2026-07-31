@@ -402,6 +402,14 @@ export interface PlayerJoinedPayload {
   userId: number;
   username: string;
   playerCount: number;
+  /**
+   * The joiner's roster decoration, so already-seated viewers can draw the new
+   * seat's level + shield without a refetch. Optional with the same semantics
+   * as RoomPlayer: absent means "not read", a real 0 arrives as 0.
+   */
+  honorScore?: number;
+  honorTier?: string;
+  level?: number;
 }
 
 export interface PlayerLeftPayload {

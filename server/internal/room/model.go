@@ -122,9 +122,14 @@ type RoomPlayer struct {
 	// to anyone, so the roster reveals nothing new. It is deliberately NOT the
 	// counts or the trend — a seatmate needs to know how reliable someone is, not
 	// their history.
-	HonorScore *int      `gorm:"-" json:"honorScore,omitempty"`
-	HonorTier  *string   `gorm:"-" json:"honorTier,omitempty"`
-	CreatedAt  time.Time `json:"createdAt"`
+	HonorScore *int    `gorm:"-" json:"honorScore,omitempty"`
+	HonorTier  *string `gorm:"-" json:"honorTier,omitempty"`
+	// Level is the seat's lifetime level, hydrated alongside honour from the same
+	// read for the roster (level renders before the shield on each seat tile).
+	// Same pointer semantics as HonorScore: nil means "not read" (a bot, or the
+	// hydration failed), while a real level 0 — a brand-new account — arrives as 0.
+	Level     *int      `gorm:"-" json:"level,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // RoomBot is a bot occupying a seat in a waiting room. Bots have no user

@@ -122,6 +122,12 @@ type HonorSnapshot struct {
 	CompletedTotal int64
 	AbandonedTotal int64
 	IsNewPlayer    bool
+	// Level is the player's lifetime level (Story 9.5 curve over total_xp),
+	// carried here so the room roster can show level beside honor from the ONE
+	// user read HonorForUsers already does. Populated ONLY by HonorForUsers —
+	// NewHonorSnapshot has no user row and leaves it zero, so never render it
+	// from a snapshot built anywhere else.
+	Level int
 }
 
 // NewHonorSnapshot builds the renderable state from a user's stored honor
