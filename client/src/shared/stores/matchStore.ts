@@ -75,6 +75,19 @@ export interface MatchStoreState {
   // be shown inside the end-of-match score dialog. Null for free (0 buy-in)
   // matches, which emit no settlement event.
   coinSettlement: CoinSettlementPayload | null;
+  // Honour movement for the result overlay (honour redesign R7). event:honor_updated
+  // lands at exactly the moment the match ends and was previously discarded
+  // visually — the score changed and nothing on screen said so.
+  //
+  // `before` is captured from authStore at the instant the event arrives, because
+  // the payload carries only the NEW score. That is enough for "95 -> 96" without
+  // widening the WS contract (and its six drift-gate touchpoints).
+  //
+  // Reset in BOTH the match_end and match_abandoned handlers, exactly as the
+  // comment on the honor_updated handler in useWsDispatch demands: the abandoning
+  // player is the one who gets no follow-up event, so a stale flourish would
+  // otherwise show them someone else's last movement.
+  honorSettlement: { before: number; after: number; tier: string } | null;
   matchAbandonedData: MatchAbandonedPayload | null;
   surrenderProposed: SurrenderProposedPayload | null;
   surrenderDeclined: SurrenderDeclinedPayload | null;
@@ -99,6 +112,7 @@ export interface MatchStoreState {
   setScoreRevealData: (data: HandScoredPayload | null) => void;
   setMatchEndData: (data: MatchEndPayload | null) => void;
   setCoinSettlement: (payload: CoinSettlementPayload | null) => void;
+  setHonorSettlement: (payload: { before: number; after: number; tier: string } | null) => void;
   setMatchAbandonedData: (data: MatchAbandonedPayload | null) => void;
   setSurrenderProposed: (payload: SurrenderProposedPayload | null) => void;
   setSurrenderDeclined: (payload: SurrenderDeclinedPayload | null) => void;
@@ -138,6 +152,7 @@ const initialState = {
   scoreRevealData: null,
   matchEndData: null,
   coinSettlement: null,
+  honorSettlement: null,
   matchAbandonedData: null,
   surrenderProposed: null,
   surrenderDeclined: null,
@@ -171,6 +186,7 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
   setMatchEndData: (matchEndData) => set({ matchEndData }),
 
   setCoinSettlement: (coinSettlement) => set({ coinSettlement }),
+  setHonorSettlement: (honorSettlement) => set({ honorSettlement }),
 
   setMatchAbandonedData: (matchAbandonedData) => set({ matchAbandonedData }),
 

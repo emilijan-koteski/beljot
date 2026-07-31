@@ -23,6 +23,7 @@ import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
+import { honorScoreOrPrior } from "@/shared/lib/honor";
 import { FLAG_LIFETIME, MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import { useWsConnectionState, useWsSendMessage } from "@/shared/providers/WebSocketContext";
@@ -229,7 +230,7 @@ export function MatchPage() {
   const sendMessage = useWsSendMessage();
 
   const user = useAuthStore((s) => s.user);
-  const setInsolventEjection = useRoomStore((s) => s.setInsolventEjection);
+  const setRoomEjection = useRoomStore((s) => s.setRoomEjection);
   const matchState = useMatchStore((s) => s.matchState);
   const myPlayerSeat = useMatchStore((s) => s.myPlayerSeat);
   const setMyPlayerSeat = useMatchStore((s) => s.setMyPlayerSeat);
@@ -247,6 +248,7 @@ export function MatchPage() {
   const matchEndData = useMatchStore((s) => s.matchEndData);
   const setMatchEndData = useMatchStore((s) => s.setMatchEndData);
   const coinSettlement = useMatchStore((s) => s.coinSettlement);
+  const honorSettlement = useMatchStore((s) => s.honorSettlement);
   const matchAbandonedData = useMatchStore((s) => s.matchAbandonedData);
   const setMatchAbandonedData = useMatchStore((s) => s.setMatchAbandonedData);
   const activeEmotes = useMatchStore((s) => s.activeEmotes);
@@ -293,6 +295,9 @@ export function MatchPage() {
   // the system:insolvent_ejected WS frame is dropped/late (the WS event remains
   // the canonical source and overwrites this when it lands).
   const roomBuyInRef = useRef<number | null>(null);
+  // Cached alongside the buy-in for the return-time HONOR ejection fallback, for the
+  // same reason: once the server frees the seat the client no longer holds the room.
+  const roomMinHonorRef = useRef<number | null>(null);
   // Same buy-in lifted into state so the match-stake (pot) HUD can render it.
   // The ref above stays the synchronous source for the return-time insolvency
   // fallback; this drives a re-render once the mount-time getRoom resolves.
@@ -790,6 +795,7 @@ export function MatchPage() {
         // Cache the room's buy-in for the return-time insolvency fallback (P4)
         // and surface it to the match-stake HUD.
         roomBuyInRef.current = detail.room.coinBuyIn;
+        roomMinHonorRef.current = detail.room.minHonor;
         setRoomBuyIn(detail.room.coinBuyIn);
         const isPlayer = detail.players.some((p) => p.userId === user.id);
         if (!isPlayer) {
@@ -1232,13 +1238,43 @@ export function MatchPage() {
         if (
           roomBuyInRef.current !== null &&
           user !== null &&
-          useRoomStore.getState().insolventEjection === null
+          useRoomStore.getState().roomEjection === null
         ) {
-          setInsolventEjection({
+          setRoomEjection({
             roomId: roomIdNum,
             buyIn: roomBuyInRef.current,
             balance: user.walletBalance,
-            reason: "ejected",
+            reason: "insolvent",
+          });
+        }
+        setMatchEndData(null);
+        clearGame();
+        returnToLobby();
+        return;
+      }
+      // Story 9.8 AC6: the honor gate behaves EXACTLY like insolvency here — the
+      // server ejects the barred returner and only then returns the 409, so the seat
+      // is already gone and the player must not be left on the result overlay. D3
+      // calls this the checkpoint that actually fires in practice (honor moves at
+      // match end and the abandoner stays seated), so this is the common path, not
+      // an edge. Same dropped-frame fallback as above; minHonor comes from the cached
+      // room and the score from the viewer's own envelope via honorScoreOrPrior,
+      // never `|| 80` — a real 0 must survive.
+      if (code === "HONOR_TOO_LOW" || code === "NEW_PLAYER_NOT_ALLOWED") {
+        if (
+          roomMinHonorRef.current !== null &&
+          user !== null &&
+          useRoomStore.getState().roomEjection === null
+        ) {
+          setRoomEjection({
+            roomId: roomIdNum,
+            // Not meaningful for an honor ejection, zeroed exactly as the WS
+            // handler does; the modal reads minHonor/honor.
+            buyIn: 0,
+            balance: 0,
+            minHonor: roomMinHonorRef.current,
+            honor: honorScoreOrPrior(user.honorScore),
+            reason: "honor",
           });
         }
         setMatchEndData(null);
@@ -1261,16 +1297,7 @@ export function MatchPage() {
         errorToastTimerRef.current = null;
       }, MOTION.TOAST_ERROR);
     }
-  }, [
-    roomIdNum,
-    clearGame,
-    navigate,
-    returnToLobby,
-    setMatchEndData,
-    setInsolventEjection,
-    user,
-    t,
-  ]);
+  }, [roomIdNum, clearGame, navigate, returnToLobby, setMatchEndData, setRoomEjection, user, t]);
 
   const handleAbandonReturnToLobby = useCallback(() => {
     setMatchAbandonedData(null);
@@ -2137,6 +2164,7 @@ export function MatchPage() {
           onReturnToRoom={handleReturnToRoom}
           surrenderedByUsername={surrenderedByUsername}
           coinDelta={coinSettlement?.coinDelta}
+          honorSettlement={honorSettlement}
         />
       )}
 

@@ -98,6 +98,14 @@ func (m *Manager) reconcileStaleRoom(roomRepo StaleRoomRepository, r StaleRoom) 
 		// same fail-safe spirit as the no-human-winner case). The record persists
 		// 0 deltas / 0 buy-in (the actually-charged amount is unrecoverable).
 		//
+		// Story 9.7: NO honor change here either, and for a stronger reason
+		// than the coin case — a crashed server is a SERVER fault, not a player
+		// signal, so nobody is charged an abandonment and nobody is credited a
+		// completion. The record below deliberately leaves AbandonedBy nil,
+		// which is also the marker the migration 000017 backfill uses to
+		// exclude these rows. This path has no live session and no
+		// honorRecorder call at all, so it is safe by construction.
+		//
 		// No precise game-start timestamp survives the restart — the room's
 		// UpdatedAt is the best proxy (StartMatch is the last writer for a
 		// "playing" row that hasn't moved on).

@@ -19,6 +19,22 @@ export interface ProfileResponse {
   level: number;
   xpIntoLevel: number;
   xpForNextLevel: number;
+  // Honor (Story 9.7). Unlike walletBalance / totalXp these are PUBLIC-SAFE by
+  // design — honor exists so other players can judge reliability, and Epic 11's
+  // public profile can carry them verbatim.
+  //
+  // honorScore is server-recomputed on every response (never the lagging
+  // honor_score column). honorTier / honorTrendDirection are stable machine
+  // tokens, mapped to i18n labels client-side. The Completed/Abandoned totals
+  // are raw undecayed lifetime counts. isNewPlayer hides the score and tier
+  // behind a "New Player" chip while the counts still render.
+  honorScore: number;
+  honorTier: string;
+  honorCompletedTotal: number;
+  honorAbandonedTotal: number;
+  isNewPlayer: boolean;
+  honorTrendDelta: number;
+  honorTrendDirection: string;
 }
 
 export interface UpdatePreferencesRequest {

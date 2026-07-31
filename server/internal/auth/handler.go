@@ -45,10 +45,23 @@ type RegisterResponseData struct {
 	// level + XP immediately on auth, without a separate profile fetch. TotalXP
 	// is the loaded lifetime total (0 for a fresh registration); Level is derived
 	// from it via user.LevelForXP (never stored).
-	TotalXP   int       `json:"totalXp"`
-	Level     int       `json:"level"`
-	CreatedAt time.Time `json:"createdAt"`
-	Token     string    `json:"token"`
+	TotalXP int `json:"totalXp"`
+	Level   int `json:"level"`
+	// Honor (Story 9.7) — read-only echoes so the top-nav honor chip renders on
+	// FIRST PAINT, without a separate profile fetch, exactly like level/totalXp
+	// above. HonorScore is recomputed from the loaded user's stored weights at
+	// response time (the recompute is the authority; the users.honor_score
+	// column is a lagging filter-only snapshot). HonorTier is a stable machine
+	// token the client maps to a label and colour.
+	//
+	// The TREND is deliberately absent: it needs a windowed query over
+	// `matches`, and the auth path must stay a single-row read. The profile
+	// endpoint carries it.
+	HonorScore  int       `json:"honorScore"`
+	HonorTier   string    `json:"honorTier"`
+	IsNewPlayer bool      `json:"isNewPlayer"`
+	CreatedAt   time.Time `json:"createdAt"`
+	Token       string    `json:"token"`
 }
 
 type AuthHandler struct {
@@ -154,6 +167,14 @@ func (h *AuthHandler) revokeFamily(familyID, reason string) {
 }
 
 func authResponseData(u *user.User, accessToken string) RegisterResponseData {
+	// Story 9.7: recompute honor from the loaded row's stored weights. This is
+	// pure arithmetic over three columns we already have — no extra query — and
+	// it is the authoritative value, so the TopBar can never render a stale
+	// score even for a user who has not played in months.
+	honor := user.NewHonorSnapshot(
+		u.HonorCompletedWeight, u.HonorAbandonedWeight, u.HonorDecayedAt,
+		u.HonorCompletedTotal, u.HonorAbandonedTotal, time.Now().UTC(),
+	)
 	return RegisterResponseData{
 		ID:                 u.ID,
 		Username:           u.Username,
@@ -163,6 +184,9 @@ func authResponseData(u *user.User, accessToken string) RegisterResponseData {
 		LoginStreakDays:    u.LoginStreakDays,
 		TotalXP:            u.TotalXP,
 		Level:              user.LevelForXP(u.TotalXP),
+		HonorScore:         honor.Score,
+		HonorTier:          honor.Tier,
+		IsNewPlayer:        honor.IsNewPlayer,
 		CreatedAt:          u.CreatedAt,
 		Token:              accessToken,
 	}

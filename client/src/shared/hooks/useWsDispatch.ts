@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 
 import { handleWsMessage as handleRoomListMessage } from "@/features/lobby/useRoomUpdates";
+import { honorIsNewPlayer, honorScoreOrPrior } from "@/shared/lib/honor";
 import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
@@ -22,6 +23,8 @@ import type {
   DeclarationsResolvedPayload,
   EmotePayload,
   HandScoredPayload,
+  HonorEjectedPayload,
+  HonorUpdatedPayload,
   InsolventEjectedPayload,
   MatchAbandonedPayload,
   MatchEndPayload,
@@ -64,6 +67,7 @@ import {
   EVENT_COIN_SETTLEMENT,
   EVENT_DECLARATIONS_RESOLVED,
   EVENT_HAND_SCORED,
+  EVENT_HONOR_UPDATED,
   EVENT_MATCH_ABANDONED,
   EVENT_MATCH_END,
   EVENT_MATCH_PAUSED,
@@ -82,6 +86,7 @@ import {
   SYSTEM_BOT_REMOVED,
   SYSTEM_CHAT_MESSAGE,
   SYSTEM_EMOTE,
+  SYSTEM_HONOR_EJECTED,
   SYSTEM_INSOLVENT_EJECTED,
   SYSTEM_MATCH_STARTED,
   SYSTEM_PLAYER_JOINED,
@@ -274,6 +279,9 @@ function dispatchGameEvent(message: WsMessage): void {
     // amount — the matching event:coin_settlement (if buy-in) arrives
     // immediately after per the ordering contract.
     store.setCoinSettlement(null);
+    // Same for honour: event:honor_updated follows in the same burst, so clearing
+    // here means the overlay shows this match's movement or none at all.
+    store.setHonorSettlement(null);
     return;
   }
 
@@ -331,6 +339,62 @@ function dispatchGameEvent(message: WsMessage): void {
         newLevel: payload.newLevel,
         newTotalXp: payload.newTotalXp,
         xpEarned: payload.xpEarned,
+      });
+    }
+    return;
+  }
+
+  if (type === EVENT_HONOR_UPDATED) {
+    // Story 9.7: per-human honor update, arriving right after
+    // event:xp_awarded and before the trailing event:match_state.
+    //
+    // It writes to authStore.user, which survives the navigation away that wipes
+    // the match store — so the top-nav honor chip is correct the moment the player
+    // lands back in the lobby.
+    //
+    // It ALSO stashes the movement on the match store for the result overlay
+    // (honour redesign R7). This is the "future story adds an honor flourish"
+    // case the previous version of this comment anticipated, and its instruction
+    // is honoured: honorSettlement is reset in BOTH the match_end and
+    // match_abandoned handlers, because the abandoning player is precisely the
+    // one who gets no follow-up event and would otherwise be shown a stale
+    // movement from an earlier match.
+    //
+    // `before` is read off authStore BEFORE the write below: the payload carries
+    // only the new score, so this is what makes "95 -> 96" possible without
+    // widening the WS contract and its six drift-gate touchpoints.
+    const payload = message.payload as HonorUpdatedPayload;
+    // Defensive validation — Go zero values are real values, so guard on type,
+    // not truthiness. A score of 0 ("Problematic") and isNewPlayer false are
+    // both legitimate, and both are falsy.
+    if (
+      !Number.isInteger(payload.honorScore) ||
+      typeof payload.honorTier !== "string" ||
+      payload.honorTier === "" ||
+      !Number.isInteger(payload.honorCompletedTotal) ||
+      !Number.isInteger(payload.honorAbandonedTotal) ||
+      typeof payload.isNewPlayer !== "boolean"
+    ) {
+      console.warn("WS: ignoring malformed event:honor_updated payload", payload);
+      return;
+    }
+    const authState = useAuthStore.getState();
+    if (authState.user) {
+      // Captured before the overwrite. A New Player has no meaningful "before",
+      // so no movement is stashed for them — the overlay then shows nothing
+      // rather than a jump from a score they never had.
+      if (!honorIsNewPlayer(authState.user.isNewPlayer) && !payload.isNewPlayer) {
+        useMatchStore.getState().setHonorSettlement({
+          before: honorScoreOrPrior(authState.user.honorScore),
+          after: payload.honorScore,
+          tier: payload.honorTier,
+        });
+      }
+      authState.setUser({
+        ...authState.user,
+        honorScore: payload.honorScore,
+        honorTier: payload.honorTier,
+        isNewPlayer: payload.isNewPlayer,
       });
     }
     return;
@@ -461,6 +525,11 @@ function dispatchGameEvent(message: WsMessage): void {
     // Mirror the match_end reset: clear any prior settlement so the result
     // surface never shows a stale coin amount.
     store.setCoinSettlement(null);
+    // Honour matters MORE here than on the clean-end path: the abandoning player
+    // is the one who never receives event:honor_updated (Hub.SendToUser is an
+    // unqueued no-op for an absent user), so without this reset they would be
+    // shown the movement from a PREVIOUS match as if it were this one's.
+    store.setHonorSettlement(null);
     return;
   }
 
@@ -534,6 +603,13 @@ function dispatchSystemEvent(message: WsMessage): void {
         seat: null,
         team: null,
         isBot: false,
+        // typeof guards, never truthiness: level 0 and honour 0 are real values.
+        // Room-lobby events are not zod-validated (see the coverage note below),
+        // so a payload from a server without these fields degrades to "no chips"
+        // rather than bogus zeros.
+        honorScore: typeof payload.honorScore === "number" ? payload.honorScore : undefined,
+        honorTier: typeof payload.honorTier === "string" ? payload.honorTier : undefined,
+        level: typeof payload.level === "number" ? payload.level : undefined,
         createdAt: new Date().toISOString(),
       },
       payload.playerCount,
@@ -661,25 +737,57 @@ function dispatchSystemEvent(message: WsMessage): void {
       console.warn("WS: ignoring malformed system:insolvent_ejected payload", payload);
       return;
     }
-    useRoomStore.getState().setInsolventEjection({
+    useRoomStore.getState().setRoomEjection({
       roomId: payload.roomId,
       buyIn: payload.buyIn,
       balance: payload.balance,
-      reason: "ejected",
+      reason: "insolvent",
+    });
+    return;
+  }
+
+  // Story 9.8 AC6: per-user push to a player ejected because their honor score no
+  // longer clears the room's gate (in practice: they abandoned the previous match
+  // in this room). Sibling of the insolvency handler above — same ungated per-user
+  // delivery, same single ejection signal, same redirect + modal pipeline.
+  //
+  // All three numbers are validated with typeof === "number" and never with JS
+  // truthiness: a real honor score of 0 is a legitimate Go value, and `!payload.honor`
+  // would silently reject it.
+  if (type === SYSTEM_HONOR_EJECTED) {
+    const payload = message.payload as HonorEjectedPayload;
+    if (
+      typeof payload?.roomId !== "number" ||
+      typeof payload?.minHonor !== "number" ||
+      typeof payload?.honor !== "number"
+    ) {
+      console.warn("WS: ignoring malformed system:honor_ejected payload", payload);
+      return;
+    }
+    useRoomStore.getState().setRoomEjection({
+      roomId: payload.roomId,
+      // Not meaningful for an honor ejection; the modal reads minHonor/honor.
+      buyIn: 0,
+      balance: 0,
+      minHonor: payload.minHonor,
+      honor: payload.honor,
+      reason: "honor",
     });
     return;
   }
 
   // Story 9.3 AC4: the room closed because no present-and-solvent player could
-  // own it. Route every still-seated recipient to the lobby with the room-closed
-  // notice (balance/buy-in are not meaningful here, so they are zeroed).
+  // own it — or (Story 9.8) because an honor-ejected owner left no eligible heir.
+  // The event and its copy are deliberately reason-agnostic. Route every
+  // still-seated recipient to the lobby with the room-closed notice (balance/buy-in
+  // are not meaningful here, so they are zeroed).
   if (type === SYSTEM_ROOM_CLOSED_INSOLVENT) {
     const payload = message.payload as RoomClosedInsolventPayload;
     if (typeof payload?.roomId !== "number") {
       console.warn("WS: ignoring malformed system:room_closed_insolvent payload", payload);
       return;
     }
-    useRoomStore.getState().setInsolventEjection({
+    useRoomStore.getState().setRoomEjection({
       roomId: payload.roomId,
       buyIn: 0,
       balance: 0,

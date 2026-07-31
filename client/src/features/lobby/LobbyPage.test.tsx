@@ -5,7 +5,8 @@ import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { QueryWrapper } from "@/test-utils";
+import { i18n } from "@/shared/i18n/i18n";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { LobbyPage } from "./LobbyPage";
 
@@ -279,17 +280,12 @@ describe("LobbyPage", () => {
     const { FetchError } = await import("@/shared/api/axiosClient");
     const { useAuthStore } = await import("@/shared/stores/authStore");
     useAuthStore.setState({
-      user: {
-        id: 1,
+      user: makeUser({
         username: "me",
         email: "me@test.dev",
-        languagePreference: "en",
         walletBalance: 300,
-        loginStreakDays: 0,
-        totalXp: 0,
-        level: 0,
         createdAt: "2026-06-18T00:00:00Z",
-      },
+      }),
     });
 
     mockGetRooms.mockResolvedValueOnce([
@@ -328,6 +324,180 @@ describe("LobbyPage", () => {
     expect(msg).toContain("500");
     expect(msg).toContain("300");
     expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
+  });
+
+  // --- Honor gate (Story 9.8 AC9) ---
+
+  const gatedRoom = {
+    id: 9,
+    name: "Veterans Table",
+    code: "VET123",
+    ownerId: 2,
+    ownerUsername: "host",
+    variant: "bitola",
+    matchMode: "1001",
+    timerStyle: "relaxed",
+    timerDurationSeconds: null,
+    status: "waiting",
+    playerCount: 1,
+    isQuickPlay: false,
+    coinBuyIn: 0,
+    isPrivate: false,
+    minHonor: 85,
+    allowNewPlayers: false,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    players: [
+      { id: 1, roomId: 9, userId: 2, username: "host", seat: 0, team: "teamA", createdAt: "" },
+    ],
+  };
+
+  it("labels a gated room's card with both honor chips", async () => {
+    mockGetRooms.mockResolvedValueOnce([gatedRoom]);
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card")).toBeInTheDocument());
+    // AC5: gated rooms stay LISTED and labelled, never filtered out.
+    expect(screen.getByTestId("room-card-min-honor")).toHaveAttribute("data-min-honor", "85");
+    expect(screen.getByTestId("room-card-veterans-only")).toBeInTheDocument();
+    expect(screen.getByTestId("room-card-join")).toBeInTheDocument();
+  });
+
+  it("locks Join on a room the viewer cannot qualify for, without firing a request", async () => {
+    // The redesign puts the gate's verdict in the button. A player who provably
+    // cannot pass is spared the click that was always going to 409, so no request
+    // leaves the client at all.
+    const user = userEvent.setup();
+    const { useAuthStore } = await import("@/shared/stores/authStore");
+    useAuthStore.setState({
+      user: makeUser({ username: "me", honorScore: 42, isNewPlayer: false }),
+    });
+
+    mockGetRooms.mockResolvedValueOnce([gatedRoom]);
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    const join = screen.getByTestId("room-card-join");
+    expect(join).toHaveAttribute("data-locked", "true");
+    expect(join).toBeDisabled();
+    // The numbers live in the tooltip, never as copy on the card.
+    expect(join).toHaveAttribute("title", expect.stringContaining("85"));
+    expect(join).toHaveAttribute("title", expect.stringContaining("42"));
+
+    await user.click(join);
+    expect(mockJoinRoom).not.toHaveBeenCalled();
+  });
+
+  it("composes the HONOR_TOO_LOW toast from the room's threshold and the viewer's score", async () => {
+    // The toast still exists for a genuine RACE — the client thought the viewer
+    // qualified (42 >= 40) and the server disagreed, e.g. the owner raised the bar
+    // between render and click. That is now the only way this code path runs, which
+    // is why the fixture must be a room the viewer passes client-side.
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    const { useAuthStore } = await import("@/shared/stores/authStore");
+    useAuthStore.setState({
+      user: makeUser({ username: "me", honorScore: 42, isNewPlayer: false }),
+    });
+
+    mockGetRooms.mockResolvedValueOnce([{ ...gatedRoom, minHonor: 40 }]);
+    mockJoinRoom.mockRejectedValueOnce(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9, undefined));
+    // Composed locally (Decision B: the error payload carries only the code).
+    const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("40");
+    expect(msg).toContain("42");
+    expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
+  });
+
+  it("renders a real honor score of 0 in the HONOR_TOO_LOW toast", async () => {
+    // honorScoreOrPrior, never `|| 80`: a score of 0 is a legitimate Go value and
+    // must not be replaced by the prior. This exact bug was patched in 9.7.
+    //
+    // A New Player passes the client mirror on the toggle alone (D1: newcomers are
+    // never score-checked), so the button is live even at a score of 0 — and the
+    // server can still 409 if they graduated in between. That race is what keeps
+    // this path reachable.
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    const { useAuthStore } = await import("@/shared/stores/authStore");
+    useAuthStore.setState({
+      user: makeUser({ username: "me", honorScore: 0, isNewPlayer: true }),
+    });
+
+    mockGetRooms.mockResolvedValueOnce([{ ...gatedRoom, minHonor: 50, allowNewPlayers: true }]);
+    mockJoinRoom.mockRejectedValueOnce(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalled());
+    const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("0");
+    expect(msg).not.toContain("80");
+  });
+
+  it("shows the veterans-only toast for NEW_PLAYER_NOT_ALLOWED", async () => {
+    // Same race shape: newcomers welcome when the grid rendered, veterans-only by
+    // the time the join landed.
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    const { FetchError } = await import("@/shared/api/axiosClient");
+    const { useAuthStore } = await import("@/shared/stores/authStore");
+    useAuthStore.setState({
+      user: makeUser({ username: "me", honorScore: 80, isNewPlayer: true }),
+    });
+
+    mockGetRooms.mockResolvedValueOnce([{ ...gatedRoom, allowNewPlayers: true }]);
+    mockJoinRoom.mockRejectedValueOnce(
+      new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "new players not allowed"),
+    );
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
+    await user.click(screen.getByTestId("room-card-join"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9, undefined));
+    expect(toast.error).toHaveBeenLastCalledWith(i18n.t("room.errors.newPlayerNotAllowed"));
+    expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
+  });
+
+  it("filters the grid to rooms the viewer qualifies for", async () => {
+    const user = userEvent.setup();
+    const { useAuthStore } = await import("@/shared/stores/authStore");
+    useAuthStore.setState({
+      user: makeUser({ username: "me", honorScore: 42, isNewPlayer: false }),
+    });
+
+    // One gated room they fail, one ungated room they pass.
+    mockGetRooms.mockResolvedValueOnce([
+      gatedRoom,
+      {
+        ...gatedRoom,
+        id: 10,
+        name: "Open Table",
+        code: "OPN123",
+        minHonor: 0,
+        allowNewPlayers: true,
+      },
+    ]);
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getAllByTestId("room-card")).toHaveLength(2));
+    await user.click(screen.getByTestId("filter-chip-qualify"));
+
+    // Filtering the grid is where the explaining belongs — the gate becomes a
+    // shorter list rather than a wall.
+    await waitFor(() => expect(screen.getAllByTestId("room-card")).toHaveLength(1));
+    expect(screen.getByText("Open Table")).toBeInTheDocument();
   });
 
   // --- Private rooms (Story 9.6) ---

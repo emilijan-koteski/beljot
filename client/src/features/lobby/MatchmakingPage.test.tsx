@@ -10,7 +10,7 @@ import { FetchError } from "@/shared/api/axiosClient";
 import { queryKeys } from "@/shared/api/queryKeys";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
-import { createTestQueryClient, QueryWrapper } from "@/test-utils";
+import { createTestQueryClient, makeUser, QueryWrapper } from "@/test-utils";
 
 import { MatchmakingPage } from "./MatchmakingPage";
 
@@ -66,17 +66,13 @@ const qpRoom = {
   updatedAt: "",
 };
 
-const viewer = {
+const viewer = makeUser({
   id: 10,
   username: "alice",
   email: "a@b.com",
-  languagePreference: "en",
-  walletBalance: 5000,
   loginStreakDays: 1,
-  totalXp: 0,
-  level: 0,
   createdAt: "",
-};
+});
 
 function renderPage() {
   render(

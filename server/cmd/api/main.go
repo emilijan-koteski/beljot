@@ -182,6 +182,18 @@ func main() {
 	// Story 9.5: the match manager awards lifetime XP at match end via the
 	// user-side XP service (built from the already-constructed userRepo).
 	sessionManager.SetXPAwarder(user.NewXPService(userRepo))
+	// Story 9.7: the match manager records honor (completed vs abandoned) at
+	// match end via the user-side honor service. Same injection shape as the XP
+	// awarder above, and for the same reason — user imports match, so match
+	// must never import user.
+	//
+	// Constructed once into a local because Story 9.8 injects the SAME service into
+	// the room handler below as its HonorService (the per-join honor gate). The two
+	// consumers use different subsets of it — match takes the write path
+	// (ApplyHonorEvents), room takes the read path (HonorForUsers) — and each
+	// declares its own narrow interface, so one instance satisfies both.
+	honorService := user.NewHonorService(userRepo)
+	sessionManager.SetHonorRecorder(honorService)
 
 	// Reconcile rooms left in status="playing" by a previous process. Sessions
 	// live only in process memory, so any "playing" row at boot has no live
@@ -239,7 +251,7 @@ func main() {
 	})
 
 	// Room routes
-	roomHandler := room.NewRoomHandler(roomRepo, sessionManager, hub, presenceRegistry, walletService)
+	roomHandler := room.NewRoomHandler(roomRepo, sessionManager, hub, presenceRegistry, walletService, honorService)
 	api.POST("/rooms", roomHandler.CreateRoom)
 	api.GET("/rooms", roomHandler.ListRooms)
 	api.POST("/rooms/quick-play", roomHandler.QuickPlay)

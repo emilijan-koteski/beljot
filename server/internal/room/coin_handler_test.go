@@ -77,9 +77,13 @@ func (s *stubWallet) ApplySettlement(credits map[uint]int) error {
 }
 
 // setupCoinTest wires the room handler with an injected wallet stub and starter.
+// honorService is nil: these are the Story 9.2/9.3 coin tests, and a nil honor
+// service means no honor enforcement, so every room here behaves exactly as it did
+// before Story 9.8. The honor-gate tests use setupHonorTest in
+// honor_handler_test.go.
 func setupCoinTest(starter room.MatchStarter, wallet room.WalletService) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, starter, &mockBroadcaster{}, nil, wallet)
+	handler := room.NewRoomHandler(repo, starter, &mockBroadcaster{}, nil, wallet, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -100,7 +104,7 @@ func setupCoinTestBC(starter room.MatchStarter, wallet room.WalletService) (*ech
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
-	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet)
+	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler

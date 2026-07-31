@@ -24,6 +24,7 @@ import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room, User } from "@/shared/types/apiTypes";
 import type { MatchState } from "@/shared/types/matchTypes";
 import type { WsMessage } from "@/shared/types/wsEvents";
+import { makeUser } from "@/test-utils";
 
 import { __resetWsDispatchStateForTests, useWsDispatch } from "./useWsDispatch";
 
@@ -1114,11 +1115,11 @@ describe("useWsDispatch", () => {
       payload: { roomId: 7, buyIn: 500, balance: 120 },
     });
 
-    expect(useRoomStore.getState().insolventEjection).toEqual({
+    expect(useRoomStore.getState().roomEjection).toEqual({
       roomId: 7,
       buyIn: 500,
       balance: 120,
-      reason: "ejected",
+      reason: "insolvent",
     });
   });
 
@@ -1134,14 +1135,14 @@ describe("useWsDispatch", () => {
       payload: { roomId: 3, buyIn: 1000, balance: 0 },
     });
 
-    expect(useRoomStore.getState().insolventEjection?.reason).toBe("ejected");
-    expect(useRoomStore.getState().insolventEjection?.roomId).toBe(3);
+    expect(useRoomStore.getState().roomEjection?.reason).toBe("insolvent");
+    expect(useRoomStore.getState().roomEjection?.roomId).toBe(3);
   });
 
   it("ignores a malformed system:insolvent_ejected payload", () => {
-    // reset() deliberately preserves insolventEjection (so the lobby modal
+    // reset() deliberately preserves roomEjection (so the lobby modal
     // survives RoomPage's unmount), so clear it explicitly for this assertion.
-    useRoomStore.getState().setInsolventEjection(null);
+    useRoomStore.getState().setRoomEjection(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
@@ -1150,7 +1151,7 @@ describe("useWsDispatch", () => {
       payload: { roomId: "7", buyIn: 500 } as never,
     });
 
-    expect(useRoomStore.getState().insolventEjection).toBeNull();
+    expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 
   it("dispatches system:room_closed_insolvent to roomStore as a 'roomClosed' signal", () => {
@@ -1162,12 +1163,90 @@ describe("useWsDispatch", () => {
       payload: { roomId: 9 },
     });
 
-    expect(useRoomStore.getState().insolventEjection).toEqual({
+    expect(useRoomStore.getState().roomEjection).toEqual({
       roomId: 9,
       buyIn: 0,
       balance: 0,
       reason: "roomClosed",
     });
+  });
+
+  // --- Honor ejection (Story 9.8 AC6/AC8) ---
+
+  it("dispatches system:honor_ejected to roomStore as an 'honor' signal", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 7, minHonor: 80, honor: 55 },
+    });
+
+    expect(useRoomStore.getState().roomEjection).toEqual({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 80,
+      honor: 55,
+      reason: "honor",
+    });
+  });
+
+  it("dispatches system:honor_ejected regardless of currentRoomId (direct per-user push)", () => {
+    useRoomStore.getState().setRoomEjection(null);
+    expect(useRoomStore.getState().currentRoomId).toBeNull();
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 3, minHonor: 95, honor: 40 },
+    });
+
+    expect(useRoomStore.getState().roomEjection?.reason).toBe("honor");
+    expect(useRoomStore.getState().roomEjection?.roomId).toBe(3);
+  });
+
+  it("accepts an honor score of 0 rather than rejecting it as falsy", () => {
+    // A real Go 0 must survive: the guard is typeof === "number", never
+    // truthiness. Same for a minHonor of 0.
+    useRoomStore.getState().setRoomEjection(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 4, minHonor: 0, honor: 0 },
+    });
+
+    expect(useRoomStore.getState().roomEjection?.honor).toBe(0);
+    expect(useRoomStore.getState().roomEjection?.minHonor).toBe(0);
+  });
+
+  it("ignores a malformed system:honor_ejected payload", () => {
+    useRoomStore.getState().setRoomEjection(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 7, minHonor: "80", honor: 55 } as never,
+    });
+
+    expect(useRoomStore.getState().roomEjection).toBeNull();
+  });
+
+  it("ignores a system:honor_ejected payload missing the honor score entirely", () => {
+    useRoomStore.getState().setRoomEjection(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:honor_ejected",
+      payload: { roomId: 7, minHonor: 80 } as never,
+    });
+
+    expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 
   // --- Surrender (Story 8.2) ---
@@ -1539,17 +1618,14 @@ describe("useWsDispatch", () => {
 });
 
 describe("useWsDispatch — coin settlement (Story 9.2)", () => {
-  const baseUser: User = {
+  const baseUser: User = makeUser({
     id: 10,
     username: "Alice",
     email: "alice@test.dev",
-    languagePreference: "en",
-    walletBalance: 5000,
-    loginStreakDays: 0,
     totalXp: 100,
     level: 1,
     createdAt: "2026-06-18T00:00:00Z",
-  };
+  });
 
   beforeEach(() => {
     useMatchStore.getState().reset();
@@ -1665,17 +1741,14 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
 });
 
 describe("useWsDispatch — XP awarded (Story 9.5)", () => {
-  const baseUser: User = {
+  const baseUser: User = makeUser({
     id: 10,
     username: "Alice",
     email: "alice@test.dev",
-    languagePreference: "en",
-    walletBalance: 5000,
-    loginStreakDays: 0,
     totalXp: 100,
     level: 1,
     createdAt: "2026-06-18T00:00:00Z",
-  };
+  });
 
   beforeEach(() => {
     useMatchStore.getState().reset();
@@ -1752,5 +1825,106 @@ describe("useWsDispatch — XP awarded (Story 9.5)", () => {
     });
 
     expect(useLevelUpStore.getState().pending).not.toBeNull();
+  });
+});
+
+describe("useWsDispatch — honor updated (Story 9.7)", () => {
+  const baseUser: User = makeUser({
+    id: 10,
+    username: "Alice",
+    email: "alice@test.dev",
+    honorScore: 90,
+    honorTier: "trusted",
+    isNewPlayer: false,
+    createdAt: "2026-06-18T00:00:00Z",
+  });
+
+  const validPayload = {
+    honorScore: 73,
+    honorTier: "fair",
+    honorCompletedTotal: 20,
+    honorAbandonedTotal: 2,
+    isNewPlayer: false,
+  };
+
+  beforeEach(() => {
+    useMatchStore.getState().reset();
+    __resetWsDispatchStateForTests();
+    vi.restoreAllMocks();
+    useAuthStore.setState({ user: { ...baseUser } });
+  });
+
+  it("writes the new score and tier onto the auth store", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "event:honor_updated", payload: validPayload });
+
+    expect(useAuthStore.getState().user?.honorScore).toBe(73);
+    expect(useAuthStore.getState().user?.honorTier).toBe("fair");
+    expect(useAuthStore.getState().user?.isNewPlayer).toBe(false);
+  });
+
+  it("preserves every unrelated user field", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "event:honor_updated", payload: validPayload });
+
+    const user = useAuthStore.getState().user;
+    expect(user?.username).toBe("Alice");
+    expect(user?.walletBalance).toBe(baseUser.walletBalance);
+    expect(user?.totalXp).toBe(baseUser.totalXp);
+    expect(user?.level).toBe(baseUser.level);
+  });
+
+  it("accepts a legitimate zero score and a false isNewPlayer", () => {
+    // Go zero values serialize as real values — the handler must not guard on
+    // truthiness, or a Problematic player's 0 would be silently dropped.
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:honor_updated",
+      payload: { ...validPayload, honorScore: 0, honorTier: "problematic" },
+    });
+
+    expect(useAuthStore.getState().user?.honorScore).toBe(0);
+    expect(useAuthStore.getState().user?.honorTier).toBe("problematic");
+  });
+
+  it("flips the user to New Player when the server says so", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:honor_updated",
+      payload: { ...validPayload, isNewPlayer: true },
+    });
+
+    expect(useAuthStore.getState().user?.isNewPlayer).toBe(true);
+  });
+
+  it("ignores a malformed honor payload without touching the user", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const malformed = [
+      { ...validPayload, honorScore: "73" },
+      { ...validPayload, honorScore: 73.5 },
+      { ...validPayload, honorScore: null },
+      { ...validPayload, honorTier: 4 },
+      { ...validPayload, honorTier: "" },
+      { ...validPayload, honorCompletedTotal: "20" },
+      { ...validPayload, honorAbandonedTotal: null },
+      { ...validPayload, isNewPlayer: "no" },
+      {},
+    ];
+    for (const payload of malformed) {
+      result.current({ type: "event:honor_updated", payload });
+    }
+
+    expect(useAuthStore.getState().user?.honorScore).toBe(90);
+    expect(useAuthStore.getState().user?.honorTier).toBe("trusted");
+  });
+
+  it("is a no-op when no user is signed in", () => {
+    useAuthStore.setState({ user: null });
+    const { result } = renderHook(() => useWsDispatch());
+
+    expect(() =>
+      result.current({ type: "event:honor_updated", payload: validPayload }),
+    ).not.toThrow();
+    expect(useAuthStore.getState().user).toBeNull();
   });
 });

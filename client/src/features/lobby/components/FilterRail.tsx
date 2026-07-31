@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { cn } from "@/shared/lib/utils";
 
-export type LobbyFilter = "all" | "open" | "relaxed" | "timed";
+export type LobbyFilter = "all" | "qualify" | "open" | "relaxed" | "timed";
 export type LobbySort = "newest" | "filling";
 
 export type FilterCounts = Record<LobbyFilter, number>;
@@ -18,7 +18,13 @@ type Props = {
   counts: FilterCounts;
 };
 
-const FILTERS: LobbyFilter[] = ["all", "open", "relaxed", "timed"];
+/**
+ * "qualify" sits second, right after the default: for a player under a common
+ * bar the honour gate turns from a wall into a shorter list, and filtering the
+ * grid is where that explaining belongs — rather than annotating every card with
+ * a viewer-specific sentence. It is also where the ejection modal sends people.
+ */
+const FILTERS: LobbyFilter[] = ["all", "qualify", "open", "relaxed", "timed"];
 
 export function FilterRail({ search, setSearch, filter, setFilter, sort, setSort, counts }: Props) {
   const { t } = useTranslation();

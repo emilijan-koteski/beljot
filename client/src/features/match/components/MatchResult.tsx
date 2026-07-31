@@ -2,8 +2,10 @@ import { Coins } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { HonorShield } from "@/shared/components/HonorShield";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import { HONOR_TIER_COLOR, honorTierForScore, normalizeHonorTier } from "@/shared/lib/honor";
 import { Z } from "@/shared/lib/zLayers";
 import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 import type { MatchEndPayload } from "@/shared/types/wsEvents";
@@ -31,6 +33,12 @@ interface MatchResultProps {
    *  matches and omitted while the settlement event is still in flight; a 0
    *  delta (e.g. a lone winner who only recovers their stake) renders nothing. */
   coinDelta?: number;
+  /** Honour movement for this match (honour redesign R7). Undefined for a New
+   *  Player, whose score is deliberately not shown, and while the honour event is
+   *  still in flight. The chip itself renders only when the movement CROSSED a
+   *  tier boundary (user decision 2026-07-31) — a few points inside the same
+   *  band is noise, a change of standing is news. */
+  honorSettlement?: { before: number; after: number; tier: string } | null;
 }
 
 // Loss accent — the soft red shared with the surrender overlay, kept local
@@ -51,6 +59,7 @@ export function MatchResult({
   onReturnToRoom,
   surrenderedByUsername,
   coinDelta,
+  honorSettlement,
 }: MatchResultProps) {
   const { t } = useTranslation();
 
@@ -178,6 +187,49 @@ export function MatchResult({
                 </span>
               </div>
             )}
+
+            {/* Honour movement (honour redesign R7), shown ONLY when the match
+                moved the score across a tier boundary (user decision 2026-07-31):
+                a few points inside the same band is noise every finished match
+                produces, but a change of STANDING — Fair to Trusted, Trusted to
+                Fair — is news, and it reads as tier names, not numbers.
+
+                The before-tier is bucketed from the before-score with the same
+                bands the server uses; the after-tier prefers the server's token.
+                No scolding copy on the way down — the demotion is the
+                consequence, and adding a sentence would make it a telling-off.
+
+                Tier colour comes from HONOR_TIER_COLOR, whose values re-root inside
+                .game-table, so this reads correctly on dark felt with no branch. */}
+            {honorSettlement &&
+              (() => {
+                const tierBefore = honorTierForScore(honorSettlement.before);
+                const tierAfter = normalizeHonorTier(honorSettlement.tier, honorSettlement.after);
+                if (tierBefore === tierAfter) return null;
+                return (
+                  <div
+                    className="font-display inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
+                    style={{
+                      color: HONOR_TIER_COLOR[tierAfter],
+                      border: "1px solid rgba(201,168,118,0.35)",
+                      background: "rgba(201,168,118,0.08)",
+                    }}
+                    data-testid="match-result-honor"
+                    data-honor-before={honorSettlement.before}
+                    data-honor-after={honorSettlement.after}
+                    data-tier-before={tierBefore}
+                    data-tier-after={tierAfter}
+                  >
+                    <HonorShield tier={tierAfter} size={16} />
+                    <span className="text-base font-semibold">
+                      {t("match.settlement.honorTierChanged", {
+                        before: t(`profile.honor.tier.${tierBefore}`),
+                        after: t(`profile.honor.tier.${tierAfter}`),
+                      })}
+                    </span>
+                  </div>
+                );
+              })()}
 
             <p
               className="font-body text-sm"

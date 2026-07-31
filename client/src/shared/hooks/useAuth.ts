@@ -51,6 +51,9 @@ export function useAuthInit(): void {
           loginStreakDays: res.loginStreakDays,
           totalXp: res.totalXp,
           level: res.level,
+          honorScore: res.honorScore,
+          honorTier: res.honorTier,
+          isNewPlayer: res.isNewPlayer,
           createdAt: res.createdAt,
         });
         // Await the language switch so the first paint after `setLoading(false)`

@@ -2,6 +2,7 @@ package user
 
 import (
 	"errors"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -228,4 +229,161 @@ func (r *GormUserRepository) TotalXPForUsers(ids []uint) (map[uint]int, error) {
 		totals[row.ID] = row.TotalXP
 	}
 	return totals, nil
+}
+
+// ApplyHonorEvents records one finished match per listed user (Story 9.7).
+// Structure copied from AddXP above — one transaction, rows locked FOR UPDATE
+// in ascending userID order — because honor is written from the same two match
+// finalizers that settle the wallet and award XP, and a differing lock order
+// between them is exactly how a deadlock gets introduced.
+//
+// Like AddXP it reads under the lock, computes in Go, and writes the ABSOLUTE
+// value rather than a gorm.Expr increment. That is not incidental: the decay
+// step (weight × 0.5^(age/half-life)) is not expressible as a simple column
+// increment, and doing it in Go keeps the arithmetic identical to the pure
+// HonorScore used by every read path.
+func (r *GormUserRepository) ApplyHonorEvents(events map[uint]HonorEvent, now time.Time) (map[uint]HonorSnapshot, error) {
+	snapshots := make(map[uint]HonorSnapshot, len(events))
+
+	ids := make([]uint, 0, len(events))
+	for id := range events {
+		// The bot placeholder must never reach the users table.
+		if id == 0 {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return snapshots, nil
+	}
+	slices.Sort(ids)
+
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		for _, id := range ids {
+			var u User
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, id).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return apperr.ErrUserNotFound
+				}
+				return err
+			}
+
+			// Decay the stored weights forward to `now` FIRST, then add the new
+			// event at full strength. Doing it in this order is what makes the
+			// running weight exactly equal to the from-scratch sum of every
+			// match's own decayed weight (Story 9.7 D3).
+			f := DecayFactor(u.HonorDecayedAt, now)
+			completedWeight := u.HonorCompletedWeight * f
+			abandonedWeight := u.HonorAbandonedWeight * f
+			completedTotal := u.HonorCompletedTotal
+			abandonedTotal := u.HonorAbandonedTotal
+
+			if events[id].Abandoned {
+				abandonedWeight += honorEventWeight
+				abandonedTotal++
+			} else {
+				completedWeight += honorEventWeight
+				completedTotal++
+			}
+
+			// The weights are now current as of `now`, so the score is computed
+			// against that same stamp (DecayFactor of a zero interval is 1.0).
+			//
+			// The stamp must never move BACKWARDS. DecayFactor already refuses to
+			// inflate weights when now < decayedAt (clock skew between app
+			// instances, an NTP step, or the 000017 backfill's Postgres NOW()
+			// running ahead of this host), but writing the earlier `now` would
+			// roll the reference back — and the NEXT write would then decay
+			// across the skew interval a second time, silently over-decaying the
+			// row toward the 80 prior and forgiving abandonments early. Clamp
+			// forward instead (code review 2026-07-29).
+			stamp := now
+			if u.HonorDecayedAt != nil && stamp.Before(*u.HonorDecayedAt) {
+				// Bounded by honorMaxClockSkew: clamping forward without a ceiling
+				// traded the double-decay bug for an unbounded NO-decay window,
+				// because DecayFactor returns 1.0 for any future stamp. One badly
+				// skewed peer or a fat-fingered SQL fix could then freeze decay —
+				// and therefore freeze forgiveness — indefinitely, silently.
+				// Beyond the ceiling the stamp is treated as corrupt and reset to
+				// now, which resumes decay; the loss is bounded and it is logged.
+				// (Review pass 2.)
+				if u.HonorDecayedAt.Sub(now) <= honorMaxClockSkew {
+					stamp = *u.HonorDecayedAt
+				} else {
+					slog.Warn("honor: stored decay stamp is implausibly far in the future, resetting to now",
+						"userID", id,
+						"storedDecayedAt", u.HonorDecayedAt,
+						"now", now,
+						"maxSkew", honorMaxClockSkew,
+					)
+				}
+			}
+			snapshot := NewHonorSnapshot(completedWeight, abandonedWeight, &stamp, completedTotal, abandonedTotal, now)
+
+			if err := tx.Model(&User{}).Where("id = ?", id).
+				Updates(map[string]interface{}{
+					"honor_completed_weight": completedWeight,
+					"honor_abandoned_weight": abandonedWeight,
+					"honor_decayed_at":       stamp,
+					"honor_completed_total":  completedTotal,
+					"honor_abandoned_total":  abandonedTotal,
+					// Refresh the denormalized filter-only snapshot column.
+					// Nothing reads this back for display — see model.go.
+					"honor_score": snapshot.Score,
+				}).Error; err != nil {
+				return err
+			}
+
+			snapshots[id] = snapshot
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return snapshots, nil
+}
+
+// ResetHonor pardons one user: it clears the PENALTY but preserves the
+// EXPERIENCE (Story 9.7 AC9 — operator forgiveness). Locked FOR UPDATE inside a
+// transaction so it cannot interleave with a match-end ApplyHonorEvents and
+// leave a half-reset row.
+//
+// honor_completed_total is deliberately left ALONE. It is the only input to
+// IsNewPlayer, so zeroing it (as this originally did) turned a pardoned
+// 500-match veteran into a "New Player": the profile hid their score behind the
+// newcomer chip and invited them to "Play 5 matches to earn an honor score"
+// while the untouched StatsGrid still displayed their real history, and Story
+// 9.8's join gate — which reads isNewPlayer off the auth envelope — reclassified
+// them as a newcomer rather than as a clean veteran. Found on review pass 2;
+// fixed by PO decision 2026-07-29.
+//
+// Keeping a nonzero total alongside a zero weight is a state the model already
+// supports and already means the right thing: a long-idle veteran's weights have
+// decayed toward zero while their lifetime counts stand. A pardon simply puts
+// them there deliberately.
+//
+// honor_decayed_at goes back to NULL, which DecayFactor reads as "never
+// decayed" — the correct state for zero weights.
+func (r *GormUserRepository) ResetHonor(userID uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var u User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperr.ErrUserNotFound
+			}
+			return err
+		}
+		return tx.Model(&User{}).Where("id = ?", userID).
+			Updates(map[string]interface{}{
+				"honor_completed_weight": 0,
+				"honor_abandoned_weight": 0,
+				"honor_decayed_at":       nil,
+				// honor_completed_total intentionally NOT reset — see above.
+				"honor_abandoned_total": 0,
+				// Derived, not hard-coded 80, so a retune of the Beta prior
+				// moves the reset target with it.
+				"honor_score": HonorScore(0, 0, nil, time.Time{}),
+			}).Error
+	})
 }

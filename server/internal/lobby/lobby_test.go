@@ -111,6 +111,10 @@ func (u *fakeUserRepo) AddXP(map[uint]int) (map[uint]int, error)       { panic("
 func (u *fakeUserRepo) TotalXPForUsers([]uint) (map[uint]int, error) {
 	panic("unused")
 }
+func (u *fakeUserRepo) ApplyHonorEvents(map[uint]user.HonorEvent, time.Time) (map[uint]user.HonorSnapshot, error) {
+	panic("unused")
+}
+func (u *fakeUserRepo) ResetHonor(uint) error { panic("unused") }
 
 func decodeStats(t *testing.T, body []byte) lobby.StatsResponse {
 	t.Helper()

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MatchFilter } from "@/shared/api/matches";
@@ -20,6 +21,56 @@ export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const { data: profile, isPending, isError } = useProfileQuery(user?.id);
   const career = useCareerQuery(user?.id);
+
+  // Story 9.7: adopt the profile response's honor into the auth store.
+  //
+  // event:honor_updated is the live path, but it is delivered over the player's
+  // own socket — and the abandoning seat is BY DEFINITION the one with no live
+  // socket when handleSeatReconnectTimeout fires, so the player whose honor just
+  // got worse is the only one never told. Hub.SendToUser is a silent no-op with
+  // no queue, so that event is gone for good. Without this effect the header chip
+  // kept rendering the pre-abandonment score until the next token refresh or a
+  // reload, which let /profile show a real 44 in the hero's honour band beside a
+  // stale 90 in the chip directly above it — two different numbers for the same
+  // quantity on one screen. (The band was a standalone HonorPanel section when
+  // this was written; the contradiction it closes is unchanged.)
+  //
+  // GET /users/:id/profile recomputes honor from the stored weights on every
+  // read, so it is authoritative by the same rule the WS event is; adopting it
+  // here costs no extra request and closes the contradiction at the one place
+  // both surfaces are visible together.
+  //
+  // Same explicit-type guards as the WS handler, for the same reason: Go zero
+  // values are real values. A score of 0 ("Problematic") and isNewPlayer false
+  // are both legitimate and both falsy, so never test truthiness. The equality
+  // check keeps this to a single write - setUser with identical values would
+  // re-render forever.
+  const honorScore = profile?.honorScore;
+  const honorTier = profile?.honorTier;
+  const honorIsNew = profile?.isNewPlayer;
+  useEffect(() => {
+    // `typeof` first because Number.isInteger is not a type guard - TS cannot
+    // narrow `number | undefined` from it on its own.
+    if (
+      typeof honorScore !== "number" ||
+      !Number.isInteger(honorScore) ||
+      typeof honorTier !== "string" ||
+      honorTier === "" ||
+      typeof honorIsNew !== "boolean"
+    ) {
+      return;
+    }
+    const { user: current, setUser } = useAuthStore.getState();
+    if (!current) return;
+    if (
+      current.honorScore === honorScore &&
+      current.honorTier === honorTier &&
+      current.isNewPlayer === honorIsNew
+    ) {
+      return;
+    }
+    setUser({ ...current, honorScore, honorTier, isNewPlayer: honorIsNew });
+  }, [honorScore, honorTier, honorIsNew]);
 
   if (isPending) {
     return (
@@ -72,6 +123,24 @@ export function ProfilePage() {
         xpIntoLevel={profile?.xpIntoLevel ?? xpFallback.xpIntoLevel}
         xpForNextLevel={profile?.xpForNextLevel ?? xpFallback.xpForNextLevel}
         winRate={winRate}
+        // Honour rides the hero as its bottom band rather than a section of its
+        // own (redesign R3). Still gated on `profile`: with no profile there is
+        // simply no honour band, so the loading transient can never mix a real
+        // value with a 0 fallback — the bug the Story 9.5 review caught on the
+        // XP bar.
+        honor={
+          profile
+            ? {
+                score: profile.honorScore,
+                tier: profile.honorTier,
+                completedTotal: profile.honorCompletedTotal,
+                abandonedTotal: profile.honorAbandonedTotal,
+                isNewPlayer: profile.isNewPlayer,
+                trendDelta: profile.honorTrendDelta,
+                trendDirection: profile.honorTrendDirection,
+              }
+            : undefined
+        }
       />
 
       {career.data && <StreakCallout streak={career.data.streak} />}

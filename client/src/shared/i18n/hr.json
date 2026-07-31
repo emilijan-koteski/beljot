@@ -71,12 +71,57 @@
       "losses": "Porazi",
       "abandoned": "Prekinuti",
       "winRate": "Postotak pobjeda",
-      "winRateEmpty": "—",
+      "winRateEmpty": "–",
       "error": "Učitavanje statistike nije uspjelo. Pokušaj ponovno",
       "outcomeSplit": "Omjer ishoda",
       "legendWins": "{{count}} pobjeda",
       "legendLosses": "{{count}} poraza",
       "legendAbandoned": "{{count}} prekinutih"
+    },
+    "honor": {
+      "eyebrow": "Čast",
+      "meterLabel": "Čast {{score}} od 100, {{tier}}",
+      "lastWindow": "Zadnjih {{window}}",
+      "trendTooltip": "Tvojih posljednjih {{window}} mečeva u usporedbi s prethodnih {{window}}.",
+      "newPlayerChip": "Novi igrač",
+      "newPlayerProgress": "{{played}} / {{total}}",
+      "newPlayerHint": "Odigraj 5 mečeva da dobiješ ocjenu časti.",
+      "explainer": {
+        "open": "Kako funkcionira",
+        "title": "Kako funkcionira čast",
+        "lede": "Ocjena pokazuje završavaš li mečeve koje započneš.",
+        "finishLabel": "Završi meč",
+        "finishBody": "i ocjena raste, bez obzira na pobjedu ili poraz.",
+        "dropLabel": "Ako napustiš i ne vratiš se,",
+        "dropBody": "ocjena pada. Jedino to je snižava.",
+        "surrenderLabel": "Predaja se ne računa.",
+        "surrenderBody": "Završen meč je završen meč.",
+        "decayLabel": "Stara napuštanja blijede.",
+        "decayBody": "Noviji mečevi vrijede mnogo više.",
+        "standing": "Trenutno si na {{score}}, <tierWord>{{tier}}</tierWord>.",
+        "standingNew": "Odigraj 5 mečeva i tvoja ocjena pojavit će se ovdje.",
+        "fullRules": "Sva pravila",
+        "close": "Razumijem"
+      },
+      "tier": {
+        "exemplary": "Uzoran",
+        "trusted": "Pouzdan",
+        "fair": "Solidan",
+        "unreliable": "Nepouzdan",
+        "problematic": "Problematičan"
+      },
+      "tierPlural": {
+        "exemplary": "Uzorni",
+        "trusted": "Pouzdani",
+        "fair": "Solidni",
+        "unreliable": "Nepouzdani",
+        "problematic": "Problematični"
+      },
+      "trend": {
+        "up": "U usponu",
+        "flat": "Stabilno",
+        "down": "U padu"
+      }
     },
     "matchHistory": {
       "eyebrow": "Aktivnost",
@@ -204,7 +249,7 @@
       "bestHandLabel": "Najbolja ruka",
       "bestHandHint": "Ruka {{hand}} · {{date}}",
       "bestHandHintEmpty": "još nema ruku",
-      "bestHandEmpty": "—",
+      "bestHandEmpty": "–",
       "avgLengthLabel": "Prosj. trajanje meča",
       "avgLengthValue": "{{minutes}}m",
       "avgLengthHint": "dovršeni mečevi"
@@ -283,7 +328,11 @@
       "insufficientCoins": "Potrebno je {{buyIn}} novčića za ulazak u sobu. Tvoje stanje: {{balance}}.",
       "insufficientCoinsGeneric": "Nemaš dovoljno novčića za ulazak u sobu.",
       "insufficientCoinsStart": "Igrač ne može uložiti toliko. Meč nije počeo.",
-      "wrongPassword": "Pogrešna lozinka sobe."
+      "wrongPassword": "Pogrešna lozinka sobe.",
+      "honorTooLow": "Ova soba traži čast {{minHonor}} ili više. Tvoja je {{honor}}. Odigraj još nekoliko mečeva da je podigneš.",
+      "honorTooLowGeneric": "Tvoja ocjena časti je ispod minimuma ove sobe.",
+      "newPlayerNotAllowed": "Ova soba je za iskusne igrače. Odigraj 5 mečeva da otvoriš takve sobe.",
+      "honorGateStart": "Igrač ne zadovoljava uvjet časti ove sobe. Meč nije počeo."
     },
     "passwordPrompt": {
       "title": "Privatna soba",
@@ -345,6 +394,7 @@
     "returningToLobby": "Povratak u lobi…",
     "startMatch": "Pokreni meč",
     "startMatchDisabled": "Sva 4 igrača moraju sjesti",
+    "startBlockedByHonor": "Jedan igrač za stolom je ispod minimuma ove sobe ({{minHonor}}).",
     "waitingForOwner": "Čekanje da domaćin pokrene meč",
     "seatTaken": "To mjesto je zauzeto",
     "matchStarting": "Meč počinje…",
@@ -432,13 +482,18 @@
       "inMatch": "igraju",
       "online": "online"
     },
-    "insolventEjection": {
+    "roomEjection": {
       "eyebrow": "Pažnja",
-      "ejectedTitle": "Nemaš dovoljno novčića",
-      "ejectedBody": "Nemaš dovoljno novčića za ulog ove sobe. Stanje: {{balance}}. Ulog: {{buyIn}}.",
+      "insolventTitle": "Nemaš dovoljno novčića",
+      "insolventBody": "Nemaš dovoljno novčića za ulog ove sobe. Stanje: {{balance}}. Ulog: {{buyIn}}.",
+      "honorTitle": "Čast ispod granice sobe",
+      "honorBody": "Tvoja čast je pala ispod minimuma ove sobe ({{minHonor}}), sada je {{honor}}. Odigraj sljedeće mečeve i vratit će se.",
       "roomClosedTitle": "Soba je zatvorena",
       "roomClosedBody": "Ova soba je zatvorena jer nijedan preostali igrač nije mogao biti domaćin.",
-      "action": "U redu"
+      "action": "U redu",
+      "youLabel": "Ti",
+      "tableLabel": "Stol",
+      "browseQualifying": "Sobe za mene"
     },
     "matchmaking": {
       "title": "Brza igra",
@@ -475,7 +530,10 @@
         "alreadyInRoom": "Već si u sobi, napusti je prije nego što napraviš novu",
         "passwordRequired": "Postavi lozinku za privatnu sobu",
         "passwordTooShort": "Lozinka mora imati barem {{min}} znakova",
-        "passwordTooLong": "Lozinka može imati najviše {{max}} znakova"
+        "passwordTooLong": "Lozinka može imati najviše {{max}} znakova",
+        "invalidMinHonor": "Minimalna čast mora biti između {{min}} i {{max}}.",
+        "ownHonorTooLow": "Tvoja čast je {{honor}}, pa ne možeš sjesti u sobu s minimumom {{minHonor}}. Spusti minimum da nastaviš.",
+        "ownNewPlayerNotAllowed": "Još si novi igrač i ne možeš sjesti u vlastitu sobu. Dozvoli nove igrače da nastaviš."
       },
       "eyebrow": "Nova soba",
       "headline": "Stvori sobu",
@@ -503,13 +561,20 @@
         "step3": "Kad se popune sva četiri mjesta, krećeš s mečom."
       },
       "coinBuyIn": "Ulog",
-      "coinBuyInHint": "Svaki igrač ulaže ovoliko za partiju · zadano 500",
+      "coinBuyInHint": "Svaki igrač ulaže ovoliko za meč · zadano 500",
       "privateRoom": "Privatna soba",
       "privateRoomHint": "Privatne sobe ostaju na popisu, ali traže lozinku za ulazak",
       "privacyPublic": "Javna",
       "privacyPrivate": "Privatna",
       "roomPassword": "Lozinka sobe",
       "roomPasswordPlaceholder": "Unesi lozinku",
+      "minHonor": "Tko može sjesti",
+      "minHonorHint": "Igrači s ovolikom ili višom ocjenom časti",
+      "minHonorAnyone": "Svatko",
+      "minHonorYou": "ti {{honor}}",
+      "allowNewPlayers": "Novi igrači",
+      "allowNewPlayersYes": "Dozvoli",
+      "allowNewPlayersNo": "Samo iskusni",
       "roomPasswordHint": "Najmanje {{min}} znakova"
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · živo se osvježava",
@@ -530,6 +595,7 @@
     },
     "filters": {
       "all": "Sve",
+      "qualify": "Zadovoljavam uvjet",
       "open": "Ima mjesta",
       "relaxed": "Opušteno",
       "timed": "S tajmerom"
@@ -564,7 +630,13 @@
       "private": "Privatna",
       "privateLockAriaLabel": "Privatna soba, za ulazak je potrebna lozinka",
       "public": "Javna",
-      "publicAriaLabel": "Javna soba, svatko može ući"
+      "publicAriaLabel": "Javna soba, svatko može ući",
+      "minHonor": "{{minHonor}}",
+      "minHonorAriaLabel": "Minimalna čast {{minHonor}}",
+      "veteransOnly": "Samo iskusni",
+      "veteransOnlyAriaLabel": "Ova soba ne prima nove igrače",
+      "locked": "Zaključano",
+      "minHonorLockedTitle": "Traži čast {{minHonor}}, ti si na {{honor}}."
     },
     "chat": {
       "title": "Lobi chat",
@@ -816,6 +888,8 @@
       "waitingMessage": "Igra je na čekanju dok čekamo da se {{player}} vrati.",
       "waitingMessageMany": "Igra je na čekanju dok čekamo da se {{count}} igrača vrate.",
       "countdownLabel": "Preostalo vrijeme",
+      "honorNoteOther": "Ako vrijeme istekne, računa se kao napuštanje. Čast igrača koji je napustio se smanjuje.",
+      "honorNoteSelf": "Ostani na ovoj stranici. Ponovno povezivanje te ne košta ništa, ali istek vremena računa se kao napuštanje i tvoja čast pada.",
       "reconnectFailed": "Ponovno povezivanje nije uspjelo, meč je možda završio",
       "matchAbandoned": "{{player}} je prekinuo vezu, meč završio",
       "matchAbandonedScores": "Konačno: Mi {{us}} : Oni {{them}}",
@@ -836,7 +910,8 @@
     },
     "settlement": {
       "won": "Osvojio si {{amount}} novčića",
-      "lost": "Izgubio si {{amount}} novčića"
+      "lost": "Izgubio si {{amount}} novčića",
+      "honorTierChanged": "{{before}} → {{after}}"
     },
     "stake": {
       "label": "Ulog"

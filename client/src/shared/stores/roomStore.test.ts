@@ -5,9 +5,9 @@ import { useRoomStore } from "./roomStore";
 describe("roomStore", () => {
   beforeEach(() => {
     useRoomStore.getState().reset();
-    // reset() deliberately preserves insolventEjection (Story 9.3), so clear it
+    // reset() deliberately preserves roomEjection (Story 9.3), so clear it
     // explicitly between tests to keep them isolated.
-    useRoomStore.getState().setInsolventEjection(null);
+    useRoomStore.getState().setRoomEjection(null);
   });
 
   it("initializes with null room, empty players, and matchStarted false", () => {
@@ -319,28 +319,63 @@ describe("roomStore", () => {
     expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
   });
 
-  // --- Insolvency ejection (Story 9.3) ---
+  // --- Room ejection (Story 9.3, widened by Story 9.8) ---
 
-  it("setInsolventEjection sets and clears the ejection notice", () => {
-    useRoomStore.getState().setInsolventEjection({
+  it("setRoomEjection sets and clears the ejection notice", () => {
+    useRoomStore.getState().setRoomEjection({
       roomId: 7,
       buyIn: 500,
       balance: 100,
-      reason: "ejected",
+      reason: "insolvent",
     });
-    expect(useRoomStore.getState().insolventEjection).toEqual({
+    expect(useRoomStore.getState().roomEjection).toEqual({
       roomId: 7,
       buyIn: 500,
       balance: 100,
-      reason: "ejected",
+      reason: "insolvent",
     });
 
-    useRoomStore.getState().setInsolventEjection(null);
-    expect(useRoomStore.getState().insolventEjection).toBeNull();
+    useRoomStore.getState().setRoomEjection(null);
+    expect(useRoomStore.getState().roomEjection).toBeNull();
+  });
+
+  it("setRoomEjection carries the honor numbers for an honor ejection", () => {
+    useRoomStore.getState().setRoomEjection({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 85,
+      honor: 42,
+      reason: "honor",
+    });
+    expect(useRoomStore.getState().roomEjection).toEqual({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 85,
+      honor: 42,
+      reason: "honor",
+    });
+  });
+
+  it("reset PRESERVES an honor-ejection notice too, not just the insolvency one", () => {
+    // The preservation is reason-agnostic by construction; pinned so a future
+    // narrowing of reset() cannot silently drop the honor branch.
+    useRoomStore.getState().setRoomEjection({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 85,
+      honor: 42,
+      reason: "honor",
+    });
+    useRoomStore.getState().reset();
+    expect(useRoomStore.getState().roomEjection?.reason).toBe("honor");
+    expect(useRoomStore.getState().roomEjection?.honor).toBe(42);
   });
 
   it("reset PRESERVES the insolvency-ejection notice so the lobby modal survives RoomPage unmount", () => {
-    useRoomStore.getState().setInsolventEjection({
+    useRoomStore.getState().setRoomEjection({
       roomId: 7,
       buyIn: 500,
       balance: 100,
@@ -348,7 +383,7 @@ describe("roomStore", () => {
     });
     useRoomStore.getState().reset();
     // Survives reset (RoomPage calls reset() on unmount while navigating to lobby).
-    expect(useRoomStore.getState().insolventEjection).toEqual({
+    expect(useRoomStore.getState().roomEjection).toEqual({
       roomId: 7,
       buyIn: 500,
       balance: 100,

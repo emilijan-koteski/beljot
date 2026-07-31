@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/shared/i18n/i18n";
 import { useAuthStore } from "@/shared/stores/authStore";
+import { makeUser } from "@/test-utils";
 
 import { LanguageSelector } from "./LanguageSelector";
 
@@ -28,15 +29,7 @@ describe("LanguageSelector", () => {
     i18n.changeLanguage("en");
     useAuthStore.setState({
       token: "test-token",
-      user: {
-        id: 1,
-        username: "testuser",
-        email: "test@example.com",
-        languagePreference: "en",
-        walletBalance: 5000,
-        loginStreakDays: 1,
-        createdAt: "2026-01-01T00:00:00Z",
-      },
+      user: makeUser({ loginStreakDays: 1 }),
       isLoading: false,
     });
     mockUpdatePreferences.mockResolvedValue({ languagePreference: "sr" });

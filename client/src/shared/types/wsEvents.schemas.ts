@@ -34,6 +34,7 @@ import type {
   CoinSettlementPayload,
   DeclarationsResolvedPayload,
   HandScoredPayload,
+  HonorUpdatedPayload,
   MatchAbandonedPayload,
   MatchEndPayload,
   MatchPausedPayload,
@@ -282,6 +283,18 @@ export const XpAwardedPayloadSchema = z.strictObject({
   leveledUp: z.boolean(),
 });
 
+// Story 9.7: per-human match-end honor update. honorTier is left as a plain
+// string rather than a union of the five tokens on purpose — a server-side
+// retune that adds a tier must not hard-fail a stale client bundle (deferred
+// item D142); the display layer falls back for an unknown token instead.
+export const HonorUpdatedPayloadSchema = z.strictObject({
+  honorScore: z.number().int(),
+  honorTier: z.string(),
+  honorCompletedTotal: z.number().int(),
+  honorAbandonedTotal: z.number().int(),
+  isNewPlayer: z.boolean(),
+});
+
 export const PlayerDisconnectedPayloadSchema = z.strictObject({
   playerSeat: z.number(),
   username: z.string(),
@@ -399,6 +412,12 @@ type _XpAwardedConformance = MutualExtends<
 >;
 const _xpAwardedConforms: _XpAwardedConformance = true;
 
+type _HonorUpdatedConformance = MutualExtends<
+  z.infer<typeof HonorUpdatedPayloadSchema>,
+  HonorUpdatedPayload
+>;
+const _honorUpdatedConforms: _HonorUpdatedConformance = true;
+
 type _PlayerDisconnectedConformance = MutualExtends<
   z.infer<typeof PlayerDisconnectedPayloadSchema>,
   PlayerDisconnectedPayload
@@ -441,6 +460,7 @@ export const _conformanceWitnesses = {
   _autoActionConforms,
   _coinSettlementConforms,
   _xpAwardedConforms,
+  _honorUpdatedConforms,
   _playerDisconnectedConforms,
   _playerReconnectedConforms,
   _surrenderProposedConforms,

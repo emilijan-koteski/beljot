@@ -216,6 +216,55 @@ export const en: RulesLangData = {
         },
       ],
     },
+    {
+      id: "honour",
+      label: "Honor",
+      title: "Finishing what you start",
+      lede: "Beljot is a partnership game: a player who walks out mid-match ruins it for three other players. Honor shows how reliable a teammate you are.",
+      blocks: [
+        {
+          kind: "p",
+          text: "Your honor score is the share of matches you finish, weighted so recent play counts for far more than old history. A new player starts at 80 and shows no score at all until they have played 5 matches — there is nothing meaningful to measure before that.",
+        },
+        {
+          kind: "steps",
+          items: [
+            {
+              t: "Finishing a match lifts it",
+              d: "Win or lose. Honor is not a measure of skill — it only asks whether you were still at the table at the end.",
+            },
+            {
+              t: "Surrendering still counts as finished",
+              d: "A surrendered match is a completed match. Agreeing to end it with your partner is the opposite of walking out, and it lifts your score exactly like any other finish.",
+            },
+            {
+              t: "Dropping out and not returning lowers it",
+              d: "This is the only thing that does. If you lose connection you have the full reconnect window to come back, and coming back costs you nothing.",
+            },
+            {
+              t: "Time repairs it",
+              d: "Old abandonments fade. A bad run months ago counts for very little against the matches you have finished more recently.",
+            },
+          ],
+        },
+        {
+          kind: "tiers",
+          title: "The five tiers",
+          items: [
+            { tier: "exemplary", d: "practically never quits." },
+            { tier: "trusted", d: "is a reliable partner." },
+            { tier: "fair", d: "is the usual range." },
+            { tier: "unreliable", d: "is locked out of some tables." },
+            { tier: "problematic", d: "is locked out of most tables." },
+          ],
+          text: "A room's host can require a minimum, and can separately decide whether players with no score yet are welcome.",
+        },
+        {
+          kind: "note",
+          text: "Two things players most often get wrong: surrendering does not hurt your honor, and a single bad night does not follow you around. Reconnecting after a dropped connection is always free.",
+        },
+      ],
+    },
   ],
 
   ui: {

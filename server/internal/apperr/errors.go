@@ -131,6 +131,25 @@ var (
 	// direct API call; 409 matches the sibling quick-play guards.
 	ErrQuickPlayRoomPrivacy = NewAppError("QUICK_PLAY_ROOM_PRIVACY", "quick play rooms cannot be made private", http.StatusConflict)
 
+	// Honor-gate errors (Story 9.8, FR57). Same shape as the private-room block
+	// above: an HTTP-only join gate with NO WS error event. 409 (not 402/403)
+	// matches the INSUFFICIENT_COINS and WRONG_ROOM_PASSWORD precedents.
+	//
+	// The payload carries ONLY the code — never the numbers (9.2 Decision B, 9.6's
+	// precedent). The client composes "requires honor >= X, yours is Y" locally from
+	// the room object and its own auth envelope, so these messages stay generic.
+	//
+	// ErrHonorTooLow is returned by the join gate, the return-time gate, CreateRoom's
+	// creator self-gate, and StartMatch (to the owner, when a seat is honor-ejected).
+	// ErrNewPlayerNotAllowed is returned from the same four sites. Because the gate
+	// evaluates isNewPlayer FIRST, a New Player in a min_honor > 0 /
+	// allow_new_players = false room gets NEW_PLAYER_NOT_ALLOWED, never HONOR_TOO_LOW.
+	ErrHonorTooLow         = NewAppError("HONOR_TOO_LOW", "honor score below this room's minimum", http.StatusConflict)
+	ErrNewPlayerNotAllowed = NewAppError("NEW_PLAYER_NOT_ALLOWED", "this room does not allow new players", http.StatusConflict)
+	// ErrInvalidMinHonor is CreateRoom validation only — the requested minimum fell
+	// outside [0,100], the same interval the rooms.min_honor CHECK enforces.
+	ErrInvalidMinHonor = NewAppError("INVALID_MIN_HONOR", "minimum honor must be between 0 and 100", http.StatusBadRequest)
+
 	// Economy domain errors (Epic 9). 409 Conflict (not 402) — the project's
 	// status set is 200/201/400/401/403/404/409/500. Surfaces from the join
 	// affordability check and the atomic match-start stake charge.

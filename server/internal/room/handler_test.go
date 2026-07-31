@@ -373,7 +373,7 @@ func testErrorHandler(err error, c echo.Context) {
 
 func setupTest() (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, nil, nil, nil, nil)
+	handler := room.NewRoomHandler(repo, nil, nil, nil, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -403,7 +403,7 @@ func setupTest() (*echo.Echo, *mockRoomRepo) {
 func setupTestWithBroadcast() (*echo.Echo, *mockRoomRepo, *mockBroadcaster) {
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
-	handler := room.NewRoomHandler(repo, nil, broadcaster, nil, nil)
+	handler := room.NewRoomHandler(repo, nil, broadcaster, nil, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -460,7 +460,7 @@ func registerRoomRoutes(api *echo.Group, handler *room.RoomHandler) {
 func setupTestWithPresence() (*echo.Echo, *mockRoomRepo, *room.PresenceRegistry) {
 	repo := newMockRoomRepo()
 	reg := room.NewPresenceRegistry()
-	handler := room.NewRoomHandler(repo, nil, &mockBroadcaster{}, reg, nil)
+	handler := room.NewRoomHandler(repo, nil, &mockBroadcaster{}, reg, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -476,7 +476,7 @@ func setupTestWithBroadcastAndPresence() (*echo.Echo, *mockRoomRepo, *mockBroadc
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
-	handler := room.NewRoomHandler(repo, nil, broadcaster, reg, nil)
+	handler := room.NewRoomHandler(repo, nil, broadcaster, reg, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -2319,7 +2319,7 @@ func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [
 
 func setupTestWithStarter(starter room.MatchStarter, broadcaster room.Broadcaster) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, starter, broadcaster, nil, nil)
+	handler := room.NewRoomHandler(repo, starter, broadcaster, nil, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler

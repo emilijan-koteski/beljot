@@ -9,6 +9,7 @@ import {
   LockOpen,
   Shuffle,
   Trophy,
+  UserCheck,
   Users,
   UserX,
   Zap,
@@ -28,6 +29,7 @@ import {
 } from "@/features/room/OwnerConfirmDialogs";
 import { RoomPrivacyDialog } from "@/features/room/RoomPrivacyDialog";
 import { FetchError } from "@/shared/api/axiosClient";
+import { HonorShield } from "@/shared/components/HonorShield";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -54,6 +56,13 @@ import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import {
+  honorFloorLabel,
+  honorQualifies,
+  honorRoomIsGated,
+  honorScoreOrPrior,
+  honorTierForScore,
+} from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -158,7 +167,7 @@ export function RoomPage() {
   const storePlayers = useRoomStore((s) => s.players);
   const matchStarted = useRoomStore((s) => s.matchStarted);
   const kickedFromRoomId = useRoomStore((s) => s.kickedFromRoomId);
-  const insolventEjection = useRoomStore((s) => s.insolventEjection);
+  const roomEjection = useRoomStore((s) => s.roomEjection);
   const returnedUserIds = useRoomStore((s) => s.returnedUserIds);
 
   const hasLeftRef = useRef(false);
@@ -226,6 +235,33 @@ export function RoomPage() {
   // the page looks dead, you can only leave. When the fetched room shows we are
   // NOT yet a member of an open (waiting, non-quick-play) room, join it here —
   // mirroring what the lobby's Join does — then refetch to pick up membership.
+  // Maps a deep-link join failure to its toast copy. Shared by BOTH of this page's
+  // join call paths — the public auto-join effect below and joinDeepLinkPrivate —
+  // deliberately: 9.6's review found the deep-link path needed the identical fix
+  // the lobby path had received, and it surfaced only in manual E2E. One function
+  // means a new error code cannot be added to one path and forgotten on the other.
+  //
+  // The numbers are composed LOCALLY (Story 9.2 Decision B): the server's error
+  // payload carries only a code, and we hold the room plus our own auth envelope.
+  function joinFailureMessage(code: string | null, room: Room): string {
+    if (code === "ROOM_FULL") return t("lobby.errors.roomFull");
+    if (code === "INSUFFICIENT_COINS") {
+      return t("room.errors.insufficientCoins", {
+        buyIn: formatCoins(room.coinBuyIn),
+        balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
+      });
+    }
+    if (code === "HONOR_TOO_LOW") {
+      // honorScoreOrPrior, never `|| 80` — a real score of 0 must survive.
+      return t("room.errors.honorTooLow", {
+        minHonor: room.minHonor,
+        honor: honorScoreOrPrior(useAuthStore.getState().user?.honorScore),
+      });
+    }
+    if (code === "NEW_PLAYER_NOT_ALLOWED") return t("room.errors.newPlayerNotAllowed");
+    return t("lobby.errors.joinFailed");
+  }
+
   useEffect(() => {
     if (!roomQuery.isSuccess || !roomQuery.data || !id) return;
     // Judge membership ONLY on data fetched fresh after this mount. With
@@ -273,16 +309,7 @@ export function RoomPage() {
           return;
         }
         hasLeftRef.current = true; // suppress the unmount cleanup-leave
-        toast.error(
-          code === "ROOM_FULL"
-            ? t("lobby.errors.roomFull")
-            : code === "INSUFFICIENT_COINS"
-              ? t("room.errors.insufficientCoins", {
-                  buyIn: formatCoins(room.coinBuyIn),
-                  balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
-                })
-              : t("lobby.errors.joinFailed"),
-        );
+        toast.error(joinFailureMessage(code, room));
         navigate("/lobby", { replace: true });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -315,16 +342,7 @@ export function RoomPage() {
         }
         hasLeftRef.current = true; // suppress the unmount cleanup-leave
         setDeepLinkPrivateRoom(null);
-        toast.error(
-          code === "ROOM_FULL"
-            ? t("lobby.errors.roomFull")
-            : code === "INSUFFICIENT_COINS"
-              ? t("room.errors.insufficientCoins", {
-                  buyIn: formatCoins(room.coinBuyIn),
-                  balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
-                })
-              : t("lobby.errors.joinFailed"),
-        );
+        toast.error(joinFailureMessage(code, room));
         navigate("/lobby", { replace: true });
       });
   }
@@ -396,16 +414,17 @@ export function RoomPage() {
     }
   }, [kickedFromRoomId, id, returnToLobby, storeRoom?.name, t]);
 
-  // Story 9.3: when WE are ejected for insolvency at match start, the server has
-  // already freed our seat, so suppress the unmount auto-leave (it would 404 and
-  // log a console error). The always-mounted useInsolventEjectRedirect handles
-  // the lobby navigation + modal; here we only quiet the cleanup-leave, mirroring
-  // the kick path above.
+  // Story 9.3: when WE are ejected at match start — for insolvency, or (Story 9.8)
+  // for honor — the server has already freed our seat, so suppress the unmount
+  // auto-leave (it would 404 and log a console error). The always-mounted
+  // useRoomEjectRedirect handles the lobby navigation + modal; here we only quiet
+  // the cleanup-leave, mirroring the kick path above. Reason-agnostic by design:
+  // any non-null notice means our seat is already gone.
   useEffect(() => {
-    if (insolventEjection !== null && id && insolventEjection.roomId === Number(id)) {
+    if (roomEjection !== null && id && roomEjection.roomId === Number(id)) {
       hasLeftRef.current = true;
     }
-  }, [insolventEjection, id]);
+  }, [roomEjection, id]);
 
   // Clear swap-mode whenever the room exits "waiting" status — owner controls
   // disappear in the same render, so a stale source-seat must not survive.
@@ -731,6 +750,18 @@ export function RoomPage() {
         // rolled back the charge and reverted the room to waiting. (Full
         // per-player ejection UX lands in Story 9.3.)
         toast.error(t("room.errors.insufficientCoinsStart"));
+      } else if (
+        err instanceof FetchError &&
+        (err.code === "HONOR_TOO_LOW" || err.code === "NEW_PLAYER_NOT_ALLOWED")
+      ) {
+        // Story 9.8 AC6: a seated human failed the honor re-check, so the server
+        // ejected that seat and refused the start. Without this branch the owner
+        // fell through to "try again" — advice that fails identically every time,
+        // since a seat is now empty. Deliberately NON-DISCLOSING: it never says
+        // which player or which of the two gates, mirroring how
+        // insufficientCoinsStart withholds whose balance was short. Per-seat
+        // disclosure is Open Question 5 / Epic 11, and is a separate decision.
+        toast.error(t("room.errors.honorGateStart"));
       } else {
         toast.error(t("room.errors.startFailed"));
       }
@@ -815,6 +846,21 @@ export function RoomPage() {
     !presenceTracked || seatedHumans.every((p) => returnedUserIds.includes(p.userId));
   const isWaitingToReturn = (p: RoomPlayer): boolean =>
     presenceTracked && p.seat !== null && p.isBot !== true && !returnedUserIds.includes(p.userId);
+
+  // Honour gate, per seat (redesign R6). Cosmetic — the server re-checks at both
+  // return and start, and it is the authority — but marking the blocking seat BEFORE
+  // the owner presses Start is the whole point: previously the owner clicked, a seat
+  // silently vanished, and they got a 409 with no way to know which one or why.
+  //
+  // Only decides for seats whose honour actually arrived. A seat with no score
+  // (a bot, or a read that failed) is never marked as blocking, so a degraded
+  // honour read can never make the room look un-startable.
+  const isBelowHonorBar = (p: RoomPlayer): boolean =>
+    honorRoomIsGated(room) &&
+    p.isBot !== true &&
+    typeof p.honorScore === "number" &&
+    !honorQualifies(room, { honorScore: p.honorScore, isNewPlayer: false });
+  const blockedSeats = players.filter(isBelowHonorBar);
 
   const ownerPlayer = players.find((p) => p.userId === room.ownerId);
   const ownerUsername = ownerPlayer?.username ?? t("room.seatOwner");
@@ -902,7 +948,12 @@ export function RoomPage() {
     ctaLabel = allSeated ? t("room.autoStarting") : t("room.waitingForPlayers");
   } else if (isOwner) {
     ctaTestId = "start-game";
-    ctaDisabled = !allSeated || !allReturned || startGameMutation.isPending;
+    // A blocked seat disables Start but does NOT relabel it: the CTA keeps saying
+    // "Start match" and the ember-ringed seat is the explanation. Stuffing the
+    // reason into the button would say it in the one place that cannot show WHICH
+    // seat, and the reason sits in the title for anyone who wants words.
+    ctaDisabled =
+      !allSeated || !allReturned || blockedSeats.length > 0 || startGameMutation.isPending;
     ctaOnClick = ctaDisabled ? undefined : handleStartGame;
     ctaLabel = startGameMutation.isPending
       ? t("room.matchStarting")
@@ -1161,6 +1212,26 @@ export function RoomPage() {
                   {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
                 </span>
               </Badge>
+              {/* Honour gate (redesign R6). The waiting room showed the gate
+                  NOWHERE before this: the lobby card carried both chips, then they
+                  vanished the moment you were inside the room they described. Same
+                  Badge component and sizing as its neighbours, so it is a room
+                  property like Bitola or 1001 — not a scoreboard. */}
+              {room.minHonor > 0 && (
+                <Badge
+                  tone="neutral"
+                  icon={<HonorShield tier={honorTierForScore(room.minHonor)} size={12} />}
+                >
+                  <span data-testid="badge-min-honor" data-min-honor={room.minHonor}>
+                    {t("lobby.card.minHonor", { minHonor: honorFloorLabel(room.minHonor) })}
+                  </span>
+                </Badge>
+              )}
+              {room.allowNewPlayers === false && (
+                <Badge tone="neutral" icon={<UserCheck className="size-3" />}>
+                  <span data-testid="badge-veterans-only">{t("lobby.card.veteransOnly")}</span>
+                </Badge>
+              )}
               {room.isQuickPlay && (
                 <Badge tone="accent" icon={<Zap className="size-3" />}>
                   <span data-testid="badge-quick-play">{t("lobby.quickPlay")}</span>
@@ -1224,7 +1295,13 @@ export function RoomPage() {
             size="cta"
             onClick={ctaOnClick}
             disabled={ctaDisabled}
-            title={!inSwapMode && isOwner && !allSeated ? t("room.startMatchDisabled") : undefined}
+            title={
+              !inSwapMode && isOwner && blockedSeats.length > 0
+                ? t("room.startBlockedByHonor", { minHonor: room.minHonor })
+                : !inSwapMode && isOwner && !allSeated
+                  ? t("room.startMatchDisabled")
+                  : undefined
+            }
             data-testid={ctaTestId}
             // Single-line pill that shares the row: min-w-0 + shrink override the
             // button's default shrink-0 so a long (usually disabled "waiting …")
@@ -1397,6 +1474,7 @@ export function RoomPage() {
                   isClickable={isClickable}
                   isPending={isPendingForThisSeat}
                   waitingToReturn={isWaiting && player !== undefined && isWaitingToReturn(player)}
+                  belowHonorBar={isWaiting && player !== undefined && isBelowHonorBar(player)}
                   ownerCanActOnRow={ownerCanKick}
                   onSelect={() => {
                     if (inSwapMode) {

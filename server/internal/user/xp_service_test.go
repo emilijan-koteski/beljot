@@ -41,6 +41,11 @@ func (f *fakeLevelRepo) UpdateLanguagePreference(uint, string) error    { panic(
 func (f *fakeLevelRepo) UpdatePasswordHash(uint, string) error          { panic("unused") }
 func (f *fakeLevelRepo) UpdateUsername(uint, string) (time.Time, error) { panic("unused") }
 func (f *fakeLevelRepo) AddXP(map[uint]int) (map[uint]int, error)       { panic("unused") }
+func (f *fakeLevelRepo) ResetHonor(uint) error                          { panic("unused") }
+
+func (f *fakeLevelRepo) ApplyHonorEvents(map[uint]HonorEvent, time.Time) (map[uint]HonorSnapshot, error) {
+	panic("unused")
+}
 
 func TestXPService_LevelsForUsers_AppliesCurve(t *testing.T) {
 	repo := &fakeLevelRepo{totals: map[uint]int{

@@ -95,4 +95,49 @@ type MatchRepository interface {
 	// GetTopRivalsForUser returns the most-faced opponents (opposite-team
 	// seats) ordered by completed matches played against them, capped at limit.
 	GetTopRivalsForUser(userID uint, limit int) ([]RivalAggregate, error)
+
+	// GetHonorTrendWindowsForUser splits the user's most recent `2*limit` matches
+	// into two adjacent windows — the newest `limit` and the `limit` before those
+	// — counting completions versus abandonments in each (Story 9.7 trend).
+	//
+	// TWO windows rather than one, per the 2026-07-29 code review. The original
+	// shape compared one 20-match window against the LIFETIME score, which is
+	// not a like-for-like comparison: the Beta(4,1) prior contributes 4
+	// pseudo-completions, whose drag is large at n=20 (capping a flawless window
+	// at 100*24/25 = 96) and negligible at n=500 (where the lifetime score
+	// reaches 98-100). A player who had never abandoned a match therefore read
+	// "Slipping -3" forever. Two equal-size windows carry an identical prior
+	// drag, so their difference reflects behaviour instead of sample size.
+	//
+	// This is the ONE honor read that must hit `matches`: the stored honor
+	// weights on `users` are running aggregates and cannot be windowed. Call it
+	// from the profile read path only — NOT from the auth/TopBar path and NOT
+	// from Story 9.8's join gate, both of which are hot.
+	//
+	// The windows use the canonical viewer gate verbatim: a row counts as
+	// abandoned-by-the-viewer when abandoned_by = userID, and as completed when
+	// it is a 'completed' row or an abandonment by someone ELSE
+	// (abandoned_by IS NOT NULL AND abandoned_by <> userID). Rows with
+	// abandoned_by IS NULL are excluded entirely — they are boot-reconcile
+	// rows, a server fault rather than a player signal, exactly as the
+	// migration 000017 backfill treats them.
+	//
+	// Ordered by completed_at DESC with LIMIT and no OFFSET (deferred item D82:
+	// offset pagination can duplicate rows under concurrent completions); the
+	// split is done by ROW_NUMBER inside the single bounded window.
+	GetHonorTrendWindowsForUser(userID uint, limit int) (HonorTrendWindows, error)
+}
+
+// HonorTrendWindows holds two adjacent slices of a user's recent match history:
+// the newest `limit` matches and the `limit` immediately preceding them.
+//
+// Compare the two ONLY when they hold the same number of matches — see
+// user.HonorTrendWindowed, which enforces that. Unequal windows differ in
+// Bayesian prior drag, which is the exact defect the two-window shape exists to
+// remove.
+type HonorTrendWindows struct {
+	RecentCompleted int
+	RecentAbandoned int
+	PriorCompleted  int
+	PriorAbandoned  int
 }

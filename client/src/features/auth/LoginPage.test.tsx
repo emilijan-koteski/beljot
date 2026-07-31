@@ -125,6 +125,9 @@ describe("LoginPage", () => {
       loginStreakDays: 1,
       totalXp: 0,
       level: 0,
+      honorScore: 80,
+      honorTier: "fair",
+      isNewPlayer: true,
       createdAt: "2026-01-01T00:00:00Z",
     });
 
@@ -205,6 +208,9 @@ describe("LoginPage", () => {
       loginStreakDays: 1,
       totalXp: 0,
       level: 0,
+      honorScore: 80,
+      honorTier: "fair",
+      isNewPlayer: true,
       createdAt: "2026-01-01",
     });
 
@@ -252,6 +258,9 @@ describe("LoginPage", () => {
         loginStreakDays: 1,
         totalXp: 0,
         level: 0,
+        honorScore: 80,
+        honorTier: "fair",
+        isNewPlayer: true,
         createdAt: "2026-01-01T00:00:00Z",
       };
     }
@@ -327,6 +336,9 @@ describe("LoginPage", () => {
         loginStreakDays: 0,
         totalXp: 0,
         level: 0,
+        honorScore: 80,
+        honorTier: "fair",
+        isNewPlayer: true,
         createdAt: "2026-01-01T00:00:00Z",
       };
     }

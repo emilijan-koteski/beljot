@@ -5,6 +5,8 @@
 // tiers) live in `shared.ts` ONCE; only the human-readable strings vary by
 // locale. A parity test asserts the four locales never drift in structure.
 
+import type { HonorTier } from "@/shared/lib/honor";
+
 export type Rank = "7" | "8" | "9" | "10" | "J" | "Q" | "K" | "A";
 
 export type RulesLang = "en" | "mk" | "hr" | "sr";
@@ -32,11 +34,18 @@ export type Declaration = {
 
 export type StepItem = { t: string; d: string };
 
+// One honour tier line: the token picks the name (from the shared i18n tier
+// keys) and colour (HONOR_TIER_COLOR) at render time; only the sentence tail
+// is authored per locale. The score range is derived from HONOR_TIER_BANDS,
+// so a tier retune never leaves stale numbers in four content files.
+export type TierItem = { tier: HonorTier; d: string };
+
 // A content block inside a chapter. The prototype's unused `split` is omitted.
 export type RuleBlock =
   | { kind: "p"; text: string }
   | { kind: "rule"; title: string; text: string }
   | { kind: "steps"; items: StepItem[] }
+  | { kind: "tiers"; title: string; items: TierItem[]; text: string }
   | { kind: "cards" }
   | { kind: "melds" }
   | { kind: "note"; text: string };

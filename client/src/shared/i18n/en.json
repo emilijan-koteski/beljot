@@ -71,12 +71,57 @@
       "losses": "Losses",
       "abandoned": "Abandoned",
       "winRate": "Win rate",
-      "winRateEmpty": "—",
+      "winRateEmpty": "–",
       "error": "Could not load stats — try again",
       "outcomeSplit": "Outcome split",
       "legendWins": "{{count}} wins",
       "legendLosses": "{{count}} losses",
       "legendAbandoned": "{{count}} abandoned"
+    },
+    "honor": {
+      "eyebrow": "Honor",
+      "meterLabel": "Honor {{score}} of 100, {{tier}}",
+      "lastWindow": "Last {{window}}",
+      "trendTooltip": "Your last {{window}} matches compared with the {{window}} before them.",
+      "newPlayerChip": "New Player",
+      "newPlayerProgress": "{{played}} / {{total}}",
+      "newPlayerHint": "Play 5 matches to get an honor score.",
+      "explainer": {
+        "open": "How it works",
+        "title": "How honor works",
+        "lede": "The score shows one thing — whether you finish the matches you start.",
+        "finishLabel": "Finish a match",
+        "finishBody": "— win or lose, it lifts your score.",
+        "dropLabel": "If you drop out and don't come back,",
+        "dropBody": "your score falls. Nothing else lowers it.",
+        "surrenderLabel": "Surrender doesn't count.",
+        "surrenderBody": "A finished match is a finished match.",
+        "decayLabel": "Old abandonments fade.",
+        "decayBody": "Recent matches count for far more.",
+        "standing": "You're at {{score}} — <tierWord>{{tier}}</tierWord>.",
+        "standingNew": "Finish 5 matches and your score appears here.",
+        "fullRules": "Full rules",
+        "close": "Got it"
+      },
+      "tier": {
+        "exemplary": "Exemplary",
+        "trusted": "Trusted",
+        "fair": "Fair",
+        "unreliable": "Unreliable",
+        "problematic": "Problematic"
+      },
+      "tierPlural": {
+        "exemplary": "Exemplary",
+        "trusted": "Trusted",
+        "fair": "Fair",
+        "unreliable": "Unreliable",
+        "problematic": "Problematic"
+      },
+      "trend": {
+        "up": "Improving",
+        "flat": "Steady",
+        "down": "Slipping"
+      }
     },
     "matchHistory": {
       "eyebrow": "Activity",
@@ -204,7 +249,7 @@
       "bestHandLabel": "Best hand",
       "bestHandHint": "Hand {{hand}} · {{date}}",
       "bestHandHintEmpty": "no hands yet",
-      "bestHandEmpty": "—",
+      "bestHandEmpty": "–",
       "avgLengthLabel": "Avg. match length",
       "avgLengthValue": "{{minutes}}m",
       "avgLengthHint": "completed matches"
@@ -283,7 +328,11 @@
       "insufficientCoins": "You need {{buyIn}} coins to join this room — your balance: {{balance}}.",
       "insufficientCoinsGeneric": "You don't have enough coins to join this room.",
       "insufficientCoinsStart": "A player can't stake that much — the match didn't start.",
-      "wrongPassword": "Incorrect room password."
+      "wrongPassword": "Incorrect room password.",
+      "honorTooLow": "This room asks for honor {{minHonor}} or higher. Yours is {{honor}} — finish a few matches to bring it up.",
+      "honorTooLowGeneric": "Your honor score is below this room's minimum.",
+      "newPlayerNotAllowed": "This room is for experienced players. Finish 5 matches to unlock rooms like it.",
+      "honorGateStart": "A player doesn't meet this room's honor requirement — the match didn't start."
     },
     "passwordPrompt": {
       "title": "Private room",
@@ -345,6 +394,7 @@
     "returningToLobby": "Returning to lobby…",
     "startMatch": "Start match",
     "startMatchDisabled": "All 4 players must be seated",
+    "startBlockedByHonor": "A seated player is below this room's minimum of {{minHonor}}.",
     "waitingForOwner": "Waiting for host to start the match",
     "seatTaken": "That seat is already taken",
     "matchStarting": "Match starting…",
@@ -432,13 +482,18 @@
       "inMatch": "playing",
       "online": "online"
     },
-    "insolventEjection": {
+    "roomEjection": {
       "eyebrow": "Heads up",
-      "ejectedTitle": "Not enough coins",
-      "ejectedBody": "You don't have enough coins to cover this room's buy-in. Balance: {{balance}}. Buy-in: {{buyIn}}.",
+      "insolventTitle": "Not enough coins",
+      "insolventBody": "You don't have enough coins to cover this room's buy-in. Balance: {{balance}}. Buy-in: {{buyIn}}.",
+      "honorTitle": "Honor below the room's bar",
+      "honorBody": "Your honor dropped below this room's minimum of {{minHonor}} — it's now {{honor}}. Finish your next matches and it climbs back.",
       "roomClosedTitle": "Room closed",
-      "roomClosedBody": "This room closed — no remaining player could afford to host it.",
-      "action": "Got it"
+      "roomClosedBody": "This room closed — no remaining player could be its host.",
+      "action": "Got it",
+      "youLabel": "You",
+      "tableLabel": "Table",
+      "browseQualifying": "Rooms I qualify for"
     },
     "matchmaking": {
       "title": "Quick Play",
@@ -475,7 +530,10 @@
         "alreadyInRoom": "You're already in a room — leave it before creating a new one",
         "passwordRequired": "Set a password for the private room",
         "passwordTooShort": "Password needs at least {{min}} characters",
-        "passwordTooLong": "Password must be at most {{max}} characters"
+        "passwordTooLong": "Password must be at most {{max}} characters",
+        "invalidMinHonor": "Minimum honor must be between {{min}} and {{max}}.",
+        "ownHonorTooLow": "Your honor is {{honor}}, so you can't sit in a room with a minimum of {{minHonor}}. Lower the minimum to continue.",
+        "ownNewPlayerNotAllowed": "You're still a new player, so you can't sit in your own room. Welcome new players to continue."
       },
       "eyebrow": "New room",
       "headline": "Create a room",
@@ -510,6 +568,13 @@
       "privacyPrivate": "Private",
       "roomPassword": "Room password",
       "roomPasswordPlaceholder": "Enter password",
+      "minHonor": "Who can sit down",
+      "minHonorHint": "Players with this honor score or higher",
+      "minHonorAnyone": "Anyone",
+      "minHonorYou": "you {{honor}}",
+      "allowNewPlayers": "New players",
+      "allowNewPlayersYes": "Welcome",
+      "allowNewPlayersNo": "Veterans only",
       "roomPasswordHint": "At least {{min}} characters"
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
@@ -530,6 +595,7 @@
     },
     "filters": {
       "all": "All",
+      "qualify": "I qualify",
       "open": "Has seats",
       "relaxed": "Relaxed",
       "timed": "Timed"
@@ -564,7 +630,13 @@
       "private": "Private",
       "privateLockAriaLabel": "Private room — password required to join",
       "public": "Public",
-      "publicAriaLabel": "Public room — anyone can join"
+      "publicAriaLabel": "Public room — anyone can join",
+      "minHonor": "{{minHonor}}",
+      "minHonorAriaLabel": "Minimum honor {{minHonor}}",
+      "veteransOnly": "Veterans only",
+      "veteransOnlyAriaLabel": "This room does not admit new players",
+      "locked": "Locked",
+      "minHonorLockedTitle": "Needs honor {{minHonor}}, you're at {{honor}}."
     },
     "chat": {
       "title": "Lobby chat",
@@ -816,6 +888,8 @@
       "waitingMessage": "The game is on hold while we wait for {{player}} to reconnect.",
       "waitingMessageMany": "The game is on hold while we wait for {{count}} players to reconnect.",
       "countdownLabel": "Time remaining",
+      "honorNoteOther": "If the timer runs out, it counts as an abandonment. The abandoning player's honor goes down.",
+      "honorNoteSelf": "Stay on this page. Reconnecting costs you nothing, but a timeout counts as an abandonment and your honor drops.",
       "reconnectFailed": "Reconnection failed — the match may have ended",
       "matchAbandoned": "{{player}} disconnected — match ended",
       "matchAbandonedScores": "Final: Us {{us}} : Them {{them}}",
@@ -836,7 +910,8 @@
     },
     "settlement": {
       "won": "You won {{amount}} coins",
-      "lost": "You lost {{amount}} coins"
+      "lost": "You lost {{amount}} coins",
+      "honorTierChanged": "{{before}} → {{after}}"
     },
     "stake": {
       "label": "Stake"

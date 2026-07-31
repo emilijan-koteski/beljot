@@ -215,6 +215,55 @@ export const sr: RulesLangData = {
         },
       ],
     },
+    {
+      id: "honour",
+      label: "Čast",
+      title: "Završi ono što započneš",
+      lede: "Beljot je igra u parovima. Igrač koji napusti meč u toku kvari ga za još tri igrača. Čast pokazuje koliko si pouzdan saigrač.",
+      blocks: [
+        {
+          kind: "p",
+          text: "Skor časti je udeo mečeva koje si završio, s tim da skoriji mečevi vrede mnogo više od stare istorije. Nov igrač počinje na 80, a skor se ne prikazuje dok ne odigra 5 mečeva, jer pre toga nema šta da se meri.",
+        },
+        {
+          kind: "steps",
+          items: [
+            {
+              t: "Završen meč podiže skor",
+              d: "Bez obzira na pobedu ili poraz. Čast ne meri veštinu, samo da li si bio za stolom do kraja.",
+            },
+            {
+              t: "Predaja se i dalje računa kao završeno",
+              d: "Predat meč je završen meč. Dogovor s partnerom da se meč završi je suprotnost napuštanju i podiže skor kao i svaki drugi završetak.",
+            },
+            {
+              t: "Napuštanje bez vraćanja ga snižava",
+              d: "To je jedino što ga snižava. Ako izgubiš vezu, imaš pun prozor za ponovno povezivanje, a vraćanje te ne košta ništa.",
+            },
+            {
+              t: "Vreme ga popravlja",
+              d: "Stara napuštanja blede. Loš niz od pre nekoliko meseci vredi vrlo malo prema mečevima koje si skorije završio.",
+            },
+          ],
+        },
+        {
+          kind: "tiers",
+          title: "Pet nivoa",
+          items: [
+            { tier: "exemplary", d: "skoro nikad ne odustaje." },
+            { tier: "trusted", d: "je pouzdan partner." },
+            { tier: "fair", d: "je uobičajen nivo." },
+            { tier: "unreliable", d: "je zaključan za neke stolove." },
+            { tier: "problematic", d: "je zaključan za većinu stolova." },
+          ],
+          text: "Domaćin sobe može da postavi minimum i da posebno odluči da li su dobrodošli igrači koji još nemaju skor.",
+        },
+        {
+          kind: "note",
+          text: "Dve stvari koje igrači najčešće pogrešno razumeju: predaja ne šteti tvojoj časti, i jedno loše veče te ne prati zauvek. Ponovno povezivanje posle prekida veze je uvek besplatno.",
+        },
+      ],
+    },
   ],
 
   ui: {

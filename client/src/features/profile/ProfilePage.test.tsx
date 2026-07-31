@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CareerResponse } from "@/shared/api/career";
 import type { ProfileResponse } from "@/shared/api/profile";
 import { useAuthStore } from "@/shared/stores/authStore";
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { ProfilePage } from "./ProfilePage";
 
@@ -63,6 +63,15 @@ function profileFixture(overrides: Partial<ProfileResponse> = {}): ProfileRespon
     level: 0,
     xpIntoLevel: 0,
     xpForNextLevel: 50,
+    // Honor (Story 9.7). Defaults describe a brand-new player: the Beta(4,1)
+    // prior of 80 with no history, so isNewPlayer is true.
+    honorScore: 80,
+    honorTier: "fair",
+    honorCompletedTotal: 0,
+    honorAbandonedTotal: 0,
+    isNewPlayer: true,
+    honorTrendDelta: 0,
+    honorTrendDirection: "flat",
     ...overrides,
   };
 }
@@ -91,17 +100,10 @@ describe("ProfilePage", () => {
     mockGetIdentities.mockResolvedValue({ hasPassword: true, identities: [] });
     useAuthStore.setState({
       token: "test-token",
-      user: {
-        id: 1,
-        username: "testuser",
-        email: "test@example.com",
-        languagePreference: "en",
-        walletBalance: 5000,
+      user: makeUser({
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "2026-01-15T10:00:00Z",
-      },
+      }),
       isLoading: false,
     });
   });
@@ -213,7 +215,11 @@ describe("ProfilePage", () => {
     expect(screen.queryByTestId("profile-stat-games-played")).not.toBeInTheDocument();
   });
 
-  it("renders em-dash for the win-rate ring when zero games played", async () => {
+  // The placeholder is an EN dash, not an em dash: the value is a bare glyph
+  // shared verbatim by all four locales, and em dashes are English-prose-only in
+  // this project (mk/sr/hr must not contain one). Asserted here so the glyph
+  // cannot drift back per-locale.
+  it("renders a dash placeholder for the win-rate ring when zero games played", async () => {
     mockGetProfile.mockResolvedValueOnce(profileFixture());
 
     renderProfilePage();
@@ -224,9 +230,85 @@ describe("ProfilePage", () => {
 
     const ring = screen.getByTestId("profile-win-rate-ring");
     expect(ring).toHaveAttribute("data-rate", "");
-    expect(ring.textContent).toContain("—");
+    expect(ring.textContent).toContain("–");
+    expect(ring.textContent).not.toContain("—");
     expect(ring.textContent).not.toContain("NaN");
     expect(ring.textContent).not.toContain("0%");
+  });
+
+  // Regression test for the deferred-work item "Absent players never receive
+  // their own event:honor_updated". The abandoning seat has no live socket when
+  // the reconnect window expires, so it never gets the event and authStore keeps
+  // the pre-abandonment values. Opening /profile used to render the fresh score
+  // in HonorPanel beside the stale one in the header chip. The profile response
+  // is authoritative (it recomputes from the stored weights), so it now hydrates
+  // authStore and both surfaces agree.
+  it("hydrates the auth store's honor from the profile response", async () => {
+    useAuthStore.setState({
+      token: "test-token",
+      user: makeUser({ honorScore: 90, honorTier: "trusted", isNewPlayer: false }),
+      isLoading: false,
+    });
+    mockGetProfile.mockResolvedValueOnce(
+      profileFixture({
+        honorScore: 44,
+        honorTier: "problematic",
+        isNewPlayer: false,
+        honorCompletedTotal: 0,
+        honorAbandonedTotal: 1,
+      }),
+    );
+
+    renderProfilePage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-honor")).toHaveAttribute("data-honor", "44");
+    });
+    await waitFor(() => {
+      expect(useAuthStore.getState().user?.honorScore).toBe(44);
+    });
+    expect(useAuthStore.getState().user?.honorTier).toBe("problematic");
+  });
+
+  // A score of 0 is a real value and isNewPlayer false is a real value; both are
+  // falsy, so a truthiness guard would silently skip the hydration.
+  it("hydrates a zero honor score rather than treating it as absent", async () => {
+    useAuthStore.setState({
+      token: "test-token",
+      user: makeUser({ honorScore: 96, honorTier: "exemplary", isNewPlayer: false }),
+      isLoading: false,
+    });
+    mockGetProfile.mockResolvedValueOnce(
+      profileFixture({ honorScore: 0, honorTier: "problematic", isNewPlayer: false }),
+    );
+
+    renderProfilePage();
+
+    await waitFor(() => {
+      expect(useAuthStore.getState().user?.honorScore).toBe(0);
+    });
+  });
+
+  it("leaves the auth store alone when the profile honor fields are malformed", async () => {
+    useAuthStore.setState({
+      token: "test-token",
+      user: makeUser({ honorScore: 90, honorTier: "trusted", isNewPlayer: false }),
+      isLoading: false,
+    });
+    mockGetProfile.mockResolvedValueOnce(
+      profileFixture({
+        honorScore: undefined as unknown as number,
+        honorTier: "" as unknown as string,
+      }),
+    );
+
+    renderProfilePage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-username")).toBeInTheDocument();
+    });
+    expect(useAuthStore.getState().user?.honorScore).toBe(90);
+    expect(useAuthStore.getState().user?.honorTier).toBe("trusted");
   });
 
   it("renders the career sidebar (partners, rivals, milestones) when career loads", async () => {

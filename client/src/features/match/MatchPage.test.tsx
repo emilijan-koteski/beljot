@@ -38,6 +38,7 @@ vi.mock("@/shared/api/rooms", () => ({
 }));
 
 import { getRoom, returnToRoom } from "@/shared/api/rooms";
+import { makeUser } from "@/test-utils";
 
 const mockGetRoom = vi.mocked(getRoom);
 const mockReturnToRoom = vi.mocked(returnToRoom);
@@ -172,17 +173,13 @@ describe("MatchPage", () => {
     useMatchStore.getState().reset();
     useAuthStore.setState({
       token: "test-token",
-      user: {
+      user: makeUser({
         id: 10,
         email: "a@b.com",
         username: "Alice",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "",
-      },
+      }),
       isLoading: false,
     });
 
@@ -739,17 +736,13 @@ describe("MatchPage", () => {
     // proposer is (0 + 2) % 4 == 2, i.e. the local player.
     useAuthStore.setState({
       token: "test-token",
-      user: {
+      user: makeUser({
         id: 30,
         email: "c@b.com",
         username: "Carol",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "",
-      },
+      }),
       isLoading: false,
     });
     useMatchStore.getState().setMatchState({ ...mockMatchState, surrenderProposerSeat: 0 });
@@ -765,17 +758,13 @@ describe("MatchPage", () => {
     // Local player is seat 1 (Bob, team B); proposer is seat 0 (Alice, team A).
     useAuthStore.setState({
       token: "test-token",
-      user: {
+      user: makeUser({
         id: 20,
         email: "b@b.com",
         username: "Bob",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "",
-      },
+      }),
       isLoading: false,
     });
     useMatchStore.getState().setMatchState({ ...mockMatchState, surrenderProposerSeat: 0 });
@@ -790,17 +779,13 @@ describe("MatchPage", () => {
   it("hides SurrenderPrompt when surrenderProposerSeat clears", () => {
     useAuthStore.setState({
       token: "test-token",
-      user: {
+      user: makeUser({
         id: 30,
         email: "c@b.com",
         username: "Carol",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "",
-      },
+      }),
       isLoading: false,
     });
     useMatchStore.getState().setMatchState({ ...mockMatchState, surrenderProposerSeat: 0 });
@@ -891,17 +876,13 @@ describe("MatchPage", () => {
     // (compass 0) regardless of the absolute seat index.
     useAuthStore.setState({
       token: "test-token",
-      user: {
+      user: makeUser({
         id: 20,
         email: "b@b.com",
         username: "Bob",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "",
-      },
+      }),
       isLoading: false,
     });
     useMatchStore.getState().setMatchState(mockMatchState);

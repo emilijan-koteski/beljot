@@ -7,6 +7,8 @@ import {
   KeyRound,
   Lock,
   LockOpen,
+  UserCheck,
+  UserPlus,
   Users,
   Zap,
 } from "lucide-react";
@@ -16,9 +18,10 @@ import { useNavigate } from "react-router";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { FetchError } from "@/shared/api/axiosClient";
+import { HonorShield } from "@/shared/components/HonorShield";
 import { Button } from "@/shared/components/ui/button";
 import { Dialog, DialogContent } from "@/shared/components/ui/dialog";
-import { DurationSlider } from "@/shared/components/ui/duration-slider";
+import { DurationSlider, type SliderTick } from "@/shared/components/ui/duration-slider";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { Field } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
@@ -26,6 +29,14 @@ import { Segmented } from "@/shared/components/ui/segmented";
 import { useCreateRoomMutation } from "@/shared/hooks/mutations/useRooms";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import {
+  HONOR_TIER_BANDS,
+  HONOR_TIER_COLOR,
+  honorFloorLabel,
+  honorIsNewPlayer,
+  honorScoreOrPrior,
+  honorTierForScore,
+} from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -41,6 +52,30 @@ const DEFAULT_BUY_IN = 500; // mirrors the server default (Story 9.2)
 // is authoritative (apperr ROOM_PASSWORD_TOO_SHORT / ROOM_PASSWORD_TOO_LONG).
 const MIN_ROOM_PASSWORD = 4;
 const MAX_ROOM_PASSWORD = 72;
+// Honor-gate bounds (Story 9.8). The same [0,100] interval, in the same unit (a
+// plain integer), that the server validates and the rooms.min_honor CHECK
+// enforces — 9.6 shipped a min in runes and a max in bytes and needed a review
+// patch to align them, so keep this symmetric and boring.
+const MIN_HONOR_FLOOR = 0;
+const MIN_HONOR_CEILING = 100;
+// The default is UNGATED: min 0, newcomers welcome. Creating a gated room is an
+// opt-in, so the modal must never nudge an owner into one by default.
+const DEFAULT_MIN_HONOR = 0;
+
+/**
+ * Slider marks on the TIER BOUNDARIES, derived from the bands themselves rather
+ * than restated — retuning a floor server-side moves these with it.
+ *
+ * Boundary marks only, with no numeric labels under the track: the readout
+ * above already carries the chosen number and tier, and dropping the label row
+ * keeps the slider box short (user decision 2026-07-31). The boundaries are
+ * emphasised because those are the positions that change what the number MEANS
+ * — a host picking "85" is really picking Trusted.
+ */
+const MIN_HONOR_TICKS: SliderTick[] = HONOR_TIER_BANDS.filter((b) => b.from > 0).map((b) => ({
+  value: b.from,
+  emphasis: true,
+}));
 
 /**
  * Split-panel create-room modal. Left = form (name, variant, match mode,
@@ -59,6 +94,25 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const createRoomMutation = useCreateRoomMutation();
   const meUsername = useAuthStore((s) => s.user?.username ?? "");
   const meBalance = useAuthStore((s) => s.user?.walletBalance ?? 0);
+  // The creator's own honor, read through the shared guards (Story 9.8 D7's
+  // self-gate). honorScoreOrPrior, never `?? 80` or `|| 80` — a real score of 0
+  // must survive; honorIsNewPlayer defaults to SUPPRESSED when the flag is absent.
+  // Both were added in 9.7 precisely because the unguarded versions rendered a
+  // confident "80 / Fair" for accounts the server had said nothing about.
+  const meHonor = useAuthStore((s) => honorScoreOrPrior(s.user?.honorScore));
+  const meIsNewPlayer = useAuthStore((s) => honorIsNewPlayer(s.user?.isNewPlayer));
+  // ...but those guards' defaults are calibrated for DISPLAY, not for a capability
+  // gate. honorIsNewPlayer(undefined) is `true` (suppress the score) and
+  // honorScoreOrPrior(undefined) is 80 — both correct when rendering an unknown,
+  // both wrong when deciding what the owner may configure, because they turn
+  // "unknown" into "denied": with the flag absent, a 200-match veteran could not
+  // create a veterans-only room at all, and the submit button offered no override
+  // for a request the SERVER would have accepted. So when the envelope carries no
+  // honor (an old server, or user === null) skip the cosmetic mirror entirely and
+  // let the authority decide.
+  const honorKnown = useAuthStore(
+    (s) => typeof s.user?.isNewPlayer === "boolean" && typeof s.user?.honorScore === "number",
+  );
 
   const [name, setName] = useState("");
   const [variant, setVariant] = useState<"bitola" | "croatia">("bitola");
@@ -69,6 +123,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [isPrivate, setIsPrivate] = useState(false);
   const [roomPassword, setRoomPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [minHonor, setMinHonor] = useState(DEFAULT_MIN_HONOR);
+  const [allowNewPlayers, setAllowNewPlayers] = useState(true);
   // Field-level error shown under the room-name input (name validation only).
   const [error, setError] = useState<string | null>(null);
   // General submit error (already-in-room, insolvency race, unexpected) shown
@@ -91,6 +147,27 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   // they can't afford is un-startable — block it here too (server re-validates).
   const effectiveBuyIn = Math.max(0, Math.floor(coinBuyIn || 0));
   const buyInExceedsBalance = effectiveBuyIn > meBalance;
+
+  // Honor self-gate (Story 9.8 D7), same shape and same reason as
+  // buyInExceedsBalance above: the creator is auto-seated, so a gate they cannot
+  // pass would eject them from their own room at the first Start. Cosmetic: the
+  // server is the authority and re-validates.
+  //
+  // The score check applies to a New Player TOO, and this is the one place it
+  // deliberately diverges from the join gate (review 2026-07-30, PO decision).
+  // At the join gate D1 is right: a newcomer is never score-checked, because the
+  // toggle is the owner's "I'll take an unknown" switch. Mirrored onto the CREATOR
+  // it made D7 a no-op for exactly the accounts whose score is about to move — a
+  // newcomer at 0 completed / 4 abandoned holds 19, could set a bar of 80, and one
+  // finished match would put them at 23 and eject them from their own room. So a
+  // creator may only set a bar they satisfy RIGHT NOW, newcomer or not.
+  const effectiveMinHonor = Math.min(
+    MIN_HONOR_CEILING,
+    Math.max(MIN_HONOR_FLOOR, Math.floor(minHonor || 0)),
+  );
+  const failsOwnNewPlayerGate = honorKnown && meIsNewPlayer && !allowNewPlayers;
+  const failsOwnHonorGate = honorKnown && meHonor < effectiveMinHonor;
+  const failsOwnGate = failsOwnNewPlayerGate || failsOwnHonorGate;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -118,6 +195,12 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         isPrivate,
         // Only send the password for a private room (Story 9.6).
         password: isPrivate ? roomPassword : undefined,
+        // Honor gate (Story 9.8). Always sent, including the ungated 0 / true
+        // defaults — the server treats them as pointers so an explicit false is
+        // distinguishable from omitted, and sending both keeps the wire honest
+        // about what the modal chose.
+        minHonor: effectiveMinHonor,
+        allowNewPlayers,
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
@@ -146,6 +229,25 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
           setFormError(
             t("lobby.createRoomModal.errors.passwordTooLong", { max: MAX_ROOM_PASSWORD }),
           );
+        } else if (err.code === "INVALID_MIN_HONOR") {
+          setFormError(
+            t("lobby.createRoomModal.errors.invalidMinHonor", {
+              min: MIN_HONOR_FLOOR,
+              max: MIN_HONOR_CEILING,
+            }),
+          );
+        } else if (err.code === "HONOR_TOO_LOW") {
+          // The creator's own gate rejected them (Story 9.8 D7). Compose the copy
+          // locally from the requested minimum and the viewer's own score — the
+          // server error deliberately carries only the code, no numbers.
+          setFormError(
+            t("lobby.createRoomModal.errors.ownHonorTooLow", {
+              minHonor: effectiveMinHonor,
+              honor: meHonor,
+            }),
+          );
+        } else if (err.code === "NEW_PLAYER_NOT_ALLOWED") {
+          setFormError(t("lobby.createRoomModal.errors.ownNewPlayerNotAllowed"));
         } else {
           setFormError(t("lobby.createRoomModal.errors.unexpected"));
         }
@@ -166,6 +268,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setIsPrivate(false);
       setRoomPassword("");
       setShowPassword(false);
+      setMinHonor(DEFAULT_MIN_HONOR);
+      setAllowNewPlayers(true);
       setError(null);
       setFormError(null);
       createRoomMutation.reset();
@@ -376,6 +480,105 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 />
               </Field>
 
+              {/* A discrete slider over the tier bands, not a free-typed number.
+                  Three things it teaches for free that the number field could not:
+                  the ticks sit on TIER BOUNDARIES so the host picks a tier rather
+                  than a digit, the fill takes that tier's colour, and the host's
+                  OWN score is marked on the track — which turns the D7 self-gate
+                  from an error you trip into a place you can see.
+
+                  Both hints are deleted with nothing put back: the ticks and the
+                  "min. honour · trusted" caption say what the number means, and
+                  Welcome / Veterans only needs no explaining. Everything else lives
+                  one tap away in the explainer. The modal already carries seven
+                  fields of copy. */}
+              <Field
+                label={t("lobby.createRoomModal.minHonor")}
+                hint={t("lobby.createRoomModal.minHonorHint")}
+                error={
+                  failsOwnHonorGate
+                    ? t("lobby.createRoomModal.errors.ownHonorTooLow", {
+                        minHonor: effectiveMinHonor,
+                        honor: meHonor,
+                      })
+                    : undefined
+                }
+                errorTestId="min-honor-error"
+              >
+                <DurationSlider
+                  value={effectiveMinHonor}
+                  onChange={setMinHonor}
+                  min={MIN_HONOR_FLOOR}
+                  max={MIN_HONOR_CEILING}
+                  step={5}
+                  // 0 reads as a word, so the default looks like a choice rather
+                  // than an empty field. Above that, honorFloorLabel renders the
+                  // floor ("60+", bare "100" at the ceiling) — the same label the
+                  // lobby chip shows.
+                  valueText={
+                    effectiveMinHonor === 0
+                      ? t("lobby.createRoomModal.minHonorAnyone")
+                      : honorFloorLabel(effectiveMinHonor)
+                  }
+                  // PLURAL tier word: this caption describes the players who may
+                  // sit, not one player's standing — the singular tier.* keys
+                  // stay untouched for badges and the rules ladder.
+                  unitLabel={
+                    effectiveMinHonor === 0
+                      ? ""
+                      : t(`profile.honor.tierPlural.${honorTierForScore(effectiveMinHonor)}`)
+                  }
+                  ticks={MIN_HONOR_TICKS}
+                  fillStyle={
+                    effectiveMinHonor === 0
+                      ? undefined
+                      : HONOR_TIER_COLOR[honorTierForScore(effectiveMinHonor)]
+                  }
+                  // Only when the envelope actually carries honour — the same
+                  // honorKnown guard the self-gate uses, for the same reason: a
+                  // marker at the 80 prior would be a claim about a score the
+                  // server never sent.
+                  marker={
+                    honorKnown
+                      ? {
+                          value: meHonor,
+                          label: t("lobby.createRoomModal.minHonorYou", { honor: meHonor }),
+                        }
+                      : undefined
+                  }
+                  testId="min-honor-input"
+                />
+              </Field>
+
+              <Field
+                label={t("lobby.createRoomModal.allowNewPlayers")}
+                error={
+                  failsOwnNewPlayerGate
+                    ? t("lobby.createRoomModal.errors.ownNewPlayerNotAllowed")
+                    : undefined
+                }
+                errorTestId="allow-new-players-error"
+              >
+                <Segmented
+                  value={allowNewPlayers ? "allow" : "veterans"}
+                  onValueChange={(v) => setAllowNewPlayers(v === "allow")}
+                  options={[
+                    {
+                      value: "allow",
+                      label: t("lobby.createRoomModal.allowNewPlayersYes"),
+                      icon: <UserPlus className="size-3.5" />,
+                    },
+                    {
+                      value: "veterans",
+                      label: t("lobby.createRoomModal.allowNewPlayersNo"),
+                      icon: <UserCheck className="size-3.5" />,
+                    },
+                  ]}
+                  testId="allow-new-players-toggle"
+                  ariaLabel={t("lobby.createRoomModal.allowNewPlayers")}
+                />
+              </Field>
+
               {isPrivate && (
                 <Field
                   label={t("lobby.createRoomModal.roomPassword")}
@@ -434,7 +637,9 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               <Button
                 type="submit"
                 size="cta"
-                disabled={!nameValid || submitting || buyInExceedsBalance || !passwordValid}
+                disabled={
+                  !nameValid || submitting || buyInExceedsBalance || !passwordValid || failsOwnGate
+                }
                 data-testid="create-room-button"
               >
                 {submitting
@@ -462,6 +667,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               timerDuration={timerDuration}
               coinBuyIn={coinBuyIn}
               isPrivate={isPrivate}
+              minHonor={effectiveMinHonor}
+              allowNewPlayers={allowNewPlayers}
               hostUsername={meUsername || "host"}
             />
 
@@ -502,6 +709,8 @@ function PreviewCard({
   timerDuration,
   coinBuyIn,
   isPrivate,
+  minHonor,
+  allowNewPlayers,
   hostUsername,
 }: {
   name: string;
@@ -511,6 +720,8 @@ function PreviewCard({
   timerDuration: number;
   coinBuyIn: number;
   isPrivate: boolean;
+  minHonor: number;
+  allowNewPlayers: boolean;
   hostUsername: string;
 }) {
   const { t } = useTranslation();
@@ -585,6 +796,39 @@ function PreviewCard({
               <LockOpen className="size-3" />
               {t("lobby.card.public")}
             </span>
+          )}
+          {/* Honor-gate chips, mirroring RoomCard exactly so the preview keeps its
+              "this is what the lobby will show" promise honest — including the
+              conditionality: an ungated room's preview shows neither chip. */}
+          {minHonor > 0 && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="preview-min-honor"
+                data-min-honor={minHonor}
+                aria-label={t("lobby.card.minHonorAriaLabel", { minHonor })}
+              >
+                {/* Same tier-tinted shield as RoomCard — tinted by the tier the
+                    REQUIREMENT falls in, so the preview's promise of "this is
+                    what the lobby will show" covers the colour too. */}
+                <HonorShield tier={honorTierForScore(minHonor)} size={12} />
+                {t("lobby.card.minHonor", { minHonor: honorFloorLabel(minHonor) })}
+              </span>
+            </>
+          )}
+          {allowNewPlayers === false && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="preview-veterans-only"
+                aria-label={t("lobby.card.veteransOnlyAriaLabel")}
+              >
+                <UserCheck className="size-3" />
+                {t("lobby.card.veteransOnly")}
+              </span>
+            </>
           )}
         </div>
       </div>

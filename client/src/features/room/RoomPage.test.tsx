@@ -8,9 +8,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { queryKeys } from "@/shared/api/queryKeys";
+import { i18n } from "@/shared/i18n/i18n";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { QueryWrapper } from "@/test-utils";
+import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -103,21 +104,20 @@ const defaultRoom = {
   isQuickPlay: false,
   coinBuyIn: 0,
   isPrivate: false,
+  // Ungated by default (Story 9.8).
+  minHonor: 0,
+  allowNewPlayers: true,
   createdAt: "",
   updatedAt: "",
 };
 
-const defaultUser = {
+const defaultUser = makeUser({
   id: 10,
   username: "alice",
   email: "a@b.com",
-  languagePreference: "en",
-  walletBalance: 5000,
   loginStreakDays: 1,
-  totalXp: 0,
-  level: 0,
   createdAt: "",
-};
+});
 
 beforeEach(() => {
   mockLeaveRoom.mockResolvedValue(undefined);
@@ -446,6 +446,139 @@ describe("RoomPage", () => {
     await waitFor(() => {
       expect(mockJoinRoom).toHaveBeenCalledWith(1, "sesame");
     });
+  });
+
+  // --- Honor gate on the deep-link paths (Story 9.8 AC9) ---
+  //
+  // RoomPage has TWO join call paths: the public auto-join effect and
+  // joinDeepLinkPrivate. 9.6's review found the deep-link path needed the
+  // identical fix the lobby path had received, and it surfaced only in manual
+  // E2E — so both are covered here.
+
+  const bobSeated = {
+    id: 1,
+    roomId: 1,
+    userId: 20,
+    username: "bob",
+    seat: 0,
+    team: "teamA",
+    isBot: false,
+    createdAt: "",
+  };
+
+  it("toasts the composed honor message and bounces to the lobby when the public auto-join is gated", async () => {
+    useAuthStore.setState({
+      user: makeUser({ id: 10, username: "alice", honorScore: 42, isNewPlayer: false }),
+      token: "tok",
+    });
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, ownerId: 20, playerCount: 1, minHonor: 85 },
+      players: [bobSeated],
+    });
+    mockJoinRoom.mockRejectedValue(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
+
+    renderRoomPage();
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(1, undefined));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+
+    // Composed locally from the room's threshold and the viewer's own score.
+    const msg = vi.mocked(toast.error).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("85");
+    expect(msg).toContain("42");
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
+  });
+
+  it("toasts the veterans-only message when the public auto-join hits the newcomer gate", async () => {
+    useAuthStore.setState({
+      user: makeUser({ id: 10, username: "alice", isNewPlayer: true }),
+      token: "tok",
+    });
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, ownerId: 20, playerCount: 1, allowNewPlayers: false },
+      players: [bobSeated],
+    });
+    mockJoinRoom.mockRejectedValue(
+      new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "new players not allowed"),
+    );
+
+    renderRoomPage();
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(1, undefined));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(i18n.t("room.errors.newPlayerNotAllowed")),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
+  });
+
+  it("surfaces the honor gate on the private deep-link path too, not just the public one", async () => {
+    useAuthStore.setState({
+      user: makeUser({ id: 10, username: "alice", honorScore: 30, isNewPlayer: false }),
+      token: "tok",
+    });
+
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, ownerId: 20, playerCount: 1, isPrivate: true, minHonor: 90 },
+      players: [bobSeated],
+    });
+    mockJoinRoom.mockRejectedValue(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
+
+    const user = userEvent.setup();
+    renderRoomPage();
+
+    // The private room prompts first; the honor gate only bites on submit.
+    await waitFor(() => expect(screen.getByTestId("password-prompt-dialog")).toBeInTheDocument());
+    await user.type(screen.getByTestId("password-prompt-input"), "sesame");
+    await user.click(screen.getByTestId("password-prompt-submit"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(1, "sesame"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+
+    const msg = vi.mocked(toast.error).mock.calls.at(-1)?.[0] as string;
+    expect(msg).toContain("90");
+    expect(msg).toContain("30");
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
+  });
+
+  // Completes the 2 codes x 2 call paths matrix. Both paths route through the same
+  // joinFailureMessage(code, room) helper, which is the structural fix AC9 asked
+  // for — but "they share a helper" is exactly the assumption 9.6 made before its
+  // deep-link path turned out to need the identical fix, so the fourth cell is
+  // asserted rather than inferred.
+  it("surfaces the newcomer gate on the private deep-link path too", async () => {
+    useAuthStore.setState({
+      user: makeUser({ id: 10, username: "alice", isNewPlayer: true }),
+      token: "tok",
+    });
+
+    mockGetRoom.mockResolvedValue({
+      room: {
+        ...defaultRoom,
+        ownerId: 20,
+        playerCount: 1,
+        isPrivate: true,
+        allowNewPlayers: false,
+      },
+      players: [bobSeated],
+    });
+    mockJoinRoom.mockRejectedValue(
+      new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "new players not allowed"),
+    );
+
+    const user = userEvent.setup();
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("password-prompt-dialog")).toBeInTheDocument());
+    await user.type(screen.getByTestId("password-prompt-input"), "sesame");
+    await user.click(screen.getByTestId("password-prompt-submit"));
+
+    await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(1, "sesame"));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(i18n.t("room.errors.newPlayerNotAllowed")),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
   });
 
   it("does not re-prompt for the password when a stale cache omits a just-joined member", async () => {
@@ -1091,17 +1224,13 @@ describe("RoomPage", () => {
 
   it("renders waiting message for non-owner when 4 players seated", async () => {
     useAuthStore.setState({
-      user: {
+      user: makeUser({
         id: 20,
         username: "bob",
         email: "b@b.com",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "",
-      },
+      }),
       token: "tok",
     });
 
@@ -1163,17 +1292,13 @@ describe("RoomPage", () => {
 
   it("does not render Start Game button for non-owner", async () => {
     useAuthStore.setState({
-      user: {
+      user: makeUser({
         id: 20,
         username: "bob",
         email: "b@b.com",
-        languagePreference: "en",
-        walletBalance: 5000,
         loginStreakDays: 1,
-        totalXp: 0,
-        level: 0,
         createdAt: "",
-      },
+      }),
       token: "tok",
     });
 
@@ -1920,5 +2045,157 @@ describe("RoomPage", () => {
     // cleanup `/leave` that would eject the player from the queue.
     unmount();
     expect(mockLeaveRoom).not.toHaveBeenCalled();
+  });
+});
+
+// --- Honour in the waiting room (honour redesign R6) ------------------------
+//
+// The waiting room showed honour NOWHERE before this: the lobby card carried both
+// chips, then they vanished the moment you were inside the room they described.
+
+describe("RoomPage honour", () => {
+  const seat = (
+    userId: number,
+    username: string,
+    s: number,
+    honor?: { honorScore: number; honorTier: string },
+  ) => ({
+    id: userId,
+    roomId: 1,
+    userId,
+    username,
+    seat: s,
+    team: s % 2 === 0 ? "teamA" : "teamB",
+    isBot: false,
+    createdAt: "",
+    ...honor,
+  });
+
+  it("shows the gate in the badges row, and not at all when ungated", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1, minHonor: 85, allowNewPlayers: false },
+      players: [seat(10, "alice", 0)],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("badge-min-honor")).toHaveAttribute("data-min-honor", "85"),
+    );
+    expect(screen.getByTestId("badge-veterans-only")).toBeInTheDocument();
+  });
+
+  it("renders no honour badges on an ungated room", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1 },
+      players: [seat(10, "alice", 0)],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("player-seat-0")).toBeInTheDocument());
+    expect(screen.queryByTestId("badge-min-honor")).toBeNull();
+    expect(screen.queryByTestId("badge-veterans-only")).toBeNull();
+  });
+
+  it("shows each seat its own tier, and rings only the seat under the room's bar", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 2, minHonor: 85 },
+      players: [
+        seat(10, "alice", 0, { honorScore: 96, honorTier: "exemplary" }),
+        // 71 is Fair — the seat gets the OLIVE shield, not a red X. Being under
+        // this room's bar is drawn by the tile's ring instead.
+        seat(20, "bob", 1, { honorScore: 71, honorTier: "fair" }),
+      ],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("seat-honor-0")).toBeInTheDocument());
+    expect(screen.getByTestId("seat-honor-0")).toHaveAttribute("data-honor", "96");
+    expect(screen.getByTestId("seat-honor-1")).toHaveAttribute("data-honor", "71");
+    // The shield states the PLAYER's tier, never a verdict about the room.
+    expect(within(screen.getByTestId("seat-honor-1")).getByTestId("honor-shield")).toHaveAttribute(
+      "data-tier",
+      "fair",
+    );
+
+    // Only the below-bar seat's tile is ringed.
+    expect(screen.getByTestId("seat-position-east")).toHaveAttribute(
+      "data-below-honor-bar",
+      "true",
+    );
+    expect(screen.getByTestId("seat-position-south")).not.toHaveAttribute("data-below-honor-bar");
+  });
+
+  it("renders a real honour score of 0 rather than omitting it", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1 },
+      players: [seat(10, "alice", 0, { honorScore: 0, honorTier: "problematic" })],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("seat-honor-0")).toBeInTheDocument());
+    expect(screen.getByTestId("seat-honor-0")).toHaveAttribute("data-honor", "0");
+  });
+
+  it("renders the seat's level before the honour", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1 },
+      players: [seat(10, "alice", 0, { level: 7, honorScore: 96, honorTier: "exemplary" })],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("seat-level-0")).toBeInTheDocument());
+    expect(screen.getByTestId("seat-level-0")).toHaveAttribute("data-level", "7");
+    expect(screen.getByTestId("seat-level-0")).toHaveTextContent("Lvl 7");
+    // Level and honour share one row, level FIRST (user decision 2026-07-31).
+    const row = screen.getByTestId("seat-level-0").parentElement;
+    expect(within(row as HTMLElement).getByTestId("seat-honor-0")).toBeInTheDocument();
+    expect(row?.firstElementChild).toBe(screen.getByTestId("seat-level-0"));
+  });
+
+  it("renders a real level 0, and no level chip for a seat whose level did not arrive", async () => {
+    // Same coercion rule as honour: 0 is a legitimate value (a brand-new
+    // account), while `undefined` means "not read" and renders nothing.
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 2 },
+      players: [
+        seat(10, "alice", 0, { level: 0, honorScore: 80, honorTier: "fair" }),
+        seat(20, "bob", 1, { honorScore: 80, honorTier: "fair" }),
+      ],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("seat-level-0")).toBeInTheDocument());
+    expect(screen.getByTestId("seat-level-0")).toHaveAttribute("data-level", "0");
+    expect(screen.queryByTestId("seat-level-1")).toBeNull();
+    // The level-less seat still shows its honour.
+    expect(screen.getByTestId("seat-honor-1")).toBeInTheDocument();
+  });
+
+  it("shows no shield for a seat whose honour did not arrive", async () => {
+    // A degraded honour read must never make a seat look like it has score 0.
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue({
+      room: { ...defaultRoom, playerCount: 1, minHonor: 85 },
+      players: [seat(10, "alice", 0)],
+    });
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("player-seat-0")).toBeInTheDocument());
+    expect(screen.queryByTestId("seat-honor-0")).toBeNull();
+    // And it is never treated as the blocking seat.
+    expect(screen.getByTestId("seat-position-south")).not.toHaveAttribute("data-below-honor-bar");
   });
 });

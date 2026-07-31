@@ -25,6 +25,18 @@ export interface User {
   // Go zero values serialize as real 0s — compare explicitly, never truthiness.
   totalXp: number;
   level: number;
+  // Honor (Story 9.7). Server-authoritative: honorScore is recomputed from the
+  // stored decayed weights on every response, and honorTier is a stable machine
+  // token the client maps to an i18n label — never a display string on the wire.
+  // isNewPlayer suppresses the score/tier in favour of a "New Player" chip, but
+  // the real values are still present (Story 9.8's join gate reads them).
+  //
+  // Go zero values serialize as real 0s / false — compare explicitly, never
+  // truthiness. In particular `honorScore || 80` is WRONG: a legitimate score of
+  // 0 ("Problematic") would silently render as 80 ("Fair").
+  honorScore: number;
+  honorTier: string;
+  isNewPlayer: boolean;
   createdAt: string;
 }
 
@@ -58,6 +70,19 @@ export interface Room {
    * indicator and the join-time password prompt.
    */
   isPrivate: boolean;
+  /**
+   * Honor gate (Story 9.8, FR57). `minHonor` is the score an EXPERIENCED player
+   * must clear, 0 = no bar; `allowNewPlayers` is whether a player with no track
+   * record may enter at all. The two are INDEPENDENT — a room can be
+   * `minHonor: 0, allowNewPlayers: false` ("anyone experienced"), and a New Player
+   * is never score-checked.
+   *
+   * Both are Go zero values on the wire, so compare EXPLICITLY: `minHonor > 0` and
+   * `allowNewPlayers === false`. A truthiness check on either is a bug (a real 0
+   * and a real false are legitimate values, not "absent").
+   */
+  minHonor: number;
+  allowNewPlayers: boolean;
   status: string;
   playerCount: number;
   isQuickPlay: boolean;
@@ -77,6 +102,15 @@ export interface CreateRoomRequest {
   isPrivate: boolean;
   /** Plaintext room password — sent only when `isPrivate` is true; never stored client-side. */
   password?: string;
+  /**
+   * Honor gate at create time (Story 9.8, FR57). Server-side both are optional
+   * pointers: omitted `minHonor` defaults to 0 and omitted `allowNewPlayers`
+   * defaults to true, so an explicit `false` is distinguishable from "not sent".
+   * `minHonor` must be within [0,100] — the same interval, in the same unit, that
+   * the server validates and the DB CHECK enforces.
+   */
+  minHonor: number;
+  allowNewPlayers: boolean;
 }
 
 export interface RoomPlayer {
@@ -89,6 +123,23 @@ export interface RoomPlayer {
   // Synthetic bot entries arrive as {id:0, userId:0, username:"", isBot:true}.
   // Always check with `isBot === true` — never infer from a falsy userId.
   isBot: boolean;
+  /**
+   * Per-seat honour for the waiting-room roster (honour redesign R6). OPTIONAL and
+   * nullable on purpose: the server omits both when the seat is a bot, when no
+   * honour service is wired, or when the read failed — so `undefined` means "no
+   * shield", never "score 0". A real 0 is a legitimate value and arrives as 0.
+   *
+   * Test with `typeof honorScore === "number"`, never truthiness.
+   */
+  honorScore?: number;
+  honorTier?: string;
+  /**
+   * Lifetime level, hydrated alongside honour from the same roster read and
+   * rendered before the shield on each seat tile. Same semantics as honorScore:
+   * `undefined` means "not read" (a bot, or the hydration failed) and renders
+   * nothing, while a real level 0 — a brand-new account — arrives as 0.
+   */
+  level?: number;
   createdAt: string;
 }
 

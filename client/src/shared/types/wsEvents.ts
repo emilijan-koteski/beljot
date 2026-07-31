@@ -219,6 +219,31 @@ export interface XpAwardedPayload {
   leveledUp: boolean;
 }
 
+// --- Honor events (Story 9.7) ---
+// Sent per-human at match end, slotted after event:xp_awarded and before the
+// trailing event:match_state. Carries that player's own recomputed honor score
+// and its tier bucket. The score and tier are server-authoritative — the client
+// mirror in shared/lib/honor.ts is presentation only and never decides access.
+//
+// honorTier is a STABLE MACHINE TOKEN ("exemplary" | "trusted" | "fair" |
+// "unreliable" | "problematic") that the client maps to an i18n label and
+// colour; a display string never crosses the wire.
+//
+// isNewPlayer is a presentation hint: below the matches-played floor
+// (completed + abandoned < 5 — it counts experience, not successes) the UI
+// hides the score and tier behind a "New Player" chip, but honorScore and
+// honorTier are still populated. Keep in sync with server events.go
+// (EventHonorUpdated).
+export const EVENT_HONOR_UPDATED = "event:honor_updated" as const;
+
+export interface HonorUpdatedPayload {
+  honorScore: number;
+  honorTier: string;
+  honorCompletedTotal: number;
+  honorAbandonedTotal: number;
+  isNewPlayer: boolean;
+}
+
 // --- Disconnect/reconnect events (server -> client) ---
 export const EVENT_PLAYER_DISCONNECTED = "event:player_disconnected" as const;
 export const EVENT_PLAYER_RECONNECTED = "event:player_reconnected" as const;
@@ -299,6 +324,21 @@ export interface RoomCreatedPayload {
   isQuickPlay: boolean;
   /** Derived privacy flag (Story 9.6) so the lobby card lock indicator stays live. */
   isPrivate: boolean;
+  /**
+   * Honor gate (Story 9.8), declared for the same reason as isPrivate above: the
+   * server's roomLifecyclePayload sends both keys, and the lobby card's honor and
+   * veterans-only chips read them, so the declared contract has to carry them or
+   * the next author gets a tsc error on a field the server is actually sending.
+   *
+   * Caveat, recorded rather than hidden: the QuickPlay system:room_created map is
+   * hand-built separately and omits these two (as it already omits isPrivate,
+   * coinBuyIn and players). Harmless today — a synthesized quick-play room IS
+   * ungated, so absent reads as ungated, which is correct — and tracked in
+   * deferred-work.md, where the real fix is routing that map through
+   * roomLifecyclePayload instead of maintaining a third key list.
+   */
+  minHonor: number;
+  allowNewPlayers: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -319,6 +359,21 @@ export interface RoomUpdatedPayload {
   isQuickPlay: boolean;
   /** Derived privacy flag (Story 9.6) so the lobby card lock indicator stays live. */
   isPrivate: boolean;
+  /**
+   * Honor gate (Story 9.8), declared for the same reason as isPrivate above: the
+   * server's roomLifecyclePayload sends both keys, and the lobby card's honor and
+   * veterans-only chips read them, so the declared contract has to carry them or
+   * the next author gets a tsc error on a field the server is actually sending.
+   *
+   * Caveat, recorded rather than hidden: the QuickPlay system:room_created map is
+   * hand-built separately and omits these two (as it already omits isPrivate,
+   * coinBuyIn and players). Harmless today — a synthesized quick-play room IS
+   * ungated, so absent reads as ungated, which is correct — and tracked in
+   * deferred-work.md, where the real fix is routing that map through
+   * roomLifecyclePayload instead of maintaining a third key list.
+   */
+  minHonor: number;
+  allowNewPlayers: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -347,6 +402,14 @@ export interface PlayerJoinedPayload {
   userId: number;
   username: string;
   playerCount: number;
+  /**
+   * The joiner's roster decoration, so already-seated viewers can draw the new
+   * seat's level + shield without a refetch. Optional with the same semantics
+   * as RoomPlayer: absent means "not read", a real 0 arrives as 0.
+   */
+  honorScore?: number;
+  honorTier?: string;
+  level?: number;
 }
 
 export interface PlayerLeftPayload {
@@ -374,6 +437,10 @@ export interface RoomOwnerChangedPayload {
 // present-and-solvent player remained to own it (Story 9.3 AC4). Recipients
 // route to the lobby with a "room closed" notice. Keep in sync with server
 // events.go (SystemRoomClosedInsolvent).
+//
+// Story 9.8 REUSES this event for honor closes (an owner honor-ejected with no
+// eligible heir). The payload and the reason-agnostic client copy already cover
+// both, so the wire string is deliberately unchanged.
 export const SYSTEM_ROOM_CLOSED_INSOLVENT = "system:room_closed_insolvent" as const;
 
 export interface RoomClosedInsolventPayload {
@@ -390,6 +457,28 @@ export interface InsolventEjectedPayload {
   roomId: number;
   buyIn: number;
   balance: number;
+}
+
+// Per-user push to a player ejected from a room because their honor score no
+// longer clears the room's gate (Story 9.8 AC6). Sibling of
+// SYSTEM_INSOLVENT_EJECTED above: same shape, same delivery, same client
+// pipeline (roomStore.roomEjection -> RoomEjectionModal). Keep in sync with
+// server events.go (SystemHonorEjected).
+//
+// The system: prefix is deliberate — this is a pre-match, room-lifecycle push,
+// not an in-match game-state event — and it means the event has ZERO WS
+// drift-gate touchpoints: no Zod schema, no golden, no conformance witness, no
+// contract-test row. Every system:* payload in this file is likewise outside the
+// gate. Do not add any of those for it (Story 9.8 D4).
+export const SYSTEM_HONOR_EJECTED = "system:honor_ejected" as const;
+
+export interface HonorEjectedPayload {
+  roomId: number;
+  // The room's threshold, and the player's own authoritative recomputed score.
+  // Both are real Go ints: a score of 0 is legitimate, so validate with
+  // typeof === "number", never JS truthiness.
+  minHonor: number;
+  honor: number;
 }
 
 export interface SeatUpdatedPayload {

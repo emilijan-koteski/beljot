@@ -115,6 +115,10 @@ func (r *timestampedRepo) GetTopRivalsForUser(_ uint, _ int) ([]match.RivalAggre
 	return nil, nil
 }
 
+func (r *timestampedRepo) GetHonorTrendWindowsForUser(_ uint, _ int) (match.HonorTrendWindows, error) {
+	return match.HonorTrendWindows{}, nil
+}
+
 func (r *timestampedRepo) wasCalled() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TopBar } from "@/shared/components/TopBar";
 import { resetLobbyReturnGuardForTests } from "@/shared/hooks/useLobbyReturn";
 import { useAuthStore } from "@/shared/stores/authStore";
+import type { User } from "@/shared/types/apiTypes";
+import { makeUser } from "@/test-utils";
 
 vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
@@ -24,21 +26,17 @@ function renderWithRouter() {
   );
 }
 
-function setAuthUser(overrides: Partial<import("@/shared/types/apiTypes").User> = {}) {
+function setAuthUser(overrides: Partial<User> = {}) {
   useAuthStore.setState({
     token: "test-token",
-    user: {
-      id: 1,
+    // Routed through the shared makeUser fixture so the next additive User field
+    // is a one-line change here too (code review 2026-07-29 — this file was the
+    // last one still hand-building the literal).
+    user: makeUser({
       username: "kiro",
       email: "kiro@example.com",
-      languagePreference: "en",
-      walletBalance: 5000,
-      loginStreakDays: 1,
-      totalXp: 0,
-      level: 0,
-      createdAt: "2026-01-01T00:00:00Z",
       ...overrides,
-    },
+    }),
     isLoading: false,
   });
 }
@@ -123,6 +121,22 @@ describe("TopBar XP level (Story 9.5)", () => {
 
     expect(screen.getByTestId("xp-level")).toHaveTextContent("Lvl 0");
     expect(screen.getByTestId("xp-bar")).toHaveAttribute("aria-valuenow", "0");
+  });
+});
+
+describe("TopBar honor (Story 9.7)", () => {
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  it("does not render an honor chip in the header", () => {
+    // Honor is surfaced on the profile page (HonorHeroBand), not in the header —
+    // the chip that used to sit beside the coin pill was removed.
+    setAuthUser({ honorScore: 96, honorTier: "exemplary" });
+    renderWithRouter();
+
+    expect(screen.queryByTestId("honor-chip")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("honor-score")).not.toBeInTheDocument();
   });
 });
 

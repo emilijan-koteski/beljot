@@ -179,6 +179,9 @@ describe("RegisterPage", () => {
       loginStreakDays: 1,
       totalXp: 0,
       level: 0,
+      honorScore: 80,
+      honorTier: "fair",
+      isNewPlayer: true,
       createdAt: "2026-04-10T00:00:00Z",
     });
 
@@ -213,6 +216,9 @@ describe("RegisterPage", () => {
       loginStreakDays: 1,
       totalXp: 0,
       level: 0,
+      honorScore: 80,
+      honorTier: "fair",
+      isNewPlayer: true,
       createdAt: "2026-04-10T00:00:00Z",
     });
 
@@ -380,6 +386,9 @@ describe("RegisterPage", () => {
       loginStreakDays: 1,
       totalXp: 0,
       level: 0,
+      honorScore: 80,
+      honorTier: "fair",
+      isNewPlayer: true,
       createdAt: "2026-04-10T00:00:00Z",
     });
   });
@@ -396,6 +405,9 @@ describe("RegisterPage", () => {
         loginStreakDays: 0,
         totalXp: 0,
         level: 0,
+        honorScore: 80,
+        honorTier: "fair",
+        isNewPlayer: true,
         createdAt: "2026-01-01T00:00:00Z",
       };
     }

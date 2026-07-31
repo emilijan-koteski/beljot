@@ -86,7 +86,7 @@ export function TopBar({
 
   return (
     <nav
-      className="sticky top-0 z-50 flex h-15 items-center border-b border-border bg-[rgba(245,242,232,0.85)] px-7 backdrop-blur-md"
+      className="sticky top-0 z-50 flex h-15 items-center border-b border-border bg-[rgba(245,242,232,0.85)] px-4 backdrop-blur-md lg:px-7"
       data-testid="app-nav"
     >
       <Link
@@ -94,7 +94,7 @@ export function TopBar({
         onClick={user ? handleLobbyLinkClick : undefined}
         data-testid="app-brand"
         aria-label={t("nav.appName")}
-        className="flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:ring-accent/50 focus-visible:outline-none focus-visible:ring-2"
+        className="flex shrink-0 items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:ring-accent/50 focus-visible:outline-none focus-visible:ring-2"
       >
         <img
           src="/beljot-logo.svg"
@@ -104,17 +104,25 @@ export function TopBar({
           data-testid="app-logo"
         />
         {/* Full "Beljot.online" wordmark — the ".online" suffix is brass, the
-            same gold as the logo's border. By default it hides below md (the
-            burger-header / mobile range) so the logo alone holds the left edge,
-            freeing width for the coin balance + level + language + burger; the
-            Link's aria-label still carries "Beljot" for assistive tech.
+            same gold as the logo's border. By default it hides below lg so the
+            logo alone holds the left edge, freeing width for the coin balance +
+            level + language + user pill; the Link's aria-label still
+            carries "Beljot" for assistive tech.
+
+            The floor was md until the 2026-07-29 E2E pass measured this row: at
+            md the wordmark (117px), the nav links AND the username pill all
+            switch on at once, so the bar needed 903px inside a 758px viewport
+            and scrolled horizontally for every signed-in user from 768px to
+            1023px. The wordmark is the largest item that carries no unique
+            information (the logo beside it is the same brand, and the aria-label
+            is unchanged), so it yields the md..lg band first.
 
             showFullBrand keeps it visible at every breakpoint — used by the
             pre-auth screens, where the bar is otherwise empty. */}
         <span
           className={cn(
-            "font-display text-ink text-xl font-semibold tracking-tight",
-            showFullBrand ? "inline" : "hidden md:inline",
+            "font-display text-ink text-xl font-semibold tracking-tight whitespace-nowrap",
+            showFullBrand ? "inline" : "hidden lg:inline",
           )}
           data-testid="app-name"
         >
@@ -124,7 +132,7 @@ export function TopBar({
       </Link>
 
       {showNav && (
-        <div className="ml-7 hidden h-full items-center md:flex">
+        <div className="ml-4 hidden h-full shrink-0 items-center md:flex lg:ml-7">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
@@ -133,7 +141,7 @@ export function TopBar({
               onClick={item.path === "/lobby" ? handleLobbyLinkClick : undefined}
               className={({ isActive }) =>
                 cn(
-                  "flex h-full items-center px-4 text-sm font-medium transition-colors",
+                  "flex h-full items-center whitespace-nowrap px-2.5 text-sm font-medium transition-colors lg:px-4",
                   isActive
                     ? "border-accent text-ink border-b-2"
                     : "text-ink-dim hover:text-ink border-b-2 border-transparent",
@@ -147,7 +155,11 @@ export function TopBar({
         </div>
       )}
 
-      <div className="ml-auto flex items-center gap-2.5">
+      {/* min-w-0 lets this cluster be a shrink target so the ONE flexible item
+          inside it (the username) can truncate instead of pushing the row wider
+          than the viewport. Every fixed-size pill below is shrink-0 + nowrap, so
+          none of them can collapse or wrap onto a second line. */}
+      <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2 lg:gap-2.5">
         {/* Lifetime level + XP progress (Story 9.5). Level is server-authoritative
             (user.level); the fill is cosmetic display math. Live-updates via the
             event:xp_awarded handler that writes user.level / user.totalXp on the
@@ -157,7 +169,7 @@ export function TopBar({
           <>
             {/* Phones (<sm): compact level ring with the level centered, so the
                 wider Lvl+bar doesn't crowd the coin pill on narrow screens. */}
-            <div className="flex sm:hidden">
+            <div className="flex shrink-0 sm:hidden">
               <LevelRing
                 level={user.level}
                 fraction={xp.fraction}
@@ -170,8 +182,11 @@ export function TopBar({
               />
             </div>
             {/* ≥sm: level text + linear XP bar. */}
-            <div className="hidden items-center gap-2 sm:flex" data-testid="xp-indicator">
-              <span className="text-ink text-xs font-semibold tabular-nums" data-testid="xp-level">
+            <div className="hidden shrink-0 items-center gap-2 sm:flex" data-testid="xp-indicator">
+              <span
+                className="text-ink text-xs font-semibold whitespace-nowrap tabular-nums"
+                data-testid="xp-level"
+              >
                 {t("xp.short", { level: user.level })}
               </span>
               <XpBar
@@ -190,11 +205,11 @@ export function TopBar({
             profile, not in the header. */}
         {user && (
           <div
-            className="bg-surface-elevated flex items-center gap-1.5 rounded-full border border-border py-1 pr-3 pl-2.5"
+            className="bg-surface-elevated flex shrink-0 items-center gap-1.5 rounded-full border border-border py-1 pr-3 pl-2.5"
             data-testid="coin-balance"
           >
-            <Coins className="size-4" style={{ color: COIN_GOLD }} aria-hidden="true" />
-            <span className="text-ink text-sm font-semibold tabular-nums">
+            <Coins className="size-4 shrink-0" style={{ color: COIN_GOLD }} aria-hidden="true" />
+            <span className="text-ink text-sm font-semibold whitespace-nowrap tabular-nums">
               {formatCoins(user.walletBalance)}
             </span>
           </div>
@@ -202,21 +217,30 @@ export function TopBar({
 
         <LanguageSelector persistToServer={persistLanguage} testIdPrefix={languageTestIdPrefix} />
 
-        {/* Desktop (≥md): username pill with a logout dropdown. */}
+        {/* Desktop (≥md): username pill with a logout dropdown.
+
+            This is the row's only elastic item, so it is the designated shrink
+            target: min-w-0 on the trigger plus truncate on the name means a long
+            username ellipsises instead of pushing the bar past the viewport. The
+            avatar and chevron stay shrink-0 so the pill never loses its shape.
+            Without this a 20-character username (the column max) reintroduced the
+            horizontal scroll that the md..lg fixes above remove. */}
         {showUserMenu && user && (
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="bg-surface-elevated hover:bg-surface-sunken aria-expanded:bg-surface-sunken hidden items-center gap-2 rounded-full border border-border py-1 pr-3 pl-1 transition-colors md:flex"
+              className="bg-surface-elevated hover:bg-surface-sunken aria-expanded:bg-surface-sunken hidden min-w-0 items-center gap-2 rounded-full border border-border py-1 pr-3 pl-1 transition-colors md:flex"
               data-testid="nav-user"
             >
               <span
-                className="bg-accent text-accent-ink flex size-6.5 items-center justify-center rounded-full text-xs font-bold"
+                className="bg-accent text-accent-ink flex size-6.5 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 aria-hidden="true"
               >
                 {(user.username.charAt(0) || "?").toUpperCase()}
               </span>
-              <span className="text-ink text-sm font-medium">{user.username}</span>
-              <ChevronDown className="text-ink-dim size-3 opacity-70" />
+              <span className="text-ink max-w-24 truncate text-sm font-medium lg:max-w-40">
+                {user.username}
+              </span>
+              <ChevronDown className="text-ink-dim size-3 shrink-0 opacity-70" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
@@ -246,7 +270,7 @@ export function TopBar({
             <DropdownMenuTrigger
               aria-label={t("nav.menu")}
               data-testid="nav-menu"
-              className="text-ink-dim hover:bg-surface-sunken hover:text-ink aria-expanded:bg-surface-sunken aria-expanded:text-ink inline-flex size-8 items-center justify-center rounded-lg border border-border bg-transparent transition-colors md:hidden"
+              className="text-ink-dim hover:bg-surface-sunken hover:text-ink aria-expanded:bg-surface-sunken aria-expanded:text-ink inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-transparent transition-colors md:hidden"
             >
               <Menu className="size-4.5" />
             </DropdownMenuTrigger>

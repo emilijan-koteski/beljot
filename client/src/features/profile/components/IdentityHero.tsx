@@ -12,6 +12,7 @@ import { xpFraction } from "@/shared/lib/xpLevel";
 
 import { daysSince } from "../lib/format";
 import { EditableUsername } from "./EditableUsername";
+import { HonorHeroBand, type HonorHeroBandProps } from "./HonorHeroBand";
 import { WinRateRing } from "./WinRateRing";
 
 type IdentityHeroProps = {
@@ -39,6 +40,12 @@ type IdentityHeroProps = {
   xpForNextLevel: number;
   /** 0–100, or null with no games. */
   winRate: number | null;
+  /**
+   * Honour (Story 9.7, redesigned): rendered as the hero's full-width bottom
+   * band. Optional so the hero stays usable without it — omit and the band and
+   * its hairline rule simply do not render.
+   */
+  honor?: HonorHeroBandProps;
 };
 
 type PillTone = "neutral" | "accent" | "brass";
@@ -118,6 +125,7 @@ export function IdentityHero({
   xpIntoLevel,
   xpForNextLevel,
   winRate,
+  honor,
 }: IdentityHeroProps) {
   const { t } = useTranslation();
 
@@ -200,8 +208,14 @@ export function IdentityHero({
 
         {/* Lifetime XP progress bar (Story 9.5, AC4). Level + numeric progress
             on top, the bar below. xpIntoLevel / xpForNextLevel are server-
-            provided; the bar fill is cosmetic. Leaves room for the not-yet-
-            built honor / prior-season rank surfaces (render nothing for them). */}
+            provided; the bar fill is cosmetic. Leaves room for the not-yet-built
+            prior-season rank surface (render nothing for it).
+
+            Honour is NOT in this column, and the original reason still holds —
+            the score, tier, meter, counts and trend need more width than this
+            narrow slot beside the XP bar. The redesign's answer is the full-width
+            band at the foot of the card (HonorHeroBand below), which gives it that
+            width without putting it outside the card. */}
         <div
           className="col-span-2 flex max-w-xs flex-col gap-1 sm:col-span-1 sm:col-start-2"
           data-testid="profile-xp"
@@ -229,6 +243,10 @@ export function IdentityHero({
       <div className="justify-self-center sm:justify-self-end">
         <WinRateRing rate={winRate} />
       </div>
+
+      {/* Full-width bottom band spanning both hero columns, so identity, level,
+          win rate and reliability read as one profile rather than four. */}
+      {honor && <HonorHeroBand {...honor} />}
     </header>
   );
 }
