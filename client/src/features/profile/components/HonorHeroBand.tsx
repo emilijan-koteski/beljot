@@ -1,4 +1,4 @@
-import { ArrowRight, HelpCircle, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { HelpCircle, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -6,6 +6,7 @@ import { HonorBandMeter } from "@/shared/components/HonorBandMeter";
 import { HonorExplainerDialog } from "@/shared/components/HonorExplainerDialog";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { Badge } from "@/shared/components/ui/badge";
+import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import {
   HONOR_NEW_PLAYER_MIN_MATCHES,
   HONOR_TREND_WINDOW,
@@ -44,19 +45,6 @@ const TREND_COLOR: Record<HonorTrendDirection, string> = {
   down: "var(--danger)",
 };
 
-function Stat({ testId, label, value }: { testId: string; label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5" data-testid={testId} data-value={value}>
-      <span className="text-brass-deep font-mono text-[9.5px] font-semibold tracking-[1.6px] uppercase">
-        {label}
-      </span>
-      <span className="font-display text-ink text-[17px] leading-none font-bold tabular-nums">
-        {value}
-      </span>
-    </div>
-  );
-}
-
 /**
  * Honour as the identity hero's bottom band, replacing the standalone
  * HonorPanel section that Story 9.7 shipped.
@@ -69,10 +57,10 @@ function Stat({ testId, label, value }: { testId: string; label: string; value: 
  * outside the card entirely.
  *
  * Layout is a WRAPPING FLEX ROW, not a fixed grid: the meter is the only elastic
- * cell, so the counts wrap as a block on narrow screens instead of the meter
- * being crushed. The explainer is an icon button on desktop — a text label there
- * would have to survive "Како функционира честа →" in mk — and becomes a labelled
- * link below sm, where there is a full row for it.
+ * cell, so the trend wraps to its own line on narrow screens instead of the
+ * meter being crushed. The explainer is a bare icon beside the ЧЕСТ eyebrow at every
+ * width — a text label would have to survive "Како функционира честа →" in mk,
+ * and anchoring it to the heading keeps it out of the wrapping row entirely.
  */
 export function HonorHeroBand({
   score: rawScore,
@@ -119,44 +107,60 @@ export function HonorHeroBand({
       data-new-player={String(isNewPlayer)}
       data-trend-direction={direction}
     >
+      {/* Section eyebrow, same rhythm as the Career / Activity headers: the
+          word sits at the top-left of the band, just below the hairline rule,
+          instead of as a mini-label crammed beside the score. mb-1 matches
+          SectionHeader's eyebrow-to-content gap. The explainer trigger rides
+          beside it as a bare brass icon — one placement at every width, sized
+          and coloured to read as part of the heading rather than a control of
+          its own. */}
+      <div className="mb-1 flex items-center gap-1.5">
+        <Eyebrow>{t("profile.honor.eyebrow")}</Eyebrow>
+        <button
+          type="button"
+          onClick={() => setExplainerOpen(true)}
+          className="text-brass-deep hover:text-ink flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          aria-label={t("profile.honor.explainer.open")}
+          title={t("profile.honor.explainer.open")}
+          data-testid="profile-honor-explainer-button"
+        >
+          <HelpCircle className="size-3.5" aria-hidden="true" />
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
-        {/* Identity: label, then either the score + tier or the newcomer counter. */}
+        {/* Identity: shield, then either the score + tier or the newcomer counter. */}
         <div className="flex min-w-0 items-center gap-2.5">
           <HonorShield tier={isNewPlayer ? "fair" : resolvedTier} size={20} className="shrink-0" />
-          <div className="flex min-w-0 flex-col">
-            <span className="text-brass-deep font-mono text-[9.5px] font-semibold tracking-[1.6px] uppercase">
-              {t("profile.honor.topBarLabel")}
+          {isNewPlayer ? (
+            <span
+              className="font-display text-ink text-[22px] leading-none font-bold tabular-nums"
+              data-testid="profile-honor-new"
+              data-value={played}
+            >
+              {t("profile.honor.newPlayerProgress", {
+                played,
+                total: HONOR_NEW_PLAYER_MIN_MATCHES,
+              })}
             </span>
-            {isNewPlayer ? (
+          ) : (
+            <div className="flex items-baseline gap-2">
               <span
-                className="font-display text-ink text-[22px] leading-none font-bold tabular-nums"
-                data-testid="profile-honor-new"
-                data-value={played}
+                className="font-display text-[26px] leading-none font-bold tracking-[-0.8px] tabular-nums"
+                style={{ color: "var(--ink)" }}
+                data-testid="profile-honor-score"
               >
-                {t("profile.honor.newPlayerProgress", {
-                  played,
-                  total: HONOR_NEW_PLAYER_MIN_MATCHES,
-                })}
+                {score}
               </span>
-            ) : (
-              <div className="flex items-baseline gap-2">
-                <span
-                  className="font-display text-[26px] leading-none font-bold tracking-[-0.8px] tabular-nums"
-                  style={{ color: "var(--ink)" }}
-                  data-testid="profile-honor-score"
-                >
-                  {score}
-                </span>
-                {/* Badge takes no arbitrary props, so the testid rides a wrapper
-                    — same shape HonorPanel used. Tone stays NEUTRAL: across this
-                    redesign only the shield is ever tinted, so the tier word does
-                    not compete with it for the same signal. */}
-                <span data-testid="profile-honor-tier">
-                  <Badge tone="neutral">{t(`profile.honor.tier.${resolvedTier}`)}</Badge>
-                </span>
-              </div>
-            )}
-          </div>
+              {/* Badge takes no arbitrary props, so the testid rides a wrapper
+                  — same shape HonorPanel used. Tone stays NEUTRAL: across this
+                  redesign only the shield is ever tinted, so the tier word does
+                  not compete with it for the same signal. */}
+              <span data-testid="profile-honor-tier">
+                <Badge tone="neutral">{t(`profile.honor.tier.${resolvedTier}`)}</Badge>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* The one elastic cell. Suppressed for a newcomer: a marker on the ramp
@@ -174,63 +178,34 @@ export function HonorHeroBand({
           )}
         </div>
 
-        {/* Counts + trend wrap together as one block rather than individually, so
-            they never split across lines mid-group. */}
-        <div className="flex items-center gap-5">
-          <Stat
-            testId="profile-honor-completed"
-            label={t("profile.honor.completedLabel")}
-            value={String(completedTotal)}
-          />
-          <Stat
-            testId="profile-honor-abandoned"
-            label={t("profile.honor.abandonedLabel")}
-            value={String(abandonedTotal)}
-          />
-          {!isNewPlayer && (
-            <div
-              className="flex flex-col gap-0.5"
-              data-testid="profile-honor-trend"
-              data-trend-direction={direction}
-              data-trend-delta={String(trendDelta)}
-              title={t("profile.honor.trendTooltip", { window: HONOR_TREND_WINDOW })}
+        {/* Trend only. The raw finished/abandoned counts left the band entirely
+            (user decision 2026-07-31): the Статистика tiles already carry those
+            numbers, so repeating them here was duplication, and the band stays
+            honor-specific. Suppressed for a newcomer, whose trend needs two full
+            windows to mean anything. */}
+        {!isNewPlayer && (
+          <div
+            className="flex flex-col gap-0.5"
+            data-testid="profile-honor-trend"
+            data-trend-direction={direction}
+            data-trend-delta={String(trendDelta)}
+            title={t("profile.honor.trendTooltip", { window: HONOR_TREND_WINDOW })}
+          >
+            <span className="text-brass-deep font-mono text-[9.5px] font-semibold tracking-[1.6px] uppercase">
+              {t("profile.honor.lastWindow", { window: HONOR_TREND_WINDOW })}
+            </span>
+            <span
+              className="inline-flex items-center gap-1 text-[15px] leading-none font-bold tabular-nums"
+              style={{ color: TREND_COLOR[direction] }}
             >
-              <span className="text-brass-deep font-mono text-[9.5px] font-semibold tracking-[1.6px] uppercase">
-                {t("profile.honor.lastWindow", { window: HONOR_TREND_WINDOW })}
-              </span>
-              <span
-                className="inline-flex items-center gap-1 text-[15px] leading-none font-bold tabular-nums"
-                style={{ color: TREND_COLOR[direction] }}
-              >
-                <TrendIcon className="size-3.5 shrink-0" aria-hidden="true" />
-                {/* A signed number is meaningless for "flat" — the icon says it. */}
-                {direction === "flat" ? null : `${trendDelta > 0 ? "+" : ""}${trendDelta}`}
-                <span className="sr-only">{t(`profile.honor.trend.${direction}`)}</span>
-              </span>
-            </div>
-          )}
-        </div>
+              <TrendIcon className="size-3.5 shrink-0" aria-hidden="true" />
+              {/* A signed number is meaningless for "flat" — the icon says it. */}
+              {direction === "flat" ? null : `${trendDelta > 0 ? "+" : ""}${trendDelta}`}
+              <span className="sr-only">{t(`profile.honor.trend.${direction}`)}</span>
+            </span>
+          </div>
+        )}
 
-        {/* Icon button from sm up; a labelled link below it. */}
-        <button
-          type="button"
-          onClick={() => setExplainerOpen(true)}
-          className="text-ink-dim hover:text-ink hover:border-border-2 border-border hidden size-8 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:flex"
-          aria-label={t("profile.honor.explainer.open")}
-          title={t("profile.honor.explainer.open")}
-          data-testid="profile-honor-explainer-button"
-        >
-          <HelpCircle className="size-4" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setExplainerOpen(true)}
-          className="text-accent hover:text-accent-deep inline-flex w-full cursor-pointer items-center gap-1.5 text-[13px] font-semibold sm:hidden"
-          data-testid="profile-honor-explainer-link"
-        >
-          {t("profile.honor.explainer.open")}
-          <ArrowRight className="size-3.5" aria-hidden="true" />
-        </button>
       </div>
 
       <HonorExplainerDialog open={explainerOpen} onOpenChange={setExplainerOpen} />

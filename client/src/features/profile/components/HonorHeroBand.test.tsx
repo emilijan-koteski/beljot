@@ -45,11 +45,13 @@ describe("HonorHeroBand (honour redesign R3)", () => {
     expect(screen.getByTestId("profile-honor-tier")).toHaveTextContent("Exemplary");
   });
 
-  it("renders the raw completed and abandoned counts", () => {
+  it("never renders the raw completed / abandoned counts (user decision 2026-07-31)", () => {
+    // The Статистика tiles already carry these numbers; repeating them in the
+    // band was duplication. The totals still feed the newcomer "n / 5" counter.
     renderBand({ completedTotal: 42, abandonedTotal: 3 });
 
-    expect(screen.getByTestId("profile-honor-completed")).toHaveAttribute("data-value", "42");
-    expect(screen.getByTestId("profile-honor-abandoned")).toHaveAttribute("data-value", "3");
+    expect(screen.queryByTestId("profile-honor-completed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("profile-honor-abandoned")).not.toBeInTheDocument();
   });
 
   it("marks the banded meter at the score", () => {
@@ -135,13 +137,6 @@ describe("HonorHeroBand (honour redesign R3)", () => {
       expect(screen.getByTestId("profile-honor-new")).toHaveAttribute("data-value", "4");
     });
 
-    it("still shows the raw counts (PO decision)", () => {
-      renderBand({ isNewPlayer: true, completedTotal: 2, abandonedTotal: 1 });
-
-      expect(screen.getByTestId("profile-honor-completed")).toHaveAttribute("data-value", "2");
-      expect(screen.getByTestId("profile-honor-abandoned")).toHaveAttribute("data-value", "1");
-    });
-
     it("hides the trend, which needs two full windows to mean anything", () => {
       renderBand({ isNewPlayer: true, trendDelta: 4, trendDirection: "up" });
 
@@ -168,9 +163,12 @@ describe("HonorHeroBand (honour redesign R3)", () => {
   it("opens the explainer from the band", async () => {
     renderBand();
 
-    // Two triggers by design (icon button ≥sm, labelled link <sm); both open the
-    // same dialog, so assert the dialog is reachable rather than which one shows.
+    // One trigger at every width: the icon button. The mobile-only labelled link
+    // it once paired with claimed a full row of its own and is gone.
     expect(screen.getByTestId("profile-honor-explainer-button")).toBeInTheDocument();
-    expect(screen.getByTestId("profile-honor-explainer-link")).toBeInTheDocument();
+    expect(screen.queryByTestId("profile-honor-explainer-link")).not.toBeInTheDocument();
+    expect(screen.getByTestId("profile-honor-explainer-button").className).not.toMatch(
+      /\bhidden\b/,
+    );
   });
 });
