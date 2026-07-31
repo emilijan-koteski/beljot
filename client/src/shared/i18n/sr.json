@@ -888,7 +888,7 @@
       "waitingMessage": "Igra je pauzirana dok čekamo da se {{player}} vrati.",
       "waitingMessageMany": "Igra je pauzirana dok čekamo da se {{count}} igrača vrate.",
       "countdownLabel": "Preostalo vreme",
-      "honorNoteOther": "Ako vreme istekne, računa se kao napuštanje: njegova čast pada, ne tvoja.",
+      "honorNoteOther": "Ako vreme istekne, računa se kao napuštanje. Čast igrača koji je napustio se smanjuje.",
       "honorNoteSelf": "Ostani na ovoj stranici. Ponovno povezivanje te ne košta ništa, ali istek vremena se računa kao napuštanje i tvoja čast pada.",
       "reconnectFailed": "Ponovno povezivanje nije uspelo, meč je možda završen",
       "matchAbandoned": "{{player}} je prekinuo vezu, meč završen",

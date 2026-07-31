@@ -888,7 +888,7 @@
       "waitingMessage": "The game is on hold while we wait for {{player}} to reconnect.",
       "waitingMessageMany": "The game is on hold while we wait for {{count}} players to reconnect.",
       "countdownLabel": "Time remaining",
-      "honorNoteOther": "If the timer runs out it counts as an abandonment — their honor drops, not yours.",
+      "honorNoteOther": "If the timer runs out, it counts as an abandonment. The abandoning player's honor goes down.",
       "honorNoteSelf": "Stay on this page. Reconnecting costs you nothing, but a timeout counts as an abandonment and your honor drops.",
       "reconnectFailed": "Reconnection failed — the match may have ended",
       "matchAbandoned": "{{player}} disconnected — match ended",
