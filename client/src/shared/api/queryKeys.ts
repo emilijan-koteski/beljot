@@ -8,6 +8,13 @@ export const queryKeys = {
   profile: {
     detail: (userId: number) => ["profile", userId] as const,
   },
+  // Story 11.3: a DISTINCT namespace from `profile`, because GET
+  // /users/:id/profile returns a narrower PublicProfileResponse for a non-self
+  // id. Keying public reads under their own root means the self full-shape
+  // entry and a public narrow-shape entry can never collide for the same id.
+  publicProfile: {
+    detail: (userId: number) => ["publicProfile", userId] as const,
+  },
   career: {
     detail: (userId: number) => ["career", userId] as const,
   },

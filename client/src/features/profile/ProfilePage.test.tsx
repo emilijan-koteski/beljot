@@ -80,6 +80,7 @@ function careerFixture(overrides: Partial<CareerResponse> = {}): CareerResponse 
   return {
     capots: 0,
     avgMatchSeconds: 0,
+    careerPoints: 0,
     streak: { kind: "none", length: 0 },
     topPartners: [],
     topRivals: [],

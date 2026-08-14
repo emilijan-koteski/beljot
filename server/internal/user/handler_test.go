@@ -37,13 +37,16 @@ type mockMatchRepo struct {
 	lastStatsUserID uint
 
 	// Career-path overrides drive the GetCareer handler without full SQL.
-	careerAgg      match.CareerAggregates
-	careerErr      error
-	partners       []match.PartnerAggregate
-	partnersErr    error
-	rivals         []match.RivalAggregate
-	rivalsErr      error
-	getCareerCalls int
+	careerAgg          match.CareerAggregates
+	careerErr          error
+	careerPoints       int64
+	careerPointsErr    error
+	lastCareerPointsID uint
+	partners           []match.PartnerAggregate
+	partnersErr        error
+	rivals             []match.RivalAggregate
+	rivalsErr          error
+	getCareerCalls     int
 
 	// Honor trend-window overrides (Story 9.7). lastHonorWindowLimit records
 	// the limit the handler asked for, so a test can assert it matches the
@@ -152,6 +155,14 @@ func (r *mockMatchRepo) GetCareerAggregatesForUser(userID uint) (match.CareerAgg
 		return match.CareerAggregates{}, r.careerErr
 	}
 	return r.careerAgg, nil
+}
+
+func (r *mockMatchRepo) GetCareerPointsForUser(userID uint) (int64, error) {
+	r.lastCareerPointsID = userID
+	if r.careerPointsErr != nil {
+		return 0, r.careerPointsErr
+	}
+	return r.careerPoints, nil
 }
 
 func (r *mockMatchRepo) GetTopPartnersForUser(userID uint, limit int) ([]match.PartnerAggregate, error) {
@@ -828,20 +839,135 @@ func TestGetProfile_UserNotFound(t *testing.T) {
 	assert.Equal(t, "USER_NOT_FOUND", errResp["error"]["code"])
 }
 
-func TestGetProfile_Forbidden(t *testing.T) {
-	repo, e := setupUserHandler()
-	repo.addUser("testuser", "test@example.com", "en")
-	repo.addUser("otheruser", "other@example.com", "en")
+// Story 11.3: a foreign id is no longer 403 — it returns 200 with the PUBLIC
+// projection for :id. This is also the D1 correctness guard: the honor/stats
+// must be the SUBJECT's (user 2), never the viewer's (user 1), which only holds
+// if the handler keyed FindByID/GetStatsForUser/GetHonorTrendWindowsForUser on
+// paramID.
+func TestGetProfile_ForeignID_ReturnsPublicProjection(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	now := time.Now().UTC()
 
-	token, err := auth.GenerateAccessToken(1, testJWTSecret)
+	// Viewer (id 1): a New Player with a distinct score (2 completed → 86).
+	viewer := repo.addUser("viewer", "viewer@example.com", "en")
+	viewer.HonorCompletedWeight = 2
+	viewer.HonorDecayedAt = &now
+	viewer.HonorCompletedTotal = 2
+
+	// Subject (id 2): a veteran with a different score (20/1 → 83, "fair").
+	subject := repo.addUser("subject", "subject@example.com", "en")
+	subject.HonorCompletedWeight = 20
+	subject.HonorAbandonedWeight = 1
+	subject.HonorDecayedAt = &now
+	subject.HonorCompletedTotal = 20
+	subject.HonorAbandonedTotal = 1
+
+	// Stats belong to the subject; the mock records which id was queried.
+	matchRepo.statsOverride = &struct{ wins, losses, abandoned int }{5, 3, 1}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
 	require.NoError(t, err)
 
-	rec := doGetProfile(e, "2", token)
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	rec := doGetProfile(e, strconvUint(subject.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
 
-	var errResp map[string]map[string]string
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
-	assert.Equal(t, "FORBIDDEN", errResp["error"]["code"])
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.PublicProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	// Identity + honor are the subject's, not the viewer's.
+	assert.Equal(t, subject.ID, data.ID)
+	assert.Equal(t, "subject", data.Username)
+	assert.Equal(t, 83, data.HonorScore, "subject's 20/1 score, not the viewer's 86")
+	assert.Equal(t, "fair", data.HonorTier)
+	assert.False(t, data.IsNewPlayer, "subject has 21 finished matches")
+	assert.Equal(t, 5, data.Wins)
+	assert.Equal(t, 3, data.Losses)
+	assert.Equal(t, 1, data.Abandoned)
+	assert.Equal(t, 9, data.TotalGamesPlayed)
+
+	// The subject id — not the viewer — drove the stats query.
+	assert.Equal(t, subject.ID, matchRepo.lastStatsUserID,
+		"GetStatsForUser must be keyed on paramID (the subject), not authUserID")
+}
+
+// The public projection must never carry the subject's private fields (nor the
+// viewer's). The subject has a distinctive email + a set wallet/streak/lang so a
+// leak of any of them is obvious in the body.
+func TestGetProfile_PublicProjection_NeverLeaksPrivateFields(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "viewer@example.com", "en")
+	subject := repo.addUser("subject", "subject-leak-probe@example.com", "sr")
+	subject.WalletBalance = 9999
+	subject.LoginStreakDays = 42
+	changed := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	subject.UsernameChangedAt = &changed
+	matchRepo.statsOverride = &struct{ wins, losses, abandoned int }{1, 0, 0}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(subject.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	body := rec.Body.String()
+	assert.NotContains(t, body, "subject-leak-probe@example.com", "email must never leak")
+	assert.NotContains(t, body, "\"email\"")
+	assert.NotContains(t, body, "passwordHash")
+	assert.NotContains(t, body, "password_hash")
+	assert.NotContains(t, body, "walletBalance", "wallet must never appear on a public profile")
+	assert.NotContains(t, body, "loginStreakDays", "login streak must never appear on a public profile")
+	assert.NotContains(t, body, "languagePreference", "language preference is private")
+	assert.NotContains(t, body, "usernameChangedAt", "username-cooldown state is private")
+	// The public-safe fields ARE present.
+	assert.Contains(t, body, "honorScore")
+	assert.Contains(t, body, "totalXp")
+}
+
+// A public subject under the completed-match floor is flagged New Player, but
+// the server STILL returns the real score and tier (mirrors the self shape) —
+// suppression is a client concern.
+func TestGetProfile_PublicProjection_NewPlayerCarriesScore(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "viewer@example.com", "en")
+	subject := repo.addUser("fresh", "fresh@example.com", "en")
+	now := time.Now().UTC()
+	subject.HonorCompletedWeight = 2
+	subject.HonorDecayedAt = &now
+	subject.HonorCompletedTotal = 2
+	matchRepo.statsOverride = &struct{ wins, losses, abandoned int }{0, 0, 0}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(subject.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.PublicProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.True(t, data.IsNewPlayer)
+	assert.Equal(t, 86, data.HonorScore, "100*6/7 = 85.7 -> 86 still populated")
+	assert.Equal(t, "trusted", data.HonorTier)
+	assert.Equal(t, int64(2), data.HonorCompletedTotal)
+}
+
+// A viewer requesting an unknown/soft-deleted subject id gets 404 USER_NOT_FOUND
+// (the page renders a localized not-found state from it).
+func TestGetProfile_PublicProjection_UnknownSubject404(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "viewer@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, "424242", token)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "USER_NOT_FOUND", errCode(t, rec))
+	assert.Zero(t, matchRepo.getStatsCalls, "an unknown subject 404s before the stats query")
 }
 
 func TestGetProfile_MissingAuth(t *testing.T) {
@@ -1400,7 +1526,38 @@ func TestListMatches_HandsEmbedded(t *testing.T) {
 	assert.Equal(t, "loss", resp.Items[0].Outcome, "viewer is team A, winner is team B -> loss")
 }
 
-func TestListMatches_Forbidden_ForeignUserID(t *testing.T) {
+// Story 11.3: matches for a foreign SUBJECT are public and computed
+// viewer-relative to the SUBJECT (not the requesting viewer). The subject sits
+// at seat 1 on the losing team, so the subject-keyed outcome is "loss" with
+// viewerSeat 1 — a viewer-keyed bug (the viewer isn't in the match) would
+// default to seat 0 / "win", so this pins the paramID swap.
+func TestListMatches_ForeignSubject_ViewerRelativeToSubject(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "viewer@example.com", "en") // id 1, not in the match
+	subject := repo.addUser("subject", "subject@example.com", "en")
+	p3 := repo.addUser("p3", "p3@example.com", "en")
+	p4 := repo.addUser("p4", "p4@example.com", "en")
+	mate := repo.addUser("mate", "mate@example.com", "en")
+
+	// seat0=p3 (A), seat1=subject (B), seat2=p4 (A), seat3=mate (B). Team A wins.
+	seats := [4]uint{p3.ID, subject.ID, p4.ID, mate.ID}
+	base := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	matchRepo.matches = []match.Match{
+		seedMatch(1, base, base.Add(20*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1010, 600, nil),
+	}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doListMatches(e, strconvUint(subject.ID), "", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	resp := decodeMatchesResponse(t, rec.Body.Bytes())
+	require.Len(t, resp.Items, 1)
+	assert.Equal(t, 1, resp.Items[0].ViewerSeat, "viewerSeat is the subject's seat, not the viewer's")
+	assert.Equal(t, "loss", resp.Items[0].Outcome, "outcome is computed for the subject (team B lost)")
+}
+
+func TestListMatches_UnknownSubject_NotFound(t *testing.T) {
 	repo, _, e := setupUserHandlerWithMatches()
 	u := repo.addUser("alice", "alice@example.com", "en")
 
@@ -1408,7 +1565,8 @@ func TestListMatches_Forbidden_ForeignUserID(t *testing.T) {
 	require.NoError(t, err)
 
 	rec := doListMatches(e, "999", "", token)
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "USER_NOT_FOUND", errCode(t, rec))
 }
 
 func TestListMatches_Unauthorized_NoToken(t *testing.T) {
@@ -1572,8 +1730,10 @@ func TestGetProfile_NeverLeaksPII(t *testing.T) {
 }
 
 func TestGetProfile_AuthFailures_DoNotCallStats(t *testing.T) {
-	// 400 on bad id, 401 on missing token, 403 on foreign id — stats repo must
-	// not be invoked because the auth check rejects before the stats call.
+	// 400 on bad id, 401 on missing token — stats repo must not be invoked
+	// because the request is rejected before the stats call. (A foreign id is
+	// no longer rejected — Story 11.3 serves it the public projection, covered
+	// by TestGetProfile_ForeignID_ReturnsPublicProjection.)
 	t.Run("bad path id", func(t *testing.T) {
 		repo, matchRepo, e := setupUserHandlerWithMatches()
 		u := repo.addUser("alice", "alice@example.com", "en")
@@ -1590,18 +1750,6 @@ func TestGetProfile_AuthFailures_DoNotCallStats(t *testing.T) {
 		rec := doGetProfile(e, "1", "")
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 		assert.Zero(t, matchRepo.getStatsCalls, "stats must not be queried on 401")
-	})
-
-	t.Run("foreign id", func(t *testing.T) {
-		repo, matchRepo, e := setupUserHandlerWithMatches()
-		repo.addUser("alice", "alice@example.com", "en")
-		repo.addUser("bob", "bob@example.com", "en")
-		token, err := auth.GenerateAccessToken(1, testJWTSecret)
-		require.NoError(t, err)
-
-		rec := doGetProfile(e, "2", token)
-		assert.Equal(t, http.StatusForbidden, rec.Code)
-		assert.Zero(t, matchRepo.getStatsCalls, "stats must not be queried on 403")
 	})
 }
 
@@ -1685,18 +1833,23 @@ func TestGetProfile_StatsMatchListTotal(t *testing.T) {
 	assert.Equal(t, 1, byProf.TotalGamesPlayed)
 }
 
-func TestGetProfile_Forbidden_WraparoundID(t *testing.T) {
+// Story 11.3 removed the self-gate, so a huge id no longer risks a wraparound
+// auth bypass — it simply resolves to no user and 404s. The self-vs-public
+// branch still compares paramID as uint64 (D86), so a 2^32+1 request from
+// user 1 never falls into the self branch and never serves user 1's private
+// profile.
+func TestGetProfile_HugeUnknownID_NotFound(t *testing.T) {
 	repo, e := setupUserHandler()
 	repo.addUser("alice", "alice@example.com", "en") // gets ID=1
 
 	token, err := auth.GenerateAccessToken(1, testJWTSecret)
 	require.NoError(t, err)
 
-	// 4294967297 = 2^32 + 1; on 32-bit uint it would truncate to 1 == userID.
-	// On 64-bit with the fixed uint64 comparison, this must return 403.
+	// 4294967297 = 2^32 + 1; no such user exists.
 	rec := doGetProfile(e, "4294967297", token)
-	assert.Equal(t, http.StatusForbidden, rec.Code,
-		"wraparound ID must not bypass auth check (D86)")
+	assert.Equal(t, http.StatusNotFound, rec.Code,
+		"a huge unknown id resolves to no user and 404s, not a wraparound self-serve (D86)")
+	assert.Equal(t, "USER_NOT_FOUND", errCode(t, rec))
 }
 
 // --- ListMatches outcome filter + sort ---
@@ -1947,16 +2100,42 @@ func TestGetCareer_AuthFailures_DoNotQuery(t *testing.T) {
 		assert.Zero(t, matchRepo.getCareerCalls)
 	})
 
-	t.Run("foreign id", func(t *testing.T) {
+	t.Run("unknown subject", func(t *testing.T) {
 		repo, matchRepo, e := setupUserHandlerWithMatches()
 		repo.addUser("alice", "alice@example.com", "en")
-		repo.addUser("bob", "bob@example.com", "en")
 		token, err := auth.GenerateAccessToken(1, testJWTSecret)
 		require.NoError(t, err)
-		rec := doGetCareer(e, "2", token)
-		assert.Equal(t, http.StatusForbidden, rec.Code)
-		assert.Zero(t, matchRepo.getCareerCalls)
+		rec := doGetCareer(e, "999", token)
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Equal(t, "USER_NOT_FOUND", errCode(t, rec))
+		assert.Zero(t, matchRepo.getCareerCalls, "aggregates must not run for an unknown subject")
 	})
+}
+
+// Story 11.3: a foreign but existing subject returns the SUBJECT's career (200),
+// keyed on paramID, and includes the net-new lifetime careerPoints figure.
+func TestGetCareer_ForeignSubject_Public(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "viewer@example.com", "en")
+	subject := repo.addUser("subject", "subject@example.com", "en")
+	matchRepo.careerAgg = match.CareerAggregates{Capots: 2, StreakKind: "win", StreakLength: 3}
+	matchRepo.careerPoints = 15840
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetCareer(e, strconvUint(subject.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.CareerResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, 2, data.Capots)
+	assert.Equal(t, int64(15840), data.CareerPoints)
+	assert.Equal(t, subject.ID, matchRepo.lastCareerPointsID,
+		"careerPoints must be keyed on paramID (the subject), not authUserID")
 }
 
 func TestGetCareer_DBError(t *testing.T) {

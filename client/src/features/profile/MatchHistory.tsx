@@ -24,6 +24,13 @@ interface MatchHistoryProps {
   userId: number | undefined;
   /** Per-outcome counts for the filter chips, sourced from profile stats. */
   counts: Record<MatchFilter, number>;
+  /**
+   * Whether the profile being viewed is the viewer's own (Story 11.3). On a
+   * PUBLIC profile (false) the subject's seat is labelled with the subject's
+   * username instead of the "YOU" badge — the subject is not the viewer.
+   * Defaults to true (the self profile).
+   */
+  subjectIsSelf?: boolean;
 }
 
 function formatDuration(
@@ -383,11 +390,13 @@ function HandsGrid({ hands, viewerTeamIndex }: HandsGridProps) {
 interface MatchRowProps {
   match: MatchListItem;
   username: string;
+  /** Marks the subject's seat as "YOU" — false on a public profile. */
+  subjectIsSelf: boolean;
   isOpen: boolean;
   onToggle: () => void;
 }
 
-function MatchRow({ match, username, isOpen, onToggle }: MatchRowProps) {
+function MatchRow({ match, username, subjectIsSelf, isOpen, onToggle }: MatchRowProps) {
   const { t } = useTranslation();
 
   const teammateSeat = (match.viewerSeat + 2) % 4;
@@ -446,7 +455,7 @@ function MatchRow({ match, username, isOpen, onToggle }: MatchRowProps) {
         {/* Players */}
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <SeatChip name={username} team={usTeam} you />
+            <SeatChip name={username} team={usTeam} you={subjectIsSelf} />
             <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
               {t("profile.matchHistory.with")}
             </span>
@@ -541,7 +550,7 @@ function MatchRow({ match, username, isOpen, onToggle }: MatchRowProps) {
   );
 }
 
-export function MatchHistory({ userId, counts }: MatchHistoryProps) {
+export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHistoryProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<MatchFilter>("all");
   const [sort, setSort] = useState<MatchSort>("new");
@@ -590,14 +599,22 @@ export function MatchHistory({ userId, counts }: MatchHistoryProps) {
           className="bg-surface border-border space-y-3 rounded-lg border border-dashed p-10 text-center text-sm"
           data-testid="match-history-empty"
         >
-          <p className="text-ink-dim m-0">{t("profile.matchHistory.empty")}</p>
-          <Link
-            to="/lobby"
-            className="text-accent inline-flex items-center underline-offset-2 hover:underline"
-            data-testid="match-history-empty-cta"
-          >
-            {t("profile.matchHistory.emptyCta")}
-          </Link>
+          {/* On a public profile (subjectIsSelf=false) the subject has never
+              played — address them in the third person and drop the viewer's
+              "Quick Play" CTA, which would tell the VIEWER to go play on someone
+              else's page (Story 11.3 review). */}
+          <p className="text-ink-dim m-0">
+            {t(subjectIsSelf ? "profile.matchHistory.empty" : "profile.matchHistory.emptyPublic")}
+          </p>
+          {subjectIsSelf && (
+            <Link
+              to="/lobby"
+              className="text-accent inline-flex items-center underline-offset-2 hover:underline"
+              data-testid="match-history-empty-cta"
+            >
+              {t("profile.matchHistory.emptyCta")}
+            </Link>
+          )}
         </div>
       </section>
     );
@@ -648,6 +665,7 @@ export function MatchHistory({ userId, counts }: MatchHistoryProps) {
               key={match.id}
               match={match}
               username={username}
+              subjectIsSelf={subjectIsSelf}
               isOpen={openIds.has(match.id)}
               onToggle={() => toggleOpen(match.id)}
             />

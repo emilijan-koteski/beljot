@@ -7,6 +7,8 @@ import { SidePanel } from "./SidePanel";
 
 type MilestonesProps = {
   capots: number;
+  /** Lifetime total game points scored across completed matches (Story 11.3). */
+  careerPoints: number;
   bestHand?: BestHand;
   avgMatchSeconds: number;
 };
@@ -29,7 +31,7 @@ function MilestoneRow({ label, hint, value }: { label: string; hint: string; val
  * Sidebar panel of three career highlights: capots called, best single hand,
  * and average match length. Driven by the career aggregates endpoint.
  */
-export function Milestones({ capots, bestHand, avgMatchSeconds }: MilestonesProps) {
+export function Milestones({ capots, careerPoints, bestHand, avgMatchSeconds }: MilestonesProps) {
   const { t } = useTranslation();
   const avgMinutes = Math.round(avgMatchSeconds / 60);
 
@@ -40,6 +42,11 @@ export function Milestones({ capots, bestHand, avgMatchSeconds }: MilestonesProp
       testId="profile-milestones"
     >
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        <MilestoneRow
+          label={t("profile.milestones.careerPointsLabel")}
+          hint={t("profile.milestones.careerPointsHint")}
+          value={careerPoints.toLocaleString()}
+        />
         <MilestoneRow
           label={t("profile.milestones.capotsLabel")}
           hint={t("profile.milestones.capotsHint")}

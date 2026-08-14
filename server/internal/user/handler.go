@@ -13,10 +13,12 @@ import (
 	"github.com/emilijan/beljot/server/internal/match"
 )
 
-// ProfileResponse is the self-only profile DTO (GetProfile authorises
-// paramID == authUserID). WalletBalance and LoginStreakDays are PRIVATE figures
-// — when Epic 11 adds public player profiles, the public DTO must NOT include
-// them. Never add these fields to a shared/public response shape.
+// ProfileResponse is the SELF profile DTO returned by GetProfile when the
+// path id equals the authenticated viewer (Story 11.3 made the endpoint
+// public — a foreign id now gets the narrower PublicProfileResponse instead of
+// a 403). WalletBalance, LoginStreakDays, LanguagePreference and
+// UsernameChangedAt are PRIVATE self-only figures: they are absent from
+// PublicProfileResponse and must never be added to any shared/public shape.
 type ProfileResponse struct {
 	ID       uint   `json:"id"`
 	Username string `json:"username"`
@@ -28,8 +30,10 @@ type ProfileResponse struct {
 	LoginStreakDays    int        `json:"loginStreakDays"`
 	// XP & level (Story 9.5). TotalXP is the lifetime total; Level is derived
 	// from it (never stored); XPIntoLevel/XPForNextLevel drive the profile XP
-	// bar (fill = XPIntoLevel / XPForNextLevel). These are PRIVATE self-only
-	// figures like WalletBalance — keep them off any future public profile DTO.
+	// bar (fill = XPIntoLevel / XPForNextLevel). Story 11.3 (D2) made these
+	// PUBLIC: level is already public on room seat tiles and XP is non-sensitive
+	// progression data, so the epic AC lifts level + total XP onto the public
+	// profile. PublicProfileResponse carries all four verbatim.
 	TotalXP        int `json:"totalXp"`
 	Level          int `json:"level"`
 	XPIntoLevel    int `json:"xpIntoLevel"`
@@ -62,6 +66,38 @@ type ProfileResponse struct {
 	Wins                int       `json:"wins"`
 	Losses              int       `json:"losses"`
 	Abandoned           int       `json:"abandoned"`
+}
+
+// PublicProfileResponse is the PUBLIC projection returned by GET
+// /users/:id/profile when :id is NOT the authenticated viewer (Story 11.3
+// FR47). It carries only public-safe fields — identity, member-since,
+// progression (level + XP, per D2), the full honor section, and the
+// win/loss/abandoned record — and deliberately OMITS every private figure the
+// self ProfileResponse holds: Email, PasswordHash, WalletBalance,
+// LoginStreakDays, LanguagePreference, UsernameChangedAt. Every value is
+// computed for the PATH id (the subject), never the viewer — see GetProfile.
+type PublicProfileResponse struct {
+	ID        uint      `json:"id"`
+	Username  string    `json:"username"`
+	CreatedAt time.Time `json:"createdAt"`
+	// Progression (Story 9.5) — public per Story 11.3 D2.
+	TotalXP        int `json:"totalXp"`
+	Level          int `json:"level"`
+	XPIntoLevel    int `json:"xpIntoLevel"`
+	XPForNextLevel int `json:"xpForNextLevel"`
+	// Honor (Story 9.7) — public by construction; the client decides New Player
+	// suppression while the score/tier stay authoritative (mirrors the self DTO).
+	HonorScore          int    `json:"honorScore"`
+	HonorTier           string `json:"honorTier"`
+	HonorCompletedTotal int64  `json:"honorCompletedTotal"`
+	HonorAbandonedTotal int64  `json:"honorAbandonedTotal"`
+	IsNewPlayer         bool   `json:"isNewPlayer"`
+	HonorTrendDelta     int    `json:"honorTrendDelta"`
+	HonorTrendDirection string `json:"honorTrendDirection"`
+	TotalGamesPlayed    int    `json:"totalGamesPlayed"`
+	Wins                int    `json:"wins"`
+	Losses              int    `json:"losses"`
+	Abandoned           int    `json:"abandoned"`
 }
 
 type UpdatePreferencesRequest struct {
@@ -176,13 +212,18 @@ type RivalStat struct {
 // derived stats that power the profile hero (capots), streak callout,
 // milestones, partner spotlight, and rivalries.
 type CareerResponse struct {
-	Capots          int           `json:"capots"`
-	AvgMatchSeconds int           `json:"avgMatchSeconds"`
-	Streak          CareerStreak  `json:"streak"`
-	BestHand        *BestHand     `json:"bestHand,omitempty"`
-	LastPlayedAt    *time.Time    `json:"lastPlayedAt,omitempty"`
-	TopPartners     []PartnerStat `json:"topPartners"`
-	TopRivals       []RivalStat   `json:"topRivals"`
+	Capots          int `json:"capots"`
+	AvgMatchSeconds int `json:"avgMatchSeconds"`
+	// CareerPoints is the lifetime sum of the subject's own team score across
+	// their COMPLETED matches (Story 11.3 net-new aggregate — see
+	// MatchRepository.GetCareerPointsForUser). Surfaced on both the public and
+	// self career views.
+	CareerPoints int64         `json:"careerPoints"`
+	Streak       CareerStreak  `json:"streak"`
+	BestHand     *BestHand     `json:"bestHand,omitempty"`
+	LastPlayedAt *time.Time    `json:"lastPlayedAt,omitempty"`
+	TopPartners  []PartnerStat `json:"topPartners"`
+	TopRivals    []RivalStat   `json:"topRivals"`
 }
 
 // careerListLimit caps how many partner / rival rows the career endpoint
@@ -221,11 +262,15 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		return apperr.ErrBadRequest
 	}
 
-	if paramID != uint64(authUserID) {
-		return apperr.ErrForbidden
-	}
+	// Story 11.3: this endpoint is PUBLIC. The subject is ALWAYS the path id —
+	// every repo call and honor query below keys on subjectID, not authUserID.
+	// (Removing the old self-gate WITHOUT this swap would silently serve the
+	// viewer's own data under another player's URL.) A non-existent subject 404s
+	// exactly as a self-lookup did; a huge/wrapped id resolves to no user and
+	// 404s too, so there is no self-serve via truncation.
+	subjectID := uint(paramID)
 
-	u, err := h.userRepo.FindByID(authUserID)
+	u, err := h.userRepo.FindByID(subjectID)
 	if err != nil {
 		return fmt.Errorf("finding user: %w", err)
 	}
@@ -233,7 +278,7 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		return apperr.ErrUserNotFound
 	}
 
-	wins, losses, abandoned, err := h.matchRepo.GetStatsForUser(authUserID)
+	wins, losses, abandoned, err := h.matchRepo.GetStatsForUser(subjectID)
 	if err != nil {
 		return fmt.Errorf("fetching profile stats: %w", err)
 	}
@@ -265,9 +310,9 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 	// failing the whole profile, which would take the far more important
 	// score/tier/counters down with it.
 	trendDelta, trendDirection := 0, HonorTrendFlat
-	windows, err := h.matchRepo.GetHonorTrendWindowsForUser(authUserID, HonorTrendWindow())
+	windows, err := h.matchRepo.GetHonorTrendWindowsForUser(subjectID, HonorTrendWindow())
 	if err != nil {
-		slog.Error("profile: failed to read honor trend windows", "userID", authUserID, "error", err)
+		slog.Error("profile: failed to read honor trend windows", "userID", subjectID, "error", err)
 	} else {
 		trendDelta, trendDirection = HonorTrendWindowed(
 			windows.RecentCompleted, windows.RecentAbandoned,
@@ -276,14 +321,44 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		)
 	}
 
+	// Self → the full private profile (wallet / streak / language / username
+	// cooldown); any other viewer → the narrower public projection. The branch
+	// compares paramID as uint64 to stay wraparound-safe, mirroring the old
+	// self-gate (D86). subjectID above has already resolved the actual subject.
+	if paramID == uint64(authUserID) {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"data": ProfileResponse{
+				ID:                  u.ID,
+				Username:            u.Username,
+				UsernameChangedAt:   u.UsernameChangedAt,
+				LanguagePreference:  u.LanguagePreference,
+				WalletBalance:       u.WalletBalance,
+				LoginStreakDays:     u.LoginStreakDays,
+				TotalXP:             u.TotalXP,
+				Level:               level,
+				XPIntoLevel:         xpIntoLevel,
+				XPForNextLevel:      xpForNextLevel,
+				HonorScore:          honor.Score,
+				HonorTier:           honor.Tier,
+				HonorCompletedTotal: honor.CompletedTotal,
+				HonorAbandonedTotal: honor.AbandonedTotal,
+				IsNewPlayer:         honor.IsNewPlayer,
+				HonorTrendDelta:     trendDelta,
+				HonorTrendDirection: trendDirection,
+				CreatedAt:           u.CreatedAt,
+				TotalGamesPlayed:    wins + losses + abandoned,
+				Wins:                wins,
+				Losses:              losses,
+				Abandoned:           abandoned,
+			},
+		})
+	}
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"data": ProfileResponse{
+		"data": PublicProfileResponse{
 			ID:                  u.ID,
 			Username:            u.Username,
-			UsernameChangedAt:   u.UsernameChangedAt,
-			LanguagePreference:  u.LanguagePreference,
-			WalletBalance:       u.WalletBalance,
-			LoginStreakDays:     u.LoginStreakDays,
+			CreatedAt:           u.CreatedAt,
 			TotalXP:             u.TotalXP,
 			Level:               level,
 			XPIntoLevel:         xpIntoLevel,
@@ -295,7 +370,6 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 			IsNewPlayer:         honor.IsNewPlayer,
 			HonorTrendDelta:     trendDelta,
 			HonorTrendDirection: trendDirection,
-			CreatedAt:           u.CreatedAt,
 			TotalGamesPlayed:    wins + losses + abandoned,
 			Wins:                wins,
 			Losses:              losses,
@@ -304,15 +378,16 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 	})
 }
 
-// GetCareer returns the derived career stats for the authenticated user:
-// capots won, average match length, current streak, best hand, and the
-// most-played partners / most-faced rivals. Authorisation mirrors GetProfile:
-// the :id path param must equal the authenticated user's ID. Like the other
-// user endpoints, only participant usernames + ids are exposed — never email,
-// password hash, or language preference.
+// GetCareer returns the derived career stats for the SUBJECT (path id):
+// capots won, average match length, lifetime career points, current streak,
+// best hand, and the most-played partners / most-faced rivals. Story 11.3 made
+// it public — any authenticated viewer may read any player's career (an unknown
+// subject 404s). Like the other user endpoints, only participant usernames +
+// ids are exposed — never email, password hash, or language preference.
 func (h *UserHandler) GetCareer(c echo.Context) error {
-	authUserID, err := getUserID(c)
-	if err != nil {
+	// Auth is still required (the route sits under the authenticated group), but
+	// the viewer's own id is no longer the subject — the path id is (Story 11.3).
+	if _, err := getUserID(c); err != nil {
 		return apperr.ErrUnauthorized
 	}
 
@@ -320,21 +395,37 @@ func (h *UserHandler) GetCareer(c echo.Context) error {
 	if err != nil || paramID == 0 {
 		return apperr.ErrBadRequest
 	}
-	if paramID != uint64(authUserID) {
-		return apperr.ErrForbidden
+
+	// Story 11.3: career is public — the subject is the path id, and every
+	// aggregate below keys on subjectID, never authUserID (D1). An unknown
+	// subject 404s (unlike the old self-only path, which relied on the token to
+	// prove the user existed).
+	subjectID := uint(paramID)
+
+	subject, err := h.userRepo.FindByID(subjectID)
+	if err != nil {
+		return fmt.Errorf("finding user: %w", err)
+	}
+	if subject == nil {
+		return apperr.ErrUserNotFound
 	}
 
-	agg, err := h.matchRepo.GetCareerAggregatesForUser(authUserID)
+	agg, err := h.matchRepo.GetCareerAggregatesForUser(subjectID)
 	if err != nil {
 		return fmt.Errorf("fetching career aggregates: %w", err)
 	}
 
-	partnerAggs, err := h.matchRepo.GetTopPartnersForUser(authUserID, careerListLimit)
+	careerPoints, err := h.matchRepo.GetCareerPointsForUser(subjectID)
+	if err != nil {
+		return fmt.Errorf("fetching career points: %w", err)
+	}
+
+	partnerAggs, err := h.matchRepo.GetTopPartnersForUser(subjectID, careerListLimit)
 	if err != nil {
 		return fmt.Errorf("fetching career partners: %w", err)
 	}
 
-	rivalAggs, err := h.matchRepo.GetTopRivalsForUser(authUserID, careerListLimit)
+	rivalAggs, err := h.matchRepo.GetTopRivalsForUser(subjectID, careerListLimit)
 	if err != nil {
 		return fmt.Errorf("fetching career rivals: %w", err)
 	}
@@ -383,6 +474,7 @@ func (h *UserHandler) GetCareer(c echo.Context) error {
 		"data": CareerResponse{
 			Capots:          agg.Capots,
 			AvgMatchSeconds: agg.AvgMatchSeconds,
+			CareerPoints:    careerPoints,
 			Streak:          CareerStreak{Kind: agg.StreakKind, Length: agg.StreakLength},
 			BestHand:        bestHand,
 			LastPlayedAt:    lastPlayedAt,
@@ -546,11 +638,12 @@ func (h *UserHandler) UpdateUsername(c echo.Context) error {
 //	outcome — win | loss | abandoned | all (default all), viewer-relative
 //	sort    — new | old (default new)
 //
-// Authorisation mirrors GetProfile: the :id path param must equal the
-// authenticated user's ID. Responses never leak email, password hash, or
-// language preference — only the 4 participant usernames + ids are included.
+// Story 11.3 made it public: the :id path param is the SUBJECT — outcome and
+// viewerSeat are computed from the subject's perspective, and an unknown
+// subject 404s. Responses never leak email, password hash, or language
+// preference — only the 4 participant usernames + ids are included.
 func (h *UserHandler) ListMatches(c echo.Context) error {
-	authUserID, err := getUserID(c)
+	_, err := getUserID(c)
 	if err != nil {
 		return apperr.ErrUnauthorized
 	}
@@ -559,8 +652,14 @@ func (h *UserHandler) ListMatches(c echo.Context) error {
 	if err != nil || paramID == 0 {
 		return apperr.ErrBadRequest
 	}
-	if paramID != uint64(authUserID) {
-		return apperr.ErrForbidden
+	subjectID := uint(paramID)
+
+	subject, err := h.userRepo.FindByID(subjectID)
+	if err != nil {
+		return fmt.Errorf("finding user: %w", err)
+	}
+	if subject == nil {
+		return apperr.ErrUserNotFound
 	}
 
 	limit, offset, outcome, sort, err := parseMatchesQuery(c)
@@ -568,7 +667,7 @@ func (h *UserHandler) ListMatches(c echo.Context) error {
 		return err
 	}
 
-	matches, total, err := h.matchRepo.GetMatchesForUser(authUserID, limit, offset, outcome, sort)
+	matches, total, err := h.matchRepo.GetMatchesForUser(subjectID, limit, offset, outcome, sort)
 	if err != nil {
 		return fmt.Errorf("fetching matches: %w", err)
 	}
@@ -580,7 +679,7 @@ func (h *UserHandler) ListMatches(c echo.Context) error {
 
 	items := make([]MatchListItem, 0, len(matches))
 	for _, m := range matches {
-		items = append(items, buildMatchListItem(m, authUserID, usernames))
+		items = append(items, buildMatchListItem(m, subjectID, usernames))
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{

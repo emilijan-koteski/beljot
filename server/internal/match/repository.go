@@ -88,6 +88,15 @@ type MatchRepository interface {
 	// streak) across every match the user participated in.
 	GetCareerAggregatesForUser(userID uint) (CareerAggregates, error)
 
+	// GetCareerPointsForUser returns the lifetime sum of the user's OWN team
+	// score across their COMPLETED matches — the "career points scored" figure
+	// surfaced on the public profile (Story 11.3). The team per row derives from
+	// the player's seat via the same CASE as GetStatsForUser (seats 0/2 → team A
+	// score, 1/3 → team B score). In-progress and abandoned rows are excluded:
+	// only a completed (natural or surrender) match has a meaningful final team
+	// total. A user with no completed matches yields 0.
+	GetCareerPointsForUser(userID uint) (int64, error)
+
 	// GetTopPartnersForUser returns the most-played teammates (same-team seat)
 	// ordered by matches played together, capped at limit.
 	GetTopPartnersForUser(userID uint, limit int) ([]PartnerAggregate, error)

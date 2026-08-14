@@ -28,10 +28,17 @@ type IdentityHeroProps = {
   wins: number;
   losses: number;
   capots: number;
-  /** Coin wallet balance (Story 9.1). */
+  /** Coin wallet balance (Story 9.1). Ignored when hidePrivatePills is set. */
   walletBalance: number;
-  /** Daily-login streak (Story 9.1) — distinct from the win/loss streak. */
+  /** Daily-login streak (Story 9.1) — distinct from the win/loss streak.
+   *  Ignored when hidePrivatePills is set. */
   loginStreakDays: number;
+  /**
+   * Story 11.3: on a PUBLIC profile the viewer must never see the subject's (or
+   * their own) wallet + login-streak pills — both are private and are fed from
+   * the viewer's authStore on the self page. When true, neither pill renders.
+   */
+  hidePrivatePills?: boolean;
   /** Lifetime level (Story 9.5) — server-derived from total XP. */
   level: number;
   /** XP earned past the current level's threshold (server-provided). */
@@ -126,6 +133,7 @@ export function IdentityHero({
   xpForNextLevel,
   winRate,
   honor,
+  hidePrivatePills = false,
 }: IdentityHeroProps) {
   const { t } = useTranslation();
 
@@ -183,26 +191,34 @@ export function IdentityHero({
           <HeroPill value={wins} label={t("profile.hero.wins")} tone="accent" />
           <HeroPill value={losses} label={t("profile.hero.losses")} tone="neutral" />
           <HeroPill value={capots} label={t("profile.hero.capots")} tone="brass" />
-          {/* Matches the header coin pill: neutral surface + border, ink
-              number, off-theme gold coin icon (see COIN_GOLD). */}
-          <HeroPill
-            value={formatCoins(walletBalance)}
-            label={t("wallet.balanceLabel")}
-            icon={<Coins className="size-3.5" style={{ color: COIN_GOLD }} aria-hidden="true" />}
-            tone="neutral"
-          />
-          {loginStreakDays > 1 && (
-            <HeroPill
-              value={loginStreakDays}
-              label={t("wallet.streakLabel")}
-              titleText={t("wallet.streakTooltip", { days: loginStreakDays })}
-              icon={
-                <span className="text-[13px] leading-none" aria-hidden="true">
-                  🔥
-                </span>
-              }
-              tone="neutral"
-            />
+          {/* Wallet + login-streak pills are PRIVATE (Story 11.3): shown only on
+              the self profile, never on a public one. Matches the header coin
+              pill: neutral surface + border, ink number, off-theme gold coin
+              icon (see COIN_GOLD). */}
+          {!hidePrivatePills && (
+            <>
+              <HeroPill
+                value={formatCoins(walletBalance)}
+                label={t("wallet.balanceLabel")}
+                icon={
+                  <Coins className="size-3.5" style={{ color: COIN_GOLD }} aria-hidden="true" />
+                }
+                tone="neutral"
+              />
+              {loginStreakDays > 1 && (
+                <HeroPill
+                  value={loginStreakDays}
+                  label={t("wallet.streakLabel")}
+                  titleText={t("wallet.streakTooltip", { days: loginStreakDays })}
+                  icon={
+                    <span className="text-[13px] leading-none" aria-hidden="true">
+                      🔥
+                    </span>
+                  }
+                  tone="neutral"
+                />
+              )}
+            </>
           )}
         </div>
 

@@ -37,11 +37,50 @@ export interface ProfileResponse {
   honorTrendDirection: string;
 }
 
+/**
+ * The PUBLIC projection of a player's profile (Story 11.3). The server returns
+ * this shape from GET /users/:id/profile when :id is NOT the authenticated
+ * viewer. It is a strict subset of {@link ProfileResponse}: identity,
+ * member-since, progression (level + XP) and the full honor section, but NONE of
+ * the private figures — no walletBalance, loginStreakDays, languagePreference or
+ * usernameChangedAt. Same URL as getProfile; the narrower type is the point.
+ */
+export interface PublicProfileResponse {
+  id: number;
+  username: string;
+  createdAt: string;
+  totalGamesPlayed: number;
+  wins: number;
+  losses: number;
+  abandoned: number;
+  totalXp: number;
+  level: number;
+  xpIntoLevel: number;
+  xpForNextLevel: number;
+  honorScore: number;
+  honorTier: string;
+  honorCompletedTotal: number;
+  honorAbandonedTotal: number;
+  isNewPlayer: boolean;
+  honorTrendDelta: number;
+  honorTrendDirection: string;
+}
+
 export interface UpdatePreferencesRequest {
   languagePreference: string;
 }
 
 export function getProfile(userId: number): Promise<ProfileResponse> {
+  return axiosClient.get(`/users/${userId}/profile`);
+}
+
+/**
+ * Fetch another player's public profile. Hits the same URL as getProfile — the
+ * server decides the shape from whether :id is the authenticated viewer — and
+ * only attaches the narrower {@link PublicProfileResponse} type. The public page
+ * never requests its own viewer's id here.
+ */
+export function getPublicProfile(userId: number): Promise<PublicProfileResponse> {
   return axiosClient.get(`/users/${userId}/profile`);
 }
 

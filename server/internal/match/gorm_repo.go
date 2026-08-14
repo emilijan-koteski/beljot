@@ -343,6 +343,31 @@ LIMIT 200`,
 	return agg, nil
 }
 
+// GetCareerPointsForUser sums the subject's OWN team score across their
+// COMPLETED matches — the lifetime "career points scored" figure on the public
+// profile (Story 11.3). The team per row is derived from the player's seat via
+// the same viewerTeamCase as GetStatsForUser (seats 0/2 → team_a_score, 1/3 →
+// team_b_score). Only status = 'completed' rows count: in-progress rows have no
+// final total and abandoned rows never reach a real score. COALESCE keeps a
+// user with no completed matches at 0 rather than NULL.
+func (r *GormMatchRepository) GetCareerPointsForUser(userID uint) (int64, error) {
+	var total int64
+	err := r.db.Raw(`
+SELECT COALESCE(SUM(
+  CASE WHEN `+viewerTeamCase+` = 0 THEN team_a_score ELSE team_b_score END
+), 0)
+FROM matches
+WHERE status = 'completed'
+  AND (player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?)`,
+		userID, userID, userID, userID,
+		userID, userID, userID, userID,
+	).Scan(&total).Error
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 // GetTopPartnersForUser returns the most-played teammates — the same-team seat
 // across each match — ordered by matches played together. wins mirrors
 // GetStatsForUser's per-player semantics: completed wins plus attributable

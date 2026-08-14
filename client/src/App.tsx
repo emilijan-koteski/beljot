@@ -20,6 +20,7 @@ import { LobbyPage } from "@/features/lobby/LobbyPage";
 import { MatchmakingPage } from "@/features/lobby/MatchmakingPage";
 import { MatchPage } from "@/features/match/MatchPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
+import { PublicPlayerProfilePage } from "@/features/profile/PublicPlayerProfilePage";
 import { RoomPage } from "@/features/room/RoomPage";
 import { RulesPage } from "@/features/rules/RulesPage";
 import { AppLayout } from "@/shared/components/AppLayout";
@@ -87,6 +88,10 @@ function createAppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/lobby" element={<LobbyPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            {/* Public player profile (Story 11.3): any logged-in viewer, under
+                the TopBar + auth gate. "Public" = not self-restricted, not
+                unauthenticated. */}
+            <Route path="/players/:id" element={<PublicPlayerProfilePage />} />
             <Route path="/rooms/:id" element={<RoomPage />} />
             <Route path="/matchmaking/:id" element={<MatchmakingPage />} />
           </Route>

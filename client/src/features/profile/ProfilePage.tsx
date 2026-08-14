@@ -174,6 +174,7 @@ export function ProfilePage() {
               <Rivalries rivals={career.data.topRivals} />
               <Milestones
                 capots={career.data.capots}
+                careerPoints={career.data.careerPoints}
                 bestHand={career.data.bestHand}
                 avgMatchSeconds={career.data.avgMatchSeconds}
               />

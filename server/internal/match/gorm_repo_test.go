@@ -331,6 +331,37 @@ func TestGormMatchRepository_GetCareerAggregatesForUser_StreakCountsAbandonmentW
 	assert.Equal(t, 1, agg.StreakLength, "streak length")
 }
 
+// TestGormMatchRepository_GetCareerPointsForUser pins the Story 11.3 lifetime
+// "career points" aggregate: the subject's OWN team score summed across
+// COMPLETED matches only. In the shared fixture the two completed rows (m1
+// natural, m4 surrender) each score 500-400 and the two abandoned rows (m2, m3)
+// are excluded — so team-A player `a` totals 1000 (team_a_score 500+500) and
+// team-B player `b` totals 800 (team_b_score 400+400). A user with no completed
+// matches totals 0.
+func TestGormMatchRepository_GetCareerPointsForUser(t *testing.T) {
+	db := getRepoTestDB(t)
+	f := seedAbandonedFixture(t, db)
+
+	t.Run("team A player sums team_a_score over completed matches", func(t *testing.T) {
+		pts, err := f.repo.GetCareerPointsForUser(f.a)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1000), pts, "m1 + m4 team_a_score; abandoned m2/m3 excluded")
+	})
+
+	t.Run("team B player sums team_b_score", func(t *testing.T) {
+		pts, err := f.repo.GetCareerPointsForUser(f.b)
+		require.NoError(t, err)
+		assert.Equal(t, int64(800), pts, "m1 + m4 team_b_score")
+	})
+
+	t.Run("no completed matches totals zero", func(t *testing.T) {
+		lonely := seedRepoUser(t, db, "cp"+repoFixtureSuffix()+"z")
+		pts, err := f.repo.GetCareerPointsForUser(lonely)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), pts)
+	})
+}
+
 // TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment pins the
 // partner/rival mirrors of the stats semantics: attributable abandoned rows
 // count viewer-relative wins/losses; the viewer's own abandonments and

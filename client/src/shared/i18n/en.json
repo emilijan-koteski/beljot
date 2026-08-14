@@ -129,6 +129,7 @@
       "sub": "Every completed match — open a row to see hand-by-hand scoring, declarations, capots and failed hands.",
       "empty": "No matches yet — Quick Play to get started",
       "emptyCta": "Go to lobby",
+      "emptyPublic": "This player hasn't played any matches yet.",
       "emptyFiltered": "No matches for this filter yet.",
       "loading": "Loading matches…",
       "error": "Could not load match history — try again",
@@ -244,6 +245,8 @@
     "milestones": {
       "eyebrow": "Milestones",
       "title": "Career highlights",
+      "careerPointsLabel": "Career points",
+      "careerPointsHint": "total points scored",
       "capotsLabel": "Capots made",
       "capotsHint": "max-points hands",
       "bestHandLabel": "Best hand",
@@ -254,6 +257,14 @@
       "avgLengthValue": "{{minutes}}m",
       "avgLengthHint": "completed matches"
     }
+  },
+  "publicProfile": {
+    "notFound": {
+      "title": "Player not found",
+      "body": "This player doesn't exist or is no longer available.",
+      "cta": "Go to lobby"
+    },
+    "error": "Couldn't load this player's profile."
   },
   "language": {
     "en": "English",

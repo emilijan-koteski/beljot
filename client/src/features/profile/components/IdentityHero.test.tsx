@@ -51,3 +51,23 @@ describe("IdentityHero XP (Story 9.5)", () => {
     expect(screen.getByTestId("profile-xp-bar")).toHaveAttribute("aria-valuenow", "0");
   });
 });
+
+describe("IdentityHero private pills (Story 11.3)", () => {
+  it("renders the wallet and login-streak pills by default (self profile)", () => {
+    const { container } = renderHero({ walletBalance: 5000, loginStreakDays: 3 });
+
+    expect(container.querySelector('[aria-label^="Coins"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label^="Day streak"]')).not.toBeNull();
+  });
+
+  it("hides the wallet and login-streak pills when hidePrivatePills is set (public profile)", () => {
+    const { container } = renderHero({
+      walletBalance: 5000,
+      loginStreakDays: 3,
+      hidePrivatePills: true,
+    });
+
+    expect(container.querySelector('[aria-label^="Coins"]')).toBeNull();
+    expect(container.querySelector('[aria-label^="Day streak"]')).toBeNull();
+  });
+});

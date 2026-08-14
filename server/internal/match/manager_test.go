@@ -86,6 +86,12 @@ func (r *mockMatchRepo) GetCareerAggregatesForUser(uint) (match.CareerAggregates
 	return match.CareerAggregates{}, r.err
 }
 
+func (r *mockMatchRepo) GetCareerPointsForUser(uint) (int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return 0, r.err
+}
+
 func (r *mockMatchRepo) GetTopPartnersForUser(uint, int) ([]match.PartnerAggregate, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -35,6 +35,12 @@ export interface RivalStat {
 export interface CareerResponse {
   capots: number;
   avgMatchSeconds: number;
+  /**
+   * Lifetime total game points the player scored across their completed matches
+   * (Story 11.3 — server sum of the subject's own team score). Surfaced on both
+   * the public and self career views.
+   */
+  careerPoints: number;
   streak: CareerStreak;
   bestHand?: BestHand;
   /** Completed-at of the most recent match, absent if none played. */

@@ -107,6 +107,10 @@ func (r *timestampedRepo) GetCareerAggregatesForUser(_ uint) (match.CareerAggreg
 	return match.CareerAggregates{}, nil
 }
 
+func (r *timestampedRepo) GetCareerPointsForUser(_ uint) (int64, error) {
+	return 0, nil
+}
+
 func (r *timestampedRepo) GetTopPartnersForUser(_ uint, _ int) ([]match.PartnerAggregate, error) {
 	return nil, nil
 }

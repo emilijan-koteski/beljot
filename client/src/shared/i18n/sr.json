@@ -129,6 +129,7 @@
       "sub": "Svaki odigrani meč. Klikni na zapis za prikaz bodovanja po deljenjima: zvanja, kapoti i pale ruke.",
       "empty": "Nema mečeva. Pokreni Brzu igru",
       "emptyCta": "U lobi",
+      "emptyPublic": "Ovaj igrač još nije odigrao nijedan meč.",
       "emptyFiltered": "Nema mečeva za ovaj filter.",
       "loading": "Učitavanje mečeva…",
       "error": "Neuspešno učitavanje istorije. Pokušaj ponovo",
@@ -244,6 +245,8 @@
     "milestones": {
       "eyebrow": "Prekretnice",
       "title": "Vrhunci karijere",
+      "careerPointsLabel": "Poeni u karijeri",
+      "careerPointsHint": "ukupno osvojenih poena",
       "capotsLabel": "Ostvareni kapoti",
       "capotsHint": "ruke s maksimumom",
       "bestHandLabel": "Najbolja ruka",
@@ -254,6 +257,14 @@
       "avgLengthValue": "{{minutes}}m",
       "avgLengthHint": "završeni mečevi"
     }
+  },
+  "publicProfile": {
+    "notFound": {
+      "title": "Igrač nije pronađen",
+      "body": "Ovaj igrač ne postoji ili više nije dostupan.",
+      "cta": "U lobi"
+    },
+    "error": "Nije moguće učitati profil ovog igrača."
   },
   "language": {
     "en": "English",
