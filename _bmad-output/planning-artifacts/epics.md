@@ -83,6 +83,8 @@ FR57: Room owners can optionally require a minimum honor score (0–100) and tog
 FR58: Room owners can kick seated players and swap seat assignments while the room is in `waiting` status; controls are disabled once the game starts and rejected for non-owners
 FR59: Room owners can seat server-controlled bot players on empty seats while the room is in `waiting` status (1, 2, or 3 bots — any combination of free seats), swap them with seated players or move them between seats, and remove them before game start. Bots play autonomously server-side with competent heuristic strategy and humanized response timing (never instantaneous). Matches that include at least one bot are flagged as bot-inclusive in persistence and visibly marked in match previews/history. Bots never replace disconnected human players — the reconnect/abandon flow is unchanged
 FR60: Rooms can be marked private with an owner-set password (stored hashed; nullable = public). Private rooms remain listed but shown as locked; joining one — via its locked room card or its join code — requires entering the correct password before the join proceeds. Owners can change the password or revert to public; Quick Play rooms are never private
+FR61: Friends can exchange private one-on-one "whisper" messages, initiated with the `/w <username>` chat command from the lobby, a room, or a match. Whispering is blocked to any friend currently in the sender's same active room or match (teammate or opponent) to prevent card-information collusion; the block is enforced server-side. Whispers are real-time only (recipient must be online) and ephemeral (not persisted), and render visually distinct (pink) with Valorant-style channel switching between the primary chat and each whisper thread (added 2026-08-14)
+FR62: Room members can invite "available" friends (online, in the lobby, not in any room or match) into a room in `waiting` status. A host (owner) invite bypasses the room password via a server-authorized one-time grant; a non-host member's invite still requires the invitee to enter the room password if one is set. Invites are delivered as a popup, expire on timeout, and auto-void if the room fills/closes or the friend leaves the lobby. The honor gate (FR57) and seat capacity still apply to all invitees (added 2026-08-14)
 
 ### NonFunctional Requirements
 
@@ -167,8 +169,8 @@ NFR17: A single player's disconnection must not affect game state integrity or c
 
 - Phase 1: ~25 FRs (auth, Bitola variant only, lobby/rooms, real-time session, chat, disconnect handling, basic match history, i18n EN+SR, desktop web)
 - Phase 2: Coin economy (FR53–55), XP/lifetime level (FR33–34), honor system (FR56–57), private rooms (FR60), room owner kick/seat (FR58), team surrender (FR28a), in-game emotes (FR32), additional languages MK+HR (FR45), 501 mode (FR15 — moved from Phase 3 on 2026-06-11, see sprint-change-proposal-2026-06-11.md)
-- Phase 3: Player search (FR5), friends (FR6), public profiles (FR47), Croatian variant (FR8), in-app rules reference (FR29)
-- Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40), social login (FR3), mobile (FR52)
+- Phase 3: Player search (FR5), friends (FR6), friend whisper chat (FR61), friend room invites (FR62), public profiles (FR47), Croatian variant (FR8), in-app rules reference (FR29)
+- Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40), social login (FR3 — Google shipped early via Story 14.1; Facebook Story 14.2 pending). Mobile (FR52) descoped 2026-08-14 — Epic 15 removed (see sprint-change-proposal-2026-08-14.md)
 - Phase 5: Spectator (FR48), achievements (FR49), cosmetics (FR50), tournaments (FR51)
 - Agents must NOT implement the Croatian variant before Phase 3 (501 mode was moved to Phase 2 / Epic 10 on 2026-06-11 and is no longer phase-gated)
 - Tied-hand rule diverges by variant (deferred to Epic 12 / Phase 3): the interim engine applies the **Croatian** rule (a tie sends all points to the taker's opponents) to all variants; the **Bitola** variant must later use **hanging points (carry-over)** instead. See `deferred-work.md`. Do not treat the current Bitola tie behavior as a bug before then.
@@ -194,7 +196,7 @@ NFR17: A single player's disconnection must not affect game state integrity or c
 
 FR1: Epic 1 — Player registration (email/password)
 FR2: Epic 1 — Login and session persistence
-FR3: Epic 14 — Social login (Google, Facebook)
+FR3: Epic 14 — Social login (Google [Story 14.1 — done 2026-08-14] + Facebook [Story 14.2 — backlog])
 FR4: Epic 1 (basic) / Epic 7 (expanded) — Player profile display
 FR5: Epic 11 — Player search by username
 FR6: Epic 11 — Friend requests and friend list
@@ -244,7 +246,7 @@ FR48: Epic 16 — Spectator/observer mode
 FR49: Epic 16 — Achievements and badges
 FR50: Epic 16 — Cosmetic purchases
 FR51: Epic 16 — Bracket-style tournaments
-FR52: Epic 15 — Mobile experience (PWA/native)
+FR52: [descoped 2026-08-14] — Epic 15 removed; mobile-responsive layout delivered incidentally across Phase 1–2, PWA/native dropped (see sprint-change-proposal-2026-08-14.md)
 FR53: Epic 9 — Room coin buy-in + match pot settlement
 FR54: Epic 9 — Coin sources (registration + daily streak)
 FR55: Epic 9 — Quick Play coin bracketing
@@ -253,6 +255,8 @@ FR57: Epic 9 — Honor-gated rooms (min_honor + allow_new_players)
 FR58: Epic 8 — Room owner pre-game kick + seat swap
 FR59: Epic 10 — Bot players (owner-seated, server-controlled; added 2026-06-11)
 FR60: Epic 9 — Private rooms (password-gated entry; added 2026-06-18)
+FR61: Epic 11 — Friend whisper chat (private friend-to-friend messaging, anti-collusion; added 2026-08-14)
+FR62: Epic 11 — Friend room invites (host password-bypass; non-host password-required; added 2026-08-14)
 
 ## Epic List
 
@@ -335,9 +339,9 @@ The i18n system is extended with Macedonian and Croatian translations, giving pl
 
 ### Epic 11: Friends & Public Profiles
 
-Players can search for other players by username, send/accept friend requests, maintain a friend list with online status, and view public profiles that include honor score, XP/level, prior-season rank archive, and career stats.
+Players can search for other players by username, send/accept friend requests, maintain a friend list with online status, and view public profiles that include honor score, XP/level, prior-season rank archive, and career stats. Friends can also whisper each other privately (with an anti-collusion block on players in the same active game) and invite available friends into their room.
 
-**FRs covered:** FR5, FR6, FR47
+**FRs covered:** FR5, FR6, FR47, FR61, FR62
 **Phase:** 3
 
 ### Epic 12: Variant Expansion
@@ -358,17 +362,17 @@ Players earn Season Points (SP) per match, climb an 8-tier seasonal ladder (Iron
 
 ### Epic 14: Social Login
 
-Players can register and log in using Google or Facebook OAuth, with account linking when an email matches an existing account.
+Players can register and log in using Google or Facebook OAuth, with account linking when an email matches an existing account. Google OAuth (Story 14.1) shipped ahead of schedule during Phase 1–2 build-out; Facebook OAuth (Story 14.2) remains pending.
 
 **FRs covered:** FR3
-**Phase:** 4
+**Phase:** 4 (Story 14.1 delivered early — epic in-progress)
 
-### Epic 15: Mobile Experience
+### Epic 15: Mobile Experience — [REMOVED 2026-08-14]
 
-The platform is delivered as a mobile-optimized experience (PWA or native client) with touch-friendly card interaction and responsive layout.
+Removed via bmad-correct-course (see sprint-change-proposal-2026-08-14.md). The mobile-responsive layout and touch-friendly card interaction were delivered incidentally across Phase 1–2 (responsive MatchPage, useVisualViewport, 320px-safe cards); the PWA/native scope (manifest, service worker, installability, offline splash, push) was never built and is dropped. FR52 is marked [descoped]. Epic 16 keeps its number.
 
-**FRs covered:** FR52
-**Phase:** 4
+**FRs covered:** — (FR52 descoped)
+**Phase:** — (removed)
 
 ### Epic 16: Spectator, Achievements, Cosmetics & Tournaments
 
@@ -2211,6 +2215,78 @@ So that I can see their reliability, progression, and competitive history.
 **Then** the prior-season rank archive section is omitted (not present in DOM), and the current seasonal rank is not displayed
 **And** the rest of the profile renders normally — the profile implementation tolerates absent season data gracefully
 
+### Story 11.4: Friend Whisper Chat
+
+As a player,
+I want to send private "whisper" messages to my friends from the lobby, a room, or a match,
+So that I can chat one-on-one with people I know — but never with someone I'm currently playing with.
+
+**Acceptance Criteria:**
+
+**Given** a player is in the lobby, a room, or an active match
+**When** they type `/w <friendUsername> <message>` in the chat input
+**Then** the message is delivered privately to that friend (new `event:whisper` WS event, analogous to the Epic 6 chat events) and appears only in the two participants' whisper thread
+**And** the `/w` command, the target username, and the message text are never shown to any other player
+
+**Given** a player issues `/w <name>` where `<name>` is not on their friend list (Story 11.2)
+**When** the server validates the whisper
+**Then** it is rejected with `error:not_friends` and the sender sees an inline hint ("You can only whisper friends")
+
+**Given** the whisper target is a friend currently in the SAME active room or match as the sender (teammate or opponent)
+**When** the sender attempts the whisper
+**Then** the server rejects it with `error:whisper_blocked_in_game` ("You can't whisper someone you're currently playing with")
+**And** the rule is enforced server-side (authoritative) using the presence registry — not merely hidden in the client — while friends in the lobby or in a different room/match remain valid targets
+
+**Given** one or more whisper threads are open
+**When** messages render in the chat panel
+**Then** whispers are visually distinct from lobby/room/match chat (pink-tinted bubbles) and labelled with the friend's username
+**And** the player can switch between the primary channel (lobby/room/match) and each open whisper thread via a tab control or the Tab key (Valorant-style channel cycling)
+
+**Given** a player whispers a friend who is offline (not connected)
+**When** the server processes it
+**Then** it is rejected with `error:whisper_recipient_offline` — whispers are real-time only, with no offline inbox (consistent with the Epic 6 chat model)
+
+**Given** whispers were exchanged during a session
+**When** a participant leaves the lobby/room/match or disconnects
+**Then** whisper threads are ephemeral and not persisted server-side (no history), matching the Epic 6 chat model
+
+### Story 11.5: Friend Room Invites
+
+As a room member,
+I want to invite my available friends into my room,
+So that we can play together quickly — with the host able to pull friends past the room password, while other members' invitees still enter it.
+
+**Acceptance Criteria:**
+
+**Given** a player is the owner of, or seated in, a room in `waiting` status
+**When** they open the friend/invite panel from the room
+**Then** each "available" friend — online, in the lobby, and not in any room or match — shows an "Invite to Room" action (extends the Story 11.2 hook); friends who are in a room/match or offline are shown as not invitable
+
+**Given** a room member sends an invite to an available friend
+**When** the invite is issued
+**Then** the friend receives a popup invitation (new `event:room_invite` WS push) showing the inviter's username, room name, buy-in, and whether the room is private
+**And** the invite expires after a timeout and is auto-voided if the room fills, closes, or the friend leaves the lobby
+
+**Given** the invite was sent by the HOST (room owner)
+**When** the friend confirms the popup
+**Then** they auto-join the room, bypassing the room password even if one is set, via a server-issued one-time invite grant (the bypass is server-authorized, never a client-supplied flag) — no password prompt is shown
+
+**Given** the invite was sent by a NON-HOST member AND the room has a password set (Story 9.6)
+**When** the friend confirms the popup
+**Then** they are shown the Story 9.6 `PasswordPromptDialog` and must enter the correct room password to join; a wrong password returns `error:wrong_room_password`
+
+**Given** the invite was sent by a NON-HOST member AND the room has no password
+**When** the friend confirms the popup
+**Then** they join directly with no password step
+
+**Given** any invitee confirms
+**When** the join is evaluated
+**Then** the room's honor gate and `allow_new_players` rule (Story 9.8) and seat capacity still apply to the invitee — only the password is bypassed, and only for host invites
+
+**Given** an invited friend confirms but the room is now full, closed, or the invite has expired
+**When** the join is attempted
+**Then** it fails gracefully with a clear message and the friend remains in the lobby
+
 ## Epic 12: Variant Expansion
 
 Players can play the Croatian trump variant and access an in-app rules reference covering both variants. (The 501-point match mode originally planned here moved to Epic 10 as Story 10.2 on 2026-06-11.)
@@ -2350,51 +2426,63 @@ So that newcomers can compete fairly while my history is still on record.
 
 Players can register and log in using Google or Facebook OAuth, with account linking when an email matches an existing account.
 
-### Story 14.1: Google & Facebook OAuth
+### Story 14.1: Google OAuth — [DONE 2026-08-14]
 
 As a player,
-I want to register and log in using Google or Facebook,
-So that I don't need to create a separate account.
+I want to register and log in using my Google account,
+So that I don't need to create a separate email/password account.
+
+**Status:** Delivered during Phase 1–2 build-out — provider-agnostic SSO handler (`internal/auth/sso_handler.go`), `BELJOT_GOOGLE_CLIENT_ID` config, "Continue with Google" button + `client/public/google.svg`. Verified 2026-08-14.
 
 **Acceptance Criteria:**
 
 **Given** a player is on the registration or login page
-**When** they click "Continue with Google" or "Continue with Facebook"
-**Then** the OAuth flow initiates, redirecting to the provider's consent screen
+**When** they click "Continue with Google"
+**Then** the Google Identity Services flow returns an ID-token credential to the client, which POSTs it to the SSO login endpoint
 
-**Given** the OAuth provider returns an authorization code
-**When** the server exchanges it for user info
-**Then** a new user account is created (if first login) or the existing account is matched
+**Given** the server receives the Google ID-token credential
+**When** it verifies the token against the configured `GoogleClientID` audience
+**Then** a new account is created (first login) or the existing linked account is matched
 **And** the player receives JWT tokens and is redirected to the lobby
 
 **Given** a player previously registered with email
-**When** they attempt social login with the same email
+**When** they sign in with Google using the same verified email
 **Then** the accounts are linked and the player can use either login method
 
-## Epic 15: Mobile Experience
+**Given** `BELJOT_GOOGLE_CLIENT_ID` is unset in a non-development environment
+**When** the server starts
+**Then** Google sign-in is simply unavailable (logged as a warning) and email/password login is unaffected
 
-The platform is delivered as a mobile-optimized experience (PWA or native client) with touch-friendly card interaction and responsive layout.
-
-### Story 15.1: PWA / Mobile Layout & Touch Interaction
+### Story 14.2: Facebook OAuth
 
 As a player,
-I want to access Beljot on my phone or tablet,
-So that I can play on the go.
+I want to register and log in using my Facebook account,
+So that I have another one-tap sign-in option.
+
+**Status:** Backlog. The SSO handler is already provider-agnostic (a `"facebook"` provider path is exercised in tests), but no Facebook token verifier or client-side Facebook Login button is wired in production.
 
 **Acceptance Criteria:**
 
-**Given** the platform is desktop-only
-**When** mobile support is added
-**Then** the platform is accessible as a PWA (progressive web app) or native client optimized for touch interaction
+**Given** a player is on the registration or login page
+**When** they click "Continue with Facebook"
+**Then** the Facebook Login flow returns a credential/access token to the client, which POSTs it to the SSO login endpoint
 
-**Given** a player opens the platform on mobile
-**When** the UI renders
-**Then** the layout adapts to mobile viewport (portrait and landscape) with touch-friendly card interaction (tap to play)
-**And** all core features are functional: lobby, room management, game play, chat, profile
+**Given** the server receives the Facebook credential
+**When** it verifies the token with Facebook (Graph API / token debug) and reads the verified email
+**Then** a new account is created (first login) or the existing linked account is matched via the same provider-agnostic path as Google
+**And** the player receives JWT tokens and is redirected to the lobby
 
-**Given** a player installs the PWA
-**When** they open it from their home screen
-**Then** it launches in a standalone app-like experience with offline splash screen and push notification support for match invites
+**Given** a player previously registered with email (or linked Google)
+**When** they sign in with Facebook using the same verified email
+**Then** the accounts are linked and the player can use any linked login method
+
+**Given** Facebook app credentials are unset
+**When** the server starts
+**Then** Facebook sign-in is unavailable (warning logged) and other login methods are unaffected
+
+## Epic 15: Mobile Experience — [REMOVED 2026-08-14]
+
+Removed via bmad-correct-course (sprint-change-proposal-2026-08-14.md). Rationale: the mobile-responsive layout and touch-friendly card interaction (tap-to-play) already shipped incidentally across Phase 1–2 — responsive MatchPage layout, `useVisualViewport` keyboard handling, 320px-safe cards — while the PWA/native scope (web app manifest, service worker, installability, offline splash, push notifications for match invites) was never built and is descoped. FR52 is retired in the FR Coverage Map. Story 15.1 is withdrawn; Epic 16 retains its number.
 
 ## Epic 16: Spectator, Achievements, Cosmetics & Tournaments
 
