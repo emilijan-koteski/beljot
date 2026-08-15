@@ -619,6 +619,14 @@
     "search": {
       "placeholder": "Search by room name or code…"
     },
+    "playerSearch": {
+      "label": "Find players",
+      "placeholder": "Search players by username…",
+      "loading": "Searching…",
+      "empty": "No players found matching \"{{query}}\"",
+      "clear": "Clear search",
+      "resultAria": "View {{username}}'s profile"
+    },
     "empty": {
       "title": "No open rooms match your filters",
       "description": "Try clearing filters, hit Quick Play, or create a room and invite your friends.",

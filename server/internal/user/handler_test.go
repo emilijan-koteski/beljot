@@ -307,6 +307,28 @@ func (m *mockUserRepo) FindByID(id uint) (*user.User, error) {
 	return nil, nil
 }
 
+// SearchByUsername mirrors the production query in memory: case-insensitive
+// substring match, self + soft-deleted (absent from m.users) excluded, ordered
+// by username ascending, capped at limit. Returns nil on no match — the handler
+// is what normalises that to a [] slice.
+func (m *mockUserRepo) SearchByUsername(query string, excludeUserID uint, limit int) ([]user.User, error) {
+	needle := strings.ToLower(query)
+	var out []user.User
+	for _, u := range m.users {
+		if u.ID == excludeUserID {
+			continue
+		}
+		if strings.Contains(strings.ToLower(u.Username), needle) {
+			out = append(out, *u)
+		}
+	}
+	sortpkg.SliceStable(out, func(i, j int) bool { return out[i].Username < out[j].Username })
+	if limit >= 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (m *mockUserRepo) FindManyByIDs(ids []uint) ([]user.User, error) {
 	if len(ids) == 0 {
 		return []user.User{}, nil
@@ -509,6 +531,7 @@ func setupUserHandlerWithMatches() (*mockUserRepo, *mockMatchRepo, *echo.Echo) {
 	e.HTTPErrorHandler = testErrorHandler
 
 	api := e.Group("/api/v1", auth.AuthMiddleware(testJWTSecret))
+	api.GET("/users", handler.SearchUsers)
 	api.GET("/users/:id/profile", handler.GetProfile)
 	api.GET("/users/:id/career", handler.GetCareer)
 	api.GET("/users/:id/matches", handler.ListMatches)
@@ -974,6 +997,91 @@ func TestGetProfile_MissingAuth(t *testing.T) {
 	_, e := setupUserHandler()
 
 	rec := doGetProfile(e, "1", "")
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// --- SearchUsers tests (Story 11.1) ---
+
+func doSearchUsers(e *echo.Echo, rawQuery, token string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users"+rawQuery, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+// A happy-path search returns the minimal {id,username} shape, ordered by
+// username, and never includes the requesting user themselves.
+func TestSearchUsers_Success(t *testing.T) {
+	repo, e := setupUserHandler()
+	me := repo.addUser("alSearcher", "me@example.com", "en") // also contains "al"
+	repo.addUser("alice", "alice@example.com", "en")
+	repo.addUser("albert", "albert@example.com", "en")
+	repo.addUser("zeta", "zeta@example.com", "en") // control: no "al"
+
+	token, err := auth.GenerateAccessToken(me.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doSearchUsers(e, "?search=al", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp struct {
+		Data []user.PlayerSearchResult `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+
+	names := make([]string, len(resp.Data))
+	for i, r := range resp.Data {
+		names[i] = r.Username
+	}
+	assert.Equal(t, []string{"albert", "alice"}, names, "ordered ascending, self excluded")
+	assert.NotZero(t, resp.Data[0].ID, "the id must be populated for navigation")
+}
+
+// A query with no matches returns an empty JSON array, never null — the client's
+// `.length === 0` empty-state check depends on it.
+func TestSearchUsers_NoMatch_ReturnsEmptyArray(t *testing.T) {
+	repo, e := setupUserHandler()
+	me := repo.addUser("someone", "someone@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(me.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doSearchUsers(e, "?search=zzznomatch", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"data":[]`, "no-match must serialize as [] not null")
+}
+
+// A missing, empty, or whitespace-only search param is a 400 BAD_REQUEST.
+func TestSearchUsers_BadRequest(t *testing.T) {
+	cases := []struct {
+		name     string
+		rawQuery string
+	}{
+		{"missing param", ""},
+		{"empty param", "?search="},
+		{"whitespace only", "?search=%20%20%20"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			me := repo.addUser("someone", "someone@example.com", "en")
+			token, err := auth.GenerateAccessToken(me.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doSearchUsers(e, tc.rawQuery, token)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+			assert.Equal(t, "BAD_REQUEST", errCode(t, rec))
+		})
+	}
+}
+
+func TestSearchUsers_MissingAuth(t *testing.T) {
+	_, e := setupUserHandler()
+
+	rec := doSearchUsers(e, "?search=al", "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 

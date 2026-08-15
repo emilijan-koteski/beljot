@@ -40,6 +40,17 @@ export interface User {
   createdAt: string;
 }
 
+/**
+ * Minimal public shape returned by the player-search endpoint (Story 11.1,
+ * GET /users?search=). Deliberately NOT the self `User` type — that carries
+ * `email` and other private fields and is not a public/search projection. Only
+ * `id` (for navigation to /players/:id) and `username` are exposed.
+ */
+export interface PlayerSearchResult {
+  id: number;
+  username: string;
+}
+
 export interface Room {
   id: number;
   name: string;

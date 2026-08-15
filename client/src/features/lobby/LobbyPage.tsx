@@ -8,6 +8,7 @@ import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
+import { PlayerSearch } from "@/features/lobby/components/PlayerSearch";
 import { RoomEjectionModal } from "@/features/lobby/components/RoomEjectionModal";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
 import { Toast } from "@/features/lobby/components/Toast";
@@ -249,6 +250,8 @@ export function LobbyPage() {
         setSort={setSort}
         counts={counts}
       />
+
+      <PlayerSearch />
 
       <RoomGrid
         rooms={filtered}

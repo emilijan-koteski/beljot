@@ -50,7 +50,10 @@ func (f *fakeHonorRepo) Create(*User) error                   { panic("unused") 
 func (f *fakeHonorRepo) Delete(uint) error                    { panic("unused") }
 func (f *fakeHonorRepo) FindByEmail(string) (*User, error)    { panic("unused") }
 func (f *fakeHonorRepo) FindByUsername(string) (*User, error) { panic("unused") }
-func (f *fakeHonorRepo) FindByID(uint) (*User, error)         { panic("unused") }
+func (f *fakeHonorRepo) SearchByUsername(string, uint, int) ([]User, error) {
+	panic("unused")
+}
+func (f *fakeHonorRepo) FindByID(uint) (*User, error) { panic("unused") }
 func (f *fakeHonorRepo) FindManyByIDs(ids []uint) ([]User, error) {
 	f.findCalls++
 	f.findIDs = append(f.findIDs, append([]uint(nil), ids...))

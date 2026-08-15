@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -628,6 +629,50 @@ func (h *UserHandler) UpdateUsername(c echo.Context) error {
 			"usernameChangedAt": changedAt,
 		},
 	})
+}
+
+// PlayerSearchResult is the minimal per-user DTO returned by SearchUsers
+// (Story 11.1). It deliberately carries ONLY the public id + username — never
+// email, wallet, honor, or any other field — because search results are shown
+// to any authenticated player. Enriching it with honor/level chips is a
+// possible future enhancement, out of scope here (see the story Scope note).
+type PlayerSearchResult struct {
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+}
+
+// searchResultLimit caps how many rows SearchUsers returns for a single query.
+const searchResultLimit = 10
+
+// SearchUsers returns players whose username matches the `search` query as a
+// case-insensitive substring (Story 11.1, FR5). The requesting user and
+// soft-deleted users are excluded; results are ordered by username ascending
+// and capped at searchResultLimit. A missing / empty / whitespace-only `search`
+// param is a 400 (reusing the generic ErrBadRequest — no AC needs a distinct
+// code). The items slice is always non-nil so a no-match serializes as [], not
+// null, matching the client's `.length === 0` empty-state check.
+func (h *UserHandler) SearchUsers(c echo.Context) error {
+	callerID, err := getUserID(c)
+	if err != nil {
+		return apperr.ErrUnauthorized
+	}
+
+	query := strings.TrimSpace(c.QueryParam("search"))
+	if query == "" {
+		return apperr.ErrBadRequest
+	}
+
+	users, err := h.userRepo.SearchByUsername(query, callerID, searchResultLimit)
+	if err != nil {
+		return fmt.Errorf("searching users: %w", err)
+	}
+
+	items := make([]PlayerSearchResult, 0, len(users))
+	for _, u := range users {
+		items = append(items, PlayerSearchResult{ID: u.ID, Username: u.Username})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": items})
 }
 
 // ListMatches returns a paginated list of matches in which the authenticated

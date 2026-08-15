@@ -29,10 +29,13 @@ func (s *userRepoStub) add(id uint, username string) {
 	s.users[id] = &user.User{ID: id, Username: username}
 }
 
-func (s *userRepoStub) Create(*user.User) error                        { return nil }
-func (s *userRepoStub) Delete(uint) error                              { return nil }
-func (s *userRepoStub) FindByEmail(string) (*user.User, error)         { return nil, nil }
-func (s *userRepoStub) FindByUsername(string) (*user.User, error)      { return nil, nil }
+func (s *userRepoStub) Create(*user.User) error                   { return nil }
+func (s *userRepoStub) Delete(uint) error                         { return nil }
+func (s *userRepoStub) FindByEmail(string) (*user.User, error)    { return nil, nil }
+func (s *userRepoStub) FindByUsername(string) (*user.User, error) { return nil, nil }
+func (s *userRepoStub) SearchByUsername(string, uint, int) ([]user.User, error) {
+	return nil, nil
+}
 func (s *userRepoStub) FindManyByIDs([]uint) ([]user.User, error)      { return nil, nil }
 func (s *userRepoStub) Count() (int64, error)                          { return int64(len(s.users)), nil }
 func (s *userRepoStub) UpdateLanguagePreference(uint, string) error    { return nil }

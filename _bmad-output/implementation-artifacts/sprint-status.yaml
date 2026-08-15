@@ -161,7 +161,7 @@ development_status:
   # (whole-epic-on-one-branch per user direction). 2 PO decisions CONFIRMED 2026-08-14: whisper/invite WS events use
   # system:* (system:whisper / system:room_invite), NOT the epics' literal event:* — outside the drift gate; 11-2
   # "Invite to Room" is a hook, actual delivery lands in 11-5.
-  11-1-player-search: ready-for-dev
+  11-1-player-search: done
   11-2-friend-requests-and-friend-list: ready-for-dev
   11-3-public-player-profiles: done
   11-4-friend-whisper-chat: ready-for-dev

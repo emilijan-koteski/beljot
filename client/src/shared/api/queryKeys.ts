@@ -25,6 +25,11 @@ export const queryKeys = {
     byUser: (userId: number, outcome: string, sort: string) =>
       ["matches", "byUser", userId, outcome, sort] as const,
   },
+  // Story 11.1: player search. The query string is part of the key so each
+  // distinct (debounced) term is its own cache entry.
+  users: {
+    search: (query: string) => ["users", "search", query] as const,
+  },
   lobby: {
     stats: ["lobby", "stats"] as const,
   },

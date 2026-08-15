@@ -12,6 +12,14 @@ type UserRepository interface {
 	Delete(id uint) error
 	FindByEmail(email string) (*User, error)
 	FindByUsername(username string) (*User, error)
+	// SearchByUsername returns up to `limit` users whose username contains
+	// `query` as a case-insensitive substring (ILIKE '%query%'), ordered by
+	// username ascending. The requesting user (excludeUserID) and soft-deleted
+	// users are excluded (the latter via GORM's default scope). LIKE
+	// metacharacters (\, %, _) in `query` are escaped so they match literally —
+	// `_` is a legal username character and must not act as a wildcard. Story
+	// 11.1 (FR5); the first ILIKE query in the Go backend.
+	SearchByUsername(query string, excludeUserID uint, limit int) ([]User, error)
 	FindByID(id uint) (*User, error)
 	// FindManyByIDs returns all users whose ID is in the provided slice, in
 	// arbitrary order. Returns an empty slice (no DB round-trip) when ids is

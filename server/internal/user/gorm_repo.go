@@ -75,6 +75,39 @@ func (r *GormUserRepository) FindByUsername(username string) (*User, error) {
 	return &u, nil
 }
 
+// likeEscaper escapes the three Postgres LIKE/ILIKE metacharacters. Backslash
+// (the escape character itself) is listed first, and strings.NewReplacer does a
+// single left-to-right pass without re-scanning replaced text, so an escaped
+// backslash is never double-escaped.
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// escapeLike neutralises LIKE wildcards in user-supplied search text so `%` and
+// `_` match literally. `_` is a legal username character, so an un-escaped one
+// would act as a single-char wildcard and over-match.
+func escapeLike(s string) string {
+	return likeEscaper.Replace(s)
+}
+
+// SearchByUsername implements UserRepository. It is a model query, so GORM's
+// default scope appends `deleted_at IS NULL` — a raw .Table("users") query would
+// leak soft-deleted rows. ILIKE gives the case-insensitive substring match;
+// ESCAPE '\' pairs with escapeLike above so escaped metacharacters are treated
+// literally (Postgres' default LIKE escape is already '\', but stating it keeps
+// the pairing explicit). The bounded Limit and self-exclusion are the caller's.
+func (r *GormUserRepository) SearchByUsername(query string, excludeUserID uint, limit int) ([]User, error) {
+	var users []User
+	pattern := "%" + escapeLike(query) + "%"
+	if err := r.db.
+		Where(`username ILIKE ? ESCAPE '\'`, pattern).
+		Where("id <> ?", excludeUserID).
+		Order("username ASC").
+		Limit(limit).
+		Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (r *GormUserRepository) FindByID(id uint) (*User, error) {
 	var u User
 	if err := r.db.First(&u, id).Error; err != nil {

@@ -619,6 +619,14 @@
     "search": {
       "placeholder": "Pretraži po imenu sobe ili kodu…"
     },
+    "playerSearch": {
+      "label": "Pronađi igrače",
+      "placeholder": "Pretraži igrače po korisničkom imenu…",
+      "loading": "Pretraživanje…",
+      "empty": "Nema igrača za „{{query}}“",
+      "clear": "Očisti pretragu",
+      "resultAria": "Pogledaj profil igrača {{username}}"
+    },
     "empty": {
       "title": "Nema otvorenih soba za tvoje filtre",
       "description": "Obriši filtre, pritisni Brza igra ili stvori sobu i pozovi prijatelje.",

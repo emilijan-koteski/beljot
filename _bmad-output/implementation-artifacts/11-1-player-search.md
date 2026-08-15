@@ -1,6 +1,10 @@
+---
+baseline_commit: e830dc360310541f8c6ef482e38222f50ae27511
+---
+
 # Story 11.1: Player Search
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -23,40 +27,40 @@ so that I can find friends and view their profiles.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: Branch setup — whole-epic-on-one-branch**
-  - [ ] **Continue on the current branch `feat/11-3-public-player-profiles`** (do NOT cut a new per-story branch). Per user direction, the remaining Epic 11 stories (11-1, 11-2, 11-4, 11-5) ship as ONE feature/PR on this branch — the same whole-scope-on-one-branch pattern used for 9.7+9.8. The branch already contains Epic 9 (honor, merged `dc14308`) + Story 11.3, so the `/players/:id` public-profile route this story navigates to already exists. This overrides the "one story = one branch = one PR" default for Epic 11 only, by explicit instruction.
+- [x] **Task 0: Branch setup — whole-epic-on-one-branch**
+  - [x] **Continue on the current branch `feat/11-3-public-player-profiles`** (do NOT cut a new per-story branch). Per user direction, the remaining Epic 11 stories (11-1, 11-2, 11-4, 11-5) ship as ONE feature/PR on this branch — the same whole-scope-on-one-branch pattern used for 9.7+9.8. The branch already contains Epic 9 (honor, merged `dc14308`) + Story 11.3, so the `/players/:id` public-profile route this story navigates to already exists. This overrides the "one story = one branch = one PR" default for Epic 11 only, by explicit instruction.
 
-- [ ] **Task 1: Backend — player search endpoint** (AC: #1, #2)
-  - [ ] Add repository method `SearchByUsername(query string, excludeUserID uint, limit int) ([]User, error)` to the `UserRepository` interface in [server/internal/user/repository.go](server/internal/user/repository.go). Document it (case-insensitive substring, excludes self + soft-deleted, capped).
-  - [ ] Implement it in `GormUserRepository` in [server/internal/user/gorm_repo.go](server/internal/user/gorm_repo.go): `r.db.Where("username ILIKE ?", "%"+escapeLike(query)+"%").Where("id <> ?", excludeUserID).Order("username ASC").Limit(limit).Find(&users)`. GORM's default scope already appends `deleted_at IS NULL` for model queries — do NOT use a raw `.Table(...)` query that would bypass it. Add an unexported `escapeLike(s string) string` helper that escapes `\`, `%`, and `_` (the query then uses the default `\` escape char, or an explicit `ESCAPE '\'` clause — verify the GORM/Postgres behavior in the repo test).
-  - [ ] Update **every** `UserRepository` mock to implement the new method so the build compiles. Start with `mockUserRepo` in [server/internal/user/handler_test.go](server/internal/user/handler_test.go); then grep the tree for other `UserRepository` mock implementers (`grep -rl "UserRepository" server/internal --include=*_test.go` and any non-test mock) and add the stub to each. This mock blast radius is a known cost of touching the shared interface — see Dev Notes → **Known Traps**.
-  - [ ] Add `SearchUsers(c echo.Context) error` handler in [server/internal/user/handler.go](server/internal/user/handler.go), modeled on `ListMatches`/`parseMatchesQuery` conventions (`handler.go:552`, `:600`): read `c.QueryParam("search")`, `strings.TrimSpace`, if empty → `return apperr.ErrBadRequest`; resolve caller id via `getUserID(c)`; call the repo with a package-level `const searchResultLimit = 10`; map results to a minimal DTO `PlayerSearchResult{ ID uint \`json:"id"\`; Username string \`json:"username"\` }`; return `c.JSON(http.StatusOK, map[string]interface{}{"data": items})`. Return a non-nil empty slice (`[]PlayerSearchResult{}`) not `nil`, so the JSON is `[]` not `null`.
-  - [ ] Register the route in [server/cmd/api/main.go](server/cmd/api/main.go) inside the authenticated `api` group (around `main.go:135`, alongside the `/users/:id/*` routes): `api.GET("/users", userHandler.SearchUsers)`. Confirmed no path collision with `GET /users/:id/profile` in Echo. It inherits `auth.AuthMiddleware` automatically.
-  - [ ] **Tests (RED first):**
-    - [ ] Repo DB-backed test in [server/internal/user/user_test.go](server/internal/user/user_test.go) using the `getTestDB` tx-rollback helper (DSN defaults to dev DB `:5433`, test skips if DB unavailable): assert case-insensitive match (`"ali"` finds `"Alice"`), substring match, self-exclusion, soft-deleted exclusion, wildcard-escape (a seeded username containing `_` is matched literally and a `%` query does not match everyone), ordering, and the limit cap.
-    - [ ] Handler test in [server/internal/user/handler_test.go](server/internal/user/handler_test.go) using `mockUserRepo` + `setupUserHandler` + a real JWT: empty/whitespace `search` → `400`; missing param → `400`; happy path returns `{data:[{id,username}]}` shape; no-match returns `{data:[]}`; unauthenticated (no token) → `401`.
-  - [ ] **(Optional / deferred perf)** A `pg_trgm` GIN or `LOWER(username)` functional index for substring search is **not required** at Phase-1/2 scale (≤50 concurrent, small users table) and is intentionally out of scope. If added later it is migration `000019_*` (last shipped migration is `000018`) with matching `.up.sql`/`.down.sql`. Do not add it in this story unless a benchmark justifies it — note the decision in Completion Notes.
+- [x] **Task 1: Backend — player search endpoint** (AC: #1, #2)
+  - [x] Add repository method `SearchByUsername(query string, excludeUserID uint, limit int) ([]User, error)` to the `UserRepository` interface in [server/internal/user/repository.go](server/internal/user/repository.go). Documented (case-insensitive substring, excludes self + soft-deleted, capped, metacharacters escaped).
+  - [x] Implemented in `GormUserRepository` in [server/internal/user/gorm_repo.go](server/internal/user/gorm_repo.go) with `ESCAPE '\'` + an unexported `escapeLike`/`likeEscaper` (single-pass `strings.NewReplacer` escaping `\`, `%`, `_`). Model query keeps the `deleted_at IS NULL` default scope. Verified escape behavior in the DB-backed repo test.
+  - [x] Updated every `user.UserRepository` mock (compiler-driven via `go vet ./...`): `mockUserRepo` (user/handler_test), `fakeHonorRepo` (honor_service_test), `fakeLevelRepo` (xp_service_test), `auth.mockUserRepo`, `chat.userRepoStub`, `lobby.fakeUserRepo`. The `match.stubHonorRecorder` satisfies the narrow `match.HonorRecorder`, so it was correctly NOT touched.
+  - [x] Added `SearchUsers(c echo.Context) error` handler in [server/internal/user/handler.go](server/internal/user/handler.go) + `PlayerSearchResult` DTO + `const searchResultLimit = 10`. `strings.TrimSpace` → empty is `apperr.ErrBadRequest`; caller id via `getUserID`; non-nil `items` slice so no-match serializes as `[]`.
+  - [x] Registered `api.GET("/users", userHandler.SearchUsers)` in [server/cmd/api/main.go](server/cmd/api/main.go) in the authenticated `api` group. No path collision with `/users/:id/profile` (verified in tests via `e.ServeHTTP`).
+  - [x] **Tests:**
+    - [x] Repo DB-backed test `TestGormUserRepository_SearchByUsername` in [server/internal/user/user_test.go](server/internal/user/user_test.go): case-insensitive, substring, self-exclusion, soft-deleted exclusion, literal `_`, literal `%` (does not match everyone), ordering, and limit cap. Ran against dev DB `:5433` (all 6 subtests RAN, not skipped).
+    - [x] Handler tests in [server/internal/user/handler_test.go](server/internal/user/handler_test.go): happy path returns ordered `{data:[{id,username}]}` with self excluded; no-match returns `"data":[]`; missing/empty/whitespace `search` → `400 BAD_REQUEST`; missing auth → `401`.
+  - [x] **(Optional / deferred perf)** No `pg_trgm`/functional index added — out of scope at Phase-1/2 scale, as specified. Decision recorded in Completion Notes.
 
-- [ ] **Task 2: Frontend — API client, query, debounce** (AC: #1, #3)
-  - [ ] Add `PlayerSearchResult` type: `export interface PlayerSearchResult { id: number; username: string }` in [client/src/shared/types/apiTypes.ts](client/src/shared/types/apiTypes.ts) (named export, alongside `User`/`RoomPlayer`). Do NOT reuse the self `User` type — it carries `email` and is not a public/search shape.
-  - [ ] New API module [client/src/shared/api/users.ts](client/src/shared/api/users.ts): `export function searchUsers(search: string): Promise<PlayerSearchResult[]> { return axiosClient.get("/users", { params: { search } }); }`. Return the unwrapped payload directly — the axios response interceptor already unwraps `{data}`; never reference `.data.data`.
-  - [ ] Extend the key factory in [client/src/shared/api/queryKeys.ts](client/src/shared/api/queryKeys.ts): `users: { search: (q: string) => ["users", "search", q] as const }`.
-  - [ ] Create a reusable debounce hook [client/src/shared/hooks/useDebounce.ts](client/src/shared/hooks/useDebounce.ts) — `export function useDebounce<T>(value: T, delayMs = 250): T` (standard `useState` + `useEffect` + `setTimeout`/cleanup). None exists today; this is the first one. Co-locate a small `useDebounce.test.ts` using `vi.useFakeTimers()`.
-  - [ ] Create query hook [client/src/shared/hooks/queries/useUserSearch.ts](client/src/shared/hooks/queries/useUserSearch.ts): `useQuery({ queryKey: queryKeys.users.search(debounced), queryFn: () => searchUsers(debounced), enabled: debounced.trim().length >= 2, placeholderData: keepPreviousData })`. Import `keepPreviousData` from `@tanstack/react-query` (v5 idiom — NOT the v4 `keepPreviousData: true` option). Gate `enabled` so no request fires below 2 trimmed chars.
+- [x] **Task 2: Frontend — API client, query, debounce** (AC: #1, #3)
+  - [x] Added `PlayerSearchResult` type in [client/src/shared/types/apiTypes.ts](client/src/shared/types/apiTypes.ts) — a distinct narrow shape (`id` + `username`), NOT the self `User` type.
+  - [x] New API module [client/src/shared/api/users.ts](client/src/shared/api/users.ts): `searchUsers(search)` returns the unwrapped payload (no `.data.data` — the axios interceptor unwraps).
+  - [x] Extended the key factory in [client/src/shared/api/queryKeys.ts](client/src/shared/api/queryKeys.ts): `users.search(query)`.
+  - [x] Created [client/src/shared/hooks/useDebounce.ts](client/src/shared/hooks/useDebounce.ts) (`useDebounce<T>(value, delayMs=250)`) + co-located `useDebounce.test.ts` (fake-timers: initial value, delayed update, reset-on-rapid-change).
+  - [x] Created [client/src/shared/hooks/queries/useUserSearch.ts](client/src/shared/hooks/queries/useUserSearch.ts): `useQuery` keyed on the trimmed debounced term, `enabled: trimmed.length >= 2`, `placeholderData: keepPreviousData` (v5 idiom imported from `@tanstack/react-query`).
 
-- [ ] **Task 3: Frontend — search UI + empty state + navigation** (AC: #3, #4, #5)
-  - [ ] Create `features/lobby/components/PlayerSearch.tsx` mirroring the controlled-input + clear-button pattern of [client/src/features/lobby/components/FilterRail.tsx](client/src/features/lobby/components/FilterRail.tsx). Controlled `<input>` with `data-testid="player-search"`, localized placeholder, a conditional clear button `data-testid="player-search-clear"` (`aria-label` from i18n). Owns the raw input `value` state; pass it through `useDebounce` before feeding `useUserSearch`.
-  - [ ] Render results below the input (mirror the list/empty-state split of [client/src/features/lobby/components/RoomGrid.tsx](client/src/features/lobby/components/RoomGrid.tsx)): a loading affordance while the query is fetching, a results list where each row is a `<button>` (keyboard-accessible) showing the username with `data-testid="player-search-result"` (and e.g. `data-user-id` for tests), and the empty state `data-testid="player-search-empty"` shown only when the (debounced) query is non-empty, the query has settled, and `results.length === 0`. Empty text: `t("lobby.playerSearch.empty", { query })`.
-  - [ ] Result activation → `const navigate = useNavigate();` then `navigate('/players/' + id)`. (Route/page owned by Story 11.3 — see Scope & Sequencing Decision.)
-  - [ ] Mount `<PlayerSearch />` in [client/src/features/lobby/LobbyPage.tsx](client/src/features/lobby/LobbyPage.tsx) as its own section (natural placement: a sibling block after `<FilterRail />`, or a clearly-labeled "Find players" area). Do not entangle it with the room `search` state — player search has its own input state and its own network-backed query.
-  - [ ] **Tests:** component tests co-located (`PlayerSearch.test.tsx`) using `vi.mock("@/shared/api/users")`, rendered with `QueryWrapper` + `BrowserRouter` (or `TestProviders`), `makeUser`-style fixtures for results: renders results after typing ≥2 chars; asserts no `searchUsers` call for a 1-char query; renders the interpolated empty state; clicking a result calls a mocked `useNavigate` with `/players/<id>`; clear button resets the input. Use present-tense `it(...)` descriptions and `data-testid` selectors.
+- [x] **Task 3: Frontend — search UI + empty state + navigation** (AC: #3, #4, #5)
+  - [x] Created [client/src/features/lobby/components/PlayerSearch.tsx](client/src/features/lobby/components/PlayerSearch.tsx): controlled `<input data-testid="player-search">`, conditional clear button (`data-testid="player-search-clear"`, i18n `aria-label`), owns raw `value` state → `useDebounce` → `useUserSearch`.
+  - [x] Results list (each row a keyboard-accessible `<button data-testid="player-search-result" data-user-id>`); loading affordance (`player-search-loading`); empty state (`player-search-empty`) shown only when active (≥2 trimmed chars), settled, and `results.length === 0`, text `t("lobby.playerSearch.empty", { query })`.
+  - [x] Result activation → `useNavigate()` → `navigate('/players/' + id)`.
+  - [x] Mounted `<PlayerSearch />` in [client/src/features/lobby/LobbyPage.tsx](client/src/features/lobby/LobbyPage.tsx) as its own "Find players" card after `<FilterRail />`, with its own input state (not entangled with the room `search`).
+  - [x] **Tests:** [client/src/features/lobby/components/PlayerSearch.test.tsx](client/src/features/lobby/components/PlayerSearch.test.tsx) — mocks `@/shared/api/users` + `useNavigate`; renders results after ≥2 chars; no `searchUsers` call for a 1-char query; interpolated empty state; result-click navigates to `/players/7`; clear resets the input.
 
-- [ ] **Task 4: i18n** (AC: #6)
-  - [ ] Add a `lobby.playerSearch` block to all four locale files [client/src/shared/i18n/en.json](client/src/shared/i18n/en.json), [sr.json](client/src/shared/i18n/sr.json), [mk.json](client/src/shared/i18n/mk.json), [hr.json](client/src/shared/i18n/hr.json). Suggested keys: `label` (section heading, e.g. "Find players"), `placeholder` ("Search players by username…"), `empty` ("No players found matching \"{{query}}\""), `clear` (clear-button aria-label, "Clear search"), `resultAria` (e.g. "View {{username}}'s profile"). Use `{{query}}`/`{{username}}` interpolation exactly. `mk` values ALL-Cyrillic; NO em dash in `mk`/`sr`/`hr` (use `…` for ellipsis is fine; avoid `—`). The `i18n.parity.test.ts` enforces 1:1 leaf parity + non-empty values across all four locales.
+- [x] **Task 4: i18n** (AC: #6)
+  - [x] Added the `lobby.playerSearch` block (`label`, `placeholder`, `loading`, `empty`, `clear`, `resultAria`) to all four locales [en.json](client/src/shared/i18n/en.json)/[sr.json](client/src/shared/i18n/sr.json)/[mk.json](client/src/shared/i18n/mk.json)/[hr.json](client/src/shared/i18n/hr.json). `{{query}}`/`{{username}}` interpolation verified in all four; `mk` all-Cyrillic; no em dash in `mk`/`sr`/`hr`. `i18n.parity.test.ts` green.
 
-- [ ] **Task 5: Full validation gates** (AC: #6)
-  - [ ] `make lint` (Go + client) and `make test` (`go test ./...` + `npx vitest run`) green. Confirm the DB-backed repo test passes (not skips) against dev DB `:5433`, or explicitly note in Completion Notes if the DB was unavailable in the dev environment and the test skipped.
-  - [ ] Update the File List and Completion Notes.
+- [x] **Task 5: Full validation gates** (AC: #6)
+  - [x] `make lint` + `make test` equivalents green — server: `gofmt` clean (only the pre-existing `profile_identity_handler_test.go`), `go vet` clean, `golangci-lint v1.64.8` clean, `go test ./...` all packages ok with the DB-backed search test PASSING (not skipped) against dev DB `:5433`; client: `tsc -p tsconfig.build.json` clean, `vitest run` 104 files / 1128 tests, `eslint` clean, `prettier --check` clean. See Completion Notes re: the golangci-lint v1/v2 toolchain nuance.
+  - [x] File List and Completion Notes updated.
 
 ## Dev Notes
 
@@ -140,12 +144,70 @@ so that I can find friends and view their profiles.
 
 ### Agent Model Used
 
-_TBD by dev-story_
+Opus 4.8 (claude-opus-4-8) — BMad dev-story workflow.
 
 ### Debug Log References
 
+- `go vet ./...` was used as the compiler-driven way to find the full `user.UserRepository` mock blast radius after adding `SearchByUsername` (it typechecks test files, unlike `go build`). It named exactly five broken mocks: `fakeHonorRepo`, `fakeLevelRepo`, `auth.mockUserRepo`, `chat.userRepoStub`, `lobby.fakeUserRepo`. `match.stubHonorRecorder` was correctly untouched (it satisfies the narrow `match.HonorRecorder`).
+- The DB-backed repo test was confirmed to RUN (not skip) with `go test -run TestGormUserRepository_SearchByUsername -v` against dev DB `:5433` — all 6 subtests executed, including the literal-`_` and literal-`%` wildcard-escape probes.
+
 ### Completion Notes List
 
-- Ultimate context engine analysis completed — comprehensive developer guide created.
+**What shipped:** player search end-to-end — `GET /api/v1/users?search=` (case-insensitive `ILIKE '%q%'`, self + soft-deleted excluded, ordered, capped at 10) → a live-search "Find players" card in the lobby (debounced, ≥2-char gate, empty state, result-click navigation to the existing `/players/:id` public profile from Story 11.3).
+
+**Key decisions / notes:**
+
+- **Wildcard escaping (AC2)** uses a single-pass `strings.NewReplacer` (`\`→`\\`, `%`→`\%`, `_`→`\_`) plus an explicit `ILIKE ? ESCAPE '\'`. Postgres' default LIKE escape is already `\`, but stating it keeps the escaper/clause pairing self-documenting. Verified in the DB test: a `car_ol` query matches only the literal `car_ol` (not `carXol`), and a `%` query returns only usernames literally containing `%` (not everyone).
+- **No `pg_trgm`/functional index** was added — intentionally out of scope at Phase-1/2 scale (≤50 concurrent, small users table), exactly as the story's optional/deferred item states. If ever justified by a benchmark it is migration `000019_*` (last shipped is `000018`).
+- **DTO is intentionally minimal (`id` + `username`).** No honor/level enrichment — kept the search story tight, per the Scope note. The endpoint does NOT widen the `/users/:id/profile` surface (Story 11.3 owns that).
+- **`data-testid="player-search-loading"`** was added beyond the story's named testids for the loading affordance the task calls for — harmless additive test hook.
+- **Toolchain note (golangci-lint):** the only `golangci-lint` on this machine is v2.12.2 (mise-managed), which cannot parse the repo's v1-format `server/.golangci.yml` ("unsupported version of the configuration"). This is a pre-existing repo-wide environment mismatch, NOT caused by this change. To actually satisfy AC6's lint gate I installed the project-pinned **v1.64.8** into a scratch `GOBIN` (`go install …@v1.64.8`) and ran it — it passes clean on the whole server module. `go vet` + `gofmt` are also clean. No repo config was modified (migrating `.golangci.yml` to v2 is out of scope).
+
+**Gates:** server — gofmt clean (except the pre-existing `profile_identity_handler_test.go`), `go vet` clean, `golangci-lint v1.64.8` clean, `go test ./...` all packages ok (DB-backed search test passing, dev DB `:5433`). client — `tsc` clean, `vitest run` 104 files / 1128 tests, `eslint` clean, `prettier --check` clean, i18n 4-locale parity green (mk all-Cyrillic, no em dash in mk/sr/hr).
+
+**Not done (stated, not implied):** no manual E2E was run (all gates above are automated). The `GET /users` search endpoint is now a newly-public authenticated read with no rate limiting — the same platform-wide enumeration/rate-limit concern deferred by Story 11.3's review applies here and remains a deferred, infra-level item, not this story's scope.
 
 ### File List
+
+**Backend (server/):**
+
+- `internal/user/repository.go` — added `SearchByUsername` to the `UserRepository` interface (documented).
+- `internal/user/gorm_repo.go` — implemented `SearchByUsername` + `escapeLike`/`likeEscaper` helpers.
+- `internal/user/handler.go` — added `PlayerSearchResult` DTO, `const searchResultLimit = 10`, `SearchUsers` handler; added `strings` import.
+- `cmd/api/main.go` — registered `api.GET("/users", userHandler.SearchUsers)`.
+- `internal/user/user_test.go` — added DB-backed `TestGormUserRepository_SearchByUsername` (6 subtests).
+- `internal/user/handler_test.go` — added `mockUserRepo.SearchByUsername`, registered the `/users` route in the test harness, added `doSearchUsers` + `TestSearchUsers_*` (success/no-match/bad-request/missing-auth).
+- `internal/user/honor_service_test.go` — added `fakeHonorRepo.SearchByUsername` stub.
+- `internal/user/xp_service_test.go` — added `fakeLevelRepo.SearchByUsername` stub.
+- `internal/auth/handler_test.go` — added `mockUserRepo.SearchByUsername` stub.
+- `internal/chat/handler_test.go` — added `userRepoStub.SearchByUsername` stub.
+- `internal/lobby/lobby_test.go` — added `fakeUserRepo.SearchByUsername` stub.
+
+**Frontend (client/src/):**
+
+- `shared/types/apiTypes.ts` — added `PlayerSearchResult` interface.
+- `shared/api/users.ts` — NEW: `searchUsers(search)` API module.
+- `shared/api/queryKeys.ts` — added `users.search(query)` key.
+- `shared/hooks/useDebounce.ts` — NEW: generic `useDebounce` hook.
+- `shared/hooks/useDebounce.test.ts` — NEW: fake-timer tests.
+- `shared/hooks/queries/useUserSearch.ts` — NEW: live-search query hook.
+- `features/lobby/components/PlayerSearch.tsx` — NEW: search UI + empty/loading states + navigation.
+- `features/lobby/components/PlayerSearch.test.tsx` — NEW: component tests.
+- `features/lobby/LobbyPage.tsx` — mounted `<PlayerSearch />`.
+- `shared/i18n/en.json`, `sr.json`, `mk.json`, `hr.json` — added the `lobby.playerSearch` block.
+
+**Story spec (this file):** added `baseline_commit` frontmatter; checked off Tasks 0–5; Status → review.
+
+## Change Log
+
+- **2026-08-14 — Implemented Story 11.1 Player Search (dev-story).** Backend `GET /users?search=` (ILIKE + wildcard-escape, self/soft-delete excluded, capped at 10), live-search lobby UI (`useDebounce` + TanStack v5 `keepPreviousData`, ≥2-char gate, empty state, `/players/:id` navigation), i18n ×4. All gates green (server: `go vet` / `gofmt` / `golangci-lint v1.64.8` / `go test ./...` incl. the DB-backed repo test; client: `tsc` / `vitest` 1128 / `eslint` / `prettier` / i18n parity). Status → review.
+
+## Senior Developer Review — bmad-code-review (2026-08-14)
+
+3-layer adversarial pass (Blind Hunter + Edge Case Hunter + Acceptance Auditor — all three green, all at Opus 4.8). All six ACs verified independently against the real code (not the story checkboxes): AC1/AC2/AC3/AC5/AC6 SATISFIED; AC4 satisfied in substance (correct `data-testid`, localization, `{{query}}` interpolation). Wildcard-escape (`\ % _` + `ESCAPE '\'`), GORM soft-delete default scope, `[]`-not-`null` serialization, the full `UserRepository` mock blast-radius (6 mocks), and i18n parity (mk all-Cyrillic, no em dash in mk/sr/hr) were all confirmed correct. 3 findings kept, 3 dismissed as noise (query-length cap — negligible, auth-gated + result-capped; case-sensitive `ORDER BY username` — collation-dependent, AC1 literally satisfied; en empty-state double-quote glyph vs AC4's single-quote notation — locale-appropriate quoting is deliberate).
+
+### Review Findings
+
+- [x] [Review][Decision] No error affordance for a failed search — On a search request error (500 / network drop) the component renders no error state; with `placeholderData: keepPreviousData` a prior term's results can even stay visible as if they matched the new query. Consistent with the codebase's read-query convention (no inline error UI; app-level Error Boundary + `toast.error` for mutations). [client/src/features/lobby/components/PlayerSearch.tsx:32] — **RESOLVED 2026-08-14: accepted as-is (matches the established read-query convention; low-frequency), dismissed.**
+- [x] [Review][Patch] Stale results linger after Clear / narrowing below 2 chars [client/src/features/lobby/components/PlayerSearch.tsx:67] — **FIXED 2026-08-14: gated the results list on `isActive && results.length > 0` (matches the loading/empty affordances). Added 2 regression tests (clear + narrow-below-2), each proven to fail without the fix. Gates green: vitest 7/7, eslint, prettier, tsc.**
+- [x] [Review][Defer] Public authenticated search endpoint has no rate-limiting / enumeration guard [server/internal/user/handler.go] — deferred, pre-existing (platform-wide infra item, already tracked from the Story 11.3 review)

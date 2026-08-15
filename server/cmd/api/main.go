@@ -132,6 +132,7 @@ func main() {
 	matchRepo := match.NewGormMatchRepository(db)
 	userHandler := user.NewUserHandler(userRepo, matchRepo)
 	api := e.Group("/api/v1", auth.AuthMiddleware(cfg.JWTSecret))
+	api.GET("/users", userHandler.SearchUsers)
 	api.GET("/users/:id/profile", userHandler.GetProfile)
 	api.GET("/users/:id/career", userHandler.GetCareer)
 	api.GET("/users/:id/matches", userHandler.ListMatches)

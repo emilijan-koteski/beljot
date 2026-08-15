@@ -84,6 +84,12 @@ func (m *mockUserRepo) FindByID(id uint) (*user.User, error) {
 	return nil, nil
 }
 
+// SearchByUsername is unused by the auth tests; a nil result satisfies the
+// interface for the player-search method added in Story 11.1.
+func (m *mockUserRepo) SearchByUsername(string, uint, int) ([]user.User, error) {
+	return nil, nil
+}
+
 func (m *mockUserRepo) UpdateLanguagePreference(id uint, lang string) error {
 	for _, u := range m.users {
 		if u.ID == id {
