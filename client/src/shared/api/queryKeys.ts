@@ -30,6 +30,15 @@ export const queryKeys = {
   users: {
     search: (query: string) => ["users", "search", query] as const,
   },
+  // Story 11.2: friends. `list` and `requests` are the viewer's own
+  // collections; `status` is keyed per subject id — the public-profile
+  // friendship button. The WS system:friend_request push invalidates
+  // `requests()`.
+  friends: {
+    list: () => ["friends", "list"] as const,
+    requests: () => ["friends", "requests"] as const,
+    status: (id: number) => ["friends", "status", id] as const,
+  },
   lobby: {
     stats: ["lobby", "stats"] as const,
   },

@@ -22,6 +22,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/chat"
 	"github.com/emilijan/beljot/server/internal/config"
 	"github.com/emilijan/beljot/server/internal/emote"
+	"github.com/emilijan/beljot/server/internal/friend"
 	"github.com/emilijan/beljot/server/internal/identity"
 	"github.com/emilijan/beljot/server/internal/lobby"
 	"github.com/emilijan/beljot/server/internal/mailer"
@@ -271,6 +272,23 @@ func main() {
 	api.POST("/rooms/:id/privacy", roomHandler.UpdateRoomPrivacy)
 	api.POST("/rooms/:id/bots", roomHandler.AddBot)
 	api.DELETE("/rooms/:id/bots/:seat", roomHandler.RemoveBot)
+
+	// Friend routes (Story 11.2, FR6) — friend requests, friend list, and the
+	// best-effort per-user system:friend_request push. Placed after the hub
+	// (line ~160) so the notifier is in scope, and co-located with the room /
+	// lobby block since it shares userRepo + hub. The friend queries live on a
+	// dedicated friend.Repository (NOT extensions of user.UserRepository) so no
+	// existing user-repo mock changes. Echo resolves the static
+	// /friends/requests and /friends/status/:id segments ahead of the param
+	// route /friends/:id/accept (static > param), so there is no collision.
+	friendRepo := friend.NewGormRepository(db)
+	friendHandler := friend.NewHandler(friendRepo, userRepo, hub)
+	api.POST("/friends/request", friendHandler.SendRequest)
+	api.GET("/friends", friendHandler.ListFriends)
+	api.GET("/friends/requests", friendHandler.ListRequests)
+	api.GET("/friends/status/:id", friendHandler.GetStatus)
+	api.POST("/friends/:id/accept", friendHandler.Accept)
+	api.POST("/friends/:id/decline", friendHandler.Decline)
 
 	// Lobby stats endpoint — bucket-counts connected users into in-lobby /
 	// in-room / in-game and reports registered totals.

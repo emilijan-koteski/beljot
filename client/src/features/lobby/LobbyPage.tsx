@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 
+import { FriendList } from "@/features/friends/FriendList";
+import { FriendRequests } from "@/features/friends/FriendRequests";
 import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
 import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
@@ -252,6 +254,11 @@ export function LobbyPage() {
       />
 
       <PlayerSearch />
+
+      {/* Story 11.2: friends panel — incoming requests + the friend list with
+          online status and the (11.5-owned) Invite-to-Room hook. */}
+      <FriendRequests />
+      <FriendList />
 
       <RoomGrid
         rooms={filtered}

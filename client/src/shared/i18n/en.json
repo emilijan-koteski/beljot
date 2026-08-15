@@ -266,6 +266,35 @@
     },
     "error": "Couldn't load this player's profile."
   },
+  "friends": {
+    "addFriend": "Add friend",
+    "requestSent": "Request sent",
+    "acceptRequest": "Accept request",
+    "friends": "Friends",
+    "accept": "Accept",
+    "decline": "Decline",
+    "online": "Online",
+    "offline": "Offline",
+    "inviteToRoom": "Invite to room",
+    "someone": "Someone",
+    "viewProfileAria": "View {{username}}'s profile",
+    "requestReceivedToast": "{{username}} sent you a friend request",
+    "list": {
+      "heading": "Friends",
+      "loading": "Loading friends…",
+      "empty": "No friends yet. Find players in search and send a request."
+    },
+    "requests": {
+      "heading": "Friend requests",
+      "loading": "Loading requests…",
+      "empty": "No pending friend requests."
+    },
+    "errors": {
+      "sendFailed": "Couldn't send friend request. Please try again.",
+      "acceptFailed": "Couldn't accept the request — it may no longer be available.",
+      "declineFailed": "Couldn't decline the request — it may no longer be available."
+    }
+  },
   "language": {
     "en": "English",
     "sr": "Srpski",

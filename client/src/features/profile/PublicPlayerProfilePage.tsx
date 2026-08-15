@@ -6,6 +6,7 @@ import type { MatchFilter } from "@/shared/api/matches";
 import { useCareerQuery } from "@/shared/hooks/queries/useCareer";
 import { usePublicProfileQuery } from "@/shared/hooks/queries/usePublicProfile";
 
+import { FriendButton } from "./components/FriendButton";
 import { IdentityHero } from "./components/IdentityHero";
 import { Milestones } from "./components/Milestones";
 import { PartnerSpotlight } from "./components/PartnerSpotlight";
@@ -152,11 +153,10 @@ export function PublicPlayerProfilePage() {
         }}
       />
 
-      {/* Story 11.2 insertion point: the "Add Friend" action mounts here once the
-          friend model + endpoint exist. Deliberately NOT built in 11.3 — there is
-          no friend backend on master, so a button here would be dead/placeholder
-          (Design Decision D4). AC4 layout parity holds without it: Add Friend is
-          an additive element, not part of the read layout. */}
+      {/* Story 11.2 AC7: the friendship action. Drives its label/action entirely
+          from GET /friends/status/:id — every state maps to a real affordance,
+          never a placeholder — and is never shown on the viewer's own profile. */}
+      {validId !== undefined && <FriendButton userId={validId} />}
 
       {career.data && <StreakCallout streak={career.data.streak} />}
 

@@ -155,6 +155,18 @@ var (
 	// affordability check and the atomic match-start stake charge.
 	ErrInsufficientCoins = NewAppError("INSUFFICIENT_COINS", "insufficient coins", http.StatusConflict)
 
+	// Friend domain errors (Story 11.2, FR6). A self-request is 400. The two
+	// conflict states are 409 (the project's conflict convention, matching the
+	// INSUFFICIENT_COINS / WRONG_ROOM_PASSWORD precedents): FRIEND_REQUEST_EXISTS
+	// for a pending relationship in either direction, ALREADY_FRIENDS for an
+	// accepted one. A failed accept/decline (not the recipient, not pending, or a
+	// missing row) is a UNIFORM 404 FRIEND_REQUEST_NOT_FOUND that never leaks
+	// which of those it was. An unknown request target reuses ErrUserNotFound.
+	ErrSelfFriendRequest     = NewAppError("SELF_FRIEND_REQUEST", "cannot send a friend request to yourself", http.StatusBadRequest)
+	ErrFriendRequestExists   = NewAppError("FRIEND_REQUEST_EXISTS", "a friend request already exists between these users", http.StatusConflict)
+	ErrAlreadyFriends        = NewAppError("ALREADY_FRIENDS", "you are already friends with this user", http.StatusConflict)
+	ErrFriendRequestNotFound = NewAppError("FRIEND_REQUEST_NOT_FOUND", "friend request not found", http.StatusNotFound)
+
 	// Game domain errors
 	ErrWrongPhase              = NewAppError("WRONG_PHASE", "action not valid in current game phase", http.StatusBadRequest)
 	ErrNotYourTurn             = NewAppError("NOT_YOUR_TURN", "it is not your turn", http.StatusForbidden)

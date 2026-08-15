@@ -266,6 +266,35 @@
     },
     "error": "Nije moguće učitati profil ovog igrača."
   },
+  "friends": {
+    "addFriend": "Dodaj prijatelja",
+    "requestSent": "Zahtjev poslan",
+    "acceptRequest": "Prihvati zahtjev",
+    "friends": "Prijatelji",
+    "accept": "Prihvati",
+    "decline": "Odbij",
+    "online": "Na mreži",
+    "offline": "Izvan mreže",
+    "inviteToRoom": "Pozovi u sobu",
+    "someone": "Netko",
+    "viewProfileAria": "Pogledaj profil igrača {{username}}",
+    "requestReceivedToast": "{{username}} vam je poslao zahtjev za prijateljstvo",
+    "list": {
+      "heading": "Prijatelji",
+      "loading": "Učitavanje prijatelja…",
+      "empty": "Još nemate prijatelja. Pronađite igrače u pretraživanju i pošaljite zahtjev."
+    },
+    "requests": {
+      "heading": "Zahtjevi za prijateljstvo",
+      "loading": "Učitavanje zahtjeva…",
+      "empty": "Nema zahtjeva za prijateljstvo na čekanju."
+    },
+    "errors": {
+      "sendFailed": "Slanje zahtjeva za prijateljstvo nije uspjelo. Pokušajte ponovo.",
+      "acceptFailed": "Prihvaćanje zahtjeva nije uspjelo. Možda više nije dostupan.",
+      "declineFailed": "Odbijanje zahtjeva nije uspjelo. Možda više nije dostupan."
+    }
+  },
   "language": {
     "en": "English",
     "sr": "Srpski",

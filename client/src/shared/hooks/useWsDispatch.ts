@@ -3,6 +3,8 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 
 import { handleWsMessage as handleRoomListMessage } from "@/features/lobby/useRoomUpdates";
+import { queryClient } from "@/shared/api/queryClient";
+import { queryKeys } from "@/shared/api/queryKeys";
 import { honorIsNewPlayer, honorScoreOrPrior } from "@/shared/lib/honor";
 import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -22,6 +24,7 @@ import type {
   CoinSettlementPayload,
   DeclarationsResolvedPayload,
   EmotePayload,
+  FriendRequestPayload,
   HandScoredPayload,
   HonorEjectedPayload,
   HonorUpdatedPayload,
@@ -86,6 +89,7 @@ import {
   SYSTEM_BOT_REMOVED,
   SYSTEM_CHAT_MESSAGE,
   SYSTEM_EMOTE,
+  SYSTEM_FRIEND_REQUEST,
   SYSTEM_HONOR_EJECTED,
   SYSTEM_INSOLVENT_EJECTED,
   SYSTEM_MATCH_STARTED,
@@ -557,6 +561,32 @@ function dispatchGameEvent(message: WsMessage): void {
 
 function dispatchSystemEvent(message: WsMessage): void {
   const { type } = message;
+
+  // Friend request received (Story 11.2). Best-effort/online-only push — the
+  // durable path is GET /friends/requests, so all we do is invalidate that
+  // query (the lobby requests surface refetches) plus surface a toast.
+  if (type === SYSTEM_FRIEND_REQUEST) {
+    const payload = message.payload as FriendRequestPayload;
+    // Validate the Go-origin numerics explicitly — never JS truthiness on a
+    // value that could legitimately be 0, and reject a malformed frame. Optional
+    // chaining so a null/missing payload returns early instead of throwing.
+    if (typeof payload?.requestId !== "number" || typeof payload?.fromUserId !== "number") {
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: queryKeys.friends.requests() });
+    // Also refresh the sender's profile-button state: a viewer sitting on the
+    // sender's public profile would otherwise keep a stale "Add friend" button
+    // and hit a 409 on click.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.friends.status(payload.fromUserId) });
+    const fromUsername =
+      typeof payload.fromUsername === "string" && payload.fromUsername.length > 0
+        ? payload.fromUsername
+        : i18n.t("friends.someone");
+    toast.info(i18n.t("friends.requestReceivedToast", { username: fromUsername }), {
+      duration: MOTION.TOAST_INFO,
+    });
+    return;
+  }
 
   // Room list updates — delegate to existing useRoomUpdates handler
   if (type === SYSTEM_ROOM_CREATED || type === SYSTEM_ROOM_UPDATED) {

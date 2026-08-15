@@ -560,6 +560,23 @@ export interface ChatMessagePayload {
   scope: "lobby" | "match" | "room";
 }
 
+// --- Friend events (Story 11.2) ---
+// Best-effort, online-only per-user push when someone sends the recipient a
+// friend request. The durable path is GET /friends/requests on next load, so a
+// missed push (offline recipient) is fine. The system: prefix keeps this OUTSIDE
+// the WS drift gate — no Zod schema, no golden, no conformance witness, no
+// contract-test row (like every other system:* payload here). Keep in sync with
+// server events.go (SystemFriendRequest).
+export const SYSTEM_FRIEND_REQUEST = "system:friend_request" as const;
+
+export interface FriendRequestPayload {
+  // All three are real Go values — validate with typeof === "number" / "string"
+  // in the dispatcher, never JS truthiness (a real id/0 is legitimate).
+  requestId: number;
+  fromUserId: number;
+  fromUsername: string;
+}
+
 // --- General error events ---
 export const SYSTEM_ERROR = "system:error" as const;
 export const ERROR_UNKNOWN_EVENT = "error:unknown_event" as const;

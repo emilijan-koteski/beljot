@@ -1,6 +1,10 @@
+---
+baseline_commit: e84d203f4a3f16a4dd3c9ff878d77d5e6bd6af90
+---
+
 # Story 11.2: Friend Requests & Friend List
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,11 +30,11 @@ so that I can easily find and play with people I know.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: Branch setup — whole-epic-on-one-branch**
-  - [ ] **Continue on the current branch `feat/11-3-public-player-profiles`** (do NOT cut a new per-story branch). Per user direction, the remaining Epic 11 stories (11-1, 11-2, 11-4, 11-5) ship as ONE feature/PR on this branch — the same whole-scope-on-one-branch pattern used for 9.7+9.8. The branch already contains Epic 9 (honor, merged `dc14308`) + Story 11.3, so the public-profile Add-Friend seam and `PublicProfileResponse` are present. Note: this overrides the "one story = one branch = one PR" default for this epic only, by explicit instruction.
+- [x] **Task 0: Branch setup — whole-epic-on-one-branch**
+  - [x] **Continue on the current branch `feat/11-3-public-player-profiles`** (do NOT cut a new per-story branch). Per user direction, the remaining Epic 11 stories (11-1, 11-2, 11-4, 11-5) ship as ONE feature/PR on this branch — the same whole-scope-on-one-branch pattern used for 9.7+9.8. The branch already contains Epic 9 (honor, merged `dc14308`) + Story 11.3, so the public-profile Add-Friend seam and `PublicProfileResponse` are present. Note: this overrides the "one story = one branch = one PR" default for this epic only, by explicit instruction.
 
-- [ ] **Task 1: Migration `000019_create_friendships`** (AC: #1, #5, #6)
-  - [ ] Create `server/migrations/000019_create_friendships.up.sql` and `.down.sql` (next number after `000018`; every up needs a matching down — project rule). Schema (mirrors the two-user-columns precedent `000014_create_user_identities` + the state-column idiom of `000013_create_refresh_tokens`):
+- [x] **Task 1: Migration `000019_create_friendships`** (AC: #1, #5, #6)
+  - [x] Create `server/migrations/000019_create_friendships.up.sql` and `.down.sql` (next number after `000018`; every up needs a matching down — project rule). Schema (mirrors the two-user-columns precedent `000014_create_user_identities` + the state-column idiom of `000013_create_refresh_tokens`):
     ```sql
     -- up
     CREATE TABLE friendships (
@@ -48,12 +52,12 @@ so that I can easily find and play with people I know.
     -- down
     DROP TABLE IF EXISTS friendships;
     ```
-  - [ ] The DB unique index only guards **one direction** `(user_id, friend_id)`. The **reverse-duplicate** (B→A while A→B exists) is NOT catchable by this index — enforce it in the repo/handler with a direction-agnostic pair lookup (Task 2). No soft-delete column (hard-delete on decline/unfriend, like `identity`/`refreshtoken`).
-  - [ ] Verify the up/down roundtrip against dev DB `:5433` (`docker compose up -d postgres`, `make migrate`), then down, then up — column + CHECK + index inspection at each step.
+  - [x] The DB unique index only guards **one direction** `(user_id, friend_id)`. The **reverse-duplicate** (B→A while A→B exists) is NOT catchable by this index — enforce it in the repo/handler with a direction-agnostic pair lookup (Task 2). No soft-delete column (hard-delete on decline/unfriend, like `identity`/`refreshtoken`).
+  - [x] Verify the up/down roundtrip against dev DB `:5433` (`docker compose up -d postgres`, `make migrate`), then down, then up — column + CHECK + index inspection at each step.
 
-- [ ] **Task 2: Backend — new `internal/friend` package (model + repo)** (AC: #1, #5, #6)
-  - [ ] Create `server/internal/friend/model.go`: `Friendship` struct with GORM/JSON tag bridge (`ID uint gorm:"primaryKey" json:"id"`, `UserID uint gorm:"column:user_id" json:"userId"`, `FriendID uint gorm:"column:friend_id" json:"friendId"`, `Status string gorm:"column:status" json:"status"`, `CreatedAt`/`UpdatedAt time.Time`). Add `const ( FriendStatusPending = "pending"; FriendStatusAccepted = "accepted" )`. GORM auto-pluralizes to `friendships` — no `TableName()` override needed.
-  - [ ] Create `server/internal/friend/repository.go` — the interface ONLY (handlers depend on it, never GORM directly):
+- [x] **Task 2: Backend — new `internal/friend` package (model + repo)** (AC: #1, #5, #6)
+  - [x] Create `server/internal/friend/model.go`: `Friendship` struct with GORM/JSON tag bridge (`ID uint gorm:"primaryKey" json:"id"`, `UserID uint gorm:"column:user_id" json:"userId"`, `FriendID uint gorm:"column:friend_id" json:"friendId"`, `Status string gorm:"column:status" json:"status"`, `CreatedAt`/`UpdatedAt time.Time`). Add `const ( FriendStatusPending = "pending"; FriendStatusAccepted = "accepted" )`. GORM auto-pluralizes to `friendships` — no `TableName()` override needed.
+  - [x] Create `server/internal/friend/repository.go` — the interface ONLY (handlers depend on it, never GORM directly):
     ```go
     type Repository interface {
         Create(f *Friendship) error
@@ -67,11 +71,11 @@ so that I can easily find and play with people I know.
     }
     ```
     (Return non-nil empty slices for the list methods — `[]Friendship{}` not `nil`.)
-  - [ ] Create `server/internal/friend/gorm_repo.go`: `GormRepository{ db *gorm.DB }` + `NewGormRepository(db)`. `Create` maps the pg unique-violation (`pgconn.PgError` code `"23505"`) → `apperr.ErrFriendRequestExists` exactly like `identity/gorm_repo.go:23-27`. `FindByPair` uses `Where("(user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)", a, b, b, a)`. `Accept`/`Delete` use conditional `UPDATE`/`DELETE` with a rows-affected return (atomic recipient-only guard — model the atomicity on `user/gorm_repo.go:138-160` `UpdateUsername`). GORM `ErrRecordNotFound` → `(nil, nil)`.
-  - [ ] Add friend-domain errors to `server/internal/apperr/errors.go` (new grouped block, following the `INSUFFICIENT_COINS`/`WRONG_ROOM_PASSWORD` 409 precedent): `ErrSelfFriendRequest` (400, `SELF_FRIEND_REQUEST`), `ErrFriendRequestExists` (409, `FRIEND_REQUEST_EXISTS`), `ErrAlreadyFriends` (409, `ALREADY_FRIENDS`), `ErrFriendRequestNotFound` (404, `FRIEND_REQUEST_NOT_FOUND`). Reuse `ErrUserNotFound` (404) for an unknown request target.
+  - [x] Create `server/internal/friend/gorm_repo.go`: `GormRepository{ db *gorm.DB }` + `NewGormRepository(db)`. `Create` maps the pg unique-violation (`pgconn.PgError` code `"23505"`) → `apperr.ErrFriendRequestExists` exactly like `identity/gorm_repo.go:23-27`. `FindByPair` uses `Where("(user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)", a, b, b, a)`. `Accept`/`Delete` use conditional `UPDATE`/`DELETE` with a rows-affected return (atomic recipient-only guard — model the atomicity on `user/gorm_repo.go:138-160` `UpdateUsername`). GORM `ErrRecordNotFound` → `(nil, nil)`.
+  - [x] Add friend-domain errors to `server/internal/apperr/errors.go` (new grouped block, following the `INSUFFICIENT_COINS`/`WRONG_ROOM_PASSWORD` 409 precedent): `ErrSelfFriendRequest` (400, `SELF_FRIEND_REQUEST`), `ErrFriendRequestExists` (409, `FRIEND_REQUEST_EXISTS`), `ErrAlreadyFriends` (409, `ALREADY_FRIENDS`), `ErrFriendRequestNotFound` (404, `FRIEND_REQUEST_NOT_FOUND`). Reuse `ErrUserNotFound` (404) for an unknown request target.
 
-- [ ] **Task 3: Backend — friend handler, routes, notification push** (AC: #1, #2, #3, #4, #5, #6)
-  - [ ] Create `server/internal/friend/handler.go`: `Handler` holding the friend `Repository`, the `user.UserRepository` (for `FindByID` target-existence + `FindManyByIDs` username resolution — reuse, do NOT add methods to `UserRepository`), and a **narrow** connection/notify interface so the handler stays unit-testable without a real hub:
+- [x] **Task 3: Backend — friend handler, routes, notification push** (AC: #1, #2, #3, #4, #5, #6)
+  - [x] Create `server/internal/friend/handler.go`: `Handler` holding the friend `Repository`, the `user.UserRepository` (for `FindByID` target-existence + `FindManyByIDs` username resolution — reuse, do NOT add methods to `UserRepository`), and a **narrow** connection/notify interface so the handler stays unit-testable without a real hub:
     ```go
     type Notifier interface {
         IsConnected(userID uint) bool
@@ -79,13 +83,13 @@ so that I can easily find and play with people I know.
     }
     ```
     (`*ws.Hub` satisfies this already — `hub.go:227`/`:178`.)
-  - [ ] Handlers (all read caller via `getUserID`-equivalent; requester is always `authUserID`):
+  - [x] Handlers (all read caller via `getUserID`-equivalent; requester is always `authUserID`):
     - `SendRequest(c)` — bind `{userId}`; guard self (400) → target `FindByID` nil (404) → `FindByPair` existing pending (409 exists) / accepted (409 already-friends) → `Create` → build & `SendToUser(recipientID, system:friend_request)` **only if `IsConnected`** → `201`.
     - `GetStatus(c)` — parse `:id`; `FindByPair(viewer, subject)`; map to `none`/`pending_outgoing`/`pending_incoming`/`friends` + `requestId`.
     - `ListRequests(c)` — `ListIncomingPending(viewer)` → resolve sender usernames via `userRepo.FindManyByIDs` → DTO list.
     - `Accept(c)` / `Decline(c)` — parse `:id`; call `repo.Accept(id, viewer)` / `repo.Delete(id, viewer)`; rows-affected `0` → `404 FRIEND_REQUEST_NOT_FOUND`.
     - `ListFriends(c)` — `ListAccepted(viewer)` → collapse each row to the OTHER user id → `FindManyByIDs` for usernames → set `online` from `notifier.IsConnected(id)` → DTO list.
-  - [ ] Register routes on the authenticated `api` group in `server/cmd/api/main.go`, placed **after** the `hub := ws.NewHub()` line (`~main.go:159`) so `hub` is in scope (co-locate near the room/session route block, ~`main.go:254`). Wire `friendRepo := friend.NewGormRepository(db)` + `friendHandler := friend.NewHandler(friendRepo, userRepo, hub)`:
+  - [x] Register routes on the authenticated `api` group in `server/cmd/api/main.go`, placed **after** the `hub := ws.NewHub()` line (`~main.go:159`) so `hub` is in scope (co-locate near the room/session route block, ~`main.go:254`). Wire `friendRepo := friend.NewGormRepository(db)` + `friendHandler := friend.NewHandler(friendRepo, userRepo, hub)`:
     ```go
     api.POST("/friends/request",    friendHandler.SendRequest)
     api.GET("/friends",             friendHandler.ListFriends)
@@ -95,31 +99,31 @@ so that I can easily find and play with people I know.
     api.POST("/friends/:id/decline",friendHandler.Decline)
     ```
     Echo resolves the static `/friends/requests` and `/friends/status/:id` segments ahead of `/friends/:id/accept` — no collision (static > param). Success envelope: `c.JSON(2xx, map[string]interface{}{"data": <dto>})`; errors `return apperr.ErrXxx`.
-  - [ ] Add `system:friend_request` to the WS contract: const + `FriendRequestPayload{ RequestID uint json:"requestId"; FromUserID uint json:"fromUserId"; FromUsername string json:"fromUsername" }` in `server/internal/ws/events.go`, and the mirror const + TS interface in `client/src/shared/types/wsEvents.ts`. **`system:` prefix ⇒ ZERO drift-gate touchpoints** (no golden, no Zod schema, no contract-test row — verified: chat/emote `system:*` events have none). The diff is exactly those two files (+ the client dispatch case in Task 7). Both contract files in the SAME commit (project rule).
+  - [x] Add `system:friend_request` to the WS contract: const + `FriendRequestPayload{ RequestID uint json:"requestId"; FromUserID uint json:"fromUserId"; FromUsername string json:"fromUsername" }` in `server/internal/ws/events.go`, and the mirror const + TS interface in `client/src/shared/types/wsEvents.ts`. **`system:` prefix ⇒ ZERO drift-gate touchpoints** (no golden, no Zod schema, no contract-test row — verified: chat/emote `system:*` events have none). The diff is exactly those two files (+ the client dispatch case in Task 7). Both contract files in the SAME commit (project rule).
 
-- [ ] **Task 4: Backend tests** (AC: #1, #3, #4, #5, #6)
-  - [ ] DB-backed `server/internal/friend/gorm_repo_test.go` via `getTestDB`-style tx-rollback (DSN dev DB `:5433`, skips if unavailable): create; `FindByPair` matches BOTH directions; unique-violation on exact-duplicate → `ErrFriendRequestExists`; `Accept` atomic (only recipient + only pending flips; wrong caller / already-accepted → 0 rows); `Delete` recipient-only; `ListAccepted` symmetric (returns friend whether viewer was requester or recipient); `ListIncomingPending`; `AreFriends` true/false; `chk_friendships_not_self` rejects self-row.
-  - [ ] Handler tests `server/internal/friend/handler_test.go` (mock friend `Repository` + a `notifierSpy` capturing `IsConnected`/`SendToUser` + mock/stub `UserRepository`; real JWT via `auth.GenerateAccessToken`, `testErrorHandler`, `ServeHTTP`): self-request → 400; unknown target → 404; pending-dup → 409; accepted-dup → 409; happy path → 201 **and** asserts `SendToUser` called for an online recipient **and NOT called** when `IsConnected` is false (endpoint still 201); `GetStatus` all four states; `Accept`/`Decline` non-recipient → 404; `ListFriends` sets `online` from the spy; empty lists serialize `[]`.
+- [x] **Task 4: Backend tests** (AC: #1, #3, #4, #5, #6)
+  - [x] DB-backed `server/internal/friend/gorm_repo_test.go` via `getTestDB`-style tx-rollback (DSN dev DB `:5433`, skips if unavailable): create; `FindByPair` matches BOTH directions; unique-violation on exact-duplicate → `ErrFriendRequestExists`; `Accept` atomic (only recipient + only pending flips; wrong caller / already-accepted → 0 rows); `Delete` recipient-only; `ListAccepted` symmetric (returns friend whether viewer was requester or recipient); `ListIncomingPending`; `AreFriends` true/false; `chk_friendships_not_self` rejects self-row.
+  - [x] Handler tests `server/internal/friend/handler_test.go` (mock friend `Repository` + a `notifierSpy` capturing `IsConnected`/`SendToUser` + mock/stub `UserRepository`; real JWT via `auth.GenerateAccessToken`, `testErrorHandler`, `ServeHTTP`): self-request → 400; unknown target → 404; pending-dup → 409; accepted-dup → 409; happy path → 201 **and** asserts `SendToUser` called for an online recipient **and NOT called** when `IsConnected` is false (endpoint still 201); `GetStatus` all four states; `Accept`/`Decline` non-recipient → 404; `ListFriends` sets `online` from the spy; empty lists serialize `[]`.
 
-- [ ] **Task 5: Frontend — API client, types, query & mutation hooks** (AC: #1, #3, #4, #5, #6)
-  - [ ] New `client/src/shared/api/friends.ts` (maps 1:1 to the `friend` backend domain): `sendFriendRequest(userId: number)`, `getFriendshipStatus(id: number)`, `listFriendRequests()`, `acceptFriendRequest(id: number)`, `declineFriendRequest(id: number)`, `listFriends()`. Return the unwrapped payload (the axios response interceptor already unwraps `{data}` — never `.data.data`).
-  - [ ] Types in `client/src/shared/types/apiTypes.ts` (named exports): `Friend { id: number; username: string; online: boolean }`, `FriendRequest { id: number; fromUserId: number; fromUsername: string; createdAt: string }`, `FriendshipStatus { status: "none" | "pending_outgoing" | "pending_incoming" | "friends"; requestId: number | null }`.
-  - [ ] Extend `client/src/shared/api/queryKeys.ts`: `friends: { list: () => ["friends","list"] as const, requests: () => ["friends","requests"] as const, status: (id: number) => ["friends","status",id] as const }`.
-  - [ ] Query hooks `client/src/shared/hooks/queries/`: `useFriends()`, `useFriendRequests()`, `useFriendshipStatus(id)` (`enabled: Number.isInteger(id) && id > 0`). Mutation hooks `client/src/shared/hooks/mutations/useFriendMutations.ts`: send/accept/decline, each `invalidateQueries` on `friends.status(target)` + `friends.requests()` + `friends.list()` as appropriate (mirror the existing mutation idiom in `hooks/mutations/useProfile.ts`).
+- [x] **Task 5: Frontend — API client, types, query & mutation hooks** (AC: #1, #3, #4, #5, #6)
+  - [x] New `client/src/shared/api/friends.ts` (maps 1:1 to the `friend` backend domain): `sendFriendRequest(userId: number)`, `getFriendshipStatus(id: number)`, `listFriendRequests()`, `acceptFriendRequest(id: number)`, `declineFriendRequest(id: number)`, `listFriends()`. Return the unwrapped payload (the axios response interceptor already unwraps `{data}` — never `.data.data`).
+  - [x] Types in `client/src/shared/types/apiTypes.ts` (named exports): `Friend { id: number; username: string; online: boolean }`, `FriendRequest { id: number; fromUserId: number; fromUsername: string; createdAt: string }`, `FriendshipStatus { status: "none" | "pending_outgoing" | "pending_incoming" | "friends"; requestId: number | null }`.
+  - [x] Extend `client/src/shared/api/queryKeys.ts`: `friends: { list: () => ["friends","list"] as const, requests: () => ["friends","requests"] as const, status: (id: number) => ["friends","status",id] as const }`.
+  - [x] Query hooks `client/src/shared/hooks/queries/`: `useFriends()`, `useFriendRequests()`, `useFriendshipStatus(id)` (`enabled: Number.isInteger(id) && id > 0`). Mutation hooks `client/src/shared/hooks/mutations/useFriendMutations.ts`: send/accept/decline, each `invalidateQueries` on `friends.status(target)` + `friends.requests()` + `friends.list()` as appropriate (mirror the existing mutation idiom in `hooks/mutations/useProfile.ts`).
 
-- [ ] **Task 6: Frontend — Add-Friend button on the public profile** (AC: #7)
-  - [ ] Create `client/src/features/profile/components/FriendButton.tsx`, mounted at the **Story-11.2 insertion point** in `client/src/features/profile/PublicPlayerProfilePage.tsx` (~lines 155-159, under `<IdentityHero>`). Props: `userId` (the validated subject id already in scope as `validId`). Drives its label/action from `useFriendshipStatus(userId)`: `Add Friend` / `Request sent` (disabled) / `Accept request` / `Friends ✓`. Never renders a dead button. testids: `friend-button-add` / `-pending` / `-accept` / `-friends`. Replace the placeholder comment with the real component.
-  - [ ] Do NOT show the button on the viewer's own id (the public page never renders for self in practice, but guard defensively — `status: "none"` self case or hide if `userId === authUser.id`).
+- [x] **Task 6: Frontend — Add-Friend button on the public profile** (AC: #7)
+  - [x] Create `client/src/features/profile/components/FriendButton.tsx`, mounted at the **Story-11.2 insertion point** in `client/src/features/profile/PublicPlayerProfilePage.tsx` (~lines 155-159, under `<IdentityHero>`). Props: `userId` (the validated subject id already in scope as `validId`). Drives its label/action from `useFriendshipStatus(userId)`: `Add Friend` / `Request sent` (disabled) / `Accept request` / `Friends ✓`. Never renders a dead button. testids: `friend-button-add` / `-pending` / `-accept` / `-friends`. Replace the placeholder comment with the real component.
+  - [x] Do NOT show the button on the viewer's own id (the public page never renders for self in practice, but guard defensively — `status: "none"` self case or hide if `userId === authUser.id`).
 
-- [ ] **Task 7: Frontend — friend list + requests UI + WS notification** (AC: #2, #4, #6, #8)
-  - [ ] New feature folder `client/src/features/friends/`: `FriendList.tsx` (`data-testid="friend-list"`; each row = username + online/offline dot + an "Invite to Room" affordance `data-testid="friend-invite-room"` for online friends — **stub: onClick is a documented no-op/handler owned by Story 11.5**; localized empty state) and `FriendRequests.tsx` (`data-testid="friend-requests"`; Accept/Decline buttons wired to the mutations; localized empty state). Mount both in `client/src/features/lobby/LobbyPage.tsx` as a "Friends" panel (sibling to the room grid / `FilterRail`).
-  - [ ] Add a `SYSTEM_FRIEND_REQUEST` dispatch case in `client/src/shared/hooks/useWsDispatch.ts` (`dispatchSystemEvent` switch, ~`:558`): validate the payload (`typeof requestId === "number"`, etc. — never JS-truthiness on Go numerics), then `queryClient.invalidateQueries({ queryKey: queryKeys.friends.requests() })` and optionally a subtle `toast`/unseen badge. Add the const to `wsEvents.ts` (done in Task 3).
+- [x] **Task 7: Frontend — friend list + requests UI + WS notification** (AC: #2, #4, #6, #8)
+  - [x] New feature folder `client/src/features/friends/`: `FriendList.tsx` (`data-testid="friend-list"`; each row = username + online/offline dot + an "Invite to Room" affordance `data-testid="friend-invite-room"` for online friends — **stub: onClick is a documented no-op/handler owned by Story 11.5**; localized empty state) and `FriendRequests.tsx` (`data-testid="friend-requests"`; Accept/Decline buttons wired to the mutations; localized empty state). Mount both in `client/src/features/lobby/LobbyPage.tsx` as a "Friends" panel (sibling to the room grid / `FilterRail`).
+  - [x] Add a `SYSTEM_FRIEND_REQUEST` dispatch case in `client/src/shared/hooks/useWsDispatch.ts` (`dispatchSystemEvent` switch, ~`:558`): validate the payload (`typeof requestId === "number"`, etc. — never JS-truthiness on Go numerics), then `queryClient.invalidateQueries({ queryKey: queryKeys.friends.requests() })` and optionally a subtle `toast`/unseen badge. Add the const to `wsEvents.ts` (done in Task 3).
 
-- [ ] **Task 8: i18n** (AC: #9)
-  - [ ] Add a `friends.*` block to all four locales `client/src/shared/i18n/{en,sr,mk,hr}.json`: button labels (`addFriend`, `requestSent`, `acceptRequest`, `friends`), list/requests headings + empty states, Accept/Decline labels, the online/offline label, the "Invite to Room" label, and a notification toast string (`{{username}}` interpolation). `mk` all-Cyrillic; NO em dash in `mk`/`sr`/`hr`. `i18n.parity.test.ts` must stay green (1:1 leaf parity + non-empty).
+- [x] **Task 8: i18n** (AC: #9)
+  - [x] Add a `friends.*` block to all four locales `client/src/shared/i18n/{en,sr,mk,hr}.json`: button labels (`addFriend`, `requestSent`, `acceptRequest`, `friends`), list/requests headings + empty states, Accept/Decline labels, the online/offline label, the "Invite to Room" label, and a notification toast string (`{{username}}` interpolation). `mk` all-Cyrillic; NO em dash in `mk`/`sr`/`hr`. `i18n.parity.test.ts` must stay green (1:1 leaf parity + non-empty).
 
-- [ ] **Task 9: Full validation gates** (AC: #9)
-  - [ ] `make lint` (Go + client) and `make test` (`go test ./...` + `npx vitest run`) green. Confirm the DB-backed friend repo test RAN (not skipped) against dev DB `:5433`, migrated to v19; note in Completion Notes if the DB was unavailable and it skipped. Update the File List and Completion Notes.
+- [x] **Task 9: Full validation gates** (AC: #9)
+  - [x] `make lint` (Go + client) and `make test` (`go test ./...` + `npx vitest run`) green. Confirm the DB-backed friend repo test RAN (not skipped) against dev DB `:5433`, migrated to v19; note in Completion Notes if the DB was unavailable and it skipped. Update the File List and Completion Notes.
 
 ## Dev Notes
 
@@ -203,12 +207,96 @@ so that I can easily find and play with people I know.
 
 ### Agent Model Used
 
-_TBD by dev-story_
+claude-opus-4-8[1m] (Opus 4.8, 1M context) — dev-story workflow.
 
 ### Debug Log References
 
+- Migration roundtrip on dev DB `:5433`: `up` → `\d friendships` (6 cols, 3 custom indexes, `chk_friendships_not_self`, both FKs `ON DELETE CASCADE`) → `down` (table dropped) → `up` again → clean at version 19.
+- `go test ./internal/friend/...` — DB-backed repo tests RAN (not skipped) against dev DB `:5433` at v19; all pass.
+- One PRE-EXISTING, unrelated Go test failure surfaced by the full `go test ./...`: `TestGormUserRepository_SearchByUsername` (Story 11.1's search test) is not isolated to its own fixtures and fails against leftover `alice_e2e`/`alicia_e2e` E2E accounts in the shared dev DB. Story 11.2 touches no `internal/user` code; its own DB tests leaked nothing (0 `friendships` rows, 0 `@f.test` users after the run). Filed in `deferred-work.md`.
+
 ### Completion Notes List
 
-- Ultimate context engine analysis completed — comprehensive developer guide created.
+Implemented Story 11.2 (Friend Requests & Friend List, FR6) end-to-end on `feat/11-3-public-player-profiles` (whole-epic-on-one-branch, Task 0).
+
+**Backend — new self-contained `internal/friend` package** (no changes to `user.UserRepository`, so zero mock blast radius):
+- Migration `000019_create_friendships`: directional `(user_id, friend_id)` rows, `status` pending/accepted, `chk_friendships_not_self`, unique index on the ordered pair + two supporting indexes, hard-delete (no soft-delete column), `ON DELETE CASCADE`. Down/up roundtrip verified on dev DB.
+- `model.go` / `repository.go` (interface only) / `gorm_repo.go`: pg 23505 → `ErrFriendRequestExists`; **direction-agnostic `FindByPair`** blocks the reverse duplicate the single-direction index cannot see; atomic recipient-only `Accept`/`Delete` (conditional `WHERE ... AND friend_id=? AND status='pending'` with rows-affected, modeled on `UpdateUsername`); symmetric `ListAccepted`; `ListIncomingPending`; `AreFriends` exposed now for 11.4/11.5.
+- `handler.go` + 6 routes (`POST /friends/request`, `GET /friends`, `GET /friends/requests`, `GET /friends/status/:id`, `POST /friends/:id/{accept,decline}`): requester is ALWAYS `getUserID(c)`; self→400, unknown target→404, either-direction pending→409 `FRIEND_REQUEST_EXISTS`, accepted→409 `ALREADY_FRIENDS`, accept/decline miss→uniform 404 (no authz/existence leak); online status from a narrow `Notifier` interface (`*ws.Hub` satisfies it); soft-deleted friends omitted from the list, never 500; lists always serialize `[]`.
+- `system:friend_request` per-user push: best-effort, online-only (gated on `IsConnected`), the 201 never depends on recipient connectivity. `system:` prefix ⇒ ZERO drift-gate touchpoints — contract is exactly `ws/events.go` + `wsEvents.ts` (verified: no golden/Zod/contract-test rows).
+- 4 new `apperr` errors (`SELF_FRIEND_REQUEST` 400, `FRIEND_REQUEST_EXISTS`/`ALREADY_FRIENDS` 409, `FRIEND_REQUEST_NOT_FOUND` 404); reused `ErrUserNotFound` for an unknown target.
+- Tests: DB-backed `gorm_repo_test.go` (both-direction FindByPair, exact-dup 409, reverse-dup NOT blocked by index [pins why FindByPair is needed], atomic recipient-only accept/decline, symmetric ListAccepted, ListIncomingPending, AreFriends, chk_not_self); mock-repo + notifierSpy + JWT `handler_test.go` (self/unknown/pending-dup/accepted-dup, happy-path 201 **with** push for an online recipient **and no push** (still 201) when offline, all four GetStatus states, non-recipient accept/decline → 404, ListFriends online flag, soft-deleted omission, empty→`[]`, auth required).
+
+**Frontend:**
+- `api/friends.ts` (6 fns, 1:1 with the backend domain), `apiTypes.ts` (`Friend`/`FriendRequest`/`FriendshipStatus`/`FriendshipState`), `queryKeys.ts` (`friends.{list,requests,status}`), query hooks (`useFriends`/`useFriendRequests`/`useFriendshipStatus` gated on a positive int id), mutation hooks (send/accept/decline with precise cache invalidation).
+- `FriendButton.tsx` on the public profile insertion point: a state machine over `useFriendshipStatus` — Add Friend / Request sent (disabled) / Accept request / Friends — **never a dead button**, hidden on the viewer's own id.
+- `FriendList.tsx` (`friend-list`, online/offline indicator, profile link, `friend-invite-room` affordance for online friends as a **documented Story 11.5 hook** — onClick is a no-op) + `FriendRequests.tsx` (`friend-requests`, Accept/Decline wired to mutations), both with localized empty states, mounted in `LobbyPage`.
+- `system:friend_request` WS dispatch case (typeof-guarded numerics, invalidates `friends.requests()`, toast) + the `wsEvents.ts` const/type mirror.
+- i18n `friends.*` block ×4 (`mk` all-Cyrillic, no em dash in mk/sr/hr, parity test green).
+- Frontend tests: `FriendButton.test.tsx` (all 4 states + send/accept wiring + self-guard), `FriendRequests.test.tsx` (empty + accept/decline by row id), `FriendList.test.tsx` (empty + online-only invite affordance).
+
+**Gates:** gofmt clean (except the pre-existing `profile_identity_handler_test.go`); `go vet` clean; golangci-lint **v1.64.8** (repo-pinned, run via `go run` since the environment's v2.12.2 rejects the v1 config) clean on all changed packages; `go test ./...` green for all packages incl. new `friend` (one pre-existing unrelated `user` search-test failure from shared-DB E2E pollution — see Debug Log / deferred-work.md); client `tsc` build clean, `eslint` clean, `prettier` clean, `vitest` 107 files / 1140 tests pass, i18n parity green.
+
+**Deferred:** 1 item → `deferred-work.md` (pre-existing test-isolation weakness in Story 11.1's `SearchByUsername` DB test, polluted by leftover E2E accounts; not a 11.2 regression).
 
 ### File List
+
+**Backend — new:**
+- `server/migrations/000019_create_friendships.up.sql`
+- `server/migrations/000019_create_friendships.down.sql`
+- `server/internal/friend/model.go`
+- `server/internal/friend/repository.go`
+- `server/internal/friend/gorm_repo.go`
+- `server/internal/friend/handler.go`
+- `server/internal/friend/gorm_repo_test.go`
+- `server/internal/friend/handler_test.go`
+
+**Backend — modified:**
+- `server/internal/apperr/errors.go` (friend-domain errors)
+- `server/internal/ws/events.go` (`SystemFriendRequest` + `FriendRequestPayload`)
+- `server/cmd/api/main.go` (friend DI + 6 routes + import)
+
+**Frontend — new:**
+- `client/src/shared/api/friends.ts`
+- `client/src/shared/hooks/queries/useFriends.ts`
+- `client/src/shared/hooks/queries/useFriendRequests.ts`
+- `client/src/shared/hooks/queries/useFriendshipStatus.ts`
+- `client/src/shared/hooks/mutations/useFriendMutations.ts`
+- `client/src/features/profile/components/FriendButton.tsx`
+- `client/src/features/profile/components/FriendButton.test.tsx`
+- `client/src/features/friends/FriendList.tsx`
+- `client/src/features/friends/FriendList.test.tsx`
+- `client/src/features/friends/FriendRequests.tsx`
+- `client/src/features/friends/FriendRequests.test.tsx`
+
+**Frontend — modified:**
+- `client/src/shared/types/apiTypes.ts` (Friend / FriendRequest / FriendshipStatus / FriendshipState)
+- `client/src/shared/api/queryKeys.ts` (`friends.*`)
+- `client/src/shared/types/wsEvents.ts` (`SYSTEM_FRIEND_REQUEST` + `FriendRequestPayload`)
+- `client/src/shared/hooks/useWsDispatch.ts` (friend-request dispatch case + imports)
+- `client/src/features/profile/PublicPlayerProfilePage.tsx` (mount `FriendButton`)
+- `client/src/features/lobby/LobbyPage.tsx` (mount `FriendRequests` + `FriendList`)
+- `client/src/shared/i18n/{en,sr,mk,hr}.json` (`friends.*` block)
+
+**Docs — modified:**
+- `_bmad-output/implementation-artifacts/deferred-work.md` (1 deferred item)
+
+### Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-08-15 | Implemented Story 11.2 — friend requests & friend list (FR6): new `internal/friend` package + migration 000019, 6 endpoints, `system:friend_request` push, FriendButton on the public profile, lobby friends/requests surfaces + WS dispatch, i18n ×4, backend + frontend tests. Status → review. |
+| 2026-08-15 | Code review (3-layer adversarial) → 1 decision + 4 patches applied, 1 dismissed. Fixed the reverse-duplicate friendship race (normalized `LEAST/GREATEST` unique index in migration 000019 → 23505/409), added `onError` toasts to the friend mutations (+`friends.errors.*` ×4), invalidated `friends.status(fromUserId)` on the WS push, split FriendButton's load/error fallback, and guarded the WS payload with optional chaining. All gates green (friend DB tests pass against the normalized index). Status → done. |
+| 2026-08-15 | Manual Playwright E2E (two concurrent online users) — verified AC1–AC8 live incl. Patch C (WS push flips a stale "Add friend"→"Accept request" with no reload), all four FriendButton states, online+offline friend-list states, and the 11.1→11.3→11.2 integration. Single accepted DB row, zero console errors. Test artifacts cleaned up. |
+
+### Review Findings
+
+_Code review 2026-08-15 (bmad-code-review, 3-layer adversarial: Blind Hunter + Edge Case Hunter + Acceptance Auditor; all three contributed, Edge/Auditor re-run once after empty first dispatch). Acceptance Auditor found AC1–AC9 all SATISFIED. Triage: 1 decision-needed, 4 patch, 0 defer, 1 dismissed. Severities are the reviewer's final ratings (subagent severities disregarded)._
+
+- [x] [Review][Patch] Reverse-duplicate friendship race (TOCTOU) — `SendRequest` does a non-transactional `FindByPair` → `Create`, and the only DB uniqueness guard `idx_friendships_pair (user_id, friend_id)` covers ONE direction. Two mutual requests (A→B and B→A) in the same window both pass `FindByPair` and both `Create` succeed → two rows for one pair; once both accepted, `ListAccepted`/`GET /friends` returns the friend twice + a phantom pending row. New code, durable corruption, narrow window. All three layers converged. `[server/internal/friend/handler.go:111-127]` + `[server/migrations/000019_create_friendships.up.sql:16]`. Severity: medium. **Decision (2026-08-15): fix now** — normalize the unique index to `(LEAST(user_id,friend_id), GREATEST(user_id,friend_id))` in the still-unshipped migration; the existing `23505 → ErrFriendRequestExists` mapping in `Create` closes the race with a clean 409.
+- [x] [Review][Patch] Friend mutations lack `onError` — send/accept/decline swallow real server errors (409 `ALREADY_FRIENDS`/`FRIEND_REQUEST_EXISTS`, 404 `FRIEND_REQUEST_NOT_FOUND`) with no toast/feedback; `queryClient` has no global mutation error handler. `[client/src/shared/hooks/mutations/useFriendMutations.ts]`. Severity: low.
+- [x] [Review][Patch] WS `system:friend_request` push doesn't invalidate `friends.status(fromUserId)` — a viewer sitting on the sender's public profile keeps a stale "Add Friend" button; clicking it hits a silent 409. Payload already carries a validated `fromUserId`. `[client/src/shared/hooks/useWsDispatch.ts:575]`. Severity: low.
+- [x] [Review][Patch] `FriendButton` loading fallback asserts a false state — `status.isPending || !status.data` renders a disabled "Add friend" (wrong label for an existing friend/pending during cold load) and, because a status-query error also lands here (`retry:1` then `isError`, `data===undefined`), leaves the button permanently stuck with no way to act. `[client/src/features/profile/components/FriendButton.tsx:43-51]`. Severity: low.
+- [x] [Review][Patch] `system:friend_request` dispatch dereferences `payload` without optional chaining — `typeof payload.requestId` throws `TypeError` on a null/missing payload; `onmessage` has no try/catch around dispatch. Sibling handlers use `payload?.`; the friend case is the lone deviation and the dev's own comment claims it "rejects a malformed frame". Defensive/unreachable from our server. `[client/src/shared/hooks/useWsDispatch.ts:569-574]`. Severity: low.
+
+_Dismissed (1): `sendFriendRequest`/`acceptFriendRequest`/`declineFriendRequest` typed `Promise<void>` while the backend returns a DTO — cosmetic type inaccuracy, no consumer reads the body, zero behavioral impact._

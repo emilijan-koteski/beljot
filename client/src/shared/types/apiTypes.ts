@@ -51,6 +51,42 @@ export interface PlayerSearchResult {
   username: string;
 }
 
+/**
+ * An accepted friend (Story 11.2, GET /friends). `online` is derived
+ * server-side from the live WS hub. It is a Go bool on the wire, so a real
+ * `false` is a legitimate value — compare with `=== true`, never JS truthiness.
+ */
+export interface Friend {
+  id: number;
+  username: string;
+  online: boolean;
+}
+
+/**
+ * One incoming pending friend request (Story 11.2, GET /friends/requests).
+ * `fromUserId` links to the sender's public profile; `fromUsername` is rendered
+ * directly in the requests list.
+ */
+export interface FriendRequest {
+  id: number;
+  fromUserId: number;
+  fromUsername: string;
+  createdAt: string;
+}
+
+/** The four friendship states between a viewer and a subject (Story 11.2). */
+export type FriendshipState = "none" | "pending_outgoing" | "pending_incoming" | "friends";
+
+/**
+ * Friendship state for a subject (Story 11.2, GET /friends/status/:id) — drives
+ * the public-profile Add-Friend button. `requestId` is the row id when a
+ * relationship exists (for accept/decline), and null otherwise.
+ */
+export interface FriendshipStatus {
+  status: FriendshipState;
+  requestId: number | null;
+}
+
 export interface Room {
   id: number;
   name: string;

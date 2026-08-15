@@ -447,6 +447,30 @@ type ChatMessagePayload struct {
 	Scope     string `json:"scope"`     // "lobby" | "match" | "room"
 }
 
+// --- Friend events (Story 11.2) ---
+
+// SystemFriendRequest is a per-user push to a recipient who is currently
+// connected when someone sends them a friend request (Story 11.2 AC2). Like
+// every system:* push it is best-effort and online-only: SendToUser is an
+// unqueued no-op for offline users (no offline inbox — same model as chat /
+// honor / coins), so the durable delivery path is the recipient seeing the
+// request in GET /friends/requests on next load. POST /friends/request must
+// succeed regardless of the recipient's connection state.
+//
+// The system: prefix keeps this OUTSIDE the WS drift gate — no golden file, no
+// Zod schema, no events_contract_test.go `cases` row — exactly like every other
+// system:* event here (chat, emote, room lifecycle, honor eject). The complete
+// contract is two files: this one and client/src/shared/types/wsEvents.ts.
+const SystemFriendRequest = "system:friend_request"
+
+// FriendRequestPayload is the typed payload for SystemFriendRequest events.
+// FromUsername lets the recipient's client render a toast without a lookup.
+type FriendRequestPayload struct {
+	RequestID    uint   `json:"requestId"`
+	FromUserID   uint   `json:"fromUserId"`
+	FromUsername string `json:"fromUsername"`
+}
+
 // --- General error events ---
 const SystemError = "system:error"
 const ErrorUnknownEvent = "error:unknown_event"
