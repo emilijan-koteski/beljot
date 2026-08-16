@@ -96,16 +96,34 @@ func main() {
 		AllowCredentials: true,
 	}))
 
+	// HandleError is load-bearing, not decoration: Echo invokes HTTPErrorHandler
+	// AFTER the middleware chain unwinds, so without it this logger reads the
+	// response before the error handler has written a status and records the
+	// default 200 for EVERY failure. A 404 room, a 401 login and a 409 join gate
+	// all logged as success, which means no error rate is visible in production
+	// logs at all. HandleError routes the error through appErrorHandler inside the
+	// chain so v.Status is the status the client actually received.
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogStatus: true,
-		LogURI:    true,
-		LogMethod: true,
+		LogStatus:   true,
+		LogURI:      true,
+		LogMethod:   true,
+		LogError:    true,
+		HandleError: true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			slog.Info("request",
-				"method", v.Method,
-				"uri", v.URI,
-				"status", v.Status,
-			)
+			// Failures log at ERROR/WARN so they surface without grepping every
+			// request line. 5xx is ours, 4xx is the caller's.
+			attrs := []any{"method", v.Method, "uri", v.URI, "status", v.Status}
+			if v.Error != nil {
+				attrs = append(attrs, "error", v.Error.Error())
+			}
+			switch {
+			case v.Status >= 500:
+				slog.Error("request", attrs...)
+			case v.Status >= 400:
+				slog.Warn("request", attrs...)
+			default:
+				slog.Info("request", attrs...)
+			}
 			return nil
 		},
 	}))
