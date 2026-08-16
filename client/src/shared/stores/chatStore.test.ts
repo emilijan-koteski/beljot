@@ -37,6 +37,7 @@ describe("chatStore", () => {
       whisperThreads: {},
       whisperUnread: {},
       activeChannel: "primary",
+      dockOpen: false,
       matchMessagesReceivedTotal: 0,
       hasSentLobby: false,
       hasSentMatch: false,
@@ -269,10 +270,37 @@ describe("chatStore", () => {
     expect(useChatStore.getState().whisperUnread.bob ?? 0).toBe(0);
   });
 
-  it("appendWhisper does NOT bump unread when its thread is the active channel", () => {
+  it("appendWhisper does NOT bump unread when its thread is the active channel and the dock is open", () => {
+    useChatStore.getState().setDockOpen(true);
     useChatStore.getState().setActiveChannel("whisper:bob");
     useChatStore.getState().appendWhisper(makeWhisper(), 1);
     expect(useChatStore.getState().whisperUnread.bob).toBe(0);
+  });
+
+  it("appendWhisper bumps unread on the active thread when the dock is CLOSED", () => {
+    // The active channel is only "read" while it is on screen. A closed (or
+    // unmounted) dock must still count the whisper, or it lands silently.
+    useChatStore.getState().setDockOpen(true);
+    useChatStore.getState().setActiveChannel("whisper:bob");
+    useChatStore.getState().setDockOpen(false);
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    useChatStore.getState().appendWhisper(makeWhisper({ message: "again" }), 1);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(2);
+  });
+
+  it("setDockOpen(true) marks the active whisper thread read", () => {
+    useChatStore.getState().setActiveChannel("whisper:bob");
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(1);
+    useChatStore.getState().setDockOpen(true);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(0);
+  });
+
+  it("setDockOpen(true) on the primary channel leaves whisper unread intact", () => {
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    useChatStore.getState().setDockOpen(true);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(1);
+    expect(useChatStore.getState().activeChannel).toBe("primary");
   });
 
   it("appendWhisper drops oldest when exceeding the 200-message cap", () => {

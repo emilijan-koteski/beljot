@@ -114,6 +114,7 @@ export function ChatDock(props: ChatDockProps) {
   const whisperUnread = useChatStore((s) => s.whisperUnread);
   const activeChannel = useChatStore((s) => s.activeChannel);
   const setActiveChannel = useChatStore((s) => s.setActiveChannel);
+  const setDockOpen = useChatStore((s) => s.setDockOpen);
 
   const threadKeys = useMemo(() => Object.keys(whisperThreads).sort(), [whisperThreads]);
   // Total unread across all whisper threads. Surfaced on the CLOSED FAB badge so an
@@ -183,6 +184,15 @@ export function ChatDock(props: ChatDockProps) {
       setPeekVisible(false);
     }
   }, [open]);
+
+  // Tell the store whether the active channel is actually on screen. A closed
+  // dock — or an unmounted one, on a page that has no dock at all — must still
+  // count an incoming whisper as unread, even on the last-selected thread;
+  // otherwise it lands silently with no tab badge and no FAB badge.
+  useEffect(() => {
+    setDockOpen(open);
+    return () => setDockOpen(false);
+  }, [open, setDockOpen]);
 
   // Phone treatment: the open panel is a full-screen overlay, but `fixed
   // inset-0` sizes to the LAYOUT viewport, which the mobile on-screen keyboard

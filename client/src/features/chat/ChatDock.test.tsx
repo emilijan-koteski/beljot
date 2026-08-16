@@ -41,6 +41,7 @@ function resetChat() {
     whisperThreads: {},
     whisperUnread: {},
     activeChannel: "primary",
+    dockOpen: false,
     matchMessagesReceivedTotal: 0,
     hasSentLobby: false,
     hasSentMatch: false,
@@ -180,5 +181,61 @@ describe("ChatDock — whisper", () => {
     const badge = screen.getByTestId("lobby-chat-unread");
     expect(badge).toHaveTextContent("1");
     expect(badge).not.toHaveTextContent("psst");
+  });
+
+  it("badges a whisper that arrives on the last-selected thread after the dock is closed", () => {
+    // The dock closing does not deselect the thread, so the store must stop
+    // treating that thread as "on screen" — otherwise the whisper is marked
+    // read on arrival and raises no badge at all.
+    render(<ChatDock variant="lobby" />);
+    fireEvent.click(screen.getByTestId("lobby-chat-fab"));
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper(), 1);
+    });
+    fireEvent.click(screen.getByTestId("lobby-chat-whisper-tab-bob"));
+    fireEvent.click(screen.getByTestId("lobby-chat-close"));
+
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper({ message: "while you were away" }), 1);
+    });
+
+    expect(screen.getByTestId("lobby-chat-unread")).toHaveTextContent("1");
+    expect(useChatStore.getState().whisperUnread.bob).toBe(1);
+  });
+
+  it("clears the active thread's unread when the dock is reopened", () => {
+    render(<ChatDock variant="lobby" />);
+    fireEvent.click(screen.getByTestId("lobby-chat-fab"));
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper(), 1);
+    });
+    fireEvent.click(screen.getByTestId("lobby-chat-whisper-tab-bob"));
+    fireEvent.click(screen.getByTestId("lobby-chat-close"));
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper({ message: "while you were away" }), 1);
+    });
+
+    fireEvent.click(screen.getByTestId("lobby-chat-fab"));
+
+    expect(useChatStore.getState().whisperUnread.bob).toBe(0);
+    expect(screen.queryByTestId("lobby-chat-whisper-tab-bob-unread")).not.toBeInTheDocument();
+  });
+
+  it("counts a whisper as unread while no dock is mounted", () => {
+    // Navigating to a page without a chat dock unmounts it; the thread is then
+    // off screen regardless of which channel was last selected.
+    const view = render(<ChatDock variant="lobby" />);
+    fireEvent.click(screen.getByTestId("lobby-chat-fab"));
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper(), 1);
+    });
+    fireEvent.click(screen.getByTestId("lobby-chat-whisper-tab-bob"));
+    view.unmount();
+
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper({ message: "offscreen" }), 1);
+    });
+
+    expect(useChatStore.getState().whisperUnread.bob).toBe(1);
   });
 });

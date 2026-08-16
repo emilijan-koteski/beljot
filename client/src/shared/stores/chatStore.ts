@@ -29,6 +29,12 @@ interface ChatState {
   // dock swap on navigation; the dock falls back to "primary" if it points at a
   // thread that no longer exists.
   activeChannel: ChatChannel;
+  // Whether a dock is currently mounted AND open — i.e. whether activeChannel is
+  // actually on screen. Without this, an incoming whisper on the last-selected
+  // thread counts as "read" even though the dock is shut (or unmounted on a
+  // page that has no dock), so it raises no tab badge and no FAB badge and the
+  // user never learns it arrived. The dock keeps this in sync.
+  dockOpen: boolean;
   // Monotonic count of match messages received since the last clear.
   // Unlike matchMessages.length (which plateaus at MAX_MESSAGES once the ring
   // buffer is full), this counter keeps incrementing so unread-badge tracking
@@ -56,6 +62,7 @@ interface ChatState {
   // Whisper actions (Story 11.4).
   appendWhisper: (msg: WhisperPayload, myUserId: number) => void;
   setActiveChannel: (channel: ChatChannel) => void;
+  setDockOpen: (open: boolean) => void;
   markThreadRead: (username: string) => void;
   clearWhispers: () => void;
 }
@@ -75,6 +82,7 @@ export const useChatStore = create<ChatState>((set) => ({
   whisperThreads: {},
   whisperUnread: {},
   activeChannel: "primary",
+  dockOpen: false,
   matchMessagesReceivedTotal: 0,
   hasSentLobby: false,
   hasSentMatch: false,
@@ -100,9 +108,10 @@ export const useChatStore = create<ChatState>((set) => ({
       const isMine = msg.fromUserId === myUserId;
       const key = isMine ? msg.toUsername : msg.fromUsername;
       const thread = appendWithCap(state.whisperThreads[key] ?? [], msg);
-      // Bump unread only for an incoming message on a thread that isn't active.
-      // Own-echo never counts as unread.
-      const bump = !isMine && state.activeChannel !== whisperChannel(key);
+      // Bump unread only for an incoming message the user cannot currently see:
+      // the thread isn't the active channel, OR the dock is closed/unmounted so
+      // even the active channel is off screen. Own-echo never counts as unread.
+      const bump = !isMine && (!state.dockOpen || state.activeChannel !== whisperChannel(key));
       return {
         whisperThreads: { ...state.whisperThreads, [key]: thread },
         whisperUnread: bump
@@ -119,6 +128,15 @@ export const useChatStore = create<ChatState>((set) => ({
         activeChannel: channel,
         whisperUnread: { ...state.whisperUnread, [key]: 0 },
       };
+    }),
+  setDockOpen: (open) =>
+    set((state) => {
+      // Opening the dock reveals the active channel, so an already-counted
+      // thread is now read. Without this the badge would linger in the store and
+      // resurface on the FAB the next time the dock closes.
+      if (!open || state.activeChannel === "primary") return { dockOpen: open };
+      const key = state.activeChannel.slice("whisper:".length);
+      return { dockOpen: true, whisperUnread: { ...state.whisperUnread, [key]: 0 } };
     }),
   markThreadRead: (username) =>
     set((state) => ({ whisperUnread: { ...state.whisperUnread, [username]: 0 } })),
