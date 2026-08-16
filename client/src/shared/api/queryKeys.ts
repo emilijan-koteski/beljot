@@ -4,6 +4,10 @@ export const queryKeys = {
     list: (status: string) => ["rooms", "list", status] as const,
     detail: (id: number) => ["rooms", "detail", id] as const,
     byCode: (code: string) => ["rooms", "byCode", code] as const,
+    // Story 11.5: the invite panel's friend roster for one room. Keyed by room
+    // because availability is answered in that room's context (a full room
+    // disables every row).
+    invitableFriends: (roomId: number) => ["rooms", "invitableFriends", roomId] as const,
   },
   profile: {
     detail: (userId: number) => ["profile", userId] as const,

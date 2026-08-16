@@ -516,6 +516,50 @@ type WhisperPayload struct {
 	Timestamp    string `json:"timestamp"` // ISO 8601 (RFC3339Nano) UTC
 }
 
+// --- Room invite events (Story 11.5) ---
+
+// SystemRoomInvite is a per-user push to a friend who has been invited into a
+// waiting room (Story 11.5 AC2). Like every system:* push it is best-effort and
+// online-only — SendToUser is an unqueued no-op for offline users, and there is
+// no offline inbox. That is correct here: an invite is a real-time popup with a
+// TTL, so an undelivered invite simply is never actioned.
+//
+// The system: prefix is a deliberate deviation from the epic AC's literal
+// event:room_invite (Story 11.5 D1, PO-confirmed 2026-08-14). A room invite is a
+// pre-match, room-level platform push — structurally identical to
+// system:honor_ejected / system:room_updated — whereas event:* is reserved for
+// in-match game state and is the ONLY prefix inside the WS drift gate. So this
+// event has ZERO drift-gate touchpoints: no golden file, no Zod schema, no
+// events_contract_test.go row. The complete contract is two files: this one and
+// client/src/shared/types/wsEvents.ts.
+const SystemRoomInvite = "system:room_invite"
+
+// RoomInvitePayload is the typed payload for SystemRoomInvite events.
+//
+// IsHostInvite is the field the client branches on: true means the inviter was
+// the room OWNER and a server-issued one-time grant will carry the invitee past
+// the password gate (so no password prompt is shown). It is NOT a bypass token —
+// the authoritative grant lives server-side in the InviteRegistry and is looked
+// up by the authenticated userID. A tampered client flag changes nothing.
+type RoomInvitePayload struct {
+	InviteID        uint64 `json:"inviteId"`
+	RoomID          uint   `json:"roomId"`
+	RoomName        string `json:"roomName"`
+	InviterUserID   uint   `json:"inviterUserId"`
+	InviterUsername string `json:"inviterUsername"`
+	CoinBuyIn       int    `json:"coinBuyIn"`
+	IsPrivate       bool   `json:"isPrivate"`
+	IsHostInvite    bool   `json:"isHostInvite"`
+	// MinHonor is the room's honor floor (0 = ungated). It rides along so the
+	// invite popup can render the SPECIFIC "you need N honor" message on a
+	// rejected accept, exactly like every other join entry point. Without it the
+	// invitee is the only joiner in the app who gets the numberless generic copy.
+	MinHonor int `json:"minHonor"`
+	// ExpiresAt is an ABSOLUTE ISO 8601 (RFC3339) UTC timestamp, never a relative
+	// duration — same discipline as the turn timer.
+	ExpiresAt string `json:"expiresAt"`
+}
+
 // --- General error events ---
 const SystemError = "system:error"
 const ErrorUnknownEvent = "error:unknown_event"

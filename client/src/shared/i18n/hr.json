@@ -510,6 +510,45 @@
       "openSeat": "Slobodno mjesto"
     }
   },
+  "roomInvite": {
+    "someone": "Netko",
+    "needARoom": "Prvo otvori sobu, pa pozovi prijatelje iznutra.",
+    "popup": {
+      "title": "Poziv u sobu",
+      "body": "{{inviter}} te zove u sobu „{{roomName}}“.",
+      "buyIn": "Ulog {{buyIn}}",
+      "privateHostInvite": "Privatna soba, poziv te pušta unutra",
+      "privatePasswordNeeded": "Privatna soba, potrebna je lozinka",
+      "accept": "Uđi u sobu",
+      "accepting": "Pridruživanje…",
+      "decline": "Ne sada"
+    },
+    "panel": {
+      "openButton": "Pozovi prijatelje",
+      "title": "Pozovi prijatelje",
+      "description": "Prijatelji koji su na mreži i slobodni mogu se pozvati u ovu sobu.",
+      "loading": "Učitavanje prijatelja…",
+      "loadFailed": "Učitavanje prijatelja nije uspjelo. Pokušaj ponovo.",
+      "empty": "Još nemaš prijatelja. Pronađi igrače u pretraživanju i pošalji zahtjev.",
+      "invite": "Pozovi",
+      "invited": "Pozvan"
+    },
+    "reasons": {
+      "offline": "Izvan mreže",
+      "inMatch": "U meču",
+      "inRoom": "U drugoj sobi",
+      "roomFull": "Ova soba je puna",
+      "unavailable": "Trenutno nedostupan"
+    },
+    "errors": {
+      "notAvailable": "Više nije slobodan",
+      "roomFull": "Ova soba je puna",
+      "notFriends": "Nisi prijatelj s ovim igračem",
+      "sendFailed": "Slanje poziva nije uspjelo. Pokušaj ponovo.",
+      "expired": "Ovaj poziv više ne vrijedi.",
+      "roomGone": "Ova soba više nije dostupna."
+    }
+  },
   "legal": {
     "wipBadge": "U izradi",
     "back": "Natrag",

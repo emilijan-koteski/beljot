@@ -104,7 +104,7 @@ func setupLobbyTest() (*mockRepoForLobby, *room.LobbyDisconnectHandler) {
 	repo := newMockRepoForLobby()
 	hub := ws.NewHub()
 	go hub.Run()
-	handler := room.NewLobbyDisconnectHandler(repo, hub, nil)
+	handler := room.NewLobbyDisconnectHandler(repo, hub, nil, nil)
 	return repo, handler
 }
 

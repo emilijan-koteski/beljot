@@ -251,8 +251,14 @@ func main() {
 	// disconnect handler (drop on lobby-timeout close). In-memory, not durable.
 	presenceRegistry := room.NewPresenceRegistry()
 
+	// Invite registry — holds the one-time host-invite grants that carry a
+	// friend past a private room's password (Story 11.5). Shared between the
+	// invite handler (issues grants) and the room handler (consumes / voids
+	// them), so it MUST be the same instance in both. In-memory, not durable.
+	inviteRegistry := room.NewInviteRegistry()
+
 	// Lobby disconnect handler — frees seats after 10s when players disconnect in room lobby
-	lobbyDisconnectHandler := room.NewLobbyDisconnectHandler(roomRepo, hub, presenceRegistry)
+	lobbyDisconnectHandler := room.NewLobbyDisconnectHandler(roomRepo, hub, presenceRegistry, inviteRegistry)
 	hub.SetConnectHandler(func(userID uint) {
 		sessionManager.HandleReconnect(userID)
 		// Always follow with a direct state push: when the hub replaced a
@@ -264,10 +270,16 @@ func main() {
 	hub.SetDisconnectHandler(func(userID uint) {
 		sessionManager.HandleDisconnect(userID)
 		lobbyDisconnectHandler.HandleDisconnect(userID)
+		// A friend who drops off the lobby cannot act on their invite popup, so
+		// their outstanding grants die with the connection (Story 11.5 AC2).
+		// Wired here rather than inside LobbyDisconnectHandler because that
+		// handler returns early for users who are NOT in a room — which is
+		// precisely every invitee.
+		inviteRegistry.VoidUser(userID)
 	})
 
 	// Room routes
-	roomHandler := room.NewRoomHandler(roomRepo, sessionManager, hub, presenceRegistry, walletService, honorService)
+	roomHandler := room.NewRoomHandler(roomRepo, sessionManager, hub, presenceRegistry, walletService, honorService, inviteRegistry)
 	api.POST("/rooms", roomHandler.CreateRoom)
 	api.GET("/rooms", roomHandler.ListRooms)
 	api.POST("/rooms/quick-play", roomHandler.QuickPlay)
@@ -286,6 +298,25 @@ func main() {
 	api.POST("/rooms/:id/privacy", roomHandler.UpdateRoomPrivacy)
 	api.POST("/rooms/:id/bots", roomHandler.AddBot)
 	api.DELETE("/rooms/:id/bots/:seat", roomHandler.RemoveBot)
+
+	// Friend room-invite routes (Story 11.5, FR62). Registered on the same
+	// /rooms/:id action group so the invite endpoints share the room's auth and
+	// membership semantics. inviteFriendDirectory does the friend-rows →
+	// usernames join here in main.go, which keeps the import direction room →
+	// friend one-way (friend must never import room).
+	inviteHandler := room.NewInviteHandler(
+		roomRepo,
+		inviteRegistry,
+		&inviteFriendDirectory{friends: friendRepo, users: userRepo},
+		hub,
+		sessionManager,
+		hub,
+	)
+	api.GET("/rooms/:id/invitable-friends", inviteHandler.ListInvitableFriends)
+	api.POST("/rooms/:id/invite", inviteHandler.InviteToRoom)
+	// Declining is called by the INVITEE, who is not in the room — hence a
+	// separate route rather than a member-guarded one.
+	api.POST("/rooms/:id/invite/decline", inviteHandler.DeclineInvite)
 
 	// Friend routes (Story 11.2, FR6) — friend requests, friend list, and the
 	// best-effort per-user system:friend_request push. Placed after the hub
@@ -383,6 +414,62 @@ func (p *whisperPresenceLocator) ActiveRoomID(userID uint) (uint, bool, error) {
 		return 0, false, nil
 	}
 	return rp.RoomID, true, nil
+}
+
+// inviteFriendDirectory adapts friend.Repository + user.UserRepository to
+// room.FriendDirectory for the room-invite panel (Story 11.5). The friend-rows →
+// usernames join lives HERE so `room` never imports `friend`: room -> friend
+// would be fine today, but keeping the dependency in main.go matches how chat
+// and whisper reach across domains and leaves both packages independently
+// testable.
+type inviteFriendDirectory struct {
+	friends friend.Repository
+	users   user.UserRepository
+}
+
+func (d *inviteFriendDirectory) AreFriends(a, b uint) (bool, error) {
+	return d.friends.AreFriends(a, b)
+}
+
+// ListFriends returns the viewer's accepted friends resolved to usernames. The
+// friendship rows are directional, so the "other" party is whichever side is not
+// the viewer. A friend whose user row was soft-deleted is omitted rather than
+// surfaced with a blank name.
+func (d *inviteFriendDirectory) ListFriends(userID uint) ([]room.FriendSummary, error) {
+	rows, err := d.friends.ListAccepted(userID)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uint, 0, len(rows))
+	for _, f := range rows {
+		other := f.UserID
+		if other == userID {
+			other = f.FriendID
+		}
+		ids = append(ids, other)
+	}
+	if len(ids) == 0 {
+		return []room.FriendSummary{}, nil
+	}
+
+	users, err := d.users.FindManyByIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[uint]string, len(users))
+	for _, u := range users {
+		names[u.ID] = u.Username
+	}
+
+	out := make([]room.FriendSummary, 0, len(ids))
+	for _, id := range ids {
+		name, ok := names[id]
+		if !ok {
+			continue
+		}
+		out = append(out, room.FriendSummary{UserID: id, Username: name})
+	}
+	return out, nil
 }
 
 func appErrorHandler(err error, c echo.Context) {

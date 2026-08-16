@@ -7,6 +7,7 @@ import {
   DoorOpen,
   Lock,
   LockOpen,
+  Send,
   Shuffle,
   Trophy,
   UserCheck,
@@ -20,6 +21,7 @@ import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
+import { InviteFriendsDialog } from "@/features/room/components/InviteFriendsDialog";
 import { RoomChatDock } from "@/features/room/components/RoomChatDock";
 import { SeatTile } from "@/features/room/components/SeatTile";
 import {
@@ -60,9 +62,9 @@ import {
   honorFloorLabel,
   honorQualifies,
   honorRoomIsGated,
-  honorScoreOrPrior,
   honorTierForScore,
 } from "@/shared/lib/honor";
+import { joinFailureMessage as sharedJoinFailureMessage } from "@/shared/lib/joinFailure";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -195,6 +197,8 @@ export function RoomPage() {
   const [removeBotConfirm, setRemoveBotConfirm] = useState<{ seat: number } | null>(null);
   // Story 9.6: owner privacy edit dialog open state.
   const [showPrivacy, setShowPrivacy] = useState(false);
+  // Story 11.5: the friend-invite panel, open from the waiting room.
+  const [showInviteFriends, setShowInviteFriends] = useState(false);
 
   // Deep-link / refresh to a private room the viewer isn't seated in: the
   // auto-join below must prompt for the password instead of joining blind
@@ -243,23 +247,12 @@ export function RoomPage() {
   //
   // The numbers are composed LOCALLY (Story 9.2 Decision B): the server's error
   // payload carries only a code, and we hold the room plus our own auth envelope.
+  //
+  // Story 11.5 D4 moved the body to shared/lib/joinFailure so the friend-invite
+  // accept — a fourth join entry point — cannot fork it. This wrapper keeps the
+  // local call sites unchanged.
   function joinFailureMessage(code: string | null, room: Room): string {
-    if (code === "ROOM_FULL") return t("lobby.errors.roomFull");
-    if (code === "INSUFFICIENT_COINS") {
-      return t("room.errors.insufficientCoins", {
-        buyIn: formatCoins(room.coinBuyIn),
-        balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
-      });
-    }
-    if (code === "HONOR_TOO_LOW") {
-      // honorScoreOrPrior, never `|| 80` — a real score of 0 must survive.
-      return t("room.errors.honorTooLow", {
-        minHonor: room.minHonor,
-        honor: honorScoreOrPrior(useAuthStore.getState().user?.honorScore),
-      });
-    }
-    if (code === "NEW_PLAYER_NOT_ALLOWED") return t("room.errors.newPlayerNotAllowed");
-    return t("lobby.errors.joinFailed");
+    return sharedJoinFailureMessage(code, room);
   }
 
   useEffect(() => {
@@ -1281,6 +1274,22 @@ export function RoomPage() {
               <DoorOpen className="size-5 sm:size-4" />
               <span className="hidden sm:inline">{t("room.leaveRoom")}</span>
             </Button>
+            {/* Story 11.5: invite friends into this table. Waiting rooms only.
+                Quick play needs no guard here — those rooms returned above (the
+                matchmaking screen owns them), so this is always a custom room.
+                Icon-only on phones, like Leave. */}
+            {room.status === "waiting" && (
+              <Button
+                variant="ghost"
+                onClick={() => setShowInviteFriends(true)}
+                data-testid="open-invite-friends"
+                aria-label={t("roomInvite.panel.openButton")}
+                className="size-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
+              >
+                <Send className="size-5 sm:size-4" />
+                <span className="hidden sm:inline">{t("roomInvite.panel.openButton")}</span>
+              </Button>
+            )}
             {inSwapMode && (
               <span
                 className="border-accent bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
@@ -1612,6 +1621,13 @@ export function RoomPage() {
                 : "B"
               : null,
         }}
+      />
+
+      {/* Friend-invite panel (Story 11.5) */}
+      <InviteFriendsDialog
+        open={showInviteFriends}
+        roomId={room.id}
+        onOpenChange={setShowInviteFriends}
       />
 
       {/* Owner privacy edit dialog (Story 9.6) */}

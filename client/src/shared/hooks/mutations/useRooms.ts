@@ -4,6 +4,8 @@ import { queryKeys } from "@/shared/api/queryKeys";
 import {
   addBot,
   createRoom,
+  declineRoomInvite,
+  inviteToRoom,
   joinRoom,
   kickPlayer,
   leaveRoom,
@@ -44,6 +46,33 @@ export function useJoinRoomMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all });
     },
+  });
+}
+
+/**
+ * Invite a friend into a waiting room (Story 11.5, AC2). On success the room's
+ * invitable-friends roster is invalidated so the just-invited friend's row
+ * re-renders against fresh availability (they may now be mid-join).
+ *
+ * Errors are surfaced by the caller — the panel renders them inline per row
+ * rather than as a page-level toast.
+ */
+export function useInviteToRoomMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { roomId: number; friendUserId: number }>({
+    mutationFn: ({ roomId, friendUserId }) => inviteToRoom(roomId, friendUserId),
+    onSuccess: (_data, { roomId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rooms.invitableFriends(roomId) });
+    },
+  });
+}
+
+// Declining is fire-and-forget: the popup closes immediately either way, since a
+// failed void only means the invite lapses on its own TTL instead of at once.
+// Blocking the dismissal on a network round-trip would be a worse trade.
+export function useDeclineRoomInviteMutation() {
+  return useMutation<void, Error, number>({
+    mutationFn: (roomId) => declineRoomInvite(roomId),
   });
 }
 

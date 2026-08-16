@@ -1,6 +1,7 @@
 import { Send, UserRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 
 import { useFriends } from "@/shared/hooks/queries/useFriends";
 
@@ -9,11 +10,15 @@ import { useFriends } from "@/shared/hooks/queries/useFriends";
  * accepted friend shows an online/offline indicator and links to their public
  * profile; each ONLINE friend also shows an "Invite to Room" affordance.
  *
- * That invite affordance is a documented HOOK: the actual delivery
- * (event:room_invite, the available-friend computation, room context, and the
- * one-time password-bypass grant) is owned by Story 11.5. This component renders
- * the button and leaves its handler a no-op for 11.5 to wire — mirroring exactly
- * how Story 11.3 left the Add-Friend hook for this story.
+ * Story 11.5 resolved that parked hook. An invite is issued INTO a specific
+ * waiting room (POST /rooms/:id/invite) — and a player looking at this list is,
+ * by definition, in the lobby and in no room at all. So the delivery surface
+ * lives where the room context exists: the waiting room's invite panel
+ * (InviteFriendsDialog, opened from RoomPage's action bar).
+ *
+ * The button stays, because removing it would leave players hunting for a
+ * feature they were shown. It now points them at the one place it can work,
+ * instead of silently doing nothing.
  */
 export function FriendList() {
   const { t } = useTranslation();
@@ -73,13 +78,10 @@ export function FriendList() {
                 <button
                   type="button"
                   data-testid="friend-invite-room"
-                  // Story 11.5 HOOK — the invite delivery (availability check, the
-                  // event:room_invite push, room context, the one-time password
-                  // bypass grant) is 11.5's scope. This story renders the
-                  // affordance only; 11.5 wires this handler.
-                  onClick={() => {
-                    /* no-op — owned by Story 11.5 */
-                  }}
+                  // Story 11.5: an invite needs a room to invite INTO, and there
+                  // is none in the lobby. Rather than a dead no-op, say where the
+                  // action lives — the waiting room's invite panel.
+                  onClick={() => toast.info(t("roomInvite.needARoom"))}
                   className="text-accent hover:bg-surface-sunken flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
                 >
                   <Send className="size-3" />

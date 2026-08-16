@@ -19,6 +19,7 @@ type LobbyDisconnectHandler struct {
 	repo     RoomRepository
 	hub      *ws.Hub
 	presence *PresenceRegistry
+	invites  *InviteRegistry
 	mu       sync.Mutex
 	pending  map[uint]*lobbyDisconnect // userID → pending disconnect
 }
@@ -29,14 +30,22 @@ type lobbyDisconnect struct {
 }
 
 // NewLobbyDisconnectHandler creates a new handler for lobby disconnect events.
-func NewLobbyDisconnectHandler(repo RoomRepository, hub *ws.Hub, presence *PresenceRegistry) *LobbyDisconnectHandler {
+//
+// invites must be the SAME registry the room and invite handlers share; a nil
+// one is replaced with an empty registry so tests can omit it, matching the
+// presence parameter's affordance.
+func NewLobbyDisconnectHandler(repo RoomRepository, hub *ws.Hub, presence *PresenceRegistry, invites *InviteRegistry) *LobbyDisconnectHandler {
 	if presence == nil {
 		presence = NewPresenceRegistry()
+	}
+	if invites == nil {
+		invites = NewInviteRegistry()
 	}
 	return &LobbyDisconnectHandler{
 		repo:     repo,
 		hub:      hub,
 		presence: presence,
+		invites:  invites,
 		pending:  make(map[uint]*lobbyDisconnect),
 	}
 }
@@ -122,6 +131,12 @@ func (h *LobbyDisconnectHandler) handleTimeout(userID uint, roomID uint) {
 		return
 	}
 
+	// Set inside the transaction when the disconnect emptied the room and closed
+	// it. This is the one room-close transition that does not sit beside a
+	// presence.Clear, so it needs its own invite void (AC2) — otherwise grants
+	// into a closed room survive until their TTL.
+	roomClosed := false
+
 	// Remove the player from the room
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
 		if err := tx.RemovePlayer(roomID, userID); err != nil {
@@ -145,6 +160,7 @@ func (h *LobbyDisconnectHandler) handleTimeout(userID uint, roomID uint) {
 				return tx.Update(freshRoom)
 			}
 			freshRoom.Status = "completed"
+			roomClosed = true
 			return tx.Update(freshRoom)
 		}
 		return nil
@@ -158,6 +174,13 @@ func (h *LobbyDisconnectHandler) handleTimeout(userID uint, roomID uint) {
 	// Drop their presence (auto-clears the room entry when the last present
 	// member times out).
 	h.presence.Remove(roomID, userID)
+
+	// The disconnected player can no longer vouch for anyone here, and if their
+	// leaving closed the room nobody can join it at all (AC2).
+	h.invites.VoidInviter(roomID, userID)
+	if roomClosed {
+		h.invites.VoidRoom(roomID)
+	}
 
 	// Broadcast player_left to remaining room participants
 	remainingPlayers, err := h.repo.FindPlayersByRoomID(roomID)

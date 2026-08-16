@@ -610,6 +610,38 @@ export interface WhisperPayload {
   timestamp: string;
 }
 
+// --- Room invite events (Story 11.5) ---
+// Best-effort, online-only per-user push when a friend invites the recipient
+// into a waiting room. There is no offline inbox and the invite carries a TTL,
+// so a missed push is simply never actioned. The system: prefix is a deliberate
+// deviation from the epic AC's literal event:room_invite (Story 11.5 D1,
+// PO-confirmed 2026-08-14) and keeps the event OUTSIDE the WS drift gate — no
+// Zod schema, no golden, no conformance witness, no contract-test row, like
+// every other system:* payload here. Keep in sync with server events.go
+// (SystemRoomInvite / RoomInvitePayload).
+export const SYSTEM_ROOM_INVITE = "system:room_invite" as const;
+
+export interface RoomInvitePayload {
+  inviteId: number;
+  roomId: number;
+  roomName: string;
+  inviterUserId: number;
+  inviterUsername: string;
+  // Real Go values: a coinBuyIn of 0 and isPrivate false are legitimate, so
+  // validate with typeof === "number" / "boolean", never JS truthiness.
+  coinBuyIn: number;
+  isPrivate: boolean;
+  // true when the inviter was the room OWNER — the server holds a one-time grant
+  // that carries this invitee past the password gate, so the client shows NO
+  // password prompt. It is a rendering hint only; the authority is server-side.
+  isHostInvite: boolean;
+  // The room's honor floor (0 = ungated). Carried so a rejected accept can render
+  // the SPECIFIC "you need N honor" message, matching every other join path.
+  minHonor: number;
+  // Absolute ISO 8601 UTC timestamp, never a relative duration.
+  expiresAt: string;
+}
+
 // --- General error events ---
 export const SYSTEM_ERROR = "system:error" as const;
 export const ERROR_UNKNOWN_EVENT = "error:unknown_event" as const;

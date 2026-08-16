@@ -228,15 +228,24 @@ type RoomHandler struct {
 	presence      *PresenceRegistry
 	walletService WalletService
 	honorService  HonorService
+	// invites holds the one-time host-invite grants (Story 11.5). RoomHandler only
+	// ever CONSUMES and VOIDS them — grants are issued by InviteHandler, which must
+	// be constructed with this same registry.
+	invites *InviteRegistry
 }
 
-func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster, presence *PresenceRegistry, walletService WalletService, honorService HonorService) *RoomHandler {
+func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster, presence *PresenceRegistry, walletService WalletService, honorService HonorService, invites *InviteRegistry) *RoomHandler {
 	// Default to a private registry when none is injected (keeps test setups
 	// that don't exercise presence working without threading a registry).
 	if presence == nil {
 		presence = NewPresenceRegistry()
 	}
-	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence, walletService: walletService, honorService: honorService}
+	// Same affordance for invites: a nil registry yields an empty private one, so
+	// no grant ever exists and every join takes the normal password path.
+	if invites == nil {
+		invites = NewInviteRegistry()
+	}
+	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence, walletService: walletService, honorService: honorService, invites: invites}
 }
 
 // broadcastToRoom sends a WebSocket message to all players in a room.
@@ -827,6 +836,29 @@ type JoinRoomRequest struct {
 	Password string `json:"password"`
 }
 
+// voidInvitesIfFull drops a room's outstanding friend invites once all four
+// seats are covered (humans + bots, the same capacity arithmetic JoinRoom's gate
+// uses). An invite is issued against a vacancy; when the vacancy is gone the
+// grant must not outlive it (Story 11.5 AC2), so a freed seat later cannot be
+// entered on a stale password bypass.
+//
+// Best-effort and post-commit: two indexed reads, and a read failure simply
+// leaves the grants to their own TTL. It is never allowed to fail the request
+// that filled the room.
+func (h *RoomHandler) voidInvitesIfFull(roomID uint) {
+	r, err := h.repo.FindByID(roomID)
+	if err != nil || r == nil {
+		return
+	}
+	bots, err := h.repo.FindBotsByRoomID(roomID)
+	if err != nil {
+		return
+	}
+	if r.PlayerCount+len(bots) >= 4 {
+		h.invites.VoidRoom(roomID)
+	}
+}
+
 func (h *RoomHandler) JoinRoom(c echo.Context) error {
 	userID, err := auth.GetUserID(c)
 	if err != nil {
@@ -861,9 +893,27 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 	// ErrWrongRoomPassword — the two are indistinguishable, and the attempted
 	// password is never logged. bcrypt's CheckPassword compares against the salt,
 	// so this must never be a plain string equality.
+	//
+	// Story 11.5 AC3 opens EXACTLY ONE hole in this gate, and only here: a friend
+	// invited by the room OWNER carries a server-issued one-time grant that stands
+	// in for the password. The grant is looked up by the AUTHENTICATED userID +
+	// roomID — the client sends no bypass flag and cannot self-authorize (D3).
+	// Nothing else changes: every gate below still runs for an invitee exactly as
+	// for any other joiner (D2/AC6). The consult sits INSIDE the nil-hash branch so
+	// a grant only matters when there is actually a password to bypass.
+	//
+	// The check is a PEEK, not a consume. This block is the first of six gates —
+	// capacity, bot-capacity, already-in-room, coin and honor all run below — and
+	// burning the grant here would spend it on a rejection the invitee can recover
+	// from (a seat frees up, they top up, they leave the other room). Their retry
+	// would then hit bcrypt with a password they were never given, and the client
+	// has no way to render that. The grant is spent on SUCCESS instead, by the
+	// VoidUser(userID) call after the transaction commits.
 	if room.PasswordHash != nil {
-		if auth.CheckPassword(*room.PasswordHash, req.Password) != nil {
-			return apperr.ErrWrongRoomPassword
+		if !h.invites.HasHostGrant(uint(roomID), userID) {
+			if auth.CheckPassword(*room.PasswordHash, req.Password) != nil {
+				return apperr.ErrWrongRoomPassword
+			}
 		}
 	}
 
@@ -952,6 +1002,17 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 	// Mark the fresh joiner present so they count toward the reopened-room
 	// Start gate (and seed presence for first-ever joins, which is harmless).
 	h.presence.Add(uint(roomID), userID)
+
+	// The joiner is in a room now, so every invite still addressed to them —
+	// including ones from other rooms — is unactionable (AC2). If they took the
+	// last seat, this room's remaining invites die with the vacancy.
+	//
+	// This is ALSO where a host grant is finally spent: the password gate above
+	// only peeked at it, so a join that failed a later gate left it intact for a
+	// retry. Reaching this line means the join succeeded, which is the one moment
+	// the grant has done its job and must not be reusable.
+	h.invites.VoidUser(userID)
+	h.voidInvitesIfFull(uint(roomID))
 
 	// Broadcast system:player_joined to room participants
 	players, broadcastErr := h.repo.FindPlayersByRoomID(uint(roomID))
@@ -1551,6 +1612,7 @@ func (h *RoomHandler) ejectReturner(roomID, userID uint, notice ejectNotice, rej
 	h.presence.Remove(roomID, userID)
 	if roomClosed {
 		h.presence.Clear(roomID)
+		h.invites.VoidRoom(roomID)
 	}
 
 	remainingPlayers, rerr := h.repo.FindPlayersByRoomID(roomID)
@@ -1723,6 +1785,7 @@ func (h *RoomHandler) ejectSeatsAtStart(roomID uint, room *Room, notices map[uin
 
 	if roomClosed {
 		h.presence.Clear(roomID)
+		h.invites.VoidRoom(roomID)
 	}
 
 	postRoom, perr := h.repo.FindByID(roomID)
@@ -1892,10 +1955,16 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 	// Drop the leaver's presence. Remove auto-clears the room's whole presence
 	// entry once the last present user leaves (empty-room close).
 	h.presence.Remove(uint(roomID), userID)
+	// A player who has left can no longer vouch for anyone: their outstanding
+	// invites into this room die with their membership. This matters most for an
+	// owner-leave — ownership transfers to a remaining player, and a stale host
+	// grant would otherwise keep bypassing the NEW owner's password.
+	h.invites.VoidInviter(uint(roomID), userID)
 	// When the owner-leave closed the room (no eligible human remained), wipe the
 	// whole presence entry — the evicted stragglers are no longer members.
 	if roomClosed {
 		h.presence.Clear(uint(roomID))
+		h.invites.VoidRoom(uint(roomID))
 	}
 
 	// Broadcast system:player_left to remaining room participants (not the leaving player)
@@ -2135,6 +2204,8 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 	// return (member), not just the reopen, so each returner flips their own
 	// "waiting to return" seat to present and the owner Start gate can re-evaluate.
 	h.presence.Add(uint(roomID), userID)
+	h.invites.VoidUser(userID)
+	h.voidInvitesIfFull(uint(roomID))
 	h.broadcastToRoom(uint(roomID), ws.SystemPlayerReturned, ws.PlayerReturnedPayload{
 		RoomID: uint(roomID),
 		UserID: userID,
@@ -2597,6 +2668,7 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 			// Match is live — clear presence (quick-play, but keep parity with
 			// the manual StartMatch path).
 			h.presence.Clear(roomID)
+			h.invites.VoidRoom(roomID)
 			h.broadcastToRoom(roomID, ws.SystemMatchStarted, map[string]interface{}{
 				"roomId": roomID,
 			})
@@ -2701,6 +2773,9 @@ func (h *RoomHandler) KickPlayer(c echo.Context) error {
 	// Drop the kicked player's presence so they no longer count toward the Start
 	// gate (their /return is already rejected as a non-member — see ReturnToRoom).
 	h.presence.Remove(uint(roomID), req.UserID)
+	// A kicked player's invites go with them — they are no longer a member, so
+	// nothing they issued should still admit anyone.
+	h.invites.VoidInviter(uint(roomID), req.UserID)
 
 	// Broadcast: kicked user gets system:room_kicked
 	h.broadcastToUsers([]uint{req.UserID}, ws.SystemRoomKicked, ws.RoomKickedPayload{
@@ -2817,6 +2892,11 @@ func (h *RoomHandler) TransferOwnership(c echo.Context) error {
 	if postRoom == nil {
 		return apperr.ErrRoomNotFound
 	}
+
+	// The previous owner is no longer the host, so the host grants they issued
+	// must not keep bypassing the new owner's password (AC3 — the bypass encodes
+	// HOST authority, and that authority has just moved).
+	h.invites.VoidInviter(uint(roomID), previousOwnerID)
 
 	// Broadcast: every room member converges on the new owner. Lobby browse
 	// page also gets system:room_updated so the room card's "Hosted by …"
@@ -3146,6 +3226,10 @@ func (h *RoomHandler) AddBot(c echo.Context) error {
 		return fmt.Errorf("adding bot: %w", err)
 	}
 
+	// A bot can take the last free seat just as a human can, so the same
+	// invite-void applies (Story 11.5 AC2).
+	h.voidInvitesIfFull(uint(roomID))
+
 	// Broadcast after commit: bot_added to room participants, then the lobby
 	// seat snapshot so browse-page seat chips refresh. Separate ordered
 	// messages, never batched.
@@ -3410,6 +3494,8 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 	// Match is live — presence is no longer meaningful; clear it so the next
 	// reopen starts from an empty "who's back" set.
 	h.presence.Clear(uint(roomID))
+	// The room is no longer joinable, so any outstanding invite is dead (AC2).
+	h.invites.VoidRoom(uint(roomID))
 
 	// Start match via match starter
 	if h.matchStarter != nil {

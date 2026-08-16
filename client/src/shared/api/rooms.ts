@@ -1,6 +1,7 @@
 import { axiosClient } from "@/shared/api/axiosClient";
 import type {
   CreateRoomRequest,
+  InvitableFriend,
   QuickPlayResponse,
   Room,
   RoomDetail,
@@ -28,6 +29,29 @@ export function getRoomByCode(code: string): Promise<RoomDetail> {
 // joins pass no password and send no body, preserving the pre-9.6 request shape.
 export function joinRoom(id: number, password?: string): Promise<Room> {
   return axiosClient.post(`/rooms/${id}/join`, password !== undefined ? { password } : undefined);
+}
+
+// listInvitableFriends returns the caller's friends annotated with whether they
+// can be invited into this room right now (Story 11.5, AC1). Caller must be a
+// member of the (waiting) room; availability is computed server-side.
+export function listInvitableFriends(roomId: number): Promise<InvitableFriend[]> {
+  return axiosClient.get(`/rooms/${roomId}/invitable-friends`);
+}
+
+// inviteToRoom issues a friend invite into this room (Story 11.5, AC2). Whether
+// the invite carries a password bypass is decided SERVER-side from the room's
+// owner — deliberately no flag is sent here (D3).
+export function inviteToRoom(roomId: number, friendUserId: number): Promise<void> {
+  return axiosClient.post(`/rooms/${roomId}/invite`, { friendUserId });
+}
+
+// declineRoomInvite voids the caller's own outstanding invite to this room
+// (Story 11.5). Called by the INVITEE, who is not in the room. Without it a
+// declined invite stays consumable until its TTL lapses, so a "no thanks" would
+// still leave the door open for a minute. Always succeeds server-side — a
+// missing or already-expired invite is a no-op, not an error.
+export function declineRoomInvite(roomId: number): Promise<void> {
+  return axiosClient.post(`/rooms/${roomId}/invite/decline`);
 }
 
 // updateRoomPrivacy sets/changes the room password or reverts the room to public

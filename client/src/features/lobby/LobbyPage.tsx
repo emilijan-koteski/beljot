@@ -24,8 +24,8 @@ import {
 import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
 import { useMarkLobbyRoot } from "@/shared/hooks/useLobbyReturn";
-import { formatCoins } from "@/shared/lib/formatCoins";
-import { type HonorGateViewer, honorQualifies, honorScoreOrPrior } from "@/shared/lib/honor";
+import { type HonorGateViewer, honorQualifies } from "@/shared/lib/honor";
+import { joinFailureMessage } from "@/shared/lib/joinFailure";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room } from "@/shared/types/apiTypes";
 
@@ -206,30 +206,10 @@ export function LobbyPage() {
         return;
       }
       setPendingPrivateRoom(null);
-      if (code === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
-      else if (code === "INSUFFICIENT_COINS")
-        // Compose the rich message locally — we know the room's buy-in and our
-        // own balance (Design Decision B: the error payload carries only a code).
-        toast.error(
-          t("room.errors.insufficientCoins", {
-            buyIn: formatCoins(room.coinBuyIn),
-            balance: formatCoins(useAuthStore.getState().user?.walletBalance ?? 0),
-          }),
-        );
-      else if (code === "HONOR_TOO_LOW")
-        // Same local-composition rule as INSUFFICIENT_COINS above (Story 9.8): the
-        // error payload carries only the code, and we hold both numbers — the room's
-        // threshold and the viewer's own score. honorScoreOrPrior, never `|| 80`,
-        // so a real score of 0 renders as 0.
-        toast.error(
-          t("room.errors.honorTooLow", {
-            minHonor: room.minHonor,
-            honor: honorScoreOrPrior(useAuthStore.getState().user?.honorScore),
-          }),
-        );
-      else if (code === "NEW_PLAYER_NOT_ALLOWED") toast.error(t("room.errors.newPlayerNotAllowed"));
-      else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
-      else toast.error(t("lobby.errors.joinFailed"));
+      // One shared mapping for every join entry point (Story 11.5 D4) — the rich
+      // {{buyIn}}/{{balance}} and {{minHonor}}/{{honor}} messages are composed
+      // locally inside it from this room plus the viewer's own auth envelope.
+      toast.error(joinFailureMessage(code, room));
     }
   }
 
@@ -290,6 +270,8 @@ export function LobbyPage() {
         }}
       />
       <RoomEjectionModal />
+      {/* Story 11.5's RoomInviteModal is NOT mounted here — it lives in AppLayout
+          so an invite renders on every authed route, not just the lobby. */}
       <LobbyChatDock />
       <Toast message={toastMsg} onClear={() => setToastMsg(null)} />
     </div>

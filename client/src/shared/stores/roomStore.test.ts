@@ -392,4 +392,29 @@ describe("roomStore", () => {
     // ...but other state is cleared as usual.
     expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
   });
+
+  // Story 11.5: an invite can land while the player is navigating out of a room,
+  // and RoomPage calls reset() on unmount — dropping it there would lose a live
+  // invite the player never got to answer.
+  it("reset PRESERVES an in-flight room invite", () => {
+    useRoomStore.getState().setRoomInvite({
+      inviteId: 3,
+      roomId: 9,
+      roomName: "Skopje Ekipa",
+      inviterUserId: 4,
+      inviterUsername: "ana",
+      coinBuyIn: 0,
+      isPrivate: false,
+      isHostInvite: true,
+      expiresAt: "2026-08-16T10:00:00Z",
+    });
+    useRoomStore.getState().reset();
+
+    expect(useRoomStore.getState().roomInvite?.inviteId).toBe(3);
+    expect(useRoomStore.getState().roomInvite?.isHostInvite).toBe(true);
+    expect(useRoomStore.getState().currentRoomId).toBeNull();
+
+    useRoomStore.getState().setRoomInvite(null);
+    expect(useRoomStore.getState().roomInvite).toBeNull();
+  });
 });

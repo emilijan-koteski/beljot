@@ -1,5 +1,6 @@
 import "@/shared/i18n/i18n";
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -30,17 +31,25 @@ vi.mock("@/shared/api/wallet", () => ({
   }),
 }));
 
+// AppLayout hosts the always-mounted RoomInviteModal (Story 11.5), which uses
+// react-query mutations — so the layout now needs a QueryClient, exactly as it
+// has one in production (App wraps RouterProvider in QueryProvider).
 function renderWithRouter(initialPath: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/lobby" element={<div data-testid="lobby-content">Lobby</div>} />
-          <Route path="/profile" element={<div data-testid="profile-content">Profile</div>} />
-          <Route path="/rules" element={<div data-testid="rules-content">Rules</div>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/lobby" element={<div data-testid="lobby-content">Lobby</div>} />
+            <Route path="/profile" element={<div data-testid="profile-content">Profile</div>} />
+            <Route path="/rules" element={<div data-testid="rules-content">Rules</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

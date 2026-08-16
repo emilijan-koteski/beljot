@@ -40,6 +40,7 @@ import type {
   PlayerReconnectedPayload,
   PlayerReturnedPayload,
   RoomClosedInsolventPayload,
+  RoomInvitePayload,
   RoomKickedPayload,
   RoomOwnerChangedPayload,
   RoomUpdatedPayload,
@@ -102,6 +103,7 @@ import {
   SYSTEM_PLAYER_RETURNED,
   SYSTEM_ROOM_CLOSED_INSOLVENT,
   SYSTEM_ROOM_CREATED,
+  SYSTEM_ROOM_INVITE,
   SYSTEM_ROOM_KICKED,
   SYSTEM_ROOM_OWNER_CHANGED,
   SYSTEM_ROOM_UPDATED,
@@ -589,6 +591,51 @@ function dispatchSystemEvent(message: WsMessage): void {
         : i18n.t("friends.someone");
     toast.info(i18n.t("friends.requestReceivedToast", { username: fromUsername }), {
       duration: MOTION.TOAST_INFO,
+    });
+    return;
+  }
+
+  // Room invite received (Story 11.5, AC2). Per-user push, gated on NOTHING —
+  // an invite is deliberately deliverable wherever the player is standing in the
+  // lobby. It feeds the single roomInvite signal the always-mounted
+  // RoomInviteModal consumes, mirroring the roomEjection pipeline.
+  //
+  // Every Go-origin scalar is validated with typeof, never JS truthiness: a
+  // coinBuyIn of 0 and isPrivate/isHostInvite of false are all legitimate real
+  // values that truthiness would silently reject.
+  if (type === SYSTEM_ROOM_INVITE) {
+    const payload = message.payload as RoomInvitePayload;
+    if (
+      typeof payload?.inviteId !== "number" ||
+      typeof payload?.roomId !== "number" ||
+      typeof payload?.roomName !== "string" ||
+      typeof payload?.inviterUserId !== "number" ||
+      typeof payload?.coinBuyIn !== "number" ||
+      typeof payload?.isPrivate !== "boolean" ||
+      typeof payload?.isHostInvite !== "boolean" ||
+      typeof payload?.minHonor !== "number" ||
+      // expiresAt is validated like every other field rather than coerced to "".
+      // The popup's only auto-dismiss is driven by this timestamp, so accepting a
+      // frame without it produces an invite that never expires on screen while
+      // its server grant quietly dies — the worst of both.
+      typeof payload?.expiresAt !== "string" ||
+      payload.expiresAt === "" ||
+      Number.isNaN(new Date(payload.expiresAt).getTime())
+    ) {
+      console.warn("WS: ignoring malformed system:room_invite payload", payload);
+      return;
+    }
+    useRoomStore.getState().setRoomInvite({
+      inviteId: payload.inviteId,
+      roomId: payload.roomId,
+      roomName: payload.roomName,
+      inviterUserId: payload.inviterUserId,
+      inviterUsername: typeof payload.inviterUsername === "string" ? payload.inviterUsername : "",
+      coinBuyIn: payload.coinBuyIn,
+      isPrivate: payload.isPrivate,
+      isHostInvite: payload.isHostInvite,
+      minHonor: payload.minHonor,
+      expiresAt: payload.expiresAt,
     });
     return;
   }

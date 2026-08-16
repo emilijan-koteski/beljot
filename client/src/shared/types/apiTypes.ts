@@ -74,6 +74,22 @@ export interface FriendRequest {
   createdAt: string;
 }
 
+/**
+ * One row of GET /rooms/:id/invitable-friends (Story 11.5, AC1). `available` is
+ * computed SERVER-side from the presence trio (online + not-in-match +
+ * not-in-room); unavailable friends are still returned so the panel can show
+ * them disabled with a reason instead of silently omitting them.
+ *
+ * `reason` is "" when available, otherwise one of the reason slugs which the
+ * panel maps to a localized line.
+ */
+export interface InvitableFriend {
+  userId: number;
+  username: string;
+  available: boolean;
+  reason: "" | "offline" | "in_match" | "in_room" | "room_full";
+}
+
 /** The four friendship states between a viewer and a subject (Story 11.2). */
 export type FriendshipState = "none" | "pending_outgoing" | "pending_incoming" | "friends";
 

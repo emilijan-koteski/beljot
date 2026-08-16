@@ -8,6 +8,7 @@ import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPrompt
 import { FetchError } from "@/shared/api/axiosClient";
 import { getRoomByCode } from "@/shared/api/rooms";
 import { useJoinRoomMutation } from "@/shared/hooks/mutations/useRooms";
+import { joinFailureMessage } from "@/shared/lib/joinFailure";
 import { cn } from "@/shared/lib/utils";
 import type { Room } from "@/shared/types/apiTypes";
 
@@ -35,26 +36,14 @@ export function JoinByCodeTile() {
 
   // Maps a join/lookup failure to a toast. WRONG_ROOM_PASSWORD is handled inline
   // by the prompt, never here.
+  //
+  // Story 11.5 D4: one shared mapping across every join entry point. No room is
+  // threaded in — toastError is shared by the lookup and join paths and the
+  // lookup one holds no room — so the coin/honor branches fall back to their
+  // param-less generic copy, exactly as before.
   function toastError(err: unknown) {
     const c = err instanceof FetchError ? err.code : null;
-    if (c === "ROOM_NOT_FOUND") toast.error(t("lobby.errors.roomNotFound"));
-    else if (c === "ROOM_FULL") toast.error(t("lobby.errors.roomFull"));
-    else if (c === "INSUFFICIENT_COINS")
-      // Join-by-code has no room object in scope, so it can't compose the
-      // {{buyIn}}/{{balance}} message — use the param-less generic variant.
-      toast.error(t("room.errors.insufficientCoinsGeneric"));
-    else if (c === "HONOR_TOO_LOW")
-      // Param-less generic variant, per Story 9.8 AC9. To be precise about WHY,
-      // since the neighbouring INSUFFICIENT_COINS rationale does not transfer
-      // verbatim: HONOR_TOO_LOW can only originate inside joinResolvedRoom, which
-      // does hold the resolved room (a lookup failure yields ROOM_NOT_FOUND, never
-      // this). The constraint is that toastError is shared by both call paths and
-      // takes no room, so the numbers are not in scope HERE. Threading the room in
-      // would let this interpolate {{minHonor}}/{{honor}} like the lobby card does.
-      toast.error(t("room.errors.honorTooLowGeneric"));
-    else if (c === "NEW_PLAYER_NOT_ALLOWED") toast.error(t("room.errors.newPlayerNotAllowed"));
-    else if (c === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
-    else toast.error(t("lobby.errors.joinFailed"));
+    toast.error(joinFailureMessage(c));
   }
 
   async function joinResolvedRoom(room: Room, password?: string) {

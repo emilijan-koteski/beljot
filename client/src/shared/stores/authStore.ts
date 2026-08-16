@@ -32,7 +32,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // data. Single canonical logout point — both manual logout and the
     // axiosClient 401 interceptor inherit this ordering.
     useMatchStore.getState().clearGame();
-    useRoomStore.getState().reset();
+    // clearSessionNotices, not reset: reset() preserves roomEjection/roomInvite
+    // on purpose so they survive a mid-navigation unmount, but they belong to the
+    // session that just ended and must not greet the next account in this tab.
+    useRoomStore.getState().clearSessionNotices();
     useChatStore.getState().clearLobby();
     useChatStore.getState().clearMatch();
     useChatStore.getState().clearRoom();

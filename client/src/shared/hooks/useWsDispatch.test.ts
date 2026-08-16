@@ -1207,6 +1207,115 @@ describe("useWsDispatch", () => {
     expect(useRoomStore.getState().roomEjection?.roomId).toBe(3);
   });
 
+  // --- Story 11.5: system:room_invite ---------------------------------------
+
+  it("dispatches system:room_invite into roomStore.roomInvite", () => {
+    useRoomStore.getState().setRoomInvite(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:room_invite",
+      payload: {
+        inviteId: 12,
+        roomId: 7,
+        roomName: "Skopje Ekipa",
+        inviterUserId: 3,
+        inviterUsername: "ana",
+        coinBuyIn: 500,
+        isPrivate: true,
+        isHostInvite: true,
+        minHonor: 70,
+        expiresAt: "2026-08-16T10:00:00Z",
+      },
+    });
+
+    expect(useRoomStore.getState().roomInvite).toEqual({
+      inviteId: 12,
+      roomId: 7,
+      roomName: "Skopje Ekipa",
+      inviterUserId: 3,
+      inviterUsername: "ana",
+      coinBuyIn: 500,
+      isPrivate: true,
+      isHostInvite: true,
+      minHonor: 70,
+      expiresAt: "2026-08-16T10:00:00Z",
+    });
+  });
+
+  it("accepts a free, public, non-host, ungated invite rather than rejecting the falsy values", () => {
+    // coinBuyIn 0, minHonor 0 and isPrivate/isHostInvite false are all real Go
+    // values — truthiness checks would silently drop this entirely valid invite.
+    useRoomStore.getState().setRoomInvite(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:room_invite",
+      payload: {
+        inviteId: 1,
+        roomId: 2,
+        roomName: "Free Room",
+        inviterUserId: 9,
+        inviterUsername: "bob",
+        coinBuyIn: 0,
+        isPrivate: false,
+        isHostInvite: false,
+        minHonor: 0,
+        expiresAt: "2026-08-16T10:00:00Z",
+      },
+    });
+
+    const invite = useRoomStore.getState().roomInvite;
+    expect(invite?.coinBuyIn).toBe(0);
+    expect(invite?.isPrivate).toBe(false);
+    expect(invite?.isHostInvite).toBe(false);
+    expect(invite?.minHonor).toBe(0);
+  });
+
+  it("ignores a system:room_invite whose expiresAt is missing or unparseable", () => {
+    // expiresAt drives the ONLY auto-dismiss. Coercing a bad one to "" would
+    // leave a popup on screen forever while its server grant quietly expired.
+    useRoomStore.getState().setRoomInvite(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    const base = {
+      inviteId: 4,
+      roomId: 5,
+      roomName: "Skopje",
+      inviterUserId: 6,
+      inviterUsername: "ana",
+      coinBuyIn: 0,
+      isPrivate: false,
+      isHostInvite: false,
+      minHonor: 0,
+    };
+
+    dispatch({ type: "system:room_invite", payload: { ...base } });
+    expect(useRoomStore.getState().roomInvite).toBeNull();
+
+    dispatch({ type: "system:room_invite", payload: { ...base, expiresAt: "" } });
+    expect(useRoomStore.getState().roomInvite).toBeNull();
+
+    dispatch({ type: "system:room_invite", payload: { ...base, expiresAt: "not-a-date" } });
+    expect(useRoomStore.getState().roomInvite).toBeNull();
+  });
+
+  it("ignores a malformed system:room_invite payload", () => {
+    useRoomStore.getState().setRoomInvite(null);
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:room_invite",
+      payload: { inviteId: 1, roomId: "7", roomName: "Bad", inviterUserId: 3 },
+    });
+
+    expect(useRoomStore.getState().roomInvite).toBeNull();
+  });
+
   it("accepts an honor score of 0 rather than rejecting it as falsy", () => {
     // A real Go 0 must survive: the guard is typeof === "number", never
     // truthiness. Same for a minHonor of 0.

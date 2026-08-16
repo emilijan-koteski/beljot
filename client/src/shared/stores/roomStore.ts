@@ -29,6 +29,28 @@ export interface RoomEjection {
   reason: "insolvent" | "roomClosed" | "honor";
 }
 
+/**
+ * An incoming room invite (Story 11.5, AC2). Set by the system:room_invite WS
+ * dispatch and consumed by the always-mounted RoomInviteModal — the same
+ * store-driven, single-consumer shape as `roomEjection` above.
+ *
+ * `isHostInvite` selects the accept path: true means the server holds a one-time
+ * grant that carries the invitee past the room password, so NO password prompt
+ * is shown. It is a rendering hint; the authority is entirely server-side.
+ */
+export interface RoomInvite {
+  inviteId: number;
+  roomId: number;
+  roomName: string;
+  inviterUserId: number;
+  inviterUsername: string;
+  coinBuyIn: number;
+  isPrivate: boolean;
+  isHostInvite: boolean;
+  minHonor: number;
+  expiresAt: string;
+}
+
 export interface RoomState {
   room: Room | null;
   players: RoomPlayer[];
@@ -41,6 +63,11 @@ export interface RoomState {
   kickedFromRoomId: number | null;
   // Room-ejection notice consumed by the lobby arrival modal (Story 9.3, 9.8).
   roomEjection: RoomEjection | null;
+  // Incoming friend room invite consumed by the always-mounted RoomInviteModal
+  // (Story 11.5). Only the most recent invite is held — a second invite while a
+  // popup is open replaces it, which matches the real-time, one-decision nature
+  // of the prompt.
+  roomInvite: RoomInvite | null;
   // User IDs of players "present" in a reopened room (returned via "Return to
   // room" or freshly joined). The owner Start button is gated on every seated
   // human appearing here; seats whose human is absent show "waiting to return".
@@ -68,7 +95,11 @@ export interface RoomState {
   setMatchStartedRoomId: (roomId: number | null) => void;
   setKickedFromRoom: (roomId: number | null) => void;
   setRoomEjection: (ejection: RoomEjection | null) => void;
+  setRoomInvite: (invite: RoomInvite | null) => void;
   reset: () => void;
+  // Full wipe INCLUDING the cross-navigation notices that reset() deliberately
+  // preserves. Only logout calls this — see clearSessionNotices below.
+  clearSessionNotices: () => void;
 }
 
 const initialState = {
@@ -79,6 +110,7 @@ const initialState = {
   currentRoomId: null,
   kickedFromRoomId: null,
   roomEjection: null as RoomEjection | null,
+  roomInvite: null as RoomInvite | null,
   returnedUserIds: [] as number[],
 };
 
@@ -169,9 +201,27 @@ export const useRoomStore = create<RoomState>((set) => ({
 
   setRoomEjection: (roomEjection) => set({ roomEjection }),
 
+  setRoomInvite: (roomInvite) => set({ roomInvite }),
+
   // Preserve the room-ejection notice across reset: RoomPage calls reset() on
   // unmount, which fires while we are navigating the ejected player to the
   // lobby — wiping it here would deny the lobby modal its one chance to render.
   // The modal clears the field itself on close (Story 9.3).
-  reset: () => set((state) => ({ ...initialState, roomEjection: state.roomEjection })),
+  //
+  // roomInvite is preserved for the same reason (Story 11.5): an invite can land
+  // while the player is leaving a room, and reset() runs mid-navigation — wiping
+  // it would drop a live invite the player never got to answer.
+  reset: () =>
+    set((state) => ({
+      ...initialState,
+      roomEjection: state.roomEjection,
+      roomInvite: state.roomInvite,
+    })),
+
+  // The one case where the preservation above is WRONG: logout. reset() keeps the
+  // notices alive across a navigation, but a logout ends the session that owns
+  // them — carrying them over would show the previous account's room invite (and
+  // its inviter's username) to whoever logs in next in the same tab, and let them
+  // act on it. Notices are session-scoped; this is the session boundary.
+  clearSessionNotices: () => set({ ...initialState }),
 }));

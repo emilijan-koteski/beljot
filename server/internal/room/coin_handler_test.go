@@ -83,7 +83,7 @@ func (s *stubWallet) ApplySettlement(credits map[uint]int) error {
 // honor_handler_test.go.
 func setupCoinTest(starter room.MatchStarter, wallet room.WalletService) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
-	handler := room.NewRoomHandler(repo, starter, &mockBroadcaster{}, nil, wallet, nil)
+	handler := room.NewRoomHandler(repo, starter, &mockBroadcaster{}, nil, wallet, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -104,7 +104,7 @@ func setupCoinTestBC(starter room.MatchStarter, wallet room.WalletService) (*ech
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
-	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet, nil)
+	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet, nil, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler

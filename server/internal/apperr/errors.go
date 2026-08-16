@@ -167,6 +167,22 @@ var (
 	ErrAlreadyFriends        = NewAppError("ALREADY_FRIENDS", "you are already friends with this user", http.StatusConflict)
 	ErrFriendRequestNotFound = NewAppError("FRIEND_REQUEST_NOT_FOUND", "friend request not found", http.StatusNotFound)
 
+	// Room-invite errors (Story 11.5, FR62). Both are 409, matching the sibling
+	// friend errors and the project's conflict convention for state guards.
+	// ErrNotFriends rejects inviting a non-friend (the HTTP counterpart of the
+	// error:not_friends WS event the whisper path uses). ErrFriendNotAvailable
+	// rejects inviting a friend who is offline, already in a room, or in a match —
+	// availability is recomputed server-side at invite time and never trusted from
+	// the client.
+	// ErrInviteAlreadyPending rejects a second invite to a friend who already has
+	// a live one for this room. It is the throttle: without it any seated member
+	// could replace a friend's popup and restart its clock as fast as they can
+	// POST, and a member's invite could silently overwrite the owner's stronger
+	// host grant.
+	ErrNotFriends           = NewAppError("NOT_FRIENDS", "you are not friends with this player", http.StatusConflict)
+	ErrFriendNotAvailable   = NewAppError("FRIEND_NOT_AVAILABLE", "this friend is not available to invite right now", http.StatusConflict)
+	ErrInviteAlreadyPending = NewAppError("INVITE_ALREADY_PENDING", "this friend already has a pending invite to this room", http.StatusConflict)
+
 	// Game domain errors
 	ErrWrongPhase              = NewAppError("WRONG_PHASE", "action not valid in current game phase", http.StatusBadRequest)
 	ErrNotYourTurn             = NewAppError("NOT_YOUR_TURN", "it is not your turn", http.StatusForbidden)

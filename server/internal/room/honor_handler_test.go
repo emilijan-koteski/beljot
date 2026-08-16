@@ -105,7 +105,7 @@ func setupHonorTest(
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
-	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet, honor)
+	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet, honor, nil)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler

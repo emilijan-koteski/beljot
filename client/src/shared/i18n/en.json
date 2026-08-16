@@ -510,6 +510,45 @@
       "openSeat": "Open seat"
     }
   },
+  "roomInvite": {
+    "someone": "Someone",
+    "needARoom": "Open a room first, then invite friends from inside it.",
+    "popup": {
+      "title": "Room invite",
+      "body": "{{inviter}} invited you to join \"{{roomName}}\".",
+      "buyIn": "Buy-in {{buyIn}}",
+      "privateHostInvite": "Private room — your invite gets you in",
+      "privatePasswordNeeded": "Private room — password required",
+      "accept": "Join room",
+      "accepting": "Joining…",
+      "decline": "Not now"
+    },
+    "panel": {
+      "openButton": "Invite friends",
+      "title": "Invite friends",
+      "description": "Friends who are online and free to play can be invited to this room.",
+      "loading": "Loading friends…",
+      "loadFailed": "Couldn't load your friends. Please try again.",
+      "empty": "No friends yet. Find players in search and send a request.",
+      "invite": "Invite",
+      "invited": "Invited"
+    },
+    "reasons": {
+      "offline": "Offline",
+      "inMatch": "In a match",
+      "inRoom": "In another room",
+      "roomFull": "This room is full",
+      "unavailable": "Not available right now"
+    },
+    "errors": {
+      "notAvailable": "No longer free to play",
+      "roomFull": "This room is full",
+      "notFriends": "You are not friends with this player",
+      "sendFailed": "Couldn't send the invite. Please try again.",
+      "expired": "That invite is no longer valid.",
+      "roomGone": "This room is no longer available."
+    }
+  },
   "legal": {
     "wipBadge": "Work in progress",
     "back": "Back",
