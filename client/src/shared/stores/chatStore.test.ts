@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { ChatMessagePayload } from "@/shared/types/wsEvents";
+import type { ChatMessagePayload, WhisperPayload } from "@/shared/types/wsEvents";
 
 import { useChatStore } from "./chatStore";
 
@@ -15,12 +15,28 @@ function makeMessage(overrides: Partial<ChatMessagePayload> = {}): ChatMessagePa
   };
 }
 
+// alice(1) is the local user in these fixtures; bob(2)/carol(3) are friends.
+function makeWhisper(overrides: Partial<WhisperPayload> = {}): WhisperPayload {
+  return {
+    fromUserId: 2,
+    fromUsername: "bob",
+    toUserId: 1,
+    toUsername: "alice",
+    message: "psst",
+    timestamp: "2026-04-18T10:00:00Z",
+    ...overrides,
+  };
+}
+
 describe("chatStore", () => {
   beforeEach(() => {
     useChatStore.setState({
       lobbyMessages: [],
       matchMessages: [],
       roomMessages: [],
+      whisperThreads: {},
+      whisperUnread: {},
+      activeChannel: "primary",
       matchMessagesReceivedTotal: 0,
       hasSentLobby: false,
       hasSentMatch: false,
@@ -207,5 +223,111 @@ describe("chatStore", () => {
 
     useChatStore.getState().clearRoom();
     expect(useChatStore.getState().hasSentRoom).toBe(false);
+  });
+
+  // --- Whisper threads (Story 11.4) ---
+
+  it("appendWhisper keys an incoming thread by the sender's username", () => {
+    // me = alice(1); bob(2) whispers me → thread keyed by "bob".
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    const state = useChatStore.getState();
+    expect(Object.keys(state.whisperThreads)).toEqual(["bob"]);
+    expect(state.whisperThreads.bob).toHaveLength(1);
+    expect(state.whisperThreads.bob![0]!.message).toBe("psst");
+  });
+
+  it("appendWhisper keys an outgoing (own-echo) thread by the recipient's username", () => {
+    // me = alice(1); my own-echo to bob → still keyed by "bob".
+    const echo = makeWhisper({
+      fromUserId: 1,
+      fromUsername: "alice",
+      toUserId: 2,
+      toUsername: "bob",
+      message: "hi bob",
+    });
+    useChatStore.getState().appendWhisper(echo, 1);
+    const state = useChatStore.getState();
+    expect(Object.keys(state.whisperThreads)).toEqual(["bob"]);
+    expect(state.whisperThreads.bob![0]!.message).toBe("hi bob");
+  });
+
+  it("appendWhisper bumps unread for an incoming message on a non-active thread", () => {
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(1);
+    useChatStore.getState().appendWhisper(makeWhisper({ message: "again" }), 1);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(2);
+  });
+
+  it("appendWhisper does NOT bump unread for own-echo", () => {
+    const echo = makeWhisper({
+      fromUserId: 1,
+      fromUsername: "alice",
+      toUserId: 2,
+      toUsername: "bob",
+    });
+    useChatStore.getState().appendWhisper(echo, 1);
+    expect(useChatStore.getState().whisperUnread.bob ?? 0).toBe(0);
+  });
+
+  it("appendWhisper does NOT bump unread when its thread is the active channel", () => {
+    useChatStore.getState().setActiveChannel("whisper:bob");
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(0);
+  });
+
+  it("appendWhisper drops oldest when exceeding the 200-message cap", () => {
+    for (let i = 0; i < 210; i++) {
+      useChatStore.getState().appendWhisper(makeWhisper({ message: `w-${i}` }), 1);
+    }
+    const thread = useChatStore.getState().whisperThreads.bob!;
+    expect(thread).toHaveLength(200);
+    expect(thread[0]!.message).toBe("w-10");
+    expect(thread[199]!.message).toBe("w-209");
+  });
+
+  it("setActiveChannel to a whisper thread resets that thread's unread", () => {
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(1);
+    useChatStore.getState().setActiveChannel("whisper:bob");
+    expect(useChatStore.getState().whisperUnread.bob).toBe(0);
+    expect(useChatStore.getState().activeChannel).toBe("whisper:bob");
+  });
+
+  it("markThreadRead zeroes a thread's unread", () => {
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    useChatStore.getState().appendWhisper(makeWhisper({ message: "b" }), 1);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(2);
+    useChatStore.getState().markThreadRead("bob");
+    expect(useChatStore.getState().whisperUnread.bob).toBe(0);
+  });
+
+  it("whisper threads are independent across friends", () => {
+    useChatStore.getState().appendWhisper(makeWhisper(), 1); // from bob
+    useChatStore
+      .getState()
+      .appendWhisper(makeWhisper({ fromUserId: 3, fromUsername: "carol", message: "yo" }), 1);
+    const state = useChatStore.getState();
+    expect(state.whisperThreads.bob).toHaveLength(1);
+    expect(state.whisperThreads.carol).toHaveLength(1);
+    expect(state.whisperUnread.bob).toBe(1);
+    expect(state.whisperUnread.carol).toBe(1);
+  });
+
+  it("clearWhispers resets threads, unread, and active channel", () => {
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    useChatStore.getState().setActiveChannel("whisper:bob");
+    useChatStore.getState().clearWhispers();
+    const state = useChatStore.getState();
+    expect(state.whisperThreads).toEqual({});
+    expect(state.whisperUnread).toEqual({});
+    expect(state.activeChannel).toBe("primary");
+  });
+
+  it("appendWhisper leaves the primary channels untouched", () => {
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    const state = useChatStore.getState();
+    expect(state.lobbyMessages).toHaveLength(0);
+    expect(state.matchMessages).toHaveLength(0);
+    expect(state.roomMessages).toHaveLength(0);
   });
 });

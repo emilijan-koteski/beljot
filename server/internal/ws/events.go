@@ -471,6 +471,51 @@ type FriendRequestPayload struct {
 	FromUsername string `json:"fromUsername"`
 }
 
+// --- Whisper events (Story 11.4) ---
+
+// ActionWhisper (client→server) + SystemWhisper (server→client) carry a private
+// one-to-one message between two friends. They mirror the chat/emote pipeline
+// exactly (action:* in, system:* out) — NOT event:whisper as the epic's literal
+// wording suggested (Story 11.4 D1, PO-confirmed 2026-08-14). event:* is reserved
+// for in-match game-state payloads with an ordering contract, and is the ONLY
+// prefix inside the WS drift gate (goldens + Zod schemas + contract tests). A
+// whisper is an ephemeral platform message, structurally identical to chat, so it
+// follows the chat/emote precedent: ZERO drift-gate touchpoints (no golden JSON,
+// no Zod schema, no events_contract_test.go row — verified against every other
+// system:* sibling here). The complete contract is two files: this one and
+// client/src/shared/types/wsEvents.ts.
+const ActionWhisper = "action:whisper"
+const SystemWhisper = "system:whisper"
+
+// Whisper error events — all sent to the SENDER only (never the target). Like
+// every error:* they are outside the drift gate.
+//
+//	ErrorNotFriends              — target is not an accepted friend (or unknown username)
+//	ErrorWhisperBlockedInGame    — target is in the sender's current room/match (anti-collusion)
+//	ErrorWhisperRecipientOffline — target is not currently connected (whispers are real-time only)
+const ErrorNotFriends = "error:not_friends"
+const ErrorWhisperBlockedInGame = "error:whisper_blocked_in_game"
+const ErrorWhisperRecipientOffline = "error:whisper_recipient_offline"
+
+// WhisperRequest is the typed payload for ActionWhisper (client → server).
+type WhisperRequest struct {
+	ToUsername string `json:"toUsername"`
+	Text       string `json:"text"`
+}
+
+// WhisperPayload is the typed payload for SystemWhisper (server → client). The
+// SAME payload is delivered to BOTH participants — the recipient AND the sender
+// (own-echo, so the sender's thread renders their own message). The client keys
+// the thread by whichever participant is NOT the local user.
+type WhisperPayload struct {
+	FromUserID   uint   `json:"fromUserId"`
+	FromUsername string `json:"fromUsername"`
+	ToUserID     uint   `json:"toUserId"`
+	ToUsername   string `json:"toUsername"`
+	Message      string `json:"message"`
+	Timestamp    string `json:"timestamp"` // ISO 8601 (RFC3339Nano) UTC
+}
+
 // --- General error events ---
 const SystemError = "system:error"
 const ErrorUnknownEvent = "error:unknown_event"

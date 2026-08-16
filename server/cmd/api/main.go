@@ -216,6 +216,14 @@ func main() {
 	chatHandler := chat.NewHandler(hub, userRepo, sessionManager, roomMembership)
 	emoteHandler := emote.NewHandler(hub, sessionManager)
 	sessionManager.AddUserRemovedHook(emoteHandler.RemoveUser)
+
+	// Whisper handler (Story 11.4) — private friend-to-friend messages, composed
+	// into the action router alongside chat/emote. Reuses friendRepo (created
+	// here so it is in scope for both the whisper handler and the friend routes
+	// below) for the friends-only check, and a presence adapter over roomRepo for
+	// the anti-collusion "same room/match" check.
+	friendRepo := friend.NewGormRepository(db)
+	whisperHandler := chat.NewWhisperHandler(hub, userRepo, friendRepo, &whisperPresenceLocator{repo: roomRepo})
 	hub.SetActionHandler(func(client *ws.Client, msg ws.WSMessage) {
 		if msg.Type == ws.ActionChatMessage {
 			chatHandler.HandleAction(client, msg)
@@ -226,6 +234,12 @@ func main() {
 		// reject it as an unknown action type and emit error:invalid_action.
 		if msg.Type == ws.ActionEmote {
 			emoteHandler.HandleAction(client, msg)
+			return
+		}
+		// Whisper handler, same reasoning as emote: routed before the session
+		// manager so the rules engine never sees action:whisper.
+		if msg.Type == ws.ActionWhisper {
+			whisperHandler.HandleAction(client, msg)
 			return
 		}
 		sessionManager.HandleAction(client, msg)
@@ -281,7 +295,8 @@ func main() {
 	// existing user-repo mock changes. Echo resolves the static
 	// /friends/requests and /friends/status/:id segments ahead of the param
 	// route /friends/:id/accept (static > param), so there is no collision.
-	friendRepo := friend.NewGormRepository(db)
+	// friendRepo is created earlier (near the whisper handler wiring) so both the
+	// whisper friend-check and these friend routes share one instance.
 	friendHandler := friend.NewHandler(friendRepo, userRepo, hub)
 	api.POST("/friends/request", friendHandler.SendRequest)
 	api.GET("/friends", friendHandler.ListFriends)
@@ -349,6 +364,25 @@ func (a *chatRoomMembership) RoomMembers(roomID uint) ([]uint, bool) {
 		ids = append(ids, p.UserID)
 	}
 	return ids, true
+}
+
+// whisperPresenceLocator adapts room.RoomRepository to chat.PresenceLocator for
+// the whisper anti-collusion check (Story 11.4). FindPlayerRoom returns the
+// user's row for a room in "waiting" OR "playing" status (nil when in neither),
+// so a nil result means "not in any active room/match".
+type whisperPresenceLocator struct {
+	repo room.RoomRepository
+}
+
+func (p *whisperPresenceLocator) ActiveRoomID(userID uint) (uint, bool, error) {
+	rp, err := p.repo.FindPlayerRoom(userID)
+	if err != nil {
+		return 0, false, err
+	}
+	if rp == nil {
+		return 0, false, nil
+	}
+	return rp.RoomID, true, nil
 }
 
 func appErrorHandler(err error, c echo.Context) {

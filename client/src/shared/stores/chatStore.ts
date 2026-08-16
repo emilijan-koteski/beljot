@@ -1,13 +1,34 @@
 import { create } from "zustand";
 
-import type { ChatMessagePayload } from "@/shared/types/wsEvents";
+import type { ChatMessagePayload, WhisperPayload } from "@/shared/types/wsEvents";
 
 const MAX_MESSAGES = 200;
+
+// A chat channel is either the dock's own primary channel (lobby/room/match) or
+// an open whisper thread keyed by the OTHER participant's username. Threads are
+// created lazily when the first whisper (sent or received) for that friend lands.
+export type ChatChannel = "primary" | `whisper:${string}`;
+
+export function whisperChannel(username: string): ChatChannel {
+  return `whisper:${username}`;
+}
 
 interface ChatState {
   lobbyMessages: ChatMessagePayload[];
   matchMessages: ChatMessagePayload[];
   roomMessages: ChatMessagePayload[];
+  // Whisper threads (Story 11.4) — ephemeral, keyed by the OTHER participant's
+  // username. Global (not per-variant): a whisper is between two friends
+  // regardless of which dock is open, and only one dock mounts at a time.
+  whisperThreads: Record<string, WhisperPayload[]>;
+  // Per-thread unread counts, keyed the same way. Incremented for an INCOMING
+  // whisper whose thread is not the active channel; reset when that thread
+  // becomes active (setActiveChannel / markThreadRead).
+  whisperUnread: Record<string, number>;
+  // The channel the mounted dock is currently showing. Global so it survives a
+  // dock swap on navigation; the dock falls back to "primary" if it points at a
+  // thread that no longer exists.
+  activeChannel: ChatChannel;
   // Monotonic count of match messages received since the last clear.
   // Unlike matchMessages.length (which plateaus at MAX_MESSAGES once the ring
   // buffer is full), this counter keeps incrementing so unread-badge tracking
@@ -32,12 +53,14 @@ interface ChatState {
   clearLobby: () => void;
   clearMatch: () => void;
   clearRoom: () => void;
+  // Whisper actions (Story 11.4).
+  appendWhisper: (msg: WhisperPayload, myUserId: number) => void;
+  setActiveChannel: (channel: ChatChannel) => void;
+  markThreadRead: (username: string) => void;
+  clearWhispers: () => void;
 }
 
-function appendWithCap(
-  buffer: ChatMessagePayload[],
-  msg: ChatMessagePayload,
-): ChatMessagePayload[] {
+function appendWithCap<T>(buffer: T[], msg: T): T[] {
   const next = [...buffer, msg];
   if (next.length > MAX_MESSAGES) {
     next.splice(0, next.length - MAX_MESSAGES);
@@ -49,6 +72,9 @@ export const useChatStore = create<ChatState>((set) => ({
   lobbyMessages: [],
   matchMessages: [],
   roomMessages: [],
+  whisperThreads: {},
+  whisperUnread: {},
+  activeChannel: "primary",
   matchMessagesReceivedTotal: 0,
   hasSentLobby: false,
   hasSentMatch: false,
@@ -67,4 +93,34 @@ export const useChatStore = create<ChatState>((set) => ({
   clearLobby: () => set({ lobbyMessages: [], hasSentLobby: false }),
   clearMatch: () => set({ matchMessages: [], matchMessagesReceivedTotal: 0, hasSentMatch: false }),
   clearRoom: () => set({ roomMessages: [], hasSentRoom: false }),
+  appendWhisper: (msg, myUserId) =>
+    set((state) => {
+      // Key by whichever participant is NOT me. The server delivers the SAME
+      // payload to both, so this yields the same thread key on both ends.
+      const isMine = msg.fromUserId === myUserId;
+      const key = isMine ? msg.toUsername : msg.fromUsername;
+      const thread = appendWithCap(state.whisperThreads[key] ?? [], msg);
+      // Bump unread only for an incoming message on a thread that isn't active.
+      // Own-echo never counts as unread.
+      const bump = !isMine && state.activeChannel !== whisperChannel(key);
+      return {
+        whisperThreads: { ...state.whisperThreads, [key]: thread },
+        whisperUnread: bump
+          ? { ...state.whisperUnread, [key]: (state.whisperUnread[key] ?? 0) + 1 }
+          : state.whisperUnread,
+      };
+    }),
+  setActiveChannel: (channel) =>
+    set((state) => {
+      if (channel === "primary") return { activeChannel: channel };
+      // Switching to a whisper thread marks it read.
+      const key = channel.slice("whisper:".length);
+      return {
+        activeChannel: channel,
+        whisperUnread: { ...state.whisperUnread, [key]: 0 },
+      };
+    }),
+  markThreadRead: (username) =>
+    set((state) => ({ whisperUnread: { ...state.whisperUnread, [username]: 0 } })),
+  clearWhispers: () => set({ whisperThreads: {}, whisperUnread: {}, activeChannel: "primary" }),
 }));

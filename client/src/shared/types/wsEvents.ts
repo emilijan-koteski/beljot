@@ -577,6 +577,39 @@ export interface FriendRequestPayload {
   fromUsername: string;
 }
 
+// --- Whisper events (Story 11.4) ---
+// ACTION_WHISPER (client→server) + SYSTEM_WHISPER (server→client) carry a private
+// one-to-one message between two friends. They mirror the chat/emote pipeline
+// exactly (action:* in, system:* out) — NOT event:whisper (Story 11.4 D1,
+// PO-confirmed 2026-08-14). The system: prefix keeps whisper OUTSIDE the WS drift
+// gate — no Zod schema, no golden, no conformance witness, no contract-test row,
+// like every other system:* payload here. Keep in sync with server events.go
+// (ActionWhisper / SystemWhisper / WhisperRequest / WhisperPayload).
+export const ACTION_WHISPER = "action:whisper" as const;
+export const SYSTEM_WHISPER = "system:whisper" as const;
+
+// Whisper error events — sent to the SENDER only. Outside the drift gate.
+export const ERROR_NOT_FRIENDS = "error:not_friends" as const;
+export const ERROR_WHISPER_BLOCKED_IN_GAME = "error:whisper_blocked_in_game" as const;
+export const ERROR_WHISPER_RECIPIENT_OFFLINE = "error:whisper_recipient_offline" as const;
+
+export interface WhisperRequest {
+  toUsername: string;
+  text: string;
+}
+
+// The SAME payload is delivered to BOTH participants — recipient AND sender
+// (own-echo). All numeric fields are real Go values (a userId of any value is
+// legitimate), so validate with typeof === "number", never JS truthiness.
+export interface WhisperPayload {
+  fromUserId: number;
+  fromUsername: string;
+  toUserId: number;
+  toUsername: string;
+  message: string;
+  timestamp: string;
+}
+
 // --- General error events ---
 export const SYSTEM_ERROR = "system:error" as const;
 export const ERROR_UNKNOWN_EVENT = "error:unknown_event" as const;

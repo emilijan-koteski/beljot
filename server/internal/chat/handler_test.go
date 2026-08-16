@@ -19,6 +19,10 @@ import (
 
 type userRepoStub struct {
 	users map[uint]*user.User
+	// Optional error injection for fail-closed tests. Default nil = no error,
+	// so existing chat tests are unaffected.
+	findByUsernameErr error
+	findByIDErr       error
 }
 
 func newUserRepoStub() *userRepoStub {
@@ -29,10 +33,22 @@ func (s *userRepoStub) add(id uint, username string) {
 	s.users[id] = &user.User{ID: id, Username: username}
 }
 
-func (s *userRepoStub) Create(*user.User) error                   { return nil }
-func (s *userRepoStub) Delete(uint) error                         { return nil }
-func (s *userRepoStub) FindByEmail(string) (*user.User, error)    { return nil, nil }
-func (s *userRepoStub) FindByUsername(string) (*user.User, error) { return nil, nil }
+func (s *userRepoStub) Create(*user.User) error                { return nil }
+func (s *userRepoStub) Delete(uint) error                      { return nil }
+func (s *userRepoStub) FindByEmail(string) (*user.User, error) { return nil, nil }
+func (s *userRepoStub) FindByUsername(username string) (*user.User, error) {
+	if s.findByUsernameErr != nil {
+		return nil, s.findByUsernameErr
+	}
+	// Exact-match resolution over the seeded users — the whisper handler resolves
+	// a typed /w <username> to a user via this. Case-sensitive, mirroring the DB.
+	for _, u := range s.users {
+		if u.Username == username {
+			return u, nil
+		}
+	}
+	return nil, nil
+}
 func (s *userRepoStub) SearchByUsername(string, uint, int) ([]user.User, error) {
 	return nil, nil
 }
@@ -50,6 +66,9 @@ func (s *userRepoStub) ApplyHonorEvents(map[uint]user.HonorEvent, time.Time) (ma
 }
 func (s *userRepoStub) ResetHonor(uint) error { return nil }
 func (s *userRepoStub) FindByID(id uint) (*user.User, error) {
+	if s.findByIDErr != nil {
+		return nil, s.findByIDErr
+	}
 	if u, ok := s.users[id]; ok {
 		return u, nil
 	}

@@ -36,6 +36,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useChatStore.getState().clearLobby();
     useChatStore.getState().clearMatch();
     useChatStore.getState().clearRoom();
+    useChatStore.getState().clearWhispers();
     set({ token: null, user: null, isLoading: false });
   },
 }));

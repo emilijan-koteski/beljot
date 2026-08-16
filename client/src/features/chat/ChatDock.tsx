@@ -8,9 +8,40 @@ import { useVisualViewport } from "@/shared/hooks/useVisualViewport";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState, useWsSendMessage } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
-import { useChatStore } from "@/shared/stores/chatStore";
-import type { ChatMessagePayload, ChatMessageRequest } from "@/shared/types/wsEvents";
-import { ACTION_CHAT_MESSAGE } from "@/shared/types/wsEvents";
+import { useChatStore, whisperChannel } from "@/shared/stores/chatStore";
+import type {
+  ChatMessagePayload,
+  ChatMessageRequest,
+  WhisperRequest,
+} from "@/shared/types/wsEvents";
+import { ACTION_CHAT_MESSAGE, ACTION_WHISPER } from "@/shared/types/wsEvents";
+
+// A single rendered line, normalized across the primary channel
+// (ChatMessagePayload) and whisper threads (WhisperPayload) so ChatLine can
+// render either. `whisper` toggles the pink skin.
+interface DisplayLine {
+  key: string;
+  userId: number;
+  username: string;
+  message: string;
+  timestamp: string;
+}
+
+// Parse a `/w <username> <message>` command. Returns null when the text is not a
+// `/w` command at all. Returns { complete: false } for an in-progress command
+// ("/w" or "/w bob" with no message yet) so the caller can swallow it rather
+// than leak a partial command to the public channel.
+function parseWhisperCommand(
+  raw: string,
+): { complete: true; toUsername: string; text: string } | { complete: false } | null {
+  const trimmed = raw.trimStart();
+  if (!/^\/w(\s|$)/i.test(trimmed)) return null;
+  const m = /^\/w\s+(\S+)\s+([\s\S]+)$/i.exec(trimmed.trim());
+  if (!m) return { complete: false };
+  const body = m[2]!.trim();
+  if (!body) return { complete: false };
+  return { complete: true, toUsername: m[1]!, text: body };
+}
 
 const PEEK_MS = 2000;
 const PEEK_MAX_CHARS = 90;
@@ -75,6 +106,31 @@ export function ChatDock(props: ChatDockProps) {
   const sendWs = useWsSendMessage();
   const connectionState = useWsConnectionState();
   const isConnected = connectionState === "connected";
+
+  // Whisper channel state (Story 11.4). Threads are global (keyed by the other
+  // participant's username); only one dock mounts at a time, so a single active
+  // channel + tab strip is sufficient.
+  const whisperThreads = useChatStore((s) => s.whisperThreads);
+  const whisperUnread = useChatStore((s) => s.whisperUnread);
+  const activeChannel = useChatStore((s) => s.activeChannel);
+  const setActiveChannel = useChatStore((s) => s.setActiveChannel);
+
+  const threadKeys = useMemo(() => Object.keys(whisperThreads).sort(), [whisperThreads]);
+  // Total unread across all whisper threads. Surfaced on the CLOSED FAB badge so an
+  // incoming whisper is noticed even when the dock is shut — the per-thread tab
+  // badges only render while the dock is open. Numeric only (no content peek), so
+  // private message text never renders on the FAB.
+  const whisperUnreadTotal = useMemo(
+    () => Object.values(whisperUnread).reduce((sum, n) => sum + n, 0),
+    [whisperUnread],
+  );
+  // Effective active thread: the store's activeChannel, but only if it still
+  // points at a live thread — otherwise fall back to the primary channel. Keeps
+  // the dock resilient to a thread being cleared out from under a stale tab.
+  const activeThread =
+    activeChannel !== "primary" && whisperThreads[activeChannel.slice("whisper:".length)]
+      ? activeChannel.slice("whisper:".length)
+      : null;
 
   // Open state: controlled when the parent wires `onOpenChange` (in-game dock),
   // otherwise self-managed (lobby/room).
@@ -154,9 +210,34 @@ export function ChatDock(props: ChatDockProps) {
     listEndRef.current?.scrollIntoView({ behavior: newMessageWhileOpen ? "smooth" : "instant" });
   }, [open, messages.length, viewportBox?.height]);
 
+  function sendWhisper(toUsername: string, text: string) {
+    const req: WhisperRequest = { toUsername, text: text.slice(0, MAX_MESSAGE_LENGTH) };
+    sendWs(ACTION_WHISPER, req);
+    setDraft("");
+  }
+
   function send() {
+    if (!isConnected) return;
+
+    // `/w <username> <message>` sends a whisper from ANY channel. A partial
+    // command ("/w" / "/w bob") is swallowed so it never leaks to the public
+    // channel; a non-`/w` message falls through to the channel logic below.
+    const whisper = parseWhisperCommand(draft);
+    if (whisper) {
+      if (whisper.complete) sendWhisper(whisper.toUsername, whisper.text);
+      return;
+    }
+
     const text = draft.trim();
-    if (!text || !isConnected) return;
+    if (!text) return;
+
+    // Active whisper thread → the composer whispers that friend directly (no
+    // `/w` prefix needed).
+    if (activeThread) {
+      sendWhisper(activeThread, text);
+      return;
+    }
+
     const trimmed = text.slice(0, MAX_MESSAGE_LENGTH);
     const payload: ChatMessageRequest =
       props.variant === "match"
@@ -169,6 +250,18 @@ export function ChatDock(props: ChatDockProps) {
     setDraft("");
   }
 
+  // Cycle channels with Tab (Valorant-style): primary → each open thread →
+  // primary. Shift+Tab reverses. Only intercepts Tab when at least one whisper
+  // thread exists, so accessibility tab-out is preserved in the common case.
+  function cycleChannel(direction: 1 | -1) {
+    if (threadKeys.length === 0) return;
+    const channels = ["primary", ...threadKeys.map(whisperChannel)];
+    const current = activeThread ? whisperChannel(activeThread) : "primary";
+    const idx = channels.indexOf(current);
+    const next = channels[(idx + direction + channels.length) % channels.length]!;
+    setActiveChannel(next as "primary" | `whisper:${string}`);
+  }
+
   const peek = useMemo(() => peekPayload(messages, me?.id), [messages, me?.id]);
   const keys = useMemo(() => i18nKeys(variant), [variant]);
   const testIdRoot =
@@ -179,8 +272,34 @@ export function ChatDock(props: ChatDockProps) {
   const skin = variant === "match" ? "chat-dock-match" : "";
   const frosted = variant === "match" ? "backdrop-blur-md" : "";
 
+  // The lines rendered in the open panel depend on the active channel: the
+  // primary channel's own slice, or the active whisper thread (pink). Both are
+  // normalized to DisplayLine so ChatLine renders either.
+  const displayLines: DisplayLine[] = useMemo(() => {
+    if (activeThread) {
+      return (whisperThreads[activeThread] ?? []).map((m) => ({
+        key: `w-${m.fromUserId}-${m.timestamp}-${m.message}`,
+        userId: m.fromUserId,
+        username: m.fromUsername,
+        message: m.message,
+        timestamp: m.timestamp,
+      }));
+    }
+    return messages.map((m) => ({
+      key: `${m.userId}-${m.timestamp}-${m.message}`,
+      userId: m.userId,
+      username: m.username,
+      message: m.message,
+      timestamp: m.timestamp,
+    }));
+  }, [activeThread, whisperThreads, messages]);
+
   // ── Closed state ──────────────────────────────────────────────────────
   if (!open) {
+    // The FAB badge combines primary-channel unread with whisper unread so a
+    // private message shut behind the closed dock is still noticed. Content is
+    // never previewed here (the peek stays primary-channel only).
+    const badgeCount = unread + whisperUnreadTotal;
     return (
       <div
         data-testid={`${testIdRoot}-dock`}
@@ -214,18 +333,18 @@ export function ChatDock(props: ChatDockProps) {
           className={cn(
             "bg-surface text-ink relative inline-flex size-14 items-center justify-center rounded-full transition-transform hover:-translate-y-0.5",
             frosted,
-            unread > 0
+            badgeCount > 0
               ? "border border-brass shadow-[0_0_0_3px_var(--brass-soft),0_10px_28px_-10px_rgba(14,58,36,0.35)]"
               : "border-border-2 border shadow-(--chat-shadow-fab)",
           )}
         >
           <MessageSquare className="size-5.5" strokeWidth={1.8} />
-          {unread > 0 && (
+          {badgeCount > 0 && (
             <span
               data-testid={`${testIdRoot}-unread`}
               className="bg-brass text-brass-ink border-surface absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 px-1.5 text-[11px] font-bold leading-none tabular-nums shadow-[0_0_10px_rgba(201,168,118,0.55)]"
             >
-              {unread > 99 ? "99+" : unread}
+              {badgeCount > 99 ? "99+" : badgeCount}
             </span>
           )}
         </button>
@@ -266,16 +385,46 @@ export function ChatDock(props: ChatDockProps) {
         </button>
       </div>
 
+      {threadKeys.length > 0 && (
+        <div
+          role="tablist"
+          aria-label={t("whisper.tablistLabel")}
+          className="flex items-center gap-1 overflow-x-auto border-b border-border px-2 py-1.5"
+          data-testid={`${testIdRoot}-tabs`}
+        >
+          <ChannelTab
+            label={t("whisper.primaryTab")}
+            active={activeThread === null}
+            onClick={() => setActiveChannel("primary")}
+            testId={`${testIdRoot}-tab-primary`}
+          />
+          {threadKeys.map((key) => (
+            <ChannelTab
+              key={key}
+              label={key}
+              whisper
+              active={activeThread === key}
+              unread={whisperUnread[key] ?? 0}
+              onClick={() => setActiveChannel(whisperChannel(key))}
+              testId={`${testIdRoot}-whisper-tab-${key}`}
+            />
+          ))}
+        </div>
+      )}
+
       <div
         className="flex flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain px-3.5 py-3"
         data-testid={`${testIdRoot}-list`}
       >
-        {messages.map((m) => (
+        {displayLines.map((line) => (
           <ChatLine
-            key={`${m.userId}-${m.timestamp}-${m.message}`}
-            m={m}
-            mine={m.userId === me?.id}
-            nameColor={resolveNameColor?.(m.userId)}
+            key={line.key}
+            username={line.username}
+            message={line.message}
+            timestamp={line.timestamp}
+            mine={line.userId === me?.id}
+            nameColor={activeThread ? undefined : resolveNameColor?.(line.userId)}
+            whisper={activeThread !== null}
           />
         ))}
         <div ref={listEndRef} />
@@ -285,10 +434,28 @@ export function ChatDock(props: ChatDockProps) {
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder={t(isConnected ? keys.placeholder : "chat.placeholderDisabled")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              send();
+              return;
+            }
+            // Tab cycles channels when whisper threads exist (Valorant-style);
+            // otherwise it keeps its default focus-navigation behaviour.
+            if (e.key === "Tab" && threadKeys.length > 0) {
+              e.preventDefault();
+              cycleChannel(e.shiftKey ? -1 : 1);
+            }
+          }}
+          placeholder={
+            !isConnected
+              ? t("chat.placeholderDisabled")
+              : activeThread
+                ? t("whisper.inputPlaceholder", { username: activeThread })
+                : t(keys.placeholder)
+          }
           disabled={!isConnected}
           maxLength={MAX_MESSAGE_LENGTH}
+          title={t("whisper.hint")}
           data-testid={`${testIdRoot}-input`}
           className="bg-surface-elevated text-ink flex-1 rounded-lg border border-border px-2.5 py-2 text-xs outline-none placeholder:text-ink-off disabled:cursor-not-allowed disabled:opacity-50"
         />
@@ -346,38 +513,99 @@ function peekPayload(messages: ChatMessagePayload[], myId: number | undefined) {
 }
 
 function ChatLine({
-  m,
+  username,
+  message,
+  timestamp,
   mine,
   nameColor,
+  whisper = false,
 }: {
-  m: ChatMessagePayload;
+  username: string;
+  message: string;
+  timestamp: string;
   mine: boolean;
   nameColor?: string;
+  whisper?: boolean;
 }) {
   return (
     <div className={cn("flex flex-col gap-0.5", mine ? "items-end" : "items-start")}>
       {!mine && (
         <span className="text-ink-mute pl-0.5 text-[11px]">
-          {nameColor ? (
+          {whisper ? (
+            <strong className="font-semibold text-(--whisper-name)">{username}</strong>
+          ) : nameColor ? (
             <strong className="font-semibold" style={{ color: nameColor }}>
-              {m.username}
+              {username}
             </strong>
           ) : (
-            m.username
+            username
           )}{" "}
-          · <RelativeTime iso={m.timestamp} variant="compact" />
+          · <RelativeTime iso={timestamp} variant="compact" />
         </span>
       )}
       <span
         className={cn(
           "max-w-[85%] rounded-2xl border px-2.5 py-1.5 text-xs",
-          mine
-            ? "bg-accent-soft border-accent/40 text-accent"
-            : "bg-surface-elevated border-border text-ink",
+          // Whisper bubbles are pink for BOTH participants so a private message
+          // is unmistakable regardless of sender; alignment still marks mine vs
+          // theirs. The primary channel keeps the accent/surface treatment.
+          whisper
+            ? "border-(--whisper-border) bg-(--whisper-fill) text-(--whisper-ink)"
+            : mine
+              ? "bg-accent-soft border-accent/40 text-accent"
+              : "bg-surface-elevated border-border text-ink",
         )}
       >
-        {m.message}
+        {message}
       </span>
     </div>
+  );
+}
+
+// A single channel tab in the whisper switcher — the primary channel or a per
+// friend whisper thread. Renders an unread dot when a non-active whisper thread
+// has pending messages (Story 11.4 AC5).
+function ChannelTab({
+  label,
+  active,
+  onClick,
+  testId,
+  whisper = false,
+  unread = 0,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  testId: string;
+  whisper?: boolean;
+  unread?: number;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      data-active={active}
+      data-testid={testId}
+      onClick={onClick}
+      className={cn(
+        "inline-flex max-w-32 items-center gap-1 truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+        active
+          ? whisper
+            ? "border-(--whisper-border) bg-(--whisper-fill) text-(--whisper-ink)"
+            : "bg-accent-soft border-accent/40 text-accent"
+          : "border-border text-ink-mute hover:text-ink",
+      )}
+    >
+      <span className="truncate">{label}</span>
+      {unread > 0 && !active && (
+        <span
+          data-testid={`${testId}-unread`}
+          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-(--whisper-name) px-1 text-[9px] leading-none font-bold text-white tabular-nums"
+        >
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </button>
   );
 }

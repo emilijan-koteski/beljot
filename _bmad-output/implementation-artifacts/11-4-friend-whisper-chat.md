@@ -1,6 +1,10 @@
+---
+baseline_commit: b17cac7cca4696a7128626c10b38502004eb51d2
+---
+
 # Story 11.4: Friend Whisper Chat
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -25,11 +29,11 @@ so that I can chat one-on-one with people I know — but never with someone I'm 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: Branch setup — whole-epic-on-one-branch**
-  - [ ] **Continue on the current branch `feat/11-3-public-player-profiles`** (do NOT cut a new branch). Per user direction, Epic 11 (11-1/11-2/11-4/11-5) ships as ONE feature/PR on this branch (same pattern as 9.7+9.8). **Hard dependency: Story 11.2** must be implemented first (or in the same branch) — this story consumes `friend.Repository.AreFriends`, `user.UserRepository.FindByUsername`, and (client) the friend-list query. Do 11.2 before 11.4 in the on-branch order.
+- [x] **Task 0: Branch setup — whole-epic-on-one-branch**
+  - [x] **Continue on the current branch `feat/11-3-public-player-profiles`** (do NOT cut a new branch). Per user direction, Epic 11 (11-1/11-2/11-4/11-5) ships as ONE feature/PR on this branch (same pattern as 9.7+9.8). **Hard dependency: Story 11.2** must be implemented first (or in the same branch) — this story consumes `friend.Repository.AreFriends`, `user.UserRepository.FindByUsername`, and (client) the friend-list query. Do 11.2 before 11.4 in the on-branch order.
 
-- [ ] **Task 1: Backend — whisper WS contract** (AC: #1, #2, #3, #4, #7)
-  - [ ] Add to `server/internal/ws/events.go`: `const ActionWhisper = "action:whisper"`, `const SystemWhisper = "system:whisper"`, and error consts `ErrorNotFriends = "error:not_friends"`, `ErrorWhisperBlockedInGame = "error:whisper_blocked_in_game"`, `ErrorWhisperRecipientOffline = "error:whisper_recipient_offline"`. Payload structs (mirror `ChatMessageRequest`/`ChatMessagePayload` at `events.go:434-448`):
+- [x] **Task 1: Backend — whisper WS contract** (AC: #1, #2, #3, #4, #7)
+  - [x] Add to `server/internal/ws/events.go`: `const ActionWhisper = "action:whisper"`, `const SystemWhisper = "system:whisper"`, and error consts `ErrorNotFriends = "error:not_friends"`, `ErrorWhisperBlockedInGame = "error:whisper_blocked_in_game"`, `ErrorWhisperRecipientOffline = "error:whisper_recipient_offline"`. Payload structs (mirror `ChatMessageRequest`/`ChatMessagePayload` at `events.go:434-448`):
     ```go
     type WhisperRequest struct {  // client → server
         ToUsername string `json:"toUsername"`
@@ -44,46 +48,46 @@ so that I can chat one-on-one with people I know — but never with someone I'm 
         Timestamp    string `json:"timestamp"` // RFC3339Nano UTC, like chat
     }
     ```
-  - [ ] Mirror the consts + a `WhisperPayload` TS interface in `client/src/shared/types/wsEvents.ts` (SAME commit). **`action:`/`system:`/`error:` are all OUTSIDE the drift gate** — do NOT add a golden JSON, a Zod schema, or a contract-test row (verified: chat/emote `system:*`/`action:*` events have none; see `events.go:336-349`, `wsEvents.ts:468-472`).
+  - [x] Mirror the consts + a `WhisperPayload` TS interface in `client/src/shared/types/wsEvents.ts` (SAME commit). **`action:`/`system:`/`error:` are all OUTSIDE the drift gate** — do NOT add a golden JSON, a Zod schema, or a contract-test row (verified: chat/emote `system:*`/`action:*` events have none; see `events.go:336-349`, `wsEvents.ts:468-472`).
 
-- [ ] **Task 2: Backend — whisper handler + action-router wiring** (AC: #1, #2, #3, #4, #6)
-  - [ ] Add whisper handling in the `chat` package (it already owns the `action:*` chat pipeline, `userRepo`, and the hub) — a new `chat/whisper_handler.go` (or a method on the existing handler) that plugs into the composite action router alongside `action:chat_message` / `action:emote` (see `chat/handler.go:72-104` `HandleAction`; wired in `cmd/api/main.go` ~`:319-333`). It must **return silently** when `msg.Type != ws.ActionWhisper` (composite-router safety).
-  - [ ] Inject narrow interfaces (keep it unit-testable + avoid import cycles — `room`/`match` must not be imported concretely if it risks a cycle; use small local interfaces):
+- [x] **Task 2: Backend — whisper handler + action-router wiring** (AC: #1, #2, #3, #4, #6)
+  - [x] Add whisper handling in the `chat` package (it already owns the `action:*` chat pipeline, `userRepo`, and the hub) — a new `chat/whisper_handler.go` (or a method on the existing handler) that plugs into the composite action router alongside `action:chat_message` / `action:emote` (see `chat/handler.go:72-104` `HandleAction`; wired in `cmd/api/main.go` ~`:319-333`). It must **return silently** when `msg.Type != ws.ActionWhisper` (composite-router safety).
+  - [x] Inject narrow interfaces (keep it unit-testable + avoid import cycles — `room`/`match` must not be imported concretely if it risks a cycle; use small local interfaces):
     ```go
     type FriendChecker interface { AreFriends(a, b uint) (bool, error) }
     type PresenceLocator interface { FindPlayerRoom(userID uint) (*room.RoomPlayer, error) } // or a bool SameRoomOrMatch(a,b)
     type Notifier interface { IsConnected(userID uint) bool; SendToUser(userID uint, msg []byte) }
     ```
-  - [ ] Handler flow for `action:whisper`:
+  - [x] Handler flow for `action:whisper`:
     1. Unmarshal `WhisperRequest`; trim; validate `text != "" && utf8.RuneCountInString(text) <= 500`; ignore self-target (`toUsername` == sender's username).
     2. Resolve target: `userRepo.FindByUsername(toUsername)`; nil → `error:not_friends` (do not disclose "no such user" — a non-existent user isn't a friend).
     3. `friend.AreFriends(senderID, targetID)` → false → `error:not_friends`.
     4. **Anti-collusion:** `FindPlayerRoom(senderID)` and `FindPlayerRoom(targetID)`; if both non-nil and same `RoomID` → `error:whisper_blocked_in_game`. (Covers waiting rooms AND active matches — `FindPlayerRoom` matches `waiting` OR `playing`, `room/gorm_repo.go:164-177`. Optionally also short-circuit via `match.Manager.MatchParticipantsByUser` for the in-match case.)
     5. **Offline:** `notifier.IsConnected(targetID)` false → `error:whisper_recipient_offline`.
     6. Build `WhisperPayload` (`Timestamp: time.Now().UTC().Format(time.RFC3339Nano)`) and `SendToUser` to **both** the target and the sender (own-echo, so the sender's thread updates) via `buildMessage(ws.SystemWhisper, payload)`.
-  - [ ] Errors go to the SENDER only: `hub.SendToUser(senderID, buildMessage(ws.ErrorXxx, map[string]string{"message": ...}))` (the `sendError` pattern at `match/live_match.go:1247-1250`). Nothing is persisted (ephemeral — no model/repo/migration, mirroring chat).
+  - [x] Errors go to the SENDER only: `hub.SendToUser(senderID, buildMessage(ws.ErrorXxx, map[string]string{"message": ...}))` (the `sendError` pattern at `match/live_match.go:1247-1250`). Nothing is persisted (ephemeral — no model/repo/migration, mirroring chat).
 
-- [ ] **Task 3: Backend tests** (AC: #1, #2, #3, #4)
-  - [ ] Handler unit tests (mirror `chat/handler_test.go`: a `hubSpy` capturing `SendToUser`/`IsConnected`, plus fakes for `FriendChecker`, `PresenceLocator`, `userRepo`): friend whisper → `system:whisper` delivered to BOTH sender and target; non-friend → `error:not_friends` (to sender only); unknown username → `error:not_friends`; same-room/same-match target → `error:whisper_blocked_in_game`; offline target → `error:whisper_recipient_offline` (and NOT delivered); text > 500 runes rejected; empty/self ignored; a wrong `msg.Type` is a silent no-op.
-  - [ ] One real-websocket integration test in the `ws_test.go` style (`httptest.Server` + two real `coder/websocket` clients per project rule): sender whispers an online friend in a different context → the second client receives exactly one `system:whisper` with the right payload, and a third uninvolved client receives nothing.
+- [x] **Task 3: Backend tests** (AC: #1, #2, #3, #4)
+  - [x] Handler unit tests (mirror `chat/handler_test.go`: a `hubSpy` capturing `SendToUser`/`IsConnected`, plus fakes for `FriendChecker`, `PresenceLocator`, `userRepo`): friend whisper → `system:whisper` delivered to BOTH sender and target; non-friend → `error:not_friends` (to sender only); unknown username → `error:not_friends`; same-room/same-match target → `error:whisper_blocked_in_game`; offline target → `error:whisper_recipient_offline` (and NOT delivered); text > 500 runes rejected; empty/self ignored; a wrong `msg.Type` is a silent no-op.
+  - [x] One real-websocket integration test in the `ws_test.go` style (`httptest.Server` + two real `coder/websocket` clients per project rule): sender whispers an online friend in a different context → the second client receives exactly one `system:whisper` with the right payload, and a third uninvolved client receives nothing.
 
-- [ ] **Task 4: Frontend — whisper store surface** (AC: #1, #5, #6)
-  - [ ] Extend `client/src/shared/stores/chatStore.ts` (or a small dedicated `whisperStore.ts`) with a per-friend thread structure — `whisperThreads: Record<string, WhisperMessage[]>` keyed by the other participant's username (or userId), an `activeChannel` selector (primary | `whisper:<username>`), and per-thread unread counts. Add `appendWhisper(payload)`, `clearWhispers()`, `markThreadRead(key)`. Cap each thread with the existing `appendWithCap`/`MAX_MESSAGES` (200) pattern (`chatStore.ts:37-46`). This is net-new surface — today `chatStore` has only three flat channel arrays and no active-channel/unread concept. Clear whisper state on the same lifecycle the other channels reset (navigation away / disconnect).
+- [x] **Task 4: Frontend — whisper store surface** (AC: #1, #5, #6)
+  - [x] Extend `client/src/shared/stores/chatStore.ts` (or a small dedicated `whisperStore.ts`) with a per-friend thread structure — `whisperThreads: Record<string, WhisperMessage[]>` keyed by the other participant's username (or userId), an `activeChannel` selector (primary | `whisper:<username>`), and per-thread unread counts. Add `appendWhisper(payload)`, `clearWhispers()`, `markThreadRead(key)`. Cap each thread with the existing `appendWithCap`/`MAX_MESSAGES` (200) pattern (`chatStore.ts:37-46`). This is net-new surface — today `chatStore` has only three flat channel arrays and no active-channel/unread concept. Clear whisper state on the same lifecycle the other channels reset (navigation away / disconnect).
 
-- [ ] **Task 5: Frontend — `/w` parsing, tabbed switcher, pink bubbles** (AC: #1, #5)
-  - [ ] In `client/src/features/chat/ChatDock.tsx` `send()` (~`:157-170`): detect a `/w ` prefix, parse `<username>` + `<message>`, and emit `sendWs(ACTION_WHISPER, { toUsername, text })` instead of `ACTION_CHAT_MESSAGE`. Reject an empty message client-side; keep the 500-char slice. (No `/` command parsing exists today — this is net-new.)
-  - [ ] Add a **tab/channel switcher** above the message list: the primary channel (the dock's `variant`) plus one tab per open whisper thread, cycled with the **`Tab` key** and clickable. The active tab drives which message slice renders. Extend the existing testid convention (`${testIdRoot}-...`) with `whisper-tab-<username>`, `whisper-tab-active`, etc.
-  - [ ] Render whisper bubbles in a **pink** variant of `ChatLine` (`ChatDock.tsx:371-380`) — add a pink token set analogous to the `.chat-dock-match` felt re-skin (`ChatDock.tsx:177-180`); label each thread with the friend's username. Never render whisper content in the primary channel.
+- [x] **Task 5: Frontend — `/w` parsing, tabbed switcher, pink bubbles** (AC: #1, #5)
+  - [x] In `client/src/features/chat/ChatDock.tsx` `send()` (~`:157-170`): detect a `/w ` prefix, parse `<username>` + `<message>`, and emit `sendWs(ACTION_WHISPER, { toUsername, text })` instead of `ACTION_CHAT_MESSAGE`. Reject an empty message client-side; keep the 500-char slice. (No `/` command parsing exists today — this is net-new.)
+  - [x] Add a **tab/channel switcher** above the message list: the primary channel (the dock's `variant`) plus one tab per open whisper thread, cycled with the **`Tab` key** and clickable. The active tab drives which message slice renders. Extend the existing testid convention (`${testIdRoot}-...`) with `whisper-tab-<username>`, `whisper-tab-active`, etc.
+  - [x] Render whisper bubbles in a **pink** variant of `ChatLine` (`ChatDock.tsx:371-380`) — add a pink token set analogous to the `.chat-dock-match` felt re-skin (`ChatDock.tsx:177-180`); label each thread with the friend's username. Never render whisper content in the primary channel.
 
-- [ ] **Task 6: Frontend — WS dispatch (whisper + errors)** (AC: #1, #2, #3, #4)
-  - [ ] Add a `SYSTEM_WHISPER` case to `dispatchSystemEvent` in `client/src/shared/hooks/useWsDispatch.ts` (~`:558`, next to `SYSTEM_CHAT_MESSAGE` at `:800`): validate the payload defensively (`typeof fromUserId === "number"`, etc. — never JS-truthiness on Go numerics), determine the thread key (the OTHER participant relative to the current user), and `appendWhisper`. Open/focus the thread tab if new.
-  - [ ] Add `error:not_friends` / `error:whisper_blocked_in_game` / `error:whisper_recipient_offline` handling in `dispatchErrorEvent` (~`:868-899`): surface a localized inline hint or `toast.error` (mirror the `ERROR_SURRENDER_EXHAUSTED` toast branch at `:875-879`). Import the new consts at the top (`:84-101`).
+- [x] **Task 6: Frontend — WS dispatch (whisper + errors)** (AC: #1, #2, #3, #4)
+  - [x] Add a `SYSTEM_WHISPER` case to `dispatchSystemEvent` in `client/src/shared/hooks/useWsDispatch.ts` (~`:558`, next to `SYSTEM_CHAT_MESSAGE` at `:800`): validate the payload defensively (`typeof fromUserId === "number"`, etc. — never JS-truthiness on Go numerics), determine the thread key (the OTHER participant relative to the current user), and `appendWhisper`. Open/focus the thread tab if new.
+  - [x] Add `error:not_friends` / `error:whisper_blocked_in_game` / `error:whisper_recipient_offline` handling in `dispatchErrorEvent` (~`:868-899`): surface a localized inline hint or `toast.error` (mirror the `ERROR_SURRENDER_EXHAUSTED` toast branch at `:875-879`). Import the new consts at the top (`:84-101`).
 
-- [ ] **Task 7: i18n** (AC: #8)
-  - [ ] Add a `whisper.*` block to all four locales `client/src/shared/i18n/{en,sr,mk,hr}.json`: the `/w` input placeholder/help, tab label ("Whisper to {{username}}"), and the three error hints (`notFriends`, `blockedInGame`, `recipientOffline`). `mk` all-Cyrillic; NO em dash in `mk`/`sr`/`hr`. `i18n.parity.test.ts` green.
+- [x] **Task 7: i18n** (AC: #8)
+  - [x] Add a `whisper.*` block to all four locales `client/src/shared/i18n/{en,sr,mk,hr}.json`: the `/w` input placeholder/help, tab label ("Whisper to {{username}}"), and the three error hints (`notFriends`, `blockedInGame`, `recipientOffline`). `mk` all-Cyrillic; NO em dash in `mk`/`sr`/`hr`. `i18n.parity.test.ts` green.
 
-- [ ] **Task 8: Full validation gates** (AC: #8)
-  - [ ] `make lint` + `make test` green (Go real-websocket test RUNS; client vitest for the store, `/w` parse, tab-cycle, dispatch). Update File List + Completion Notes. If the WS integration test needs the dev DB, run against `:5433`; the whisper path itself is DB-free (ephemeral) but `FindPlayerRoom`/`FindByUsername`/`AreFriends` touch Postgres.
+- [x] **Task 8: Full validation gates** (AC: #8)
+  - [x] `make lint` + `make test` green (Go real-websocket test RUNS; client vitest for the store, `/w` parse, tab-cycle, dispatch). Update File List + Completion Notes. If the WS integration test needs the dev DB, run against `:5433`; the whisper path itself is DB-free (ephemeral) but `FindPlayerRoom`/`FindByUsername`/`AreFriends` touch Postgres.
 
 ## Dev Notes
 
@@ -160,12 +164,81 @@ so that I can chat one-on-one with people I know — but never with someone I'm 
 
 ### Agent Model Used
 
-_TBD by dev-story_
+Opus 4.8 (claude-opus-4-8[1m]) — bmad-dev-story workflow.
 
 ### Debug Log References
 
+- `go test ./...` (server) — all 20 packages ok, DB-backed friend/room/user/ws tests PASSING (dev DB on :5433, migration state unchanged — whisper adds no migration).
+- `go run golangci-lint@v1.64.8 run ./internal/chat/... ./internal/ws/... ./cmd/...` — clean (env's golangci-lint is v2.12.2 which rejects the v1 `.golangci.yml`; pinned v1.64.8 via `go run`, same approach as 9.7/9.8).
+- `npx vitest run` (client) — 108 files / 1162 tests pass (baseline 1140 on this branch; +22 net from the new whisper store/dispatch/dock tests, some existing files recounted).
+- `tsc -p tsconfig.build.json` clean; `eslint` clean (1 import-sort autofix in ChatDock.test.tsx); `prettier --check` clean; i18n parity green.
+
 ### Completion Notes List
 
-- Ultimate context engine analysis completed — comprehensive developer guide created.
+- **D1 honored — `system:whisper`, not `event:whisper`.** Implemented `action:whisper` (client→server) + `system:whisper` (server→client) + three `error:*` events, mirroring the chat/emote pipeline. **AC7 independently verified**: zero drift-gate touchpoints — `grep -i whisper` over `events_contract_test.go`, `testdata/events/`, `wsEvents.schemas.ts`, `wsEvents.contract.test.ts` returns nothing, and none of those files are in the diff. The contract is exactly two files: `ws/events.go` + `wsEvents.ts`.
+- **Backend handler is a sibling, not a method** — `chat/whisper_handler.go` (`WhisperHandler`) rather than extending the chat `Handler`, because whisper needs per-user `SendToUser` + `IsConnected` (chat's `Broadcaster` has neither) and a friend/presence check; keeping it separate left the chat `Handler` and all its tests untouched. Narrow local interfaces (`FriendChecker`, `PresenceLocator`, `WhisperNotifier`) so the `chat` package imports neither `friend` nor `room` — no import-cycle risk, fully unit-testable.
+- **Anti-collusion is one presence comparison (D3)** — `PresenceLocator.ActiveRoomID(userID) (roomID, inRoom, err)`, adapted in `main.go` over `room.FindPlayerRoom` (which matches `waiting` OR `playing`), so a shared waiting room AND a shared active match are both covered by "both in a room AND same roomID". Deliberately chose to return a plain `(roomID, bool)` from the interface rather than `*room.RoomPlayer`, to keep the anti-collusion comparison inside the (testable) handler and the `chat` package free of a `room` import.
+- **Fail-closed on internal errors** — a `FindByUsername` / `AreFriends` / `ActiveRoomID` error logs and returns with NO delivery (never leaks, never delivers to an unverified friend). The three defined rejections (`not_friends`, `whisper_blocked_in_game`, `whisper_recipient_offline`) are the only sender-facing errors; a non-existent username maps to `not_friends` (does not disclose "no such user"). Self-whisper is compared by resolved ID (casing/whitespace can't defeat it) and silently ignored.
+- **Offline pre-check (D4)** — explicit `hub.IsConnected(targetID)` before building the payload, because `SendToUser` is a silent no-op for offline users. Own-echo: the same `system:whisper` payload is sent to BOTH the recipient and the sender so the sender's thread renders their own message.
+- **Frontend store surface is net-new** — `chatStore` gained `whisperThreads` (keyed by the OTHER participant's username), `whisperUnread`, a global `activeChannel` (`primary` | `whisper:<username>`), and `appendWhisper/setActiveChannel/markThreadRead/clearWhispers`. `appendWhisper(payload, myUserId)` keys the thread + bumps unread only for an incoming (non-own-echo) message on a non-active thread — all logic in the store, so it is fully unit-tested. `clearWhispers` wired into `authStore.logout` alongside the other channel resets (ephemeral, AC6).
+- **ChatDock: net-new tab switcher + `/w` parser + pink bubbles.** A tab strip renders only when ≥1 whisper thread exists (so the existing single-channel docks are visually unchanged and their tests untouched); primary + one tab per friend, each with an unread badge, cycled with `Tab`/`Shift+Tab` (Valorant-style) and clickable. `send()` routes `/w <user> <msg>` to `action:whisper` from any channel (a partial `/w` is swallowed, never leaked to the public channel), an active whisper tab whispers that friend directly, else the normal chat path (unchanged). Pink bubbles via new `--whisper-*` CSS tokens (a `.chat-dock-match` override for the dark felt dock, mirroring the accent re-skin). The FAB unread/peek logic is deliberately left primary-only (untouched) so all existing dock tests pass verbatim — whisper unread surfaces on the tab badges when the dock is open.
+- **Deferred nicety (noted, not a gap):** a CLOSED dock does not surface an incoming-whisper signal on the FAB (the FAB badge/peek remain primary-channel-only to avoid destabilising the tightly-tested existing behaviour). The whisper unread indicator lives on the tab, visible when the dock is open. Candidate for a future polish pass if desired.
+- **NOT done, stated rather than implied:** manual E2E (Playwright, two live clients) has NOT been run — every gate above is automated. 9.6 found real bugs in manual E2E after its review passed, so a manual pass is recommended before merge (two online friends: `/w` delivery both ways, non-friend/offline/same-room rejections, tab cycling, pink rendering).
 
 ### File List
+
+**Backend (new):**
+
+- `server/internal/chat/whisper_handler.go` — `WhisperHandler` + narrow interfaces (`FriendChecker`, `PresenceLocator`, `WhisperNotifier`), the `action:whisper` flow.
+- `server/internal/chat/whisper_handler_test.go` — handler unit tests (friend delivery to both, non-friend/unknown → not_friends, same-room block, different-room allowed, offline reject, rune-cap, self/empty ignore, wrong-type no-op, fail-closed on friend-check error).
+- `server/internal/chat/whisper_integration_test.go` — real-websocket integration test (httptest + real hub + 3 coder/websocket clients: delivery to both participants, none to an uninvolved third).
+
+**Backend (modified):**
+
+- `server/internal/ws/events.go` — whisper action/system consts, 3 error consts, `WhisperRequest`/`WhisperPayload` (with the D1 drift-gate rationale in the doc comment).
+- `server/cmd/api/main.go` — `friendRepo` created earlier (shared with friend routes), `whisperHandler` wired into the action router before the session manager, `whisperPresenceLocator` adapter over `room.RoomRepository`.
+- `server/internal/chat/handler_test.go` — `userRepoStub.FindByUsername` now resolves from the seeded users (was a stub returning nil; no existing chat test used it).
+
+**Frontend (new):**
+
+- `client/src/features/chat/ChatDock.test.tsx` — whisper UI tests (`/w` send + partial-leak guard, tab + pink bubble render, active-thread compose, Tab-cycle, no-tabs baseline).
+
+**Frontend (modified):**
+
+- `client/src/shared/types/wsEvents.ts` — whisper consts + `WhisperRequest`/`WhisperPayload` (D1 drift-gate note).
+- `client/src/shared/stores/chatStore.ts` — whisper thread surface (`whisperThreads`/`whisperUnread`/`activeChannel` + actions), generic `appendWithCap<T>`, `ChatChannel` type + `whisperChannel()`.
+- `client/src/shared/stores/chatStore.test.ts` — whisper store tests.
+- `client/src/shared/stores/authStore.ts` — `clearWhispers()` on logout.
+- `client/src/shared/hooks/useWsDispatch.ts` — `system:whisper` case (author-keyed thread, defensive numeric validation, drop when no signed-in user) + 3 `error:*` toast cases.
+- `client/src/shared/hooks/useWsDispatch.test.ts` — whisper dispatch tests.
+- `client/src/features/chat/ChatDock.tsx` — `/w` parser, tab switcher + `Tab` cycling, pink whisper bubbles, active-thread compose.
+- `client/src/index.css` — `--whisper-*` pink token set (+ `.chat-dock-match` override).
+- `client/src/shared/i18n/{en,sr,mk,hr}.json` — `whisper.*` block (primaryTab, tablistLabel, inputPlaceholder, hint, errors ×3); mk all-Cyrillic, no em dash in mk/sr/hr, parity green.
+
+## Change Log
+
+| Date       | Version | Description                                                                 | Author  |
+| ---------- | ------- | --------------------------------------------------------------------------- | ------- |
+| 2026-08-15 | 0.1     | Implemented Story 11.4 (friend whisper chat) end-to-end — `action:`/`system:whisper` contract (zero drift-gate touchpoints per D1), server-authoritative friends-only + anti-collusion + offline checks, ephemeral whisper store surface, `/w` parser + tabbed switcher + pink bubbles + Tab cycling, i18n ×4. All automated gates green. Status → review. | Amelia (dev-story) |
+
+## Review Findings
+
+_3-lens adversarial code review (Blind Hunter + Edge Case Hunter + Acceptance Auditor), 2026-08-16. The parallel-subagent mechanism failed to execute in this environment, so all three lenses were run directly in the main thread. AC1–AC8 and D1–D5 all independently verified in code (not from checkboxes): AreFriends direction-agnostic, anti-collusion same-RoomID covers waiting + playing, explicit offline pre-check, fail-closed on every internal error, no user enumeration, own-echo to both, rune-cap (not byte-cap), ephemeral/no-DB, drift-gate genuinely untouched, i18n parity + mk-Cyrillic + no em dash, XSS-safe render, immutable store, typeof-guarded numerics. 5 findings dismissed as noise._
+
+- [x] [Review][Patch] Incoming whispers give no notification while the chat dock is CLOSED — `appendWhisper` bumps `whisperUnread`, but the FAB unread badge counts only primary-channel messages ([ChatDock.tsx:144-162](client/src/features/chat/ChatDock.tsx#L144-L162)) and the per-thread tab badges render only in the open-dock JSX ([ChatDock.tsx:376-401](client/src/features/chat/ChatDock.tsx#L376-L401)). In the default dock-closed state a recipient gets no FAB badge, no peek, no tab badge — the whisper is silently in the store until they happen to open the dock, degrading the core private-messaging use case (AC1/AC5 intent). **RESOLVED → Patched (2026-08-16): `whisperUnreadTotal` memo folded into the closed FAB badge count (`badgeCount = unread + whisperUnreadTotal`), numeric only — no content peek. +1 regression test ("surfaces an incoming whisper on the closed FAB unread badge").** **MEDIUM.**
+- [x] [Review][Defer] `Tab`-key channel cycling hijacks input focus whenever ≥1 whisper thread exists — [ChatDock.tsx:432-435](client/src/features/chat/ChatDock.tsx#L432-L435) `preventDefault`s `Tab` even on the primary channel, so a keyboard-only user cannot Tab from the message input to Send or out of the dock while any thread exists. This is the spec-mandated Valorant-style cycling (AC5) but its scope (active on primary too) is an a11y regression. — deferred (2026-08-16 decision): spec-mandated AC5 tradeoff, low impact (Send stays clickable, Enter sends); revisit in a future a11y pass. **LOW.**
+- [x] [Review][Patch] Fail-closed error branches are untested — [whisper_handler.go:104-116](server/internal/chat/whisper_handler.go#L104-L116),[145-154](server/internal/chat/whisper_handler.go#L145-L154) fail closed on sender `FindByID` error, target `FindByUsername` error, and `ActiveRoomID` (presence) error, but the handler tests cover only the friend-check error branch. **RESOLVED → Patched (2026-08-16): added `TestWhisper_PresenceLookupError_FailsClosed`, `TestWhisper_TargetLookupError_FailsClosed`, `TestWhisper_SenderLookupError_FailsClosed`; `userRepoStub` gained opt-in `findByUsernameErr`/`findByIDErr` (default nil, no impact on chat tests).** [server/internal/chat/whisper_handler_test.go](server/internal/chat/whisper_handler_test.go) **LOW.**
+- [x] [Review][Defer] Draft cleared optimistically before a whisper can be rejected [ChatDock.tsx:205-209](client/src/features/chat/ChatDock.tsx#L205-L209) — `sendWhisper` calls `setDraft("")` immediately; on a `not_friends`/`blocked_in_game`/`recipient_offline` rejection the typed text is lost and only a toast remains. Inherits chat's no-delivery-ack optimistic-clear pattern (no ack correlation exists to restore on failure). Deferred, pre-existing architectural trait. **LOW.**
+
+## Live E2E Verification (2026-08-16)
+
+Server-side end-to-end run against the real `make dev` stack (Go handler + real `ws.Hub` + Postgres on :5433 @ v19; three live WS clients driven via a Node 22 native `fetch`/`WebSocket` script). **NOTE:** the React UI (tab switcher, pink bubbles, `Tab`-cycling, the new closed-FAB whisper badge) was NOT exercised in a real browser — `@playwright/test` is not installed and the Playwright MCP browser tools were unavailable this session; those UI pieces remain covered only by the vitest component tests. The security-critical, server-authoritative surface was verified live end-to-end. **22/22 assertions passed:**
+
+- Friend whisper delivered to BOTH participants (own-echo + recipient), both directions; an uninvolved third client received nothing.
+- Non-friend → `error:not_friends`; unknown username → `error:not_friends` (no "no such user" leak); neither reached the target.
+- Self-whisper silently ignored (no echo, no error).
+- Rune cap: 500 chars delivered, 501 rejected (no delivery).
+- Anti-collusion (AC3) LIVE: alice created a free public room + bob joined → `error:whisper_blocked_in_game`, blocked whisper never reached bob; after bob `POST /rooms/:id/leave`, the same whisper was delivered again.
+- Offline recipient (AC4) LIVE: after bob's WS closed and the hub unregistered him, alice's whisper → `error:whisper_recipient_offline`.
+
+Throwaway accounts/friendship/room hard-deleted from the dev DB afterward (0 residue verified); `room_players` cleanup on `/leave` confirmed (0 rows left before explicit delete). Stack stopped; Postgres left running.

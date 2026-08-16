@@ -527,6 +527,26 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────
+   Whisper bubbles (Story 11.4) — a pink tint distinct from the accent /
+   team palettes, marking private friend messages in the ChatDock. The
+   default set reads on the parchment lobby/room dock; `.chat-dock-match`
+   re-points to a brighter pink that reads on the dark felt match dock,
+   mirroring how the match skin re-points the accent family above.
+   ────────────────────────────────────────────────────────────────────── */
+:root {
+  --whisper-fill: rgba(194, 86, 138, 0.12);
+  --whisper-border: rgba(194, 86, 138, 0.4);
+  --whisper-ink: #a83d70;
+  --whisper-name: #c2568a;
+}
+.chat-dock-match {
+  --whisper-fill: rgba(240, 168, 204, 0.16);
+  --whisper-border: rgba(240, 168, 204, 0.45);
+  --whisper-ink: #f2b8d4;
+  --whisper-name: #f2b8d4;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
    Shared keyframes — referenced across screens.
    ────────────────────────────────────────────────────────────────────── */
 @keyframes pulse-dot {

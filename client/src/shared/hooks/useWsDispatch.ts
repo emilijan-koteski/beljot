@@ -48,6 +48,7 @@ import type {
   SurrenderProposedPayload,
   TrickResolvedPayload,
   TrumpSelectedPayload,
+  WhisperPayload,
   WsMessage,
   XpAwardedPayload,
 } from "@/shared/types/wsEvents";
@@ -58,11 +59,14 @@ import {
   ERROR_INVALID_ACTION,
   ERROR_MATCH_START_FAILED,
   ERROR_NO_ACTIVE_PAUSE,
+  ERROR_NOT_FRIENDS,
   ERROR_NOT_ROOM_OWNER,
   ERROR_NOT_YOUR_TURN,
   ERROR_PAUSE_EXHAUSTED,
   ERROR_PLAYER_DISCONNECTED,
   ERROR_SURRENDER_EXHAUSTED,
+  ERROR_WHISPER_BLOCKED_IN_GAME,
+  ERROR_WHISPER_RECIPIENT_OFFLINE,
   ERROR_WRONG_PHASE,
   EVENT_AUTO_ACTION,
   EVENT_BELOT_ANNOUNCED,
@@ -102,6 +106,7 @@ import {
   SYSTEM_ROOM_OWNER_CHANGED,
   SYSTEM_ROOM_UPDATED,
   SYSTEM_SEAT_UPDATED,
+  SYSTEM_WHISPER,
 } from "@/shared/types/wsEvents";
 
 export function useWsDispatch() {
@@ -881,6 +886,32 @@ function dispatchSystemEvent(message: WsMessage): void {
     useMatchStore.getState().setActiveEmote(payload.playerSeat, payload.emote);
     return;
   }
+
+  // Whisper received (Story 11.4). The SAME payload arrives at both participants
+  // (own-echo + recipient); the store keys the thread by whichever participant
+  // is not the local user. Ephemeral — no persistence, mirroring chat.
+  if (type === SYSTEM_WHISPER) {
+    const payload = message.payload as WhisperPayload;
+    // Validate the Go-origin fields explicitly — never JS truthiness on numerics
+    // (a real userId of any value is legitimate). Reject a malformed frame.
+    if (
+      typeof payload?.fromUserId !== "number" ||
+      typeof payload?.fromUsername !== "string" ||
+      typeof payload?.toUserId !== "number" ||
+      typeof payload?.toUsername !== "string" ||
+      typeof payload?.message !== "string" ||
+      typeof payload?.timestamp !== "string"
+    ) {
+      console.warn("WS: ignoring malformed system:whisper payload", payload);
+      return;
+    }
+    const myId = useAuthStore.getState().user?.id;
+    // Without a resolved local user we cannot decide which participant keys the
+    // thread — drop rather than mis-key. Whispers only arrive while authed.
+    if (typeof myId !== "number") return;
+    useChatStore.getState().appendWhisper(payload, myId);
+    return;
+  }
 }
 
 // Game error types that should trigger a user-visible toast
@@ -919,6 +950,22 @@ function dispatchErrorEvent(message: WsMessage): void {
     }
     useMatchStore.getState().setLastError(message.type);
     toast.error(i18n.t("room.errors.matchStartFailed"), { duration: 5000 });
+    return;
+  }
+
+  // Whisper errors (Story 11.4) — sent to the sender only, surfaced as an inline
+  // toast hint. These are not GAME_ERROR_TYPES (no match store involvement); a
+  // whisper can be attempted from the lobby with no match in scope.
+  if (message.type === ERROR_NOT_FRIENDS) {
+    toast.error(i18n.t("whisper.errors.notFriends"));
+    return;
+  }
+  if (message.type === ERROR_WHISPER_BLOCKED_IN_GAME) {
+    toast.error(i18n.t("whisper.errors.blockedInGame"));
+    return;
+  }
+  if (message.type === ERROR_WHISPER_RECIPIENT_OFFLINE) {
+    toast.error(i18n.t("whisper.errors.recipientOffline"));
     return;
   }
 

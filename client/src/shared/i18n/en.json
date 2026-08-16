@@ -336,6 +336,17 @@
     "title": "Lobby chat",
     "placeholderDisabled": "Reconnecting…"
   },
+  "whisper": {
+    "primaryTab": "Chat",
+    "tablistLabel": "Chat channels",
+    "inputPlaceholder": "Whisper to {{username}}…",
+    "hint": "Type /w <friend> <message> to whisper a friend privately",
+    "errors": {
+      "notFriends": "You can only whisper friends.",
+      "blockedInGame": "You can't whisper someone you're currently playing with.",
+      "recipientOffline": "That friend is offline. Whispers are real-time only."
+    }
+  },
   "room": {
     "chat": {
       "title": "Room chat",

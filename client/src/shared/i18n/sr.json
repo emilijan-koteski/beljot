@@ -336,6 +336,17 @@
     "title": "Lobi chat",
     "placeholderDisabled": "Ponovno povezivanje…"
   },
+  "whisper": {
+    "primaryTab": "Chat",
+    "tablistLabel": "Kanali chata",
+    "inputPlaceholder": "Šapat za {{username}}…",
+    "hint": "Ukucaj /w <prijatelj> <poruka> za privatni šapat",
+    "errors": {
+      "notFriends": "Možeš da šapćeš samo prijateljima.",
+      "blockedInGame": "Ne možeš da šapćeš nekome sa kim trenutno igraš.",
+      "recipientOffline": "Taj prijatelj nije na mreži. Šaptanje radi samo uživo."
+    }
+  },
   "room": {
     "chat": {
       "title": "Chat sobe",

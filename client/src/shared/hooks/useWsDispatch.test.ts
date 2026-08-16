@@ -1928,3 +1928,86 @@ describe("useWsDispatch — honor updated (Story 9.7)", () => {
     expect(useAuthStore.getState().user).toBeNull();
   });
 });
+
+describe("useWsDispatch — whisper (Story 11.4)", () => {
+  const me: User = makeUser({ id: 1, username: "alice" });
+
+  function validWhisper() {
+    return {
+      fromUserId: 2,
+      fromUsername: "bob",
+      toUserId: 1,
+      toUsername: "alice",
+      message: "psst",
+      timestamp: "2026-08-15T12:00:00Z",
+    };
+  }
+
+  beforeEach(() => {
+    __resetWsDispatchStateForTests();
+    vi.restoreAllMocks();
+    useAuthStore.setState({ user: { ...me } });
+    useChatStore.getState().clearWhispers();
+  });
+
+  it("appends an incoming system:whisper to the sender-keyed thread", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "system:whisper", payload: validWhisper() });
+
+    const state = useChatStore.getState();
+    expect(state.whisperThreads.bob).toHaveLength(1);
+    expect(state.whisperThreads.bob![0]!.message).toBe("psst");
+    expect(state.whisperUnread.bob).toBe(1);
+  });
+
+  it("appends an own-echo whisper without bumping unread", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "system:whisper",
+      payload: {
+        fromUserId: 1,
+        fromUsername: "alice",
+        toUserId: 2,
+        toUsername: "bob",
+        message: "hi bob",
+        timestamp: "2026-08-15T12:00:00Z",
+      },
+    });
+
+    const state = useChatStore.getState();
+    expect(state.whisperThreads.bob).toHaveLength(1);
+    expect(state.whisperUnread.bob ?? 0).toBe(0);
+  });
+
+  it("ignores a malformed system:whisper payload", () => {
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { result } = renderHook(() => useWsDispatch());
+    const malformed = [
+      { ...validWhisper(), fromUserId: "2" },
+      { ...validWhisper(), message: 123 },
+      { ...validWhisper(), toUsername: null },
+      {},
+    ];
+    for (const payload of malformed) {
+      result.current({ type: "system:whisper", payload });
+    }
+    expect(useChatStore.getState().whisperThreads).toEqual({});
+    expect(consoleWarnSpy).toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it("drops a whisper when no user is signed in (cannot key the thread)", () => {
+    useAuthStore.setState({ user: null });
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "system:whisper", payload: validWhisper() });
+    expect(useChatStore.getState().whisperThreads).toEqual({});
+  });
+
+  it("surfaces a toast for each whisper error type", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "error:not_friends", payload: {} });
+    result.current({ type: "error:whisper_blocked_in_game", payload: {} });
+    result.current({ type: "error:whisper_recipient_offline", payload: {} });
+    expect(toast.error).toHaveBeenCalledTimes(3);
+  });
+});
