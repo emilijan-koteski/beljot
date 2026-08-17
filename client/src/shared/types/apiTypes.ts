@@ -87,7 +87,9 @@ export interface InvitableFriend {
   userId: number;
   username: string;
   available: boolean;
-  reason: "" | "offline" | "in_match" | "in_room" | "room_full";
+  // "in_room" is some OTHER room; "in_this_room" is already seated here. Both
+  // block the invite, but only one of them means "look for them elsewhere".
+  reason: "" | "offline" | "in_match" | "in_room" | "in_this_room" | "room_full";
 }
 
 /** The four friendship states between a viewer and a subject (Story 11.2). */

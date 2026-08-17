@@ -60,7 +60,9 @@
       "winTitle": "Win streak — {{count}} in a row",
       "lossTitle": "Cold streak — {{count}} losses in a row",
       "winSubtitle": "Keep it going — your next match counts toward the streak.",
+      "winSubtitlePublic": "Their next match counts toward the streak.",
       "lossSubtitle": "Shake it off — Quick Play to break the run.",
+      "lossSubtitlePublic": "The run breaks with their next win.",
       "play": "Play"
     },
     "stats": {
@@ -83,9 +85,11 @@
       "meterLabel": "Honor {{score}} of 100, {{tier}}",
       "lastWindow": "Last {{window}}",
       "trendTooltip": "Your last {{window}} matches compared with the {{window}} before them.",
+      "trendTooltipPublic": "Their last {{window}} matches compared with the {{window}} before them.",
       "newPlayerChip": "New Player",
       "newPlayerProgress": "{{played}} / {{total}}",
       "newPlayerHint": "Play 5 matches to get an honor score.",
+      "newPlayerHintPublic": "Gets an honor score after 5 matches.",
       "explainer": {
         "open": "How it works",
         "title": "How honor works",
@@ -206,12 +210,14 @@
       "eyebrow": "Spotlight",
       "title": "Most-played partner",
       "matchesTogether": "{{count}} matches together",
-      "empty": "No regular partners yet — play a few matches."
+      "empty": "No regular partners yet — play a few matches.",
+      "emptyPublic": "No regular partners yet."
     },
     "rivals": {
       "eyebrow": "Rivalry",
       "title": "Across the table",
-      "empty": "No rivals yet — play a few matches."
+      "empty": "No rivals yet — play a few matches.",
+      "emptyPublic": "No rivals yet."
     },
     "linkedAccounts": {
       "eyebrow": "Account",
@@ -275,19 +281,17 @@
     "decline": "Decline",
     "online": "Online",
     "offline": "Offline",
-    "inviteToRoom": "Invite to room",
+    "whisperAria": "Whisper {{username}}",
     "someone": "Someone",
     "viewProfileAria": "View {{username}}'s profile",
     "requestReceivedToast": "{{username}} sent you a friend request",
     "list": {
       "heading": "Friends",
       "loading": "Loading friends…",
-      "empty": "No friends yet. Find players in search and send a request."
+      "empty": "No friends yet. Find players and send a friend request."
     },
     "requests": {
-      "heading": "Friend requests",
-      "loading": "Loading requests…",
-      "empty": "No pending friend requests."
+      "heading": "Friend requests"
     },
     "errors": {
       "sendFailed": "Couldn't send friend request. Please try again.",
@@ -512,7 +516,6 @@
   },
   "roomInvite": {
     "someone": "Someone",
-    "needARoom": "Open a room first, then invite friends from inside it.",
     "popup": {
       "title": "Room invite",
       "body": "{{inviter}} invited you to join \"{{roomName}}\".",
@@ -529,7 +532,7 @@
       "description": "Friends who are online and free to play can be invited to this room.",
       "loading": "Loading friends…",
       "loadFailed": "Couldn't load your friends. Please try again.",
-      "empty": "No friends yet. Find players in search and send a request.",
+      "empty": "No friends yet. Find players and send a friend request.",
       "invite": "Invite",
       "invited": "Invited"
     },
@@ -537,6 +540,7 @@
       "offline": "Offline",
       "inMatch": "In a match",
       "inRoom": "In another room",
+      "alreadyHere": "Already in this room",
       "roomFull": "This room is full",
       "unavailable": "Not available right now"
     },
@@ -703,7 +707,7 @@
       "placeholder": "Search players by username…",
       "loading": "Searching…",
       "empty": "No players found matching \"{{query}}\"",
-      "clear": "Clear search",
+      "close": "Close search",
       "resultAria": "View {{username}}'s profile"
     },
     "empty": {

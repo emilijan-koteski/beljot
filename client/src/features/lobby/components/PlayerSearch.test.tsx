@@ -20,11 +20,11 @@ vi.mock("@/shared/api/users", () => ({
   searchUsers: (...args: unknown[]) => mockSearchUsers(...args),
 }));
 
-function renderSearch() {
+function renderSearch(props: { onClose?: () => void } = {}) {
   render(
     <QueryWrapper>
       <BrowserRouter>
-        <PlayerSearch />
+        <PlayerSearch {...props} />
       </BrowserRouter>
     </QueryWrapper>,
   );
@@ -89,17 +89,29 @@ describe("PlayerSearch", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/players/7");
   });
 
-  it("clears the input when the clear button is pressed", async () => {
+  // The panel is opened from the Friends card header and dismissed from there or
+  // with Escape — there is no in-field clear button to duplicate that control.
+  it("drops the term and asks the host to close on Escape", async () => {
     const user = userEvent.setup();
+    const onClose = vi.fn();
     mockSearchUsers.mockResolvedValue([{ id: 7, username: "alice" }]);
-    renderSearch();
+    renderSearch({ onClose });
 
     const input = screen.getByTestId<HTMLInputElement>("player-search");
     await user.type(input, "al");
     expect(input.value).toBe("al");
 
-    await user.click(screen.getByTestId("player-search-clear"));
+    await user.type(input, "{Escape}");
+
     expect(input.value).toBe("");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes the focus on mount, so opening the search is one click", () => {
+    mockSearchUsers.mockResolvedValue([]);
+    renderSearch();
+
+    expect(screen.getByTestId("player-search")).toHaveFocus();
   });
 
   it("removes the results list after the input is cleared", async () => {
@@ -113,7 +125,7 @@ describe("PlayerSearch", () => {
 
     // keepPreviousData keeps the resolved rows in the query cache, but the list
     // is gated on the active (>=2 char) term, so it must disappear on clear.
-    await user.click(screen.getByTestId("player-search-clear"));
+    await user.clear(input);
     await waitFor(() => expect(screen.queryByTestId("player-search-result")).toBeNull());
   });
 

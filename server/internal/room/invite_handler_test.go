@@ -407,6 +407,42 @@ func TestListInvitableFriends_AnnotatesAvailability(t *testing.T) {
 	assert.Equal(t, "in_room", byID[203].Reason)
 }
 
+// A friend seated in the room being invited into is NOT "in another room": the
+// host can see them in the seats, and the panel used to send them looking
+// elsewhere for someone sitting at this very table.
+func TestListInvitableFriends_FriendSeatedHereReadsAsAlreadyHere(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "", 0, true)
+
+	h.befriend(100, "owner", 200, "here")
+	h.befriend(100, "owner", 201, "elsewhere")
+	h.available(200, 201)
+
+	// 200 sits in room 1 — the room this panel is for. 201 sits in another room.
+	require.NoError(t, h.repo.AddPlayer(&room.RoomPlayer{RoomID: 1, UserID: 200, Username: "here"}))
+	other := seedInviteRoom(t, h.repo, 300, "", 0, true)
+	require.NoError(t, h.repo.AddPlayer(&room.RoomPlayer{
+		RoomID: other.ID, UserID: 201, Username: "elsewhere",
+	}))
+
+	rec := doListInvitable(h.e, "1", validToken(100))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp struct {
+		Data []room.InvitableFriendDTO `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	byID := map[uint]room.InvitableFriendDTO{}
+	for _, f := range resp.Data {
+		byID[f.UserID] = f
+	}
+
+	assert.False(t, byID[200].Available, "already seated here is still not invitable")
+	assert.Equal(t, "in_this_room", byID[200].Reason)
+	assert.False(t, byID[201].Available)
+	assert.Equal(t, "in_room", byID[201].Reason, "another room keeps the old reason")
+}
+
 func TestListInvitableFriends_CallerNotInRoomIsRejected(t *testing.T) {
 	h := setupInviteTest(nil)
 	seedInviteRoom(t, h.repo, 100, "", 0, true)

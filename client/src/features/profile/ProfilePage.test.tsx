@@ -339,4 +339,20 @@ describe("ProfilePage", () => {
     // Win streak callout shows.
     expect(screen.getByTestId("profile-streak")).toHaveAttribute("data-streak-kind", "win");
   });
+
+  // The self page is the one place the second-person copy is correct — the
+  // reader IS the subject here. Pins the subjectIsSelf default that the public
+  // page overrides (Story 11.3 wording fix).
+  it("keeps the second-person streak copy and the Play link on the viewer's own profile", async () => {
+    mockGetProfile.mockResolvedValueOnce(
+      profileFixture({ totalGamesPlayed: 5, wins: 3, losses: 2 }),
+    );
+    mockGetCareer.mockResolvedValueOnce(careerFixture({ streak: { kind: "loss", length: 3 } }));
+
+    renderProfilePage();
+
+    const callout = await screen.findByTestId("profile-streak");
+    expect(callout).toHaveTextContent(/Shake it off/);
+    expect(screen.getByTestId("profile-streak-play")).toBeInTheDocument();
+  });
 });

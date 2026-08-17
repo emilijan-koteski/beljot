@@ -1,21 +1,45 @@
-import { Search, UserRound, X } from "lucide-react";
-import { useState } from "react";
+import { Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
+import { Avatar } from "@/shared/components/ui/avatar";
 import { useUserSearch } from "@/shared/hooks/queries/useUserSearch";
 import { useDebounce } from "@/shared/hooks/useDebounce";
+
+type PlayerSearchProps = {
+  /**
+   * Collapses the search back to its icon button. Called on Escape — the host
+   * (FriendList) owns the open/closed state and renders the toggle, so this
+   * component is only ever mounted while the search is open.
+   */
+  onClose?: () => void;
+};
 
 /**
  * Live player search (Story 11.1, FR5). Owns the raw input value, debounces it,
  * and feeds the debounced term to useUserSearch. Results are keyboard-accessible
  * buttons that navigate to the player's public profile (/players/:id — the route
  * and page were delivered by Story 11.3).
+ *
+ * No card chrome of its own: it is a panel INSIDE the Friends card, opened from
+ * that card's header. Finding a player and befriending them are one task, and
+ * this used to be a separate full-width card sitting above the friends surfaces
+ * for a field that is empty almost all of the time.
  */
-export function PlayerSearch() {
+export function PlayerSearch({ onClose }: PlayerSearchProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [value, setValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // The search is mounted by the toggle, so the caret belongs in the field the
+  // click just revealed — otherwise every open costs a second click. A ref +
+  // effect rather than `autoFocus`, which fires before layout and is a lint
+  // no-no for its unconditional behaviour in reusable components.
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const debounced = useDebounce(value);
   const trimmed = debounced.trim();
@@ -33,35 +57,30 @@ export function PlayerSearch() {
   const showEmpty = isActive && query.isSuccess && !query.isFetching && results.length === 0;
 
   return (
-    <div className="bg-surface mb-3.5 rounded-lg border border-border p-3.5">
-      <label
-        htmlFor="player-search-input"
-        className="text-ink-dim mb-2 block text-xs font-semibold"
-      >
-        {t("lobby.playerSearch.label")}
-      </label>
-
-      <div className="bg-surface-elevated flex items-center gap-2 rounded-[10px] border border-border px-2.5 py-1.5">
-        <Search className="text-ink-mute size-3.5" />
+    <div
+      className="border-border mb-2 flex flex-col border-b pb-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-150"
+      data-testid="player-search-panel"
+    >
+      <div className="bg-surface-elevated border-border flex items-center gap-2 rounded-[10px] border px-2.5 py-1.5">
+        <Search className="text-ink-mute size-3.5 shrink-0" aria-hidden="true" />
         <input
-          id="player-search-input"
+          ref={inputRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          // Escape is the keyboard twin of the header's close button: it drops the
+          // term AND collapses the panel, so the field never stays open holding a
+          // query the player has walked away from.
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setValue("");
+              onClose?.();
+            }
+          }}
           placeholder={t("lobby.playerSearch.placeholder")}
+          aria-label={t("lobby.playerSearch.label")}
           data-testid="player-search"
-          className="text-ink min-w-0 flex-1 truncate bg-transparent text-sm outline-none placeholder:text-ink-off"
+          className="text-ink placeholder:text-ink-off min-w-0 flex-1 truncate bg-transparent text-sm outline-none"
         />
-        {value && (
-          <button
-            type="button"
-            onClick={() => setValue("")}
-            data-testid="player-search-clear"
-            aria-label={t("lobby.playerSearch.clear")}
-            className="text-ink-mute flex p-0.5"
-          >
-            <X className="size-3.5" />
-          </button>
-        )}
       </div>
 
       {isActive && results.length > 0 && (
@@ -74,11 +93,12 @@ export function PlayerSearch() {
                 data-testid="player-search-result"
                 data-user-id={player.id}
                 aria-label={t("lobby.playerSearch.resultAria", { username: player.username })}
-                className="hover:bg-surface-sunken flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left text-sm transition-colors hover:border-border"
+                className="hover:bg-surface-sunken hover:border-border flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left text-sm transition-colors"
               >
-                <span className="bg-accent-soft text-accent flex size-7 items-center justify-center rounded-full">
-                  <UserRound className="size-3.5" />
-                </span>
+                {/* Same initial-in-circle as the friend and request tiles: one
+                    avatar grammar across the whole card, and a letter identifies
+                    the player a generic person glyph cannot. */}
+                <Avatar name={player.username} size={28} className="shrink-0" />
                 <span className="text-ink truncate font-medium">{player.username}</span>
               </button>
             </li>

@@ -38,6 +38,7 @@ describe("chatStore", () => {
       whisperUnread: {},
       activeChannel: "primary",
       dockOpen: false,
+      whisperOpenRequest: 0,
       matchMessagesReceivedTotal: 0,
       hasSentLobby: false,
       hasSentMatch: false,
@@ -357,5 +358,32 @@ describe("chatStore", () => {
     expect(state.lobbyMessages).toHaveLength(0);
     expect(state.matchMessages).toHaveLength(0);
     expect(state.roomMessages).toHaveLength(0);
+  });
+
+  // openWhisper is how a surface OUTSIDE the dock (the friend list's whisper
+  // button) starts a conversation.
+  it("openWhisper seeds an empty thread, selects it and raises an open request", () => {
+    useChatStore.getState().openWhisper("bob");
+    const state = useChatStore.getState();
+    expect(state.whisperThreads.bob).toEqual([]);
+    expect(state.activeChannel).toBe("whisper:bob");
+    expect(state.whisperOpenRequest).toBe(1);
+  });
+
+  it("openWhisper keeps an existing thread's history and clears its unread", () => {
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    expect(useChatStore.getState().whisperUnread.bob).toBe(1);
+
+    useChatStore.getState().openWhisper("bob");
+
+    const state = useChatStore.getState();
+    expect(state.whisperThreads.bob).toHaveLength(1);
+    expect(state.whisperUnread.bob).toBe(0);
+  });
+
+  it("counts every openWhisper, so a second click still asks the dock to open", () => {
+    useChatStore.getState().openWhisper("bob");
+    useChatStore.getState().openWhisper("bob");
+    expect(useChatStore.getState().whisperOpenRequest).toBe(2);
   });
 });

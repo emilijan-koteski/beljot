@@ -1,5 +1,5 @@
 import { MessageSquare, Send, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { RelativeTime } from "@/shared/components/RelativeTime";
@@ -46,6 +46,10 @@ function parseWhisperCommand(
 const PEEK_MS = 2000;
 const PEEK_MAX_CHARS = 90;
 const MAX_MESSAGE_LENGTH = 500;
+/** How long a sent `/w` keeps the right to switch the view to its thread. Past
+ *  this the send is treated as failed, so a rejected whisper cannot hijack the
+ *  view later when that friend whispers first. */
+const PENDING_WHISPER_MS = 5000;
 
 type Variant = "lobby" | "room" | "match";
 
@@ -115,6 +119,7 @@ export function ChatDock(props: ChatDockProps) {
   const activeChannel = useChatStore((s) => s.activeChannel);
   const setActiveChannel = useChatStore((s) => s.setActiveChannel);
   const setDockOpen = useChatStore((s) => s.setDockOpen);
+  const whisperOpenRequest = useChatStore((s) => s.whisperOpenRequest);
 
   const threadKeys = useMemo(() => Object.keys(whisperThreads).sort(), [whisperThreads]);
   // Total unread across all whisper threads. Surfaced on the CLOSED FAB badge so an
@@ -136,12 +141,18 @@ export function ChatDock(props: ChatDockProps) {
   // Open state: controlled when the parent wires `onOpenChange` (in-game dock),
   // otherwise self-managed (lobby/room).
   const [internalOpen, setInternalOpen] = useState(false);
-  const isControlled = props.onOpenChange != null;
+  const onOpenChange = props.onOpenChange;
+  const isControlled = onOpenChange != null;
   const open = isControlled ? props.open === true : internalOpen;
-  const setOpen = (next: boolean) => {
-    if (isControlled) props.onOpenChange?.(next);
-    else setInternalOpen(next);
-  };
+  // Stable across renders: the whisper-open effect below depends on it, and an
+  // identity that changed every render would re-run that effect every render.
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (onOpenChange) onOpenChange(next);
+      else setInternalOpen(next);
+    },
+    [onOpenChange],
+  );
 
   const [draft, setDraft] = useState("");
   const [unread, setUnread] = useState(0);
@@ -194,6 +205,18 @@ export function ChatDock(props: ChatDockProps) {
     return () => setDockOpen(false);
   }, [open, setDockOpen]);
 
+  // Someone outside the dock asked for a whisper thread (the friend list's
+  // whisper button): the store has already selected it, so all that is left is
+  // to be open. Baselined at mount, so only requests raised while this dock is
+  // alive count — a stale counter from an earlier page must not pop the dock
+  // open the moment the next one mounts.
+  const handledWhisperOpen = useRef(whisperOpenRequest);
+  useEffect(() => {
+    if (whisperOpenRequest === handledWhisperOpen.current) return;
+    handledWhisperOpen.current = whisperOpenRequest;
+    setOpen(true);
+  }, [whisperOpenRequest, setOpen]);
+
   // Phone treatment: the open panel is a full-screen overlay, but `fixed
   // inset-0` sizes to the LAYOUT viewport, which the mobile on-screen keyboard
   // does not shrink on iOS — the browser pans to the focused input and drags
@@ -226,6 +249,31 @@ export function ChatDock(props: ChatDockProps) {
     setDraft("");
   }
 
+  // A `/w bob …` typed in the primary channel used to send and leave you where
+  // you were, so the reply landed in a tab you were not reading. Remember who the
+  // command addressed and switch once their thread EXISTS — the thread is created
+  // by the server's echo, so its appearance is the success signal. A rejected
+  // whisper (not friends / offline / mid-match) creates nothing and raises a
+  // toast, and you stay put. Not needed when composing inside a thread: you are
+  // already there.
+  const pendingWhisper = useRef<{ username: string; at: number } | null>(null);
+  useEffect(() => {
+    const pending = pendingWhisper.current;
+    if (!pending) return;
+    // The server owns the canonical spelling; the typed target may differ in case.
+    const key = Object.keys(whisperThreads).find(
+      (k) => k.toLowerCase() === pending.username.toLowerCase(),
+    );
+    if (!key) {
+      // Give up after a beat, so a whisper that was rejected cannot hijack the
+      // view later when that same friend happens to whisper first.
+      if (Date.now() - pending.at > PENDING_WHISPER_MS) pendingWhisper.current = null;
+      return;
+    }
+    pendingWhisper.current = null;
+    setActiveChannel(whisperChannel(key));
+  }, [whisperThreads, setActiveChannel]);
+
   function send() {
     if (!isConnected) return;
 
@@ -234,7 +282,10 @@ export function ChatDock(props: ChatDockProps) {
     // channel; a non-`/w` message falls through to the channel logic below.
     const whisper = parseWhisperCommand(draft);
     if (whisper) {
-      if (whisper.complete) sendWhisper(whisper.toUsername, whisper.text);
+      if (whisper.complete) {
+        pendingWhisper.current = { username: whisper.toUsername, at: Date.now() };
+        sendWhisper(whisper.toUsername, whisper.text);
+      }
       return;
     }
 
@@ -556,14 +607,19 @@ function ChatLine({
       <span
         className={cn(
           "max-w-[85%] rounded-2xl border px-2.5 py-1.5 text-xs",
-          // Whisper bubbles are pink for BOTH participants so a private message
-          // is unmistakable regardless of sender; alignment still marks mine vs
-          // theirs. The primary channel keeps the accent/surface treatment.
-          whisper
-            ? "border-(--whisper-border) bg-(--whisper-fill) text-(--whisper-ink)"
-            : mine
-              ? "bg-accent-soft border-accent/40 text-accent"
-              : "bg-surface-elevated border-border text-ink",
+          // Two independent signals, so a bubble says both things at once.
+          // BORDER = which channel: the pink hairline runs down both sides of a
+          // whisper thread, marking it private no matter who spoke.
+          whisper ? "border-(--whisper-border)" : mine ? "border-accent/40" : "border-border",
+          // FILL = who sent it: mine is tinted (pink in a whisper, accent in the
+          // primary channel), what arrives is neutral parchment. Tinting incoming
+          // whispers too — the original treatment — left a column of pink on both
+          // sides with only alignment to separate them.
+          mine
+            ? whisper
+              ? "bg-(--whisper-fill) text-(--whisper-ink)"
+              : "bg-accent-soft text-accent"
+            : "bg-surface-elevated text-ink",
         )}
       >
         {message}

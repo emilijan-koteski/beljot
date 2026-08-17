@@ -361,6 +361,27 @@ describe("CreateRoomModal", () => {
     expect(screen.getByTestId("room-password-input")).toBeInTheDocument();
   });
 
+  // It has to appear WITH the toggle that revealed it. Rendered last (after the
+  // honour gate) a required field grew two fields below the tap that caused it —
+  // off screen on a phone — and the host met it as a validation error instead.
+  it("puts the password field directly under the privacy toggle, above the honour gate", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    await user.click(screen.getByTestId("private-room-toggle-private"));
+
+    const toggle = screen.getByTestId("private-room-toggle");
+    const password = screen.getByTestId("room-password-input");
+    const honorGate = screen.getByTestId("min-honor-input");
+
+    expect(
+      toggle.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      password.compareDocumentPosition(honorGate) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("blocks submit when private is on but the password is too short", async () => {
     const user = userEvent.setup();
     renderModal(true);

@@ -266,4 +266,57 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     // The self-only "go play" CTA must never render on someone else's profile.
     expect(screen.queryByTestId("match-history-empty-cta")).not.toBeInTheDocument();
   });
+
+  // Every surface here is written for the SELF page by default, where the reader
+  // is the subject. On a public profile the reader is a visitor, so second-person
+  // copy told them to play 5 matches / to shake off a losing run that belongs to
+  // someone else entirely.
+  it("writes the honour newcomer hint about the subject, not at the viewer", async () => {
+    mockGetPublicProfile.mockResolvedValue(publicProfileFixture({ isNewPlayer: true }));
+
+    renderAt("2");
+
+    const hint = await screen.findByTestId("profile-honor-new-hint");
+    expect(hint).toHaveTextContent("Gets an honor score after 5 matches.");
+    expect(hint).not.toHaveTextContent(/^Play 5 matches/);
+  });
+
+  it("writes the honour trend tooltip about the subject, not at the viewer", async () => {
+    mockGetPublicProfile.mockResolvedValue(
+      publicProfileFixture({ honorTrendDelta: 4, honorTrendDirection: "up" }),
+    );
+
+    renderAt("2");
+
+    const trend = await screen.findByTestId("profile-honor-trend");
+    expect(trend).toHaveAttribute(
+      "title",
+      "Their last 20 matches compared with the 20 before them.",
+    );
+  });
+
+  it("states the subject's streak as a fact, with no Play nudge at the viewer", async () => {
+    mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
+    mockGetCareer.mockResolvedValue(careerFixture({ streak: { kind: "loss", length: 3 } }));
+
+    renderAt("2");
+
+    const callout = await screen.findByTestId("profile-streak");
+    expect(callout).toHaveTextContent("The run breaks with their next win.");
+    expect(callout).not.toHaveTextContent(/Shake it off/);
+    expect(screen.queryByTestId("profile-streak-play")).not.toBeInTheDocument();
+  });
+
+  it("drops the 'play a few matches' prompt from the empty partner and rival panels", async () => {
+    mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
+    mockGetCareer.mockResolvedValue(careerFixture({ topPartners: [], topRivals: [] }));
+
+    renderAt("2");
+
+    const partners = await screen.findByTestId("profile-partners");
+    expect(partners).toHaveTextContent("No regular partners yet.");
+    expect(partners).not.toHaveTextContent(/play a few matches/i);
+    expect(screen.getByTestId("profile-rivals")).toHaveTextContent("No rivals yet.");
+    expect(screen.getByTestId("profile-rivals")).not.toHaveTextContent(/play a few matches/i);
+  });
 });

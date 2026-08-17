@@ -6,6 +6,16 @@ import type { CareerStreak } from "@/shared/api/career";
 
 type StreakCalloutProps = {
   streak: CareerStreak;
+  /**
+   * False on ANOTHER player's profile (Story 11.3). Both subtitles are written
+   * AT the reader ("Keep it going…", "Shake it off — Quick Play…"), which is
+   * right on the self page and wrong on a public one, where the streak belongs
+   * to the subject and the reader is a visitor. Selects the third-person
+   * `*Public` copy and drops the Play link, the same way MatchHistory drops its
+   * lobby CTA from a public empty state — the callout there is a fact about that
+   * player, not a nudge to the person reading it.
+   */
+  subjectIsSelf?: boolean;
 };
 
 // Frost-blue accent reserved exclusively for the cold (loss) streak callout — a
@@ -27,7 +37,7 @@ const ICE = {
  * reads as a warm felt-green callout; a cold streak as a neutral nudge back to
  * the lobby. Renders nothing when there is no active streak.
  */
-export function StreakCallout({ streak }: StreakCalloutProps) {
+export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutProps) {
   const { t } = useTranslation();
 
   if (streak.length === 0 || streak.kind === "none") return null;
@@ -63,21 +73,29 @@ export function StreakCallout({ streak }: StreakCalloutProps) {
             : t("profile.streak.lossTitle", { count: streak.length })}
         </span>
         <span className="text-ink-dim text-xs">
-          {isWin ? t("profile.streak.winSubtitle") : t("profile.streak.lossSubtitle")}
+          {subjectIsSelf
+            ? isWin
+              ? t("profile.streak.winSubtitle")
+              : t("profile.streak.lossSubtitle")
+            : isWin
+              ? t("profile.streak.winSubtitlePublic")
+              : t("profile.streak.lossSubtitlePublic")}
         </span>
       </div>
-      <Link
-        to="/lobby"
-        className="ml-auto inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-2 text-[13px] font-semibold"
-        style={{
-          background: isWin ? "var(--accent)" : ICE.buttonBg,
-          color: isWin ? "var(--accent-ink)" : ICE.buttonText,
-        }}
-        data-testid="profile-streak-play"
-      >
-        {t("profile.streak.play")}
-        <ArrowRight className="size-3.5" />
-      </Link>
+      {subjectIsSelf && (
+        <Link
+          to="/lobby"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-2 text-[13px] font-semibold"
+          style={{
+            background: isWin ? "var(--accent)" : ICE.buttonBg,
+            color: isWin ? "var(--accent-ink)" : ICE.buttonText,
+          }}
+          data-testid="profile-streak-play"
+        >
+          {t("profile.streak.play")}
+          <ArrowRight className="size-3.5" />
+        </Link>
+      )}
     </div>
   );
 }

@@ -45,7 +45,7 @@ export function FriendButton({ userId }: FriendButtonProps) {
   if (status.isPending) {
     return (
       <div
-        className="bg-surface-sunken mt-4 h-8 w-28 animate-pulse rounded-md"
+        className="bg-surface-sunken my-5 h-8 w-28 animate-pulse rounded-md"
         data-testid="friend-button-loading"
         aria-hidden="true"
       />
@@ -106,7 +106,10 @@ export function FriendButton({ userId }: FriendButtonProps) {
   }
 
   return (
-    <div className="mt-4" data-testid="friend-button">
+    // my-5 (not mt-only): the row needs the same 20px gap below it as above,
+    // otherwise it sits flush against whatever follows on the public profile —
+    // the streak callout has no top margin of its own.
+    <div className="my-5" data-testid="friend-button">
       {content}
     </div>
   );

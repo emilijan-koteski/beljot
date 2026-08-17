@@ -4,13 +4,11 @@ import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { FriendList } from "@/features/friends/FriendList";
-import { FriendRequests } from "@/features/friends/FriendRequests";
 import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
 import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
-import { PlayerSearch } from "@/features/lobby/components/PlayerSearch";
 import { RoomEjectionModal } from "@/features/lobby/components/RoomEjectionModal";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
 import { Toast } from "@/features/lobby/components/Toast";
@@ -223,6 +221,16 @@ export function LobbyPage() {
         quickPlayDisabled={quickPlayMutation.isPending}
       />
 
+      {/* Story 11.2: the friends card, full width — one card for the whole
+          relationship. It carries the pending-requests section, the roster with
+          online status and whisper, and player search behind its header icon, so
+          the lobby spends one heading and one border on all three instead of
+          three of each. */}
+      <FriendList />
+
+      {/* The room filters belong to the room grid, so they sit directly above it
+          — with the friends row above, the search field is no longer separated
+          from the list it filters by two unrelated cards. */}
       <FilterRail
         search={search}
         setSearch={setSearch}
@@ -232,13 +240,6 @@ export function LobbyPage() {
         setSort={setSort}
         counts={counts}
       />
-
-      <PlayerSearch />
-
-      {/* Story 11.2: friends panel — incoming requests + the friend list with
-          online status and the (11.5-owned) Invite-to-Room hook. */}
-      <FriendRequests />
-      <FriendList />
 
       <RoomGrid
         rooms={filtered}

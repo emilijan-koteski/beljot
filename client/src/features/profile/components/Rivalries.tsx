@@ -8,13 +8,17 @@ import { WinLoseBar } from "./WinLoseBar";
 
 type RivalriesProps = {
   rivals: RivalStat[];
+  /** False on ANOTHER player's profile (Story 11.3): the empty state tells the
+   *  reader to go play a few matches, which only makes sense when the reader is
+   *  the subject. Selects the third-person `emptyPublic` copy. */
+  subjectIsSelf?: boolean;
 };
 
 /**
  * Sidebar panel of most-faced opponents with the viewer's head-to-head record
  * and a win-share bar. Rival avatars use the silver "Them" palette.
  */
-export function Rivalries({ rivals }: RivalriesProps) {
+export function Rivalries({ rivals, subjectIsSelf = true }: RivalriesProps) {
   const { t } = useTranslation();
 
   return (
@@ -24,7 +28,9 @@ export function Rivalries({ rivals }: RivalriesProps) {
       testId="profile-rivals"
     >
       {rivals.length === 0 ? (
-        <p className="text-ink-mute text-[13px]">{t("profile.rivals.empty")}</p>
+        <p className="text-ink-mute text-[13px]">
+          {t(subjectIsSelf ? "profile.rivals.empty" : "profile.rivals.emptyPublic")}
+        </p>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {rivals.map((r) => {

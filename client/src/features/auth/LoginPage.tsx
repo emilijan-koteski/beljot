@@ -103,6 +103,15 @@ export function LoginPage() {
         {t("auth.login.title")}
       </h1>
 
+      {/* Tab order is set with tabIndex 1-2-3 on the three sign-in controls, NOT by
+          DOM order. "Forgot?" belongs beside the Password label visually, and that
+          slot renders above the input — so in document order it sat between the two
+          credentials and caught the Tab out of the email field. Positive tabIndex
+          values are the one thing that separates focus order from source order, and
+          they promote these three ahead of every other tabbable element: on a login
+          page that IS the meaningful order — email → password → Sign in, then
+          everything else (Forgot, Google, Register) in source order. Keep the three
+          numbers contiguous, and leave everything else at 0. */}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" data-testid="login-form">
         <Field
           label={t("auth.login.emailLabel")}
@@ -120,6 +129,7 @@ export function LoginPage() {
             onBlur={() => handleBlur("email")}
             aria-invalid={!!errors.email}
             autoFocus
+            tabIndex={1}
             data-testid="email-input"
           />
         </Field>
@@ -149,6 +159,7 @@ export function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               onBlur={() => handleBlur("password")}
               aria-invalid={!!errors.password}
+              tabIndex={2}
               data-testid="password-input"
             />
             <button
@@ -179,6 +190,7 @@ export function LoginPage() {
             size="cta"
             className="w-full"
             disabled={loginMutation.isPending || !email || !password}
+            tabIndex={3}
             data-testid="submit-button"
           >
             {loginMutation.isPending ? t("auth.login.submitting") : t("auth.login.submitButton")}

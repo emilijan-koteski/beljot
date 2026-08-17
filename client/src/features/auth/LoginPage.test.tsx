@@ -95,6 +95,39 @@ describe("LoginPage", () => {
     expect(screen.getByTestId("login-title")).toHaveTextContent("Log in");
   });
 
+  // Signing in is this page's job, so the credentials and the button own the front
+  // of the tab sequence. The forgot link used to render in the password field's
+  // label row, which put it BETWEEN the two credentials.
+  it("tabs email → password → sign in, with the forgot link after them", async () => {
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    // autoFocus puts the caret in the email field on arrival.
+    expect(screen.getByTestId("email-input")).toHaveFocus();
+
+    // Fill both credentials first: an empty form disables the submit button, and
+    // a disabled button is not in the tab sequence at all.
+    await user.type(screen.getByTestId("email-input"), "test@example.com");
+    await user.type(screen.getByTestId("password-input"), "hunter2");
+    await user.click(screen.getByTestId("email-input"));
+
+    await user.tab();
+    expect(screen.getByTestId("password-input")).toHaveFocus();
+
+    await user.tab();
+    // The eye toggle is tabIndex={-1} on purpose, so the button comes next.
+    expect(screen.getByTestId("submit-button")).toHaveFocus();
+
+    // "Forgot?" stays beside the Password label, which in document order is above
+    // the input — it is kept out of the way by having NO positive tabIndex, so it
+    // follows the promoted three rather than interrupting them. It is still a
+    // plain tabbable link, never removed from the sequence with tabIndex={-1}.
+    const forgot = screen.getByTestId("forgot-password-link");
+    expect(forgot).not.toHaveFocus();
+    expect(forgot).not.toHaveAttribute("tabindex");
+    expect(forgot).toHaveAttribute("href", "/forgot-password");
+  });
+
   it("shows validation errors on blur for empty fields", async () => {
     const user = userEvent.setup();
     renderLoginPage();

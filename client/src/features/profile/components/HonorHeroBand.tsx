@@ -25,6 +25,15 @@ export type HonorHeroBandProps = {
   isNewPlayer: boolean;
   trendDelta: number;
   trendDirection: string;
+  /**
+   * False on ANOTHER player's profile (Story 11.3). Two of this band's strings
+   * address the reader as the subject — the newcomer hint ("Play 5 matches…")
+   * and the trend tooltip ("Your last 20 matches…") — and on a public profile
+   * that reader is the viewer, not the subject, so both told the viewer things
+   * about a stranger's record in the second person. Selects the third-person
+   * `*Public` copy instead; same `subjectIsSelf` switch MatchHistory uses.
+   */
+  subjectIsSelf?: boolean;
 };
 
 const TREND_ICON: Record<HonorTrendDirection, typeof TrendingUp> = {
@@ -69,6 +78,7 @@ export function HonorHeroBand({
   isNewPlayer: rawIsNewPlayer,
   trendDelta: rawTrendDelta,
   trendDirection,
+  subjectIsSelf = true,
 }: HonorHeroBandProps) {
   const { t } = useTranslation();
   const [explainerOpen, setExplainerOpen] = useState(false);
@@ -174,7 +184,9 @@ export function HonorHeroBand({
             // the progress, and a count-dependent sentence would need plural forms
             // this project does not use anywhere (see profile.lastPlayed.daysAgo).
             <p className="text-ink-dim m-0 text-[13px]" data-testid="profile-honor-new-hint">
-              {t("profile.honor.newPlayerHint")}
+              {t(
+                subjectIsSelf ? "profile.honor.newPlayerHint" : "profile.honor.newPlayerHintPublic",
+              )}
             </p>
           ) : (
             <HonorBandMeter score={score} testId="profile-honor-meter" />
@@ -192,7 +204,10 @@ export function HonorHeroBand({
             data-testid="profile-honor-trend"
             data-trend-direction={direction}
             data-trend-delta={String(trendDelta)}
-            title={t("profile.honor.trendTooltip", { window: HONOR_TREND_WINDOW })}
+            title={t(
+              subjectIsSelf ? "profile.honor.trendTooltip" : "profile.honor.trendTooltipPublic",
+              { window: HONOR_TREND_WINDOW },
+            )}
           >
             <span className="text-brass-deep font-mono text-[9.5px] font-semibold tracking-[1.6px] uppercase">
               {t("profile.honor.lastWindow", { window: HONOR_TREND_WINDOW })}

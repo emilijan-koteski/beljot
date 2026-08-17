@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
 import { Dialog, DialogClose, DialogContent } from "@/shared/components/ui/dialog";
+import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { HONOR_TIER_COLOR, honorTierForScore } from "@/shared/lib/honor";
 import { useRoomStore } from "@/shared/stores/roomStore";
@@ -150,7 +151,10 @@ export function RoomEjectionModal() {
             ) : honor ? (
               <ShieldAlert size={24} color="var(--brass-deep)" />
             ) : (
-              <Coins size={24} color="var(--brass-deep)" />
+              // Coins are always the off-theme gold (COIN_GOLD), even in a brass
+              // icon well where its neighbours take --brass-deep: the door and the
+              // shield are theme glyphs, a coin is a coin.
+              <Coins size={24} color={COIN_GOLD} />
             )}
           </div>
           <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>

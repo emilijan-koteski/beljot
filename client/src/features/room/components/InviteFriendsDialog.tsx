@@ -1,9 +1,10 @@
-import { Check, Send, UserRound } from "lucide-react";
+import { Check, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { FetchError } from "@/shared/api/axiosClient";
+import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -65,6 +66,10 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
         return t("roomInvite.reasons.inMatch");
       case "in_room":
         return t("roomInvite.reasons.inRoom");
+      case "in_this_room":
+        // Seated at THIS table. Saying "in another room" about someone the host
+        // can see in the seats is the one reason that reads as a bug.
+        return t("roomInvite.reasons.alreadyHere");
       case "room_full":
         return t("roomInvite.reasons.roomFull");
       default:
@@ -146,9 +151,7 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
                   data-user-id={friend.userId}
                   data-available={friend.available === true ? "true" : "false"}
                 >
-                  <span className="bg-accent-soft text-accent flex size-7 shrink-0 items-center justify-center rounded-full">
-                    <UserRound className="size-3.5" />
-                  </span>
+                  <Avatar name={friend.username} size={28} className="shrink-0" />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-ink truncate font-medium">{friend.username}</span>
                     {(rowError !== undefined || friend.available !== true) && (

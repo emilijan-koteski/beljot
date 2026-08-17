@@ -480,6 +480,44 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 />
               </Field>
 
+              {/* Directly under the toggle that reveals it. It used to render last,
+                  after the honour gate, so choosing Приватна grew a required field
+                  two fields further down — off screen on a phone — and the host met
+                  it as a validation error instead of as the consequence of the tap
+                  they just made. */}
+              {isPrivate && (
+                <Field
+                  label={t("lobby.createRoomModal.roomPassword")}
+                  htmlFor="room-password"
+                  hint={t("lobby.createRoomModal.roomPasswordHint", { min: MIN_ROOM_PASSWORD })}
+                  required
+                >
+                  <div className="relative">
+                    <Input
+                      id="room-password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder={t("lobby.createRoomModal.roomPasswordPlaceholder")}
+                      value={roomPassword}
+                      onChange={(e) => setRoomPassword(e.target.value.slice(0, MAX_ROOM_PASSWORD))}
+                      maxLength={MAX_ROOM_PASSWORD}
+                      data-testid="room-password-input"
+                      className="h-11 pr-10"
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
+                      onClick={() => setShowPassword(!showPassword)}
+                      data-testid="room-password-toggle"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                </Field>
+              )}
+
               {/* A discrete slider over the tier bands, not a free-typed number.
                   Three things it teaches for free that the number field could not:
                   the ticks sit on TIER BOUNDARIES so the host picks a tier rather
@@ -578,39 +616,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   ariaLabel={t("lobby.createRoomModal.allowNewPlayers")}
                 />
               </Field>
-
-              {isPrivate && (
-                <Field
-                  label={t("lobby.createRoomModal.roomPassword")}
-                  htmlFor="room-password"
-                  hint={t("lobby.createRoomModal.roomPasswordHint", { min: MIN_ROOM_PASSWORD })}
-                  required
-                >
-                  <div className="relative">
-                    <Input
-                      id="room-password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      placeholder={t("lobby.createRoomModal.roomPasswordPlaceholder")}
-                      value={roomPassword}
-                      onChange={(e) => setRoomPassword(e.target.value.slice(0, MAX_ROOM_PASSWORD))}
-                      maxLength={MAX_ROOM_PASSWORD}
-                      data-testid="room-password-input"
-                      className="h-11 pr-10"
-                    />
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
-                      onClick={() => setShowPassword(!showPassword)}
-                      data-testid="room-password-toggle"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                </Field>
-              )}
             </div>
 
             {/* General submit error — pinned above the footer so it's always

@@ -8,6 +8,10 @@ import { WinLoseBar } from "./WinLoseBar";
 
 type PartnerSpotlightProps = {
   partners: PartnerStat[];
+  /** False on ANOTHER player's profile (Story 11.3): the empty state tells the
+   *  reader to go play a few matches, which only makes sense when the reader is
+   *  the subject. Selects the third-person `emptyPublic` copy. */
+  subjectIsSelf?: boolean;
 };
 
 /** Win rate (%) over matches played together; 0 when none. */
@@ -20,7 +24,7 @@ function winRate(wins: number, total: number): number {
  * a short list of other regular partners. Partner avatars use the gold "Us"
  * palette to read as the viewer's side of the table.
  */
-export function PartnerSpotlight({ partners }: PartnerSpotlightProps) {
+export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpotlightProps) {
   const { t } = useTranslation();
 
   const featured = partners[0];
@@ -33,7 +37,9 @@ export function PartnerSpotlight({ partners }: PartnerSpotlightProps) {
         title={t("profile.partners.title")}
         testId="profile-partners"
       >
-        <p className="text-ink-mute text-[13px]">{t("profile.partners.empty")}</p>
+        <p className="text-ink-mute text-[13px]">
+          {t(subjectIsSelf ? "profile.partners.empty" : "profile.partners.emptyPublic")}
+        </p>
       </SidePanel>
     );
   }

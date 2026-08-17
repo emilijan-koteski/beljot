@@ -35,6 +35,12 @@ interface ChatState {
   // page that has no dock), so it raises no tab badge and no FAB badge and the
   // user never learns it arrived. The dock keeps this in sync.
   dockOpen: boolean;
+  // Monotonic counter of "open a whisper with X" requests raised outside the dock
+  // (the friend list's whisper button). A COUNTER, not a boolean or a channel:
+  // two clicks in a row must both land, and a dock that mounts later — a page
+  // navigation — must not spring open on a stale value it never saw raised. The
+  // dock records the value at mount and only reacts to increments past it.
+  whisperOpenRequest: number;
   // Monotonic count of match messages received since the last clear.
   // Unlike matchMessages.length (which plateaus at MAX_MESSAGES once the ring
   // buffer is full), this counter keeps incrementing so unread-badge tracking
@@ -65,6 +71,12 @@ interface ChatState {
   setDockOpen: (open: boolean) => void;
   markThreadRead: (username: string) => void;
   clearWhispers: () => void;
+  /**
+   * Start (or resume) a whisper conversation from OUTSIDE the dock — the friend
+   * list's whisper button. Seeds an empty thread if there is none, selects it,
+   * and asks the mounted dock to open via `whisperOpenRequest`.
+   */
+  openWhisper: (username: string) => void;
 }
 
 function appendWithCap<T>(buffer: T[], msg: T): T[] {
@@ -83,6 +95,7 @@ export const useChatStore = create<ChatState>((set) => ({
   whisperUnread: {},
   activeChannel: "primary",
   dockOpen: false,
+  whisperOpenRequest: 0,
   matchMessagesReceivedTotal: 0,
   hasSentLobby: false,
   hasSentMatch: false,
@@ -141,4 +154,17 @@ export const useChatStore = create<ChatState>((set) => ({
   markThreadRead: (username) =>
     set((state) => ({ whisperUnread: { ...state.whisperUnread, [username]: 0 } })),
   clearWhispers: () => set({ whisperThreads: {}, whisperUnread: {}, activeChannel: "primary" }),
+  openWhisper: (username) =>
+    set((state) => ({
+      // Threads are born from the first message, so a friend you have never
+      // whispered has none — seed an empty one, or the dock's activeThread guard
+      // sees a channel pointing at nothing and falls back to the primary channel.
+      whisperThreads: state.whisperThreads[username]
+        ? state.whisperThreads
+        : { ...state.whisperThreads, [username]: [] },
+      activeChannel: whisperChannel(username),
+      // Deliberately opening the thread reads whatever was waiting in it.
+      whisperUnread: { ...state.whisperUnread, [username]: 0 },
+      whisperOpenRequest: state.whisperOpenRequest + 1,
+    })),
 }));

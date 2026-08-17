@@ -58,7 +58,10 @@ export function HonorBandMeter({
   ).join(", ")})`;
 
   return (
-    <div className={cn("flex flex-col", className)} data-testid={testId}>
+    // @container: the tick row thins itself against the METER's width, not the
+    // viewport — the same meter is a wide hero band on the profile and a ~420px
+    // row inside the explainer dialog.
+    <div className={cn("@container flex flex-col", className)} data-testid={testId}>
       <div className="relative h-2 w-full">
         <div
           className="absolute inset-0 rounded-[4px]"
@@ -99,13 +102,40 @@ export function HonorBandMeter({
         )}
       </div>
 
+      {/* Ticks are placed at their TRUE position on the track (left: v%), not
+          spread evenly. Evenly spread is what shipped, and it made the axis lie:
+          six labels at 0/20/40/60/80/100% of the width put "95" at 80%, so a
+          marker at its honest 87% landed to the RIGHT of the 95 label and read
+          as near-perfect. The track, the fill and the marker are all linear in
+          the score, so the labels have to be too. */}
       {showTicks && (
-        <div className="text-ink-mute mt-1.5 flex justify-between font-mono text-[9.5px] tracking-[0.6px]">
-          {TICKS.map((v) => (
-            <span key={v} className="tabular-nums">
-              {v}
-            </span>
-          ))}
+        <div className="text-ink-mute relative mt-1.5 h-3 font-mono text-[9.5px] leading-none tracking-[0.6px]">
+          {TICKS.map((v, i) => {
+            const prev = TICKS[i - 1];
+            // The 100 end tick is the only droppable label: it marks no tier
+            // floor, and it is the one that collides with the top tier's floor
+            // (5 points away) on a narrow track. Below ~30rem of meter width it
+            // gives way to that floor, which is the tick carrying information.
+            const droppable = v === 100 && prev !== undefined && v - prev < 12;
+            return (
+              <span
+                key={v}
+                className={cn(
+                  "absolute top-0 tabular-nums",
+                  droppable && "hidden @min-[30rem]:block",
+                )}
+                style={{
+                  left: `${v}%`,
+                  // The end labels hang inside the track instead of straddling
+                  // its ends, so neither is clipped by the meter's own box.
+                  transform:
+                    i === 0 ? undefined : v === 100 ? "translateX(-100%)" : "translateX(-50%)",
+                }}
+              >
+                {v}
+              </span>
+            );
+          })}
         </div>
       )}
 

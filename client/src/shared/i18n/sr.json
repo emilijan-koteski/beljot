@@ -60,7 +60,9 @@
       "winTitle": "Niz pobeda, {{count}} zaredom",
       "lossTitle": "Hladni niz, {{count}} poraza zaredom",
       "winSubtitle": "Samo tako nastavi, sledeći meč ulazi u niz.",
+      "winSubtitlePublic": "Sledeći meč ovog igrača ulazi u niz.",
       "lossSubtitle": "Glavu gore, pokreni Brzu igru i prekini niz.",
+      "lossSubtitlePublic": "Sledeća pobeda prekida niz.",
       "play": "Igraj"
     },
     "stats": {
@@ -83,9 +85,11 @@
       "meterLabel": "Čast {{score}} od 100, {{tier}}",
       "lastWindow": "Zadnjih {{window}}",
       "trendTooltip": "Tvojih poslednjih {{window}} mečeva u poređenju sa prethodnih {{window}}.",
+      "trendTooltipPublic": "Poslednjih {{window}} mečeva ovog igrača u poređenju sa prethodnih {{window}}.",
       "newPlayerChip": "Novi igrač",
       "newPlayerProgress": "{{played}} / {{total}}",
       "newPlayerHint": "Odigraj 5 mečeva da dobiješ skor časti.",
+      "newPlayerHintPublic": "Dobija skor časti nakon 5 odigranih mečeva.",
       "explainer": {
         "open": "Kako funkcioniše",
         "title": "Kako funkcioniše čast",
@@ -206,12 +210,14 @@
       "eyebrow": "U fokusu",
       "title": "Najčešći saigrač",
       "matchesTogether": "{{count}} mečeva zajedno",
-      "empty": "Još nema stalnih saigrača. Odigraj nekoliko mečeva."
+      "empty": "Još nema stalnih saigrača. Odigraj nekoliko mečeva.",
+      "emptyPublic": "Još nema stalnih saigrača."
     },
     "rivals": {
       "eyebrow": "Rivalstvo",
       "title": "S druge strane stola",
-      "empty": "Još nema rivala. Odigraj nekoliko mečeva."
+      "empty": "Još nema rivala. Odigraj nekoliko mečeva.",
+      "emptyPublic": "Još nema rivala."
     },
     "linkedAccounts": {
       "eyebrow": "Nalog",
@@ -273,21 +279,19 @@
     "friends": "Prijatelji",
     "accept": "Prihvati",
     "decline": "Odbij",
-    "online": "Na vezi",
-    "offline": "Van veze",
-    "inviteToRoom": "Pozovi u sobu",
+    "online": "Online",
+    "offline": "Offline",
+    "whisperAria": "Šapni {{username}}",
     "someone": "Neko",
     "viewProfileAria": "Pogledaj profil igrača {{username}}",
     "requestReceivedToast": "{{username}} vam je poslao zahtev za prijateljstvo",
     "list": {
       "heading": "Prijatelji",
       "loading": "Učitavanje prijatelja…",
-      "empty": "Još nemate prijatelje. Pronađite igrače u pretrazi i pošaljite zahtev."
+      "empty": "Još nemaš prijatelje. Pronađi igrače i pošalji zahtev za prijateljstvo."
     },
     "requests": {
-      "heading": "Zahtevi za prijateljstvo",
-      "loading": "Učitavanje zahteva…",
-      "empty": "Nema zahteva za prijateljstvo na čekanju."
+      "heading": "Zahtevi za prijateljstvo"
     },
     "errors": {
       "sendFailed": "Slanje zahteva za prijateljstvo nije uspelo. Pokušajte ponovo.",
@@ -339,12 +343,12 @@
   "whisper": {
     "primaryTab": "Chat",
     "tablistLabel": "Kanali chata",
-    "inputPlaceholder": "Šapat za {{username}}…",
+    "inputPlaceholder": "Šapni {{username}}…",
     "hint": "Ukucaj /w <prijatelj> <poruka> za privatni šapat",
     "errors": {
       "notFriends": "Možeš da šapćeš samo prijateljima.",
       "blockedInGame": "Ne možeš da šapćeš nekome sa kim trenutno igraš.",
-      "recipientOffline": "Taj prijatelj nije na mreži. Šaptanje radi samo uživo."
+      "recipientOffline": "Taj prijatelj nije online. Šaptanje radi samo uživo."
     }
   },
   "room": {
@@ -512,7 +516,6 @@
   },
   "roomInvite": {
     "someone": "Neko",
-    "needARoom": "Prvo otvori sobu, pa pozovi prijatelje iznutra.",
     "popup": {
       "title": "Poziv u sobu",
       "body": "{{inviter}} te zove u sobu „{{roomName}}“.",
@@ -526,17 +529,18 @@
     "panel": {
       "openButton": "Pozovi prijatelje",
       "title": "Pozovi prijatelje",
-      "description": "Prijatelji koji su na vezi i slobodni mogu da se pozovu u ovu sobu.",
+      "description": "Prijatelji koji su online i slobodni mogu da se pozovu u ovu sobu.",
       "loading": "Učitavanje prijatelja…",
       "loadFailed": "Učitavanje prijatelja nije uspelo. Pokušaj ponovo.",
-      "empty": "Još nemaš prijatelje. Pronađi igrače u pretrazi i pošalji zahtev.",
+      "empty": "Još nemaš prijatelje. Pronađi igrače i pošalji zahtev za prijateljstvo.",
       "invite": "Pozovi",
       "invited": "Pozvan"
     },
     "reasons": {
-      "offline": "Van veze",
+      "offline": "Offline",
       "inMatch": "U meču",
       "inRoom": "U drugoj sobi",
+      "alreadyHere": "Već je u ovoj sobi",
       "roomFull": "Ova soba je puna",
       "unavailable": "Trenutno nedostupan"
     },
@@ -685,7 +689,7 @@
     },
     "filters": {
       "all": "Sve",
-      "qualify": "Ispunjavam uslov",
+      "qualify": "Ispunjavam uslove",
       "open": "Ima mesta",
       "relaxed": "Opušteno",
       "timed": "Sa tajmerom"
@@ -702,8 +706,8 @@
       "label": "Pronađi igrače",
       "placeholder": "Pretraži igrače po korisničkom imenu…",
       "loading": "Pretraga…",
-      "empty": "Nema igrača za „{{query}}“",
-      "clear": "Očisti pretragu",
+      "empty": "Nema igrača sa „{{query}}“",
+      "close": "Zatvori pretragu",
       "resultAria": "Pogledaj profil igrača {{username}}"
     },
     "empty": {

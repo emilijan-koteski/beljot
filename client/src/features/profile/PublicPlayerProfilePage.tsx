@@ -143,6 +143,9 @@ export function PublicPlayerProfilePage() {
         // client decides New Player suppression; the server-recomputed score/tier
         // are authoritative for any viewer.
         honor={{
+          // Every honour string that speaks to the reader as the subject (the
+          // newcomer hint, the trend tooltip) switches to third person here.
+          subjectIsSelf: false,
           score: profile.honorScore,
           tier: profile.honorTier,
           completedTotal: profile.honorCompletedTotal,
@@ -158,7 +161,10 @@ export function PublicPlayerProfilePage() {
           never a placeholder — and is never shown on the viewer's own profile. */}
       {validId !== undefined && <FriendButton userId={validId} />}
 
-      {career.data && <StreakCallout streak={career.data.streak} />}
+      {/* subjectIsSelf=false: the streak reads as a fact about this player, not
+          as a nudge at whoever is reading, and it drops the Play link with the
+          second-person copy. */}
+      {career.data && <StreakCallout streak={career.data.streak} subjectIsSelf={false} />}
 
       <StatsGrid games={games} wins={wins} losses={losses} abandoned={abandoned} />
 
@@ -180,8 +186,8 @@ export function PublicPlayerProfilePage() {
             </p>
           ) : career.data ? (
             <>
-              <PartnerSpotlight partners={career.data.topPartners} />
-              <Rivalries rivals={career.data.topRivals} />
+              <PartnerSpotlight partners={career.data.topPartners} subjectIsSelf={false} />
+              <Rivalries rivals={career.data.topRivals} subjectIsSelf={false} />
               <Milestones
                 capots={career.data.capots}
                 careerPoints={career.data.careerPoints}

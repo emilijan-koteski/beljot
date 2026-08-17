@@ -396,3 +396,37 @@ func TestRoom_AfterFindDerivesIsPrivate(t *testing.T) {
 	require.NotNil(t, gotPub)
 	assert.False(t, gotPub.IsPrivate, "AfterFind derives isPrivate=false from a NULL hash")
 }
+
+// --- FindPlayerRoom room identity (invite-panel reason, DB-backed) -----------
+
+// The invite panel decides "in this room" vs "in another room" by comparing
+// FindPlayerRoom's RoomID against the room being invited into. That query is a
+// `Table("room_players").Joins("rooms")` with an implicit SELECT * — both tables
+// carry `id`, `created_at` and `updated_at`, so this pins that the ROOM_ID column
+// still lands in the struct intact. If it ever scanned as 0 or as rooms.id, every
+// friend seated at the host's own table would read as "in another room".
+func TestFindPlayerRoom_ReportsTheRoomThePlayerIsActuallyIn(t *testing.T) {
+	db := getRoomTestDB(t)
+	repo := room.NewGormRepository(db)
+
+	host := &user.User{Email: "fpr-host@room.test", Username: "fprhost", PasswordHash: "x"}
+	guest := &user.User{Email: "fpr-guest@room.test", Username: "fprguest", PasswordHash: "x"}
+	require.NoError(t, db.Create(host).Error)
+	require.NoError(t, db.Create(guest).Error)
+
+	// Two live rooms, so a wrong scan cannot accidentally match.
+	other := &room.Room{Name: "FPR Other", Code: "FPROTH", OwnerID: host.ID, Variant: "bitola", MatchMode: "1001", TimerStyle: "relaxed", Status: "waiting", PlayerCount: 1}
+	hosted := &room.Room{Name: "FPR Hosted", Code: "FPRHST", OwnerID: host.ID, Variant: "bitola", MatchMode: "1001", TimerStyle: "relaxed", Status: "waiting", PlayerCount: 2}
+	require.NoError(t, repo.Create(other))
+	require.NoError(t, repo.Create(hosted))
+
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: hosted.ID, UserID: host.ID, Username: host.Username}))
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: hosted.ID, UserID: guest.ID, Username: guest.Username}))
+
+	got, err := repo.FindPlayerRoom(guest.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, hosted.ID, got.RoomID, "the seated guest's room id, not the other room's and not 0")
+	assert.Equal(t, guest.ID, got.UserID)
+	assert.NotEqual(t, other.ID, got.RoomID)
+}

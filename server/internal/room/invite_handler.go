@@ -58,10 +58,16 @@ type InviteNotifier interface {
 // available friend carries the empty string; the client maps the rest to a
 // localized "why not" line under a disabled Invite button.
 const (
-	inviteReasonOffline  = "offline"
-	inviteReasonInMatch  = "in_match"
-	inviteReasonInRoom   = "in_room"
-	inviteReasonRoomFull = "room_full"
+	inviteReasonOffline = "offline"
+	inviteReasonInMatch = "in_match"
+	inviteReasonInRoom  = "in_room"
+	// A friend who is ALREADY SEATED in the room being invited into. Distinct from
+	// inviteReasonInRoom, which means "busy in some other room": both leave the
+	// Invite button disabled, but only one of them is a reason to go looking for
+	// them elsewhere. Reporting "in another room" for someone sitting at this very
+	// table is simply false.
+	inviteReasonAlreadyHere = "in_this_room"
+	inviteReasonRoomFull    = "room_full"
 )
 
 // InviteHandler serves the two friend-invite endpoints (Story 11.5). It is a
@@ -143,7 +149,7 @@ func (h *InviteHandler) ListInvitableFriends(c echo.Context) error {
 
 	items := make([]InvitableFriendDTO, 0, len(friends))
 	for _, f := range friends {
-		reason, rerr := h.availabilityReason(f.UserID)
+		reason, rerr := h.availabilityReason(f.UserID, roomID)
 		if rerr != nil {
 			return rerr
 		}
@@ -202,7 +208,7 @@ func (h *InviteHandler) InviteToRoom(c echo.Context) error {
 
 	// Availability is ALWAYS recomputed here — a client claim that "this friend is
 	// available" is never trusted.
-	reason, err := h.availabilityReason(req.FriendUserID)
+	reason, err := h.availabilityReason(req.FriendUserID, roomID)
 	if err != nil {
 		return err
 	}
@@ -342,7 +348,7 @@ func (h *InviteHandler) requireRoomMember(c echo.Context) (uint, uint, *Room, er
 // already-in-room gate uses, so the panel can never advertise a friend the join
 // would then reject. A missing tracker is treated as "no signal" rather than
 // "unavailable", mirroring the nil-service affordances elsewhere in this package.
-func (h *InviteHandler) availabilityReason(friendID uint) (string, error) {
+func (h *InviteHandler) availabilityReason(friendID, roomID uint) (string, error) {
 	if h.connections != nil && !h.connections.IsConnected(friendID) {
 		return inviteReasonOffline, nil
 	}
@@ -354,6 +360,11 @@ func (h *InviteHandler) availabilityReason(friendID uint) (string, error) {
 		return "", fmt.Errorf("checking friend room presence: %w", err)
 	}
 	if existing != nil {
+		// Same table → say so. Either way they cannot be invited, but the panel
+		// must not send the host hunting for a friend who is sitting right there.
+		if existing.RoomID == roomID {
+			return inviteReasonAlreadyHere, nil
+		}
 		return inviteReasonInRoom, nil
 	}
 	return "", nil

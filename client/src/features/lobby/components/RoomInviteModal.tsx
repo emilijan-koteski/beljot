@@ -19,6 +19,7 @@ import {
   useDeclineRoomInviteMutation,
   useJoinRoomMutation,
 } from "@/shared/hooks/mutations/useRooms";
+import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { joinFailureMessage } from "@/shared/lib/joinFailure";
 import { useRoomStore } from "@/shared/stores/roomStore";
@@ -210,7 +211,10 @@ export function RoomInviteModal() {
                 className="border-border bg-surface-sunken text-ink-dim inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
                 data-testid="room-invite-buyin"
               >
-                <Coins className="size-3" />
+                {/* A coin is ALWAYS the off-theme gold (see COIN_GOLD) — the chip
+                    around it stays neutral, the coin itself never inherits the
+                    text colour. */}
+                <Coins className="size-3" style={{ color: COIN_GOLD }} aria-hidden="true" />
                 {t("roomInvite.popup.buyIn", { buyIn: formatCoins(invite.coinBuyIn) })}
               </span>
             )}
