@@ -28,6 +28,8 @@ so that the rules engine has a solid, testable foundation for all game operation
    **And** the phase is set to `bidding`
    **And** the dealer is seat 0 for the first hand
 
+   > **SUPERSEDED (2026-08-18)** — the fixed dealer-0 start no longer holds. `NewGame` now draws the first-hand dealer uniformly at random from seats 0-3, with the opening bidder derived as `(DealerSeat + 1) % 4`. This affects the AC above and tasks 3.5 and 3.6 below, which still record `DealerSeat=0` / `ActivePlayerSeat=1` as this story implemented them. The ACs are left as the historical record of Story 3.1; current behavior is defined by `spec-randomize-first-dealer.md` and `epics.md`. Do not "restore" dealer 0 from this file.
+
 4. **Given** test fixtures are needed
    **When** I inspect `server/internal/game/testfixtures/fixtures.go`
    **Then** factory function `NewGameJustDealt()` exists and returns a valid GameState in `bidding` phase with all 4 players holding 8 cards

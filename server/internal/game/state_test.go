@@ -154,12 +154,35 @@ func TestNewGame(t *testing.T) {
 		assert.Equal(t, game.PhaseDealing, gs.Phase)
 	})
 
-	t.Run("dealer is seat 0 for first hand", func(t *testing.T) {
-		assert.Equal(t, 0, gs.DealerSeat)
+	t.Run("active player is the seat after the dealer", func(t *testing.T) {
+		assert.Equal(t, (gs.DealerSeat+1)%4, gs.ActivePlayerSeat)
 	})
 
-	t.Run("active player is seat 1 (after dealer)", func(t *testing.T) {
-		assert.Equal(t, 1, gs.ActivePlayerSeat)
+	t.Run("first dealer is drawn roughly uniformly across all four seats", func(t *testing.T) {
+		// A "seat appears at least once" check is too weak: a badly skewed draw
+		// (say 70/10/10/10) would satisfy it while quietly handing one seat most
+		// of the deals, which matters because coin buy-in matches settle real
+		// stakes. So assert every seat's SHARE too.
+		//
+		// 4000 draws, expected 1000 per seat, sd = sqrt(4000*0.25*0.75) ~= 27.
+		// The +/-20% band below sits about 7 sd out, so a uniform source
+		// effectively never trips it, while any material skew does.
+		const draws = 4000
+		var counts [4]int
+		for range draws {
+			g := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42)
+			require.GreaterOrEqual(t, g.DealerSeat, 0)
+			require.LessOrEqual(t, g.DealerSeat, 3)
+			require.Equal(t, (g.DealerSeat+1)%4, g.ActivePlayerSeat,
+				"opening bidder is always derived from the dealer")
+			counts[g.DealerSeat]++
+		}
+		for seat, n := range counts {
+			assert.Greater(t, n, draws/4*80/100,
+				"seat %d is dealt too rarely to be a uniform draw (%d of %d)", seat, n, draws)
+			assert.Less(t, n, draws/4*120/100,
+				"seat %d is dealt too often to be a uniform draw (%d of %d)", seat, n, draws)
+		}
 	})
 
 	t.Run("hand number is 1", func(t *testing.T) {

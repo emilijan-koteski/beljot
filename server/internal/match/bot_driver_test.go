@@ -132,8 +132,31 @@ func TestBot_ActsAfterMinDelayAndBeforeTimerExpiry(t *testing.T) {
 	mgr := match.NewManager(hub, repo) // production delays: 1–2.5s
 
 	start := time.Now()
-	// Per-move timer at the 10s minimum; first bidder (seat 1) is a bot.
+	// Per-move timer at the 10s minimum. The first-hand dealer is randomized, so
+	// the bot seat is put on the opening bid explicitly rather than assumed:
+	// NewGameJustDealt deals from dealer 0, leaving seat 1 owing the bid.
+	//
+	// Two arming paths are reachable and both hold. When the random dealer is 0,
+	// StartMatch already armed seat 1 and the BotSchedule below no-ops
+	// (maybeScheduleBotAction skips a seat that already has a live timer); the
+	// injected fixture shares that decision context (bidding, hand 1, no
+	// prompts), so the pending delay still applies to the state asserted below.
+	// Otherwise BotSchedule arms it here.
+	//
+	// `start` predates StartMatch, so elapsed carries a few ms of setup on top of
+	// the think delay. That direction loosens the >=1s floor rather than
+	// tightening it, by about the setup cost -- a regression bigger than that
+	// (e.g. a sub-second botDelayMin) is still caught. The 10s ceiling only gets
+	// stricter.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "per-move", 10, 10, 120, 0))
+	mgr.SetGameStateForTest(100, markBots(testfixtures.NewGameJustDealt(), 1))
+	mgr.BotSchedule(100)
+
+	pre := mgr.GetStateSnapshot(100)
+	require.NotNil(t, pre)
+	require.Equal(t, game.PhaseBidding, pre.Phase)
+	require.Equal(t, 1, pre.ActivePlayerSeat, "the bot seat must really owe the opening bid")
+	require.True(t, pre.Players[1].IsBot)
 
 	acted := waitFor(5*time.Second, func() bool {
 		st := mgr.GetStateSnapshot(100)
@@ -203,21 +226,65 @@ func TestBot_StaleTimerNeverFiresAfterStateChange(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	mgr.SetBotDelayForTest(50*time.Millisecond, 50*time.Millisecond)
+	// 300ms rather than 50ms: the delay must outlast the setup below. When the
+	// random dealer is 0 the clock starts back at StartMatch, so with a 50ms
+	// delay a loaded machine could let the bot act BEFORE the pause is injected
+	// — the assertions would then still pass, without the stale path ever being
+	// exercised.
+	mgr.SetBotDelayForTest(300*time.Millisecond, 300*time.Millisecond)
 
-	// Seat 1 (bot) is the first bidder — StartMatch schedules its decision.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0))
 
-	// Before the 50ms delay fires, the table pauses.
+	// The first-hand dealer is randomized, so the bot seat is put on the bidding
+	// decision explicitly: NewGameJustDealt deals from dealer 0, leaving seat 1
+	// (the bot) on the bid. When the dealer is already 0 the delay was armed by
+	// StartMatch and BotSchedule no-ops, but the decision context is identical,
+	// so a delay is pending for seat 1 either way.
+	mgr.SetGameStateForTest(100, markBots(testfixtures.NewGameJustDealt(), 1))
+	mgr.BotSchedule(100)
+
+	pre := mgr.GetStateSnapshot(100)
+	require.NotNil(t, pre)
+	require.Equal(t, game.PhaseBidding, pre.Phase)
+	require.Equal(t, 1, pre.ActivePlayerSeat, "a bot seat must really owe the bidding decision")
+	require.True(t, pre.Players[1].IsBot)
+
+	// Before the delay fires, the table pauses.
 	paused := markBots(testfixtures.NewGamePaused(0), 1)
+	pauseAt := time.Now()
 	mgr.SetGameStateForTest(100, paused)
 
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(700 * time.Millisecond) // well past the 300ms think delay
 
 	st := mgr.GetStateSnapshot(100)
 	require.NotNil(t, st)
 	assert.Equal(t, game.PhasePaused, st.Phase, "stale bot timer must not act on a paused table")
 	assert.Equal(t, 0, st.BiddingPassCount, "no bidding action may have been applied")
+
+	// Both assertions above are also true of the paused fixture exactly as
+	// injected, so on their own they cannot tell "the phase guard rejected the
+	// decision" from "the fixture was inert". A stale timer that DID act would
+	// have gone through applyAndBroadcastActionWith and broadcast, so require
+	// that nothing broadcast after the pause.
+	for _, call := range hub.snapshot() {
+		assert.False(t, call.at.After(pauseAt),
+			"a stale think delay must not broadcast after the table paused")
+	}
+
+	// Control: the identical arrangement WITHOUT the pause does produce a bot
+	// action. Without it the assertions above could pass simply because no
+	// think delay was ever armed.
+	mgr.SetGameStateForTest(100, markBots(testfixtures.NewGameJustDealt(), 1))
+	mgr.BotSchedule(100)
+
+	acted := waitFor(2*time.Second, func() bool {
+		st := mgr.GetStateSnapshot(100)
+		if st == nil {
+			return false
+		}
+		return st.Phase != game.PhaseBidding || st.BiddingPassCount > 0 || st.ActivePlayerSeat != 1
+	})
+	require.True(t, acted, "the same setup must arm a think delay that really fires")
 }
 
 // TestBot_RemoveSessionCancelsPendingBotTimers pins teardown: pending think
@@ -228,11 +295,61 @@ func TestBot_RemoveSessionCancelsPendingBotTimers(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetBotDelayForTest(50*time.Millisecond, 50*time.Millisecond)
 
+	// The first-hand dealer is randomized, so the bot's decision point is set
+	// explicitly rather than assumed: NewGameJustDealt deals from dealer 0, which
+	// leaves seat 1 (the bot) on the opening bid. When the random dealer is
+	// already 0, StartMatch armed that seat and BotSchedule no-ops against the
+	// identical decision context; otherwise BotSchedule arms it here. Either way
+	// a 50ms delay is pending for seat 1.
+	armBotThinkDelay := func() {
+		mgr.SetGameStateForTest(100, markBots(testfixtures.NewGameJustDealt(), 1))
+		mgr.BotSchedule(100)
+
+		st := mgr.GetStateSnapshot(100)
+		require.NotNil(t, st)
+		require.Equal(t, game.PhaseBidding, st.Phase)
+		require.Equal(t, 1, st.ActivePlayerSeat, "the bot seat must really owe the decision")
+		require.True(t, st.Players[1].IsBot)
+	}
+
+	// Control: left alone, that armed delay really does fire and act. Without
+	// it the teardown assertions below would also hold if no bot timer had
+	// ever been pending.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0))
+	armBotThinkDelay()
+	require.True(t, waitFor(2*time.Second, func() bool {
+		st := mgr.GetStateSnapshot(100)
+		if st == nil {
+			return false
+		}
+		return st.Phase != game.PhaseBidding || st.BiddingPassCount > 0 || st.ActivePlayerSeat != 1
+	}), "an armed think delay must fire while the session is alive")
 	mgr.RemoveSession(100)
 
-	time.Sleep(150 * time.Millisecond)
+	// Drain: applyAndBroadcastActionWith releases session.mu before it
+	// broadcasts, so the control action's broadcast can still be in flight after
+	// waitFor observed the applied state. Let it land before the cutoff below.
+	time.Sleep(50 * time.Millisecond)
+
+	// Now tear the session down while the SAME delay is still pending.
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0))
+	armBotThinkDelay()
+
+	teardownAt := time.Now()
+	mgr.RemoveSession(100)
+
+	time.Sleep(150 * time.Millisecond) // well past the 50ms think delay
 	assert.False(t, mgr.HasSession(100))
+
+	// This pins the OUTCOME, not the cancellation mechanism specifically:
+	// applyAndBroadcastActionWith also drops everything once session.closed is
+	// set, and RemoveSession sets that flag before it cancels timers, so a leaked
+	// (uncancelled) timer would still look silent here. Proving cancellation
+	// itself needs timer introspection — see deferred-work.
+	for _, call := range hub.snapshot() {
+		assert.False(t, call.at.After(teardownAt),
+			"nothing may broadcast after the session was torn down")
+	}
 }
 
 // TestBot_RespondsToBelotPrompt: a bot holding the pending Belote decision
@@ -472,5 +589,8 @@ func TestBot_HumanOnlyMatchSchedulesNothing(t *testing.T) {
 	require.NotNil(t, st)
 	assert.Equal(t, game.PhaseBidding, st.Phase)
 	assert.Equal(t, 0, st.BiddingPassCount, "nothing may act for a human seat")
-	assert.Equal(t, 1, st.ActivePlayerSeat)
+	// The first-hand dealer is randomized, so the opening bid is asserted
+	// against the seat after the dealer rather than a fixed seat 1.
+	assert.Equal(t, (st.DealerSeat+1)%4, st.ActivePlayerSeat,
+		"the opening bid still sits with the seat after the dealer")
 }

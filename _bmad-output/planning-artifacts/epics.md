@@ -736,7 +736,7 @@ So that the rules engine has a solid, testable foundation for all game operation
 **And** each player holds exactly 8 cards
 **And** a trump candidate card is set (first undealt card or per Bitola convention)
 **And** the phase is set to `bidding`
-**And** the dealer is seat 0 for the first hand
+**And** the dealer for the first hand is picked uniformly at random from seats 0-3 (the opening bidder is the seat after it), so the starting point varies between matches
 
 **Given** test fixtures are needed
 **When** I inspect `server/internal/game/testfixtures/fixtures.go`

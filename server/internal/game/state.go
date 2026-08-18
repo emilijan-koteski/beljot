@@ -192,14 +192,21 @@ func ShuffleDeck(deck []Card) {
 // using the Bitola 3+2 dealing sequence. bots marks the server-driven seats
 // (UserID 0, empty username) — see PlayerState.IsBot.
 func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint) *GameState {
+	// The first-hand dealer is drawn uniformly at random, the way a real
+	// table cuts for the deal. Hardcoding seat 0 handed the same seat the
+	// deal (and the seat after it the opening bid) in every single match;
+	// per-hand rotation only ever moved that fixed starting point. Uses the
+	// same auto-seeded math/rand/v2 global as ShuffleDeck above.
+	dealerSeat := rand.IntN(4)
+
 	gs := &GameState{
 		RoomID:           roomID,
 		Variant:          variant,
 		MatchMode:        matchMode,
 		Phase:            PhaseDealing,
 		HandNumber:       1,
-		DealerSeat:       0,
-		ActivePlayerSeat: 1, // player after dealer (counter-clockwise)
+		DealerSeat:       dealerSeat,
+		ActivePlayerSeat: (dealerSeat + 1) % 4, // player after dealer (counter-clockwise)
 		BiddingRound:     1,
 		BiddingPassCount: 0,
 		TrickNumber:      0,

@@ -36,6 +36,21 @@ func TestSimulation_HeuristicBeatsRandomBaseline(t *testing.T) {
 			[4]bool{true, true, true, true},
 			game.VariantBitola, "1001", 1,
 		)
+		// NewGame draws the first-hand dealer at random. This experiment measures
+		// heuristic quality, not seat luck, so the dealer is pinned to seat 0 and
+		// the opening bidder derived from it -- the same bidding rotation the
+		// >=60% threshold below was calibrated against, when NewGame hardcoded
+		// dealer 0.
+		//
+		// Note this pins the rotation, not the deal: stage-1 hands were already
+		// dealt from the RANDOM dealer inside NewGame above, and only stage-2
+		// distribution follows the value set here. That costs nothing
+		// statistically -- the deck is uniformly shuffled, so each seat still
+		// holds a uniformly random hand either way -- but the state is not what a
+		// coherent dealer-0 deal would produce, so do not add assertions here that
+		// depend on which seat received which card.
+		gs.DealerSeat = 0
+		gs.ActivePlayerSeat = (gs.DealerSeat + 1) % 4
 		mem := bot.NewMemory()
 
 		result, ok := playOneHand(t, gs, mem, rng)
