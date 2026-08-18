@@ -1013,8 +1013,9 @@ The rules engine must enforce phase-based action validation. This is the contrac
 | Phase             | Valid Player Actions                     | Transitions To                                        |
 | ----------------- | ---------------------------------------- | ----------------------------------------------------- |
 | `dealing`         | (automatic — no player actions)          | `bidding`                                             |
-| `bidding`         | `pick_trump`, `pass_trump`               | `playing` (if picked) or `dealing` (Bitola reshuffle) |
-| `playing`         | `play_card`, `declare`, `skip_declare`   | `trick_resolving` (4th card played)                   |
+| `bidding`         | `pick_trump`, `pass_trump`               | Bitola: `playing` (if picked) or `dealing` (reshuffle). Croatian: `declaring` (always — dealer is forced, so bidding never fails) |
+| `declaring`       | `declare`, `skip_declare`                | `playing` (once all four have answered) — **Croatian variant only**; added by Epic 12 Story 12.6 |
+| `playing`         | `play_card`, `declare`, `skip_declare`   | `trick_resolving` (4th card played). `declare`/`skip_declare` are Bitola-only here — Croatian resolves them in `declaring` |
 | `trick_resolving` | (automatic — score, sweep)               | `playing` (next trick) or `hand_scoring` (8th trick)  |
 | `hand_scoring`    | (automatic — calculate, check match end) | `dealing` (next hand) or `match_end`                  |
 | `match_end`       | (none — persist results to DB)           | —                                                     |
@@ -1022,6 +1023,8 @@ The rules engine must enforce phase-based action validation. This is the contrac
 | `disconnected`    | `reconnect`                              | (return to previous phase)                            |
 
 The `GameState.Phase` field must always reflect the current phase. `ApplyAction()` rejects any action not valid for the current phase.
+
+**Variant-conditional phases (Epic 12, added 2026-08-18).** The `declaring` phase exists only under the Croatian rule config; Bitola resolves declarations inside `playing` during trick 1. Per D-VAR-1 the engine selects between these paths by reading a `VariantRules` config field, never by comparing `state.Variant`. See sprint-change-proposal-2026-08-18.md.
 
 #### Card Encoding Convention
 

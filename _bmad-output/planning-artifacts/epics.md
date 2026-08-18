@@ -29,7 +29,7 @@ FR4: Players can view their own profile displaying username, level, stats summar
 FR5: Players can search for other players by username
 FR6: Players can send, accept, and decline friend requests and maintain a friend list
 FR7: The system enforces Bitola variant rules: 3+2 dealing sequence, reshuffle-and-rotate-dealer trump bidding mechanic when no player selects trump in round 2, counter-clockwise play, and variant-specific scoring
-FR8: The system enforces Croatian variant rules: 3+2 dealing sequence, forced trump selection by last player in bidding, counter-clockwise play, and variant-specific scoring
+FR8: The system enforces Croatian variant rules, which diverge from Bitola in six places: (a) **deal shape** — all eight cards are dealt before bidding as 3+3 visible to their holder plus 2 face-down, with no trump candidate flipped and no post-pick distribution stage; (b) **trump selection** — trump is a bare named suit, chosen freely in both rounds, and the picker takes no card into hand; (c) **round 2 reveal** — four passes in round 1 turns each player's two face-down cards up to that player, so round 2 is bid on a full eight-card hand; (d) **all-pass outcome** — the dealer, bidding last in round 2, must name a suit; there is no reshuffle-and-rotate; (e) **declaration overlap** — a single card may count in more than one declaration, with no Bitola single-use dedup; (f) **declaration timing** — a dedicated declaration phase runs between bidding and trick 1 in which all four players declare or skip, its result is revealed, and only then does trick 1 begin (Bitola declares during trick 1 and reveals at trick 2). All other rules are shared with Bitola: counter-clockwise play, follow-suit, the overplay obligation and its lifting gate, must-trump-when-void, over-trump, all card and declaration point values, the meld tie-break chain, Belote bonus, failed hands, last-trick bonus, Capot, and the tied-hand rule (which Bitola alone leaves — see FR64). Both variants are expressed as **named presets over an internal per-rule configuration** (see D-VAR-1), not as hardcoded variant branches (rewritten 2026-08-18)
 FR9: The system validates and scores declarations at the first trick — highest-value set wins ties; only the winning team's declarations count
 FR10: The system awards the Belote bonus (K+Q of trump held by same player = 20 pts) when announced during play
 FR11: The system applies failed hand scoring: the failing team scores 0 pts and all points transfer to opponents
@@ -85,6 +85,8 @@ FR59: Room owners can seat server-controlled bot players on empty seats while th
 FR60: Rooms can be marked private with an owner-set password (stored hashed; nullable = public). Private rooms remain listed but shown as locked; joining one — via its locked room card or its join code — requires entering the correct password before the join proceeds. Owners can change the password or revert to public; Quick Play rooms are never private
 FR61: Friends can exchange private one-on-one "whisper" messages, initiated with the `/w <username>` chat command from the lobby, a room, or a match. Whispering is blocked to any friend currently in the sender's same active room or match (teammate or opponent) to prevent card-information collusion; the block is enforced server-side. Whispers are real-time only (recipient must be online) and ephemeral (not persisted), and render visually distinct (pink) with Valorant-style channel switching between the primary chat and each whisper thread (added 2026-08-14)
 FR62: Room members can invite "available" friends (online, in the lobby, not in any room or match) into a room in `waiting` status. A host (owner) invite bypasses the room password via a server-authorized one-time grant; a non-host member's invite still requires the invitee to enter the room password if one is set. Invites are delivered as a popup, expire on timeout, and auto-void if the room fills/closes or the friend leaves the lobby. The honor gate (FR57) and seat capacity still apply to all invitees (added 2026-08-14)
+FR63: Players can choose a card deck style (French-suited default, Croatian/German-suited alternative) as a persisted account preference, selectable from the in-game Settings dialog alongside language. The choice is purely visual, applies to every card surface in a match, is free of charge, and has no gameplay effect — it is not a purchasable cosmetic (see FR50) (added 2026-08-18)
+FR64: The Bitola variant applies the **hanging points** tie rule: when the taker's team total equals the opponents', neither team scores and the hand's points are carried over to the side that wins the next decisive hand. Interacts with the 1001/501 match target and match-end resolution. Croatian keeps all-points-to-opponents, which is what ships today for both variants as an interim stand-in. Split out of Story 3.5 (added 2026-08-18)
 
 ### NonFunctional Requirements
 
@@ -201,7 +203,7 @@ FR4: Epic 1 (basic) / Epic 7 (expanded) — Player profile display
 FR5: Epic 11 — Player search by username
 FR6: Epic 11 — Friend requests and friend list
 FR7: Epic 3 — Bitola variant rules engine
-FR8: Epic 12 — Croatian variant rules engine
+FR8: Epic 12 — Croatian variant rules engine (seven divergences; scope corrected 2026-08-18)
 FR9: Epic 3 — Declaration validation and scoring
 FR10: Epic 3 — Belote bonus (K+Q trump = 20 pts)
 FR11: Epic 3 — Failed hand scoring
@@ -244,7 +246,7 @@ FR46: Epic 1 — Desktop web browser support
 FR47: Epic 11 — Public player profiles
 FR48: Epic 16 — Spectator/observer mode
 FR49: Epic 16 — Achievements and badges
-FR50: Epic 16 — Cosmetic purchases
+FR50: Epic 16 — Cosmetic purchases — purchasable cosmetics only; the free deck-style preference is FR63/Epic 12
 FR51: Epic 16 — Bracket-style tournaments
 FR52: [descoped 2026-08-14] — Epic 15 removed; mobile-responsive layout delivered incidentally across Phase 1–2, PWA/native dropped (see sprint-change-proposal-2026-08-14.md)
 FR53: Epic 9 — Room coin buy-in + match pot settlement
@@ -257,6 +259,8 @@ FR59: Epic 10 — Bot players (owner-seated, server-controlled; added 2026-06-11
 FR60: Epic 9 — Private rooms (password-gated entry; added 2026-06-18)
 FR61: Epic 11 — Friend whisper chat (private friend-to-friend messaging, anti-collusion; added 2026-08-14)
 FR62: Epic 11 — Friend room invites (host password-bypass; non-host password-required; added 2026-08-14)
+FR63: Epic 12 — Card deck style preference (free, Settings-level; added 2026-08-18)
+FR64: Epic 12 — Bitola hanging-points tie rule (added 2026-08-18)
 
 ## Epic List
 
@@ -346,11 +350,15 @@ Players can search for other players by username, send/accept friend requests, m
 
 ### Epic 12: Variant Expansion
 
-Players can play the Croatian trump variant and access an in-app rules reference covering both variants. (The 501-point match mode originally planned here moved to Epic 10 as Story 10.2 on 2026-06-11.)
+Players can play the Croatian variant, choose the card deck style they play with, and access an in-app rules reference covering both variants. (The 501-point match mode originally planned here moved to Epic 10 as Story 10.2 on 2026-06-11.)
 
-**Variant rule divergence — tied hand (carried over from Story 3.5):** the two variants must differ on the tied-hand rule. The **Croatian variant** awards all points to the opponents when the taker's team only ties (already implemented in Epic 3 and applied to all variants as an interim stand-in). The **Bitola variant** must instead use **hanging points (carry-over)**: on a tie the hand's points are held over, nobody scores, and they carry to the winner of the next decisive hand. This needs cross-hand carry-over state plus match-end interaction — see the dedicated item in `deferred-work.md`. Until this lands, Bitola intentionally uses the Croatian tie rule.
+**Scope corrected 2026-08-18** (sprint-change-proposal-2026-08-18.md). A rules audit against a Croatian source, corrected by a player, found Story 12.1's original premise wrong: Croatian is not "Bitola plus a forced dealer pick." It diverges in **seven** places — deal shape (3+3+2, no candidate card, no post-pick distribution), free suit choice in both bidding rounds, the round-2 reveal of each player's two face-down cards, the forced dealer pick, declaration overlap, a dedicated declaration phase before trick 1, and the tied-hand rule. Thirty other rules — every card and declaration value, the meld tie-break chain, all four play obligations, Belote, failed hands, last trick, and Capot — were verified **identical** and must not be branched.
 
-**FRs covered:** FR8, FR29
+**D-VAR-1 — Variants are presets over a rule config, not branch conditions.** Every divergence above is a named field on a `VariantRules` struct resolved once at game initialization; `bitola` and `croatia` are preset resolvers returning a fully-populated config. The engine reads rule fields only — `state.Variant` is never compared inside `bidding.go`, `declarations.go`, `scoring.go`, or `validation.go`. Separate code paths per rule outcome are still required; the selector is the config field, not the variant string. The seven fields are: deal shape, trump candidate on/off, round-2 reveal on/off, all-pass outcome, declaration overlap, declaration timing, tie rule. This is forward-compatibility for a planned future story exposing these rules directly in room creation, with Bitola and Croatian demoted to preset buttons — that story must be reachable by adding a config source, not by rewriting the engine.
+
+**Tied hand — the divergence Bitola absorbs.** Croatian sends a tied hand's points to the taker's opponents, which is exactly what ships today for all variants as a deliberate interim stand-in (Story 3.5). **Bitola** is the side that moves, to hanging points (carry-over): on a tie nobody scores and the points carry to the side that wins the next decisive hand. Needs cross-hand state plus match-end interaction — Story 12.7.
+
+**FRs covered:** FR8, FR29, FR63, FR64
 **Phase:** 3
 
 ### Epic 13: Seasonal Rank & Leaderboard
@@ -2289,33 +2297,60 @@ So that we can play together quickly — with the host able to pull friends past
 
 ## Epic 12: Variant Expansion
 
-Players can play the Croatian trump variant and access an in-app rules reference covering both variants. (The 501-point match mode originally planned here moved to Epic 10 as Story 10.2 on 2026-06-11.)
+Players can play the Croatian variant, choose the card deck style they play with, and access an in-app rules reference covering both variants. (The 501-point match mode originally planned here moved to Epic 10 as Story 10.2 on 2026-06-11.)
 
-### Story 12.1: Croatian Variant Rules Engine
+**Scope corrected 2026-08-18** — see sprint-change-proposal-2026-08-18.md and the binding D-VAR-1 constraint on the Epic 12 overview card. Story 12.1 was rewritten and split; Stories 12.4-12.8 were added. Sequencing is load-bearing: **12.1 -> 12.5 -> 12.6 -> 12.7 -> 12.8**, with 12.4 independent. Enablement (12.8) must ship last — after 12.1 the variant is half-built, and exposing the room option earlier ships a broken game.
+
+### Story 12.1: Variant Rule Configuration & Croatian Dealing/Bidding
 
 As a player,
-I want to play the Croatian trump variant with its authentic bidding rules,
-So that the platform supports both major Balkan Belot variants.
+I want to play the Croatian variant's dealing and trump bidding with its authentic rules,
+So that the platform supports both major Balkan Belot variants without either one's rules bending to fit the other.
 
 **Acceptance Criteria:**
 
-**Given** a game is initialized with Croatian variant
-**When** the rules engine processes the bidding phase
-**Then** round 1 follows the same counter-clockwise PICK/PASS pattern as Bitola
-**And** in round 2, if the first 3 players pass, the last player (dealer) is FORCED to pick a trump suit — there is no reshuffle
+**Given** the rules engine initializes any game
+**When** `NewGame` runs
+**Then** a `VariantRules` config is resolved once from the variant name and carried on `GameState`
+**And** `bitola` and `croatia` preset resolvers each return a fully-populated config — no field is left to a default
+**And** no file in `internal/game` compares `state.Variant` to a variant name; every branch reads a config field (D-VAR-1)
 
-**Given** the Croatian variant is selected
-**When** card play and scoring proceed
-**Then** all other rules (suit-following, trump obligations, declarations, Belote bonus, scoring, failed hands, Capot, last-trick bonus) are identical to Bitola variant
+**Given** a Croatian game is dealt
+**When** `dealCards` runs
+**Then** all eight cards per player are dealt before bidding — 3, then 3, then 2 face-down
+**And** no trump candidate is flipped and `TrumpCandidate` stays `nil`
+**And** `gs.Deck` is empty — there is no post-pick distribution stage
 
-**Given** the rules engine receives a Croatian game
-**When** `ApplyAction` processes bidding actions
-**Then** the variant field in GameState determines which bidding rules apply
-**And** all existing Bitola tests continue to pass unchanged
+**Given** a Croatian game is in bidding round 1
+**When** a player's state snapshot is built
+**Then** that player sees six of their own cards and the two face-down cards are withheld **server-side**
+**And** no player's face-down cards appear in any other player's snapshot at any point
 
-**Given** a room is created
-**When** the variant dropdown is configured
-**Then** both Bitola and Croatian are available as options
+**Given** a Croatian game is in bidding round 1
+**When** a player picks trump
+**Then** the trump is the suit named in `action.Suit` — freely chosen, not bound to any candidate card
+**And** the picker takes no card into hand
+
+**Given** all four players pass in Croatian bidding round 1
+**When** round 2 opens
+**Then** each player's two face-down cards become visible **to that player only**
+**And** bidding resumes from the player after the dealer with all suits available
+
+**Given** a Croatian game is in bidding round 2 and the first three players have passed
+**When** it is the dealer's turn
+**Then** `pass_trump` is rejected and only `pick_trump` is legal
+**And** the hand proceeds to play — `reshuffleAndRedeal` is unreachable under the Croatian config
+
+**Given** any Bitola game
+**When** the full existing test suite runs
+**Then** every Bitola test passes unchanged — the flipped candidate, stage-2 distribution, round-1 candidate-suit binding, and reshuffle-and-rotate all behave exactly as before
+
+**Given** the client renders a Croatian bidding turn
+**When** `TrumpPrompt` and `TrumpReveal` mount
+**Then** they render a free four-suit choice with no candidate card, in both rounds
+**And** the Bitola candidate presentation and round-2 candidate-disable behaviour are untouched
+
+**Technical notes:** `handlePickTrump`'s `TrumpCandidate == nil || len(Deck) != 11` guard becomes config-gated. Hidden-card masking belongs in the snapshot builder, never the client — this is the epic's only rule where information must be withheld from a player about their own cards, and NFR8 makes it server-authoritative. The round-2 reveal event lands in `wsEvents.ts` and `events.go` in one commit.
 
 ### Story 12.2: [moved] 501-Point Match Mode
 
@@ -2342,6 +2377,191 @@ So that I can look up rules without leaving the platform.
 **When** it renders
 **Then** it is displayed in the player's selected language (EN, SR, MK, HR) via i18n
 **And** the content is structured as static markdown rendered as a React component in `features/rules/`
+
+### Story 12.4: Card Deck Style Preference
+
+As a player,
+I want to choose which card deck the game draws with,
+So that I can play with the deck I grew up with rather than the one the platform defaults to.
+
+**Acceptance Criteria:**
+
+**Given** a registered player
+**When** their account is created or migrated
+**Then** a `card_deck_preference` column on `users` defaults to `french`
+**And** migration `000020_add_card_deck_to_users` ships with a reversing `.down.sql`
+
+**Given** a player opens the Settings dialog
+**When** the deck section renders
+**Then** it presents the available decks the same way the language section presents languages — a labelled radio set with the current choice marked
+**And** selecting a deck applies it immediately, with no page reload and no match interruption
+
+**Given** a player changes their deck
+**When** the selection is made
+**Then** it is persisted via the same `PATCH /users/:id/preferences` endpoint that carries `languagePreference`
+**And** an unreachable or failing endpoint reverts the UI to the previous choice, matching how the language handler already behaves
+
+**Given** a player signs in on a different browser
+**When** the auth envelope resolves
+**Then** their deck preference is applied before the first card renders
+
+**Given** any deck is active
+**When** a card renders anywhere in a match
+**Then** every card surface uses that deck — hand, trick area, card flight, deal animation, trump prompt and reveal, declaration prompt and reveal, Belote prompt and reveal
+**And** `cardFaceUrl` derives the path from the deck and the card ID with no lookup table
+**And** card IDs, geometry, states, glow, the face-down back, and all `data-testid`s are unchanged
+
+**Given** a screen-reader user with the Croatian deck active
+**When** a card is focused
+**Then** the `aria-label` names the suit as that deck depicts it, in the player's language
+
+**Given** the marketing landing page
+**When** it renders its decorative cards
+**Then** it is untouched — `features/landing/components/PlayingCard.tsx` stays on the French deck for unauthenticated visitors
+
+**Given** the deck assets
+**When** they are added
+**Then** they live under `client/public/cards/{deck}/`, are generated through `scripts/recolor-cards.mjs` rather than hand-edited, and their provenance and licence are recorded in `docs/card-deck.md`
+
+**Dependencies:** artwork must be sourced under a compatible licence before this story starts (procurement, not engineering); `spec-svg-card-deck.md`'s frozen `/cards/{ID}.svg` path contract needs a change-log entry; the three-way auth-envelope duplication (`axiosClient.ts`, `hooks/mutations/useAuth.ts`, `hooks/useAuth.ts`) should be unified here while all three files are open.
+
+### Story 12.5: Croatian Declaration Overlap
+
+As a Croatian-variant player,
+I want a card to count toward every declaration it belongs to,
+So that a hand holding four jacks and a sequence through a jack scores both, as it does at a real table.
+
+**Acceptance Criteria:**
+
+**Given** a Croatian game resolves declarations
+**When** `detectDeclarations` returns groups that share a card
+**Then** all of them survive — the `dedupBitola` pass is skipped by config, not by a variant-name check
+**And** a hand with 9-T-J-Q of spades and all four jacks scores the sequence **and** the four-of-a-kind
+
+**Given** a Bitola game resolves declarations
+**When** two groups share a card
+**Then** the higher-value group is kept and the other dropped, exactly as today, with every existing dedup test passing unchanged
+
+**Given** a Croatian player holds two surviving declarations
+**When** the declaration result is revealed
+**Then** the reveal renders every surviving meld for that player rather than only the first
+**And** the panel anchors correctly when one player contributes multiple melds — closes deferred **D67**
+
+**Given** both partners on the winning team hold declarations
+**When** the team total is computed
+**Then** all their melds sum, unchanged from today's `teamDeclarationTotal` behaviour
+
+### Story 12.6: Croatian Declaration Phase
+
+As a Croatian-variant player,
+I want to declare after trump is set and before the first card is played,
+So that declarations resolve the way the Croatian game plays them rather than being folded into trick one.
+
+**Acceptance Criteria:**
+
+**Given** a Croatian game where trump has just been set
+**When** bidding completes
+**Then** the game enters a dedicated declaration phase before any card is played
+**And** all four players are prompted to declare or skip
+**And** the phase resolves only once every player has answered
+
+**Given** the Croatian declaration phase resolves
+**When** the result is determined
+**Then** it is revealed to all four players
+**And** only then does trick 1 begin
+
+**Given** a Bitola game
+**When** a hand is played
+**Then** declarations still fire per player during trick 1 and reveal at the start of trick 2 — no Bitola behaviour changes
+
+**Given** a player's move timer expires during the Croatian declaration phase
+**When** the timer fires
+**Then** the player is auto-skipped and the phase continues, consistent with how auto-play resolves an expired turn elsewhere
+
+**Given** a player disconnects or the match is paused during the declaration phase
+**When** they reconnect
+**Then** the restored snapshot places them back in the declaration phase with their own answer state intact
+
+**Given** the declaration phase exists
+**When** its events cross the wire
+**Then** they are defined in `wsEvents.ts` and `events.go` in the same commit, and the phase transition table in `architecture.md` is updated
+
+**Note:** the largest story in the epic — it adds a phase to the state machine, reaching the session manager's timer handling and the full pause/reconnect matrix, plus a blocking four-player prompt with no existing UI precedent (`DeclarationPrompt` today is per-card, single-player, during trick 1).
+
+### Story 12.7: Bitola Hanging-Points Tie Rule
+
+As a Bitola player,
+I want a tied hand's points to hang and carry to the next decisive hand,
+So that a tie is held over the way we play it, rather than handed to the opponents.
+
+**Acceptance Criteria:**
+
+**Given** a Bitola hand where the taker's team total equals the opponents'
+**When** the hand is scored
+**Then** neither team's match score changes
+**And** the hand's full point pool is held as hanging points on the game state
+
+**Given** hanging points are outstanding
+**When** the next hand resolves decisively
+**Then** the hanging points are added to that hand's winning side and the accumulator resets to zero
+
+**Given** hanging points are outstanding
+**When** the next hand also ties
+**Then** both pools accumulate and carry forward together
+
+**Given** a Bitola hand ties
+**When** the match-end condition is checked
+**Then** no team crosses the target on that hand — hanging points count toward nobody until they resolve
+
+**Given** a match ends by surrender or abandonment with hanging points outstanding
+**When** the match is finalized
+**Then** the hanging points are discarded and the existing surrender/abandonment settlement is unchanged
+
+**Given** a Croatian hand ties
+**When** it is scored
+**Then** all points transfer to the taker's opponents, exactly as ships today — no Croatian behaviour changes
+
+**Given** a hand ties or resolves hanging points
+**When** the score reveal and hand-results table render
+**Then** the held-over state is visible to players, in all four locales
+
+**Given** the rules reference
+**When** it describes Bitola scoring
+**Then** the hanging-points rule is documented in all four locale files, and the Croatian pages continue to describe all-points-to-opponents
+
+**Resolved ambiguity — do not re-open.** "The side that wins the next decisive hand" has two candidate readings: (a) the team with the higher hand total, or (b) the taker's team if they succeed, else the opponents. They are **provably equivalent** across every reachable outcome — a successful take means scoring strictly more; a failed take transfers everything to the opponents; a Capot gives its team the higher total by definition; and a tie is not decisive. Implement either, but do not let a future refactor invent a third meaning.
+
+### Story 12.8: Croatian Variant Enablement
+
+As a player,
+I want to actually create and play Croatian rooms,
+So that the variant is available rather than merely implemented.
+
+**Acceptance Criteria:**
+
+**Given** a player creates a room
+**When** they choose the Croatian variant
+**Then** the server accepts it — `validVariants` includes `croatia`
+**And** the create-room dropdown option is no longer `disabled`
+
+**Given** a Croatian room with bot players
+**When** the match runs
+**Then** bots bid correctly with no trump candidate in both rounds, answer the declaration phase, and play tricks under the shared obligations
+**And** bot behaviour reads the rule config, never a variant name
+
+**Given** Quick Play matchmaking
+**When** a player queues
+**Then** they are matched into Bitola rooms only, as a documented and intentional limit for this epic
+
+**Given** the in-app rules reference
+**When** a player reads either variant's pages
+**Then** the content matches what the engine actually does, in all four locales, reconciled against everything 12.1 / 12.5 / 12.6 / 12.7 shipped
+
+**Given** a room appears in the lobby, room preview, or match history
+**When** it is Croatian
+**Then** the variant is visible to the player
+
+**Note:** must ship last. After 12.1 the variant is half-built; enabling the room option earlier ships a broken game.
 
 ## Epic 13: Seasonal Rank & Leaderboard
 
