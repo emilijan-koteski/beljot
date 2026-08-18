@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Z } from "@/shared/lib/zLayers";
 import type { Card } from "@/shared/types/matchTypes";
 
+import { CARD_SIZES } from "../lib/cardFace";
 import { PlayingCard } from "./PlayingCard";
 
 /** Viewport-relative rect captured via `getBoundingClientRect()`. */
@@ -49,8 +50,7 @@ interface CardFlightProps {
 // to match the source rect at the start and the destination rect at the end,
 // so this base value only sets the resolution at which the card glyphs are
 // rasterized — it does not affect the on-screen size at any moment.
-const BASE_W = 72; // matches PlayingCard size="md"
-const BASE_H = 104;
+const { width: BASE_W, height: BASE_H } = CARD_SIZES.md;
 
 interface FlightCardProps {
   flight: CardFlightDescriptor;

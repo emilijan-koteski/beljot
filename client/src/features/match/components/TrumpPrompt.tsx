@@ -4,6 +4,7 @@ import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import { Z } from "@/shared/lib/zLayers";
 import type { Card, Suit } from "@/shared/types/matchTypes";
 
+import { CARD_FACE_BACKGROUND, CARD_FACE_BORDER } from "../lib/cardFace";
 import { type SeatTeam, teamColors } from "../lib/tableTheme";
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
 import { ClassicButton } from "./overlay/ClassicButton";
@@ -129,8 +130,8 @@ export function TrumpPrompt({
                       style={{
                         width: 22,
                         height: 30,
-                        background: "linear-gradient(180deg, #fdfaf0 0%, #f4ecd8 100%)",
-                        border: "1px solid rgba(0,0,0,0.15)",
+                        background: CARD_FACE_BACKGROUND,
+                        border: CARD_FACE_BORDER,
                         boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
                         color: SUIT_COLOR[suit],
                         fontFamily: "var(--font-suit)",
@@ -222,10 +223,11 @@ export function TrumpPrompt({
                   />
                 </div>
               )}
-              {/* Card-style picker buttons: white parchment surface mirroring
-                  PlayingCard so the tap target reads as "pick this suit's
-                  card". Just the suit glyph — the suit name is redundant
-                  next to a 60×80 white card with a 40 px symbol. The
+              {/* Card-style picker buttons: they take their face treatment from
+                  PlayingCard's exported constants rather than restating it, so
+                  the tap target keeps reading as "pick this suit's card" even
+                  if the deck face changes. Just the suit glyph — the suit name
+                  is redundant next to a 60×80 card with a 40 px symbol. The
                   candidate suit stays in the grid as a disabled tile so the
                   layout doesn't shift and the lock-out is visible. */}
               <div className="grid grid-cols-4 gap-2.5 mb-3.5">
@@ -243,8 +245,8 @@ export function TrumpPrompt({
                       className="flex items-center justify-center rounded-md transition-[filter,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-(--felt-deep,#072a14) disabled:cursor-not-allowed not-disabled:cursor-pointer not-disabled:hover:brightness-105 not-disabled:motion-safe:hover:-translate-y-0.5"
                       style={{
                         height: 52,
-                        background: "linear-gradient(180deg, #fdfaf0 0%, #f4ecd8 100%)",
-                        border: "1px solid rgba(0,0,0,0.15)",
+                        background: CARD_FACE_BACKGROUND,
+                        border: CARD_FACE_BORDER,
                         boxShadow: "0 3px 6px rgba(0,0,0,0.3)",
                         color: SUIT_COLOR[suit],
                         fontFamily: "var(--font-suit)",

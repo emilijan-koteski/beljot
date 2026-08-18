@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { Card, Rank, Suit } from "@/shared/types/matchTypes";
 
+import { CARD_SIZES } from "../lib/cardFace";
 import type { CardState } from "./PlayingCard";
 import { PlayingCard } from "./PlayingCard";
 
@@ -26,10 +27,11 @@ interface HandCardsProps {
   flyingId?: string | null;
 }
 
-// Display sizing matches the `lg` PlayingCard variant — wider than the previous
-// medium fan so the table-edge presentation reads at glance.
-const CARD_WIDTH = 88; // matches SIZE_DIMENSIONS.lg.width in PlayingCard
-const CARD_HEIGHT = 128;
+// Display sizing takes the `lg` PlayingCard variant — wider than the previous
+// medium fan so the table-edge presentation reads at glance. Read from
+// CARD_SIZES rather than restated, so the fan's arithmetic cannot drift from the
+// box the cards actually render at.
+const { width: CARD_WIDTH, height: CARD_HEIGHT } = CARD_SIZES.lg;
 
 // Maximum lateral spread between adjacent cards before they start to compress.
 const MAX_SPREAD_PX = 54;
@@ -95,7 +97,15 @@ export function HandCards({
   }, []);
 
   if (hand.length === 0) {
-    return <div className="relative h-36 w-px" data-testid="hand-cards" />;
+    // Same height as the populated fan below, so the last card leaving does not
+    // collapse the container and shift everything anchored above it.
+    return (
+      <div
+        className="relative w-px"
+        style={{ height: CARD_HEIGHT + 32 }}
+        data-testid="hand-cards"
+      />
+    );
   }
 
   const sortedHand = sortHand(hand);

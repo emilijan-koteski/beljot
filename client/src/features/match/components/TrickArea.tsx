@@ -1,5 +1,6 @@
 import type { TrickCard } from "@/shared/types/matchTypes";
 
+import { CARD_SIZES } from "../lib/cardFace";
 import { compassOffset, SLOT_POSITIONS } from "../lib/trickLayout";
 import { PlayingCard } from "./PlayingCard";
 
@@ -39,8 +40,8 @@ interface TrickAreaProps {
 /** PlayingCard `md` dimensions — used for both placeholders and slot cards.
  *  Exported so the CardFlight wiring in `MatchPage` can compute the slot's
  *  destination rect without measuring the slot DOM. */
-export const TRICK_SLOT_W = 72;
-export const TRICK_SLOT_H = 104;
+export const TRICK_SLOT_W = CARD_SIZES.md.width;
+export const TRICK_SLOT_H = CARD_SIZES.md.height;
 
 const PLACEHOLDER_W = TRICK_SLOT_W;
 const PLACEHOLDER_H = TRICK_SLOT_H;
@@ -146,7 +147,9 @@ export function TrickArea({
               width: phW,
               height: phH,
               transform: `translate(calc(-50% + ${slot.offsetX * slotScale}px), calc(-50% + ${slot.offsetY * slotScale}px)) rotate(${slot.rotation}deg)`,
-              borderRadius: 6,
+              // Same radius as the card that lands here, so the dashed slot and
+              // the played card share an outline instead of showing two.
+              borderRadius: CARD_SIZES.md.radius,
               border: occupied ? "1.5px solid transparent" : "1.5px dashed rgba(255,255,255,0.14)",
               background: occupied ? "transparent" : "rgba(255,255,255,0.02)",
               // Keep the anchor measurable even when a card sits over it.

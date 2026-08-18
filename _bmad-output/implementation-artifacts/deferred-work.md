@@ -698,3 +698,23 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A â€
   summary: When the bot LEADS trick 7 holding master + spare, `retainLastTrickWinner` always leads the spare, which can be over-trumped and donate a trick worth more than the +10 it is protecting.
   reason_deferred: Same scope gate as the capot entry. Measurement says the current choice is right on balance, so this is a refinement rather than a defect: over 52 053 fully-legal trick-7 lead positions, leading the spare was better 9 815 times against 6 009 for leading the master. Distinct from the already-logged non-trump *follow* gap.
   evidence: Enumeration by an adversarial review agent over fully-legal trick-7 lead positions, deltas evaluated to 60 hand points. The guard at `bot.go` `retainLastTrickWinner` has no lead-specific branch.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-svg-card-deck.md`
+  summary: `CardFlight` derives its start/end scale from `getBoundingClientRect()` of *rotated* wrappers, so a flight's first and last frame can be ~18% larger than the settled card it hands off to.
+  reason_deferred: Pre-existing. The hand fan rotates each card (`PER_OFFSET_DEG`) and the E/W trick slots rotate 8deg, so the measured bbox has always exceeded the card's own box; this change only altered the constant the ratio divides by (72 -> 75). Fixing it means dividing by a `CARD_SIZES`-derived width instead of the bbox, which shifts every flight's scale curve and needs its own visual pass.
+  evidence: `CardFlight.tsx` computes `fromScale = f.fromRect.width / BASE_W` from rects captured in `MatchPage`; a rotated 90px card reports a bbox wider than 90px, so the ratio overshoots. Identified independently by an edge-case review agent.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-svg-card-deck.md`
+  summary: The 32 deck faces are served from the site root, which `Caddyfile.prod` matches with `Cache-Control: no-cache`, so every page load revalidates all 32 instead of serving them from cache.
+  reason_deferred: The fix is a production Caddy config change (an immutable-cache rule scoped to `/cards/*`), which is deploy infrastructure rather than app code and should not ride along silently in a frontend change. Note the URLs are ID-derived and therefore not content-hashed, so a long max-age needs a deliberate cache-busting story first.
+  evidence: `Caddyfile.prod` scopes its immutable rule to `path /assets/*`; Vite copies `public/` to the site root, so `/cards/*.svg` falls through to the `@unhashed` no-cache rule. Both review agents flagged it. The spec's own manual check expects 200-from-cache on reload and will instead see 304s.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-svg-card-deck.md`
+  summary: `warmDeck` cannot prevent the blank-card flash on the *opening* deal, because it starts in the same frame as the first cards' own image requests.
+  reason_deferred: Fixing it properly means either 32 `<link rel="preload">` tags in `index.html` or warming the deck on room/match entry -- a different change with its own placement question, and the code comment now states the limitation rather than overclaiming. Subsequent tricks, prompts, and hands are already covered.
+  evidence: The warm-up runs in the first mounted card's `useEffect`, i.e. after that card's `<img src>` is in flight; `client/index.html` preloads nothing. Raised by an adversarial review agent.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-svg-card-deck.md`
+  summary: `TrumpPrompt`'s card-imitating suit surfaces take their background and border from `cardFace.ts` but keep their own unrelated corner radii (`rounded-[5px]` on the 22x30 chips, `rounded-md` on the 52px picker tiles) and aspect ratios.
+  reason_deferred: Cosmetic and currently invisible -- these are suit-glyph tiles, not card faces, and nobody sees them beside a card at matching scale. Binding them fully would mean exporting a radius policy for non-card surfaces, which is more shared API than the problem justifies today.
+  evidence: `TrumpPrompt.tsx` tile styles set radius via Tailwind classes while the card computes `width * 0.05`; a future deck with a different `rx` would move the cards and leave the tiles behind. Raised by an adversarial review agent as residual drift.

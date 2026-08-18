@@ -8,10 +8,18 @@ import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 import type { DeclarationsResolvedPayload } from "@/shared/types/wsEvents";
 
+import { CARD_SIZES } from "../lib/cardFace";
 import { declarationLabelKey } from "../lib/declarations";
 import { TEAM_GOLD, TEAM_SILVER } from "../lib/tableTheme";
 import { AutoCloseRing } from "./overlay/AutoCloseRing";
 import { PlayingCard } from "./PlayingCard";
+
+// Fanned meld cards overlap by a fraction of their width rather than a fixed
+// pixel amount, so the visible sliver of each card scales with the card. A
+// five-card sequence has to share a 520px panel (and `100vw - 2rem` on a phone)
+// with its label, so this is the balance point between a readable rank index and
+// a row that squeezes the label out.
+const CARD_OVERLAP = Math.round(CARD_SIZES.sm.width * 0.4);
 
 interface DeclarationRevealProps {
   payload: DeclarationsResolvedPayload;
@@ -204,7 +212,10 @@ export function DeclarationReveal({
               >
                 <div className="flex shrink-0">
                   {decl.cards.map((cardId, j) => (
-                    <div key={cardId} style={{ marginLeft: j === 0 ? 0 : -16, zIndex: j }}>
+                    <div
+                      key={cardId}
+                      style={{ marginLeft: j === 0 ? 0 : -CARD_OVERLAP, zIndex: j }}
+                    >
                       <PlayingCard
                         card={parseCardId(cardId)}
                         state="default"

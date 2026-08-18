@@ -6,3 +6,6 @@ node_modules/
 
 # Coverage reports — generated, never formatted
 coverage/
+
+# Vendored + script-transformed card faces (see docs/card-deck.md)
+public/cards/

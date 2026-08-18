@@ -10,28 +10,48 @@ import { PlayingCard } from "./PlayingCard";
 
 const kingOfSpades: Card = { rank: "K", suit: "S" };
 const tenOfHearts: Card = { rank: "T", suit: "H" };
+const queenOfDiamonds: Card = { rank: "Q", suit: "D" };
+
+/** The face artwork layer inside a card wrapper (see `public/cards/`). */
+function faceImage(card: HTMLElement): HTMLImageElement | null {
+  return card.querySelector("img");
+}
 
 describe("PlayingCard", () => {
-  it("renders face-up card with correct rank and suit symbol", () => {
+  it("renders face-up card with the deck artwork for its card ID", () => {
     render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
 
     const card = screen.getByTestId("playing-card-KS");
-    expect(card).toHaveTextContent("K");
-    expect(card).toHaveTextContent("\u2660");
+    expect(faceImage(card)).toHaveAttribute("src", "/cards/KS.svg");
   });
 
-  it("renders ten as '10' not 'T'", () => {
+  it("uses the rank character in the asset name, not the '10' display label", () => {
     render(<PlayingCard card={tenOfHearts} state="default" size="md" />);
 
     const card = screen.getByTestId("playing-card-TH");
-    expect(card).toHaveTextContent("10");
-    expect(card).toHaveTextContent("\u2665");
+    expect(faceImage(card)).toHaveAttribute("src", "/cards/TH.svg");
   });
 
-  it("renders face-down card with no suit/rank visible", () => {
+  it("renders court cards from their own artwork file", () => {
+    render(<PlayingCard card={queenOfDiamonds} state="default" size="lg" />);
+
+    const card = screen.getByTestId("playing-card-QD");
+    expect(faceImage(card)).toHaveAttribute("src", "/cards/QD.svg");
+  });
+
+  it("keeps the face artwork decorative so the wrapper label is the only announcement", () => {
+    render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
+
+    const image = faceImage(screen.getByTestId("playing-card-KS"));
+    expect(image).toHaveAttribute("alt", "");
+    expect(image).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("renders face-down card with no artwork and no suit/rank visible", () => {
     render(<PlayingCard card={null} state="face-down" size="md" />);
 
     const card = screen.getByTestId("playing-card-facedown");
+    expect(faceImage(card)).toBeNull();
     expect(card).not.toHaveTextContent("K");
     expect(card).not.toHaveTextContent("\u2660");
   });

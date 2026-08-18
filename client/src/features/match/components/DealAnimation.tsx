@@ -6,7 +6,11 @@ import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import type { Card } from "@/shared/types/matchTypes";
 
+import { cardBox } from "../lib/cardFace";
 import { PlayingCard } from "./PlayingCard";
+
+/** Small card-shaped proxy flown to each seat during the deal. */
+const DEAL_PROXY = cardBox(32);
 
 interface DealAnimationProps {
   trumpCandidate: Card | null;
@@ -69,7 +73,17 @@ export function DealAnimation({ trumpCandidate }: DealAnimationProps) {
               className={`absolute motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-in ${DEAL_TARGETS[dir]}`}
               style={{ transitionDelay: `${i * 80}ms` }}
             >
-              <div className="w-8 h-12 rounded bg-surface-elevated border border-border" />
+              {/* Card-shaped proxy. Takes its geometry from the shared box so it
+                  keeps the deck's proportions and corner — a proxy at a different
+                  ratio visibly changes shape when the real card takes over. */}
+              <div
+                className="bg-surface-elevated border border-border"
+                style={{
+                  width: DEAL_PROXY.width,
+                  height: DEAL_PROXY.height,
+                  borderRadius: DEAL_PROXY.radius,
+                }}
+              />
             </div>
           ))}
         </>
