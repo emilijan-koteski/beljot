@@ -176,7 +176,7 @@ Entry: `chooseCard`. Decision tree:
 ```
 1. Only one legal card?            -> play it (forced).
 2. Endgame retention (dix de der)? -> retainLastTrickWinner (hold a guaranteed trick-8 winner
-   for +10).
+   for +10, unless the trump-led trick in front of us is worth more than the bonus).
 3. Trick is empty (leading)?       -> chooseLead.
 4. Trick in progress (following)?  -> chooseFollow.
 ```
@@ -190,12 +190,35 @@ Fires only at the second-to-last trick (exactly 2 cards in hand). The forced 8th
 whoever retains the best card; its winner gets +10. The bot must hold the **master trump**
 (no opponent can beat it) — a guaranteed trick-8 winner under **any** lead: it wins whether led
 or forced in as a follow. It normally spends its other card now and banks the master for trick 8.
-
 Defers (back to normal heuristics) unless all hold: exactly 2 cards left; the bot's best trump
 is the master; the card it would spend is legal this trick; and the partner is not already known
 to hold a higher trump (do not fight the partner).
 
 Example: trump ♠, hand J♠ + 7♥, all other trumps gone -> play 7♥ now, keep J♠ for trick 8.
+
+**Why retention does NOT look at the trick in front of it — including a fat trump-led pot.**
+Retention runs **before** `chooseFollow` (see `chooseCard`), so at exactly two cards it, not
+`trumpEconomyTake`, chooses the card. On a trump lead the overplay rule forces a trump out, so
+spending the spare can hand the current trick to the opponents while the bot sits on the master.
+That *looks* like the trump-lead leak fixed below, and a guard to "contest" a fat trick-7 pot was
+tried — and measured **worse at every threshold**.
+
+The reason is that the master takes exactly **one** trick either way, so it should take the trick
+that is worth more — and trick 8 carries the **+10** plus the opponents' last cards:
+
+| Trick 7, trump ♥, hand J♥ T♥, partner led Q♥, opponent 7♥, seat 1 holds 9♥ A♥ | Trick 7 | Final |
+|---|---|---|
+| **Retain** (spend T♥, J♥ takes trick 8 + the +10) | 0 / 24 | **44 / 24** |
+| Contest (spend J♥ now, T♥ loses trick 8 + the +10) | 34 / 0 | 34 / 34 |
+
+Conceding 24 on trick 7 is repaid with interest on trick 8. Wider measurement agreed: double-dummy
+over 5,374 two-card information sets lost **2.54 points per changed decision**, minimax over 200k
+fully legal hands was 11 better / 23 worse, and sweeping the threshold showed *never contesting*
+scored best. `TestDecide_TrickSevenRetentionBeatsContesting` pins this — **do not add a contest
+guard here.** Known gaps that a future change might legitimately address (capot, leading trick 7,
+the non-trump over-ruff) are logged in `deferred-work.md`.
+
+analogue — a spare that gets over-ruffed — is logged in `deferred-work.md`, not fixed here.
 
 **Generalization — an uncuttable non-trump boss is also a guaranteed trick-8 winner**
 (`isUncuttableBoss`): a non-trump card that is the boss of its suit **and** cannot be ruffed
@@ -328,8 +351,9 @@ First it computes who currently wins. Branches:
   **and** there are points at stake (trick points + the donation's own points > 0), picking the
   donation by points alone can hand the trick away. If some legal card **takes the trick beyond
   doubt** (`securelyWins`, below), the bot calls `trumpEconomyTake` (see "Trump economy on the
-  take" below) to secure it while preserving the control trumps **J/9** — this is the
-  forced-overplay/forced-ruff shape of the same take used against a winning opponent; if
+  take" below) to secure it while preserving the control trumps **J/9** on a ruff — on a **trump
+  lead** there is no control to preserve, so it secures whenever the trick has points on it; this
+  is the forced-overplay/forced-ruff shape of the same take used against a winning opponent; if
   nothing is provably secure, it donates the cheapest as before.
 
   Example (the classic leak this fixes): trump ♥, partner leads **Q♥**, opponent plays 8♥, bot
@@ -359,9 +383,11 @@ gamble — the master is never burnt to secure nothing.
 **Trump economy on the take** (`trumpEconomyTake`) — used at **both** secure-take call sites
 above: the forced-overplay/forced-ruff take over a partner, and the "otherwise, take the
 trick" case over a winning opponent. Once the material-stake gate has passed, the bot does not
-simply grab the cheapest provably-secure card (`cheapestSecureWinning`) — it holds back the
-**control trumps**, the Jack and the 9 (`isControlTrump`), whenever a cheaper path to the trick
-exists. It computes two candidates and chooses between them by pot size:
+simply grab the cheapest provably-secure card (`cheapestSecureWinning`) — **when ruffing a side
+suit** it holds back the **control trumps**, the Jack and the 9 (`isControlTrump`), whenever a
+cheaper path to the trick exists. On a **trump lead** there is no cheaper path worth anything (the
+overplay rule spends a trump either way), so the reservation does not apply there — only a
+points-on-the-table test does. It computes two candidates and chooses between them by pot size:
 
 - `secure`: the cheapest legal card that provably `securelyWins` (may or may not be a control
   trump).
@@ -375,14 +401,55 @@ exists. It computes two candidates and chooses between them by pot size:
   "known safe" here while not being strictly `securelyWins`.
 
 Then: (1) if `secure` is **not** a control trump, take it immediately — nothing to preserve.
-(2) Else, when ruffing and `preserve` exists, bank `preserve` instead — **unless** the pot
+**Note there is no points gate on this step**, which is why `retainLastTrickWinner` must decide
+trick 7 for itself rather than routing through this function (see B1). (2) Else, on a **TRUMP
+lead** with points on the table, take `secure` — see "No reservation on a trump lead" below.
+(3) Else, when ruffing and `preserve` exists, bank `preserve` instead — **unless** the pot
 already justifies spending the control trump (below), in which case the mathematically
-guaranteed control-trump win is taken over the merely known-safe cheaper trump. (3) Else, if
+guaranteed control-trump win is taken over the merely known-safe cheaper trump. (4) Else, if
 `secure` is a control trump and the pot is worth **at least its own value**
 (`trickPoints(v, trump) >= controlTrumpValue`: the Jack needs >= 20, the 9 needs >= 14), spend
-it. (4) Otherwise `trumpEconomyTake` returns nil: the caller falls through to its cheap
-take/duck and accepts the speculative over-ruff — the master is never burnt for less than it
-is worth.
+it. (5) Otherwise `trumpEconomyTake` returns nil: the caller falls through to its cheap
+take/duck and accepts the speculative over-ruff.
+
+Step (3) is the only genuinely ruff-gated step. Steps (4) and (5) still run on a trump lead —
+in fact step (5)'s `return nil` is what keeps the master back on a **pointless** trump-led trick,
+since step (2) declines it and `0 >= 14` fails at step (4).
+
+**No reservation on a trump lead** — when the led suit IS trump, the overplay rule forces a trump
+out no matter what, so declining to secure does not *preserve* the control trump: it donates a
+**cheaper trump** into a trick the opponents then take. `controlTrumpValue` prices a control trump
+by its own card points, but on a win those points land in **our own** pile — the wrong quantity to
+weigh. So the reservation is dropped and replaced by a weaker test: **are there points on the
+table** (`trickPoints(v, trump) > 0`)?
+
+That test is load-bearing, and the callers' material-stake gate does **not** substitute for it.
+That gate is `trickPoints + cardPoints(fallback) > 0`, where the fallback is the *cheapest legal
+card* — so a cheap-but-scoring fallback (a Queen or King, when no 0-point trump is legal) opens it
+on a worthless trick. Verified: without `trickPoints > 0`, hand J♥ Q♥ over an 8♥ lead burns the
+J♥ to win nothing.
+
+Because step (2) fires on any non-zero pot, a Jack **can** be spent for a pot of 3 — that is
+deliberate: the alternative on a trump lead is donating a cheaper trump plus the pot, not keeping
+a card for free. This is why step (5)'s old blanket claim that the master is "never burnt for less
+than it is worth" no longer holds as a statement about the whole function; it describes step (4).
+
+Legal sets on a trump lead come in three shapes, and only the first can reach step (2):
+strictly-higher trumps (every card overtakes); all held trumps with **none** overtaking; or —
+when void in trump — the whole all-non-trump hand. In the latter two nothing can beat the
+trump-led winner, so nothing `securelyWins`, `secure` is nil, and the step is inert.
+
+Example (the reported leak): trump ♥, the bot is third; its partner led **Q♥** and an opponent
+played 7♥ — **3** points showing. Forced above the Q♥ holding T♥ 9♥ J♥ with the **A♥ unseen**,
+the old value gate refused the 9♥ (3 < 14) and ducked with the **T♥**, which the last opponent
+took with the A♥ — **24 points donated**. The 9♥ is beaten only by the J♥ the bot itself holds,
+so it now plays **9♥**; end-to-end it banks 28 instead of conceding 24.
+
+Counter-example (the pot must be real): same trump lead, but seat 3 opened the **8♥** (0 pts) and
+the bot holds only J♥ + Q♥. Both are forced above the 8♥ and the Q♥ loses to any of the four
+unseen higher trumps — but there is nothing on the table to win, so the bot donates the **Q♥** and
+keeps the master. Add points (a void opponent discarding the A♠ onto the same lead) and it spends
+the **J♥** instead.
 
 Example (bank the ace): trump ♥, opponent leads T♦ (10 pts), bot void in ♦ (must cut) holding
 J♥ A♥ 7♣, early hand — legal cards are J♥ and A♥. No opponent is known void in ♦ or in trump,
@@ -556,7 +623,11 @@ By impact:
    (`isControlTrump`), the known-over-ruff signal (`knownSafeRuff` /
    `highestExpendableKnownSafeRuff`) that lets it bank a cheaper trump instead, and the value
    gate `trickPoints(v, trump) >= controlTrumpValue` that decides whether a pot is fat enough to
-   spend a control trump at all.
+   spend a control trump at all. Those two levers apply to **ruffs**; on a trump lead they are
+   reachable only when `trickPoints == 0`, where both comparisons fail anyway. The trump-lead dial
+   is `trickPoints(v, trump) > 0` — raise it to make the bot stingier with the J/9. It applies to
+   3+ card hands only: at two cards `retainLastTrickWinner` decides first and has no such dial,
+   deliberately (B1).
 6. `bestSmear` / `bossWorthGuarding`: what counts as control worth hoarding (backup test,
    endgame and dead-suit exceptions, the all-unprotected fallback).
 7. `partnerDrawTrump`: the Q/K/T/A order and the "never the 9" rule.
@@ -570,6 +641,21 @@ Blind spots if you want a stronger bot (the first four are logged in
   trump (J/9) spend on `trickPoints(v, trump) >= controlTrumpValue` (J needs >= 20, 9 needs
   >= 14); below that threshold it banks a cheaper known-safe trump (`knownSafeRuff`) or accepts
   the speculative over-ruff instead.
+- **Addressed** — that value gate then over-applied on a **trump lead**, where the overplay rule
+  spends a trump regardless: reserving the J/9 for a fatter pot donated a *cheaper* trump into a
+  trick the opponents took (forced over a partner's Q♥ with 3 showing, the bot ducked the T♥ into
+  the unseen A♥ — 24 points). It is now ruff-only, replaced on a trump lead by `trickPoints > 0`.
+  The asymmetry is deliberate: on a **ruff** the bot still declines a control trump below the
+  threshold, because there it genuinely keeps the card.
+- **Investigated, deliberately NOT changed** — the same shape at **two cards** is decided by
+  `retainLastTrickWinner`, which banks the master and spends the spare. Two attempts to make it
+  "contest" a fat trump-led pot were both reverted: the master takes one trick either way, so it
+  should take trick 8 with its +10, and measurement put every contest threshold below never
+  contesting. See B1 and `TestDecide_TrickSevenRetentionBeatsContesting`.
+- There is **no** general arbitration between spending a master mid-hand and last-trick control —
+  the two sites simply do not interact, because retention short-circuits before `chooseFollow` at
+  two cards. `retainLastTrickWinner` also ignores **capot** (a swept hand makes the last trick
+  worth +100, not +10) and can lead a spare into an over-ruff; both are in `deferred-work.md`.
 - The endgame boss-guard ignores **who leads trick 8** — a hoarded uncuttable boss converts
   for sure only when the bot itself leads it.
 - `partnerWinIsSafe`'s trump-threat leg is still a **raw unseen scan** (not seat-aware like
@@ -597,7 +683,9 @@ Blind spots if you want a stronger bot (the first four are logged in
 | Only trumps left: highest if master, else lowest | `chooseLead` only-trumps branch, `isTrumpMaster` | `server/internal/bot/bot.go` |
 | Preserve the boss on a forced overtake (Ace/Ten: smear the Ace) | `strongestPreservingBoss` | `server/internal/bot/bot.go` |
 | Secure take: cheapest guaranteed winner when points are at stake | `securelyWins`, `cheapestSecureWinning`, `trickPoints`, `seatKnownHoldsSuit` | `server/internal/bot/bot.go` |
-| Preserve control trumps on the take (bank the ace, value-gate the master) | `trumpEconomyTake`, `isControlTrump`, `controlTrumpValue`, `knownSafeRuff`, `highestExpendableKnownSafeRuff` | `server/internal/bot/bot.go` |
+| Preserve control trumps on the take (bank the ace, value-gate the master) — **ruff-only** | `trumpEconomyTake`, `isControlTrump`, `controlTrumpValue`, `knownSafeRuff`, `highestExpendableKnownSafeRuff` | `server/internal/bot/bot.go` |
+| Secure the take on a trump lead when points are on the table | `trumpEconomyTake` (trump-lead branch), `trickPoints` | `server/internal/bot/bot.go` |
+| Trick 7: bank the master unconditionally (do NOT add a contest guard) | `retainLastTrickWinner`, `TestDecide_TrickSevenRetentionBeatsContesting` | `server/internal/bot/bot.go` |
 | Boss-preserving smear (backup test, endgame/dead-suit exceptions) | `bestSmear`, `bossWorthGuarding`, `heldSameSuitBoss` | `server/internal/bot/bot.go` |
 | Never fight a partner forced to win a trump-led trick | `partnerTakesTrick` (trump-led branch) | `server/internal/bot/bot.go` |
 | Bank the high card as last player | `highestPointsLedSuitWinner` + `chooseFollow` | `server/internal/bot/bot.go` |

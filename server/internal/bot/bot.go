@@ -216,6 +216,14 @@ func chooseCard(v View) game.Card {
 //   - the partner is not already known (from the declaration reveal) to hold a
 //     higher trump — if it does, the team controls trick 8 regardless, so we
 //     don't fight the partner and let the normal heuristics play (e.g. draw).
+//
+// Deliberately NOT conditional on the trick in front of us, even when a
+// trump-led trick is being donated by spending the spare. The master takes
+// exactly ONE trick either way, so it should take trick 8 — the trick that
+// carries the +10 "dix de der" AND collects the opponents' last cards. Making
+// retention "contest" a fat trick-7 pot instead was tried and measured worse at
+// every threshold (see spec-bot-forced-overplay-secure-take.md);
+// TestDecide_TrickSevenRetentionBeatsContesting pins the correct line.
 func retainLastTrickWinner(v View, legal []game.Card, trump game.Suit) *game.Card {
 	if len(v.Hand) != 2 {
 		return nil
@@ -1250,16 +1258,34 @@ func highestExpendableKnownSafeRuff(v View, legal []game.Card, trump game.Suit) 
 // trumps (J, 9). Returns the card to play, or nil to let the caller fall through
 // to its existing cheapest-winner / duck logic. Priority:
 //  1. a NON-control card that securely wins — take it (unchanged behavior; e.g.
-//     the Ace/King that provably beats the field);
-//  2. ruffing a side suit — bank the highest expendable trump that is safe
+//     the Ace/King that provably beats the field). NOTE: no points gate here —
+//     retainLastTrickWinner must not route its trick-7 decision through this
+//     function, or an A/T/K/Q master would be spent on a pointless trick;
+//  2. a TRUMP lead with points on the table — secure it even with a J/9: the
+//     overplay rule spends a trump either way, so there is no control to keep;
+//  3. ruffing a side suit — bank the highest expendable trump that is safe
 //     against known over-ruffs (keep J/9), unless the pot is worth the master;
-//  3. only a control trump can securely win — spend it only when the pot
+//  4. only a control trump can securely win — spend it only when the pot
 //     (trickPoints) is at least its own value; otherwise return nil so the caller
 //     takes/ruffs cheaply and accepts the speculative gamble.
 func trumpEconomyTake(v View, legal []game.Card, trump game.Suit) *game.Card {
 	secure := cheapestSecureWinning(v, legal, trump)
-	if secure != nil && !isControlTrump(*secure, trump) {
-		return secure
+	if secure != nil {
+		if !isControlTrump(*secure, trump) {
+			return secure
+		}
+		// Reaching here, secure IS a control trump. On a TRUMP lead the overplay
+		// rule forces a trump out no matter what, so declining to secure does not
+		// PRESERVE the control trump — it donates a cheaper trump into a trick the
+		// opponents then take. On a win its own card points land in our pile, so
+		// the value gate below prices the wrong thing here. A real pot is still
+		// required: with nothing on the table there is no trick worth spending a
+		// J/9 to win, and the callers' stake gate does NOT cover that — it prices
+		// the cheapest legal card, so a cheap-but-scoring fallback opens it on a
+		// worthless trick.
+		if v.CurrentTrick[0].Card.Suit == trump && trickPoints(v, trump) > 0 {
+			return secure
+		}
 	}
 	if v.CurrentTrick[0].Card.Suit != trump { // ruff of a side suit
 		if preserve := highestExpendableKnownSafeRuff(v, legal, trump); preserve != nil {

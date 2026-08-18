@@ -1301,6 +1301,7 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 // Trump = Hearts; bot = seat 0, partner = seat 2, opponents = seats 1 & 3.
 func TestDecide_TrumpEconomyTake(t *testing.T) {
 	spades := game.SuitSpades
+	hearts := game.SuitHearts
 	runPlayTweakCases(t, []playTweakCase{
 		{
 			// 2a: early ruff of the opponent's TS (10 pts). The 9H is unseen, so the
@@ -1356,6 +1357,103 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 			callerSeat: 1,
 			observes:   []obs{{seat: 1, card: "8D", lead: &spades}}, // seat 1 void in spades
 			wantCard:   "8H",
+		},
+
+		// --- Trump lead: no control to reserve, but the pot must be real ---
+		// On a trump lead the overplay rule spends a trump either way, so holding
+		// the J/9 back only donates a cheaper trump. The ruff value gate
+		// (trickPoints >= controlTrumpValue) is replaced here by trickPoints > 0.
+		{
+			// The reported leak. Bot (seat 0) is third; partner (seat 2) led Q♥ and
+			// seat 3 played 7♥ — 3 points showing. Forced above the Q♥ holding
+			// T♥ 9♥ J♥ with the A♥ unseen at seat 1. The old value gate (3 < 14)
+			// refused the 9♥ and ducked the T♥, which seat 1 took with the A♥ — 24
+			// points donated. Only the J♥ (in hand) beats the 9♥.
+			name: "forced over the partner's trump queen secures with the 9",
+			hand: cards("JH", "9H", "TH", "7C", "8S"),
+			trick: []game.TrickCard{
+				{Card: card("QH"), PlayerSeat: 2},
+				{Card: card("7H"), PlayerSeat: 3},
+			},
+			callerSeat: 0,
+			wantCard:   "9H",
+		},
+		{
+			// Same shape at the other call site: seat 3 overtook the partner's Q♥
+			// with the K♥, so an OPPONENT is winning — 7 points, still under the 9's
+			// own value of 14. The cheapest winner T♥ loses to the unseen A♥.
+			name: "forced over a winning opponent's trump king secures with the 9",
+			hand: cards("JH", "9H", "TH", "7C", "8S"),
+			trick: []game.TrickCard{
+				{Card: card("QH"), PlayerSeat: 2},
+				{Card: card("KH"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "9H",
+		},
+		{
+			// GUARDS THE trickPoints > 0 CLAUSE. Seat 3 led the 8♥ (0 pts) and the
+			// bot holds J♥ + Q♥. The callers' stake gate does NOT stop this: it
+			// prices the cheapest legal card (0 + Q♥'s 3 = 3 > 0), so it opens.
+			// Only trickPoints > 0 keeps the master back.
+			name: "pointless trump lead keeps the master and donates the queen",
+			hand: cards("JH", "QH", "7C", "8S"),
+			trick: []game.TrickCard{
+				{Card: card("8H"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "QH",
+		},
+		{
+			// The same shape with a REAL pot: seat 3, void in hearts, discarded the
+			// A♠ (11 pts) onto the partner's 8♥ lead. Now spending the master is
+			// right — the Q♥ loses to any of the four unseen higher trumps.
+			name: "trump lead with a fat pot spends the master over a cheap trump",
+			hand: cards("JH", "QH", "7C", "8S"),
+			trick: []game.TrickCard{
+				{Card: card("8H"), PlayerSeat: 2},
+				{Card: card("AS"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "JH",
+		},
+		{
+			// Partner still to play BEHIND us: seat 3 leads, bot is second, partner
+			// (seat 2) plays last. The partner is never a threat, so the J♥ is
+			// secure and the 3-point pot justifies it.
+			name: "trump lead with the partner behind us still secures",
+			hand: cards("JH", "KH", "7C", "8S"),
+			trick: []game.TrickCard{
+				{Card: card("QH"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "JH",
+		},
+		{
+			// Unchanged: the cheapest secure winner is NOT a control trump, so the
+			// pre-existing early return handles it before the new branch. Seat 1
+			// (the only seat left) is known void in trump, so nothing beats the K♥.
+			name: "trump lead with a non-control secure winner still takes the king",
+			hand: cards("KH", "AH", "JH", "7C"),
+			trick: []game.TrickCard{
+				{Card: card("QH"), PlayerSeat: 2},
+				{Card: card("7H"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "8D", lead: &hearts}}, // seat 1 void in trump
+			wantCard:   "KH",
+		},
+		{
+			// Unchanged: NOTHING securely wins, so the new branch cannot fire (it
+			// requires a secure winner). A♥ T♥ 9♥ J♥ are all unseen.
+			name: "trump lead with no secure winner donates the cheapest",
+			hand: cards("KH", "QH", "7C"),
+			trick: []game.TrickCard{
+				{Card: card("8H"), PlayerSeat: 2},
+				{Card: card("7H"), PlayerSeat: 3},
+			},
+			callerSeat: 1,
+			wantCard:   "QH",
 		},
 	})
 }
@@ -1731,4 +1829,110 @@ func TestMemory_SyncHandResets(t *testing.T) {
 	mem.SyncHand(2)
 	assert.Empty(t, mem.PlayedCards())
 	assert.False(t, mem.KnownVoids()[2][bot.SuitIndex(game.SuitSpades)])
+}
+
+// TestDecide_ReportedTrumpLeadLeakEndToEnd drives the reported position through
+// the rules engine and asserts the MATERIAL outcome. runPlayTweakCases only
+// asserts which card Decide returns, so on its own it cannot show the trick was
+// won — and the bug is a points leak, not a card choice: a regression that wins
+// the trick while conceding material would pass a TricksWon-only assertion.
+//
+// Trump = Hearts. Seat 2 (the bot's partner) leads Q(H), seat 3 plays 7(H), the
+// bot at seat 0 is forced above the Q(H), and seat 1 holds the A(H).
+func TestDecide_ReportedTrumpLeadLeakEndToEnd(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(1) // trump = Hearts
+	gs.Players[0].Hand = cards("JH", "9H", "TH", "8S")
+	gs.Players[1].Hand = cards("AH", "7S", "8D", "9D")
+	gs.Players[2].Hand = cards("QH", "AS", "KS", "QS")
+	gs.Players[3].Hand = cards("7H", "TS", "7D", "KD")
+	gs.ActivePlayerSeat = 2 // the partner leads
+
+	play := func(seat int, id string) {
+		t.Helper()
+		c := card(id)
+		next, err := game.ApplyAction(gs, game.Action{
+			Type: game.ActionPlayCard, PlayerSeat: seat, Card: &c,
+		})
+		require.NoError(t, err, "seat %d playing %s must be legal", seat, id)
+		gs = next
+	}
+
+	play(2, "QH")
+	play(3, "7H")
+
+	action := bot.Decide(viewFromState(gs, 0, bot.NewMemory()))
+	require.Equal(t, game.ActionPlayCard, action.Type)
+	require.NotNil(t, action.Card)
+	assert.Equal(t, "9H", action.Card.String(), "bot must secure the trick, not donate the TH")
+	play(0, action.Card.String())
+
+	play(1, "AH") // the Ace that used to take this trick
+
+	// Q(H) 3 + 7(H) 0 + 9(H) 14 + A(H) 11 = 28. Before the fix the bot played the
+	// T(H), seat 1 took the trick with the A(H), and team B banked 24 instead.
+	assert.Equal(t, 1, gs.TricksWon[game.TeamA], "the bot's team must take the trick")
+	assert.Equal(t, 0, gs.TricksWon[game.TeamB], "the opponents must not take the trick")
+	assert.Equal(t, 28, gs.HandPoints[game.TeamA], "the bot's team must bank the trick points")
+	assert.Equal(t, 0, gs.HandPoints[game.TeamB], "the opponents must bank nothing")
+}
+
+// TestDecide_TrickSevenRetentionBeatsContesting pins the trick-7 shape as
+// deliberately NOT part of the fix above, and proves why with a two-trick
+// playout. It exists to stop a future change from "fixing" retention here.
+//
+// The same trump-lead shape at exactly two cards in hand is decided by
+// retainLastTrickWinner, which banks the master and spends the spare. Looked at
+// over trick 7 alone that concedes 24 points and reads like the reported bug.
+// Played out over BOTH remaining tricks it is the better line: the master takes
+// exactly one trick either way, so it should take trick 8 — the trick carrying
+// the +10 "dix de der" and the opponents' last cards.
+func TestDecide_TrickSevenRetentionBeatsContesting(t *testing.T) {
+	build := func() *game.GameState {
+		gs := testfixtures.NewGameMidPlay(7)
+		gs.Players[0].Hand = cards("JH", "TH") // bot: master JH + spare TH
+		gs.Players[1].Hand = cards("9H", "AH")
+		gs.Players[2].Hand = cards("QH", "8S")
+		gs.Players[3].Hand = cards("7H", "9S")
+		gs.ActivePlayerSeat = 2
+		gs.HandPoints = [2]int{0, 0}
+		gs.TricksWon = [2]int{0, 0}
+		return gs
+	}
+	playOut := func(t *testing.T, trick7Bot, trick8Bot string) [2]int {
+		t.Helper()
+		gs := build()
+		play := func(seat int, id string) {
+			t.Helper()
+			c := card(id)
+			next, err := game.ApplyAction(gs, game.Action{
+				Type: game.ActionPlayCard, PlayerSeat: seat, Card: &c,
+			})
+			require.NoError(t, err, "seat %d playing %s must be legal", seat, id)
+			gs = next
+		}
+		play(2, "QH")
+		play(3, "7H")
+		play(0, trick7Bot)
+		play(1, "AH")
+		// Trick 8: the trick-7 winner leads; every seat has one card left.
+		last := map[int]string{0: trick8Bot, 1: "9H", 2: "8S", 3: "9S"}
+		for s, n := gs.ActivePlayerSeat, 0; n < 4; s, n = (s+1)%4, n+1 {
+			play(s, last[s])
+		}
+		return gs.HandPoints
+	}
+
+	// What the bot actually does at two cards: spend the spare, bank the master.
+	action := bot.Decide(viewFromState(build(), 0, bot.NewMemory()))
+	require.NotNil(t, action.Card)
+	assert.Equal(t, "TH", action.Card.String(),
+		"at two cards retention must bank the master for the +10 trick")
+
+	retain := playOut(t, "TH", "JH")  // spare now, master takes trick 8 + the +10
+	contest := playOut(t, "JH", "TH") // master now, spare loses trick 8 + the +10
+
+	assert.Equal(t, [2]int{44, 24}, retain, "retaining banks trick 8 and the +10")
+	assert.Equal(t, [2]int{34, 34}, contest, "contesting trick 7 gives trick 8 away")
+	assert.Greater(t, retain[game.TeamA]-retain[game.TeamB], contest[game.TeamA]-contest[game.TeamB],
+		"retention must remain the better line — do not add a contest guard here")
 }
