@@ -159,7 +159,7 @@ export function PublicPlayerProfilePage() {
       {/* Story 11.2 AC7: the friendship action. Drives its label/action entirely
           from GET /friends/status/:id — every state maps to a real affordance,
           never a placeholder — and is never shown on the viewer's own profile. */}
-      {validId !== undefined && <FriendButton userId={validId} />}
+      {validId !== undefined && <FriendButton userId={validId} username={profile.username} />}
 
       {/* subjectIsSelf=false: the streak reads as a fact about this player, not
           as a nudge at whoever is reading, and it drops the Play link with the

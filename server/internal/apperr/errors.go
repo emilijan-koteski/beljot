@@ -166,6 +166,12 @@ var (
 	ErrFriendRequestExists   = NewAppError("FRIEND_REQUEST_EXISTS", "a friend request already exists between these users", http.StatusConflict)
 	ErrAlreadyFriends        = NewAppError("ALREADY_FRIENDS", "you are already friends with this user", http.StatusConflict)
 	ErrFriendRequestNotFound = NewAppError("FRIEND_REQUEST_NOT_FOUND", "friend request not found", http.StatusNotFound)
+	// ErrFriendshipNotFound is the unfriend counterpart of that uniform 404: a
+	// failed DELETE /friends/:id (caller not a party, the row not accepted, or no
+	// row at all) never leaks which it was. A distinct code because the
+	// request-oriented FRIEND_REQUEST_NOT_FOUND is semantically wrong for an
+	// accepted friendship.
+	ErrFriendshipNotFound = NewAppError("FRIENDSHIP_NOT_FOUND", "friendship not found", http.StatusNotFound)
 
 	// Room-invite errors (Story 11.5, FR62). Both are 409, matching the sibling
 	// friend errors and the project's conflict convention for state guards.

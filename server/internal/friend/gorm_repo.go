@@ -78,6 +78,18 @@ func (r *GormRepository) Delete(id, recipientID uint) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
+// Unfriend removes an ACCEPTED row in a single conditional DELETE. The guard is
+// party-agnostic ((user_id=? OR friend_id=?)) — the one deliberate divergence
+// from Accept/Delete's recipient-only guard, because an accepted friendship
+// belongs to both sides equally. rows==0 means: not a party, not accepted, or
+// the row is gone — the handler maps all three to a uniform 404.
+func (r *GormRepository) Unfriend(id, userID uint) (int64, error) {
+	res := r.db.
+		Where("id = ? AND (user_id = ? OR friend_id = ?) AND status = ?", id, userID, userID, FriendStatusAccepted).
+		Delete(&Friendship{})
+	return res.RowsAffected, res.Error
+}
+
 func (r *GormRepository) ListAccepted(userID uint) ([]Friendship, error) {
 	rows := []Friendship{}
 	if err := r.db.

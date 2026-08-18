@@ -32,6 +32,11 @@ export function declineFriendRequest(id: number): Promise<void> {
   return axiosClient.post(`/friends/${id}/decline`);
 }
 
+/** Remove an accepted friend by the friendship row id (either party, server-enforced). */
+export function removeFriend(id: number): Promise<void> {
+  return axiosClient.delete(`/friends/${id}`);
+}
+
 /** The viewer's accepted friends, each with a live online flag. */
 export function listFriends(): Promise<Friend[]> {
   return axiosClient.get("/friends");

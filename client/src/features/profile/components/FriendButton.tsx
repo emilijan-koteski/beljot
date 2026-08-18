@@ -1,18 +1,25 @@
-import { Check, Clock, UserPlus } from "lucide-react";
+import { Check, Clock, UserMinus, UserPlus, X } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/shared/components/ui/button";
 import {
   useAcceptFriendRequestMutation,
+  useDeclineFriendRequestMutation,
+  useRemoveFriendMutation,
   useSendFriendRequestMutation,
 } from "@/shared/hooks/mutations/useFriendMutations";
 import { useFriendshipStatus } from "@/shared/hooks/queries/useFriendshipStatus";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { FriendshipStatus } from "@/shared/types/apiTypes";
 
+import { RemoveFriendDialog } from "./RemoveFriendDialog";
+
 interface FriendButtonProps {
   /** The subject whose profile is being viewed (the validated /players/:id id). */
   userId: number;
+  /** The subject's username, interpolated into the remove-friend confirm dialog. */
+  username: string;
 }
 
 /**
@@ -20,20 +27,24 @@ interface FriendButtonProps {
  * action entirely from GET /friends/status/:id, so EVERY state maps to a real
  * affordance — it is never a dead/placeholder button:
  *
- *   none             -> "Add Friend"     (sends a request)
- *   pending_outgoing -> "Request sent"   (disabled)
- *   pending_incoming -> "Accept request" (accepts)
- *   friends          -> "Friends"        (disabled, with a check)
+ *   none             -> "Add Friend"        (sends a request)
+ *   pending_outgoing -> "Request sent"      (disabled)
+ *   pending_incoming -> "Accept request"    (accepts) + "Decline" (declines)
+ *   friends          -> "Friends" (disabled, with a check) + "Remove friend"
+ *                       (opens a confirm dialog, then unfriends)
  *
  * Never rendered for the viewer's own profile.
  */
-export function FriendButton({ userId }: FriendButtonProps) {
+export function FriendButton({ userId, username }: FriendButtonProps) {
   const { t } = useTranslation();
   const viewer = useAuthStore((s) => s.user);
 
   const status = useFriendshipStatus(userId);
   const sendMutation = useSendFriendRequestMutation();
   const acceptMutation = useAcceptFriendRequestMutation();
+  const declineMutation = useDeclineFriendRequestMutation();
+  const removeMutation = useRemoveFriendMutation();
+  const [removeOpen, setRemoveOpen] = useState(false);
 
   // Defensive self-guard: the public page is not reached for the viewer's own id
   // in practice, but never show the button there.
@@ -65,9 +76,41 @@ export function FriendButton({ userId }: FriendButtonProps) {
   switch (state) {
     case "friends":
       content = (
-        <Button variant="outline" size="sm" disabled data-testid="friend-button-friends">
-          <Check /> {t("friends.friends")}
-        </Button>
+        <>
+          <Button variant="outline" size="sm" disabled data-testid="friend-button-friends">
+            <Check /> {t("friends.friends")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="friend-button-remove"
+            // requestId === null should be impossible for "friends", but never
+            // offer a confirm that could fire without a row id.
+            disabled={removeMutation.isPending || requestId === null}
+            onClick={() => setRemoveOpen(true)}
+          >
+            <UserMinus /> {t("friends.removeFriend")}
+          </Button>
+          <RemoveFriendDialog
+            open={removeOpen}
+            username={username}
+            pending={removeMutation.isPending}
+            onConfirm={() => {
+              if (removeMutation.isPending || requestId === null) return;
+              removeMutation.mutate(
+                { requestId, userId },
+                // Close on settled: on success the invalidated status query flips
+                // the button to "Add friend"; on error (e.g. the other party won
+                // the both-unfriend race → 404) the hook's toast reports it and a
+                // lingering dialog would just restate a stale question.
+                { onSettled: () => setRemoveOpen(false) },
+              );
+            }}
+            onClose={() => {
+              if (!removeMutation.isPending) setRemoveOpen(false);
+            }}
+          />
+        </>
       );
       break;
     case "pending_outgoing":
@@ -77,20 +120,40 @@ export function FriendButton({ userId }: FriendButtonProps) {
         </Button>
       );
       break;
-    case "pending_incoming":
+    case "pending_incoming": {
+      // Accept and Decline act on the same request row — never let them race:
+      // either one in flight disables both.
+      const actionPending = acceptMutation.isPending || declineMutation.isPending;
       content = (
-        <Button
-          size="sm"
-          data-testid="friend-button-accept"
-          disabled={acceptMutation.isPending || requestId === null}
-          onClick={() => {
-            if (requestId !== null) acceptMutation.mutate({ requestId, userId });
-          }}
-        >
-          <Check /> {t("friends.acceptRequest")}
-        </Button>
+        <>
+          <Button
+            size="sm"
+            data-testid="friend-button-accept"
+            disabled={actionPending || requestId === null}
+            onClick={() => {
+              if (requestId !== null) acceptMutation.mutate({ requestId, userId });
+            }}
+          >
+            <Check /> {t("friends.acceptRequest")}
+          </Button>
+          {/* Deliberate asymmetry: decline needs no confirm dialog (mirrors the
+              lobby requests list — the sender can simply re-send), while
+              remove-friend destroys an established relationship and gets one. */}
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="friend-button-decline"
+            disabled={actionPending || requestId === null}
+            onClick={() => {
+              if (requestId !== null) declineMutation.mutate({ requestId, userId });
+            }}
+          >
+            <X /> {t("friends.decline")}
+          </Button>
+        </>
       );
       break;
+    }
     default:
       // "none"
       content = (
@@ -109,7 +172,7 @@ export function FriendButton({ userId }: FriendButtonProps) {
     // my-5 (not mt-only): the row needs the same 20px gap below it as above,
     // otherwise it sits flush against whatever follows on the public profile —
     // the streak callout has no top margin of its own.
-    <div className="my-5" data-testid="friend-button">
+    <div className="my-5 flex flex-wrap items-center gap-2" data-testid="friend-button">
       {content}
     </div>
   );

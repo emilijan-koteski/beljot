@@ -168,6 +168,80 @@ func TestGormRepository_Delete_RecipientOnly(t *testing.T) {
 	assert.Nil(t, got)
 }
 
+func TestGormRepository_Unfriend_EitherParty(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormRepository(db)
+	requester := makeUser(t, db, "ufreq@f.test")
+	recipient := makeUser(t, db, "ufrec@f.test")
+
+	accepted := func() *Friendship {
+		f := &Friendship{UserID: requester.ID, FriendID: recipient.ID, Status: FriendStatusPending}
+		require.NoError(t, repo.Create(f))
+		rows, err := repo.Accept(f.ID, recipient.ID)
+		require.NoError(t, err)
+		require.Equal(t, int64(1), rows)
+		return f
+	}
+
+	// The requester unfriends → 1 row, and the row is gone.
+	f := accepted()
+	rows, err := repo.Unfriend(f.ID, requester.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+	got, err := repo.FindByID(f.ID)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+
+	// The recipient unfriends a fresh row just the same — the guard is
+	// party-agnostic, unlike Accept/Delete.
+	f = accepted()
+	rows, err = repo.Unfriend(f.ID, recipient.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	// A second delete of the same id (the both-unfriend race) → 0 rows.
+	rows, err = repo.Unfriend(f.ID, requester.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows)
+
+	// After the unfriend, a fresh request for the same pair — in the REVERSE
+	// direction, no less — succeeds: the hard delete leaves no residue in the
+	// normalized unique index, so the "send a new request later" promise holds.
+	require.NoError(t, repo.Create(&Friendship{UserID: recipient.ID, FriendID: requester.ID, Status: FriendStatusPending}))
+}
+
+func TestGormRepository_Unfriend_GuardMisses(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormRepository(db)
+	requester := makeUser(t, db, "ufga@f.test")
+	recipient := makeUser(t, db, "ufgb@f.test")
+	third := makeUser(t, db, "ufgc@f.test")
+
+	// A pending row is decline's job, not unfriend's → 0 rows, row survives.
+	f := &Friendship{UserID: requester.ID, FriendID: recipient.ID, Status: FriendStatusPending}
+	require.NoError(t, repo.Create(f))
+	rows, err := repo.Unfriend(f.ID, recipient.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows)
+
+	acceptRows, err := repo.Accept(f.ID, recipient.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), acceptRows)
+
+	// A third party cannot unfriend an accepted row → 0 rows, row survives.
+	rows, err = repo.Unfriend(f.ID, third.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows)
+	got, err := repo.FindByID(f.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+
+	// A missing id → 0 rows.
+	rows, err = repo.Unfriend(f.ID+9999, requester.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows)
+}
+
 func TestGormRepository_ListAccepted_Symmetric(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormRepository(db)

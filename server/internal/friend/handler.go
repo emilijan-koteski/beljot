@@ -272,6 +272,34 @@ func (h *Handler) Decline(c echo.Context) error {
 	})
 }
 
+// Unfriend handles DELETE /friends/:id — removal of an ACCEPTED friendship by
+// EITHER party (unlike Accept/Decline's recipient-only guard, an accepted
+// friendship belongs to both sides equally). A miss (not a party, not accepted,
+// or missing) is a uniform 404 that never leaks which it was. No WS push to the
+// other party — their surfaces refresh on next load, and whisper/invite already
+// re-check AreFriends server-side per action.
+func (h *Handler) Unfriend(c echo.Context) error {
+	viewerID, err := getUserID(c)
+	if err != nil {
+		return apperr.ErrUnauthorized
+	}
+	id, err := parseIDParam(c)
+	if err != nil {
+		return err
+	}
+
+	rows, err := h.repo.Unfriend(id, viewerID)
+	if err != nil {
+		return fmt.Errorf("removing friend: %w", err)
+	}
+	if rows == 0 {
+		return apperr.ErrFriendshipNotFound
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": map[string]interface{}{"id": id, "status": "removed"},
+	})
+}
+
 // ListFriends handles GET /friends — the viewer's accepted friends with a
 // live online flag. The list is symmetric (a friend appears whether the viewer
 // was requester or recipient); soft-deleted friends are omitted. Empty → [].

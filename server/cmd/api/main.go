@@ -353,6 +353,9 @@ func main() {
 	api.GET("/friends/status/:id", friendHandler.GetStatus)
 	api.POST("/friends/:id/accept", friendHandler.Accept)
 	api.POST("/friends/:id/decline", friendHandler.Decline)
+	// Unfriend — party-agnostic removal of an accepted friendship. DELETE is a
+	// distinct method from the GET/POST /friends routes above, so no collision.
+	api.DELETE("/friends/:id", friendHandler.Unfriend)
 
 	// Lobby stats endpoint — bucket-counts connected users into in-lobby /
 	// in-room / in-game and reports registered totals.

@@ -277,6 +277,7 @@
     "requestSent": "Zahtjev poslan",
     "acceptRequest": "Prihvati zahtjev",
     "friends": "Prijatelji",
+    "removeFriend": "Ukloni prijatelja",
     "accept": "Prihvati",
     "decline": "Odbij",
     "online": "Online",
@@ -293,10 +294,18 @@
     "requests": {
       "heading": "Zahtjevi za prijateljstvo"
     },
+    "removeDialog": {
+      "title": "Ukloniti prijatelja?",
+      "description": "Uklonite {{username}} s popisa prijatelja. Kasnije možete ponovno poslati zahtjev za prijateljstvo.",
+      "cancel": "Odustani",
+      "confirm": "Ukloni",
+      "submitting": "Uklanjanje…"
+    },
     "errors": {
       "sendFailed": "Slanje zahtjeva za prijateljstvo nije uspjelo. Pokušajte ponovo.",
       "acceptFailed": "Prihvaćanje zahtjeva nije uspjelo. Možda više nije dostupan.",
-      "declineFailed": "Odbijanje zahtjeva nije uspjelo. Možda više nije dostupan."
+      "declineFailed": "Odbijanje zahtjeva nije uspjelo. Možda više nije dostupan.",
+      "removeFailed": "Uklanjanje prijatelja nije uspjelo. Možda više niste prijatelji."
     }
   },
   "language": {

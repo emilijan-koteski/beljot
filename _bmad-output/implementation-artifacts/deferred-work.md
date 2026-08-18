@@ -718,3 +718,18 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A â€
   summary: `TrumpPrompt`'s card-imitating suit surfaces take their background and border from `cardFace.ts` but keep their own unrelated corner radii (`rounded-[5px]` on the 22x30 chips, `rounded-md` on the 52px picker tiles) and aspect ratios.
   reason_deferred: Cosmetic and currently invisible -- these are suit-glyph tiles, not card faces, and nobody sees them beside a card at matching scale. Binding them fully would mean exporting a radius policy for non-card surfaces, which is more shared API than the problem justifies today.
   evidence: `TrumpPrompt.tsx` tile styles set radius via Tailwind classes while the card computes `width * 0.05`; a future deck with a different `rx` would move the cards and leave the tiles behind. Raised by an adversarial review agent as residual drift.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-profile-remove-friend-and-decline.md`
+  summary: `RemoveFriendDialog` is the third near-verbatim clone of the confirm-dialog shape (`UnlinkAccountDialog`, the remove-bot dialog) -- extract a shared `ConfirmDialog` before the pattern drifts.
+  reason_deferred: Pre-existing duplication; extracting a shared abstraction touches surfaces outside this story and deserves its own pass over all call sites.
+  evidence: Both profile dialogs line up almost line-for-line (same `showCloseButton={false}`, same `if (!next && !pending) onClose()`, same brass icon chip, same ghost-cancel/destructive-confirm footer). Raised by an adversarial review agent.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-profile-remove-friend-and-decline.md`
+  summary: No axios request timeout exists anywhere, so a hung mutation locks any pending-guarded confirm dialog (remove-friend, unlink-account) with every dismissal path disabled.
+  reason_deferred: App-wide client configuration, not caused by this story; fixing only `removeFriend` would be inconsistent -- needs a global `axiosClient` timeout decision plus a sweep of pending-guarded dialogs.
+  evidence: Neither axios instance in `client/src/shared/api/axiosClient.ts` sets `timeout`, and `refetchOnWindowFocus` is disabled, so nothing unsticks a hung `isPending`. Verified by an edge-case review agent.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-profile-remove-friend-and-decline.md`
+  summary: `useAcceptFriendRequestMutation.onError` only toasts -- after a 404 (request resolved elsewhere) the stale Accept button survives in cache, the same gap this story fixed for remove/decline.
+  reason_deferred: Pre-existing behavior on an untouched mutation; fixed decline/remove because this story added their profile surfaces, but accept's error path predates the change and was deliberately left alone to keep the diff scoped.
+  evidence: `useFriendMutations.ts` accept `onError` invalidates nothing, while its siblings now resync `friends.requests()`/`friends.status()`; identical failure mode was confirmed for decline by both review agents.

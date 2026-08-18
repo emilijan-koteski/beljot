@@ -24,6 +24,11 @@ type Repository interface {
 	// Delete removes a pending row under the same recipient-only guard (decline).
 	// Returns rows affected (0 = not the recipient, not pending, or missing).
 	Delete(id, recipientID uint) (int64, error)
+	// Unfriend removes an ACCEPTED row under a party-agnostic guard — either side
+	// may end an accepted friendship: DELETE ... WHERE id=? AND (user_id=? OR
+	// friend_id=?) AND status='accepted'. Returns rows affected (0 = not a party,
+	// not accepted, or missing).
+	Unfriend(id, userID uint) (int64, error)
 	// ListAccepted returns the user's accepted friendships in EITHER direction
 	// ((user_id=? OR friend_id=?) AND status='accepted'). Returns a non-nil empty
 	// slice when the user has no friends.

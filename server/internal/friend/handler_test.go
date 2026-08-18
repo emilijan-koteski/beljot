@@ -107,6 +107,16 @@ func (m *mockFriendRepo) Delete(id, recipientID uint) (int64, error) {
 	return 0, nil
 }
 
+func (m *mockFriendRepo) Unfriend(id, userID uint) (int64, error) {
+	for i, r := range m.rows {
+		if r.ID == id && (r.UserID == userID || r.FriendID == userID) && r.Status == friend.FriendStatusAccepted {
+			m.rows = append(m.rows[:i], m.rows[i+1:]...)
+			return 1, nil
+		}
+	}
+	return 0, nil
+}
+
 func (m *mockFriendRepo) ListAccepted(userID uint) ([]friend.Friendship, error) {
 	out := []friend.Friendship{}
 	for _, r := range m.rows {
@@ -246,6 +256,7 @@ func setup() (*mockFriendRepo, *stubUserRepo, *notifierSpy, *echo.Echo) {
 	api.GET("/friends/status/:id", h.GetStatus)
 	api.POST("/friends/:id/accept", h.Accept)
 	api.POST("/friends/:id/decline", h.Decline)
+	api.DELETE("/friends/:id", h.Unfriend)
 	return repo, users, spy, e
 }
 
@@ -269,6 +280,16 @@ func doPost(e *echo.Echo, path, body, token string) *httptest.ResponseRecorder {
 
 func doGet(e *echo.Echo, path, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+func doDelete(e *echo.Echo, path, token string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodDelete, path, nil)
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -457,6 +478,87 @@ func TestDecline_RecipientOnly(t *testing.T) {
 	assert.Nil(t, got)
 }
 
+// --- Unfriend ---
+
+func TestUnfriend_EitherParty(t *testing.T) {
+	repo, users, _, e := setup()
+	users.add(1, "alice")
+	users.add(2, "bob")
+
+	// The requester (1) unfriends → 200 and the row is gone.
+	f := repo.seed(1, 2, friend.FriendStatusAccepted)
+	rec := doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 1))
+	assert.Equal(t, http.StatusOK, rec.Code)
+	got, _ := repo.FindByID(f.ID)
+	assert.Nil(t, got)
+
+	// The recipient (2) unfriends a fresh row just the same — the guard is
+	// party-agnostic, unlike Accept/Decline.
+	f = repo.seed(1, 2, friend.FriendStatusAccepted)
+	rec = doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 2))
+	assert.Equal(t, http.StatusOK, rec.Code)
+	got, _ = repo.FindByID(f.ID)
+	assert.Nil(t, got)
+}
+
+func TestUnfriend_RepeatCall404(t *testing.T) {
+	repo, users, _, e := setup()
+	users.add(1, "alice")
+	users.add(2, "bob")
+	f := repo.seed(1, 2, friend.FriendStatusAccepted)
+
+	rec := doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 1))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	// The second delete (the both-unfriend race, or a stale button) → uniform 404.
+	rec = doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 2))
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "FRIENDSHIP_NOT_FOUND", errorCode(t, rec))
+}
+
+func TestUnfriend_PendingRow404(t *testing.T) {
+	repo, users, _, e := setup()
+	users.add(1, "alice")
+	users.add(2, "bob")
+	f := repo.seed(1, 2, friend.FriendStatusPending)
+
+	// A pending row is decline's job, not unfriend's → uniform 404, row survives.
+	rec := doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 2))
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "FRIENDSHIP_NOT_FOUND", errorCode(t, rec))
+	got, _ := repo.FindByID(f.ID)
+	require.NotNil(t, got)
+}
+
+func TestUnfriend_ThirdParty404(t *testing.T) {
+	repo, users, _, e := setup()
+	users.add(1, "alice")
+	users.add(2, "bob")
+	users.add(3, "carol")
+	f := repo.seed(1, 2, friend.FriendStatusAccepted)
+
+	// A third party (3) gets the same uniform 404 as a missing row — never a 403
+	// that would leak the row's existence — and the row survives.
+	rec := doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 3))
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "FRIENDSHIP_NOT_FOUND", errorCode(t, rec))
+	got, _ := repo.FindByID(f.ID)
+	require.NotNil(t, got)
+}
+
+func TestUnfriend_BadID(t *testing.T) {
+	_, users, _, e := setup()
+	users.add(1, "alice")
+
+	// Non-numeric and zero ids are both a 400 BAD_REQUEST from parseIDParam.
+	rec := doDelete(e, "/api/v1/friends/abc", tokenFor(t, 1))
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, "BAD_REQUEST", errorCode(t, rec))
+	rec = doDelete(e, "/api/v1/friends/0", tokenFor(t, 1))
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, "BAD_REQUEST", errorCode(t, rec))
+}
+
 // --- Lists ---
 
 func TestListRequests_IncomingWithUsernames(t *testing.T) {
@@ -547,5 +649,7 @@ func TestListFriends_EmptySerializesArray(t *testing.T) {
 func TestFriendEndpoints_RequireAuth(t *testing.T) {
 	_, _, _, e := setup()
 	rec := doGet(e, "/api/v1/friends", "")
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	rec = doDelete(e, "/api/v1/friends/1", "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }

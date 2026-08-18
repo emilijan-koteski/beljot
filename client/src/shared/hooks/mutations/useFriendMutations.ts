@@ -2,7 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import i18n from "i18next";
 import { toast } from "sonner";
 
-import { acceptFriendRequest, declineFriendRequest, sendFriendRequest } from "@/shared/api/friends";
+import {
+  acceptFriendRequest,
+  declineFriendRequest,
+  removeFriend,
+  sendFriendRequest,
+} from "@/shared/api/friends";
 import { queryKeys } from "@/shared/api/queryKeys";
 
 /**
@@ -64,9 +69,35 @@ export function useDeclineFriendRequestMutation() {
         queryClient.invalidateQueries({ queryKey: queryKeys.friends.status(vars.userId) });
       }
     },
-    onError: () => {
-      // The request may have been accepted/declined elsewhere first → 404.
+    onError: (_error, vars) => {
+      // The request may have been accepted/declined elsewhere first → 404. The
+      // row is already gone then, so resync the stale caches too — otherwise
+      // every retry just re-404s against the same phantom request.
       toast.error(i18n.t("friends.errors.declineFailed"));
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.requests() });
+      if (vars.userId !== undefined) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.friends.status(vars.userId) });
+      }
+    },
+  });
+}
+
+/** Remove an accepted friend; refreshes the friend list and the subject's status. */
+export function useRemoveFriendMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { requestId: number; userId: number }) => removeFriend(vars.requestId),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.status(vars.userId) });
+    },
+    onError: (_error, vars) => {
+      // A 404 means the friendship is already gone (the other party removed it
+      // first) — so the stale "Friends" state must be resynced too, otherwise
+      // every retry just re-404s against the same phantom row.
+      toast.error(i18n.t("friends.errors.removeFailed"));
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.status(vars.userId) });
     },
   });
 }

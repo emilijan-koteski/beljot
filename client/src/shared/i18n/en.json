@@ -277,6 +277,7 @@
     "requestSent": "Request sent",
     "acceptRequest": "Accept request",
     "friends": "Friends",
+    "removeFriend": "Remove friend",
     "accept": "Accept",
     "decline": "Decline",
     "online": "Online",
@@ -293,10 +294,18 @@
     "requests": {
       "heading": "Friend requests"
     },
+    "removeDialog": {
+      "title": "Remove friend?",
+      "description": "Remove {{username}} from your friends. You can send a new friend request later.",
+      "cancel": "Cancel",
+      "confirm": "Remove",
+      "submitting": "Removing…"
+    },
     "errors": {
       "sendFailed": "Couldn't send friend request. Please try again.",
       "acceptFailed": "Couldn't accept the request — it may no longer be available.",
-      "declineFailed": "Couldn't decline the request — it may no longer be available."
+      "declineFailed": "Couldn't decline the request — it may no longer be available.",
+      "removeFailed": "Couldn't remove this friend — you may no longer be friends."
     }
   },
   "language": {
