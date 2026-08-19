@@ -334,3 +334,191 @@ func TestTeamStringForIndex_SafeOnOutOfRange(t *testing.T) {
 		})
 	}
 }
+
+// TestRulesForPresets locks D-VAR-1's foundation: both presets return a fully
+// populated config, an unknown variant string falls back to Bitola, and the two
+// presets actually differ on the seven divergences.
+func TestRulesForPresets(t *testing.T) {
+	bitola := game.VariantRules{
+		DealShape:              game.DealShapeCandidate,
+		HasTrumpCandidate:      true,
+		RevealFaceDownOnRound2: false,
+		AllPassOutcome:         game.AllPassReshuffleAndRotate,
+		DeclarationOverlap:     false,
+		DeclarationTiming:      game.DeclarationTimingDuringFirstTrick,
+		TieRule:                game.TieRuleHangingPoints,
+	}
+	croatia := game.VariantRules{
+		DealShape:              game.DealShapeAllBeforeBidding,
+		HasTrumpCandidate:      false,
+		RevealFaceDownOnRound2: true,
+		AllPassOutcome:         game.AllPassDealerMustPick,
+		DeclarationOverlap:     true,
+		DeclarationTiming:      game.DeclarationTimingDedicatedPhase,
+		TieRule:                game.TieRuleAllToOpponents,
+	}
+
+	tests := []struct {
+		name     string
+		variant  game.Variant
+		expected game.VariantRules
+	}{
+		{name: "bitola resolves to the bitola preset", variant: game.VariantBitola, expected: bitola},
+		{name: "croatia resolves to the croatia preset", variant: game.VariantCroatia, expected: croatia},
+		{name: "an unknown variant string falls back to bitola", variant: game.Variant("atlantis"), expected: bitola},
+		{name: "an empty variant string falls back to bitola", variant: game.Variant(""), expected: bitola},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rules := game.RulesFor(tc.variant)
+			assert.Equal(t, tc.expected, rules)
+
+			// Fully populated: no named-string field may be left at its zero
+			// value. The two booleans are legitimately false in one preset each,
+			// so they are covered by the exact-equality assertion above.
+			assert.NotEmpty(t, rules.DealShape, "DealShape must be populated")
+			assert.NotEmpty(t, rules.AllPassOutcome, "AllPassOutcome must be populated")
+			assert.NotEmpty(t, rules.DeclarationTiming, "DeclarationTiming must be populated")
+			assert.NotEmpty(t, rules.TieRule, "TieRule must be populated")
+		})
+	}
+
+	t.Run("the two presets differ on every divergence", func(t *testing.T) {
+		assert.NotEqual(t, bitola.DealShape, croatia.DealShape)
+		assert.NotEqual(t, bitola.HasTrumpCandidate, croatia.HasTrumpCandidate)
+		assert.NotEqual(t, bitola.RevealFaceDownOnRound2, croatia.RevealFaceDownOnRound2)
+		assert.NotEqual(t, bitola.AllPassOutcome, croatia.AllPassOutcome)
+		assert.NotEqual(t, bitola.DeclarationOverlap, croatia.DeclarationOverlap)
+		assert.NotEqual(t, bitola.DeclarationTiming, croatia.DeclarationTiming)
+		assert.NotEqual(t, bitola.TieRule, croatia.TieRule)
+	})
+
+	t.Run("the zero-value config is NOT the bitola preset", func(t *testing.T) {
+		// This is why every GameState literal must set Rules explicitly — an
+		// unset config would deal no candidate and reject every round-1 take.
+		assert.NotEqual(t, bitola, game.VariantRules{})
+	})
+}
+
+// TestNewGameResolvesRulesOnce asserts the config is stamped on the state at
+// construction, for every variant string NewGame can be handed.
+func TestNewGameResolvesRulesOnce(t *testing.T) {
+	tests := []struct {
+		name    string
+		variant game.Variant
+	}{
+		{name: "bitola", variant: game.VariantBitola},
+		{name: "croatia", variant: game.VariantCroatia},
+		{name: "unknown falls back to bitola", variant: game.Variant("nonsense")},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
+				[4]bool{}, tc.variant, "1001", 1)
+			assert.Equal(t, game.RulesFor(tc.variant), gs.Rules)
+			assert.Equal(t, tc.variant, gs.Variant, "the variant string is stored verbatim")
+		})
+	}
+}
+
+// TestNewGameCroatianDeal covers the Croatian-deal row of the I/O matrix: eight
+// cards per seat (six open, two face-down), no candidate, empty deck, and 32-card
+// conservation.
+func TestNewGameCroatianDeal(t *testing.T) {
+	gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
+		[4]bool{}, game.VariantCroatia, "1001", 7)
+
+	t.Run("six open cards and two face-down per seat", func(t *testing.T) {
+		for i, p := range gs.Players {
+			assert.Len(t, p.Hand, 6, "seat %d holds 6 open cards before bidding", i)
+			assert.Len(t, p.FaceDownCards, 2, "seat %d holds 2 face-down cards", i)
+		}
+	})
+
+	t.Run("no trump candidate and no stage-2 reserve", func(t *testing.T) {
+		assert.Nil(t, gs.TrumpCandidate, "there is no candidate in this deal shape")
+		assert.Empty(t, gs.Deck, "every card is dealt before bidding")
+	})
+
+	t.Run("nothing is revealed yet", func(t *testing.T) {
+		assert.False(t, gs.FaceDownRevealed)
+	})
+
+	t.Run("all 32 cards accounted for exactly once", func(t *testing.T) {
+		seen := make(map[string]bool, 32)
+		for _, p := range gs.Players {
+			for _, c := range append(append([]game.Card{}, p.Hand...), p.FaceDownCards...) {
+				id := c.String()
+				assert.False(t, seen[id], "duplicate card: %s", id)
+				seen[id] = true
+			}
+		}
+		assert.Len(t, seen, 32)
+	})
+
+	t.Run("a face-down card is never also in an open hand", func(t *testing.T) {
+		open := make(map[string]bool, 24)
+		for _, p := range gs.Players {
+			for _, c := range p.Hand {
+				open[c.String()] = true
+			}
+		}
+		for i, p := range gs.Players {
+			for _, c := range p.FaceDownCards {
+				assert.False(t, open[c.String()],
+					"seat %d's face-down %s must not also sit in an open hand", i, c)
+			}
+		}
+	})
+
+	t.Run("phase and opening bidder match the Bitola deal", func(t *testing.T) {
+		assert.Equal(t, game.PhaseDealing, gs.Phase)
+		assert.Equal(t, (gs.DealerSeat+1)%4, gs.ActivePlayerSeat)
+		assert.Equal(t, 1, gs.BiddingRound)
+		assert.Equal(t, 1, gs.HandNumber)
+	})
+}
+
+// TestGameStateJSONOmitsServerOnlyRuleFields is the wire-shape guard for the
+// fields this story added: none of them may appear on the wire, for either
+// variant.
+func TestGameStateJSONOmitsServerOnlyRuleFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		variant game.Variant
+	}{
+		{name: "bitola", variant: game.VariantBitola},
+		{name: "croatia", variant: game.VariantCroatia},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
+				[4]bool{}, tc.variant, "1001", 1)
+
+			data, err := json.Marshal(gs)
+			require.NoError(t, err)
+
+			var raw map[string]any
+			require.NoError(t, json.Unmarshal(data, &raw))
+			for _, key := range []string{"rules", "Rules", "faceDownRevealed", "FaceDownRevealed"} {
+				_, exists := raw[key]
+				assert.False(t, exists, "server-only field %q must not reach the wire", key)
+			}
+
+			players, ok := raw["players"].([]any)
+			require.True(t, ok)
+			require.Len(t, players, 4)
+			for i, p := range players {
+				seat, ok := p.(map[string]any)
+				require.True(t, ok)
+				for _, key := range []string{"faceDownCards", "FaceDownCards"} {
+					_, exists := seat[key]
+					assert.False(t, exists, "seat %d's %q must not reach the wire", i, key)
+				}
+			}
+		})
+	}
+}

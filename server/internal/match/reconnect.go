@@ -479,6 +479,12 @@ func (m *Manager) HandleReconnect(userID uint) {
 // until some unrelated event happened to broadcast. Call AFTER HandleReconnect
 // so the snapshot reflects any phase restore. Safe for every registration:
 // no-ops for users outside a session.
+//
+// It also replays this user's own face-down-card reveal when one is outstanding.
+// That reveal is a one-shot per-seat event whose cards deliberately never ride
+// match_state, so a refreshed client would otherwise lose its own two cards for
+// the rest of bidding. Only the reconnecting seat's cards are sent — never any
+// other seat's.
 func (m *Manager) SyncStateOnConnect(userID uint) {
 	m.mu.RLock()
 	roomID, ok := m.userToRoom[userID]
@@ -498,9 +504,23 @@ func (m *Manager) SyncStateOnConnect(userID uint) {
 		return
 	}
 	msg := buildMessage(ws.EventMatchState, session.gameState)
+	// Build the face-down replay under the same read lock as the snapshot, so
+	// the two cannot straddle a bidding resolution.
+	var faceDownMsg []byte
+	if session.gameState.FaceDownRevealed {
+		for seat, uid := range session.playerIDs {
+			if uid == userID {
+				faceDownMsg = buildFaceDownRevealMsg(session.gameState, seat)
+				break
+			}
+		}
+	}
 	session.mu.RUnlock()
 
 	m.hub.SendToUser(userID, msg)
+	if faceDownMsg != nil {
+		m.hub.SendToUser(userID, faceDownMsg)
+	}
 }
 
 // handleSeatReconnectTimeout is called when an individual seat's reconnect

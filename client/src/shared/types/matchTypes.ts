@@ -7,7 +7,7 @@ export type Suit = "S" | "H" | "D" | "C";
 export type Rank = "7" | "8" | "9" | "T" | "J" | "Q" | "K" | "A";
 export type CardId = `${Rank}${Suit}`;
 
-export type Variant = "bitola";
+export type Variant = "bitola" | "croatia";
 
 export type Phase =
   | ""

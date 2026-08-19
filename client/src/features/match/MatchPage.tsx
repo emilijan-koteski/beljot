@@ -85,6 +85,7 @@ import { TrumpPrompt } from "./components/TrumpPrompt";
 import { TrumpReveal } from "./components/TrumpReveal";
 import { Wordmark } from "./components/Wordmark";
 import { detectDeclarations } from "./lib/declarations";
+import { mergeRevealedFaceDownCards } from "./lib/faceDownCards";
 import { isBelotEligible, legalCardIds } from "./lib/legalCards";
 import { seatTeam } from "./lib/tableTheme";
 import { compassOffset, SLOT_POSITIONS } from "./lib/trickLayout";
@@ -243,6 +244,7 @@ export function MatchPage() {
   const setBelotReveal = useMatchStore((s) => s.setBelotReveal);
   const trumpReveal = useMatchStore((s) => s.trumpReveal);
   const setTrumpReveal = useMatchStore((s) => s.setTrumpReveal);
+  const faceDownReveal = useMatchStore((s) => s.faceDownReveal);
   const scoreRevealData = useMatchStore((s) => s.scoreRevealData);
   const setScoreRevealData = useMatchStore((s) => s.setScoreRevealData);
   const matchEndData = useMatchStore((s) => s.matchEndData);
@@ -1436,7 +1438,17 @@ export function MatchPage() {
     !matchState.awaitingDeclaration &&
     matchState.pendingBelotSeat !== myPlayerSeat;
   const myPlayer = matchState.players.find((p) => p.seat === myPlayerSeat);
-  const myHand = myPlayer?.hand ?? [];
+  // Croatian bidding: the viewer's own two face-down cards arrive on a per-seat
+  // event and are deliberately absent from every snapshot, so they are merged in
+  // here for rendering only. The store drops the slice the moment the phase
+  // leaves bidding, by which point the authoritative hand already holds them —
+  // so the two sources can never both contribute the same card.
+  const myHand = mergeRevealedFaceDownCards(
+    myPlayer?.hand ?? [],
+    myPlayerSeat,
+    faceDownReveal?.playerSeat ?? null,
+    faceDownReveal?.cardIds,
+  );
   const playableCardIds =
     isMyTurn && myPlayerSeat !== null ? legalCardIds(matchState, myPlayerSeat) : [];
 

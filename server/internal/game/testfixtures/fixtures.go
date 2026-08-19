@@ -34,6 +34,7 @@ func NewGameJustDealt() *game.GameState {
 	return &game.GameState{
 		RoomID:           1,
 		Variant:          game.VariantBitola,
+		Rules:            game.RulesFor(game.VariantBitola),
 		MatchMode:        "1001",
 		Phase:            game.PhaseBidding,
 		HandNumber:       1,
@@ -143,6 +144,7 @@ func NewGameMidPlay(trickNum int) *game.GameState {
 	gs := &game.GameState{
 		RoomID:               1,
 		Variant:              game.VariantBitola,
+		Rules:                game.RulesFor(game.VariantBitola),
 		MatchMode:            "1001",
 		Phase:                game.PhasePlaying,
 		HandNumber:           1,
@@ -260,6 +262,7 @@ func NewGameFirstTrick(trump game.Suit) *game.GameState {
 	gs := &game.GameState{
 		RoomID:           1,
 		Variant:          game.VariantBitola,
+		Rules:            game.RulesFor(game.VariantBitola),
 		MatchMode:        "1001",
 		Phase:            game.PhasePlaying,
 		HandNumber:       1,
@@ -373,6 +376,7 @@ func NewGameLastTrick() *game.GameState {
 	return &game.GameState{
 		RoomID:               1,
 		Variant:              game.VariantBitola,
+		Rules:                game.RulesFor(game.VariantBitola),
 		MatchMode:            "1001",
 		Phase:                game.PhasePlaying,
 		HandNumber:           1,
@@ -452,6 +456,7 @@ func NewGameCapotInProgress() *game.GameState {
 	return &game.GameState{
 		RoomID:               1,
 		Variant:              game.VariantBitola,
+		Rules:                game.RulesFor(game.VariantBitola),
 		MatchMode:            "1001",
 		Phase:                game.PhasePlaying,
 		HandNumber:           1,
@@ -625,5 +630,141 @@ func NewGameMidBidding(passCount int) *game.GameState {
 		gs.ActivePlayerSeat = (1 + passesInRound2) % 4 // seat 1 is first bidder in round 2
 	}
 
+	return gs
+}
+
+// NewGameCroatianJustDealt returns a valid GameState in the BIDDING phase after
+// a Croatian all-before-bidding deal: every card is already dealt, so each seat
+// physically holds 8 — 6 open in Hand and 2 in the server-only FaceDownCards
+// slot. There is no trump candidate and Deck is empty.
+//
+// Layout is deterministic and engineered so that no pick (either round, any
+// seat) triggers instant-win — seat 3 holds exactly two cards of every suit, and
+// no seat holds more than six of one suit:
+//
+//	Seat 0 (team A): 7S 8S 9S TS 7H 8H   face-down: JS QS
+//	Seat 1 (team B): 7D 8D 9D TD 9H TH   face-down: JD QD
+//	Seat 2 (team A): 7C 8C 9C TC JH QH   face-down: JC QC
+//	Seat 3 (team B): KS AS KD AD KH AH   face-down: KC AC
+//
+// Dealer: seat 0, Active bidder: seat 1.
+func NewGameCroatianJustDealt() *game.GameState {
+	c := func(r game.Rank, s game.Suit) game.Card { return game.Card{Rank: r, Suit: s} }
+
+	return &game.GameState{
+		RoomID:           1,
+		Variant:          game.VariantCroatia,
+		Rules:            game.RulesFor(game.VariantCroatia),
+		MatchMode:        "1001",
+		Phase:            game.PhaseBidding,
+		HandNumber:       1,
+		DealerSeat:       0,
+		TrumpCandidate:   nil,
+		BiddingRound:     1,
+		BiddingPassCount: 0,
+		ActivePlayerSeat: 1,
+		TrickNumber:      0,
+		CurrentTrick:     []game.TrickCard{},
+		Deck:             nil,
+		Players: [4]game.PlayerState{
+			{
+				Hand: []game.Card{
+					c(game.Rank7, game.SuitSpades), c(game.Rank8, game.SuitSpades),
+					c(game.Rank9, game.SuitSpades), c(game.RankTen, game.SuitSpades),
+					c(game.Rank7, game.SuitHearts), c(game.Rank8, game.SuitHearts),
+				},
+				FaceDownCards: []game.Card{
+					c(game.RankJack, game.SuitSpades), c(game.RankQueen, game.SuitSpades),
+				},
+				Seat:         0,
+				UserID:       10,
+				Team:         "teamA",
+				Declarations: []game.Declaration{},
+				Connected:    true,
+			},
+			{
+				Hand: []game.Card{
+					c(game.Rank7, game.SuitDiamonds), c(game.Rank8, game.SuitDiamonds),
+					c(game.Rank9, game.SuitDiamonds), c(game.RankTen, game.SuitDiamonds),
+					c(game.Rank9, game.SuitHearts), c(game.RankTen, game.SuitHearts),
+				},
+				FaceDownCards: []game.Card{
+					c(game.RankJack, game.SuitDiamonds), c(game.RankQueen, game.SuitDiamonds),
+				},
+				Seat:         1,
+				UserID:       20,
+				Team:         "teamB",
+				Declarations: []game.Declaration{},
+				Connected:    true,
+			},
+			{
+				Hand: []game.Card{
+					c(game.Rank7, game.SuitClubs), c(game.Rank8, game.SuitClubs),
+					c(game.Rank9, game.SuitClubs), c(game.RankTen, game.SuitClubs),
+					c(game.RankJack, game.SuitHearts), c(game.RankQueen, game.SuitHearts),
+				},
+				FaceDownCards: []game.Card{
+					c(game.RankJack, game.SuitClubs), c(game.RankQueen, game.SuitClubs),
+				},
+				Seat:         2,
+				UserID:       30,
+				Team:         "teamA",
+				Declarations: []game.Declaration{},
+				Connected:    true,
+			},
+			{
+				Hand: []game.Card{
+					c(game.RankKing, game.SuitSpades), c(game.RankAce, game.SuitSpades),
+					c(game.RankKing, game.SuitDiamonds), c(game.RankAce, game.SuitDiamonds),
+					c(game.RankKing, game.SuitHearts), c(game.RankAce, game.SuitHearts),
+				},
+				FaceDownCards: []game.Card{
+					c(game.RankKing, game.SuitClubs), c(game.RankAce, game.SuitClubs),
+				},
+				Seat:         3,
+				UserID:       40,
+				Team:         "teamB",
+				Declarations: []game.Declaration{},
+				Connected:    true,
+			},
+		},
+	}
+}
+
+// NewGameCroatianMidBidding returns a Croatian GameState with the specified
+// number of passes already recorded. Mirrors NewGameMidBidding's contract:
+//
+// passCount 0: same as NewGameCroatianJustDealt (round 1, seat 1 active)
+// passCount 1-3: round 1 with passes applied
+// passCount 4: round 2 just started, face-down cards revealed, seat 1 active
+// passCount 5-7: round 2 with passes applied (7 puts the dealer on the clock)
+//
+// Clamped to 7: round 2 cannot be passed out under this variant's config — the
+// dealer must pick — so passCount 8 is not a reachable state.
+//
+// Dealer is always seat 0. First bidder is seat 1.
+func NewGameCroatianMidBidding(passCount int) *game.GameState {
+	gs := NewGameCroatianJustDealt()
+
+	if passCount <= 0 {
+		return gs
+	}
+	if passCount > 7 {
+		passCount = 7
+	}
+
+	if passCount < 4 {
+		gs.BiddingPassCount = passCount
+		gs.ActivePlayerSeat = (1 + passCount) % 4 // seat 1 is first bidder
+		return gs
+	}
+
+	// Round 2: the fourth round-1 pass reset the count and turned every seat's
+	// two face-down cards up to their owner.
+	passesInRound2 := passCount - 4
+	gs.BiddingRound = 2
+	gs.BiddingPassCount = passesInRound2
+	gs.ActivePlayerSeat = (1 + passesInRound2) % 4
+	gs.FaceDownRevealed = true
 	return gs
 }

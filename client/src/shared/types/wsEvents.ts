@@ -92,6 +92,9 @@ export const EVENT_BELOT_ANNOUNCED = "event:belot_announced" as const;
 export const EVENT_MATCH_PAUSED = "event:match_paused" as const;
 export const EVENT_MATCH_RESUMED = "event:match_resumed" as const;
 export const EVENT_AUTO_ACTION = "event:auto_action" as const;
+// Per-seat only — the server sends this to ONE user, never broadcast. See
+// FaceDownRevealedPayload.
+export const EVENT_FACE_DOWN_REVEALED = "event:face_down_revealed" as const;
 
 // Match state payload types will be expanded in Story 4.2 when the session manager
 // defines the exact shape of match state broadcasts. For now, typed as unknown.
@@ -147,7 +150,30 @@ export interface TrumpSelectedPayload {
   trumpSuit: string;
   // Originally face-up trump candidate the picker absorbed. The post-pick
   // MatchState clears trumpCandidate, so this event is the only carrier.
+  //
+  // EMPTY STRING when the variant has no trump candidate: trump was a bare
+  // named suit and the taker drew no card. The reveal renders candidate-less
+  // in that case rather than being suppressed.
   cardId: string;
+}
+
+/**
+ * A seat's own two face-down cards, turned up for that seat alone.
+ *
+ * Sent per-user via SendToUser and never broadcast: under the
+ * all-before-bidding deal each seat physically holds eight cards but only six
+ * are open, and when bidding round 1 is passed out the other two turn up for
+ * their owner only. They deliberately never ride `event:match_state` — that
+ * payload is serialized once and the identical bytes go to all four seats, so a
+ * card visible to exactly one player cannot travel on it.
+ *
+ * `playerSeat` is always the recipient's OWN seat; a different seat here means a
+ * server bug, not another player's cards. Re-sent on reconnect (the server
+ * replays it from `SyncStateOnConnect`) because it is a one-shot event.
+ */
+export interface FaceDownRevealedPayload {
+  playerSeat: number;
+  cardIds: string[];
 }
 
 export interface DeclarationsResolvedPayload {

@@ -19,6 +19,9 @@ interface TrumpRevealProps {
    *  null (race during initial mount), the panel renders with a brass glow
    *  fallback. */
   myPlayerSeat: number | null;
+  /** The originally face-up trump candidate the taker absorbed, or an EMPTY
+   *  string when the variant has no candidate — trump was a bare named suit and
+   *  the taker drew no card. */
   cardId: string;
   /** The actually-chosen trump suit. Differs from `cardId`'s suit only in
    *  round-2 free-suit picks; round 1 always has them equal. */
@@ -97,7 +100,10 @@ function rankNameKey(
  * card is the hero; the *chosen* trump suit is stamped over its corner as an
  * embossed wax seal. One layout serves both rounds: round 1 takes the
  * candidate's suit ("{Suit} is trump this hand"); a round-2 free pick names a
- * different suit ("chose {Suit}" + the candidate that was on the table). The
+ * different suit ("chose {Suit}" + the candidate that was on the table). A
+ * variant with no candidate sends an empty cardId — then the seal stands alone
+ * and the copy reads "named {Suit} as trump", because there is no card to show
+ * and no suit was turned down. The
  * panel glows in the taker's viewer-relative team color (Gold = Us, Silver =
  * Them) and auto-closes after 8 s — early dismissal via the X-with-countdown.
  */
@@ -128,30 +134,34 @@ export function TrumpReveal({
     onCompleteRef.current();
   };
 
-  // Defence in depth: WS dispatch already drops payloads with cardId.length < 2,
-  // but parseCardId would silently produce undefined suit/rank if reached with
-  // a short string — guard at the boundary.
-  if (!visible || cardId.length < 2) {
+  // An EMPTY cardId is a legitimate candidate-less take, rendered without a hero
+  // card. A 1-character id is malformed — parseCardId would silently produce an
+  // undefined suit/rank — so bail. WS dispatch already rejects that shape; this
+  // is defence in depth at the boundary.
+  if (!visible || cardId.length === 1) {
     return null;
   }
 
   const picker = players.find((p) => p.seat === playerSeat);
   const pickerName = playerDisplayName(t, picker ?? null);
-  const card = parseCardId(cardId);
+  const card = cardId.length >= 2 ? parseCardId(cardId) : null;
 
-  // Free-pick (round 2) is detected purely from the wire fields: when the
-  // chosen suit differs from the candidate's, the player named a free suit.
-  const isFreePick = card.suit !== trumpSuit;
+  // Free-pick is detected purely from the wire fields: with a candidate, a
+  // chosen suit that differs from the candidate's means the player named a free
+  // suit. With no candidate at all, every take is a free naming — but there is
+  // no turned-down suit to contrast it against, so it gets its own copy below
+  // rather than the "free pick" eyebrow.
+  const isFreePick = card !== null && card.suit !== trumpSuit;
 
   const suitName = t(`match.suits.${suitNameKey(trumpSuit)}`, {
     defaultValue: SUIT_NAME[trumpSuit],
   });
-  const candidateRankName = t(`match.ranks.${rankNameKey(card.rank)}`, {
-    defaultValue: RANK_NAME[card.rank],
-  });
-  const candidateSuitName = t(`match.suits.${suitNameKey(card.suit)}`, {
-    defaultValue: SUIT_NAME[card.suit],
-  });
+  const candidateRankName = card
+    ? t(`match.ranks.${rankNameKey(card.rank)}`, { defaultValue: RANK_NAME[card.rank] })
+    : "";
+  const candidateSuitName = card
+    ? t(`match.suits.${suitNameKey(card.suit)}`, { defaultValue: SUIT_NAME[card.suit] })
+    : "";
 
   // Viewer-relative team color for the glow, avatar fill, and Us/Them chip.
   // Falls back to brass when the viewer's seat hasn't resolved yet.
@@ -217,28 +227,42 @@ export function TrumpReveal({
           {eyebrow}
         </div>
 
-        {/* hero candidate card + chosen-trump wax seal */}
+        {/* hero candidate card + chosen-trump wax seal. With no candidate the
+            seal is the hero on its own — centred in the flow instead of pinned
+            to a card's corner. */}
         <div className="relative mb-4.5 inline-block">
+          {card && (
+            <>
+              <div
+                aria-hidden
+                className="absolute rounded-lg"
+                style={{ inset: -10, boxShadow: `0 0 32px ${glowColor}55`, zIndex: 0 }}
+              />
+              <div className="relative z-1">
+                <PlayingCard card={card} state="default" size="lg" withTransition={false} />
+              </div>
+            </>
+          )}
           <div
-            aria-hidden
-            className="absolute rounded-lg"
-            style={{ inset: -10, boxShadow: `0 0 32px ${glowColor}55`, zIndex: 0 }}
-          />
-          <div className="relative z-1">
-            <PlayingCard card={card} state="default" size="lg" withTransition={false} />
-          </div>
-          <div
-            className="absolute z-2 flex items-center justify-center"
+            className={
+              card
+                ? "absolute z-2 flex items-center justify-center"
+                : "flex items-center justify-center"
+            }
             style={{
-              right: -16,
-              bottom: -14,
+              ...(card ? { right: -16, bottom: -14 } : {}),
               width: 60,
               height: 60,
               borderRadius: "50%",
               background: "radial-gradient(circle at 38% 30%, #fffdf6, #efe4c8 68%, #ddcca2)",
               border: `2.5px solid ${sealRing}`,
-              boxShadow:
-                "0 6px 14px rgba(0,0,0,0.5), inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)",
+              // With a card, the team-coloured halo sits behind the card and the
+              // seal is pinned to its corner. Without one the seal IS the hero,
+              // so it carries the halo itself — otherwise it reads as an
+              // unglowing stamp inside a panel that still glows.
+              boxShadow: card
+                ? "0 6px 14px rgba(0,0,0,0.5), inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)"
+                : `0 6px 14px rgba(0,0,0,0.5), 0 0 32px ${glowColor}66, 0 0 0 6px ${glowColor}22, inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)`,
             }}
             data-testid="trump-reveal-seal"
             data-suit={trumpSuit}
@@ -286,19 +310,17 @@ export function TrumpReveal({
           style={{ fontSize: 13, color: "#e8dfc8" }}
           data-testid="trump-reveal-copy"
         >
-          {isFreePick ? (
-            <Trans
-              i18nKey="match.trumpReveal.chose"
-              values={{ suit: suitName }}
-              components={{ suit: <b style={{ color: chosenColor }} /> }}
-            />
-          ) : (
-            <Trans
-              i18nKey="match.trumpReveal.isTrump"
-              values={{ suit: suitName }}
-              components={{ suit: <b style={{ color: chosenColor }} /> }}
-            />
-          )}
+          <Trans
+            i18nKey={
+              card === null
+                ? "match.trumpReveal.namedTrump"
+                : isFreePick
+                  ? "match.trumpReveal.chose"
+                  : "match.trumpReveal.isTrump"
+            }
+            values={{ suit: suitName }}
+            components={{ suit: <b style={{ color: chosenColor }} /> }}
+          />
         </div>
 
         {/* candidate that was on the table (round 2 only) */}

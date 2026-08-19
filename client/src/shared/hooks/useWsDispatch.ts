@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { handleWsMessage as handleRoomListMessage } from "@/features/lobby/useRoomUpdates";
 import { queryClient } from "@/shared/api/queryClient";
 import { queryKeys } from "@/shared/api/queryKeys";
+import { isCardId } from "@/shared/lib/cardId";
 import { honorIsNewPlayer, honorScoreOrPrior } from "@/shared/lib/honor";
 import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -24,6 +25,7 @@ import type {
   CoinSettlementPayload,
   DeclarationsResolvedPayload,
   EmotePayload,
+  FaceDownRevealedPayload,
   FriendRequestPayload,
   HandScoredPayload,
   HonorEjectedPayload,
@@ -74,6 +76,7 @@ import {
   EVENT_CARD_PLAYED,
   EVENT_COIN_SETTLEMENT,
   EVENT_DECLARATIONS_RESOLVED,
+  EVENT_FACE_DOWN_REVEALED,
   EVENT_HAND_SCORED,
   EVENT_HONOR_UPDATED,
   EVENT_MATCH_ABANDONED,
@@ -417,11 +420,55 @@ function dispatchGameEvent(message: WsMessage): void {
     // activePlayerSeat); the cardId here is the originally face-up
     // trumpCandidate the picker absorbed and lives only on this event.
     const payload = message.payload as TrumpSelectedPayload;
-    if (!payload.cardId || payload.cardId.length < 2) {
+    // cardId is either EMPTY — a variant with no trump candidate has no card to
+    // show, and the reveal renders candidate-less — or exactly a 2-character
+    // card ID. Nothing in between: a 1- or 3-character id is malformed, and a
+    // 3-character one would otherwise be sliced into a plausible-but-wrong card
+    // (`"10S"` reading as rank "1", suit "0").
+    if (
+      typeof payload.cardId !== "string" ||
+      (payload.cardId !== "" && !isCardId(payload.cardId))
+    ) {
       console.warn("WS: ignoring malformed event:trump_selected payload", payload);
       return;
     }
     store.setTrumpReveal(payload);
+    return;
+  }
+
+  if (type === EVENT_FACE_DOWN_REVEALED) {
+    // Per-seat delivery of the viewer's OWN two face-down cards (Croatian
+    // round-2 reveal). These cards are never part of match_state by design, so
+    // they live in their own store slice and MatchPage merges them into the
+    // rendered hand until bidding resolves.
+    //
+    // Validated against exactly what the server can send: an object, an integer
+    // seat 0-3 that is the VIEWER'S OWN seat, and exactly two well-formed card
+    // IDs. Anything else is a server bug or a forged frame, and must be dropped
+    // rather than half-merged into the hand.
+    const payload = message.payload as FaceDownRevealedPayload;
+    const seatIsOwn =
+      // myPlayerSeat is resolved by MatchPage from the match_state snapshot, so
+      // on a reconnect this event can arrive in the same tick as that snapshot,
+      // before the seat is known. Skip the comparison then rather than drop the
+      // cards for the rest of bidding — mergeRevealedFaceDownCards refuses to
+      // merge a foreign seat anyway, so nothing can leak into the hand.
+      store.myPlayerSeat === null || payload?.playerSeat === store.myPlayerSeat;
+    if (
+      typeof payload !== "object" ||
+      payload === null ||
+      !Number.isInteger(payload.playerSeat) ||
+      payload.playerSeat < 0 ||
+      payload.playerSeat > 3 ||
+      !seatIsOwn ||
+      !Array.isArray(payload.cardIds) ||
+      payload.cardIds.length !== 2 ||
+      !payload.cardIds.every(isCardId)
+    ) {
+      console.warn("WS: ignoring malformed event:face_down_revealed payload", payload);
+      return;
+    }
+    store.setFaceDownReveal(payload);
     return;
   }
 

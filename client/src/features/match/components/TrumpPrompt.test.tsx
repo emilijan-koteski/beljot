@@ -1,3 +1,5 @@
+import "@/shared/i18n/i18n";
+
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -232,6 +234,174 @@ describe("TrumpPrompt", () => {
     expect(screen.queryByTestId(/^playing-card-/)).not.toBeInTheDocument();
     // Suit buttons still render so the player isn't blocked from picking.
     expect(screen.getByTestId("trump-prompt-suit-S")).toBeInTheDocument();
+  });
+
+  // --- Candidate-less bidding (a variant that names trump freely in BOTH
+  // rounds). The Bitola assertions above must keep holding unchanged.
+  describe("no trump candidate (free-suit variant)", () => {
+    it("renders the four-suit grid in ROUND 1 with nothing locked and no candidate card", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={1}
+          isActiveBidder={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      for (const suit of ["S", "H", "D", "C"] as const) {
+        const button = screen.getByTestId(`trump-prompt-suit-${suit}`);
+        expect(button).toBeInTheDocument();
+        expect(button).toBeEnabled();
+        expect(button).toHaveAttribute("aria-disabled", "false");
+      }
+      expect(screen.queryByTestId(/^playing-card-/)).not.toBeInTheDocument();
+    });
+
+    it("renders the four-suit grid in ROUND 2 with nothing locked", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={2}
+          isActiveBidder={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      for (const suit of ["S", "H", "D", "C"] as const) {
+        expect(screen.getByTestId(`trump-prompt-suit-${suit}`)).toBeEnabled();
+      }
+    });
+
+    it("hides the suitless Take button in round 1 — the server would reject it", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={1}
+          isActiveBidder={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.queryByTestId("trump-prompt-pick")).not.toBeInTheDocument();
+      // Passing is still offered — only the dealer's last round-2 pass is
+      // refused, and that is enforced server-side.
+      expect(screen.getByTestId("trump-prompt-pass")).toBeInTheDocument();
+    });
+
+    it("calls onPick WITH a suit from the round-1 grid", async () => {
+      const user = userEvent.setup();
+      const onPick = vi.fn();
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={1}
+          isActiveBidder={true}
+          onPick={onPick}
+          onPass={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByTestId("trump-prompt-suit-H"));
+      expect(onPick).toHaveBeenCalledWith("H");
+    });
+
+    it("renders the free-pick title and subtitle, not a raw i18n key", () => {
+      // i18n.parity.test.ts only proves the key EXISTS in all four locales — a
+      // typo in the key name here would render the key string itself, and only
+      // an assertion on the rendered copy catches that.
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={1}
+          isActiveBidder={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.getByText("Take trump — any suit")).toBeInTheDocument();
+      expect(screen.getByText("All four suits are yours to call.")).toBeInTheDocument();
+      // Neither the candidate-bound round-1 copy nor a bare key may appear.
+      const panel = screen.getByTestId("trump-prompt");
+      expect(panel.textContent).not.toContain("match.trumpPrompt");
+      expect(panel.textContent).not.toContain("Take trump or pass");
+    });
+
+    it("uses the same free-pick copy in round 2", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={2}
+          isActiveBidder={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.getByText("Take trump — any suit")).toBeInTheDocument();
+      expect(screen.getByText("All four suits are yours to call.")).toBeInTheDocument();
+    });
+
+    it("shows waiting players all four suit chips in round 1, none locked", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={1}
+          isActiveBidder={false}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId("trump-prompt-considering")).toBeInTheDocument();
+      for (const suit of ["S", "H", "D", "C"] as const) {
+        const chip = screen.getByTestId(`trump-prompt-considering-${suit}`);
+        expect(chip).toBeInTheDocument();
+        expect(chip).not.toHaveAttribute("data-locked");
+      }
+      expect(screen.queryByTestId(/^playing-card-/)).not.toBeInTheDocument();
+    });
+  });
+
+  // Bitola regression: round 1 WITH a candidate must still be the
+  // take-it-or-pass layout — one card, one Take button, no suit grid.
+  it("keeps Bitola's candidate-bound titles unchanged in both rounds", () => {
+    const { unmount } = render(
+      <TrumpPrompt
+        trumpCandidate={trumpCandidate}
+        biddingRound={1}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Take trump or pass")).toBeInTheDocument();
+    expect(screen.getByText("Adopt this suit, or pass to the next player.")).toBeInTheDocument();
+    unmount();
+
+    render(
+      <TrumpPrompt
+        trumpCandidate={trumpCandidate}
+        biddingRound={2}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Choose any suit — or pass")).toBeInTheDocument();
+    expect(screen.getByText("Any suit except the candidate.")).toBeInTheDocument();
+  });
+
+  it("round 1 with a candidate still renders the Take button and NO suit grid", () => {
+    render(
+      <TrumpPrompt
+        trumpCandidate={trumpCandidate}
+        biddingRound={1}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("trump-prompt-pick")).toBeInTheDocument();
+    expect(screen.queryByTestId("trump-prompt-suit-S")).not.toBeInTheDocument();
+    expect(screen.getByTestId("playing-card-KH")).toBeInTheDocument();
   });
 
   it("wraps the Pass button with the rounded-rect button-timer ring when active and per-move", () => {

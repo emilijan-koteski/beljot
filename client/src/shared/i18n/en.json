@@ -811,6 +811,7 @@
       "eyebrowFreeChoice": "Trump taken · free pick",
       "isTrump": "<suit>{{suit}}</suit> is trump this hand",
       "chose": "chose <suit>{{suit}}</suit>",
+      "namedTrump": "named <suit>{{suit}}</suit> as trump",
       "candidateOnTable": "{{rank}} of {{suit}} was on the table",
       "dismiss": "Dismiss"
     },
@@ -823,6 +824,8 @@
       "titleRound2": "Choose any suit — or pass",
       "subtitleRound1": "Adopt this suit, or pass to the next player.",
       "subtitleRound2": "Any suit except the candidate.",
+      "titleFreePick": "Take trump — any suit",
+      "subtitleFreePick": "All four suits are yours to call.",
       "bodyRound1": "The candidate card was turned face-up. Take it as trump for your team, or pass to the next player.",
       "roundLabel": "Round {{round}} / 2",
       "pick": "Take",
@@ -899,7 +902,8 @@
       "handVariant": "Hand {{hand}} · {{variant}}"
     },
     "variants": {
-      "bitola": "Bitola"
+      "bitola": "Bitola",
+      "croatia": "Croatia"
     },
     "scoreReveal": {
       "title": "Hand Score",

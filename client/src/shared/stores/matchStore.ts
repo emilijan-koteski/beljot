@@ -6,6 +6,7 @@ import type {
   CoinSettlementPayload,
   DeclarationsResolvedPayload,
   EmoteID,
+  FaceDownRevealedPayload,
   HandScoredPayload,
   MatchAbandonedPayload,
   MatchEndPayload,
@@ -68,6 +69,14 @@ export interface MatchStoreState {
   declarationReveal: DeclarationsResolvedPayload | null;
   belotReveal: BelotAnnouncedPayload | null;
   trumpReveal: TrumpSelectedPayload | null;
+  // The viewer's OWN two face-down cards, turned up when Croatian bidding
+  // round 1 is passed out. Kept in its own slice rather than merged into
+  // matchState.players[me].hand because the server deliberately never puts
+  // them in any snapshot — a later match_state would wipe them straight back
+  // out. MatchPage merges this into the rendered hand; setMatchState drops it
+  // once bidding has RESOLVED (see the predicate there), by which point the
+  // authoritative hand already contains the cards.
+  faceDownReveal: FaceDownRevealedPayload | null;
   scoreRevealData: HandScoredPayload | null;
   matchEndData: MatchEndPayload | null;
   // Story 9.2: the per-human coin settlement that arrives right after
@@ -109,6 +118,7 @@ export interface MatchStoreState {
   setDeclarationReveal: (payload: DeclarationsResolvedPayload | null) => void;
   setBelotReveal: (payload: BelotAnnouncedPayload | null) => void;
   setTrumpReveal: (payload: TrumpSelectedPayload | null) => void;
+  setFaceDownReveal: (payload: FaceDownRevealedPayload | null) => void;
   setScoreRevealData: (data: HandScoredPayload | null) => void;
   setMatchEndData: (data: MatchEndPayload | null) => void;
   setCoinSettlement: (payload: CoinSettlementPayload | null) => void;
@@ -149,6 +159,7 @@ const initialState = {
   declarationReveal: null,
   belotReveal: null,
   trumpReveal: null,
+  faceDownReveal: null,
   scoreRevealData: null,
   matchEndData: null,
   coinSettlement: null,
@@ -167,7 +178,24 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
   ...initialState,
 
   setMatchState: (matchState) =>
-    set({ matchState: normalizeMatchState(matchState), roomId: matchState.roomId }),
+    set((state) => ({
+      matchState: normalizeMatchState(matchState),
+      roomId: matchState.roomId,
+      // Drop the face-down reveal once bidding has RESOLVED — at that moment
+      // the engine folds those cards into the authoritative hand, so keeping
+      // the slice would render them twice.
+      //
+      // The test is "trump is set", NOT "phase is literally bidding". Bidding
+      // can be interrupted without resolving: a pause moves the phase to
+      // `paused` and any seat dropping moves it to `disconnected`, and both are
+      // broadcast to all four seats — so a phase test would wipe the viewer's
+      // two cards on someone else's pause or drop, and only a seat that
+      // actually reconnects gets a replay. trumpSuit is nil for the whole of
+      // bidding (and is reset to nil by startNewHand / reshuffleAndRedeal) and
+      // is set by the same engine step that merges the cards in, so it is
+      // exactly the "has bidding resolved" signal.
+      faceDownReveal: matchState.trumpSuit === null ? state.faceDownReveal : null,
+    })),
 
   setMyPlayerSeat: (myPlayerSeat) => set({ myPlayerSeat }),
 
@@ -180,6 +208,8 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
   setBelotReveal: (belotReveal) => set({ belotReveal }),
 
   setTrumpReveal: (trumpReveal) => set({ trumpReveal }),
+
+  setFaceDownReveal: (faceDownReveal) => set({ faceDownReveal }),
 
   setScoreRevealData: (scoreRevealData) => set({ scoreRevealData }),
 

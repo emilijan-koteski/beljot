@@ -120,6 +120,45 @@ type HonorUpdatedPayload struct {
 	IsNewPlayer         bool   `json:"isNewPlayer"`
 }
 
+// --- Variant: face-down card reveal ---
+
+// EventFaceDownRevealed hands ONE seat its own two face-down cards. It is sent
+// per-user via SendToUser and is NEVER broadcast — the whole point is that no
+// other seat receives the data.
+//
+// Under the all-before-bidding deal each seat physically holds eight cards but
+// only six are open; the other two sit in a server-only field. When bidding
+// round 1 is passed out those two turn up for their owner alone, so round 2 is
+// bid on a full eight-card hand.
+//
+// It is a NEW event rather than fields on event:match_state, and that is
+// load-bearing rather than stylistic: match_state is serialized ONCE and the
+// identical bytes go to all four seats (buildMessage takes no recipient,
+// BroadcastToUsers takes pre-serialized bytes), so a card that must reach
+// exactly one player cannot ride it. Same house rule as EventHonorUpdated —
+// the client's payload schemas are z.strictObject, so widening an existing
+// event breaks stale tabs while an unknown event type is simply ignored.
+//
+// This does NOT make match_state per-seat safe. These two cards per seat are the
+// one exception in an otherwise open payload: match_state still carries all four
+// players' hands and the undealt deck to every seat (a pre-existing leak, out of
+// scope here). The guarantee is about these cards only.
+//
+// Re-sent to a reconnecting player by SyncStateOnConnect: this is a one-shot
+// per-seat event, so without that replay a refreshed client would lose its own
+// two cards for the rest of bidding.
+const EventFaceDownRevealed = "event:face_down_revealed"
+
+// FaceDownRevealedPayload is the typed payload for EventFaceDownRevealed.
+//
+// PlayerSeat is always the recipient's OWN seat — a client that ever sees a
+// different seat here is looking at a server bug, not at another player's
+// cards. CardIDs are 2-character card IDs (e.g. "JS"), in deal order.
+type FaceDownRevealedPayload struct {
+	PlayerSeat int      `json:"playerSeat"`
+	CardIDs    []string `json:"cardIds"`
+}
+
 // --- Game event payload structs ---
 
 // CardPlayedPayload is the typed payload for EventCardPlayed events.

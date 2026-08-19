@@ -155,6 +155,9 @@ func scoreHand(state *GameState) {
 
 // startNewHand resets all per-hand state, rotates the dealer, shuffles and deals
 // a fresh deck, and transitions to PhaseBidding for the next hand.
+//
+// The deal goes through dealCards, which reads state.Rules.DealShape — so hand 2
+// onwards of a match is dealt exactly like hand 1 was, whatever the variant.
 func startNewHand(state *GameState) {
 	// Advance hand metadata
 	state.HandNumber++
@@ -166,6 +169,7 @@ func startNewHand(state *GameState) {
 	state.TrumpCandidate = nil
 	state.BiddingRound = 1
 	state.BiddingPassCount = 0
+	state.FaceDownRevealed = false
 
 	// Reset trick state
 	state.TrickNumber = 0
@@ -194,9 +198,10 @@ func startNewHand(state *GameState) {
 	state.DisconnectedSeat = -1
 	state.ReconnectExpiresAt = nil
 
-	// Clear player hands and declarations
+	// Clear player hands, face-down cards, and declarations
 	for i := range state.Players {
 		state.Players[i].Hand = []Card{}
+		state.Players[i].FaceDownCards = nil
 		state.Players[i].Declarations = nil
 	}
 

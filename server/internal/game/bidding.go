@@ -9,10 +9,16 @@ import (
 // handleBidding processes trump bidding actions (pick_trump, pass_trump) during
 // the bidding phase. Pure function — no side effects.
 //
-// Bitola variant bidding rules:
-// Round 1: Players can pick the trump candidate's suit or pass.
-// Round 2: If all 4 pass in round 1, players can pick any suit or pass.
-// Reshuffle: If all 4 pass in round 2, deck reshuffles, dealer rotates, re-deal.
+// Both variants bid over two rounds; the divergences all read state.Rules:
+//
+// Round 1: with VariantRules.HasTrumpCandidate, a pick adopts the face-up
+// candidate's suit and action.Suit is ignored; without it, the picker names any
+// suit freely and action.Suit is required.
+// Round 2: the picker names a suit. A candidate's own suit is locked out
+// (already spent in round 1); with no candidate all four suits stay open.
+// Passed out: VariantRules.AllPassOutcome decides — either reshuffle, rotate
+// the dealer, and re-deal, or refuse the dealer's fourth round-2 pass so the
+// hand always finds a taker.
 func handleBidding(state *GameState, action Action) (*GameState, error) {
 	if state.Phase != PhaseBidding {
 		return nil, apperr.ErrWrongPhase
@@ -34,6 +40,19 @@ func handleBidding(state *GameState, action Action) (*GameState, error) {
 
 // handlePassTrump processes a pass action during bidding.
 func handlePassTrump(state *GameState) (*GameState, error) {
+	// Under AllPassDealerMustPick the round-2 bidding cannot be passed out: the
+	// dealer bids last and must name a suit. This pass would be round 2's
+	// fourth, i.e. the dealer's, so refuse it — pick_trump is their only legal
+	// action. Rejecting here is also what makes reshuffleAndRedeal unreachable
+	// under that config.
+	//
+	// `>= 3` rather than `== 3`: a state that somehow arrived with a higher count
+	// must not fall through and keep accepting passes forever.
+	if state.Rules.AllPassOutcome == AllPassDealerMustPick &&
+		state.BiddingRound == 2 && state.BiddingPassCount >= 3 {
+		return nil, apperr.ErrInvalidBid
+	}
+
 	newState := cloneGameState(state)
 
 	newState.BiddingPassCount++
@@ -46,6 +65,14 @@ func handlePassTrump(state *GameState) (*GameState, error) {
 			newState.BiddingRound = 2
 			newState.BiddingPassCount = 0
 			newState.ActivePlayerSeat = (newState.DealerSeat + 1) % 4
+			// Mark the round-2 reveal: every seat's two face-down cards are now
+			// known to their owner, so round 2 is bid on a full eight-card hand.
+			// The cards stay out of Hand (and therefore out of every snapshot) —
+			// the match layer delivers each seat its own two through a per-seat
+			// event.
+			if newState.Rules.RevealFaceDownOnRound2 {
+				newState.FaceDownRevealed = true
+			}
 		} else {
 			// Round 2 complete — reshuffle and re-deal
 			newState = reshuffleAndRedeal(newState)
@@ -57,30 +84,48 @@ func handlePassTrump(state *GameState) (*GameState, error) {
 
 // handlePickTrump processes a pick action during bidding.
 //
-// Stage-2 distribution (real-table rotation): walk seats from (Dealer+1)%4,
-// taking cards off the front of newState.Deck — 3 per non-picker seat, 2 in
-// the picker's slot. After the rotation, append the public TrumpCandidate to
-// the picker's hand. Then run instant-win detection against the final 8-card
-// hands and transition to PhasePlaying (or PhaseMatchEnd on instant-win).
+// With a trump candidate, the pick also completes the deal — stage-2
+// distribution (real-table rotation): walk seats from (Dealer+1)%4, taking
+// cards off the front of newState.Deck — 3 per non-picker seat, 2 in the
+// picker's slot. After the rotation, append the public TrumpCandidate to the
+// picker's hand.
+//
+// Without a candidate every card was already dealt, so there is no rotation and
+// the picker draws nothing; instead each seat's two face-down cards fold into
+// its hand. Either way, instant-win detection then runs against the final
+// 8-card hands and the phase moves to PhasePlaying (or PhaseMatchEnd on
+// instant-win).
 func handlePickTrump(state *GameState, action Action) (*GameState, error) {
-	// Defensive: stage-2 distribution requires both a public candidate and a
-	// full 11-card Deck. Either being missing means the state has skipped or
-	// already completed stage-1 — reject as wrong phase rather than panicking
-	// on a slice index later in the rotation.
-	if state.TrumpCandidate == nil || len(state.Deck) != 11 {
+	// Defensive: reject a state that does not match its own deal shape rather
+	// than panicking on a slice index in the rotation below. Config-gated, not
+	// removed.
+	//
+	// With a candidate, stage-2 distribution requires both the public candidate
+	// and the full 11-card reserve; either being missing means the state has
+	// skipped or already completed stage-1. Without one, the deal held nothing
+	// back, so a candidate or a non-empty reserve means the state is malformed —
+	// proving the rotation cannot run on an unvalidated deck under either
+	// config.
+	if state.Rules.HasTrumpCandidate {
+		if state.TrumpCandidate == nil || len(state.Deck) != 11 {
+			return nil, apperr.ErrWrongPhase
+		}
+	} else if state.TrumpCandidate != nil || len(state.Deck) != 0 {
 		return nil, apperr.ErrWrongPhase
 	}
 
 	newState := cloneGameState(state)
 
-	if newState.BiddingRound == 1 {
-		// Round 1: trump is the candidate card's suit (action.Suit ignored).
+	if newState.BiddingRound == 1 && newState.Rules.HasTrumpCandidate {
+		// Round 1 with a candidate: trump is the candidate card's suit
+		// (action.Suit ignored).
 		suit := newState.TrumpCandidate.Suit
 		newState.TrumpSuit = &suit
 	} else {
-		// Round 2: player picks any suit — action.Suit is required, and the
-		// originally face-up candidate's suit is locked out (already "spent"
-		// in round 1).
+		// Free-suit pick — round 2 in either variant, and round 1 too when
+		// there is no candidate. action.Suit is required and must be a real
+		// suit. A candidate's own suit is locked out (already "spent" in round
+		// 1); with no candidate all four suits stay open.
 		if action.Suit == nil {
 			return nil, apperr.ErrInvalidBid
 		}
@@ -97,21 +142,29 @@ func handlePickTrump(state *GameState, action Action) (*GameState, error) {
 	seat := action.PlayerSeat
 	newState.TrumpCallerSeat = &seat
 
-	// Stage-2 distribution.
-	deck := newState.Deck
-	idx := 0
-	for i := 0; i < 4; i++ {
-		s := (newState.DealerSeat + 1 + i) % 4
-		n := 3
-		if s == seat {
-			n = 2
+	// Stage-2 distribution — only when a candidate was on the table. The guard
+	// above already proved Deck holds exactly 11 in that case.
+	if newState.TrumpCandidate != nil {
+		deck := newState.Deck
+		idx := 0
+		for i := 0; i < 4; i++ {
+			s := (newState.DealerSeat + 1 + i) % 4
+			n := 3
+			if s == seat {
+				n = 2
+			}
+			newState.Players[s].Hand = append(newState.Players[s].Hand, deck[idx:idx+n]...)
+			idx += n
 		}
-		newState.Players[s].Hand = append(newState.Players[s].Hand, deck[idx:idx+n]...)
-		idx += n
+		newState.Players[seat].Hand = append(newState.Players[seat].Hand, *newState.TrumpCandidate)
+		newState.Deck = nil
+		newState.TrumpCandidate = nil
 	}
-	newState.Players[seat].Hand = append(newState.Players[seat].Hand, *newState.TrumpCandidate)
-	newState.Deck = nil
-	newState.TrumpCandidate = nil
+
+	// Bidding has resolved, so the face-down cards are no longer secret from
+	// anyone — fold them into their owners' hands and every seat holds eight,
+	// exactly as it does after a stage-2 deal.
+	mergeFaceDownCards(newState)
 
 	// Instant-win check against final 8-card hands.
 	if winnerTeam := checkInstantWin(newState); winnerTeam != nil {
@@ -131,6 +184,21 @@ func handlePickTrump(state *GameState, action Action) (*GameState, error) {
 	return newState, nil
 }
 
+// mergeFaceDownCards folds each seat's face-down cards into its hand and clears
+// the hidden slot, so from this point on the state is indistinguishable from a
+// variant that never had face-down cards. A no-op for deal shapes that produce
+// none.
+func mergeFaceDownCards(state *GameState) {
+	for i := range state.Players {
+		if len(state.Players[i].FaceDownCards) == 0 {
+			continue
+		}
+		state.Players[i].Hand = append(state.Players[i].Hand, state.Players[i].FaceDownCards...)
+		state.Players[i].FaceDownCards = nil
+	}
+	state.FaceDownRevealed = false
+}
+
 // reshuffleAndRedeal pools all 32 cards (hands + Deck + TrumpCandidate),
 // shuffles, rotates the dealer counter-clockwise, and re-runs stage-1.
 // Instant-win cannot be detected here — only stage-2 (post-pick) produces
@@ -144,6 +212,12 @@ func reshuffleAndRedeal(state *GameState) *GameState {
 	for i := range state.Players {
 		deck = append(deck, state.Players[i].Hand...)
 		state.Players[i].Hand = []Card{}
+		// Face-down cards are part of the pool too. Unreachable under
+		// AllPassDealerMustPick (the only config that deals them refuses the
+		// fourth round-2 pass), but a short pool would silently re-deal 30
+		// cards, so recover them rather than trust the reachability argument.
+		deck = append(deck, state.Players[i].FaceDownCards...)
+		state.Players[i].FaceDownCards = nil
 	}
 	deck = append(deck, state.Deck...)
 	if state.TrumpCandidate != nil {
@@ -158,6 +232,7 @@ func reshuffleAndRedeal(state *GameState) *GameState {
 	state.TrumpCandidate = nil
 	state.TrumpSuit = nil
 	state.TrumpCallerSeat = nil
+	state.FaceDownRevealed = false
 
 	// Shuffle and rotate dealer
 	ShuffleDeck(deck)
@@ -230,9 +305,10 @@ func cloneGameState(state *GameState) *GameState {
 	newState.CurrentTrick = slices.Clone(state.CurrentTrick)
 	newState.Deck = slices.Clone(state.Deck)
 
-	// Deep clone player hands and declarations
+	// Deep clone player hands, face-down cards, and declarations
 	for i := range newState.Players {
 		newState.Players[i].Hand = slices.Clone(state.Players[i].Hand)
+		newState.Players[i].FaceDownCards = slices.Clone(state.Players[i].FaceDownCards)
 		newDecls := slices.Clone(state.Players[i].Declarations)
 		for j := range newDecls {
 			newDecls[j].Cards = slices.Clone(newDecls[j].Cards)

@@ -25,6 +25,23 @@ type PlayerState struct {
 	// match start. It is static for the duration of a match (XP is only awarded
 	// at match end), so the match engine never recomputes it. Bot seats are 0.
 	Level int `json:"level"`
+	// FaceDownCards holds the two cards dealt face-down to this seat under
+	// DealShapeAllBeforeBidding. They are part of the seat's real holding but
+	// live OUTSIDE Hand until bidding resolves, at which point mergeFaceDownCards
+	// folds them in and every seat holds eight.
+	//
+	// Server-only (json:"-") and deliberately so: match_state is serialized once
+	// and the identical bytes go to all four seats, so a card that must be
+	// visible to exactly one player cannot ride it. Keeping these out of Hand
+	// means they are never serialized into ANYONE's snapshot, and their owner
+	// learns them through a per-seat WS event instead.
+	//
+	// Scope of that claim, precisely: these two cards per seat are the ONE
+	// exception in an otherwise fully open payload. match_state still ships all
+	// four players' Hands and the undealt Deck to every seat — a pre-existing
+	// leak that is deliberately out of scope here and recorded in the deferred
+	// work log. Nothing about this field makes match_state per-seat safe.
+	FaceDownCards []Card `json:"-"`
 }
 
 // TrickCard represents a single card played in a trick, with the player who played it.
@@ -74,16 +91,38 @@ type GameState struct {
 	MatchMode string  `json:"matchMode"`
 	Phase     Phase   `json:"phase"`
 	OwnerSeat int     `json:"ownerSeat"` // Seat index of the room owner (for pause override)
+	// Rules is the resolved per-rule configuration for Variant, set once by
+	// NewGame via RulesFor and never mutated afterwards. Every variant
+	// divergence in this package reads a field here rather than comparing
+	// Variant (D-VAR-1).
+	//
+	// Server-only (json:"-"): the client validates match_state with a strict
+	// schema and derives nothing from the config — the server is authoritative
+	// on every rule it selects. All-value-typed, so cloneGameState's shallow
+	// struct copy carries it correctly.
+	Rules VariantRules `json:"-"`
 
 	// Current hand state
-	HandNumber       int    `json:"handNumber"`
-	DealerSeat       int    `json:"dealerSeat"`
-	TrumpSuit        *Suit  `json:"trumpSuit"`
-	TrumpCallerSeat  *int   `json:"trumpCallerSeat"`
-	TrumpCandidate   *Card  `json:"trumpCandidate"`
-	BiddingRound     int    `json:"biddingRound"`
-	BiddingPassCount int    `json:"biddingPassCount"`
-	Deck             []Card `json:"deck"` // Undealt remainder during bidding (11 cards); empty once bidding resolves.
+	HandNumber       int   `json:"handNumber"`
+	DealerSeat       int   `json:"dealerSeat"`
+	TrumpSuit        *Suit `json:"trumpSuit"`
+	TrumpCallerSeat  *int  `json:"trumpCallerSeat"`
+	TrumpCandidate   *Card `json:"trumpCandidate"`
+	BiddingRound     int   `json:"biddingRound"`
+	BiddingPassCount int   `json:"biddingPassCount"`
+	// Deck is the undealt remainder held back for post-pick distribution. Under
+	// DealShapeCandidate it holds 11 cards through bidding and is emptied when
+	// bidding resolves; under DealShapeAllBeforeBidding every card is dealt up
+	// front so it is ALWAYS empty — handlePickTrump's deal-shape guard depends on
+	// exactly that.
+	Deck []Card `json:"deck"`
+	// FaceDownRevealed records that round 1 was passed out under
+	// VariantRules.RevealFaceDownOnRound2, so every seat's two face-down cards
+	// are now known to their owner. Server-only (json:"-") — the cards
+	// themselves never ride match_state, so neither does this flag; the match
+	// layer reads it to deliver (and, on reconnect, re-deliver) each seat's own
+	// two cards through a per-seat event.
+	FaceDownRevealed bool `json:"-"`
 
 	// Current trick state
 	TrickNumber          int         `json:"trickNumber"`
@@ -188,9 +227,10 @@ func ShuffleDeck(deck []Card) {
 	})
 }
 
-// NewGame creates a new game state with 4 players, shuffles and deals cards
-// using the Bitola 3+2 dealing sequence. bots marks the server-driven seats
-// (UserID 0, empty username) — see PlayerState.IsBot.
+// NewGame creates a new game state with 4 players, resolves the variant's rule
+// config ONCE (the only place a config is resolved), then shuffles and deals
+// per that config's deal shape. bots marks the server-driven seats (UserID 0,
+// empty username) — see PlayerState.IsBot.
 func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint) *GameState {
 	// The first-hand dealer is drawn uniformly at random, the way a real
 	// table cuts for the deal. Hardcoding seat 0 handed the same seat the
@@ -202,6 +242,7 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 	gs := &GameState{
 		RoomID:           roomID,
 		Variant:          variant,
+		Rules:            RulesFor(variant),
 		MatchMode:        matchMode,
 		Phase:            PhaseDealing,
 		HandNumber:       1,
@@ -232,8 +273,8 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 		}
 	}
 
-	// Generate, shuffle, and deal stage-1 (5 cards per seat + visible candidate + 11-card Deck).
-	// Instant-win can't be determined here — final hands aren't known until the picker is decided.
+	// Generate, shuffle, and deal per gs.Rules.DealShape. Instant-win can't be
+	// determined here — final hands aren't known until the picker is decided.
 	deck := NewDeck()
 	ShuffleDeck(deck)
 	dealCards(gs, deck)
@@ -241,7 +282,14 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 	return gs
 }
 
-// dealCards performs the stage-1 Bitola deal:
+// dealCards deals a full 32-card deck according to gs.Rules.DealShape. It is
+// the single dealing entry point — NewGame, startNewHand, and
+// reshuffleAndRedeal all route through it, so a variant's deal shape holds for
+// every hand of the match, not just the first.
+//
+// DealShapeAllBeforeBidding (see dealAllBeforeBidding) deals everything up
+// front. DealShapeCandidate performs the two-stage deal below:
+//
 // Round 1: 3 cards to each player counter-clockwise from dealer (12 cards)
 // Round 2: 2 cards to each player (8 cards, 20 total)
 // Then the next card (deck[20]) is lifted onto the table as TrumpCandidate.
@@ -252,6 +300,11 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 // aside, not in any hand. handlePickTrump completes the deal once bidding
 // resolves.
 func dealCards(gs *GameState, deck []Card) {
+	if gs.Rules.DealShape == DealShapeAllBeforeBidding {
+		dealAllBeforeBidding(gs, deck)
+		return
+	}
+
 	cardIdx := 0
 	dealer := gs.DealerSeat
 
@@ -278,4 +331,43 @@ func dealCards(gs *GameState, deck []Card) {
 
 	// Remaining 11 cards held in the deck for stage-2 distribution.
 	gs.Deck = slices.Clone(deck[cardIdx:])
+}
+
+// dealAllBeforeBidding deals every card before bidding opens (the
+// DealShapeAllBeforeBidding sequence):
+//
+// Round 1: 3 cards to each player counter-clockwise from dealer (12 cards)
+// Round 2: 3 more cards to each player (12 cards, 24 total)
+// Round 3: the last 2 cards per player, placed FACE-DOWN (8 cards, 32 total)
+//
+// Each player therefore physically holds 8 cards, but only 6 sit in Hand — the
+// other 2 live in PlayerState.FaceDownCards, unknown even to their owner until
+// round 1 is passed out (see VariantRules.RevealFaceDownOnRound2) or bidding
+// resolves. There is no trump candidate and nothing is held back, so Deck is
+// empty and bidding is a bare named suit in both rounds.
+func dealAllBeforeBidding(gs *GameState, deck []Card) {
+	cardIdx := 0
+	dealer := gs.DealerSeat
+
+	// Two open batches of 3.
+	for batch := 0; batch < 2; batch++ {
+		for i := 0; i < 4; i++ {
+			seat := (dealer + 1 + i) % 4 // start from player after dealer
+			gs.Players[seat].Hand = append(gs.Players[seat].Hand, slices.Clone(deck[cardIdx:cardIdx+3])...)
+			cardIdx += 3
+		}
+	}
+
+	// Final batch of 2 per seat, face-down. Assigned (not appended) so a
+	// re-deal cannot accumulate a previous hand's hidden cards.
+	for i := 0; i < 4; i++ {
+		seat := (dealer + 1 + i) % 4
+		gs.Players[seat].FaceDownCards = slices.Clone(deck[cardIdx : cardIdx+2])
+		cardIdx += 2
+	}
+
+	// No candidate, no stage-2 reserve, and nothing revealed yet.
+	gs.TrumpCandidate = nil
+	gs.Deck = nil
+	gs.FaceDownRevealed = false
 }

@@ -1,6 +1,7 @@
 package game_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/emilijan/beljot/server/internal/apperr"
@@ -616,11 +617,13 @@ func TestPickTrumpRound1_AppendsCandidateAndDealsCorrectCards(t *testing.T) {
 func suitPtr(s game.Suit) *game.Suit { return &s }
 
 // collectCards returns every card present anywhere in the game state:
-// hands, deck, and the visible trump candidate.
+// hands, face-down slots, deck, and the visible trump candidate. Bitola states
+// have no face-down cards, so that term contributes nothing there.
 func collectCards(gs *game.GameState) []game.Card {
 	out := make([]game.Card, 0, 32)
 	for i := range gs.Players {
 		out = append(out, gs.Players[i].Hand...)
+		out = append(out, gs.Players[i].FaceDownCards...)
 	}
 	out = append(out, gs.Deck...)
 	if gs.TrumpCandidate != nil {
@@ -644,4 +647,472 @@ func TestRound1IgnoresActionSuit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result.TrumpSuit)
 	assert.Equal(t, game.SuitHearts, *result.TrumpSuit, "round 1 should use candidate suit, not action.Suit")
+}
+
+// --- Variant rule config: the free-suit / all-before-bidding divergences ---
+
+// TestCroatianPickRound1 locks the round-1 divergence: with no trump candidate,
+// the picker names any suit freely, takes no card, and the face-down cards fold
+// into every hand as bidding resolves.
+func TestCroatianPickRound1(t *testing.T) {
+	tests := []struct {
+		name       string
+		passCount  int
+		activeSeat int
+		chosenSuit game.Suit
+	}{
+		{name: "first bidder names spades", passCount: 0, activeSeat: 1, chosenSuit: game.SuitSpades},
+		{name: "second bidder names hearts after 1 pass", passCount: 1, activeSeat: 2, chosenSuit: game.SuitHearts},
+		{name: "third bidder names diamonds after 2 passes", passCount: 2, activeSeat: 3, chosenSuit: game.SuitDiamonds},
+		{name: "dealer names clubs after 3 passes", passCount: 3, activeSeat: 0, chosenSuit: game.SuitClubs},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gs := testfixtures.NewGameCroatianMidBidding(tc.passCount)
+			startingCards := collectCards(gs)
+			handBefore := len(gs.Players[tc.activeSeat].Hand)
+			suit := tc.chosenSuit
+			action := game.Action{
+				Type:       game.ActionPickTrump,
+				PlayerSeat: tc.activeSeat,
+				Suit:       &suit,
+			}
+
+			result, err := game.ApplyAction(gs, action)
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, game.PhasePlaying, result.Phase)
+			require.NotNil(t, result.TrumpSuit)
+			assert.Equal(t, tc.chosenSuit, *result.TrumpSuit, "trump is the freely named suit")
+			require.NotNil(t, result.TrumpCallerSeat)
+			assert.Equal(t, tc.activeSeat, *result.TrumpCallerSeat)
+			assert.Equal(t, 1, result.ActivePlayerSeat, "(DealerSeat+1)%4 leads trick 1")
+			assert.Equal(t, 1, result.TrickNumber)
+			assert.Empty(t, result.CurrentTrick)
+
+			// The picker draws no card: their hand grows only by their own two
+			// face-down cards, exactly like every other seat.
+			assert.Equal(t, handBefore+2, len(result.Players[tc.activeSeat].Hand),
+				"picker takes no extra card — only their own two face-down cards")
+			for i, p := range result.Players {
+				assert.Len(t, p.Hand, 8, "seat %d holds 8 after the reveal-and-merge", i)
+				assert.Empty(t, p.FaceDownCards, "seat %d's hidden slot is cleared", i)
+			}
+			assert.Empty(t, result.Deck, "no stage-2 reserve exists")
+			assert.Nil(t, result.TrumpCandidate)
+			assert.False(t, result.FaceDownRevealed, "the reveal flag is spent once bidding resolves")
+
+			assertCardsAreFullDeck(t, collectCards(result))
+			assert.ElementsMatch(t, startingCards, collectCards(result), "all 32 cards preserved")
+		})
+	}
+}
+
+// TestCroatianPickRejectsBadSuit covers both invalid-suit rows of the matrix in
+// both rounds: a missing suit and an unknown suit are ErrInvalidBid, and the
+// original state is untouched.
+func TestCroatianPickRejectsBadSuit(t *testing.T) {
+	badSuit := game.Suit("X")
+	tests := []struct {
+		name       string
+		passCount  int
+		activeSeat int
+		suit       *game.Suit
+	}{
+		{name: "round 1 pick with no suit", passCount: 0, activeSeat: 1, suit: nil},
+		{name: "round 1 pick with an unknown suit", passCount: 0, activeSeat: 1, suit: &badSuit},
+		{name: "round 2 pick with no suit", passCount: 4, activeSeat: 1, suit: nil},
+		{name: "round 2 pick with an unknown suit", passCount: 4, activeSeat: 1, suit: &badSuit},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gs := testfixtures.NewGameCroatianMidBidding(tc.passCount)
+			origPhase := gs.Phase
+			origRound := gs.BiddingRound
+			origPassCount := gs.BiddingPassCount
+			origActiveSeat := gs.ActivePlayerSeat
+			origCards := collectCards(gs)
+
+			result, err := game.ApplyAction(gs, game.Action{
+				Type:       game.ActionPickTrump,
+				PlayerSeat: tc.activeSeat,
+				Suit:       tc.suit,
+			})
+
+			assert.Nil(t, result)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, apperr.ErrInvalidBid)
+
+			assert.Equal(t, origPhase, gs.Phase)
+			assert.Equal(t, origRound, gs.BiddingRound)
+			assert.Equal(t, origPassCount, gs.BiddingPassCount)
+			assert.Equal(t, origActiveSeat, gs.ActivePlayerSeat)
+			assert.Nil(t, gs.TrumpSuit, "trump must remain unset after a rejected pick")
+			assert.ElementsMatch(t, origCards, collectCards(gs), "cards must not move")
+		})
+	}
+}
+
+// TestCroatianRound1PassedOutRevealsFaceDown locks the round-2 reveal: the
+// fourth round-1 pass opens round 2 at dealer+1 with all four suits available
+// and marks every seat's two face-down cards as revealed — while keeping them
+// out of Hand, so they still cannot ride any snapshot.
+func TestCroatianRound1PassedOutRevealsFaceDown(t *testing.T) {
+	gs := testfixtures.NewGameCroatianMidBidding(3)
+	require.False(t, gs.FaceDownRevealed, "not revealed before the fourth pass")
+
+	result, err := game.ApplyAction(gs, game.Action{Type: game.ActionPassTrump, PlayerSeat: 0})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, game.PhaseBidding, result.Phase)
+	assert.Equal(t, 2, result.BiddingRound)
+	assert.Equal(t, 0, result.BiddingPassCount)
+	assert.Equal(t, (result.DealerSeat+1)%4, result.ActivePlayerSeat)
+	assert.True(t, result.FaceDownRevealed, "the fourth round-1 pass marks the reveal")
+
+	for i, p := range result.Players {
+		assert.Len(t, p.Hand, 6, "seat %d's open hand is unchanged by the reveal", i)
+		assert.Len(t, p.FaceDownCards, 2, "seat %d's two cards stay OUT of Hand", i)
+	}
+
+	// All four suits are open in round 2 — nothing was spent, because no
+	// candidate ever existed.
+	for _, suit := range game.AllSuits {
+		s := suit
+		picked, err := game.ApplyAction(result, game.Action{
+			Type:       game.ActionPickTrump,
+			PlayerSeat: result.ActivePlayerSeat,
+			Suit:       &s,
+		})
+		require.NoError(t, err, "suit %s must be available in round 2", suit)
+		require.NotNil(t, picked.TrumpSuit)
+		assert.Equal(t, suit, *picked.TrumpSuit)
+	}
+}
+
+// TestCroatianDealerCannotPassInRound2 locks the forced dealer pick: the fourth
+// round-2 pass is rejected, so reshuffleAndRedeal is unreachable under this
+// config, and pick_trump is the dealer's only legal action.
+func TestCroatianDealerCannotPassInRound2(t *testing.T) {
+	gs := testfixtures.NewGameCroatianMidBidding(7)
+	require.Equal(t, 2, gs.BiddingRound)
+	require.Equal(t, 3, gs.BiddingPassCount)
+	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat, "the dealer bids last in round 2")
+
+	result, err := game.ApplyAction(gs, game.Action{
+		Type:       game.ActionPassTrump,
+		PlayerSeat: gs.DealerSeat,
+	})
+
+	assert.Nil(t, result)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, apperr.ErrInvalidBid)
+	assert.Equal(t, game.PhaseBidding, gs.Phase, "no reshuffle — state is untouched")
+	assert.Equal(t, 1, gs.HandNumber)
+	assert.Equal(t, 0, gs.DealerSeat, "the dealer does not rotate")
+
+	// The dealer CAN pick, and that resolves the hand.
+	suit := game.SuitClubs
+	picked, err := game.ApplyAction(gs, game.Action{
+		Type:       game.ActionPickTrump,
+		PlayerSeat: gs.DealerSeat,
+		Suit:       &suit,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, game.PhasePlaying, picked.Phase)
+	require.NotNil(t, picked.TrumpSuit)
+	assert.Equal(t, game.SuitClubs, *picked.TrumpSuit)
+}
+
+// TestCroatianEarlierPassesStillLegal guards against the forced-dealer rule
+// over-reaching: only the FOURTH round-2 pass is refused.
+func TestCroatianEarlierPassesStillLegal(t *testing.T) {
+	tests := []struct {
+		name               string
+		passCount          int
+		activeSeat         int
+		expectedRound      int
+		expectedPassCount  int
+		expectedActiveSeat int
+	}{
+		{name: "first pass in round 1", passCount: 0, activeSeat: 1, expectedRound: 1, expectedPassCount: 1, expectedActiveSeat: 2},
+		{name: "third pass in round 1", passCount: 2, activeSeat: 3, expectedRound: 1, expectedPassCount: 3, expectedActiveSeat: 0},
+		{name: "first pass in round 2", passCount: 4, activeSeat: 1, expectedRound: 2, expectedPassCount: 1, expectedActiveSeat: 2},
+		{name: "third pass in round 2", passCount: 6, activeSeat: 3, expectedRound: 2, expectedPassCount: 3, expectedActiveSeat: 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gs := testfixtures.NewGameCroatianMidBidding(tc.passCount)
+
+			result, err := game.ApplyAction(gs, game.Action{
+				Type:       game.ActionPassTrump,
+				PlayerSeat: tc.activeSeat,
+			})
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, game.PhaseBidding, result.Phase)
+			assert.Equal(t, tc.expectedRound, result.BiddingRound)
+			assert.Equal(t, tc.expectedPassCount, result.BiddingPassCount)
+			assert.Equal(t, tc.expectedActiveSeat, result.ActivePlayerSeat)
+			assert.Nil(t, result.TrumpSuit)
+		})
+	}
+}
+
+// TestFaceDownCardsNeverSerialized is the security assertion: at every point
+// before bidding resolves, a marshalled snapshot contains none of any seat's
+// two face-down cards — including in that seat's own payload, because the same
+// bytes go to all four seats.
+func TestFaceDownCardsNeverSerialized(t *testing.T) {
+	tests := []struct {
+		name      string
+		passCount int
+	}{
+		{name: "just dealt, round 1", passCount: 0},
+		{name: "mid round 1", passCount: 2},
+		{name: "round 2 just opened, cards revealed to their owners", passCount: 4},
+		{name: "round 2 with the dealer on the clock", passCount: 7},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gs := testfixtures.NewGameCroatianMidBidding(tc.passCount)
+
+			data, err := json.Marshal(gs)
+			require.NoError(t, err)
+
+			// Collect the hidden cards, then collect every card the payload
+			// actually carries by WALKING the unmarshalled structure. A substring
+			// search for `"rank":"X","suit":"Y"` would only hold while Card's
+			// field order and json tags are exactly today's — reorder the struct
+			// and the assertion would pass vacuously on any payload.
+			hidden := map[string]int{}
+			for i := range gs.Players {
+				for _, c := range gs.Players[i].FaceDownCards {
+					hidden[c.String()] = i
+				}
+			}
+			require.Len(t, hidden, 8, "the fixture must actually be hiding 8 distinct cards")
+
+			var raw map[string]any
+			require.NoError(t, json.Unmarshal(data, &raw))
+
+			for _, id := range cardIDsInPayload(t, raw) {
+				seat, isHidden := hidden[id]
+				assert.False(t, isHidden,
+					"seat %d's face-down card %s must not appear anywhere in a snapshot", seat, id)
+			}
+
+			// The flag itself is server-only too — nothing about the hidden
+			// cards reaches the wire.
+			assert.NotContains(t, raw, "faceDownRevealed")
+			assert.NotContains(t, raw, "faceDownCards")
+			assert.NotContains(t, raw, "rules")
+		})
+	}
+}
+
+// cardIDsInPayload walks an unmarshalled match_state payload and returns the ID
+// of every card it carries, wherever it sits — hands, the deck, the trump
+// candidate, trick cards, declaration cards, or anywhere a future field puts
+// one. Structure-driven rather than string-driven, so it keeps finding cards
+// through a Card field reorder or a rename of the field that holds them.
+func cardIDsInPayload(t *testing.T, node any) []string {
+	t.Helper()
+	var out []string
+	switch v := node.(type) {
+	case map[string]any:
+		rank, rankOK := v["rank"].(string)
+		suit, suitOK := v["suit"].(string)
+		if rankOK && suitOK {
+			out = append(out, rank+suit)
+		}
+		for _, child := range v {
+			out = append(out, cardIDsInPayload(t, child)...)
+		}
+	case []any:
+		for _, child := range v {
+			out = append(out, cardIDsInPayload(t, child)...)
+		}
+	}
+	return out
+}
+
+// TestBitolaBiddingUnaffectedByConfig re-asserts the Bitola paths that the
+// config gates now guard, from the Croatian-capable code: the round-1 candidate
+// binding, the spent-suit lock, and the reshuffle outcome.
+func TestBitolaBiddingUnaffectedByConfig(t *testing.T) {
+	t.Run("round 1 still binds to the candidate and ignores action.Suit", func(t *testing.T) {
+		gs := testfixtures.NewGameJustDealt()
+		spades := game.SuitSpades
+		result, err := game.ApplyAction(gs, game.Action{
+			Type:       game.ActionPickTrump,
+			PlayerSeat: 1,
+			Suit:       &spades,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, result.TrumpSuit)
+		assert.Equal(t, game.SuitHearts, *result.TrumpSuit)
+	})
+
+	t.Run("the fourth round-2 pass still reshuffles and rotates the dealer", func(t *testing.T) {
+		gs := testfixtures.NewGameMidBidding(7)
+		result, err := game.ApplyAction(gs, game.Action{Type: game.ActionPassTrump, PlayerSeat: 0})
+		require.NoError(t, err)
+		assert.Equal(t, game.PhaseDealing, result.Phase)
+		assert.Equal(t, 1, result.DealerSeat)
+		require.NotNil(t, result.TrumpCandidate)
+	})
+
+	t.Run("a stage-1 state with a short deck is still rejected as wrong phase", func(t *testing.T) {
+		gs := testfixtures.NewGameJustDealt()
+		gs.Deck = gs.Deck[:5]
+		result, err := game.ApplyAction(gs, game.Action{Type: game.ActionPickTrump, PlayerSeat: 1})
+		assert.Nil(t, result)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, apperr.ErrWrongPhase)
+	})
+}
+
+// TestPickTrumpRejectsStateContradictingItsDealShape locks the other half of the
+// deal-shape guard: a state whose cards contradict its own config is rejected
+// rather than reaching the rotation with an unvalidated deck.
+func TestPickTrumpRejectsStateContradictingItsDealShape(t *testing.T) {
+	spades := game.SuitSpades
+	tests := []struct {
+		name   string
+		mutate func(gs *game.GameState)
+	}{
+		{
+			name: "no-candidate config but a candidate is present",
+			mutate: func(gs *game.GameState) {
+				gs.TrumpCandidate = &game.Card{Rank: game.Rank7, Suit: game.SuitHearts}
+			},
+		},
+		{
+			name: "no-candidate config but the reserve is not empty",
+			mutate: func(gs *game.GameState) {
+				gs.Deck = []game.Card{{Rank: game.Rank7, Suit: game.SuitHearts}}
+			},
+		},
+		{
+			name: "candidate config but the candidate is missing",
+			mutate: func(gs *game.GameState) {
+				gs.Rules = game.RulesFor(game.VariantBitola)
+				gs.TrumpCandidate = nil
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gs := testfixtures.NewGameCroatianJustDealt()
+			tc.mutate(gs)
+
+			result, err := game.ApplyAction(gs, game.Action{
+				Type:       game.ActionPickTrump,
+				PlayerSeat: gs.ActivePlayerSeat,
+				Suit:       &spades,
+			})
+
+			assert.Nil(t, result)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, apperr.ErrWrongPhase)
+		})
+	}
+}
+
+// TestCroatianFullBiddingFromNewGame walks a real (randomly dealt) Croatian
+// hand from NewGame through a passed-out round 1 to the dealer's forced round-2
+// pick, so the fixtures' hand-built layout is not the only thing under test.
+func TestCroatianFullBiddingFromNewGame(t *testing.T) {
+	gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
+		[4]bool{}, game.VariantCroatia, "1001", 1)
+	startingCards := collectCards(gs)
+	require.Len(t, startingCards, 32)
+
+	// The session manager performs the dealing→bidding transition.
+	gs.Phase = game.PhaseBidding
+
+	// Round 1: everybody passes.
+	for i := 0; i < 4; i++ {
+		var err error
+		gs, err = game.ApplyAction(gs, game.Action{
+			Type:       game.ActionPassTrump,
+			PlayerSeat: gs.ActivePlayerSeat,
+		})
+		require.NoError(t, err, "round-1 pass %d", i+1)
+	}
+	assert.Equal(t, game.PhaseBidding, gs.Phase, "no reshuffle after round 1")
+	assert.Equal(t, 2, gs.BiddingRound)
+	assert.True(t, gs.FaceDownRevealed)
+	assert.Equal(t, (gs.DealerSeat+1)%4, gs.ActivePlayerSeat)
+
+	// Round 2: three pass, then the dealer is refused a pass.
+	for i := 0; i < 3; i++ {
+		var err error
+		gs, err = game.ApplyAction(gs, game.Action{
+			Type:       game.ActionPassTrump,
+			PlayerSeat: gs.ActivePlayerSeat,
+		})
+		require.NoError(t, err, "round-2 pass %d", i+1)
+	}
+	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat)
+
+	rejected, err := game.ApplyAction(gs, game.Action{
+		Type:       game.ActionPassTrump,
+		PlayerSeat: gs.DealerSeat,
+	})
+	assert.Nil(t, rejected)
+	require.ErrorIs(t, err, apperr.ErrInvalidBid)
+
+	// The dealer names a suit and the hand starts.
+	suit := game.SuitHearts
+	final, err := game.ApplyAction(gs, game.Action{
+		Type:       game.ActionPickTrump,
+		PlayerSeat: gs.DealerSeat,
+		Suit:       &suit,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, game.PhasePlaying, final.Phase)
+	require.NotNil(t, final.TrumpSuit)
+	assert.Equal(t, game.SuitHearts, *final.TrumpSuit)
+	require.NotNil(t, final.TrumpCallerSeat)
+	assert.Equal(t, gs.DealerSeat, *final.TrumpCallerSeat)
+	assert.Equal(t, 1, final.TrickNumber)
+	for i, p := range final.Players {
+		assert.Len(t, p.Hand, 8, "seat %d holds 8 once bidding resolves", i)
+		assert.Empty(t, p.FaceDownCards)
+	}
+	assert.ElementsMatch(t, startingCards, collectCards(final), "all 32 cards preserved end to end")
+
+	// The hand is genuinely playable: the leader can play a legal card.
+	lead := final.Players[final.ActivePlayerSeat].Hand[0]
+	played, err := game.ApplyAction(final, game.Action{
+		Type:       game.ActionPlayCard,
+		PlayerSeat: final.ActivePlayerSeat,
+		Card:       &lead,
+	})
+	if final.AwaitingDeclaration {
+		// The leader holds a meld, so a declare/skip is owed first.
+		require.Error(t, err, "a pending declaration must block the card")
+		played, err = game.ApplyAction(final, game.Action{
+			Type:       game.ActionSkipDeclare,
+			PlayerSeat: final.ActivePlayerSeat,
+		})
+		require.NoError(t, err)
+		played, err = game.ApplyAction(played, game.Action{
+			Type:       game.ActionPlayCard,
+			PlayerSeat: played.ActivePlayerSeat,
+			Card:       &played.Players[played.ActivePlayerSeat].Hand[0],
+		})
+	}
+	require.NoError(t, err)
+	assert.Len(t, played.CurrentTrick, 1)
 }

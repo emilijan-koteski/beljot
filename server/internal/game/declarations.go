@@ -91,16 +91,19 @@ func detectDeclarations(hand []Card) []Declaration {
 		}
 	}
 
-	// TODO(croatian-variant): skip dedup for the Croatian variant when added —
-	// there a card may participate in multiple declarations.
-	return dedupBitola(decls)
+	// TODO(declaration-overlap): gate this on VariantRules.DeclarationOverlap —
+	// when it is true a card may participate in multiple declarations, so the
+	// dedup below is skipped. The config field already exists; wiring it up is
+	// the declaration-overlap story's job. Never branch on the variant name.
+	return dedupOneCardOneGroup(decls)
 }
 
-// dedupBitola applies the Bitola-variant rule: one card, one group. Among
+// dedupOneCardOneGroup applies the one-card-one-group rule (the behaviour
+// VariantRules.DeclarationOverlap=false selects). Among
 // declarations that share at least one card, the highest-Value one is kept
 // and the rest are dropped. Stable — original order is preserved among
 // survivors; for equal-Value ties, the earlier declaration wins.
-func dedupBitola(decls []Declaration) []Declaration {
+func dedupOneCardOneGroup(decls []Declaration) []Declaration {
 	if len(decls) <= 1 {
 		return decls
 	}

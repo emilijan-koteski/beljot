@@ -287,6 +287,14 @@ func TestEventsJSONContract(t *testing.T) {
 			},
 			goldenFile: "surrender_declined.json",
 		},
+		{
+			name: "FaceDownRevealedPayload",
+			sample: ws.FaceDownRevealedPayload{
+				PlayerSeat: 2,
+				CardIDs:    []string{"JS", "QS"},
+			},
+			goldenFile: "face_down_revealed.json",
+		},
 	}
 
 	require.NoError(t, os.MkdirAll(goldensDir, 0o755))

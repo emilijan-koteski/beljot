@@ -865,20 +865,32 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		if newState.TrumpSuit != nil {
 			// oldState.TrumpCandidate is the face-up card the picker took;
 			// ApplyAction clears it on newState, so source from oldState.
-			// handlePickTrump rejects the action with ErrWrongPhase when
-			// TrumpCandidate is nil, so the nil branch here is a defensive
-			// guard for future code paths — log loudly rather than emit a
-			// payload the client will silently drop on its length-2 guard.
-			if oldState.TrumpCandidate == nil {
-				slog.Warn("session: trump_selected suppressed; oldState.TrumpCandidate is nil",
-					"playerSeat", action.PlayerSeat)
-			} else {
-				trumpSelected := ws.TrumpSelectedPayload{
+			//
+			// An EMPTY CardID is legitimate for exactly one reason: the variant
+			// has no candidate, so there is no card to show. The client renders a
+			// candidate-less reveal for it — suppressing the event instead would
+			// mean a take under that variant fires no reveal at all.
+			//
+			// Under a candidate config a nil candidate is still a SERVER BUG
+			// (handlePickTrump rejects that state with ErrWrongPhase), so it
+			// stays loud and suppressed rather than quietly riding an empty
+			// CardID that the client would render as a candidate-less take.
+			switch {
+			case oldState.TrumpCandidate != nil:
+				m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrumpSelected, ws.TrumpSelectedPayload{
 					PlayerSeat: action.PlayerSeat,
 					TrumpSuit:  string(*newState.TrumpSuit),
 					CardID:     oldState.TrumpCandidate.String(),
-				}
-				m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrumpSelected, trumpSelected))
+				}))
+			case !oldState.Rules.HasTrumpCandidate:
+				m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrumpSelected, ws.TrumpSelectedPayload{
+					PlayerSeat: action.PlayerSeat,
+					TrumpSuit:  string(*newState.TrumpSuit),
+					CardID:     "",
+				}))
+			default:
+				slog.Warn("session: trump_selected suppressed; oldState.TrumpCandidate is nil under a candidate config",
+					"roomID", newState.RoomID, "playerSeat", action.PlayerSeat)
 			}
 		}
 		// Always follow with full state so clients leave the bidding UI and
@@ -888,6 +900,14 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
 
 	case game.ActionPassTrump:
+		// A pass that emptied round 1 under a reveal config turns every seat's
+		// two face-down cards up — to that seat alone. Emitted BEFORE the
+		// authoritative state, matching every other typed-event-then-state pair
+		// here; the cards are not part of match_state (and must never be), so
+		// the client keeps them in a separate slice until bidding resolves.
+		if newState.FaceDownRevealed && !oldState.FaceDownRevealed {
+			m.sendFaceDownReveals(playerIDs, newState)
+		}
 		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
 
 	case game.ActionDeclare, game.ActionSkipDeclare:
@@ -1034,6 +1054,53 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// For any other action, broadcast full state
 		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
 	}
+}
+
+// sendFaceDownReveals delivers each seat its OWN two face-down cards and
+// nobody else's — one SendToUser per human seat, never a broadcast. Bot seats
+// are skipped: they read the game state directly through buildBotView, and
+// UserID 0 has no socket.
+//
+// Called when bidding enters round 2 under VariantRules.RevealFaceDownOnRound2,
+// and again by SyncStateOnConnect for a player who reconnects after the reveal.
+func (m *Manager) sendFaceDownReveals(playerIDs [4]uint, state *game.GameState) {
+	for seat := range state.Players {
+		userID := playerIDs[seat]
+		if userID == 0 {
+			continue // bot seat — no socket to send to
+		}
+		m.sendFaceDownRevealToSeat(userID, seat, state)
+	}
+}
+
+// sendFaceDownRevealToSeat sends one seat's own face-down cards to one user.
+// No-op when that seat holds none (already merged, or a deal shape that never
+// produces them).
+func (m *Manager) sendFaceDownRevealToSeat(userID uint, seat int, state *game.GameState) {
+	if msg := buildFaceDownRevealMsg(state, seat); msg != nil {
+		m.hub.SendToUser(userID, msg)
+	}
+}
+
+// buildFaceDownRevealMsg serializes one seat's face-down-card reveal, or returns
+// nil when that seat has none. Split out from the send so SyncStateOnConnect can
+// build it under the session read lock and send it after releasing.
+func buildFaceDownRevealMsg(state *game.GameState, seat int) []byte {
+	if seat < 0 || seat >= len(state.Players) {
+		return nil
+	}
+	cards := state.Players[seat].FaceDownCards
+	if len(cards) == 0 {
+		return nil
+	}
+	cardIDs := make([]string, 0, len(cards))
+	for _, c := range cards {
+		cardIDs = append(cardIDs, c.String())
+	}
+	return buildMessage(ws.EventFaceDownRevealed, ws.FaceDownRevealedPayload{
+		PlayerSeat: seat,
+		CardIDs:    cardIDs,
+	})
 }
 
 // broadcastDeclarationsResolvedIfTransition fires event:declarations_resolved
@@ -1438,7 +1505,23 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	var action game.Action
 	switch {
 	case gs.Phase == game.PhaseBidding:
-		// Auto-pass trump on bidding timeout
+		// Auto-pass trump on bidding timeout.
+		//
+		// TODO(croatian-enablement): under VariantRules.AllPassOutcome ==
+		// AllPassDealerMustPick the dealer's fourth round-2 pass is REJECTED by
+		// the rules engine, so this auto-action errors and the error path below
+		// re-arms the same seat.
+		//
+		// That is a HOT SPIN, not merely a stall: the re-arm uses
+		// time.Until(*oldState.TurnExpiresAt), which is already <= 0 once a
+		// timeout produced the error, so time.AfterFunc fires immediately and the
+		// reject -> re-arm cycle runs as fast as the scheduler allows — burning a
+		// core and flooding the log for as long as the session lives.
+		//
+		// Unreachable today (that config belongs to a variant that is not
+		// selectable), and picking a suit on an absent player's behalf is a rule
+		// decision that belongs with the same story that teaches bots to bid with
+		// no candidate.
 		action = game.Action{
 			Type:       game.ActionPassTrump,
 			PlayerSeat: expectedSeat,

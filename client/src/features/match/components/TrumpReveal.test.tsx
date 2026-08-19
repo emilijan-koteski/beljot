@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PlayerState } from "@/shared/types/matchTypes";
@@ -86,7 +86,12 @@ describe("TrumpReveal — Wax Seal", () => {
     expect(screen.getByTestId("trump-reveal-eyebrow")).toHaveTextContent("Trump taken");
     expect(screen.getByTestId("trump-reveal-eyebrow").textContent).not.toContain("free pick");
     expect(screen.getByTestId("trump-reveal-copy")).toHaveTextContent("Spades is trump this hand");
-    expect(screen.getByTestId("trump-reveal-seal").getAttribute("data-suit")).toBe("S");
+    const seal = screen.getByTestId("trump-reveal-seal");
+    expect(seal.getAttribute("data-suit")).toBe("S");
+    // With a hero card the seal stays pinned to its corner and takes no halo of
+    // its own — the halo lives behind the card.
+    expect(seal.className).toContain("absolute");
+    expect(seal.style.boxShadow).not.toContain("0 0 32px");
     expect(screen.queryByTestId("trump-reveal-candidate")).toBeNull();
   });
 
@@ -214,6 +219,103 @@ describe("TrumpReveal — Wax Seal", () => {
     );
     fireEvent.click(screen.getByTestId("trump-reveal-close"));
     expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  // --- Candidate-less take (a variant that names trump freely and gives the
+  // taker no card). The server sends an empty cardId rather than suppressing
+  // the event, so the reveal must render without a hero card.
+  describe("no trump candidate (empty cardId)", () => {
+    it("renders the panel, the seal, and 'named {suit} as trump' with no hero card", () => {
+      render(
+        <TrumpReveal
+          playerSeat={2}
+          myPlayerSeat={0}
+          cardId=""
+          trumpSuit="C"
+          players={makePlayers()}
+          onComplete={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId("trump-reveal")).toBeInTheDocument();
+      expect(screen.getByTestId("trump-reveal-taker")).toHaveTextContent("Carol");
+      expect(screen.getByTestId("trump-reveal-seal").getAttribute("data-suit")).toBe("C");
+      expect(screen.getByTestId("trump-reveal-copy")).toHaveTextContent("named Clubs as trump");
+      // No candidate existed, so neither the hero card nor the "was on the
+      // table" subline may appear.
+      expect(screen.queryByTestId(/^playing-card-/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("trump-reveal-candidate")).toBeNull();
+    });
+
+    it("uses the plain eyebrow, not the 'free pick' contrast (no suit was turned down)", () => {
+      render(
+        <TrumpReveal
+          playerSeat={1}
+          myPlayerSeat={0}
+          cardId=""
+          trumpSuit="S"
+          players={makePlayers()}
+          onComplete={vi.fn()}
+        />,
+      );
+      const eyebrow = screen.getByTestId("trump-reveal-eyebrow");
+      expect(eyebrow).toHaveTextContent("Trump taken");
+      expect(eyebrow.textContent).not.toContain("free pick");
+    });
+
+    it("still auto-dismisses and still resolves the viewer-relative team glow", () => {
+      vi.useFakeTimers();
+      const onComplete = vi.fn();
+      render(
+        <TrumpReveal
+          playerSeat={1}
+          myPlayerSeat={0}
+          cardId=""
+          trumpSuit="D"
+          players={makePlayers()}
+          onComplete={onComplete}
+        />,
+      );
+      const panel = screen.getByTestId("trump-reveal").querySelector("[data-team]");
+      expect(panel?.getAttribute("data-team")).toBe("silver");
+      act(() => {
+        vi.advanceTimersByTime(8500);
+      });
+      expect(onComplete).toHaveBeenCalledOnce();
+      vi.useRealTimers();
+    });
+
+    it("gives the seal its own team-coloured halo when it is the hero", () => {
+      // With a hero card the halo sits behind the card; with none the seal
+      // carries it, or it reads as an unglowing stamp inside a glowing panel.
+      render(
+        <TrumpReveal
+          playerSeat={2}
+          myPlayerSeat={0}
+          cardId=""
+          trumpSuit="S"
+          players={makePlayers()}
+          onComplete={vi.fn()}
+        />,
+      );
+      const seal = screen.getByTestId("trump-reveal-seal");
+      expect(seal.style.boxShadow).toContain("0 0 32px");
+      // The seal also leaves the card's absolute corner anchor behind.
+      expect(seal.className).not.toContain("absolute");
+    });
+
+    it("still returns null for a malformed 1-character cardId", () => {
+      render(
+        <TrumpReveal
+          playerSeat={2}
+          myPlayerSeat={0}
+          cardId="J"
+          trumpSuit="S"
+          players={makePlayers()}
+          onComplete={vi.fn()}
+        />,
+      );
+      expect(screen.queryByTestId("trump-reveal")).toBeNull();
+    });
   });
 
   it("glows gold (Us) when the caller is on the viewer's team", () => {

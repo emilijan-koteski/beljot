@@ -811,6 +811,7 @@
       "eyebrowFreeChoice": "Adut zvan · slobodan izbor",
       "isTrump": "<suit>{{suit}}</suit> je adut u ovoj ruci",
       "chose": "izabrao <suit>{{suit}}</suit>",
+      "namedTrump": "zvao <suit>{{suit}}</suit> za aduta",
       "candidateOnTable": "{{rank}} {{suit}} bila je na stolu",
       "dismiss": "Zatvori"
     },
@@ -823,6 +824,8 @@
       "titleRound2": "Odaberi bilo koju boju ili dalje",
       "subtitleRound1": "Prihvati ovu boju ili prepusti sljedećem igraču.",
       "subtitleRound2": "Bilo koja boja osim kandidata.",
+      "titleFreePick": "Zovi aduta u bilo kojoj boji",
+      "subtitleFreePick": "Sve četiri boje su ti na raspolaganju.",
       "bodyRound1": "Karta kandidat je okrenuta. Prihvati je kao aduta za svoj tim, ili prepusti sljedećem igraču.",
       "roundLabel": "Krug {{round}} / 2",
       "pick": "Zovi",
@@ -899,7 +902,8 @@
       "handVariant": "Dijeljenje {{hand}} · {{variant}}"
     },
     "variants": {
-      "bitola": "Bitola"
+      "bitola": "Bitola",
+      "croatia": "Hrvatska"
     },
     "scoreReveal": {
       "title": "Rezultat dijeljenja",

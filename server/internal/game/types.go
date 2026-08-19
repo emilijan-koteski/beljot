@@ -74,8 +74,136 @@ func ParseCard(id string) (Card, error) {
 type Variant string
 
 const (
-	VariantBitola Variant = "bitola"
+	VariantBitola  Variant = "bitola"
+	VariantCroatia Variant = "croatia"
 )
+
+// DealShape names how a hand's 32 cards reach the table.
+type DealShape string
+
+const (
+	// DealShapeCandidate is the two-stage deal: 3 then 2 cards to each seat, one
+	// card lifted face-up as the public trump candidate, and the remaining 11
+	// held back for stage-2 distribution once a seat takes trump.
+	DealShapeCandidate DealShape = "candidate"
+	// DealShapeAllBeforeBidding deals every card before bidding opens: 3 then 3
+	// to each seat, then 2 more per seat placed face-down. Nothing is held back
+	// and there is no candidate, so bidding is a bare named suit.
+	DealShapeAllBeforeBidding DealShape = "all_before_bidding"
+)
+
+// AllPassOutcome names what happens when the second bidding round finds no
+// taker.
+type AllPassOutcome string
+
+const (
+	// AllPassReshuffleAndRotate pools all 32 cards, rotates the dealer
+	// counter-clockwise, and deals the same hand number again.
+	AllPassReshuffleAndRotate AllPassOutcome = "reshuffle_and_rotate"
+	// AllPassDealerMustPick makes the dealer the last bidder of round 2 with no
+	// right to pass, so the hand always finds a taker and the round can never
+	// be passed out.
+	AllPassDealerMustPick AllPassOutcome = "dealer_must_pick"
+)
+
+// DeclarationTiming names when declarations are collected and revealed.
+type DeclarationTiming string
+
+const (
+	// DeclarationTimingDuringFirstTrick collects each player's declaration as
+	// their turn comes round in trick 1 and reveals the winner at trick 2.
+	DeclarationTimingDuringFirstTrick DeclarationTiming = "during_first_trick"
+	// DeclarationTimingDedicatedPhase runs a phase between bidding and trick 1
+	// in which all four seats declare or skip, then the result is revealed.
+	DeclarationTimingDedicatedPhase DeclarationTiming = "dedicated_phase"
+)
+
+// TieRule names how a hand whose two sides tie on points is settled.
+type TieRule string
+
+const (
+	// TieRuleAllToOpponents awards the whole tied pool to the taker's opponents.
+	TieRuleAllToOpponents TieRule = "all_to_opponents"
+	// TieRuleHangingPoints scores the tied hand for nobody and carries the pool
+	// over to whichever side wins the next decisive hand.
+	TieRuleHangingPoints TieRule = "hanging_points"
+)
+
+// VariantRules is the per-rule configuration a variant resolves to. It is the
+// engine's ONLY variant-aware surface: RulesFor is resolved once at game
+// initialization, carried on GameState.Rules, and every divergent branch reads
+// a field here — no engine code compares a variant name (D-VAR-1).
+//
+// Every field is a value type (no pointer, slice, or map) on purpose, so
+// cloneGameState's shallow struct copy carries the whole config correctly with
+// no clone line of its own.
+//
+// All seven fields are populated by both presets from day one. Only DealShape,
+// HasTrumpCandidate, RevealFaceDownOnRound2 and AllPassOutcome are READ today;
+// DeclarationOverlap, DeclarationTiming and TieRule describe each variant's
+// authentic rule and are read once the stories that implement them land.
+type VariantRules struct {
+	// DealShape selects the dealing sequence — see DealShape.
+	DealShape DealShape
+	// HasTrumpCandidate is true when one card is lifted face-up and round-1
+	// bidding is a take-it-or-pass on that card's suit. False means trump is a
+	// freely named suit in both rounds and the taker draws no card.
+	HasTrumpCandidate bool
+	// RevealFaceDownOnRound2 turns each seat's two face-down cards up — to that
+	// seat alone — when round 1 is passed out, so round 2 is bid on a full
+	// eight-card hand. Only meaningful alongside DealShapeAllBeforeBidding.
+	RevealFaceDownOnRound2 bool
+	// AllPassOutcome selects what a passed-out round 2 does — see
+	// AllPassOutcome.
+	AllPassOutcome AllPassOutcome
+	// DeclarationOverlap allows one card to count toward more than one
+	// declaration. False keeps one-card-one-group dedup by higher value.
+	//
+	// Not read yet — behaviour lands with the declaration-overlap story.
+	DeclarationOverlap bool
+	// DeclarationTiming selects when declarations are collected — see
+	// DeclarationTiming.
+	//
+	// Not read yet — behaviour lands with the declaration-phase story.
+	DeclarationTiming DeclarationTiming
+	// TieRule selects how a tied hand is settled — see TieRule. This field
+	// states each variant's AUTHENTIC rule; the engine currently awards every
+	// tied hand to the taker's opponents for both variants as a deliberate
+	// interim stand-in, so Bitola's hanging-points value here is not yet
+	// reflected in behaviour.
+	//
+	// Not read yet — behaviour lands with the hanging-points story.
+	TieRule TieRule
+}
+
+// RulesFor resolves a variant string to its fully-populated rule preset. It is
+// the single variant-aware construct in this package.
+//
+// An unrecognised variant string resolves to the Bitola preset — explicit and
+// tested, never a zero-value config (which would deal no candidate and reject
+// every round-1 take).
+func RulesFor(v Variant) VariantRules {
+	if v == VariantCroatia {
+		return VariantRules{
+			DealShape:              DealShapeAllBeforeBidding,
+			HasTrumpCandidate:      false,
+			RevealFaceDownOnRound2: true,
+			AllPassOutcome:         AllPassDealerMustPick,
+			DeclarationOverlap:     true,
+			DeclarationTiming:      DeclarationTimingDedicatedPhase,
+			TieRule:                TieRuleAllToOpponents,
+		}
+	}
+	return VariantRules{
+		DealShape:              DealShapeCandidate,
+		HasTrumpCandidate:      true,
+		RevealFaceDownOnRound2: false,
+		AllPassOutcome:         AllPassReshuffleAndRotate,
+		DeclarationOverlap:     false,
+		DeclarationTiming:      DeclarationTimingDuringFirstTrick,
+		TieRule:                TieRuleHangingPoints,
+	}
+}
 
 // Phase represents the current phase of the game state machine.
 type Phase string

@@ -49,6 +49,62 @@ const SUIT_COLOR: Record<Suit, string> = {
   C: "var(--suit-black, #1a1a1a)",
 };
 
+/**
+ * The four-suit picker grid. One definition serves every case that needs it:
+ * Bitola round 2 (where the candidate's suit is locked out as "spent"), and
+ * both rounds of a variant with no candidate at all (where nothing is locked
+ * because no suit was ever offered and turned down).
+ *
+ * Card-style tiles: they take their face treatment from PlayingCard's exported
+ * constants rather than restating it, so the tap target keeps reading as "pick
+ * this suit's card" even if the deck face changes. Just the suit glyph — the
+ * suit name is redundant next to a 60x80 card with a 40px symbol. A locked tile
+ * stays in the grid, visibly disabled, so the layout doesn't shift and the
+ * lock-out is explicit rather than a suit that silently vanished.
+ */
+function SuitPickerGrid({
+  lockedSuit,
+  onPick,
+}: {
+  lockedSuit: Suit | null;
+  onPick: (suit: Suit) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="grid grid-cols-4 gap-2.5 mb-3.5">
+      {SUITS.map((suit) => {
+        const isLocked = lockedSuit === suit;
+        return (
+          <button
+            key={suit}
+            type="button"
+            disabled={isLocked}
+            aria-disabled={isLocked}
+            onClick={() => onPick(suit)}
+            aria-label={t(`match.suits.${suitName(suit)}`)}
+            data-testid={`trump-prompt-suit-${suit}`}
+            className="flex items-center justify-center rounded-md transition-[filter,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-(--felt-deep,#072a14) disabled:cursor-not-allowed not-disabled:cursor-pointer not-disabled:hover:brightness-105 not-disabled:motion-safe:hover:-translate-y-0.5"
+            style={{
+              height: 52,
+              background: CARD_FACE_BACKGROUND,
+              border: CARD_FACE_BORDER,
+              boxShadow: "0 3px 6px rgba(0,0,0,0.3)",
+              color: SUIT_COLOR[suit],
+              fontFamily: "var(--font-suit)",
+              fontSize: 28,
+              lineHeight: 1,
+              opacity: isLocked ? 0.4 : 1,
+              filter: isLocked ? "grayscale(0.85)" : undefined,
+            }}
+          >
+            <span aria-hidden="true">{SUIT_SYMBOL[suit]}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function TrumpPrompt({
   trumpCandidate,
   biddingRound,
@@ -72,10 +128,12 @@ export function TrumpPrompt({
     const nameColor = activePlayerTeam
       ? teamColors(activePlayerTeam)[0]
       : "var(--ink-light, #f5f2e8)";
-    // Round 2: surface all four suits as little parchment "suit chips" beside
-    // the copy. The candidate suit is shown muted/disabled (it can't be picked
-    // in round 2) — mirroring the active bidder's locked tile — so waiting
-    // players see the full set and which suit is off the table.
+    // Surface all four suits as little parchment "suit chips" beside the copy
+    // whenever the active bidder is choosing freely: Bitola round 2, where the
+    // candidate suit is shown muted/disabled (it can't be picked) mirroring the
+    // active bidder's locked tile, and both rounds of a candidate-less variant,
+    // where nothing is locked.
+    const showSuitChips = biddingRound === 2 || trumpCandidate === null;
 
     return (
       <div
@@ -107,18 +165,18 @@ export function TrumpPrompt({
             >
               <Trans
                 i18nKey={
-                  biddingRound === 1
-                    ? "match.trumpPrompt.waitingRound1"
-                    : "match.trumpPrompt.waitingRound2"
+                  trumpCandidate === null || biddingRound === 2
+                    ? "match.trumpPrompt.waitingRound2"
+                    : "match.trumpPrompt.waitingRound1"
                 }
                 values={{ name: activePlayerName ?? "" }}
                 components={{ name: <strong style={{ color: nameColor, fontWeight: 700 }} /> }}
               />
             </p>
-            {biddingRound === 2 && trumpCandidate && (
+            {showSuitChips && (
               <div className="flex items-center gap-1.5" data-testid="trump-prompt-considering">
                 {SUITS.map((suit) => {
-                  const isLocked = suit === trumpCandidate.suit;
+                  const isLocked = trumpCandidate?.suit === suit;
                   return (
                     <span
                       key={suit}
@@ -153,22 +211,26 @@ export function TrumpPrompt({
     );
   }
 
-  const title =
-    biddingRound === 1 ? t("match.trumpPrompt.titleRound1") : t("match.trumpPrompt.titleRound2");
+  // A round-1 take-it-or-pass on a face-up candidate only exists when there IS a
+  // candidate. Without one, trump is a freely named suit in BOTH rounds, so
+  // round 1 gets the same four-suit grid as round 2 and the single "Take"
+  // button — which sends no suit — must not render.
+  const isFreeSuitPick = trumpCandidate === null;
+
+  const title = isFreeSuitPick
+    ? t("match.trumpPrompt.titleFreePick")
+    : biddingRound === 1
+      ? t("match.trumpPrompt.titleRound1")
+      : t("match.trumpPrompt.titleRound2");
 
   // Subtitle copy stays generic — the candidate card is already rendered at
   // 80×116 directly below, so a "Candidate: T♣" prefix would just repeat in
   // text what the visual already shows.
-  const subtitle =
-    biddingRound === 1
+  const subtitle = isFreeSuitPick
+    ? t("match.trumpPrompt.subtitleFreePick")
+    : biddingRound === 1
       ? t("match.trumpPrompt.subtitleRound1")
       : t("match.trumpPrompt.subtitleRound2");
-
-  // Round 2: all four suits render so the layout is stable, but the
-  // candidate suit (Bitola "spent suit") is disabled — visually muted and
-  // not clickable. Keeping it on screen makes the lock-out explicit rather
-  // than leaving the player guessing why a suit they thought was available
-  // disappeared.
 
   return (
     <OverlayBackdrop dim={0.5}>
@@ -192,25 +254,19 @@ export function TrumpPrompt({
           subtitle={subtitle}
           style={{ maxHeight: "90vh", overflowY: "auto" }}
         >
-          {biddingRound === 1 ? (
-            // Round 1: candidate card sits on the left, descriptive copy on
-            // the right — matches the design's 80×116 card + flex-1 paragraph.
-            trumpCandidate && (
-              <div className="flex items-center gap-5 mb-5">
-                <PlayingCard
-                  card={trumpCandidate}
-                  state="default"
-                  size="lg"
-                  withTransition={false}
-                />
-                <p
-                  className="font-body text-[13px] leading-relaxed flex-1"
-                  style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.8 }}
-                >
-                  {t("match.trumpPrompt.bodyRound1")}
-                </p>
-              </div>
-            )
+          {biddingRound === 1 && trumpCandidate ? (
+            // Round 1 with a candidate: the card sits on the left, descriptive
+            // copy on the right — matches the design's 80×116 card + flex-1
+            // paragraph. The decision is take-this-suit or pass, so no grid.
+            <div className="flex items-center gap-5 mb-5">
+              <PlayingCard card={trumpCandidate} state="default" size="lg" withTransition={false} />
+              <p
+                className="font-body text-[13px] leading-relaxed flex-1"
+                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.8 }}
+              >
+                {t("match.trumpPrompt.bodyRound1")}
+              </p>
+            </div>
           ) : (
             <>
               {trumpCandidate && (
@@ -223,44 +279,9 @@ export function TrumpPrompt({
                   />
                 </div>
               )}
-              {/* Card-style picker buttons: they take their face treatment from
-                  PlayingCard's exported constants rather than restating it, so
-                  the tap target keeps reading as "pick this suit's card" even
-                  if the deck face changes. Just the suit glyph — the suit name
-                  is redundant next to a 60×80 card with a 40 px symbol. The
-                  candidate suit stays in the grid as a disabled tile so the
-                  layout doesn't shift and the lock-out is visible. */}
-              <div className="grid grid-cols-4 gap-2.5 mb-3.5">
-                {SUITS.map((suit) => {
-                  const isLocked = trumpCandidate?.suit === suit;
-                  return (
-                    <button
-                      key={suit}
-                      type="button"
-                      disabled={isLocked}
-                      aria-disabled={isLocked}
-                      onClick={() => onPick(suit)}
-                      aria-label={t(`match.suits.${suitName(suit)}`)}
-                      data-testid={`trump-prompt-suit-${suit}`}
-                      className="flex items-center justify-center rounded-md transition-[filter,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-(--felt-deep,#072a14) disabled:cursor-not-allowed not-disabled:cursor-pointer not-disabled:hover:brightness-105 not-disabled:motion-safe:hover:-translate-y-0.5"
-                      style={{
-                        height: 52,
-                        background: CARD_FACE_BACKGROUND,
-                        border: CARD_FACE_BORDER,
-                        boxShadow: "0 3px 6px rgba(0,0,0,0.3)",
-                        color: SUIT_COLOR[suit],
-                        fontFamily: "var(--font-suit)",
-                        fontSize: 28,
-                        lineHeight: 1,
-                        opacity: isLocked ? 0.4 : 1,
-                        filter: isLocked ? "grayscale(0.85)" : undefined,
-                      }}
-                    >
-                      <span aria-hidden="true">{SUIT_SYMBOL[suit]}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {/* With a candidate, its suit is spent and locked out. With none,
+                  every suit is on the table and nothing is locked. */}
+              <SuitPickerGrid lockedSuit={trumpCandidate?.suit ?? null} onPick={onPick} />
             </>
           )}
 
@@ -292,7 +313,10 @@ export function TrumpPrompt({
                   {t("match.trumpPrompt.pass")}
                 </ClassicButton>
               )}
-              {biddingRound === 1 && (
+              {biddingRound === 1 && trumpCandidate && (
+                // Suitless pick — the server binds trump to the candidate's
+                // suit. Never rendered without a candidate: there would be
+                // nothing for the server to bind to and the action is rejected.
                 <ClassicButton
                   variant="primary"
                   onClick={() => onPick()}

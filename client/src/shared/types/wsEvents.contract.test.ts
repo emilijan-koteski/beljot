@@ -20,6 +20,7 @@ import coinSettlementGolden from "../../../../server/internal/ws/testdata/events
 import declarationsResolvedGolden from "../../../../server/internal/ws/testdata/events/declarations_resolved.json";
 import eventHandScoredGolden from "../../../../server/internal/ws/testdata/events/event_hand_scored.json";
 import eventMatchStateGolden from "../../../../server/internal/ws/testdata/events/event_match_state.json";
+import faceDownRevealedGolden from "../../../../server/internal/ws/testdata/events/face_down_revealed.json";
 import honorUpdatedGolden from "../../../../server/internal/ws/testdata/events/honor_updated.json";
 import matchAbandonedGolden from "../../../../server/internal/ws/testdata/events/match_abandoned.json";
 import matchEndGolden from "../../../../server/internal/ws/testdata/events/match_end.json";
@@ -40,6 +41,7 @@ import {
   CoinSettlementPayloadSchema,
   DeclarationsResolvedPayloadSchema,
   EventMatchStateSchema,
+  FaceDownRevealedPayloadSchema,
   HandScoredPayloadSchema,
   HonorUpdatedPayloadSchema,
   MatchAbandonedPayloadSchema,
@@ -84,6 +86,7 @@ const cases = [
   ["PlayerReconnectedPayload", PlayerReconnectedPayloadSchema, playerReconnectedGolden],
   ["SurrenderProposedPayload", SurrenderProposedPayloadSchema, surrenderProposedGolden],
   ["SurrenderDeclinedPayload", SurrenderDeclinedPayloadSchema, surrenderDeclinedGolden],
+  ["FaceDownRevealedPayload", FaceDownRevealedPayloadSchema, faceDownRevealedGolden],
 ] as const;
 
 describe("WS event JSON contract (Zod parse against Go-produced goldens)", () => {

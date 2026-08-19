@@ -118,30 +118,40 @@ func trumpSuitScore(hand []game.Card, suit game.Suit) int {
 }
 
 func decideBid(v View) game.Action {
-	// The picker ALWAYS receives the face-up trump candidate (engine appends it
-	// in handlePickTrump, both rounds), so the bid must be evaluated on the hand
-	// the bot would actually hold after picking: the 5 dealt cards PLUS the
-	// candidate. In round 1 the candidate is a trump (its suit IS the trump
-	// suit); in round 2 it is a guaranteed side card (its suit is locked out).
+	// When a candidate is on the table the picker ALWAYS receives it (the engine
+	// appends it in handlePickTrump, both rounds), so the bid must be evaluated
+	// on the hand the bot would actually hold after picking: the 5 dealt cards
+	// PLUS the candidate. In round 1 the candidate is a trump (its suit IS the
+	// trump suit); in round 2 it is a guaranteed side card (its suit is locked
+	// out).
 	bidHand := v.Hand
 	if v.TrumpCandidate != nil {
 		bidHand = append(slices.Clone(v.Hand), *v.TrumpCandidate)
 	}
 
-	if v.BiddingRound == 1 {
-		// Round 1: the candidate's suit is the only option — pick or pass.
-		// A round-1 pick carries no Suit (the engine locks the candidate's).
-		if v.TrumpCandidate != nil && wantsTrump(bidHand, v.TrumpCandidate.Suit) {
+	if v.BiddingRound == 1 && v.TrumpCandidate != nil {
+		// Round 1 with a candidate: the candidate's suit is the only option —
+		// pick or pass. A round-1 pick carries no Suit (the engine locks the
+		// candidate's).
+		if wantsTrump(bidHand, v.TrumpCandidate.Suit) {
 			return game.Action{Type: game.ActionPickTrump, PlayerSeat: v.Seat}
 		}
 		return game.Action{Type: game.ActionPassTrump, PlayerSeat: v.Seat}
 	}
 
-	// Round 2: evaluate the non-candidate suits with the same evaluator and
-	// pick the best one that clears the threshold, else pass. The candidate's
-	// suit is locked out by the engine (already spent in round 1), but the
-	// candidate card itself still lands in the picker's hand as a side card, so
-	// it counts toward the side-Ace backup in wantsTrump.
+	// Free-suit bid — round 2, and round 1 too when there is no candidate (a
+	// variant that names trump freely in both rounds). Evaluate the available
+	// suits with the same evaluator and pick the best one that clears the
+	// threshold, else pass. A candidate's own suit is locked out by the engine
+	// (already spent in round 1), but the candidate card itself still lands in
+	// the picker's hand as a side card, so it counts toward the side-Ace backup
+	// in wantsTrump. With no candidate, nothing is locked out and the bot draws
+	// no extra card.
+	//
+	// A dealer that MUST pick (no legal pass) is not handled here: this returns
+	// pass_trump when no suit clears the bar, and the engine rejects it. That is
+	// out of scope until the Croatian variant is actually enabled, which is when
+	// bots get variant-aware bidding.
 	var best *game.Suit
 	bestScore := -1
 	for _, suit := range game.AllSuits {

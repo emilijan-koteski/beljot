@@ -811,6 +811,7 @@
       "eyebrowFreeChoice": "Адутот е земен · слободен избор",
       "isTrump": "<suit>{{suit}}</suit> е адут во оваа рака",
       "chose": "избра <suit>{{suit}}</suit>",
+      "namedTrump": "го зеде <suit>{{suit}}</suit> за адут",
       "candidateOnTable": "{{rank}} {{suit}} беше на масата",
       "dismiss": "Затвори"
     },
@@ -823,6 +824,8 @@
       "titleRound2": "Избери било која боја или продолжи понатаму",
       "subtitleRound1": "Земи ја оваа боја или препушти на следниот играч.",
       "subtitleRound2": "Било која боја освен кандидатот.",
+      "titleFreePick": "Земи адут во која боја сакаш",
+      "subtitleFreePick": "Сите четири бои ти се на располагање.",
       "bodyRound1": "Картата кандидат е свртена со лицето нагоре. Земи ја како адут за твојот тим, или препушти на следниот играч.",
       "roundLabel": "Круг {{round}} / 2",
       "pick": "Земи",
@@ -899,7 +902,8 @@
       "handVariant": "Делење {{hand}} · {{variant}}"
     },
     "variants": {
-      "bitola": "Битола"
+      "bitola": "Битола",
+      "croatia": "Хрватска"
     },
     "scoreReveal": {
       "title": "Резултат на делењето",

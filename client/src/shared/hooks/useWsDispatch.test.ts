@@ -738,23 +738,204 @@ describe("useWsDispatch", () => {
     expect(reveal?.cardId).toBe("7S");
   });
 
-  it("ignores malformed event:trump_selected payloads (cardId guard)", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("accepts an EMPTY cardId on event:trump_selected (variant with no candidate)", () => {
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
+    // A variant that names trump freely has no card to show, so the server
+    // sends an empty cardId rather than suppressing the event — suppressing it
+    // would mean a take under that variant fires no reveal at all.
     dispatch({
       type: "event:trump_selected",
       payload: { playerSeat: 2, trumpSuit: "S", cardId: "" },
     });
-    dispatch({
-      type: "event:trump_selected",
-      payload: { playerSeat: 2, trumpSuit: "S", cardId: "X" },
-    });
 
-    expect(useMatchStore.getState().trumpReveal).toBeNull();
+    const reveal = useMatchStore.getState().trumpReveal;
+    expect(reveal).not.toBeNull();
+    expect(reveal?.cardId).toBe("");
+    expect(reveal?.trumpSuit).toBe("S");
+  });
+
+  it("ignores malformed event:trump_selected cardIds (not empty and not a real 2-char id)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    // "10S" is the dangerous one: a bare length check lets it through and the
+    // reveal slices it into rank "1" / suit "0".
+    for (const cardId of ["X", "10S", "JSX", "js", "XS", "JX"]) {
+      dispatch({
+        type: "event:trump_selected",
+        payload: { playerSeat: 2, trumpSuit: "S", cardId },
+      });
+      expect(useMatchStore.getState().trumpReveal, cardId).toBeNull();
+    }
+
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+
+  it("dispatches event:face_down_revealed to matchStore.faceDownReveal", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "event:face_down_revealed",
+      payload: { playerSeat: 2, cardIds: ["JS", "QS"] },
+    });
+
+    const reveal = useMatchStore.getState().faceDownReveal;
+    expect(reveal).not.toBeNull();
+    expect(reveal?.playerSeat).toBe(2);
+    expect(reveal?.cardIds).toEqual(["JS", "QS"]);
+  });
+
+  it("ignores malformed event:face_down_revealed payloads", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    const bad: { name: string; payload: unknown }[] = [
+      { name: "id too short", payload: { playerSeat: 2, cardIds: ["J", "QS"] } },
+      { name: "id too long", payload: { playerSeat: 2, cardIds: ["10S", "QS"] } },
+      { name: "unknown rank", payload: { playerSeat: 2, cardIds: ["XS", "QS"] } },
+      { name: "unknown suit", payload: { playerSeat: 2, cardIds: ["JX", "QS"] } },
+      { name: "cardIds missing", payload: { playerSeat: 2 } },
+      { name: "only one id", payload: { playerSeat: 2, cardIds: ["JS"] } },
+      { name: "three ids", payload: { playerSeat: 2, cardIds: ["JS", "QS", "KS"] } },
+      { name: "empty cardIds", payload: { playerSeat: 2, cardIds: [] } },
+      { name: "cardIds not an array", payload: { playerSeat: 2, cardIds: "JSQS" } },
+      { name: "playerSeat missing", payload: { cardIds: ["JS", "QS"] } },
+      { name: "playerSeat out of range", payload: { playerSeat: 4, cardIds: ["JS", "QS"] } },
+      { name: "playerSeat negative", payload: { playerSeat: -1, cardIds: ["JS", "QS"] } },
+      { name: "playerSeat not an integer", payload: { playerSeat: 1.5, cardIds: ["JS", "QS"] } },
+      { name: "playerSeat a string", payload: { playerSeat: "2", cardIds: ["JS", "QS"] } },
+      { name: "payload null", payload: null },
+    ];
+
+    for (const tc of bad) {
+      dispatch({ type: "event:face_down_revealed", payload: tc.payload });
+      expect(useMatchStore.getState().faceDownReveal, tc.name).toBeNull();
+    }
+
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("ignores an event:face_down_revealed naming a seat that is not the viewer's own", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    // The server only ever addresses a seat's own user; a different seat here
+    // would be another player's cards, so it must not be stored at all.
+    useMatchStore.getState().setMyPlayerSeat(1);
+    dispatch({
+      type: "event:face_down_revealed",
+      payload: { playerSeat: 2, cardIds: ["JS", "QS"] },
+    });
+    expect(useMatchStore.getState().faceDownReveal).toBeNull();
+
+    // The viewer's own seat still lands.
+    dispatch({
+      type: "event:face_down_revealed",
+      payload: { playerSeat: 1, cardIds: ["JD", "QD"] },
+    });
+    expect(useMatchStore.getState().faceDownReveal?.playerSeat).toBe(1);
+
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("accepts an event:face_down_revealed that arrives before the viewer's seat resolves", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    // On reconnect the reveal can land in the same tick as the snapshot that
+    // teaches MatchPage its seat. Dropping it then would lose the viewer's own
+    // cards for the rest of bidding.
+    expect(useMatchStore.getState().myPlayerSeat).toBeNull();
+    dispatch({
+      type: "event:face_down_revealed",
+      payload: { playerSeat: 3, cardIds: ["JS", "QS"] },
+    });
+    expect(useMatchStore.getState().faceDownReveal?.playerSeat).toBe(3);
+  });
+
+  // faceDownReveal survives until bidding RESOLVES, not until the phase stops
+  // being literally "bidding". Bidding is interrupted without resolving by a
+  // pause (phase -> paused) and by any seat dropping (phase -> disconnected),
+  // and both are broadcast to all four seats — so a phase-based predicate wipes
+  // the viewer's own two cards on someone else's pause or drop, and only a seat
+  // that actually reconnects gets a replay.
+  describe("faceDownReveal retention across snapshots", () => {
+    const seedReveal = (dispatch: (m: { type: string; payload: unknown }) => void) => {
+      dispatch({
+        type: "event:face_down_revealed",
+        payload: { playerSeat: 2, cardIds: ["JS", "QS"] },
+      });
+      expect(useMatchStore.getState().faceDownReveal).not.toBeNull();
+    };
+
+    const kept: { name: string; phase: string }[] = [
+      { name: "a trailing bidding snapshot", phase: "bidding" },
+      { name: "a pause taken during bidding", phase: "paused" },
+      { name: "another seat dropping during bidding", phase: "disconnected" },
+      { name: "the dealing phase of an interrupted deal", phase: "dealing" },
+    ];
+
+    for (const tc of kept) {
+      it(`survives ${tc.name}`, () => {
+        const { result } = renderHook(() => useWsDispatch());
+        const dispatch = result.current;
+        seedReveal(dispatch);
+
+        // trumpSuit null = bidding has not resolved, whatever the phase says.
+        dispatch({
+          type: "event:match_state",
+          payload: { ...mockMatchState, phase: tc.phase, trumpSuit: null },
+        });
+        expect(useMatchStore.getState().faceDownReveal).not.toBeNull();
+      });
+    }
+
+    it("survives a phase that returns to bidding after an interruption", () => {
+      const { result } = renderHook(() => useWsDispatch());
+      const dispatch = result.current;
+      seedReveal(dispatch);
+
+      for (const phase of ["paused", "bidding", "disconnected", "bidding"]) {
+        dispatch({
+          type: "event:match_state",
+          payload: { ...mockMatchState, phase, trumpSuit: null },
+        });
+        expect(useMatchStore.getState().faceDownReveal, phase).not.toBeNull();
+      }
+    });
+
+    it("is dropped once bidding resolves — the authoritative hand now holds the cards", () => {
+      const { result } = renderHook(() => useWsDispatch());
+      const dispatch = result.current;
+      seedReveal(dispatch);
+
+      dispatch({
+        type: "event:match_state",
+        payload: { ...mockMatchState, phase: "playing", trumpSuit: "S" },
+      });
+      expect(useMatchStore.getState().faceDownReveal).toBeNull();
+    });
+
+    it("is dropped when a take ends the match outright (instant win)", () => {
+      const { result } = renderHook(() => useWsDispatch());
+      const dispatch = result.current;
+      seedReveal(dispatch);
+
+      dispatch({
+        type: "event:match_state",
+        payload: { ...mockMatchState, phase: "match_end", trumpSuit: "S" },
+      });
+      expect(useMatchStore.getState().faceDownReveal).toBeNull();
+    });
   });
 
   // --- Room lobby event dispatch tests ---

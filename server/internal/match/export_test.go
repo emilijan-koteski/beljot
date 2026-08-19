@@ -1,6 +1,7 @@
 package match
 
 import (
+	"errors"
 	"time"
 
 	"github.com/emilijan/beljot/server/internal/game"
@@ -94,6 +95,19 @@ func (m *Manager) HandResults(roomID uint) []HandResult {
 	return out
 }
 
+// ApplyActionForTest drives applyAndBroadcastAction for one action, so tests can
+// assert what a single successful action puts on the wire without going through
+// a ws.Client. Tests using this helper must call StartMatch first.
+func (m *Manager) ApplyActionForTest(roomID uint, action game.Action) error {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return errNoSession
+	}
+	return m.applyAndBroadcastAction(lm, action)
+}
+
 // SetGameStateForTest replaces the lm's game state. Used to drive
 // HandleAction through specific mid-game states (declaration prompt, belot
 // prompt) without scripting an entire match. Tests using this helper must
@@ -161,3 +175,7 @@ func (m *Manager) TriggerTimerExpiryForTest(roomID uint, expectedSeat int, fireA
 	})
 	lm.mu.Unlock()
 }
+
+// errNoSession is returned by the *ForTest helpers when the room has no live
+// session — a test-setup mistake, surfaced rather than silently no-oping.
+var errNoSession = errors.New("match: no live session for room")
