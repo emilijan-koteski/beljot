@@ -138,10 +138,11 @@ const (
 // cloneGameState's shallow struct copy carries the whole config correctly with
 // no clone line of its own.
 //
-// All seven fields are populated by both presets from day one. Only DealShape,
-// HasTrumpCandidate, RevealFaceDownOnRound2 and AllPassOutcome are READ today;
-// DeclarationOverlap, DeclarationTiming and TieRule describe each variant's
-// authentic rule and are read once the stories that implement them land.
+// All seven fields are populated by both presets from day one. DealShape,
+// HasTrumpCandidate, RevealFaceDownOnRound2, AllPassOutcome and
+// DeclarationOverlap are READ today; DeclarationTiming and TieRule describe
+// each variant's authentic rule and are read once the stories that implement
+// them land.
 type VariantRules struct {
 	// DealShape selects the dealing sequence — see DealShape.
 	DealShape DealShape
@@ -158,8 +159,6 @@ type VariantRules struct {
 	AllPassOutcome AllPassOutcome
 	// DeclarationOverlap allows one card to count toward more than one
 	// declaration. False keeps one-card-one-group dedup by higher value.
-	//
-	// Not read yet — behaviour lands with the declaration-overlap story.
 	DeclarationOverlap bool
 	// DeclarationTiming selects when declarations are collected — see
 	// DeclarationTiming.

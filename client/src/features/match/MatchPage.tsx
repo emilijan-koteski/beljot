@@ -89,6 +89,7 @@ import { mergeRevealedFaceDownCards } from "./lib/faceDownCards";
 import { isBelotEligible, legalCardIds } from "./lib/legalCards";
 import { seatTeam } from "./lib/tableTheme";
 import { compassOffset, SLOT_POSITIONS } from "./lib/trickLayout";
+import { rulesForVariant } from "./lib/variantRules";
 
 function rectFrom(el: Element | null): FlightRect | null {
   if (!el) return null;
@@ -1307,6 +1308,30 @@ export function MatchPage() {
     returnToLobby();
   }, [clearGame, returnToLobby, setMatchAbandonedData]);
 
+  // Declaration-prompt melds. The server stamps them on the player once it has
+  // recorded a declare; until then the prompt previews what the server WILL
+  // record, so the detector must run under the same rule config — resolved from
+  // the variant, since the server's rule struct is never serialized.
+  //
+  // Memoized because detection allocates a fresh array, which inline in JSX
+  // would hand DeclarationPrompt a new identity on every unrelated re-render.
+  // It sits above the loading-state early return below so the hook order is
+  // unconditional, which is why it re-derives the seat's player rather than
+  // reusing the post-guard `myPlayer`.
+  const promptPlayer = matchState?.players.find((p) => p.seat === myPlayerSeat);
+  const declarationOverlap = rulesForVariant(matchState?.variant).declarationOverlap;
+  const promptHandKey = (promptPlayer?.hand ?? []).map((c) => `${c.rank}${c.suit}`).join(",");
+  const promptDeclarations = useMemo(
+    () =>
+      promptPlayer !== undefined && promptPlayer.declarations.length > 0
+        ? promptPlayer.declarations
+        : detectDeclarations(promptPlayer?.hand ?? [], declarationOverlap),
+    // promptHandKey stands in for the hand array, whose identity churns with
+    // every snapshot even when the cards are unchanged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [promptPlayer?.declarations, promptHandKey, declarationOverlap],
+  );
+
   // Loading state — themed with the in-game felt + brass palette so the
   // transition into the table doesn't flash a generic dark splash. We can't
   // render the full TableBackdrop (no matchState yet), so this is a slimmed-
@@ -2009,11 +2034,7 @@ export function MatchPage() {
       {/* Declaration prompt overlay */}
       {showDeclarationPrompt && myPlayer && (
         <DeclarationPrompt
-          declarations={
-            myPlayer.declarations.length > 0
-              ? myPlayer.declarations
-              : detectDeclarations(myPlayer.hand)
-          }
+          declarations={promptDeclarations}
           onDeclare={handleDeclare}
           onSkip={handleSkipDeclare}
           turnExpiresAt={matchState.turnExpiresAt}

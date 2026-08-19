@@ -768,3 +768,28 @@ func NewGameCroatianMidBidding(passCount int) *game.GameState {
 	gs.FaceDownRevealed = true
 	return gs
 }
+
+// NewGameCroatianFirstTrick returns the Croatian counterpart of
+// NewGameFirstTrick: the identical trick-1 playing-phase layout, but carrying
+// the Croatian variant string AND the Croatian rule preset, so
+// Rules.DeclarationOverlap is true.
+//
+// Both fields must be set together — game.RulesFor is the only thing that
+// populates the config, and the zero-value VariantRules is not Bitola (see
+// state_test.go's note), so a fixture that set Variant alone would silently
+// run on an invalid config.
+//
+// By trick 1 a Croatian hand holds all eight cards openly: bidding merged each
+// seat's two face-down cards into Hand and cleared FaceDownCards, which is
+// exactly the shape NewGameFirstTrick already has. Declarations are still
+// resolved during trick 1 under both variants; the dedicated Croatian
+// declaration phase is a separate story.
+//
+// Tests that need a specific meld shape overwrite Players[n].Hand, the same
+// way the Bitola dedup tests do.
+func NewGameCroatianFirstTrick(trump game.Suit) *game.GameState {
+	gs := NewGameFirstTrick(trump)
+	gs.Variant = game.VariantCroatia
+	gs.Rules = game.RulesFor(game.VariantCroatia)
+	return gs
+}

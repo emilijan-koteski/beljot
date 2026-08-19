@@ -27,7 +27,13 @@ var fourOfAKindPoints = map[Rank]int{
 // detectDeclarations scans a player's hand for all valid declarations.
 // Returns sequences and four-of-a-kind combinations with their point values.
 // Longer sequences subsume shorter subsequences within them.
-func detectDeclarations(hand []Card) []Declaration {
+//
+// overlap comes from VariantRules.DeclarationOverlap and must always be passed
+// explicitly by the caller from the game state's resolved config — never
+// defaulted, and never derived from the variant name. When it is true a single
+// card may count toward more than one declaration, so the one-card-one-group
+// dedup is skipped and every detected meld survives.
+func detectDeclarations(hand []Card, overlap bool) []Declaration {
 	var decls []Declaration
 
 	// --- Sequences: consecutive ranks of the same suit ---
@@ -91,10 +97,11 @@ func detectDeclarations(hand []Card) []Declaration {
 		}
 	}
 
-	// TODO(declaration-overlap): gate this on VariantRules.DeclarationOverlap —
-	// when it is true a card may participate in multiple declarations, so the
-	// dedup below is skipped. The config field already exists; wiring it up is
-	// the declaration-overlap story's job. Never branch on the variant name.
+	// A card may participate in several declarations under this config, so
+	// every detected meld stands on its own.
+	if overlap {
+		return decls
+	}
 	return dedupOneCardOneGroup(decls)
 }
 
@@ -102,7 +109,15 @@ func detectDeclarations(hand []Card) []Declaration {
 // VariantRules.DeclarationOverlap=false selects). Among
 // declarations that share at least one card, the highest-Value one is kept
 // and the rest are dropped. Stable — original order is preserved among
-// survivors; for equal-Value ties, the earlier declaration wins.
+// survivors.
+//
+// Equal-Value ties keep the four-of-a-kind, matching declarationBeats rule 2,
+// so the survivor is the same meld the clash comparison would have preferred.
+// Rule 2 alone settles every reachable tie here: overlap is only possible
+// between a sequence and a four-of-a-kind (sequences are maximal per-suit
+// runs, so two sequences never share a card; four-of-a-kinds are
+// rank-disjoint), and the later chain steps need trump and seat, neither of
+// which is known at detection time.
 func dedupOneCardOneGroup(decls []Declaration) []Declaration {
 	if len(decls) <= 1 {
 		return decls
@@ -113,7 +128,14 @@ func dedupOneCardOneGroup(decls []Declaration) []Declaration {
 		order[i] = i
 	}
 	sort.SliceStable(order, func(i, j int) bool {
-		return decls[order[i]].Value > decls[order[j]].Value
+		a, b := decls[order[i]], decls[order[j]]
+		if a.Value != b.Value {
+			return a.Value > b.Value
+		}
+		if a.Type != b.Type {
+			return a.Type == DeclarationFourOfAKind
+		}
+		return false
 	})
 
 	used := map[Card]bool{}
@@ -145,9 +167,13 @@ func dedupOneCardOneGroup(decls []Declaration) []Declaration {
 	return out
 }
 
-// hasDeclarableCombinations returns true if the hand contains any valid declarations.
-func hasDeclarableCombinations(hand []Card) bool {
-	return len(detectDeclarations(hand)) > 0
+// hasDeclarableCombinations returns true if the hand contains any valid
+// declarations. overlap has the same meaning as in detectDeclarations; the
+// predicate is in fact invariant under it (dedup keeps at least one meld from
+// any non-empty set), but the parameter is threaded through so the two
+// functions cannot drift apart.
+func hasDeclarableCombinations(hand []Card, overlap bool) bool {
+	return len(detectDeclarations(hand, overlap)) > 0
 }
 
 // resolveDeclarations compares all players' declarations after trick 1.
@@ -286,7 +312,7 @@ func handleDeclare(state *GameState, action Action) (*GameState, error) {
 	}
 
 	hand := state.Players[action.PlayerSeat].Hand
-	decls := detectDeclarations(hand)
+	decls := detectDeclarations(hand, state.Rules.DeclarationOverlap)
 	if len(decls) == 0 {
 		return nil, apperr.ErrDeclarationNotAvailable
 	}
@@ -467,7 +493,7 @@ func checkDeclarationPrompt(state *GameState) {
 	if len(state.Players[seat].Declarations) > 0 {
 		return
 	}
-	if hasDeclarableCombinations(state.Players[seat].Hand) {
+	if hasDeclarableCombinations(state.Players[seat].Hand, state.Rules.DeclarationOverlap) {
 		state.AwaitingDeclaration = true
 	}
 }

@@ -1936,3 +1936,36 @@ func TestDecide_TrickSevenRetentionBeatsContesting(t *testing.T) {
 	assert.Greater(t, retain[game.TeamA]-retain[game.TeamB], contest[game.TeamA]-contest[game.TeamB],
 		"retention must remain the better line — do not add a contest guard here")
 }
+
+// TestObserveDeclarations_OverlapRecordsEachCardOnce pins KnownCards' "exact
+// cards held" invariant under a declaration-overlap config, where one card can
+// legitimately appear in two of the same seat's melds. Concatenating the melds
+// would store the shared JS twice.
+func TestObserveDeclarations_OverlapRecordsEachCardOnce(t *testing.T) {
+	var players [4]game.PlayerState
+	players[0].Declarations = []game.Declaration{
+		{
+			Type:       game.DeclarationSequence,
+			Cards:      cards("9S", "TS", "JS", "QS"),
+			PlayerSeat: 0,
+			Value:      50,
+		},
+		{
+			Type:       game.DeclarationFourOfAKind,
+			Cards:      cards("JS", "JH", "JD", "JC"),
+			PlayerSeat: 0,
+			Value:      200,
+		},
+	}
+
+	mem := bot.NewMemory()
+	mem.ObserveDeclarations(players)
+	known := mem.KnownCards()[0]
+
+	ids := make([]string, 0, len(known))
+	for _, c := range known {
+		ids = append(ids, c.String())
+	}
+	assert.ElementsMatch(t, []string{"9S", "TS", "JS", "QS", "JH", "JD", "JC"}, ids,
+		"the shared JS must be recorded exactly once")
+}

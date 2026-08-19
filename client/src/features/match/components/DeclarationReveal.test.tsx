@@ -202,12 +202,21 @@ describe("DeclarationReveal", () => {
     expect(screen.queryByTestId("declaration-reveal")).not.toBeInTheDocument();
   });
 
-  it("stacks multiple declarations from the winning team", () => {
+  // Story 12.5 / D67: a declaration-overlap config lets ONE seat hold two
+  // surviving melds that share a card. Both rows must render, the shared card
+  // must appear in each of them, both declarer rows must carry that seat, and
+  // the total must be the plain sum — the reveal is deliberately centred, so
+  // there is nothing to anchor to a single declarer.
+  //
+  // This subsumes the older "stacks multiple declarations" case, whose
+  // `toBeGreaterThanOrEqual(1)` on the shared card would not have noticed a
+  // collapse to a single rendered copy. Every count here is exact.
+  it("stacks both melds when one seat holds two that share a card", () => {
     const payload: DeclarationsResolvedPayload = {
       winnerTeam: 0,
       declarations: [
-        { playerSeat: 0, type: "sequence", value: 50, cards: ["JS", "QS", "KS", "AS"] },
-        { playerSeat: 0, type: "four_of_a_kind", value: 200, cards: ["JC", "JH", "JD", "JS"] },
+        { playerSeat: 0, type: "sequence", value: 50, cards: ["9S", "TS", "JS", "QS"] },
+        { playerSeat: 0, type: "four_of_a_kind", value: 200, cards: ["JS", "JH", "JD", "JC"] },
       ],
     };
     render(
@@ -218,11 +227,26 @@ describe("DeclarationReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("playing-card-QS")).toBeInTheDocument();
-    expect(screen.getByTestId("playing-card-JC")).toBeInTheDocument();
-    expect(screen.getByTestId("playing-card-JH")).toBeInTheDocument();
-    // JS appears in both declarations — multiple matches expected
-    expect(screen.getAllByTestId("playing-card-JS").length).toBeGreaterThanOrEqual(1);
+
+    const values = screen.getAllByTestId("declaration-reveal-meld-value");
+    expect(values).toHaveLength(2);
+    expect(values[0]).toHaveTextContent("+50");
+    expect(values[1]).toHaveTextContent("+200");
+
+    // The shared JS is rendered once per row; every unshared card exactly once.
+    expect(screen.getAllByTestId("playing-card-JS")).toHaveLength(2);
+    for (const id of ["9S", "TS", "QS", "JH", "JD", "JC"]) {
+      expect(screen.getAllByTestId(`playing-card-${id}`)).toHaveLength(1);
+    }
+
+    const declarers = screen.getAllByTestId("declaration-reveal-declarer");
+    expect(declarers).toHaveLength(2);
+    expect(declarers[0]).toHaveAttribute("data-seat", "0");
+    expect(declarers[1]).toHaveAttribute("data-seat", "0");
+    expect(declarers[0]).toHaveTextContent("by alice");
+    expect(declarers[1]).toHaveTextContent("by alice");
+
+    expect(screen.getByTestId("declaration-reveal-total-value")).toHaveTextContent("+250");
   });
 
   it("shows the declarer's username for each declaration row", () => {

@@ -56,11 +56,23 @@ func (m *Memory) ObservePlay(seat int, card game.Card, leadSuit *game.Suit) {
 // public reveal — only the winning team's cards are ever stored, which keeps
 // the Bitola no-peeking rule intact. Idempotent within a hand; reset by
 // SyncHand on a hand advance.
+//
+// Each card is recorded once per seat. Under a config that allows declaration
+// overlap a single card can appear in two of the same seat's melds, and a
+// naive concatenation would store it twice — breaking the "exact cards held"
+// invariant KnownCards promises. A linear scan over the accumulating slice is
+// the right dedup here: a seat's melds can never cover more than the 8 cards
+// it was dealt, so there is nothing for a map to amortise.
 func (m *Memory) ObserveDeclarations(players [4]game.PlayerState) {
 	for seat := range players {
 		var cs []game.Card
 		for _, d := range players[seat].Declarations {
-			cs = append(cs, d.Cards...) // append copies the cards into a fresh slice
+			for _, c := range d.Cards {
+				if slices.Contains(cs, c) {
+					continue
+				}
+				cs = append(cs, c) // copies the card value into a fresh slice
+			}
 		}
 		m.declared[seat] = cs
 	}

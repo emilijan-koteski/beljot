@@ -102,6 +102,14 @@ func TestEventsJSONContract(t *testing.T) {
 
 	// declarationsResolvedSample mirrors the manager.go broadcast — also a
 	// map[string]any with a list of decl maps.
+	//
+	// Two entries for the SAME seat, sharing JS: that is what a
+	// declaration-overlap config produces, and the flat "one entry per meld,
+	// each carrying its own playerSeat" shape already carries it — no payload
+	// change was needed. This sample is a hand-written literal, so it pins the
+	// payload and Zod schema shape for that case, NOT the broadcast helper that
+	// produces it — collapsing the producer loop would keep this green. The
+	// producer stays covered by the game-package declaration tests.
 	declarationsResolvedSample := map[string]any{
 		"winnerTeam": 0,
 		"declarations": []map[string]any{
@@ -110,6 +118,12 @@ func TestEventsJSONContract(t *testing.T) {
 				"type":       "sequence",
 				"value":      50,
 				"cards":      []string{"JS", "QS", "KS", "AS"},
+			},
+			{
+				"playerSeat": 0,
+				"type":       "four_of_a_kind",
+				"value":      200,
+				"cards":      []string{"JS", "JH", "JD", "JC"},
 			},
 		},
 	}

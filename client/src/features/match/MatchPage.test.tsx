@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1612,6 +1612,67 @@ describe("MatchPage", () => {
         vi.advanceTimersByTime(2000);
       });
       expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+    });
+  });
+  // Story 12.5: the prompt's fallback detector is the ONE production site that
+  // reads the variant's declaration-overlap rule. The lib tests pass the flag as
+  // a literal and the resolver test is isolated, so without a page-level test
+  // hardcoding the argument to `false` here would keep the whole suite green.
+  describe("declaration prompt overlap wiring", () => {
+    // Seat 0 holds quarte 9S-TS-JS-QS (50) and a carré of Jacks (200) sharing
+    // JS. Croatian keeps both melds; Bitola dedups down to the carré.
+    function overlapPromptState(variant: MatchState["variant"]): MatchState {
+      return {
+        ...mockMatchState,
+        variant,
+        phase: "playing",
+        trumpSuit: "H",
+        activePlayerSeat: 0,
+        awaitingDeclaration: true,
+        players: mockMatchState.players.map((p) =>
+          p.seat === 0
+            ? {
+                ...p,
+                declarations: [],
+                hand: [
+                  { rank: "9", suit: "S" },
+                  { rank: "T", suit: "S" },
+                  { rank: "J", suit: "S" },
+                  { rank: "Q", suit: "S" },
+                  { rank: "J", suit: "H" },
+                  { rank: "J", suit: "D" },
+                  { rank: "J", suit: "C" },
+                  { rank: "7", suit: "C" },
+                ] as MatchState["players"][number]["hand"],
+              }
+            : p,
+        ) as MatchState["players"],
+      };
+    }
+
+    it("lists both overlapping melds and totals 250 in a Croatian match", () => {
+      useMatchStore.getState().setMatchState(overlapPromptState("croatia"));
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      const prompt = screen.getByTestId("declaration-prompt");
+      // The shared JS is rendered once in each of the two meld rows.
+      expect(within(prompt).getAllByTestId("playing-card-JS")).toHaveLength(2);
+      expect(within(prompt).getAllByTestId("playing-card-QS")).toHaveLength(1);
+      expect(within(prompt).getAllByTestId("playing-card-JC")).toHaveLength(1);
+      expect(within(prompt).getByTestId("declaration-prompt-total")).toHaveTextContent("250");
+    });
+
+    it("lists one deduped meld and totals 200 in a Bitola match", () => {
+      useMatchStore.getState().setMatchState(overlapPromptState("bitola"));
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      const prompt = screen.getByTestId("declaration-prompt");
+      // Only the carré survives, so JS appears once and the quarte's QS not at all.
+      expect(within(prompt).getAllByTestId("playing-card-JS")).toHaveLength(1);
+      expect(within(prompt).queryByTestId("playing-card-QS")).not.toBeInTheDocument();
+      expect(within(prompt).getByTestId("declaration-prompt-total")).toHaveTextContent("200");
     });
   });
 });

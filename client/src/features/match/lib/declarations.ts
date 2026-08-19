@@ -48,8 +48,14 @@ export function declarationLabelKey(
  * Scans a hand for sequences (3+ consecutive same-suit cards in natural order)
  * and four-of-a-kind (same rank across all 4 suits). Longer sequences subsume
  * shorter subsequences within them.
+ *
+ * `overlap` must come from `rulesForVariant(...).declarationOverlap` — the
+ * single client resolver — and is required so no caller can silently fall back
+ * to the wrong variant's rule. When it is true a card may count toward more
+ * than one declaration, so the one-card-one-group dedup is skipped and every
+ * detected meld survives, exactly as the server records it.
  */
-export function detectDeclarations(hand: Card[]): Declaration[] {
+export function detectDeclarations(hand: Card[], overlap: boolean): Declaration[] {
   const decls: Declaration[] = [];
 
   // Sequences
@@ -111,23 +117,37 @@ export function detectDeclarations(hand: Card[]): Declaration[] {
     }
   }
 
-  // TODO(croatian-variant): skip dedup for the Croatian variant when added —
-  // there a card may participate in multiple declarations.
+  // A card may participate in several declarations under this config, so every
+  // detected meld stands on its own.
+  if (overlap) return decls;
   return dedupBitola(decls);
 }
 
 /**
- * Applies the Bitola-variant rule: one card, one group. Among declarations
- * that share at least one card, the highest-value one is kept and the rest
- * are dropped. Stable — original order is preserved among survivors; for
- * equal-value ties, the earlier declaration wins.
+ * Applies the one-card-one-group rule (what `declarationOverlap: false`
+ * selects). Among declarations that share at least one card, the highest-value
+ * one is kept and the rest are dropped. Stable — original order is preserved
+ * among survivors.
+ *
+ * Equal-value ties keep the four-of-a-kind, mirroring `declarationBeats` rule 2
+ * in the Go engine, so the survivor is the meld the clash comparison would have
+ * preferred. Rule 2 alone settles every reachable tie: overlap is only possible
+ * between a sequence and a four-of-a-kind, since sequences are maximal
+ * per-suit runs and four-of-a-kinds are rank-disjoint.
  */
 function dedupBitola(decls: Declaration[]): Declaration[] {
   if (decls.length <= 1) return decls;
 
   const order = decls.map((_, i) => i);
-  // Stable sort by value descending (Array.sort in modern engines is stable).
-  order.sort((a, b) => decls[b]!.value - decls[a]!.value);
+  // Stable sort by value descending, four-of-a-kind first on a tie (Array.sort
+  // in modern engines is stable).
+  order.sort((a, b) => {
+    const da = decls[a]!;
+    const db = decls[b]!;
+    if (da.value !== db.value) return db.value - da.value;
+    if (da.type !== db.type) return da.type === "four_of_a_kind" ? -1 : 1;
+    return 0;
+  });
 
   const used = new Set<string>();
   const keep = new Array<boolean>(decls.length).fill(false);
