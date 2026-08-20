@@ -249,3 +249,71 @@ baseline_commit: "4639656e4da3d933dc6b7ab64e0d84829217fffa"
 
 - First fixture reaching a Croatian post-bidding, pre-trick-1 state.
   [`fixtures.go:797`](../../server/internal/game/testfixtures/fixtures.go#L797)
+
+## Suggested Review Order
+
+**Rule selection — start here**
+
+- The whole story in one branch: dedicated timing opens the phase, Bitola's block is untouched.
+  [`bidding.go:180`](../../server/internal/game/bidding.go#L180)
+
+- The phase's three moving parts: dispatch, open at the dealer's left, walk the cursor.
+  [`declarations.go:305`](../../server/internal/game/declarations.go#L305)
+
+- Resolution and handoff — the fourth answer resolves and opens trick 1 in one action.
+  [`declarations.go:358`](../../server/internal/game/declarations.go#L358)
+
+- Answer progress is server-only and value-typed, so nothing widens and no clone line is needed.
+  [`state.go:145`](../../server/internal/game/state.go#L145)
+
+- Without this case the phase rejects every action silently, not at compile time.
+  [`rules_engine.go:52`](../../server/internal/game/rules_engine.go#L52)
+
+**The default arms — where this story could actually freeze a table**
+
+- Auto-skip now covers both timings; the prompted seat is always the active seat.
+  [`live_match.go:1541`](../../server/internal/match/live_match.go#L1541)
+
+- The unreachable shape re-arms loudly and refreshes the deadline instead of returning silently.
+  [`live_match.go:1554`](../../server/internal/match/live_match.go#L1554)
+
+- The auto-action chain may now continue through the phase rather than breaking out.
+  [`live_match.go:1654`](../../server/internal/match/live_match.go#L1654)
+
+- Bots are scheduled for the prompted seat only, which is what keeps the guard below unreachable.
+  [`bot_driver.go:100`](../../server/internal/match/bot_driver.go#L100)
+
+- Returns before the card ladder; `LegalCards` is nil here and `chooseCard` would panic.
+  [`bot.go:41`](../../server/internal/bot/bot.go#L41)
+
+- A drop during the phase previously opened no reconnect window at all.
+  [`reconnect.go:97`](../../server/internal/match/reconnect.go#L97)
+
+**Wire — the reveal is the only thing that crosses**
+
+- The reveal latch is consumed here on a meld-less hand, so this arm has to emit it.
+  [`live_match.go:905`](../../server/internal/match/live_match.go#L905)
+
+- Ordering contract: the reveal rides ahead of the state that opens trick 1.
+  [`declaration_phase_test.go:130`](../../server/internal/match/declaration_phase_test.go#L130)
+
+**Client — reacts to the phase, never to the variant**
+
+- One derived predicate feeds the seat ring, both HUD clusters, pause, surrender and emotes.
+  [`MatchPage.tsx:1425`](../../client/src/features/match/MatchPage.tsx#L1425)
+
+- The closed union must carry the new value or every comparison is a `tsc` error.
+  [`matchTypes.ts:19`](../../client/src/shared/types/matchTypes.ts#L19)
+
+**Peripherals**
+
+- Entry from both Croatian bidding paths, with the Bitola control beside it.
+  [`declarations_test.go:1564`](../../server/internal/game/declarations_test.go#L1564)
+
+- The deadlock proof: a full Croatian hand driven through the shared bot loop.
+  [`simulation_test.go:206`](../../server/internal/bot/simulation_test.go#L206)
+
+- The first fixture producing a Croatian post-bidding, pre-trick-1 state.
+  [`fixtures.go:790`](../../server/internal/game/testfixtures/fixtures.go#L790)
+
+Note: the `## Code Map` anchors above are pre-change positions captured during planning; the code this story added has shifted several by a few lines.
