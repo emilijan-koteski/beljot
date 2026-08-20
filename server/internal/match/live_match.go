@@ -465,7 +465,8 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 		} else {
 			newState.TurnTimeRemaining = 0
 		}
-	} else if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding {
+	} else if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding ||
+		newState.Phase == game.PhaseDeclaring {
 		// Within-turn predicate: when seat and phase are unchanged, the action
 		// resolved a prompt (declare/skip_declare, play_card-into-belot,
 		// surrender request/decline) without advancing the turn. The original
@@ -893,6 +894,15 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 					"roomID", newState.RoomID, "playerSeat", action.PlayerSeat)
 			}
 		}
+		// Under DeclarationTimingDedicatedPhase a pick can RESOLVE the contest on
+		// the spot: when no seat holds a meld the phase opens and closes inside
+		// this one transition, so DeclarationsResolved flips false→true here and
+		// nowhere else. Without this call the fire-once latch is consumed by a
+		// broadcast arm that never emits, and the hand silently loses its
+		// event:declarations_resolved — while the equivalent Bitola hand fires a
+		// winnerTeam:null event at trick 2. Emitted BEFORE the authoritative
+		// state, like every other typed-event-then-state pair here.
+		m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
 		// Always follow with full state so clients leave the bidding UI and
 		// sync activePlayerSeat/phase/trumpCallerSeat. Without this, a
 		// successful pick leaves the client stuck on TrumpPrompt and every
@@ -912,17 +922,18 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 
 	case game.ActionDeclare, game.ActionSkipDeclare:
 		// Announce WHO declared the moment the declare commits, so the table
-		// learns a declaration exists during trick 1 (seat only — the melds
-		// themselves stay secret until event:declarations_resolved). Timer
-		// expiry only ever auto-SKIPS, so this fires for manual declares only.
+		// learns a declaration exists (seat only — the melds themselves stay
+		// secret until event:declarations_resolved). Timer expiry only ever
+		// auto-SKIPS, so this fires for manual declares only.
 		if action.Type == game.ActionDeclare {
 			declared := ws.PlayerDeclaredPayload{PlayerSeat: action.PlayerSeat}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventPlayerDeclared, declared))
 		}
-		// In Bitola, DeclarationsResolved cannot actually flip here — declarations
-		// resolve only at end of trick 1 (see ActionPlayCard branch). The helper
-		// is still called so future variants (e.g. Croatian, where declarations
-		// resolve during a dedicated phase) don't silently regress.
+		// Under DeclarationTimingDuringFirstTrick DeclarationsResolved cannot
+		// flip here — declarations resolve only at end of trick 1 (see the
+		// ActionPlayCard branch). Under DeclarationTimingDedicatedPhase it flips
+		// on the FOURTH seat's answer, the same action that opens trick 1, so the
+		// reveal rides ahead of the playing-phase match_state below.
 		m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
 		// Always follow with full state so the client clears awaitingDeclaration,
 		// advances activePlayerSeat, and picks up declarationsResolved. The
@@ -1462,7 +1473,8 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 	if newState.Phase == game.PhaseDealing {
 		newState.Phase = game.PhaseBidding
 	}
-	if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding {
+	if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding ||
+		newState.Phase == game.PhaseDeclaring {
 		m.setTurnExpiry(session, newState)
 		m.startTimerLocked(session, newState.ActivePlayerSeat)
 	}
@@ -1526,12 +1538,40 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 			Type:       game.ActionPassTrump,
 			PlayerSeat: expectedSeat,
 		}
-	case gs.Phase == game.PhasePlaying && gs.AwaitingDeclaration:
-		// Auto-skip declaration on timer expiry
+	case (gs.Phase == game.PhasePlaying || gs.Phase == game.PhaseDeclaring) && gs.AwaitingDeclaration:
+		// Auto-skip declaration on timer expiry — inside trick 1 under
+		// DeclarationTimingDuringFirstTrick, or inside the dedicated phase.
+		//
+		// Unlike the bidding TODO above, this auto-action can never be rejected:
+		// the prompted seat IS the active seat and AwaitingDeclaration is set, so
+		// skip_declare always applies. There is therefore no reject → re-arm
+		// cycle to hot-spin on, and the dedicated phase advances to the next seat
+		// (or resolves into trick 1) on this one action.
 		action = game.Action{
 			Type:       game.ActionSkipDeclare,
 			PlayerSeat: expectedSeat,
 		}
+	case gs.Phase == game.PhaseDeclaring:
+		// Defensive: the dedicated declaration phase only ever exists with a
+		// prompt outstanding — it resolves the instant the last seat answers — so
+		// arriving here means the state machine produced a shape it should not.
+		// Log it as loudly as every sibling defensive re-arm below, then re-arm
+		// for the seat actually holding the cursor (expectedSeat may be stale)
+		// rather than falling into the default's silent return, which would leave
+		// the phase with no clock at all. The refreshed deadline is broadcast too,
+		// or all four clients would keep rendering the elapsed one while the
+		// server quietly holds a fresh full window.
+		slog.Error("session: declaring phase reached timer expiry with no prompt outstanding; re-arming",
+			"roomID", session.roomID, "activeSeat", gs.ActivePlayerSeat, "expectedSeat", expectedSeat)
+		m.setTurnExpiry(session, gs)
+		m.startTimerLocked(session, gs.ActivePlayerSeat)
+		// Build under the lock, send after releasing it — same pattern as
+		// HandleDisconnect / SyncStateOnConnect.
+		staleMsg := buildMessage(ws.EventMatchState, gs)
+		staleUserIDs := humanUserIDs(session.playerIDs)
+		session.mu.Unlock()
+		m.hub.BroadcastToUsers(staleUserIDs, staleMsg)
+		return
 	case gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == expectedSeat:
 		// Auto-skip belot announcement on timer expiry
 		action = game.Action{
@@ -1611,7 +1651,7 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		if cur.ActivePlayerSeat != oldState.ActivePlayerSeat || cur.Phase != oldState.Phase {
 			break
 		}
-		if cur.Phase != game.PhasePlaying {
+		if cur.Phase != game.PhasePlaying && cur.Phase != game.PhaseDeclaring {
 			break
 		}
 		// Pick the next auto-action structurally — no action-type enumeration.
@@ -1623,6 +1663,12 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 			next = game.Action{Type: game.ActionSkipBelot, PlayerSeat: cur.ActivePlayerSeat}
 		case cur.AwaitingDeclaration:
 			next = game.Action{Type: game.ActionSkipDeclare, PlayerSeat: cur.ActivePlayerSeat}
+		case cur.Phase == game.PhaseDeclaring:
+			// The dedicated declaration phase with no prompt outstanding — an
+			// unreachable shape (an answer either moves the cursor to another
+			// seat, which the checks above already broke on, or ends the phase).
+			// Leave next empty so the loop breaks rather than reaching AutoPlay,
+			// which has no legal card to offer here.
 		default:
 			cardID, autoErr := game.AutoPlay(cur)
 			if autoErr != nil {
@@ -1661,7 +1707,8 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	//    violation; arming a fresh timer keeps the game moving while operator
 	//    debugs.
 	//  • Phase is match_end / paused — outer guard skips both.
-	if finalState.Phase == game.PhasePlaying || finalState.Phase == game.PhaseBidding {
+	if finalState.Phase == game.PhasePlaying || finalState.Phase == game.PhaseBidding ||
+		finalState.Phase == game.PhaseDeclaring {
 		// Pass finalState.ActivePlayerSeat explicitly: session.gameState is
 		// reassigned to finalState only after this block, so a state-less
 		// startTimerLocked would capture the OLD (timed-out) seat and the next

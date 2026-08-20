@@ -298,10 +298,91 @@ func teamDeclarationTotal(players [4]PlayerState, team int) int {
 	return total
 }
 
-// handleDeclare processes a declare action at trick 1.
+// handleDeclaring processes the actions valid inside PhaseDeclaring, the
+// dedicated declaration phase Croatian runs between bidding and trick 1.
+// declare and skip_declare are the only ones — play_card in particular is
+// rejected, since no trick is open yet.
+func handleDeclaring(state *GameState, action Action) (*GameState, error) {
+	if state.Phase != PhaseDeclaring {
+		return nil, apperr.ErrWrongPhase
+	}
+
+	switch action.Type {
+	case ActionDeclare:
+		return handleDeclare(state, action)
+	case ActionSkipDeclare:
+		return handleSkipDeclare(state, action)
+	default:
+		return nil, apperr.ErrWrongPhase
+	}
+}
+
+// openDeclarationPhase enters PhaseDeclaring from a resolved bid. The cursor
+// starts at (DealerSeat+1)%4 — the seat that will lead trick 1 — and walks
+// counter-clockwise, so the declaration order matches the play order.
+//
+// TrickNumber is deliberately 0: no trick is open, and Bitola's trick-1
+// declaration path (checkDeclarationPrompt, resolveTrickWithDeclarations) is
+// guarded on TrickNumber == 1, so it can never engage here.
+//
+// A hand where no seat holds a meld opens and resolves in this single call —
+// advanceDeclarationPhase steps past all four seats without ever setting
+// AwaitingDeclaration and hands off to trick 1.
+func openDeclarationPhase(state *GameState) {
+	state.Phase = PhaseDeclaring
+	state.TrickNumber = 0
+	state.CurrentTrick = []TrickCard{}
+	state.DeclarationSeatsAnswered = 0
+	state.AwaitingDeclaration = false
+
+	advanceDeclarationPhase(state)
+}
+
+// advanceDeclarationPhase moves the PhaseDeclaring cursor to the next seat that
+// owes an answer, or ends the phase when every seat has been visited.
+//
+// Seats holding no meld have nothing to answer: they are counted as visited and
+// stepped past without a prompt, which is the same rule Bitola applies through
+// checkDeclarationPrompt. That also keeps a meld-less bot from being handed a
+// prompt it can only answer with ErrDeclarationNotAvailable.
+//
+// Termination: every iteration either returns or increments
+// DeclarationSeatsAnswered, which is bounded at 4 — so the phase always ends,
+// and each seat is visited exactly once.
+//
+// On the fourth answer the contest resolves through the SAME
+// resolveDeclarationsForHand Bitola uses at trick 2 (DeclarationsResolved flips
+// false→true here, so the match layer's fire-once reveal latch works unchanged)
+// and the game moves straight to PhasePlaying at trick 1 — the reveal panel
+// floats over live play exactly as it does in Bitola.
+func advanceDeclarationPhase(state *GameState) {
+	state.AwaitingDeclaration = false
+
+	for state.DeclarationSeatsAnswered < 4 {
+		seat := (state.DealerSeat + 1 + state.DeclarationSeatsAnswered) % 4
+		state.ActivePlayerSeat = seat
+		if hasDeclarableCombinations(state.Players[seat].Hand, state.Rules.DeclarationOverlap) {
+			state.AwaitingDeclaration = true
+			return
+		}
+		state.DeclarationSeatsAnswered++
+	}
+
+	resolveDeclarationsForHand(state)
+
+	state.DeclarationSeatsAnswered = 0
+	state.Phase = PhasePlaying
+	state.ActivePlayerSeat = (state.DealerSeat + 1) % 4
+	state.TrickNumber = 1
+	state.CurrentTrick = []TrickCard{}
+}
+
+// handleDeclare processes a declare action — at trick 1 under
+// DeclarationTimingDuringFirstTrick, or inside PhaseDeclaring under
+// DeclarationTimingDedicatedPhase.
 // Auto-detects all declarations from the player's hand and stores them.
 func handleDeclare(state *GameState, action Action) (*GameState, error) {
-	if state.TrickNumber != 1 {
+	if state.Phase != PhaseDeclaring && state.TrickNumber != 1 {
 		return nil, apperr.ErrWrongPhase
 	}
 	if !state.AwaitingDeclaration {
@@ -326,12 +407,21 @@ func handleDeclare(state *GameState, action Action) (*GameState, error) {
 	newState.Players[action.PlayerSeat].Declarations = decls
 	newState.AwaitingDeclaration = false
 
+	// In the dedicated phase nothing else advances the turn — Bitola relies on
+	// the same seat's following play_card, which does not exist here.
+	if newState.Phase == PhaseDeclaring {
+		newState.DeclarationSeatsAnswered++
+		advanceDeclarationPhase(newState)
+	}
+
 	return newState, nil
 }
 
-// handleSkipDeclare processes a skip_declare action at trick 1.
+// handleSkipDeclare processes a skip_declare action — at trick 1 under
+// DeclarationTimingDuringFirstTrick, or inside PhaseDeclaring under
+// DeclarationTimingDedicatedPhase.
 func handleSkipDeclare(state *GameState, action Action) (*GameState, error) {
-	if state.TrickNumber != 1 {
+	if state.Phase != PhaseDeclaring && state.TrickNumber != 1 {
 		return nil, apperr.ErrWrongPhase
 	}
 	if !state.AwaitingDeclaration {
@@ -343,6 +433,12 @@ func handleSkipDeclare(state *GameState, action Action) (*GameState, error) {
 
 	newState := cloneGameState(state)
 	newState.AwaitingDeclaration = false
+
+	// See handleDeclare: the dedicated phase owns its own turn advance.
+	if newState.Phase == PhaseDeclaring {
+		newState.DeclarationSeatsAnswered++
+		advanceDeclarationPhase(newState)
+	}
 
 	return newState, nil
 }

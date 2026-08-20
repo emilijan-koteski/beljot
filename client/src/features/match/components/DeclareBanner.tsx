@@ -57,11 +57,13 @@ const COMPACT_POSITIONS: Record<0 | 1 | 2 | 3, CSSProperties> = {
 };
 
 /**
- * Trick-1 "has a declaration" seat banner. Shown the moment a player commits
- * a declare action so the whole table knows a declaration exists — WITHOUT
- * revealing which melds or how much; that stays secret until the
- * DeclarationReveal at the end of trick 1. Styling and anchoring mirror
- * EmoteBubble / SurrenderOpponentBanner; auto-dismisses like the emote bubble.
+ * "Has a declaration" seat banner. Shown the moment a player commits a declare
+ * action so the whole table knows a declaration exists — WITHOUT revealing
+ * which melds or how much; that stays secret until the DeclarationReveal. It is
+ * phase-agnostic: declarations may be collected inside trick 1 or in a
+ * dedicated phase before it, and the banner reads the same either way. Styling
+ * and anchoring mirror EmoteBubble / SurrenderOpponentBanner; auto-dismisses
+ * like the emote bubble.
  */
 export function DeclareBanner({
   declarerUsername,

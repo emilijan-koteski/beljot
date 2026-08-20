@@ -482,9 +482,9 @@ function dispatchGameEvent(message: WsMessage): void {
   }
 
   if (type === EVENT_PLAYER_DECLARED) {
-    // Trick-1 "who declared" announcement — ephemeral per-seat banner, not
-    // part of MatchState. Mirrors the system:emote defensive validation; the
-    // banner component clears its own slot via its auto-dismiss timer.
+    // "Who declared" announcement — ephemeral per-seat banner, not part of
+    // MatchState. Mirrors the system:emote defensive validation; the banner
+    // component clears its own slot via its auto-dismiss timer.
     const payload = message.payload as PlayerDeclaredPayload;
     if (
       typeof payload?.playerSeat !== "number" ||

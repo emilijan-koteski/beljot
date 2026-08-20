@@ -653,7 +653,9 @@ func TestRound1IgnoresActionSuit(t *testing.T) {
 
 // TestCroatianPickRound1 locks the round-1 divergence: with no trump candidate,
 // the picker names any suit freely, takes no card, and the face-down cards fold
-// into every hand as bidding resolves.
+// into every hand as bidding resolves. A resolved Croatian bid opens the
+// dedicated declaration phase rather than trick 1 — every seat in this fixture
+// holds a meld, so the cursor stops on the first of them.
 func TestCroatianPickRound1(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -683,13 +685,15 @@ func TestCroatianPickRound1(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, result)
-			assert.Equal(t, game.PhasePlaying, result.Phase)
+			assert.Equal(t, game.PhaseDeclaring, result.Phase)
 			require.NotNil(t, result.TrumpSuit)
 			assert.Equal(t, tc.chosenSuit, *result.TrumpSuit, "trump is the freely named suit")
 			require.NotNil(t, result.TrumpCallerSeat)
 			assert.Equal(t, tc.activeSeat, *result.TrumpCallerSeat)
-			assert.Equal(t, 1, result.ActivePlayerSeat, "(DealerSeat+1)%4 leads trick 1")
-			assert.Equal(t, 1, result.TrickNumber)
+			assert.Equal(t, 1, result.ActivePlayerSeat,
+				"declarations open at (DealerSeat+1)%4 — the seat that will lead trick 1")
+			assert.True(t, result.AwaitingDeclaration, "that seat holds a meld, so it is prompted")
+			assert.Equal(t, 0, result.TrickNumber, "no trick is open during the declaration phase")
 			assert.Empty(t, result.CurrentTrick)
 
 			// The picker draws no card: their hand grows only by their own two
@@ -823,7 +827,7 @@ func TestCroatianDealerCannotPassInRound2(t *testing.T) {
 		Suit:       &suit,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, game.PhasePlaying, picked.Phase)
+	assert.Equal(t, game.PhaseDeclaring, picked.Phase, "a resolved Croatian bid opens the declaration phase")
 	require.NotNil(t, picked.TrumpSuit)
 	assert.Equal(t, game.SuitClubs, *picked.TrumpSuit)
 }
@@ -1080,39 +1084,46 @@ func TestCroatianFullBiddingFromNewGame(t *testing.T) {
 		Suit:       &suit,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, game.PhasePlaying, final.Phase)
+	// A resolved Croatian bid opens the dedicated declaration phase, never trick 1
+	// directly — unless the random deal left nobody holding a meld, in which case
+	// the phase opens and resolves inside this same transition.
+	require.Contains(t, []game.Phase{game.PhaseDeclaring, game.PhasePlaying}, final.Phase)
 	require.NotNil(t, final.TrumpSuit)
 	assert.Equal(t, game.SuitHearts, *final.TrumpSuit)
 	require.NotNil(t, final.TrumpCallerSeat)
 	assert.Equal(t, gs.DealerSeat, *final.TrumpCallerSeat)
-	assert.Equal(t, 1, final.TrickNumber)
 	for i, p := range final.Players {
 		assert.Len(t, p.Hand, 8, "seat %d holds 8 once bidding resolves", i)
 		assert.Empty(t, p.FaceDownCards)
 	}
 	assert.ElementsMatch(t, startingCards, collectCards(final), "all 32 cards preserved end to end")
 
-	// The hand is genuinely playable: the leader can play a legal card.
+	// Walk the declaration phase to its end. Every prompted seat skips; the
+	// phase must terminate in at most four answers whatever the random deal
+	// produced.
+	for i := 0; final.Phase == game.PhaseDeclaring; i++ {
+		require.Less(t, i, 4, "the declaration phase must resolve within four answers")
+		require.True(t, final.AwaitingDeclaration, "the phase only persists with a prompt outstanding")
+		final, err = game.ApplyAction(final, game.Action{
+			Type:       game.ActionSkipDeclare,
+			PlayerSeat: final.ActivePlayerSeat,
+		})
+		require.NoError(t, err, "skip_declare %d", i+1)
+	}
+	assert.Equal(t, game.PhasePlaying, final.Phase, "the phase hands off to trick 1")
+	assert.Equal(t, 1, final.TrickNumber)
+	assert.True(t, final.DeclarationsResolved)
+	assert.False(t, final.AwaitingDeclaration, "nothing is owed at trick 1 any more")
+	assert.Equal(t, (final.DealerSeat+1)%4, final.ActivePlayerSeat, "the seat after the dealer leads")
+
+	// The hand is genuinely playable: the leader can play a legal card with no
+	// declaration owed.
 	lead := final.Players[final.ActivePlayerSeat].Hand[0]
 	played, err := game.ApplyAction(final, game.Action{
 		Type:       game.ActionPlayCard,
 		PlayerSeat: final.ActivePlayerSeat,
 		Card:       &lead,
 	})
-	if final.AwaitingDeclaration {
-		// The leader holds a meld, so a declare/skip is owed first.
-		require.Error(t, err, "a pending declaration must block the card")
-		played, err = game.ApplyAction(final, game.Action{
-			Type:       game.ActionSkipDeclare,
-			PlayerSeat: final.ActivePlayerSeat,
-		})
-		require.NoError(t, err)
-		played, err = game.ApplyAction(played, game.Action{
-			Type:       game.ActionPlayCard,
-			PlayerSeat: played.ActivePlayerSeat,
-			Card:       &played.Players[played.ActivePlayerSeat].Hand[0],
-		})
-	}
 	require.NoError(t, err)
 	assert.Len(t, played.CurrentTrick, 1)
 }

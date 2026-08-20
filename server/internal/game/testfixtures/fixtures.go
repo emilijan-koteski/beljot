@@ -769,6 +769,45 @@ func NewGameCroatianMidBidding(passCount int) *game.GameState {
 	return gs
 }
 
+// NewGameCroatianDeclaring returns a Croatian GameState parked in the dedicated
+// DECLARING phase, the state between a resolved bid and trick 1 that no other
+// factory can produce.
+//
+// It is built by driving the real engine — NewGameCroatianJustDealt plus a
+// round-1 free-suit pick by seat 1 — rather than by hand, so the fixture also
+// exercises mergeFaceDownCards and can never drift from what handlePickTrump
+// actually produces. Panics if the engine rejects the pick: that means the
+// bidding fixture and the engine have diverged, which no test should paper over.
+//
+// With the standard NewGameCroatianJustDealt layout every seat holds a meld
+// once its two face-down cards merge in — seats 0/1/2 each a six-card run,
+// seat 3 four Kings and four Aces — so the cursor stops at all four in turn.
+//
+//	Seat 0: 7S 8S 9S TS JS QS + 7H 8H     -> spade run of six
+//	Seat 1: 7D 8D 9D TD JD QD + 9H TH     -> diamond run of six
+//	Seat 2: 7C 8C 9C TC JC QC + JH QH     -> club run of six
+//	Seat 3: KS AS KD AD KH AH KC AC       -> four Kings + four Aces
+//
+// Dealer is seat 0, so the declaration cursor opens on seat 1 — the seat that
+// will lead trick 1 — and walks counter-clockwise 1 → 2 → 3 → 0.
+//
+// A test that needs a different meld layout (meld-less seats, no melds at all)
+// should overwrite the hands on NewGameCroatianJustDealt and apply pick_trump
+// itself, so the engine still decides where the cursor stops.
+func NewGameCroatianDeclaring(trump game.Suit) *game.GameState {
+	gs := NewGameCroatianJustDealt()
+
+	picked, err := game.ApplyAction(gs, game.Action{
+		Type:       game.ActionPickTrump,
+		PlayerSeat: gs.ActivePlayerSeat,
+		Suit:       &trump,
+	})
+	if err != nil {
+		panic("testfixtures: Croatian pick_trump rejected: " + err.Error())
+	}
+	return picked
+}
+
 // NewGameCroatianFirstTrick returns the Croatian counterpart of
 // NewGameFirstTrick: the identical trick-1 playing-phase layout, but carrying
 // the Croatian variant string AND the Croatian rule preset, so
@@ -781,9 +820,14 @@ func NewGameCroatianMidBidding(passCount int) *game.GameState {
 //
 // By trick 1 a Croatian hand holds all eight cards openly: bidding merged each
 // seat's two face-down cards into Hand and cleared FaceDownCards, which is
-// exactly the shape NewGameFirstTrick already has. Declarations are still
-// resolved during trick 1 under both variants; the dedicated Croatian
-// declaration phase is a separate story.
+// exactly the shape NewGameFirstTrick already has.
+//
+// Scope: this is the fixture for MELD DETECTION and RESOLUTION under the
+// Croatian overlap rule — the parts of the contest that are timing-agnostic. A
+// real Croatian hand no longer reaches trick 1 with declarations outstanding;
+// they are collected in the dedicated phase before the first card is played.
+// Use NewGameCroatianDeclaring for anything that depends on WHEN they are
+// collected.
 //
 // Tests that need a specific meld shape overwrite Players[n].Hand, the same
 // way the Bitola dedup tests do.

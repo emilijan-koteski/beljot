@@ -131,6 +131,18 @@ type GameState struct {
 	TrickWinnerSeat      *int        `json:"trickWinnerSeat"`
 	AwaitingDeclaration  bool        `json:"awaitingDeclaration"`
 	DeclarationsResolved bool        `json:"declarationsResolved"`
+	// DeclarationSeatsAnswered counts how many seats the PhaseDeclaring cursor
+	// has already visited, walking counter-clockwise from (DealerSeat+1)%4. A
+	// seat counts as visited once it declares, skips, or is stepped past for
+	// holding no meld — so the phase ends exactly when this reaches 4, and a
+	// skip is never confused with "not asked yet" (stored Declarations cannot
+	// tell those two apart). Always 0 outside the phase.
+	//
+	// Server-only (json:"-"): the client drives the prompt entirely from phase +
+	// awaitingDeclaration + activePlayerSeat, so this must not widen
+	// match_state. Value-typed, so cloneGameState's shallow struct copy carries
+	// it with no clone line of its own.
+	DeclarationSeatsAnswered int `json:"-"`
 
 	// Player states
 	Players [4]PlayerState `json:"players"`

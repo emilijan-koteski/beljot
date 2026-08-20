@@ -49,6 +49,8 @@ func ApplyAction(state *GameState, action Action) (*GameState, error) {
 	switch state.Phase {
 	case PhaseBidding:
 		return handleBidding(state, action)
+	case PhaseDeclaring:
+		return handleDeclaring(state, action)
 	case PhasePlaying:
 		return handlePlaying(state, action)
 	case PhaseMatchEnd:

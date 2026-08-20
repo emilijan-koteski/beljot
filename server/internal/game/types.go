@@ -139,10 +139,10 @@ const (
 // no clone line of its own.
 //
 // All seven fields are populated by both presets from day one. DealShape,
-// HasTrumpCandidate, RevealFaceDownOnRound2, AllPassOutcome and
-// DeclarationOverlap are READ today; DeclarationTiming and TieRule describe
-// each variant's authentic rule and are read once the stories that implement
-// them land.
+// HasTrumpCandidate, RevealFaceDownOnRound2, AllPassOutcome,
+// DeclarationOverlap and DeclarationTiming are READ today; TieRule describes
+// each variant's authentic rule and is read once the story that implements it
+// lands.
 type VariantRules struct {
 	// DealShape selects the dealing sequence — see DealShape.
 	DealShape DealShape
@@ -161,9 +161,8 @@ type VariantRules struct {
 	// declaration. False keeps one-card-one-group dedup by higher value.
 	DeclarationOverlap bool
 	// DeclarationTiming selects when declarations are collected — see
-	// DeclarationTiming.
-	//
-	// Not read yet — behaviour lands with the declaration-phase story.
+	// DeclarationTiming. Read by handlePickTrump: a dedicated-phase config
+	// opens PhaseDeclaring instead of going straight to trick 1.
 	DeclarationTiming DeclarationTiming
 	// TieRule selects how a tied hand is settled — see TieRule. This field
 	// states each variant's AUTHENTIC rule; the engine currently awards every
@@ -208,8 +207,15 @@ func RulesFor(v Variant) VariantRules {
 type Phase string
 
 const (
-	PhaseDealing        Phase = "dealing"
-	PhaseBidding        Phase = "bidding"
+	PhaseDealing Phase = "dealing"
+	PhaseBidding Phase = "bidding"
+	// PhaseDeclaring is the dedicated declaration phase between bidding and
+	// trick 1, entered only under VariantRules.DeclarationTiming ==
+	// DeclarationTimingDedicatedPhase. Seats are prompted one at a time
+	// counter-clockwise from the trick-1 leader; once all four have answered the
+	// contest resolves and the phase moves straight to PhasePlaying at trick 1.
+	// Under DeclarationTimingDuringFirstTrick this phase never occurs.
+	PhaseDeclaring      Phase = "declaring"
 	PhasePlaying        Phase = "playing"
 	PhaseTrickResolving Phase = "trick_resolving"
 	PhaseHandScoring    Phase = "hand_scoring"

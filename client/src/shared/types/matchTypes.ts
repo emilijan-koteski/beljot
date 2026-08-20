@@ -9,10 +9,14 @@ export type CardId = `${Rank}${Suit}`;
 
 export type Variant = "bitola" | "croatia";
 
+// "declaring" is the dedicated declaration phase between bidding and trick 1.
+// The server decides when it happens — the client only reacts to the phase it
+// is told it is in, and derives nothing about it from the variant.
 export type Phase =
   | ""
   | "dealing"
   | "bidding"
+  | "declaring"
   | "playing"
   | "trick_resolving"
   | "hand_scoring"

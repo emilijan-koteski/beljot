@@ -178,6 +178,7 @@ func startNewHand(state *GameState) {
 	state.TrickWinnerSeat = nil
 	state.AwaitingDeclaration = false
 	state.DeclarationsResolved = false
+	state.DeclarationSeatsAnswered = 0
 	state.HandCompleteReady = [4]bool{}
 
 	// Reset per-hand scoring

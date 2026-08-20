@@ -23,19 +23,29 @@ describe("gameTypes", () => {
   });
 
   describe("Phase", () => {
-    it("covers all 8 game phases", () => {
-      const phases: Phase[] = [
-        "dealing",
-        "bidding",
-        "playing",
-        "trick_resolving",
-        "hand_scoring",
-        "match_end",
-        "paused",
-        "disconnected",
-      ];
+    // Exhaustiveness map rather than a list. `Record<Phase, true>` makes a
+    // missing member a tsc error and an unknown one an excess-property error,
+    // so widening the union without updating this fails the BUILD. An array the
+    // test writes itself can only ever agree with whatever it was handed — its
+    // length assertion never catches a union change.
+    it("names every member of the Phase union", () => {
+      const ALL_PHASES: Record<Phase, true> = {
+        "": true,
+        dealing: true,
+        bidding: true,
+        // Dedicated declaration phase — between bidding and trick 1.
+        declaring: true,
+        playing: true,
+        trick_resolving: true,
+        hand_scoring: true,
+        hand_complete: true,
+        match_end: true,
+        paused: true,
+        disconnected: true,
+      };
 
-      expect(phases).toHaveLength(8);
+      expect(Object.keys(ALL_PHASES)).toHaveLength(11);
+      expect(ALL_PHASES.declaring).toBe(true);
     });
   });
 

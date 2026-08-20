@@ -3,11 +3,15 @@ package game
 import "github.com/emilijan/beljot/server/internal/apperr"
 
 // handlePause processes a pause action from a player.
-// Valid from PhasePlaying or PhaseBidding. Each player gets 1 pause per game.
+// Valid from PhasePlaying, PhaseBidding or PhaseDeclaring. Each player gets 1
+// pause per game.
 // Multiple players can pause (stacking); game stays paused until all clear.
 func handlePause(state *GameState, action Action) (*GameState, error) {
-	// Allow pause from playing, bidding, or already-paused (stacking)
-	if state.Phase != PhasePlaying && state.Phase != PhaseBidding && state.Phase != PhasePaused {
+	// Allow pause from playing, bidding, declaring, or already-paused (stacking).
+	// PhaseDeclaring is a turn-taking phase with a live per-move timer just like
+	// the other two, so a phase where pause silently failed would be a hole.
+	if state.Phase != PhasePlaying && state.Phase != PhaseBidding &&
+		state.Phase != PhaseDeclaring && state.Phase != PhasePaused {
 		return nil, apperr.ErrWrongPhase
 	}
 

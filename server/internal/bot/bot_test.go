@@ -287,6 +287,41 @@ func TestDecide_AlwaysDeclares(t *testing.T) {
 	assert.Equal(t, 0, action.PlayerSeat)
 }
 
+// TestDecide_AnswersDedicatedDeclarationPhase pins the Croatian phase guard.
+// View.LegalCards is populated only in PhasePlaying, so a fall-through to
+// chooseCard here would index legal[0] on a nil slice and panic INSIDE the
+// session's critical section — taking the table down, not just the bot.
+func TestDecide_AnswersDedicatedDeclarationPhase(t *testing.T) {
+	gs := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
+	require.Equal(t, game.PhaseDeclaring, gs.Phase)
+	require.True(t, gs.AwaitingDeclaration)
+	require.Nil(t, viewFromState(gs, gs.ActivePlayerSeat, nil).LegalCards,
+		"the phase has no legal cards — that is the panic this guard prevents")
+
+	t.Run("the prompted seat declares", func(t *testing.T) {
+		action := bot.Decide(viewFromState(gs, gs.ActivePlayerSeat, nil))
+		assert.Equal(t, game.ActionDeclare, action.Type)
+		assert.Equal(t, gs.ActivePlayerSeat, action.PlayerSeat)
+	})
+
+	t.Run("no seat ever reaches for a card", func(t *testing.T) {
+		for seat := 0; seat < 4; seat++ {
+			action := bot.Decide(viewFromState(gs, seat, nil))
+			assert.NotEqual(t, game.ActionPlayCard, action.Type, "seat %d", seat)
+		}
+	})
+
+	t.Run("an unprompted seat skips", func(t *testing.T) {
+		// Defensive shape: the scheduler only ever hands the phase to the
+		// prompted seat, but Decide must still answer rather than fall through.
+		noPrompt := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
+		noPrompt.AwaitingDeclaration = false
+
+		action := bot.Decide(viewFromState(noPrompt, noPrompt.ActivePlayerSeat, nil))
+		assert.Equal(t, game.ActionSkipDeclare, action.Type)
+	})
+}
+
 func TestDecide_AlwaysAnnouncesBelot(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(1)
 	seat := 0

@@ -22,6 +22,29 @@ func Decide(v View) game.Action {
 		return decideBid(v)
 	}
 
+	// Dedicated declaration phase. This exists for ONE reason: to stop the ladder
+	// before chooseCard. View.LegalCards is populated only in PhasePlaying, so a
+	// fall-through would index legal[0] on a nil slice and panic inside the
+	// session's critical section — taking the whole table down, not just this
+	// seat. It is a crash guard, not a decision.
+	//
+	// The prompted branch is the real one: only meld-holders are ever prompted,
+	// so declaring is always both legal and correct.
+	//
+	// The unprompted branch is UNREACHABLE BY CONSTRUCTION — botDecisionSeats
+	// schedules a seat in this phase only while AwaitingDeclaration is set for it.
+	// It is not a safe fallback and must not be treated as one: handleSkipDeclare
+	// rejects skip_declare when nothing is awaited, and handleBotActionTimer
+	// re-arms the seat on rejection, so actually reaching it would be a
+	// reject/re-arm livelock. Returning an action here (rather than a card) keeps
+	// that failure recoverable and loggable instead of fatal.
+	if v.Phase == game.PhaseDeclaring {
+		if v.AwaitingDeclaration {
+			return game.Action{Type: game.ActionDeclare, PlayerSeat: v.Seat}
+		}
+		return game.Action{Type: game.ActionSkipDeclare, PlayerSeat: v.Seat}
+	}
+
 	// Belote/Rebelote: +20 is unconditional value — always announce.
 	if v.PendingBelot {
 		return game.Action{Type: game.ActionAnnounceBelot, PlayerSeat: v.Seat}

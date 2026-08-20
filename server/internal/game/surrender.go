@@ -3,8 +3,8 @@ package game
 import "github.com/emilijan/beljot/server/internal/apperr"
 
 // handleSurrenderRequest processes a player's request to surrender the match.
-// Valid only from PhasePlaying or PhaseBidding. Each player may initiate at
-// most one surrender request per match — the SurrenderUsed flag flips on
+// Valid only from PhasePlaying, PhaseBidding or PhaseDeclaring. Each player may
+// initiate at most one surrender request per match — the SurrenderUsed flag flips on
 // request, regardless of whether the partner later accepts or declines.
 // A proposal already pending is rejected with ErrActionRequired (must be
 // resolved first). PhasePaused is rejected with ErrGamePaused (AC#1: pause
@@ -13,7 +13,7 @@ func handleSurrenderRequest(state *GameState, action Action) (*GameState, error)
 	if state.Phase == PhasePaused {
 		return nil, apperr.ErrGamePaused
 	}
-	if state.Phase != PhasePlaying && state.Phase != PhaseBidding {
+	if state.Phase != PhasePlaying && state.Phase != PhaseBidding && state.Phase != PhaseDeclaring {
 		return nil, apperr.ErrWrongPhase
 	}
 

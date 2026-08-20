@@ -186,9 +186,11 @@ export interface DeclarationsResolvedPayload {
   }>;
 }
 
-// Fired the moment a player commits a declare during trick 1 — drives the
-// seat-anchored "has a declaration" banner. Seat only: meld type/value/cards
-// stay secret until event:declarations_resolved at the end of trick 1.
+// Fired the moment a player commits a declare — drives the seat-anchored
+// "has a declaration" banner. Seat only: meld type/value/cards stay secret
+// until event:declarations_resolved. When declarations are collected depends on
+// the server's rules (inside trick 1, or in a dedicated phase before it); this
+// event's meaning does not.
 export interface PlayerDeclaredPayload {
   playerSeat: number;
 }

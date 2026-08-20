@@ -48,6 +48,10 @@ func (m *Manager) maybeScheduleBotAction(session *LiveMatch) {
 // hand's bidding opened for the same seat), acting immediately would undercut
 // the ≥1 s humanization floor — the fire path compares contexts and re-arms a
 // fresh delay instead of acting.
+//
+// The dedicated declaration phase needs no field of its own: `phase` separates
+// it from bidding and playing, and `awaitingDecl` is per-seat, so a delay armed
+// for one seat's prompt never matches another seat's.
 type botDecisionContext struct {
 	phase            game.Phase
 	handNumber       int
@@ -67,13 +71,15 @@ func botDecisionContextFor(gs *game.GameState, seat int) botDecisionContext {
 }
 
 // botDecisionSeats resolves which BOT seats owe a decision in the given
-// state. Phase table per the story: bidding → active bidder; playing →
-// pending belote seat, else active player (covers the declaration prompt —
-// it always belongs to the active player); hand_complete → every bot that
-// has not acknowledged the score reveal; a pending surrender adds the
-// proposer's partner (surrender is team-internal — bots never initiate and
-// never respond to opponents' proposals). Paused / disconnected / match_end
-// never schedule.
+// state. Phase table per the story: bidding → active bidder; declaring → the
+// prompted seat (the dedicated declaration phase always has exactly one, and
+// only seats holding a meld are ever prompted, so the bot's declare can never
+// be rejected); playing → pending belote seat, else active player (covers the
+// trick-1 declaration prompt — it always belongs to the active player);
+// hand_complete → every bot that has not acknowledged the score reveal; a
+// pending surrender adds the proposer's partner (surrender is team-internal —
+// bots never initiate and never respond to opponents' proposals). Paused /
+// disconnected / match_end never schedule.
 func botDecisionSeats(gs *game.GameState) []int {
 	seats := make([]int, 0, 4)
 	add := func(seat int) {
@@ -91,6 +97,14 @@ func botDecisionSeats(gs *game.GameState) []int {
 	switch gs.Phase {
 	case game.PhaseBidding:
 		add(gs.ActivePlayerSeat)
+	case game.PhaseDeclaring:
+		// Scheduling only the PROMPTED seat matters: a meld-less seat is stepped
+		// past by the engine and never becomes active with AwaitingDeclaration
+		// set, so an unconditional add would hand a bot a decision it cannot
+		// legally make and spin the reject → reschedule loop.
+		if gs.AwaitingDeclaration {
+			add(gs.ActivePlayerSeat)
+		}
 	case game.PhasePlaying:
 		if gs.PendingBelotSeat != nil {
 			add(*gs.PendingBelotSeat)
@@ -115,8 +129,9 @@ func botDecisionSeats(gs *game.GameState) []int {
 }
 
 // botThinkDelay returns the humanized delay before a bot acts: uniform
-// random in [botDelayMin, botDelayMax] for game decisions, a single short
-// beat (botDelayMin) for score-reveal acknowledgements — humans plus the
+// random in [botDelayMin, botDelayMax] for game decisions — bidding, the
+// dedicated declaration phase, and play alike — and a single short beat
+// (botDelayMin) for score-reveal acknowledgements, where humans plus the
 // existing 14 s fallback still pace the reveal.
 func (m *Manager) botThinkDelay(phase game.Phase) time.Duration {
 	if phase == game.PhaseHandComplete {

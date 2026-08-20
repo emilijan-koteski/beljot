@@ -1675,4 +1675,133 @@ describe("MatchPage", () => {
       expect(within(prompt).getByTestId("declaration-prompt-total")).toHaveTextContent("200");
     });
   });
+
+  // The dedicated declaration phase (Croatian) is a phase the table has never
+  // rendered before. The prompt gate is phase-agnostic and the table chrome is
+  // phase-independent, so both work here for free — which is exactly why they
+  // would regress silently. Everything below is driven by `phase: "declaring"`
+  // alone; nothing derives behaviour from the variant.
+  describe("dedicated declaration phase", () => {
+    // Seat 0 holds a tierce 9S-TS-JS, and the server has it on the clock in the
+    // declaring phase with a live turn deadline.
+    function declaringState(overrides: Partial<MatchState> = {}): MatchState {
+      return {
+        // Deliberately NOT a Croatian state: the phase is the only input the
+        // client reacts to, and the tierce below is worth 20 under both rule
+        // sets. Carrying the variant here would quietly suggest the page
+        // branches on it — it does not, and variantRules.ts stays the single
+        // variant→behaviour mapping.
+        ...mockMatchState,
+        phase: "declaring",
+        trumpSuit: "H",
+        trickNumber: 0,
+        activePlayerSeat: 0,
+        awaitingDeclaration: true,
+        turnExpiresAt: new Date(Date.now() + 30_000).toISOString(),
+        timerDurationSec: 30,
+        players: mockMatchState.players.map((p) =>
+          p.seat === 0
+            ? {
+                ...p,
+                declarations: [],
+                hand: [
+                  { rank: "9", suit: "S" },
+                  { rank: "T", suit: "S" },
+                  { rank: "J", suit: "S" },
+                ] as MatchState["players"][number]["hand"],
+              }
+            : p,
+        ) as MatchState["players"],
+        ...overrides,
+      };
+    }
+
+    function renderDeclaring(overrides: Partial<MatchState> = {}) {
+      useMatchStore.getState().setMatchState(declaringState(overrides));
+      useMatchStore.getState().setMyPlayerSeat(0);
+      return renderMatchPage();
+    }
+
+    it("shows the declaration prompt to the prompted seat", () => {
+      renderDeclaring();
+
+      const prompt = screen.getByTestId("declaration-prompt");
+      expect(within(prompt).getByTestId("declaration-prompt-total")).toHaveTextContent("20");
+      expect(within(prompt).getByTestId("declaration-prompt-declare")).toBeInTheDocument();
+      expect(within(prompt).getByTestId("declaration-prompt-skip")).toBeInTheDocument();
+    });
+
+    it("shows no prompt to a seat that is not on the clock", () => {
+      useMatchStore.getState().setMatchState(declaringState({ activePlayerSeat: 1 }));
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.queryByTestId("declaration-prompt")).not.toBeInTheDocument();
+    });
+
+    it("keeps the active seat's turn countdown visible", () => {
+      renderDeclaring();
+
+      // Without the phase in the seat-ring predicate the countdown goes dark and
+      // the table looks frozen while the server is very much running a clock.
+      expect(screen.getByTestId("player-seat-timer-seconds")).toBeInTheDocument();
+    });
+
+    it("keeps the pause and surrender controls available", () => {
+      renderDeclaring();
+
+      const pause = screen.getByTestId("pause-button");
+      expect(pause).toBeInTheDocument();
+      expect(pause).toBeEnabled();
+      expect(screen.getByTestId("surrender-button")).toBeInTheDocument();
+    });
+
+    it("does not make cards playable — no trick is open yet", () => {
+      renderDeclaring();
+
+      // Two independent guards hold here: isMyTurn requires the playing phase,
+      // AND it requires no declaration to be outstanding. Scoped to the hand —
+      // the same card is also drawn inside the prompt's meld preview.
+      // Click the CARD, not its positioning wrapper — the click handler lives on
+      // playing-card-*, and hand-card-* is the parent it bubbles up to.
+      const hand = screen.getByTestId("hand-cards");
+      fireEvent.click(within(hand).getByTestId("playing-card-9S"));
+      expect(mockSendMessage).not.toHaveBeenCalledWith("action:play_card", expect.anything());
+    });
+
+    it("keeps cards unplayable on the phase alone, with no prompt outstanding", () => {
+      // The server never emits this shape — the phase resolves the instant
+      // nothing is awaited — so this isolates the PHASE clause of isMyTurn from
+      // the awaitingDeclaration clause that masks it above. Without it, dropping
+      // "playing" from that check would go unnoticed and a stray tap could throw
+      // a card before trick 1 exists.
+      renderDeclaring({ awaitingDeclaration: false });
+
+      // Click the CARD, not its positioning wrapper — the click handler lives on
+      // playing-card-*, and hand-card-* is the parent it bubbles up to.
+      const hand = screen.getByTestId("hand-cards");
+      fireEvent.click(within(hand).getByTestId("playing-card-9S"));
+      expect(mockSendMessage).not.toHaveBeenCalledWith("action:play_card", expect.anything());
+    });
+
+    it("sends action:declare when the player declares in the phase", () => {
+      renderDeclaring();
+
+      fireEvent.click(
+        within(screen.getByTestId("declaration-prompt")).getByTestId("declaration-prompt-declare"),
+      );
+
+      expect(mockSendMessage).toHaveBeenCalledWith("action:declare", {});
+    });
+
+    it("sends action:skip_declare when the player skips in the phase", () => {
+      renderDeclaring();
+
+      fireEvent.click(
+        within(screen.getByTestId("declaration-prompt")).getByTestId("declaration-prompt-skip"),
+      );
+
+      expect(mockSendMessage).toHaveBeenCalledWith("action:skip_declare", {});
+    });
+  });
 });

@@ -1013,8 +1013,8 @@ The rules engine must enforce phase-based action validation. This is the contrac
 | Phase             | Valid Player Actions                     | Transitions To                                        |
 | ----------------- | ---------------------------------------- | ----------------------------------------------------- |
 | `dealing`         | (automatic — no player actions)          | `bidding`                                             |
-| `bidding`         | `pick_trump`, `pass_trump`               | Bitola: `playing` (if picked) or `dealing` (reshuffle). Croatian: `declaring` (always — dealer is forced, so bidding never fails) |
-| `declaring`       | `declare`, `skip_declare`                | `playing` (once all four have answered) — **Croatian variant only**; added by Epic 12 Story 12.6 |
+| `bidding`         | `pick_trump`, `pass_trump`               | On a pick: `match_end` if it triggers an instant win (checked before either branch below); else Bitola → `playing` at trick 1, Croatian → `declaring`, or `playing` directly when no seat holds a meld and the phase resolves in the same transition. On a passed-out round 2: Bitola → `dealing` (reshuffle); Croatian cannot pass out at all, since the dealer's fourth pass is refused |
+| `declaring`       | `declare`, `skip_declare` (prompted seat only) | `playing` at trick 1, once all four seats have answered — **selected by `VariantRules.DeclarationTiming == dedicated_phase`**; shipped by Epic 12 Story 12.6 |
 | `playing`         | `play_card`, `declare`, `skip_declare`   | `trick_resolving` (4th card played). `declare`/`skip_declare` are Bitola-only here — Croatian resolves them in `declaring` |
 | `trick_resolving` | (automatic — score, sweep)               | `playing` (next trick) or `hand_scoring` (8th trick)  |
 | `hand_scoring`    | (automatic — calculate, check match end) | `dealing` (next hand) or `match_end`                  |
@@ -1024,7 +1024,11 @@ The rules engine must enforce phase-based action validation. This is the contrac
 
 The `GameState.Phase` field must always reflect the current phase. `ApplyAction()` rejects any action not valid for the current phase.
 
-**Variant-conditional phases (Epic 12, added 2026-08-18).** The `declaring` phase exists only under the Croatian rule config; Bitola resolves declarations inside `playing` during trick 1. Per D-VAR-1 the engine selects between these paths by reading a `VariantRules` config field, never by comparing `state.Variant`. See sprint-change-proposal-2026-08-18.md.
+**Variant-conditional phases (Epic 12, added 2026-08-18; `declaring` shipped 2026-08-19).** The `declaring` phase exists only under the Croatian rule config; Bitola resolves declarations inside `playing` during trick 1. Per D-VAR-1 the engine selects between these paths by reading a `VariantRules` config field, never by comparing `state.Variant`. See sprint-change-proposal-2026-08-18.md.
+
+**How `declaring` behaves (Story 12.6).** `handlePickTrump` is the only entry point: when `Rules.DeclarationTiming == dedicated_phase` a resolved bid opens the phase with `TrickNumber = 0` instead of starting trick 1. Seats are prompted **one at a time**, counter-clockwise from `(DealerSeat + 1) % 4` — the seat that will lead trick 1 — reusing the existing `AwaitingDeclaration` + `ActivePlayerSeat` prompt, so the phase adds **no WS event and no client→server action**: `phase` on `match_state` carries the whole thing. Only seats **holding a meld** are prompted; the rest count as answered and the cursor steps past them without stopping, so a hand where nobody holds a meld opens and resolves in the same transition. On the fourth answer the contest resolves through the same `resolveDeclarationsForHand` Bitola uses at trick 2 — `DeclarationsResolved` flips `false → true`, so `event:declarations_resolved` fires on the existing latch — and the phase hands off to `playing` at trick 1 with the leader's timer armed; the reveal panel floats over live play exactly as it does in Bitola.
+
+The phase is a full turn-taking phase for every session-manager concern: it runs the per-move turn timer (expiry auto-skips the prompted seat and the phase continues to the next), accepts `pause` / `unpause` and `surrender_request`, schedules bot seats, and freezes the clock and opens a reconnect window on a drop — restoring the cursor intact on return. Every phase switch in `internal/match` (timer arming, `handleTimerExpiry`, the auto-action chain, `botDecisionSeats`, `HandleDisconnect`, the reconnect re-arm) must name it: each one's `default` arm is a silent stall, not an error.
 
 #### Card Encoding Convention
 
@@ -1085,6 +1089,8 @@ Negative test cases — every entry becomes a rules engine test:
 | `playing`      | Card violating suit-following            | `ErrIllegalPlay`        | Critical      |
 | `playing`      | Action from non-active player            | `ErrNotYourTurn`        | Critical      |
 | `playing`      | Declare after first trick                | `ErrWrongPhase`         | High          |
+| `declaring`    | `play_card`, `pick_trump`, `pass_trump`, `announce_belot`, `skip_belot`, `continue` | `ErrWrongPhase` | High |
+| `declaring`    | Declare from a seat that was stepped past or not yet reached | `ErrNotYourTurn` | High |
 | `bidding`      | Pick trump when not active bidder        | `ErrNotYourTurn`        | High          |
 | `paused`       | Any game action                          | `ErrGamePaused`         | Medium        |
 | `disconnected` | Any game action from disconnected player | `ErrPlayerDisconnected` | Medium        |

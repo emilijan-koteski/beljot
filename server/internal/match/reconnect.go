@@ -89,8 +89,12 @@ func (m *Manager) HandleDisconnect(userID uint) {
 	// allConnectedReady check waits the full auto-continue window for an
 	// acknowledgement that can never arrive, jamming the table (seen when a
 	// mobile client's socket drops during the pause).
+	// PhaseDeclaring (the dedicated declaration phase) is included for the same
+	// reason bidding is: it is a turn-taking phase with a live per-move timer, so
+	// a drop must freeze the clock and open a reconnect window rather than fall
+	// into the transient default and leave the seat marked Connected.
 	switch gs.Phase {
-	case game.PhasePlaying, game.PhaseBidding, game.PhasePaused, game.PhaseHandComplete:
+	case game.PhasePlaying, game.PhaseBidding, game.PhaseDeclaring, game.PhasePaused, game.PhaseHandComplete:
 		// These are valid phases for disconnect handling — proceed
 	case game.PhaseDisconnected:
 		// Concurrent disconnect: another player's reconnect window is already
@@ -417,7 +421,8 @@ func (m *Manager) HandleReconnect(userID uint) {
 			// clears.
 			gs.PreviousPhase = gs.Phase
 			gs.Phase = game.PhasePaused
-		} else if session.timerStyle == "per-move" && (gs.Phase == game.PhasePlaying || gs.Phase == game.PhaseBidding) {
+		} else if session.timerStyle == "per-move" &&
+			(gs.Phase == game.PhasePlaying || gs.Phase == game.PhaseBidding || gs.Phase == game.PhaseDeclaring) {
 			// Restore turn timer (same pattern as unpause timer resume in HandleAction).
 			const minResumeMs int64 = 3000
 			remaining := time.Duration(gs.TurnTimeRemaining) * time.Millisecond

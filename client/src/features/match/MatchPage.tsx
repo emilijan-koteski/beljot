@@ -734,6 +734,11 @@ export function MatchPage() {
   // tricks the countdown never finished and the dialog re-appeared every trick
   // (its own AutoCloseRing only fires while it stays mounted). The belot/trump
   // reveals aren't collect-gated, so they don't need this.
+  //
+  // When declarations are collected in a dedicated phase instead, the reveal
+  // arrives before a single card has been played, so `pendingResolvedTrick` is
+  // null and the latch flips immediately — the deferral has nothing to wait for
+  // and costs nothing.
   const [declRevealReady, setDeclRevealReady] = useState(false);
   useEffect(() => {
     if (declarationReveal === null) {
@@ -1411,6 +1416,17 @@ export function MatchPage() {
   const isRoomOwner = myPlayerSeat !== null && matchState.ownerSeat === myPlayerSeat;
   const isPaused = matchState.phase === "paused";
 
+  // The phases where a seat is genuinely on the clock: bidding, the dedicated
+  // declaration phase (Croatian collects declarations between bidding and trick
+  // 1), and play. The server runs a per-move turn timer and accepts
+  // pause/surrender in all three, so the seat countdown and the HUD controls
+  // must appear in all three or they vanish mid-hand. Phase-driven, never
+  // variant-driven — the client is told which phase it is in.
+  const isTurnPhase =
+    matchState.phase === "playing" ||
+    matchState.phase === "bidding" ||
+    matchState.phase === "declaring";
+
   // Single source of truth for "is an overlay covering the table". Used to
   // gate reveals (D112) and the dealer/trump pill (dealer-indicator D97).
   const isOverlayActive =
@@ -1419,10 +1435,7 @@ export function MatchPage() {
     matchAbandonedData !== null ||
     matchState.phase === "disconnected";
   const canPause =
-    !isPaused &&
-    (matchState.phase === "playing" || matchState.phase === "bidding") &&
-    myPlayerSeat !== null &&
-    !matchState.pauseUsed?.[myPlayerSeat];
+    !isPaused && isTurnPhase && myPlayerSeat !== null && !matchState.pauseUsed?.[myPlayerSeat];
 
   // Surrender state (Story 8.2)
   const surrenderProposerSeat = matchState.surrenderProposerSeat;
@@ -1433,8 +1446,7 @@ export function MatchPage() {
     (surrenderProposerSeat + 2) % 4 === myPlayerSeat;
   const isOpponentOfProposer =
     surrenderProposerSeat !== null && myPlayerSeat !== null && !isProposer && !isPartnerOfProposer;
-  const showSurrenderControls =
-    myPlayerSeat !== null && (matchState.phase === "playing" || matchState.phase === "bidding");
+  const showSurrenderControls = myPlayerSeat !== null && isTurnPhase;
   const canSurrenderRequest =
     showSurrenderControls &&
     surrenderProposerSeat === null &&
@@ -1642,11 +1654,7 @@ export function MatchPage() {
               isActive={isActive}
               seatTeam={seatTeam(player.seat, myPlayerSeat)}
               cardCount={isSelf ? undefined : player.hand.length}
-              turnExpiresAt={
-                isActive && (matchState.phase === "playing" || matchState.phase === "bidding")
-                  ? matchState.turnExpiresAt
-                  : null
-              }
+              turnExpiresAt={isActive && isTurnPhase ? matchState.turnExpiresAt : null}
               timerDuration={matchState.timerDurationSec}
               isDealer={matchState.dealerSeat === player.seat}
               trumpCallerSuit={isCaller ? matchState.trumpSuit : null}
@@ -1717,7 +1725,7 @@ export function MatchPage() {
 
       {/* Pause + surrender controls — bottom-left HUD cluster (desktop only;
           phones fold these into the top-right hamburger menu below). */}
-      {(matchState.phase === "playing" || matchState.phase === "bidding") && (
+      {isTurnPhase && (
         <div className="absolute bottom-4 left-4 z-10 hidden items-center gap-2 md:flex">
           <HUDButton
             icon={<Pause className="h-4 w-4" aria-hidden="true" />}
@@ -1763,9 +1771,7 @@ export function MatchPage() {
             onClick={() => setSettingsOpen(true)}
             data-testid="settings-button"
           />
-          {(matchState.phase === "dealing" ||
-            matchState.phase === "bidding" ||
-            matchState.phase === "playing") &&
+          {(matchState.phase === "dealing" || isTurnPhase) &&
             matchEndData === null &&
             matchAbandonedData === null && <EmotePickerButton onSend={handleSendEmote} />}
         </div>
@@ -1834,7 +1840,7 @@ export function MatchPage() {
                 }}
                 data-testid="hud-menu"
               >
-                {(matchState.phase === "playing" || matchState.phase === "bidding") && (
+                {isTurnPhase && (
                   <>
                     <HUDButton
                       icon={<Pause className="h-4 w-4" aria-hidden="true" />}
@@ -1885,9 +1891,7 @@ export function MatchPage() {
                   style={{ width: "100%", justifyContent: "flex-start" }}
                   data-testid="hud-menu-settings"
                 />
-                {(matchState.phase === "dealing" ||
-                  matchState.phase === "bidding" ||
-                  matchState.phase === "playing") &&
+                {(matchState.phase === "dealing" || isTurnPhase) &&
                   matchEndData === null &&
                   matchAbandonedData === null && (
                     <EmotePickerButton

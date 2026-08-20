@@ -173,6 +173,15 @@ func handlePickTrump(state *GameState, action Action) (*GameState, error) {
 		return newState, nil
 	}
 
+	// Declaration timing decides what a resolved bid opens into. Under a
+	// dedicated-phase config every seat answers before a card is played, so the
+	// hand enters PhaseDeclaring; otherwise trick 1 starts immediately and each
+	// seat is prompted as its turn comes round.
+	if newState.Rules.DeclarationTiming == DeclarationTimingDedicatedPhase {
+		openDeclarationPhase(newState)
+		return newState, nil
+	}
+
 	newState.Phase = PhasePlaying
 	newState.ActivePlayerSeat = (newState.DealerSeat + 1) % 4
 	newState.TrickNumber = 1

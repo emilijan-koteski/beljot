@@ -70,11 +70,39 @@ func TestSimulation_HeuristicBeatsRandomBaseline(t *testing.T) {
 		"heuristic must take at least 60%% of all points vs the random baseline")
 }
 
+// simDriver supplies the acting seat and its action for one simulation step.
+// Swapping it is how a run changes WHO is playing without forking the loop —
+// and therefore without forking the bot-memory bookkeeping, which is the part
+// that silently drifts when a second driver is copy-pasted.
+type simDriver func(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action)
+
+// simObserver is called with the PRE-action state on every step, so a run can
+// assert phase invariants and action legality at the exact moment a decision is
+// made. nil for runs that only care about the outcome.
+type simObserver func(t *testing.T, gs *game.GameState, seat int, action game.Action)
+
 // playOneHand drives a fresh deal to its scored end and returns the hand
 // result. Returns ok=false when the deal ended the match without scoring a
 // hand (instant-win). Every ApplyAction error fails the test immediately —
 // that is the AC3 always-legal contract.
 func playOneHand(t *testing.T, gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (game.HandScore, bool) {
+	t.Helper()
+	return playOneHandWith(t, gs, mem, rng, nextSimAction, nil)
+}
+
+// playOneHandWith is playOneHand with the decision source and an optional
+// per-step observer injected. Every run shares this one loop so they all feed
+// bot memory identically — a driver that learned nothing would exercise
+// chooseCard on empty PlayedCards / KnownVoids / KnownCards, i.e. a different
+// code path from production.
+func playOneHandWith(
+	t *testing.T,
+	gs *game.GameState,
+	mem *bot.Memory,
+	rng *rand.Rand,
+	drive simDriver,
+	observe simObserver,
+) (game.HandScore, bool) {
 	t.Helper()
 
 	// Safety bound: a hand resolves in well under 100 actions; repeated
@@ -85,8 +113,14 @@ func playOneHand(t *testing.T, gs *game.GameState, mem *bot.Memory, rng *rand.Ra
 			// Mirror the session manager's dealing → bidding auto-transition.
 			gs.Phase = game.PhaseBidding
 
-		case game.PhaseBidding, game.PhasePlaying:
-			seat, action := nextSimAction(gs, mem, rng)
+		case game.PhaseBidding, game.PhaseDeclaring, game.PhasePlaying:
+			// PhaseDeclaring is unreachable under DeclarationTimingDuringFirstTrick
+			// (declarations are collected inside trick 1); it is live for the
+			// dedicated-phase run — see TestSimulation_CroatianHandWithBotSeats.
+			seat, action := drive(gs, mem, rng)
+			if observe != nil {
+				observe(t, gs, seat, action)
+			}
 			oldLead := gs.LeadSuit
 			next, err := game.ApplyAction(gs, action)
 			require.NoError(t, err,
@@ -176,4 +210,122 @@ func randomLegalAction(gs *game.GameState, seat int, rng *rand.Rand) game.Action
 	legal := game.LegalCards(gs, seat)
 	c := legal[rng.IntN(len(legal))]
 	return game.Action{Type: game.ActionPlayCard, PlayerSeat: seat, Card: &c}
+}
+
+// TestSimulation_CroatianHandWithBotSeats is the deadlock proof for the
+// dedicated declaration phase (Story 12.6): full Croatian hands, all four seats
+// driven by bot.Decide, from the deal to a scored hand. It is the engine-level
+// counterpart of the session-manager tests — no timers, no WS — so anything it
+// catches is a rules-engine or bot-ladder defect, not a scheduling one.
+//
+// It runs through the SAME playOneHandWith loop as the Bitola experiment, only
+// with a different driver, so the bots learn from played cards and resolved
+// declarations exactly as they do in production. A hand-rolled loop here would
+// quietly feed chooseCard an empty memory and test a path no real match takes.
+//
+// What it pins:
+//   - bidding always finds a taker and hands off to the declaration phase (or
+//     straight to trick 1 when no seat holds a meld);
+//   - the phase terminates: every seat is visited once and nobody is asked twice;
+//   - bot.Decide never reaches for a card there — View.LegalCards is nil in the
+//     phase and chooseCard would panic on legal[0];
+//   - trick 1 opens with the contest already resolved, so no declaration is ever
+//     outstanding during play;
+//   - the hand scores.
+func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
+	// 60 hands keeps the phase-was-entered assertions comfortably clear of a
+	// deal-luck flake: only hands where some seat is dealt a meld open the phase.
+	const handsTarget = 60
+	rng := rand.New(rand.NewPCG(12, 6))
+
+	sawDeclarationPhase := 0
+	sawPromptedSeat := 0
+
+	for hand := 0; hand < handsTarget; hand++ {
+		gs := game.NewGame(
+			[4]uint{0, 0, 0, 0},
+			[4]string{"", "", "", ""},
+			[4]bool{true, true, true, true},
+			game.VariantCroatia, "1001", 1,
+		)
+		require.Equal(t, game.DeclarationTimingDedicatedPhase, gs.Rules.DeclarationTiming)
+		mem := bot.NewMemory()
+
+		// Seats already answered this hand — the phase must visit each exactly once.
+		answered := map[int]bool{}
+		enteredPhase := false
+
+		observe := func(t *testing.T, cur *game.GameState, seat int, action game.Action) {
+			switch cur.Phase {
+			case game.PhaseDeclaring:
+				if !enteredPhase {
+					enteredPhase = true
+					sawDeclarationPhase++
+				}
+				require.Equal(t, 0, cur.TrickNumber, "no trick is open during the declaration phase")
+				require.True(t, cur.AwaitingDeclaration,
+					"the phase only persists with a prompt outstanding — otherwise the table has nothing to wait for")
+				require.NotNil(t, cur.TrumpSuit, "the phase is only reachable after a resolved bid")
+				require.Equal(t, cur.ActivePlayerSeat, seat, "only the prompted seat may answer")
+				require.False(t, answered[seat], "seat %d was prompted twice", seat)
+				answered[seat] = true
+				sawPromptedSeat++
+				require.Contains(t,
+					[]string{game.ActionDeclare, game.ActionSkipDeclare}, action.Type,
+					"bot must answer the prompt, not play a card, in the declaration phase")
+
+			case game.PhasePlaying:
+				require.True(t, cur.DeclarationsResolved,
+					"declarations are settled before the first card under this config")
+				require.False(t, cur.AwaitingDeclaration,
+					"no declaration may be owed once play has started")
+			}
+		}
+
+		_, _ = playOneHandWith(t, gs, mem, rng, croatianBotDriver, observe)
+
+		if enteredPhase {
+			require.NotEmpty(t, answered, "the phase opened, so at least one seat was prompted")
+		}
+	}
+
+	// The phase is not vacuously "safe" because it was never entered.
+	assert.Positive(t, sawDeclarationPhase, "no hand ever opened the declaration phase")
+	assert.Positive(t, sawPromptedSeat, "no seat was ever prompted inside the phase")
+	t.Logf("declaration phase opened in %d/%d hands, %d seats prompted",
+		sawDeclarationPhase, handsTarget, sawPromptedSeat)
+}
+
+// croatianBotDriver plays every seat with bot.Decide, substituting a free-suit
+// pick for the one bid the bot cannot make yet: under AllPassDealerMustPick the
+// dealer bidding last in round 2 has no legal pass, and decideBid does not know
+// that until variant-aware bidding lands with the enablement story.
+//
+// The substitution is decided BEFORE applying, not retried after a rejection, so
+// playOneHandWith's require.NoError stays a strict always-legal proof.
+func croatianBotDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action) {
+	_ = rng // every seat is deterministic here; randomness lives in the deal
+
+	seat := gs.ActivePlayerSeat
+	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil {
+		seat = *gs.PendingBelotSeat
+	}
+
+	action := bot.Decide(viewFromState(gs, seat, mem))
+	if action.Type == game.ActionPassTrump && mustPickTrump(gs, seat) {
+		suit := game.AllSuits[0]
+		action = game.Action{Type: game.ActionPickTrump, PlayerSeat: seat, Suit: &suit}
+	}
+	return seat, action
+}
+
+// mustPickTrump reports whether the engine will refuse this seat's pass: the
+// dealer bids last in round 2 under AllPassDealerMustPick and has no right to
+// pass, which is what makes reshuffle-and-redeal unreachable under that config.
+// Reads the rule config, never the variant name.
+func mustPickTrump(gs *game.GameState, seat int) bool {
+	return gs.Rules.AllPassOutcome == game.AllPassDealerMustPick &&
+		gs.BiddingRound == 2 &&
+		gs.BiddingPassCount >= 3 &&
+		seat == gs.DealerSeat
 }
