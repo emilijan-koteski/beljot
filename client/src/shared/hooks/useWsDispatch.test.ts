@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 import { queryClient } from "@/shared/api/queryClient";
 import { queryKeys } from "@/shared/api/queryKeys";
+import { i18n } from "@/shared/i18n/i18n";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useLevelUpStore } from "@/shared/stores/levelUpStore";
@@ -41,6 +42,7 @@ const mockMatchState: MatchState = {
   trumpCandidate: null,
   biddingRound: 1,
   biddingPassCount: 0,
+  mustPickTrump: false,
   deck: [],
   activePlayerSeat: 1,
   trickNumber: 1,
@@ -60,6 +62,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
     {
       hand: [{ rank: "7", suit: "H" }],
@@ -71,6 +74,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
     {
       hand: [{ rank: "A", suit: "D" }],
@@ -82,6 +86,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
     {
       hand: [{ rank: "9", suit: "C" }],
@@ -93,6 +98,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
   ],
   teamScores: [0, 0],
@@ -1629,6 +1635,30 @@ describe("useWsDispatch", () => {
       payload: { playerSeat: 3, type: "skip_belot" },
     });
     expect(toast.info).toHaveBeenCalledTimes(1);
+  });
+
+  // Story 12.8: the forced dealer pick is the only auto-action that COMMITS the
+  // hand (it names trump) rather than declining something, so it must reach the
+  // table as its own toast — the allowlist above it silently dropped anything
+  // unrecognised, which would have made it invisible.
+  it("fires a distinct info toast for event:auto_action of type pick_trump", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    const tSpy = vi.spyOn(i18n, "t");
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:auto_action",
+      payload: { playerSeat: 0, type: "pick_trump" },
+    });
+    // Reaching a toast at all is the first half: the type allowlist ahead of
+    // this branch drops anything it does not recognise, which would have made
+    // the forced pick silent.
+    expect(toast.info).toHaveBeenCalledTimes(1);
+
+    // The second half is WHICH copy. This suite runs without an i18n bundle, so
+    // t() resolves to undefined and the toast argument cannot be compared —
+    // spy on the translator instead and assert the key.
+    expect(tSpy).toHaveBeenCalledWith("match.timer.autoPickedTrump", { player: "Alice" });
+    expect(tSpy).not.toHaveBeenCalledWith("match.timer.autoPassed", expect.anything());
   });
 
   it("ignores event:auto_action when matchState is null", () => {

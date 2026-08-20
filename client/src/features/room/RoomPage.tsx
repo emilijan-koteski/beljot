@@ -74,6 +74,7 @@ import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
 const variantKeys: Record<string, string> = {
   bitola: "lobby.card.variantBitola",
+  croatia: "lobby.card.variantCroatia",
 };
 
 const matchModeKeys: Record<string, string> = {

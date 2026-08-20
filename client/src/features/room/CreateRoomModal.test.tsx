@@ -620,6 +620,57 @@ describe("CreateRoomModal", () => {
     expect(screen.getByTestId("create-room-button")).toBeEnabled();
   });
 
+  // Story 12.8: the Croatian option was a deliberately disabled placeholder
+  // while the variant's rules were still landing. Nothing asserted that it was
+  // disabled, so nothing broke when it opened — these two tests are what now
+  // hold the enabled state in place.
+  it("offers the Croatian variant as a selectable option", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    const croatia = screen.getByTestId("variant-segmented-croatia");
+    expect(croatia).toBeEnabled();
+    expect(croatia).not.toHaveAttribute("aria-disabled");
+
+    // Bitola is the default; selecting Croatian actually moves the selection,
+    // which a disabled option could never do.
+    expect(screen.getByTestId("variant-segmented-bitola")).toHaveAttribute("aria-checked", "true");
+    await user.click(croatia);
+    expect(croatia).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("variant-segmented-bitola")).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("submits variant croatia when the Croatian option is chosen", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 9,
+      name: "Hrvatska Ekipa",
+      code: "CRO001",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "croatia",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      coinBuyIn: 500,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-08-20T14:30:00Z",
+      updatedAt: "2026-08-20T14:30:00Z",
+    });
+
+    renderModal(true);
+    await user.type(screen.getByTestId("room-name-input"), "Hrvatska Ekipa");
+    await user.click(screen.getByTestId("variant-segmented-croatia"));
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Hrvatska Ekipa", variant: "croatia" }),
+      );
+    });
+  });
+
   it("surfaces the server's INVALID_MIN_HONOR rejection in the form banner", async () => {
     const user = userEvent.setup();
     mockCreateRoom.mockRejectedValueOnce(new FetchError(400, "INVALID_MIN_HONOR", "bad"));

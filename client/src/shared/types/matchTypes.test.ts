@@ -90,6 +90,7 @@ describe("gameTypes", () => {
         trumpCandidate: { rank: "7", suit: "H" },
         biddingRound: 1,
         biddingPassCount: 0,
+        mustPickTrump: false,
         deck: [],
         activePlayerSeat: 1,
         trickNumber: 0,
@@ -109,6 +110,7 @@ describe("gameTypes", () => {
             connected: true,
             isBot: false,
             level: 1,
+            faceDownCount: 0,
           },
           {
             hand: [],
@@ -120,6 +122,7 @@ describe("gameTypes", () => {
             connected: true,
             isBot: false,
             level: 1,
+            faceDownCount: 0,
           },
           {
             hand: [],
@@ -131,6 +134,7 @@ describe("gameTypes", () => {
             connected: true,
             isBot: false,
             level: 1,
+            faceDownCount: 0,
           },
           {
             hand: [],
@@ -142,6 +146,7 @@ describe("gameTypes", () => {
             connected: true,
             isBot: false,
             level: 1,
+            faceDownCount: 0,
           },
         ],
         teamScores: [0, 0],

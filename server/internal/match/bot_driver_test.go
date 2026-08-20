@@ -1,7 +1,12 @@
 package match_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"log/slog"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -593,4 +598,108 @@ func TestBot_HumanOnlyMatchSchedulesNothing(t *testing.T) {
 	// against the seat after the dealer rather than a fixed seat 1.
 	assert.Equal(t, (st.DealerSeat+1)%4, st.ActivePlayerSeat,
 		"the opening bid still sits with the seat after the dealer")
+}
+
+// logCapture redirects slog to an in-memory buffer so a test can assert an
+// error path did NOT fire. Concurrency-safe: the bot driver logs from timer
+// goroutines. Tests in this package never run in parallel, so swapping the
+// process-wide default logger is safe here.
+//
+// Process-wide is exactly why `matched` below takes a roomID: a session left
+// running by an earlier test can log into this buffer, and a bare substring
+// match on the message would turn another room's rejection into this test's
+// failure. Every session log line carries roomID=N, so the assertion pins both.
+type logCapture struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func captureLogs(t *testing.T) *logCapture {
+	t.Helper()
+	c := &logCapture{}
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(c, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return c
+}
+
+func (c *logCapture) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.Write(p)
+}
+
+// matched returns the captured lines that mention `sub` AND carry this room's
+// id, so a concurrent session's identical message cannot be attributed here.
+func (c *logCapture) matched(roomID uint, sub string) []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	room := fmt.Sprintf("roomID=%d", roomID)
+	var out []string
+	for _, line := range strings.Split(c.buf.String(), "\n") {
+		if strings.Contains(line, sub) && strings.Contains(line, room) {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+// TestBot_ForcedDealerPickAdvancesHandWithoutRejection is the driver-level half
+// of the Story 12.8 deadlock fix. The engine refuses the dealer's fourth
+// round-2 pass under AllPassOutcome == AllPassDealerMustPick; a bot that
+// offered one had its action rejected and re-armed by handleBotActionTimer, so
+// the same rejected pass cycled at the 1 s think-delay floor forever. An
+// engine-level test cannot see that loop — it lives in the driver.
+//
+// Relaxed timers on purpose: with no per-move auto-play backstop the bot driver
+// is the ONLY thing that can move this hand, so the assertion below is about the
+// bot's own decision and nothing else.
+func TestBot_ForcedDealerPickAdvancesHandWithoutRejection(t *testing.T) {
+	logs := captureLogs(t)
+	hub := &hubSpy{}
+	mgr := match.NewManager(hub, newMockMatchRepo())
+	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
+
+	const roomID = uint(100)
+	require.NoError(t, mgr.StartMatch(roomID, string(game.VariantCroatia), "1001",
+		mixedPlayers(0), "relaxed", 0, 10, 120, 0))
+	t.Cleanup(func() { mgr.RemoveSession(roomID) })
+
+	// passCount 7: round 1 passed out, three round-2 passes recorded, the dealer
+	// (seat 0, the bot) on the clock with no legal pass.
+	gs := markBots(testfixtures.NewGameCroatianMidBidding(7), 0)
+	gs.RoomID = roomID
+	require.True(t, game.MustPickTrump(gs, gs.ActivePlayerSeat), "the fixture must be the forced-pick state")
+	require.Equal(t, 0, gs.ActivePlayerSeat, "the bot dealer must be the seat on the clock")
+
+	// Swap seats 0 and 3's holdings — a permutation, so the deck stays valid and
+	// the fixture's no-instant-win guarantee survives. It matters because the
+	// default seat-0 layout is a six-card spade run: the bot would call spades
+	// VOLUNTARILY and the run would prove nothing about the forced path. Seat 3's
+	// holding is K+A in all four suits, which clears no threshold in any suit, so
+	// a bot that only knew the threshold has nothing to offer but the pass the
+	// engine refuses.
+	gs.Players[0].Hand, gs.Players[3].Hand = gs.Players[3].Hand, gs.Players[0].Hand
+	gs.Players[0].FaceDownCards, gs.Players[3].FaceDownCards =
+		gs.Players[3].FaceDownCards, gs.Players[0].FaceDownCards
+
+	mgr.SetGameStateForTest(roomID, gs)
+	mgr.BotSchedule(roomID)
+
+	advanced := waitFor(5*time.Second, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.TrumpSuit != nil
+	})
+	require.True(t, advanced, "the bot dealer must name a suit and advance the hand")
+
+	after := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, after)
+	require.NotNil(t, after.TrumpCallerSeat)
+	assert.Equal(t, 0, *after.TrumpCallerSeat, "the forced dealer is the taker")
+	assert.NotEqual(t, game.PhaseBidding, after.Phase, "bidding must be over")
+
+	// The livelock's signature. One rejection is already the bug: nothing else
+	// would ever wake this seat with a different decision.
+	assert.Empty(t, logs.matched(roomID, "action rejected by engine"),
+		"the bot must never offer the engine a bid it will refuse")
 }

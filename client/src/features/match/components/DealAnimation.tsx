@@ -32,6 +32,14 @@ export function DealAnimation({ trumpCandidate }: DealAnimationProps) {
 
   const prefersReducedMotion = useReducedMotion();
 
+  // The trump-flip beat only exists when there is a candidate to flip. Without
+  // one (a variant that deals every card and names trump as a bare suit) the
+  // reveal phase renders nothing, so spending DEAL_PHASE_TRUMP there is a dead
+  // pause on an empty table centre before bidding opens. Ending at
+  // DEAL_PHASE_DEAL removes it. Deliberately NOT new choreography for the
+  // face-down pair — that is a separate design question.
+  const hasCandidate = trumpCandidate !== null;
+
   useEffect(() => {
     if (prefersReducedMotion) {
       setDealPhase("done");
@@ -40,8 +48,12 @@ export function DealAnimation({ trumpCandidate }: DealAnimationProps) {
 
     // Phase 1: dealing cards (3+2 sequence)
     const dealTimer = setTimeout(() => {
-      setDealPhase("revealing");
+      setDealPhase(hasCandidate ? "revealing" : "done");
     }, MOTION.DEAL_PHASE_DEAL);
+
+    if (!hasCandidate) {
+      return () => clearTimeout(dealTimer);
+    }
 
     // Phase 2: reveal trump candidate — at total = phase1 + phase2-extension
     const revealTimer = setTimeout(() => {
@@ -52,7 +64,7 @@ export function DealAnimation({ trumpCandidate }: DealAnimationProps) {
       clearTimeout(dealTimer);
       clearTimeout(revealTimer);
     };
-  }, [prefersReducedMotion]);
+  }, [prefersReducedMotion, hasCandidate]);
 
   // Skip rendering once animation is complete
   if (dealPhase === "done" && !trumpCandidate) return null;

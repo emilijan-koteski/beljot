@@ -154,6 +154,24 @@ describe("RoomCard", () => {
     expect(screen.getByTestId("room-card-join")).toBeInTheDocument();
   });
 
+  // Story 12.8: before lobby.card.variantCroatia existed, variantLabel fell
+  // through to title-casing the raw server string, so every locale rendered the
+  // English-looking "Croatia". mk is the discriminator that catches it — a
+  // Latin-script label in a Cyrillic bundle is unmistakable.
+  it.each([
+    ["mk", "Хрватска"],
+    ["hr", "Hrvatska"],
+    ["sr", "Hrvatska"],
+    ["en", "Croatian"],
+  ] as const)("renders the localized Croatian variant label in %s locale", async (lang, label) => {
+    await i18n.changeLanguage(lang);
+
+    render(<RoomCard room={{ ...baseRoom, variant: "croatia" }} onJoin={() => {}} />);
+
+    expect(screen.getByText(new RegExp(label))).toBeInTheDocument();
+    expect(screen.queryByText(/Croatia\b/)).not.toBeInTheDocument();
+  });
+
   it("keeps both honor chips all-Cyrillic in the mk locale", async () => {
     await i18n.changeLanguage("mk");
 

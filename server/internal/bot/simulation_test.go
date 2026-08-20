@@ -9,6 +9,7 @@ import (
 
 	"github.com/emilijan/beljot/server/internal/bot"
 	"github.com/emilijan/beljot/server/internal/game"
+	"github.com/emilijan/beljot/server/internal/game/testfixtures"
 )
 
 // TestSimulation_HeuristicBeatsRandomBaseline is the AC4 evidence: seats 0+2
@@ -231,15 +232,45 @@ func randomLegalAction(gs *game.GameState, seat int, rng *rand.Rand) game.Action
 //     phase and chooseCard would panic on legal[0];
 //   - trick 1 opens with the contest already resolved, so no declaration is ever
 //     outstanding during play;
+//   - the FORCED DEALER PICK: when round 1 is passed out and three seats pass
+//     again, the dealer has no legal pass, and bot.Decide must name a suit. A
+//     pass here is rejected by the engine, which playOneHandWith's
+//     require.NoError turns into an immediate failure — so this run is also the
+//     deadlock proof for Story 12.8;
 //   - the hand scores.
 func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
-	// 60 hands keeps the phase-was-entered assertions comfortably clear of a
-	// deal-luck flake: only hands where some seat is dealt a meld open the phase.
-	const handsTarget = 60
+	// 200 hands: 60 already clears the phase-was-entered assertions (only hands
+	// where some seat is dealt a meld open the phase), and the wider sample is
+	// nearly free at this speed, so it buys extra deal coverage for the
+	// forced-pick path — which needs BOTH bidding rounds to reach the dealer and
+	// so shows up in roughly 5% of deals.
+	//
+	// Deck shuffles are NOT seeded, so that 5% is a rate, not a guarantee: over
+	// 200 hands a zero is around 1 in 3,500, which is a flake rather than a
+	// proof. The forced pick is therefore observed and logged here but asserted
+	// on the deterministic tail hand below, and pinned exhaustively by
+	// TestDecide_ForcedDealerNeverPasses.
+	const handsTarget = 200
 	rng := rand.New(rand.NewPCG(12, 6))
 
 	sawDeclarationPhase := 0
 	sawPromptedSeat := 0
+	sawForcedPick := 0
+
+	// tailObserver holds the forced-pick invariant on its own, so the per-hand
+	// observer below and the deterministic tail hand at the end share exactly one
+	// definition of it.
+	tailObserver := func(t *testing.T, cur *game.GameState, seat int, action game.Action) {
+		if !game.MustPickTrump(cur, seat) {
+			return
+		}
+		sawForcedPick++
+		require.Equal(t, cur.DealerSeat, seat,
+			"only the dealer can be the seat with no legal pass")
+		require.Equal(t, game.ActionPickTrump, action.Type,
+			"the dealer has no legal pass here — a pass is the deadlock this run proves gone")
+		require.NotNil(t, action.Suit, "a free-suit pick must carry a suit")
+	}
 
 	for hand := 0; hand < handsTarget; hand++ {
 		gs := game.NewGame(
@@ -256,6 +287,7 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 		enteredPhase := false
 
 		observe := func(t *testing.T, cur *game.GameState, seat int, action game.Action) {
+			tailObserver(t, cur, seat, action)
 			switch cur.Phase {
 			case game.PhaseDeclaring:
 				if !enteredPhase {
@@ -292,17 +324,29 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 	// The phase is not vacuously "safe" because it was never entered.
 	assert.Positive(t, sawDeclarationPhase, "no hand ever opened the declaration phase")
 	assert.Positive(t, sawPromptedSeat, "no seat was ever prompted inside the phase")
-	t.Logf("declaration phase opened in %d/%d hands, %d seats prompted",
-		sawDeclarationPhase, handsTarget, sawPromptedSeat)
+	t.Logf("declaration phase opened in %d/%d random hands, %d seats prompted, %d forced dealer picks",
+		sawDeclarationPhase, handsTarget, sawPromptedSeat, sawForcedPick)
+
+	// Deterministic tail: one hand started FROM the forced-pick state, so this
+	// run always exercises it regardless of how the 200 random deals fell. Same
+	// driver, same observer, so the observer's "the dealer must not pass"
+	// assertions apply — and ApplyAction's require.NoError inside
+	// playOneHandWith makes a pass an immediate failure.
+	forcedBefore := sawForcedPick
+	forced := testfixtures.NewGameCroatianMidBidding(7)
+	require.True(t, game.MustPickTrump(forced, forced.ActivePlayerSeat),
+		"the tail fixture must be the state where the dealer has no legal pass")
+	_, _ = playOneHandWith(t, forced, bot.NewMemory(), rng, croatianBotDriver, tailObserver)
+	assert.Greater(t, sawForcedPick, forcedBefore,
+		"the deterministic tail hand must have gone through the forced dealer pick")
 }
 
-// croatianBotDriver plays every seat with bot.Decide, substituting a free-suit
-// pick for the one bid the bot cannot make yet: under AllPassDealerMustPick the
-// dealer bidding last in round 2 has no legal pass, and decideBid does not know
-// that until variant-aware bidding lands with the enablement story.
-//
-// The substitution is decided BEFORE applying, not retried after a rejection, so
-// playOneHandWith's require.NoError stays a strict always-legal proof.
+// croatianBotDriver plays every seat with bot.Decide — no substitutions, no
+// retries. It used to swap in a free-suit pick for the one bid the bot could not
+// make (the dealer bidding last in round 2 under AllPassDealerMustPick has no
+// legal pass); that crutch is gone, so playOneHandWith's require.NoError is now
+// a strict always-legal proof over the bot's OWN decisions, including the forced
+// dealer pick.
 func croatianBotDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action) {
 	_ = rng // every seat is deterministic here; randomness lives in the deal
 
@@ -311,21 +355,5 @@ func croatianBotDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int
 		seat = *gs.PendingBelotSeat
 	}
 
-	action := bot.Decide(viewFromState(gs, seat, mem))
-	if action.Type == game.ActionPassTrump && mustPickTrump(gs, seat) {
-		suit := game.AllSuits[0]
-		action = game.Action{Type: game.ActionPickTrump, PlayerSeat: seat, Suit: &suit}
-	}
-	return seat, action
-}
-
-// mustPickTrump reports whether the engine will refuse this seat's pass: the
-// dealer bids last in round 2 under AllPassDealerMustPick and has no right to
-// pass, which is what makes reshuffle-and-redeal unreachable under that config.
-// Reads the rule config, never the variant name.
-func mustPickTrump(gs *game.GameState, seat int) bool {
-	return gs.Rules.AllPassOutcome == game.AllPassDealerMustPick &&
-		gs.BiddingRound == 2 &&
-		gs.BiddingPassCount >= 3 &&
-		seat == gs.DealerSeat
+	return seat, bot.Decide(viewFromState(gs, seat, mem))
 }

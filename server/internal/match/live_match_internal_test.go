@@ -3,11 +3,13 @@ package match
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/emilijan/beljot/server/internal/game"
+	"github.com/emilijan/beljot/server/internal/game/testfixtures"
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
@@ -345,4 +347,132 @@ func TestBroadcastActionResult_DeclareEmitsPlayerDeclared(t *testing.T) {
 		assert.NotContains(t, rec.eventTypes(), ws.EventPlayerDeclared,
 			"skipping declarations must not announce anything")
 	})
+}
+
+// TestHandleTimerExpiry_ForcedDealerPickResolvesBidding is the timeout half of
+// the Story 12.8 deadlock fix, independent of bots.
+//
+// Under AllPassOutcome == AllPassDealerMustPick the dealer bidding last in
+// round 2 has no legal pass. The old auto-action passed anyway, the engine
+// rejected it, and the error path re-armed the SAME seat for a full fresh
+// window — so the hand never advanced and the session logged one rejection per
+// timer period for as long as it lived. Bidding resolving here is the proof
+// that loop is gone.
+func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
+	rec := &recordingBroadcaster{}
+	// nil repo: this test never reaches a persisted match end — bidding
+	// resolves into the declaration phase and stops there.
+	m := NewManager(rec, nil)
+
+	const roomID = uint(100)
+	players := [4]PlayerSeatInfo{
+		{UserID: 10, Username: "a", Seat: 0},
+		{UserID: 20, Username: "b", Seat: 1},
+		{UserID: 30, Username: "c", Seat: 2},
+		{UserID: 40, Username: "d", Seat: 3},
+	}
+	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0))
+	t.Cleanup(func() { m.RemoveSession(roomID) })
+
+	// passCount 7: round 1 passed out, three round-2 passes recorded, the
+	// dealer on the clock with no legal pass.
+	gs := testfixtures.NewGameCroatianMidBidding(7)
+	gs.RoomID = roomID
+	require.True(t, game.MustPickTrump(gs, gs.ActivePlayerSeat), "the fixture must be the forced-pick state")
+	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat, "the dealer must be the seat on the clock")
+	m.SetGameStateForTest(roomID, gs)
+
+	m.TriggerTimerExpiryForTest(roomID, gs.ActivePlayerSeat, 10*time.Millisecond)
+
+	resolved := false
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); {
+		if snap := m.GetStateSnapshot(roomID); snap != nil && snap.TrumpSuit != nil {
+			resolved = true
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	require.True(t, resolved, "the expired forced-dealer turn must resolve bidding, not loop on a rejected pass")
+
+	// The table must be TOLD. This is the only auto-action that fixes trump for a
+	// whole hand, so leaving it to be inferred from the next snapshot would mean
+	// three players watch a suit appear from nowhere.
+	assert.Contains(t, rec.eventTypes(), ws.EventAutoAction,
+		"the forced auto-pick must announce itself (got %v)", rec.eventTypes())
+	autoPayload := rec.payloadOf(t, ws.EventAutoAction)
+	require.NotNil(t, autoPayload, "event:auto_action carried no payload")
+	assert.Equal(t, string(ws.AutoActionPickTrump), autoPayload["type"])
+	assert.Equal(t, float64(gs.DealerSeat), autoPayload["playerSeat"])
+
+	after := m.GetStateSnapshot(roomID)
+	require.NotNil(t, after)
+	require.NotNil(t, after.TrumpCallerSeat)
+	assert.Equal(t, gs.DealerSeat, *after.TrumpCallerSeat, "the dealer is the taker — nobody else can be")
+	assert.NotEqual(t, game.PhaseBidding, after.Phase, "bidding must be over")
+	// The pick merged every seat's face-down pair, so no seat is still holding
+	// two cards back and the public count is zero across the table.
+	for seat, p := range after.Players {
+		assert.Len(t, p.Hand, 8, "seat %d must hold all eight cards once bidding resolves", seat)
+		assert.Zero(t, p.FaceDownCount, "seat %d", seat)
+	}
+}
+
+// TestBuildBotView_FaceDownGating pins the no-peeking boundary for bot seats:
+// the two face-down cards reach a bot's View only after the round-2 reveal, and
+// only ever its OWN two.
+func TestBuildBotView_FaceDownGating(t *testing.T) {
+	// Round 1, nothing revealed yet.
+	hidden := testfixtures.NewGameCroatianMidBidding(1)
+	require.False(t, hidden.FaceDownRevealed)
+	for seat := 0; seat < 4; seat++ {
+		v := buildBotView(hidden, seat, nil)
+		assert.Empty(t, v.FaceDownCards,
+			"seat %d must not see its own face-down cards before the reveal", seat)
+	}
+
+	// Round 2 after the reveal: each seat sees exactly its own pair.
+	revealed := testfixtures.NewGameCroatianMidBidding(4)
+	require.True(t, revealed.FaceDownRevealed)
+	for seat := 0; seat < 4; seat++ {
+		v := buildBotView(revealed, seat, nil)
+		assert.Equal(t, revealed.Players[seat].FaceDownCards, v.FaceDownCards, "seat %d", seat)
+		for other := 0; other < 4; other++ {
+			if other == seat {
+				continue
+			}
+			for _, c := range revealed.Players[other].FaceDownCards {
+				assert.NotContains(t, v.FaceDownCards, c,
+					"seat %d's view leaked seat %d's hidden card %s", seat, other, c)
+			}
+		}
+		// Never merged into Hand: len(Hand) == 2 is chooseCard's endgame marker.
+		assert.Len(t, v.Hand, 6, "seat %d", seat)
+	}
+}
+
+// TestBuildBotView_MustPickTrumpIsSeatScoped pins the other half of what the
+// view hands the bot: the "a pass will be refused" flag belongs to the seat on
+// the clock and nobody else, and it is derived from the rule config — the bot
+// never learns a variant name.
+func TestBuildBotView_MustPickTrumpIsSeatScoped(t *testing.T) {
+	forced := testfixtures.NewGameCroatianMidBidding(7)
+	require.True(t, game.MustPickTrump(forced, forced.ActivePlayerSeat))
+	for seat := 0; seat < 4; seat++ {
+		v := buildBotView(forced, seat, nil)
+		assert.Equal(t, seat == forced.ActivePlayerSeat, v.MustPickTrump, "seat %d", seat)
+	}
+
+	// One pass earlier the dealer is not yet on the clock, so no seat is forced.
+	open := testfixtures.NewGameCroatianMidBidding(6)
+	require.False(t, game.MustPickTrump(open, open.ActivePlayerSeat))
+	for seat := 0; seat < 4; seat++ {
+		assert.False(t, buildBotView(open, seat, nil).MustPickTrump, "seat %d", seat)
+	}
+
+	// Bitola never forces a pick — its config reshuffles instead.
+	bitola := testfixtures.NewGameMidBidding(7)
+	require.False(t, game.MustPickTrump(bitola, bitola.ActivePlayerSeat))
+	for seat := 0; seat < 4; seat++ {
+		assert.False(t, buildBotView(bitola, seat, nil).MustPickTrump, "seat %d", seat)
+	}
 }

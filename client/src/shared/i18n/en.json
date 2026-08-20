@@ -653,7 +653,7 @@
         "codeLabel": "CODE",
         "seated": "{{current}}/4"
       },
-      "variantHint": "Only Bitola for now",
+      "variantHint": "Bitola or Croatian rules",
       "matchModeHint": "501 for a quicker match, 1001 for the full race",
       "timerHintRelaxed": "No timer",
       "timerDurationHint": "10–120s · default 30s",
@@ -735,6 +735,7 @@
       "empty": "empty",
       "joining": "Joining \"{{name}}\"…",
       "variantBitola": "Bitola",
+      "variantCroatia": "Croatian",
       "matchMode1001": "1001 pts",
       "matchMode501": "501 pts",
       "buyInFree": "No stake",
@@ -830,8 +831,10 @@
       "roundLabel": "Round {{round}} / 2",
       "pick": "Take",
       "pass": "Pass",
+      "mustPick": "You must name a suit",
       "waitingRound1": "Waiting for <name>{{name}}</name> to take or pass the trump",
-      "waitingRound2": "Waiting for <name>{{name}}</name> to pick a suit or pass"
+      "waitingRound2": "Waiting for <name>{{name}}</name> to pick a suit or pass",
+      "waitingForcedPick": "Waiting for <name>{{name}}</name> to name a suit"
     },
     "deal": {
       "dealing": "Dealing cards…"
@@ -890,6 +893,7 @@
     "timer": {
       "autoPlayed": "Auto-played: {{card}}",
       "autoPassed": "{{player}} ran out of time — auto-passed",
+      "autoPickedTrump": "{{player}} ran out of time — trump was named for them",
       "autoSkippedDeclare": "{{player}} ran out of time — auto-skipped declarations",
       "autoSkippedBelot": "{{player}} ran out of time — auto-declined Belote"
     },
@@ -903,7 +907,7 @@
     },
     "variants": {
       "bitola": "Bitola",
-      "croatia": "Croatia"
+      "croatia": "Croatian"
     },
     "scoreReveal": {
       "title": "Hand Score",
@@ -1211,7 +1215,7 @@
       "r1meta": "Bitola · 1001 pts · 30s",
       "r1ago": "4m ago",
       "r2title": "Quick 501 — no timer",
-      "r2meta": "Croatia · 501 pts · relaxed",
+      "r2meta": "Croatian · 501 pts · relaxed",
       "r2ago": "just now"
     },
     "vig": {

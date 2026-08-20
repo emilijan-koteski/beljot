@@ -744,36 +744,44 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A �
   summary: Under `VariantRules.AllPassOutcome == AllPassDealerMustPick`, a Croatian dealer who times out on their round-2 turn would livelock bidding — `handleTimerExpiry` auto-issues `pass_trump`, the engine rejects it because the dealer must pick, and the error path re-arms the same seat's timer, so the hand never advances.
   reason_deferred: Unreachable today — that config belongs to a variant Story 12.8 has not yet made selectable. Resolving it means deciding what suit to name on an absent player's behalf, which is a rule decision belonging with the same story that teaches bots to bid without a candidate (12.8 per the Epic 12 context). Story 12.1 deliberately shipped the forced-pick rule without inventing that policy.
   evidence: The re-arm uses `time.Until(*oldState.TurnExpiresAt)`, already <= 0 when a timeout produced the error, so `time.AfterFunc` fires immediately and the reject-re-arm cycle is a hot spin that burns a core rather than a quiet stall. `server/internal/match/live_match.go:1498` carries a `TODO(croatian-enablement)` at the exact auto-action site, inside the `gs.Phase == game.PhaseBidding` branch that unconditionally issues `ActionPassTrump`. `TestCroatianDealerCannotPassInRound2` confirms the engine rejects that action under the Croatian config. Surfaced by the implementing agent and verified against the timeout path.
+  update_2026-08-20: The "hot spin that burns a core" claim in the evidence above is WRONG, and so is the same claim in the `TODO(croatian-enablement)` comment itself (now at `live_match.go:1522`). `handleTimerExpiry`'s auto-action error path calls `m.startTimerLocked` (`live_match.go:1616` -> `:1429-1435` -> `armTurnTimerLocked`), which arms a FULL fresh `timerDurationSec` window — there is no `time.Until` anywhere in `handleTimerExpiry`. The `time.Until(*oldState.TurnExpiresAt)` re-arm the evidence cites lives in `HandleAction`'s error path (`live_match.go:424`), a different path, and `armTurnTimerLocked` clamps it with `max(remaining,0)+expiryGrace` (400ms). Real severity: a reject/re-arm loop at one timer period, forever, with one `slog.Error` per cycle — the hand never advances, but no core is burned. Verified by reading both paths during Story 12.8 planning. Fix the comment when the fix lands.
+  update_2026-08-20: CLOSED by Story 12.8. `handleTimerExpiry` gained a forced-pick arm ahead of the general bidding arm, guarded by the new exported `game.MustPickTrump`, that auto-names a suit via the new pure `game.AutoPickTrumpSuit` instead of passing. Covered by `TestHandleTimerExpiry_ForcedDealerPickResolvesBidding`. See also the 2026-08-20 correction above: the severity was a bounded reject loop, not a hot spin.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-1-variant-rule-config-and-croatian-bidding.md`
   summary: A bot bids Croatian round 2 on six of the eight cards it actually holds — `bot.View` carries no face-down cards, so the round-2 reveal never reaches the bot's decision input.
   reason_deferred: Story 12.1 scoped the bot change to a nil-candidate panic guard only; teaching bots to bid without a candidate is assigned to Story 12.8 by the Epic 12 context, and evaluating the full eight-card hand is the same piece of work.
   evidence: `server/internal/bot/view.go:15` is a bare `Hand []game.Card` and `buildBotView` (`server/internal/match/bot_driver.go:204-207`) populates it from `gs.Players[seat].Hand` alone, which under `DealShapeAllBeforeBidding` holds only the six open cards until bidding resolves. Raised independently by all three review layers.
+  update_2026-08-20: CLOSED by Story 12.8. `bot.View` gained `FaceDownCards`, populated by `buildBotView` only when `FaceDownRevealed` and only for that seat, and `decideBid` counts the pair. Kept OUT of `Hand` so the playable set stays the playable set. Covered by `TestBuildBotView_FaceDownGating` and paired bidding rows that prove round 2 counts the pair and round 1 does not.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-1-variant-rule-config-and-croatian-bidding.md`
   summary: A bot dealer hits the same forced-pass livelock as a timing-out human, and `bot_test.go`'s shared post-assertion encodes a Bitola-only rule as universal, which will block the first candidate-less bot test row.
   reason_deferred: Same root cause and same owner as the timeout livelock above — choosing a suit on the dealer's behalf is a rule decision belonging to Story 12.8. Unreachable until the variant is selectable.
   evidence: `decideBid` returns `pass_trump` when no suit clears its threshold; under `AllPassDealerMustPick` the engine rejects that, and `server/internal/match/bot_driver.go:185-195` deliberately re-arms the seat, re-running `Decide` over unchanged state and reproducing the identical rejected pass. Separately, `server/internal/bot/bot_test.go:266` asserts `action.Suit` is nil for every round-1 pick, which is true only for the candidate variant. A bot dealer is the more likely trigger than a human timeout.
+  update_2026-08-20: CLOSED by Story 12.8. `View.MustPickTrump` (derived from the rule config, never a variant name) makes `decideBid` return its best-scoring suit instead of passing; the Bitola-only "round-1 pick carries no suit" assertion is now scoped to the candidate variant. Covered by `TestDecide_ForcedDealerNeverPasses` and `TestBot_ForcedDealerPickAdvancesHandWithoutRejection`, plus deletion of the Croatian simulation's forced-pick substitution.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-1-variant-rule-config-and-croatian-bidding.md`
   summary: The forced dealer is shown a Pass button the server will reject, and the refusal reuses `ErrInvalidBid`, so the client cannot tell "you must pick" from "bad suit" even if it wanted to.
   reason_deferred: `TrumpPrompt` has no `canPass` prop and Story 12.1's task list covered only the free four-suit grid; the prompt is unreachable until 12.8 exposes the variant. A distinct sentinel is public error-surface API that was not in scope.
   evidence: `server/internal/game/bidding.go` refuses the dealer's fourth round-2 pass under `AllPassDealerMustPick` (pinned by `TestCroatianDealerCannotPassInRound2`), while `TrumpPrompt.tsx` renders Pass unconditionally and the `waitingRound2` copy other seats read still says "to pick a suit or pass". Raised by two review layers.
+  update_2026-08-20: PARTLY CLOSED by Story 12.8. `TrumpPrompt` gained `canPass`, fed from a new `GameState.MustPickTrump` wire flag, and hides Pass plus swaps the sibling-seat waiting copy. Still open by explicit decision: the refusal still reuses `ErrInvalidBid`, so the client cannot distinguish "you must pick" from "bad suit" — a new public error sentinel was on the spec's Ask First list and was not taken.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-1-variant-rule-config-and-croatian-bidding.md`
   summary: Lobby and room-page variant labels have no Croatian branch, so a Croatian room would read an unlocalized, title-cased "Croatia" in all four locales.
   reason_deferred: Only reachable once 12.8 allows Croatian rooms to exist. Story 12.1 added `match.variants.croatia` for the in-match path only; the lobby surfaces use a different key namespace with a deliberate title-case fallback.
   evidence: `client/src/features/lobby/lib/roomLabels.ts:10` special-cases `"bitola"` alone and falls through to title-casing, and `client/src/features/room/RoomPage.tsx:75`'s `variantKeys` map has a `bitola` key only. `lobby.createRoomModal.variantCroatia` already exists while `lobby.card.variantCroatia` does not. Raised by two review layers.
+  update_2026-08-20: CLOSED by Story 12.8. `lobby.card.variantCroatia` added in all four locales; `roomLabels.variantLabel` and `RoomPage`'s `variantKeys` both map `croatia`. Covered by four-locale `it.each` cases in `RoomCard.test.tsx` and `RoomPage.locale.test.tsx` that also assert the title-cased fallback is gone.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-1-variant-rule-config-and-croatian-bidding.md`
   summary: During Croatian bidding, each opponent's card-back stack reads 6 while that opponent actually holds 8, because the two face-down cards are deliberately absent from other seats' snapshots.
   reason_deferred: A direct and accepted consequence of keeping the face-down cards out of every snapshot (the design the spec chose); it is invisible until 12.8 makes the variant selectable, and whether to render two extra backs is a presentation decision for the story that surfaces the variant.
   evidence: `client/src/features/match/MatchPage.tsx` passes `player.hand.length` as `cardCount` in every phase, and the Croatian deal leaves only six cards in `Players[i].Hand` until bidding resolves. The spec's Design Notes accept it; recorded here so 12.8 actually reads it.
+  update_2026-08-20: CLOSED for opponents by Story 12.8 via a new per-seat `PlayerState.FaceDownCount` on the wire (a count leaks nothing; the card identities stay out of every snapshot). NOT closed for the viewer's OWN seat — see the 2026-08-20 entry near the end of this file.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-1-variant-rule-config-and-croatian-bidding.md`
   summary: `DealAnimation` still holds its trump-phase window open over an empty table centre when the variant flips no candidate, and nothing visually represents the two face-down cards being dealt.
   reason_deferred: Purely presentational, unreachable until 12.8, and the right treatment (a face-down pair animating to each seat) is a design question rather than a defect in the dealing rules Story 12.1 delivered.
   evidence: `DealAnimation.tsx` self-hides on `dealPhase === "done" && !trumpCandidate` but still spends the `MOTION.DEAL_PHASE_TRUMP` duration with nothing to show. Raised by one review layer as residual polish.
+  update_2026-08-20: PARTLY CLOSED by Story 12.8 — the dead trump-flip beat is skipped when there is no candidate. Still open by explicit decision: nothing visually represents the two face-down cards being dealt; the spec forbade designing new choreography.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-5-croatian-declaration-overlap.md`
   summary: Nothing mechanically detects drift between the Go declaration detector plus its variant presets and the hand-written TypeScript mirror of both.
@@ -794,6 +802,7 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A �
   summary: No test exercises the match-layer broadcast loop that flattens several melds per seat into the `event:declarations_resolved` payload.
   reason_deferred: The producing loop is pre-existing code that Story 12.5 did not touch, and the story's engine-level tests prove the multi-meld state it would serialize. Adding match-package coverage means driving a Croatian trick 1 through the manager with a captured hub, which is a test-infrastructure task beyond this story's task list.
   evidence: The contract case in `server/internal/ws/events_contract_test.go` marshals a hand-written map literal and byte-compares it with the golden; it never constructs a `GameState` nor calls `broadcastDeclarationsResolvedIfTransition`. Collapsing that broadcast loop to the first meld per seat would keep the Go contract test, the client contract test and every match-package test green, while a Croatian hand scored 250 and the reveal rendered a single 200 row.
+  update_2026-08-20: Partially closed by Story 12.6. `server/internal/match/declaration_phase_test.go` now drives resolution through the manager with a captured hub and asserts `event:declarations_resolved` fires, names the team the engine chose, and precedes the trick-1 `match_state` — so the test-infrastructure blocker this entry cited is gone, and deleting either broadcast call site now fails a test. Still open: nothing asserts the payload's `declarations` array, so the several-melds-per-seat flattening this entry was filed about remains unverified. A Croatian overlap hand driven to resolution and checked meld-by-meld would close it.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-12-6-croatian-declaration-phase.md`
   summary: The `phase` string is never pinned across the Go/TypeScript boundary, so a server phase constant and its client union member can drift with no test failing anywhere.
@@ -814,3 +823,75 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A �
   summary: At both boundaries of the Croatian declaration phase an overlay covers a seat whose per-move timer is already running, and the phase makes this systematic rather than incidental.
   reason_deferred: Both behaviours are pre-existing Bitola patterns that Story 12.6 inherited rather than introduced, and the reveal's timing and centring are frozen by `spec-12-5-croatian-declaration-overlap.md` and its upstream specs. Changing either needs a deliberate decision about whose clock pays for a reveal.
   evidence: `showDeclarationPrompt` requires `trumpReveal === null`, so the first prompted seat's clock runs while the trump-take reveal still hides their prompt; and at the handoff into trick 1 the leader's fresh timer starts underneath the 8s declaration reveal. Under this phase the first prompted seat and the trick-1 leader are both always `(DealerSeat+1)%4`, so the same seat pays both costs every hand.
+
+- source_spec: none
+  summary: Bitola hanging-points tie rule (Story 12.7) — deliberately NOT built; Bitola keeps borrowing the Croatian tie rule (a tied hand is lost, all points to the taker's opponents).
+  evidence: |
+    Decided by the project owner on 2026-08-20, mid-planning, and it supersedes the epic
+    sequence "12.1 -> 12.5 -> 12.6 -> 12.7 -> 12.8". Hanging points was only ever a *Bitola*
+    change; the Croatian tie rule is exactly what already ships, so the Croatian variant needs
+    nothing from this story and 12.8 is unblocked without it. `VariantRules.TieRule` keeps
+    resolving bitola -> `TieRuleHangingPoints` as a statement of the authentic rule, but stays
+    UNREAD by the engine — do not treat the Bitola tie behaviour as a bug, and do not "fix" the
+    rules-reference tie sentence ("Fall short — or even tie — and the hand is lost"), which is
+    correct for both variants under this decision.
+
+    Findings from the planning pass, preserved so they are not re-derived if this ever revives:
+    - Single decision site is `scoreHand` in `server/internal/game/scoring.go:84-116`; keep the
+      Capot arm first (with enough declarations a Capot could in principle tie).
+    - Two `HandScore` fields suffice — pool outstanding after the hand, and pool folded into this
+      hand's award; `>0` on the first is unambiguously "this hand hung". A third boolean would
+      only distinguish a Croatian tie, which `FailedContract` already covers.
+    - The accumulator is per-match, so `startNewHand` (`scoring.go:161-225`) must NOT reset it.
+    - Trap: `client/src/shared/types/wsEvents.schemas.ts:126-142` is a `z.strictObject` for
+      `lastHandResult` inside `MatchStateSchema`, and `gameStateSample()` in
+      `server/internal/ws/events_contract_test.go:37-80` leaves `lastHandResult` nil — so a new
+      `HandScore` key does NOT move `event_match_state.json` and no golden catches the drift,
+      while every live `match_state` parse would fail.
+    - Match history is REST-fed from persisted `hand_results` rows, so surfacing it there needs
+      migration 000020 (000019 is the highest existing) plus `match.HandResult`,
+      `user.MatchHandView` and its mapping loop at `internal/user/handler.go:881-903`.
+    - `internal/game/testfixtures/fixtures.go` has no Croatian last-trick factory; the three
+      existing Bitola tie tests (`scoring_test.go:167,176,196`) are the only tie coverage.
+    - Locked terminology, had it shipped: en "Held-over points" / mk „Виснати поени" /
+      hr „Viseći bodovi" / sr „Viseći poeni"; tie subtitle en "Tied · the hand hangs" /
+      mk „Изедначено · раката виси" / hr+sr „Izjednačeno · ruka visi".
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-8-croatian-variant-enablement.md`
+  summary: Reconcile the in-app rules reference against real engine behaviour for BOTH variants, in all four locales — Story 12.8 acceptance criterion (d), split into its own spec.
+  evidence: |
+    Split from Story 12.8 at intent capture on 2026-08-20 by owner decision, so the enablement
+    build stays focused on "can you actually play it". The reference has NO variant split today:
+    `client/src/features/rules/content/{en,mk,hr,sr}.ts` (~300 lines each) describe the Bitola
+    flow only — face-up trump candidate (`en.ts:106`), melds "announced on your turn in the first
+    trick" (`en.ts:170`) — both of which are wrong for Croatian after 12.1 and 12.6.
+    `content/rulesContent.parity.test.ts` gates identical section ids, order AND block shapes
+    across all four locales, so every new or changed block must land in all four.
+    NOT part of this deferral: the tie sentence at `en/mk:209-211`, `hr/sr:208-210` ("Fall short —
+    or even tie — and the hand is lost"), which is correct for both variants now that Story 12.7
+    is deferred and Bitola keeps borrowing the Croatian tie rule.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-8-croatian-variant-enablement.md`
+  summary: The viewer's OWN seat still shows six cards during Croatian round-1 bidding while every opponent now visibly shows eight — Story 12.8 fixed the opponent count and made the asymmetry conspicuous.
+  reason_deferred: Whether to draw two card backs at your own seat (or a count) is a presentation decision, and it is genuinely ambiguous: pre-reveal the player does not KNOW those two cards, but does know they hold them. Story 12.8's scope was the opponent count, which is what the spec's matrix row named.
+  evidence: `client/src/features/match/lib/faceDownCards.ts` merges the revealed pair into the local fan only after the round-2 reveal, so before it `myHand` is six cards. Post-12.8 every other seat renders `hand.length + faceDownCount` = 8. Raised independently by two review layers.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-8-croatian-variant-enablement.md`
+  summary: Nothing in the shipped UI signals that the in-app rules reference describes Bitola only, so a player mid-Croatian-match can open instructions that contradict the table in front of them and read them as truth.
+  reason_deferred: The full reconciliation is an owner-approved split with its own spec (see the rules-reference entry above). This entry is narrower: even before that lands, `RulesDialog` takes no variant prop and offers no caveat, which is a small in-product signal rather than a content rewrite.
+  evidence: `client/src/features/rules/content/en.ts` describes the 3+2 deal, the face-up candidate flip, declarations "announced on your turn in the first trick", and "dealt 3 and 2, then trump" — all wrong for Croatian after 12.1/12.6. `client/src/features/match/components/RulesDialog.tsx` renders `getRulesContent(language)` with no variant awareness.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-8-croatian-variant-enablement.md`
+  summary: Four independent variant-to-label mappings and three i18n key families holding identical values now exist, and Story 12.8 had to patch each one separately.
+  reason_deferred: Pre-existing duplication that 12.8 extended rather than introduced; consolidating it touches the lobby, room, create-room and match features at once, which is its own refactor. Recorded because the next variant will have to patch all four again.
+  evidence: `roomLabels.ts` `variantLabel`'s if-chain, `RoomPage.tsx` `variantKeys`, `CreateRoomModal.tsx`'s PreviewCard ternary, and `MatchPage.tsx`'s `t(\`match.variants.${variant}\`)` — backed by `lobby.card.*`, `lobby.createRoomModal.*` and `match.variants.*` carrying the same strings. `client/src/features/match/lib/variantRules.ts` already declares itself the sanctioned single home for variant-keyed client facts. Also: `profile.matchHistory.variant.*` exists in all four locales, has no `croatia`, and is read by nothing — the new history chip imports the lobby helper across a feature boundary instead. And `MatchListItem.variant` is typed `string` rather than the exported `Variant` union.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-8-croatian-variant-enablement.md`
+  summary: The bot's `wantsTrump` thresholds are still calibrated for a six-card bid hand while Croatian round 2 now feeds them the eight cards the bot actually holds, so bots will be somewhat keener to take trump there.
+  reason_deferred: On Story 12.8's Ask First list and deliberately not taken — correcting the INPUT was the story's job, re-deriving the numeric bar is a balance change that deserves its own decision and its own before/after measurement.
+  evidence: `server/internal/bot/bot.go` `wantsTrump`'s thresholds were sized against five dealt cards plus a candidate. Croatian round 1 is coincidentally also six, so only round 2 changes — strictly more information against an unchanged bar.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-8-croatian-variant-enablement.md`
+  summary: The create-room variant hint now restates the two option labels instead of explaining what distinguishes the variants, so nothing in the product tells an owner what they are choosing at the moment of choice.
+  reason_deferred: Writing a per-variant summary is product copy in four locales, and it overlaps the rules-reference reconciliation that was split out of this story. The old hint ("Only Bitola for now") had to go regardless, since it became false.
+  evidence: `lobby.createRoomModal.variantHint` reads "Bitola or Croatian rules" in en, duplicating the `variantBitola` / `variantCroatia` labels rendered directly above it. With no per-variant rules content either, the difference (all eight cards dealt and free-suit calling, versus 5+3 with a face-up candidate) is stated nowhere in the UI.

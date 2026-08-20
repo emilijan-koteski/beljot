@@ -17,6 +17,7 @@ const mockMatchState: MatchState = {
   trumpCandidate: { rank: "K", suit: "S" },
   biddingRound: 1,
   biddingPassCount: 0,
+  mustPickTrump: false,
   deck: [],
   activePlayerSeat: 1,
   trickNumber: 0,
@@ -36,6 +37,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
     {
       hand: [],
@@ -47,6 +49,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
     {
       hand: [],
@@ -58,6 +61,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
     {
       hand: [],
@@ -69,6 +73,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
   ],
   teamScores: [0, 0],

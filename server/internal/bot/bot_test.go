@@ -45,6 +45,10 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	if gs.Phase == game.PhasePlaying {
 		v.LegalCards = game.LegalCards(gs, seat)
 	}
+	if gs.FaceDownRevealed {
+		v.FaceDownCards = gs.Players[seat].FaceDownCards
+	}
+	v.MustPickTrump = game.MustPickTrump(gs, seat)
 	return v
 }
 
@@ -73,8 +77,23 @@ func TestDecide_Bidding(t *testing.T) {
 		hand      []game.Card
 		round     int
 		candidate string // card id; "" keeps the fixture default (AH)
-		wantType  string
-		wantSuit  *game.Suit
+		// noCandidate switches the row onto a Croatian fixture: no trump
+		// candidate at all, so trump is a freely named suit in BOTH rounds and
+		// the seat holds six open cards plus a face-down pair.
+		noCandidate bool
+		// faceDown overrides the fixture's face-down pair (noCandidate rows
+		// only). Those two cards are turned up to their owner before round 2, so
+		// the bid must count them.
+		faceDown []game.Card
+		// revealed turns the face-down pair up. Round-2 rows want true; a
+		// round-1 row wants false, which is what proves the bot bids on six
+		// cards before the reveal and eight after.
+		revealed bool
+		// forcedPick puts the row in the state where the engine refuses a pass:
+		// the dealer bidding last in round 2 with no legal pass.
+		forcedPick bool
+		wantType   string
+		wantSuit   *game.Suit
 	}{
 		{
 			name:     "round 1 five of candidate suit picks",
@@ -245,11 +264,96 @@ func TestDecide_Bidding(t *testing.T) {
 			round:    2,
 			wantType: game.ActionPassTrump,
 		},
+		{
+			// No candidate: round 1 is already a free-suit choice, so a pick
+			// must CARRY the suit — the round-1 suitless pick is a
+			// candidate-variant rule, not a universal one. Five spades in the
+			// six open cards clears the bar on its own.
+			name:        "no candidate round 1 picks and carries the suit",
+			seat:        1,
+			hand:        cards("7S", "8S", "9S", "TS", "JS", "7H"),
+			round:       1,
+			noCandidate: true,
+			faceDown:    cards("7D", "8D"),
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitSpades),
+		},
+		{
+			// Same shape, nothing qualifying, and a pass is still legal in round
+			// 1 — so the bot passes rather than inventing a call.
+			name:        "no candidate round 1 junk passes",
+			seat:        1,
+			hand:        cards("7S", "8H", "9D", "TC", "QS", "KH"),
+			round:       1,
+			noCandidate: true,
+			faceDown:    cards("7D", "8D"),
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			// The face-down pair is the whole point. Open six hold three
+			// diamonds and two spades; the revealed pair adds two more
+			// diamonds, making five — a call the bot cannot see if it bids on
+			// Hand alone (three diamonds without the Jack is under the bar).
+			name:        "no candidate round 2 counts the revealed face-down pair",
+			seat:        1,
+			hand:        cards("7D", "8D", "9D", "7S", "8S", "7H"),
+			round:       2,
+			noCandidate: true,
+			faceDown:    cards("TD", "JD"),
+			revealed:    true,
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitDiamonds),
+		},
+		{
+			// The same hand BEFORE the reveal: the two hidden diamonds are not
+			// in the view, nothing clears the bar, and the bot passes. Pinning
+			// both halves is what proves the reveal gate is real rather than
+			// the bot simply always seeing eight cards.
+			name:        "no candidate round 1 does not count the still-hidden pair",
+			seat:        1,
+			hand:        cards("7D", "8D", "9D", "7S", "8S", "7H"),
+			round:       1,
+			noCandidate: true,
+			faceDown:    cards("TD", "JD"),
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			// The forced dealer. Deliberately junk — no suit clears the
+			// threshold — so a bot that only knew the threshold would pass and
+			// be rejected forever. Diamonds is the highest-scoring holding
+			// (three cards, one of them the Jack).
+			name:        "forced dealer picks its best suit rather than passing",
+			seat:        0,
+			hand:        cards("7D", "8D", "JD", "7S", "8H", "9C"),
+			round:       2,
+			noCandidate: true,
+			faceDown:    cards("QC", "KH"),
+			revealed:    true,
+			forcedPick:  true,
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitDiamonds),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gs := testfixtures.NewGameJustDealt()
+			var gs *game.GameState
+			if tt.noCandidate {
+				gs = testfixtures.NewGameCroatianJustDealt()
+				gs.FaceDownRevealed = tt.revealed
+				if tt.faceDown != nil {
+					gs.Players[tt.seat].FaceDownCards = tt.faceDown
+				}
+				if tt.forcedPick {
+					// Three seats have already passed in round 2, so the dealer
+					// on the clock has no legal pass. Asserted, not assumed —
+					// the row's whole meaning depends on it.
+					gs.BiddingPassCount = 3
+					gs.DealerSeat = tt.seat
+				}
+			} else {
+				gs = testfixtures.NewGameJustDealt()
+			}
 			gs.BiddingRound = tt.round
 			gs.ActivePlayerSeat = tt.seat
 			gs.Players[tt.seat].Hand = tt.hand
@@ -257,19 +361,49 @@ func TestDecide_Bidding(t *testing.T) {
 				c := card(tt.candidate)
 				gs.TrumpCandidate = &c
 			}
+			require.Equal(t, tt.forcedPick, game.MustPickTrump(gs, tt.seat),
+				"the fixture must match the row's forcedPick expectation")
 
 			action := bot.Decide(viewFromState(gs, tt.seat, nil))
 
 			assert.Equal(t, tt.wantType, action.Type)
 			assert.Equal(t, tt.seat, action.PlayerSeat)
-			if tt.round == 1 && tt.wantType == game.ActionPickTrump {
-				assert.Nil(t, action.Suit, "round 1 pick carries no suit")
+			// A suitless round-1 pick is a CANDIDATE-variant rule: the engine
+			// locks trump to the candidate's suit and ignores action.Suit. With
+			// no candidate round 1 is a free-suit choice like round 2, so the
+			// pick must carry a suit — asserted through wantSuit on those rows.
+			if tt.round == 1 && gs.TrumpCandidate != nil && tt.wantType == game.ActionPickTrump {
+				assert.Nil(t, action.Suit, "round 1 pick on a candidate carries no suit")
 			}
 			if tt.wantSuit != nil {
 				require.NotNil(t, action.Suit)
 				assert.Equal(t, *tt.wantSuit, *action.Suit)
 			}
 		})
+	}
+}
+
+// TestDecide_ForcedDealerNeverPasses is the bot half of the Story 12.8 deadlock
+// fix, stated as an invariant rather than one table row: in the state where the
+// engine refuses a pass, NO hand may produce pass_trump. A single row proves one
+// hand; this proves the property across every deal the fixture can hold.
+func TestDecide_ForcedDealerNeverPasses(t *testing.T) {
+	// Every seat takes the dealer's chair in turn, so the assertion does not
+	// rest on one seat's holding.
+	for seat := 0; seat < 4; seat++ {
+		gs := testfixtures.NewGameCroatianMidBidding(7)
+		gs.DealerSeat = seat
+		gs.ActivePlayerSeat = seat
+		require.True(t, game.MustPickTrump(gs, seat), "seat %d must be the forced picker", seat)
+
+		action := bot.Decide(viewFromState(gs, seat, nil))
+		require.Equal(t, game.ActionPickTrump, action.Type,
+			"seat %d: a pass here is rejected by the engine, forever", seat)
+		require.NotNil(t, action.Suit, "seat %d: a free-suit pick must carry a suit", seat)
+
+		// Not merely non-pass: the engine must actually accept it.
+		_, err := game.ApplyAction(gs, action)
+		require.NoError(t, err, "seat %d: the forced pick must be legal", seat)
 	}
 }
 

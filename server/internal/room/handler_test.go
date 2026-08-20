@@ -202,7 +202,12 @@ func (m *mockRoomRepo) FindQuickPlayRoomExcluding(excluded map[uint]bool, buyIn 
 			continue
 		}
 		// Story 9.4: only return a room in the caller's affordability bracket.
-		if r.IsQuickPlay && r.Status == "waiting" && r.PlayerCount < 4 && r.CoinBuyIn == buyIn {
+		// The variant predicate mirrors GormRepository.FindQuickPlayRoomExcluding
+		// (Story 12.8) — Quick Play is Bitola-only, and the mock must not be a
+		// looser filter than production or a quick-play test could pass against
+		// behaviour the real query rejects.
+		if r.IsQuickPlay && r.Status == "waiting" && r.PlayerCount < 4 &&
+			r.CoinBuyIn == buyIn && r.Variant == "bitola" {
 			return r, nil
 		}
 	}
@@ -751,6 +756,39 @@ func TestCreateRoom_InvalidVariant(t *testing.T) {
 	var errResp map[string]map[string]string
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "INVALID_VARIANT", errResp["error"]["code"])
+}
+
+// TestCreateRoom_CroatianVariant is the positive half of the variant gate: the
+// existing invalid-variant test uses "unknown", which says nothing about the
+// value that actually changed in Story 12.8.
+func TestCreateRoom_CroatianVariant(t *testing.T) {
+	e, repo := setupTest()
+	token := validToken(5)
+
+	body := `{"name":"Hrvatska Ekipa","variant":"croatia","matchMode":"1001","timerStyle":"relaxed"}`
+	rec := doCreateRoom(e, body, token)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+
+	var data room.Room
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+	assert.Equal(t, "croatia", data.Variant)
+
+	// Persisted, not just echoed — the column is a plain varchar with no CHECK,
+	// so the allowlist in the handler is the only thing standing between a
+	// request body and the row.
+	persisted, err := repo.FindByID(data.ID)
+	require.NoError(t, err)
+	require.NotNil(t, persisted)
+	assert.Equal(t, "croatia", persisted.Variant)
+
+	// A quick-play room is never creatable through this endpoint: the DTO has no
+	// IsQuickPlay field, so a Croatian room can never carry the flag that makes
+	// it matchmaking-eligible.
+	assert.False(t, persisted.IsQuickPlay)
 }
 
 func TestCreateRoom_InvalidMatchMode(t *testing.T) {
@@ -2118,6 +2156,52 @@ func TestQuickPlay_SkipsNonQuickPlayRooms(t *testing.T) {
 	assert.False(t, data.MatchStarted)
 }
 
+// TestQuickPlay_NeverMatchesCroatianRooms pins the "Quick Play stays
+// Bitola-only" limit of Epic 12. It was true by construction before this test
+// existed — QuickPlay's room synthesis hardcodes Variant "bitola", the only
+// place is_quick_play is ever set true — but nothing STATED it, so a future
+// change to that synthesis would have silently dropped queued players into a
+// variant matchmaking was never sized for.
+//
+// The Croatian room here is deliberately given every other matchable
+// attribute (quick-play flag, waiting, seats free, matching buy-in) so the
+// variant is the only reason it is skipped.
+func TestQuickPlay_NeverMatchesCroatianRooms(t *testing.T) {
+	e, repo := setupTest()
+
+	croatianRoom := &room.Room{
+		Name:        "Quick Play CRO001",
+		Code:        "CRO001",
+		OwnerID:     50,
+		Variant:     "croatia",
+		MatchMode:   "1001",
+		TimerStyle:  "per-move",
+		IsQuickPlay: true,
+		Status:      "waiting",
+		PlayerCount: 1,
+	}
+	_ = repo.Create(croatianRoom)
+	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: croatianRoom.ID, UserID: 50})
+
+	// Queue repeatedly: matchmaking must never land in it, not merely usually.
+	for attempt, uid := range []uint{60, 61, 62} {
+		rec := doQuickPlay(e, validToken(uid))
+		require.Equal(t, http.StatusOK, rec.Code, "attempt %d", attempt)
+
+		var resp map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+		var data struct {
+			Room room.Room `json:"room"`
+			Seat int       `json:"seat"`
+		}
+		require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+		assert.NotEqual(t, croatianRoom.ID, data.Room.ID,
+			"attempt %d landed in the Croatian quick-play room", attempt)
+		assert.Equal(t, "bitola", data.Room.Variant, "attempt %d", attempt)
+	}
+}
+
 func TestQuickPlay_FillsFirstEmptySeat(t *testing.T) {
 	e, repo := setupTest()
 
@@ -2304,16 +2388,26 @@ type fakeMatchStarter struct {
 	lastCoinBuyIn        int
 	lastTimerStyle       string
 	lastTimerDurationSec int
-	err                  error
+	// lastVariant is captured because it is the ONE argument whose value the
+	// engine cannot validate: game.RulesFor resolves any unrecognised string to
+	// the Bitola preset rather than erroring, so a room that persisted "croatia"
+	// but handed the session manager anything else would deal 5 cards plus a
+	// candidate and look entirely healthy. Nothing else in this suite would
+	// notice (Story 12.8).
+	lastVariant   string
+	lastMatchMode string
+	err           error
 }
 
-func (g *fakeMatchStarter) StartMatch(roomID uint, _ string, _ string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int) error {
+func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int) error {
 	g.called++
 	g.lastRoom = roomID
 	g.lastPlayers = players
 	g.lastCoinBuyIn = coinBuyIn
 	g.lastTimerStyle = timerStyle
 	g.lastTimerDurationSec = timerDurationSec
+	g.lastVariant = variant
+	g.lastMatchMode = matchMode
 	return g.err
 }
 
@@ -2358,6 +2452,66 @@ func containsString(haystack []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+// TestStartGame_PassesTheRoomsVariantToTheSessionManager is the story's headline
+// behaviour, and it had no test: a room persisted as Croatian must start a
+// CROATIAN match. The link is a bare string argument and game.RulesFor falls
+// back to Bitola for anything it does not recognise, so a normalisation or
+// rename refactor between the two would silently deal the wrong shape.
+func TestStartGame_PassesTheRoomsVariantToTheSessionManager(t *testing.T) {
+	for _, variant := range []string{"croatia", "bitola"} {
+		t.Run(variant, func(t *testing.T) {
+			starter := &fakeMatchStarter{}
+			e, repo := setupTestWithStarter(starter, &mockBroadcaster{})
+
+			r := seedRoomWithPlayers(repo, "Start "+variant, 1, 1, 2, 3, 4)
+			r.Variant = variant
+			r.MatchMode = "501"
+			// StartGame requires four SEATED players.
+			seats := []int{0, 1, 2, 3}
+			teams := []string{"teamA", "teamB", "teamA", "teamB"}
+			for i, p := range repo.players {
+				p.Seat = intPtr(seats[i])
+				p.Team = strPtr(teams[i])
+			}
+
+			rec := doStartGame(e, "1", validToken(1))
+			require.Equal(t, http.StatusOK, rec.Code)
+
+			require.Equal(t, 1, starter.called)
+			assert.Equal(t, variant, starter.lastVariant,
+				"the session manager must be told the room's own variant")
+			assert.Equal(t, "501", starter.lastMatchMode,
+				"the match mode travels the same way and is checked alongside it")
+		})
+	}
+}
+
+// TestQuickPlay_StartsABitolaMatch pins the other half: quick play synthesizes
+// its own room and hardcodes Bitola, so the match it starts must be Bitola too.
+func TestQuickPlay_StartsABitolaMatch(t *testing.T) {
+	starter := &fakeMatchStarter{}
+	e, repo := setupTestWithStarter(starter, &mockBroadcaster{})
+
+	qpRoom := &room.Room{
+		Name: "Quick Play QPVAR1", Code: "QPVAR1", OwnerID: 500,
+		Variant: "bitola", MatchMode: "1001", TimerStyle: "relaxed",
+		IsQuickPlay: true, Status: "waiting", PlayerCount: 3,
+	}
+	require.NoError(t, repo.Create(qpRoom))
+	seat0, seat1, seat2 := 0, 1, 2
+	teamA, teamB := "teamA", "teamB"
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: qpRoom.ID, UserID: 500, Seat: &seat0, Team: &teamA, Username: "P1"}))
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: qpRoom.ID, UserID: 501, Seat: &seat1, Team: &teamB, Username: "P2"}))
+	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: qpRoom.ID, UserID: 502, Seat: &seat2, Team: &teamA, Username: "P3"}))
+
+	rec := doQuickPlay(e, validToken(503))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	require.Equal(t, 1, starter.called, "the 4th joiner auto-starts the match")
+	assert.Equal(t, "bitola", starter.lastVariant,
+		"Quick Play is Bitola-only — the started match must be too")
 }
 
 // TestSelectSeat_AutoStart_BroadcastsWhenStartGameSucceeds locks in Story

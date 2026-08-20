@@ -30,7 +30,14 @@ func TestAutoActionTypeFor(t *testing.T) {
 		{"play_card uses autoPlayed flag, not auto-action", game.ActionPlayCard, "", false},
 		{"announce_belot is not a timeout action", game.ActionAnnounceBelot, "", false},
 		{"declare is not a timeout action", game.ActionDeclare, "", false},
-		{"pick_trump is not a timeout action", game.ActionPickTrump, "", false},
+		// Story 12.8 flipped this row. It used to read "pick_trump is not a
+		// timeout action", which was true only while no config could force a
+		// pick. Under AllPassOutcome == AllPassDealerMustPick the dealer bidding
+		// last in round 2 has no legal pass, so the timer names a suit for an
+		// absent one — and that is the one auto-action that FIXES trump for the
+		// whole hand, so it must be announced rather than silently inferred from
+		// the next snapshot.
+		{"pick_trump emits auto-action (forced dealer pick)", game.ActionPickTrump, ws.AutoActionPickTrump, true},
 		{"empty action", "", "", false},
 	}
 

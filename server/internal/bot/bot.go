@@ -69,8 +69,14 @@ func Decide(v View) game.Action {
 // the 9+Ace pair plus a side Ace; or exactly 2 that are the Jack AND the 9 plus
 // a side Ace (the two strongest trumps, worth a call when backed by an outside
 // winner). A side Ace is any Ace in another suit — it need not be backed by a
-// second card of its suit. Used by both bidding rounds. Callers pass the
-// hand-plus-candidate the picker would actually hold (see decideBid).
+// second card of its suit. Used by both bidding rounds.
+//
+// Callers pass the full bid hand — every card the picker would actually hold
+// after taking (see decideBid), which is the dealt cards plus a candidate and/or
+// a revealed face-down pair. The thresholds were calibrated against a six-card
+// bid hand; a config that bids round 2 on eight feeds strictly MORE information
+// to the same bar, which makes bots keener to take there. Re-deriving the bar is
+// a balance decision, deliberately not made here.
 func wantsTrump(hand []game.Card, suit game.Suit) bool {
 	var count int
 	var hasJack, hasNine, hasAce, has7, has8 bool
@@ -141,15 +147,27 @@ func trumpSuitScore(hand []game.Card, suit game.Suit) int {
 }
 
 func decideBid(v View) game.Action {
-	// When a candidate is on the table the picker ALWAYS receives it (the engine
-	// appends it in handlePickTrump, both rounds), so the bid must be evaluated
-	// on the hand the bot would actually hold after picking: the 5 dealt cards
-	// PLUS the candidate. In round 1 the candidate is a trump (its suit IS the
-	// trump suit); in round 2 it is a guaranteed side card (its suit is locked
-	// out).
+	// Bid on the hand the bot would ACTUALLY hold after picking, which is not
+	// always View.Hand:
+	//
+	//   - When a candidate is on the table the picker always receives it (the
+	//     engine appends it in handlePickTrump, both rounds), so it joins the
+	//     dealt cards. In round 1 the candidate is a trump (its suit IS the trump
+	//     suit); in round 2 it is a guaranteed side card (its suit is locked out).
+	//   - Under a deal that holds two cards back face-down, round 2 is bid AFTER
+	//     the reveal but BEFORE the engine merges them, so they arrive as their
+	//     own View field and must be counted here or the bot bids on six of the
+	//     eight cards it knows.
+	//
+	// Neither source ever mutates v.Hand's backing array — the clone below is
+	// what keeps a caller's state intact.
 	bidHand := v.Hand
-	if v.TrumpCandidate != nil {
-		bidHand = append(slices.Clone(v.Hand), *v.TrumpCandidate)
+	if len(v.FaceDownCards) > 0 || v.TrumpCandidate != nil {
+		bidHand = slices.Clone(v.Hand)
+		bidHand = append(bidHand, v.FaceDownCards...)
+		if v.TrumpCandidate != nil {
+			bidHand = append(bidHand, *v.TrumpCandidate)
+		}
 	}
 
 	if v.BiddingRound == 1 && v.TrumpCandidate != nil {
@@ -171,20 +189,30 @@ func decideBid(v View) game.Action {
 	// in wantsTrump. With no candidate, nothing is locked out and the bot draws
 	// no extra card.
 	//
-	// A dealer that MUST pick (no legal pass) is not handled here: this returns
-	// pass_trump when no suit clears the bar, and the engine rejects it. That is
-	// out of scope until the Croatian variant is actually enabled, which is when
-	// bots get variant-aware bidding.
-	var best *game.Suit
-	bestScore := -1
+	// View.MustPickTrump says a pass would be REFUSED at this seat this turn (the
+	// dealer bidding last in round 2 where the hand must find a taker). Then
+	// "nothing clears the bar" cannot mean pass, so the best-scoring available
+	// suit is taken regardless of the threshold — a forced call, made on the
+	// strongest holding rather than an arbitrary one. The threshold itself is
+	// untouched: it still decides every VOLUNTARY call.
+	var best, forced *game.Suit
+	bestScore, forcedScore := -1, -1
 	for _, suit := range game.AllSuits {
 		if v.TrumpCandidate != nil && suit == v.TrumpCandidate.Suit {
 			continue
 		}
+		score := trumpSuitScore(bidHand, suit)
+		// Strictly greater, walking game.AllSuits in order, so a scoring tie
+		// resolves deterministically to the earliest suit.
+		if score > forcedScore {
+			s := suit
+			forced = &s
+			forcedScore = score
+		}
 		if !wantsTrump(bidHand, suit) {
 			continue
 		}
-		if score := trumpSuitScore(bidHand, suit); score > bestScore {
+		if score > bestScore {
 			s := suit
 			best = &s
 			bestScore = score
@@ -192,6 +220,9 @@ func decideBid(v View) game.Action {
 	}
 	if best != nil {
 		return game.Action{Type: game.ActionPickTrump, PlayerSeat: v.Seat, Suit: best}
+	}
+	if v.MustPickTrump && forced != nil {
+		return game.Action{Type: game.ActionPickTrump, PlayerSeat: v.Seat, Suit: forced}
 	}
 	return game.Action{Type: game.ActionPassTrump, PlayerSeat: v.Seat}
 }

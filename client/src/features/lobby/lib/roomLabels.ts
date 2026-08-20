@@ -8,6 +8,7 @@
 
 export function variantLabel(t: (key: string) => string, v: string): string {
   if (v === "bitola") return t("lobby.card.variantBitola");
+  if (v === "croatia") return t("lobby.card.variantCroatia");
   return v ? v.charAt(0).toUpperCase() + v.slice(1) : "—";
 }
 

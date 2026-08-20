@@ -12,6 +12,7 @@
   "trumpCandidate": null,
   "biddingRound": 2,
   "biddingPassCount": 0,
+  "mustPickTrump": false,
   "deck": [],
   "trickNumber": 4,
   "currentTrick": [],
@@ -34,7 +35,8 @@
       "declarations": [],
       "connected": true,
       "isBot": false,
-      "level": 3
+      "level": 3,
+      "faceDownCount": 0
     },
     {
       "hand": [
@@ -50,7 +52,8 @@
       "declarations": [],
       "connected": true,
       "isBot": false,
-      "level": 1
+      "level": 1,
+      "faceDownCount": 0
     },
     {
       "hand": [
@@ -66,7 +69,8 @@
       "declarations": [],
       "connected": true,
       "isBot": false,
-      "level": 2
+      "level": 2,
+      "faceDownCount": 0
     },
     {
       "hand": [
@@ -82,7 +86,8 @@
       "declarations": [],
       "connected": true,
       "isBot": false,
-      "level": 0
+      "level": 0,
+      "faceDownCount": 0
     }
   ],
   "teamScores": [

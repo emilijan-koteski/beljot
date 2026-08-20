@@ -196,6 +196,29 @@ describe("RoomPage locale overflow", () => {
     },
   );
 
+  // Story 12.8: RoomPage's variantKeys map held only bitola, so a Croatian room
+  // fell through `t(variantKeys[v] ?? v)` and rendered the raw server string
+  // "croatia" in every locale — a missing-key passthrough, not a translation.
+  it.each([
+    ["mk", "Хрватска"],
+    ["hr", "Hrvatska"],
+    ["sr", "Hrvatska"],
+    ["en", "Croatian"],
+  ] as const)("renders the localized Croatian variant badge in %s locale", async (lang, label) => {
+    const detail = fourSeatedRoom();
+    detail.room.variant = "croatia";
+    mockGetRoom.mockResolvedValue(detail);
+    await i18n.changeLanguage(lang);
+
+    renderRoomPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("badge-variant")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("badge-variant")).toHaveTextContent(label);
+    expect(screen.getByTestId("badge-variant")).not.toHaveTextContent("croatia");
+  });
+
   it("renders the localized 501 match-mode badge in mk locale", async () => {
     // mk distinguishes the i18n label ("501 поен") from the raw "501"
     // fallback that an unmapped matchMode key would render.

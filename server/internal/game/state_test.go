@@ -446,6 +446,52 @@ func TestNewGameCroatianDeal(t *testing.T) {
 		assert.False(t, gs.FaceDownRevealed)
 	})
 
+	// FaceDownCount is the only public trace of the hidden pair, and it is what
+	// makes an opponent's stack render as 8 instead of 6. Asserted here on a real
+	// NewGame rather than on a fixture, because the fixtures author the count and
+	// would still pass with the derivation deleted from the deal itself.
+	t.Run("the public face-down count is 2 per seat", func(t *testing.T) {
+		for i, p := range gs.Players {
+			assert.Equal(t, 2, p.FaceDownCount, "seat %d", i)
+			assert.Equal(t, len(p.FaceDownCards), p.FaceDownCount,
+				"seat %d: the count must equal the cards it counts", i)
+		}
+	})
+
+	t.Run("the count survives to the wire and drops to 0 when the pair merges", func(t *testing.T) {
+		data, err := json.Marshal(gs)
+		require.NoError(t, err)
+		var raw map[string]any
+		require.NoError(t, json.Unmarshal(data, &raw))
+		players, ok := raw["players"].([]any)
+		require.True(t, ok)
+		require.Len(t, players, 4)
+		for i, p := range players {
+			seat, ok := p.(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, float64(2), seat["faceDownCount"], "seat %d on the wire", i)
+		}
+
+		// Resolving the bid merges every pair into its owner's hand, so the count
+		// must go back to 0 — a stale 2 would render every stack as 10. Built on
+		// its own deal: `gs` is a pointer shared with the sibling subtests, and
+		// flipping its phase here would leak into them.
+		bidding := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
+			[4]bool{}, game.VariantCroatia, "1001", 7)
+		bidding.Phase = game.PhaseBidding
+		suit := game.SuitSpades
+		resolved, err := game.ApplyAction(bidding, game.Action{
+			Type:       game.ActionPickTrump,
+			PlayerSeat: bidding.ActivePlayerSeat,
+			Suit:       &suit,
+		})
+		require.NoError(t, err)
+		for i, p := range resolved.Players {
+			assert.Zero(t, p.FaceDownCount, "seat %d after the merge", i)
+			assert.Len(t, p.Hand, 8, "seat %d holds all eight once bidding resolves", i)
+		}
+	})
+
 	t.Run("all 32 cards accounted for exactly once", func(t *testing.T) {
 		seen := make(map[string]bool, 32)
 		for _, p := range gs.Players {
@@ -518,6 +564,14 @@ func TestGameStateJSONOmitsServerOnlyRuleFields(t *testing.T) {
 					_, exists := seat[key]
 					assert.False(t, exists, "seat %d's %q must not reach the wire", i, key)
 				}
+				// The COUNT does ride the wire — it is the public half. Zero for
+				// a deal shape that holds nothing back, so a Bitola client can
+				// add it unconditionally.
+				want := float64(0)
+				if tc.variant == game.VariantCroatia {
+					want = 2
+				}
+				assert.Equal(t, want, seat["faceDownCount"], "seat %d's faceDownCount", i)
 			}
 		})
 	}

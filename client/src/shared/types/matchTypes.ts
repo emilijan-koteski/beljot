@@ -87,6 +87,14 @@ export interface PlayerState {
   // Server-authoritative lifetime level (derived from total_xp), captured once
   // at match start and static for the whole match. Bot seats are 0.
   level: number;
+  // How many cards this seat holds face-down, outside `hand`. Non-zero only
+  // while a Croatian hand is still bidding; 0 everywhere else.
+  //
+  // A count, never the cards: the identities are server-only, and the viewer's
+  // own two arrive on a per-seat event. A seat's rendered stack is
+  // `hand.length + faceDownCount`, which is server-authoritative and needs no
+  // client-side variant branch.
+  faceDownCount: number;
 }
 
 export interface HandResult {
@@ -119,6 +127,11 @@ export interface MatchState {
   trumpCandidate: Card | null;
   biddingRound: number;
   biddingPassCount: number;
+  /** Server-authoritative: the seat on the clock has NO legal pass, so
+   *  pick_trump is its only bid (the dealer bidding last in round 2 of a variant
+   *  where the hand must find a taker). Drives whether the trump prompt offers a
+   *  Pass control — the client never re-derives the rule. */
+  mustPickTrump: boolean;
   deck: Card[];
   activePlayerSeat: number;
   trickNumber: number;

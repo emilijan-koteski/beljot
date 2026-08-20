@@ -216,6 +216,13 @@ const (
 	AutoActionPassTrump   AutoActionType = "pass_trump"
 	AutoActionSkipDeclare AutoActionType = "skip_declare"
 	AutoActionSkipBelot   AutoActionType = "skip_belot"
+	// AutoActionPickTrump is emitted when the timed-out seat had no legal pass
+	// (the dealer bidding last in round 2 of a variant where the hand must find
+	// a taker), so the server named a suit on its behalf. Unlike the three
+	// above, this auto-action CHANGES the hand rather than declining something —
+	// it fixes trump for the whole hand — which is exactly why it must be
+	// announced rather than left to be inferred from the state snapshot.
+	AutoActionPickTrump AutoActionType = "pick_trump"
 )
 
 // AutoActionPayload is the typed payload for EventAutoAction events.

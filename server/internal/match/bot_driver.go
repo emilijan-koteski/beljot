@@ -241,6 +241,19 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	if gs.Phase == game.PhasePlaying {
 		v.LegalCards = game.LegalCards(gs, seat)
 	}
+	// The seat's own face-down pair, and only after the round-2 reveal turned it
+	// up to its owner — the flag gates this, so a bot can no more see its hidden
+	// cards early than a human can. Cleared again the moment bidding resolves
+	// (mergeFaceDownCards empties both), so this is live for round 2 only.
+	if gs.FaceDownRevealed {
+		v.FaceDownCards = gs.Players[seat].FaceDownCards
+	}
+	// Whether a pass would be refused at THIS seat's turn: the rule config and
+	// the bidding counters decide, read through the engine's own predicate so the
+	// bot and the engine can never disagree. The predicate takes the seat, so the
+	// scoping cannot be forgotten here — offering the flag to a seat that is not
+	// on the clock would make it pick out of turn.
+	v.MustPickTrump = game.MustPickTrump(gs, seat)
 	if mem != nil {
 		v.PlayedCards = mem.PlayedCards()
 		v.KnownVoids = mem.KnownVoids()

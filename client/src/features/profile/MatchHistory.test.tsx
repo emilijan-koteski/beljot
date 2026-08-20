@@ -2,7 +2,7 @@ import "@/shared/i18n/i18n";
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   MatchesListResponse,
@@ -10,6 +10,7 @@ import type {
   MatchHandView,
   MatchListItem,
 } from "@/shared/api/matches";
+import { i18n } from "@/shared/i18n/i18n";
 import { QueryWrapper } from "@/test-utils";
 
 import { MatchHistory } from "./MatchHistory";
@@ -98,6 +99,13 @@ describe("MatchHistory", () => {
     mockGetUserMatches.mockReset();
   });
 
+  // In a hook, not at the end of the locale test's body: a failed assertion
+  // returns early and would leak mk into every test that runs after it in this
+  // file. Matches how RoomCard / RoomPage.locale restore theirs.
+  afterEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
   it("renders loading skeleton on first mount", () => {
     mockGetUserMatches.mockReturnValue(new Promise(() => {}));
     renderMatchHistory();
@@ -178,6 +186,28 @@ describe("MatchHistory", () => {
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
     expect(within(row).queryByTestId("match-history-bots-marker")).not.toBeInTheDocument();
+  });
+
+  // Story 12.8: match history rendered no variant at all, even though the DTO
+  // and the client type both carried it — so a Croatian match was
+  // indistinguishable from a Bitola one after the fact.
+  it("renders the variant on each row", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch({ variant: "croatia" })], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    const chip = within(row).getByTestId("match-history-variant");
+    expect(chip).toHaveAttribute("data-variant", "croatia");
+    // Localized, not the raw server string title-cased.
+    expect(chip).toHaveTextContent("Croatian");
+    expect(chip).not.toHaveTextContent("croatia");
+  });
+
+  it("renders the localized variant on a Croatian row in the mk locale", async () => {
+    await i18n.changeLanguage("mk");
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch({ variant: "croatia" })], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    expect(within(row).getByTestId("match-history-variant")).toHaveTextContent("Хрватска");
   });
 
   it("renders rows with teammate, opponents, outcome and viewer-first score", async () => {

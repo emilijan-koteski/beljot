@@ -26,6 +26,17 @@ interface TrumpPromptProps {
   activePlayerTeam?: SeatTeam | null;
   onPick: (suit?: Suit) => void;
   onPass: () => void;
+  /**
+   * Whether a pass is legal for the active bidder right now. False only for the
+   * dealer bidding last in round 2 under a variant where the hand must find a
+   * taker: the server refuses that pass outright, so the control must not be
+   * offered. Server-derived (matchState.mustPickTrump) — the client never
+   * re-derives the rule.
+   *
+   * Also drives the sibling seats' waiting copy, which otherwise promises the
+   * table a pass that cannot happen.
+   */
+  canPass?: boolean;
   turnExpiresAt?: string | null;
   timerDurationSec?: number;
 }
@@ -105,6 +116,44 @@ function SuitPickerGrid({
   );
 }
 
+/**
+ * Replaces the Pass button when the server says this seat has no legal pass.
+ *
+ * Deliberately shaped like a ClassicButton rather than styled as fine print, for
+ * two reasons. First, ButtonTimerRing traces a rounded rect around whatever it
+ * wraps at `radius` 8 — around a bare line of text that radius exceeds half the
+ * height and the sweep degenerates into a lozenge, so the note needs
+ * button-height padding and the same 8px corner for the ring to read correctly.
+ * Second, it occupies the slot the player's eye is already on; a 0.55-opacity
+ * caption there reads as decoration, and the one thing they must understand is
+ * that the button they were about to press is gone on purpose.
+ *
+ * role="status" so the disappearance is announced rather than silently visual —
+ * a screen-reader user otherwise just finds one fewer control.
+ */
+function MustPickNote() {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      data-testid="trump-prompt-must-pick"
+      className="inline-flex items-center px-3.5 py-2 text-[13px] sm:px-4.5 sm:py-2.5 sm:text-[14px]"
+      style={{
+        border: "1px dashed rgba(201,168,118,0.45)",
+        borderRadius: 8,
+        background: "linear-gradient(180deg, rgba(60,90,70,0.35), rgba(30,50,35,0.35))",
+        color: "var(--ink-light, #f5f2e8)",
+        fontFamily: "var(--font-body)",
+        fontWeight: 600,
+        letterSpacing: 0.4,
+      }}
+    >
+      {t("match.trumpPrompt.mustPick")}
+    </div>
+  );
+}
+
 export function TrumpPrompt({
   trumpCandidate,
   biddingRound,
@@ -113,6 +162,7 @@ export function TrumpPrompt({
   activePlayerTeam,
   onPick,
   onPass,
+  canPass = true,
   turnExpiresAt,
   timerDurationSec,
 }: TrumpPromptProps) {
@@ -165,9 +215,14 @@ export function TrumpPrompt({
             >
               <Trans
                 i18nKey={
-                  trumpCandidate === null || biddingRound === 2
-                    ? "match.trumpPrompt.waitingRound2"
-                    : "match.trumpPrompt.waitingRound1"
+                  !canPass
+                    ? // The active bidder has no pass to make, so the copy must
+                      // not promise the table one. Same key family, forced
+                      // variant.
+                      "match.trumpPrompt.waitingForcedPick"
+                    : trumpCandidate === null || biddingRound === 2
+                      ? "match.trumpPrompt.waitingRound2"
+                      : "match.trumpPrompt.waitingRound1"
                 }
                 values={{ name: activePlayerName ?? "" }}
                 components={{ name: <strong style={{ color: nameColor, fontWeight: 700 }} /> }}
@@ -296,7 +351,26 @@ export function TrumpPrompt({
               })}
             </span>
             <div className="flex items-center gap-3.5">
-              {showRing ? (
+              {/* No Pass control when the server would refuse the pass: the
+                  dealer bidding last in round 2 where the hand must find a
+                  taker. Hiding it is the fix — offering a button whose only
+                  outcome is a rejection toast is the defect, and a dedicated
+                  error code for "you must pick" is explicitly not the answer.
+                  The suit grid above is already the complete set of legal
+                  moves, and the ring stays on the note in its place so the
+                  countdown survives (an expiry here auto-PICKS server-side). */}
+              {!canPass ? (
+                showRing ? (
+                  <ButtonTimerRing
+                    turnExpiresAt={turnExpiresAt}
+                    totalDuration={timerDurationSec ?? 0}
+                  >
+                    <MustPickNote />
+                  </ButtonTimerRing>
+                ) : (
+                  <MustPickNote />
+                )
+              ) : showRing ? (
                 // Visual countdown only — server-authoritative auto-pass on
                 // expiry. A client-side onExpire would race the server's
                 // ActionPassTrump auto-action and surface a wrong-phase toast.

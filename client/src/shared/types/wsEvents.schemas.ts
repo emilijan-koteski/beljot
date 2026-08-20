@@ -78,6 +78,13 @@ const PlayerStateSchema = z.strictObject({
   // Server-authoritative lifetime level (from total_xp), captured at match
   // start and static for the match. Must match the Go PlayerState.Level field.
   level: z.number().int(),
+  // Story 12.8: how many cards the seat holds face-down, outside `hand`. Must
+  // land in the same commit as the Go PlayerState.FaceDownCount field or the
+  // contract test fails. Note the gate is BUILD-time, not runtime: these schemas
+  // are exercised by wsEvents.contract.test.ts against the Go goldens, while the
+  // live dispatch path casts the payload instead of parsing it — so consumers
+  // still guard against a field an older server did not send.
+  faceDownCount: z.number().int(),
 });
 
 const TrickCardSchema = z.strictObject({
@@ -103,6 +110,10 @@ export const EventMatchStateSchema = z.strictObject({
   trumpCandidate: CardSchema.nullable(),
   biddingRound: z.number(),
   biddingPassCount: z.number(),
+  // Story 12.8: the active seat has no legal pass. Must land in the same commit
+  // as the Go GameState.MustPickTrump field — enforced by the contract test, not
+  // at runtime (see faceDownCount above).
+  mustPickTrump: z.boolean(),
   deck: z.array(CardSchema),
   trickNumber: z.number(),
   currentTrick: z.array(TrickCardSchema),
@@ -268,7 +279,14 @@ export const MatchResumedPayloadSchema = z.strictObject({
 
 export const AutoActionPayloadSchema = z.strictObject({
   playerSeat: z.number().int().min(0).max(3),
-  type: z.union([z.literal("pass_trump"), z.literal("skip_declare"), z.literal("skip_belot")]),
+  type: z.union([
+    z.literal("pass_trump"),
+    z.literal("skip_declare"),
+    z.literal("skip_belot"),
+    // Story 12.8: the forced dealer pick. Must stay in step with the Go
+    // ws.AutoActionType constants.
+    z.literal("pick_trump"),
+  ]),
 });
 
 // Story 9.2: per-human match-end coin settlement.

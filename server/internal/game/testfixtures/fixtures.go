@@ -630,6 +630,12 @@ func NewGameMidBidding(passCount int) *game.GameState {
 		gs.ActivePlayerSeat = (1 + passesInRound2) % 4 // seat 1 is first bidder in round 2
 	}
 
+	// Bidding counters were set directly rather than by applying passes, so the
+	// derived wire flag ApplyAction normally maintains has to be refreshed here.
+	// Always false for this variant (its config reshuffles instead of forcing a
+	// pick), but derived rather than hardcoded so the fixture cannot drift.
+	gs.MustPickTrump = game.MustPickTrump(gs, gs.ActivePlayerSeat)
+
 	return gs
 }
 
@@ -651,7 +657,7 @@ func NewGameMidBidding(passCount int) *game.GameState {
 func NewGameCroatianJustDealt() *game.GameState {
 	c := func(r game.Rank, s game.Suit) game.Card { return game.Card{Rank: r, Suit: s} }
 
-	return &game.GameState{
+	gs := &game.GameState{
 		RoomID:           1,
 		Variant:          game.VariantCroatia,
 		Rules:            game.RulesFor(game.VariantCroatia),
@@ -729,6 +735,16 @@ func NewGameCroatianJustDealt() *game.GameState {
 			},
 		},
 	}
+
+	// FaceDownCount is the PUBLIC half of FaceDownCards (see game.PlayerState),
+	// so it is derived here rather than authored beside each literal: a fixture
+	// edit that changes the hidden pair cannot leave the wire count disagreeing
+	// with it. Every other Croatian factory builds on this one, so they inherit
+	// the derivation.
+	for i := range gs.Players {
+		gs.Players[i].FaceDownCount = len(gs.Players[i].FaceDownCards)
+	}
+	return gs
 }
 
 // NewGameCroatianMidBidding returns a Croatian GameState with the specified
@@ -766,6 +782,9 @@ func NewGameCroatianMidBidding(passCount int) *game.GameState {
 	gs.BiddingPassCount = passesInRound2
 	gs.ActivePlayerSeat = (1 + passesInRound2) % 4
 	gs.FaceDownRevealed = true
+	// Counters set directly, so refresh the derived flag ApplyAction maintains.
+	// True at passCount 7 — the state where the dealer has no legal pass.
+	gs.MustPickTrump = game.MustPickTrump(gs, gs.ActivePlayerSeat)
 	return gs
 }
 

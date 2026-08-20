@@ -525,7 +525,8 @@ function dispatchGameEvent(message: WsMessage): void {
       payload.playerSeat > 3 ||
       (payload?.type !== "pass_trump" &&
         payload?.type !== "skip_declare" &&
-        payload?.type !== "skip_belot")
+        payload?.type !== "skip_belot" &&
+        payload?.type !== "pick_trump")
     ) {
       console.warn("WS: ignoring malformed event:auto_action payload", payload);
       return;
@@ -537,7 +538,12 @@ function dispatchGameEvent(message: WsMessage): void {
         ? "match.timer.autoPassed"
         : payload.type === "skip_declare"
           ? "match.timer.autoSkippedDeclare"
-          : "match.timer.autoSkippedBelot";
+          : payload.type === "skip_belot"
+            ? "match.timer.autoSkippedBelot"
+            : // pick_trump: the seat had no legal pass, so the server named a
+              // suit for it. Worth its own copy — the other three decline
+              // something, this one commits the hand to a trump suit.
+              "match.timer.autoPickedTrump";
     toast.info(i18n.t(i18nKey, { player: playerName }), { duration: 3000 });
     return;
   }

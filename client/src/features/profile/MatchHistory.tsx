@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
+import { variantLabel } from "@/features/lobby/lib/roomLabels";
 import type {
   MatchFilter,
   MatchHandView,
@@ -441,7 +442,12 @@ function MatchRow({ match, username, subjectIsSelf, isOpen, onToggle }: MatchRow
           isOpen ? t("profile.matchHistory.collapseRow") : t("profile.matchHistory.expandRow")
         }
       >
-        {/* Date */}
+        {/* Date + variant. The variant rides the date block rather than the
+            outcome group so it reads as "when and what", and so a Croatian row
+            is identifiable at a glance (Epic 12: Croatian rooms must be
+            identifiable in the lobby, room preview, and match history).
+            Localized through the same lobby.card.* keys the lobby and room-page
+            badges use, so the three surfaces cannot drift. */}
         <div className="flex min-w-22 flex-col gap-0.5">
           <span className="text-ink font-display text-[15px] font-semibold tracking-[-0.1px]">
             {formatLocalizedDate(match.completedAt, t, "short")}
@@ -449,6 +455,13 @@ function MatchRow({ match, username, subjectIsSelf, isOpen, onToggle }: MatchRow
           <span className="text-ink-mute text-[11.5px] tabular-nums">
             {formatClockTime(match.completedAt)} ·{" "}
             {formatDuration(match.startedAt, match.completedAt, t)}
+          </span>
+          <span
+            className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+            data-testid="match-history-variant"
+            data-variant={match.variant}
+          >
+            {variantLabel(t, match.variant)}
           </span>
         </div>
 

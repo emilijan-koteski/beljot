@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 
 import autoActionGolden from "../../../../server/internal/ws/testdata/events/auto_action.json";
+import autoActionPickTrumpGolden from "../../../../server/internal/ws/testdata/events/auto_action_pick_trump.json";
 import belotAnnouncedGolden from "../../../../server/internal/ws/testdata/events/belot_announced.json";
 import cardPlayedGolden from "../../../../server/internal/ws/testdata/events/card_played.json";
 import coinSettlementGolden from "../../../../server/internal/ws/testdata/events/coin_settlement.json";
@@ -79,6 +80,9 @@ const cases = [
   ["MatchPausedPayload", MatchPausedPayloadSchema, matchPausedGolden],
   ["MatchResumedPayload", MatchResumedPayloadSchema, matchResumedGolden],
   ["AutoActionPayload", AutoActionPayloadSchema, autoActionGolden],
+  // Story 12.8: the forced dealer pick. Separate golden because the literal
+  // "pick_trump" is the part that must match the Go constant, not the shape.
+  ["AutoActionPayload (pick_trump)", AutoActionPayloadSchema, autoActionPickTrumpGolden],
   ["CoinSettlementPayload", CoinSettlementPayloadSchema, coinSettlementGolden],
   ["XpAwardedPayload", XpAwardedPayloadSchema, xpAwardedGolden],
   ["HonorUpdatedPayload", HonorUpdatedPayloadSchema, honorUpdatedGolden],

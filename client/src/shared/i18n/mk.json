@@ -653,7 +653,7 @@
         "codeLabel": "КОД",
         "seated": "{{current}}/4"
       },
-      "variantHint": "Засега само Битола",
+      "variantHint": "Битолски или хрватски правила",
       "matchModeHint": "501 за пократок меч, 1001 за целосна трка",
       "timerHintRelaxed": "Без тајмер",
       "timerDurationHint": "10–120s · стандардно 30s",
@@ -735,6 +735,7 @@
       "empty": "празно",
       "joining": "Се приклучуваш во \"{{name}}\"…",
       "variantBitola": "Битола",
+      "variantCroatia": "Хрватска",
       "matchMode1001": "1001 поен",
       "matchMode501": "501 поен",
       "buyInFree": "Без влог",
@@ -830,8 +831,10 @@
       "roundLabel": "Круг {{round}} / 2",
       "pick": "Земи",
       "pass": "Понатаму",
+      "mustPick": "Мораш да избереш боја",
       "waitingRound1": "Се чека <name>{{name}}</name> да го земе адутот или да продолжи понатаму",
-      "waitingRound2": "Се чека <name>{{name}}</name> да избере боја или да продолжи понатаму"
+      "waitingRound2": "Се чека <name>{{name}}</name> да избере боја или да продолжи понатаму",
+      "waitingForcedPick": "Се чека <name>{{name}}</name> да избере боја"
     },
     "deal": {
       "dealing": "Делење на карти…"
@@ -890,6 +893,7 @@
     "timer": {
       "autoPlayed": "Автоматски одиграно: {{card}}",
       "autoPassed": "{{player}}, времето истече, автоматски пас",
+      "autoPickedTrump": "{{player}}, времето истече, адутот е избран автоматски",
       "autoSkippedDeclare": "{{player}}, времето истече, прескокната најава",
       "autoSkippedBelot": "{{player}}, времето истече, Бељот одбиен"
     },

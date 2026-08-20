@@ -45,6 +45,7 @@ function testPlayer(seat: number, username: string): PlayerState {
     connected: true,
     isBot: false,
     level: 1,
+    faceDownCount: 0,
   };
 }
 

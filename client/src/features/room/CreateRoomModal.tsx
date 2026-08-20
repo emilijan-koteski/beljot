@@ -84,9 +84,9 @@ const MIN_HONOR_TICKS: SliderTick[] = HONOR_TIER_BANDS.filter((b) => b.from > 0)
  * what the lobby grid will display.
  *
  * Backend contract unchanged — only `name | variant | matchMode | timerStyle
- * | timerDurationSeconds` are submitted. The disabled segmented option
- * (Croatian variant) sits in the UI to telegraph the planned scope;
- * its "Only X for now" Field hint communicates that locked state.
+ * | timerDurationSeconds` are submitted. Both variants are selectable as of
+ * Story 12.8; the server's own allowlist is the authority on that, so the
+ * segmented control carries no locked option any more.
  */
 export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const { t } = useTranslation();
@@ -279,11 +279,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
   const variantOptions = [
     { value: "bitola" as const, label: t("lobby.createRoomModal.variantBitola") },
-    {
-      value: "croatia" as const,
-      label: t("lobby.createRoomModal.variantCroatia"),
-      disabled: true,
-    },
+    { value: "croatia" as const, label: t("lobby.createRoomModal.variantCroatia") },
   ];
 
   const matchModeOptions = [
@@ -730,10 +726,10 @@ function PreviewCard({
   hostUsername: string;
 }) {
   const { t } = useTranslation();
+  // Mirrors the lobby card the room will become, so it reads the same
+  // lobby.card.* keys the real card does rather than the modal's option labels.
   const variantLabel =
-    variant === "bitola"
-      ? t("lobby.card.variantBitola")
-      : t("lobby.createRoomModal.variantCroatia");
+    variant === "bitola" ? t("lobby.card.variantBitola") : t("lobby.card.variantCroatia");
   const matchLabel =
     matchMode === "1001" ? t("lobby.card.matchMode1001") : t("lobby.card.matchMode501");
   const timerLabel =

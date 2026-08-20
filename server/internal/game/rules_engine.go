@@ -6,7 +6,20 @@ import "github.com/emilijan/beljot/server/internal/apperr"
 // It takes the current game state and a player action, and returns
 // a new game state (or an error if the action is invalid).
 // No side effects — session manager handles broadcasting, persistence, timers.
+//
+// It is also the single exit every successful action passes through, which is
+// where the state's DERIVED wire flags are refreshed. Doing it here rather than
+// in each handler means a new handler cannot forget one.
 func ApplyAction(state *GameState, action Action) (*GameState, error) {
+	newState, err := applyAction(state, action)
+	if err != nil {
+		return nil, err
+	}
+	newState.MustPickTrump = MustPickTrump(newState, newState.ActivePlayerSeat)
+	return newState, nil
+}
+
+func applyAction(state *GameState, action Action) (*GameState, error) {
 	// Disconnected phase blocks all actions — game is waiting for reconnection
 	if state.Phase == PhaseDisconnected {
 		return nil, apperr.ErrPlayerDisconnected

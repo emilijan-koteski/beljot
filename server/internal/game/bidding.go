@@ -38,18 +38,38 @@ func handleBidding(state *GameState, action Action) (*GameState, error) {
 	}
 }
 
+// MustPickTrump reports whether the engine will REFUSE `seat`'s pass, leaving
+// pick_trump as its only legal bid. Under AllPassDealerMustPick the round-2
+// bidding cannot be passed out: the dealer bids last and must name a suit,
+// which is also what makes reshuffleAndRedeal unreachable under that config.
+//
+// This is the single definition of that condition, exported because three
+// callers outside the engine need to agree with it exactly: the session
+// manager's timer-expiry auto-action, the bot view handed to bot.Decide, and
+// the per-seat flag the client reads to hide the Pass control. Each reads the
+// rule config through this function — never the variant name (D-VAR-1).
+//
+// The condition describes exactly ONE seat — whichever is on the clock — so
+// `seat` is a required argument rather than something callers are trusted to
+// check themselves. A seat-less version returned true for all four seats and
+// every caller had to remember to scope it; one that forgot would have three
+// seats picking out of turn.
+//
+// `>= 3` rather than `== 3`: a state that somehow arrived with a higher count
+// must not fall through and keep accepting passes forever.
+func MustPickTrump(state *GameState, seat int) bool {
+	return state.Phase == PhaseBidding &&
+		state.ActivePlayerSeat == seat &&
+		state.Rules.AllPassOutcome == AllPassDealerMustPick &&
+		state.BiddingRound == 2 &&
+		state.BiddingPassCount >= 3
+}
+
 // handlePassTrump processes a pass action during bidding.
 func handlePassTrump(state *GameState) (*GameState, error) {
-	// Under AllPassDealerMustPick the round-2 bidding cannot be passed out: the
-	// dealer bids last and must name a suit. This pass would be round 2's
-	// fourth, i.e. the dealer's, so refuse it — pick_trump is their only legal
-	// action. Rejecting here is also what makes reshuffleAndRedeal unreachable
-	// under that config.
-	//
-	// `>= 3` rather than `== 3`: a state that somehow arrived with a higher count
-	// must not fall through and keep accepting passes forever.
-	if state.Rules.AllPassOutcome == AllPassDealerMustPick &&
-		state.BiddingRound == 2 && state.BiddingPassCount >= 3 {
+	// This pass would be round 2's fourth, i.e. the dealer's, and their config
+	// gives them no right to pass — pick_trump is their only legal action.
+	if MustPickTrump(state, state.ActivePlayerSeat) {
 		return nil, apperr.ErrInvalidBid
 	}
 
@@ -206,6 +226,7 @@ func mergeFaceDownCards(state *GameState) {
 		state.Players[i].FaceDownCards = nil
 	}
 	state.FaceDownRevealed = false
+	syncFaceDownCounts(state)
 }
 
 // reshuffleAndRedeal pools all 32 cards (hands + Deck + TrumpCandidate),

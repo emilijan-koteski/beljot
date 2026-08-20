@@ -49,6 +49,7 @@ func TestEventsJSONContract(t *testing.T) {
 			TrumpCandidate:        nil,
 			BiddingRound:          2,
 			BiddingPassCount:      0,
+			MustPickTrump:         false,
 			Deck:                  []game.Card{},
 			TrickNumber:           4,
 			CurrentTrick:          []game.TrickCard{},
@@ -236,6 +237,17 @@ func TestEventsJSONContract(t *testing.T) {
 				Type:       ws.AutoActionPassTrump,
 			},
 			goldenFile: "auto_action.json",
+		},
+		{
+			// Story 12.8's added AutoActionType gets its own golden: the payload
+			// SHAPE is already pinned above, so what this fixes across the wire is
+			// the literal "pick_trump", which the TS union must accept verbatim.
+			name: "AutoActionPayload_PickTrump",
+			sample: ws.AutoActionPayload{
+				PlayerSeat: 3,
+				Type:       ws.AutoActionPickTrump,
+			},
+			goldenFile: "auto_action_pick_trump.json",
 		},
 		{
 			name: "CoinSettlementPayload",

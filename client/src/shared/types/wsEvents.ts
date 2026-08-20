@@ -213,7 +213,11 @@ export interface MatchResumedPayload {
 
 // Non-card auto-action emitted on per-move timer expiry. Card auto-play uses
 // the autoPlayed flag on event:card_played and is not represented here.
-export type AutoActionType = "pass_trump" | "skip_declare" | "skip_belot";
+//
+// "pick_trump" (Story 12.8) is the odd one out: the other three DECLINE
+// something, while this one names trump for a seat that had no legal pass — the
+// dealer bidding last in round 2 of a variant where the hand must find a taker.
+export type AutoActionType = "pass_trump" | "skip_declare" | "skip_belot" | "pick_trump";
 
 export interface AutoActionPayload {
   playerSeat: number;

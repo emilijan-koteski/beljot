@@ -27,6 +27,7 @@ function player(seat: number, cards: Card[]): PlayerState {
     connected: true,
     isBot: false,
     level: 1,
+    faceDownCount: 0,
   };
 }
 
@@ -58,6 +59,7 @@ function makeState(args: {
     trumpCandidate: null,
     biddingRound: 1,
     biddingPassCount: 0,
+    mustPickTrump: false,
     deck: [],
     activePlayerSeat: args.mySeat,
     trickNumber: 1,

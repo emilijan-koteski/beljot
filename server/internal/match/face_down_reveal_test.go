@@ -117,9 +117,11 @@ func TestFaceDownReveal_EachSeatGetsOnlyItsOwnCards(t *testing.T) {
 }
 
 // TestFaceDownReveal_SkipsBotSeats exercises the bot-seat branch of
-// sendFaceDownReveals: a bot carries UserID 0 and has no socket, and it reads
-// the game state directly through buildBotView, so it must be skipped rather
-// than sent to. Three humans means exactly three reveals.
+// sendFaceDownReveals: a bot carries UserID 0 and has no socket, so there is
+// nowhere to send it. It needs none — buildBotView copies the seat's own
+// FaceDownCards into its View once GameState.FaceDownRevealed is set, i.e. the
+// bot learns them from the same state transition that triggers these sends,
+// through the same reveal gate. Three humans means exactly three reveals.
 func TestFaceDownReveal_SkipsBotSeats(t *testing.T) {
 	hub := &hubSpy{}
 	mgr := match.NewManager(hub, newMockMatchRepo())
@@ -161,7 +163,9 @@ func TestFaceDownReveal_SkipsBotSeats(t *testing.T) {
 	}
 
 	// The bot's own hidden cards still exist server-side — they are simply not
-	// pushed anywhere, because buildBotView reads them from the state.
+	// pushed anywhere, because buildBotView hands them to bot.Decide straight
+	// from the state (gated on FaceDownRevealed, which the auto-pass above just
+	// set).
 	after := mgr.GetStateSnapshot(roomID)
 	require.NotNil(t, after)
 	assert.Len(t, after.Players[1].FaceDownCards, 2)

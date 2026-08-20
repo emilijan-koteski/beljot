@@ -42,6 +42,37 @@ type PlayerState struct {
 	// leak that is deliberately out of scope here and recorded in the deferred
 	// work log. Nothing about this field makes match_state per-seat safe.
 	FaceDownCards []Card `json:"-"`
+	// FaceDownCount is how many cards sit in FaceDownCards — the public half of
+	// the field above, and the only half that crosses the wire.
+	//
+	// A count is not a card. Every seat's Hand already ships to all four
+	// clients, so how MANY cards an opponent holds was never secret; what must
+	// stay secret is WHICH. Without this the table renders a Croatian
+	// opponent's stack as 6 while they hold 8 — an error any Belot player spots
+	// instantly — and shipping FaceDownCards to fix it would break the rule
+	// this variant guards hardest.
+	//
+	// Derived, never independently authored: syncFaceDownCounts refreshes it from
+	// FaceDownCards (see that function for exactly where), so the two can only
+	// ever agree.
+	FaceDownCount int `json:"faceDownCount"`
+}
+
+// syncFaceDownCounts refreshes every seat's public FaceDownCount from its
+// server-only FaceDownCards, so the wire count can never drift from the cards it
+// counts. Idempotent.
+//
+// It has exactly TWO call sites: the end of dealCards (covering both deal
+// shapes) and the end of mergeFaceDownCards. The other two places that write
+// FaceDownCards — reshuffleAndRedeal's card pool and startNewHand's hand reset —
+// are covered only TRANSITIVELY, because each clears the slot and then falls
+// through to dealCards. That is load-bearing: an early return added to either
+// path BEFORE its dealCards call would leave the previous hand's count on the
+// wire with no cards behind it, and nothing here would catch it.
+func syncFaceDownCounts(state *GameState) {
+	for i := range state.Players {
+		state.Players[i].FaceDownCount = len(state.Players[i].FaceDownCards)
+	}
 }
 
 // TrickCard represents a single card played in a trick, with the player who played it.
@@ -110,6 +141,17 @@ type GameState struct {
 	TrumpCandidate   *Card `json:"trumpCandidate"`
 	BiddingRound     int   `json:"biddingRound"`
 	BiddingPassCount int   `json:"biddingPassCount"`
+	// MustPickTrump mirrors the MustPickTrump predicate onto the wire: the seat
+	// currently on the clock has NO legal pass, so pick_trump is its only bid.
+	//
+	// Derived, never authored — ApplyAction refreshes it at its single exit, so
+	// no handler can forget it. It exists because the client must not offer a
+	// control the server will refuse, and the alternative was for the client to
+	// re-derive the rule from candidate-absence — an inference that happens to
+	// hold today and would silently rot the moment a variant paired no candidate
+	// with a reshuffle. The server owns every rule; the client renders what it is
+	// told.
+	MustPickTrump bool `json:"mustPickTrump"`
 	// Deck is the undealt remainder held back for post-pick distribution. Under
 	// DealShapeCandidate it holds 11 cards through bidding and is emptied when
 	// bidding resolves; under DealShapeAllBeforeBidding every card is dealt up
@@ -314,6 +356,7 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 func dealCards(gs *GameState, deck []Card) {
 	if gs.Rules.DealShape == DealShapeAllBeforeBidding {
 		dealAllBeforeBidding(gs, deck)
+		syncFaceDownCounts(gs)
 		return
 	}
 
@@ -343,6 +386,10 @@ func dealCards(gs *GameState, deck []Card) {
 
 	// Remaining 11 cards held in the deck for stage-2 distribution.
 	gs.Deck = slices.Clone(deck[cardIdx:])
+
+	// This shape deals nothing face-down; sync anyway so a re-deal zeroes a
+	// previous hand's count instead of carrying it.
+	syncFaceDownCounts(gs)
 }
 
 // dealAllBeforeBidding deals every card before bidding opens (the

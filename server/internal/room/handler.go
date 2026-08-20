@@ -24,7 +24,11 @@ import (
 )
 
 var (
-	validVariants    = map[string]bool{"bitola": true}
+	// Both engine variants are creatable (Epic 12, Story 12.8). Still a
+	// hand-maintained list rather than a derivation from internal/game: adding a
+	// variant constant to the engine must not make it creatable here until its
+	// rules are actually finished. See variant_allowlist_test.go.
+	validVariants    = map[string]bool{"bitola": true, "croatia": true}
 	validMatchModes  = map[string]bool{"1001": true, "501": true}
 	validTimerStyles = map[string]bool{"relaxed": true, "per-move": true}
 	validStatuses    = map[string]bool{"waiting": true, "playing": true, "completed": true}

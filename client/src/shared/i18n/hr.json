@@ -653,7 +653,7 @@
         "codeLabel": "KOD",
         "seated": "{{current}}/4"
       },
-      "variantHint": "Zasad samo Bitola",
+      "variantHint": "Bitolska ili hrvatska pravila",
       "matchModeHint": "501 za kraći meč, 1001 za punu utrku",
       "timerHintRelaxed": "Bez tajmera",
       "timerDurationHint": "10–120s · zadano 30s",
@@ -735,6 +735,7 @@
       "empty": "prazno",
       "joining": "Pridruživanje sobi \"{{name}}\"…",
       "variantBitola": "Bitola",
+      "variantCroatia": "Hrvatska",
       "matchMode1001": "1001 bod",
       "matchMode501": "501 bod",
       "buyInFree": "Bez uloga",
@@ -830,8 +831,10 @@
       "roundLabel": "Krug {{round}} / 2",
       "pick": "Zovi",
       "pass": "Dalje",
+      "mustPick": "Moraš izabrati boju",
       "waitingRound1": "Čeka se da <name>{{name}}</name> zove aduta ili propusti",
-      "waitingRound2": "Čeka se da <name>{{name}}</name> izabere boju ili propusti"
+      "waitingRound2": "Čeka se da <name>{{name}}</name> izabere boju ili propusti",
+      "waitingForcedPick": "Čeka se da <name>{{name}}</name> izabere boju"
     },
     "deal": {
       "dealing": "Dijeljenje karata…"
@@ -890,6 +893,7 @@
     "timer": {
       "autoPlayed": "Automatski odigrano: {{card}}",
       "autoPassed": "{{player}} · vrijeme isteklo, automatski pas",
+      "autoPickedTrump": "{{player}} · vrijeme isteklo, adut izabran automatski",
       "autoSkippedDeclare": "{{player}} · vrijeme isteklo, zvanje preskočeno",
       "autoSkippedBelot": "{{player}} · vrijeme isteklo, Bela odbijena"
     },

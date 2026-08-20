@@ -18,6 +18,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     connected: true,
     isBot: false,
     level: 1,
+    faceDownCount: 0,
     ...overrides,
   };
 }

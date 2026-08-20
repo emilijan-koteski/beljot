@@ -1653,7 +1653,17 @@ export function MatchPage() {
               isSelf={isSelf}
               isActive={isActive}
               seatTeam={seatTeam(player.seat, myPlayerSeat)}
-              cardCount={isSelf ? undefined : player.hand.length}
+              // An opponent's stack is every card they physically hold, which
+              // during Croatian bidding is six open plus two face-down. The
+              // count is server-authoritative and 0 in every other variant and
+              // phase, so this needs no variant branch. Own seat renders its
+              // real hand instead (see myHand), so it passes undefined.
+              //
+              // `?? 0` is not defensive noise: match_state is CAST to MatchState,
+              // not parsed, so a server that predates this field yields undefined
+              // and `6 + undefined` renders "×NaN" on every seat. A client-first
+              // rolling deploy is exactly that window.
+              cardCount={isSelf ? undefined : player.hand.length + (player.faceDownCount ?? 0)}
               turnExpiresAt={isActive && isTurnPhase ? matchState.turnExpiresAt : null}
               timerDuration={matchState.timerDurationSec}
               isDealer={matchState.dealerSeat === player.seat}
@@ -2025,6 +2035,15 @@ export function MatchPage() {
               }
               onPick={handlePickTrump}
               onPass={handlePassTrump}
+              // Server-authoritative: false only for the dealer bidding last in
+              // round 2 of a variant where the hand must find a taker. The
+              // client never re-derives the rule, so no variant branch appears
+              // here.
+              canPass={!matchState.mustPickTrump}
+              // Server-authoritative: false only for the dealer bidding last in
+              // round 2 of a variant where the hand must find a taker. The
+              // client never re-derives the rule, so no variant branch appears
+              // here.
               turnExpiresAt={matchState.turnExpiresAt}
               timerDurationSec={matchState.timerDurationSec}
             />

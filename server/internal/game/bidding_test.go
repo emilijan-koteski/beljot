@@ -1127,3 +1127,54 @@ func TestCroatianFullBiddingFromNewGame(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, played.CurrentTrick, 1)
 }
+
+// TestMustPickTrumpWireFlag pins the derived snapshot flag the client reads to
+// decide whether to offer a Pass control. It is refreshed at ApplyAction's
+// single exit, so the assertions below drive real actions rather than setting
+// counters — the point is that no handler can leave it stale.
+func TestMustPickTrumpWireFlag(t *testing.T) {
+	t.Run("false through a Croatian hand until the dealer is on the clock", func(t *testing.T) {
+		gs := testfixtures.NewGameCroatianJustDealt()
+		assert.False(t, gs.MustPickTrump, "nobody is forced on the opening bid")
+
+		// Seven passes: round 1 passed out, then three in round 2. Only the
+		// last one leaves the dealer with no legal pass.
+		for i := 0; i < 7; i++ {
+			next, err := game.ApplyAction(gs, game.Action{
+				Type:       game.ActionPassTrump,
+				PlayerSeat: gs.ActivePlayerSeat,
+			})
+			require.NoError(t, err, "pass %d must be legal", i+1)
+			gs = next
+			assert.Equal(t, i == 6, gs.MustPickTrump,
+				"after %d passes the flag must be %v", i+1, i == 6)
+		}
+		assert.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat,
+			"the forced seat is the dealer, bidding last in round 2")
+
+		// The forced pick clears it again.
+		suit := game.SuitSpades
+		resolved, err := game.ApplyAction(gs, game.Action{
+			Type:       game.ActionPickTrump,
+			PlayerSeat: gs.ActivePlayerSeat,
+			Suit:       &suit,
+		})
+		require.NoError(t, err)
+		assert.False(t, resolved.MustPickTrump, "bidding is over — nobody is on the clock")
+	})
+
+	t.Run("never true in Bitola", func(t *testing.T) {
+		// Bitola's config reshuffles a passed-out round 2 instead of forcing the
+		// dealer, so no pass count can ever raise this flag.
+		gs := testfixtures.NewGameJustDealt()
+		for i := 0; i < 8; i++ {
+			next, err := game.ApplyAction(gs, game.Action{
+				Type:       game.ActionPassTrump,
+				PlayerSeat: gs.ActivePlayerSeat,
+			})
+			require.NoError(t, err, "pass %d must be legal", i+1)
+			gs = next
+			assert.False(t, gs.MustPickTrump, "after %d passes", i+1)
+		}
+	})
+}

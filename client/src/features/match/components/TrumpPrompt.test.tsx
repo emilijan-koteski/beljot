@@ -284,8 +284,9 @@ describe("TrumpPrompt", () => {
         />,
       );
       expect(screen.queryByTestId("trump-prompt-pick")).not.toBeInTheDocument();
-      // Passing is still offered — only the dealer's last round-2 pass is
-      // refused, and that is enforced server-side.
+      // Passing is still offered: only the dealer's last round-2 pass is
+      // refused, which the server reports through canPass (see the
+      // forced-dealer block below), not something the prompt infers.
       expect(screen.getByTestId("trump-prompt-pass")).toBeInTheDocument();
     });
 
@@ -402,6 +403,115 @@ describe("TrumpPrompt", () => {
     expect(screen.getByTestId("trump-prompt-pick")).toBeInTheDocument();
     expect(screen.queryByTestId("trump-prompt-suit-S")).not.toBeInTheDocument();
     expect(screen.getByTestId("playing-card-KH")).toBeInTheDocument();
+  });
+
+  // --- The forced dealer (Story 12.8). Under a variant where the hand must find
+  // a taker, the dealer bidding last in round 2 has no legal pass: the server
+  // refuses it outright. Rendering the button anyway turned the only visible
+  // "get out of this" control into a guaranteed error toast, so it is hidden.
+  // canPass is server-derived (matchState.mustPickTrump) — this component never
+  // infers the rule, which is why every case here sets it explicitly.
+  describe("forced pick (canPass=false)", () => {
+    it("hides the Pass control from the active bidder", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={2}
+          isActiveBidder={true}
+          canPass={false}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.queryByTestId("trump-prompt-pass")).not.toBeInTheDocument();
+      // The four suits remain — they are the complete set of legal moves.
+      for (const suit of ["S", "H", "D", "C"] as const) {
+        expect(screen.getByTestId(`trump-prompt-suit-${suit}`)).toBeEnabled();
+      }
+      // And the player is told why, rather than left wondering.
+      expect(screen.getByTestId("trump-prompt-must-pick")).toBeInTheDocument();
+    });
+
+    it("keeps the Pass control when canPass is true or omitted", () => {
+      const { unmount } = render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={2}
+          isActiveBidder={true}
+          canPass={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId("trump-prompt-pass")).toBeInTheDocument();
+      unmount();
+
+      // Omitted defaults to true, so every existing caller keeps its Pass.
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={2}
+          isActiveBidder={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId("trump-prompt-pass")).toBeInTheDocument();
+      expect(screen.queryByTestId("trump-prompt-must-pick")).not.toBeInTheDocument();
+    });
+
+    it("keeps the countdown ring when the Pass button is gone", () => {
+      const expiry = new Date(Date.now() + 20000).toISOString();
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={2}
+          isActiveBidder={true}
+          canPass={false}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+          turnExpiresAt={expiry}
+          timerDurationSec={30}
+        />,
+      );
+      // The clock still runs — an expiry here auto-PICKS server-side — so the
+      // ring must not disappear with the button it used to wrap.
+      const ring = screen.getByTestId("button-timer-ring");
+      expect(ring.querySelector('[data-testid="trump-prompt-must-pick"]')).toBeInTheDocument();
+      expect(screen.queryByTestId("trump-prompt-pass")).not.toBeInTheDocument();
+    });
+
+    it("does not promise the sibling seats a pass that cannot happen", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={2}
+          isActiveBidder={false}
+          canPass={false}
+          activePlayerName="dealer"
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      const prompt = screen.getByTestId("trump-prompt");
+      expect(prompt).toHaveTextContent("dealer");
+      expect(prompt).toHaveTextContent(/name a suit/i);
+      expect(prompt).not.toHaveTextContent(/or pass/i);
+    });
+
+    it("still promises a pass to the sibling seats when one is legal", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={2}
+          isActiveBidder={false}
+          activePlayerName="bidder"
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId("trump-prompt")).toHaveTextContent(/or pass/i);
+    });
   });
 
   it("wraps the Pass button with the rounded-rect button-timer ring when active and per-move", () => {

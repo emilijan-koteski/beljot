@@ -1516,24 +1516,51 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	// Determine what action to auto-take based on game phase and state
 	var action game.Action
 	switch {
+	case gs.Phase == game.PhaseBidding && game.MustPickTrump(gs, expectedSeat):
+		// The dealer bidding last in round 2 under AllPassOutcome ==
+		// AllPassDealerMustPick has no legal pass, so an absent one must be given
+		// a suit instead. Auto-passing here would be REJECTED by the rules engine
+		// and the error path below re-arms the same seat through
+		// startTimerLocked — a full fresh window every time, so the hand never
+		// advances and one slog.Error lands per timer period, forever. (It is a
+		// bounded loop, not a hot spin: handleTimerExpiry contains no
+		// time.Until re-arm. The clamped `max(remaining,0)` re-arm on an
+		// already-elapsed deadline lives in HandleAction's error path, which this
+		// path does not go through.)
+		//
+		// The picker is game.AutoPickTrumpSuit — pure and deterministic, mirroring
+		// AutoPlay, and reading the seat's face-down pair as well as its hand
+		// because at round 2 the revealed cards have not merged yet. The rule
+		// config decides this, never the variant name (D-VAR-1). The guard above
+		// already proved expectedSeat is the seat on the clock, so the same value
+		// picks the suit and stamps the action.
+		suit, err := game.AutoPickTrumpSuit(gs, expectedSeat)
+		if err != nil {
+			// Defensive: a bidding seat holding no pickable card is a state the
+			// deal cannot produce. Recover the way the sibling PhaseDeclaring
+			// branch below does rather than with a bare re-arm — refresh the
+			// ADVERTISED deadline and rebroadcast it, or all four clients keep
+			// rendering an elapsed clock while the server quietly holds a fresh
+			// window, which is the same "silently stuck" shape this story removed.
+			slog.Error("session: auto-pick trump failed; re-arming",
+				"roomID", session.roomID, "seat", expectedSeat, "error", err)
+			m.setTurnExpiry(session, gs)
+			m.startTimerLocked(session, expectedSeat)
+			// Build under the lock, send after releasing it.
+			staleMsg := buildMessage(ws.EventMatchState, gs)
+			staleUserIDs := humanUserIDs(session.playerIDs)
+			session.mu.Unlock()
+			m.hub.BroadcastToUsers(staleUserIDs, staleMsg)
+			return
+		}
+		action = game.Action{
+			Type:       game.ActionPickTrump,
+			PlayerSeat: expectedSeat,
+			Suit:       &suit,
+		}
 	case gs.Phase == game.PhaseBidding:
-		// Auto-pass trump on bidding timeout.
-		//
-		// TODO(croatian-enablement): under VariantRules.AllPassOutcome ==
-		// AllPassDealerMustPick the dealer's fourth round-2 pass is REJECTED by
-		// the rules engine, so this auto-action errors and the error path below
-		// re-arms the same seat.
-		//
-		// That is a HOT SPIN, not merely a stall: the re-arm uses
-		// time.Until(*oldState.TurnExpiresAt), which is already <= 0 once a
-		// timeout produced the error, so time.AfterFunc fires immediately and the
-		// reject -> re-arm cycle runs as fast as the scheduler allows — burning a
-		// core and flooding the log for as long as the session lives.
-		//
-		// Unreachable today (that config belongs to a variant that is not
-		// selectable), and picking a suit on an absent player's behalf is a rule
-		// decision that belongs with the same story that teaches bots to bid with
-		// no candidate.
+		// Auto-pass trump on bidding timeout — the ordinary case, in both
+		// bidding rounds of every config that still allows a pass.
 		action = game.Action{
 			Type:       game.ActionPassTrump,
 			PlayerSeat: expectedSeat,
@@ -1542,11 +1569,11 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		// Auto-skip declaration on timer expiry — inside trick 1 under
 		// DeclarationTimingDuringFirstTrick, or inside the dedicated phase.
 		//
-		// Unlike the bidding TODO above, this auto-action can never be rejected:
-		// the prompted seat IS the active seat and AwaitingDeclaration is set, so
-		// skip_declare always applies. There is therefore no reject → re-arm
-		// cycle to hot-spin on, and the dedicated phase advances to the next seat
-		// (or resolves into trick 1) on this one action.
+		// This auto-action can never be rejected: the prompted seat IS the active
+		// seat and AwaitingDeclaration is set, so skip_declare always applies.
+		// There is therefore no reject → re-arm cycle to stall on, and the
+		// dedicated phase advances to the next seat (or resolves into trick 1) on
+		// this one action.
 		action = game.Action{
 			Type:       game.ActionSkipDeclare,
 			PlayerSeat: expectedSeat,
@@ -1790,6 +1817,11 @@ func autoActionTypeFor(actionType string) (ws.AutoActionType, bool) {
 		return ws.AutoActionSkipDeclare, true
 	case game.ActionSkipBelot:
 		return ws.AutoActionSkipBelot, true
+	case game.ActionPickTrump:
+		// Only ever reachable as an auto-action through the forced-pick arm of
+		// handleTimerExpiry: a seat with no legal pass. A voluntary pick is a
+		// player action and never passes through here.
+		return ws.AutoActionPickTrump, true
 	}
 	return "", false
 }

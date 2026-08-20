@@ -56,6 +56,7 @@ const mockMatchState: MatchState = {
   trumpCandidate: null,
   biddingRound: 1,
   biddingPassCount: 0,
+  mustPickTrump: false,
   deck: [],
   activePlayerSeat: 0,
   trickNumber: 1,
@@ -75,6 +76,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
     {
       hand: [{ rank: "7", suit: "H" }],
@@ -86,6 +88,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
     {
       hand: [{ rank: "A", suit: "D" }],
@@ -97,6 +100,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
     {
       hand: [{ rank: "9", suit: "C" }],
@@ -108,6 +112,7 @@ const mockMatchState: MatchState = {
       connected: true,
       isBot: false,
       level: 1,
+      faceDownCount: 0,
     },
   ],
   teamScores: [0, 0],
@@ -1802,6 +1807,117 @@ describe("MatchPage", () => {
       );
 
       expect(mockSendMessage).toHaveBeenCalledWith("action:skip_declare", {});
+    });
+  });
+
+  // Opponent card counts during a deal that holds two cards back per seat. The
+  // count is server-authoritative (players[n].faceDownCount) — the page adds it
+  // to the open hand and branches on no variant at all, which is why these cases
+  // are driven by the field and not by `variant: "croatia"`.
+  describe("opponent card counts with face-down cards outstanding", () => {
+    function biddingState(faceDownCount: number): MatchState {
+      return {
+        ...mockMatchState,
+        phase: "bidding",
+        trumpSuit: null,
+        trumpCallerSeat: null,
+        trumpCandidate: null,
+        biddingRound: 2,
+        trickNumber: 0,
+        activePlayerSeat: 1,
+        players: mockMatchState.players.map((p) => ({
+          ...p,
+          // Six OPEN cards, as a seat holds mid-bidding under this deal.
+          hand: [
+            { rank: "7", suit: "S" },
+            { rank: "8", suit: "S" },
+            { rank: "9", suit: "S" },
+            { rank: "T", suit: "S" },
+            { rank: "7", suit: "H" },
+            { rank: "8", suit: "H" },
+          ] as MatchState["players"][number]["hand"],
+          faceDownCount,
+        })) as MatchState["players"],
+      };
+    }
+
+    it("reads 8 while each opponent holds six open cards plus two face-down", () => {
+      useMatchStore.getState().setMatchState(biddingState(2));
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      // Three opponents (the viewer's own seat renders its real hand instead).
+      const counts = screen.getAllByTestId("player-seat-card-count");
+      expect(counts).toHaveLength(3);
+      for (const c of counts) {
+        expect(c).toHaveTextContent("×8");
+      }
+    });
+
+    // The page-level wiring of mustPickTrump -> TrumpPrompt's canPass. The
+    // component's own suite covers the prop; nothing covered the PROP BEING
+    // PASSED, and because canPass defaults to true, deleting the attribute here
+    // silently restores the rejected-Pass button for the forced dealer.
+    it("hides the Pass control from the viewer when the server says they must pick", () => {
+      const st = biddingState(2);
+      useMatchStore.getState().setMatchState({
+        ...st,
+        activePlayerSeat: 0,
+        mustPickTrump: true,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
+      expect(screen.queryByTestId("trump-prompt-pass")).not.toBeInTheDocument();
+      expect(screen.getByTestId("trump-prompt-must-pick")).toBeInTheDocument();
+      // The legal moves are still all there.
+      for (const suit of ["S", "H", "D", "C"] as const) {
+        expect(screen.getByTestId(`trump-prompt-suit-${suit}`)).toBeEnabled();
+      }
+    });
+
+    it("offers the Pass control when the server does not force a pick", () => {
+      const st = biddingState(2);
+      useMatchStore.getState().setMatchState({
+        ...st,
+        activePlayerSeat: 0,
+        mustPickTrump: false,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.getByTestId("trump-prompt-pass")).toBeInTheDocument();
+      expect(screen.queryByTestId("trump-prompt-must-pick")).not.toBeInTheDocument();
+    });
+
+    it("does not promise the other seats a pass the dealer cannot make", () => {
+      // Viewer is NOT the bidder: the waiting banner must drop "or pass" too,
+      // which is the same prop reaching the sibling-seat branch.
+      const st = biddingState(2);
+      useMatchStore.getState().setMatchState({
+        ...st,
+        activePlayerSeat: 1,
+        mustPickTrump: true,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      const prompt = screen.getByTestId("trump-prompt");
+      expect(prompt).toHaveTextContent(/name a suit/i);
+      expect(prompt).not.toHaveTextContent(/or pass/i);
+    });
+
+    it("reads the open hand alone when nothing is held face-down", () => {
+      // The Bitola path and every post-bidding phase: faceDownCount is 0, so the
+      // sum must be indistinguishable from hand.length on its own.
+      useMatchStore.getState().setMatchState(biddingState(0));
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      for (const c of screen.getAllByTestId("player-seat-card-count")) {
+        expect(c).toHaveTextContent("×6");
+      }
     });
   });
 });
