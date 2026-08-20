@@ -5,6 +5,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
+import { isCardId } from "@/shared/lib/cardId";
 import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 
@@ -135,16 +136,18 @@ export function TrumpReveal({
   };
 
   // An EMPTY cardId is a legitimate candidate-less take, rendered without a hero
-  // card. A 1-character id is malformed — parseCardId would silently produce an
-  // undefined suit/rank — so bail. WS dispatch already rejects that shape; this
-  // is defence in depth at the boundary.
-  if (!visible || cardId.length === 1) {
+  // card. Anything else must be exactly a rank character plus a suit character,
+  // checked with the same `isCardId` the WS dispatch uses — a bare length test
+  // would let `"10S"` through and parseCardId would slice it into rank "1",
+  // suit "0" rather than rejecting it. This is defence in depth at the boundary;
+  // dispatch already drops both shapes.
+  if (!visible || (cardId !== "" && !isCardId(cardId))) {
     return null;
   }
 
   const picker = players.find((p) => p.seat === playerSeat);
   const pickerName = playerDisplayName(t, picker ?? null);
-  const card = cardId.length >= 2 ? parseCardId(cardId) : null;
+  const card = cardId === "" ? null : parseCardId(cardId);
 
   // Free-pick is detected purely from the wire fields: with a candidate, a
   // chosen suit that differs from the candidate's means the player named a free

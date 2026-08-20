@@ -2062,10 +2062,6 @@ export function MatchPage() {
               // client never re-derives the rule, so no variant branch appears
               // here.
               canPass={!matchState.mustPickTrump}
-              // Server-authoritative: false only for the dealer bidding last in
-              // round 2 of a variant where the hand must find a taker. The
-              // client never re-derives the rule, so no variant branch appears
-              // here.
               turnExpiresAt={matchState.turnExpiresAt}
               timerDurationSec={matchState.timerDurationSec}
             />

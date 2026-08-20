@@ -194,6 +194,9 @@ func (m *Manager) HandleDisconnect(userID uint) {
 		gs.PreviousPhase = gs.Phase
 	}
 	gs.Phase = game.PhaseDisconnected
+	// Both Phase writes above (the pause auto-clear restore and this one) bypass
+	// ApplyAction, so the derived wire flags must be recomputed by hand.
+	game.RefreshDerivedFlags(gs)
 
 	// Per-seat reconnect window: this seat gets the full `reconnectWindowSec`
 	// from now, independent of any other seat's clock. Earliest-expiry view
@@ -454,6 +457,13 @@ func (m *Manager) HandleReconnect(userID uint) {
 			})
 		}
 	}
+
+	// The phase restore above is a direct write that bypasses ApplyAction. Without
+	// this the flags still describe the phase the match was PARKED in: a pause
+	// taken on a forced-pick bidding turn recomputes MustPickTrump to false under
+	// PhasePaused, and restoring PhaseBidding here would ship that false to every
+	// client — offering a Pass control the engine refuses.
+	game.RefreshDerivedFlags(gs)
 
 	// Build messages BEFORE unlocking (data-race prevention — same pattern as HandleDisconnect)
 	playerIDs := session.playerIDs

@@ -629,3 +629,66 @@ func TestReconnectTimeout_RemovesSession(t *testing.T) {
 	assert.False(t, mgr.HasSession(100))
 	assert.Nil(t, mgr.GetStateSnapshot(100))
 }
+
+// TestReconnect_RefreshesDerivedMustPickTrump pins the derived-flag half of the
+// forced-pick fix (Story 12.8) against the session manager's out-of-engine phase
+// writes.
+//
+// GameState.MustPickTrump is DERIVED: ApplyAction recomputes it at its single
+// exit, so no rules-engine handler can leave it stale. The reconnect module does
+// not go through ApplyAction — it assigns gs.Phase directly, twice — and the
+// engine's own tests cannot see that.
+//
+// The reachable sequence is: pause on a forced-pick bidding turn (ApplyAction
+// recomputes the flag to false, correctly, because PhasePaused is not a bidding
+// turn) → the paused player drops, and HandleDisconnect auto-clears their pause
+// by restoring the pre-pause phase directly → they reconnect, and HandleReconnect
+// restores PhaseBidding directly. Without a refresh at those writes the snapshot
+// says "you may pass" while the engine refuses the pass — the client renders the
+// Pass control and the player gets a rejection toast, which is precisely the
+// defect this story removed.
+func TestReconnect_RefreshesDerivedMustPickTrump(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(1288)
+	mgr := match.NewManager(hub, newMockMatchRepo())
+	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0))
+	t.Cleanup(func() { mgr.RemoveSession(roomID) })
+
+	// Round 2 with three passes behind it: the dealer is on the clock with no
+	// legal pass.
+	gs := testfixtures.NewGameCroatianMidBidding(7)
+	gs.RoomID = roomID
+	seat := gs.ActivePlayerSeat
+	gs.DealerSeat = seat
+	game.RefreshDerivedFlags(gs)
+	require.True(t, gs.MustPickTrump, "the fixture must be the forced-pick state")
+	deadline := time.Now().Add(30 * time.Second)
+	gs.TurnExpiresAt = &deadline
+	gs.TimerDurationSec = 60
+	mgr.SetGameStateForTest(roomID, gs)
+
+	userID := gs.Players[seat].UserID
+	client := &ws.Client{UserID: userID}
+
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:pause", Payload: []byte(`{}`)})
+	paused := mgr.GetStateSnapshot(roomID)
+	require.Equal(t, game.PhasePaused, paused.Phase)
+	require.False(t, paused.MustPickTrump,
+		"nobody is on the bidding clock while paused — this false is correct, and is what "+
+			"the restores below must not carry back into PhaseBidding")
+
+	mgr.HandleDisconnect(userID)
+	mgr.HandleReconnect(userID)
+
+	back := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, back)
+	require.Equal(t, game.PhaseBidding, back.Phase, "the reconnect must restore the bidding turn")
+	assert.Equal(t, game.MustPickTrump(back, back.ActivePlayerSeat), back.MustPickTrump,
+		"the wire flag must agree with the engine predicate after an out-of-engine phase restore")
+	assert.True(t, back.MustPickTrump, "the dealer still has no legal pass")
+
+	// The consequence, stated rather than implied: the engine refuses exactly the
+	// action a false flag would have let the client offer.
+	_, err := game.ApplyAction(back, game.Action{Type: game.ActionPassTrump, PlayerSeat: back.ActivePlayerSeat})
+	assert.Error(t, err, "a pass here is rejected, so the client must never render the control")
+}

@@ -302,3 +302,69 @@ func TestReshuffleAndRedealRecoversFaceDownCards(t *testing.T) {
 			"the marked duplicate proves the pool came from the state's own cards")
 	})
 }
+
+// TestFaceDownCountTracksCardsAcrossHands pins the invariant syncFaceDownCounts
+// documents but nothing enforced: the public FaceDownCount never diverges from
+// the server-only FaceDownCards it counts.
+//
+// It matters at the HAND BOUNDARY specifically. startNewHand and
+// reshuffleAndRedeal both clear FaceDownCards themselves and are covered only
+// transitively, by falling through to dealCards — so an early return added to
+// either one before its dealCards call would ship the previous hand's count with
+// no cards behind it, rendering a wrong stack size on every opponent's seat with
+// no test to catch it. This is an internal test because startNewHand is the
+// unexported entry point that boundary runs through.
+func TestFaceDownCountTracksCardsAcrossHands(t *testing.T) {
+	assertInSync := func(t *testing.T, state *GameState, want int, when string) {
+		t.Helper()
+		for seat := range state.Players {
+			p := state.Players[seat]
+			assert.Equal(t, len(p.FaceDownCards), p.FaceDownCount,
+				"seat %d %s: the wire count must equal the cards behind it", seat, when)
+			assert.Equal(t, want, p.FaceDownCount, "seat %d %s", seat, when)
+		}
+	}
+
+	t.Run("croatian deal shape", func(t *testing.T) {
+		state := NewGame([4]uint{1, 2, 3, 4}, [4]string{"a", "b", "c", "d"},
+			[4]bool{}, VariantCroatia, "1001", 1)
+		assertInSync(t, state, 2, "on the opening deal")
+
+		// Bidding resolves: the pair merges into Hand and the count must follow.
+		state.Phase = PhaseBidding
+		suit := SuitHearts
+		picked, err := ApplyAction(state, Action{
+			Type: ActionPickTrump, PlayerSeat: state.ActivePlayerSeat, Suit: &suit,
+		})
+		require.NoError(t, err)
+		assertInSync(t, picked, 0, "once bidding resolved")
+		for seat := range picked.Players {
+			require.Len(t, picked.Players[seat].Hand, 8, "seat %d holds all eight after the merge", seat)
+		}
+
+		// Hand 2 is dealt by the same path a scored hand takes.
+		startNewHand(picked)
+		assertInSync(t, picked, 2, "after startNewHand dealt hand 2")
+	})
+
+	t.Run("candidate deal shape never carries a count", func(t *testing.T) {
+		state := NewGame([4]uint{1, 2, 3, 4}, [4]string{"a", "b", "c", "d"},
+			[4]bool{}, VariantBitola, "1001", 1)
+		assertInSync(t, state, 0, "on the opening deal")
+
+		// Four round-2 passes reshuffle and re-deal — the other transitively
+		// covered path.
+		state.Phase = PhaseBidding
+		state.BiddingRound = 2
+		state.BiddingPassCount = 3
+		reshuffled, err := ApplyAction(state, Action{
+			Type: ActionPassTrump, PlayerSeat: state.ActivePlayerSeat,
+		})
+		require.NoError(t, err)
+		require.Equal(t, PhaseDealing, reshuffled.Phase, "the fourth round-2 pass re-deals")
+		assertInSync(t, reshuffled, 0, "after the reshuffle")
+
+		startNewHand(reshuffled)
+		assertInSync(t, reshuffled, 0, "after startNewHand dealt hand 2")
+	})
+}

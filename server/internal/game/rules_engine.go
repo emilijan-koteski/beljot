@@ -15,8 +15,27 @@ func ApplyAction(state *GameState, action Action) (*GameState, error) {
 	if err != nil {
 		return nil, err
 	}
-	newState.MustPickTrump = MustPickTrump(newState, newState.ActivePlayerSeat)
+	RefreshDerivedFlags(newState)
 	return newState, nil
+}
+
+// RefreshDerivedFlags recomputes every DERIVED wire flag from the rest of the
+// state. It is idempotent and pure.
+//
+// ApplyAction calls it at its single exit, so no rules-engine handler can forget
+// one. It is EXPORTED because the session manager writes state.Phase directly in
+// several places that bypass the engine entirely — the dealing→bidding
+// auto-transition, the disconnect pause auto-clear, and the reconnect phase
+// restore — and a derived flag computed under the previous phase would then ride
+// match_state to the client. Every one of those writes must be followed by a
+// call here.
+//
+// Concretely, that is not hypothetical: pause during a forced-pick bidding turn
+// recomputes MustPickTrump to false under PhasePaused, and the reconnect path
+// restores PhaseBidding without going near ApplyAction — so the client would be
+// offered a Pass control the engine refuses.
+func RefreshDerivedFlags(state *GameState) {
+	state.MustPickTrump = MustPickTrump(state, state.ActivePlayerSeat)
 }
 
 func applyAction(state *GameState, action Action) (*GameState, error) {

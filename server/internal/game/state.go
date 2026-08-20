@@ -62,13 +62,14 @@ type PlayerState struct {
 // server-only FaceDownCards, so the wire count can never drift from the cards it
 // counts. Idempotent.
 //
-// It has exactly TWO call sites: the end of dealCards (covering both deal
-// shapes) and the end of mergeFaceDownCards. The other two places that write
-// FaceDownCards — reshuffleAndRedeal's card pool and startNewHand's hand reset —
-// are covered only TRANSITIVELY, because each clears the slot and then falls
-// through to dealCards. That is load-bearing: an early return added to either
-// path BEFORE its dealCards call would leave the previous hand's count on the
-// wire with no cards behind it, and nothing here would catch it.
+// It is called from exactly two PLACES — dealCards (once per deal shape, so
+// three physical calls: both of dealCards' return paths and the end of
+// mergeFaceDownCards) — and nowhere else. The other two functions that write
+// FaceDownCards, reshuffleAndRedeal's card pool and startNewHand's hand reset,
+// are covered only TRANSITIVELY: each clears the slot and then falls through to
+// dealCards. That is load-bearing, and TestFaceDownCountTracksCardsAcrossHands
+// pins it: an early return added to either path BEFORE its dealCards call would
+// leave the previous hand's count on the wire with no cards behind it.
 func syncFaceDownCounts(state *GameState) {
 	for i := range state.Players {
 		state.Players[i].FaceDownCount = len(state.Players[i].FaceDownCards)
@@ -185,6 +186,21 @@ type GameState struct {
 	// match_state. Value-typed, so cloneGameState's shallow struct copy carries
 	// it with no clone line of its own.
 	DeclarationSeatsAnswered int `json:"-"`
+	// DeclarationsContested records whether BOTH teams put a meld on the table
+	// in this hand's declaration contest — i.e. whether a comparison, rather
+	// than one team being the sole declarer, decided the winner.
+	//
+	// It is set inside resolveDeclarationsForHand because that call is the ONLY
+	// moment the fact is knowable: the same function then clears the losing
+	// team's declarations, and under DeclarationTimingDedicatedPhase the last
+	// seat's melds are both stored AND (if its team loses) cleared inside a
+	// single ApplyAction — so no pair of before/after states outside the engine
+	// can reconstruct it.
+	//
+	// Server-only (json:"-"): it reaches the client on
+	// event:declarations_resolved, never in match_state. Value-typed, so
+	// cloneGameState's shallow struct copy carries it with no clone line.
+	DeclarationsContested bool `json:"-"`
 
 	// Player states
 	Players [4]PlayerState `json:"players"`

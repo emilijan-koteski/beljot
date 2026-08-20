@@ -300,6 +300,7 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 	if gs.Phase == game.PhaseDealing {
 		session.mu.Lock()
 		gs.Phase = game.PhaseBidding
+		game.RefreshDerivedFlags(gs)
 		m.setTurnExpiry(session, gs)
 		m.startTimerLocked(session, gs.ActivePlayerSeat)
 		session.mu.Unlock()
@@ -427,9 +428,12 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 		return err
 	}
 
-	// Handle dealing→bidding auto-transition inside the lock (prevents data race)
+	// Handle dealing→bidding auto-transition inside the lock (prevents data race).
+	// Every direct Phase write bypasses ApplyAction, so the derived wire flags
+	// have to be recomputed by hand — see game.RefreshDerivedFlags.
 	if newState.Phase == game.PhaseDealing {
 		newState.Phase = game.PhaseBidding
+		game.RefreshDerivedFlags(newState)
 	}
 
 	// Timer management for pause/unpause
@@ -1145,35 +1149,17 @@ func (m *Manager) broadcastDeclarationsResolvedIfTransition(oldState, newState *
 	}
 
 	payload := ws.DeclarationsResolvedPayload{
-		WinnerTeam:   declWinnerTeam,
-		Contested:    bothTeamsDeclared(oldState),
+		WinnerTeam: declWinnerTeam,
+		// Read from the engine, never re-derived here. The session manager only
+		// ever sees a before/after pair, and neither member carries the fact:
+		// resolution clears the losing team's melds, and under
+		// DeclarationTimingDedicatedPhase the seat whose answer triggered the
+		// resolution had its melds stored — and, if its team lost, cleared —
+		// inside that same ApplyAction, so they appear in NEITHER state.
+		Contested:    newState.DeclarationsContested,
 		Declarations: decls,
 	}
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventDeclarationsResolved, payload))
-}
-
-// bothTeamsDeclared reports whether each team put at least one meld on the
-// table, which is the only condition under which the winner was decided by a
-// comparison rather than by being the sole declarer.
-//
-// It must read the PRE-resolution state: resolveDeclarationsForHand clears the
-// losing team's declarations, so by the time the reveal is built the loser's
-// melds are already gone and newState can no longer answer this. oldState is a
-// deep clone (cloneGameState clones every player's Declarations and their
-// Cards), so the losing team's melds are intact there.
-func bothTeamsDeclared(oldState *game.GameState) bool {
-	var teamA, teamB bool
-	for seat := 0; seat < 4; seat++ {
-		if len(oldState.Players[seat].Declarations) == 0 {
-			continue
-		}
-		if game.TeamForSeat(seat) == game.TeamA {
-			teamA = true
-		} else {
-			teamB = true
-		}
-	}
-	return teamA && teamB
 }
 
 // bufferHandResultIfScored appends a HandResult to session.handResults
@@ -1501,6 +1487,7 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 	}
 	if newState.Phase == game.PhaseDealing {
 		newState.Phase = game.PhaseBidding
+		game.RefreshDerivedFlags(newState)
 	}
 	if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding ||
 		newState.Phase == game.PhaseDeclaring {
@@ -1677,6 +1664,7 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	// Handle dealing→bidding auto-transition inside the lock
 	if newState.Phase == game.PhaseDealing {
 		newState.Phase = game.PhaseBidding
+		game.RefreshDerivedFlags(newState)
 	}
 
 	// Within-turn auto-action chain. The first ApplyAction may leave the same
@@ -1749,6 +1737,7 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		}
 		if appliedNS.Phase == game.PhaseDealing {
 			appliedNS.Phase = game.PhaseBidding
+			game.RefreshDerivedFlags(appliedNS)
 		}
 		steps = append(steps, chainStep{action: next, pre: cur, post: appliedNS})
 	}

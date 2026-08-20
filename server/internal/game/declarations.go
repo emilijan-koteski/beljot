@@ -559,8 +559,38 @@ func resolveTrickWithDeclarations(state *GameState) {
 	}
 }
 
+// bothTeamsDeclared reports whether each team put at least one meld on the
+// table — the only condition under which the winner was decided by a
+// comparison rather than by being the sole declarer.
+//
+// Must be read BEFORE resolveDeclarationsForHand clears the losing team's
+// declarations, which is why its single caller is that function's first
+// statement.
+func bothTeamsDeclared(state *GameState) bool {
+	var teamA, teamB bool
+	for seat := 0; seat < 4; seat++ {
+		if len(state.Players[seat].Declarations) == 0 {
+			continue
+		}
+		if TeamForSeat(seat) == TeamA {
+			teamA = true
+		} else {
+			teamB = true
+		}
+	}
+	return teamA && teamB
+}
+
 // resolveDeclarationsForHand resolves declarations after trick 1 and awards points.
 func resolveDeclarationsForHand(state *GameState) {
+	// Record whether a comparison decided this contest while BOTH teams' melds
+	// are still on the table. Everything below destroys the evidence: the
+	// losing team's declarations are cleared a few lines down, and under
+	// DeclarationTimingDedicatedPhase the seat whose answer triggered this call
+	// had its melds stored moments ago in the SAME ApplyAction — so a caller
+	// comparing the pre- and post-action states cannot see them at all.
+	state.DeclarationsContested = bothTeamsDeclared(state)
+
 	// Determine trick 1 leader: the player after the dealer
 	trickLeaderSeat := (state.DealerSeat + 1) % 4
 

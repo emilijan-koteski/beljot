@@ -307,19 +307,26 @@ describe("TrumpReveal — Wax Seal", () => {
       expect(seal.className).not.toContain("absolute");
     });
 
-    it("still returns null for a malformed 1-character cardId", () => {
-      render(
-        <TrumpReveal
-          playerSeat={2}
-          myPlayerSeat={0}
-          cardId="J"
-          trumpSuit="S"
-          players={makePlayers()}
-          onComplete={vi.fn()}
-        />,
-      );
-      expect(screen.queryByTestId("trump-reveal")).toBeNull();
-    });
+    // Empty is the only non-2-character shape that renders. Everything else is
+    // malformed and must be dropped rather than sliced into a plausible card —
+    // "10S" is the dangerous one a bare length check lets through, where
+    // parseCardId reads rank "1" and suit "0".
+    it.each(["J", "10S", "JSX", "js", "XS", "JX"])(
+      "returns null for the malformed cardId %s",
+      (cardId) => {
+        render(
+          <TrumpReveal
+            playerSeat={2}
+            myPlayerSeat={0}
+            cardId={cardId}
+            trumpSuit="S"
+            players={makePlayers()}
+            onComplete={vi.fn()}
+          />,
+        );
+        expect(screen.queryByTestId("trump-reveal")).toBeNull();
+      },
+    );
   });
 
   it("glows gold (Us) when the caller is on the viewer's team", () => {

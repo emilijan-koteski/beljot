@@ -179,6 +179,7 @@ func startNewHand(state *GameState) {
 	state.AwaitingDeclaration = false
 	state.DeclarationsResolved = false
 	state.DeclarationSeatsAnswered = 0
+	state.DeclarationsContested = false
 	state.HandCompleteReady = [4]bool{}
 
 	// Reset per-hand scoring

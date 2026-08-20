@@ -702,3 +702,68 @@ func TestDeclarationPhase_RevealReportsAnUncontestedWin(t *testing.T) {
 	// meld count could never have stood in for "was this contested".
 	assert.Greater(t, len(melds), 1)
 }
+
+// TestDeclarationPhase_RevealReportsAContestWonByAnEarlierSeat is the row the
+// other two `contested` tests structurally could not fail on.
+//
+// Both of them let the LAST seat to answer be redundant: one has every earlier
+// seat declare (so both teams are on the table before the final answer), the
+// other has only one team declare at all. A `contested` derived from the
+// pre-action state passes both.
+//
+// Here the last answerer is the ONLY declarer on its team, which is the shape
+// that breaks that derivation: at broadcast time seat 0's melds exist in
+// neither the pre-action state (it had not answered yet) nor the post-action
+// state (its team lost, so resolution cleared them). Only the engine, inside
+// resolveDeclarationsForHand, ever sees both teams at once — which is why
+// GameState.DeclarationsContested is computed there and merely read here.
+func TestDeclarationPhase_RevealReportsAContestWonByAnEarlierSeat(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(120)
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
+
+	// Cursor order is 1 → 2 → 3 → 0. Seats 1 and 3 are team B and declare;
+	// seat 2 (team A) skips, so seat 0 — answering last — is team A's only
+	// declarer.
+	require.Equal(t, game.TeamA, game.TeamForSeat(0))
+	require.Equal(t, game.TeamA, game.TeamForSeat(2))
+	state := gs
+	for _, seat := range []int{1, 2, 3} {
+		action := game.ActionDeclare
+		if seat == 2 {
+			action = game.ActionSkipDeclare
+		}
+		next, err := game.ApplyAction(state, game.Action{Type: action, PlayerSeat: seat})
+		require.NoError(t, err)
+		state = next
+	}
+	require.Equal(t, 0, state.ActivePlayerSeat, "seat 0 must be the last to answer")
+	require.Empty(t, state.Players[0].Declarations,
+		"seat 0 has not answered yet — its melds are absent from the pre-action state")
+	mgr.SetGameStateForTest(roomID, state)
+
+	before := len(hub.snapshot())
+	client := &ws.Client{UserID: state.Players[0].UserID}
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:declare", Payload: []byte(`{}`)})
+
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Phase == game.PhasePlaying
+	}, 2*time.Second, 5*time.Millisecond, "the fourth answer must open trick 1")
+
+	after := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, after)
+	require.Equal(t, game.TeamB, *winningTeamOf(t, after), "team B holds the stronger meld")
+	require.Empty(t, after.Players[0].Declarations,
+		"resolution cleared the loser's melds — so seat 0 is absent from the post-action state too, "+
+			"which is what makes this row unsatisfiable from the before/after pair alone")
+
+	events := wireEvents(t, hub.snapshot()[before:])
+	revealIdx := indexOfKind(events, ws.EventDeclarationsResolved)
+	require.GreaterOrEqual(t, revealIdx, 0)
+	_, contested := declarationsResolvedBody(t, events[revealIdx].payload)
+
+	assert.True(t, contested,
+		"both teams put melds on the table, so a comparison decided the winner and the "+
+			"reveal may name the deciding meld")
+}
