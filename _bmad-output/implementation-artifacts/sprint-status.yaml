@@ -183,6 +183,12 @@ development_status:
   12-6-croatian-declaration-phase: review
   12-7-bitola-hanging-points-tie-rule: backlog # deferred indefinitely — see deferred-work.md
   12-8-croatian-variant-enablement: review
+  # 12-9 added 2026-08-20 by owner decision: Story 12.8 AC(d) (rules-reference reconciliation)
+  # was split out at intent capture and never given a story number. Ships inside Epic 12.
+  12-9-variant-rules-reference-reconciliation: backlog
+  # 12-10 added 2026-08-20 by owner decision: the per-recipient snapshot projection
+  # (card privacy) was filed as deferred work against 12.1 but is story-sized on its own.
+  12-10-per-recipient-snapshot-projection: backlog
   epic-12-retrospective: optional
 
   # --- Epic 13: Seasonal Rank & Leaderboard (Phase 4) ---

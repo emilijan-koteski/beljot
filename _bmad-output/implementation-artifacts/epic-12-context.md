@@ -4,7 +4,7 @@
 
 ## Goal
 
-Make Beljot a genuinely two-variant platform: the Croatian variant becomes playable with its authentic rules, players can choose the card deck they play with, and an in-app rules reference covers both variants. Scope was corrected on 2026-08-18 after a rules audit found the original premise wrong — Croatian is not "Bitola plus a forced dealer pick." It diverges in **seven** places, while **thirty** other rules were verified genuinely identical and must not be branched. So the deliverable is twofold: the Croatian rules themselves, plus a per-rule configuration layer that makes variants *presets* rather than hardcoded branches, so a future story can expose these rules directly in room creation without rewriting the engine. This is a rule-correctness epic — an incorrect rule hurts more than any UI defect, because players who know Belot detect it immediately. The rule config, Croatian dealing/bidding, declaration overlap and the dedicated declaration phase are built and awaiting review; what remains is enablement and the deck preference. The seventh divergence — Bitola's tie rule — was deliberately dropped on 2026-08-20: Bitola keeps borrowing the Croatian tie rule, so only six divergences ship.
+Make Beljot a genuinely two-variant platform: the Croatian variant becomes playable with its authentic rules, players can choose the card deck they play with, and an in-app rules reference covers both variants. Scope was corrected on 2026-08-18 after a rules audit found the original premise wrong — Croatian is not "Bitola plus a forced dealer pick." It diverges in **seven** places, while **thirty** other rules were verified genuinely identical and must not be branched. So the deliverable is twofold: the Croatian rules themselves, plus a per-rule configuration layer that makes variants *presets* rather than hardcoded branches, so a future story can expose these rules directly in room creation without rewriting the engine. This is a rule-correctness epic — an incorrect rule hurts more than any UI defect, because players who know Belot detect it immediately. The rule config, Croatian dealing/bidding, declaration overlap, the dedicated declaration phase and variant enablement are built and awaiting review; what remains is the rules-reference reconciliation (Story 12.9) and the deck preference (Story 12.4). The seventh divergence — Bitola's tie rule — was deliberately dropped on 2026-08-20: Bitola keeps borrowing the Croatian tie rule, so only six divergences ship.
 
 ## Stories
 
@@ -15,7 +15,38 @@ Make Beljot a genuinely two-variant platform: the Croatian variant becomes playa
 - Story 12.5: Croatian Declaration Overlap — `review`
 - Story 12.6: Croatian Declaration Phase — `review`
 - Story 12.7: Bitola Hanging-Points Tie Rule — **deferred indefinitely** (owner decision 2026-08-20; not a blocker for anything)
-- Story 12.8: Croatian Variant Enablement — `backlog`, **next to implement**, ships last
+- Story 12.8: Croatian Variant Enablement — `review`
+- Story 12.9: Variant Rules-Reference Reconciliation — `backlog`, **ships last**. Story 12.8's
+  AC(d), split out at intent capture on 2026-08-20 and given its own number on the same day so it
+  is tracked rather than remembered. Reconcile `client/src/features/rules/content/{en,mk,hr,sr}.ts`
+  against real engine behaviour for BOTH variants: the reference has no variant split today and
+  describes the Bitola flow only — face-up trump candidate (`en.ts:106`) and melds "announced on
+  your turn in the first trick" (`en.ts:170`) are both wrong for Croatian after 12.1 and 12.6.
+  Also carries three findings filed against other stories: the one-card-one-group rule and the
+  Croatian overlap exception are documented nowhere (from 12.5); `RulesDialog` takes no variant
+  prop and offers no caveat (from 12.8); and `lobby.createRoomModal.variantHint` restates the two
+  option labels instead of explaining the difference (from 12.8). D137 (the both-teams-cross-tied
+  -> taker-wins match tiebreaker, implemented but undocumented) folds in here too.
+  `content/rulesContent.parity.test.ts` gates identical section ids, order AND block shapes across
+  all four locales, so every new or changed block lands x4. NOT in scope: the tie sentence at
+  `en/mk:209-211`, `hr/sr:208-210` — correct for both variants under the 12.7 decision.
+- Story 12.10: Per-Recipient Snapshot Projection (Card Privacy) — `backlog`. Filed as deferred work
+  against Story 12.1 on 2026-08-20 and promoted to a story the same day: it is story-sized, and it
+  is the only OPEN violation of the epic's own non-negotiable that "a player's face-down cards
+  never appear in another player's snapshot". Today `event:match_state` broadcasts **every**
+  player's full hand and the 11-card undealt deck to all four seats, so any player can read the
+  whole table from devtools or a websocket inspector. `state.go:11` (`Hand []Card`) and
+  `state.go:86` (`Deck []Card`) carry no `json:"-"` and no per-seat conditionality, and
+  `server/internal/ws/testdata/events/event_match_state.json` contains all four `hand` arrays with
+  concrete ranks and suits. No test anywhere asserts card privacy. The client already holds the
+  real cards and merely chooses not to draw them — `MatchPage.tsx` renders opponents from
+  `player.hand.length`. Closing it needs a per-recipient projection seam: `buildMessage`
+  (`live_match.go:1277`) takes no recipient and `BroadcastToUsers` (`ws/hub.go:188`) takes
+  pre-serialized bytes, so ~21 `match_state` broadcast sites plus `SyncStateOnConnect` change,
+  along with the client's `z.strictObject` `PlayerStateSchema`, `matchTypes.MatchState`, and the
+  opponent card-count rendering. Absorbs the older **D96** entry (the `Deck` field exposed in every
+  `event:game_state` frame), which is the same defect on the same wire. Bitola is a regression
+  surface here, not a refactor target — every pre-existing Bitola test must pass unchanged.
 
 ## Requirements & Constraints
 
