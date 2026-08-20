@@ -38,7 +38,7 @@ vi.mock("@/shared/api/rooms", () => ({
 }));
 
 import { getRoom, returnToRoom } from "@/shared/api/rooms";
-import { makeUser } from "@/test-utils";
+import { makeRoom, makeRoomDetail, makeUser } from "@/test-utils";
 
 const mockGetRoom = vi.mocked(getRoom);
 const mockReturnToRoom = vi.mocked(returnToRoom);
@@ -525,39 +525,41 @@ describe("MatchPage", () => {
     ["MATCH_ALREADY_STARTED", 409, "The next match already started without you."],
     ["NOT_IN_ROOM", 404, "You're no longer in this room."],
   ])("surfaces distinct copy when return-to-room fails with %s", async (code, status, message) => {
-    mockGetRoom.mockResolvedValue({
-      room: {
-        id: 1,
-        name: "R",
-        code: "ABC123",
-        ownerId: 10,
-        ownerUsername: "alice",
-        variant: "bitola",
-        matchMode: "1001",
-        timerStyle: "relaxed",
-        timerDurationSeconds: null,
-        status: "in_progress",
-        playerCount: 4,
-        isQuickPlay: false,
-        coinBuyIn: 0,
-        isPrivate: false,
-        createdAt: "",
-        updatedAt: "",
-      },
-      players: [
-        {
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: makeRoom({
           id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
+          name: "R",
+          code: "ABC123",
+          ownerId: 10,
+          ownerUsername: "alice",
+          variant: "bitola",
+          matchMode: "1001",
+          timerStyle: "relaxed",
+          timerDurationSeconds: null,
+          status: "in_progress",
+          playerCount: 4,
+          isQuickPlay: false,
+          coinBuyIn: 0,
+          isPrivate: false,
           createdAt: "",
-        },
-      ],
-      returnedUserIds: [],
-    });
+          updatedAt: "",
+        }),
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+        returnedUserIds: [],
+      }),
+    );
     mockReturnToRoom.mockRejectedValueOnce(new FetchError(status, code, "x"));
 
     useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
@@ -590,39 +592,41 @@ describe("MatchPage", () => {
   // Unlike the other return errors, the seat is gone server-side, so we clear
   // match state and route to the lobby instead of keeping the result overlay.
   it("routes to the lobby (no overlay toast) when return-to-room is rejected for insolvency", async () => {
-    mockGetRoom.mockResolvedValue({
-      room: {
-        id: 1,
-        name: "R",
-        code: "ABC123",
-        ownerId: 10,
-        ownerUsername: "alice",
-        variant: "bitola",
-        matchMode: "1001",
-        timerStyle: "relaxed",
-        timerDurationSeconds: null,
-        status: "completed",
-        playerCount: 4,
-        isQuickPlay: false,
-        coinBuyIn: 500,
-        isPrivate: false,
-        createdAt: "",
-        updatedAt: "",
-      },
-      players: [
-        {
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: makeRoom({
           id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
+          name: "R",
+          code: "ABC123",
+          ownerId: 10,
+          ownerUsername: "alice",
+          variant: "bitola",
+          matchMode: "1001",
+          timerStyle: "relaxed",
+          timerDurationSeconds: null,
+          status: "completed",
+          playerCount: 4,
+          isQuickPlay: false,
+          coinBuyIn: 500,
+          isPrivate: false,
           createdAt: "",
-        },
-      ],
-      returnedUserIds: [],
-    });
+          updatedAt: "",
+        }),
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+        returnedUserIds: [],
+      }),
+    );
     mockReturnToRoom.mockRejectedValueOnce(new FetchError(409, "INSUFFICIENT_COINS", "x"));
 
     useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
@@ -948,6 +952,7 @@ describe("MatchPage", () => {
     useMatchStore.getState().setMyPlayerSeat(0);
     useMatchStore.getState().setDeclarationReveal({
       winnerTeam: 0,
+      contested: false,
       declarations: [
         {
           playerSeat: 0,
@@ -1065,6 +1070,7 @@ describe("MatchPage", () => {
         useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
         useMatchStore.getState().setDeclarationReveal({
           winnerTeam: 0,
+          contested: false,
           declarations: [
             { playerSeat: 0, type: "sequence", cards: ["9S", "TS", "JS", "QS"], value: 50 },
           ],
@@ -1249,39 +1255,41 @@ describe("MatchPage", () => {
     it("does not block the back button once the match has ended", async () => {
       // Distinct routes (not "*") so the pop actually unmounts MatchPage —
       // that unmount is what triggers the end-state store cleanup.
-      mockGetRoom.mockResolvedValue({
-        room: {
-          id: 1,
-          name: "R",
-          code: "ABC123",
-          ownerId: 10,
-          ownerUsername: "alice",
-          variant: "bitola",
-          matchMode: "1001",
-          timerStyle: "relaxed",
-          timerDurationSeconds: null,
-          status: "in_progress",
-          playerCount: 4,
-          isQuickPlay: false,
-          coinBuyIn: 0,
-          isPrivate: false,
-          createdAt: "",
-          updatedAt: "",
-        },
-        players: [
-          {
+      mockGetRoom.mockResolvedValue(
+        makeRoomDetail({
+          room: makeRoom({
             id: 1,
-            roomId: 1,
-            userId: 10,
-            username: "alice",
-            seat: 0,
-            team: "teamA",
-            isBot: false,
+            name: "R",
+            code: "ABC123",
+            ownerId: 10,
+            ownerUsername: "alice",
+            variant: "bitola",
+            matchMode: "1001",
+            timerStyle: "relaxed",
+            timerDurationSeconds: null,
+            status: "in_progress",
+            playerCount: 4,
+            isQuickPlay: false,
+            coinBuyIn: 0,
+            isPrivate: false,
             createdAt: "",
-          },
-        ],
-        returnedUserIds: [],
-      });
+            updatedAt: "",
+          }),
+          players: [
+            {
+              id: 1,
+              roomId: 1,
+              userId: 10,
+              username: "alice",
+              seat: 0,
+              team: "teamA",
+              isBot: false,
+              createdAt: "",
+            },
+          ],
+          returnedUserIds: [],
+        }),
+      );
 
       useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
       useMatchStore.getState().setMyPlayerSeat(0);
@@ -1454,6 +1462,7 @@ describe("MatchPage", () => {
   describe("declaration / belot reveal lifetime (issue 5)", () => {
     const decls = {
       winnerTeam: 0 as const,
+      contested: false,
       declarations: [
         { playerSeat: 0, type: "sequence" as const, cards: ["9S", "TS", "JS", "QS"], value: 50 },
       ],

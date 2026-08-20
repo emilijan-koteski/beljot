@@ -1,27 +1,28 @@
 {
+  "winnerTeam": 0,
+  "contested": true,
   "declarations": [
     {
+      "playerSeat": 0,
+      "type": "sequence",
+      "value": 50,
       "cards": [
         "JS",
         "QS",
         "KS",
         "AS"
-      ],
-      "playerSeat": 0,
-      "type": "sequence",
-      "value": 50
+      ]
     },
     {
+      "playerSeat": 0,
+      "type": "four_of_a_kind",
+      "value": 200,
       "cards": [
         "JS",
         "JH",
         "JD",
         "JC"
-      ],
-      "playerSeat": 0,
-      "type": "four_of_a_kind",
-      "value": 200
+      ]
     }
-  ],
-  "winnerTeam": 0
+  ]
 }

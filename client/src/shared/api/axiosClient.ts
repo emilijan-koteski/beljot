@@ -5,6 +5,18 @@ import { useAuthStore } from "@/shared/stores/authStore";
 
 const BASE_URL = "/api/v1";
 
+// Every request gets a deadline. Without one, axios waits forever on a hung
+// connection (a dropped link, a wedged proxy, a server that accepted the socket
+// and never answered) and the promise never settles — which strands any UI
+// gated on the mutation's `isPending`. The pending-guarded confirm dialogs
+// (remove-friend, unlink-account, remove-bot) disable every dismissal path
+// while pending, so an unsettled request locks them with no way out and
+// `refetchOnWindowFocus` is off, so nothing unsticks them either.
+// 15s is well past the slowest real endpoint here (all are short REST calls —
+// no uploads, no long-polling; live gameplay runs over the WebSocket, which has
+// its own lifecycle and is unaffected by this).
+const REQUEST_TIMEOUT_MS = 15_000;
+
 // ---------------------------------------------------------------------------
 // FetchError — kept for backward compatibility with all component error handling
 // ---------------------------------------------------------------------------
@@ -162,6 +174,7 @@ async function doRefresh(): Promise<string> {
 export const axiosPublic = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
+  timeout: REQUEST_TIMEOUT_MS,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -177,6 +190,7 @@ interface RetryConfig extends InternalAxiosRequestConfig {
 export const axiosClient = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
+  timeout: REQUEST_TIMEOUT_MS,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -237,6 +251,14 @@ axiosClient.interceptors.response.use(
         "UNKNOWN_ERROR",
         error.response.statusText || "Request failed",
       );
+    }
+
+    // Timed out — surfaced separately from a hard network failure so callers can
+    // say "took too long" rather than "you are offline". Axios reports both an
+    // exceeded `timeout` and a caller abort as ECONNABORTED; ETIMEDOUT shows up
+    // on some platforms instead. Status stays 0: no response ever arrived.
+    if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+      throw new FetchError(0, "TIMEOUT", error.message || "Request timed out");
     }
 
     // Network error or no response

@@ -21,7 +21,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { i18n } from "@/shared/i18n/i18n";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { makeUser, QueryWrapper } from "@/test-utils";
+import { makeRoom, makeRoomDetail, makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -60,8 +60,8 @@ const mockGetRoom = vi.mocked(getRoom);
 const mockLeaveRoom = vi.mocked(leaveRoom);
 
 function fourSeatedRoom() {
-  return {
-    room: {
+  return makeRoomDetail({
+    room: makeRoom({
       id: 1,
       name: "Test Room",
       code: "ABC123",
@@ -77,7 +77,7 @@ function fourSeatedRoom() {
       coinBuyIn: 0,
       createdAt: "",
       updatedAt: "",
-    },
+    }),
     players: [
       {
         id: 1,
@@ -120,7 +120,7 @@ function fourSeatedRoom() {
         createdAt: "",
       },
     ],
-  };
+  });
 }
 
 function renderRoomPage() {

@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { makeUser, QueryWrapper } from "@/test-utils";
+import { makeRoom, makeRoomDetail, makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -79,8 +79,8 @@ function fourSeated(viewerSeat: number) {
     isBot: false,
     createdAt: "",
   }));
-  return {
-    room: {
+  return makeRoomDetail({
+    room: makeRoom({
       id: 1,
       name: "Test Room",
       code: "ABC123",
@@ -96,9 +96,9 @@ function fourSeated(viewerSeat: number) {
       coinBuyIn: 0,
       createdAt: "",
       updatedAt: "",
-    },
+    }),
     players,
-  };
+  });
 }
 
 function renderRoomPage() {

@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -158,5 +158,60 @@ describe("HandCards", () => {
     // Without the playable lift class, the card is in default state — no
     // cursor-pointer hint, no extra click handler that would re-fire onPlay.
     expect(flying.className).not.toContain("cursor-pointer");
+  });
+});
+
+describe("Croatian face-down pair at the viewer's own seat", () => {
+  const six: Card[] = [
+    { rank: "7", suit: "S" },
+    { rank: "8", suit: "S" },
+    { rank: "9", suit: "H" },
+    { rank: "T", suit: "H" },
+    { rank: "J", suit: "C" },
+    { rank: "Q", suit: "D" },
+  ];
+
+  function renderHand(hand: Card[], faceDownCount: number) {
+    return render(
+      <HandCards
+        hand={hand}
+        isMyTurn={false}
+        playableCardIds={[]}
+        onPlayCard={vi.fn()}
+        faceDownCount={faceDownCount}
+      />,
+    );
+  }
+
+  it("renders the pair as backs so the seat shows all eight cards it holds", () => {
+    // Before this, the viewer's own seat showed six while every opponent's
+    // stack showed eight — the asymmetry Story 12.8 made conspicuous.
+    renderHand(six, 2);
+    expect(screen.getAllByTestId("hand-card-face-down")).toHaveLength(2);
+    expect(screen.getAllByTestId(/^hand-card-[A-Z0-9]{2}$/)).toHaveLength(6);
+  });
+
+  it("renders no backs on a Bitola hand", () => {
+    renderHand(six, 0);
+    expect(screen.queryByTestId("hand-card-face-down")).not.toBeInTheDocument();
+  });
+
+  it("keeps the backs unclickable", () => {
+    // They carry no card id, so they can never be a legal move.
+    renderHand(six, 2);
+    for (const back of screen.getAllByTestId("hand-card-face-down")) {
+      expect(back).toHaveStyle({ pointerEvents: "none" });
+    }
+  });
+
+  it("lays the fan out for eight slots, not six", () => {
+    // The backs occupy real slots: if the geometry counted only the face-up
+    // cards, the container would be sized for six and the backs would spill.
+    const { container: withBacks } = renderHand(six, 2);
+    const wide = (withBacks.querySelector("[data-testid='hand-cards']") as HTMLElement).style.width;
+    cleanup();
+    const { container: without } = renderHand(six, 0);
+    const narrow = (without.querySelector("[data-testid='hand-cards']") as HTMLElement).style.width;
+    expect(parseFloat(wide)).toBeGreaterThan(parseFloat(narrow));
   });
 });

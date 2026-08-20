@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { makeUser, QueryWrapper } from "@/test-utils";
+import { makeRoom, makeRoomDetail, makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -71,7 +71,7 @@ function renderRoomPage() {
   );
 }
 
-const room = {
+const room = makeRoom({
   id: 1,
   name: "Bot Room",
   code: "BOTBOT",
@@ -88,7 +88,7 @@ const room = {
   isPrivate: false,
   createdAt: "",
   updatedAt: "",
-};
+});
 
 const owner = makeUser({
   id: 10,
@@ -155,7 +155,9 @@ afterEach(() => {
 describe("RoomPage bot seating", () => {
   it("renders the localized bot name and badge on a bot-occupied seat", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({ room, players: [human(10, "alice", 0), bot(2)] });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({ room, players: [human(10, "alice", 0), bot(2)] }),
+    );
 
     renderRoomPage();
 
@@ -170,7 +172,7 @@ describe("RoomPage bot seating", () => {
 
   it("owner sees the add-bot affordance on empty seats and it fires the mutation", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({ room, players: [human(10, "alice", 0)] });
+    mockGetRoom.mockResolvedValue(makeRoomDetail({ room, players: [human(10, "alice", 0)] }));
     mockAddBot.mockResolvedValue({ players: [human(10, "alice", 0), bot(1)] });
 
     renderRoomPage();
@@ -185,10 +187,12 @@ describe("RoomPage bot seating", () => {
 
   it("non-owner sees no add-bot or remove-bot affordances", async () => {
     useAuthStore.setState({ user: guest, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room,
-      players: [human(10, "alice", 0), human(20, "bob", 1), bot(2)],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room,
+        players: [human(10, "alice", 0), human(20, "bob", 1), bot(2)],
+      }),
+    );
 
     renderRoomPage();
 
@@ -199,7 +203,9 @@ describe("RoomPage bot seating", () => {
 
   it("owner removes a bot via the confirm dialog", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({ room, players: [human(10, "alice", 0), bot(2)] });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({ room, players: [human(10, "alice", 0), bot(2)] }),
+    );
     mockRemoveBot.mockResolvedValue({ players: [human(10, "alice", 0)] });
 
     renderRoomPage();
@@ -216,7 +222,9 @@ describe("RoomPage bot seating", () => {
 
   it("bot tiles never show kick or promote controls", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({ room, players: [human(10, "alice", 0), bot(2)] });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({ room, players: [human(10, "alice", 0), bot(2)] }),
+    );
 
     renderRoomPage();
 
@@ -227,7 +235,9 @@ describe("RoomPage bot seating", () => {
 
   it("owner swaps a bot to an empty seat through the existing swap flow", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({ room, players: [human(10, "alice", 0), bot(1)] });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({ room, players: [human(10, "alice", 0), bot(1)] }),
+    );
     mockSwapSeats.mockResolvedValue({ players: [human(10, "alice", 0), bot(3)] });
 
     renderRoomPage();
@@ -242,7 +252,9 @@ describe("RoomPage bot seating", () => {
 
   it("owner swaps themselves with a bot (own seat is a valid target for a bot source)", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({ room, players: [human(10, "alice", 0), bot(1)] });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({ room, players: [human(10, "alice", 0), bot(1)] }),
+    );
     mockSwapSeats.mockResolvedValue({ players: [human(10, "alice", 1), bot(0)] });
 
     renderRoomPage();
@@ -256,10 +268,12 @@ describe("RoomPage bot seating", () => {
 
   it("owner swaps another human with a bot (human ↔ bot)", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room: { ...room, playerCount: 2 },
-      players: [human(10, "alice", 0), human(20, "bob", 2), bot(1)],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...room, playerCount: 2 },
+        players: [human(10, "alice", 0), human(20, "bob", 2), bot(1)],
+      }),
+    );
     mockSwapSeats.mockResolvedValue({
       players: [human(10, "alice", 0), human(20, "bob", 1), bot(2)],
     });
@@ -275,10 +289,12 @@ describe("RoomPage bot seating", () => {
 
   it("owner swaps a human onto a bot's seat (human source, bot target)", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room: { ...room, playerCount: 2 },
-      players: [human(10, "alice", 0), human(20, "bob", 2), bot(1)],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...room, playerCount: 2 },
+        players: [human(10, "alice", 0), human(20, "bob", 2), bot(1)],
+      }),
+    );
     mockSwapSeats.mockResolvedValue({
       players: [human(10, "alice", 0), human(20, "bob", 1), bot(2)],
     });
@@ -294,10 +310,12 @@ describe("RoomPage bot seating", () => {
 
   it("start button enables when bots cover the remaining seats", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room,
-      players: [human(10, "alice", 0), bot(1), bot(2), bot(3)],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room,
+        players: [human(10, "alice", 0), bot(1), bot(2), bot(3)],
+      }),
+    );
 
     renderRoomPage();
 
@@ -307,10 +325,12 @@ describe("RoomPage bot seating", () => {
 
   it("start button stays disabled with an uncovered seat", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room,
-      players: [human(10, "alice", 0), bot(1), bot(2)],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room,
+        players: [human(10, "alice", 0), bot(1), bot(2)],
+      }),
+    );
 
     renderRoomPage();
 

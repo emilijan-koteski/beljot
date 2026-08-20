@@ -187,6 +187,37 @@ type PlayerDeclaredPayload struct {
 	PlayerSeat int `json:"playerSeat"`
 }
 
+// DeclarationPayload is one revealed meld inside a DeclarationsResolvedPayload.
+// The shape is flat — one entry per meld, each carrying its own PlayerSeat —
+// so a single seat holding several overlapping melds (the normal case under a
+// DeclarationOverlap config) needs no nesting and no payload change.
+type DeclarationPayload struct {
+	PlayerSeat int      `json:"playerSeat"`
+	Type       string   `json:"type"`
+	Value      int      `json:"value"`
+	Cards      []string `json:"cards"`
+}
+
+// DeclarationsResolvedPayload is the typed payload for
+// EventDeclarationsResolved events. It carries only the WINNING team's melds —
+// the engine clears the losing team's at resolution — so every entry counts
+// toward the awarded total.
+//
+// WinnerTeam is nil when no seat declared at all.
+//
+// Contested reports whether BOTH teams put a meld on the table, i.e. whether a
+// comparison actually decided the winner. The client cannot infer this from the
+// melds it receives: with only the winner's melds on the wire, "we out-declared
+// them" and "we were the only team to declare" look identical, and under a
+// DeclarationOverlap config one seat holding two melds is ordinary rather than
+// evidence of a contest. The reveal uses it to decide whether to name the
+// highest meld as the deciding one.
+type DeclarationsResolvedPayload struct {
+	WinnerTeam   *int                 `json:"winnerTeam"`
+	Contested    bool                 `json:"contested"`
+	Declarations []DeclarationPayload `json:"declarations"`
+}
+
 // BelotAnnouncedPayload is the typed payload for EventBelotAnnounced events.
 // CardID is the K/Q of trump that was just played and triggered the announcement.
 type BelotAnnouncedPayload struct {
@@ -313,6 +344,13 @@ const ErrorNoActivePause = "error:no_active_pause"
 const ErrorNotRoomOwner = "error:not_room_owner"
 const ErrorPlayerDisconnected = "error:player_disconnected"
 const ErrorSurrenderExhausted = "error:surrender_exhausted"
+
+// ErrorMustPickTrump is sent when a seat passes but the rules give it no
+// pass to make — the dealer bidding last under AllPassDealerMustPick. Kept
+// apart from ErrorInvalidAction so the client can distinguish it from a
+// rejected suit; the UI normally hides Pass in this state, so receiving it
+// means a stale client or a hand-crafted frame.
+const ErrorMustPickTrump = "error:must_pick_trump"
 
 // ErrorMatchStartFailed is broadcast to the four would-be participants of an
 // auto-start that reached a "ready to start" state in the room transaction

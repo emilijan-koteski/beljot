@@ -25,6 +25,7 @@ import { toast } from "sonner";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { useRoomStore } from "@/shared/stores/roomStore";
+import { makeRoomInvite } from "@/test-utils";
 
 import { RoomInviteModal } from "./RoomInviteModal";
 
@@ -41,7 +42,7 @@ function renderModal() {
   );
 }
 
-const baseInvite = {
+const baseInvite = makeRoomInvite({
   inviteId: 1,
   roomId: 7,
   roomName: "Skopje Ekipa",
@@ -52,7 +53,7 @@ const baseInvite = {
   isHostInvite: false,
   // Far enough out that the auto-dismiss timer never fires during a test.
   expiresAt: new Date(Date.now() + 60_000).toISOString(),
-};
+});
 
 describe("RoomInviteModal", () => {
   beforeEach(() => {
@@ -153,7 +154,6 @@ describe("RoomInviteModal", () => {
   // routed through the ONE shared join-failure mapping (D4).
   it.each([
     ["ROOM_FULL", "lobby.errors.roomFull"],
-    ["HONOR_TOO_LOW", "room.errors.honorTooLowGeneric"],
     ["NEW_PLAYER_NOT_ALLOWED", "room.errors.newPlayerNotAllowed"],
     ["ROOM_NOT_FOUND", "lobby.errors.roomNotFound"],
   ])(
@@ -173,6 +173,29 @@ describe("RoomInviteModal", () => {
       expect(navigateSpy).not.toHaveBeenCalled();
     },
   );
+
+  // HONOR_TOO_LOW takes the SPECIFIC arm of the same mapping, not the generic
+  // fallback: an invite payload always carries the room's `minHonor` (Story
+  // 11.5 added the field for exactly this), so `joinFailure` has the floor in
+  // hand and can name it. The generic arm is for callers with no room object,
+  // which is why JoinByCodeTile asserts that one instead.
+  it("names the room's honor floor when an invited join is rejected for honor", async () => {
+    const user = userEvent.setup();
+    joinRoomSpy.mockRejectedValue(new FetchError(409, "HONOR_TOO_LOW", "join rejected"));
+    useRoomStore.getState().setRoomInvite(makeRoomInvite({ ...baseInvite, minHonor: 85 }));
+    renderModal();
+
+    await user.click(screen.getByTestId("room-invite-accept"));
+
+    const i18n = (await import("i18next")).default;
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        i18n.t("room.errors.honorTooLow", { minHonor: 85, honor: 80 }),
+      ),
+    );
+    expect(useRoomStore.getState().roomInvite).toBeNull();
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
 
   it("declining clears the invite without joining", async () => {
     const user = userEvent.setup();

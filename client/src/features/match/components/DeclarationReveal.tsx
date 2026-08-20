@@ -79,12 +79,19 @@ export function DeclarationReveal({
   // every entry in the payload counts toward the winner's tally.
   const totalAwarded = payload.declarations.reduce((acc, d) => acc + d.value, 0);
 
-  // Tiebreaker line: only render when there's more than one meld in play. The
-  // highest-value meld is what tipped the team-result decision per Beljot
-  // rules ("highest meld at the table wins all declarations"); naming it +
-  // its declarer makes the win-reason explicit instead of leaving the
-  // viewer to infer it from the rows.
-  const showTiebreaker = payload.declarations.length > 1;
+  // Tiebreaker line: only render when a comparison actually happened, i.e. the
+  // opposing team also declared. The highest-value meld is what tipped the
+  // team-result decision per Beljot rules ("the team holding the single
+  // strongest meld wins, and that team's other melds stack on top"); naming it
+  // and its declarer makes the win-reason explicit.
+  //
+  // Gated on the server's `contested` flag, NOT on declarations.length > 1.
+  // Only the winning team's melds reach the client, so meld count cannot tell a
+  // real clash from an uncontested win — and under the Croatian overlap rule a
+  // single seat holding two melds is the ordinary case, not evidence of a
+  // contest. The old count-based gate announced a "highest declaration at the
+  // table" on hands where nothing was ever compared.
+  const showTiebreaker = payload.contested && payload.declarations.length > 0;
   const highestMeld = showTiebreaker
     ? payload.declarations.reduce((best, d) => (d.value > best.value ? d : best))
     : null;

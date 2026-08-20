@@ -118,7 +118,7 @@ func TestListIdentities_EmptyListSerializesAsArray(t *testing.T) {
 
 func TestListIdentities_ForeignIDForbidden(t *testing.T) {
 	e, ur, _, _ := setupIdentityHandler()
-	seedUser(ur, "one@example.com", "pw")   // id 1
+	seedUser(ur, "one@example.com", "pw")          // id 1
 	other := seedUser(ur, "two@example.com", "pw") // id 2
 
 	rec := doAuthedReq(e, http.MethodGet, "/api/v1/users/1/identities", other.ID, "")
@@ -171,7 +171,7 @@ func TestLinkIdentity_IdempotentWhenAlreadyLinkedToSelf(t *testing.T) {
 
 func TestLinkIdentity_ConflictWhenSubjectLinkedToAnotherUser(t *testing.T) {
 	e, ur, ir, fp := setupIdentityHandler()
-	seedUser(ur, "owner@example.com", "pw")        // id 1 already owns the Google account
+	seedUser(ur, "owner@example.com", "pw")            // id 1 already owns the Google account
 	caller := seedUser(ur, "caller@example.com", "pw") // id 2
 	seedIdentity(ir, 1, "fakeprov", "sub-shared", "g@example.com")
 	fp.add("cred-shared", identity.ExternalIdentity{Subject: "sub-shared", Email: "g@example.com", EmailVerified: true})

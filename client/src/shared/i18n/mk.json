@@ -168,12 +168,6 @@
         "newest": "Најнови прво",
         "oldest": "Најстари прво"
       },
-      "variant": {
-        "bitola": "Битола"
-      },
-      "mode": {
-        "1001": "1001 поен"
-      },
       "hand": {
         "number": "Делење {{number}}",
         "cardPoints": "Поени од карти",
@@ -616,7 +610,6 @@
       "roomName": "Име на собата",
       "roomNamePlaceholder": "Неделен меч…",
       "variant": "Варијанта",
-      "variantBitola": "Битола",
       "matchMode": "Тип на меч",
       "matchMode1001": "1001 поен",
       "timerStyle": "Тип на тајмер",
@@ -641,7 +634,6 @@
       "eyebrow": "Нова соба",
       "headline": "Креирај соба",
       "roomNameHint": "{{min}}–{{max}} знаци",
-      "variantCroatia": "Хрватска",
       "matchMode501": "501 поен",
       "timerDurationSuffix": "секунди / потег",
       "submit": "Креирај соба",
@@ -738,6 +730,7 @@
       "variantCroatia": "Хрватска",
       "matchMode1001": "1001 поен",
       "matchMode501": "501 поен",
+      "matchModeGeneric": "{{points}} поени",
       "buyInFree": "Без влог",
       "private": "Приватна",
       "privateLockAriaLabel": "Приватна соба, за влез е потребна лозинка",
@@ -846,6 +839,7 @@
       "title": "Имаш најави!",
       "declare": "Најави",
       "skip": "Прескокни",
+      "waiting": "Се чека <name>{{name}}</name> да најави или да прескокне",
       "pts": "поени",
       "total": "Вкупно",
       "tierce": "Терца",
@@ -888,7 +882,8 @@
       "illegalPlay": "Таа карта не може да се одигра",
       "pauseExhausted": "Веќе ја искористи паузата",
       "noActivePause": "Немаш активна пауза",
-      "notRoomOwner": "Само домаќинот може да го направи ова"
+      "notRoomOwner": "Само домаќинот може да го направи ова",
+      "mustPickTrump": "Мораш да избереш боја за адут, не смееш да продолжиш понатаму"
     },
     "timer": {
       "autoPlayed": "Автоматски одиграно: {{card}}",
@@ -904,10 +899,6 @@
       "thisHand": "ова делење",
       "handLabel": "Делење {{hand}}",
       "handVariant": "Делење {{hand}} · {{variant}}"
-    },
-    "variants": {
-      "bitola": "Битола",
-      "croatia": "Хрватска"
     },
     "scoreReveal": {
       "title": "Резултат на делењето",

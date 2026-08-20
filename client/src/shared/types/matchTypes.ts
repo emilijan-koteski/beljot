@@ -9,21 +9,42 @@ export type CardId = `${Rank}${Suit}`;
 
 export type Variant = "bitola" | "croatia";
 
+// The race target for a match. Stringly-typed end to end until now (D139): the
+// server sends "1001"/"501" as a string and every consumer re-tested it with a
+// bare === against a string literal, so a typo produced a silent fallback
+// rather than a compile error.
+export type MatchMode = "1001" | "501";
+
+// SERVER_PHASES is every phase the server can send, in state-machine order.
+// It is a runtime VALUE, not just a type, for two reasons: the Zod schema needs
+// it to validate `phase` as an enum rather than a bare string, and the contract
+// test can compare it byte-for-byte against the Go-owned golden
+// (server/internal/ws/testdata/events/phases.json). Before this existed the
+// phase string was matched by nothing but hand-copying, so a server constant
+// and its client union member could drift with no test failing anywhere.
+//
+// Keep in the SAME ORDER as game.AllPhases() — wsEvents.contract.test.ts
+// compares the two as ordered lists.
+//
 // "declaring" is the dedicated declaration phase between bidding and trick 1.
 // The server decides when it happens — the client only reacts to the phase it
 // is told it is in, and derives nothing about it from the variant.
-export type Phase =
-  | ""
-  | "dealing"
-  | "bidding"
-  | "declaring"
-  | "playing"
-  | "trick_resolving"
-  | "hand_scoring"
-  | "hand_complete"
-  | "match_end"
-  | "paused"
-  | "disconnected";
+export const SERVER_PHASES = [
+  "dealing",
+  "bidding",
+  "declaring",
+  "playing",
+  "trick_resolving",
+  "hand_scoring",
+  "hand_complete",
+  "match_end",
+  "paused",
+  "disconnected",
+] as const;
+
+// "" is client-local ("no game loaded") and is never sent by the server, which
+// is why it lives here rather than in SERVER_PHASES.
+export type Phase = "" | (typeof SERVER_PHASES)[number];
 
 export type ActionType =
   | "play_card"
@@ -117,7 +138,7 @@ export interface MatchState {
   id: number;
   roomId: number;
   variant: Variant;
-  matchMode: string;
+  matchMode: MatchMode;
   phase: Phase;
   ownerSeat: number;
   handNumber: number;

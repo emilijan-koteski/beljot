@@ -14,7 +14,6 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
-import { modeLabel, variantLabel } from "@/features/lobby/lib/roomLabels";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { RelativeTime } from "@/shared/components/RelativeTime";
 import { botDisplayName } from "@/shared/lib/botName";
@@ -26,6 +25,7 @@ import {
   honorScoreOrPrior,
   honorTierForScore,
 } from "@/shared/lib/honor";
+import { modeLabel, variantLabel } from "@/shared/lib/roomLabels";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";

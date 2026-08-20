@@ -1,4 +1,7 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client"]
+  },
   "exclude": ["**/*.test.ts", "**/*.test.tsx", "src/test-setup.ts"]
 }

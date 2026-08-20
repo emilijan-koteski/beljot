@@ -65,22 +65,13 @@ import {
   honorTierForScore,
 } from "@/shared/lib/honor";
 import { joinFailureMessage as sharedJoinFailureMessage } from "@/shared/lib/joinFailure";
+import { modeLabel, variantLabel } from "@/shared/lib/roomLabels";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
-
-const variantKeys: Record<string, string> = {
-  bitola: "lobby.card.variantBitola",
-  croatia: "lobby.card.variantCroatia",
-};
-
-const matchModeKeys: Record<string, string> = {
-  "1001": "lobby.card.matchMode1001",
-  "501": "lobby.card.matchMode501",
-};
 
 // Cardinal positions for the diamond seat layout. In the waiting room seat
 // indices map 1:1 to fixed cardinal positions (no viewer-relative rotation).
@@ -810,8 +801,8 @@ export function RoomPage() {
 
   const players = storePlayers.length > 0 ? storePlayers : roomQuery.data!.players;
 
-  const variantLabel = t(variantKeys[room.variant] ?? room.variant);
-  const matchModeLabel = t(matchModeKeys[room.matchMode] ?? room.matchMode);
+  const variantText = variantLabel(t, room.variant);
+  const matchModeText = modeLabel(t, room.matchMode);
   const timerLabel =
     room.timerStyle === "relaxed"
       ? t("lobby.card.relaxed")
@@ -1192,10 +1183,10 @@ export function RoomPage() {
               data-testid="room-info-badges"
             >
               <Badge tone="brass" icon={<Trophy className="size-3" />}>
-                <span data-testid="badge-variant">{variantLabel}</span>
+                <span data-testid="badge-variant">{variantText}</span>
               </Badge>
               <Badge tone="brass">
-                <span data-testid="badge-match-mode">{matchModeLabel}</span>
+                <span data-testid="badge-match-mode">{matchModeText}</span>
               </Badge>
               <Badge tone={isRelaxed ? "accent" : "neutral"} icon={<Clock className="size-3" />}>
                 <span data-testid="badge-timer">{timerLabel}</span>

@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MatchmakingDiagram } from "@/features/lobby/components/MatchmakingDiagram";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
+import { makeRoom } from "@/test-utils";
 
 function player(userId: number, username: string, seat: number): RoomPlayer {
   return {
@@ -23,7 +24,7 @@ function player(userId: number, username: string, seat: number): RoomPlayer {
 // Defaults to the real Quick Play config: a per-move 30s timer with a coin
 // stake. Overrides let individual tests exercise the relaxed / free variants.
 function room(overrides: Partial<Room> = {}): Room {
-  return {
+  return makeRoom({
     id: 1,
     name: "Quick Play ABC123",
     code: "ABC123",
@@ -41,7 +42,7 @@ function room(overrides: Partial<Room> = {}): Room {
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     ...overrides,
-  };
+  });
 }
 
 describe("MatchmakingDiagram", () => {

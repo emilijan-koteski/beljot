@@ -1,4 +1,5 @@
 import { axiosClient } from "@/shared/api/axiosClient";
+import type { MatchMode, Variant } from "@/shared/types/matchTypes";
 
 export type MatchOutcome = "win" | "loss" | "abandoned";
 
@@ -35,8 +36,8 @@ export interface MatchHandView {
 
 export interface MatchListItem {
   id: number;
-  variant: string;
-  matchMode: string;
+  variant: Variant;
+  matchMode: MatchMode;
   startedAt: string;
   completedAt: string;
   status: string;

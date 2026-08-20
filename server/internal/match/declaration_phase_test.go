@@ -539,3 +539,166 @@ func TestDeclarationPhase_BotAnswersPrompt(t *testing.T) {
 	assert.NotEmpty(t, after.Players[1].Declarations, "the bot declares whenever it can")
 	assert.Empty(t, after.CurrentTrick, "no card may be played in this phase")
 }
+
+// declarationsResolvedMelds reads the full `declarations` array off an
+// event:declarations_resolved payload, flattened exactly as it travels the
+// wire: one entry per meld, each carrying its own seat.
+type wireMeld struct {
+	PlayerSeat int      `json:"playerSeat"`
+	Type       string   `json:"type"`
+	Value      int      `json:"value"`
+	Cards      []string `json:"cards"`
+}
+
+func declarationsResolvedBody(t *testing.T, payload json.RawMessage) (melds []wireMeld, contested bool) {
+	t.Helper()
+	var body struct {
+		Declarations []wireMeld `json:"declarations"`
+		Contested    bool       `json:"contested"`
+	}
+	require.NoError(t, json.Unmarshal(payload, &body))
+	return body.Declarations, body.Contested
+}
+
+// TestDeclarationPhase_RevealCarriesEveryMeldPerSeat closes the gap the
+// broadcast-loop deferral named: the producing loop flattens several melds per
+// seat into the payload, and nothing asserted the resulting array. Collapsing
+// that loop to the first meld per seat kept every other test in this package
+// green — while a Croatian hand scored 300 and the reveal rendered one 100 row.
+//
+// The expectations are derived from the resolved engine state rather than
+// hand-copied, so a meld-value change moves both sides together instead of
+// turning this into a stale constant.
+func TestDeclarationPhase_RevealCarriesEveryMeldPerSeat(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(118)
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
+
+	state := gs
+	for _, seat := range []int{1, 2, 3} {
+		next, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
+		require.NoError(t, err)
+		state = next
+	}
+	require.Equal(t, 0, state.ActivePlayerSeat)
+	mgr.SetGameStateForTest(roomID, state)
+
+	before := len(hub.snapshot())
+	client := &ws.Client{UserID: state.Players[0].UserID}
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:declare", Payload: []byte(`{}`)})
+
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Phase == game.PhasePlaying
+	}, 2*time.Second, 5*time.Millisecond, "the fourth answer must open trick 1")
+
+	after := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, after)
+
+	events := wireEvents(t, hub.snapshot()[before:])
+	revealIdx := indexOfKind(events, ws.EventDeclarationsResolved)
+	require.GreaterOrEqual(t, revealIdx, 0)
+	melds, contested := declarationsResolvedBody(t, events[revealIdx].payload)
+
+	// What the engine actually kept, flattened the same way.
+	want := make([]wireMeld, 0)
+	perSeat := map[int]int{}
+	for seat := 0; seat < 4; seat++ {
+		for _, d := range after.Players[seat].Declarations {
+			ids := make([]string, 0, len(d.Cards))
+			for _, c := range d.Cards {
+				ids = append(ids, string(c.Rank)+string(c.Suit))
+			}
+			want = append(want, wireMeld{PlayerSeat: d.PlayerSeat, Type: string(d.Type), Value: d.Value, Cards: ids})
+			perSeat[seat]++
+		}
+	}
+
+	// Guard the guard: if the fixture ever stops producing a multi-meld seat,
+	// this test would still pass while proving nothing about flattening.
+	maxPerSeat := 0
+	for _, n := range perSeat {
+		if n > maxPerSeat {
+			maxPerSeat = n
+		}
+	}
+	require.Greater(t, maxPerSeat, 1,
+		"fixture must give at least one seat several melds, or this test cannot detect a collapse")
+
+	assert.Equal(t, want, melds, "every meld must reach the wire, each carrying its own seat")
+	assert.Len(t, melds, len(want))
+
+	// The awarded total the reveal renders is the sum of the rows it carries.
+	sum := 0
+	for _, m := range melds {
+		sum += m.Value
+	}
+	assert.Equal(t, after.DeclarationPoints[game.TeamA]+after.DeclarationPoints[game.TeamB], sum,
+		"the rows must add up to what the engine awarded")
+
+	// Every seat declared, so both teams put melds on the table and the reveal
+	// may name the deciding one.
+	//
+	// This also pins WHERE the flag is computed. Resolution has already deleted
+	// the losing team's melds — assert that, so the point is not theoretical —
+	// which means an implementation reading the post-resolution state would see
+	// only the winner and report `false` here. It has to read the pre-resolution
+	// clone.
+	assert.True(t, contested, "both teams declared, so a comparison decided the winner")
+	losers := 0
+	for seat := 0; seat < 4; seat++ {
+		if game.TeamForSeat(seat) != *winningTeamOf(t, after) {
+			losers += len(after.Players[seat].Declarations)
+		}
+	}
+	require.Zero(t, losers,
+		"resolution must have cleared the losing team's melds — otherwise this test does not "+
+			"prove `contested` is derived from the pre-resolution state")
+}
+
+// TestDeclarationPhase_RevealReportsAnUncontestedWin is the other half: when
+// only ONE team declares, nothing was compared, and the reveal must say so.
+// Without the flag the client cannot tell the two apart — it only ever receives
+// the winner's melds — and under the Croatian overlap rule a single seat
+// holding several melds is the ordinary shape rather than evidence of a clash.
+func TestDeclarationPhase_RevealReportsAnUncontestedWin(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(119)
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
+
+	// Seats 1 and 3 are team B and hold the melds; seats 2 and 0 are team A and
+	// SKIP, so exactly one team ever declares.
+	state := gs
+	for _, seat := range []int{1, 2, 3} {
+		action := game.ActionDeclare
+		if game.TeamForSeat(seat) == game.TeamA {
+			action = game.ActionSkipDeclare
+		}
+		next, err := game.ApplyAction(state, game.Action{Type: action, PlayerSeat: seat})
+		require.NoError(t, err)
+		state = next
+	}
+	require.Equal(t, 0, state.ActivePlayerSeat)
+	require.Equal(t, game.TeamA, game.TeamForSeat(0), "seat 0 must be the second skipping seat")
+	mgr.SetGameStateForTest(roomID, state)
+
+	before := len(hub.snapshot())
+	client := &ws.Client{UserID: state.Players[0].UserID}
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:skip_declare", Payload: []byte(`{}`)})
+
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Phase == game.PhasePlaying
+	}, 2*time.Second, 5*time.Millisecond, "the fourth answer must open trick 1")
+
+	events := wireEvents(t, hub.snapshot()[before:])
+	revealIdx := indexOfKind(events, ws.EventDeclarationsResolved)
+	require.GreaterOrEqual(t, revealIdx, 0)
+	melds, contested := declarationsResolvedBody(t, events[revealIdx].payload)
+
+	assert.False(t, contested, "only one team declared, so nothing was compared")
+	require.NotEmpty(t, melds, "the declaring team's melds must still be revealed")
+	// The uncontested win is still a multi-meld payload — which is exactly why
+	// meld count could never have stood in for "was this contested".
+	assert.Greater(t, len(melds), 1)
+}

@@ -1,7 +1,6 @@
 import { Clock, Coins, Trophy, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { modeLabel, variantLabel } from "@/features/lobby/lib/roomLabels";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -9,6 +8,7 @@ import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
+import { modeLabel, variantLabel } from "@/shared/lib/roomLabels";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
 type Props = {

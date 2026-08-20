@@ -10,7 +10,13 @@ import { FetchError } from "@/shared/api/axiosClient";
 import { queryKeys } from "@/shared/api/queryKeys";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
-import { createTestQueryClient, makeUser, QueryWrapper } from "@/test-utils";
+import {
+  createTestQueryClient,
+  makeRoom,
+  makeRoomDetail,
+  makeUser,
+  QueryWrapper,
+} from "@/test-utils";
 
 import { MatchmakingPage } from "./MatchmakingPage";
 
@@ -47,7 +53,7 @@ import { getRoom, leaveRoom } from "@/shared/api/rooms";
 const mockGetRoom = vi.mocked(getRoom);
 const mockLeaveRoom = vi.mocked(leaveRoom);
 
-const qpRoom = {
+const qpRoom = makeRoom({
   id: 1,
   name: "Quick Play ABC123",
   code: "ABC123",
@@ -64,7 +70,7 @@ const qpRoom = {
   isPrivate: false,
   createdAt: "",
   updatedAt: "",
-};
+});
 
 const viewer = makeUser({
   id: 10,
@@ -97,21 +103,23 @@ afterEach(() => {
 
 describe("MatchmakingPage", () => {
   it("renders the matchmaking diagram for a quick-play room the viewer is in", async () => {
-    mockGetRoom.mockResolvedValue({
-      room: qpRoom,
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: qpRoom,
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderPage();
 
@@ -123,21 +131,23 @@ describe("MatchmakingPage", () => {
   });
 
   it("navigates to the game when the match starts", async () => {
-    mockGetRoom.mockResolvedValue({
-      room: qpRoom,
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: qpRoom,
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderPage();
     await waitFor(() => expect(screen.getByTestId("matchmaking-diagram")).toBeInTheDocument());
@@ -153,21 +163,23 @@ describe("MatchmakingPage", () => {
   });
 
   it("redirects a non-quick-play room to the in-room lobby", async () => {
-    mockGetRoom.mockResolvedValue({
-      room: { ...qpRoom, isQuickPlay: false },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...qpRoom, isQuickPlay: false },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderPage();
 
@@ -178,21 +190,23 @@ describe("MatchmakingPage", () => {
 
   it("cancels the queue: leaves the room and returns to the lobby", async () => {
     const user = userEvent.setup();
-    mockGetRoom.mockResolvedValue({
-      room: qpRoom,
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: qpRoom,
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderPage();
     await waitFor(() => expect(screen.getByTestId("matchmaking-cancel")).toBeInTheDocument());
@@ -208,21 +222,23 @@ describe("MatchmakingPage", () => {
     mockLeaveRoom.mockRejectedValue(
       new FetchError(409, "MATCH_ALREADY_STARTED", "the match has already started"),
     );
-    mockGetRoom.mockResolvedValue({
-      room: qpRoom,
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: qpRoom,
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderPage();
     await waitFor(() => expect(screen.getByTestId("matchmaking-cancel")).toBeInTheDocument());
@@ -259,31 +275,33 @@ describe("MatchmakingPage", () => {
       ],
     });
     // The fresh fetch (after the just-completed quick-join) includes the viewer.
-    mockGetRoom.mockResolvedValue({
-      room: qpRoom,
-      players: [
-        {
-          id: 9,
-          roomId: 1,
-          userId: 9,
-          username: "cece",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 1,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: qpRoom,
+        players: [
+          {
+            id: 9,
+            roomId: 1,
+            userId: 9,
+            username: "cece",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 1,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     render(
       <QueryClientProvider client={client}>

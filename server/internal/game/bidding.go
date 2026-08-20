@@ -70,7 +70,7 @@ func handlePassTrump(state *GameState) (*GameState, error) {
 	// This pass would be round 2's fourth, i.e. the dealer's, and their config
 	// gives them no right to pass — pick_trump is their only legal action.
 	if MustPickTrump(state, state.ActivePlayerSeat) {
-		return nil, apperr.ErrInvalidBid
+		return nil, apperr.ErrMustPickTrump
 	}
 
 	newState := cloneGameState(state)

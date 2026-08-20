@@ -168,12 +168,6 @@
         "newest": "Newest first",
         "oldest": "Oldest first"
       },
-      "variant": {
-        "bitola": "Bitola"
-      },
-      "mode": {
-        "1001": "1001 points"
-      },
       "hand": {
         "number": "Hand {{number}}",
         "cardPoints": "Card Points",
@@ -616,7 +610,6 @@
       "roomName": "Room name",
       "roomNamePlaceholder": "Sunday Service…",
       "variant": "Variant",
-      "variantBitola": "Bitola",
       "matchMode": "Match mode",
       "matchMode1001": "1001 points",
       "timerStyle": "Timer style",
@@ -641,7 +634,6 @@
       "eyebrow": "New room",
       "headline": "Create a room",
       "roomNameHint": "{{min}}–{{max}} characters",
-      "variantCroatia": "Croatian",
       "matchMode501": "501 points",
       "timerDurationSuffix": "seconds / move",
       "submit": "Create room",
@@ -738,6 +730,7 @@
       "variantCroatia": "Croatian",
       "matchMode1001": "1001 pts",
       "matchMode501": "501 pts",
+      "matchModeGeneric": "{{points}} pts",
       "buyInFree": "No stake",
       "private": "Private",
       "privateLockAriaLabel": "Private room — password required to join",
@@ -826,7 +819,7 @@
       "subtitleRound1": "Adopt this suit, or pass to the next player.",
       "subtitleRound2": "Any suit except the candidate.",
       "titleFreePick": "Take trump — any suit",
-      "subtitleFreePick": "All four suits are yours to call.",
+      "subtitleFreePick": "All four suits are yours to take.",
       "bodyRound1": "The candidate card was turned face-up. Take it as trump for your team, or pass to the next player.",
       "roundLabel": "Round {{round}} / 2",
       "pick": "Take",
@@ -846,6 +839,7 @@
       "title": "You have declarations!",
       "declare": "Declare",
       "skip": "Skip",
+      "waiting": "Waiting for <name>{{name}}</name> to declare or skip",
       "pts": "pts",
       "total": "Total",
       "tierce": "Tierce",
@@ -888,7 +882,8 @@
       "illegalPlay": "That card cannot be played",
       "pauseExhausted": "You have already used your pause",
       "noActivePause": "You don't have an active pause",
-      "notRoomOwner": "Only the host can do this"
+      "notRoomOwner": "Only the host can do this",
+      "mustPickTrump": "You must name a trump suit — passing isn't allowed here"
     },
     "timer": {
       "autoPlayed": "Auto-played: {{card}}",
@@ -904,10 +899,6 @@
       "thisHand": "this hand",
       "handLabel": "Hand {{hand}}",
       "handVariant": "Hand {{hand}} · {{variant}}"
-    },
-    "variants": {
-      "bitola": "Bitola",
-      "croatia": "Croatian"
     },
     "scoreReveal": {
       "title": "Hand Score",

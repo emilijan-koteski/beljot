@@ -1,5 +1,7 @@
 // API response types — keep in sync with server models
 
+import type { MatchMode, Variant } from "./matchTypes";
+
 export interface ApiResponse<T> {
   data: T;
 }
@@ -123,8 +125,8 @@ export interface Room {
    * this field undefined on the inner room.
    */
   players?: RoomPlayer[];
-  variant: string;
-  matchMode: string;
+  variant: Variant;
+  matchMode: MatchMode;
   timerStyle: string;
   timerDurationSeconds: number | null;
   /** Per-human coin stake paid at match start (Story 9.2). 0 = free room. */
@@ -157,8 +159,8 @@ export interface Room {
 
 export interface CreateRoomRequest {
   name: string;
-  variant: string;
-  matchMode: string;
+  variant: Variant;
+  matchMode: MatchMode;
   timerStyle: string;
   timerDurationSeconds: number | null;
   /** Per-human coin stake (Story 9.2). min 0, no max; omitted → server default 500. */

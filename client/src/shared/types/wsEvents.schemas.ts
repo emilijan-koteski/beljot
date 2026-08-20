@@ -27,6 +27,7 @@
 
 import { z } from "zod";
 
+import { SERVER_PHASES } from "./matchTypes";
 import type {
   AutoActionPayload,
   BelotAnnouncedPayload,
@@ -101,7 +102,12 @@ export const EventMatchStateSchema = z.strictObject({
   roomId: z.number(),
   variant: z.string(),
   matchMode: z.string(),
-  phase: z.string(),
+  // Enum, not z.string(): the phase string is the ONLY field carrying the
+  // dedicated-declaration state, so it is load-bearing. SERVER_PHASES is pinned
+  // against the Go-owned golden by wsEvents.contract.test.ts, which makes this
+  // the far end of a chain that fails on drift instead of silently accepting an
+  // unknown phase and rendering a blank table.
+  phase: z.enum(SERVER_PHASES),
   ownerSeat: z.number(),
   handNumber: z.number(),
   dealerSeat: z.number(),
@@ -247,6 +253,7 @@ export const DeclarationsResolvedPayloadSchema = z.strictObject({
   // See note on TrickResolvedPayloadSchema — schema kept as `number | null`
   // to match the hand-maintained interface; values from Go are 0|1|null.
   winnerTeam: z.number().nullable(),
+  contested: z.boolean(),
   declarations: z.array(
     z.strictObject({
       playerSeat: z.number(),

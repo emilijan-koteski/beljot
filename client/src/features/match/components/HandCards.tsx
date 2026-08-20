@@ -18,6 +18,17 @@ interface HandCardsProps {
    */
   compact?: boolean;
   /**
+   * Face-down cards the viewer HOLDS but cannot yet see — the Croatian deal's
+   * two-card pair during round-1 bidding. Rendered as backs on the right of the
+   * fan so the viewer's own seat shows the eight cards they physically hold,
+   * matching the count every opponent's stack already shows.
+   *
+   * Zero on every Bitola hand and after the round-2 reveal, at which point the
+   * cards arrive face-up in `hand` instead. Never a source of card identity:
+   * only a count reaches the client before the reveal.
+   */
+  faceDownCount?: number;
+  /**
    * Card id (e.g. `"KS"`) currently being thrown into the trick. Hides the
    * matching card via `visibility: hidden` so the `CardFlight` overlay is
    * the only painter of the in-flight card. The card stays laid out (so the
@@ -84,6 +95,7 @@ export function HandCards({
   onPlayCard,
   flyingId = null,
   compact = false,
+  faceDownCount = 0,
 }: HandCardsProps) {
   // Track viewport width so the phone fan can compress to whatever's available
   // (and re-fit on rotation). Desktop ignores this — spread stays budget-based.
@@ -96,7 +108,7 @@ export function HandCards({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  if (hand.length === 0) {
+  if (hand.length === 0 && faceDownCount === 0) {
     // Same height as the populated fan below, so the last card leaving does not
     // collapse the container and shift everything anchored above it.
     return (
@@ -109,7 +121,11 @@ export function HandCards({
   }
 
   const sortedHand = sortHand(hand);
-  const total = sortedHand.length;
+  // The backs occupy real slots in the fan: spread, container width and the
+  // per-card rotation all have to count them, or the eight-card fan would be
+  // laid out as six and the backs would pile up past the right edge.
+  const backs = Math.max(0, faceDownCount);
+  const total = sortedHand.length + backs;
   const budgetSpread = Math.min(MAX_SPREAD_PX, total > 1 ? SPREAD_BUDGET_PX / total : 0);
   // On phones, cap the spread so the whole fan fits within the viewport; cards
   // keep their full `lg` size and just overlap more. The margin also absorbs the
@@ -167,6 +183,31 @@ export function HandCards({
               size="lg"
               onClick={state === "playable" ? () => onPlayCard(id) : undefined}
             />
+          </div>
+        );
+      })}
+
+      {/* The viewer's own face-down pair. Not playable and not clickable —
+          they are not in `hand`, so they carry no id and cannot be legal
+          moves; bidding is the only phase in which they exist. */}
+      {Array.from({ length: backs }, (_, i) => {
+        const index = sortedHand.length + i;
+        const offset = index - (total - 1) / 2;
+        return (
+          <div
+            key={`face-down-${i}`}
+            className="absolute"
+            data-testid="hand-card-face-down"
+            style={{
+              left: `calc(50% + ${offset * spread}px - ${CARD_WIDTH / 2}px)`,
+              bottom: Math.abs(offset) * PER_OFFSET_DROP,
+              transform: `rotate(${offset * PER_OFFSET_DEG}deg)`,
+              transformOrigin: "50% 120%",
+              zIndex: index,
+              pointerEvents: "none",
+            }}
+          >
+            <PlayingCard card={null} state="face-down" size="lg" />
           </div>
         );
       })}

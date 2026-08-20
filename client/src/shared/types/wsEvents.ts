@@ -178,6 +178,12 @@ export interface FaceDownRevealedPayload {
 
 export interface DeclarationsResolvedPayload {
   winnerTeam: number | null;
+  // True when BOTH teams put a meld on the table, i.e. a comparison actually
+  // decided the winner. Only the winning team's melds are on the wire, so the
+  // client cannot derive this: "we out-declared them" and "we were the only
+  // team to declare" look identical, and under a declaration-overlap config one
+  // seat holding two melds is ordinary rather than evidence of a contest.
+  contested: boolean;
   declarations: Array<{
     playerSeat: number;
     type: string;
@@ -324,6 +330,12 @@ export const ERROR_NO_ACTIVE_PAUSE = "error:no_active_pause" as const;
 export const ERROR_NOT_ROOM_OWNER = "error:not_room_owner" as const;
 export const ERROR_PLAYER_DISCONNECTED = "error:player_disconnected" as const;
 export const ERROR_SURRENDER_EXHAUSTED = "error:surrender_exhausted" as const;
+// Sent when a seat passes but the rules give it no pass to make — the dealer
+// bidding last under a "the hand must find a taker" config. Distinct from
+// error:invalid_action so the toast can say "you must name a suit" rather
+// than "invalid action"; the UI hides Pass in this state, so this only
+// reaches a stale client or a hand-crafted frame.
+export const ERROR_MUST_PICK_TRUMP = "error:must_pick_trump" as const;
 
 // Story 8.5-1 AC2: broadcast to the four would-be participants of an auto-start
 // whose matchStarter.StartMatch call returned an error. The room is reverted to

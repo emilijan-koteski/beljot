@@ -190,16 +190,21 @@ var (
 	ErrInviteAlreadyPending = NewAppError("INVITE_ALREADY_PENDING", "this friend already has a pending invite to this room", http.StatusConflict)
 
 	// Game domain errors
-	ErrWrongPhase              = NewAppError("WRONG_PHASE", "action not valid in current game phase", http.StatusBadRequest)
-	ErrNotYourTurn             = NewAppError("NOT_YOUR_TURN", "it is not your turn", http.StatusForbidden)
-	ErrInvalidCard             = NewAppError("INVALID_CARD", "card is not in your hand", http.StatusBadRequest)
-	ErrIllegalPlay             = NewAppError("ILLEGAL_PLAY", "card play violates game rules", http.StatusBadRequest)
-	ErrGamePaused              = NewAppError("GAME_PAUSED", "game is currently paused", http.StatusConflict)
-	ErrPauseExhausted          = NewAppError("PAUSE_EXHAUSTED", "player has already used their pause", http.StatusConflict)
-	ErrNotPaused               = NewAppError("NOT_PAUSED", "game is not paused", http.StatusConflict)
-	ErrNoActivePause           = NewAppError("NO_ACTIVE_PAUSE", "player does not have an active pause to clear", http.StatusConflict)
-	ErrPlayerDisconnected      = NewAppError("PLAYER_DISCONNECTED", "player is disconnected", http.StatusConflict)
-	ErrInvalidBid              = NewAppError("INVALID_BID", "invalid bid action", http.StatusBadRequest)
+	ErrWrongPhase         = NewAppError("WRONG_PHASE", "action not valid in current game phase", http.StatusBadRequest)
+	ErrNotYourTurn        = NewAppError("NOT_YOUR_TURN", "it is not your turn", http.StatusForbidden)
+	ErrInvalidCard        = NewAppError("INVALID_CARD", "card is not in your hand", http.StatusBadRequest)
+	ErrIllegalPlay        = NewAppError("ILLEGAL_PLAY", "card play violates game rules", http.StatusBadRequest)
+	ErrGamePaused         = NewAppError("GAME_PAUSED", "game is currently paused", http.StatusConflict)
+	ErrPauseExhausted     = NewAppError("PAUSE_EXHAUSTED", "player has already used their pause", http.StatusConflict)
+	ErrNotPaused          = NewAppError("NOT_PAUSED", "game is not paused", http.StatusConflict)
+	ErrNoActivePause      = NewAppError("NO_ACTIVE_PAUSE", "player does not have an active pause to clear", http.StatusConflict)
+	ErrPlayerDisconnected = NewAppError("PLAYER_DISCONNECTED", "player is disconnected", http.StatusConflict)
+	ErrInvalidBid         = NewAppError("INVALID_BID", "invalid bid action", http.StatusBadRequest)
+	// Distinct from ErrInvalidBid so the client can tell "you must name a suit"
+	// (the dealer bidding last under AllPassDealerMustPick, whose only legal
+	// action is pick_trump) from "that suit is not allowed". Both were
+	// INVALID_BID before, which left the two indistinguishable on the wire.
+	ErrMustPickTrump           = NewAppError("MUST_PICK_TRUMP", "you must name a trump suit", http.StatusBadRequest)
 	ErrDeclarationNotAvailable = NewAppError("DECLARATION_NOT_AVAILABLE", "no declarable combinations in hand", http.StatusBadRequest)
 	ErrBelotNotAvailable       = NewAppError("BELOT_NOT_AVAILABLE", "belot announcement not available", http.StatusBadRequest)
 	ErrActionRequired          = NewAppError("ACTION_REQUIRED", "pending action must be resolved first", http.StatusBadRequest)

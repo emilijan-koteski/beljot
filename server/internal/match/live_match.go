@@ -1123,30 +1123,57 @@ func (m *Manager) broadcastDeclarationsResolvedIfTransition(oldState, newState *
 		return
 	}
 
-	decls := make([]map[string]interface{}, 0)
+	decls := make([]ws.DeclarationPayload, 0)
 	for _, p := range newState.Players {
 		for _, d := range p.Declarations {
-			decls = append(decls, map[string]interface{}{
-				"playerSeat": d.PlayerSeat,
-				"type":       string(d.Type),
-				"value":      d.Value,
-				"cards":      cardsToIDs(d.Cards),
+			decls = append(decls, ws.DeclarationPayload{
+				PlayerSeat: d.PlayerSeat,
+				Type:       string(d.Type),
+				Value:      d.Value,
+				Cards:      cardsToIDs(d.Cards),
 			})
 		}
 	}
 
-	var declWinnerTeam interface{} = nil
+	var declWinnerTeam *int
 	if newState.DeclarationPoints[game.TeamA] > 0 {
-		declWinnerTeam = game.TeamA
+		t := game.TeamA
+		declWinnerTeam = &t
 	} else if newState.DeclarationPoints[game.TeamB] > 0 {
-		declWinnerTeam = game.TeamB
+		t := game.TeamB
+		declWinnerTeam = &t
 	}
 
-	payload := map[string]interface{}{
-		"winnerTeam":   declWinnerTeam,
-		"declarations": decls,
+	payload := ws.DeclarationsResolvedPayload{
+		WinnerTeam:   declWinnerTeam,
+		Contested:    bothTeamsDeclared(oldState),
+		Declarations: decls,
 	}
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventDeclarationsResolved, payload))
+}
+
+// bothTeamsDeclared reports whether each team put at least one meld on the
+// table, which is the only condition under which the winner was decided by a
+// comparison rather than by being the sole declarer.
+//
+// It must read the PRE-resolution state: resolveDeclarationsForHand clears the
+// losing team's declarations, so by the time the reveal is built the loser's
+// melds are already gone and newState can no longer answer this. oldState is a
+// deep clone (cloneGameState clones every player's Declarations and their
+// Cards), so the losing team's melds are intact there.
+func bothTeamsDeclared(oldState *game.GameState) bool {
+	var teamA, teamB bool
+	for seat := 0; seat < 4; seat++ {
+		if len(oldState.Players[seat].Declarations) == 0 {
+			continue
+		}
+		if game.TeamForSeat(seat) == game.TeamA {
+			teamA = true
+		} else {
+			teamB = true
+		}
+	}
+	return teamA && teamB
 }
 
 // bufferHandResultIfScored appends a HandResult to session.handResults
@@ -1347,6 +1374,8 @@ func (m *Manager) sendGameError(userID uint, err error) {
 		eventType = ws.ErrorPlayerDisconnected
 	case errors.Is(err, apperr.ErrSurrenderExhausted):
 		eventType = ws.ErrorSurrenderExhausted
+	case errors.Is(err, apperr.ErrMustPickTrump):
+		eventType = ws.ErrorMustPickTrump
 	}
 	m.sendError(userID, eventType, err.Error())
 }

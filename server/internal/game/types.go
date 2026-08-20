@@ -229,6 +229,32 @@ const (
 	PhaseDisconnected Phase = "disconnected"
 )
 
+// AllPhases is every Phase the server can put on the wire, in state-machine
+// order. It exists so the phase strings can be PINNED across the Go/TypeScript
+// boundary: the ws contract test writes this list to a golden, and the client
+// builds its `Phase` union from that same golden, so adding a phase on one side
+// without the other fails a test instead of drifting silently.
+//
+// The client union additionally carries "" for "no game loaded", which is a
+// client-local state the server never sends and so is deliberately absent here.
+//
+// Keep in sync with the constants above — TestAllPhasesCoversEveryConstant
+// scans this file and fails if a constant is declared but not listed.
+func AllPhases() []Phase {
+	return []Phase{
+		PhaseDealing,
+		PhaseBidding,
+		PhaseDeclaring,
+		PhasePlaying,
+		PhaseTrickResolving,
+		PhaseHandScoring,
+		PhaseHandComplete,
+		PhaseMatchEnd,
+		PhasePaused,
+		PhaseDisconnected,
+	}
+}
+
 // Action type constants for player actions.
 const (
 	ActionPlayCard      = "play_card"

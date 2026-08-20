@@ -1,0 +1,20 @@
+{
+  "bitola": {
+    "dealShape": "candidate",
+    "hasTrumpCandidate": true,
+    "revealFaceDownOnRound2": false,
+    "allPassOutcome": "reshuffle_and_rotate",
+    "declarationOverlap": false,
+    "declarationTiming": "during_first_trick",
+    "tieRule": "hanging_points"
+  },
+  "croatia": {
+    "dealShape": "all_before_bidding",
+    "hasTrumpCandidate": false,
+    "revealFaceDownOnRound2": true,
+    "allPassOutcome": "dealer_must_pick",
+    "declarationOverlap": true,
+    "declarationTiming": "dedicated_phase",
+    "tieRule": "all_to_opponents"
+  }
+}

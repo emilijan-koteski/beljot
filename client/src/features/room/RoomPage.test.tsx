@@ -11,7 +11,8 @@ import { queryKeys } from "@/shared/api/queryKeys";
 import { i18n } from "@/shared/i18n/i18n";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { makeUser, QueryWrapper } from "@/test-utils";
+import type { RoomPlayer } from "@/shared/types/apiTypes";
+import { makeRoom, makeRoomDetail, makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -89,7 +90,7 @@ function renderRoomPage() {
   );
 }
 
-const defaultRoom = {
+const defaultRoom = makeRoom({
   id: 1,
   name: "Test Room",
   code: "XYZ123",
@@ -109,7 +110,7 @@ const defaultRoom = {
   allowNewPlayers: true,
   createdAt: "",
   updatedAt: "",
-};
+});
 
 const defaultUser = makeUser({
   id: 10,
@@ -148,21 +149,23 @@ describe("RoomPage", () => {
   it("renders room name and configuration", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -179,31 +182,33 @@ describe("RoomPage", () => {
   it("displays occupied seats with player usernames", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 2 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 1,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 2 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 1,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -219,21 +224,23 @@ describe("RoomPage", () => {
   it("displays empty seats with take-a-seat prompts", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -248,21 +255,23 @@ describe("RoomPage", () => {
   it("highlights current user seat with You indicator", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -282,21 +291,23 @@ describe("RoomPage", () => {
       configurable: true,
     });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -316,21 +327,23 @@ describe("RoomPage", () => {
 
     mockLeaveRoom.mockResolvedValue(undefined);
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -351,21 +364,23 @@ describe("RoomPage", () => {
     // directly instead of going through the lobby's Join, so she never became
     // a member. Without auto-join the server rejects seat selection with
     // ErrNotInRoom and sends her no room WS events.
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, ownerId: 20, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, ownerId: 20, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
     mockJoinRoom.mockResolvedValue({ ...defaultRoom, ownerId: 20, playerCount: 2 });
 
     renderRoomPage();
@@ -378,21 +393,23 @@ describe("RoomPage", () => {
   it("does not auto-join when the viewer is already a member", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -408,21 +425,23 @@ describe("RoomPage", () => {
     // Viewer alice (id 10) deep-links to a PRIVATE room she isn't seated in. A
     // blind auto-join would be rejected with WRONG_ROOM_PASSWORD, so the page
     // must prompt for the password and only join once she submits it.
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, ownerId: 20, playerCount: 1, isPrivate: true },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, ownerId: 20, playerCount: 1, isPrivate: true },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
     mockJoinRoom.mockResolvedValue({
       ...defaultRoom,
       ownerId: 20,
@@ -472,10 +491,12 @@ describe("RoomPage", () => {
       token: "tok",
     });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, ownerId: 20, playerCount: 1, minHonor: 85 },
-      players: [bobSeated],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, ownerId: 20, playerCount: 1, minHonor: 85 },
+        players: [bobSeated],
+      }),
+    );
     mockJoinRoom.mockRejectedValue(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
 
     renderRoomPage();
@@ -496,10 +517,12 @@ describe("RoomPage", () => {
       token: "tok",
     });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, ownerId: 20, playerCount: 1, allowNewPlayers: false },
-      players: [bobSeated],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, ownerId: 20, playerCount: 1, allowNewPlayers: false },
+        players: [bobSeated],
+      }),
+    );
     mockJoinRoom.mockRejectedValue(
       new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "new players not allowed"),
     );
@@ -519,10 +542,12 @@ describe("RoomPage", () => {
       token: "tok",
     });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, ownerId: 20, playerCount: 1, isPrivate: true, minHonor: 90 },
-      players: [bobSeated],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, ownerId: 20, playerCount: 1, isPrivate: true, minHonor: 90 },
+        players: [bobSeated],
+      }),
+    );
     mockJoinRoom.mockRejectedValue(new FetchError(409, "HONOR_TOO_LOW", "honor too low"));
 
     const user = userEvent.setup();
@@ -553,16 +578,18 @@ describe("RoomPage", () => {
       token: "tok",
     });
 
-    mockGetRoom.mockResolvedValue({
-      room: {
-        ...defaultRoom,
-        ownerId: 20,
-        playerCount: 1,
-        isPrivate: true,
-        allowNewPlayers: false,
-      },
-      players: [bobSeated],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: {
+          ...defaultRoom,
+          ownerId: 20,
+          playerCount: 1,
+          isPrivate: true,
+          allowNewPlayers: false,
+        },
+        players: [bobSeated],
+      }),
+    );
     mockJoinRoom.mockRejectedValue(
       new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "new players not allowed"),
     );
@@ -623,11 +650,13 @@ describe("RoomPage", () => {
       returnedUserIds: [],
     });
     // ...while the fresh post-mount fetch shows alice IS a member.
-    mockGetRoom.mockResolvedValue({
-      room: privateRoom,
-      players: [bob, aliceMember],
-      returnedUserIds: [],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: privateRoom,
+        players: [bob, aliceMember],
+        returnedUserIds: [],
+      }),
+    );
 
     render(
       <QueryClientProvider client={client}>
@@ -648,21 +677,23 @@ describe("RoomPage", () => {
   it("sends a keepalive leave on hard page unload (direct URL navigation) when a member", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     const fetchSpy = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("fetch", fetchSpy);
@@ -711,21 +742,23 @@ describe("RoomPage", () => {
   it("renders Us and Them legend labels once seated", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -741,31 +774,33 @@ describe("RoomPage", () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 2 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: null,
-          team: null,
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 2 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: null,
+            team: null,
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     mockSelectSeat.mockResolvedValue({
       matchStarted: false,
@@ -809,31 +844,33 @@ describe("RoomPage", () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 2 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 1,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 2 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 1,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -852,21 +889,23 @@ describe("RoomPage", () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     mockSelectSeat.mockResolvedValue({
       matchStarted: false,
@@ -900,21 +939,23 @@ describe("RoomPage", () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     mockSelectSeat.mockRejectedValue(new FetchError(409, "SEAT_TAKEN", "seat is taken"));
 
@@ -936,51 +977,53 @@ describe("RoomPage", () => {
   it("renders Start Game button for room owner", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 4 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 1,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 3,
-          roomId: 1,
-          userId: 30,
-          username: "carol",
-          seat: 2,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 4,
-          roomId: 1,
-          userId: 40,
-          username: "dave",
-          seat: 3,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 4 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 1,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 3,
+            roomId: 1,
+            userId: 30,
+            username: "carol",
+            seat: 2,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 4,
+            roomId: 1,
+            userId: 40,
+            username: "dave",
+            seat: 3,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -994,31 +1037,33 @@ describe("RoomPage", () => {
   it("renders disabled Start Game button when fewer than 4 players seated", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 2 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: null,
-          team: null,
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 2 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: null,
+            team: null,
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -1077,11 +1122,13 @@ describe("RoomPage", () => {
       },
     ];
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 4 },
-      players: fourSeated,
-      returnedUserIds: [10, 20, 30], // dave (seat 3) is still away
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 4 },
+        players: fourSeated,
+        returnedUserIds: [10, 20, 30], // dave (seat 3) is still away
+      }),
+    );
 
     renderRoomPage();
 
@@ -1096,52 +1143,54 @@ describe("RoomPage", () => {
   it("enables Start once every seated human has returned", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 4 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 1,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 3,
-          roomId: 1,
-          userId: 30,
-          username: "carol",
-          seat: 2,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 4,
-          roomId: 1,
-          userId: 40,
-          username: "dave",
-          seat: 3,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-      returnedUserIds: [10, 20, 30, 40],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 4 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 1,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 3,
+            roomId: 1,
+            userId: 30,
+            username: "carol",
+            seat: 2,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 4,
+            roomId: 1,
+            userId: 40,
+            username: "dave",
+            seat: 3,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+        returnedUserIds: [10, 20, 30, 40],
+      }),
+    );
 
     renderRoomPage();
 
@@ -1156,51 +1205,53 @@ describe("RoomPage", () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 4 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 1,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 3,
-          roomId: 1,
-          userId: 30,
-          username: "carol",
-          seat: 2,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 4,
-          roomId: 1,
-          userId: 40,
-          username: "dave",
-          seat: 3,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 4 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 1,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 3,
+            roomId: 1,
+            userId: 30,
+            username: "carol",
+            seat: 2,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 4,
+            roomId: 1,
+            userId: 40,
+            username: "dave",
+            seat: 3,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     mockStartGame.mockResolvedValue({
       ...defaultRoom,
@@ -1234,51 +1285,53 @@ describe("RoomPage", () => {
       token: "tok",
     });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 4 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 1,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 3,
-          roomId: 1,
-          userId: 30,
-          username: "carol",
-          seat: 2,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 4,
-          roomId: 1,
-          userId: 40,
-          username: "dave",
-          seat: 3,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 4 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 1,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 3,
+            roomId: 1,
+            userId: 30,
+            username: "carol",
+            seat: 2,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 4,
+            roomId: 1,
+            userId: 40,
+            username: "dave",
+            seat: 3,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -1302,31 +1355,33 @@ describe("RoomPage", () => {
       token: "tok",
     });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 2 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 1,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 2 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 1,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -1341,51 +1396,53 @@ describe("RoomPage", () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 4 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 2,
-          roomId: 1,
-          userId: 20,
-          username: "bob",
-          seat: 1,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 3,
-          roomId: 1,
-          userId: 30,
-          username: "carol",
-          seat: 2,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-        {
-          id: 4,
-          roomId: 1,
-          userId: 40,
-          username: "dave",
-          seat: 3,
-          team: "teamB",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 4 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 2,
+            roomId: 1,
+            userId: 20,
+            username: "bob",
+            seat: 1,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 3,
+            roomId: 1,
+            userId: 30,
+            username: "carol",
+            seat: 2,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+          {
+            id: 4,
+            roomId: 1,
+            userId: 40,
+            username: "dave",
+            seat: 3,
+            team: "teamB",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     mockStartGame.mockRejectedValue(new FetchError(400, "NOT_ALL_SEATED", "not all seated"));
 
@@ -1414,21 +1471,23 @@ describe("RoomPage", () => {
   it("renders the room chat panel once the room is loaded", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -1441,21 +1500,23 @@ describe("RoomPage", () => {
   it("clears chatStore.roomMessages on unmount", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     // Seed roomMessages to verify they get cleared
     useChatStore.setState({
@@ -1490,7 +1551,7 @@ describe("RoomPage", () => {
   // --- Owner pre-game controls (Story 8.1) ---
 
   function fourSeatedRoomQuery(ownerSeat = 0) {
-    return {
+    return makeRoomDetail({
       room: { ...defaultRoom, ownerId: 10, playerCount: 4 },
       players: [
         {
@@ -1534,7 +1595,7 @@ describe("RoomPage", () => {
           createdAt: "",
         },
       ],
-    };
+    });
   }
 
   it("renders kick icons only for owner on non-owner seated tiles in waiting status", async () => {
@@ -1578,10 +1639,12 @@ describe("RoomPage", () => {
   it("hides kick icons once room status transitions away from waiting", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     const data = fourSeatedRoomQuery();
-    mockGetRoom.mockResolvedValue({
-      ...data,
-      room: { ...data.room, status: "playing" },
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        ...data,
+        room: { ...data.room, status: "playing" },
+      }),
+    );
 
     renderRoomPage();
 
@@ -1671,7 +1734,7 @@ describe("RoomPage", () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     // Owner alice at seat 0, bob at seat 1, seats 2 & 3 empty.
-    const partial = {
+    const partial = makeRoomDetail({
       room: { ...defaultRoom, ownerId: 10, playerCount: 2 },
       players: [
         {
@@ -1695,7 +1758,7 @@ describe("RoomPage", () => {
           createdAt: "",
         },
       ],
-    };
+    });
     mockGetRoom.mockResolvedValue(partial);
     mockSwapSeats.mockResolvedValue({ players: partial.players });
 
@@ -1810,7 +1873,7 @@ describe("RoomPage", () => {
   function partialRoomQuery() {
     // alice (owner, seat 0), bob (seat 1), carol (in room but unseated).
     // Used to exercise the kick-from-list path on an unseated player.
-    return {
+    return makeRoomDetail({
       room: { ...defaultRoom, ownerId: 10, playerCount: 3 },
       players: [
         {
@@ -1844,7 +1907,7 @@ describe("RoomPage", () => {
           createdAt: "",
         },
       ],
-    };
+    });
   }
 
   it("owner can kick an unseated player from the in-room dropdown", async () => {
@@ -2010,21 +2073,23 @@ describe("RoomPage", () => {
   it("redirects a quick-play room to the matchmaking screen without leaving the queue", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, isQuickPlay: true, playerCount: 1 },
-      players: [
-        {
-          id: 1,
-          roomId: 1,
-          userId: 10,
-          username: "alice",
-          seat: 0,
-          team: "teamA",
-          isBot: false,
-          createdAt: "",
-        },
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, isQuickPlay: true, playerCount: 1 },
+        players: [
+          {
+            id: 1,
+            roomId: 1,
+            userId: 10,
+            username: "alice",
+            seat: 0,
+            team: "teamA",
+            isBot: false,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
 
     const { unmount } = render(
       <QueryWrapper>
@@ -2058,8 +2123,8 @@ describe("RoomPage honour", () => {
     userId: number,
     username: string,
     s: number,
-    honor?: { honorScore: number; honorTier: string },
-  ) => ({
+    honor?: Partial<Pick<RoomPlayer, "honorScore" | "honorTier" | "level">>,
+  ): RoomPlayer => ({
     id: userId,
     roomId: 1,
     userId,
@@ -2073,10 +2138,12 @@ describe("RoomPage honour", () => {
 
   it("shows the gate in the badges row, and not at all when ungated", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1, minHonor: 85, allowNewPlayers: false },
-      players: [seat(10, "alice", 0)],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1, minHonor: 85, allowNewPlayers: false },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
 
     renderRoomPage();
 
@@ -2088,10 +2155,12 @@ describe("RoomPage honour", () => {
 
   it("renders no honour badges on an ungated room", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [seat(10, "alice", 0)],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
 
     renderRoomPage();
 
@@ -2102,15 +2171,17 @@ describe("RoomPage honour", () => {
 
   it("shows each seat its own tier, and rings only the seat under the room's bar", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 2, minHonor: 85 },
-      players: [
-        seat(10, "alice", 0, { honorScore: 96, honorTier: "exemplary" }),
-        // 71 is Fair — the seat gets the OLIVE shield, not a red X. Being under
-        // this room's bar is drawn by the tile's ring instead.
-        seat(20, "bob", 1, { honorScore: 71, honorTier: "fair" }),
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 2, minHonor: 85 },
+        players: [
+          seat(10, "alice", 0, { honorScore: 96, honorTier: "exemplary" }),
+          // 71 is Fair — the seat gets the OLIVE shield, not a red X. Being under
+          // this room's bar is drawn by the tile's ring instead.
+          seat(20, "bob", 1, { honorScore: 71, honorTier: "fair" }),
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -2133,10 +2204,12 @@ describe("RoomPage honour", () => {
 
   it("renders a real honour score of 0 rather than omitting it", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [seat(10, "alice", 0, { honorScore: 0, honorTier: "problematic" })],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [seat(10, "alice", 0, { honorScore: 0, honorTier: "problematic" })],
+      }),
+    );
 
     renderRoomPage();
 
@@ -2146,10 +2219,12 @@ describe("RoomPage honour", () => {
 
   it("renders the seat's level before the honour", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1 },
-      players: [seat(10, "alice", 0, { level: 7, honorScore: 96, honorTier: "exemplary" })],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [seat(10, "alice", 0, { level: 7, honorScore: 96, honorTier: "exemplary" })],
+      }),
+    );
 
     renderRoomPage();
 
@@ -2166,13 +2241,15 @@ describe("RoomPage honour", () => {
     // Same coercion rule as honour: 0 is a legitimate value (a brand-new
     // account), while `undefined` means "not read" and renders nothing.
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 2 },
-      players: [
-        seat(10, "alice", 0, { level: 0, honorScore: 80, honorTier: "fair" }),
-        seat(20, "bob", 1, { honorScore: 80, honorTier: "fair" }),
-      ],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 2 },
+        players: [
+          seat(10, "alice", 0, { level: 0, honorScore: 80, honorTier: "fair" }),
+          seat(20, "bob", 1, { honorScore: 80, honorTier: "fair" }),
+        ],
+      }),
+    );
 
     renderRoomPage();
 
@@ -2186,10 +2263,12 @@ describe("RoomPage honour", () => {
   it("shows no shield for a seat whose honour did not arrive", async () => {
     // A degraded honour read must never make a seat look like it has score 0.
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue({
-      room: { ...defaultRoom, playerCount: 1, minHonor: 85 },
-      players: [seat(10, "alice", 0)],
-    });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1, minHonor: 85 },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
 
     renderRoomPage();
 

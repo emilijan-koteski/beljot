@@ -70,6 +70,7 @@ beforeEach(() => {
 
 const mockPayload: DeclarationsResolvedPayload = {
   winnerTeam: 1,
+  contested: false,
   declarations: [{ playerSeat: 1, type: "sequence", value: 50, cards: ["JD", "QD", "KD", "AD"] }],
 };
 
@@ -127,12 +128,14 @@ describe("DeclarationReveal", () => {
   it("centers the panel regardless of winning declarer's seat", () => {
     const eastWinner: DeclarationsResolvedPayload = {
       winnerTeam: 1,
+      contested: false,
       declarations: [
         { playerSeat: 1, type: "sequence", value: 50, cards: ["JD", "QD", "KD", "AD"] },
       ],
     };
     const northWinner: DeclarationsResolvedPayload = {
       winnerTeam: 0,
+      contested: false,
       declarations: [
         { playerSeat: 2, type: "sequence", value: 50, cards: ["JD", "QD", "KD", "AD"] },
       ],
@@ -169,6 +172,7 @@ describe("DeclarationReveal", () => {
   it("renders +value per meld and a +total in the brass strip (sum of meld values)", () => {
     const payload: DeclarationsResolvedPayload = {
       winnerTeam: 0,
+      contested: false,
       declarations: [
         { playerSeat: 0, type: "sequence", value: 50, cards: ["JS", "QS", "KS", "AS"] },
         { playerSeat: 2, type: "sequence", value: 20, cards: ["8H", "9H", "TH"] },
@@ -190,6 +194,7 @@ describe("DeclarationReveal", () => {
   it("does not render when winnerTeam is null", () => {
     const payload: DeclarationsResolvedPayload = {
       winnerTeam: null,
+      contested: false,
       declarations: [],
     };
     render(
@@ -215,6 +220,7 @@ describe("DeclarationReveal", () => {
   it("stacks both melds when one seat holds two that share a card", () => {
     const payload: DeclarationsResolvedPayload = {
       winnerTeam: 0,
+      contested: false,
       declarations: [
         { playerSeat: 0, type: "sequence", value: 50, cards: ["9S", "TS", "JS", "QS"] },
         { playerSeat: 0, type: "four_of_a_kind", value: 200, cards: ["JS", "JH", "JD", "JC"] },
@@ -253,6 +259,7 @@ describe("DeclarationReveal", () => {
   it("shows the declarer's username for each declaration row", () => {
     const payload: DeclarationsResolvedPayload = {
       winnerTeam: 0,
+      contested: false,
       declarations: [
         { playerSeat: 0, type: "sequence", value: 50, cards: ["JS", "QS", "KS", "AS"] },
         { playerSeat: 2, type: "four_of_a_kind", value: 200, cards: ["JC", "JH", "JD", "JS"] },
@@ -274,33 +281,46 @@ describe("DeclarationReveal", () => {
     expect(declarers[1]).toHaveTextContent("by carol");
   });
 
-  it("renders the tiebreaker line only when there is more than one meld", () => {
-    const single: DeclarationsResolvedPayload = {
+  // The gate is the server's `contested` flag, not the meld count. Only the
+  // WINNING team's melds are on the wire, so counting them cannot distinguish
+  // "we out-declared them" from "we were the only team to declare".
+  it("hides the tiebreaker line when the opposing team declared nothing", () => {
+    // Two melds from ONE seat sharing a card — the ordinary Croatian overlap
+    // case. Nothing was compared, so naming a "highest meld at the table"
+    // would report a contest that never happened.
+    const uncontestedOverlap: DeclarationsResolvedPayload = {
       winnerTeam: 1,
+      contested: false,
       declarations: [
-        { playerSeat: 1, type: "sequence", value: 50, cards: ["JD", "QD", "KD", "AD"] },
+        { playerSeat: 1, type: "sequence", value: 20, cards: ["8H", "9H", "TH"] },
+        { playerSeat: 1, type: "four_of_a_kind", value: 200, cards: ["JC", "JH", "JD", "JS"] },
       ],
     };
-    const { rerender } = render(
+    render(
       <DeclarationReveal
-        payload={single}
+        payload={uncontestedOverlap}
         players={mockPlayers}
         viewerTeam="teamA"
         onComplete={vi.fn()}
       />,
     );
     expect(screen.queryByTestId("declaration-reveal-tiebreaker")).not.toBeInTheDocument();
+    // The melds themselves still render — only the win-reason line is withheld.
+    expect(screen.getAllByTestId("declaration-reveal-meld-label")).toHaveLength(2);
+  });
 
-    const multi: DeclarationsResolvedPayload = {
+  it("names the deciding meld when both teams declared", () => {
+    const contested: DeclarationsResolvedPayload = {
       winnerTeam: 1,
+      contested: true,
       declarations: [
         { playerSeat: 1, type: "sequence", value: 20, cards: ["8H", "9H", "TH"] },
         { playerSeat: 3, type: "four_of_a_kind", value: 200, cards: ["JC", "JH", "JD", "JS"] },
       ],
     };
-    rerender(
+    render(
       <DeclarationReveal
-        payload={multi}
+        payload={contested}
         players={mockPlayers}
         viewerTeam="teamA"
         onComplete={vi.fn()}
@@ -310,6 +330,27 @@ describe("DeclarationReveal", () => {
     expect(screen.getByTestId("declaration-reveal-tiebreaker")).toHaveTextContent(
       "dave's Carré — highest meld at the table",
     );
+  });
+
+  it("names the deciding meld even when the winning team has only one", () => {
+    // A single meld can still have beaten the other team's — the count never
+    // decided this, the comparison did.
+    const contestedSingle: DeclarationsResolvedPayload = {
+      winnerTeam: 1,
+      contested: true,
+      declarations: [
+        { playerSeat: 1, type: "sequence", value: 50, cards: ["JD", "QD", "KD", "AD"] },
+      ],
+    };
+    render(
+      <DeclarationReveal
+        payload={contestedSingle}
+        players={mockPlayers}
+        viewerTeam="teamA"
+        onComplete={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("declaration-reveal-tiebreaker")).toBeInTheDocument();
   });
 
   it("renders the total label in the brass strip", () => {
@@ -330,6 +371,7 @@ describe("DeclarationReveal", () => {
   it("falls back to seat marker when player is unknown", () => {
     const payload: DeclarationsResolvedPayload = {
       winnerTeam: 1,
+      contested: false,
       declarations: [{ playerSeat: 3, type: "sequence", value: 50, cards: ["JD", "QD", "KD"] }],
     };
     render(

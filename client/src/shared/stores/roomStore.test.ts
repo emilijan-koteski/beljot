@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { makeRoom, makeRoomInvite } from "@/test-utils";
+
 import { useRoomStore } from "./roomStore";
 
 describe("roomStore", () => {
@@ -36,24 +38,26 @@ describe("roomStore", () => {
   });
 
   it("addPlayer updates room playerCount", () => {
-    useRoomStore.getState().setRoom({
-      id: 10,
-      name: "Test",
-      code: "ABC123",
-      ownerId: 1,
-      ownerUsername: "owner",
-      variant: "bitola",
-      matchMode: "1001",
-      timerStyle: "relaxed",
-      timerDurationSeconds: null,
-      status: "waiting",
-      playerCount: 1,
-      isQuickPlay: false,
-      coinBuyIn: 0,
-      isPrivate: false,
-      createdAt: "2026-04-12T00:00:00Z",
-      updatedAt: "2026-04-12T00:00:00Z",
-    });
+    useRoomStore.getState().setRoom(
+      makeRoom({
+        id: 10,
+        name: "Test",
+        code: "ABC123",
+        ownerId: 1,
+        ownerUsername: "owner",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "waiting",
+        playerCount: 1,
+        isQuickPlay: false,
+        coinBuyIn: 0,
+        isPrivate: false,
+        createdAt: "2026-04-12T00:00:00Z",
+        updatedAt: "2026-04-12T00:00:00Z",
+      }),
+    );
 
     const player = {
       id: 2,
@@ -105,24 +109,26 @@ describe("roomStore", () => {
   });
 
   it("removePlayer updates ownerId when newOwnerId is provided", () => {
-    useRoomStore.getState().setRoom({
-      id: 10,
-      name: "Test",
-      code: "ABC123",
-      ownerId: 42,
-      ownerUsername: "owner",
-      variant: "bitola",
-      matchMode: "1001",
-      timerStyle: "relaxed",
-      timerDurationSeconds: null,
-      status: "waiting",
-      playerCount: 2,
-      isQuickPlay: false,
-      coinBuyIn: 0,
-      isPrivate: false,
-      createdAt: "2026-04-12T00:00:00Z",
-      updatedAt: "2026-04-12T00:00:00Z",
-    });
+    useRoomStore.getState().setRoom(
+      makeRoom({
+        id: 10,
+        name: "Test",
+        code: "ABC123",
+        ownerId: 42,
+        ownerUsername: "owner",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "waiting",
+        playerCount: 2,
+        isQuickPlay: false,
+        coinBuyIn: 0,
+        isPrivate: false,
+        createdAt: "2026-04-12T00:00:00Z",
+        updatedAt: "2026-04-12T00:00:00Z",
+      }),
+    );
 
     useRoomStore.getState().removePlayer(42, 1, 99);
 
@@ -397,17 +403,19 @@ describe("roomStore", () => {
   // and RoomPage calls reset() on unmount — dropping it there would lose a live
   // invite the player never got to answer.
   it("reset PRESERVES an in-flight room invite", () => {
-    useRoomStore.getState().setRoomInvite({
-      inviteId: 3,
-      roomId: 9,
-      roomName: "Skopje Ekipa",
-      inviterUserId: 4,
-      inviterUsername: "ana",
-      coinBuyIn: 0,
-      isPrivate: false,
-      isHostInvite: true,
-      expiresAt: "2026-08-16T10:00:00Z",
-    });
+    useRoomStore.getState().setRoomInvite(
+      makeRoomInvite({
+        inviteId: 3,
+        roomId: 9,
+        roomName: "Skopje Ekipa",
+        inviterUserId: 4,
+        inviterUsername: "ana",
+        coinBuyIn: 0,
+        isPrivate: false,
+        isHostInvite: true,
+        expiresAt: "2026-08-16T10:00:00Z",
+      }),
+    );
     useRoomStore.getState().reset();
 
     expect(useRoomStore.getState().roomInvite?.inviteId).toBe(3);

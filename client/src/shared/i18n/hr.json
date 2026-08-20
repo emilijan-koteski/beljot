@@ -168,12 +168,6 @@
         "newest": "Najnovije prvo",
         "oldest": "Najstarije prvo"
       },
-      "variant": {
-        "bitola": "Bitola"
-      },
-      "mode": {
-        "1001": "1001 bodova"
-      },
       "hand": {
         "number": "Dijeljenje {{number}}",
         "cardPoints": "Bodovi iz karata",
@@ -616,7 +610,6 @@
       "roomName": "Naziv sobe",
       "roomNamePlaceholder": "Nedjeljni meč…",
       "variant": "Varijanta",
-      "variantBitola": "Bitola",
       "matchMode": "Način meča",
       "matchMode1001": "1001 bod",
       "timerStyle": "Tip tajmera",
@@ -641,7 +634,6 @@
       "eyebrow": "Nova soba",
       "headline": "Stvori sobu",
       "roomNameHint": "{{min}}–{{max}} znakova",
-      "variantCroatia": "Hrvatska",
       "matchMode501": "501 bod",
       "timerDurationSuffix": "sekundi / potezu",
       "submit": "Stvori sobu",
@@ -738,6 +730,7 @@
       "variantCroatia": "Hrvatska",
       "matchMode1001": "1001 bod",
       "matchMode501": "501 bod",
+      "matchModeGeneric": "{{points}} bodova",
       "buyInFree": "Bez uloga",
       "private": "Privatna",
       "privateLockAriaLabel": "Privatna soba, za ulazak je potrebna lozinka",
@@ -846,6 +839,7 @@
       "title": "Imaš zvanja!",
       "declare": "Zovi",
       "skip": "Preskoči",
+      "waiting": "Čeka se da <name>{{name}}</name> zove zvanje ili preskoči",
       "pts": "bodova",
       "total": "Ukupno",
       "tierce": "Terca",
@@ -888,7 +882,8 @@
       "illegalPlay": "Ta karta se ne može odigrati",
       "pauseExhausted": "Već si iskoristio pauzu",
       "noActivePause": "Nemaš aktivnu pauzu",
-      "notRoomOwner": "Samo domaćin može ovo učiniti"
+      "notRoomOwner": "Samo domaćin može ovo učiniti",
+      "mustPickTrump": "Moraš izabrati boju za aduta, ovdje ne možeš dalje"
     },
     "timer": {
       "autoPlayed": "Automatski odigrano: {{card}}",
@@ -904,10 +899,6 @@
       "thisHand": "ovo dijeljenje",
       "handLabel": "Dijeljenje {{hand}}",
       "handVariant": "Dijeljenje {{hand}} · {{variant}}"
-    },
-    "variants": {
-      "bitola": "Bitola",
-      "croatia": "Hrvatska"
     },
     "scoreReveal": {
       "title": "Rezultat dijeljenja",

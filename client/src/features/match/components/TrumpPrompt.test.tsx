@@ -320,7 +320,7 @@ describe("TrumpPrompt", () => {
         />,
       );
       expect(screen.getByText("Take trump — any suit")).toBeInTheDocument();
-      expect(screen.getByText("All four suits are yours to call.")).toBeInTheDocument();
+      expect(screen.getByText("All four suits are yours to take.")).toBeInTheDocument();
       // Neither the candidate-bound round-1 copy nor a bare key may appear.
       const panel = screen.getByTestId("trump-prompt");
       expect(panel.textContent).not.toContain("match.trumpPrompt");
@@ -338,7 +338,7 @@ describe("TrumpPrompt", () => {
         />,
       );
       expect(screen.getByText("Take trump — any suit")).toBeInTheDocument();
-      expect(screen.getByText("All four suits are yours to call.")).toBeInTheDocument();
+      expect(screen.getByText("All four suits are yours to take.")).toBeInTheDocument();
     });
 
     it("shows waiting players all four suit chips in round 1, none locked", () => {

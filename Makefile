@@ -19,7 +19,7 @@ test:
 	cd server && go test ./...
 
 lint:
-	cd client && npx eslint . && npx prettier --check .
+	cd client && npx tsc --noEmit && npx eslint . && npx prettier --check .
 	cd server && golangci-lint run ./...
 
 migrate:

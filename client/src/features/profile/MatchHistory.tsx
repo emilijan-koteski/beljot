@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
-import { variantLabel } from "@/features/lobby/lib/roomLabels";
 import type {
   MatchFilter,
   MatchHandView,
@@ -15,6 +14,7 @@ import { useUserMatchesInfiniteQuery } from "@/shared/hooks/queries/useMatches";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { botDisplayName } from "@/shared/lib/botName";
 import { formatLocalizedDate } from "@/shared/lib/formatDate";
+import { variantLabel } from "@/shared/lib/roomLabels";
 
 import { HistoryFilters } from "./components/HistoryFilters";
 import { SeatChip } from "./components/SeatChip";

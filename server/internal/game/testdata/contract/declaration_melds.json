@@ -1,0 +1,170 @@
+[
+  {
+    "name": "overlap_run_and_carre_share_a_jack",
+    "hand": [
+      "9S",
+      "TS",
+      "JS",
+      "JH",
+      "JD",
+      "JC",
+      "7H",
+      "8D"
+    ],
+    "withoutOverlap": [
+      {
+        "type": "four_of_a_kind",
+        "value": 200,
+        "cards": [
+          "JS",
+          "JH",
+          "JD",
+          "JC"
+        ]
+      }
+    ],
+    "withOverlap": [
+      {
+        "type": "sequence",
+        "value": 20,
+        "cards": [
+          "9S",
+          "TS",
+          "JS"
+        ]
+      },
+      {
+        "type": "four_of_a_kind",
+        "value": 200,
+        "cards": [
+          "JS",
+          "JH",
+          "JD",
+          "JC"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "five_card_run_subsumes_shorter",
+    "hand": [
+      "9S",
+      "TS",
+      "JS",
+      "QS",
+      "KS",
+      "7H",
+      "8D",
+      "9C"
+    ],
+    "withoutOverlap": [
+      {
+        "type": "sequence",
+        "value": 100,
+        "cards": [
+          "9S",
+          "TS",
+          "JS",
+          "QS",
+          "KS"
+        ]
+      }
+    ],
+    "withOverlap": [
+      {
+        "type": "sequence",
+        "value": 100,
+        "cards": [
+          "9S",
+          "TS",
+          "JS",
+          "QS",
+          "KS"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "two_disjoint_runs",
+    "hand": [
+      "7S",
+      "8S",
+      "9S",
+      "TH",
+      "JH",
+      "QH",
+      "7D",
+      "8C"
+    ],
+    "withoutOverlap": [
+      {
+        "type": "sequence",
+        "value": 20,
+        "cards": [
+          "7S",
+          "8S",
+          "9S"
+        ]
+      },
+      {
+        "type": "sequence",
+        "value": 20,
+        "cards": [
+          "TH",
+          "JH",
+          "QH"
+        ]
+      }
+    ],
+    "withOverlap": [
+      {
+        "type": "sequence",
+        "value": 20,
+        "cards": [
+          "7S",
+          "8S",
+          "9S"
+        ]
+      },
+      {
+        "type": "sequence",
+        "value": 20,
+        "cards": [
+          "TH",
+          "JH",
+          "QH"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "four_sevens_not_declarable",
+    "hand": [
+      "7S",
+      "7H",
+      "7D",
+      "7C",
+      "9S",
+      "TH",
+      "JD",
+      "QC"
+    ],
+    "withoutOverlap": [],
+    "withOverlap": []
+  },
+  {
+    "name": "no_melds",
+    "hand": [
+      "7S",
+      "9H",
+      "JD",
+      "KC",
+      "AS",
+      "8H",
+      "TD",
+      "QC"
+    ],
+    "withoutOverlap": [],
+    "withOverlap": []
+  }
+]

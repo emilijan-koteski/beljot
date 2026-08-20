@@ -101,30 +101,32 @@ func TestEventsJSONContract(t *testing.T) {
 		"teamBMatchScore": 280,
 	}
 
-	// declarationsResolvedSample mirrors the manager.go broadcast — also a
-	// map[string]any with a list of decl maps.
+	// declarationsResolvedSample is now the REAL ws.DeclarationsResolvedPayload
+	// struct that the match layer emits, not a hand-written map that merely
+	// resembled it. Previously the producer built a map[string]interface{} and
+	// this test marshalled a separate literal, so nothing connected the keys
+	// actually put on the wire to either the type or the golden.
 	//
 	// Two entries for the SAME seat, sharing JS: that is what a
 	// declaration-overlap config produces, and the flat "one entry per meld,
 	// each carrying its own playerSeat" shape already carries it — no payload
-	// change was needed. This sample is a hand-written literal, so it pins the
-	// payload and Zod schema shape for that case, NOT the broadcast helper that
-	// produces it — collapsing the producer loop would keep this green. The
-	// producer stays covered by the game-package declaration tests.
-	declarationsResolvedSample := map[string]any{
-		"winnerTeam": 0,
-		"declarations": []map[string]any{
+	// change was needed for overlap.
+	declarationsResolvedSample := ws.DeclarationsResolvedPayload{
+		WinnerTeam: ptrInt(0),
+		// Both teams declared, so the reveal may name the deciding meld.
+		Contested: true,
+		Declarations: []ws.DeclarationPayload{
 			{
-				"playerSeat": 0,
-				"type":       "sequence",
-				"value":      50,
-				"cards":      []string{"JS", "QS", "KS", "AS"},
+				PlayerSeat: 0,
+				Type:       "sequence",
+				Value:      50,
+				Cards:      []string{"JS", "QS", "KS", "AS"},
 			},
 			{
-				"playerSeat": 0,
-				"type":       "four_of_a_kind",
-				"value":      200,
-				"cards":      []string{"JS", "JH", "JD", "JC"},
+				PlayerSeat: 0,
+				Type:       "four_of_a_kind",
+				Value:      200,
+				Cards:      []string{"JS", "JH", "JD", "JC"},
 			},
 		},
 	}
@@ -192,6 +194,19 @@ func TestEventsJSONContract(t *testing.T) {
 				CardID:     "7S",
 			},
 			goldenFile: "trump_selected.json",
+		},
+		{
+			// Not a payload — the phase VOCABULARY itself. Story 12.6 left the
+			// `phase` string as the only field carrying the declaring state,
+			// while the client typed it as a bare z.string(), so a server
+			// constant and its client union member could drift with nothing
+			// failing. This golden is the pin: the client builds its Phase
+			// union from this file, so adding a phase on either side without
+			// the other breaks a test. game.AllPhases() is itself guarded
+			// against the constants by TestAllPhasesCoversEveryConstant.
+			name:       "Phases",
+			sample:     game.AllPhases(),
+			goldenFile: "phases.json",
 		},
 		{
 			name:       "DeclarationsResolvedPayload",
@@ -344,17 +359,13 @@ func TestEventsJSONContract(t *testing.T) {
 			expected, err := os.ReadFile(goldenPath)
 			if err != nil {
 				if os.IsNotExist(err) {
-					// AC10 / D118: a missing golden must hard-fail unless the
-					// caller explicitly asked for regeneration. The previous
+					// AC10 / D118: a missing golden hard-fails. The original
 					// bootstrap-on-missing path silently treated a deleted
 					// golden as the new truth, defeating the drift gate.
-					if !*updateGoldens {
-						t.Fatalf("missing golden %s — rerun with UPDATE_GOLDENS=1 to regenerate", goldenPath)
-					}
-					require.NoError(t, os.WriteFile(goldenPath, actual, 0o644),
-						"failed to write golden %s", goldenPath)
-					t.Logf("regenerated golden: %s", goldenPath)
-					return
+					// Regeneration is the *updateGoldens branch above, which
+					// has already returned by this point — so there is no
+					// "write it if the caller asked" case to handle here.
+					t.Fatalf("missing golden %s — rerun with UPDATE_GOLDENS=1 to regenerate", goldenPath)
 				}
 				t.Fatalf("failed to read golden %s: %v", goldenPath, err)
 			}

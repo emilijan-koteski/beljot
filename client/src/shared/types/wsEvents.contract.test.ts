@@ -27,6 +27,7 @@ import matchAbandonedGolden from "../../../../server/internal/ws/testdata/events
 import matchEndGolden from "../../../../server/internal/ws/testdata/events/match_end.json";
 import matchPausedGolden from "../../../../server/internal/ws/testdata/events/match_paused.json";
 import matchResumedGolden from "../../../../server/internal/ws/testdata/events/match_resumed.json";
+import phasesGolden from "../../../../server/internal/ws/testdata/events/phases.json";
 import playerDeclaredGolden from "../../../../server/internal/ws/testdata/events/player_declared.json";
 import playerDisconnectedGolden from "../../../../server/internal/ws/testdata/events/player_disconnected.json";
 import playerReconnectedGolden from "../../../../server/internal/ws/testdata/events/player_reconnected.json";
@@ -35,6 +36,7 @@ import surrenderProposedGolden from "../../../../server/internal/ws/testdata/eve
 import trickResolvedGolden from "../../../../server/internal/ws/testdata/events/trick_resolved.json";
 import trumpSelectedGolden from "../../../../server/internal/ws/testdata/events/trump_selected.json";
 import xpAwardedGolden from "../../../../server/internal/ws/testdata/events/xp_awarded.json";
+import { SERVER_PHASES } from "./matchTypes";
 import {
   AutoActionPayloadSchema,
   BelotAnnouncedPayloadSchema,
@@ -92,6 +94,39 @@ const cases = [
   ["SurrenderDeclinedPayload", SurrenderDeclinedPayloadSchema, surrenderDeclinedGolden],
   ["FaceDownRevealedPayload", FaceDownRevealedPayloadSchema, faceDownRevealedGolden],
 ] as const;
+
+// The phase vocabulary is pinned separately from the payload schemas: it is a
+// list of strings, not an event body, and it is the ONE field Story 12.6 made
+// load-bearing while leaving it typed as a bare z.string().
+//
+// SERVER_PHASES is the client's single source for both the `Phase` union and
+// the Zod enum, so comparing it to the Go-owned golden closes the loop: adding
+// a phase on either side without the other now fails here. On the Go side
+// game.AllPhases() is itself guarded against the constants by
+// TestAllPhasesCoversEveryConstant, so the chain has no unguarded link.
+describe("phase vocabulary contract", () => {
+  it("SERVER_PHASES matches the Go-owned phases golden exactly, in order", () => {
+    expect(SERVER_PHASES).toEqual(phasesGolden);
+  });
+
+  it("does not include the client-local empty phase", () => {
+    // "" means "no game loaded" and is never sent by the server; it belongs on
+    // the Phase union but must stay out of the wire vocabulary and the Zod enum.
+    expect(SERVER_PHASES as readonly string[]).not.toContain("");
+  });
+
+  it("accepts every golden phase through the match-state schema and rejects an unknown one", () => {
+    for (const phase of phasesGolden) {
+      const result = EventMatchStateSchema.safeParse({ ...eventMatchStateGolden, phase });
+      expect(result.success, `schema rejected known phase "${phase}"`).toBe(true);
+    }
+    // The whole point of the enum: an unknown phase must not slip through as a
+    // plain string and leave the client rendering a blank table.
+    expect(
+      EventMatchStateSchema.safeParse({ ...eventMatchStateGolden, phase: "bogus" }).success,
+    ).toBe(false);
+  });
+});
 
 describe("WS event JSON contract (Zod parse against Go-produced goldens)", () => {
   it.each(cases)("%s parses cleanly through its Zod schema", (name, schema, golden) => {

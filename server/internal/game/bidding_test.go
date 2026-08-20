@@ -814,7 +814,11 @@ func TestCroatianDealerCannotPassInRound2(t *testing.T) {
 
 	assert.Nil(t, result)
 	require.Error(t, err)
-	assert.ErrorIs(t, err, apperr.ErrInvalidBid)
+	// Its OWN sentinel, not the generic ErrInvalidBid: "you must name a suit"
+	// and "that suit is not allowed" are different things to tell a player, and
+	// the client cannot act on the difference if both arrive as INVALID_BID.
+	assert.ErrorIs(t, err, apperr.ErrMustPickTrump)
+	assert.NotErrorIs(t, err, apperr.ErrInvalidBid, "must be distinguishable from a bad-suit refusal")
 	assert.Equal(t, game.PhaseBidding, gs.Phase, "no reshuffle — state is untouched")
 	assert.Equal(t, 1, gs.HandNumber)
 	assert.Equal(t, 0, gs.DealerSeat, "the dealer does not rotate")
@@ -1074,7 +1078,7 @@ func TestCroatianFullBiddingFromNewGame(t *testing.T) {
 		PlayerSeat: gs.DealerSeat,
 	})
 	assert.Nil(t, rejected)
-	require.ErrorIs(t, err, apperr.ErrInvalidBid)
+	require.ErrorIs(t, err, apperr.ErrMustPickTrump)
 
 	// The dealer names a suit and the hand starts.
 	suit := game.SuitHearts

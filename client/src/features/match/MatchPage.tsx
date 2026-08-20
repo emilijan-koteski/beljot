@@ -25,6 +25,7 @@ import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
 import { honorScoreOrPrior } from "@/shared/lib/honor";
 import { FLAG_LIFETIME, MOTION } from "@/shared/lib/motion";
+import { variantLabel } from "@/shared/lib/roomLabels";
 import { Z } from "@/shared/lib/zLayers";
 import { useWsConnectionState, useWsSendMessage } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -58,6 +59,7 @@ import { CardFlight, type CardFlightDescriptor, type FlightRect } from "./compon
 import { DealAnimation } from "./components/DealAnimation";
 import { DeclarationPrompt } from "./components/DeclarationPrompt";
 import { DeclarationReveal } from "./components/DeclarationReveal";
+import { DeclarationWaiting } from "./components/DeclarationWaiting";
 import { DeclareBanner } from "./components/DeclareBanner";
 import { EmoteBubble } from "./components/EmoteBubble";
 import { EmotePickerButton } from "./components/EmotePickerButton";
@@ -915,6 +917,7 @@ export function MatchPage() {
       "error:pause_exhausted": "match.errors.pauseExhausted",
       "error:no_active_pause": "match.errors.noActivePause",
       "error:not_room_owner": "match.errors.notRoomOwner",
+      "error:must_pick_trump": "match.errors.mustPickTrump",
     };
     const SURRENDER_ERROR_I18N: Record<string, string> = {
       "error:invalid_action": "match.surrender.errors.actionRequired",
@@ -1486,6 +1489,10 @@ export function MatchPage() {
     faceDownReveal?.playerSeat ?? null,
     faceDownReveal?.cardIds,
   );
+  // Cards the viewer holds but has not been shown yet (Croatian round 1). The
+  // server sends a COUNT per seat, never the identities, so this can render
+  // backs without ever putting the cards on the client.
+  const myFaceDownCount = myPlayer?.faceDownCount ?? 0;
   const playableCardIds =
     isMyTurn && myPlayerSeat !== null ? legalCardIds(matchState, myPlayerSeat) : [];
 
@@ -1503,6 +1510,16 @@ export function MatchPage() {
     matchState.awaitingDeclaration === true &&
     matchState.activePlayerSeat === myPlayerSeat &&
     trumpReveal === null;
+
+  // The dedicated declaration phase prompts ONE seat at a time; the other three
+  // would otherwise sit in front of a table that looks frozen — full hands, an
+  // empty trick, trickNumber 0 — for up to four consecutive turns before trick
+  // 1 begins. Keyed off the server's phase, never off the variant.
+  const showDeclarationWaiting =
+    matchState.phase === "declaring" &&
+    matchState.activePlayerSeat !== myPlayerSeat &&
+    trumpReveal === null &&
+    declarationReveal === null;
 
   // Belot state. The local pre-play prompt (belotPromptCardId) takes priority;
   // the server-driven prompt is the fallback and is suppressed while the local
@@ -1573,9 +1590,7 @@ export function MatchPage() {
         lastTrickBonus={scoreRevealData?.lastTrickBonus}
         lastTrickTeam={scoreRevealData?.lastTrickTeam}
         handNumber={matchState.handNumber}
-        variantLabel={t(`match.variants.${matchState.variant}`, {
-          defaultValue: matchState.variant,
-        })}
+        variantLabel={variantLabel(t, matchState.variant)}
         matchTarget={matchTarget}
       />
 
@@ -1725,6 +1740,13 @@ export function MatchPage() {
       >
         <HandCards
           hand={myHand}
+          // Only while the pair is still face-down TO THE VIEWER. Once
+          // `event:face_down_revealed` lands, mergeRevealedFaceDownCards folds
+          // the two cards into myHand face-up, and after bidding resolves the
+          // authoritative snapshot carries them — either way they must not be
+          // counted twice. Comparing merged length against the raw snapshot
+          // length is the exact test for "has the reveal happened yet".
+          faceDownCount={myHand.length === (myPlayer?.hand.length ?? 0) ? myFaceDownCount : 0}
           isMyTurn={isMyTurn}
           playableCardIds={playableCardIds}
           onPlayCard={handlePlayCard}
@@ -2053,6 +2075,23 @@ export function MatchPage() {
 
       {/* Reshuffle animation overlay */}
       {showReshuffle && <ReshuffleAnimation onComplete={handleReshuffleComplete} />}
+
+      {/* Declaration phase, seats not on the clock */}
+      {showDeclarationWaiting && (
+        <DeclarationWaiting
+          activePlayerName={
+            playerDisplayName(
+              t,
+              matchState.players.find((p) => p.seat === matchState.activePlayerSeat),
+            ) ?? null
+          }
+          activePlayerTeam={
+            matchState.activePlayerSeat !== null
+              ? seatTeam(matchState.activePlayerSeat, myPlayerSeat)
+              : null
+          }
+        />
+      )}
 
       {/* Declaration prompt overlay */}
       {showDeclarationPrompt && myPlayer && (

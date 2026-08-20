@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RoomPrivacyDialog } from "@/features/room/RoomPrivacyDialog";
 import type { Room } from "@/shared/types/apiTypes";
-import { QueryWrapper } from "@/test-utils";
+import { makeRoom, QueryWrapper } from "@/test-utils";
 
 const mockUpdateRoomPrivacy = vi.fn();
 
@@ -18,7 +18,7 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
-const baseRoom: Room = {
+const baseRoom: Room = makeRoom({
   id: 7,
   name: "Owner Table",
   code: "OWN123",
@@ -35,7 +35,7 @@ const baseRoom: Room = {
   isPrivate: false,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
-};
+});
 
 function renderDialog(room: Room = baseRoom) {
   const onClose = vi.fn();

@@ -37,6 +37,7 @@ import {
   honorScoreOrPrior,
   honorTierForScore,
 } from "@/shared/lib/honor";
+import { modeLabel, modeOptionLabel, variantLabel } from "@/shared/lib/roomLabels";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -277,15 +278,19 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     onOpenChange(nextOpen);
   }
 
-  const variantOptions = [
-    { value: "bitola" as const, label: t("lobby.createRoomModal.variantBitola") },
-    { value: "croatia" as const, label: t("lobby.createRoomModal.variantCroatia") },
-  ];
+  // Both option lists resolve through shared/lib/roomLabels — the one place a
+  // variant or mode is turned into text. The form spells modes out ("1001
+  // points") where chips abbreviate ("1001 pts"), which is why the mode helper
+  // has two forms; variants read identically everywhere and have only one.
+  const variantOptions = (["bitola", "croatia"] as const).map((value) => ({
+    value,
+    label: variantLabel(t, value),
+  }));
 
-  const matchModeOptions = [
-    { value: "501" as const, label: t("lobby.createRoomModal.matchMode501") },
-    { value: "1001" as const, label: t("lobby.createRoomModal.matchMode1001") },
-  ];
+  const matchModeOptions = (["501", "1001"] as const).map((value) => ({
+    value,
+    label: modeOptionLabel(t, value),
+  }));
 
   const timerOptions = [
     {
@@ -728,10 +733,8 @@ function PreviewCard({
   const { t } = useTranslation();
   // Mirrors the lobby card the room will become, so it reads the same
   // lobby.card.* keys the real card does rather than the modal's option labels.
-  const variantLabel =
-    variant === "bitola" ? t("lobby.card.variantBitola") : t("lobby.card.variantCroatia");
-  const matchLabel =
-    matchMode === "1001" ? t("lobby.card.matchMode1001") : t("lobby.card.matchMode501");
+  const variantText = variantLabel(t, variant);
+  const matchLabel = modeLabel(t, matchMode);
   const timerLabel =
     timerStyle === "relaxed"
       ? t("lobby.card.relaxed")
@@ -764,7 +767,7 @@ function PreviewCard({
 
         <div className="text-ink-dim mt-1.5 flex flex-wrap items-center gap-2 text-xs">
           <span>
-            {variantLabel} · {matchLabel}
+            {variantText} · {matchLabel}
           </span>
           <Dot />
           <span className="inline-flex items-center gap-1">

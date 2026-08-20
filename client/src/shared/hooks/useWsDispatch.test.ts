@@ -25,7 +25,7 @@ import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room, User } from "@/shared/types/apiTypes";
 import type { MatchState } from "@/shared/types/matchTypes";
 import type { WsMessage } from "@/shared/types/wsEvents";
-import { makeUser } from "@/test-utils";
+import { makeRoom, makeUser } from "@/test-utils";
 
 import { __resetWsDispatchStateForTests, useWsDispatch } from "./useWsDispatch";
 
@@ -176,7 +176,7 @@ describe("useWsDispatch", () => {
   it("routes system:room_updated to queryClient room cache", () => {
     // Pre-populate with a room
     queryClient.setQueryData<Room[]>(queryKeys.rooms.list("waiting"), [
-      {
+      makeRoom({
         id: 2,
         name: "Old Name",
         code: "XYZ789",
@@ -193,7 +193,7 @@ describe("useWsDispatch", () => {
         isPrivate: false,
         createdAt: "2026-04-12T00:00:00Z",
         updatedAt: "2026-04-12T00:00:00Z",
-      },
+      }),
     ]);
 
     const { result } = renderHook(() => useWsDispatch());
@@ -227,24 +227,26 @@ describe("useWsDispatch", () => {
   it("updates the in-room store when system:room_updated targets the current room", () => {
     // The viewer is seated in room 2, which is currently private.
     const store = useRoomStore.getState();
-    store.setRoom({
-      id: 2,
-      name: "Friends Table",
-      code: "XYZ789",
-      ownerId: 42,
-      ownerUsername: "owner",
-      variant: "bitola",
-      matchMode: "1001",
-      timerStyle: "relaxed",
-      timerDurationSeconds: null,
-      status: "waiting",
-      playerCount: 2,
-      isQuickPlay: false,
-      coinBuyIn: 0,
-      isPrivate: true,
-      createdAt: "2026-04-12T00:00:00Z",
-      updatedAt: "2026-04-12T00:00:00Z",
-    });
+    store.setRoom(
+      makeRoom({
+        id: 2,
+        name: "Friends Table",
+        code: "XYZ789",
+        ownerId: 42,
+        ownerUsername: "owner",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "waiting",
+        playerCount: 2,
+        isQuickPlay: false,
+        coinBuyIn: 0,
+        isPrivate: true,
+        createdAt: "2026-04-12T00:00:00Z",
+        updatedAt: "2026-04-12T00:00:00Z",
+      }),
+    );
     store.setCurrentRoomId(2);
 
     const { result } = renderHook(() => useWsDispatch());
@@ -276,24 +278,26 @@ describe("useWsDispatch", () => {
 
   it("ignores system:room_updated for a room the viewer is not in", () => {
     const store = useRoomStore.getState();
-    store.setRoom({
-      id: 2,
-      name: "Friends Table",
-      code: "XYZ789",
-      ownerId: 42,
-      ownerUsername: "owner",
-      variant: "bitola",
-      matchMode: "1001",
-      timerStyle: "relaxed",
-      timerDurationSeconds: null,
-      status: "waiting",
-      playerCount: 2,
-      isQuickPlay: false,
-      coinBuyIn: 0,
-      isPrivate: true,
-      createdAt: "2026-04-12T00:00:00Z",
-      updatedAt: "2026-04-12T00:00:00Z",
-    });
+    store.setRoom(
+      makeRoom({
+        id: 2,
+        name: "Friends Table",
+        code: "XYZ789",
+        ownerId: 42,
+        ownerUsername: "owner",
+        variant: "bitola",
+        matchMode: "1001",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        status: "waiting",
+        playerCount: 2,
+        isQuickPlay: false,
+        coinBuyIn: 0,
+        isPrivate: true,
+        createdAt: "2026-04-12T00:00:00Z",
+        updatedAt: "2026-04-12T00:00:00Z",
+      }),
+    );
     store.setCurrentRoomId(2);
 
     const { result } = renderHook(() => useWsDispatch());
@@ -324,7 +328,7 @@ describe("useWsDispatch", () => {
 
   it("removes room from cache when status is not waiting", () => {
     queryClient.setQueryData<Room[]>(queryKeys.rooms.list("waiting"), [
-      {
+      makeRoom({
         id: 3,
         name: "Active Room",
         code: "AAA111",
@@ -341,7 +345,7 @@ describe("useWsDispatch", () => {
         isPrivate: false,
         createdAt: "2026-04-12T00:00:00Z",
         updatedAt: "2026-04-12T00:00:00Z",
-      },
+      }),
     ]);
 
     const { result } = renderHook(() => useWsDispatch());
@@ -435,6 +439,7 @@ describe("useWsDispatch", () => {
     useMatchStore.setState({
       declarationReveal: {
         winnerTeam: 0,
+        contested: false,
         declarations: [
           {
             playerSeat: 0,
