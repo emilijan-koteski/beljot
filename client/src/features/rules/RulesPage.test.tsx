@@ -15,6 +15,14 @@ function renderRules() {
   );
 }
 
+// `getAllByTestId` already throws when nothing matches, so the guard is here
+// only to narrow away `undefined` under `noUncheckedIndexedAccess`.
+function firstDiffMarker(): HTMLElement {
+  const [marker] = screen.getAllByTestId("rules-diff-marker");
+  if (!marker) throw new Error("no difference marker rendered");
+  return marker;
+}
+
 beforeEach(async () => {
   // jsdom has no scrollIntoView — the TOC jump calls it.
   Element.prototype.scrollIntoView = vi.fn();
@@ -224,7 +232,7 @@ describe("RulesPage", () => {
   it("opens a difference marker on hover", async () => {
     const user = userEvent.setup();
     renderRules();
-    const marker = screen.getAllByTestId("rules-diff-marker")[0];
+    const marker = firstDiffMarker();
     await user.hover(marker);
     expect(
       await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),
@@ -234,7 +242,7 @@ describe("RulesPage", () => {
   it("opens and dismisses a difference marker on tap", async () => {
     const user = userEvent.setup();
     renderRules();
-    const marker = screen.getAllByTestId("rules-diff-marker")[0];
+    const marker = firstDiffMarker();
     // A real touch, not a mouse click: Base UI's hover is `mouseOnly`, so this
     // is the one path that proves the marker is reachable on a phone. Hover-only
     // would pass every other test here and still be dead on a handset.

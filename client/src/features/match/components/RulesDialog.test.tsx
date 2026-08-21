@@ -7,6 +7,14 @@ import type { Variant } from "@/shared/types/matchTypes";
 
 import { RulesDialog } from "./RulesDialog";
 
+// `getAllByTestId` already throws when nothing matches, so the guard is here
+// only to narrow away `undefined` under `noUncheckedIndexedAccess`.
+function firstDiffMarker(): HTMLElement {
+  const [marker] = screen.getAllByTestId("rules-diff-marker");
+  if (!marker) throw new Error("no difference marker rendered");
+  return marker;
+}
+
 beforeEach(async () => {
   Element.prototype.scrollIntoView = vi.fn();
   await act(async () => {
@@ -204,7 +212,7 @@ describe("RulesDialog (in-game)", () => {
   it("carries the difference marker into the dark theme", async () => {
     const user = userEvent.setup();
     render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
-    const marker = screen.getAllByTestId("rules-diff-marker")[0];
+    const marker = firstDiffMarker();
     await user.hover(marker);
     expect(
       await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),

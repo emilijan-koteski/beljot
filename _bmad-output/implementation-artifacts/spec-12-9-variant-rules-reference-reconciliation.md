@@ -160,8 +160,7 @@ gates added, each proved to fail against broken content before being kept.
 **Commands:**
 
 - `cd client && npx vitest run` -- expected: all pass, including `rulesContent.parity.test.ts`, `RulesPage.test.tsx`, `RulesDialog.test.tsx`, `i18n.parity.test.ts`, `i18n.test.ts`.
-- `cd client && npx tsc -p tsconfig.build.json --noEmit` -- expected: clean. Not run in CI — run it manually.
-- `cd client && npx eslint . && npx prettier --check .` -- expected: clean.
+- `make lint` -- expected: clean. **Use this, not a bare `tsc -p tsconfig.build.json`** — the build config EXCLUDES `**/*.test.tsx`, so it cannot see type errors in tests, while `make lint` runs `npx tsc --noEmit` against the default config, which includes them. `noUncheckedIndexedAccess` makes `getAllByTestId(...)[0]` an `HTMLElement | undefined` that test-only code must narrow.
 - `cd server && go test ./...` -- expected: all pass, unchanged.
 - `git diff --stat HEAD -- server/` -- expected: empty.
 - `grep -n "Beljot" client/src/features/rules/content/*.ts` -- expected: only the four header comments.
