@@ -26,6 +26,9 @@ type mockUserRepo struct {
 	// any insert happens — lets tests inject insert-time unique violations the
 	// in-memory pre-checks can't produce naturally (concurrency races).
 	createErrs []error
+	// failUpdatePreferences mirrors the user package's mock; unused here, but the
+	// shared UpdatePreferences body reads it.
+	failUpdatePreferences error
 }
 
 func newMockUserRepo() *mockUserRepo {
@@ -90,10 +93,22 @@ func (m *mockUserRepo) SearchByUsername(string, uint, int) ([]user.User, error) 
 	return nil, nil
 }
 
-func (m *mockUserRepo) UpdateLanguagePreference(id uint, lang string) error {
+// UpdatePreferences mirrors the real repo's ALL-OR-NOTHING contract: both
+// columns are applied to the in-memory row together, so a test asserting the
+// half-applied case has to force the failure rather than rely on ordering.
+// failUpdatePreferences, when set, fails BEFORE writing anything.
+func (m *mockUserRepo) UpdatePreferences(id uint, lang *string, deck *string) error {
+	if m.failUpdatePreferences != nil {
+		return m.failUpdatePreferences
+	}
 	for _, u := range m.users {
 		if u.ID == id {
-			u.LanguagePreference = lang
+			if lang != nil {
+				u.LanguagePreference = *lang
+			}
+			if deck != nil {
+				u.CardDeckPreference = *deck
+			}
 			return nil
 		}
 	}
@@ -402,6 +417,106 @@ func TestRegister_LanguagePreference(t *testing.T) {
 			assert.Equal(t, tc.expected, data.LanguagePreference)
 		})
 	}
+}
+
+// TestRegister_CardDeckPreference pins the one derivation point (Story 12.4):
+// the deck is seeded from the RESOLVED language, so "hr" gets the Croatian deck
+// and everything else — including a language that fell back to "en" — gets
+// French. This is a first-impression default, not a lock: the player can switch
+// decks from Settings or the profile panel at any time.
+func TestRegister_CardDeckPreference(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		expectedLang string
+		expectedDeck string
+	}{
+		{
+			name:         "hr seeds the croatian deck",
+			body:         `{"email":"hr@example.com","username":"hrdeck","password":"password123","languagePreference":"hr"}`,
+			expectedLang: "hr",
+			expectedDeck: "croatian",
+		},
+		{
+			name:         "absent language seeds french",
+			body:         `{"email":"absent@example.com","username":"absentdeck","password":"password123"}`,
+			expectedLang: "en",
+			expectedDeck: "french",
+		},
+		{
+			name:         "empty language seeds french",
+			body:         `{"email":"empty@example.com","username":"emptydeck","password":"password123","languagePreference":""}`,
+			expectedLang: "en",
+			expectedDeck: "french",
+		},
+		{
+			// An unsupported code falls back to "en", and the deck must follow
+			// the RESOLVED language rather than the requested one.
+			name:         "unsupported language seeds french",
+			body:         `{"email":"fr@example.com","username":"frdeck","password":"password123","languagePreference":"fr"}`,
+			expectedLang: "en",
+			expectedDeck: "french",
+		},
+		{
+			name:         "en seeds french",
+			body:         `{"email":"en@example.com","username":"endeck","password":"password123","languagePreference":"en"}`,
+			expectedLang: "en",
+			expectedDeck: "french",
+		},
+		{
+			name:         "mk seeds french",
+			body:         `{"email":"mk@example.com","username":"mkdeck","password":"password123","languagePreference":"mk"}`,
+			expectedLang: "mk",
+			expectedDeck: "french",
+		},
+		{
+			name:         "sr seeds french",
+			body:         `{"email":"sr@example.com","username":"srdeck","password":"password123","languagePreference":"sr"}`,
+			expectedLang: "sr",
+			expectedDeck: "french",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler, e := setupHandler()
+			rec := doRegister(e, tc.body)
+
+			require.Equal(t, http.StatusCreated, rec.Code, "register should succeed; body: %s", rec.Body.String())
+
+			var resp map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+			var data RegisterResponseData
+			require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+			// Echoed on the envelope so the first card of the session already
+			// draws in the right deck, with no separate profile fetch.
+			assert.Equal(t, tc.expectedLang, data.LanguagePreference)
+			assert.Equal(t, tc.expectedDeck, data.CardDeckPreference)
+
+			// And persisted on the row, not only echoed.
+			repo, ok := handler.userRepo.(*mockUserRepo)
+			require.True(t, ok)
+			require.Len(t, repo.users, 1)
+			assert.Equal(t, tc.expectedDeck, repo.users[0].CardDeckPreference)
+		})
+	}
+}
+
+// The deck is NOT the variant. A Croatian-deck account says nothing about which
+// game variant it plays, and these two enums must never share a value.
+func TestRegister_DeckValueIsNotTheVariantValue(t *testing.T) {
+	_, e := setupHandler()
+	rec := doRegister(e, `{"email":"hr2@example.com","username":"hrvariant","password":"password123","languagePreference":"hr"}`)
+	require.Equal(t, http.StatusCreated, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data RegisterResponseData
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, user.CardDeckCroatian, data.CardDeckPreference)
+	assert.NotEqual(t, "croatia", data.CardDeckPreference, "deck is 'croatian'; 'croatia' is the game variant")
 }
 
 func TestRegister_SetsRefreshCookie(t *testing.T) {

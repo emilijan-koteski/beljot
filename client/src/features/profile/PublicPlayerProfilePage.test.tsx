@@ -151,6 +151,20 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     expect(screen.queryByTestId("profile-edit-username-button")).not.toBeInTheDocument();
   });
 
+  it("never mounts the card-deck picker (a private self-only preference)", async () => {
+    mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
+
+    renderAt("2");
+
+    await waitFor(() => expect(screen.getByTestId("public-profile-page")).toBeInTheDocument());
+    // cardDeckPreference is absent from PublicProfileResponse by construction,
+    // so a picker here could only ever edit the VIEWER's own deck from somebody
+    // else's page. It must be structurally absent, not merely disabled.
+    expect(screen.queryByTestId("profile-card-deck")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("profile-deck-option-french")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("profile-deck-option-croatian")).not.toBeInTheDocument();
+  });
+
   it("never mounts the LinkedAccounts (SSO) surface", async () => {
     mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
 

@@ -206,9 +206,9 @@ func (s *stubUserRepo) FindByUsername(string) (*user.User, error) { return nil, 
 func (s *stubUserRepo) SearchByUsername(string, uint, int) ([]user.User, error) {
 	return nil, nil
 }
-func (s *stubUserRepo) Count() (int64, error)                       { return int64(len(s.users)), nil }
-func (s *stubUserRepo) UpdateLanguagePreference(uint, string) error { return nil }
-func (s *stubUserRepo) UpdatePasswordHash(uint, string) error       { return nil }
+func (s *stubUserRepo) Count() (int64, error)                          { return int64(len(s.users)), nil }
+func (s *stubUserRepo) UpdatePreferences(uint, *string, *string) error { return nil }
+func (s *stubUserRepo) UpdatePasswordHash(uint, string) error          { return nil }
 func (s *stubUserRepo) UpdateUsername(uint, string) (time.Time, error) {
 	return time.Time{}, nil
 }

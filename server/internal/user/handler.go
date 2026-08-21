@@ -17,9 +17,10 @@ import (
 // ProfileResponse is the SELF profile DTO returned by GetProfile when the
 // path id equals the authenticated viewer (Story 11.3 made the endpoint
 // public — a foreign id now gets the narrower PublicProfileResponse instead of
-// a 403). WalletBalance, LoginStreakDays, LanguagePreference and
-// UsernameChangedAt are PRIVATE self-only figures: they are absent from
-// PublicProfileResponse and must never be added to any shared/public shape.
+// a 403). WalletBalance, LoginStreakDays, LanguagePreference,
+// CardDeckPreference and UsernameChangedAt are PRIVATE self-only figures:
+// they are absent from PublicProfileResponse and must never be added to any
+// shared/public shape.
 type ProfileResponse struct {
 	ID       uint   `json:"id"`
 	Username string `json:"username"`
@@ -27,8 +28,12 @@ type ProfileResponse struct {
 	// The client derives the change-cooldown state / next-allowed date from it.
 	UsernameChangedAt  *time.Time `json:"usernameChangedAt,omitempty"`
 	LanguagePreference string     `json:"languagePreference"`
-	WalletBalance      int        `json:"walletBalance"`
-	LoginStreakDays    int        `json:"loginStreakDays"`
+	// CardDeckPreference is the player's card-face artwork choice (Story
+	// 12.4): "french" or "croatian". PRIVATE, like LanguagePreference above —
+	// absent from PublicProfileResponse and never to be added to it.
+	CardDeckPreference string `json:"cardDeckPreference"`
+	WalletBalance      int    `json:"walletBalance"`
+	LoginStreakDays    int    `json:"loginStreakDays"`
 	// XP & level (Story 9.5). TotalXP is the lifetime total; Level is derived
 	// from it (never stored); XPIntoLevel/XPForNextLevel drive the profile XP
 	// bar (fill = XPIntoLevel / XPForNextLevel). Story 11.3 (D2) made these
@@ -75,8 +80,9 @@ type ProfileResponse struct {
 // progression (level + XP, per D2), the full honor section, and the
 // win/loss/abandoned record — and deliberately OMITS every private figure the
 // self ProfileResponse holds: Email, PasswordHash, WalletBalance,
-// LoginStreakDays, LanguagePreference, UsernameChangedAt. Every value is
-// computed for the PATH id (the subject), never the viewer — see GetProfile.
+// LoginStreakDays, LanguagePreference, CardDeckPreference, UsernameChangedAt.
+// Every value is computed for the PATH id (the subject), never the viewer — see
+// GetProfile.
 type PublicProfileResponse struct {
 	ID        uint      `json:"id"`
 	Username  string    `json:"username"`
@@ -101,8 +107,18 @@ type PublicProfileResponse struct {
 	Abandoned           int    `json:"abandoned"`
 }
 
+// UpdatePreferencesRequest is a PARTIAL update: both fields are pointers so
+// "absent" is distinguishable from "empty string". Story 12.4 made this
+// necessary — with plain strings a deck-only PATCH sent `languagePreference: ""`
+// implicitly and was rejected with INVALID_LANGUAGE, so changing your deck would
+// have meant resending your language (and vice versa).
+//
+// Every supplied field is validated before anything is written, and the write
+// itself is a single multi-column UPDATE, so a request either applies whole or
+// not at all. A body with neither field is ErrBadRequest.
 type UpdatePreferencesRequest struct {
-	LanguagePreference string `json:"languagePreference"`
+	LanguagePreference *string `json:"languagePreference"`
+	CardDeckPreference *string `json:"cardDeckPreference"`
 }
 
 var supportedLanguages = map[string]struct{}{
@@ -112,11 +128,42 @@ var supportedLanguages = map[string]struct{}{
 	"hr": {},
 }
 
+// supportedCardDecks is the card-face artwork allowlist (Story 12.4). These are
+// DECKS, not game variants: the deck is "croatian", the variant is "croatia"
+// (game.VariantCroatia). Unrelated enums — never cross-wire them.
+//
+// Validation lives here rather than in a DB CHECK, mirroring
+// language_preference: users.card_deck_preference is a bare VARCHAR(20), so
+// adding a deck is a Go change plus artwork, not a migration.
+var supportedCardDecks = map[string]struct{}{
+	CardDeckFrench:   {},
+	CardDeckCroatian: {},
+}
+
+const (
+	// CardDeckFrench is the default deck for every account that did not choose
+	// otherwise, and the value migration 000020 backfills every existing row
+	// with.
+	CardDeckFrench = "french"
+	// CardDeckCroatian is the German/Hungarian-suited deck (leaves / hearts /
+	// bells / acorns). Seeded at registration only when the chosen language is
+	// "hr".
+	CardDeckCroatian = "croatian"
+)
+
 // IsSupportedLanguage reports whether code is one of the registered UI
 // languages. Exported so the auth package can validate register-time language
 // preferences without duplicating the allowlist.
 func IsSupportedLanguage(code string) bool {
 	_, ok := supportedLanguages[code]
+	return ok
+}
+
+// IsSupportedCardDeck reports whether deck is one of the shipped card-face
+// decks. Exported for the same reason as IsSupportedLanguage: the auth package
+// seeds this preference at registration and must not restate the allowlist.
+func IsSupportedCardDeck(deck string) bool {
+	_, ok := supportedCardDecks[deck]
 	return ok
 }
 
@@ -333,6 +380,7 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 				Username:            u.Username,
 				UsernameChangedAt:   u.UsernameChangedAt,
 				LanguagePreference:  u.LanguagePreference,
+				CardDeckPreference:  u.CardDeckPreference,
 				WalletBalance:       u.WalletBalance,
 				LoginStreakDays:     u.LoginStreakDays,
 				TotalXP:             u.TotalXP,
@@ -540,19 +588,40 @@ func (h *UserHandler) UpdatePreferences(c echo.Context) error {
 		return apperr.ErrBadRequest
 	}
 
-	if _, ok := supportedLanguages[req.LanguagePreference]; !ok {
+	// Nothing to update is a client error, not a silent 200: an empty body means
+	// the caller believes it is changing something.
+	if req.LanguagePreference == nil && req.CardDeckPreference == nil {
+		return apperr.ErrBadRequest
+	}
+
+	// Validate EVERY supplied field before writing ANY of them, so a both-fields
+	// request with one bad value cannot half-apply.
+	if req.LanguagePreference != nil && !IsSupportedLanguage(*req.LanguagePreference) {
 		return apperr.ErrInvalidLanguage
 	}
-
-	if err := h.userRepo.UpdateLanguagePreference(authUserID, req.LanguagePreference); err != nil {
-		return fmt.Errorf("updating language preference: %w", err)
+	if req.CardDeckPreference != nil && !IsSupportedCardDeck(*req.CardDeckPreference) {
+		return apperr.ErrInvalidCardDeck
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"data": map[string]string{
-			"languagePreference": req.LanguagePreference,
-		},
-	})
+	// ONE statement for however many fields were supplied. Two sequential writes
+	// meant a both-fields request could commit the language and then fail on the
+	// deck, answering 500 with half the change persisted — the client reverts its
+	// optimistic deck and never learns its language moved.
+	if err := h.userRepo.UpdatePreferences(authUserID, req.LanguagePreference, req.CardDeckPreference); err != nil {
+		return fmt.Errorf("updating preferences: %w", err)
+	}
+
+	// Echo only what was written. A field the caller did not send is absent from
+	// the response rather than reported as "" — the client merges the echo into
+	// its cached user, and a blank echo would clobber the untouched preference.
+	data := map[string]string{}
+	if req.LanguagePreference != nil {
+		data["languagePreference"] = *req.LanguagePreference
+	}
+	if req.CardDeckPreference != nil {
+		data["cardDeckPreference"] = *req.CardDeckPreference
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": data})
 }
 
 type UpdateUsernameRequest struct {

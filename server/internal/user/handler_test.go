@@ -256,6 +256,13 @@ type mockUserRepo struct {
 	// simulate the DB unique-index race (pg 23505 → ErrUsernameTaken) that the
 	// handler's pre-check can't otherwise reproduce.
 	updateUsernameErr error
+	// failUpdatePreferences, when set, forces UpdatePreferences to return it
+	// WITHOUT writing anything — the only way to exercise the all-or-nothing
+	// contract, since the real repo's single UPDATE cannot half-apply by itself.
+	failUpdatePreferences error
+	// updatePreferencesCalls counts repo writes, so a test can assert the handler
+	// issues exactly ONE per request regardless of how many fields it carried.
+	updatePreferencesCalls int
 }
 
 func newMockUserRepo() *mockUserRepo {
@@ -350,10 +357,23 @@ func (m *mockUserRepo) Count() (int64, error) {
 	return int64(len(m.users)), nil
 }
 
-func (m *mockUserRepo) UpdateLanguagePreference(id uint, lang string) error {
+// UpdatePreferences mirrors the real repo's ALL-OR-NOTHING contract: both
+// columns are applied to the in-memory row together, so a test asserting the
+// half-applied case has to force the failure rather than rely on ordering.
+// failUpdatePreferences, when set, fails BEFORE writing anything.
+func (m *mockUserRepo) UpdatePreferences(id uint, lang *string, deck *string) error {
+	m.updatePreferencesCalls++
+	if m.failUpdatePreferences != nil {
+		return m.failUpdatePreferences
+	}
 	for _, u := range m.users {
 		if u.ID == id {
-			u.LanguagePreference = lang
+			if lang != nil {
+				u.LanguagePreference = *lang
+			}
+			if deck != nil {
+				u.CardDeckPreference = *deck
+			}
 			return nil
 		}
 	}
@@ -481,10 +501,13 @@ func (m *mockUserRepo) ResetHonor(userID uint) error {
 
 func (m *mockUserRepo) addUser(username, email, lang string) *user.User {
 	u := &user.User{
-		ID:                 m.nextID,
-		Username:           username,
-		Email:              email,
+		ID:       m.nextID,
+		Username: username,
+		Email:    email,
+		// Both preferences are seeded to their DB defaults so a test asserting
+		// "the other field was left alone" has a real value to compare against.
 		LanguagePreference: lang,
+		CardDeckPreference: user.CardDeckFrench,
 		CreatedAt:          time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
 	}
 	m.nextID++
@@ -591,7 +614,29 @@ func TestGetProfile_Success(t *testing.T) {
 	assert.Equal(t, uint(1), data.ID)
 	assert.Equal(t, "testuser", data.Username)
 	assert.Equal(t, "en", data.LanguagePreference)
+	assert.Equal(t, user.CardDeckFrench, data.CardDeckPreference)
 	assert.NotEmpty(t, data.CreatedAt)
+}
+
+// The self profile carries the stored deck, not a hardcoded default — a player
+// who picked Croatian and reloads must not be handed French back.
+func TestGetProfile_IncludesStoredCardDeck(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("deckuser", "deck@example.com", "hr")
+	u.CardDeckPreference = user.CardDeckCroatian
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, "1", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, user.CardDeckCroatian, data.CardDeckPreference)
 }
 
 // TestGetProfile_IncludesWalletFields pins AC #4: the self-only profile carries
@@ -942,6 +987,7 @@ func TestGetProfile_PublicProjection_NeverLeaksPrivateFields(t *testing.T) {
 	assert.NotContains(t, body, "walletBalance", "wallet must never appear on a public profile")
 	assert.NotContains(t, body, "loginStreakDays", "login streak must never appear on a public profile")
 	assert.NotContains(t, body, "languagePreference", "language preference is private")
+	assert.NotContains(t, body, "cardDeckPreference", "card deck preference is private")
 	assert.NotContains(t, body, "usernameChangedAt", "username-cooldown state is private")
 	// The public-safe fields ARE present.
 	assert.Contains(t, body, "honorScore")
@@ -1149,6 +1195,157 @@ func TestUpdatePreferences_MissingAuth(t *testing.T) {
 
 	rec := doUpdatePreferences(e, "1", `{"languagePreference":"sr"}`, "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// --- Card deck preference (Story 12.4) ---
+//
+// The endpoint is a PARTIAL update: each field is independently optional,
+// validated and written. Before 12.4 both were plain strings, so a deck-only
+// PATCH carried languagePreference:"" implicitly and 400'd with
+// INVALID_LANGUAGE — these tests are what pin that shut.
+
+func TestUpdatePreferences_DeckOnly_LeavesLanguageAlone(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "mk")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"cardDeckPreference":"croatian"}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	var resp map[string]map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.Equal(t, "croatian", resp["data"]["cardDeckPreference"])
+	// Echo only what was written: a blank languagePreference in the response
+	// would clobber the client's cached value when it merged the echo.
+	assert.NotContains(t, resp["data"], "languagePreference")
+
+	assert.Equal(t, "croatian", repo.users[0].CardDeckPreference)
+	assert.Equal(t, "mk", repo.users[0].LanguagePreference)
+}
+
+func TestUpdatePreferences_LanguageOnly_LeavesDeckAlone(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "en")
+	repo.users[0].CardDeckPreference = user.CardDeckCroatian
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"languagePreference":"mk"}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	var resp map[string]map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.Equal(t, "mk", resp["data"]["languagePreference"])
+	assert.NotContains(t, resp["data"], "cardDeckPreference")
+
+	assert.Equal(t, "mk", repo.users[0].LanguagePreference)
+	assert.Equal(t, "croatian", repo.users[0].CardDeckPreference)
+}
+
+func TestUpdatePreferences_BothFields(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"languagePreference":"hr","cardDeckPreference":"croatian"}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	var resp map[string]map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.Equal(t, "hr", resp["data"]["languagePreference"])
+	assert.Equal(t, "croatian", resp["data"]["cardDeckPreference"])
+
+	assert.Equal(t, "hr", repo.users[0].LanguagePreference)
+	assert.Equal(t, "croatian", repo.users[0].CardDeckPreference)
+}
+
+func TestUpdatePreferences_EveryDeckIsAccepted(t *testing.T) {
+	for _, deck := range []string{"french", "croatian"} {
+		t.Run(deck, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "en")
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", `{"cardDeckPreference":"`+deck+`"}`, token)
+			require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+			assert.Equal(t, deck, repo.users[0].CardDeckPreference)
+		})
+	}
+}
+
+func TestUpdatePreferences_InvalidCardDeck(t *testing.T) {
+	// "german" is the deck family the Croatian faces belong to but not a value
+	// we ship, and "croatia" is the game VARIANT — the exact cross-wiring this
+	// rejects.
+	for _, deck := range []string{"german", "croatia", "hungarian", "FRENCH", ""} {
+		t.Run(deck, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "en")
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", `{"cardDeckPreference":"`+deck+`"}`, token)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+			var errResp map[string]map[string]string
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
+			assert.Equal(t, "INVALID_CARD_DECK", errResp["error"]["code"])
+
+			assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
+		})
+	}
+}
+
+func TestUpdatePreferences_EmptyBody(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{}`, token)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+	assert.Equal(t, "en", repo.users[0].LanguagePreference)
+	assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
+}
+
+// One bad field must not let the good one through: validation runs over the
+// whole body before the first write, so the request either applies or does not.
+func TestUpdatePreferences_BothFields_OneInvalid_WritesNeither(t *testing.T) {
+	t.Run("bad deck", func(t *testing.T) {
+		repo, e := setupUserHandler()
+		u := repo.addUser("testuser", "test@example.com", "en")
+
+		token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+		require.NoError(t, err)
+
+		rec := doUpdatePreferences(e, "1", `{"languagePreference":"mk","cardDeckPreference":"german"}`, token)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Equal(t, "en", repo.users[0].LanguagePreference)
+		assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
+	})
+
+	t.Run("bad language", func(t *testing.T) {
+		repo, e := setupUserHandler()
+		u := repo.addUser("testuser", "test@example.com", "en")
+
+		token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+		require.NoError(t, err)
+
+		rec := doUpdatePreferences(e, "1", `{"languagePreference":"fr","cardDeckPreference":"croatian"}`, token)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Equal(t, "en", repo.users[0].LanguagePreference)
+		assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
+	})
 }
 
 // --- UpdateUsername tests (Change Username feature) ---
@@ -1740,6 +1937,7 @@ func TestListMatches_NoPIILeak(t *testing.T) {
 	assert.NotContains(t, body, "secret-email@example.com", "email must never be in the matches response")
 	assert.NotContains(t, body, "passwordHash")
 	assert.NotContains(t, body, "languagePreference", "language preference must not leak into matches response")
+	assert.NotContains(t, body, "cardDeckPreference", "card deck preference must not leak into matches response")
 }
 
 func strconvUint(u uint) string { return strconv.FormatUint(uint64(u), 10) }
@@ -2256,4 +2454,51 @@ func TestGetCareer_DBError(t *testing.T) {
 
 	rec := doGetCareer(e, strconvUint(u.ID), token)
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+// A both-fields request must apply WHOLE or not at all. Before the write became
+// a single multi-column UPDATE it was two sequential calls, so a failure on the
+// second answered 500 with the first change already committed — the client
+// reverts its optimistic deck and never learns its language moved.
+func TestUpdatePreferences_WriteFailure_LeavesNothingApplied(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "en")
+	repo.failUpdatePreferences = errors.New("connection reset mid-statement")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"languagePreference":"mk","cardDeckPreference":"croatian"}`, token)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+
+	// Neither column moved. The repo is the atomicity boundary; the handler just
+	// has to make ONE call to it.
+	assert.Equal(t, "en", repo.users[0].LanguagePreference)
+	assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
+}
+
+// The handler must reach the repo exactly once, whatever the field count — that
+// single call is what the atomicity guarantee rests on.
+func TestUpdatePreferences_IssuesOneWritePerRequest(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "deck only", body: `{"cardDeckPreference":"croatian"}`},
+		{name: "language only", body: `{"languagePreference":"mk"}`},
+		{name: "both", body: `{"languagePreference":"mk","cardDeckPreference":"croatian"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "en")
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", tc.body, token)
+			require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+			assert.Equal(t, 1, repo.updatePreferencesCalls)
+		})
+	}
 }

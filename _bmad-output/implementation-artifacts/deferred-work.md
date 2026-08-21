@@ -944,3 +944,28 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A â€
   reason_deferred: Writing a per-variant summary is product copy in four locales, and it overlaps the rules-reference reconciliation that was split out of this story. The old hint ("Only Bitola for now") had to go regardless, since it became false.
   evidence: `lobby.createRoomModal.variantHint` reads "Bitola or Croatian rules" in en, duplicating the `variantBitola` / `variantCroatia` labels rendered directly above it. With no per-variant rules content either, the difference (all eight cards dealt and free-suit taking, versus 5+3 with a face-up candidate) is stated nowhere in the UI.
   update_2026-08-20: Owner assigned to **Story 12.9**, which owns the per-variant rules copy this hint should point at.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-4-card-deck-style-preference.md`
+  summary: `LEGACY_INK_CLASS` in `TrumpIndicator.tsx` is a dead per-suit Tailwind class map kept alive only so four pre-existing test assertions keep matching.
+  reason_deferred: Deleting the map and repointing those four assertions at the accent is cleaner than the comment defending it, but it means editing pre-existing tests, which is risk this story did not need to take.
+  evidence: The component's own comment concedes the map has never carried colour (the inline `color` always wins). It also has no Croatian equivalent, so the `.text-red-500` / `.text-text-primary` assertions only hold on the French deck, by accident rather than design.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-4-card-deck-style-preference.md`
+  summary: Both deck importers hardcode owner-machine source paths and there is no checked-in manifest or checksum for the source art, so a re-import cannot be verified.
+  reason_deferred: The art is owner-authored and lives outside the repo; committing a manifest is a separate decision about where masters live.
+  evidence: `scripts/import-croatian-deck.py` defaults to `D:\Downloads\Croatian Card Deck` and `scripts/import-croatian-suits.py` to the same path plus ` (1)`, differing only by a suffix. Both accept an override argument, so they are reproducible only for someone holding identical sources. Nothing validates that the `AQ`->`AD` / `TQ`->`TD` remap still points at bells; that correctness claim lives only in prose.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-4-card-deck-style-preference.md`
+  summary: `cardDeckPreference` rides the self-profile DTO on both sides but the client never reads it, so store-vs-row drift never reconciles.
+  reason_deferred: Language has `reconcileLanguagePreference` for exactly this; giving the deck an equivalent is a small but independent behaviour, and no known path currently produces the drift.
+  evidence: Every client read goes through `useAuthStore((s) => s.user?.cardDeckPreference)`, including `CardDeckPanel` â€” which sits on the very page whose profile query already carries the server's fresh value. A deck changed in another tab, or a PATCH that succeeded server-side with a lost response, leaves the panel showing a stale selection with nothing to settle it.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-4-card-deck-style-preference.md`
+  summary: The in-match language picker fires concurrent PATCHes with no latest-wins guard, the same race being fixed for the deck picker in this story.
+  reason_deferred: Pre-existing on every language surface (`LanguageSelector`, `SettingsDialog`, `reconcileLanguage`); fixing it here would have widened an already-wide story, and fixing only one of the two is what leaves the inconsistency.
+  evidence: `handleLanguageChange` captures `previousPreference` before its own request and reverts to it on failure. Two fast switches whose responses land out of order leave the auth store and the row disagreeing, with no error surfaced. Story 12.4 added a sequence guard to the deck paths only, so the two pickers in the same dialog now behave differently under the same abuse.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-12-4-card-deck-style-preference.md`
+  summary: `TestDeclarationPhase_TimerExpiryOnLastSeatOpensTrick1` in `server/internal/match` is flaky and fails intermittently on a clean tree, so `make test` is not reliably green independent of any story.
+  reason_deferred: Pre-existing and unrelated to the card deck; it belongs to Story 12.6's declaration phase. Surfaced incidentally because Story 12.4 ran the Go suite repeatedly.
+  evidence: Proven pre-existing, not inferred: checked out baseline 89e7964 into a clean detached worktree with NONE of Story 12.4's changes and ran the test with `-count=5` -- it failed there. The assertion is `declaration_phase_test.go:134` via `:256`, failing with "-1 is not greater than or equal to 0" and the message "the resolving answer must emit event:declarations_resolved", i.e. a broadcast-index lookup returns -1 because the expected event has not been emitted yet when the assertion runs. Timing-sensitive on the timer-expiry path. Full suite runs do often pass, which is what makes it a flake rather than a hard failure: `go test ./...` was fully green on 2026-08-21 across two separate runs of the same code.

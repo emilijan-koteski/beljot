@@ -1,9 +1,11 @@
 import "@/shared/i18n/i18n";
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { PlayerState } from "@/shared/types/matchTypes";
+import { makeUser } from "@/test-utils";
 
 import { TrumpReveal } from "./TrumpReveal";
 
@@ -359,5 +361,125 @@ describe("TrumpReveal — Wax Seal", () => {
     );
     const panel = screen.getByTestId("trump-reveal").querySelector("[data-team]");
     expect(panel?.getAttribute("data-team")).toBe("silver");
+  });
+});
+
+// --- Scope Amendment 1: the wax seal follows the active deck ---
+//
+// The seal is the largest suit mark in the app (30 px), which is what set the
+// icon resolution, so it is also where a wrong accent is most visible.
+describe("TrumpReveal card deck", () => {
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  function signIn(deck: "french" | "croatian") {
+    useAuthStore.setState({ user: makeUser({ cardDeckPreference: deck }), isLoading: false });
+  }
+
+  it("draws the Croatian icon and rings the seal in that suit's accent", () => {
+    signIn("croatian");
+    render(
+      <TrumpReveal
+        playerSeat={2}
+        myPlayerSeat={0}
+        cardId=""
+        trumpSuit="S"
+        players={makePlayers()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    const mark = screen.getByTestId("suit-mark-S");
+    expect(mark.tagName).toBe("IMG");
+    expect(mark).toHaveAttribute("src", "/suits/croatian/S.webp");
+
+    // Leaves are green, so the wax ring must not be the French near-black.
+    // rgb() because jsdom re-serialises hex in `border`.
+    const seal = screen.getByTestId("trump-reveal-seal");
+    expect(seal.style.borderColor).toBe("rgb(74, 122, 58)");
+    expect(seal.style.borderColor).not.toBe("rgb(26, 26, 26)");
+    // The testid and data-suit contract is unchanged by the deck.
+    expect(seal).toHaveAttribute("data-suit", "S");
+  });
+
+  it("names the trump suit in the active deck's vocabulary", () => {
+    signIn("croatian");
+    render(
+      <TrumpReveal
+        playerSeat={2}
+        myPlayerSeat={0}
+        cardId=""
+        trumpSuit="D"
+        players={makePlayers()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    // The seal's aria-label IS the suit name, and the body copy repeats it.
+    expect(screen.getByTestId("trump-reveal-seal")).toHaveAttribute("aria-label", "Bells");
+    expect(screen.getByTestId("trump-reveal").textContent).not.toContain("Diamonds");
+  });
+
+  // Item 13: SUIT_INK_ON_FELT was pinned as a table but nothing asserted that
+  // TrumpReveal actually READS it — repointing the body copy at SUIT_ACCENT
+  // would have wrecked legibility on both decks with no test failing.
+  it("inks the suit word with the on-felt palette, not the parchment accent", () => {
+    signIn("croatian");
+    const { container } = render(
+      <TrumpReveal
+        playerSeat={2}
+        myPlayerSeat={0}
+        cardId=""
+        trumpSuit="D"
+        players={makePlayers()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    // SUIT_INK_ON_FELT.croatian.D = #e8c766 (lifted), NOT SUIT_ACCENT's #c9a23c:
+    // the parchment gold is unreadable on dark felt.
+    const inked = Array.from(container.querySelectorAll("b")).map(
+      (b) => (b as HTMLElement).style.color,
+    );
+    expect(inked).toContain("rgb(232, 199, 102)");
+    expect(inked).not.toContain("rgb(201, 162, 60)");
+  });
+
+  it("inks the French suit word with the pre-existing lifted red", () => {
+    signIn("french");
+    const { container } = render(
+      <TrumpReveal
+        playerSeat={2}
+        myPlayerSeat={0}
+        cardId=""
+        trumpSuit="H"
+        players={makePlayers()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    // #ff8585 — `--suit-red-up`, exactly what shipped before this story.
+    const inked = Array.from(container.querySelectorAll("b")).map(
+      (b) => (b as HTMLElement).style.color,
+    );
+    expect(inked).toContain("rgb(255, 133, 133)");
+  });
+
+  it("keeps the French seal exactly as it was", () => {
+    signIn("french");
+    render(
+      <TrumpReveal
+        playerSeat={2}
+        myPlayerSeat={0}
+        cardId=""
+        trumpSuit="H"
+        players={makePlayers()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("suit-mark-H")).toHaveTextContent("♥");
+    expect(screen.getByTestId("trump-reveal-seal").style.borderColor).toBe("rgb(198, 40, 40)");
   });
 });

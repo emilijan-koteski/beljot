@@ -1,6 +1,6 @@
 // API response types — keep in sync with server models
 
-import type { MatchMode, Variant } from "./matchTypes";
+import type { CardDeck, MatchMode, Variant } from "./matchTypes";
 
 export interface ApiResponse<T> {
   data: T;
@@ -18,6 +18,13 @@ export interface User {
   username: string;
   email: string;
   languagePreference: string;
+  // Card-face artwork the match renders with (Story 12.4): "french" |
+  // "croatian". PURELY VISUAL — it feeds `cardFaceUrl` and nothing else, so no
+  // gameplay, engine, WS payload or bot behaviour reads it. Typed as `CardDeck`
+  // rather than `string` so a typo cannot silently resolve to a missing asset
+  // path. NOT the game variant: the deck is "croatian", the variant is
+  // "croatia" (see `Variant` in matchTypes).
+  cardDeckPreference: CardDeck;
   // Wallet fields (Story 9.1). Go zero values (0) serialize as real numbers, not
   // null — never use JS truthiness on these; compare explicitly (e.g. > 1).
   walletBalance: number;

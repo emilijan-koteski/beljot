@@ -7,11 +7,15 @@ import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
 import { isCardId } from "@/shared/lib/cardId";
 import { Z } from "@/shared/lib/zLayers";
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 
+import { resolveCardDeck } from "../lib/cardFace";
+import { rankNameKey, suitAccent, suitInkOnFelt, suitNameKey } from "../lib/suitArt";
 import { seatTeam, teamColors } from "../lib/tableTheme";
 import { AutoCloseRing } from "./overlay/AutoCloseRing";
 import { PlayingCard } from "./PlayingCard";
+import { SuitMark } from "./SuitMark";
 
 interface TrumpRevealProps {
   /** Seat index of the player who took the trump. */
@@ -31,69 +35,8 @@ interface TrumpRevealProps {
   onComplete: () => void;
 }
 
-const SUIT_NAME: Record<Suit, string> = {
-  S: "Spades",
-  H: "Hearts",
-  D: "Diamonds",
-  C: "Clubs",
-};
-
-const SUIT_GLYPH: Record<Suit, string> = {
-  S: "♠",
-  H: "♥",
-  D: "♦",
-  C: "♣",
-};
-
-const RANK_NAME: Record<Rank, string> = {
-  "7": "Seven",
-  "8": "Eight",
-  "9": "Nine",
-  T: "Ten",
-  J: "Jack",
-  Q: "Queen",
-  K: "King",
-  A: "Ace",
-};
-
 function parseCardId(id: string) {
   return { rank: id[0] as Rank, suit: id[1] as Suit };
-}
-
-function suitNameKey(suit: Suit): "spades" | "hearts" | "diamonds" | "clubs" {
-  switch (suit) {
-    case "S":
-      return "spades";
-    case "H":
-      return "hearts";
-    case "D":
-      return "diamonds";
-    case "C":
-      return "clubs";
-  }
-}
-
-function rankNameKey(
-  rank: Rank,
-): "seven" | "eight" | "nine" | "ten" | "jack" | "queen" | "king" | "ace" {
-  switch (rank) {
-    case "7":
-      return "seven";
-    case "8":
-      return "eight";
-    case "9":
-      return "nine";
-    case "T":
-      return "ten";
-    case "J":
-      return "jack";
-    case "Q":
-      return "queen";
-    case "K":
-      return "king";
-    case "A":
-      return "ace";
-  }
 }
 
 /**
@@ -141,6 +84,9 @@ export function TrumpReveal({
   // would let `"10S"` through and parseCardId would slice it into rank "1",
   // suit "0" rather than rejecting it. This is defence in depth at the boundary;
   // dispatch already drops both shapes.
+  // Must sit above the early return below — hooks cannot run conditionally.
+  const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
+
   if (!visible || (cardId !== "" && !isCardId(cardId))) {
     return null;
   }
@@ -156,15 +102,12 @@ export function TrumpReveal({
   // rather than the "free pick" eyebrow.
   const isFreePick = card !== null && card.suit !== trumpSuit;
 
-  const suitName = t(`match.suits.${suitNameKey(trumpSuit)}`, {
-    defaultValue: SUIT_NAME[trumpSuit],
-  });
-  const candidateRankName = card
-    ? t(`match.ranks.${rankNameKey(card.rank)}`, { defaultValue: RANK_NAME[card.rank] })
-    : "";
-  const candidateSuitName = card
-    ? t(`match.suits.${suitNameKey(card.suit)}`, { defaultValue: SUIT_NAME[card.suit] })
-    : "";
+  // Deck-aware, like the seal's mark: a gold bell is announced and captioned
+  // "Bells", never "Diamonds". No English defaultValue — the key set is gated by
+  // the i18n parity test, so a missing leaf is a test failure, not a fallback.
+  const suitName = t(suitNameKey(trumpSuit, deck));
+  const candidateRankName = card ? t(rankNameKey(card.rank)) : "";
+  const candidateSuitName = card ? t(suitNameKey(card.suit, deck)) : "";
 
   // Viewer-relative team color for the glow, avatar fill, and Us/Them chip.
   // Falls back to brass when the viewer's seat hasn't resolved yet.
@@ -174,10 +117,14 @@ export function TrumpReveal({
   const teamLabel = team ? t(team === "gold" ? "team.us" : "team.them") : null;
   const avatarTeam = team === "gold" ? "A" : team === "silver" ? "B" : null;
 
-  // Wax-seal ring + chosen-suit accent: red for ♥/♦, near-black for ♠/♣.
-  const redChosen = trumpSuit === "H" || trumpSuit === "D";
-  const sealRing = redChosen ? "#c62828" : "#1a1a1a";
-  const chosenColor = redChosen ? "#ff8585" : "#f5f2e8";
+  // Wax-seal ring: the active deck's accent for the chosen suit, so the ring
+  // round a Croatian bell is its gold and not the French red.
+  const sealRing = suitAccent(trumpSuit, deck);
+  // The suit word inside the body copy sits on dark felt, not parchment, so it
+  // keeps its own lifted pair rather than reusing the seal accent: `--suit-red`
+  // is unreadable there, which is what `--suit-red-up` exists for. Still not an
+  // H/D test — a per-suit lookup, one entry per deck.
+  const chosenColor = suitInkOnFelt(trumpSuit, deck);
 
   const eyebrow = isFreePick
     ? t("match.trumpReveal.eyebrowFreeChoice", { defaultValue: "Trump taken · free pick" })
@@ -271,17 +218,15 @@ export function TrumpReveal({
             data-suit={trumpSuit}
             aria-label={suitName}
           >
-            <span
-              style={{
-                color: sealRing,
-                fontSize: 30,
-                lineHeight: 1,
-                fontFamily: "var(--font-suit)",
-                textShadow: "0 1px 1px rgba(0,0,0,0.25)",
-              }}
-            >
-              {SUIT_GLYPH[trumpSuit]}
-            </span>
+            <SuitMark
+              suit={trumpSuit}
+              deck={deck}
+              size={30}
+              // `shadow`, not style.textShadow: the icon branch needs
+              // `drop-shadow` for the same effect, and SuitMark owns that split.
+              shadow="0 1px 1px rgba(0,0,0,0.25)"
+              style={{ fontFamily: "var(--font-suit)" }}
+            />
           </div>
         </div>
 
@@ -336,7 +281,6 @@ export function TrumpReveal({
             {t("match.trumpReveal.candidateOnTable", {
               rank: candidateRankName,
               suit: candidateSuitName,
-              defaultValue: `${RANK_NAME[card.rank]} of ${SUIT_NAME[card.suit]} was on the table`,
             })}
           </div>
         )}

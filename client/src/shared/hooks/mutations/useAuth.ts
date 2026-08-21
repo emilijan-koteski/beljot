@@ -15,6 +15,7 @@ import {
   ssoLogin,
 } from "@/shared/api/auth";
 import { useAuthStore } from "@/shared/stores/authStore";
+import type { CardDeck } from "@/shared/types/matchTypes";
 
 function setAuthState(res: {
   token: string;
@@ -22,6 +23,7 @@ function setAuthState(res: {
   username: string;
   email: string;
   languagePreference: string;
+  cardDeckPreference: CardDeck;
   walletBalance: number;
   loginStreakDays: number;
   totalXp: number;
@@ -37,6 +39,7 @@ function setAuthState(res: {
     username: res.username,
     email: res.email,
     languagePreference: res.languagePreference,
+    cardDeckPreference: res.cardDeckPreference,
     walletBalance: res.walletBalance,
     loginStreakDays: res.loginStreakDays,
     totalXp: res.totalXp,

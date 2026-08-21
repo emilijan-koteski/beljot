@@ -21,6 +21,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     username: "testuser",
     email: "test@example.com",
     languagePreference: "en",
+    cardDeckPreference: "french",
     walletBalance: 5000,
     loginStreakDays: 0,
     totalXp: 0,

@@ -39,6 +39,11 @@ type RegisterResponseData struct {
 	Username           string `json:"username"`
 	Email              string `json:"email"`
 	LanguagePreference string `json:"languagePreference"`
+	// CardDeckPreference is the card-face artwork the client renders with
+	// (Story 12.4). Echoed on the auth envelope for the same reason as
+	// level/honor above: the FIRST card the player sees must already be in
+	// their chosen deck, without waiting on a separate profile fetch.
+	CardDeckPreference string `json:"cardDeckPreference"`
 	WalletBalance      int    `json:"walletBalance"`
 	LoginStreakDays    int    `json:"loginStreakDays"`
 	// XP & level (Story 9.5) — read-only echoes so the top-nav banner has the
@@ -180,6 +185,7 @@ func authResponseData(u *user.User, accessToken string) RegisterResponseData {
 		Username:           u.Username,
 		Email:              u.Email,
 		LanguagePreference: u.LanguagePreference,
+		CardDeckPreference: u.CardDeckPreference,
 		WalletBalance:      u.WalletBalance,
 		LoginStreakDays:    u.LoginStreakDays,
 		TotalXP:            u.TotalXP,
@@ -231,6 +237,18 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		lang = req.LanguagePreference
 	}
 
+	// Seed the card deck from the RESOLVED language (Story 12.4): somebody
+	// registering in Croatian grew up on the German-suited deck, so that is the
+	// better first impression than the French one. Every other language — and
+	// every fallback to "en" above — gets French. Derived from `lang`, not from
+	// req.LanguagePreference, so an unsupported code cannot pick a deck the
+	// account's actual language does not match. Purely visual and changeable at
+	// any time from Settings or the profile panel; the deck is NOT the variant.
+	deck := user.CardDeckFrench
+	if lang == "hr" {
+		deck = user.CardDeckCroatian
+	}
+
 	// Seed the wallet at registration (Story 9.1): balance 5000, streak 0, and
 	// last_login stamped to today (UTC). Stamping today is what makes the
 	// same-day bootstrap a no-grant and the FIRST grant land on the next
@@ -249,6 +267,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		Username:           req.Username,
 		PasswordHash:       hash,
 		LanguagePreference: lang,
+		CardDeckPreference: deck,
 		WalletBalance:      5000,
 		LoginStreakDays:    0,
 		LastLoginAt:        &today,

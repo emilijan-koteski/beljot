@@ -27,7 +27,18 @@ type UserRepository interface {
 	FindManyByIDs(ids []uint) ([]User, error)
 	// Count returns the total number of registered (non-soft-deleted) users.
 	Count() (int64, error)
-	UpdateLanguagePreference(id uint, lang string) error
+	// UpdatePreferences writes the supplied preference columns in ONE statement.
+	// A nil argument means "leave that column alone", so a deck-only PATCH does
+	// not have to resend the language and vice versa (Story 12.4).
+	//
+	// One statement, not two, is the point: with sequential per-column writes a
+	// both-fields request whose second write failed answered 500 with the FIRST
+	// change already committed, leaving the client's optimistic state and the row
+	// disagreeing with no way to tell. Either both land or neither does.
+	//
+	// Returns ErrUserNotFound when no row matches. Passing two nils is a
+	// programming error and returns ErrBadRequest rather than a no-op UPDATE.
+	UpdatePreferences(id uint, lang *string, deck *string) error
 	// UpdatePasswordHash replaces the user's bcrypt password hash (used by the
 	// password-reset flow). Returns ErrUserNotFound when no row matches.
 	UpdatePasswordHash(id uint, hash string) error

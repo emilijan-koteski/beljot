@@ -1,8 +1,12 @@
 import { useTranslation } from "react-i18next";
 
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { Suit, TeamString } from "@/shared/types/matchTypes";
 
+import { resolveCardDeck } from "../lib/cardFace";
+import { suitAccent, suitGlowAlpha, suitNameKey } from "../lib/suitArt";
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
+import { SuitMark } from "./SuitMark";
 
 interface TrumpIndicatorProps {
   trumpSuit: Suit;
@@ -16,20 +20,6 @@ interface TrumpIndicatorProps {
   viewerTeam?: TeamString | null;
 }
 
-const SUIT_SYMBOL: Record<Suit, string> = {
-  S: "♠",
-  H: "♥",
-  D: "♦",
-  C: "♣",
-};
-
-const SUIT_NAME_KEY: Record<Suit, string> = {
-  S: "match.suits.spades",
-  H: "match.suits.hearts",
-  D: "match.suits.diamonds",
-  C: "match.suits.clubs",
-};
-
 const TEAM_NAME_KEY: Record<TeamString, string> = {
   teamA: "team.a",
   teamB: "team.b",
@@ -39,12 +29,19 @@ function callerTeam(seat: number): TeamString {
   return seat % 2 === 0 ? "teamA" : "teamB";
 }
 
-function suitColor(suit: Suit): string {
-  // Spades/clubs are slightly off-black on the parchment orb so the glyph
-  // doesn't crush against the cream background. Hearts/diamonds use the
-  // suit-red token (with a hex fallback for stand-alone test renders).
-  return suit === "H" || suit === "D" ? "var(--suit-red, #c62828)" : "var(--suit-black, #1a1a1a)";
-}
+/**
+ * Tailwind ink class for the glyph, kept only because four pre-existing tests
+ * assert on it. It has NEVER carried colour — the inline `color` from
+ * SUIT_ACCENT wins over a class — and it is a per-suit lookup rather than the
+ * red/black conditional it replaced, so no `H/D` test survives in this file.
+ * Glyph-only: the Croatian marks are images and ignore it.
+ */
+const LEGACY_INK_CLASS: Record<Suit, string> = {
+  S: "text-text-primary",
+  H: "text-red-500",
+  D: "text-red-500",
+  C: "text-text-primary",
+};
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
 const INK = "var(--ink-light, #f5f2e8)";
@@ -67,12 +64,21 @@ export function TrumpIndicator({
   viewerTeam,
 }: TrumpIndicatorProps) {
   const { t } = useTranslation();
+  const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
+  // Every channel of the orb's chrome — border, radial tint, glow — plus the
+  // glyph ink comes from this one accent. Before Scope Amendment 1 all four were
+  // keyed off `suit === "H" || suit === "D"`, which would have painted a red
+  // halo around the Croatian gold bell and a black one around the green leaf.
+  const accent = suitAccent(trumpSuit, deck);
+  const glowAlpha = suitGlowAlpha(trumpSuit, deck);
 
   const team: TeamString | null =
     typeof trumpCallerSeat === "number" ? callerTeam(trumpCallerSeat) : null;
 
   const callerName = trumpCallerName?.trim() || null;
-  const suitName = t(SUIT_NAME_KEY[trumpSuit]);
+  // Deck-aware: the caption beside a gold bell must read "Bells", not
+  // "Diamonds". Same lookup feeds the visible text and the aria-label below.
+  const suitName = t(suitNameKey(trumpSuit, deck));
 
   // Viewer-relative Us/Them when both caller team + viewerTeam are known,
   // otherwise the legacy neutral Team A / Team B label.
@@ -108,11 +114,6 @@ export function TrumpIndicator({
         ? t("match.trumpIndicator.labelWithTeam", { suit: suitName, team: teamName })
         : t("match.trumpIndicator.label", { suit: suitName });
 
-  // SuitColor for the small inline glyph next to the suit name. Uses Tailwind
-  // classes (and not raw vars) so the existing `text-text-primary` / `text-red-500`
-  // tests stay green even without the `.game-table` scope.
-  const suitClass = trumpSuit === "H" || trumpSuit === "D" ? "text-red-500" : "text-text-primary";
-
   // Container border:
   //  • legacy mode → border-team-a / border-team-b (drives existing tests).
   //  • viewer-relative → brass border (the team chip carries the team color).
@@ -147,24 +148,17 @@ export function TrumpIndicator({
         style={{
           width: 44,
           height: 44,
-          background: `radial-gradient(circle, ${
-            trumpSuit === "H" || trumpSuit === "D" ? "#c6282822" : "#1a1a1a22"
-          }, transparent 70%), linear-gradient(180deg, #fdfaf0, #f0e8d0)`,
-          border: `2px solid ${trumpSuit === "H" || trumpSuit === "D" ? "#c62828" : "#1a1a1a"}`,
-          boxShadow: `0 0 16px ${
-            trumpSuit === "H" || trumpSuit === "D" ? "#c6282877" : "#1a1a1a55"
-          }, inset 0 1px 0 rgba(255,255,255,0.6)`,
+          background: `radial-gradient(circle, ${accent}22, transparent 70%), linear-gradient(180deg, #fdfaf0, #f0e8d0)`,
+          border: `2px solid ${accent}`,
+          boxShadow: `0 0 16px ${accent}${glowAlpha}, inset 0 1px 0 rgba(255,255,255,0.6)`,
         }}
       >
-        <span
-          className={`${suitClass} font-display font-semibold leading-none`}
-          style={{
-            color: suitColor(trumpSuit),
-            fontSize: 22,
-          }}
-        >
-          {SUIT_SYMBOL[trumpSuit]}
-        </span>
+        <SuitMark
+          suit={trumpSuit}
+          deck={deck}
+          size={22}
+          className={`${LEGACY_INK_CLASS[trumpSuit]} font-display font-semibold leading-none`}
+        />
       </div>
 
       <div className="flex flex-col min-w-0">

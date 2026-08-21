@@ -2,6 +2,7 @@ import type { AxiosError, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
 import { useAuthStore } from "@/shared/stores/authStore";
+import type { CardDeck } from "@/shared/types/matchTypes";
 
 const BASE_URL = "/api/v1";
 
@@ -126,6 +127,7 @@ async function doRefresh(): Promise<string> {
         username: string;
         email: string;
         languagePreference: string;
+        cardDeckPreference: CardDeck;
         walletBalance: number;
         loginStreakDays: number;
         totalXp: number;
@@ -147,6 +149,7 @@ async function doRefresh(): Promise<string> {
         username: r.username,
         email: r.email,
         languagePreference: r.languagePreference,
+        cardDeckPreference: r.cardDeckPreference,
         walletBalance: r.walletBalance,
         loginStreakDays: r.loginStreakDays,
         totalXp: r.totalXp,

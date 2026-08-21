@@ -9,6 +9,25 @@ export type CardId = `${Rank}${Suit}`;
 
 export type Variant = "bitola" | "croatia";
 
+/**
+ * The card-face artwork a player has chosen (Story 12.4). `french` is the
+ * original French-suited deck; `croatian` is the German/Hungarian-suited deck
+ * (leaves / hearts / bells / acorns).
+ *
+ * PURELY VISUAL — it selects assets and nothing else. No gameplay, engine, WS
+ * payload or bot behaviour reads it.
+ *
+ * NOT the game variant. This is `croatian`; the variant is `croatia` (see
+ * `Variant` above). Two unrelated enums that happen to share a country — a
+ * Croatian-variant room does not imply the Croatian deck.
+ *
+ * Lives here beside `Suit` and `Variant` because it is a wire value carried on
+ * the auth envelope and the profile DTO: `shared/` must not reach into
+ * `features/` for the type of one of its own fields. `features/match/lib/cardFace`
+ * re-exports it for the render code that lives next to it.
+ */
+export type CardDeck = "french" | "croatian";
+
 // The race target for a match. Stringly-typed end to end until now (D139): the
 // server sends "1001"/"501" as a string and every consumer re-tested it with a
 // bare === against a string literal, so a typo produced a silent fallback

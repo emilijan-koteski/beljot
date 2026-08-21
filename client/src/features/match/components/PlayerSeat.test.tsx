@@ -1,9 +1,11 @@
 import "@/shared/i18n/i18n";
 
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { PlayerState } from "@/shared/types/matchTypes";
+import { makeUser } from "@/test-utils";
 
 import { PlayerSeat } from "./PlayerSeat";
 
@@ -192,6 +194,105 @@ describe("PlayerSeat", () => {
     );
 
     expect(screen.getByTestId("player-seat-caller-chip")).toHaveTextContent("♥");
+  });
+
+  // --- Scope Amendment 1: the seat trump chip follows the active deck ---
+  describe("trump chip card deck", () => {
+    afterEach(() => {
+      useAuthStore.setState({ token: null, user: null, isLoading: false });
+    });
+
+    it("draws the Croatian icon and rings the chip in that suit's accent", () => {
+      useAuthStore.setState({
+        user: makeUser({ cardDeckPreference: "croatian" }),
+        isLoading: false,
+      });
+      render(
+        <PlayerSeat
+          player={makePlayer()}
+          isSelf={false}
+          isActive={false}
+          seatTeam="silver"
+          trumpCallerSuit="C"
+        />,
+      );
+
+      const mark = screen.getByTestId("suit-mark-C");
+      expect(mark.tagName).toBe("IMG");
+      expect(mark).toHaveAttribute("src", "/suits/croatian/C.webp");
+      // Acorns are brown, so the chip's border and glow must not be the French
+      // black they would have been before the amendment.
+      const chip = screen.getByTestId("player-seat-caller-chip");
+      expect(chip.style.borderColor).toBe("rgb(150, 80, 30)");
+      expect(chip.style.boxShadow).toContain("#96501e99");
+      expect(chip.style.boxShadow).not.toContain("#1a1a1a");
+    });
+
+    it("titles the chip in the active deck's vocabulary, localized", () => {
+      useAuthStore.setState({
+        user: makeUser({ cardDeckPreference: "croatian" }),
+        isLoading: false,
+      });
+      render(
+        <PlayerSeat
+          player={makePlayer()}
+          isSelf={false}
+          isActive={false}
+          seatTeam="silver"
+          trumpCallerSuit="D"
+        />,
+      );
+
+      // Was a hardcoded English `Called ${SUIT_NAME[suit]}` on a French-only
+      // map: a Croatian-deck player got "Called Diamonds" over a gold bell,
+      // untranslated in every locale.
+      expect(screen.getByTestId("player-seat-caller-chip")).toHaveAttribute(
+        "title",
+        "Called Bells",
+      );
+    });
+
+    it("titles the chip with the French name on the French deck", () => {
+      useAuthStore.setState({
+        user: makeUser({ cardDeckPreference: "french" }),
+        isLoading: false,
+      });
+      render(
+        <PlayerSeat
+          player={makePlayer()}
+          isSelf={false}
+          isActive={false}
+          seatTeam="silver"
+          trumpCallerSuit="D"
+        />,
+      );
+
+      expect(screen.getByTestId("player-seat-caller-chip")).toHaveAttribute(
+        "title",
+        "Called Diamonds",
+      );
+    });
+
+    it("keeps the French chip exactly as it was", () => {
+      useAuthStore.setState({
+        user: makeUser({ cardDeckPreference: "french" }),
+        isLoading: false,
+      });
+      render(
+        <PlayerSeat
+          player={makePlayer()}
+          isSelf={false}
+          isActive={false}
+          seatTeam="silver"
+          trumpCallerSuit="H"
+        />,
+      );
+
+      expect(screen.getByTestId("player-seat-caller-chip")).toHaveTextContent("♥");
+      const chip = screen.getByTestId("player-seat-caller-chip");
+      expect(chip.style.borderColor).toBe("rgb(198, 40, 40)");
+      expect(chip.style.boxShadow).toContain("#c6282899");
+    });
   });
 
   it("renders both chips stacked when the seat is dealer AND trump caller", () => {

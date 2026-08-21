@@ -7,6 +7,7 @@ import { useProfileQuery } from "@/shared/hooks/queries/useProfile";
 import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
+import { CardDeckPanel } from "./components/CardDeckPanel";
 import { IdentityHero } from "./components/IdentityHero";
 import { LinkedAccounts } from "./components/LinkedAccounts";
 import { Milestones } from "./components/Milestones";
@@ -163,6 +164,11 @@ export function ProfilePage() {
 
         <aside className="flex flex-col gap-3.5 lg:sticky lg:top-20" data-testid="profile-sidebar">
           <LinkedAccounts userId={user?.id} />
+
+          {/* Outside the `career` gate below: the deck is a preference read
+              from the auth store, not career data, so it must still render for
+              a brand-new account whose career query has nothing to show. */}
+          <CardDeckPanel />
 
           {career.isError ? (
             <p className="text-ink-mute text-sm" data-testid="profile-career-error">

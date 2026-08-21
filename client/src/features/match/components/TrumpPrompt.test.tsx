@@ -4,7 +4,146 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAuthStore } from "@/shared/stores/authStore";
+import { makeUser } from "@/test-utils";
+
 import { TrumpPrompt } from "./TrumpPrompt";
+
+// --- Scope Amendment 1: the suit picker shows the deck the player will see ---
+describe("TrumpPrompt card deck", () => {
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  function signIn(deck: "french" | "croatian") {
+    useAuthStore.setState({ user: makeUser({ cardDeckPreference: deck }), isLoading: false });
+  }
+
+  it("draws Croatian icons on all four picker tiles", () => {
+    signIn("croatian");
+    render(
+      <TrumpPrompt
+        trumpCandidate={null}
+        biddingRound={2}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+
+    for (const suit of ["S", "H", "D", "C"] as const) {
+      const mark = screen.getByTestId(`suit-mark-${suit}`);
+      expect(mark.tagName).toBe("IMG");
+      expect(mark).toHaveAttribute("src", `/suits/croatian/${suit}.webp`);
+    }
+    // Tile ink follows the accent too — a bells tile is gold, not French red.
+    // rgb() because jsdom re-serialises hex in `color`.
+    expect(screen.getByTestId("trump-prompt-suit-D").style.color).toBe("rgb(201, 162, 60)");
+  });
+
+  it("keeps the French tiles on glyphs, unchanged", () => {
+    signIn("french");
+    render(
+      <TrumpPrompt
+        trumpCandidate={null}
+        biddingRound={2}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("suit-mark-H")).toHaveTextContent("♥");
+    expect(screen.getByTestId("suit-mark-H").tagName).toBe("SPAN");
+    expect(screen.getByTestId("trump-prompt-suit-H").style.color).toBe("rgb(198, 40, 40)");
+  });
+
+  it("names each tile in the ACTIVE DECK's vocabulary, not the French one", () => {
+    signIn("croatian");
+    render(
+      <TrumpPrompt
+        trumpCandidate={null}
+        biddingRound={2}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+
+    // The mark is decorative, so the button's aria-label is the ONLY thing a
+    // screen-reader user gets — and a gold bell announced as "Diamonds" is the
+    // defect this pins shut. Names follow the deck exactly as the artwork does.
+    for (const suit of ["S", "H", "D", "C"] as const) {
+      expect(screen.getByTestId(`trump-prompt-suit-${suit}`)).toBeInTheDocument();
+    }
+    expect(screen.getByLabelText("Bells")).toBeInTheDocument();
+    expect(screen.getByLabelText("Leaves")).toBeInTheDocument();
+    expect(screen.getByLabelText("Acorns")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Diamonds")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Spades")).not.toBeInTheDocument();
+  });
+
+  it("keeps the French names on the French deck", () => {
+    signIn("french");
+    render(
+      <TrumpPrompt
+        trumpCandidate={null}
+        biddingRound={2}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Diamonds")).toBeInTheDocument();
+    expect(screen.getByLabelText("Spades")).toBeInTheDocument();
+  });
+
+  // Item 13: three of four seats see the WAITING branch during bidding, and its
+  // "considering" chips are deck-aware too — every other deck test here renders
+  // the active bidder.
+  it("draws Croatian icons on the waiting view's considering chips", () => {
+    signIn("croatian");
+    render(
+      <TrumpPrompt
+        trumpCandidate={null}
+        biddingRound={2}
+        isActiveBidder={false}
+        activePlayerName="Bob"
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+
+    for (const suit of ["S", "H", "D", "C"] as const) {
+      const chip = screen.getByTestId(`trump-prompt-considering-${suit}`);
+      expect(chip).toBeInTheDocument();
+      const mark = screen.getByTestId(`suit-mark-${suit}`);
+      expect(mark.tagName).toBe("IMG");
+      expect(mark).toHaveAttribute("src", `/suits/croatian/${suit}.webp`);
+    }
+    // Bells chip ink is gold, not the French red.
+    expect(screen.getByTestId("trump-prompt-considering-D").style.color).toBe("rgb(201, 162, 60)");
+    expect(screen.getByLabelText("Bells")).toBeInTheDocument();
+  });
+
+  it("keeps the waiting view's considering chips on glyphs for the French deck", () => {
+    signIn("french");
+    render(
+      <TrumpPrompt
+        trumpCandidate={null}
+        biddingRound={2}
+        isActiveBidder={false}
+        activePlayerName="Bob"
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("suit-mark-D").tagName).toBe("SPAN");
+    expect(screen.getByTestId("trump-prompt-considering-D").style.color).toBe("rgb(198, 40, 40)");
+  });
+});
 
 const trumpCandidate = { rank: "K" as const, suit: "H" as const };
 

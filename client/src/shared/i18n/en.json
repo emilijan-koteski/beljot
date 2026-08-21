@@ -22,6 +22,11 @@
   },
   "profile": {
     "title": "Profile",
+    "cardDeck": {
+      "eyebrow": "Appearance",
+      "title": "Card deck",
+      "description": "Choose the artwork your cards are drawn with."
+    },
     "eyebrow": "Profile",
     "memberSince": "Member since {{date}}",
     "winRate": "Win rate",
@@ -307,6 +312,10 @@
     "sr": "Srpski",
     "mk": "Македонски",
     "hr": "Hrvatski"
+  },
+  "cardDeck": {
+    "croatian": "Croatian suits",
+    "french": "French suits"
   },
   "date": {
     "format": "{{month}} {{day}}, {{year}}",
@@ -762,6 +771,7 @@
   "match": {
     "seat": {
       "waiting": "Waiting…",
+      "calledSuit": "Called {{suit}}",
       "you": "You"
     },
     "chat": {
@@ -777,22 +787,6 @@
     "notMember": "You're not a player in this match. Returning to lobby…",
     "roomNotFound": "Match not found. Returning to lobby…",
     "leaveConfirm": "Leave the game? You may lose your progress.",
-    "suits": {
-      "spades": "Spades",
-      "hearts": "Hearts",
-      "diamonds": "Diamonds",
-      "clubs": "Clubs"
-    },
-    "ranks": {
-      "seven": "Seven",
-      "eight": "Eight",
-      "nine": "Nine",
-      "ten": "Ten",
-      "jack": "Jack",
-      "queen": "Queen",
-      "king": "King",
-      "ace": "Ace"
-    },
     "trumpIndicator": {
       "trump": "Trump",
       "label": "Trump suit: {{suit}}",
@@ -924,6 +918,34 @@
       "bonusUs": "+{{points}} to us",
       "bonusThem": "+{{points}} to them"
     },
+    "card": {
+      "label": "{{rank}} of {{suit}}",
+      "faceDown": "face-down card",
+      "rank": {
+        "7": "Seven",
+        "8": "Eight",
+        "9": "Nine",
+        "T": "Ten",
+        "J": "Jack",
+        "Q": "Queen",
+        "K": "King",
+        "A": "Ace"
+      },
+      "suit": {
+        "french": {
+          "S": "Spades",
+          "H": "Hearts",
+          "D": "Diamonds",
+          "C": "Clubs"
+        },
+        "croatian": {
+          "S": "Leaves",
+          "H": "Hearts",
+          "D": "Bells",
+          "C": "Acorns"
+        }
+      }
+    },
     "matchResult": {
       "title": "Match Complete",
       "winnerUs": "We Won!",
@@ -1016,6 +1038,7 @@
     "settings": {
       "title": "Settings",
       "languageHeading": "Language",
+      "deckHeading": "Card deck",
       "close": "Close"
     },
     "settlement": {

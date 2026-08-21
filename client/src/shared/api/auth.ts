@@ -1,6 +1,7 @@
 import type { AxiosError } from "axios";
 
 import { axiosPublic, FetchError } from "@/shared/api/axiosClient";
+import type { CardDeck } from "@/shared/types/matchTypes";
 
 export interface RegisterRequest {
   email: string;
@@ -15,6 +16,10 @@ export interface RegisterResponse {
   username: string;
   email: string;
   languagePreference: string;
+  // Card deck (Story 12.4) — echoed on the auth envelope so the FIRST card of
+  // the session already draws in the player's chosen deck, with no separate
+  // profile fetch. Seeded `croatian` at registration only when `hr` was picked.
+  cardDeckPreference: CardDeck;
   walletBalance: number;
   loginStreakDays: number;
   // XP & level (Story 9.5) — echoed on auth so the top-nav banner has them on
@@ -43,6 +48,8 @@ export interface RefreshResponse {
   username: string;
   email: string;
   languagePreference: string;
+  // Card deck (Story 12.4) — see RegisterResponse.
+  cardDeckPreference: CardDeck;
   walletBalance: number;
   loginStreakDays: number;
   // XP & level (Story 9.5) — see RegisterResponse.

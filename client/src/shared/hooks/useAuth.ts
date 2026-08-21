@@ -47,6 +47,7 @@ export function useAuthInit(): void {
           username: res.username,
           email: res.email,
           languagePreference: res.languagePreference,
+          cardDeckPreference: res.cardDeckPreference,
           walletBalance: res.walletBalance,
           loginStreakDays: res.loginStreakDays,
           totalXp: res.totalXp,

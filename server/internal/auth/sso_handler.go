@@ -165,6 +165,10 @@ func (h *AuthHandler) createSSOUser(email, displayName string) (*user.User, erro
 			Username:           username,
 			PasswordHash:       "",
 			LanguagePreference: "en",
+			// SSO carries no language input, so there is nothing to derive a deck
+			// from — French, matching the "en" above. The player switches decks
+			// from Settings or the profile panel like anyone else (Story 12.4).
+			CardDeckPreference: user.CardDeckFrench,
 			WalletBalance:      5000,
 			LoginStreakDays:    0,
 			LastLoginAt:        &today,

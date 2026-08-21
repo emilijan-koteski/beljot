@@ -2,15 +2,19 @@ import { Trans, useTranslation } from "react-i18next";
 
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import { Z } from "@/shared/lib/zLayers";
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { Card, Suit } from "@/shared/types/matchTypes";
 
-import { CARD_FACE_BACKGROUND, CARD_FACE_BORDER } from "../lib/cardFace";
+import type { CardDeck } from "../lib/cardFace";
+import { CARD_FACE_BACKGROUND, CARD_FACE_BORDER, resolveCardDeck } from "../lib/cardFace";
+import { suitAccent, suitNameKey } from "../lib/suitArt";
 import { type SeatTeam, teamColors } from "../lib/tableTheme";
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 import { PlayingCard } from "./PlayingCard";
+import { SuitMark } from "./SuitMark";
 
 interface TrumpPromptProps {
   trumpCandidate: Card | null;
@@ -43,23 +47,6 @@ interface TrumpPromptProps {
 
 const SUITS: Suit[] = ["S", "H", "D", "C"];
 
-const SUIT_SYMBOL: Record<Suit, string> = {
-  S: "♠",
-  H: "♥",
-  D: "♦",
-  C: "♣",
-};
-
-// Card-on-white suit colors — these buttons read like miniature playing cards,
-// so use the deep card-red (`--suit-red`) rather than the lifted variant
-// (`--suit-red-up`) which is only legible on dark felt.
-const SUIT_COLOR: Record<Suit, string> = {
-  S: "var(--suit-black, #1a1a1a)",
-  H: "var(--suit-red, #c62828)",
-  D: "var(--suit-red, #c62828)",
-  C: "var(--suit-black, #1a1a1a)",
-};
-
 /**
  * The four-suit picker grid. One definition serves every case that needs it:
  * Bitola round 2 (where the candidate's suit is locked out as "spent"), and
@@ -76,9 +63,11 @@ const SUIT_COLOR: Record<Suit, string> = {
 function SuitPickerGrid({
   lockedSuit,
   onPick,
+  deck,
 }: {
   lockedSuit: Suit | null;
   onPick: (suit: Suit) => void;
+  deck: CardDeck;
 }) {
   const { t } = useTranslation();
   return (
@@ -92,7 +81,7 @@ function SuitPickerGrid({
             disabled={isLocked}
             aria-disabled={isLocked}
             onClick={() => onPick(suit)}
-            aria-label={t(`match.suits.${suitName(suit)}`)}
+            aria-label={t(suitNameKey(suit, deck))}
             data-testid={`trump-prompt-suit-${suit}`}
             className="flex items-center justify-center rounded-md transition-[filter,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-(--felt-deep,#072a14) disabled:cursor-not-allowed not-disabled:cursor-pointer not-disabled:hover:brightness-105 not-disabled:motion-safe:hover:-translate-y-0.5"
             style={{
@@ -100,7 +89,9 @@ function SuitPickerGrid({
               background: CARD_FACE_BACKGROUND,
               border: CARD_FACE_BORDER,
               boxShadow: "0 3px 6px rgba(0,0,0,0.3)",
-              color: SUIT_COLOR[suit],
+              // Tile ink is the deck's accent, so a Croatian bell tile is not
+              // labelled with the French red it has nothing to do with.
+              color: suitAccent(suit, deck),
               fontFamily: "var(--font-suit)",
               fontSize: 28,
               lineHeight: 1,
@@ -108,7 +99,7 @@ function SuitPickerGrid({
               filter: isLocked ? "grayscale(0.85)" : undefined,
             }}
           >
-            <span aria-hidden="true">{SUIT_SYMBOL[suit]}</span>
+            <SuitMark suit={suit} deck={deck} size={28} />
           </button>
         );
       })}
@@ -168,6 +159,9 @@ export function TrumpPrompt({
 }: TrumpPromptProps) {
   const { t } = useTranslation();
   const promptRef = useFocusTrap<HTMLDivElement>();
+  // Resolved above the early return below, so the waiting view's "considering"
+  // row and the active bidder's picker grid draw the same deck.
+  const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
   const showRing = isActiveBidder && Boolean(turnExpiresAt) && (timerDurationSec ?? 0) > 0;
 
   if (!isActiveBidder) {
@@ -235,7 +229,7 @@ export function TrumpPrompt({
                   return (
                     <span
                       key={suit}
-                      aria-label={t(`match.suits.${suitName(suit)}`)}
+                      aria-label={t(suitNameKey(suit, deck))}
                       aria-disabled={isLocked}
                       data-locked={isLocked ? "true" : undefined}
                       data-testid={`trump-prompt-considering-${suit}`}
@@ -246,7 +240,7 @@ export function TrumpPrompt({
                         background: CARD_FACE_BACKGROUND,
                         border: CARD_FACE_BORDER,
                         boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
-                        color: SUIT_COLOR[suit],
+                        color: suitAccent(suit, deck),
                         fontFamily: "var(--font-suit)",
                         fontSize: 15,
                         lineHeight: 1,
@@ -254,7 +248,7 @@ export function TrumpPrompt({
                         filter: isLocked ? "grayscale(0.85)" : undefined,
                       }}
                     >
-                      <span aria-hidden="true">{SUIT_SYMBOL[suit]}</span>
+                      <SuitMark suit={suit} deck={deck} size={15} />
                     </span>
                   );
                 })}
@@ -336,7 +330,11 @@ export function TrumpPrompt({
               )}
               {/* With a candidate, its suit is spent and locked out. With none,
                   every suit is on the table and nothing is locked. */}
-              <SuitPickerGrid lockedSuit={trumpCandidate?.suit ?? null} onPick={onPick} />
+              <SuitPickerGrid
+                lockedSuit={trumpCandidate?.suit ?? null}
+                onPick={onPick}
+                deck={deck}
+              />
             </>
           )}
 
@@ -405,17 +403,4 @@ export function TrumpPrompt({
       </div>
     </OverlayBackdrop>
   );
-}
-
-function suitName(suit: Suit): "spades" | "hearts" | "diamonds" | "clubs" {
-  switch (suit) {
-    case "S":
-      return "spades";
-    case "H":
-      return "hearts";
-    case "D":
-      return "diamonds";
-    case "C":
-      return "clubs";
-  }
 }

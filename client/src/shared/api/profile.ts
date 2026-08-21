@@ -1,4 +1,5 @@
 import { axiosClient } from "@/shared/api/axiosClient";
+import type { CardDeck } from "@/shared/types/matchTypes";
 
 export interface ProfileResponse {
   id: number;
@@ -7,6 +8,10 @@ export interface ProfileResponse {
   // client-side change-cooldown UX (see shared/lib/usernameChange).
   usernameChangedAt?: string | null;
   languagePreference: string;
+  // Card deck (Story 12.4) — PRIVATE, self-only, deliberately absent from
+  // PublicProfileResponse below. Mirrors the server DTO; the auth envelope is
+  // what the renderer actually reads.
+  cardDeckPreference: CardDeck;
   createdAt: string;
   totalGamesPlayed: number;
   wins: number;
@@ -66,8 +71,24 @@ export interface PublicProfileResponse {
   honorTrendDirection: string;
 }
 
+/**
+ * A PARTIAL preferences update — both fields are optional, and the server
+ * validates and writes each independently (Story 12.4). Sending only the deck
+ * leaves the language untouched and vice versa; a body with neither is a 400.
+ */
 export interface UpdatePreferencesRequest {
-  languagePreference: string;
+  languagePreference?: string;
+  cardDeckPreference?: CardDeck;
+}
+
+/**
+ * The server echoes back ONLY the fields it wrote, so both keys are optional
+ * here too. Merging a `cardDeckPreference: undefined` into the cached user is a
+ * no-op; merging an echoed `""` would have clobbered the untouched preference.
+ */
+export interface UpdatePreferencesResponse {
+  languagePreference?: string;
+  cardDeckPreference?: CardDeck;
 }
 
 export function getProfile(userId: number): Promise<ProfileResponse> {
@@ -87,7 +108,7 @@ export function getPublicProfile(userId: number): Promise<PublicProfileResponse>
 export function updatePreferences(
   userId: number,
   prefs: UpdatePreferencesRequest,
-): Promise<{ languagePreference: string }> {
+): Promise<UpdatePreferencesResponse> {
   return axiosClient.patch(`/users/${userId}/preferences`, prefs);
 }
 

@@ -107,7 +107,7 @@ func (u *fakeUserRepo) SearchByUsername(string, uint, int) ([]user.User, error) 
 }
 func (u *fakeUserRepo) FindByID(uint) (*user.User, error)              { panic("unused") }
 func (u *fakeUserRepo) FindManyByIDs([]uint) ([]user.User, error)      { panic("unused") }
-func (u *fakeUserRepo) UpdateLanguagePreference(uint, string) error    { panic("unused") }
+func (u *fakeUserRepo) UpdatePreferences(uint, *string, *string) error { panic("unused") }
 func (u *fakeUserRepo) UpdatePasswordHash(uint, string) error          { panic("unused") }
 func (u *fakeUserRepo) UpdateUsername(uint, string) (time.Time, error) { panic("unused") }
 func (u *fakeUserRepo) AddXP(map[uint]int) (map[uint]int, error)       { panic("unused") }

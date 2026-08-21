@@ -3,10 +3,14 @@ import { useTranslation } from "react-i18next";
 
 import { botDisplayName } from "@/shared/lib/botName";
 import { MOTION } from "@/shared/lib/motion";
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { PlayerState, Suit } from "@/shared/types/matchTypes";
 
+import { resolveCardDeck } from "../lib/cardFace";
+import { suitAccent, suitNameKey } from "../lib/suitArt";
 import { type SeatTeam, teamColors, teamLabelKey } from "../lib/tableTheme";
 import { isCountdownUrgent, useTurnCountdown } from "../lib/turnCountdown";
+import { SuitMark } from "./SuitMark";
 import { TimerRing } from "./TimerRing";
 
 export type SeatOrientation = "bottom" | "left" | "top" | "right";
@@ -44,24 +48,6 @@ interface PlayerSeatProps {
    * their size. Defaults to the desktop layout.
    */
   compact?: boolean;
-}
-
-const SUIT_GLYPH: Record<Suit, string> = {
-  S: "♠",
-  H: "♥",
-  D: "♦",
-  C: "♣",
-};
-
-const SUIT_NAME: Record<Suit, string> = {
-  S: "Spades",
-  H: "Hearts",
-  D: "Diamonds",
-  C: "Clubs",
-};
-
-function suitColorHex(suit: Suit): string {
-  return suit === "H" || suit === "D" ? "#c62828" : "#1a1a1a";
 }
 
 const AVATAR_DISC_PX = 64;
@@ -236,6 +222,8 @@ export function PlayerSeat({
   // external label rendered inside the name pill (next to the team label).
   // Returns 0 when there's no expiry, so an empty/inactive seat costs nothing.
   const secondsLeft = useTurnCountdown(turnExpiresAt ?? null);
+  // Same reason this sits above the early return: hooks cannot run conditionally.
+  const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
 
   if (!player) {
     return (
@@ -294,13 +282,16 @@ export function PlayerSeat({
 
   const callerChipNode = trumpCallerSuit ? (
     <StatusChip
-      borderColor={suitColorHex(trumpCallerSuit)}
-      textColor={suitColorHex(trumpCallerSuit)}
-      glowColor={`${suitColorHex(trumpCallerSuit)}99`}
-      title={`Called ${SUIT_NAME[trumpCallerSuit]}`}
+      borderColor={suitAccent(trumpCallerSuit, deck)}
+      textColor={suitAccent(trumpCallerSuit, deck)}
+      glowColor={`${suitAccent(trumpCallerSuit, deck)}99`}
+      // Localized AND deck-aware. This was `Called ${SUIT_NAME[suit]}` —
+      // hardcoded English on a French-only name map, so a Croatian-deck player
+      // reading Macedonian got an English "Called Diamonds" over a gold bell.
+      title={t("match.seat.calledSuit", { suit: t(suitNameKey(trumpCallerSuit, deck)) })}
       testId="player-seat-caller-chip"
     >
-      <span style={{ fontSize: 18, lineHeight: 1 }}>{SUIT_GLYPH[trumpCallerSuit]}</span>
+      <SuitMark suit={trumpCallerSuit} deck={deck} size={18} />
     </StatusChip>
   ) : null;
 

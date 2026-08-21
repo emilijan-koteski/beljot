@@ -40,7 +40,7 @@ func (f *fakeLevelRepo) SearchByUsername(string, uint, int) ([]User, error) {
 func (f *fakeLevelRepo) FindByID(uint) (*User, error)                   { panic("unused") }
 func (f *fakeLevelRepo) FindManyByIDs([]uint) ([]User, error)           { panic("unused") }
 func (f *fakeLevelRepo) Count() (int64, error)                          { panic("unused") }
-func (f *fakeLevelRepo) UpdateLanguagePreference(uint, string) error    { panic("unused") }
+func (f *fakeLevelRepo) UpdatePreferences(uint, *string, *string) error { panic("unused") }
 func (f *fakeLevelRepo) UpdatePasswordHash(uint, string) error          { panic("unused") }
 func (f *fakeLevelRepo) UpdateUsername(uint, string) (time.Time, error) { panic("unused") }
 func (f *fakeLevelRepo) AddXP(map[uint]int) (map[uint]int, error)       { panic("unused") }

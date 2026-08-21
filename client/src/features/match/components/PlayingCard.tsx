@@ -1,9 +1,11 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { Card, CardId, Rank, Suit } from "@/shared/types/matchTypes";
 
-import type { CardSize } from "../lib/cardFace";
-import { CARD_FACE_BACKGROUND, CARD_SIZES, cardFaceUrl } from "../lib/cardFace";
+import type { CardDeck, CardSize } from "../lib/cardFace";
+import { CARD_FACE_BACKGROUND, CARD_SIZES, cardFaceUrl, resolveCardDeck } from "../lib/cardFace";
 
 export type CardState = "default" | "playable" | "unplayable" | "face-down";
 export type { CardSize };
@@ -23,30 +25,17 @@ interface PlayingCardProps {
   glowColor?: string;
 }
 
-const RANK_FULL_NAME: Record<Rank, string> = {
-  "7": "Seven",
-  "8": "Eight",
-  "9": "Nine",
-  T: "Ten",
-  J: "Jack",
-  Q: "Queen",
-  K: "King",
-  A: "Ace",
-};
+// The deck's 32 IDs, as the two axes that produce them. Used both to warm the
+// deck and (via the i18n key suffix) to name a card — the rank and suit
+// CHARACTERS are the contract in both places, so there is no English table here
+// to drift out of sync with the locale files.
+const RANKS: Rank[] = ["7", "8", "9", "T", "J", "Q", "K", "A"];
+const SUITS: Suit[] = ["S", "H", "D", "C"];
 
-const SUIT_FULL_NAME: Record<Suit, string> = {
-  S: "Spades",
-  H: "Hearts",
-  D: "Diamonds",
-  C: "Clubs",
-};
-
-// Derived from the a11y label maps rather than declared again, so a second
-// rank/suit table can't drift out of sync with the one the labels use.
-const RANKS = Object.keys(RANK_FULL_NAME) as Rank[];
-const SUITS = Object.keys(SUIT_FULL_NAME) as Suit[];
-
-let deckWarmed = false;
+// Keyed by deck, not a single boolean: with one latch the FIRST deck mounted won
+// for the page's lifetime, so a player who switched decks mid-session got no
+// warm-up at all for the deck they were actually looking at.
+const decksWarmed = new Set<CardDeck>();
 // Preloads must stay reachable: a detached, still-loading `Image` is eligible
 // for collection in some engines, which cancels the request mid-flight and warms
 // the deck only partially.
@@ -62,18 +51,19 @@ const warmed: HTMLImageElement[] = [];
  * opening deal instant needs `<link rel="preload">` in `index.html` or warming
  * on match entry, which is a separate change.
  *
- * Runs once per page load. Guarded on `document` rather than `Image` because
- * jsdom defines `Image` — it just never fetches — so an `Image` guard would not
- * keep this out of the test environment.
+ * Runs once PER DECK per page load — switching decks mid-session warms the new
+ * one, and switching back does not refetch. Guarded on `document` rather than
+ * `Image` because jsdom defines `Image` — it just never fetches — so an `Image`
+ * guard would not keep this out of the test environment.
  */
-function warmDeck(): void {
-  if (deckWarmed || typeof document === "undefined") return;
-  deckWarmed = true;
+function warmDeck(deck: CardDeck): void {
+  if (decksWarmed.has(deck) || typeof document === "undefined") return;
+  decksWarmed.add(deck);
 
   for (const rank of RANKS) {
     for (const suit of SUITS) {
       const img = new Image();
-      img.src = cardFaceUrl(`${rank}${suit}`);
+      img.src = cardFaceUrl(`${rank}${suit}`, deck);
       warmed.push(img);
     }
   }
@@ -96,13 +86,18 @@ const DEFAULT_GLOW_HALO = "rgba(0, 229, 160, 0.8)";
  *                    transparent"); cursor flips to not-allowed.
  *  • `face-down`  — parchment-on-wood back with the "B" monogram.
  *
- * Face-up cards render the vendored deck SVG for their ID over a parchment
- * background. The artwork's own face rect is transparent and its ink is already
+ * Face-up cards render the face artwork for their ID out of the player's ACTIVE
+ * DECK ({@link resolveCardDeck}) over a parchment background. On the French
+ * deck the artwork's own face rect is transparent and its ink is already
  * retargeted onto `--suit-red` / `--suit-black` (see `scripts/recolor-cards.mjs`),
  * so there is no blend layer: the pips sit directly on {@link
- * CARD_FACE_BACKGROUND} at their exact token colour. That background therefore
- * doubles as the fallback — a face that has not loaded, or cannot, degrades to a
- * blank card rather than a hole in the hand.
+ * CARD_FACE_BACKGROUND} at their exact token colour. (The Croatian deck is opaque
+ * raster and simply covers it.) That background therefore doubles as the
+ * fallback — a face that has not loaded, or cannot, degrades to a blank card
+ * rather than a hole in the hand.
+ *
+ * The deck is the ONLY thing the preference changes. Card IDs, geometry, states,
+ * glow, the face-down back and every `data-testid` are identical either way.
  *
  * The image is decorative (`alt=""`, `aria-hidden`) — the wrapper's `aria-label`
  * is the one announcement — and pointer-transparent, so the wrapper owns every
@@ -110,8 +105,9 @@ const DEFAULT_GLOW_HALO = "rgba(0, 229, 160, 0.8)";
  *
  * Geometry comes from {@link CARD_SIZES}: an exact 5:7 box so the artwork is
  * never stretched, and a corner radius equal to the artwork's own so the two
- * edges coincide. The card draws no CSS border — the artwork strokes its own
- * outline, and a second one would leave a seam at the corners.
+ * edges coincide — the Croatian faces are encoded to the same 5:7, so both decks
+ * share it. The card draws no CSS border — the artwork strokes its own outline,
+ * and a second one would leave a seam at the corners.
  *
  * The lime glow is driven by `.game-table` CSS vars, so tests rendering the card
  * standalone fall back to the literal hex in {@link DEFAULT_GLOW}.
@@ -124,13 +120,20 @@ export function PlayingCard({
   withTransition = true,
   glowColor = DEFAULT_GLOW,
 }: PlayingCardProps) {
+  const { t } = useTranslation();
+  // The one place the active deck is resolved. Subscribing through the store
+  // selector is what makes a mid-match deck change re-skin the table with no
+  // reload and no interruption to play: the preference write re-renders every
+  // mounted card, and each one re-derives its own face URL.
+  const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
+
   const isFaceDown = state === "face-down" || card === null;
   const isPlayable = state === "playable";
   const isUnplayable = state === "unplayable";
 
   useEffect(() => {
-    warmDeck();
-  }, []);
+    warmDeck(deck);
+  }, [deck]);
 
   const handleClick = () => {
     if (isPlayable && onClick) {
@@ -145,9 +148,15 @@ export function PlayingCard({
     }
   };
 
+  // Composed from a locale-owned template plus a PER-DECK suit name, so each
+  // locale controls word order and case, and a Croatian card is never announced
+  // as a French suit (a bells seven is "bundeva", not "karo").
   const ariaLabel = isFaceDown
-    ? "face-down card"
-    : `${RANK_FULL_NAME[card!.rank]} of ${SUIT_FULL_NAME[card!.suit]}`;
+    ? t("match.card.faceDown")
+    : t("match.card.label", {
+        rank: t(`match.card.rank.${card!.rank}`),
+        suit: t(`match.card.suit.${deck}.${card!.suit}`),
+      });
 
   const dims = CARD_SIZES[size];
   const boxStyle = {
@@ -168,6 +177,8 @@ export function PlayingCard({
     : "";
 
   const cardId: CardId | undefined = card ? `${card.rank}${card.suit}` : undefined;
+  // One expression feeding both `key` and `src`, so they can never disagree.
+  const faceUrl = cardId !== undefined ? cardFaceUrl(cardId, deck) : undefined;
   const role = isPlayable ? "button" : undefined;
 
   // Lime halo on playable cards. Two channels: a 2 px ring for the green
@@ -257,20 +268,35 @@ export function PlayingCard({
         boxShadow: playableGlow,
       }}
     >
-      {/* `object-fill` is the default, and deliberate: the face is authored with
-          `preserveAspectRatio="none"`, and the box is an exact 5:7 to match, so
+      {/* `object-fill` is the default, and deliberate: the French faces are
+          authored with `preserveAspectRatio="none"` and the Croatian ones are
+          encoded to 5:7 at import time, and the box is an exact 5:7 to match, so
           filling the box is an identity scale rather than a distortion. */}
       <img
-        src={cardFaceUrl(cardId!)}
+        // Keyed by the resolved URL so a NEW node mounts whenever the source
+        // changes. Without it React reuses this element across src changes, and
+        // the imperative `visibility: hidden` below outlives the failure that
+        // set it: one transient miss on the French face left the card blank for
+        // the page's lifetime and survived switching to the Croatian deck, whose
+        // asset was perfectly fine.
+        key={faceUrl}
+        src={faceUrl}
         alt=""
         aria-hidden="true"
         draggable={false}
         className="pointer-events-none absolute inset-0 h-full w-full"
         // A missing asset does NOT 404 in production — the SPA fallback serves
         // index.html with a 200, which browsers paint as a broken-image glyph.
-        // Hiding the element degrades to a blank parchment card instead.
+        // Hiding the element degrades to a blank parchment card instead. Also
+        // covers a deck whose artwork has not shipped yet.
         onError={(e) => {
           e.currentTarget.style.visibility = "hidden";
+        }}
+        // Clears a stale hide if the same node ever does resolve — belt to the
+        // key's braces, and the only thing that recovers a node whose src did
+        // not change.
+        onLoad={(e) => {
+          e.currentTarget.style.visibility = "";
         }}
       />
     </div>

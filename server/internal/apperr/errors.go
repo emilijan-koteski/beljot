@@ -71,6 +71,10 @@ var (
 	// User domain errors
 	ErrUserNotFound    = NewAppError("USER_NOT_FOUND", "user not found", http.StatusNotFound)
 	ErrInvalidLanguage = NewAppError("INVALID_LANGUAGE", "language must be one of: en, sr, mk, hr", http.StatusBadRequest)
+	// ErrInvalidCardDeck rejects an unknown card-deck style on
+	// PATCH /users/:id/preferences (Story 12.4). These are DECK values, not game
+	// variants: "croatian" is a deck, "croatia" is a variant.
+	ErrInvalidCardDeck = NewAppError("INVALID_CARD_DECK", "card deck must be one of: french, croatian", http.StatusBadRequest)
 	// Change-username errors. ErrUsernameUnchanged guards the no-op case (new
 	// name equals current) so a redundant submit never consumes the cooldown.
 	// ErrUsernameChangeTooSoon is 429 Too Many Requests — a rate limit, not a

@@ -12,6 +12,15 @@ type User struct {
 	Username           string `gorm:"uniqueIndex;not null" json:"username"`
 	PasswordHash       string `gorm:"not null" json:"-"`
 	LanguagePreference string `gorm:"default:en;not null" json:"languagePreference"`
+	// CardDeckPreference selects which artwork the 32 card faces are drawn from
+	// (Story 12.4, migration 000020): "french" or "croatian". PURELY VISUAL —
+	// the client derives asset paths from it and nothing else reads it; card
+	// IDs, card values, and every engine/WS payload are identical either way.
+	//
+	// NOT the game variant. rooms.variant is "bitola" / "croatia"; this is
+	// "french" / "croatian". Unrelated enums that happen to share a country —
+	// never cross-wire them.
+	CardDeckPreference string `gorm:"default:french;not null" json:"cardDeckPreference"`
 	// Wallet fields (Story 9.1). State lives on the users table rather than a
 	// dedicated wallet table; the wallet domain package owns the mutation logic.
 	// WalletBalance default mirrors migration 000009 / wallet.StartingBalance.

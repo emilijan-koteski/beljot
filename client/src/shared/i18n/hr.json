@@ -22,6 +22,11 @@
   },
   "profile": {
     "title": "Profil",
+    "cardDeck": {
+      "eyebrow": "Izgled",
+      "title": "Špil karata",
+      "description": "Odaberite grafiku kojom se crtaju vaše karte."
+    },
     "eyebrow": "Profil",
     "memberSince": "Član od {{date}}",
     "winRate": "Postotak pobjeda",
@@ -307,6 +312,10 @@
     "sr": "Srpski",
     "mk": "Македонски",
     "hr": "Hrvatski"
+  },
+  "cardDeck": {
+    "croatian": "Hrvatske karte",
+    "french": "Francuske karte"
   },
   "date": {
     "format": "{{day}}. {{month}} {{year}}.",
@@ -762,6 +771,7 @@
   "match": {
     "seat": {
       "waiting": "Čeka se…",
+      "calledSuit": "Zvao {{suit}}",
       "you": "Ti"
     },
     "chat": {
@@ -777,22 +787,6 @@
     "notMember": "Nisi igrač u ovom meču. Povratak u lobi…",
     "roomNotFound": "Meč nije pronađen. Povratak u lobi…",
     "leaveConfirm": "Napustiti igru? Možeš izgubiti napredak.",
-    "suits": {
-      "spades": "Pik",
-      "hearts": "Herc",
-      "diamonds": "Karo",
-      "clubs": "Tref"
-    },
-    "ranks": {
-      "seven": "Sedmica",
-      "eight": "Osmica",
-      "nine": "Devetka",
-      "ten": "Desetka",
-      "jack": "Dečko",
-      "queen": "Dama",
-      "king": "Kralj",
-      "ace": "As"
-    },
     "trumpIndicator": {
       "trump": "Adut",
       "label": "Adut: {{suit}}",
@@ -924,6 +918,34 @@
       "bonusUs": "+{{points}} za nas",
       "bonusThem": "+{{points}} za njih"
     },
+    "card": {
+      "label": "{{suit}} {{rank}}",
+      "faceDown": "zatvorena karta",
+      "rank": {
+        "7": "sedmica",
+        "8": "osmica",
+        "9": "devetka",
+        "T": "desetka",
+        "J": "dečko",
+        "Q": "dama",
+        "K": "kralj",
+        "A": "as"
+      },
+      "suit": {
+        "french": {
+          "S": "Pik",
+          "H": "Herc",
+          "D": "Karo",
+          "C": "Tref"
+        },
+        "croatian": {
+          "S": "Zelje",
+          "H": "Srce",
+          "D": "Bundeva",
+          "C": "Žir"
+        }
+      }
+    },
     "matchResult": {
       "title": "Meč je završen",
       "winnerUs": "Mi smo pobijedili!",
@@ -1016,6 +1038,7 @@
     "settings": {
       "title": "Postavke",
       "languageHeading": "Jezik",
+      "deckHeading": "Špil karata",
       "close": "Zatvori"
     },
     "settlement": {

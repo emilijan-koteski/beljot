@@ -138,8 +138,24 @@ func (r *GormUserRepository) Count() (int64, error) {
 	return n, nil
 }
 
-func (r *GormUserRepository) UpdateLanguagePreference(id uint, lang string) error {
-	result := r.db.Model(&User{}).Where("id = ?", id).Update("language_preference", lang)
+// UpdatePreferences writes both preference columns in a single UPDATE, so a
+// both-fields request cannot half-apply. The multi-column Updates(map[...]) form
+// mirrors UpdateUsername below, which writes username + username_changed_at the
+// same way and for the same reason.
+func (r *GormUserRepository) UpdatePreferences(id uint, lang *string, deck *string) error {
+	columns := make(map[string]interface{}, 2)
+	if lang != nil {
+		columns["language_preference"] = *lang
+	}
+	if deck != nil {
+		columns["card_deck_preference"] = *deck
+	}
+	if len(columns) == 0 {
+		// GORM errors on an empty Updates map anyway; answering explicitly keeps
+		// the caller's bug from surfacing as an opaque driver error.
+		return apperr.ErrBadRequest
+	}
+	result := r.db.Model(&User{}).Where("id = ?", id).Updates(columns)
 	if result.Error != nil {
 		return result.Error
 	}

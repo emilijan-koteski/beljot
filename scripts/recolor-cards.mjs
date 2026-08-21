@@ -26,7 +26,15 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const CARDS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../client/public/cards");
+// The FRENCH deck only. `public/cards/` is now one folder per deck, and this
+// script is French-specific by construction: the substitutions below name the
+// builder's palette (`red`, `black`, `#44F`) and the builder only produces the
+// French set. The Croatian deck is owner-authored raster imported by
+// `scripts/import-croatian-deck.py` and must never be run through here.
+const CARDS_DIR = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../client/public/cards/french",
+);
 
 // Keep in sync with the `.game-table` scope in client/src/index.css — these are
 // the values the suit glyphs beside the cards resolve to.

@@ -1,0 +1,31 @@
+-- Card deck style preference (Epic 12, Story 12.4, FR63). A per-user choice of
+-- which artwork the 32 card faces are drawn from: the French-suited deck the
+-- game has always used, or the Croatian/German-suited deck (leaves / hearts /
+-- bells / acorns) that Croatian-variant players grew up on.
+--
+-- PURELY VISUAL. This column feeds asset paths on the client and nothing else:
+-- no gameplay, engine, WS-payload or bot behaviour reads it, card IDs and card
+-- values are identical across both decks, and it is a player setting rather
+-- than a purchasable cosmetic. Additive ALTER style, mirroring 000018.
+--
+-- NOT THE GAME VARIANT. rooms.variant carries 'bitola' / 'croatia'; this column
+-- carries 'french' / 'croatian'. They are unrelated enums that happen to share a
+-- country — a Croatian-variant room does not imply the Croatian deck and vice
+-- versa. Never cross-wire them.
+--
+-- NO CHECK CONSTRAINT, deliberately: this mirrors users.language_preference
+-- (000002), which is a bare `VARCHAR(10) NOT NULL DEFAULT 'en'` with the
+-- allowlist enforced in Go (user.IsSupportedCardDeck, answering
+-- apperr.ErrInvalidCardDeck / 400). Adding a value here would otherwise mean a
+-- migration to widen a DB constraint for a client-side art change.
+--
+-- DEFAULT 'french' IS THE BACKFILL. Every existing row is a player who has only
+-- ever seen the French deck, so the default reproduces today's rendering exactly
+-- and no companion UPDATE is needed. Registration derives 'croatian' only when
+-- the language chosen at sign-up is 'hr'; SSO (which has no language input) and
+-- every other language get 'french'.
+--
+-- VARCHAR(20) rather than language_preference's (10): 'croatian' is already 8
+-- characters, and a third deck name is plausible where a fifth two-letter
+-- language code is not.
+ALTER TABLE users ADD COLUMN card_deck_preference VARCHAR(20) NOT NULL DEFAULT 'french';

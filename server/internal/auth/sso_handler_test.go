@@ -193,6 +193,11 @@ func TestSSOLogin_RegistersNewUser(t *testing.T) {
 	assert.Equal(t, "", u.PasswordHash)
 	assert.Equal(t, 5000, u.WalletBalance)
 	assert.Equal(t, 0, u.LoginStreakDays)
+	// SSO carries no language input, so there is nothing to derive a deck from:
+	// language "en" and the French deck (Story 12.4).
+	assert.Equal(t, "en", u.LanguagePreference)
+	assert.Equal(t, user.CardDeckFrench, u.CardDeckPreference)
+	assert.Equal(t, user.CardDeckFrench, data.CardDeckPreference)
 	require.NotNil(t, u.LastLoginAt)
 	gotY, gotM, gotD := u.LastLoginAt.UTC().Date()
 	wantY, wantM, wantD := time.Now().UTC().Date()

@@ -54,6 +54,7 @@ function profileFixture(overrides: Partial<ProfileResponse> = {}): ProfileRespon
     id: 1,
     username: "testuser",
     languagePreference: "en",
+    cardDeckPreference: "french",
     createdAt: "2026-01-15T10:00:00Z",
     totalGamesPlayed: 0,
     wins: 0,
@@ -338,6 +339,32 @@ describe("ProfilePage", () => {
     expect(screen.getByTestId("profile-rivals")).toHaveTextContent("rival_x");
     // Win streak callout shows.
     expect(screen.getByTestId("profile-streak")).toHaveAttribute("data-streak-kind", "win");
+  });
+
+  // The deck panel sits OUTSIDE the `career` gate: it renders off the auth
+  // store, not career data, so a brand-new account with nothing to show in the
+  // career sidebar must still be able to change its deck (Story 12.4).
+  it("renders the card-deck picker with the store's deck selected, even with no career data", async () => {
+    mockGetProfile.mockResolvedValueOnce(profileFixture());
+    mockGetCareer.mockRejectedValueOnce(new Error("no career yet"));
+    useAuthStore.setState({
+      token: "test-token",
+      user: makeUser({ cardDeckPreference: "croatian" }),
+      isLoading: false,
+    });
+
+    renderProfilePage();
+
+    const panel = await screen.findByTestId("profile-card-deck");
+    expect(panel).toBeInTheDocument();
+    expect(screen.getByTestId("profile-deck-option-croatian")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByTestId("profile-deck-option-french")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
   });
 
   // The self page is the one place the second-person copy is correct — the

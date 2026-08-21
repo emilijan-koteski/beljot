@@ -1,4 +1,12 @@
-import type { CardId } from "@/shared/types/matchTypes";
+import type { CardDeck, CardId } from "@/shared/types/matchTypes";
+
+/**
+ * Re-exported so the render code that lives beside this module can keep
+ * importing its deck type from one place. The type itself is declared in
+ * `shared/types/matchTypes` — it is a wire value on the auth envelope, and
+ * `shared/` must not import from `features/` to describe its own fields.
+ */
+export type { CardDeck };
 
 export type CardSize = "sm" | "md" | "lg";
 
@@ -62,13 +70,49 @@ export const CARD_FACE_BACKGROUND = "linear-gradient(180deg, #fdfaf0 0%, #f4ecd8
 export const CARD_FACE_BORDER = "1px solid rgba(0,0,0,0.15)";
 
 /**
- * Vendored face artwork lives in `public/cards/`, one SVG per card, named by the
- * canonical two-char card ID — so the URL is derived, never looked up. See
- * `docs/card-deck.md` for provenance and how to regenerate the deck.
+ * One file extension per deck. The French set is vendored builder SVG; the
+ * Croatian set is owner-authored raster imported to WebP by
+ * `scripts/import-croatian-deck.py`. Keyed by deck rather than baked into the
+ * template so a future deck brings its own format without touching callers.
+ */
+const DECK_EXT: Record<CardDeck, string> = { french: "svg", croatian: "webp" };
+
+/** The deck every account gets unless it chose otherwise (and the DB default). */
+export const DEFAULT_CARD_DECK: CardDeck = "french";
+
+/**
+ * Narrow an unvalidated deck value to a `CardDeck`, falling back to the French
+ * default.
+ *
+ * Needed because both inputs are genuinely uncertain: the auth store's `user` is
+ * null before hydration and on the unauthenticated paths, and HTTP responses are
+ * *cast* rather than parsed (see `apiTypes.ts`), so a server that ships a third
+ * deck before the client knows it would otherwise resolve to a missing asset —
+ * which degrades to a blank parchment card, not an error anyone would notice.
+ */
+export function resolveCardDeck(value: string | null | undefined): CardDeck {
+  // Object.hasOwn, NOT `in`: `in` walks the prototype chain, so `"toString" in
+  // DECK_EXT` is true and a hostile or garbled value would be accepted as a deck
+  // — producing `cards/toString/KS.function toString() { [native code] }` as an
+  // asset URL. Own-property only.
+  return value !== null && value !== undefined && Object.hasOwn(DECK_EXT, value)
+    ? (value as CardDeck)
+    : DEFAULT_CARD_DECK;
+}
+
+/**
+ * Face artwork lives in `public/cards/{deck}/`, one file per card, named by the
+ * canonical two-char card ID — so the URL is derived from deck + ID, never
+ * looked up per card. See `docs/card-deck.md` for both decks' provenance and how
+ * to regenerate them.
+ *
+ * Takes the deck as an argument rather than reading the auth store so it stays
+ * pure and unit-testable; `PlayingCard` is the single component that resolves
+ * the active deck, and it is already the only caller.
  *
  * Built off `BASE_URL` rather than a bare `/` so the deck still resolves if the
  * app is ever served from a sub-path.
  */
-export function cardFaceUrl(cardId: CardId): string {
-  return `${import.meta.env.BASE_URL}cards/${cardId}.svg`;
+export function cardFaceUrl(cardId: CardId, deck: CardDeck): string {
+  return `${import.meta.env.BASE_URL}cards/${deck}/${cardId}.${DECK_EXT[deck]}`;
 }

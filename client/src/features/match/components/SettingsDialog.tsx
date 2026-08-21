@@ -1,12 +1,16 @@
-import { Globe } from "lucide-react";
+import { Globe, Spade } from "lucide-react";
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import { updatePreferences } from "@/shared/api/profile";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import { persistCardDeck } from "@/shared/lib/cardDeckPreference";
 import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
 
+import type { CardDeck } from "../lib/cardFace";
+import { resolveCardDeck } from "../lib/cardFace";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
@@ -27,16 +31,125 @@ const LANGUAGES = [
   { code: "mk", labelKey: "language.mk" },
 ] as const;
 
+// Order: French first — it is the default, and the deck every account that did
+// not pick otherwise is already looking at.
+const DECKS = [
+  { code: "french", labelKey: "cardDeck.french" },
+  { code: "croatian", labelKey: "cardDeck.croatian" },
+] as const satisfies ReadonlyArray<{ code: CardDeck; labelKey: string }>;
+
 const BRASS = "#c9a876";
 
 /**
- * In-game settings dialog. Currently exposes only the UI language; the layout
- * is sectioned ("Language" heading) so future settings (sound, table theme,
- * timer preference, etc.) can drop in without rework.
+ * One brass radio row. Shared by the Language and Card Deck sections rather than
+ * copied into each, so the two pickers cannot drift apart visually and the next
+ * section added below inherits the same row for free.
+ */
+function SettingRow({
+  selected,
+  onSelect,
+  testId,
+  children,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  testId: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      data-testid={testId}
+      className="flex items-center justify-between rounded-lg px-3 py-2 text-left transition-[background,border-color,box-shadow] cursor-pointer"
+      style={{
+        border: selected ? `1px solid ${BRASS}` : "1px solid rgba(201,168,118,0.32)",
+        background: selected
+          ? "linear-gradient(90deg, rgba(80,60,30,0.55), rgba(50,38,20,0.35))"
+          : "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
+        color: "var(--ink-light, #f5f2e8)",
+        boxShadow: selected
+          ? "inset 0 1px 0 rgba(201,168,118,0.22), 0 0 0 1px rgba(201,168,118,0.25)"
+          : "inset 0 1px 0 rgba(201,168,118,0.10)",
+      }}
+    >
+      <span
+        className="font-body text-sm font-medium inline-flex items-center gap-2"
+        style={{
+          fontFamily: "var(--font-body)",
+          letterSpacing: 0.2,
+        }}
+      >
+        <span
+          aria-hidden
+          className="rounded-full"
+          style={{
+            width: 7,
+            height: 7,
+            background: selected ? BRASS : "transparent",
+            border: selected ? "none" : "1px solid rgba(201,168,118,0.45)",
+            boxShadow: selected ? "0 0 6px rgba(201,168,118,0.55)" : "none",
+            flexShrink: 0,
+          }}
+        />
+        {children}
+      </span>
+      {selected && (
+        <span
+          className="text-xs uppercase tracking-wider"
+          style={{ color: BRASS, fontFamily: "var(--font-body)" }}
+          aria-hidden
+        >
+          ✓
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** Brass eyebrow + radiogroup — one per settings group. */
+function SettingSection({
+  icon,
+  heading,
+  children,
+}: {
+  icon: ReactNode;
+  heading: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-3">
+      <div
+        className="flex items-center gap-2 text-xs uppercase"
+        style={{
+          color: BRASS,
+          fontFamily: "var(--font-body)",
+          letterSpacing: "0.18em",
+        }}
+      >
+        {icon}
+        <span>{heading}</span>
+      </div>
+
+      <div className="flex flex-col gap-2" role="radiogroup">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * In-game settings dialog. Exposes the UI language and the card deck; the layout
+ * is sectioned so future settings (sound, table theme, timer preference, etc.)
+ * can drop in without rework.
  *
- * The language change persists to the user's profile via `updatePreferences`,
- * mirroring the lobby's [LanguageSelector] behavior — fire-and-forget so the
- * UI doesn't block on the network round-trip.
+ * Both changes persist to the user's profile via `updatePreferences`, mirroring
+ * the lobby's [LanguageSelector] behavior — optimistic store write, silent
+ * revert on failure, no reload and no interruption to play. The deck is read
+ * straight back off the auth store, so every mounted `PlayingCard` re-skins the
+ * moment the optimistic write lands, mid-hand included.
  *
  * Renders inside the same classic-felt overlay shell (ClassicPanel +
  * OverlayBackdrop) used by the bidding / belot / surrender / rules prompts so
@@ -46,6 +159,7 @@ const BRASS = "#c9a876";
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { t, i18n } = useTranslation();
   const dialogRef = useFocusTrap<HTMLDivElement>({ onEscape: () => onOpenChange(false) });
+  const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
 
   async function handleLanguageChange(lang: string) {
     if (lang === i18n.language) return;
@@ -70,6 +184,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     }
   }
 
+  /**
+   * Persist the deck. Shares one latest-wins helper with the profile panel, so
+   * two fast toggles cannot leave store and server disagreeing — see
+   * `persistCardDeck`. Deliberately NOT merged with the language handler above:
+   * they write different fields, only language has an i18n switch to sequence
+   * first, and the language path's identical race is pre-existing and deferred.
+   */
+  async function handleDeckChange(next: CardDeck) {
+    if (next === deck) return;
+    // `deck` is the RESOLVED value, so a rollback cannot reinstate an
+    // unrecognised string that would render as a missing asset.
+    await persistCardDeck(next, deck);
+  }
+
   if (!open) return null;
 
   const dialog = (
@@ -90,82 +218,43 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </span>
             }
           >
-            {/* Language section — sectioned heading so future settings (sound,
-                table theme, timer preference) can drop in below without
-                shifting this block. */}
-            <section className="flex flex-col gap-3">
-              <div
-                className="flex items-center gap-2 text-xs uppercase"
-                style={{
-                  color: BRASS,
-                  fontFamily: "var(--font-body)",
-                  letterSpacing: "0.18em",
-                }}
+            {/* One sectioned group per setting, so the next one (sound, table
+                theme, timer preference) drops in below without shifting these. */}
+            <div className="flex flex-col gap-5">
+              <SettingSection
+                icon={<Globe size={14} aria-hidden="true" />}
+                heading={t("match.settings.languageHeading")}
               >
-                <Globe size={14} aria-hidden="true" />
-                <span>{t("match.settings.languageHeading")}</span>
-              </div>
+                {LANGUAGES.map((lang) => (
+                  <SettingRow
+                    key={lang.code}
+                    selected={i18n.language === lang.code}
+                    onSelect={() => handleLanguageChange(lang.code)}
+                    testId={`settings-language-option-${lang.code}`}
+                  >
+                    {t(lang.labelKey)}
+                  </SettingRow>
+                ))}
+              </SettingSection>
 
-              <div className="flex flex-col gap-2" role="radiogroup">
-                {LANGUAGES.map((lang) => {
-                  const selected = i18n.language === lang.code;
-                  return (
-                    <button
-                      key={lang.code}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => handleLanguageChange(lang.code)}
-                      data-testid={`settings-language-option-${lang.code}`}
-                      className="flex items-center justify-between rounded-lg px-3 py-2 text-left transition-[background,border-color,box-shadow] cursor-pointer"
-                      style={{
-                        border: selected
-                          ? `1px solid ${BRASS}`
-                          : "1px solid rgba(201,168,118,0.32)",
-                        background: selected
-                          ? "linear-gradient(90deg, rgba(80,60,30,0.55), rgba(50,38,20,0.35))"
-                          : "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
-                        color: "var(--ink-light, #f5f2e8)",
-                        boxShadow: selected
-                          ? "inset 0 1px 0 rgba(201,168,118,0.22), 0 0 0 1px rgba(201,168,118,0.25)"
-                          : "inset 0 1px 0 rgba(201,168,118,0.10)",
-                      }}
-                    >
-                      <span
-                        className="font-body text-sm font-medium inline-flex items-center gap-2"
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          letterSpacing: 0.2,
-                        }}
-                      >
-                        <span
-                          aria-hidden
-                          className="rounded-full"
-                          style={{
-                            width: 7,
-                            height: 7,
-                            background: selected ? BRASS : "transparent",
-                            border: selected ? "none" : "1px solid rgba(201,168,118,0.45)",
-                            boxShadow: selected ? "0 0 6px rgba(201,168,118,0.55)" : "none",
-                            flexShrink: 0,
-                          }}
-                        />
-                        {t(lang.labelKey)}
-                      </span>
-                      {selected && (
-                        <span
-                          className="text-xs uppercase tracking-wider"
-                          style={{ color: BRASS, fontFamily: "var(--font-body)" }}
-                          aria-hidden
-                        >
-                          ✓
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
+              {/* Card deck — purely visual, and applied without leaving the
+                  match: the store write re-renders every card in place. */}
+              <SettingSection
+                icon={<Spade size={14} aria-hidden="true" />}
+                heading={t("match.settings.deckHeading")}
+              >
+                {DECKS.map((d) => (
+                  <SettingRow
+                    key={d.code}
+                    selected={deck === d.code}
+                    onSelect={() => handleDeckChange(d.code)}
+                    testId={`settings-deck-option-${d.code}`}
+                  >
+                    {t(d.labelKey)}
+                  </SettingRow>
+                ))}
+              </SettingSection>
+            </div>
 
             <div className="flex justify-end items-center mt-5">
               <ClassicButton

@@ -54,7 +54,7 @@ func (s *userRepoStub) SearchByUsername(string, uint, int) ([]user.User, error) 
 }
 func (s *userRepoStub) FindManyByIDs([]uint) ([]user.User, error)      { return nil, nil }
 func (s *userRepoStub) Count() (int64, error)                          { return int64(len(s.users)), nil }
-func (s *userRepoStub) UpdateLanguagePreference(uint, string) error    { return nil }
+func (s *userRepoStub) UpdatePreferences(uint, *string, *string) error { return nil }
 func (s *userRepoStub) UpdatePasswordHash(uint, string) error          { return nil }
 func (s *userRepoStub) UpdateUsername(uint, string) (time.Time, error) { return time.Time{}, nil }
 func (s *userRepoStub) AddXP(map[uint]int) (map[uint]int, error)       { return nil, nil }
