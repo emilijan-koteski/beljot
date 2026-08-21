@@ -57,7 +57,6 @@ const mockMatchState: MatchState = {
   biddingRound: 1,
   biddingPassCount: 0,
   mustPickTrump: false,
-  deck: [],
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],
@@ -65,6 +64,11 @@ const mockMatchState: MatchState = {
   trickWinnerSeat: null,
   awaitingDeclaration: false,
   declarationsResolved: false,
+  // The fixture mirrors what the server actually sends since Story 12.10's
+  // per-recipient projection (most tests view as seat 0): only the viewer's
+  // own `hand` carries cards; every other seat arrives masked to `hand: []`
+  // with the real `handCount`. Tests that view as another seat override the
+  // hands they need.
   players: [
     {
       hand: [{ rank: "K", suit: "S" }],
@@ -77,9 +81,10 @@ const mockMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 1,
     },
     {
-      hand: [{ rank: "7", suit: "H" }],
+      hand: [],
       seat: 1,
       userId: 20,
       username: "Bob",
@@ -89,9 +94,10 @@ const mockMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 1,
     },
     {
-      hand: [{ rank: "A", suit: "D" }],
+      hand: [],
       seat: 2,
       userId: 30,
       username: "Carol",
@@ -101,9 +107,10 @@ const mockMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 1,
     },
     {
-      hand: [{ rank: "9", suit: "C" }],
+      hand: [],
       seat: 3,
       userId: 40,
       username: "Dave",
@@ -113,6 +120,7 @@ const mockMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 1,
     },
   ],
   teamScores: [0, 0],
@@ -1858,10 +1866,15 @@ describe("MatchPage", () => {
     });
   });
 
-  // Opponent card counts during a deal that holds two cards back per seat. The
-  // count is server-authoritative (players[n].faceDownCount) — the page adds it
-  // to the open hand and branches on no variant at all, which is why these cases
-  // are driven by the field and not by `variant: "croatia"`.
+  // Opponent card counts during a deal that holds two cards back per seat. Both
+  // counts are server-authoritative (players[n].handCount + faceDownCount) —
+  // the page adds them and branches on no variant at all, which is why these
+  // cases are driven by the fields and not by `variant: "croatia"`.
+  //
+  // The fixtures mirror what the server actually sends since Story 12.10's
+  // per-recipient projection: only the VIEWER's own `hand` carries cards; every
+  // opponent arrives with `hand: []` and their real `handCount`. The page must
+  // render opponents' card backs from the count alone.
   describe("opponent card counts with face-down cards outstanding", () => {
     function biddingState(faceDownCount: number): MatchState {
       return {
@@ -1875,15 +1888,20 @@ describe("MatchPage", () => {
         activePlayerSeat: 1,
         players: mockMatchState.players.map((p) => ({
           ...p,
-          // Six OPEN cards, as a seat holds mid-bidding under this deal.
-          hand: [
-            { rank: "7", suit: "S" },
-            { rank: "8", suit: "S" },
-            { rank: "9", suit: "S" },
-            { rank: "T", suit: "S" },
-            { rank: "7", suit: "H" },
-            { rank: "8", suit: "H" },
-          ] as MatchState["players"][number]["hand"],
+          // The viewer (seat 0) receives their own six OPEN cards; every other
+          // seat's hand is masked to [] and only handCount says they hold six.
+          hand:
+            p.seat === 0
+              ? ([
+                  { rank: "7", suit: "S" },
+                  { rank: "8", suit: "S" },
+                  { rank: "9", suit: "S" },
+                  { rank: "T", suit: "S" },
+                  { rank: "7", suit: "H" },
+                  { rank: "8", suit: "H" },
+                ] as MatchState["players"][number]["hand"])
+              : [],
+          handCount: 6,
           faceDownCount,
         })) as MatchState["players"],
       };
@@ -1895,6 +1913,8 @@ describe("MatchPage", () => {
       renderMatchPage();
 
       // Three opponents (the viewer's own seat renders its real hand instead).
+      // Their hands are empty on the wire, so ×8 can ONLY come from
+      // handCount(6) + faceDownCount(2).
       const counts = screen.getAllByTestId("player-seat-card-count");
       expect(counts).toHaveLength(3);
       for (const c of counts) {
@@ -1957,9 +1977,75 @@ describe("MatchPage", () => {
     });
 
     it("reads the open hand alone when nothing is held face-down", () => {
-      // The Bitola path and every post-bidding phase: faceDownCount is 0, so the
-      // sum must be indistinguishable from hand.length on its own.
+      // The Bitola path and every post-bidding phase: faceDownCount is 0, so
+      // the count must be handCount on its own — opponents' hands are empty
+      // on the wire, never counted.
       useMatchStore.getState().setMatchState(biddingState(0));
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      for (const c of screen.getAllByTestId("player-seat-card-count")) {
+        expect(c).toHaveTextContent("×6");
+      }
+    });
+
+    it("renders the full masked wire shape — empty foreign declarations and null pendingBelotSeat included", () => {
+      // The complete Story 12.10 mask, every vector at once: opponents' hands
+      // [], their PRE-RESOLUTION declarations [] (the projection empties them
+      // until the reveal), and pendingBelotSeat null because the viewer is not
+      // the holder. The page must render the table normally — all four seats,
+      // the viewer's own card, opponent card backs from handCount alone — and
+      // must not open a belote prompt for a null field.
+      const masked: MatchState = {
+        ...mockMatchState,
+        declarationsResolved: false,
+        pendingBelotSeat: null,
+        players: mockMatchState.players.map((p): MatchState["players"][number] =>
+          p.seat === 0 ? { ...p, declarations: [] } : { ...p, hand: [], declarations: [] },
+        ) as MatchState["players"],
+      };
+      useMatchStore.getState().setMatchState(masked);
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      for (const compass of [0, 1, 2, 3]) {
+        expect(screen.getByTestId(`player-seat-${compass}-wrapper`)).toBeInTheDocument();
+      }
+      const counts = screen.getAllByTestId("player-seat-card-count");
+      expect(counts).toHaveLength(3);
+      for (const c of counts) {
+        expect(c).toHaveTextContent("×1");
+      }
+      // The viewer's own hand still renders its real card.
+      expect(screen.getByTestId("playing-card-KS")).toBeInTheDocument();
+      // A null pendingBelotSeat is "not you", never a prompt.
+      expect(screen.queryByTestId("belot-prompt")).not.toBeInTheDocument();
+    });
+
+    it("falls back to hand.length for a server that predates handCount", () => {
+      // Rolling-deploy window: an OLD server still broadcasts full hands and no
+      // handCount. The cast (not parse) path leaves the field undefined, and
+      // the page must keep rendering opponents from hand.length until the
+      // server flips — never ×NaN, never ×0.
+      const legacy = biddingState(0);
+      useMatchStore.getState().setMatchState({
+        ...legacy,
+        players: legacy.players.map((p) => {
+          const rest: Partial<MatchState["players"][number]> = { ...p };
+          delete rest.handCount;
+          return {
+            ...rest,
+            hand: [
+              { rank: "7", suit: "D" },
+              { rank: "8", suit: "D" },
+              { rank: "9", suit: "D" },
+              { rank: "T", suit: "D" },
+              { rank: "J", suit: "D" },
+              { rank: "Q", suit: "D" },
+            ],
+          };
+        }) as unknown as MatchState["players"],
+      });
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 

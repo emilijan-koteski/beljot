@@ -141,11 +141,16 @@ function normalizeMatchState(gs: MatchState): MatchState {
   return {
     ...gs,
     currentTrick: gs.currentTrick ?? [],
-    deck: gs.deck ?? [],
     players: gs.players.map((p) => ({
       ...p,
       hand: p.hand ?? [],
       declarations: p.declarations ?? [],
+      // Backfill for the rolling-deploy window: a server that predates
+      // Story 12.10 sends full hands and no handCount, and the live path CASTS
+      // the payload (never parses), so the required field would be undefined
+      // for every consumer. Against such a server hand.length IS the count;
+      // against a current one this is a no-op.
+      handCount: p.handCount ?? (p.hand ?? []).length,
     })) as MatchState["players"],
   };
 }

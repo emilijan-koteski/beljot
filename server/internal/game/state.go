@@ -30,32 +30,36 @@ type PlayerState struct {
 	// live OUTSIDE Hand until bidding resolves, at which point mergeFaceDownCards
 	// folds them in and every seat holds eight.
 	//
-	// Server-only (json:"-") and deliberately so: match_state is serialized once
-	// and the identical bytes go to all four seats, so a card that must be
-	// visible to exactly one player cannot ride it. Keeping these out of Hand
-	// means they are never serialized into ANYONE's snapshot, and their owner
-	// learns them through a per-seat WS event instead.
-	//
-	// Scope of that claim, precisely: these two cards per seat are the ONE
-	// exception in an otherwise fully open payload. match_state still ships all
-	// four players' Hands and the undealt Deck to every seat — a pre-existing
-	// leak that is deliberately out of scope here and recorded in the deferred
-	// work log. Nothing about this field makes match_state per-seat safe.
+	// Server-only (json:"-") and deliberately so: a card that must be visible
+	// to exactly one player never rides match_state. Keeping these out of Hand
+	// means they are never serialized into ANYONE's snapshot — not even after
+	// ProjectForSeat masks the rest of the payload per recipient — and their
+	// owner learns them through a per-seat WS event instead.
 	FaceDownCards []Card `json:"-"`
 	// FaceDownCount is how many cards sit in FaceDownCards — the public half of
 	// the field above, and the only half that crosses the wire.
 	//
-	// A count is not a card. Every seat's Hand already ships to all four
-	// clients, so how MANY cards an opponent holds was never secret; what must
-	// stay secret is WHICH. Without this the table renders a Croatian
-	// opponent's stack as 6 while they hold 8 — an error any Belot player spots
-	// instantly — and shipping FaceDownCards to fix it would break the rule
-	// this variant guards hardest.
+	// A count is not a card. How MANY cards an opponent holds is public
+	// information at any real table; what must stay secret is WHICH. Without
+	// this the table renders a Croatian opponent's stack as 6 while they hold 8
+	// — an error any Belot player spots instantly — and shipping FaceDownCards
+	// to fix it would break the rule this variant guards hardest.
 	//
 	// Derived, never independently authored: syncFaceDownCounts refreshes it from
 	// FaceDownCards (see that function for exactly where), so the two can only
 	// ever agree.
 	FaceDownCount int `json:"faceDownCount"`
+	// HandCount is how many cards sit in Hand — the public half of the field at
+	// the top of this struct, mirroring FaceDownCount's "a count is not a card"
+	// doctrine. ProjectForSeat empties every OTHER seat's Hand before a snapshot
+	// leaves the server, so this count is what lets a client render an
+	// opponent's card backs without ever holding their cards.
+	//
+	// Computed at PROJECTION time only (ProjectForSeat sets it from len(Hand) at
+	// the one moment it matters), never maintained by engine mutations — unlike
+	// FaceDownCount there is no sync call for any dealing or playing path to
+	// forget. In-process it is always stale/zero; nothing server-side may read it.
+	HandCount int `json:"handCount"`
 }
 
 // syncFaceDownCounts refreshes every seat's public FaceDownCount from its
@@ -115,6 +119,13 @@ type HandScore struct {
 // 4. Player states
 // 5. Scoring
 // 6. Timer state
+//
+// PER-SEAT VISIBILITY TRIAGE (Story 12.10): every NEW field here or on
+// PlayerState must be classified before it ships — public (fine on the wire
+// as-is), server-only (tag it json:"-"), or hidden-per-seat (mask it in
+// ProjectForSeat). ProjectForSeat masks BY ENUMERATION, so an untriaged
+// json-tagged field ships to all four seats by default — exactly the leak
+// class that story closed (hands, deck, unresolved melds, pendingBelotSeat).
 type GameState struct {
 	// Match metadata
 	ID        uint    `json:"id"`
@@ -158,7 +169,13 @@ type GameState struct {
 	// bidding resolves; under DealShapeAllBeforeBidding every card is dealt up
 	// front so it is ALWAYS empty — handlePickTrump's deal-shape guard depends on
 	// exactly that.
-	Deck []Card `json:"deck"`
+	//
+	// Server-only (json:"-"): the 11 held-back cards are hidden information —
+	// a client that reads them knows every stage-2 card before bidding ends —
+	// and the client has zero consumers for the field, so it is removed from
+	// the wire outright rather than masked or counted (D96 / Story 12.10). The
+	// engine keeps dealing from it in-process; only the wire loses it.
+	Deck []Card `json:"-"`
 	// FaceDownRevealed records that round 1 was passed out under
 	// VariantRules.RevealFaceDownOnRound2, so every seat's two face-down cards
 	// are now known to their owner. Server-only (json:"-") — the cards

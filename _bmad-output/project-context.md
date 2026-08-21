@@ -138,7 +138,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Rules engine tests use **factory functions** from `internal/game/testfixtures/` exclusively — no raw `GameState{}` struct literals, even if they compile. When `GameState` gains new fields, factories are the single update point. If no existing factory fits, create a new one
 - Rules engine tests must use **Go table-driven test pattern** (`[]struct{ name string; ... }` with `t.Run`) — each test function covers one rule category with multiple cases per variant
 - Test the rules engine through **`ApplyAction` only** — internal functions (`bidding.go`, `declarations.go`, `scoring.go`, `validation.go`) are tested indirectly through their effect on `ApplyAction` output. This preserves refactoring freedom
-- Session manager tests must include **reconnection scenarios**: disconnect at each game phase (bidding, playing, between tricks, between hands). Verify state snapshot sent to reconnecting client matches current server state exactly
+- Session manager tests must include **reconnection scenarios**: disconnect at each game phase (bidding, playing, between tricks, between hands). Verify the state snapshot sent to a reconnecting client matches the server's **projected** view for that seat (Story 12.10: own hand real, every other seat's hand masked to `[]` with `handCount`, no `deck` key) — never the raw in-process state, which since 12.10 must not reach any wire
 - Integration tests that touch PostgreSQL must use a **per-test transaction with rollback** — never rely on test execution order or shared test data between test functions
 - Tests create all their own data — never reference or depend on seed data from `make seed`. Seed data is for manual development only
 

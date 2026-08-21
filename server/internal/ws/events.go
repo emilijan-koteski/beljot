@@ -132,17 +132,16 @@ type HonorUpdatedPayload struct {
 // bid on a full eight-card hand.
 //
 // It is a NEW event rather than fields on event:match_state, and that is
-// load-bearing rather than stylistic: match_state is serialized ONCE and the
-// identical bytes go to all four seats (buildMessage takes no recipient,
-// BroadcastToUsers takes pre-serialized bytes), so a card that must reach
-// exactly one player cannot ride it. Same house rule as EventHonorUpdated —
-// the client's payload schemas are z.strictObject, so widening an existing
-// event breaks stale tabs while an unknown event type is simply ignored.
-//
-// This does NOT make match_state per-seat safe. These two cards per seat are the
-// one exception in an otherwise open payload: match_state still carries all four
-// players' hands and the undealt deck to every seat (a pre-existing leak, out of
-// scope here). The guarantee is about these cards only.
+// load-bearing rather than stylistic: when it shipped (Story 12.1),
+// match_state was serialized ONCE and the identical bytes went to all four
+// seats, so a card that must reach exactly one player could not ride it.
+// Story 12.10 has since made match_state per-recipient (every state frame is
+// masked by game.ProjectForSeat and sent via SendFrames), but this event
+// stays: FaceDownCards remain json:"-" — never in ANY snapshot, projected or
+// not — and the reveal is a one-shot moment, not state. Same house rule as
+// EventHonorUpdated — the client's payload schemas are z.strictObject, so
+// widening an existing event breaks stale tabs while an unknown event type is
+// simply ignored.
 //
 // Re-sent to a reconnecting player by SyncStateOnConnect: this is a one-shot
 // per-seat event, so without that replay a refreshed client would lose its own

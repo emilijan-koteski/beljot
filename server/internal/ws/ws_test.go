@@ -285,6 +285,69 @@ func TestHub_BroadcastToUsers(t *testing.T) {
 	assert.Equal(t, "event:broadcast_test", msg2.Type)
 }
 
+// TestHub_SendFrames drives the REAL delivery loop against registered sockets
+// (the match-layer spies only mimic it): every frame reaches exactly its own
+// recipient — DISTINCT bytes per user, the shape carrying Story 12.10's
+// per-seat projected match_state — and an unknown userID is tolerated. A
+// frames[0].Msg slip in the loop would ship seat 0's hand to every seat; this
+// is the test that would catch it.
+func TestHub_SendFrames(t *testing.T) {
+	server, hub := setupTestServer(t)
+
+	// Connect three users
+	conn1 := dialWS(t, server)
+	defer func() { _ = conn1.CloseNow() }()
+	sendAuthMessage(t, conn1, generateTestToken(t, 401))
+	readMessage(t, conn1)
+
+	conn2 := dialWS(t, server)
+	defer func() { _ = conn2.CloseNow() }()
+	sendAuthMessage(t, conn2, generateTestToken(t, 402))
+	readMessage(t, conn2)
+
+	conn3 := dialWS(t, server)
+	defer func() { _ = conn3.CloseNow() }()
+	sendAuthMessage(t, conn3, generateTestToken(t, 403))
+	readMessage(t, conn3)
+
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, 3, hub.ClientCount())
+
+	frameFor := func(uid uint) []byte {
+		payload, _ := json.Marshal(map[string]uint{"forUser": uid})
+		msg, _ := json.Marshal(ws.WSMessage{
+			Type:    "event:frames_test",
+			Payload: payload,
+		})
+		return msg
+	}
+
+	// One batch, a DISTINCT payload per user, plus an unregistered recipient
+	// (999) that must be tolerated with no effect on the others' delivery.
+	hub.SendFrames([]ws.UserFrame{
+		{UserID: 401, Msg: frameFor(401)},
+		{UserID: 999, Msg: frameFor(999)},
+		{UserID: 402, Msg: frameFor(402)},
+		{UserID: 403, Msg: frameFor(403)},
+	})
+
+	for _, tc := range []struct {
+		conn *websocket.Conn
+		uid  uint
+	}{
+		{conn1, 401},
+		{conn2, 402},
+		{conn3, 403},
+	} {
+		msg := readMessage(t, tc.conn)
+		assert.Equal(t, "event:frames_test", msg.Type)
+		var payload map[string]uint
+		require.NoError(t, json.Unmarshal(msg.Payload, &payload))
+		assert.Equal(t, tc.uid, payload["forUser"],
+			"user %d must receive exactly their OWN frame, not another recipient's", tc.uid)
+	}
+}
+
 func TestHub_ConnectedUserIDs(t *testing.T) {
 	server, hub := setupTestServer(t)
 

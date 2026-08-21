@@ -22,6 +22,7 @@ function makePlayers(): PlayerState[] {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 0,
     },
     {
       hand: [],
@@ -34,6 +35,7 @@ function makePlayers(): PlayerState[] {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 0,
     },
     {
       hand: [],
@@ -46,6 +48,7 @@ function makePlayers(): PlayerState[] {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 0,
     },
     {
       hand: [],
@@ -58,6 +61,7 @@ function makePlayers(): PlayerState[] {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 0,
     },
   ];
 }

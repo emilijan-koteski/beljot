@@ -66,6 +66,7 @@ describe("BelotReveal", () => {
             isBot: false,
             level: 1,
             faceDownCount: 0,
+            handCount: 0,
           },
           {
             seat: 1,
@@ -78,6 +79,7 @@ describe("BelotReveal", () => {
             isBot: false,
             level: 1,
             faceDownCount: 0,
+            handCount: 0,
           },
           {
             seat: 2,
@@ -90,6 +92,7 @@ describe("BelotReveal", () => {
             isBot: false,
             level: 1,
             faceDownCount: 0,
+            handCount: 0,
           },
           {
             seat: 3,
@@ -102,6 +105,7 @@ describe("BelotReveal", () => {
             isBot: false,
             level: 1,
             faceDownCount: 0,
+            handCount: 0,
           },
         ]}
         onComplete={vi.fn()}

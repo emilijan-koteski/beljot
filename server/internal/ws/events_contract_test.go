@@ -137,8 +137,12 @@ func TestEventsJSONContract(t *testing.T) {
 		goldenFile string
 	}{
 		{
+			// Marshalled through the seat-0 projection, exactly as the match
+			// layer serializes every state frame (Story 12.10) — so the golden
+			// itself is the standing proof of card privacy: one real hand
+			// (seat 0's), three empty ones, four handCounts, and no deck key.
 			name:       "EventMatchState",
-			sample:     gameStateSample(),
+			sample:     game.ProjectForSeat(gameStateSample(), 0),
 			goldenFile: "event_match_state.json",
 		},
 		{

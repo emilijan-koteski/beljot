@@ -43,7 +43,6 @@ const minimalMatchState: MatchState = {
   biddingRound: 1,
   biddingPassCount: 0,
   mustPickTrump: false,
-  deck: [],
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],
@@ -65,6 +64,7 @@ const minimalMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 0,
     },
     {
       hand: [],
@@ -77,6 +77,7 @@ const minimalMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 0,
     },
     {
       hand: [],
@@ -89,6 +90,7 @@ const minimalMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 0,
     },
     {
       hand: [],
@@ -101,6 +103,7 @@ const minimalMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 0,
     },
   ],
   teamScores: [0, 0],

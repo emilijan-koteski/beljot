@@ -21,6 +21,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     isBot: false,
     level: 1,
     faceDownCount: 0,
+    handCount: 0,
     ...overrides,
   };
 }

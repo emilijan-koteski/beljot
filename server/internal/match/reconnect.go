@@ -221,7 +221,9 @@ func (m *Manager) HandleDisconnect(userID uint) {
 	}
 
 	disconnectMsg := buildMessage(ws.EventPlayerDisconnected, disconnectPayload)
-	stateMsg := buildMessage(ws.EventMatchState, gs)
+	// Per-seat projected frames for the remaining seats only — the disconnected
+	// seat gets nothing (it has no socket, and its frame would go stale anyway).
+	stateFrames := buildStateFrames(playerIDs, gs, seat)
 
 	var surrenderDeclinedMsg []byte
 	if clearedSurrenderProposer >= 0 {
@@ -246,7 +248,7 @@ func (m *Manager) HandleDisconnect(userID uint) {
 		m.hub.BroadcastToUsers(remainingPlayers, surrenderDeclinedMsg)
 	}
 	m.hub.BroadcastToUsers(remainingPlayers, disconnectMsg)
-	m.hub.BroadcastToUsers(remainingPlayers, stateMsg)
+	m.hub.SendFrames(stateFrames)
 }
 
 // handleConcurrentDisconnectLocked is called when another player disconnects
@@ -295,9 +297,9 @@ func (m *Manager) handleConcurrentDisconnectLocked(session *LiveMatch, gs *game.
 		ReconnectExpiresAt: reconnectExpiry.UTC().Format(time.RFC3339Nano),
 	}
 	disconnectMsg := buildMessage(ws.EventPlayerDisconnected, disconnectPayload)
-	stateMsg := buildMessage(ws.EventMatchState, gs)
-
 	playerIDs := session.playerIDs
+	// Per-seat projected frames for the remaining seats only.
+	stateFrames := buildStateFrames(playerIDs, gs, seat)
 	session.mu.Unlock()
 
 	// Broadcast to the remaining human players (exclude the just-disconnected
@@ -309,7 +311,7 @@ func (m *Manager) handleConcurrentDisconnectLocked(session *LiveMatch, gs *game.
 		}
 	}
 	m.hub.BroadcastToUsers(remaining, disconnectMsg)
-	m.hub.BroadcastToUsers(remaining, stateMsg)
+	m.hub.SendFrames(stateFrames)
 }
 
 // hasActivePause reports whether any seat has an active pause flag set.
@@ -469,14 +471,14 @@ func (m *Manager) HandleReconnect(userID uint) {
 	playerIDs := session.playerIDs
 	reconnectPayload := ws.PlayerReconnectedPayload{PlayerSeat: mySeat}
 	reconnectMsg := buildMessage(ws.EventPlayerReconnected, reconnectPayload)
-	stateMsg := buildMessage(ws.EventMatchState, gs)
+	stateFrames := buildStateFrames(playerIDs, gs, -1)
 
 	session.mu.Unlock()
 
 	// Broadcast to all human players (reconnecting player needs the state too)
 	humanIDs := humanUserIDs(playerIDs)
 	m.hub.BroadcastToUsers(humanIDs, reconnectMsg)
-	m.hub.BroadcastToUsers(humanIDs, stateMsg)
+	m.hub.SendFrames(stateFrames)
 
 	// The restored phase may put a bot back on the clock (its pending timer
 	// no-oped during the disconnect pause).
@@ -518,21 +520,36 @@ func (m *Manager) SyncStateOnConnect(userID uint) {
 		session.mu.RUnlock()
 		return
 	}
-	msg := buildMessage(ws.EventMatchState, session.gameState)
+	// Resolve the user's seat first: the snapshot is projected FOR that seat,
+	// so a user who somehow isn't in playerIDs gets nothing rather than an
+	// unmasked (or wrongly masked) frame.
+	mySeat := -1
+	for seat, uid := range session.playerIDs {
+		if uid == userID {
+			mySeat = seat
+			break
+		}
+	}
+	if mySeat == -1 {
+		session.mu.RUnlock()
+		return
+	}
+	// A single-frame batch, not SendToUser: SendFrames is the ONLY path by
+	// which match_state reaches the wire, so the spies can hard-fail any state
+	// payload that arrives through the unprojected primitives.
+	stateFrames := []ws.UserFrame{{
+		UserID: userID,
+		Msg:    buildMessage(ws.EventMatchState, game.ProjectForSeat(session.gameState, mySeat)),
+	}}
 	// Build the face-down replay under the same read lock as the snapshot, so
 	// the two cannot straddle a bidding resolution.
 	var faceDownMsg []byte
 	if session.gameState.FaceDownRevealed {
-		for seat, uid := range session.playerIDs {
-			if uid == userID {
-				faceDownMsg = buildFaceDownRevealMsg(session.gameState, seat)
-				break
-			}
-		}
+		faceDownMsg = buildFaceDownRevealMsg(session.gameState, mySeat)
 	}
 	session.mu.RUnlock()
 
-	m.hub.SendToUser(userID, msg)
+	m.hub.SendFrames(stateFrames)
 	if faceDownMsg != nil {
 		m.hub.SendToUser(userID, faceDownMsg)
 	}
@@ -626,7 +643,12 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		MatchDurationSec:  int(time.Since(startedAt).Seconds()),
 	}
 	abandonedMsg := buildMessage(ws.EventMatchAbandoned, abandonedPayload)
-	stateMsg := buildMessage(ws.EventMatchState, gs)
+	// All human seats, projected per recipient. Delivery is best-effort to
+	// sockets registered AT SEND TIME only: the abandoned seat's user has no
+	// socket (that is why their window expired) and the session is removed
+	// right after, so nothing is queued for them — a later reconnect finds no
+	// session and lands in the lobby, not on this frame.
+	stateFrames := buildStateFrames(playerIDs, gs, -1)
 
 	session.mu.Unlock()
 
@@ -662,7 +684,9 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	// xp_awarded, before the trailing match_state.
 	honorMsgs := m.recordHonor(roomID, playerIDs, botSeats, connected, abandonedSeat)
 
-	// Broadcast to all human players (disconnected player gets it if they reconnect to WS later)
+	// Broadcast to every human seat still holding a registered socket — the
+	// hub drops unknown IDs, and nothing is queued for a seat that is offline
+	// at send time (the abandoned seat always is).
 	userIDs := humanUserIDs(playerIDs)
 	m.hub.BroadcastToUsers(userIDs, abandonedMsg)
 	for _, sm := range settlementMsgs {
@@ -674,7 +698,7 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	for _, hm := range honorMsgs {
 		m.hub.SendToUser(hm.userID, hm.msg)
 	}
-	m.hub.BroadcastToUsers(userIDs, stateMsg)
+	m.hub.SendFrames(stateFrames)
 
 	slog.Info("session: match abandoned due to reconnect timeout",
 		"roomID", roomID,

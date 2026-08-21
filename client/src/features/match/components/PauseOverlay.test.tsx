@@ -34,6 +34,7 @@ const mockPlayers = [
     isBot: false,
     level: 1,
     faceDownCount: 0,
+    handCount: 0,
   },
   {
     hand: [],
@@ -46,6 +47,7 @@ const mockPlayers = [
     isBot: false,
     level: 1,
     faceDownCount: 0,
+    handCount: 0,
   },
   {
     hand: [],
@@ -58,6 +60,7 @@ const mockPlayers = [
     isBot: false,
     level: 1,
     faceDownCount: 0,
+    handCount: 0,
   },
   {
     hand: [],
@@ -70,6 +73,7 @@ const mockPlayers = [
     isBot: false,
     level: 1,
     faceDownCount: 0,
+    handCount: 0,
   },
 ] as PauseOverlayProps["players"];
 

@@ -184,6 +184,35 @@ func (h *Hub) SendToUser(userID uint, msg []byte) {
 	}
 }
 
+// UserFrame pairs one recipient with the exact bytes that recipient must
+// receive. The unit of SendFrames: one logical event whose payload differs per
+// recipient (the per-seat projected match_state, Story 12.10).
+type UserFrame struct {
+	UserID uint
+	Msg    []byte
+}
+
+// SendFrames delivers each frame to its own recipient, in slice order, under a
+// single lock pass. The per-recipient counterpart of BroadcastToUsers: where
+// that fans identical bytes out to many users, this carries a DISTINCT frame
+// per user while remaining ONE logical send — so a per-seat state event stays
+// one call on the wire log rather than decomposing into N unicasts. Unknown
+// user IDs are tolerated, mirroring BroadcastToUsers. An empty batch is a
+// legal no-op — a match whose only human seat just disconnected has nobody
+// left to frame.
+func (h *Hub) SendFrames(frames []UserFrame) {
+	if len(frames) == 0 {
+		return
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, f := range frames {
+		if client, ok := h.clients[f.UserID]; ok {
+			client.Send(f.Msg)
+		}
+	}
+}
+
 // BroadcastToUsers sends a message to multiple users by their IDs.
 func (h *Hub) BroadcastToUsers(userIDs []uint, msg []byte) {
 	h.mu.RLock()

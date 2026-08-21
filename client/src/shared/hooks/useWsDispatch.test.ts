@@ -43,7 +43,6 @@ const mockMatchState: MatchState = {
   biddingRound: 1,
   biddingPassCount: 0,
   mustPickTrump: false,
-  deck: [],
   activePlayerSeat: 1,
   trickNumber: 1,
   currentTrick: [],
@@ -63,6 +62,7 @@ const mockMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 1,
     },
     {
       hand: [{ rank: "7", suit: "H" }],
@@ -75,6 +75,7 @@ const mockMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 1,
     },
     {
       hand: [{ rank: "A", suit: "D" }],
@@ -87,6 +88,7 @@ const mockMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 1,
     },
     {
       hand: [{ rank: "9", suit: "C" }],
@@ -99,6 +101,7 @@ const mockMatchState: MatchState = {
       isBot: false,
       level: 1,
       faceDownCount: 0,
+      handCount: 1,
     },
   ],
   teamScores: [0, 0],

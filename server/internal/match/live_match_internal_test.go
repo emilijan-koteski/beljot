@@ -17,14 +17,43 @@ import (
 // which events broadcastActionResult emits, without a real WS hub/clients.
 type recordingBroadcaster struct{ msgs [][]byte }
 
+// rejectUnprojectedState hard-fails the run when an event:match_state payload
+// arrives through an identical-bytes primitive — same adoption sweep as
+// hubSpy's failIfUnprojectedState (matchend_test.go): every state frame must
+// ride SendFrames with a per-seat game.ProjectForSeat mask (Story 12.10).
+func rejectUnprojectedState(primitive string, msg []byte) {
+	if json.Valid(msg) {
+		var env struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(msg, &env); err == nil && env.Type == ws.EventMatchState {
+			panic("recordingBroadcaster: " + ws.EventMatchState + " must ride SendFrames with a per-seat projection (Story 12.10); got it via " + primitive)
+		}
+	}
+}
+
 func (r *recordingBroadcaster) BroadcastToUsers(_ []uint, msg []byte) {
+	rejectUnprojectedState("BroadcastToUsers", msg)
 	cp := make([]byte, len(msg))
 	copy(cp, msg)
 	r.msgs = append(r.msgs, cp)
 }
 func (r *recordingBroadcaster) SendToUser(_ uint, msg []byte) {
+	rejectUnprojectedState("SendToUser", msg)
 	cp := make([]byte, len(msg))
 	copy(cp, msg)
+	r.msgs = append(r.msgs, cp)
+}
+
+// SendFrames records one entry per frames batch (the first frame stands in for
+// the whole call — all frames in a batch carry the same event type), so the
+// event-type/order assertions keep seeing one entry per logical state event.
+func (r *recordingBroadcaster) SendFrames(frames []ws.UserFrame) {
+	if len(frames) == 0 {
+		return
+	}
+	cp := make([]byte, len(frames[0].Msg))
+	copy(cp, frames[0].Msg)
 	r.msgs = append(r.msgs, cp)
 }
 

@@ -25,6 +25,12 @@ type hubCall struct {
 	userIDs []uint
 	msg     []byte
 	at      time.Time
+	// frames holds the per-recipient bytes when the call came through
+	// SendFrames (per-seat projected match_state, Story 12.10); nil for
+	// BroadcastToUsers / SendToUser calls. msg is then the FIRST frame, kept
+	// as the representative for type/ordering assertions — every frame in one
+	// call carries the same event type.
+	frames map[uint][]byte
 }
 
 // hubSpy records every BroadcastToUsers / SendToUser call so tests can assert
@@ -36,7 +42,22 @@ type hubSpy struct {
 	calls []hubCall
 }
 
+// failIfUnprojectedState hard-fails the run when an event:match_state payload
+// arrives through an identical-bytes primitive. Story 12.10 routes EVERY state
+// frame through SendFrames carrying a per-seat game.ProjectForSeat mask; a
+// state payload on BroadcastToUsers or SendToUser is an unprojected send that
+// would ship hidden cards to all four seats. It panics (rather than t.Errorf)
+// so the failure fires AT the offending send with a stack trace naming the
+// call site, without threading *testing.T through every spy constructor —
+// this turns the whole wiring suite into an adoption sweep.
+func failIfUnprojectedState(spy, primitive string, msg []byte) {
+	if containsType(msg, ws.EventMatchState) {
+		panic(spy + ": " + ws.EventMatchState + " must ride SendFrames with a per-seat projection (Story 12.10); got it via " + primitive)
+	}
+}
+
 func (h *hubSpy) BroadcastToUsers(userIDs []uint, msg []byte) {
+	failIfUnprojectedState("hubSpy", "BroadcastToUsers", msg)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	cp := make([]uint, len(userIDs))
@@ -47,11 +68,36 @@ func (h *hubSpy) BroadcastToUsers(userIDs []uint, msg []byte) {
 }
 
 func (h *hubSpy) SendToUser(userID uint, msg []byte) {
+	failIfUnprojectedState("hubSpy", "SendToUser", msg)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	msgCopy := make([]byte, len(msg))
 	copy(msgCopy, msg)
 	h.calls = append(h.calls, hubCall{userIDs: []uint{userID}, msg: msgCopy, at: time.Now()})
+}
+
+// SendFrames records ONE call per frames batch — the wire log keeps one entry
+// per logical state event, so every count/order assertion over calls still
+// holds, and a single-recipient entry still means a targeted SendToUser.
+// An empty batch (every recipient seat is a bot) records nothing, mirroring
+// recordingBroadcaster — a phantom nil-msg call would poison type decoding.
+func (h *hubSpy) SendFrames(frames []ws.UserFrame) {
+	if len(frames) == 0 {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	call := hubCall{at: time.Now(), frames: make(map[uint][]byte, len(frames))}
+	for i, f := range frames {
+		msgCopy := make([]byte, len(f.Msg))
+		copy(msgCopy, f.Msg)
+		call.userIDs = append(call.userIDs, f.UserID)
+		call.frames[f.UserID] = msgCopy
+		if i == 0 {
+			call.msg = msgCopy
+		}
+	}
+	h.calls = append(h.calls, call)
 }
 
 func (h *hubSpy) snapshot() []hubCall {

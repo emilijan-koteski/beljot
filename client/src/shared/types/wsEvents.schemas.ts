@@ -27,6 +27,7 @@
 
 import { z } from "zod";
 
+import type { MatchState, PlayerState } from "./matchTypes";
 import { SERVER_PHASES } from "./matchTypes";
 import type {
   AutoActionPayload,
@@ -86,6 +87,11 @@ const PlayerStateSchema = z.strictObject({
   // live dispatch path casts the payload instead of parsing it — so consumers
   // still guard against a field an older server did not send.
   faceDownCount: z.number().int(),
+  // Story 12.10: the open-hand counterpart of faceDownCount. match_state is
+  // projected per recipient — only the viewer's own `hand` carries cards, so
+  // opponents render from this count. Real hand length on all four seats.
+  // Same build-time gate as faceDownCount above.
+  handCount: z.number().int(),
 });
 
 const TrickCardSchema = z.strictObject({
@@ -120,7 +126,10 @@ export const EventMatchStateSchema = z.strictObject({
   // as the Go GameState.MustPickTrump field — enforced by the contract test, not
   // at runtime (see faceDownCount above).
   mustPickTrump: z.boolean(),
-  deck: z.array(CardSchema),
+  // No `deck` field: the 11 held-back Bitola cards are hidden information and
+  // Story 12.10 removed them from the wire outright (GameState.Deck is
+  // json:"-" on the Go side). strictObject means the field cannot quietly
+  // return without failing the contract test.
   trickNumber: z.number(),
   currentTrick: z.array(TrickCardSchema),
   leadSuit: z.string().nullable(),
@@ -375,6 +384,47 @@ export const FaceDownRevealedPayloadSchema = z.strictObject({
 
 type MutualExtends<A, B> = A extends B ? (B extends A ? true : false) : false;
 
+// --- MatchState / PlayerState witnesses (Story 12.10) ---
+//
+// The live dispatch path CASTS event:match_state to `MatchState` instead of
+// parsing it (useWsDispatch), so nothing at runtime connects the interface to
+// the schema the goldens gate — a field added or removed on only one side
+// (exactly this story's change: `deck` out, `handCount` in) would drift
+// silently. `MutualExtends` cannot witness these two directly because the
+// interface deliberately narrows value types (Variant, Suit, Rank, TeamString
+// are unions where the wire schema keeps plain strings), so the witness is
+// split in two, each half compiling only while its guarantee holds:
+//
+//  1. Key parity, both directions and at both nesting levels that this story
+//     touched (MatchState itself and the PlayerState tuple element) — the
+//     drift class the cast leaves open is a missing/extra field, and keys
+//     catch it symmetrically.
+//  2. Assignability of the interface INTO the schema output (minus `phase`,
+//     whose union adds the client-local "" member the server never sends) —
+//     this checks every field's VALUE type in the direction the narrowing
+//     allows, so e.g. `handCount: string` on either side still fails tsc.
+
+type MutualKeys<A, B> = [keyof A] extends [keyof B]
+  ? [keyof B] extends [keyof A]
+    ? true
+    : false
+  : false;
+
+type _MatchStateConformance = MutualKeys<z.infer<typeof EventMatchStateSchema>, MatchState>;
+const _matchStateConforms: _MatchStateConformance = true;
+
+type _PlayerStateConformance = MutualKeys<
+  z.infer<typeof EventMatchStateSchema>["players"][number],
+  PlayerState
+>;
+const _playerStateConforms: _PlayerStateConformance = true;
+
+type _MatchStateAssignability =
+  Omit<MatchState, "phase"> extends Omit<z.infer<typeof EventMatchStateSchema>, "phase">
+    ? true
+    : false;
+const _matchStateAssignable: _MatchStateAssignability = true;
+
 type _CardPlayedConformance = MutualExtends<
   z.infer<typeof CardPlayedPayloadSchema>,
   CardPlayedPayload
@@ -496,6 +546,9 @@ const _faceDownRevealedConforms: _FaceDownRevealedConformance = true;
 // assertion above. Re-exporting under a private namespace gives them a
 // reachable use without polluting the public module surface.
 export const _conformanceWitnesses = {
+  _matchStateConforms,
+  _playerStateConforms,
+  _matchStateAssignable,
   _cardPlayedConforms,
   _trickResolvedConforms,
   _handScoredConforms,

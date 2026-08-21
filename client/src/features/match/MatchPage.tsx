@@ -1669,16 +1669,27 @@ export function MatchPage() {
               isActive={isActive}
               seatTeam={seatTeam(player.seat, myPlayerSeat)}
               // An opponent's stack is every card they physically hold, which
-              // during Croatian bidding is six open plus two face-down. The
-              // count is server-authoritative and 0 in every other variant and
-              // phase, so this needs no variant branch. Own seat renders its
-              // real hand instead (see myHand), so it passes undefined.
+              // during Croatian bidding is six open plus two face-down. Both
+              // counts are server-authoritative, so this needs no variant
+              // branch. Own seat renders its real hand instead (see myHand),
+              // so it passes undefined.
               //
-              // `?? 0` is not defensive noise: match_state is CAST to MatchState,
-              // not parsed, so a server that predates this field yields undefined
-              // and `6 + undefined` renders "×NaN" on every seat. A client-first
-              // rolling deploy is exactly that window.
-              cardCount={isSelf ? undefined : player.hand.length + (player.faceDownCount ?? 0)}
+              // handCount, not hand.length: the server projects match_state
+              // per recipient (Story 12.10), so an opponent's `hand` arrives
+              // EMPTY and only the count crosses the wire — their cards never
+              // reach this client at all.
+              //
+              // The `??` fallbacks are not defensive noise: match_state is CAST
+              // to MatchState, not parsed, so a server that predates either
+              // field yields undefined and `6 + undefined` renders "×NaN" on
+              // every seat. A client-first rolling deploy is exactly that
+              // window — an old server still sends full hands and no handCount,
+              // and hand.length keeps rendering them correctly until it flips.
+              cardCount={
+                isSelf
+                  ? undefined
+                  : (player.handCount ?? player.hand.length) + (player.faceDownCount ?? 0)
+              }
               turnExpiresAt={isActive && isTurnPhase ? matchState.turnExpiresAt : null}
               timerDuration={matchState.timerDurationSec}
               isDealer={matchState.dealerSeat === player.seat}

@@ -13,7 +13,6 @@
   "biddingRound": 2,
   "biddingPassCount": 0,
   "mustPickTrump": false,
-  "deck": [],
   "trickNumber": 4,
   "currentTrick": [],
   "leadSuit": null,
@@ -36,15 +35,11 @@
       "connected": true,
       "isBot": false,
       "level": 3,
-      "faceDownCount": 0
+      "faceDownCount": 0,
+      "handCount": 1
     },
     {
-      "hand": [
-        {
-          "rank": "8",
-          "suit": "H"
-        }
-      ],
+      "hand": [],
       "seat": 1,
       "userId": 20,
       "username": "bob",
@@ -53,15 +48,11 @@
       "connected": true,
       "isBot": false,
       "level": 1,
-      "faceDownCount": 0
+      "faceDownCount": 0,
+      "handCount": 1
     },
     {
-      "hand": [
-        {
-          "rank": "9",
-          "suit": "D"
-        }
-      ],
+      "hand": [],
       "seat": 2,
       "userId": 30,
       "username": "carol",
@@ -70,15 +61,11 @@
       "connected": true,
       "isBot": false,
       "level": 2,
-      "faceDownCount": 0
+      "faceDownCount": 0,
+      "handCount": 1
     },
     {
-      "hand": [
-        {
-          "rank": "A",
-          "suit": "S"
-        }
-      ],
+      "hand": [],
       "seat": 3,
       "userId": 40,
       "username": "dave",
@@ -87,7 +74,8 @@
       "connected": true,
       "isBot": false,
       "level": 0,
-      "faceDownCount": 0
+      "faceDownCount": 0,
+      "handCount": 1
     }
   ],
   "teamScores": [

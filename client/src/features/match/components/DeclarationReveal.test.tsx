@@ -46,6 +46,7 @@ function testPlayer(seat: number, username: string): PlayerState {
     isBot: false,
     level: 1,
     faceDownCount: 0,
+    handCount: 0,
   };
 }
 

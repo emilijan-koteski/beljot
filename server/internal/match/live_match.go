@@ -127,9 +127,16 @@ type HonorRecorder interface {
 // Broadcaster is the subset of *ws.Hub the manager depends on. Mirrors the
 // chat / emote pattern (chat/handler.go, emote/handler.go) so tests can swap
 // in a hubSpy without spinning up a real hub. *ws.Hub satisfies this directly.
+//
+// SendFrames is the per-recipient primitive every match_state send rides
+// (Story 12.10): each human seat gets its own ProjectForSeat frame, but the
+// event stays ONE logical call — so wiring tests that count/order broadcasts
+// keep one entry per state event, and a single-recipient SendToUser still
+// reliably means a targeted send (an error, a settlement, a face-down reveal).
 type Broadcaster interface {
 	BroadcastToUsers(userIDs []uint, msg []byte)
 	SendToUser(userID uint, msg []byte)
+	SendFrames(frames []ws.UserFrame)
 }
 
 // Manager orchestrates game sessions: receives actions via WebSocket,
@@ -291,10 +298,8 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 
 	slog.Info("session: game started", "roomID", roomID, "players", playerIDs)
 
-	humanIDs := humanUserIDs(playerIDs)
-
 	// Broadcast dealing-phase state (client shows deal animation)
-	m.hub.BroadcastToUsers(humanIDs, buildMessage(ws.EventMatchState, gs))
+	m.broadcastState(playerIDs, gs)
 
 	// Auto-transition to bidding phase (client's DealAnimation handles visual timing)
 	if gs.Phase == game.PhaseDealing {
@@ -304,7 +309,7 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		m.setTurnExpiry(session, gs)
 		m.startTimerLocked(session, gs.ActivePlayerSeat)
 		session.mu.Unlock()
-		m.hub.BroadcastToUsers(humanIDs, buildMessage(ws.EventMatchState, gs))
+		m.broadcastState(playerIDs, gs)
 	}
 
 	// The first bidder may be a bot.
@@ -864,7 +869,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// awaitingDeclaration / pendingBelotSeat flags. event:card_played only
 		// mutates the trick on the client — without this the next player never
 		// learns it's their turn.
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionPickTrump:
 		if newState.TrumpSuit != nil {
@@ -911,7 +916,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// sync activePlayerSeat/phase/trumpCallerSeat. Without this, a
 		// successful pick leaves the client stuck on TrumpPrompt and every
 		// subsequent click returns error:wrong_phase.
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionPassTrump:
 		// A pass that emptied round 1 under a reveal config turns every seat's
@@ -922,7 +927,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		if newState.FaceDownRevealed && !oldState.FaceDownRevealed {
 			m.sendFaceDownReveals(playerIDs, newState)
 		}
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionDeclare, game.ActionSkipDeclare:
 		// Announce WHO declared the moment the declare commits, so the table
@@ -942,7 +947,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// Always follow with full state so the client clears awaitingDeclaration,
 		// advances activePlayerSeat, and picks up declarationsResolved. The
 		// event:declarations_resolved handler is reveal-only and does not sync state.
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionAnnounceBelot, game.ActionSkipBelot:
 		if newState.BelotAnnounced && !oldState.BelotAnnounced {
@@ -984,7 +989,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// Always follow with full state so the client clears pendingBelotSeat,
 		// advances activePlayerSeat, and resolves the trick if the belot action
 		// came after the 4th card. event:belot_announced is informational only.
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionContinue:
 		// Acknowledging the hand-complete pause. If this continue dealt the next
@@ -995,7 +1000,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		if newState.Phase == game.PhaseMatchEnd {
 			return
 		}
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionPause:
 		paused := ws.MatchPausedPayload{
@@ -1003,7 +1008,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			PausedPlayers: newState.PausedPlayers,
 		}
 		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchPaused, paused))
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionSurrenderRequest:
 		// Story 8.2 — broadcast typed proposed payload, then authoritative
@@ -1021,7 +1026,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			PartnerSeat:      (proposerSeat + 2) % 4,
 		}
 		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventSurrenderProposed, proposed))
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionSurrenderDecline:
 		// Proposer is no longer in newState (cleared on decline) — read it
@@ -1040,7 +1045,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			slog.Warn("session: surrender_declined broadcast suppressed; oldState.SurrenderProposerSeat is nil",
 				"decliningSeat", action.PlayerSeat)
 		}
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionSurrenderAccept:
 		// Story 8.5-1 AC4: match-end transition emits event:match_end AND the
@@ -1052,7 +1057,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// Defensive fallback for the (currently unreachable) case where surrender
 		// accept does not reach match_end — emit authoritative state so clients
 		// pick up the cleared SurrenderProposerSeat.
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	case game.ActionUnpause, game.ActionOwnerUnpause:
 		resumed := ws.MatchResumedPayload{
@@ -1063,11 +1068,11 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		if newState.Phase != game.PhasePaused {
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchResumed, resumed))
 		}
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 
 	default:
 		// For any other action, broadcast full state
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, newState))
+		m.broadcastState(playerIDs, newState)
 	}
 }
 
@@ -1329,7 +1334,7 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	for _, hm := range honorMsgs {
 		m.hub.SendToUser(hm.userID, hm.msg)
 	}
-	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchState, finalState))
+	m.broadcastState(session.playerIDs, finalState)
 
 	m.RemoveSession(session.roomID)
 }
@@ -1364,6 +1369,45 @@ func (m *Manager) sendGameError(userID uint, err error) {
 		eventType = ws.ErrorMustPickTrump
 	}
 	m.sendError(userID, eventType, err.Error())
+}
+
+// buildStateFrames builds one event:match_state frame PER HUMAN SEAT, each
+// carrying game.ProjectForSeat's mask for that recipient, in deterministic
+// seat order 0→3. Every match_state frame is built through ProjectForSeat and
+// sent through hub.SendFrames — this helper covers every fan-out send, and
+// SyncStateOnConnect builds its one-recipient frame the same way as a
+// single-frame batch. An unprojected state frame would ship every hand, the
+// undealt deck, unresolved melds, and the pending-Belote secret to all four
+// seats (Story 12.10); the test spies hard-fail any match_state payload that
+// arrives via BroadcastToUsers or SendToUser, so no send site can drift back.
+//
+// excludeSeat omits that one seat's frame (-1 for none): the disconnect
+// broadcasts address the remaining seats only. Bot seats (UserID 0) never get
+// a frame — they read the unprojected struct in-process via buildBotView and
+// have no socket.
+//
+// Callers that build under the session lock and send after releasing it pass
+// the returned frames to hub.SendFrames, same as the old pre-built stateMsg.
+func buildStateFrames(playerIDs [4]uint, state *game.GameState, excludeSeat int) []ws.UserFrame {
+	frames := make([]ws.UserFrame, 0, 4)
+	for seat, uid := range playerIDs {
+		if uid == 0 || seat == excludeSeat {
+			continue
+		}
+		frames = append(frames, ws.UserFrame{
+			UserID: uid,
+			Msg:    buildMessage(ws.EventMatchState, game.ProjectForSeat(state, seat)),
+		})
+	}
+	return frames
+}
+
+// broadcastState sends the authoritative state to every human seat, projected
+// per recipient. The projection-aware replacement for the old
+// BroadcastToUsers(humanUserIDs(...), buildMessage(EventMatchState, state)) —
+// one logical send, four distinct frames.
+func (m *Manager) broadcastState(playerIDs [4]uint, state *game.GameState) {
+	m.hub.SendFrames(buildStateFrames(playerIDs, state, -1))
 }
 
 // buildMessage creates a JSON-encoded WS message.
@@ -1509,7 +1553,7 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 		m.handleMatchEnd(session, newState, nil, matchEndPayload)
 		return
 	}
-	m.hub.BroadcastToUsers(humanUserIDs(playerIDs), buildMessage(ws.EventMatchState, newState))
+	m.broadcastState(playerIDs, newState)
 
 	// The freshly dealt hand's first bidder may be a bot.
 	m.maybeScheduleBotAction(session)
@@ -1563,10 +1607,9 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 			m.setTurnExpiry(session, gs)
 			m.startTimerLocked(session, expectedSeat)
 			// Build under the lock, send after releasing it.
-			staleMsg := buildMessage(ws.EventMatchState, gs)
-			staleUserIDs := humanUserIDs(session.playerIDs)
+			staleFrames := buildStateFrames(session.playerIDs, gs, -1)
 			session.mu.Unlock()
-			m.hub.BroadcastToUsers(staleUserIDs, staleMsg)
+			m.hub.SendFrames(staleFrames)
 			return
 		}
 		action = game.Action{
@@ -1610,10 +1653,9 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		m.startTimerLocked(session, gs.ActivePlayerSeat)
 		// Build under the lock, send after releasing it — same pattern as
 		// HandleDisconnect / SyncStateOnConnect.
-		staleMsg := buildMessage(ws.EventMatchState, gs)
-		staleUserIDs := humanUserIDs(session.playerIDs)
+		staleFrames := buildStateFrames(session.playerIDs, gs, -1)
 		session.mu.Unlock()
-		m.hub.BroadcastToUsers(staleUserIDs, staleMsg)
+		m.hub.SendFrames(staleFrames)
 		return
 	case gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == expectedSeat:
 		// Auto-skip belot announcement on timer expiry

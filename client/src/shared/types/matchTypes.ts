@@ -155,9 +155,15 @@ export interface PlayerState {
   //
   // A count, never the cards: the identities are server-only, and the viewer's
   // own two arrive on a per-seat event. A seat's rendered stack is
-  // `hand.length + faceDownCount`, which is server-authoritative and needs no
+  // `handCount + faceDownCount`, which is server-authoritative and needs no
   // client-side variant branch.
   faceDownCount: number;
+  // How many cards this seat holds in `hand` — the open-hand counterpart of
+  // faceDownCount. The server projects every match_state per recipient
+  // (Story 12.10): only the viewer's own `hand` carries cards, every other
+  // seat's arrives empty, and this count is what renders their card backs.
+  // Real hand length on all four seats, the viewer's own included.
+  handCount: number;
 }
 
 export interface HandResult {
@@ -195,7 +201,6 @@ export interface MatchState {
    *  where the hand must find a taker). Drives whether the trump prompt offers a
    *  Pass control — the client never re-derives the rule. */
   mustPickTrump: boolean;
-  deck: Card[];
   activePlayerSeat: number;
   trickNumber: number;
   currentTrick: TrickCard[];

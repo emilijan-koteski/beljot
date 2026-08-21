@@ -127,7 +127,9 @@ func TestGameStateJSONCamelCaseKeys(t *testing.T) {
 	expectedKeys := []string{
 		"id", "roomId", "variant", "matchMode", "phase",
 		"handNumber", "dealerSeat", "trumpSuit", "trumpCallerSeat",
-		"trumpCandidate", "biddingRound", "biddingPassCount", "deck", "activePlayerSeat",
+		// "deck" left this list with Story 12.10: GameState.Deck is json:"-" —
+		// the 11 held-back cards are hidden information and never serialize.
+		"trumpCandidate", "biddingRound", "biddingPassCount", "activePlayerSeat",
 		"trickNumber", "currentTrick", "leadSuit", "trickWinnerSeat",
 		"players", "teamScores", "handPoints", "declarationPoints", "tricksWon",
 		"turnExpiresAt",
