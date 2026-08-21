@@ -257,7 +257,13 @@ describe("PlayingCard", () => {
     await i18n.changeLanguage("hr");
     render(<PlayingCard card={queenOfDiamonds} state="default" size="md" />);
 
-    expect(screen.getByTestId("playing-card-QD")).toHaveAttribute("aria-label", "Bundeva dama");
+    // Lower case, unlike the French row's "Pik": the Croatian deck's suits are
+    // ordinary common nouns (bundeva, žir, zelje) rather than the borrowed,
+    // capitalised card words, and hr does not capitalise common nouns
+    // mid-sentence — which is where most templates put them ("zvao bundeva za
+    // aduta"). The one surface that needs a leading capital, TrumpIndicator's
+    // caption, gets it from CSS `capitalize`, not from the stored string.
+    expect(screen.getByTestId("playing-card-QD")).toHaveAttribute("aria-label", "bundeva dama");
   });
 
   it("has correct aria-label for face-down card", () => {

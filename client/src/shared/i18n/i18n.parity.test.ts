@@ -101,3 +101,37 @@ describe("i18n parity", () => {
     }
   });
 });
+
+// The Croatian deck's suits are ordinary common nouns (zelje / srce / bundeva /
+// žir, лист / срце / ѕвонче / жир), unlike the French row's borrowed, capitalised
+// card words (Pik / Herc / Karo / Tref). Most templates put the suit
+// mid-sentence — "zvao bundeva za aduta", "го зеде ѕвонче за адут" — and none of
+// these languages capitalise common nouns there, so a capital in the stored
+// string is an orthography bug at every one of those call sites.
+//
+// Nothing else would catch it: the parity test above checks key sets and
+// non-empty leaves, never wording. The one surface that needs a leading capital,
+// TrumpIndicator's suit caption, takes it from CSS `capitalize` rather than from
+// the stored value, so lowercase here is safe as well as correct.
+describe("card-deck suit name casing", () => {
+  const LATIN_AND_CYRILLIC = { hr, sr, mk } as const;
+
+  it.each(Object.entries(LATIN_AND_CYRILLIC))(
+    "%s stores the Croatian deck's suit names lower case",
+    (_locale, bundle) => {
+      const suits: Record<string, string> = bundle.match.card.suit.croatian;
+      for (const [suit, name] of Object.entries(suits)) {
+        expect(name, `${suit} must not start capitalised`).toBe(
+          name[0]!.toLowerCase() + name.slice(1),
+        );
+      }
+    },
+  );
+
+  it("keeps English capitalised, since English does capitalise suit names", () => {
+    const suits: Record<string, string> = en.match.card.suit.croatian;
+    for (const [suit, name] of Object.entries(suits)) {
+      expect(name[0], `${suit} should be capitalised in en`).toBe(name[0]!.toUpperCase());
+    }
+  });
+});
