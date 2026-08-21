@@ -1,8 +1,9 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/shared/i18n/i18n";
+import type { Variant } from "@/shared/types/matchTypes";
 
 import { RulesDialog } from "./RulesDialog";
 
@@ -29,7 +30,7 @@ describe("RulesDialog (in-game)", () => {
     render(<RulesDialog open onOpenChange={() => {}} />);
 
     expect(screen.getByTestId("rules-dialog")).toBeInTheDocument();
-    expect(screen.getByText("Beljot rules")).toBeInTheDocument();
+    expect(screen.getByText("Belote rules")).toBeInTheDocument();
     // Chapter index entries for all six chapters.
     expect(screen.getByTestId("rules-toc-goal")).toHaveTextContent("The goal");
     expect(screen.getByTestId("rules-toc-scoring")).toHaveTextContent("Scoring");
@@ -64,6 +65,122 @@ describe("RulesDialog (in-game)", () => {
     render(<RulesDialog open onOpenChange={() => {}} />);
     await user.click(screen.getByTestId("rules-toc-melds"));
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  // ── The variant split ────────────────────────────────────────────────────
+  //
+  // The overlay opens over a live table, so the tab it lands on has to be the
+  // variant actually being played — rules that contradict the cards in front of
+  // the player are worse than no rules at all.
+
+  const BITOLA_STEP = "Deal five each, then turn one up";
+  const CROATIA_STEP = "Deal all eight up front";
+
+  it("pre-selects the Croatian tab in a Croatian match", () => {
+    render(<RulesDialog open onOpenChange={() => {}} variant="croatia" />);
+    expect(screen.getByTestId("rules-dialog-variant-croatia")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText(CROATIA_STEP)).toBeInTheDocument();
+    expect(screen.queryByText(BITOLA_STEP)).not.toBeInTheDocument();
+  });
+
+  it("pre-selects the Bitola tab in a Bitola match", () => {
+    render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
+    expect(screen.getByTestId("rules-dialog-variant-bitola")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText(BITOLA_STEP)).toBeInTheDocument();
+    expect(screen.queryByText(CROATIA_STEP)).not.toBeInTheDocument();
+  });
+
+  it("falls back to Bitola for a missing or unknown variant", () => {
+    const { unmount } = render(<RulesDialog open onOpenChange={() => {}} />);
+    expect(screen.getByText(BITOLA_STEP)).toBeInTheDocument();
+    unmount();
+    render(<RulesDialog open onOpenChange={() => {}} variant={"pelagonia" as Variant} />);
+    expect(screen.getByTestId("rules-dialog-variant-bitola")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText(BITOLA_STEP)).toBeInTheDocument();
+  });
+
+  it("swaps only the scoped blocks when the tab is switched by hand", async () => {
+    const user = userEvent.setup();
+    render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
+    const shared = "Trump plays by its own rules";
+    expect(screen.getByRole("heading", { name: shared })).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("rules-dialog-variant-croatia"));
+
+    expect(screen.getByText(CROATIA_STEP)).toBeInTheDocument();
+    expect(screen.queryByText(BITOLA_STEP)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: shared })).toBeInTheDocument();
+  });
+
+  it("resets the tab to the match variant when reopened", () => {
+    // The component stays MOUNTED while closed (`if (!open) return null` sits
+    // after the hooks), so `activeVariant` survives a close. Without the reset
+    // effect a player who browsed the other ruleset mid-hand would come back to
+    // it, still showing rules this table is not playing.
+    const { rerender } = render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
+    fireEvent.click(screen.getByTestId("rules-dialog-variant-croatia"));
+    expect(screen.getByText(CROATIA_STEP)).toBeInTheDocument();
+
+    rerender(<RulesDialog open={false} onOpenChange={() => {}} variant="bitola" />);
+    rerender(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
+
+    expect(screen.getByTestId("rules-dialog-variant-bitola")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText(BITOLA_STEP)).toBeInTheDocument();
+    expect(screen.queryByText(CROATIA_STEP)).not.toBeInTheDocument();
+  });
+
+  it("moves between variant tabs with the arrow keys", async () => {
+    const user = userEvent.setup();
+    render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
+    const bitola = screen.getByTestId("rules-dialog-variant-bitola");
+    const croatia = screen.getByTestId("rules-dialog-variant-croatia");
+    // Roving tabIndex: only the selected tab is in the tab order.
+    expect(bitola).toHaveAttribute("tabindex", "0");
+    expect(croatia).toHaveAttribute("tabindex", "-1");
+
+    bitola.focus();
+    await user.keyboard("{ArrowRight}");
+
+    expect(croatia).toHaveAttribute("aria-selected", "true");
+    expect(croatia).toHaveFocus();
+    expect(screen.getByText(CROATIA_STEP)).toBeInTheDocument();
+
+    await user.keyboard("{ArrowLeft}");
+    expect(bitola).toHaveAttribute("aria-selected", "true");
+    expect(bitola).toHaveFocus();
+  });
+
+  it("points both variant tabs at the panel they control", () => {
+    render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
+    const panelId = screen.getByTestId("rules-dialog-variant-bitola").getAttribute("aria-controls");
+    expect(panelId).toBeTruthy();
+    expect(screen.getByTestId("rules-dialog-variant-croatia")).toHaveAttribute(
+      "aria-controls",
+      panelId,
+    );
+    expect(document.getElementById(panelId!)).toHaveAttribute("role", "tabpanel");
+  });
+
+  it("carries the difference marker into the dark theme", async () => {
+    const user = userEvent.setup();
+    render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
+    const marker = screen.getAllByTestId("rules-diff-marker")[0];
+    await user.hover(marker);
+    expect(
+      await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),
+    ).toBeInTheDocument();
   });
 
   it("renders Macedonian content when that locale is active", async () => {

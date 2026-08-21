@@ -47,8 +47,18 @@ export const DECLARATIONS_BASE: DeclarationBase[] = [
   { id: "carre", pts: 100, tier: 1, kind: "set" },
   { id: "carre9", pts: 150, tier: 2, kind: "set" },
   { id: "carreJ", pts: 200, tier: 2, kind: "set" },
-  // Belote / Bela — all eight cards of one suit: instant 1001-point win.
-  // Documentation only; engine detection/scoring is deferred (see deferred-work.md).
+  // Belote / Bela — all eight cards of the TRUMP suit in one hand ends the match
+  // on the spot, and the engine DOES implement that: game.checkInstantWin
+  // (server/internal/game/scoring.go) runs after the deal and after a resolved
+  // pick, setting WinnerTeam and PhaseMatchEnd. It awards no points — it names a
+  // winner — so the prose must not promise a 1001-point payout.
+  // Only the ANY-suit generalisation is deferred (see deferred-work.md). The
+  // earlier wording here claimed the whole rule was documentation-only with no
+  // engine support; that was false, and it propagated into the locale copy
+  // through two stories before anyone re-read the engine.
+  // The 1001 below, and this entry sitting in a list of DECLARATIONS at all, are
+  // deliberate holdovers: moving it out is a wire-shape change to this module and
+  // is deferred by owner decision.
   // Tier 3 = its own "wins the match on the spot" visual treatment.
   { id: "bela", pts: 1001, tier: 3, kind: "run" },
 ];

@@ -20,10 +20,20 @@ function TooltipContent({
   sideOffset = 4,
   align = "center",
   alignOffset = 0,
+  zIndex,
   children,
   ...props
 }: TooltipPrimitive.Popup.Props &
-  Pick<TooltipPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
+  Pick<TooltipPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset"> & {
+    /**
+     * Stacking tier for the portalled positioner, for the case where the default
+     * `z-50` is not enough: the portal target is `document.body`, so a tooltip
+     * opened from inside a higher layer lands as that layer's SIBLING and paints
+     * behind it. Pass a value from `shared/lib/zLayers` — an inline z-index is
+     * the repo convention precisely so the number stays traceable to that file.
+     */
+    zIndex?: number;
+  }) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner
@@ -31,7 +41,9 @@ function TooltipContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
+        data-slot="tooltip-positioner"
         className="isolate z-50"
+        style={zIndex === undefined ? undefined : { zIndex }}
       >
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"

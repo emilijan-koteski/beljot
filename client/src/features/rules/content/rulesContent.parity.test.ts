@@ -4,17 +4,47 @@
 
 import { describe, expect, it } from "vitest";
 
+import { type Variant, VARIANTS } from "@/shared/types/matchTypes";
+
 import { getRulesContent, RULES_CONTENT } from "./rulesContent";
 import type { RuleBlock, RulesContent, RulesLang } from "./types";
 
 const LANGS: RulesLang[] = ["en", "mk", "hr", "sr"];
 const reference = RULES_CONTENT.en;
 
+// The block kinds whose renderers actually paint a difference marker, in BOTH
+// the light `RuleBlock` switch and the dark `DarkBlock` one. `cards` and `melds`
+// take no marker in either (they render a grid, with no text to hang it on), and
+// `tiers` renders in the light theme only — `DarkBlock` has no `tiers` case at
+// all, a pre-existing gap filed as deferred work. `VariantScope` sits on every
+// member of the union, so nothing in the type system stops a scoped `melds`
+// block; this list is what makes it a test failure instead of a note that
+// silently disappears in one theme.
+const MARKER_CAPABLE: RuleBlock["kind"][] = ["p", "rule", "steps", "note"];
+
+// The variant scope and the presence of a difference marker are structure, not
+// translation: a block scoped in one locale only, or one that lost its marker
+// in translation, renders a different page per language. Folding both into the
+// shape string is what makes that a test failure instead of silent drift.
+function scopeShape(b: RuleBlock): string {
+  return `${b.variant ?? "all"}/${b.otherVariantNote ? "marked" : "plain"}`;
+}
+
 function blockShape(b: RuleBlock): string {
-  if (b.kind === "steps") return `steps:${b.items.length}`;
+  if (b.kind === "steps") return `steps:${b.items.length}:${scopeShape(b)}`;
   // Tier tokens are structure, not translation — the shape pins their order.
-  if (b.kind === "tiers") return `tiers:${b.items.map((i) => i.tier).join(",")}`;
-  return b.kind;
+  if (b.kind === "tiers") return `tiers:${b.items.map((i) => i.tier).join(",")}:${scopeShape(b)}`;
+  return `${b.kind}:${scopeShape(b)}`;
+}
+
+/** Every scoped block in a section, grouped by the variant it is scoped to. */
+function scopedVariants(blocks: RuleBlock[]): Set<Variant> {
+  return new Set(blocks.flatMap((b) => (b.variant ? [b.variant] : [])));
+}
+
+/** The blocks one variant's tab actually renders. Mirrors RuleBlock's filter. */
+function visibleBlocks(blocks: RuleBlock[], variant: Variant): RuleBlock[] {
+  return blocks.filter((b) => !b.variant || b.variant === variant);
 }
 
 // Walk every leaf string in a content object and collect empties.
@@ -59,6 +89,90 @@ describe("rules content parity", () => {
         expect(blocks, `${lang} block shapes for section "${section.id}"`).toEqual(refShapes);
       }
     });
+  });
+
+  it("renders a non-empty block list for both variants in every section", () => {
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        for (const variant of VARIANTS) {
+          expect(
+            visibleBlocks(section.blocks, variant).length,
+            `${lang} section "${section.id}" renders nothing under ${variant}`,
+          ).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it("gives every variant-scoped block a difference marker", () => {
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        section.blocks.forEach((b, i) => {
+          if (!b.variant) return;
+          expect(
+            b.otherVariantNote,
+            `${lang} section "${section.id}" block ${i} is scoped to ${b.variant} with no otherVariantNote`,
+          ).toBeTruthy();
+        });
+      }
+    }
+  });
+
+  it("scopes a block to a real variant only", () => {
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        for (const b of section.blocks) {
+          if (b.variant) expect(VARIANTS as readonly string[]).toContain(b.variant);
+        }
+      }
+    }
+  });
+
+  it("puts a difference note only on kinds whose renderers show one", () => {
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        section.blocks.forEach((b, i) => {
+          if (!b.otherVariantNote) return;
+          expect(
+            MARKER_CAPABLE,
+            `${lang} section "${section.id}" block ${i} is a "${b.kind}" carrying an otherVariantNote, which its renderer would drop`,
+          ).toContain(b.kind);
+        });
+      }
+    }
+  });
+
+  it("never carries a difference note on an unscoped block", () => {
+    // An unscoped block renders under BOTH tabs, so a note saying "the other
+    // variant does X" would be wrong on one of them.
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        section.blocks.forEach((b, i) => {
+          if (!b.otherVariantNote) return;
+          expect(
+            b.variant,
+            `${lang} section "${section.id}" block ${i} has an otherVariantNote but no variant scope`,
+          ).toBeTruthy();
+        });
+      }
+    }
+  });
+
+  it("covers both variants wherever a section scopes anything", () => {
+    // A section that scopes a block for one variant and gives the other no
+    // counterpart is a content hole: that tab is simply missing the rule.
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        const scoped = scopedVariants(section.blocks);
+        if (scoped.size === 0) continue;
+        for (const variant of VARIANTS) {
+          expect(
+            [...scoped],
+            `${lang} section "${section.id}" scopes blocks but has none for ${variant}`,
+          ).toContain(variant);
+        }
+      }
+    }
   });
 
   it("has identical declaration ids and shared numbers across locales", () => {

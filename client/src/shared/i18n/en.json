@@ -654,7 +654,7 @@
         "codeLabel": "CODE",
         "seated": "{{current}}/4"
       },
-      "variantHint": "Bitola or Croatian rules",
+      "variantHint": "Bitola deals five cards and turns up a trump candidate; Croatian deals all eight and lets the taker name any suit",
       "matchModeHint": "501 for a quicker match, 1001 for the full race",
       "timerHintRelaxed": "No timer",
       "timerDurationHint": "10–120s · default 30s",
@@ -1196,7 +1196,7 @@
       "eyebrow": "Beljot Online · 2 v 2 · Free to play",
       "title1": "Sit down at",
       "title2": "the table.",
-      "subtitle": "Beljot is the classic four-player card game — two teams, race to 1001. Find a room in seconds, or invite your usual four with a code.",
+      "subtitle": "Belote is the classic four-player card game — two teams, race to 1001. Find a room in seconds, or invite your usual four with a code.",
       "cta": "Create free account",
       "playing": "playing right now",
       "openTables": "open rooms"
@@ -1217,7 +1217,7 @@
       "f1body": "Every open room, every seat, updated as it happens. Filter by timer style or points, search by code, or just hit Quick Play and let us seat you.",
       "f2tag": "Teams · gold vs silver",
       "f2title": "It's a partnership, not a free-for-all",
-      "f2body": "Two against two, the way Beljot is built. Sit across from your partner, read the declarations, and play the long game to 1001. Built-in chat and emotes keep the table talking.",
+      "f2body": "Two against two, the way Belote is built. Sit across from your partner, read the declarations, and play the long game to 1001. Built-in chat and emotes keep the table talking.",
       "f3tag": "Profile · match history",
       "f3title": "Every hand counts toward your record",
       "f3body": "Track your matches played, win and loss rate, with a full match history hand by hand. See who you win alongside and how tonight stacked up."

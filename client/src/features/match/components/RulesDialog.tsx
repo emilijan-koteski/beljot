@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
+import { DiffMarker } from "@/features/rules/components/DiffMarker";
 import { getRulesContent } from "@/features/rules/content/rulesContent";
 import type {
   CardRow,
@@ -11,8 +12,11 @@ import type {
   RulesContent,
   RuleSection,
 } from "@/features/rules/content/types";
+import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import { variantLabel } from "@/shared/lib/roomLabels";
 import { Z } from "@/shared/lib/zLayers";
+import { normalizeVariant, type Variant, VARIANTS } from "@/shared/types/matchTypes";
 
 import { ClassicButton } from "./overlay/ClassicButton";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
@@ -20,7 +24,17 @@ import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 interface RulesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * The running match's variant, which pre-selects the tab. Without it the
+   * overlay could sit in a Croatian match describing the Bitola deal — rules
+   * contradicting the table in front of the player.
+   */
+  variant?: Variant;
 }
+
+// The scrolling body is the single region both tabs control, so both name it.
+const PANEL_ID = "rules-dialog-panel";
+const tabId = (v: Variant) => `rules-dialog-tab-${v}`;
 
 // Felt-dark palette — matches the bidding / belot / score overlays.
 const PANEL_BG = "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)";
@@ -31,8 +45,10 @@ const TEXT_DIM = "rgba(245,242,232,0.66)";
 const TEXT_FAINT = "rgba(245,242,232,0.5)";
 const GREEN = "#00e5a0"; // --turn-lime — the in-game accent
 
-const DarkRulesCtx = createContext<RulesContent | null>(null);
-const useDarkRules = () => useContext(DarkRulesCtx) as RulesContent;
+type DarkRulesValue = { content: RulesContent; variant: Variant };
+const DarkRulesCtx = createContext<DarkRulesValue | null>(null);
+const useDarkRules = () => (useContext(DarkRulesCtx) as DarkRulesValue).content;
+const useDarkVariant = () => (useContext(DarkRulesCtx) as DarkRulesValue).variant;
 
 /**
  * In-game rules reference. Same content module as the standalone /rules page
@@ -40,17 +56,35 @@ const useDarkRules = () => useContext(DarkRulesCtx) as RulesContent;
  * in-game overlays use. A sticky chapter index scroll-spies a single scrolling
  * body. No language switch — the locale is the one chosen in game settings.
  */
-export function RulesDialog({ open, onOpenChange }: RulesDialogProps) {
-  const { i18n } = useTranslation();
+export function RulesDialog({ open, onOpenChange, variant }: RulesDialogProps) {
+  const { t, i18n } = useTranslation();
   const content = getRulesContent(i18n.language);
   const { sections, ui } = content;
+
+  // An unknown or absent variant falls back to Bitola, mirroring the engine's
+  // own `RulesFor` fallback rather than rendering an empty tab bar.
+  const matchVariant = normalizeVariant(variant);
+  const [activeVariant, setActiveVariant] = useState<Variant>(matchVariant);
+
+  // LOAD-BEARING, not redundant. The early return below sits AFTER the hooks, so
+  // this component stays mounted while closed and `activeVariant` survives —
+  // without this effect a player who browsed the other ruleset mid-hand would
+  // come back to it, still showing rules the table is not playing, next time
+  // they tapped the icon. Covered by "resets the tab to the match variant when
+  // reopened".
+  useEffect(() => {
+    if (open) setActiveVariant(matchVariant);
+  }, [open, matchVariant]);
 
   const dialogRef = useFocusTrap<HTMLDivElement>({ onEscape: () => onOpenChange(false) });
   const scrollRef = useRef<HTMLDivElement>(null);
   const chapterRefs = useRef<Record<string, HTMLElement | null>>({});
   const [activeId, setActiveId] = useState(sections[0]?.id ?? "");
 
-  // Scroll-spy within the dialog's own scroll container.
+  // Scroll-spy within the dialog's own scroll container. Keyed on the active
+  // variant too: flipping tabs swaps blocks in and out of `basics` and `melds`,
+  // so every chapter below them moves and a stale `activeId` would highlight the
+  // wrong index entry until the next scroll event.
   useEffect(() => {
     if (!open) return;
     const el = scrollRef.current;
@@ -68,7 +102,7 @@ export function RulesDialog({ open, onOpenChange }: RulesDialogProps) {
     el.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => el.removeEventListener("scroll", onScroll);
-  }, [open, sections]);
+  }, [open, sections, activeVariant]);
 
   if (!open) return null;
 
@@ -78,161 +112,240 @@ export function RulesDialog({ open, onOpenChange }: RulesDialogProps) {
   };
 
   const dialog = (
-    <div className="fixed inset-0" style={{ zIndex: Z.UTIL }} data-testid="rules-dialog">
-      <OverlayBackdrop dim={0.55}>
-        <div
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="rules-dialog-title"
-          className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150 flex flex-col overflow-hidden"
-          style={{
-            width: 860,
-            maxWidth: "92vw",
-            height: 620,
-            maxHeight: "88vh",
-            borderRadius: 14,
-            background: PANEL_BG,
-            border: "1px solid rgba(201,168,118,0.55)",
-            boxShadow:
-              "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px rgba(201,168,118,0.12), inset 0 1px 0 rgba(201,168,118,0.22)",
-            color: INK,
-          }}
-        >
-          {/* Header */}
+    // One provider for the whole overlay: every difference marker's tooltip
+    // shares Base UI's delay grouping instead of each mounting a provider root.
+    <TooltipProvider delay={0}>
+      <div className="fixed inset-0" style={{ zIndex: Z.UTIL }} data-testid="rules-dialog">
+        <OverlayBackdrop dim={0.55}>
           <div
-            className="flex shrink-0 items-center gap-3"
-            style={{ padding: "16px 20px 14px", borderBottom: "1px solid rgba(201,168,118,0.22)" }}
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rules-dialog-title"
+            className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150 flex flex-col overflow-hidden"
+            style={{
+              width: 860,
+              maxWidth: "92vw",
+              height: 620,
+              maxHeight: "88vh",
+              borderRadius: 14,
+              background: PANEL_BG,
+              border: "1px solid rgba(201,168,118,0.55)",
+              boxShadow:
+                "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px rgba(201,168,118,0.12), inset 0 1px 0 rgba(201,168,118,0.22)",
+              color: INK,
+            }}
           >
-            <BookOpen size={18} style={{ color: BRASS }} aria-hidden="true" />
-            <div className="flex flex-col">
-              <span
-                style={{
-                  fontFamily: "var(--font-body)",
-                  fontSize: 11,
-                  letterSpacing: 2,
-                  textTransform: "uppercase",
-                  color: BRASS,
-                  opacity: 0.85,
-                }}
-              >
-                {ui.ovReference}
-              </span>
-              <span
-                id="rules-dialog-title"
-                style={{
-                  fontFamily: "var(--font-body)",
-                  fontSize: 19,
-                  fontWeight: 600,
-                  letterSpacing: 0.2,
-                  color: INK,
-                  marginTop: 1,
-                }}
-              >
-                {ui.ovTitle}
-              </span>
+            {/* Header */}
+            <div
+              className="flex shrink-0 items-center gap-3"
+              style={{
+                padding: "16px 20px 14px",
+                borderBottom: "1px solid rgba(201,168,118,0.22)",
+              }}
+            >
+              <BookOpen size={18} style={{ color: BRASS }} aria-hidden="true" />
+              <div className="flex flex-col">
+                <span
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: 11,
+                    letterSpacing: 2,
+                    textTransform: "uppercase",
+                    color: BRASS,
+                    opacity: 0.85,
+                  }}
+                >
+                  {ui.ovReference}
+                </span>
+                <span
+                  id="rules-dialog-title"
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: 19,
+                    fontWeight: 600,
+                    letterSpacing: 0.2,
+                    color: INK,
+                    marginTop: 1,
+                  }}
+                >
+                  {ui.ovTitle}
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* Body: TOC rail + scrolling content. On phones the rail is hidden
+            {/* Body: TOC rail + scrolling content. On phones the rail is hidden
               and the content fills the full width (everything scrolls in one
               column). */}
-          <div className="flex min-h-0 flex-1">
-            <nav
-              className="hidden shrink-0 flex-col gap-0.5 md:flex"
+            <div className="flex min-h-0 flex-1">
+              <nav
+                className="hidden shrink-0 flex-col gap-0.5 md:flex"
+                style={{
+                  width: 200,
+                  borderRight: "1px solid rgba(201,168,118,0.22)",
+                  padding: "14px 10px",
+                  background: "rgba(10,22,15,0.30)",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "0 10px 10px",
+                    fontFamily: "var(--font-body)",
+                    fontSize: 10,
+                    letterSpacing: 2,
+                    textTransform: "uppercase",
+                    color: BRASS,
+                    opacity: 0.7,
+                    fontWeight: 600,
+                  }}
+                >
+                  {ui.ovChapters}
+                </div>
+                {sections.map((s, i) => {
+                  const on = s.id === activeId;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => jump(s.id)}
+                      data-testid={`rules-toc-${s.id}`}
+                      className="grid cursor-pointer grid-cols-[26px_1fr] items-center rounded-[7px] text-left transition-colors"
+                      style={{
+                        padding: "8px 10px",
+                        background: on ? "rgba(201,168,118,0.18)" : "transparent",
+                        border: on ? "1px solid rgba(201,168,118,0.4)" : "1px solid transparent",
+                        color: on ? INK : "rgba(245,242,232,0.75)",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          fontSize: 10.5,
+                          color: on ? BRASS : TEXT_FAINT,
+                          letterSpacing: 0.5,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: on ? 600 : 500 }}>{s.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <div
+                ref={scrollRef}
+                className="min-w-0 flex-1 overflow-y-auto px-4 pt-1 pb-5 md:px-6.5 md:pb-5.5"
+              >
+                <div
+                  className="flex items-center gap-2 pt-3"
+                  data-testid="rules-dialog-variant-tabs"
+                  role="tablist"
+                  aria-label={ui.variantLabel}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: 10,
+                      letterSpacing: 2,
+                      textTransform: "uppercase",
+                      color: BRASS,
+                      opacity: 0.7,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {ui.variantLabel}
+                  </span>
+                  {VARIANTS.map((v, i) => {
+                    const on = v === activeVariant;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        role="tab"
+                        id={tabId(v)}
+                        aria-selected={on}
+                        aria-controls={PANEL_ID}
+                        // Roving tabIndex + arrow traversal, matching what the Tabs
+                        // primitive gives the standalone page. This bar is
+                        // hand-rolled because the shared primitive is painted from
+                        // light-theme tokens, so its keyboard contract has to be
+                        // hand-rolled too — otherwise the same choice behaves
+                        // differently on the two surfaces for anyone not using a
+                        // pointer.
+                        tabIndex={on ? 0 : -1}
+                        onKeyDown={(e) => {
+                          const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+                          if (step === 0) return;
+                          e.preventDefault();
+                          const next = normalizeVariant(
+                            VARIANTS[(i + step + VARIANTS.length) % VARIANTS.length],
+                          );
+                          setActiveVariant(next);
+                          e.currentTarget.parentElement
+                            ?.querySelector<HTMLButtonElement>(
+                              `[data-testid="rules-dialog-variant-${next}"]`,
+                            )
+                            ?.focus();
+                        }}
+                        onClick={() => setActiveVariant(v)}
+                        data-testid={`rules-dialog-variant-${v}`}
+                        className="cursor-pointer rounded-[7px] transition-colors"
+                        style={{
+                          padding: "5px 11px",
+                          fontSize: 12.5,
+                          fontWeight: on ? 600 : 500,
+                          background: on ? "rgba(201,168,118,0.18)" : "transparent",
+                          border: on
+                            ? "1px solid rgba(201,168,118,0.45)"
+                            : "1px solid rgba(201,168,118,0.20)",
+                          color: on ? INK : TEXT_DIM,
+                        }}
+                      >
+                        {variantLabel(t, v)}
+                      </button>
+                    );
+                  })}
+                </div>
+                <DarkRulesCtx.Provider value={{ content, variant: activeVariant }}>
+                  <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(activeVariant)}>
+                    {sections.map((s, i) => (
+                      <DarkChapter
+                        key={s.id}
+                        idx={i}
+                        section={s}
+                        registerRef={(el) => {
+                          chapterRefs.current[s.id] = el;
+                        }}
+                      />
+                    ))}
+                  </div>
+                </DarkRulesCtx.Provider>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              className="flex shrink-0 items-center justify-end"
               style={{
-                width: 200,
-                borderRight: "1px solid rgba(201,168,118,0.22)",
-                padding: "14px 10px",
+                padding: "12px 20px",
+                borderTop: "1px solid rgba(201,168,118,0.22)",
                 background: "rgba(10,22,15,0.30)",
               }}
             >
-              <div
-                style={{
-                  padding: "0 10px 10px",
-                  fontFamily: "var(--font-body)",
-                  fontSize: 10,
-                  letterSpacing: 2,
-                  textTransform: "uppercase",
-                  color: BRASS,
-                  opacity: 0.7,
-                  fontWeight: 600,
-                }}
+              <ClassicButton
+                variant="primary"
+                onClick={() => onOpenChange(false)}
+                data-testid="rules-dialog-close"
               >
-                {ui.ovChapters}
-              </div>
-              {sections.map((s, i) => {
-                const on = s.id === activeId;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => jump(s.id)}
-                    data-testid={`rules-toc-${s.id}`}
-                    className="grid cursor-pointer grid-cols-[26px_1fr] items-center rounded-[7px] text-left transition-colors"
-                    style={{
-                      padding: "8px 10px",
-                      background: on ? "rgba(201,168,118,0.18)" : "transparent",
-                      border: on ? "1px solid rgba(201,168,118,0.4)" : "1px solid transparent",
-                      color: on ? INK : "rgba(245,242,232,0.75)",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: "var(--font-body)",
-                        fontSize: 10.5,
-                        color: on ? BRASS : TEXT_FAINT,
-                        letterSpacing: 0.5,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span style={{ fontSize: 13, fontWeight: on ? 600 : 500 }}>{s.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            <div
-              ref={scrollRef}
-              className="min-w-0 flex-1 overflow-y-auto px-4 pt-1 pb-5 md:px-6.5 md:pb-5.5"
-            >
-              <DarkRulesCtx.Provider value={content}>
-                {sections.map((s, i) => (
-                  <DarkChapter
-                    key={s.id}
-                    idx={i}
-                    section={s}
-                    registerRef={(el) => {
-                      chapterRefs.current[s.id] = el;
-                    }}
-                  />
-                ))}
-              </DarkRulesCtx.Provider>
+                {ui.ovClose}
+              </ClassicButton>
             </div>
           </div>
-
-          {/* Footer */}
-          <div
-            className="flex shrink-0 items-center justify-end"
-            style={{
-              padding: "12px 20px",
-              borderTop: "1px solid rgba(201,168,118,0.22)",
-              background: "rgba(10,22,15,0.30)",
-            }}
-          >
-            <ClassicButton
-              variant="primary"
-              onClick={() => onOpenChange(false)}
-              data-testid="rules-dialog-close"
-            >
-              {ui.ovClose}
-            </ClassicButton>
-          </div>
-        </div>
-      </OverlayBackdrop>
-    </div>
+        </OverlayBackdrop>
+      </div>
+    </TooltipProvider>
   );
 
   return createPortal(dialog, document.body);
@@ -299,13 +412,28 @@ function DarkChapter({
   );
 }
 
+/**
+ * The dark-felt twin of `RuleBlock`. The variant filter and the difference
+ * marker have to live in BOTH switches: added to only one of them, they would
+ * silently vanish in whichever theme was missed.
+ */
 function DarkBlock({ block }: { block: RuleBlock }) {
   const { ui } = useDarkRules();
+  const activeVariant = useDarkVariant();
+
+  if (block.variant && block.variant !== activeVariant) return null;
+
+  const marker = block.otherVariantNote ? (
+    <DiffMarker note={block.otherVariantNote} label={ui.diffLabel} tone="dark" />
+  ) : null;
 
   switch (block.kind) {
     case "p":
       return (
-        <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: TEXT }}>{block.text}</p>
+        <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: TEXT }}>
+          {block.text}
+          {marker}
+        </p>
       );
 
     case "rule":
@@ -329,6 +457,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
             }}
           >
             {block.title}
+            {marker}
           </div>
           <div style={{ fontSize: 12.5, lineHeight: 1.55, color: TEXT_DIM }}>{block.text}</div>
         </div>
@@ -361,71 +490,79 @@ function DarkBlock({ block }: { block: RuleBlock }) {
           >
             {ui.noteLabel}
           </span>
-          <span style={{ fontSize: 12.5, lineHeight: 1.55, color: TEXT_DIM }}>{block.text}</span>
+          <span style={{ fontSize: 12.5, lineHeight: 1.55, color: TEXT_DIM }}>
+            {block.text}
+            {marker}
+          </span>
         </div>
       );
 
     case "steps":
       return (
-        <ol
-          style={{
-            margin: 0,
-            padding: 0,
-            listStyle: "none",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          {block.items.map((it, i) => (
-            <li
-              key={i}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "32px 1fr",
-                gap: 12,
-                padding: "10px 12px",
-                background: "rgba(20,46,28,0.45)",
-                border: "1px solid rgba(201,168,118,0.18)",
-                borderRadius: 8,
-              }}
-            >
-              <span
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {marker ? (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>{marker}</div>
+          ) : null}
+          <ol
+            style={{
+              margin: 0,
+              padding: 0,
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {block.items.map((it, i) => (
+              <li
+                key={i}
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 24,
-                  height: 24,
-                  borderRadius: 6,
-                  background: "rgba(201,168,118,0.18)",
-                  border: "1px solid rgba(201,168,118,0.35)",
-                  fontFamily: "var(--font-body)",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: BRASS,
-                  letterSpacing: 0.5,
+                  display: "grid",
+                  gridTemplateColumns: "32px 1fr",
+                  gap: 12,
+                  padding: "10px 12px",
+                  background: "rgba(20,46,28,0.45)",
+                  border: "1px solid rgba(201,168,118,0.18)",
+                  borderRadius: 8,
                 }}
               >
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <div>
-                <div
+                <span
                   style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 24,
+                    height: 24,
+                    borderRadius: 6,
+                    background: "rgba(201,168,118,0.18)",
+                    border: "1px solid rgba(201,168,118,0.35)",
                     fontFamily: "var(--font-body)",
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    color: INK,
-                    marginBottom: 2,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: BRASS,
+                    letterSpacing: 0.5,
                   }}
                 >
-                  {it.t}
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <div>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      color: INK,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {it.t}
+                  </div>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.55, color: TEXT_DIM }}>{it.d}</div>
                 </div>
-                <div style={{ fontSize: 12.5, lineHeight: 1.55, color: TEXT_DIM }}>{it.d}</div>
-              </div>
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ol>
+        </div>
       );
 
     case "cards":

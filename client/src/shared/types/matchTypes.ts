@@ -7,7 +7,30 @@ export type Suit = "S" | "H" | "D" | "C";
 export type Rank = "7" | "8" | "9" | "T" | "J" | "Q" | "K" | "A";
 export type CardId = `${Rank}${Suit}`;
 
-export type Variant = "bitola" | "croatia";
+// VARIANTS is every game variant, as a runtime VALUE so that a surface which
+// has to enumerate them (the rules page's tab bar, the in-match rules overlay)
+// derives its list from the union instead of hand-copying it. `Variant` is
+// derived FROM this array, so the two can never disagree.
+//
+// Order is presentation order: `bitola` first, the variant Quick Play offers and
+// the default everywhere a variant is unknown.
+export const VARIANTS = ["bitola", "croatia"] as const;
+
+export type Variant = (typeof VARIANTS)[number];
+
+/**
+ * Narrow an untrusted variant string to the union, falling back to `bitola`.
+ *
+ * The fallback mirrors the engine's own (`game.RulesFor` resolves anything
+ * unrecognised to the Bitola preset) so client and server agree on what an
+ * unknown variant means. It exists as ONE function because the hand-rolled
+ * `v === "croatia" ? "croatia" : "bitola"` it replaces silently resolved every
+ * future variant to Bitola with no type error — which, on the rules surfaces, is
+ * a page describing the wrong rules over a live table.
+ */
+export function normalizeVariant(v: unknown): Variant {
+  return VARIANTS.includes(v as Variant) ? (v as Variant) : "bitola";
+}
 
 /**
  * The card-face artwork a player has chosen (Story 12.4). `french` is the

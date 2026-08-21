@@ -6,6 +6,7 @@
 // locale. A parity test asserts the four locales never drift in structure.
 
 import type { HonorTier } from "@/shared/lib/honor";
+import type { Variant } from "@/shared/types/matchTypes";
 
 export type Rank = "7" | "8" | "9" | "10" | "J" | "Q" | "K" | "A";
 
@@ -40,15 +41,32 @@ export type StepItem = { t: string; d: string };
 // so a tier retune never leaves stale numbers in four content files.
 export type TierItem = { tier: HonorTier; d: string };
 
+// Variant scoping, carried by every block kind.
+//
+// Most of the rules are identical in both variants, so the default — no
+// `variant` — means "renders under both tabs". Only a genuinely divergent block
+// names one, and it renders only while that variant's tab is active. Whole
+// chapters are never duplicated: the visible diff between the two tabs IS the
+// divergence list.
+//
+// `otherVariantNote` is authored prose, not a derived badge — a marker that
+// says "this differs" tells a player nothing; the useful sentence is what the
+// OTHER variant does. It lives beside the block it annotates so it is
+// translated with it.
+export type VariantScope = {
+  variant?: Variant;
+  otherVariantNote?: string;
+};
+
 // A content block inside a chapter. The prototype's unused `split` is omitted.
 export type RuleBlock =
-  | { kind: "p"; text: string }
-  | { kind: "rule"; title: string; text: string }
-  | { kind: "steps"; items: StepItem[] }
-  | { kind: "tiers"; title: string; items: TierItem[]; text: string }
-  | { kind: "cards" }
-  | { kind: "melds" }
-  | { kind: "note"; text: string };
+  | (VariantScope & { kind: "p"; text: string })
+  | (VariantScope & { kind: "rule"; title: string; text: string })
+  | (VariantScope & { kind: "steps"; items: StepItem[] })
+  | (VariantScope & { kind: "tiers"; title: string; items: TierItem[]; text: string })
+  | (VariantScope & { kind: "cards" })
+  | (VariantScope & { kind: "melds" })
+  | (VariantScope & { kind: "note"; text: string });
 
 export type RuleSection = {
   id: string;
@@ -71,6 +89,11 @@ export type RulesUi = {
   footerBody: string;
   footerCta: string;
   noteLabel: string;
+  // Chrome for the variant split: the eyebrow above the tab bar (tab labels
+  // themselves come from `variantLabel`, not from here) and the accessible
+  // name of the per-block difference marker.
+  variantLabel: string;
+  diffLabel: string;
   pts: string;
   ladderTrumpTitle: string;
   ladderTrumpEyebrow: string;

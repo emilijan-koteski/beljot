@@ -654,7 +654,7 @@
         "codeLabel": "KOD",
         "seated": "{{current}}/4"
       },
-      "variantHint": "Bitolska ili hrvatska pravila",
+      "variantHint": "Bitolska dijeli pet karata i okreće adutsku kartu, hrvatska dijeli svih osam i adut se zove slobodno",
       "matchModeHint": "501 za kraći meč, 1001 za punu utrku",
       "timerHintRelaxed": "Bez tajmera",
       "timerDurationHint": "10–120s · zadano 30s",
@@ -1196,7 +1196,7 @@
       "eyebrow": "Beljot Online · 2 na 2 · Besplatno",
       "title1": "Sjedni za",
       "title2": "stol.",
-      "subtitle": "Beljot je klasična kartaška igra za četvero, dvije ekipe, utrka do 1001. Nađi sobu za nekoliko sekundi ili pozovi svoju ekipu kodom.",
+      "subtitle": "Bela je klasična kartaška igra za četvero, dvije ekipe, utrka do 1001. Nađi sobu za nekoliko sekundi ili pozovi svoju ekipu kodom.",
       "cta": "Otvori besplatan račun",
       "playing": "trenutno igra",
       "openTables": "otvorenih soba"
@@ -1217,7 +1217,7 @@
       "f1body": "Svaka otvorena soba, svako mjesto, ažurira se u trenu. Filtriraj po tajmeru ili bodovima, traži po kodu ili samo pritisni Brza igra i smjestit ćemo te.",
       "f2tag": "Ekipe · zlato protiv srebra",
       "f2title": "To je partnerstvo, ne svatko za sebe",
-      "f2body": "Dvoje protiv dvoje, onako kako je Beljot zamišljen. Sjedni nasuprot partneru, čitaj zvanja i igraj dugu igru do 1001. Ugrađeni chat i emotikoni drže stol u razgovoru.",
+      "f2body": "Dvoje protiv dvoje, onako kako je Bela zamišljena. Sjedni nasuprot partneru, čitaj zvanja i igraj dugu igru do 1001. Ugrađeni chat i emotikoni drže stol u razgovoru.",
       "f3tag": "Profil · povijest mečeva",
       "f3title": "Svaka ruka se broji u tvoj učinak",
       "f3body": "Prati odigrane mečeve, postotak pobjeda i poraza, uz potpunu povijest mečeva ruku po ruku. Vidi s kim pobjeđuješ i kako je prošla večeras."

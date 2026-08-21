@@ -55,6 +55,11 @@ export const Z = {
   PROMPT: 74,
   /** Player-opened utilities — settings, rules, emote picker — above prompts. */
   UTIL: 80,
+  /** Tooltips and popovers opened FROM a utility overlay. Base UI portals a
+   *  tooltip to document.body, so it lands as a SIBLING of the overlay panel
+   *  rather than a child — at the primitive's default `z-50` it paints behind a
+   *  UTIL panel instead of over it. */
+  UTIL_POPOVER: 82,
   /** Surrender prompts (request-confirm + partner-accept) — above other prompts. */
   SURRENDER: 90,
   /** System blockers: pause, reconnect countdown, match-abandoned. */

@@ -59,9 +59,9 @@ export const hr: RulesLangData = {
     },
     bela: {
       name: "Bela",
-      summary: "Svih osam karata jedne boje, u jednoj ruci.",
+      summary: "Svih osam karata adutske boje, u jednoj ruci.",
       detail:
-        "Najrjeđa ruka u igri. Svih osam karata jedne boje kod jednog igrača. Odmah nosi cijeli meč: taj tim dobiva punih 1001 bod i igra staje istog trena kad se pokaže.",
+        "Najrjeđa ruka u igri. Svih osam karata aduta kod jednog igrača. Odmah nosi cijeli meč: čim je adut određen i ruke su pune, taj tim je proglašen pobjednikom, meč završava tu i ne igra se ni jedna karta.",
     },
   },
 
@@ -90,6 +90,9 @@ export const hr: RulesLangData = {
       blocks: [
         {
           kind: "steps",
+          variant: "bitola",
+          otherVariantNote:
+            "U hrvatskim pravilima svih osam karata dijeli se prije nego što se zove adut, a posljednje dvije idu licem prema dolje. Ništa se ne okreće, adut se zove slobodno u oba kruga, i nijedno dijeljenje ne propada. Djelitelj zove posljednji u drugom krugu i mora nazvati boju.",
           items: [
             {
               t: "Sjedni na svoje mjesto",
@@ -97,15 +100,55 @@ export const hr: RulesLangData = {
             },
             {
               t: "Sastavi špil",
-              d: "Beljot se igra s 32 karte. Uzmi obični špil i izbaci sve od 2 do 6. Ono što ostaje su sedmica, osmica, devetka, desetka, Dečko, Dama, Kralj i As u sve četiri boje. Time igraš.",
+              d: "Bela se igra s 32 karte. Uzmi obični špil i izbaci sve od 2 do 6. Ono što ostaje su sedmica, osmica, devetka, desetka, Dečko, Dama, Kralj i As u sve četiri boje. Time igraš.",
             },
             {
-              t: "Podijeli prvih pet",
-              d: "Djelitelj obilazi dvaput, po tri karte pa dvije, pa svatko počinje s pet u ruci. Ostatak špila ostaje licem prema dolje na sredini.",
+              t: "Podijeli po pet, pa okreni jednu",
+              d: "Djelitelj obilazi dvaput, po tri karte pa dvije, pa svatko počinje s pet u ruci. Sljedeća karta sa špila ide licem prema gore na stol kao adutska karta, a jedanaest iza nje ostaju licem prema dolje na sredini.",
             },
             {
-              t: "Otvori adut",
-              d: "Djelitelj okreće sljedeću kartu sa špila licem prema gore. Redom, svaki igrač može je uzeti, čime njezina boja postaje adut za tu ruku, ili propustiti. Čim je netko uzme, ta je boja adut i djelitelj dijeli ostatak karata dok svatko ne drži osam. Adut pobjeđuje sve iz druge tri boje, bez obzira na rang.",
+              t: "Prvi krug: uzmi tu kartu ili propusti",
+              d: "Počevši zdesna od djelitelja, svaki igrač ili uzima okrenutu kartu, čime njezina boja postaje adut za tu ruku, ili propušta. Tko je uzme, zadržava je kao jednu od svojih osam, a djelitelj dijeli dok svaka ruka nije puna. Adut pobjeđuje sve iz druge tri boje, bez obzira na rang.",
+            },
+            {
+              t: "Drugi krug: nazovi boju, ali ne tu",
+              d: "Sva četvorica su propustila? Isti red ide ponovno, ali ovaj put boju nazivaš umjesto da uzimaš kartu. Boja okrenute karte je potrošena i zaključana, pa birate između druge tri. Onaj tko zove ipak uzima okrenutu kartu s ostatkom dijeljenja.",
+            },
+            {
+              t: "Dvaput propušteno? Novo dijeljenje",
+              d: "Ako i drugi krug prođe bez ijednog zvanja aduta, ruka se ne igra: sve 32 karte vraćaju se zajedno i miješaju, dijeljenje prelazi na sljedećeg igrača zdesna, i sve počinje ispočetka.",
+            },
+          ],
+        },
+        {
+          kind: "steps",
+          variant: "croatia",
+          otherVariantNote:
+            "U bitolskim pravilima dijeljenje staje na pet karata po igraču, a sljedeća karta se okreće kao adutska: prvi krug uzima tu kartu i njezinu boju, drugi krug naziva bilo koju od druge tri, a ako oba kruga prođu bez zvanja aduta karte se miješaju zajedno i dijeljenje prelazi dalje.",
+          items: [
+            {
+              t: "Sjedni na svoje mjesto",
+              d: "Sjediš točno nasuprot svom partneru; dvojica protivnika zauzimaju stolice s obje strane. Igra se kreće udesno oko stola.",
+            },
+            {
+              t: "Sastavi špil",
+              d: "Bela se igra s 32 karte. Uzmi obični špil i izbaci sve od 2 do 6. Ono što ostaje su sedmica, osmica, devetka, desetka, Dečko, Dama, Kralj i As u sve četiri boje. Time igraš.",
+            },
+            {
+              t: "Podijeli svih osam odmah",
+              d: "Djelitelj obilazi triput: po tri karte, još tri, pa posljednje dvije licem prema dolje. Svaka je karta podijeljena prije nego što bilo tko zove adut. Šest možeš gledati, a dvije ne može nitko, ni ti sam.",
+            },
+            {
+              t: "Prvi krug: nazovi boju ili propusti",
+              d: "Ništa se ne okreće i nema adutske karte za uzimanje. Počevši zdesna od djelitelja, svaki igrač ili naziva bilo koju od četiri boje kao adut, na temelju šest karata koje vidi, ili propušta. Tko je nazove ne dobiva dodatnu kartu, ruka mu je već podijeljena. Adut pobjeđuje sve iz druge tri boje, bez obzira na rang.",
+            },
+            {
+              t: "Drugi krug: posljednje dvije se otkrivaju",
+              d: "Ako sva četvorica propuste, dvije karte licem prema dolje otkrivaju se samo svom vlasniku. Nitko ne vidi tuđe. Drugi krug se zove na punoj ruci od osam karata, a sve četiri boje su još otvorene.",
+            },
+            {
+              t: "Djelitelj ne smije propustiti",
+              d: "U drugom krugu djelitelj zove posljednji i nema pravo propustiti. Ako druga trojica propuste, djelitelj mora nazvati boju. U ovim pravilima nema ponovnog miješanja, svako dijeljenje se igra.",
             },
           ],
         },
@@ -167,17 +210,47 @@ export const hr: RulesLangData = {
       id: "melds",
       label: "Zvanja",
       title: "Neke ruke nose bodove same po sebi",
-      lede: "Imaj pravu kombinaciju u podijeljenoj ruci i ona nosi bodove sama po sebi. Zoveš je na svom redu u prvom štihu, pa je otkrivaš na početku drugog.",
+      lede: "Imaj pravu kombinaciju u podijeljenoj ruci i ona nosi bodove sama po sebi, uz ono što vrijede tvoji štihovi.",
       blocks: [
         {
           kind: "p",
-          text: "Čim su karte podijeljene i adut određen, provjeri ruku za zvanja: nizove karata u nizu u jednoj boji, četiri iste, i par Kralj-i-Dama u adutu. Dama je Bela, Kralj je Rebela. Zvanje se radi na tvom redu u prvom štihu, dok igraš kartu, a zatim slažeš karte licem prema gore za sve na početku drugog štiha. Bela i Rebela su iznimka. Svaku zoveš kad igraš tu kartu tijekom igre.",
+          text: "Čim su karte podijeljene i adut određen, provjeri ruku za zvanja: nizove karata u nizu u jednoj boji, četiri iste, i par Kralj-i-Dama u adutu. Dama je Bela, Kralj je Rebela. Bela i Rebela su iznimka. Svaku zoveš kad igraš tu kartu, u kojem se god dijelu ruke to dogodi.",
+        },
+        {
+          kind: "p",
+          variant: "bitola",
+          otherVariantNote:
+            "U hrvatskim pravilima zvanja imaju vlastitu fazu između zvanja aduta i prvog štiha: svako mjesto zove ili preskače, cijeli se stol otkriva odjednom i tek onda se igra karta.",
+          text: "Nema odvojenog kruga za zvanja. Zoveš na svom redu u prvom štihu, dok igraš kartu, a zatim slažeš karte licem prema gore za sve na početku drugog štiha.",
+        },
+        {
+          kind: "p",
+          variant: "croatia",
+          otherVariantNote:
+            "U bitolskim pravilima nema odvojene faze: zoveš na svom redu u prvom štihu, dok igraš kartu, a karte idu licem prema gore na početku drugog.",
+          text: "Zvanja imaju vlastitu fazu, između zvanja aduta i prvog štiha. Svako mjesto redom zove ili preskače, zvanja cijelog stola se zatim otkrivaju zajedno, i tek nakon toga počinje prvi štih.",
         },
         { kind: "melds" },
         {
           kind: "rule",
           title: "Samo jedan tim je plaćen za zvanja",
           text: "Svaka strana ističe svoje jedino najbolje zvanje. Čije je jače, skuplja sva zvanja iz obje ruke tima, a drugi tim ne dobiva ništa za svoja. Jednako vrijede? Četiri iste pobjeđuju niz, pa četiri asa (100) pobjeđuju kvintu (100). Dulji niz pobjeđuje kraći, ali samo do kvinte. Kad obje strane imaju kvintu (pet ili više karata), duljina više ne znači ništa, nego pobjeđuje niz s višom gornjom kartom, jednako kao i kod dva niza iste duljine. Još uvijek izjednačeno? Niz u adutu nosi. A ako nijedan niz nije adut, prednost ima onaj od dvojice igrača koji je prije na redu, počevši zdesna od djelitelja. Bela i Rebela stoje izvan ovog natjecanja, tko ih zove, uvijek ih boduje.",
+        },
+        {
+          kind: "rule",
+          variant: "bitola",
+          otherVariantNote:
+            "U hrvatskim pravilima karta nema takvo ograničenje: računa se u svako zvanje kojem pripada, pa se dvije kombinacije koje dijele kartu boduju u cijelosti.",
+          title: "Jedna karta, jedno zvanje",
+          text: "Jedna karta ne može se računati dvaput. Ako dvije tvoje kombinacije traže istu kartu, kao terca u Hercu i četiri kralja koje oboje žele tvog Kralja Herca, računa se samo vrjednija, a druga pada. Jednako vrijede? Ostaju četiri iste.",
+        },
+        {
+          kind: "rule",
+          variant: "croatia",
+          otherVariantNote:
+            "U bitolskim pravilima jedna karta računa se samo u jedno zvanje: od dvije kombinacije koje dijele kartu pada slabija, a pri jednakoj vrijednosti ostaju četiri iste.",
+          title: "Jedna karta može se računati više puta",
+          text: "Ista karta može pripadati nekoliko zvanja istodobno i svako od njih boduje se u cijelosti. Terca u Hercu i četiri kralja koje oboje računaju tvog Kralja Herca je u redu. Zoveš oboje i ništa se ne umanjuje.",
         },
       ],
     },
@@ -210,8 +283,13 @@ export const hr: RulesLangData = {
           text: "Tim koji je zvao adut mora završiti sa strogo više bodova od druge strane, uključujući zvanja s obje strane. Ako zaostane ili se čak izjednači, ruka je izgubljena: sve što je osvojio te ruke, i karte i zvanja, ide protivnicima umjesto toga. Igrači to zovu „pad“, i jedna loša ruka može izbrisati udobnu prednost.",
         },
         {
+          kind: "rule",
+          title: "Svih osam štihova je štiglja",
+          text: "Osvoji sve štihove u ruci i bonus od 10 bodova za posljednji štih zamjenjuje se sa 100, jer je posljednji štih ionako tvoj. Tvoj tim tada uzima sve bodove na stolu: bodove s karata, taj bonus i zvanja obaju timova, uključujući i protivnička. Tim koji nije osvojio ni jedan štih ne boduje ništa, ni vlastita zvanja.",
+        },
+        {
           kind: "note",
-          text: "Ruke se igraju dok barem jedan tim ne sjedne na 1001 ili više na kraju ruke. Ako oba tima prijeđu granicu u istoj ruci, strana s više ukupnih bodova osvaja meč. Za kraći meč, soba se može postaviti i na utrku do 501 boda, uz potpuno ista pravila.",
+          text: "Ruke se igraju dok barem jedan tim ne sjedne na 1001 ili više na kraju ruke. Ako oba tima prijeđu granicu u istoj ruci, strana s više ukupnih bodova osvaja meč. A ako su oba zbroja točno jednaka, meč osvaja tim koji je zvao adut. Za kraći meč, soba se može postaviti i na utrku do 501 boda, uz potpuno ista pravila.",
         },
       ],
     },
@@ -219,7 +297,7 @@ export const hr: RulesLangData = {
       id: "honour",
       label: "Čast",
       title: "Završi ono što započneš",
-      lede: "Beljot je igra u parovima. Igrač koji napusti meč u tijeku pokvari ga za još tri igrača. Čast pokazuje koliko si pouzdan suigrač.",
+      lede: "Bela je igra u parovima. Igrač koji napusti meč u tijeku pokvari ga za još tri igrača. Čast pokazuje koliko si pouzdan suigrač.",
       blocks: [
         {
           kind: "p",
@@ -268,13 +346,13 @@ export const hr: RulesLangData = {
 
   ui: {
     heroEyebrow: "Pravila · čitanje od 6 minuta",
-    heroTitle: "Nauči Beljot u jednom sjedenju",
+    heroTitle: "Nauči Belu u jednom sjedenju",
     heroIntro:
-      "Beljot je timska igra s kartama za četiri igrača sa špilom od 32 karte. Šest kratkih poglavlja u nastavku vode te od prve ruke sve do pobjedničkog rezultata, sve što ti treba da se snađeš za stolom. Čitaj redom, ili skoči na ono što ti treba preko sadržaja lijevo.",
+      "Bela je timska igra s kartama za četiri igrača sa špilom od 32 karte. Šest kratkih poglavlja u nastavku vode te od prve ruke sve do pobjedničkog rezultata, sve što ti treba da se snađeš za stolom. Čitaj redom, ili skoči na ono što ti treba preko sadržaja lijevo.",
     facts: [
       { label: "Igrači", value: "4", caption: "dva tima po dvoje" },
       { label: "Špil", value: "32", caption: "od sedmice do Asa, četiri boje" },
-      { label: "Karte po ruci", value: "8", caption: "podijeljene 3, pa 2, pa 3" },
+      { label: "Karte po ruci", value: "8", caption: "osam u ruci prije prvog štiha" },
       { label: "Utrka do", value: "1001", caption: "bodova za pobjedu" },
     ],
     tocTitle: "Sadržaj",
@@ -283,6 +361,8 @@ export const hr: RulesLangData = {
       "Ovaj vodič prati te i u igru. Tijekom ruke, pritisni gumb s upitnikom u donjem desnom kutu i istih šest poglavlja se otvara, bez pauziranja igre.",
     footerCta: "Igraj",
     noteLabel: "Napomena",
+    variantLabel: "Varijanta",
+    diffLabel: "Razlikuje se u drugoj varijanti",
     pts: "bodova",
     ladderTrumpTitle: "U adutskoj boji",
     ladderTrumpEyebrow: "Adut",
@@ -293,7 +373,7 @@ export const hr: RulesLangData = {
     colPower: "Snaga",
     meldKinds: { belot: "Par u adutu", set: "Četiri iste", run: "Niz" },
     ovReference: "Uputa",
-    ovTitle: "Pravila Beljota",
+    ovTitle: "Pravila Bele",
     ovChapters: "Poglavlja",
     ovFullRef: "Potpuna uputa:",
     ovClose: "Zatvori",

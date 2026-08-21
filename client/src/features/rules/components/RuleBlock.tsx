@@ -1,12 +1,14 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CardLadder } from "@/features/rules/components/CardLadder";
+import { DiffMarker } from "@/features/rules/components/DiffMarker";
 import { MeldsGrid } from "@/features/rules/components/MeldsGrid";
 import type { RuleBlock as RuleBlockType } from "@/features/rules/content/types";
-import { useRules } from "@/features/rules/RulesContext";
+import { useRules, useRulesVariant } from "@/features/rules/RulesContext";
 import { HONOR_TIER_BANDS, HONOR_TIER_COLOR, type HonorTier } from "@/shared/lib/honor";
 
-function NoteBlock({ text }: { text: string }) {
+function NoteBlock({ text, marker }: { text: string; marker: ReactNode }) {
   const { ui } = useRules();
   return (
     <div
@@ -37,7 +39,10 @@ function NoteBlock({ text }: { text: string }) {
       >
         {ui.noteLabel}
       </span>
-      <span>{text}</span>
+      <span>
+        {text}
+        {marker}
+      </span>
     </div>
   );
 }
@@ -56,7 +61,13 @@ function tierRange(tier: HonorTier): string {
  * hue; ranges are derived from HONOR_TIER_BANDS. Only the sentence tails and
  * the host note are authored per locale.
  */
-function TiersBlock({ block }: { block: Extract<RuleBlockType, { kind: "tiers" }> }) {
+function TiersBlock({
+  block,
+  marker,
+}: {
+  block: Extract<RuleBlockType, { kind: "tiers" }>;
+  marker: ReactNode;
+}) {
   const { t } = useTranslation();
   return (
     <div
@@ -76,6 +87,7 @@ function TiersBlock({ block }: { block: Extract<RuleBlockType, { kind: "tiers" }
         style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)", letterSpacing: -0.1 }}
       >
         {block.title}
+        {marker}
       </div>
       <ul
         style={{
@@ -142,13 +154,31 @@ function CardBlock() {
   );
 }
 
-/** Renders one content block by kind. New kinds are added in `content/`. */
+/**
+ * Renders one content block by kind, for the variant tab that is active.
+ *
+ * A block scoped to the other variant renders nothing at all — that is what
+ * makes switching tabs swap `basics` and `melds` while the four shared chapters
+ * visibly do not move. A scoped block also carries a difference marker naming
+ * what the other variant does; `p` and `note` have no header to hang it on, so
+ * it sits inline at the end of their text.
+ */
 export function RuleBlock({ block }: { block: RuleBlockType }) {
+  const activeVariant = useRulesVariant();
+  const { ui } = useRules();
+
+  if (block.variant && block.variant !== activeVariant) return null;
+
+  const marker = block.otherVariantNote ? (
+    <DiffMarker note={block.otherVariantNote} label={ui.diffLabel} />
+  ) : null;
+
   switch (block.kind) {
     case "p":
       return (
         <p style={{ margin: 0, fontSize: 15, lineHeight: 1.65, color: "var(--ink-dim)" }}>
           {block.text}
+          {marker}
         </p>
       );
 
@@ -171,6 +201,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
             style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)", letterSpacing: -0.1 }}
           >
             {block.title}
+            {marker}
           </div>
           <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-dim)" }}>
             {block.text}
@@ -179,73 +210,78 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
       );
 
     case "note":
-      return <NoteBlock text={block.text} />;
+      return <NoteBlock text={block.text} marker={marker} />;
 
     case "tiers":
-      return <TiersBlock block={block} />;
+      return <TiersBlock block={block} marker={marker} />;
 
     case "steps":
       return (
-        <ol
-          style={{
-            margin: 0,
-            padding: 0,
-            listStyle: "none",
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}
-        >
-          {block.items.map((it, i) => (
-            <li
-              key={i}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "36px 1fr",
-                gap: 14,
-                padding: "12px 14px",
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-              }}
-            >
-              <span
-                className="font-mono"
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {marker ? (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>{marker}</div>
+          ) : null}
+          <ol
+            style={{
+              margin: 0,
+              padding: 0,
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            {block.items.map((it, i) => (
+              <li
+                key={i}
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  background: "var(--accent-soft)",
-                  color: "var(--accent)",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: 0.6,
+                  display: "grid",
+                  gridTemplateColumns: "36px 1fr",
+                  gap: 14,
+                  padding: "12px 14px",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 12,
                 }}
               >
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 <span
-                  className="font-display"
+                  className="font-mono"
                   style={{
-                    fontSize: 14.5,
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                    letterSpacing: -0.1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 28,
+                    height: 28,
+                    borderRadius: 8,
+                    background: "var(--accent-soft)",
+                    color: "var(--accent)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: 0.6,
                   }}
                 >
-                  {it.t}
+                  {String(i + 1).padStart(2, "0")}
                 </span>
-                <span style={{ fontSize: 13, lineHeight: 1.55, color: "var(--ink-dim)" }}>
-                  {it.d}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ol>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <span
+                    className="font-display"
+                    style={{
+                      fontSize: 14.5,
+                      fontWeight: 600,
+                      color: "var(--ink)",
+                      letterSpacing: -0.1,
+                    }}
+                  >
+                    {it.t}
+                  </span>
+                  <span style={{ fontSize: 13, lineHeight: 1.55, color: "var(--ink-dim)" }}>
+                    {it.d}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
       );
 
     case "cards":

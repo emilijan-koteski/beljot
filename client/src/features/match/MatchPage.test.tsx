@@ -1694,7 +1694,46 @@ describe("MatchPage", () => {
   // rendered before. The prompt gate is phase-agnostic and the table chrome is
   // phase-independent, so both work here for free — which is exactly why they
   // would regress silently. Everything below is driven by `phase: "declaring"`
-  // alone; nothing derives behaviour from the variant.
+  // alone.
+  //
+  // The page derives exactly ONE thing from the variant, and it is not in this
+  // block: `matchState.variant` is handed to `RulesDialog` so the rules overlay
+  // opens on the ruleset actually being played (see "rules overlay" below).
+  // Nothing about PLAY branches on it — `variantRules.ts` remains the single
+  // variant→behaviour mapping.
+  // The variant prop on RulesDialog is optional and falls back to Bitola, so
+  // deleting the wiring at MatchPage's render site compiles cleanly and every
+  // RulesDialog test still passes. This is the only thing that catches it.
+  describe("rules overlay", () => {
+    function openRules(variant: MatchState["variant"]) {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, variant });
+      renderMatchPage();
+      fireEvent.click(screen.getByTestId("rules-button"));
+    }
+
+    it("opens the rules overlay on the Croatian tab in a Croatian match", () => {
+      openRules("croatia");
+      expect(screen.getByTestId("rules-dialog")).toBeInTheDocument();
+      expect(screen.getByTestId("rules-dialog-variant-croatia")).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      // The Croatian deal, not Bitola's face-up candidate.
+      expect(screen.getByText("Deal all eight up front")).toBeInTheDocument();
+      expect(screen.queryByText("Deal five each, then turn one up")).not.toBeInTheDocument();
+    });
+
+    it("opens the rules overlay on the Bitola tab in a Bitola match", () => {
+      openRules("bitola");
+      expect(screen.getByTestId("rules-dialog-variant-bitola")).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.getByText("Deal five each, then turn one up")).toBeInTheDocument();
+      expect(screen.queryByText("Deal all eight up front")).not.toBeInTheDocument();
+    });
+  });
+
   describe("dedicated declaration phase", () => {
     // Seat 0 holds a tierce 9S-TS-JS, and the server has it on the clock in the
     // declaring phase with a live turn deadline.

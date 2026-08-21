@@ -60,9 +60,9 @@ export const en: RulesLangData = {
     },
     bela: {
       name: "Belote",
-      summary: "All eight cards of one suit, held by a single player.",
+      summary: "All eight cards of the trump suit, held by a single player.",
       detail:
-        "The rarest hand in the game — every card of one suit, all eight, in one hand. It wins the whole match on the spot: that player's team takes the full 1001 points and play stops the instant it's shown.",
+        "The rarest hand in the game — every card of trump, all eight, in one hand. It wins the whole match on the spot: as soon as trump is settled and the hands are complete, that player's team is declared the winner, the match ends there, and not a single card is played.",
     },
   },
 
@@ -91,6 +91,9 @@ export const en: RulesLangData = {
       blocks: [
         {
           kind: "steps",
+          variant: "bitola",
+          otherVariantNote:
+            "Croatian rules deal all eight cards before anyone bids, the last two face-down. Nothing is turned face-up, trump is a suit you name freely in both rounds, and no deal is ever passed out — the dealer bids last in round two and has to name a suit.",
           items: [
             {
               t: "Take your seat",
@@ -98,15 +101,55 @@ export const en: RulesLangData = {
             },
             {
               t: "Build the deck",
-              d: "Beljot uses 32 cards. Grab a standard deck and toss out everything from 2 to 6. What’s left — 7, 8, 9, 10, Jack, Queen, King and Ace in all four suits — is what you play with.",
+              d: "Belote uses 32 cards. Grab a standard deck and toss out everything from 2 to 6. What’s left — 7, 8, 9, 10, Jack, Queen, King and Ace in all four suits — is what you play with.",
             },
             {
-              t: "Deal the first five",
-              d: "The dealer goes around twice — three cards each, then two — so everyone starts with five in hand. The rest of the deck stays face-down in the middle as the talon.",
+              t: "Deal five each, then turn one up",
+              d: "The dealer goes around twice — three cards each, then two — so everyone starts with five in hand. The next card off the deck goes face-up on the table as the trump candidate, and the eleven behind it stay face-down as the talon.",
             },
             {
-              t: "Turn up the trump",
-              d: "The dealer flips the next card off the talon face-up. In turn, each player can take it — making its suit trump for the hand — or pass. Once someone takes it, that suit is trump and the dealer deals out the rest until everyone holds eight. Trump beats anything from the other three suits, whatever its rank.",
+              t: "Round one: take that card, or pass",
+              d: "Starting to the dealer’s right, each player either takes the face-up card — making its suit trump for the hand — or passes. Whoever takes it keeps it as one of their eight, and the dealer deals out the talon until every hand is full. Trump beats anything from the other three suits, whatever its rank.",
+            },
+            {
+              t: "Round two: name a suit — but not that one",
+              d: "All four passed? The same order goes round again, and this time you name a suit outright instead of taking the card. The candidate’s suit is spent and locked out, so you are choosing between the other three. The taker still picks the face-up card up with the rest of the deal.",
+            },
+            {
+              t: "Passed out twice? Fresh deal",
+              d: "If round two passes out as well, nobody plays the hand: all 32 cards go back together and are shuffled, the deal moves to the next player on the right, and the whole thing starts over.",
+            },
+          ],
+        },
+        {
+          kind: "steps",
+          variant: "croatia",
+          otherVariantNote:
+            "Bitola rules stop the deal at five cards each and turn the next card face-up as a trump candidate: round one takes that card and its suit, round two names any of the other three, and if both rounds pass out the cards are shuffled back together and the deal moves on.",
+          items: [
+            {
+              t: "Take your seat",
+              d: "You sit directly across from your partner; your two opponents take the chairs on either side. Play moves to the right around the table.",
+            },
+            {
+              t: "Build the deck",
+              d: "Belote uses 32 cards. Grab a standard deck and toss out everything from 2 to 6. What’s left — 7, 8, 9, 10, Jack, Queen, King and Ace in all four suits — is what you play with.",
+            },
+            {
+              t: "Deal all eight up front",
+              d: "The dealer goes around three times — three cards each, three more, then a last two dealt face-down. Every card is out before anyone bids: six you can look at, and two nobody can, not even you.",
+            },
+            {
+              t: "Round one: name a suit, or pass",
+              d: "Nothing is turned face-up and there is no candidate card to take. Starting to the dealer’s right, each player either names any one of the four suits as trump — bidding on the six cards they can see — or passes. Whoever names it draws no extra card; their hand is already dealt. Trump beats anything from the other three suits, whatever its rank.",
+            },
+            {
+              t: "Round two: your last two turn up",
+              d: "If all four pass, each player’s two face-down cards turn face-up for that player alone — nobody sees anyone else’s. Round two is then bid on a full eight-card hand, and all four suits are still open.",
+            },
+            {
+              t: "The dealer cannot pass",
+              d: "In round two the dealer bids last and has no right to pass: if the other three pass, the dealer must name a suit. There is no reshuffle in these rules — every deal gets played.",
             },
           ],
         },
@@ -168,17 +211,47 @@ export const en: RulesLangData = {
       id: "melds",
       label: "Declarations",
       title: "Some hands carry points of their own",
-      lede: "Land the right combination in your dealt hand and it scores on its own — announced on your turn in the first trick, then revealed at the start of the second.",
+      lede: "Land the right combination in your dealt hand and it scores on its own, on top of whatever your tricks are worth.",
       blocks: [
         {
           kind: "p",
-          text: "Once the cards are dealt and trump is set, check your hand for declarations: runs of cards in a row in one suit, four of a kind, and the King-and-Queen-of-trump pair — the Queen is the Belote, the King the Rebelote. You announce a declaration on your turn during the first trick, as you play your card — then lay the cards face-up for everyone at the start of the second trick. Belote and Rebelote are the odd ones out — you announce each as you play that card during the hand.",
+          text: "Once the cards are dealt and trump is set, check your hand for declarations: runs of cards in a row in one suit, four of a kind, and the King-and-Queen-of-trump pair — the Queen is the Belote, the King the Rebelote. Belote and Rebelote are the odd ones out — you announce each as you play that card, wherever in the hand it falls.",
+        },
+        {
+          kind: "p",
+          variant: "bitola",
+          otherVariantNote:
+            "Croatian rules give declaring a phase of its own between bidding and the first trick: every seat declares or skips, the whole table is revealed at once, and only then is a card played.",
+          text: "There is no separate round for declaring. You announce yours on your turn during the first trick, as you play your card — then lay the cards face-up for everyone to see at the start of the second trick.",
+        },
+        {
+          kind: "p",
+          variant: "croatia",
+          otherVariantNote:
+            "Bitola rules have no separate phase: you declare on your turn during the first trick, as you play your card, and lay the cards face-up at the start of the second.",
+          text: "Declaring gets a phase of its own, between bidding and the first trick. Each seat in turn declares or skips, the whole table’s declarations are then revealed together, and only after that does the first trick begin.",
         },
         { kind: "melds" },
         {
           kind: "rule",
           title: "Only one team gets paid for declarations",
           text: "Each side puts forward its single best declaration. Whoever’s is stronger scoops up every declaration across both their hands — the other team scores nothing for theirs. Worth the same? A four-of-a-kind beats a run — a carré of Aces (100) takes it over a quint (100). A longer run beats a shorter one — up to a quint. Once both runs are quints (five cards or more), length stops mattering: the higher top card wins, as it does between two runs of equal length. Still level? A run in trump takes it — and if neither is trump, the tie falls to whichever player comes first in the turn order, starting to the dealer’s right. Belote and Rebelote sit outside this contest — whoever announces them always scores them.",
+        },
+        {
+          kind: "rule",
+          variant: "bitola",
+          otherVariantNote:
+            "Croatian rules put no such limit on a card: it counts in every declaration it belongs to, so two combinations sharing a card both score in full.",
+          title: "One card, one declaration",
+          text: "A single card cannot be counted twice. If two of your combinations need the same card — a tierce in Hearts and a carré of Kings that both want your King of Hearts — only the more valuable one counts and the other is dropped. Worth the same? The four-of-a-kind is the one that stands.",
+        },
+        {
+          kind: "rule",
+          variant: "croatia",
+          otherVariantNote:
+            "Bitola rules count one card toward one declaration only: of two combinations sharing a card the weaker one is dropped, and at equal value the four-of-a-kind is the one kept.",
+          title: "One card can count more than once",
+          text: "The same card may belong to several declarations at once, and each of them scores in full. A tierce in Hearts and a carré of Kings both counting your King of Hearts is fine — you announce both and neither is discounted.",
         },
       ],
     },
@@ -211,8 +284,13 @@ export const en: RulesLangData = {
           text: "The team that took trump must finish with strictly more points than the other side, declarations on both sides included. Fall short — or even tie — and the hand is lost: everything you scored that hand, cards and declarations alike, goes to your opponents instead. Players call this “going down”, and one bad hand can wipe out a comfortable lead.",
         },
         {
+          kind: "rule",
+          title: "Take all eight tricks and it’s a capot",
+          text: "Sweep the hand and the 10-point last-trick bonus is replaced by 100 — the last trick is yours anyway. Your team then takes every point on the table: all the card points, that bonus, and both teams’ declarations, the other side’s included. A team that wins no trick at all banks nothing, not even the declarations it had won.",
+        },
+        {
           kind: "note",
-          text: "Hands keep coming until at least one team is sitting on 1001 or more at the end of a hand. If both teams cross the line on the same hand, the side with more total points takes the match. For a quicker match, a room can be set up as a race to 501 instead — every other rule stays exactly the same.",
+          text: "Hands keep coming until at least one team is sitting on 1001 or more at the end of a hand. If both teams cross the line on the same hand, the side with more total points takes the match — and if the two totals are exactly equal, it goes to the team that took trump. For a quicker match, a room can be set up as a race to 501 instead — every other rule stays exactly the same.",
         },
       ],
     },
@@ -220,7 +298,7 @@ export const en: RulesLangData = {
       id: "honour",
       label: "Honor",
       title: "Finishing what you start",
-      lede: "Beljot is a partnership game: a player who walks out mid-match ruins it for three other players. Honor shows how reliable a teammate you are.",
+      lede: "Belote is a partnership game: a player who walks out mid-match ruins it for three other players. Honor shows how reliable a teammate you are.",
       blocks: [
         {
           kind: "p",
@@ -269,13 +347,13 @@ export const en: RulesLangData = {
 
   ui: {
     heroEyebrow: "Rules · 6-minute read",
-    heroTitle: "Learn Beljot in one sitting",
+    heroTitle: "Learn Belote in one sitting",
     heroIntro:
-      "Beljot is a partnership card game for four players with a 32-card deck. The six short chapters below take you from the deal all the way to the winning score — everything you need to hold your own at the table. Read straight through, or jump to whatever you need with the contents on the left.",
+      "Belote is a partnership card game for four players with a 32-card deck. The six short chapters below take you from the deal all the way to the winning score — everything you need to hold your own at the table. Read straight through, or jump to whatever you need with the contents on the left.",
     facts: [
       { label: "Players", value: "4", caption: "two teams of two" },
       { label: "Deck", value: "32", caption: "7 up to Ace, four suits" },
-      { label: "Cards per hand", value: "8", caption: "dealt 3 and 2, then trump" },
+      { label: "Cards per hand", value: "8", caption: "eight in hand before trick one" },
       { label: "Race to", value: "1001", caption: "points to win" },
     ],
     tocTitle: "Table of contents",
@@ -284,6 +362,8 @@ export const en: RulesLangData = {
       "This guide tags along into the game, too. Mid-hand, tap the question mark in the bottom-right corner and these same six chapters slide open — no need to pause the play.",
     footerCta: "Play",
     noteLabel: "Note",
+    variantLabel: "Variant",
+    diffLabel: "Differs in the other variant",
     pts: "pts",
     ladderTrumpTitle: "In the trump suit",
     ladderTrumpEyebrow: "Trump",
@@ -294,7 +374,7 @@ export const en: RulesLangData = {
     colPower: "Power",
     meldKinds: { belot: "Trump pair", set: "Carré", run: "Run" },
     ovReference: "Reference",
-    ovTitle: "Beljot rules",
+    ovTitle: "Belote rules",
     ovChapters: "Chapters",
     ovFullRef: "Full reference:",
     ovClose: "Close",

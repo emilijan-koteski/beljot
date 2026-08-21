@@ -33,7 +33,7 @@ describe("RulesPage", () => {
   it("renders the hero and all six chapter headings", () => {
     renderRules();
     expect(
-      screen.getByRole("heading", { level: 1, name: "Learn Beljot in one sitting" }),
+      screen.getByRole("heading", { level: 1, name: "Learn Belote in one sitting" }),
     ).toBeInTheDocument();
     for (const title of [
       "Race your team to 1001",
@@ -77,6 +77,106 @@ describe("RulesPage", () => {
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
+  // ── The variant split ────────────────────────────────────────────────────
+  //
+  // The four shared chapters must not move between tabs; `basics` and `melds`
+  // must. These assertions are the only thing standing between that promise and
+  // a page that quietly describes the wrong ruleset.
+
+  const BITOLA_STEP = "Deal five each, then turn one up";
+  const CROATIA_STEP = "Deal all eight up front";
+  const BITOLA_RULE = "One card, one declaration";
+  const CROATIA_RULE = "One card can count more than once";
+  const SHARED_HEADING = "Trump plays by its own rules";
+  const SHARED_RULE = "Out of the suit? You must trump — over the top if you can";
+
+  it("opens on the Bitola tab and renders only its scoped blocks", () => {
+    renderRules();
+    expect(screen.getByTestId("rules-variant-bitola")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("rules-variant-croatia")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByText(BITOLA_STEP)).toBeInTheDocument();
+    expect(screen.getByText(BITOLA_RULE)).toBeInTheDocument();
+    expect(screen.queryByText(CROATIA_STEP)).not.toBeInTheDocument();
+    expect(screen.queryByText(CROATIA_RULE)).not.toBeInTheDocument();
+  });
+
+  it("swaps the scoped blocks on the Croatian tab and leaves shared chapters alone", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    expect(screen.getByRole("heading", { level: 2, name: SHARED_HEADING })).toBeInTheDocument();
+    expect(screen.getByText(SHARED_RULE)).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("rules-variant-croatia"));
+
+    expect(screen.getByTestId("rules-variant-croatia")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(CROATIA_STEP)).toBeInTheDocument();
+    expect(screen.getByText(CROATIA_RULE)).toBeInTheDocument();
+    expect(screen.queryByText(BITOLA_STEP)).not.toBeInTheDocument();
+    expect(screen.queryByText(BITOLA_RULE)).not.toBeInTheDocument();
+    // Shared chapters are untouched — that is the whole point of block scoping.
+    expect(screen.getByRole("heading", { level: 2, name: SHARED_HEADING })).toBeInTheDocument();
+    expect(screen.getByText(SHARED_RULE)).toBeInTheDocument();
+  });
+
+  it("describes the Croatian deal, reveal and forced pick under that tab", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    await user.click(screen.getByTestId("rules-variant-croatia"));
+    expect(screen.getByText("Round two: your last two turn up")).toBeInTheDocument();
+    expect(screen.getByText("The dealer cannot pass")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Declaring gets a phase of its own, between bidding and the first trick/),
+    ).toBeInTheDocument();
+  });
+
+  it("states the shared Capot and tied-tiebreaker rules under both tabs", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    for (const tab of ["rules-variant-bitola", "rules-variant-croatia"]) {
+      await user.click(screen.getByTestId(tab));
+      expect(screen.getByText("Take all eight tricks and it’s a capot")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /if the two totals are exactly equal, it goes to the team that took trump/,
+        ),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("names the all-eight hand after the trump suit, not any suit", () => {
+    renderRules();
+    const bela = screen.getByTestId("meld-bela");
+    expect(within(bela).getByText("Belote")).toBeInTheDocument();
+    expect(within(bela).getByText(/All eight cards of the trump suit/)).toBeInTheDocument();
+  });
+
+  it("opens a difference marker on hover", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    const marker = screen.getAllByTestId("rules-diff-marker")[0];
+    await user.hover(marker);
+    expect(
+      await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),
+    ).toBeInTheDocument();
+  });
+
+  it("opens and dismisses a difference marker on tap", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    const marker = screen.getAllByTestId("rules-diff-marker")[0];
+    // A real touch, not a mouse click: Base UI's hover is `mouseOnly`, so this
+    // is the one path that proves the marker is reachable on a phone. Hover-only
+    // would pass every other test here and still be dead on a handset.
+    await user.pointer({ keys: "[TouchA]", target: marker });
+    expect(
+      await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),
+    ).toBeInTheDocument();
+    await user.pointer({ keys: "[TouchA]", target: marker });
+    expect(
+      screen.queryByText(/Croatian rules deal all eight cards before anyone bids/),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders fully translated content when the language switches to Macedonian", async () => {
     renderRules();
     await act(async () => {
@@ -90,19 +190,30 @@ describe("RulesPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps the active variant tab across a locale switch", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    await user.click(screen.getByTestId("rules-variant-croatia"));
+    await act(async () => {
+      await i18n.changeLanguage("hr");
+    });
+    expect(screen.getByTestId("rules-variant-croatia")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Podijeli svih osam odmah")).toBeInTheDocument();
+  });
+
   it("renders Croatian and Serbian hero titles", async () => {
     renderRules();
     await act(async () => {
       await i18n.changeLanguage("hr");
     });
     expect(
-      screen.getByRole("heading", { level: 1, name: "Nauči Beljot u jednom sjedenju" }),
+      screen.getByRole("heading", { level: 1, name: "Nauči Belu u jednom sjedenju" }),
     ).toBeInTheDocument();
     await act(async () => {
       await i18n.changeLanguage("sr");
     });
     expect(
-      screen.getByRole("heading", { level: 1, name: "Nauči Beljot u jednom sedenju" }),
+      screen.getByRole("heading", { level: 1, name: "Nauči Belu u jednom sedenju" }),
     ).toBeInTheDocument();
   });
 });
