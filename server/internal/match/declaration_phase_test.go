@@ -91,8 +91,13 @@ func indexOfKind(events []wireEvent, kind string) int {
 
 // indexOfMatchStateWithPhase is the position of the first event:match_state
 // carrying the given phase, or -1.
-func indexOfMatchStateWithPhase(t *testing.T, events []wireEvent, phase string) int {
-	t.Helper()
+//
+// Deliberately takes no *testing.T and asserts nothing: it is called from inside
+// a require.Eventually condition, and testify runs that condition on its own
+// goroutine. A require in there would call t.FailNow off the test goroutine,
+// which Go's testing package does not support. A payload that will not decode
+// simply is not a match.
+func indexOfMatchStateWithPhase(events []wireEvent, phase string) int {
 	for i, e := range events {
 		if e.kind != ws.EventMatchState {
 			continue
@@ -100,7 +105,9 @@ func indexOfMatchStateWithPhase(t *testing.T, events []wireEvent, phase string) 
 		var st struct {
 			Phase string `json:"phase"`
 		}
-		require.NoError(t, json.Unmarshal(e.payload, &st))
+		if err := json.Unmarshal(e.payload, &st); err != nil {
+			continue
+		}
 		if st.Phase == phase {
 			return i
 		}
@@ -127,16 +134,28 @@ func declarationsResolvedWinner(t *testing.T, payload json.RawMessage) *int {
 // It also proves the fire-once latch was actually consumed by a broadcast arm
 // that emits — deleting the broadcastDeclarationsResolvedIfTransition call from
 // the declare/skip arm leaves every other assertion in this package green.
-func assertRevealPrecedesPlayingState(t *testing.T, events []wireEvent, wantWinner *int) {
+// It takes the spy and a watermark rather than a pre-taken slice because it has
+// to WAIT for those two events, not merely look for them. handleTimerExpiry
+// assigns session.gameState and unlocks BEFORE it broadcasts anything
+// (live_match.go), so a test that polls GetStateSnapshot for PhasePlaying can win
+// the race against the broadcasts by a few milliseconds and read a hub that is
+// still empty. Synchronising on the state while asserting on the wire is what
+// made TestDeclarationPhase_TimerExpiryOnLastSeatOpensTrick1 fail 19 runs out of
+// 30 in isolation, with a bare "-1 is not greater than or equal to 0". Wait for
+// the thing you assert.
+func assertRevealPrecedesPlayingState(t *testing.T, hub *hubSpy, before int, wantWinner *int) {
 	t.Helper()
 
-	revealIdx := indexOfKind(events, ws.EventDeclarationsResolved)
-	require.GreaterOrEqual(t, revealIdx, 0,
-		"the resolving answer must emit event:declarations_resolved")
+	var events []wireEvent
+	require.Eventually(t, func() bool {
+		events = wireEvents(t, hub.snapshot()[before:])
+		return indexOfKind(events, ws.EventDeclarationsResolved) >= 0 &&
+			indexOfMatchStateWithPhase(events, string(game.PhasePlaying)) >= 0
+	}, 2*time.Second, 5*time.Millisecond,
+		"the resolving answer must emit both event:declarations_resolved and a playing-phase match_state")
 
-	playingIdx := indexOfMatchStateWithPhase(t, events, string(game.PhasePlaying))
-	require.GreaterOrEqual(t, playingIdx, 0,
-		"the resolving answer must emit a playing-phase match_state")
+	revealIdx := indexOfKind(events, ws.EventDeclarationsResolved)
+	playingIdx := indexOfMatchStateWithPhase(events, string(game.PhasePlaying))
 
 	assert.Less(t, revealIdx, playingIdx,
 		"the reveal must ride ahead of the match_state that opens trick 1")
@@ -253,7 +272,7 @@ func TestDeclarationPhase_TimerExpiryOnLastSeatOpensTrick1(t *testing.T) {
 	require.NotNil(t, after.TurnExpiresAt)
 	assert.True(t, after.TurnExpiresAt.After(time.Now()), "trick 1 opens with a live timer")
 
-	assertRevealPrecedesPlayingState(t, wireEvents(t, hub.snapshot()[before:]), winningTeamOf(t, after))
+	assertRevealPrecedesPlayingState(t, hub, before, winningTeamOf(t, after))
 }
 
 // TestDeclarationPhase_FinalAnswerRevealsBeforePlayingState is the same wire
@@ -288,8 +307,8 @@ func TestDeclarationPhase_FinalAnswerRevealsBeforePlayingState(t *testing.T) {
 	assert.Equal(t, 1, after.TrickNumber)
 	assert.True(t, after.DeclarationsResolved)
 
+	assertRevealPrecedesPlayingState(t, hub, before, winningTeamOf(t, after))
 	events := wireEvents(t, hub.snapshot()[before:])
-	assertRevealPrecedesPlayingState(t, events, winningTeamOf(t, after))
 	assert.GreaterOrEqual(t, indexOfKind(events, ws.EventPlayerDeclared), 0,
 		"a manual declare still announces who declared")
 }
@@ -346,7 +365,7 @@ func TestDeclarationPhase_NoMeldHandStillRevealsOnPick(t *testing.T) {
 	assert.Equal(t, [2]int{0, 0}, after.DeclarationPoints)
 
 	// No team scored, so the reveal names no winner — but it must still fire.
-	assertRevealPrecedesPlayingState(t, wireEvents(t, hub.snapshot()[before:]), nil)
+	assertRevealPrecedesPlayingState(t, hub, before, nil)
 }
 
 // TestDeclarationPhase_ActionArmsTimerForNextSeat guards the timer-arm branch in
