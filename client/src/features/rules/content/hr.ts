@@ -88,11 +88,11 @@ export const hr: RulesLangData = {
       title: "Promiješaj, podijeli, zovi adut",
       lede: "Četiri igrača, 32 karte, osam u ruci i brzi krug da se odredi koja je boja adut.",
       blocks: [
+        // Jedan blok, ne po jedan za svaku varijantu. Prva dva koraka identična
+        // su u oba pravila i napisana su jednom; sljedeća četiri označena su po
+        // varijanti, svaki sa svojom napomenom o svom paru.
         {
           kind: "steps",
-          variant: "bitola",
-          otherVariantNote:
-            "U hrvatskim pravilima svih osam karata dijeli se prije nego što se zove adut, a posljednje dvije idu licem prema dolje. Ništa se ne okreće, adut se zove slobodno u oba kruga, i nijedno dijeljenje ne propada. Djelitelj zove posljednji u drugom krugu i mora nazvati boju.",
           items: [
             {
               t: "Sjedni na svoje mjesto",
@@ -103,50 +103,58 @@ export const hr: RulesLangData = {
               d: "Bela se igra s 32 karte. Uzmi obični špil i izbaci sve od 2 do 6. Ono što ostaje su sedmica, osmica, devetka, desetka, Dečko, Dama, Kralj i As u sve četiri boje. Time igraš.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "U hrvatskim pravilima svih osam karata dijeli se prije nego što se zove adut, po tri, tri, pa posljednje dvije licem prema dolje, i ništa se ne okreće.",
               t: "Podijeli po pet, pa okreni jednu",
               d: "Djelitelj obilazi dvaput, po tri karte pa dvije, pa svatko počinje s pet u ruci. Sljedeća karta sa špila ide licem prema gore na stol kao adutska karta, a jedanaest iza nje ostaju licem prema dolje na sredini.",
             },
             {
-              t: "Prvi krug: uzmi tu kartu ili propusti",
-              d: "Počevši zdesna od djelitelja, svaki igrač ili uzima okrenutu kartu, čime njezina boja postaje adut za tu ruku, ili propušta. Tko je uzme, zadržava je kao jednu od svojih osam, a djelitelj dijeli dok svaka ruka nije puna. Adut pobjeđuje sve iz druge tri boje, bez obzira na rang.",
-            },
-            {
-              t: "Drugi krug: nazovi boju, ali ne tu",
-              d: "Sva četvorica su propustila? Isti red ide ponovno, ali ovaj put boju nazivaš umjesto da uzimaš kartu. Boja okrenute karte je potrošena i zaključana, pa birate između druge tri. Onaj tko zove ipak uzima okrenutu kartu s ostatkom dijeljenja.",
-            },
-            {
-              t: "Dvaput propušteno? Novo dijeljenje",
-              d: "Ako i drugi krug prođe bez ijednog zvanja aduta, ruka se ne igra: sve 32 karte vraćaju se zajedno i miješaju, dijeljenje prelazi na sljedećeg igrača zdesna, i sve počinje ispočetka.",
-            },
-          ],
-        },
-        {
-          kind: "steps",
-          variant: "croatia",
-          otherVariantNote:
-            "U bitolskim pravilima dijeljenje staje na pet karata po igraču, a sljedeća karta se okreće kao adutska: prvi krug uzima tu kartu i njezinu boju, drugi krug naziva bilo koju od druge tri, a ako oba kruga prođu bez zvanja aduta karte se miješaju zajedno i dijeljenje prelazi dalje.",
-          items: [
-            {
-              t: "Sjedni na svoje mjesto",
-              d: "Sjediš točno nasuprot svom partneru; dvojica protivnika zauzimaju stolice s obje strane. Igra se kreće udesno oko stola.",
-            },
-            {
-              t: "Sastavi špil",
-              d: "Bela se igra s 32 karte. Uzmi obični špil i izbaci sve od 2 do 6. Ono što ostaje su sedmica, osmica, devetka, desetka, Dečko, Dama, Kralj i As u sve četiri boje. Time igraš.",
-            },
-            {
+              variant: "croatia",
+              otherVariantNote:
+                "U bitolskim pravilima dijeljenje staje na pet karata po igraču, a sljedeća karta se okreće kao adutska, dok ostalih jedanaest ostaje na sredini.",
               t: "Podijeli svih osam odmah",
               d: "Djelitelj obilazi triput: po tri karte, još tri, pa posljednje dvije licem prema dolje. Svaka je karta podijeljena prije nego što bilo tko zove adut. Šest možeš gledati, a dvije ne može nitko, ni ti sam.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "U hrvatskim pravilima nema karte za uzimanje: nazivaš bilo koju od četiri boje, na temelju šest karata koje vidiš, i ne dobivaš dodatnu kartu.",
+              t: "Prvi krug: uzmi tu kartu ili propusti",
+              d: "Počevši zdesna od djelitelja, svaki igrač ili uzima okrenutu kartu, čime njezina boja postaje adut za tu ruku, ili propušta. Tko je uzme, zadržava je kao jednu od svojih osam, a djelitelj dijeli dok svaka ruka nije puna. Adut pobjeđuje sve iz druge tri boje, bez obzira na rang.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "U bitolskim pravilima prvi krug nudi tu jednu okrenutu kartu: tko je uzme, njezina boja postaje adut, a karta mu ostaje kao jedna od osam.",
               t: "Prvi krug: nazovi boju ili propusti",
               d: "Ništa se ne okreće i nema adutske karte za uzimanje. Počevši zdesna od djelitelja, svaki igrač ili naziva bilo koju od četiri boje kao adut, na temelju šest karata koje vidi, ili propušta. Tko je nazove ne dobiva dodatnu kartu, ruka mu je već podijeljena. Adut pobjeđuje sve iz druge tri boje, bez obzira na rang.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "U hrvatskim pravilima i u drugom krugu sve četiri boje ostaju otvorene, jer ništa nije potrošeno na adutsku kartu, a dvije karte licem prema dolje prije toga se otkrivaju samo svom vlasniku.",
+              t: "Drugi krug: nazovi boju, ali ne tu",
+              d: "Sva četvorica su propustila? Isti red ide ponovno, ali ovaj put boju nazivaš umjesto da uzimaš kartu. Boja okrenute karte je potrošena i zaključana, pa birate između druge tri. Onaj tko zove ipak uzima okrenutu kartu s ostatkom dijeljenja.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "U bitolskim pravilima ništa se ne dijeli licem prema dolje, pa nema što otkrivati, a drugi krug naziva bilo koju boju osim one okrenute karte, koja je već potrošena.",
               t: "Drugi krug: posljednje dvije se otkrivaju",
               d: "Ako sva četvorica propuste, dvije karte licem prema dolje otkrivaju se samo svom vlasniku. Nitko ne vidi tuđe. Drugi krug se zove na punoj ruci od osam karata, a sve četiri boje su još otvorene.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "U hrvatskim pravilima nijedno dijeljenje ne propada: djelitelj zove posljednji u drugom krugu i mora nazvati boju, pa se svako dijeljenje igra.",
+              t: "Dvaput propušteno? Novo dijeljenje",
+              d: "Ako i drugi krug prođe bez ijednog zvanja aduta, ruka se ne igra: sve 32 karte vraćaju se zajedno i miješaju, dijeljenje prelazi na sljedećeg igrača zdesna, i sve počinje ispočetka.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "U bitolskim pravilima dijeljenje može propasti: ako i drugi krug prođe bez zvanja aduta, sve 32 karte se miješaju zajedno i dijeljenje prelazi na sljedećeg igrača zdesna.",
               t: "Djelitelj ne smije propustiti",
               d: "U drugom krugu djelitelj zove posljednji i nema pravo propustiti. Ako druga trojica propuste, djelitelj mora nazvati boju. U ovim pravilima nema ponovnog miješanja, svako dijeljenje se igra.",
             },

@@ -88,11 +88,11 @@ export const sr: RulesLangData = {
       title: "Promešaj, podeli, zovi adut",
       lede: "Četiri igrača, 32 karte, osam u ruci i brz krug da se odredi koja je boja adut.",
       blocks: [
+        // Jedan blok, ne po jedan za svaku varijantu. Prva dva koraka identična
+        // su u oba pravila i napisana su jednom; sledeća četiri označena su po
+        // varijanti, svaki sa svojom napomenom o svom paru.
         {
           kind: "steps",
-          variant: "bitola",
-          otherVariantNote:
-            "U hrvatskim pravilima svih osam karata deli se pre nego što se zove adut, a poslednje dve idu licem nadole. Ništa se ne okreće, adut se zove slobodno u oba kruga, i nijedno deljenje ne propada. Delilac zove poslednji u drugom krugu i mora da nazove boju.",
           items: [
             {
               t: "Sedni na svoje mesto",
@@ -103,50 +103,58 @@ export const sr: RulesLangData = {
               d: "Bela se igra sa 32 karte. Uzmi običan špil i izbaci sve od 2 do 6. Ono što ostaje su sedmica, osmica, devetka, desetka, Žandar, Dama, Kralj i As u sve četiri boje. Time igraš.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "U hrvatskim pravilima svih osam karata deli se pre nego što se zove adut, po tri, tri, pa poslednje dve licem nadole, i ništa se ne okreće.",
               t: "Podeli po pet, pa okreni jednu",
               d: "Delilac obilazi dvaput, po tri karte pa dve, pa svako počinje sa pet u ruci. Sledeća karta sa špila ide licem nagore na sto kao adutska karta, a jedanaest iza nje ostaju licem nadole na sredini.",
             },
             {
-              t: "Prvi krug: uzmi tu kartu ili preskoči",
-              d: "Počev zdesna od delioca, svaki igrač ili uzima okrenutu kartu, čime njena boja postaje adut za tu ruku, ili preskače. Ko je uzme, zadržava je kao jednu od svojih osam, a delilac deli dok svaka ruka nije puna. Adut pobeđuje sve iz druge tri boje, bez obzira na rang.",
-            },
-            {
-              t: "Drugi krug: nazovi boju, ali ne tu",
-              d: "Sva četvorica su preskočila? Isti red ide ponovo, ali ovaj put boju nazivaš umesto da uzimaš kartu. Boja okrenute karte je potrošena i zaključana, pa birate između druge tri. Onaj ko zove ipak uzima okrenutu kartu sa ostatkom deljenja.",
-            },
-            {
-              t: "Dvaput preskočeno? Novo deljenje",
-              d: "Ako i drugi krug prođe bez ijednog zvanja aduta, ruka se ne igra: sve 32 karte vraćaju se zajedno i mešaju, deljenje prelazi na sledećeg igrača zdesna, i sve počinje ispočetka.",
-            },
-          ],
-        },
-        {
-          kind: "steps",
-          variant: "croatia",
-          otherVariantNote:
-            "U bitolskim pravilima deljenje staje na pet karata po igraču, a sledeća karta se okreće kao adutska: prvi krug uzima tu kartu i njenu boju, drugi krug naziva bilo koju od druge tri, a ako oba kruga prođu bez zvanja aduta karte se mešaju zajedno i deljenje prelazi dalje.",
-          items: [
-            {
-              t: "Sedni na svoje mesto",
-              d: "Sediš tačno naspram svog partnera; dvojica protivnika zauzimaju stolice s obe strane. Igra se kreće udesno oko stola.",
-            },
-            {
-              t: "Sastavi špil",
-              d: "Bela se igra sa 32 karte. Uzmi običan špil i izbaci sve od 2 do 6. Ono što ostaje su sedmica, osmica, devetka, desetka, Žandar, Dama, Kralj i As u sve četiri boje. Time igraš.",
-            },
-            {
+              variant: "croatia",
+              otherVariantNote:
+                "U bitolskim pravilima deljenje staje na pet karata po igraču, a sledeća karta se okreće kao adutska, dok ostalih jedanaest ostaje na sredini.",
               t: "Podeli svih osam odmah",
               d: "Delilac obilazi triput: po tri karte, još tri, pa poslednje dve licem nadole. Svaka je karta podeljena pre nego što bilo ko zove adut. Šest možeš da gledaš, a dve ne može niko, ni ti sam.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "U hrvatskim pravilima nema karte za uzimanje: nazivaš bilo koju od četiri boje, na osnovu šest karata koje vidiš, i ne dobijaš dodatnu kartu.",
+              t: "Prvi krug: uzmi tu kartu ili preskoči",
+              d: "Počev zdesna od delioca, svaki igrač ili uzima okrenutu kartu, čime njena boja postaje adut za tu ruku, ili preskače. Ko je uzme, zadržava je kao jednu od svojih osam, a delilac deli dok svaka ruka nije puna. Adut pobeđuje sve iz druge tri boje, bez obzira na rang.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "U bitolskim pravilima prvi krug nudi tu jednu okrenutu kartu: ko je uzme, njena boja postaje adut, a karta mu ostaje kao jedna od osam.",
               t: "Prvi krug: nazovi boju ili preskoči",
               d: "Ništa se ne okreće i nema adutske karte za uzimanje. Počev zdesna od delioca, svaki igrač ili naziva bilo koju od četiri boje kao adut, na osnovu šest karata koje vidi, ili preskače. Ko je nazove ne dobija dodatnu kartu, ruka mu je već podeljena. Adut pobeđuje sve iz druge tri boje, bez obzira na rang.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "U hrvatskim pravilima i u drugom krugu sve četiri boje ostaju otvorene, jer ništa nije potrošeno na adutsku kartu, a dve karte licem nadole se pre toga otkrivaju samo svom vlasniku.",
+              t: "Drugi krug: nazovi boju, ali ne tu",
+              d: "Sva četvorica su preskočila? Isti red ide ponovo, ali ovaj put boju nazivaš umesto da uzimaš kartu. Boja okrenute karte je potrošena i zaključana, pa birate između druge tri. Onaj ko zove ipak uzima okrenutu kartu sa ostatkom deljenja.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "U bitolskim pravilima ništa se ne deli licem nadole, pa nema šta da se otkriva, a drugi krug naziva bilo koju boju osim one okrenute karte, koja je već potrošena.",
               t: "Drugi krug: poslednje dve se otkrivaju",
               d: "Ako sva četvorica preskoče, dve karte licem nadole otkrivaju se samo svom vlasniku. Niko ne vidi tuđe. Drugi krug se zove na punoj ruci od osam karata, a sve četiri boje su još otvorene.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "U hrvatskim pravilima nijedno deljenje ne propada: delilac zove poslednji u drugom krugu i mora da nazove boju, pa se svako deljenje igra.",
+              t: "Dvaput preskočeno? Novo deljenje",
+              d: "Ako i drugi krug prođe bez ijednog zvanja aduta, ruka se ne igra: sve 32 karte vraćaju se zajedno i mešaju, deljenje prelazi na sledećeg igrača zdesna, i sve počinje ispočetka.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "U bitolskim pravilima deljenje može da propadne: ako i drugi krug prođe bez zvanja aduta, sve 32 karte se mešaju zajedno i deljenje prelazi na sledećeg igrača zdesna.",
               t: "Delilac ne sme da preskoči",
               d: "U drugom krugu delilac zove poslednji i nema pravo da preskoči. Ako druga trojica preskoče, delilac mora da nazove boju. U ovim pravilima nema ponovnog mešanja, svako deljenje se igra.",
             },

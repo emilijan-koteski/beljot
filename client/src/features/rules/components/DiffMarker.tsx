@@ -1,4 +1,3 @@
-import { ArrowLeftRight } from "lucide-react";
 import { useState } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
@@ -83,14 +82,28 @@ export function DiffMarker({ note, label, tone = "light" }: Props) {
             width: 18,
             height: 18,
             marginLeft: 6,
-            borderRadius: 6,
+            // A circle, not a rounded square: with the bare "!" glyph below it
+            // reads as the familiar (!) "there is something to know here" mark.
+            borderRadius: "50%",
             cursor: "pointer",
             verticalAlign: "middle",
             flexShrink: 0,
             ...skin,
           }}
         >
-          <ArrowLeftRight size={11} aria-hidden="true" />
+          <span
+            aria-hidden="true"
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: 12,
+              fontWeight: 700,
+              // lineHeight 1 keeps the glyph optically centred in the circle —
+              // an inherited body line-height pushes it visibly low.
+              lineHeight: 1,
+            }}
+          >
+            !
+          </span>
         </TooltipTrigger>
         {/* Base UI portals the popup to document.body, so inside the in-match
             overlay it is a SIBLING of a panel painting at Z.UTIL — at the

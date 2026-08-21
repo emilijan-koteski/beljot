@@ -12,6 +12,7 @@ import type {
   RulesContent,
   RuleSection,
 } from "@/features/rules/content/types";
+import { isVisibleFor, visibleFor } from "@/features/rules/content/visibility";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import { variantLabel } from "@/shared/lib/roomLabels";
@@ -421,7 +422,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
   const { ui } = useDarkRules();
   const activeVariant = useDarkVariant();
 
-  if (block.variant && block.variant !== activeVariant) return null;
+  if (!isVisibleFor(block, activeVariant)) return null;
 
   const marker = block.otherVariantNote ? (
     <DiffMarker note={block.otherVariantNote} label={ui.diffLabel} tone="dark" />
@@ -497,7 +498,10 @@ function DarkBlock({ block }: { block: RuleBlock }) {
         </div>
       );
 
-    case "steps":
+    // Filtered FIRST, numbered from the survivors — see the light renderer's
+    // note: numbering the unfiltered array shows 01, 02, 03, 05.
+    case "steps": {
+      const items = visibleFor(block.items, activeVariant);
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {marker ? (
@@ -513,7 +517,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
               gap: 8,
             }}
           >
-            {block.items.map((it, i) => (
+            {items.map((it, i) => (
               <li
                 key={i}
                 style={{
@@ -556,6 +560,9 @@ function DarkBlock({ block }: { block: RuleBlock }) {
                     }}
                   >
                     {it.t}
+                    {it.otherVariantNote ? (
+                      <DiffMarker note={it.otherVariantNote} label={ui.diffLabel} tone="dark" />
+                    ) : null}
                   </div>
                   <div style={{ fontSize: 12.5, lineHeight: 1.55, color: TEXT_DIM }}>{it.d}</div>
                 </div>
@@ -564,6 +571,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
           </ol>
         </div>
       );
+    }
 
     case "cards":
       return <DarkCardLadders />;

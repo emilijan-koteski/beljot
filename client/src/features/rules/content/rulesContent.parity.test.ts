@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import { type Variant, VARIANTS } from "@/shared/types/matchTypes";
 
 import { getRulesContent, RULES_CONTENT } from "./rulesContent";
-import type { RuleBlock, RulesContent, RulesLang } from "./types";
+import type { RuleBlock, RulesContent, RulesLang, StepItem, VariantScope } from "./types";
+import { visibleFor } from "./visibility";
 
 const LANGS: RulesLang[] = ["en", "mk", "hr", "sr"];
 const reference = RULES_CONTENT.en;
@@ -26,12 +27,16 @@ const MARKER_CAPABLE: RuleBlock["kind"][] = ["p", "rule", "steps", "note"];
 // translation: a block scoped in one locale only, or one that lost its marker
 // in translation, renders a different page per language. Folding both into the
 // shape string is what makes that a test failure instead of silent drift.
-function scopeShape(b: RuleBlock): string {
-  return `${b.variant ?? "all"}/${b.otherVariantNote ? "marked" : "plain"}`;
+function scopeShape(s: VariantScope): string {
+  return `${s.variant ?? "all"}/${s.otherVariantNote ? "marked" : "plain"}`;
 }
 
 function blockShape(b: RuleBlock): string {
-  if (b.kind === "steps") return `steps:${b.items.length}:${scopeShape(b)}`;
+  // Step items carry their own scope, so the per-item scopes are part of the
+  // block's shape: a locale that scoped the same six steps differently would
+  // render a different page under the same tab.
+  if (b.kind === "steps")
+    return `steps:${b.items.length}:${scopeShape(b)}:[${b.items.map(scopeShape).join("|")}]`;
   // Tier tokens are structure, not translation — the shape pins their order.
   if (b.kind === "tiers") return `tiers:${b.items.map((i) => i.tier).join(",")}:${scopeShape(b)}`;
   return `${b.kind}:${scopeShape(b)}`;
@@ -42,9 +47,11 @@ function scopedVariants(blocks: RuleBlock[]): Set<Variant> {
   return new Set(blocks.flatMap((b) => (b.variant ? [b.variant] : [])));
 }
 
-/** The blocks one variant's tab actually renders. Mirrors RuleBlock's filter. */
-function visibleBlocks(blocks: RuleBlock[], variant: Variant): RuleBlock[] {
-  return blocks.filter((b) => !b.variant || b.variant === variant);
+/** Every scoped step item across a section's `steps` blocks. */
+function stepItems(blocks: RuleBlock[]): { blockIndex: number; index: number; item: StepItem }[] {
+  return blocks.flatMap((b, blockIndex) =>
+    b.kind === "steps" ? b.items.map((item, index) => ({ blockIndex, index, item })) : [],
+  );
 }
 
 // Walk every leaf string in a content object and collect empties.
@@ -96,7 +103,7 @@ describe("rules content parity", () => {
       for (const section of RULES_CONTENT[lang].sections) {
         for (const variant of VARIANTS) {
           expect(
-            visibleBlocks(section.blocks, variant).length,
+            visibleFor(section.blocks, variant).length,
             `${lang} section "${section.id}" renders nothing under ${variant}`,
           ).toBeGreaterThan(0);
         }
@@ -171,6 +178,88 @@ describe("rules content parity", () => {
             `${lang} section "${section.id}" scopes blocks but has none for ${variant}`,
           ).toContain(variant);
         }
+      }
+    }
+  });
+
+  // ── Item-level scoping ───────────────────────────────────────────────────
+  //
+  // `basics` holds ONE steps block whose individual items are scoped, so the
+  // block-level gates above see nothing there. These are the equivalents one
+  // level down.
+
+  it("gives every variant-scoped step item a difference marker", () => {
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        for (const { blockIndex, index, item } of stepItems(section.blocks)) {
+          if (!item.variant) continue;
+          expect(
+            item.otherVariantNote,
+            `${lang} "${section.id}" block ${blockIndex} step ${index} ("${item.t}") is scoped to ${item.variant} with no otherVariantNote`,
+          ).toBeTruthy();
+        }
+      }
+    }
+  });
+
+  it("scopes a step item to a real variant only", () => {
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        for (const { item } of stepItems(section.blocks)) {
+          if (item.variant) expect(VARIANTS as readonly string[]).toContain(item.variant);
+        }
+      }
+    }
+  });
+
+  it("never carries a difference note on an unscoped step item", () => {
+    // A shared item renders under BOTH tabs, so "the other variant does X" is
+    // wrong on one of them.
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        for (const { blockIndex, index, item } of stepItems(section.blocks)) {
+          if (!item.otherVariantNote) continue;
+          expect(
+            item.variant,
+            `${lang} "${section.id}" block ${blockIndex} step ${index} ("${item.t}") has an otherVariantNote but no variant scope`,
+          ).toBeTruthy();
+        }
+      }
+    }
+  });
+
+  it("covers both variants wherever a steps block scopes any item", () => {
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        section.blocks.forEach((block, blockIndex) => {
+          if (block.kind !== "steps") return;
+          const scoped = new Set(block.items.flatMap((it) => (it.variant ? [it.variant] : [])));
+          if (scoped.size === 0) return;
+          for (const variant of VARIANTS) {
+            expect(
+              [...scoped],
+              `${lang} "${section.id}" block ${blockIndex} scopes step items but has none for ${variant}`,
+            ).toContain(variant);
+          }
+        });
+      }
+    }
+  });
+
+  it("shows both variants the same number of steps in every steps block", () => {
+    // "Almost identical" is the product requirement, not a nice-to-have: one tab
+    // silently short a step is the failure this catches. It also pins the
+    // gapless 01..06 the renderers derive from the filtered list.
+    for (const lang of LANGS) {
+      for (const section of RULES_CONTENT[lang].sections) {
+        section.blocks.forEach((block, blockIndex) => {
+          if (block.kind !== "steps") return;
+          const counts = VARIANTS.map((v) => visibleFor(block.items, v).length);
+          expect(
+            new Set(counts).size,
+            `${lang} "${section.id}" block ${blockIndex} renders ${counts.join(" vs ")} steps across ${VARIANTS.join("/")}`,
+          ).toBe(1);
+        });
       }
     }
   });

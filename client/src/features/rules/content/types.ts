@@ -33,30 +33,40 @@ export type Declaration = {
   detail: string; // localized
 };
 
-export type StepItem = { t: string; d: string };
-
-// One honour tier line: the token picks the name (from the shared i18n tier
-// keys) and colour (HONOR_TIER_COLOR) at render time; only the sentence tail
-// is authored per locale. The score range is derived from HONOR_TIER_BANDS,
-// so a tier retune never leaves stale numbers in four content files.
-export type TierItem = { tier: HonorTier; d: string };
-
-// Variant scoping, carried by every block kind.
+// Variant scoping, carried by every block kind AND by individual step items.
 //
 // Most of the rules are identical in both variants, so the default — no
-// `variant` — means "renders under both tabs". Only a genuinely divergent block
+// `variant` — means "renders under both tabs". Only a genuinely divergent piece
 // names one, and it renders only while that variant's tab is active. Whole
 // chapters are never duplicated: the visible diff between the two tabs IS the
 // divergence list.
 //
 // `otherVariantNote` is authored prose, not a derived badge — a marker that
 // says "this differs" tells a player nothing; the useful sentence is what the
-// OTHER variant does. It lives beside the block it annotates so it is
+// OTHER variant does. It lives beside the thing it annotates so it is
 // translated with it.
 export type VariantScope = {
   variant?: Variant;
   otherVariantNote?: string;
 };
+
+// One numbered step. Scoping lives at the ITEM level here, not just the block
+// level, because a deal-and-bid sequence diverges step by step: "take your seat"
+// and "build the deck" are word-for-word identical in both variants, while the
+// four steps after them differ. Scoping the whole block instead would author the
+// shared two twice per locale (eight duplicate strings the epic's audit forbids)
+// and give the reader ONE marker for the entire sequence, hiding exactly where
+// the rules part company.
+//
+// Renderers filter items by the active variant and number what SURVIVES, so both
+// tabs show a gapless 01..06.
+export type StepItem = VariantScope & { t: string; d: string };
+
+// One honour tier line: the token picks the name (from the shared i18n tier
+// keys) and colour (HONOR_TIER_COLOR) at render time; only the sentence tail
+// is authored per locale. The score range is derived from HONOR_TIER_BANDS,
+// so a tier retune never leaves stale numbers in four content files.
+export type TierItem = { tier: HonorTier; d: string };
 
 // A content block inside a chapter. The prototype's unused `split` is omitted.
 export type RuleBlock =

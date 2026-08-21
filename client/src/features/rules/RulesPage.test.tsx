@@ -150,6 +150,77 @@ describe("RulesPage", () => {
     expect(within(bela).getByText(/All eight cards of the trump suit/)).toBeInTheDocument();
   });
 
+  /** The visible 01/02/… chips of the `basics` step list, in document order. */
+  function basicsStepNumbers(): string[] {
+    const basics = document.getElementById("basics");
+    if (!basics) throw new Error("basics chapter is not rendered");
+    return [...basics.querySelectorAll("ol > li > span.font-mono")].map(
+      (el) => el.textContent ?? "",
+    );
+  }
+
+  /** The step whose title is `title`, as the element that also holds its marker. */
+  function step(title: string) {
+    return screen.getByText(title);
+  }
+
+  it("numbers the visible steps gaplessly on both tabs", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    // Items are scoped INSIDE one shared block, so numbering the unfiltered
+    // array would render 01, 02, 03, 05, 07, 09 here. Both tabs must read 01-06.
+    expect(basicsStepNumbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
+    await user.click(screen.getByTestId("rules-variant-croatia"));
+    expect(basicsStepNumbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
+  });
+
+  it("authors the shared steps once, with no marker on them", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    for (const shared of ["Take your seat", "Build the deck"]) {
+      // One node, not two: the shared steps are no longer duplicated per variant.
+      expect(screen.getByText(shared)).toBeInTheDocument();
+      expect(within(step(shared)).queryByTestId("rules-diff-marker")).not.toBeInTheDocument();
+    }
+    await user.click(screen.getByTestId("rules-variant-croatia"));
+    for (const shared of ["Take your seat", "Build the deck"]) {
+      expect(screen.getByText(shared)).toBeInTheDocument();
+      expect(within(step(shared)).queryByTestId("rules-diff-marker")).not.toBeInTheDocument();
+    }
+  });
+
+  it("marks each divergent step individually, explaining that step's counterpart", async () => {
+    const user = userEvent.setup();
+    renderRules();
+
+    // Bitola tab: the deal step's own marker describes the Croatian deal.
+    const bitolaDeal = within(step(BITOLA_STEP)).getByTestId("rules-diff-marker");
+    await user.hover(bitolaDeal);
+    expect(
+      await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),
+    ).toBeInTheDocument();
+    await user.unhover(bitolaDeal);
+
+    // And the round-one step carries a DIFFERENT note — one marker per diff
+    // spot, not one for the whole sequence.
+    const bitolaRound1 = within(step("Round one: take that card, or pass")).getByTestId(
+      "rules-diff-marker",
+    );
+    await user.hover(bitolaRound1);
+    expect(
+      await screen.findByText(/In Croatian rules there is no card to take/),
+    ).toBeInTheDocument();
+    await user.unhover(bitolaRound1);
+
+    // Croatian tab: the mirror image.
+    await user.click(screen.getByTestId("rules-variant-croatia"));
+    const croatiaDeal = within(step(CROATIA_STEP)).getByTestId("rules-diff-marker");
+    await user.hover(croatiaDeal);
+    expect(
+      await screen.findByText(/Bitola rules stop the deal at five cards each/),
+    ).toBeInTheDocument();
+  });
+
   it("opens a difference marker on hover", async () => {
     const user = userEvent.setup();
     renderRules();

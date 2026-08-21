@@ -173,6 +173,34 @@ describe("RulesDialog (in-game)", () => {
     expect(document.getElementById(panelId!)).toHaveAttribute("role", "tabpanel");
   });
 
+  it("numbers the visible steps gaplessly in the overlay, on both tabs", async () => {
+    const user = userEvent.setup();
+    render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
+    const numbers = () =>
+      [...screen.getByTestId("rules-dialog").querySelectorAll("ol > li > span:first-child")]
+        .map((el) => el.textContent ?? "")
+        .filter((txt) => /^\d\d$/.test(txt))
+        .slice(0, 6);
+    // The dark switch filters and numbers independently of the light one, so it
+    // needs its own proof: numbering the unfiltered array reads 01,02,03,05,07,09.
+    expect(numbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
+    await user.click(screen.getByTestId("rules-dialog-variant-croatia"));
+    expect(numbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
+  });
+
+  it("marks each divergent step individually in the overlay", async () => {
+    const user = userEvent.setup();
+    render(<RulesDialog open onOpenChange={() => {}} variant="croatia" />);
+    // Shared steps carry no marker; the divergent one carries its own.
+    expect(
+      within(screen.getByText("Take your seat")).queryByTestId("rules-diff-marker"),
+    ).not.toBeInTheDocument();
+    await user.hover(within(screen.getByText(CROATIA_STEP)).getByTestId("rules-diff-marker"));
+    expect(
+      await screen.findByText(/Bitola rules stop the deal at five cards each/),
+    ).toBeInTheDocument();
+  });
+
   it("carries the difference marker into the dark theme", async () => {
     const user = userEvent.setup();
     render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);

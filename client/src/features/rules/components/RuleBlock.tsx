@@ -5,6 +5,7 @@ import { CardLadder } from "@/features/rules/components/CardLadder";
 import { DiffMarker } from "@/features/rules/components/DiffMarker";
 import { MeldsGrid } from "@/features/rules/components/MeldsGrid";
 import type { RuleBlock as RuleBlockType } from "@/features/rules/content/types";
+import { isVisibleFor, visibleFor } from "@/features/rules/content/visibility";
 import { useRules, useRulesVariant } from "@/features/rules/RulesContext";
 import { HONOR_TIER_BANDS, HONOR_TIER_COLOR, type HonorTier } from "@/shared/lib/honor";
 
@@ -167,7 +168,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
   const activeVariant = useRulesVariant();
   const { ui } = useRules();
 
-  if (block.variant && block.variant !== activeVariant) return null;
+  if (!isVisibleFor(block, activeVariant)) return null;
 
   const marker = block.otherVariantNote ? (
     <DiffMarker note={block.otherVariantNote} label={ui.diffLabel} />
@@ -215,7 +216,11 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
     case "tiers":
       return <TiersBlock block={block} marker={marker} />;
 
-    case "steps":
+    // Items are filtered FIRST and numbered from the survivors, so the visible
+    // 01..06 is gapless on both tabs. Numbering over `block.items` would render
+    // 01, 02, 03, 05 wherever the skipped item belonged to the other variant.
+    case "steps": {
+      const items = visibleFor(block.items, activeVariant);
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {marker ? (
@@ -231,7 +236,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
               gap: 10,
             }}
           >
-            {block.items.map((it, i) => (
+            {items.map((it, i) => (
               <li
                 key={i}
                 style={{
@@ -273,6 +278,9 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
                     }}
                   >
                     {it.t}
+                    {it.otherVariantNote ? (
+                      <DiffMarker note={it.otherVariantNote} label={ui.diffLabel} />
+                    ) : null}
                   </span>
                   <span style={{ fontSize: 13, lineHeight: 1.55, color: "var(--ink-dim)" }}>
                     {it.d}
@@ -283,6 +291,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
           </ol>
         </div>
       );
+    }
 
     case "cards":
       return <CardBlock />;

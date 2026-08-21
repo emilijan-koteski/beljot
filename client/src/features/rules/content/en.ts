@@ -89,11 +89,13 @@ export const en: RulesLangData = {
       title: "Shuffle, deal, take trump",
       lede: "Four players, 32 cards, eight to a hand, and a quick round to settle which suit is trump.",
       blocks: [
+        // ONE block, not one per variant. The first two steps are word-for-word
+        // identical in both rulesets and are authored once; the four after them
+        // are scoped, each carrying its own note about that specific step's
+        // counterpart. Bitola and Croatian items alternate so that filtering
+        // either variant leaves a correctly ordered six-step sequence.
         {
           kind: "steps",
-          variant: "bitola",
-          otherVariantNote:
-            "Croatian rules deal all eight cards before anyone bids, the last two face-down. Nothing is turned face-up, trump is a suit you name freely in both rounds, and no deal is ever passed out — the dealer bids last in round two and has to name a suit.",
           items: [
             {
               t: "Take your seat",
@@ -104,50 +106,58 @@ export const en: RulesLangData = {
               d: "Belote uses 32 cards. Grab a standard deck and toss out everything from 2 to 6. What’s left — 7, 8, 9, 10, Jack, Queen, King and Ace in all four suits — is what you play with.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "Croatian rules deal all eight cards before anyone bids — three, three, then a last two face-down — and turn nothing face-up.",
               t: "Deal five each, then turn one up",
               d: "The dealer goes around twice — three cards each, then two — so everyone starts with five in hand. The next card off the deck goes face-up on the table as the trump candidate, and the eleven behind it stay face-down as the talon.",
             },
             {
-              t: "Round one: take that card, or pass",
-              d: "Starting to the dealer’s right, each player either takes the face-up card — making its suit trump for the hand — or passes. Whoever takes it keeps it as one of their eight, and the dealer deals out the talon until every hand is full. Trump beats anything from the other three suits, whatever its rank.",
-            },
-            {
-              t: "Round two: name a suit — but not that one",
-              d: "All four passed? The same order goes round again, and this time you name a suit outright instead of taking the card. The candidate’s suit is spent and locked out, so you are choosing between the other three. The taker still picks the face-up card up with the rest of the deal.",
-            },
-            {
-              t: "Passed out twice? Fresh deal",
-              d: "If round two passes out as well, nobody plays the hand: all 32 cards go back together and are shuffled, the deal moves to the next player on the right, and the whole thing starts over.",
-            },
-          ],
-        },
-        {
-          kind: "steps",
-          variant: "croatia",
-          otherVariantNote:
-            "Bitola rules stop the deal at five cards each and turn the next card face-up as a trump candidate: round one takes that card and its suit, round two names any of the other three, and if both rounds pass out the cards are shuffled back together and the deal moves on.",
-          items: [
-            {
-              t: "Take your seat",
-              d: "You sit directly across from your partner; your two opponents take the chairs on either side. Play moves to the right around the table.",
-            },
-            {
-              t: "Build the deck",
-              d: "Belote uses 32 cards. Grab a standard deck and toss out everything from 2 to 6. What’s left — 7, 8, 9, 10, Jack, Queen, King and Ace in all four suits — is what you play with.",
-            },
-            {
+              variant: "croatia",
+              otherVariantNote:
+                "Bitola rules stop the deal at five cards each and turn the next card face-up as the trump candidate, holding the other eleven back as the talon.",
               t: "Deal all eight up front",
               d: "The dealer goes around three times — three cards each, three more, then a last two dealt face-down. Every card is out before anyone bids: six you can look at, and two nobody can, not even you.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "In Croatian rules there is no card to take: you name any one of the four suits outright, bidding on the six cards you can see, and you draw no extra card.",
+              t: "Round one: take that card, or pass",
+              d: "Starting to the dealer’s right, each player either takes the face-up card — making its suit trump for the hand — or passes. Whoever takes it keeps it as one of their eight, and the dealer deals out the talon until every hand is full. Trump beats anything from the other three suits, whatever its rank.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "In Bitola rules round one offers that one face-up card: take it and its suit becomes trump, and the taker keeps the card as one of their eight.",
               t: "Round one: name a suit, or pass",
               d: "Nothing is turned face-up and there is no candidate card to take. Starting to the dealer’s right, each player either names any one of the four suits as trump — bidding on the six cards they can see — or passes. Whoever names it draws no extra card; their hand is already dealt. Trump beats anything from the other three suits, whatever its rank.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "Croatian rules keep all four suits open in round two — nothing was spent on a candidate — and each player’s two face-down cards turn up, for that player alone, before they bid.",
+              t: "Round two: name a suit — but not that one",
+              d: "All four passed? The same order goes round again, and this time you name a suit outright instead of taking the card. The candidate’s suit is spent and locked out, so you are choosing between the other three. The taker still picks the face-up card up with the rest of the deal.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "Bitola rules deal nothing face-down, so there is nothing to reveal — and round two there names any suit except the candidate’s, which is already spent.",
               t: "Round two: your last two turn up",
               d: "If all four pass, each player’s two face-down cards turn face-up for that player alone — nobody sees anyone else’s. Round two is then bid on a full eight-card hand, and all four suits are still open.",
             },
             {
+              variant: "bitola",
+              otherVariantNote:
+                "Croatian rules never pass a deal out: the dealer bids last in round two and has to name a suit, so every deal gets played.",
+              t: "Passed out twice? Fresh deal",
+              d: "If round two passes out as well, nobody plays the hand: all 32 cards go back together and are shuffled, the deal moves to the next player on the right, and the whole thing starts over.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "Bitola rules do pass a deal out: if round two passes out too, all 32 cards are shuffled back together and the deal moves to the next player on the right.",
               t: "The dealer cannot pass",
               d: "In round two the dealer bids last and has no right to pass: if the other three pass, the dealer must name a suit. There is no reshuffle in these rules — every deal gets played.",
             },

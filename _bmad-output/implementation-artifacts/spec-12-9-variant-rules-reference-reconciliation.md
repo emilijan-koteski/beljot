@@ -128,6 +128,25 @@ baseline_commit: "fba840984aba617a91c173022a0ccd1315f7e7cb"
 
 ## Spec Change Log
 
+**2026-08-21 — marker granularity and glyph (owner refinement, post-`done`).**
+Shipped `basics` as two per-variant `steps` blocks, which gave a reader ONE
+marker for the whole six-step deal sequence and authored the two identical
+opening steps twice in every locale. The owner's requirement is that the tabs
+read "almost identical" with a `(!)` at each individual diff spot, so
+`StepItem` gained the same optional `VariantScope` the blocks have: `basics` is
+now a single unscoped block of ten items — two shared, then four
+Bitola/Croatian pairs alternating so either filter yields an ordered six — and
+each divergent step carries its own note about that step's counterpart. Marker
+count in `basics` went 1 -> 4 per tab; 8 duplicate strings per locale (32
+total) are gone. `melds` was deliberately NOT restructured: its timing
+sentence and overlap rule are each a whole divergent block, so block-level
+markers are already correct there. New `content/visibility.ts` is the single
+definition of "what this tab shows", imported by both renderers and the parity
+gate — numbering is derived from its result, never from the unfiltered array,
+which would render `01,02,03,05,07,09`. The marker glyph changed from an
+`ArrowLeftRight` icon to a bare `!` in a circular chip. Five item-level parity
+gates added, each proved to fail against broken content before being kept.
+
 ## Design Notes
 
 **Why block-level scoping, not per-variant chapters.** Most of the rules on this page are identical, and the epic's audit insists identical rules must not be branched. Duplicating six chapters × four locales would quadruple a file that already needs a parity gate to stay honest, and every future shared-rule fix would need applying twice. Scoping at the block level makes the diff between tabs *be* the divergence list — switch tabs and four chapters visibly do not move.
