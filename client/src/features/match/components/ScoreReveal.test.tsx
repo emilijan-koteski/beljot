@@ -32,8 +32,10 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+import { useAuthStore } from "@/shared/stores/authStore";
 import type { HandScoredPayload } from "@/shared/types/wsEvents";
 
+import { makeUser } from "../../../test-utils";
 import { ScoreReveal } from "./ScoreReveal";
 
 const normalData: HandScoredPayload = {
@@ -75,6 +77,9 @@ describe("ScoreReveal", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    // The deck cases below write a signed-in player into the store; without this
+    // the Croatian one leaks into every later test in the file.
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
   it("renders score breakdown", () => {
@@ -176,6 +181,30 @@ describe("ScoreReveal", () => {
       />,
     );
     expect(container.textContent).toContain("Pulled it off · you took trump on");
+  });
+
+  // The suit NAME is this panel's only representation of the suit — it draws no
+  // glyph and no icon — so naming it from the French vocabulary while the player
+  // holds the Croatian deck was a visible contradiction with nothing to justify
+  // it. The mocked `t` echoes unknown keys, so asserting the key proves which
+  // vocabulary row was chosen without needing real translations.
+  it.each([
+    ["french", undefined, "match.card.suit.french.H"],
+    ["croatian", "croatian" as const, "match.card.suit.croatian.H"],
+  ])("names the trump suit from the %s deck's vocabulary", (_deck, preference, key) => {
+    if (preference) {
+      useAuthStore.setState({ user: makeUser({ cardDeckPreference: preference }) });
+    }
+    const { container } = render(
+      <ScoreReveal
+        data={normalData}
+        viewerTeam="teamA"
+        onContinue={vi.fn()}
+        trumpSuit="H"
+        trumpCallerSeat={0}
+      />,
+    );
+    expect(container.textContent).toContain(key);
   });
 
   it("Continue button is enabled from the start (no read-delay gate)", () => {

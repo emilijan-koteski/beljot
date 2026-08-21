@@ -267,14 +267,31 @@ against cream without going muddy. Two of the four need explaining beyond that:
 Two companion tables live beside it:
 
 - `SUIT_GLOW_ALPHA` — halo strength, as the hex-alpha suffix appended to an
-  accent. French keeps its pre-existing asymmetry (`77` on the reds, `55` on the
-  blacks: a near-black glow at the red's strength reads as a smudge under the
-  parchment orb). Croatian's accents are all mid-value, so one strength serves
-  all four.
+  accent. **Derived, not chosen:** alpha rises with the accent's WCAG relative
+  luminance, because a near-black glow at a bright accent's strength reads as a
+  smudge under the parchment orb rather than a halo. Linear between French's own
+  two anchors and clamped to them — `L(#c62828)=0.1368 → 0x77`,
+  `L(#1a1a1a)=0.0103 → 0x55`. The rule is trustworthy because it reproduces
+  French's pre-existing `55/77/77/55` *exactly*, which is what `suitArt.test.ts`
+  asserts first. Croatian's accents are all more luminous than the French red, so
+  three clamp to `77`; acorn brown is the only one landing below, at `73`.
 - `SUIT_INK_ON_FELT` — suit ink for text on **dark felt** rather than parchment,
   which only `TrumpReveal`'s body copy needs. `#c62828` is close to unreadable
-  there, which is what `--suit-red-up` exists for; the Croatian mid-green and
-  mid-brown vanish into the table entirely, so each is lifted.
+  there, which is what `--suit-red-up` exists for; a Croatian mid-green or
+  mid-brown vanishes into the table entirely, so each is lifted.
+
+  **Every value is measured against a contrast floor, not eyeballed.** The floor
+  is the weaker of French's own two anchors — `#ff8585` at **4.89:1** — taken
+  against `#20402b`, the *lightest* end of the reveal panel's gradient and so the
+  worst case for light ink. Measured: leaves 6.27, hearts 4.89, bells 6.99,
+  acorns 4.89. Croatian hearts deliberately reuses `#ff8585`, since the suit is
+  red in both decks and treating it differently would be gratuitous.
+
+  Acorns is the one value the measurement changed: it shipped as `#d69a63` while
+  these were judgment values — **4.73:1, under the floor** — and is now
+  `#e19967`, the lightest hex on its own hue that clears it. `suitArt.test.ts`
+  pins the floor for every entry in both decks, strictly, so a future edit cannot
+  silently drop under it.
 
 **The French rows of all three tables reproduce the pre-existing values exactly**,
 so French rendering is unchanged by this story — the literals are safe

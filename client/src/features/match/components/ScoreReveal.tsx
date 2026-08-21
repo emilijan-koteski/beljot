@@ -4,9 +4,11 @@ import { useTranslation } from "react-i18next";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
+import { useAuthStore } from "@/shared/stores/authStore";
 import { type Suit, type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 import type { HandScoredPayload } from "@/shared/types/wsEvents";
 
+import { resolveCardDeck } from "../lib/cardFace";
 import { suitNameKey } from "../lib/suitArt";
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
 import { ringDrainStyle } from "../lib/turnCountdown";
@@ -33,13 +35,6 @@ interface ScoreRevealProps {
   /** Match target shown in the brass strip — defaults to the full 1001 race. */
   matchTarget?: number;
 }
-
-// Pinned to the FRENCH vocabulary on purpose. ScoreReveal is not one of the
-// four surfaces Scope Amendment 1 authorised, and the spec's Never clause
-// forbids re-suiting anything outside them — so this reads the single card
-// vocabulary but always at its french row, matching the French glyphs the rest
-// of this panel draws. Revisit only with the owner.
-const NAME_DECK = "french" as const;
 
 function callerTeamString(seat: number): TeamString {
   return seat % 2 === 0 ? "teamA" : "teamB";
@@ -226,7 +221,11 @@ export function ScoreReveal({
   const callerTeam: TeamString | null =
     typeof trumpCallerSeat === "number" ? callerTeamString(trumpCallerSeat) : null;
   const callerWasViewer = callerTeam !== null && callerTeam === viewerTeam;
-  const trumpSuitName = trumpSuit ? t(suitNameKey(trumpSuit, NAME_DECK)) : null;
+  // Names the suit as the player's own deck depicts it. This panel draws no suit
+  // artwork at all — the name is the only representation — so there is nothing
+  // here to contradict: a Croatian player reads "Bells", not "Diamonds".
+  const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
+  const trumpSuitName = trumpSuit ? t(suitNameKey(trumpSuit, deck)) : null;
 
   // Subtitle carries the hand-outcome callout per design. When the taker's
   // team went down, it names who collects the points — split into Us/Them

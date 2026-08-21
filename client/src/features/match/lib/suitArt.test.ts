@@ -8,6 +8,7 @@ import type { Suit } from "@/shared/types/matchTypes";
 import type { CardDeck } from "./cardFace";
 import {
   SUIT_ACCENT,
+  SUIT_GLOW_ALPHA,
   SUIT_INK_ON_FELT,
   suitAccent,
   suitGlowAlpha,
@@ -148,5 +149,77 @@ describe("suitNameKey", () => {
   it.each(DECKS)("resolves a distinct key per suit on %s", (deck) => {
     const keys = SUITS.map((suit) => suitNameKey(suit, deck));
     expect(new Set(keys).size).toBe(4);
+  });
+});
+
+// The reveal panel's gradient runs rgba(32,64,43,.98) -> rgba(13,38,23,.98)
+// (TrumpReveal.tsx). The LIGHTEST end is the worst case for light ink, so that is
+// what the floor is measured against.
+const PANEL_LIGHTEST = "#20402b";
+
+/** WCAG relative luminance. */
+function luminance(hex: string): number {
+  const channel = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  // Read each channel by name rather than destructuring a mapped array: under
+  // noUncheckedIndexedAccess the elements come back `number | undefined`.
+  const r = channel(parseInt(hex.slice(1, 3), 16));
+  const g = channel(parseInt(hex.slice(3, 5), 16));
+  const b = channel(parseInt(hex.slice(5, 7), 16));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+describe("SUIT_INK_ON_FELT legibility", () => {
+  // The bar is French's own weaker anchor, so "Croatian is as readable as French"
+  // is a measured claim rather than a design opinion. Acorn brown shipped at
+  // 4.73 while these were judgment values; this is what caught it.
+  const FLOOR = contrast(SUIT_INK_ON_FELT.french.H, PANEL_LIGHTEST);
+
+  it("uses the french red anchor as the floor", () => {
+    expect(FLOOR).toBeCloseTo(4.89, 2);
+  });
+
+  it.each(DECKS.flatMap((deck) => SUITS.map((suit) => [deck, suit] as const)))(
+    "%s %s ink clears the floor on the panel's lightest end",
+    (deck, suit) => {
+      expect(contrast(SUIT_INK_ON_FELT[deck][suit], PANEL_LIGHTEST)).toBeGreaterThanOrEqual(FLOOR);
+    },
+  );
+
+  it("keeps hearts identical across decks — the one suit that is red in both", () => {
+    expect(SUIT_INK_ON_FELT.croatian.H).toBe(SUIT_INK_ON_FELT.french.H);
+  });
+});
+
+describe("SUIT_GLOW_ALPHA derivation", () => {
+  // Alpha rises with the accent's luminance, linear between French's two
+  // anchors and clamped to them. The rule is only trustworthy because it
+  // reproduces French's pre-existing 55/77/77/55 exactly — that is asserted
+  // below, so a change to the rule fails on French before it reaches Croatian.
+  const LO = { l: luminance("#1a1a1a"), a: 0x55 };
+  const HI = { l: luminance("#c62828"), a: 0x77 };
+
+  function expected(accent: string): number {
+    const t = (luminance(accent) - LO.l) / (HI.l - LO.l);
+    return Math.min(HI.a, Math.max(LO.a, Math.round(LO.a + t * (HI.a - LO.a))));
+  }
+
+  it.each(DECKS.flatMap((deck) => SUITS.map((suit) => [deck, suit] as const)))(
+    "%s %s alpha follows the accent's luminance",
+    (deck, suit) => {
+      expect(parseInt(SUIT_GLOW_ALPHA[deck][suit], 16)).toBe(expected(SUIT_ACCENT[deck][suit]));
+    },
+  );
+
+  it("reproduces the french asymmetry that predates the per-deck palette", () => {
+    expect(SUIT_GLOW_ALPHA.french).toEqual({ S: "55", H: "77", D: "77", C: "55" });
   });
 });
