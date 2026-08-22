@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
 import type { PartnerStat } from "@/shared/api/career";
 import { Avatar } from "@/shared/components/ui/avatar";
@@ -17,6 +18,30 @@ type PartnerSpotlightProps = {
 /** Win rate (%) over matches played together; 0 when none. */
 function winRate(wins: number, total: number): number {
   return total === 0 ? 0 : Math.round((wins / total) * 100);
+}
+
+/** Avatar + name + together-stats for the featured partner — shared by the
+ *  linked wrapper and the non-linked fallback for soft-deleted users. The
+ *  hover underline only fires inside the `group`-classed Link. */
+function FeaturedPartner({ featured }: { featured: PartnerStat }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Avatar name={featured.username} team="A" size={56} />
+      <div className="min-w-0">
+        <div className="text-ink font-display truncate text-lg font-semibold tracking-[-0.1px] underline-offset-2 group-hover:underline">
+          {featured.username}
+        </div>
+        <div className="text-ink-dim text-xs">
+          {t("profile.partners.matchesTogether", { count: featured.played })}
+          <span className="text-ink-off"> · </span>
+          <span className="text-ink font-semibold tabular-nums">
+            {winRate(featured.wins, featured.played)}%
+          </span>
+        </div>
+      </div>
+    </>
+  );
 }
 
 /**
@@ -51,21 +76,23 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
       testId="profile-partners"
     >
       <div className="mb-3.5 flex flex-col gap-2">
-        <div className="flex items-center gap-3.5">
-          <Avatar name={featured.username} team="A" size={56} />
-          <div className="min-w-0">
-            <div className="text-ink font-display truncate text-lg font-semibold tracking-[-0.1px]">
-              {featured.username}
-            </div>
-            <div className="text-ink-dim text-xs">
-              {t("profile.partners.matchesTogether", { count: featured.played })}
-              <span className="text-ink-off"> · </span>
-              <span className="text-ink font-semibold tabular-nums">
-                {winRate(featured.wins, featured.played)}%
-              </span>
-            </div>
+        {/* Bots ARE excluded server-side (NULL seat ids never reach this list),
+            but soft-deleted users are not: they arrive with a valid userId and
+            an empty username. Linking them would 404, so the link is gated on
+            a non-empty username. */}
+        {featured.username !== "" ? (
+          <Link
+            to={`/players/${featured.userId}`}
+            aria-label={t("friends.viewProfileAria", { username: featured.username })}
+            className="group focus-visible:ring-ring/50 flex items-center gap-3.5 rounded-md focus-visible:ring-3 focus-visible:outline-none"
+          >
+            <FeaturedPartner featured={featured} />
+          </Link>
+        ) : (
+          <div className="flex items-center gap-3.5">
+            <FeaturedPartner featured={featured} />
           </div>
-        </div>
+        )}
         <WinLoseBar winPct={winRate(featured.wins, featured.played)} />
       </div>
 
@@ -77,10 +104,22 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
               className="bg-surface-elevated border-border flex flex-col gap-1.5 rounded-[10px] border px-2.5 py-2"
             >
               <div className="flex items-center gap-2.5">
-                <Avatar name={p.username} team="A" size={24} />
-                <span className="text-ink flex-1 truncate text-[13px] font-medium">
-                  {p.username}
-                </span>
+                {/* Same soft-deleted guard as the featured partner above. */}
+                {p.username !== "" ? (
+                  <Link
+                    to={`/players/${p.userId}`}
+                    aria-label={t("friends.viewProfileAria", { username: p.username })}
+                    className="focus-visible:ring-ring/50 flex min-w-0 flex-1 items-center gap-2.5 rounded-md underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
+                  >
+                    <Avatar name={p.username} team="A" size={24} />
+                    <span className="text-ink truncate text-[13px] font-medium">{p.username}</span>
+                  </Link>
+                ) : (
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <Avatar name={p.username} team="A" size={24} />
+                    <span className="text-ink truncate text-[13px] font-medium">{p.username}</span>
+                  </div>
+                )}
                 <span className="text-ink-dim text-[12px] tabular-nums">
                   {p.played}
                   <span className="text-ink-off"> · </span>

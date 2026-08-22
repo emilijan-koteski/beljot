@@ -405,12 +405,21 @@ function MatchRow({ match, username, subjectIsSelf, isOpen, onToggle }: MatchRow
   const opp2Seat = (match.viewerSeat + 3) % 4;
   // Bot seats carry an empty username with isBot:true — render the localized
   // seat-derived bot name (and the bot glyph in the chip avatar) instead of
-  // a blank chip.
-  const seatChipProps = (seat: number): { name: string; bot: boolean } => {
+  // a blank chip. Only real, still-existing users get a `userId`, which turns
+  // the chip into a link to their public profile: isBot !== true, userId > 0
+  // AND username !== "" (explicit comparisons, never truthiness on Go zero
+  // values). A soft-deleted participant arrives as {userId > 0, username: "",
+  // isBot: false} — the server hydrates usernames from the users table, which
+  // excludes deleted rows — and linking their "—" chip would be a sure 404.
+  const seatChipProps = (seat: number): { name: string; bot: boolean; userId?: number } => {
     const p = match.players.find((pl) => pl.seat === seat);
     if (!p) return { name: "—", bot: false };
     if (p.isBot === true) return { name: botDisplayName(t, p.seat), bot: true };
-    return { name: p.username || "—", bot: false };
+    return {
+      name: p.username || "—",
+      bot: false,
+      userId: p.userId > 0 && p.username !== "" ? p.userId : undefined,
+    };
   };
   const teammate = seatChipProps(teammateSeat);
   const opponent1 = seatChipProps(opp1Seat);
@@ -432,15 +441,15 @@ function MatchRow({ match, username, subjectIsSelf, isOpen, onToggle }: MatchRow
       data-testid="match-history-row"
       data-match-id={match.id}
     >
-      <button
-        type="button"
+      {/* The header is a clickable <div>, NOT a <button>: seat chips inside it
+          are links to player profiles, and interactive elements must not nest.
+          The real toggle (with the aria state) is the chevron <button> at the
+          far end; this div is a convenience click target that mirrors it, so
+          keyboard users lose nothing. */}
+      <div
         onClick={onToggle}
-        className="flex w-full cursor-pointer flex-col gap-3 p-4 text-left md:grid md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center md:gap-5"
-        aria-expanded={isOpen}
-        aria-controls={detailId}
-        aria-label={
-          isOpen ? t("profile.matchHistory.collapseRow") : t("profile.matchHistory.expandRow")
-        }
+        className="flex cursor-pointer flex-col gap-3 p-4 md:grid md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center md:gap-5"
+        data-testid="match-history-row-header"
       >
         {/* Date + variant. The variant rides the date block rather than the
             outcome group so it reads as "when and what", and so a Croatian row
@@ -472,17 +481,32 @@ function MatchRow({ match, username, subjectIsSelf, isOpen, onToggle }: MatchRow
             <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
               {t("profile.matchHistory.with")}
             </span>
-            <SeatChip name={teammate.name} bot={teammate.bot} team={usTeam} />
+            <SeatChip
+              name={teammate.name}
+              bot={teammate.bot}
+              userId={teammate.userId}
+              team={usTeam}
+            />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
               {t("profile.matchHistory.versus")}
             </span>
-            <SeatChip name={opponent1.name} bot={opponent1.bot} team={themTeam} />
+            <SeatChip
+              name={opponent1.name}
+              bot={opponent1.bot}
+              userId={opponent1.userId}
+              team={themTeam}
+            />
             <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
               {t("profile.matchHistory.and")}
             </span>
-            <SeatChip name={opponent2.name} bot={opponent2.bot} team={themTeam} />
+            <SeatChip
+              name={opponent2.name}
+              bot={opponent2.bot}
+              userId={opponent2.userId}
+              team={themTeam}
+            />
           </div>
         </div>
 
@@ -541,12 +565,28 @@ function MatchRow({ match, username, subjectIsSelf, isOpen, onToggle }: MatchRow
             </span>
           )}
           <OutcomeChip outcome={match.outcome} />
-          <ChevronDown
-            className={`text-ink-mute size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
-            aria-hidden="true"
-          />
+          <button
+            type="button"
+            onClick={(e) => {
+              // The header div above also toggles on click — stop the bubble so
+              // one press means one toggle.
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="text-ink-mute hover:text-ink focus-visible:ring-ring/50 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none"
+            aria-expanded={isOpen}
+            aria-controls={detailId}
+            aria-label={
+              isOpen ? t("profile.matchHistory.collapseRow") : t("profile.matchHistory.expandRow")
+            }
+          >
+            <ChevronDown
+              className={`size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+          </button>
         </div>
-      </button>
+      </div>
 
       {isOpen && (
         <div

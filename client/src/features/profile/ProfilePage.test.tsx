@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -339,6 +339,38 @@ describe("ProfilePage", () => {
     expect(screen.getByTestId("profile-rivals")).toHaveTextContent("rival_x");
     // Win streak callout shows.
     expect(screen.getByTestId("profile-streak")).toHaveAttribute("data-streak-kind", "win");
+  });
+
+  it("links partner and rival names to their public profiles", async () => {
+    mockGetProfile.mockResolvedValueOnce(
+      profileFixture({ totalGamesPlayed: 5, wins: 3, losses: 2 }),
+    );
+    mockGetCareer.mockResolvedValueOnce(
+      careerFixture({
+        // Two partners so BOTH PartnerSpotlight link paths render: partner_a
+        // is the featured block, partner_b takes the rest-list row.
+        topPartners: [
+          { userId: 2, username: "partner_a", played: 4, wins: 3 },
+          { userId: 5, username: "partner_b", played: 2, wins: 1 },
+        ],
+        topRivals: [{ userId: 3, username: "rival_x", wins: 2, losses: 1 }],
+      }),
+    );
+
+    renderProfilePage();
+
+    const partners = await screen.findByTestId("profile-partners");
+    expect(
+      within(partners).getByRole("link", { name: "View partner_a's profile" }),
+    ).toHaveAttribute("href", "/players/2");
+    expect(
+      within(partners).getByRole("link", { name: "View partner_b's profile" }),
+    ).toHaveAttribute("href", "/players/5");
+    expect(
+      within(screen.getByTestId("profile-rivals")).getByRole("link", {
+        name: "View rival_x's profile",
+      }),
+    ).toHaveAttribute("href", "/players/3");
   });
 
   // The deck panel sits OUTSIDE the `career` gate: it renders off the auth

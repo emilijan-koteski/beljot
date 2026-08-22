@@ -339,6 +339,158 @@ describe("MatchHistory", () => {
     expect(screen.queryByTestId("match-history-detail")).not.toBeInTheDocument();
   });
 
+  // Clickable player names: human teammate/opponent chips link to the public
+  // profile; bot, missing and subject chips stay inert; a name click must
+  // never toggle the row; the chevron stays the one real toggle button.
+  it("renders human teammate/opponent chips as links to their public profiles", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    expect(within(row).getByRole("link", { name: "View mate's profile" })).toHaveAttribute(
+      "href",
+      "/players/12",
+    );
+    expect(within(row).getByRole("link", { name: "View opp1's profile" })).toHaveAttribute(
+      "href",
+      "/players/11",
+    );
+    expect(within(row).getByRole("link", { name: "View opp2's profile" })).toHaveAttribute(
+      "href",
+      "/players/13",
+    );
+  });
+
+  it("keeps the subject's own chip non-interactive", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    // The subject's chip renders, but never as a link.
+    expect(within(row).getByText("viewer")).toBeInTheDocument();
+    expect(
+      within(row).queryByRole("link", { name: "View viewer's profile" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps bot chips non-interactive", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(
+      makeResponse(
+        [
+          makeMatch({
+            hasBots: true,
+            players: [
+              { seat: 0, userId: 10, username: "viewer", isBot: false },
+              { seat: 1, userId: 0, username: "", isBot: true },
+              { seat: 2, userId: 12, username: "mate", isBot: false },
+              { seat: 3, userId: 0, username: "", isBot: true },
+            ],
+          }),
+        ],
+        1,
+      ),
+    );
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    // Only the human teammate links out; both bot chips stay inert.
+    const links = within(row).getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "/players/12");
+  });
+
+  it("keeps missing-seat chips non-interactive", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(
+      makeResponse(
+        [
+          makeMatch({
+            players: [
+              { seat: 0, userId: 10, username: "viewer", isBot: false },
+              { seat: 1, userId: 11, username: "opp1", isBot: false },
+              { seat: 2, userId: 12, username: "mate", isBot: false },
+            ],
+          }),
+        ],
+        1,
+      ),
+    );
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    // Seat 3 has no player — its "—" chip renders as a plain span, not a link.
+    const chips = within(row).getAllByTestId("match-seat-chip");
+    const missingChip = chips.find((c) => c.textContent?.includes("—"));
+    expect(missingChip).toBeDefined();
+    expect(missingChip?.tagName).toBe("SPAN");
+    expect(within(row).getAllByRole("link")).toHaveLength(2);
+  });
+
+  it("keeps deleted-user chips non-interactive", async () => {
+    // A soft-deleted participant arrives with a real userId but an empty
+    // username (the server hydrates usernames from the users table, which
+    // excludes deleted rows) — the "—" chip must not link to a sure 404.
+    mockGetUserMatches.mockResolvedValueOnce(
+      makeResponse(
+        [
+          makeMatch({
+            players: [
+              { seat: 0, userId: 10, username: "viewer", isBot: false },
+              { seat: 1, userId: 11, username: "opp1", isBot: false },
+              { seat: 2, userId: 14, username: "", isBot: false },
+              { seat: 3, userId: 13, username: "opp2", isBot: false },
+            ],
+          }),
+        ],
+        1,
+      ),
+    );
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    const chips = within(row).getAllByTestId("match-seat-chip");
+    const deletedChip = chips.find((c) => c.textContent?.includes("—"));
+    expect(deletedChip).toBeDefined();
+    expect(deletedChip?.tagName).toBe("SPAN");
+    // Only the two still-existing opponents link out.
+    expect(within(row).getAllByRole("link")).toHaveLength(2);
+  });
+
+  it("does not toggle the detail view when a name link is clicked", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    fireEvent.click(within(row).getByRole("link", { name: "View mate's profile" }));
+    expect(screen.queryByTestId("match-history-detail")).not.toBeInTheDocument();
+  });
+
+  it("toggles the detail view from a click on the row-header background", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    const header = within(row).getByTestId("match-history-row-header");
+
+    fireEvent.click(header);
+    expect(screen.getByTestId("match-history-detail")).toBeInTheDocument();
+
+    fireEvent.click(header);
+    expect(screen.queryByTestId("match-history-detail")).not.toBeInTheDocument();
+  });
+
+  it("keeps exactly one button per row — the chevron toggle with the aria state", async () => {
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    const buttons = within(row).getAllByRole("button");
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveAttribute("aria-expanded", "false");
+    expect(buttons[0]).toHaveAttribute("aria-controls", "match-history-detail-1");
+  });
+
+  it("localizes the chip link aria-label in the mk locale", async () => {
+    await i18n.changeLanguage("mk");
+    mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
+    renderMatchHistory();
+    const row = await screen.findByTestId("match-history-row");
+    expect(
+      within(row).getByRole("link", { name: "Погледни го профилот на mate" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders Capot badge and failed-contract pill — viewer was on the contracting team → 'Us'", async () => {
     const match = makeMatch({
       hands: [

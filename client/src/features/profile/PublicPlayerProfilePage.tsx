@@ -118,7 +118,17 @@ export function PublicPlayerProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-330 px-4 py-8 pb-32 md:px-7" data-testid="public-profile-page">
+    // key={validId}: profile→profile navigation (a partner/rival/seat-chip link
+    // on THIS page) can land on a subject that is already in the query cache,
+    // so no pending skeleton renders and nothing would otherwise remount —
+    // MatchHistory's local filter/sort/open-rows state (and any other page-local
+    // state) would carry over to the new subject. Keying on the subject forces
+    // a clean remount per player.
+    <div
+      key={validId}
+      className="mx-auto max-w-330 px-4 py-8 pb-32 md:px-7"
+      data-testid="public-profile-page"
+    >
       <IdentityHero
         username={profile.username}
         // No userId → the username edit pencil stays hidden (read-only switch).
