@@ -20,6 +20,22 @@ interface FriendButtonProps {
   userId: number;
   /** The subject's username, interpolated into the remove-friend confirm dialog. */
   username: string;
+  /**
+   * Drops the profile-page `my-5` rhythm (see the wrapper below) for surfaces
+   * that own their own spacing — the per-player action rows in the match-stats
+   * card, where 20px of vertical margin per row would shred the list. Layout
+   * only: every state, label and handler is unchanged.
+   */
+  compact?: boolean;
+  /**
+   * Offer "Remove friend" in the `friends` state. FALSE inside the in-match
+   * overlay: the confirm it opens is a shadcn Dialog at the primitive's `z-50`,
+   * while the match-result panel sits at `Z.PROMPT` (74) — the confirm would
+   * paint BEHIND the overlay, invisible and unclickable, with the pending-guard
+   * locking every dismissal path. Suppressing the affordance is the honest fix;
+   * unfriending belongs on the profile, not mid-celebration.
+   */
+  allowRemove?: boolean;
 }
 
 /**
@@ -35,7 +51,12 @@ interface FriendButtonProps {
  *
  * Never rendered for the viewer's own profile.
  */
-export function FriendButton({ userId, username }: FriendButtonProps) {
+export function FriendButton({
+  userId,
+  username,
+  compact = false,
+  allowRemove = true,
+}: FriendButtonProps) {
   const { t } = useTranslation();
   const viewer = useAuthStore((s) => s.user);
 
@@ -56,7 +77,7 @@ export function FriendButton({ userId, username }: FriendButtonProps) {
   if (status.isPending) {
     return (
       <div
-        className="bg-surface-sunken my-5 h-8 w-28 animate-pulse rounded-md"
+        className={`bg-surface-sunken h-8 w-28 animate-pulse rounded-md ${compact ? "" : "my-5"}`}
         data-testid="friend-button-loading"
         aria-hidden="true"
       />
@@ -80,36 +101,41 @@ export function FriendButton({ userId, username }: FriendButtonProps) {
           <Button variant="outline" size="sm" disabled data-testid="friend-button-friends">
             <Check /> {t("friends.friends")}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="friend-button-remove"
-            // requestId === null should be impossible for "friends", but never
-            // offer a confirm that could fire without a row id.
-            disabled={removeMutation.isPending || requestId === null}
-            onClick={() => setRemoveOpen(true)}
-          >
-            <UserMinus /> {t("friends.removeFriend")}
-          </Button>
-          <RemoveFriendDialog
-            open={removeOpen}
-            username={username}
-            pending={removeMutation.isPending}
-            onConfirm={() => {
-              if (removeMutation.isPending || requestId === null) return;
-              removeMutation.mutate(
-                { requestId, userId },
-                // Close on settled: on success the invalidated status query flips
-                // the button to "Add friend"; on error (e.g. the other party won
-                // the both-unfriend race → 404) the hook's toast reports it and a
-                // lingering dialog would just restate a stale question.
-                { onSettled: () => setRemoveOpen(false) },
-              );
-            }}
-            onClose={() => {
-              if (!removeMutation.isPending) setRemoveOpen(false);
-            }}
-          />
+          {allowRemove && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="friend-button-remove"
+                // requestId === null should be impossible for "friends", but never
+                // offer a confirm that could fire without a row id.
+                disabled={removeMutation.isPending || requestId === null}
+                onClick={() => setRemoveOpen(true)}
+              >
+                <UserMinus /> {t("friends.removeFriend")}
+              </Button>
+              <RemoveFriendDialog
+                open={removeOpen}
+                username={username}
+                pending={removeMutation.isPending}
+                onConfirm={() => {
+                  if (removeMutation.isPending || requestId === null) return;
+                  removeMutation.mutate(
+                    { requestId, userId },
+                    // Close on settled: on success the invalidated status query
+                    // flips the button to "Add friend"; on error (e.g. the other
+                    // party won the both-unfriend race → 404) the hook's toast
+                    // reports it and a lingering dialog would just restate a
+                    // stale question.
+                    { onSettled: () => setRemoveOpen(false) },
+                  );
+                }}
+                onClose={() => {
+                  if (!removeMutation.isPending) setRemoveOpen(false);
+                }}
+              />
+            </>
+          )}
         </>
       );
       break;
@@ -171,8 +197,12 @@ export function FriendButton({ userId, username }: FriendButtonProps) {
   return (
     // my-5 (not mt-only): the row needs the same 20px gap below it as above,
     // otherwise it sits flush against whatever follows on the public profile —
-    // the streak callout has no top margin of its own.
-    <div className="my-5 flex flex-wrap items-center gap-2" data-testid="friend-button">
+    // the streak callout has no top margin of its own. `compact` drops it for
+    // hosts that space their own rows.
+    <div
+      className={`flex flex-wrap items-center gap-2 ${compact ? "" : "my-5"}`}
+      data-testid="friend-button"
+    >
       {content}
     </div>
   );

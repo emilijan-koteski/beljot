@@ -68,6 +68,18 @@ func (r *mockMatchRepo) GetMatchesForUser(userID uint, limit, offset int, outcom
 	return nil, 0, nil
 }
 
+// Not exercised by session-manager tests — the room-scoped read belongs to the
+// room last-match endpoint, which the manager never calls.
+func (r *mockMatchRepo) GetLastMatchForRoomAndUser(roomID, userID uint) (*match.Match, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.err != nil {
+		return nil, r.err
+	}
+	_, _ = roomID, userID
+	return nil, nil
+}
+
 func (r *mockMatchRepo) GetStatsForUser(userID uint) (int, int, int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

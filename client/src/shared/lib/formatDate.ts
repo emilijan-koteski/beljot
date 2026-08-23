@@ -40,3 +40,17 @@ export function formatLocalizedDate(
     year: date.getFullYear(),
   });
 }
+
+/**
+ * 24-hour HH:MM for an ISO timestamp, locale-neutral (matches the match-row
+ * clock in the design). Returns "" for an unparseable input.
+ *
+ * Shared rather than profile-local because the match-stats card that renders it
+ * is mounted from the profile, the room lobby, and the end-of-match dialog.
+ */
+export function formatClockTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

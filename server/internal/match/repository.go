@@ -69,6 +69,21 @@ type MatchRepository interface {
 	// DESC, both tie-broken by id in the same direction.
 	GetMatchesForUser(userID uint, limit, offset int, outcome, sort string) (items []Match, total int64, err error)
 
+	// GetLastMatchForRoomAndUser returns the most recent completed / abandoned
+	// match played in roomID in which userID occupied one of the four seats,
+	// with Hands preloaded in hand_number ASC order. Returns (nil, nil) when
+	// the room never hosted a match the user played — the caller maps that to
+	// 404.
+	//
+	// The participation predicate is the AUTHORIZATION gate for
+	// GET /rooms/:id/last-match, and it is deliberately fused into the same
+	// query as the room scoping: MatchListItem is viewer-relative
+	// (buildMatchListItem derives viewerSeat by scanning the seats and falls
+	// back to seat 0), so serving a row to a non-participant would render a
+	// confident but wrong "us / them". One predicate makes the gate and the
+	// projection's correctness the same condition.
+	GetLastMatchForRoomAndUser(roomID, userID uint) (*Match, error)
+
 	// GetStatsForUser counts matches where userID appears in any of
 	// player1..player4 seats, with per-player abandonment semantics. The
 	// viewer's team derives from their seat (seats 0/2 → team A index 0; seats

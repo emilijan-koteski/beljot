@@ -295,6 +295,17 @@ function dispatchGameEvent(message: WsMessage): void {
     // Same for honour: event:honor_updated follows in the same burst, so clearing
     // here means the overlay shows this match's movement or none at all.
     store.setHonorSettlement(null);
+    // Drop the room last-match cache. The key is per-ROOM, so whatever sits
+    // there right now describes the PREVIOUS match — the room lobby populated
+    // it before this one started, and the client-wide 30s staleTime means a
+    // short match ends while that entry is still considered fresh. Removing it
+    // (not invalidating: invalidate keeps serving the stale row during the
+    // refetch) is what guarantees the end-of-match overlay can only ever paint
+    // the match that just finished. The row itself is already persisted at this
+    // point — match/live_match.go writes it BEFORE broadcasting match_end.
+    // A prefix removal because the payload carries no roomId, and any other
+    // room's entry is equally worth re-reading after a match.
+    queryClient.removeQueries({ queryKey: queryKeys.matches.lastByRoomAll() });
     return;
   }
 

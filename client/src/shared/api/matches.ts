@@ -85,3 +85,16 @@ export function getUserMatches(
     params: { limit, offset, outcome: outcome === "all" ? undefined : outcome, sort },
   });
 }
+
+/**
+ * The most recent match played in a room, in the same viewer-relative shape as
+ * the profile's history rows (the response is a bare MatchListItem, not the
+ * paginated envelope — there is deliberately no room match HISTORY).
+ *
+ * 404s when the room never hosted a match OR when the caller did not play the
+ * one it hosted: participation is the server's authorization gate, and the two
+ * cases are indistinguishable on purpose.
+ */
+export function getRoomLastMatch(roomId: number): Promise<MatchListItem> {
+  return axiosClient.get(`/rooms/${roomId}/last-match`);
+}

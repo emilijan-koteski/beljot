@@ -316,6 +316,14 @@ func main() {
 	api.POST("/rooms/:id/privacy", roomHandler.UpdateRoomPrivacy)
 	api.POST("/rooms/:id/bots", roomHandler.AddBot)
 	api.DELETE("/rooms/:id/bots/:seat", roomHandler.RemoveBot)
+	// The room's most recent match, in the profile's viewer-relative
+	// MatchListItem shape. Owned by userHandler, not roomHandler, despite the
+	// /rooms path: building that DTO needs the batched username hydration on
+	// the user repository, which roomHandler does not have. Authorization is
+	// match participation (enforced inside the repository query), not room
+	// membership — the end-of-match dialog reads it while the room is still
+	// "completed", which the room-member guard rejects outright.
+	api.GET("/rooms/:id/last-match", userHandler.GetRoomLastMatch)
 
 	// Friend room-invite routes (Story 11.5, FR62). Registered on the same
 	// /rooms/:id action group so the invite endpoints share the room's auth and

@@ -1,6 +1,7 @@
 package match
 
 import (
+	"errors"
 	"math"
 	"time"
 
@@ -218,6 +219,35 @@ func (r *GormMatchRepository) GetMatchesForUser(userID uint, limit, offset int, 
 	}
 
 	return items, total, nil
+}
+
+// GetLastMatchForRoomAndUser returns the room's most recent completed /
+// abandoned match in which userID held one of the four seats, hands preloaded
+// in play order. (nil, nil) when there is none — either the room never hosted
+// a match or the caller did not play the one it hosted, which the handler maps
+// to the same 404 so the two cases are indistinguishable to a stranger.
+func (r *GormMatchRepository) GetLastMatchForRoomAndUser(roomID, userID uint) (*Match, error) {
+	var m Match
+	err := r.db.
+		Where("room_id = ?", roomID).
+		Where("status IN ?", []string{"completed", "abandoned"}).
+		Where(
+			"player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?",
+			userID, userID, userID, userID,
+		).
+		Preload("Hands", func(db *gorm.DB) *gorm.DB {
+			return db.Order("hand_number ASC")
+		}).
+		Order("completed_at DESC").
+		Order("id DESC").
+		First(&m).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &m, nil
 }
 
 // GetCareerAggregatesForUser computes the viewer-relative career metrics across

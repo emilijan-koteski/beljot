@@ -3,10 +3,10 @@ import { Link, useParams } from "react-router";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import type { MatchFilter } from "@/shared/api/matches";
+import { FriendButton } from "@/shared/components/friends/FriendButton";
 import { useCareerQuery } from "@/shared/hooks/queries/useCareer";
 import { usePublicProfileQuery } from "@/shared/hooks/queries/usePublicProfile";
 
-import { FriendButton } from "./components/FriendButton";
 import { IdentityHero } from "./components/IdentityHero";
 import { Milestones } from "./components/Milestones";
 import { PartnerSpotlight } from "./components/PartnerSpotlight";

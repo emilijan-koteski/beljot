@@ -524,6 +524,13 @@
       "partnerSeat": "Partner seat · open",
       "opponentSeat": "Opponent seat · open",
       "openSeat": "Open seat"
+    },
+    "lastMatch": {
+      "openButton": "Last match",
+      "title": "Last match",
+      "description": "How this table's most recent match went, hand by hand.",
+      "loading": "Loading the last match…",
+      "unavailable": "The last match isn't available right now."
     }
   },
   "roomInvite": {
@@ -560,10 +567,17 @@
       "notAvailable": "No longer free to play",
       "roomFull": "This room is full",
       "notFriends": "You are not friends with this player",
+      "alreadyPending": "They already have an invite to this room",
       "sendFailed": "Couldn't send the invite. Please try again.",
       "expired": "That invite is no longer valid.",
       "roomGone": "This room is no longer available."
     }
+  },
+  "matchStats": {
+    "actionsTitle": "Players",
+    "reinvite": "Invite back",
+    "reinvited": "Invited",
+    "reinviteSent": "Invite sent to {{username}}."
   },
   "legal": {
     "wipBadge": "Work in progress",
@@ -958,7 +972,9 @@
       "returnToRoomError": "Couldn't return to the room — it may no longer be available.",
       "returnToRoomAlreadyStarted": "The next match already started without you.",
       "returnToRoomNotInRoom": "You're no longer in this room.",
-      "surrenderNote": "{{username}} surrendered the match"
+      "surrenderNote": "{{username}} surrendered the match",
+      "statsShow": "Show hand details",
+      "statsHide": "Hide hand details"
     },
     "emote": {
       "button": "Send emote",

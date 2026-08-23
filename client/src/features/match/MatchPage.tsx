@@ -2258,6 +2258,7 @@ export function MatchPage() {
           surrenderedByUsername={surrenderedByUsername}
           coinDelta={coinSettlement?.coinDelta}
           honorSettlement={honorSettlement}
+          roomId={roomIdNum ?? undefined}
         />
       )}
 

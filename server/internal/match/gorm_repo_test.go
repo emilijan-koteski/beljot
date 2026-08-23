@@ -502,3 +502,105 @@ func TestGormMatchRepository_GetHonorTrendWindowsForUser(t *testing.T) {
 		assert.Equal(t, match.HonorTrendWindows{}, w)
 	})
 }
+
+// TestGormMatchRepository_GetLastMatchForRoomAndUser pins the room last-match
+// read: it is scoped to one room, gated on the caller occupying a seat (that
+// predicate IS the endpoint's authorization), resolves to the newest row, and
+// preloads hands in play order.
+func TestGormMatchRepository_GetLastMatchForRoomAndUser(t *testing.T) {
+	db := getRepoTestDB(t)
+	repo := match.NewGormMatchRepository(db)
+
+	suffix := repoFixtureSuffix()
+	a := seedRepoUser(t, db, "lm"+suffix+"a")
+	b := seedRepoUser(t, db, "lm"+suffix+"b")
+	c := seedRepoUser(t, db, "lm"+suffix+"c")
+	d := seedRepoUser(t, db, "lm"+suffix+"d")
+	stranger := seedRepoUser(t, db, "lm"+suffix+"z")
+	roomOne := seedRepoRoom(t, db, a, suffix)
+	// A second room needs its own unique name/code — build it from a fresh suffix.
+	roomTwo := seedRepoRoom(t, db, a, repoFixtureSuffix())
+
+	base := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	newMatch := func(roomID uint, offset time.Duration, status string) *match.Match {
+		aID, bID, cID, dID := a, b, c, d
+		return &match.Match{
+			RoomID:      roomID,
+			Player1ID:   &aID,
+			Player2ID:   &bID,
+			Player3ID:   &cID,
+			Player4ID:   &dID,
+			TeamAScore:  1010,
+			TeamBScore:  640,
+			WinnerTeam:  0,
+			Variant:     "bitola",
+			MatchMode:   "1001",
+			StartedAt:   base.Add(offset - 20*time.Minute),
+			CompletedAt: base.Add(offset),
+			Status:      status,
+		}
+	}
+
+	older := newMatch(roomOne, -2*time.Hour, "completed")
+	newest := newMatch(roomOne, -1*time.Hour, "abandoned")
+	// Newer in wall-clock terms, but a DIFFERENT room — must never be picked.
+	otherRoom := newMatch(roomTwo, 0, "completed")
+	require.NoError(t, repo.Create(older))
+	// Hands are inserted OUT of order so the ASC preload has something to sort.
+	require.NoError(t, repo.CreateWithHands(newest, []match.HandResult{
+		{HandNumber: 3, TeamAHandTotal: 60, TeamBHandTotal: 102},
+		{HandNumber: 1, TeamAHandTotal: 90, TeamBHandTotal: 72},
+		{HandNumber: 2, TeamAHandTotal: 81, TeamBHandTotal: 81},
+	}))
+	require.NoError(t, repo.Create(otherRoom))
+
+	t.Run("participant gets the room's newest match with ordered hands", func(t *testing.T) {
+		got, err := repo.GetLastMatchForRoomAndUser(roomOne, b)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, newest.ID, got.ID, "newest row in the room")
+		assert.Equal(t, roomOne, got.RoomID)
+		require.Len(t, got.Hands, 3)
+		assert.Equal(t, []int{1, 2, 3}, []int{
+			got.Hands[0].HandNumber, got.Hands[1].HandNumber, got.Hands[2].HandNumber,
+		}, "hands preloaded in hand_number ASC order")
+	})
+
+	t.Run("every seat is a participant", func(t *testing.T) {
+		for _, viewer := range []uint{a, b, c, d} {
+			got, err := repo.GetLastMatchForRoomAndUser(roomOne, viewer)
+			require.NoError(t, err)
+			require.NotNil(t, got, "viewer %d", viewer)
+			assert.Equal(t, newest.ID, got.ID)
+		}
+	})
+
+	t.Run("a non-participant gets nothing, not the row", func(t *testing.T) {
+		got, err := repo.GetLastMatchForRoomAndUser(roomOne, stranger)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("scoping is per room", func(t *testing.T) {
+		got, err := repo.GetLastMatchForRoomAndUser(roomTwo, a)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, otherRoom.ID, got.ID, "room two resolves to its own row")
+	})
+
+	t.Run("a room with no matches yields nil, not an error", func(t *testing.T) {
+		empty := seedRepoRoom(t, db, a, repoFixtureSuffix())
+		got, err := repo.GetLastMatchForRoomAndUser(empty, a)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("an in-progress row is not the last match", func(t *testing.T) {
+		room := seedRepoRoom(t, db, a, repoFixtureSuffix())
+		live := newMatch(room, time.Hour, "in_progress")
+		require.NoError(t, repo.Create(live))
+		got, err := repo.GetLastMatchForRoomAndUser(room, a)
+		require.NoError(t, err)
+		assert.Nil(t, got, "only completed / abandoned rows count")
+	})
+}

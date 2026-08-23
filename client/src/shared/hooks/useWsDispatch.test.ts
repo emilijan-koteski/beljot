@@ -740,6 +740,30 @@ describe("useWsDispatch", () => {
     expect(state.matchEndData?.matchDurationSec).toBe(300);
   });
 
+  // The room last-match cache is keyed per ROOM, so the entry the room lobby
+  // populated describes the PREVIOUS match the moment this one starts — and the
+  // client-wide 30s staleTime means a short match ends while it still counts as
+  // fresh. match_end must evict it, or the end-of-match overlay is handed match
+  // N-1 out of cache.
+  it("evicts the room last-match cache on event:match_end", () => {
+    queryClient.setQueryData(queryKeys.matches.lastByRoom(7), { id: 41 });
+    queryClient.setQueryData(queryKeys.matches.lastByRoom(9), { id: 12 });
+
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:match_end",
+      payload: {
+        winnerTeam: 0,
+        teamAFinalScore: 1020,
+        teamBFinalScore: 850,
+        matchDurationSec: 300,
+      },
+    });
+
+    expect(queryClient.getQueryData(queryKeys.matches.lastByRoom(7))).toBeUndefined();
+    expect(queryClient.getQueryData(queryKeys.matches.lastByRoom(9))).toBeUndefined();
+  });
+
   it("dispatches event:trump_selected to matchStore.trumpReveal", () => {
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;

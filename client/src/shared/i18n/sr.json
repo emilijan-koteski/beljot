@@ -524,6 +524,13 @@
       "partnerSeat": "Mesto partnera · slobodno",
       "opponentSeat": "Mesto protivnika · slobodno",
       "openSeat": "Slobodno mesto"
+    },
+    "lastMatch": {
+      "openButton": "Poslednji meč",
+      "title": "Poslednji meč",
+      "description": "Kako je prošao poslednji meč za ovim stolom, ruku po ruku.",
+      "loading": "Učitavanje poslednjeg meča…",
+      "unavailable": "Poslednji meč trenutno nije dostupan."
     }
   },
   "roomInvite": {
@@ -560,10 +567,17 @@
       "notAvailable": "Više nije slobodan",
       "roomFull": "Ova soba je puna",
       "notFriends": "Nisi prijatelj sa ovim igračem",
+      "alreadyPending": "Već ima poziv za ovu sobu",
       "sendFailed": "Slanje poziva nije uspelo. Pokušaj ponovo.",
       "expired": "Ovaj poziv više ne važi.",
       "roomGone": "Ova soba više nije dostupna."
     }
+  },
+  "matchStats": {
+    "actionsTitle": "Igrači",
+    "reinvite": "Pozovi ponovo",
+    "reinvited": "Pozvan",
+    "reinviteSent": "Poziv je poslat igraču {{username}}."
   },
   "legal": {
     "wipBadge": "U izradi",
@@ -958,7 +972,9 @@
       "returnToRoomError": "Povratak u sobu nije uspeo. Možda više nije dostupna.",
       "returnToRoomAlreadyStarted": "Sledeći meč je već počeo bez tebe.",
       "returnToRoomNotInRoom": "Više nisi u ovoj sobi.",
-      "surrenderNote": "{{username}} je predao meč"
+      "surrenderNote": "{{username}} je predao meč",
+      "statsShow": "Prikaži detalje deljenja",
+      "statsHide": "Sakrij detalje deljenja"
     },
     "emote": {
       "button": "Pošalji emotikon",

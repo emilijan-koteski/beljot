@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FriendButton } from "@/features/profile/components/FriendButton";
+import { FriendButton } from "@/shared/components/friends/FriendButton";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { FriendshipState } from "@/shared/types/apiTypes";
 import { expectActionBeforeStatusQuo, makeUser, QueryWrapper } from "@/test-utils";

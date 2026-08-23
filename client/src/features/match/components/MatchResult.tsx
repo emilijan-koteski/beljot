@@ -1,8 +1,11 @@
-import { Coins } from "lucide-react";
-import { useMemo } from "react";
+import { ChevronDown, Coins } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { HonorShield } from "@/shared/components/HonorShield";
+import { MatchPlayerActions } from "@/shared/components/matchStats/MatchPlayerActions";
+import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
+import { useRoomLastMatchQuery } from "@/shared/hooks/queries/useMatches";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { HONOR_TIER_COLOR, honorTierForScore, normalizeHonorTier } from "@/shared/lib/honor";
@@ -39,6 +42,10 @@ interface MatchResultProps {
    *  tier boundary (user decision 2026-07-31) — a few points inside the same
    *  band is noise, a change of standing is news. */
   honorSettlement?: { before: number; after: number; tier: string } | null;
+  /** The room this match was played in. Enables the collapsible per-hand
+   *  breakdown — without it there is no room to read the stats from, and the
+   *  section simply never renders. */
+  roomId?: number;
 }
 
 // Loss accent — the soft red shared with the surrender overlay, kept local
@@ -60,8 +67,34 @@ export function MatchResult({
   surrenderedByUsername,
   coinDelta,
   honorSettlement,
+  roomId,
 }: MatchResultProps) {
   const { t } = useTranslation();
+
+  // The just-finished match, read back over REST (there is no match-stats WS
+  // event). Enabled as soon as the overlay mounts rather than on expand, so the
+  // toggle only ever appears when there is something behind it. The row is
+  // already persisted by the time match_end reaches us (live_match.go writes
+  // before it broadcasts), so this is a read, not a poll.
+  const statsQuery = useRoomLastMatchQuery(roomId, roomId !== undefined);
+  // Collapsed by default — the score and the two actions are what this dialog
+  // is for; the breakdown is an optional second look.
+  const [statsOpen, setStatsOpen] = useState(false);
+
+  // Only ever paint a row that IS the match that just ended. The query key is
+  // per-ROOM, so its cache entry describes match N-1 from the moment match N
+  // starts — the room lobby populated it before anyone sat down. `useWsDispatch`
+  // removes that entry on match_end and the query is `staleTime: 0`, but neither
+  // helps an overlay mounted from a cache this component cannot see (a
+  // reconnect, a second tab, a future caller). Both the persisted row and the
+  // match_end payload are projections of the same final GameState — TeamScores
+  // and WinnerTeam, verbatim — so equality here is exact, never a heuristic.
+  const stats = statsQuery.data;
+  const statsAreThisMatch =
+    stats !== undefined &&
+    stats.teamAScore === data.teamAFinalScore &&
+    stats.teamBScore === data.teamBFinalScore &&
+    stats.winnerTeam === data.winnerTeam;
 
   const showCoins = typeof coinDelta === "number" && coinDelta !== 0;
   const coinWon = (coinDelta ?? 0) > 0;
@@ -238,6 +271,57 @@ export function MatchResult({
             >
               {t("match.matchResult.duration")}: {formattedDuration}
             </p>
+
+            {/* Per-hand breakdown — the SAME card the profile and the room
+                lobby render, on a parchment inset because it is built for the
+                parchment palette and this panel sits on dark felt.
+
+                Three props are load-bearing here and nowhere else:
+                • `handsLayout="stacked"` — HandsGrid picks its layout from a
+                  VIEWPORT media query, and its desktop table is `min-w-155`
+                  (620px), which overflows this 520px panel on any desktop.
+                • `linkPlayers={false}` — a seat chip link would PUSH-navigate
+                  out of the match, unmounting MatchPage before the player has
+                  returned to the room or left it.
+                • `allowRemoveFriend={false}` — that confirm is a z-50 dialog
+                  and this panel is Z.PROMPT (74); it would open behind us. */}
+            {statsAreThisMatch && stats !== undefined && (
+              <div className="mt-1 w-full" data-testid="match-result-stats">
+                <button
+                  type="button"
+                  onClick={() => setStatsOpen((v) => !v)}
+                  className="font-body focus-visible:ring-brass/60 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-[13px] opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+                  style={{ color: "var(--ink-light, #f5f2e8)" }}
+                  aria-expanded={statsOpen}
+                  aria-controls="match-result-stats-panel"
+                  data-testid="match-result-stats-toggle"
+                >
+                  {statsOpen ? t("match.matchResult.statsHide") : t("match.matchResult.statsShow")}
+                  <ChevronDown
+                    className={`size-4 transition-transform ${statsOpen ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  />
+                </button>
+                {statsOpen && (
+                  <div
+                    id="match-result-stats-panel"
+                    className="parchment-inset mt-2 max-h-[46vh] overflow-y-auto rounded-xl p-2 text-left"
+                    data-testid="match-result-stats-panel"
+                  >
+                    <ul className="m-0 list-none p-0">
+                      <MatchStatsCard
+                        match={stats}
+                        isOpen
+                        onToggle={() => setStatsOpen(false)}
+                        handsLayout="stacked"
+                        linkPlayers={false}
+                        footer={<MatchPlayerActions match={stats} allowRemoveFriend={false} />}
+                      />
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-2 flex w-full flex-col gap-2" data-testid="match-result-actions">
               <ClassicButton

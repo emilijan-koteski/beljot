@@ -429,6 +429,43 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────
+   Parchment island inside a felt scope — `.parchment-inset`.
+
+   The exact inverse of `.felt-surface`: it re-roots the SAME token names back
+   to the `:root` parchment values, so a shared component built for the
+   lobby/profile palette can be dropped inside `.game-table` (or any felt
+   scope) and theme itself with no fork and no per-component branch. Used by
+   the match-stats breakdown in the end-of-match overlay, which is the very
+   same card the profile and the room lobby render.
+
+   Only the tokens the felt scopes actually override are restated — brass,
+   bot, team-*, danger and the card-face colours are scope-stable and inherit
+   from :root unchanged.
+   ────────────────────────────────────────────────────────────────────── */
+.parchment-inset {
+  --bg: #f5f2e8;
+  --surface: #fbf9f2;
+  --surface-2: #ffffff;
+  --surface-3: #ebe6d6;
+  --border: #d9d1ba;
+  --border-2: #c9a876;
+
+  --ink: #0e3a24;
+  --ink-dim: #466354;
+  --ink-mute: #7a8a82;
+  --ink-off: #b1b8b3;
+
+  --accent: #196536;
+  --accent-deep: #0e4824;
+  --accent-soft: rgba(25, 101, 54, 0.1);
+  --accent-ink: #f5f2e8;
+  --accent-glow: rgba(25, 101, 54, 0.7);
+
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
    Reusable dark-felt marketing surface — `.felt-surface`.
 
    Re-roots the parchment palette to the felt palette using the SAME token

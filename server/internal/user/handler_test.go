@@ -149,6 +149,42 @@ func (r *mockMatchRepo) GetMatchesForUser(userID uint, limit, offset int, outcom
 	return filtered[offset:end], total, nil
 }
 
+// GetLastMatchForRoomAndUser mirrors the production query: the newest
+// completed/abandoned row for the room in which userID holds a seat, hands
+// ordered by hand number. nil when there is none — participation is the gate,
+// so a non-participant is indistinguishable from "no match".
+func (r *mockMatchRepo) GetLastMatchForRoomAndUser(roomID, userID uint) (*match.Match, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	var best *match.Match
+	for i := range r.matches {
+		m := r.matches[i]
+		if m.RoomID != roomID {
+			continue
+		}
+		if m.Status != "completed" && m.Status != "abandoned" {
+			continue
+		}
+		if seatID(m.Player1ID) != userID && seatID(m.Player2ID) != userID &&
+			seatID(m.Player3ID) != userID && seatID(m.Player4ID) != userID {
+			continue
+		}
+		if best == nil || m.CompletedAt.After(best.CompletedAt) ||
+			(m.CompletedAt.Equal(best.CompletedAt) && m.ID > best.ID) {
+			row := m
+			best = &row
+		}
+	}
+	if best == nil {
+		return nil, nil
+	}
+	sortpkg.SliceStable(best.Hands, func(i, j int) bool {
+		return best.Hands[i].HandNumber < best.Hands[j].HandNumber
+	})
+	return best, nil
+}
+
 func (r *mockMatchRepo) GetCareerAggregatesForUser(userID uint) (match.CareerAggregates, error) {
 	r.getCareerCalls++
 	if r.careerErr != nil {
@@ -560,6 +596,9 @@ func setupUserHandlerWithMatches() (*mockUserRepo, *mockMatchRepo, *echo.Echo) {
 	api.GET("/users/:id/matches", handler.ListMatches)
 	api.PATCH("/users/:id/preferences", handler.UpdatePreferences)
 	api.PATCH("/users/:id/username", handler.UpdateUsername)
+	// Registered here exactly as main.go does — a /rooms path served by the
+	// user handler, so the route wiring is covered by the same tests.
+	api.GET("/rooms/:id/last-match", handler.GetRoomLastMatch)
 
 	return repo, matchRepo, e
 }
@@ -2501,4 +2540,205 @@ func TestUpdatePreferences_IssuesOneWritePerRequest(t *testing.T) {
 			assert.Equal(t, 1, repo.updatePreferencesCalls)
 		})
 	}
+}
+
+// --- GetRoomLastMatch tests (room last-match stats) ---
+
+func doGetRoomLastMatch(e *echo.Echo, roomID, token string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/rooms/"+roomID+"/last-match", nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+func decodeRoomLastMatch(t *testing.T, body []byte) user.MatchListItem {
+	t.Helper()
+	var resp struct {
+		Data user.MatchListItem `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(body, &resp))
+	return resp.Data
+}
+
+// The happy path: a participant gets the room's newest match, projected from
+// THEIR seat, with hands in play order.
+func TestGetRoomLastMatch_ParticipantGetsNewestRoomMatch(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "v@example.com", "en")
+	opp1 := repo.addUser("opp1", "o1@example.com", "en")
+	mate := repo.addUser("mate", "m@example.com", "en")
+	opp2 := repo.addUser("opp2", "o2@example.com", "en")
+
+	// Viewer at seat 1 (team B) so a seat-0 fallback would be visible.
+	seats := [4]uint{opp1.ID, viewer.ID, opp2.ID, mate.ID}
+	base := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	hands := []match.HandResult{
+		{HandNumber: 2, TeamAHandTotal: 70, TeamBHandTotal: 92},
+		{HandNumber: 1, TeamAHandTotal: 90, TeamBHandTotal: 72},
+	}
+	older := seedMatch(1, base.Add(-2*time.Hour), base.Add(-90*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1010, 640, nil)
+	older.RoomID = 7
+	newest := seedMatch(2, base, base.Add(25*time.Minute), seats, "completed", 1, nil, "croatia", "1001", 640, 1010, hands)
+	newest.RoomID = 7
+	// A newer match in a DIFFERENT room must never win the recency race.
+	otherRoom := seedMatch(3, base.Add(time.Hour), base.Add(90*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1001, 300, nil)
+	otherRoom.RoomID = 8
+	matchRepo.matches = []match.Match{older, newest, otherRoom}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetRoomLastMatch(e, "7", token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	item := decodeRoomLastMatch(t, rec.Body.Bytes())
+	assert.Equal(t, uint(2), item.ID, "newest match in room 7")
+	assert.Equal(t, 1, item.ViewerSeat, "viewer-relative seat, not the seat-0 fallback")
+	assert.Equal(t, "win", item.Outcome, "team B won and the viewer sits on team B")
+	require.Len(t, item.Players, 4)
+	assert.Equal(t, "viewer", item.Players[1].Username)
+	require.Len(t, item.Hands, 2)
+	assert.Equal(t, 1, item.Hands[0].HandNumber, "hands ordered by hand number")
+	assert.Equal(t, 2, item.Hands[1].HandNumber)
+}
+
+// Someone who joined the room after the match is indistinguishable from a room
+// with no match at all — the participation gate IS the authorization.
+func TestGetRoomLastMatch_NonParticipantNotFound(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	a := repo.addUser("a", "a@example.com", "en")
+	b := repo.addUser("b", "b@example.com", "en")
+	c := repo.addUser("c", "c@example.com", "en")
+	d := repo.addUser("d", "d@example.com", "en")
+	stranger := repo.addUser("stranger", "s@example.com", "en")
+
+	base := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	m := seedMatch(1, base, base.Add(20*time.Minute), [4]uint{a.ID, b.ID, c.ID, d.ID}, "completed", 0, nil, "bitola", "1001", 1010, 500, nil)
+	m.RoomID = 7
+	matchRepo.matches = []match.Match{m}
+
+	token, err := auth.GenerateAccessToken(stranger.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetRoomLastMatch(e, "7", token)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestGetRoomLastMatch_NoMatchInRoomNotFound(t *testing.T) {
+	repo, _, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "v@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetRoomLastMatch(e, "7", token)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+// A repository failure is a 500, NOT the 404 that means "nothing to show":
+// conflating them would render the empty state over a broken database and hide
+// the outage from anyone watching the status codes.
+func TestGetRoomLastMatch_RepoError_InternalServerError(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "v@example.com", "en")
+	matchRepo.err = errors.New("connection refused")
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetRoomLastMatch(e, "7", token)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "connection refused", "internal detail must not leak")
+}
+
+func TestGetRoomLastMatch_BadRequestInvalidID(t *testing.T) {
+	repo, _, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "v@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	for _, roomID := range []string{"abc", "0"} {
+		rec := doGetRoomLastMatch(e, roomID, token)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, "roomID %q should be 400", roomID)
+	}
+}
+
+func TestGetRoomLastMatch_Unauthorized_NoToken(t *testing.T) {
+	_, _, e := setupUserHandlerWithMatches()
+	rec := doGetRoomLastMatch(e, "7", "")
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// A bot seat stays {userId:0, username:"", isBot:true} — the client renders the
+// localized seat-derived name and shows no per-player actions for it.
+func TestGetRoomLastMatch_BotSeatsMarked(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "v@example.com", "en")
+
+	viewerID := viewer.ID
+	base := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	matchRepo.matches = []match.Match{{
+		ID:           1,
+		RoomID:       7,
+		Player1ID:    &viewerID,
+		Player2IsBot: true,
+		Player3IsBot: true,
+		Player4IsBot: true,
+		HasBots:      true,
+		TeamAScore:   1004,
+		TeamBScore:   730,
+		WinnerTeam:   0,
+		Variant:      "bitola",
+		MatchMode:    "1001",
+		StartedAt:    base,
+		CompletedAt:  base.Add(20 * time.Minute),
+		Status:       "completed",
+	}}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetRoomLastMatch(e, "7", token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	item := decodeRoomLastMatch(t, rec.Body.Bytes())
+	assert.True(t, item.HasBots)
+	for _, p := range item.Players[1:] {
+		assert.True(t, p.IsBot, "seat %d", p.Seat)
+		assert.Equal(t, uint(0), p.UserID)
+		assert.Equal(t, "", p.Username)
+	}
+}
+
+// An abandoned row is still the room's last match: the status allowlist covers
+// it, so the ROOM dialog can show the game that fell over. (Nothing on the
+// client polls for it — the end-of-match overlay never renders on an
+// abandonment; that path shows ReconnectOverlay instead.)
+func TestGetRoomLastMatch_AbandonedRowIsReturned(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "v@example.com", "en")
+	opp1 := repo.addUser("opp1", "o1@example.com", "en")
+	mate := repo.addUser("mate", "m@example.com", "en")
+	opp2 := repo.addUser("opp2", "o2@example.com", "en")
+
+	base := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	abandoner := opp1.ID
+	m := seedMatch(1, base, base.Add(9*time.Minute), [4]uint{viewer.ID, opp1.ID, mate.ID, opp2.ID}, "abandoned", 0, &abandoner, "bitola", "1001", 320, 410, nil)
+	m.RoomID = 7
+	matchRepo.matches = []match.Match{m}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetRoomLastMatch(e, "7", token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	item := decodeRoomLastMatch(t, rec.Body.Bytes())
+	assert.Equal(t, "abandoned", item.Status)
+	assert.Equal(t, "abandonment", item.EndReason)
+	assert.Equal(t, "win", item.Outcome, "non-abandoner on the winning team")
 }

@@ -145,6 +145,10 @@ func (r *timestampedRepo) GetMatchesForUser(_ uint, _, _ int, _, _ string) ([]ma
 	return nil, 0, nil
 }
 
+func (r *timestampedRepo) GetLastMatchForRoomAndUser(_, _ uint) (*match.Match, error) {
+	return nil, nil
+}
+
 func (r *timestampedRepo) GetStatsForUser(_ uint) (int, int, int, error) {
 	return 0, 0, 0, nil
 }

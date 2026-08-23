@@ -5,6 +5,7 @@ import {
   Coins,
   Crown,
   DoorOpen,
+  History,
   Lock,
   LockOpen,
   Send,
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { InviteFriendsDialog } from "@/features/room/components/InviteFriendsDialog";
+import { LastMatchDialog } from "@/features/room/components/LastMatchDialog";
 import { RoomChatDock } from "@/features/room/components/RoomChatDock";
 import { SeatTile } from "@/features/room/components/SeatTile";
 import {
@@ -53,6 +55,7 @@ import {
   useSwapSeatsMutation,
   useTransferOwnershipMutation,
 } from "@/shared/hooks/mutations/useRooms";
+import { useRoomLastMatchQuery } from "@/shared/hooks/queries/useMatches";
 import { useRoomDetailQuery } from "@/shared/hooks/queries/useRooms";
 import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { botDisplayName } from "@/shared/lib/botName";
@@ -191,6 +194,8 @@ export function RoomPage() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   // Story 11.5: the friend-invite panel, open from the waiting room.
   const [showInviteFriends, setShowInviteFriends] = useState(false);
+  // The room's last-match stats panel, opened from the action bar.
+  const [showLastMatch, setShowLastMatch] = useState(false);
 
   // Deep-link / refresh to a private room the viewer isn't seated in: the
   // auto-join below must prompt for the password instead of joining blind
@@ -377,6 +382,25 @@ export function RoomPage() {
     currentRoomStatus === "completed" ||
     currentRoomStatus === "cancelled" ||
     currentRoomStatus === "finished";
+  // The room's most recent match, for the action-bar stats panel. Read while
+  // the room is back in `waiting` — that is the lobby state the button lives
+  // in, and it is where the group lands after a match ends. Quick-play rooms
+  // are excluded: they render on the matchmaking screen, never this page.
+  // A 404 (no match, or the viewer did not play it) simply leaves `data`
+  // undefined and the button unrendered — see useRoomLastMatchQuery.
+  const currentRoomIsQuickPlay =
+    storeRoom?.isQuickPlay ?? roomQuery.data?.room.isQuickPlay ?? false;
+  // Validate the route param the same way MatchPage does (`roomIdNum`): a
+  // non-numeric :id makes `Number(id)` NaN, which is `!== undefined` and would
+  // sail through the hook's guard into a request for `/rooms/NaN/last-match`.
+  const parsedRoomId = id ? Number(id) : null;
+  const roomIdNum =
+    parsedRoomId !== null && Number.isFinite(parsedRoomId) && parsedRoomId > 0
+      ? parsedRoomId
+      : undefined;
+  const roomIsWaiting = currentRoomStatus === "waiting";
+  const lastMatchQuery = useRoomLastMatchQuery(roomIdNum, roomIsWaiting && !currentRoomIsQuickPlay);
+
   useEffect(() => {
     if (!isRoomClosed || matchStarted) return;
     hasLeftRef.current = true; // Don't fire the cleanup-leave on the way out
@@ -1282,6 +1306,27 @@ export function RoomPage() {
                 <span className="hidden sm:inline">{t("roomInvite.panel.openButton")}</span>
               </Button>
             )}
+            {/* Last-match stats. Renders only once the query HAS the match —
+                a room whose last match the viewer did not play (or that never
+                hosted one) 404s, and an absent button is the honest answer
+                there: there is nothing behind it to show.
+
+                Gated on `waiting` as well, matching Invite-friends beside it:
+                DISABLING a query does not evict its cache, so once the room
+                leaves `waiting` the fetched row lingers and the data check
+                alone would keep the button up off stale state. */}
+            {roomIsWaiting && lastMatchQuery.data !== undefined && (
+              <Button
+                variant="ghost"
+                onClick={() => setShowLastMatch(true)}
+                data-testid="open-last-match"
+                aria-label={t("room.lastMatch.openButton")}
+                className="size-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
+              >
+                <History className="size-5 sm:size-4" />
+                <span className="hidden sm:inline">{t("room.lastMatch.openButton")}</span>
+              </Button>
+            )}
             {inSwapMode && (
               <span
                 className="border-accent bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
@@ -1620,6 +1665,14 @@ export function RoomPage() {
         open={showInviteFriends}
         roomId={room.id}
         onOpenChange={setShowInviteFriends}
+      />
+
+      {/* Room last-match stats panel */}
+      <LastMatchDialog
+        open={showLastMatch}
+        roomId={room.id}
+        onOpenChange={setShowLastMatch}
+        playersInRoom={players.map((p) => p.userId)}
       />
 
       {/* Owner privacy edit dialog (Story 9.6) */}

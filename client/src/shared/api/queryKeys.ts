@@ -28,6 +28,16 @@ export const queryKeys = {
   matches: {
     byUser: (userId: number, outcome: string, sort: string) =>
       ["matches", "byUser", userId, outcome, sort] as const,
+    // The room's single most recent match. Keyed by room, not by user: the
+    // response is viewer-relative but the viewer is the authenticated caller,
+    // and the cache is per-session anyway.
+    //
+    // Because the key is per-ROOM and not per-match, an entry populated in the
+    // room lobby describes match N-1 the instant match N starts. `lastByRoomAll`
+    // is the prefix the match_end handler removes so nothing can serve that
+    // stale row to the end-of-match overlay.
+    lastByRoom: (roomId: number) => ["matches", "lastByRoom", roomId] as const,
+    lastByRoomAll: () => ["matches", "lastByRoom"] as const,
   },
   // Story 11.1: player search. The query string is part of the key so each
   // distinct (debounced) term is its own cache entry.

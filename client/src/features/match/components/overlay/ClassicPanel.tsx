@@ -49,12 +49,19 @@ export function ClassicPanel({
 
   return (
     <div
-      className={`overflow-hidden ${className}`}
+      className={`flex flex-col overflow-hidden ${className}`}
       style={{
         width,
         // Never exceed the viewport on a narrow (phone) screen — the panel
         // shrinks to fit with a small gutter, then caps at `width` on desktop.
         maxWidth: "calc(100vw - 2rem)",
+        // …and the same in the other axis. Without this the panel grows past a
+        // short viewport (landscape phone, a ~700px laptop) and `overflow-hidden`
+        // CLIPS whatever sits at the bottom — which on the match-result panel is
+        // the "Return to room" / "Return to lobby" pair, leaving the overlay a
+        // dead end with nothing scrollable. The body below scrolls instead, so
+        // the last control is always reachable.
+        maxHeight: "calc(100vh - 2rem)",
         borderRadius: 14,
         background: PANEL_BG,
         border: "1px solid rgba(201,168,118,0.55)",
@@ -66,7 +73,7 @@ export function ClassicPanel({
     >
       {title && (
         <div
-          className="px-4 pt-3.5 pb-2.5 sm:px-6 sm:pt-4.5"
+          className="shrink-0 px-4 pt-3.5 pb-2.5 sm:px-6 sm:pt-4.5"
           style={{
             borderBottom: "1px solid rgba(201,168,118,0.22)",
           }}
@@ -91,8 +98,11 @@ export function ClassicPanel({
           )}
         </div>
       )}
+      {/* min-h-0 is what lets a flex child actually shrink below its content
+          height — without it `overflow-y-auto` never engages and the cap above
+          would clip instead of scroll. */}
       <div
-        className={bodyPadding === undefined ? "p-4 sm:p-6" : undefined}
+        className={`min-h-0 overflow-y-auto ${bodyPadding === undefined ? "p-4 sm:p-6" : ""}`}
         style={bodyPadding === undefined ? undefined : { padding: bodyPadding }}
       >
         {children}

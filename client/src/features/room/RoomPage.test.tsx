@@ -16,13 +16,16 @@ import { makeRoom, makeRoomDetail, makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
-// Mock react-router useParams and useNavigate
+// Mock react-router useParams and useNavigate. The route id lives in a hoisted
+// box so a test can drive a MALFORMED :id through the page (vi.mock factories
+// run before module-level `let` bindings are initialised, hence vi.hoisted).
 const mockNavigate = vi.fn();
+const { routeParams } = vi.hoisted(() => ({ routeParams: { id: "1" } }));
 vi.mock("react-router", async () => {
   const actual = await vi.importActual("react-router");
   return {
     ...actual,
-    useParams: () => ({ id: "1" }),
+    useParams: () => ({ id: routeParams.id }),
     useNavigate: () => mockNavigate,
   };
 });
@@ -43,6 +46,25 @@ vi.mock("@/shared/api/rooms", () => ({
 }));
 
 // Mock WebSocket connection state + sendMessage hook (ChatDock pulls both)
+// The room's last-match panel reads GET /rooms/:id/last-match. Controlled here
+// so the action-bar button's presence is a property of the fixture, not of a
+// stray network call: a rejection (the 404 a room with no playable-by-you match
+// returns) leaves the button unrendered.
+const mockGetRoomLastMatch = vi.fn();
+vi.mock("@/shared/api/matches", () => ({
+  getRoomLastMatch: (roomId: number) => mockGetRoomLastMatch(roomId),
+}));
+
+// Friendship backs the per-player rows inside the last-match dialog.
+const mockGetFriendshipStatus = vi.fn();
+vi.mock("@/shared/api/friends", () => ({
+  getFriendshipStatus: (id: number) => mockGetFriendshipStatus(id),
+  sendFriendRequest: vi.fn(),
+  acceptFriendRequest: vi.fn(),
+  declineFriendRequest: vi.fn(),
+  removeFriend: vi.fn(),
+}));
+
 vi.mock("@/shared/providers/WebSocketContext", () => ({
   useWsConnectionState: () => "connected",
   useWsSendMessage: () => vi.fn(),
@@ -123,6 +145,12 @@ const defaultUser = makeUser({
 beforeEach(() => {
   mockLeaveRoom.mockResolvedValue(undefined);
   mockJoinRoom.mockResolvedValue(defaultRoom);
+  // Default: this room has no last match the viewer played (the server's 404).
+  mockGetRoomLastMatch.mockReset();
+  mockGetRoomLastMatch.mockRejectedValue(new FetchError(404, "NOT_FOUND", "not found"));
+  mockGetFriendshipStatus.mockReset();
+  mockGetFriendshipStatus.mockResolvedValue({ status: "none", requestId: null });
+  routeParams.id = "1";
   // jsdom has no scrollIntoView — the nested ChatDock calls it on mount.
   Element.prototype.scrollIntoView = vi.fn();
   // jsdom has no matchMedia — RoomPage reads `prefers-reduced-motion` to
@@ -2276,5 +2304,167 @@ describe("RoomPage honour", () => {
     expect(screen.queryByTestId("seat-honor-0")).toBeNull();
     // And it is never treated as the blocking seat.
     expect(screen.getByTestId("seat-position-south")).not.toHaveAttribute("data-below-honor-bar");
+  });
+});
+
+// --- Room last-match stats entry point --------------------------------------
+
+describe("RoomPage last match", () => {
+  const roomPlayer = (userId: number, username: string, s: number): RoomPlayer => ({
+    id: userId,
+    roomId: 1,
+    userId,
+    username,
+    seat: s,
+    team: s % 2 === 0 ? "teamA" : "teamB",
+    isBot: false,
+    createdAt: "",
+  });
+
+  const lastMatch = {
+    id: 42,
+    variant: "bitola" as const,
+    matchMode: "1001" as const,
+    startedAt: "2026-08-01T12:00:00Z",
+    completedAt: "2026-08-01T12:25:00Z",
+    status: "completed",
+    winnerTeam: 0,
+    teamAScore: 1010,
+    teamBScore: 640,
+    hasBots: false,
+    viewerSeat: 0,
+    outcome: "win" as const,
+    endReason: "natural" as const,
+    players: [
+      { seat: 0, userId: 10, username: "alice", isBot: false },
+      { seat: 1, userId: 11, username: "bob", isBot: false },
+      { seat: 2, userId: 12, username: "carol", isBot: false },
+      { seat: 3, userId: 13, username: "dave", isBot: false },
+    ],
+    hands: [],
+  };
+
+  function seedRoom() {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [roomPlayer(10, "alice", 0)],
+      }),
+    );
+  }
+
+  it("hides the button when the room's last match 404s", async () => {
+    seedRoom();
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("action-bar")).toBeInTheDocument());
+    await waitFor(() => expect(mockGetRoomLastMatch).toHaveBeenCalledWith(1));
+    expect(screen.queryByTestId("open-last-match")).toBeNull();
+  });
+
+  it("shows the button once the match arrives and opens the dialog", async () => {
+    seedRoom();
+    mockGetRoomLastMatch.mockResolvedValue(lastMatch);
+    renderRoomPage();
+
+    const button = await screen.findByTestId("open-last-match");
+    expect(screen.queryByTestId("last-match-dialog")).toBeNull();
+
+    await userEvent.click(button);
+    expect(await screen.findByTestId("last-match-dialog")).toBeInTheDocument();
+  });
+
+  // The `playersInRoom` prop is what hides Reinvite for someone already back at
+  // the table; dropping it left every other RoomPage test green, so the wiring
+  // is asserted here end to end rather than only inside the dialog's own suite.
+  it("hides Reinvite for a co-player who is already seated in the room", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 2 },
+        // bob (11) played the last match AND is back in the room; carol (12) is not.
+        players: [roomPlayer(10, "alice", 0), roomPlayer(11, "bob", 1)],
+      }),
+    );
+    mockGetRoomLastMatch.mockResolvedValue(lastMatch);
+    mockGetFriendshipStatus.mockResolvedValue({ status: "friends", requestId: 1 });
+    renderRoomPage();
+
+    await userEvent.click(await screen.findByTestId("open-last-match"));
+    await screen.findByTestId("last-match-dialog");
+
+    // carol is a friend who is NOT here — she gets the control.
+    expect(await screen.findByTestId("match-player-reinvite-12")).toBeInTheDocument();
+    // bob is sitting at the table already — inviting him would be nonsense.
+    expect(screen.queryByTestId("match-player-reinvite-11")).toBeNull();
+  });
+
+  // A non-numeric :id makes Number(id) NaN, and NaN is `!== undefined` — without
+  // the finite-and-positive guard the hook enables and requests
+  // /rooms/NaN/last-match.
+  it("does not read the last match for a malformed route id", async () => {
+    routeParams.id = "abc";
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [roomPlayer(10, "alice", 0)],
+      }),
+    );
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("action-bar")).toBeInTheDocument());
+    expect(mockGetRoomLastMatch).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("open-last-match")).toBeNull();
+  });
+
+  // Disabling a query does NOT evict its cache: once the match starts, the row
+  // fetched while the room was `waiting` is still sitting there, so the data
+  // check alone would keep the button on screen off stale state.
+  it("drops the button when the room leaves waiting, even with the row still cached", async () => {
+    seedRoom();
+    mockGetRoomLastMatch.mockResolvedValue(lastMatch);
+    renderRoomPage();
+
+    await screen.findByTestId("open-last-match");
+
+    const { useRoomStore } = await import("@/shared/stores/roomStore");
+    act(() => {
+      useRoomStore.getState().setRoom({ ...defaultRoom, status: "playing" });
+    });
+
+    expect(screen.queryByTestId("open-last-match")).toBeNull();
+  });
+
+  it("does not read the last match for a quick-play room", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, isQuickPlay: true, playerCount: 1 },
+        players: [roomPlayer(10, "alice", 0)],
+      }),
+    );
+    renderRoomPage();
+
+    // Quick-play rooms redirect to the matchmaking screen — this page renders
+    // nothing for them, and must not have fired the read on the way past.
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+    expect(mockGetRoomLastMatch).not.toHaveBeenCalled();
+  });
+
+  it("does not read the last match while the room is playing", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, status: "playing", playerCount: 1 },
+        players: [roomPlayer(10, "alice", 0)],
+      }),
+    );
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("action-bar")).toBeInTheDocument());
+    expect(mockGetRoomLastMatch).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("open-last-match")).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import "@/shared/i18n/i18n";
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -26,6 +27,24 @@ vi.mock("@/shared/providers/WebSocketContext", () => ({
 
 vi.mock("@/shared/providers/WebSocketProvider", () => ({
   WebSocketProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// MatchResult reads the room's last match for its collapsible hand breakdown.
+// Held pending by default: most of these tests are about the page, not the
+// breakdown, and a never-settling promise keeps the section unrendered without
+// a network call. The wiring test below drives it explicitly.
+const mockGetRoomLastMatch = vi.fn((_roomId: number): Promise<unknown> => new Promise(() => {}));
+vi.mock("@/shared/api/matches", () => ({
+  getRoomLastMatch: (roomId: number) => mockGetRoomLastMatch(roomId),
+}));
+
+// Friendship backs the per-player rows inside the expanded breakdown.
+vi.mock("@/shared/api/friends", () => ({
+  getFriendshipStatus: vi.fn(() => Promise.resolve({ status: "none", requestId: null })),
+  sendFriendRequest: vi.fn(),
+  acceptFriendRequest: vi.fn(),
+  declineFriendRequest: vi.fn(),
+  removeFriend: vi.fn(),
 }));
 
 // Rooms API — controllable so the return-to-room flow (D146) can assert distinct
@@ -166,8 +185,24 @@ const mockMatchState: MatchState = {
 // no `:roomId` param (mirroring the old plain-BrowserRouter helper), so
 // roomIdNum stays null and the mount-time getRoom splash check is skipped;
 // tests that need the param use an explicit `/match/:roomId` route instead.
+// One QueryClient for the file (MatchResult's last-match query needs a
+// provider). Module-scoped rather than per-render so `rerender` keeps the same
+// cache instead of remounting a fresh one mid-assertion.
+const matchPageQueryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, gcTime: 0 } },
+});
+
+/** MatchPage under the QueryClientProvider the app gives it at the root. */
+function MatchPageRoute() {
+  return (
+    <QueryClientProvider client={matchPageQueryClient}>
+      <MatchPage />
+    </QueryClientProvider>
+  );
+}
+
 function createMatchPageRouter({ fromRoom = false } = {}) {
-  return createMemoryRouter([{ path: "*", element: <MatchPage /> }], {
+  return createMemoryRouter([{ path: "*", element: <MatchPageRoute /> }], {
     initialEntries: [fromRoom ? { pathname: "/match/1", state: { fromRoom: true } } : "/match/1"],
   });
 }
@@ -187,6 +222,8 @@ describe("MatchPage", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockSendMessage.mockClear();
+    mockGetRoomLastMatch.mockReset();
+    mockGetRoomLastMatch.mockReturnValue(new Promise(() => {}));
     useMatchStore.getState().reset();
     useAuthStore.setState({
       token: "test-token",
@@ -259,7 +296,7 @@ describe("MatchPage", () => {
     const renderAtRoom1 = () =>
       render(
         <RouterProvider
-          router={createMemoryRouter([{ path: "/match/:roomId", element: <MatchPage /> }], {
+          router={createMemoryRouter([{ path: "/match/:roomId", element: <MatchPageRoute /> }], {
             initialEntries: ["/match/1"],
           })}
         />,
@@ -508,6 +545,73 @@ describe("MatchPage", () => {
     expect(screen.getByTestId("match-result-team-a-score")).toHaveTextContent("1020");
   });
 
+  // The roomId prop is the ONLY thing that turns the result overlay's hand
+  // breakdown on; deleting it left every other test in this file green, so the
+  // wiring gets its own assertion — the request must reach the API with the
+  // route's room id, and the toggle must appear.
+  it("passes the route roomId to MatchResult, which reads that room's last match", async () => {
+    mockGetRoom.mockResolvedValue({
+      room: { id: 1, status: "playing", coinBuyIn: 0 },
+      players: [{ id: 1, roomId: 1, userId: 10, username: "Alice", seat: 0, isBot: false }],
+      returnedUserIds: [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    mockGetRoomLastMatch.mockResolvedValue({
+      id: 42,
+      variant: "bitola",
+      matchMode: "1001",
+      startedAt: "2026-08-01T12:00:00Z",
+      completedAt: "2026-08-01T12:25:00Z",
+      status: "completed",
+      winnerTeam: 0,
+      teamAScore: 1020,
+      teamBScore: 850,
+      hasBots: false,
+      viewerSeat: 0,
+      outcome: "win",
+      endReason: "natural",
+      players: [
+        { seat: 0, userId: 10, username: "Alice", isBot: false },
+        { seat: 1, userId: 11, username: "Bob", isBot: false },
+        { seat: 2, userId: 12, username: "Carol", isBot: false },
+        { seat: 3, userId: 13, username: "Dave", isBot: false },
+      ],
+      hands: [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    useMatchStore.getState().setMatchState(mockMatchState);
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    render(
+      <RouterProvider
+        router={createMemoryRouter([{ path: "/match/:roomId", element: <MatchPageRoute /> }], {
+          initialEntries: ["/match/1"],
+        })}
+      />,
+    );
+    await act(async () => {});
+
+    act(() => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
+      useMatchStore.getState().setMatchEndData({
+        winnerTeam: 0,
+        teamAFinalScore: 1020,
+        teamBFinalScore: 850,
+        matchDurationSec: 300,
+      });
+    });
+    await act(async () => {});
+
+    expect(mockGetRoomLastMatch).toHaveBeenCalledWith(1);
+    // The query only starts once the overlay has mounted, and React Query
+    // batches its notifications through a timer — which this file has faked.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId("match-result-stats-toggle")).toBeInTheDocument();
+  });
+
   // D145a: a new match's match_state (any live phase) must clear a stale result
   // overlay left from the previous match.
   it("clears a stale result overlay when a fresh match_state arrives", () => {
@@ -585,7 +689,7 @@ describe("MatchPage", () => {
 
     render(
       <RouterProvider
-        router={createMemoryRouter([{ path: "/match/:roomId", element: <MatchPage /> }], {
+        router={createMemoryRouter([{ path: "/match/:roomId", element: <MatchPageRoute /> }], {
           initialEntries: ["/match/1"],
         })}
       />,
@@ -654,7 +758,7 @@ describe("MatchPage", () => {
       <RouterProvider
         router={createMemoryRouter(
           [
-            { path: "/match/:roomId", element: <MatchPage /> },
+            { path: "/match/:roomId", element: <MatchPageRoute /> },
             { path: "/lobby", element: <div data-testid="lobby-marker" /> },
           ],
           { initialEntries: ["/match/1"] },
@@ -1213,7 +1317,7 @@ describe("MatchPage", () => {
     // data-router equivalent of the browser back button (a POP), which the
     // useBlocker predicate intercepts while the match is active.
     function renderWithHistoryBeneath() {
-      const router = createMemoryRouter([{ path: "*", element: <MatchPage /> }], {
+      const router = createMemoryRouter([{ path: "*", element: <MatchPageRoute /> }], {
         initialEntries: ["/lobby", "/match/1"],
         initialIndex: 1,
       });
@@ -1314,7 +1418,7 @@ describe("MatchPage", () => {
 
       const router = createMemoryRouter(
         [
-          { path: "/match/:roomId", element: <MatchPage /> },
+          { path: "/match/:roomId", element: <MatchPageRoute /> },
           { path: "/lobby", element: <div data-testid="lobby-after-back" /> },
         ],
         { initialEntries: ["/lobby", "/match/1"], initialIndex: 1 },

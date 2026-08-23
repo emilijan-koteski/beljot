@@ -15,6 +15,7 @@ import {
 } from "@/shared/components/ui/dialog";
 import { useInviteToRoomMutation } from "@/shared/hooks/mutations/useRooms";
 import { useInvitableFriends } from "@/shared/hooks/queries/useInvitableFriends";
+import { inviteFailure } from "@/shared/lib/inviteFailure";
 import type { InvitableFriend } from "@/shared/types/apiTypes";
 
 interface InviteFriendsDialogProps {
@@ -91,28 +92,22 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
       await inviteMutation.mutateAsync({ roomId, friendUserId: friend.userId });
       setInvited((prev) => ({ ...prev, [friend.userId]: true }));
     } catch (err) {
-      const code = err instanceof FetchError ? err.code : null;
-      // Availability is recomputed server-side, so a row can legitimately go
-      // stale between render and click — report it on the row, not as a toast
-      // that loses track of WHICH friend failed.
-      if (code === "FRIEND_NOT_AVAILABLE") {
-        setRowErrors((prev) => ({ ...prev, [friend.userId]: t("roomInvite.errors.notAvailable") }));
-      } else if (code === "ROOM_FULL") {
-        setRowErrors((prev) => ({ ...prev, [friend.userId]: t("roomInvite.errors.roomFull") }));
-      } else if (code === "NOT_FRIENDS") {
-        setRowErrors((prev) => ({ ...prev, [friend.userId]: t("roomInvite.errors.notFriends") }));
-      } else if (code === "INVITE_ALREADY_PENDING") {
+      const { kind, message } = inviteFailure(err instanceof FetchError ? err.code : null);
+      if (kind === "alreadyPending") {
         // They already have a live popup for this room — show it as sent rather
         // than as a failure, which is what it means from the host's side.
         setInvited((prev) => ({ ...prev, [friend.userId]: true }));
-      } else if (code === "ROOM_NOT_FOUND" || code === "NOT_IN_ROOM") {
+      } else if (kind === "roomGone") {
         // The room closed, the match started, or the host was kicked in another
         // tab. "Please try again" is a lie here — nothing on this panel can ever
         // succeed again, so close it instead of inviting a pointless retry.
-        toast.error(t("roomInvite.errors.roomGone"));
+        toast.error(message);
         onOpenChange(false);
       } else {
-        toast.error(t("roomInvite.errors.sendFailed"));
+        // Availability is recomputed server-side, so a row can legitimately go
+        // stale between render and click — report it on the row, not as a toast
+        // that loses track of WHICH friend failed.
+        setRowErrors((prev) => ({ ...prev, [friend.userId]: message }));
       }
     } finally {
       setPendingId(null);

@@ -1043,3 +1043,15 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A �
 - source_spec: `_bmad-output/implementation-artifacts/spec-dialog-button-layout-standardization.md`
   summary: CreateRoomModal's footer has no narrow-screen stacking — its two buttons sit in a bare `flex` row with no `flex-col` below `sm`.
   evidence: Pre-existing; the footer was `justify-between` with no responsive direction before this story and is `justify-end` after, neither of which stacks. Every other multi-button footer in the app stacks below `sm` (shared `DialogFooter`, RoomEjectionModal). The `size="cta"` submit plus the cancel can overflow horizontally on narrow phones.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-room-last-match-stats.md`
+  summary: `.parchment-inset` restates 15 literal copies of the `:root` parchment palette, so retuning that palette silently desyncs the inset.
+  evidence: `client/src/index.css` — every value in the new block (`#f5f2e8`, `#fbf9f2`, `#ffffff`, `#ebe6d6`, `#d9d1ba`, `#c9a876`, the four inks, the five accents) is byte-for-byte identical to `:root` in the same file, and nothing (lint, test, or comment cross-reference) ties them together. The felt scopes at least redefine *different* values; this block exists only to restate identical ones. The real fix is a single source — `--parchment-*` tokens at `:root` referenced by both — which means editing the global palette and is beyond this story's blast radius.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-room-last-match-stats.md`
+  summary: Boot-reconcile placeholder rows surface as a room's "last match", showing 0–0 with no hand details after a server crash.
+  evidence: `server/internal/match/reconcile.go:124-131` writes `TeamAScore: 0, WinnerTeam: 0, CompletedAt: time.Now(), Status: "abandoned"` with no hands for every room stuck in `playing` at boot. `GetLastMatchForRoomAndUser` accepts `abandoned`, so that placeholder becomes the room's last match. The surface degrades honestly (the card's `match-history-no-hands` empty state renders) rather than lying, and it only occurs post-crash — but a crash-recovery artifact presented as a played match is still misleading. Either exclude hand-less placeholder rows from the query or mark them distinctly in the DTO.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-room-last-match-stats.md`
+  summary: Five near-identical `MatchListItem` fixtures were added across test files instead of one factory in `test-utils.tsx`.
+  evidence: `makeLastMatch` (MatchResult.test), `makeMatch` (LastMatchDialog.test), `makeMatch` (MatchPlayerActions.test), `makeMatch` (MatchStatsCard.test) and the inline `lastMatch` literal in `RoomPage.test.tsx` are the same ~35-line DTO. The repo convention centralizes fixtures — `client/src/test-utils.tsx` already hosts `makeUser`, `makeRoom`, `makeRoomPlayer`, `makeRoomDetail`, `makeRoomInvite`. Adding a `MatchListItem` field now means five edits.

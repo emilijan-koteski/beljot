@@ -39,6 +39,13 @@ vi.mock("@/shared/api/rooms", () => ({
   transferOwnership: vi.fn(),
 }));
 
+// The room's last-match panel reads GET /rooms/:id/last-match. Rejected here so
+// these suites never touch the network; the action-bar button stays unrendered,
+// which is what a room with no viewer-played match looks like.
+vi.mock("@/shared/api/matches", () => ({
+  getRoomLastMatch: vi.fn(() => Promise.reject(new Error("no last match"))),
+}));
+
 vi.mock("@/shared/providers/WebSocketContext", () => ({
   useWsConnectionState: () => "connected",
   useWsSendMessage: () => vi.fn(),
