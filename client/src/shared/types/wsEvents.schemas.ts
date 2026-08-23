@@ -91,6 +91,13 @@ const PlayerStateSchema = z.strictObject({
   // opponents render from this count. Real hand length on all four seats.
   // Same build-time gate as faceDownCount above.
   handCount: z.number().int(),
+  // Whether this seat has answered the dedicated declaration phase (declared or
+  // skipped). Public on all four seats because the phase asks every seat
+  // regardless of what it holds, so it reports who has clicked and never who
+  // holds a meld. Must land in the same commit as the Go
+  // PlayerState.DeclarationAnswered field. Same build-time gate as the two
+  // counts above.
+  declarationAnswered: z.boolean(),
 });
 
 const TrickCardSchema = z.strictObject({

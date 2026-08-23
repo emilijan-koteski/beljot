@@ -29,6 +29,7 @@ function player(seat: number, cards: Card[]): PlayerState {
     level: 1,
     faceDownCount: 0,
     handCount: cards.length,
+    declarationAnswered: false,
   };
 }
 

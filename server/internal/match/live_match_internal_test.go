@@ -413,15 +413,23 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 
 	m.TriggerTimerExpiryForTest(roomID, gs.ActivePlayerSeat, 10*time.Millisecond)
 
-	resolved := false
+	// Captured AT the moment bidding resolves, not re-read later. The phase this
+	// opens runs on a wall-clock window (declarationAutoClose), so a later
+	// snapshot can legitimately have moved on to trick 1 if this goroutine was
+	// starved long enough — which happens under a loaded `go test ./...`.
+	// Asserting on the captured pair keeps the test about the transition rather
+	// than about how fast the machine is.
+	var resolvedSnap *game.GameState
+	var declExpiry time.Time
 	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); {
 		if snap := m.GetStateSnapshot(roomID); snap != nil && snap.TrumpSuit != nil {
-			resolved = true
+			resolvedSnap = snap
+			declExpiry = m.DeclarationExpiresAtForTest(roomID)
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	require.True(t, resolved, "the expired forced-dealer turn must resolve bidding, not loop on a rejected pass")
+	require.NotNil(t, resolvedSnap, "the expired forced-dealer turn must resolve bidding, not loop on a rejected pass")
 
 	// The table must be TOLD. This is the only auto-action that fixes trump for a
 	// whole hand, so leaving it to be inferred from the next snapshot would mean
@@ -444,6 +452,26 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 		assert.Len(t, p.Hand, 8, "seat %d must hold all eight cards once bidding resolves", seat)
 		assert.Zero(t, p.FaceDownCount, "seat %d", seat)
 	}
+
+	// This is the SECOND of only two doors into the declaration phase, and the
+	// only one a player never opens: a forced dealer pick that arrives by
+	// timeout. handleTimerExpiry has to arm the phase's fixed window itself,
+	// because the phase runs no per-move timer for the ordinary re-arm to reach.
+	//
+	// Without the deadline the failure is silent and delayed: declarationExpiresAt
+	// stays the zero time, HandleAction's declaring arm does NOT re-seed it (the
+	// phase is already open), so `max(time.Until(zero), 0)` is 0 and the timer
+	// fires the instant the first seat answers — force-closing the contest and
+	// forfeiting the other three seats' melds.
+	require.Equal(t, game.PhaseDeclaring, resolvedSnap.Phase, "the pick opens the declaration phase")
+	assert.Nil(t, resolvedSnap.TurnExpiresAt, "the phase has no active turn and no per-move clock")
+	// Non-zero, not "in the future": that the deadline was SET is the invariant.
+	// Whether it has since elapsed is a wall-clock race with the test runner, and
+	// the zero value is exactly the bug this guards — a zero deadline makes
+	// `max(time.Until(zero), 0)` evaluate to 0, so the window fires the instant
+	// the first seat answers and force-closes the contest.
+	assert.False(t, declExpiry.IsZero(),
+		"the phase's fixed window must be armed by the timer-expiry door too")
 }
 
 // TestBuildBotView_FaceDownNeverVisible pins the no-peeking boundary for bot

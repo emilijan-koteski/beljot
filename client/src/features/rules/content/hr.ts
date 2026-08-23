@@ -236,7 +236,7 @@ export const hr: RulesLangData = {
           variant: "croatia",
           otherVariantNote:
             "U bitolskim pravilima nema odvojene faze: zoveš na svom redu u prvom štihu, dok igraš kartu, a karte idu licem prema gore na početku drugog.",
-          text: "Zvanja imaju vlastitu fazu, između zvanja aduta i prvog štiha. Svako mjesto redom zove ili preskače, zvanja cijelog stola se zatim otkrivaju zajedno, i tek nakon toga počinje prvi štih.",
+          text: "Zvanja imaju vlastitu fazu, između zvanja aduta i prvog štiha. Sva četiri mjesta biraju istovremeno i imaju osam sekundi da zovu ili preskoče, pa se ne vidi tko što drži; zvanja cijelog stola se zatim otkrivaju zajedno, i tek nakon toga počinje prvi štih.",
         },
         { kind: "melds" },
         {

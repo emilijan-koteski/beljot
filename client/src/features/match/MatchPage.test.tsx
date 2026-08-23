@@ -82,6 +82,7 @@ const mockMatchState: MatchState = {
       level: 1,
       faceDownCount: 0,
       handCount: 1,
+      declarationAnswered: false,
     },
     {
       hand: [],
@@ -95,6 +96,7 @@ const mockMatchState: MatchState = {
       level: 1,
       faceDownCount: 0,
       handCount: 1,
+      declarationAnswered: false,
     },
     {
       hand: [],
@@ -108,6 +110,7 @@ const mockMatchState: MatchState = {
       level: 1,
       faceDownCount: 0,
       handCount: 1,
+      declarationAnswered: false,
     },
     {
       hand: [],
@@ -121,6 +124,7 @@ const mockMatchState: MatchState = {
       level: 1,
       faceDownCount: 0,
       handCount: 1,
+      declarationAnswered: false,
     },
   ],
   teamScores: [0, 0],
@@ -1685,6 +1689,28 @@ describe("MatchPage", () => {
       expect(within(prompt).getByTestId("declaration-prompt-total")).toHaveTextContent("250");
     });
 
+    // The seat gate on Bitola's trick-1 prompt. It is the ONLY thing keeping the
+    // dialog private to the prompted seat: promptDeclarations is built from the
+    // VIEWER's own hand, so without this check all four seats would render a
+    // prompt during trick 1, three of them would be rejected with
+    // ErrNotYourTurn, and the dialog's mere appearance would announce that a
+    // declaration is outstanding at the table.
+    //
+    // The simultaneous phase deliberately has no such gate, which is exactly why
+    // this needs its own test: every other prompt test in this file sets
+    // activePlayerSeat === myPlayerSeat, so the clause is otherwise unpinned.
+    it("shows no prompt to a Bitola seat that is not on the clock", () => {
+      useMatchStore.getState().setMatchState({
+        ...overlapPromptState("bitola"),
+        trickNumber: 1,
+        activePlayerSeat: 1,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.queryByTestId("declaration-prompt")).not.toBeInTheDocument();
+    });
+
     it("lists one deduped meld and totals 200 in a Bitola match", () => {
       useMatchStore.getState().setMatchState(overlapPromptState("bitola"));
       useMatchStore.getState().setMyPlayerSeat(0);
@@ -1743,8 +1769,9 @@ describe("MatchPage", () => {
   });
 
   describe("dedicated declaration phase", () => {
-    // Seat 0 holds a tierce 9S-TS-JS, and the server has it on the clock in the
-    // declaring phase with a live turn deadline.
+    // Seat 0 holds a tierce 9S-TS-JS. No seat is on the clock and there is no
+    // turn deadline — the phase asks all four at once and runs its own
+    // mount-anchored window.
     function declaringState(overrides: Partial<MatchState> = {}): MatchState {
       return {
         // Deliberately NOT a Croatian state: the phase is the only input the
@@ -1756,9 +1783,9 @@ describe("MatchPage", () => {
         phase: "declaring",
         trumpSuit: "H",
         trickNumber: 0,
-        activePlayerSeat: 0,
-        awaitingDeclaration: true,
-        turnExpiresAt: new Date(Date.now() + 30_000).toISOString(),
+        activePlayerSeat: 1,
+        awaitingDeclaration: false,
+        turnExpiresAt: null,
         timerDurationSec: 30,
         players: mockMatchState.players.map((p) =>
           p.seat === 0
@@ -1783,63 +1810,149 @@ describe("MatchPage", () => {
       return renderMatchPage();
     }
 
-    it("shows the declaration prompt to the prompted seat", () => {
+    /** declaringState with the viewer's seat 0 hand replaced (no melds). */
+    function meldlessOverride(): Partial<MatchState> {
+      return {
+        players: mockMatchState.players.map((p) =>
+          p.seat === 0
+            ? {
+                ...p,
+                declarations: [],
+                hand: [
+                  { rank: "9", suit: "S" },
+                  { rank: "Q", suit: "H" },
+                  { rank: "7", suit: "D" },
+                ] as MatchState["players"][number]["hand"],
+              }
+            : p,
+        ) as MatchState["players"],
+      };
+    }
+
+    it("shows the declaration prompt to a seat holding a meld", () => {
       renderDeclaring();
 
       const prompt = screen.getByTestId("declaration-prompt");
       expect(within(prompt).getByTestId("declaration-prompt-total")).toHaveTextContent("20");
-      expect(within(prompt).getByTestId("declaration-prompt-declare")).toBeInTheDocument();
-      expect(within(prompt).getByTestId("declaration-prompt-skip")).toBeInTheDocument();
+      expect(within(prompt).getByTestId("declaration-prompt-declare")).toBeEnabled();
+      expect(within(prompt).getByTestId("declaration-prompt-skip")).toBeEnabled();
     });
 
-    it("shows no prompt to a seat that is not on the clock", () => {
-      useMatchStore.getState().setMatchState(declaringState({ activePlayerSeat: 1 }));
-      useMatchStore.getState().setMyPlayerSeat(0);
-      renderMatchPage();
+    // The leak this phase was rebuilt to close. A seat holding nothing must get
+    // the SAME dialog, so that having one tells nobody anything.
+    it("shows the same prompt to a seat holding nothing, with Declare disabled", () => {
+      renderDeclaring(meldlessOverride());
 
-      expect(screen.queryByTestId("declaration-prompt")).not.toBeInTheDocument();
+      const prompt = screen.getByTestId("declaration-prompt");
+      expect(within(prompt).getByTestId("declaration-prompt-none")).toBeInTheDocument();
+      expect(within(prompt).queryByTestId("declaration-prompt-total")).not.toBeInTheDocument();
+      expect(within(prompt).getByTestId("declaration-prompt-declare")).toBeDisabled();
+      expect(within(prompt).getByTestId("declaration-prompt-skip")).toBeEnabled();
     });
 
-    it("keeps the active seat's turn countdown visible", () => {
+    it("shows the prompt to a seat that is not the pinned activePlayerSeat", () => {
+      // activePlayerSeat is 1 in every fixture here; the viewer is seat 0 and
+      // must still be asked. Under the old cursor this was the "not on the
+      // clock" case that rendered nothing.
       renderDeclaring();
 
-      // Without the phase in the seat-ring predicate the countdown goes dark and
-      // the table looks frozen while the server is very much running a clock.
-      expect(screen.getByTestId("player-seat-timer-seconds")).toBeInTheDocument();
+      expect(screen.getByTestId("declaration-prompt")).toBeInTheDocument();
     });
 
-    it("keeps the pause and surrender controls available", () => {
+    it("holds the dialog open in a waiting state once the viewer has answered", () => {
+      renderDeclaring({
+        players: declaringState().players.map((p) =>
+          p.seat === 0 ? { ...p, declarationAnswered: true } : p,
+        ) as MatchState["players"],
+      });
+
+      const prompt = screen.getByTestId("declaration-prompt");
+      expect(prompt).toBeInTheDocument();
+      expect(within(prompt).getByTestId("declaration-prompt-declare")).toBeDisabled();
+      const skip = within(prompt).getByTestId("declaration-prompt-skip");
+      expect(skip).toBeDisabled();
+      expect(skip).toHaveTextContent("Waiting for the others");
+    });
+
+    it("reports how many seats have answered", () => {
+      renderDeclaring({
+        players: declaringState().players.map((p) =>
+          p.seat === 0 || p.seat === 2 ? { ...p, declarationAnswered: true } : p,
+        ) as MatchState["players"],
+      });
+
+      expect(
+        within(screen.getByTestId("declaration-prompt")).getByTestId("declaration-prompt-skip"),
+      ).toHaveTextContent("2/4");
+    });
+
+    it("auto-skips once the phase window elapses", () => {
       renderDeclaring();
 
-      const pause = screen.getByTestId("pause-button");
-      expect(pause).toBeInTheDocument();
-      expect(pause).toBeEnabled();
+      expect(mockSendMessage).not.toHaveBeenCalledWith("action:skip_declare", expect.anything());
+      act(() => {
+        vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP + 100);
+      });
+      expect(mockSendMessage).toHaveBeenCalledWith("action:skip_declare", {});
+    });
+
+    it("does not auto-skip again once the viewer has answered", () => {
+      renderDeclaring({
+        players: declaringState().players.map((p) =>
+          p.seat === 0 ? { ...p, declarationAnswered: true } : p,
+        ) as MatchState["players"],
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP + 100);
+      });
+      expect(mockSendMessage).not.toHaveBeenCalledWith("action:skip_declare", expect.anything());
+    });
+
+    // Nobody is on the clock in this phase, so no seat may be lit as if they
+    // were — it would misdescribe the phase, and under the old cursor it named
+    // a meld holder outright.
+    it("flags no seat as active and shows no turn countdown", () => {
+      renderDeclaring();
+
+      expect(screen.queryByTestId("player-seat-timer-seconds")).not.toBeInTheDocument();
+      for (const compass of [0, 1, 2, 3]) {
+        expect(screen.getByTestId(`player-seat-${compass}`)).toHaveAttribute(
+          "data-active",
+          "false",
+        );
+      }
+    });
+
+    // Pause is refused by the engine in this phase, so offering the control
+    // would only earn the player a wrong-phase toast. Both HUD surfaces are
+    // asserted: phones use the hamburger menu, not the desktop cluster, so
+    // gating only one leaves half the players able to click a dead button.
+    it("withdraws the pause control — the phase is a fixed window, not a turn", () => {
+      renderDeclaring();
+
+      expect(screen.queryByTestId("pause-button")).not.toBeInTheDocument();
+      // Surrender is still legal in the phase and stays rendered. (The prompt
+      // overlay is modal, so it covers the control for as long as it is up —
+      // the same as every other prompt in the game.)
       expect(screen.getByTestId("surrender-button")).toBeInTheDocument();
+    });
+
+    it("withdraws the pause control from the phone HUD menu too", () => {
+      renderDeclaring();
+      fireEvent.click(screen.getByTestId("hud-menu-button"));
+
+      expect(screen.getByTestId("hud-menu")).toBeInTheDocument();
+      expect(screen.queryByTestId("hud-menu-pause")).not.toBeInTheDocument();
     });
 
     it("does not make cards playable — no trick is open yet", () => {
       renderDeclaring();
 
-      // Two independent guards hold here: isMyTurn requires the playing phase,
-      // AND it requires no declaration to be outstanding. Scoped to the hand —
-      // the same card is also drawn inside the prompt's meld preview.
-      // Click the CARD, not its positioning wrapper — the click handler lives on
-      // playing-card-*, and hand-card-* is the parent it bubbles up to.
-      const hand = screen.getByTestId("hand-cards");
-      fireEvent.click(within(hand).getByTestId("playing-card-9S"));
-      expect(mockSendMessage).not.toHaveBeenCalledWith("action:play_card", expect.anything());
-    });
-
-    it("keeps cards unplayable on the phase alone, with no prompt outstanding", () => {
-      // The server never emits this shape — the phase resolves the instant
-      // nothing is awaited — so this isolates the PHASE clause of isMyTurn from
-      // the awaitingDeclaration clause that masks it above. Without it, dropping
-      // "playing" from that check would go unnoticed and a stray tap could throw
-      // a card before trick 1 exists.
-      renderDeclaring({ awaitingDeclaration: false });
-
-      // Click the CARD, not its positioning wrapper — the click handler lives on
-      // playing-card-*, and hand-card-* is the parent it bubbles up to.
+      // isMyTurn requires the playing phase. Scoped to the hand — the same card
+      // is also drawn inside the prompt's meld preview. Click the CARD, not its
+      // positioning wrapper: the click handler lives on playing-card-*, and
+      // hand-card-* is the parent it bubbles up to.
       const hand = screen.getByTestId("hand-cards");
       fireEvent.click(within(hand).getByTestId("playing-card-9S"));
       expect(mockSendMessage).not.toHaveBeenCalledWith("action:play_card", expect.anything());
@@ -1902,6 +2015,7 @@ describe("MatchPage", () => {
                 ] as MatchState["players"][number]["hand"])
               : [],
           handCount: 6,
+          declarationAnswered: false,
           faceDownCount,
         })) as MatchState["players"],
       };
@@ -1951,6 +2065,7 @@ describe("MatchPage", () => {
                 ] as MatchState["players"][number]["hand"])
               : [],
           handCount: 8,
+          declarationAnswered: false,
           faceDownCount: 0,
         })) as MatchState["players"],
       });

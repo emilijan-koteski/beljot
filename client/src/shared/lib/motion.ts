@@ -136,6 +136,12 @@ export const MOTION = {
    *  8 s auto-close the informational reveals use. The server keeps a longer
    *  backstop for fully-disconnected clients. */
   SCORE_REVEAL_AUTO_CONTINUE: 8000,
+  /** The dedicated declaration phase auto-skips after this long, measured from
+   *  when the dialog MOUNTS — which trails the phase opening by the trump-take
+   *  reveal that suppresses it. All four seats answer in parallel, so this is
+   *  the whole phase for a table that never clicks. The server keeps a longer
+   *  backstop that force-closes for every unanswered seat at once. */
+  DECLARATION_PHASE_AUTO_SKIP: 8000,
   /** Last-trick bonus number flash on the scoreboard. */
   SCORE_BONUS_FADE: 1200,
   SCORE_BONUS_FADE_REDUCED: 300,

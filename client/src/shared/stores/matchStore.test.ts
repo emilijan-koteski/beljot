@@ -38,6 +38,7 @@ const mockMatchState: MatchState = {
       level: 1,
       faceDownCount: 0,
       handCount: 0,
+      declarationAnswered: false,
     },
     {
       hand: [],
@@ -51,6 +52,7 @@ const mockMatchState: MatchState = {
       level: 1,
       faceDownCount: 0,
       handCount: 0,
+      declarationAnswered: false,
     },
     {
       hand: [],
@@ -64,6 +66,7 @@ const mockMatchState: MatchState = {
       level: 1,
       faceDownCount: 0,
       handCount: 0,
+      declarationAnswered: false,
     },
     {
       hand: [],
@@ -77,6 +80,7 @@ const mockMatchState: MatchState = {
       level: 1,
       faceDownCount: 0,
       handCount: 0,
+      declarationAnswered: false,
     },
   ],
   teamScores: [0, 0],

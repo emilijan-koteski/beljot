@@ -164,6 +164,15 @@ export interface PlayerState {
   // seat's arrives empty, and this count is what renders their card backs.
   // Real hand length on all four seats, the viewer's own included.
   handCount: number;
+  // Whether this seat has answered the dedicated declaration phase — declared
+  // or skipped. Always false outside `phase: "declaring"`.
+  //
+  // Public for all four seats, and safe because the phase asks EVERY seat
+  // regardless of what it holds: this says who has clicked, never who holds a
+  // meld. Drives the viewer's own dialog into its "waiting for the others"
+  // state and survives a reconnect mid-phase, so an answered seat is never
+  // handed a second answer.
+  declarationAnswered: boolean;
 }
 
 export interface HandResult {

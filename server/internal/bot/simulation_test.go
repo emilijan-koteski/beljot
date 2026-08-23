@@ -254,7 +254,7 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 	rng := rand.New(rand.NewPCG(12, 6))
 
 	sawDeclarationPhase := 0
-	sawPromptedSeat := 0
+	sawAnsweredSeat := 0
 	sawForcedPick := 0
 
 	// tailObserver holds the forced-pick invariant on its own, so the per-hand
@@ -295,16 +295,22 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 					sawDeclarationPhase++
 				}
 				require.Equal(t, 0, cur.TrickNumber, "no trick is open during the declaration phase")
-				require.True(t, cur.AwaitingDeclaration,
-					"the phase only persists with a prompt outstanding — otherwise the table has nothing to wait for")
+				require.False(t, cur.AwaitingDeclaration,
+					"the phase asks all four seats at once — no seat is ever on the clock")
 				require.NotNil(t, cur.TrumpSuit, "the phase is only reachable after a resolved bid")
-				require.Equal(t, cur.ActivePlayerSeat, seat, "only the prompted seat may answer")
-				require.False(t, answered[seat], "seat %d was prompted twice", seat)
+				require.Equal(t, (cur.DealerSeat+1)%4, cur.ActivePlayerSeat,
+					"pinned to the trick-1 leader for the phase's whole duration")
+				// Two distinct invariants, so two distinct messages: the engine
+				// must still consider the seat unanswered, and this observer
+				// must not have seen it answer before.
+				require.False(t, cur.Players[seat].DeclarationAnswered,
+					"seat %d is already marked answered in the engine state", seat)
+				require.False(t, answered[seat], "the driver drove seat %d twice", seat)
 				answered[seat] = true
-				sawPromptedSeat++
+				sawAnsweredSeat++
 				require.Contains(t,
 					[]string{game.ActionDeclare, game.ActionSkipDeclare}, action.Type,
-					"bot must answer the prompt, not play a card, in the declaration phase")
+					"bot must answer, not play a card, in the declaration phase")
 
 			case game.PhasePlaying:
 				require.True(t, cur.DeclarationsResolved,
@@ -317,15 +323,15 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 		_, _ = playOneHandWith(t, gs, mem, rng, croatianBotDriver, observe)
 
 		if enteredPhase {
-			require.NotEmpty(t, answered, "the phase opened, so at least one seat was prompted")
+			require.Len(t, answered, 4, "the phase opened, so every seat answered exactly once")
 		}
 	}
 
 	// The phase is not vacuously "safe" because it was never entered.
 	assert.Positive(t, sawDeclarationPhase, "no hand ever opened the declaration phase")
-	assert.Positive(t, sawPromptedSeat, "no seat was ever prompted inside the phase")
-	t.Logf("declaration phase opened in %d/%d random hands, %d seats prompted, %d forced dealer picks",
-		sawDeclarationPhase, handsTarget, sawPromptedSeat, sawForcedPick)
+	assert.Positive(t, sawAnsweredSeat, "no seat ever answered inside the phase")
+	t.Logf("declaration phase opened in %d/%d random hands, %d seats answered, %d forced dealer picks",
+		sawDeclarationPhase, handsTarget, sawAnsweredSeat, sawForcedPick)
 
 	// Deterministic tail: one hand started FROM the forced-pick state, so this
 	// run always exercises it regardless of how the 200 random deals fell. Same
@@ -353,6 +359,18 @@ func croatianBotDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int
 	seat := gs.ActivePlayerSeat
 	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil {
 		seat = *gs.PendingBelotSeat
+	}
+	if gs.Phase == game.PhaseDeclaring {
+		// The dedicated phase asks all four seats at once and ActivePlayerSeat
+		// is pinned to the trick-1 leader, so it names nobody in particular.
+		// Drive the first seat that still owes an answer — the same rule
+		// botDecisionSeats applies in the match layer.
+		for s := range gs.Players {
+			if !gs.Players[s].DeclarationAnswered {
+				seat = s
+				break
+			}
+		}
 	}
 
 	return seat, bot.Decide(viewFromState(gs, seat, mem))

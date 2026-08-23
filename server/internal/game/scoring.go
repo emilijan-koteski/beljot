@@ -177,7 +177,6 @@ func startNewHand(state *GameState) {
 	state.TrickWinnerSeat = nil
 	state.AwaitingDeclaration = false
 	state.DeclarationsResolved = false
-	state.DeclarationSeatsAnswered = 0
 	state.DeclarationsContested = false
 	state.HandCompleteReady = [4]bool{}
 
@@ -204,6 +203,7 @@ func startNewHand(state *GameState) {
 		state.Players[i].Hand = []Card{}
 		state.Players[i].FaceDownCards = nil
 		state.Players[i].Declarations = nil
+		state.Players[i].DeclarationAnswered = false
 	}
 
 	// Generate fresh deck, shuffle, and deal

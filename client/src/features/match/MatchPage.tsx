@@ -59,7 +59,6 @@ import { CardFlight, type CardFlightDescriptor, type FlightRect } from "./compon
 import { DealAnimation } from "./components/DealAnimation";
 import { DeclarationPrompt } from "./components/DeclarationPrompt";
 import { DeclarationReveal } from "./components/DeclarationReveal";
-import { DeclarationWaiting } from "./components/DeclarationWaiting";
 import { DeclareBanner } from "./components/DeclareBanner";
 import { EmoteBubble } from "./components/EmoteBubble";
 import { EmotePickerButton } from "./components/EmotePickerButton";
@@ -1435,8 +1434,14 @@ export function MatchPage() {
     matchEndData !== null ||
     matchAbandonedData !== null ||
     matchState.phase === "disconnected";
+  // The dedicated declaration phase is a fixed window rather than a turn: nobody
+  // is on the clock, there is no turnExpiresAt to preserve, and the server
+  // rejects action:pause there outright. Offering the control would only earn
+  // the player a wrong-phase toast. Surrender stays available in all three
+  // phases, which is why this is separate from isTurnPhase.
+  const isPausablePhase = isTurnPhase && matchState.phase !== "declaring";
   const canPause =
-    !isPaused && isTurnPhase && myPlayerSeat !== null && !matchState.pauseUsed?.[myPlayerSeat];
+    !isPaused && isPausablePhase && myPlayerSeat !== null && !matchState.pauseUsed?.[myPlayerSeat];
 
   // Surrender state (Story 8.2)
   const surrenderProposerSeat = matchState.surrenderProposerSeat;
@@ -1495,20 +1500,24 @@ export function MatchPage() {
   // taken" reveal and the "you have declarations" prompt appear in the same
   // render. The reveal auto-dismisses (or the player closes it), then the
   // prompt surfaces — a deliberate beat between the two.
+  //
+  // The dedicated phase (Croatian) asks all four seats AT ONCE, so every seat
+  // sees the dialog — a seat holding nothing included, with an empty state and
+  // a disabled Declare. That uniformity is the feature: the phase used to prompt
+  // meld holders one at a time, so activePlayerSeat named exactly who held a
+  // meld and the table learned it before they chose. Keyed off the server's
+  // phase and the seat's own answered flag, never off the variant.
+  //
+  // Bitola keeps its seat gate: promptDeclarations is built from the VIEWER's
+  // own hand, so without it all four seats would render a trick-1 prompt and
+  // three would be rejected with ErrNotYourTurn.
+  const isDeclarationPhase = matchState.phase === "declaring";
+  const declarationAnsweredCount = matchState.players.filter((p) => p.declarationAnswered).length;
   const showDeclarationPrompt =
-    matchState.awaitingDeclaration === true &&
-    matchState.activePlayerSeat === myPlayerSeat &&
-    trumpReveal === null;
-
-  // The dedicated declaration phase prompts ONE seat at a time; the other three
-  // would otherwise sit in front of a table that looks frozen — full hands, an
-  // empty trick, trickNumber 0 — for up to four consecutive turns before trick
-  // 1 begins. Keyed off the server's phase, never off the variant.
-  const showDeclarationWaiting =
-    matchState.phase === "declaring" &&
-    matchState.activePlayerSeat !== myPlayerSeat &&
     trumpReveal === null &&
-    declarationReveal === null;
+    (isDeclarationPhase
+      ? myPlayer !== undefined && declarationReveal === null
+      : matchState.awaitingDeclaration === true && matchState.activePlayerSeat === myPlayerSeat);
 
   // Belot state. The local pre-play prompt (belotPromptCardId) takes priority;
   // the server-driven prompt is the fallback and is suppressed while the local
@@ -1619,7 +1628,13 @@ export function MatchPage() {
       {matchState.players.map((player) => {
         const compass = compassOffset(player.seat, myPlayerSeat);
         const isSelf = player.seat === myPlayerSeat;
-        const isActive = matchState.activePlayerSeat === player.seat;
+        // Nobody is on the clock during the dedicated declaration phase — all
+        // four seats answer at once. activePlayerSeat is still set there (pinned
+        // to the trick-1 leader, where it has to land anyway), so the highlight
+        // and its countdown ring are suppressed on the phase rather than on the
+        // seat. Leaving one seat lit would both misdescribe the phase and, back
+        // when it was a cursor, name a meld holder.
+        const isActive = !isDeclarationPhase && matchState.activePlayerSeat === player.seat;
         // Caller chip only shows the suit when this seat IS the trump caller.
         const isCaller =
           matchState.trumpCallerSeat !== null &&
@@ -1753,17 +1768,19 @@ export function MatchPage() {
           phones fold these into the top-right hamburger menu below). */}
       {isTurnPhase && (
         <div className="absolute bottom-4 left-4 z-10 hidden items-center gap-2 md:flex">
-          <HUDButton
-            icon={<Pause className="h-4 w-4" aria-hidden="true" />}
-            label={
-              matchState.pauseUsed?.[myPlayerSeat]
-                ? t("match.pause.pauseUsed")
-                : t("match.hud.pause")
-            }
-            onClick={handlePause}
-            disabled={!canPause}
-            data-testid="pause-button"
-          />
+          {isPausablePhase && (
+            <HUDButton
+              icon={<Pause className="h-4 w-4" aria-hidden="true" />}
+              label={
+                matchState.pauseUsed?.[myPlayerSeat]
+                  ? t("match.pause.pauseUsed")
+                  : t("match.hud.pause")
+              }
+              onClick={handlePause}
+              disabled={!canPause}
+              data-testid="pause-button"
+            />
+          )}
 
           <SurrenderButton
             canRequest={canSurrenderRequest}
@@ -1868,21 +1885,23 @@ export function MatchPage() {
               >
                 {isTurnPhase && (
                   <>
-                    <HUDButton
-                      icon={<Pause className="h-4 w-4" aria-hidden="true" />}
-                      label={
-                        matchState.pauseUsed?.[myPlayerSeat]
-                          ? t("match.pause.pauseUsed")
-                          : t("match.hud.pause")
-                      }
-                      onClick={() => {
-                        handlePause();
-                        setHudMenuOpen(false);
-                      }}
-                      disabled={!canPause}
-                      style={{ width: "100%", justifyContent: "flex-start" }}
-                      data-testid="hud-menu-pause"
-                    />
+                    {isPausablePhase && (
+                      <HUDButton
+                        icon={<Pause className="h-4 w-4" aria-hidden="true" />}
+                        label={
+                          matchState.pauseUsed?.[myPlayerSeat]
+                            ? t("match.pause.pauseUsed")
+                            : t("match.hud.pause")
+                        }
+                        onClick={() => {
+                          handlePause();
+                          setHudMenuOpen(false);
+                        }}
+                        disabled={!canPause}
+                        style={{ width: "100%", justifyContent: "flex-start" }}
+                        data-testid="hud-menu-pause"
+                      />
+                    )}
                     <HUDButton
                       variant="danger"
                       icon={<Flag className="h-4 w-4" aria-hidden="true" />}
@@ -2066,24 +2085,10 @@ export function MatchPage() {
       {/* Reshuffle animation overlay */}
       {showReshuffle && <ReshuffleAnimation onComplete={handleReshuffleComplete} />}
 
-      {/* Declaration phase, seats not on the clock */}
-      {showDeclarationWaiting && (
-        <DeclarationWaiting
-          activePlayerName={
-            playerDisplayName(
-              t,
-              matchState.players.find((p) => p.seat === matchState.activePlayerSeat),
-            ) ?? null
-          }
-          activePlayerTeam={
-            matchState.activePlayerSeat !== null
-              ? seatTeam(matchState.activePlayerSeat, myPlayerSeat)
-              : null
-          }
-        />
-      )}
-
-      {/* Declaration prompt overlay */}
+      {/* Declaration prompt overlay. In the dedicated phase this is on every
+          seat's screen at once, in the same shape, and stays up in a waiting
+          state after the viewer answers — so nobody can read anyone else's
+          melds, or whether they had any, off the table. */}
       {showDeclarationPrompt && myPlayer && (
         <DeclarationPrompt
           declarations={promptDeclarations}
@@ -2091,6 +2096,9 @@ export function MatchPage() {
           onSkip={handleSkipDeclare}
           turnExpiresAt={matchState.turnExpiresAt}
           timerDurationSec={matchState.timerDurationSec}
+          simultaneous={isDeclarationPhase}
+          answered={isDeclarationPhase && myPlayer.declarationAnswered}
+          answeredCount={declarationAnsweredCount}
         />
       )}
 

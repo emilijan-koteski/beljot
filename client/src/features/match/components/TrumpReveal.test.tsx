@@ -23,6 +23,7 @@ function makePlayers(): PlayerState[] {
       level: 1,
       faceDownCount: 0,
       handCount: 0,
+      declarationAnswered: false,
     },
     {
       hand: [],
@@ -36,6 +37,7 @@ function makePlayers(): PlayerState[] {
       level: 1,
       faceDownCount: 0,
       handCount: 0,
+      declarationAnswered: false,
     },
     {
       hand: [],
@@ -49,6 +51,7 @@ function makePlayers(): PlayerState[] {
       level: 1,
       faceDownCount: 0,
       handCount: 0,
+      declarationAnswered: false,
     },
     {
       hand: [],
@@ -62,6 +65,7 @@ function makePlayers(): PlayerState[] {
       level: 1,
       faceDownCount: 0,
       handCount: 0,
+      declarationAnswered: false,
     },
   ];
 }

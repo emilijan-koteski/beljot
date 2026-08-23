@@ -22,18 +22,19 @@ import (
 // these tests carry more weight than the detection logic.
 
 // croatianDeclaringSession starts a per-move Croatian session and parks it in
-// the declaration phase with the cursor on its opening seat.
+// the declaration phase with all four seats unanswered.
 //
-// deadlineIn is added to now to produce the injected TurnExpiresAt: pass a
-// negative span for the timer-expiry tests (an already-elapsed deadline is what
-// makes "the next seat got a FRESH window" a real assertion) and a positive one
-// for tests that must observe an existing deadline being preserved.
+// windowIn is added to now to produce the session's fixed declaration deadline:
+// pass a negative span to model a window that has already elapsed, a positive
+// one for tests that must observe an existing deadline being preserved. The
+// phase carries NO TurnExpiresAt — nobody is on the clock — so that is asserted
+// here rather than injected.
 func croatianDeclaringSession(
 	t *testing.T,
 	hub match.Broadcaster,
 	roomID uint,
 	timerSec int,
-	deadlineIn time.Duration,
+	windowIn time.Duration,
 ) (*match.Manager, *game.GameState) {
 	t.Helper()
 
@@ -46,15 +47,30 @@ func croatianDeclaringSession(
 	gs := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
 	gs.RoomID = roomID
 	require.Equal(t, game.PhaseDeclaring, gs.Phase)
-	require.True(t, gs.AwaitingDeclaration)
-	require.Equal(t, 1, gs.ActivePlayerSeat, "the fixture opens the cursor on seat 1")
+	require.False(t, gs.AwaitingDeclaration, "the phase never puts a seat on the clock")
+	require.Equal(t, 1, gs.ActivePlayerSeat, "pinned to the trick-1 leader")
+	for seat, p := range gs.Players {
+		require.False(t, p.DeclarationAnswered, "seat %d starts unanswered", seat)
+	}
 
-	deadline := time.Now().Add(deadlineIn)
-	gs.TurnExpiresAt = &deadline
+	gs.TurnExpiresAt = nil
 	gs.TimerDurationSec = timerSec
 	mgr.SetGameStateForTest(roomID, gs)
+	mgr.SetDeclarationExpiresAtForTest(roomID, time.Now().Add(windowIn))
 
 	return mgr, gs
+}
+
+// answerAll drives every seat through the phase with the given action, applying
+// each through ApplyAction so the walk exercises the real engine.
+func answerAll(t *testing.T, state *game.GameState, seats []int, action string) *game.GameState {
+	t.Helper()
+	for _, seat := range seats {
+		next, err := game.ApplyAction(state, game.Action{Type: action, PlayerSeat: seat})
+		require.NoError(t, err, "seat %d", seat)
+		state = next
+	}
+	return state
 }
 
 // --- Wire helpers ---
@@ -188,80 +204,23 @@ func winningTeamOf(t *testing.T, st *game.GameState) *int {
 
 // --- Tests ---
 
-// TestDeclarationPhase_TimerExpiryAutoSkipsAndContinues pins the matrix row for
-// an expired prompt: the seat is auto-skipped, the phase moves on to the next
-// seat, and a FRESH timer is armed for it. Without the phase in
-// handleTimerExpiry's chain the default arm returns with no timer at all and the
-// table freezes forever.
-func TestDeclarationPhase_TimerExpiryAutoSkipsAndContinues(t *testing.T) {
+// TestDeclarationPhase_WindowForceClosesTheContest pins the matrix row for an
+// elapsed window: every unanswered seat is treated as having skipped, the
+// contest resolves, and trick 1 opens with a live per-move timer. The phase runs
+// no per-move timer of its own, so this fallback is its ONLY clock — without it
+// an idle table sits in the phase forever.
+func TestDeclarationPhase_WindowForceClosesTheContest(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(100)
-	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, -time.Second)
-	promptedSeat := gs.ActivePlayerSeat
-
-	mgr.TriggerTimerExpiryForTest(roomID, promptedSeat, 10*time.Millisecond)
-
-	require.Eventually(t, func() bool {
-		st := mgr.GetStateSnapshot(roomID)
-		return st != nil && st.ActivePlayerSeat != promptedSeat
-	}, 2*time.Second, 5*time.Millisecond, "the auto-skip must advance the cursor")
-
-	after := mgr.GetStateSnapshot(roomID)
-	require.NotNil(t, after)
-	assert.Equal(t, game.PhaseDeclaring, after.Phase, "the phase continues to the next seat")
-	assert.True(t, after.AwaitingDeclaration, "the next meld-holder is prompted")
-	assert.Equal(t, 2, after.ActivePlayerSeat, "the cursor walks counter-clockwise")
-	assert.Empty(t, after.Players[promptedSeat].Declarations, "an auto-skip stores nothing")
-
-	require.NotNil(t, after.TurnExpiresAt, "the next seat must have a clock")
-	assert.True(t, after.TurnExpiresAt.After(time.Now()),
-		"a fresh window, never the elapsed deadline the expiry fired on")
-
-	events := wireEvents(t, hub.snapshot())
-	autoIdx := indexOfKind(events, ws.EventAutoAction)
-	require.GreaterOrEqual(t, autoIdx, 0, "the timed-out player must be named to the table")
-	var auto ws.AutoActionPayload
-	require.NoError(t, json.Unmarshal(events[autoIdx].payload, &auto))
-	assert.Equal(t, ws.AutoActionSkipDeclare, auto.Type)
-	assert.Equal(t, promptedSeat, auto.PlayerSeat)
-	assert.Equal(t, -1, indexOfKind(events, ws.EventDeclarationsResolved),
-		"the contest is still open — nothing may be revealed yet")
-}
-
-// TestDeclarationPhase_TimerExpiryOnLastSeatOpensTrick1 covers the handoff under
-// timer expiry rather than a player action: the fourth auto-skip must resolve
-// the contest, emit the reveal ahead of the playing-phase state, start trick 1,
-// and arm the leader's timer.
-func TestDeclarationPhase_TimerExpiryOnLastSeatOpensTrick1(t *testing.T) {
-	hub := &hubSpy{}
-	const roomID = uint(101)
-	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, -time.Second)
-
-	// Walk to the last seat of the cursor's rotation by hand, leaving one answer
-	// outstanding for the timer to supply. Seats 1-3 DECLARE so the contest has a
-	// real winner and the reveal payload is non-trivial.
-	state := gs
-	for _, seat := range []int{1, 2, 3} {
-		require.Equal(t, seat, state.ActivePlayerSeat)
-		next, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
-		require.NoError(t, err)
-		state = next
-	}
-	require.Equal(t, game.PhaseDeclaring, state.Phase)
-	require.Equal(t, 0, state.ActivePlayerSeat, "the dealer answers last")
-
-	elapsed := time.Now().Add(-time.Second)
-	state.TurnExpiresAt = &elapsed
-	state.TimerDurationSec = 60
-	mgr.SetGameStateForTest(roomID, state)
+	mgr, _ := croatianDeclaringSession(t, hub, roomID, 60, -time.Second)
 
 	before := len(hub.snapshot())
-	mgr.TriggerTimerExpiryForTest(roomID, 0, 10*time.Millisecond)
+	mgr.TriggerDeclarationTimeoutForTest(roomID, 10*time.Millisecond)
 
 	require.Eventually(t, func() bool {
 		st := mgr.GetStateSnapshot(roomID)
 		return st != nil && st.Phase == game.PhasePlaying
-	}, 2*time.Second, 5*time.Millisecond, "the last auto-skip must open trick 1")
+	}, 2*time.Second, 5*time.Millisecond, "the elapsed window must force-close the phase")
 
 	after := mgr.GetStateSnapshot(roomID)
 	require.NotNil(t, after)
@@ -269,28 +228,57 @@ func TestDeclarationPhase_TimerExpiryOnLastSeatOpensTrick1(t *testing.T) {
 	assert.True(t, after.DeclarationsResolved)
 	assert.False(t, after.AwaitingDeclaration)
 	assert.Equal(t, (after.DealerSeat+1)%4, after.ActivePlayerSeat, "the leader is on the clock")
-	require.NotNil(t, after.TurnExpiresAt)
-	assert.True(t, after.TurnExpiresAt.After(time.Now()), "trick 1 opens with a live timer")
+	require.NotNil(t, after.TurnExpiresAt, "trick 1 opens with a live timer")
+	assert.True(t, after.TurnExpiresAt.After(time.Now()))
+	for seat, p := range after.Players {
+		assert.False(t, p.DeclarationAnswered, "seat %d's flag is cleared on the way out", seat)
+		assert.Empty(t, p.Declarations, "seat %d never answered, so it forfeits its melds", seat)
+	}
+
+	// Nobody declared, so the reveal names no winner — but it must still fire,
+	// and still ride ahead of the trick-1 state.
+	assertRevealPrecedesPlayingState(t, hub, before, nil)
+}
+
+// TestDeclarationPhase_WindowKeepsAnswersAlreadyGiven is the other half of the
+// force-close: seats that DID answer keep what they said.
+func TestDeclarationPhase_WindowKeepsAnswersAlreadyGiven(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(101)
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, -time.Second)
+
+	// Seats 1-3 declare; seat 0 never answers and is force-closed.
+	state := answerAll(t, gs, []int{1, 2, 3}, game.ActionDeclare)
+	require.Equal(t, game.PhaseDeclaring, state.Phase, "seat 0 still owes an answer")
+	mgr.SetGameStateForTest(roomID, state)
+
+	before := len(hub.snapshot())
+	mgr.TriggerDeclarationTimeoutForTest(roomID, 10*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Phase == game.PhasePlaying
+	}, 2*time.Second, 5*time.Millisecond, "the window must close the phase")
+
+	after := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, after)
+	assert.True(t, after.DeclarationsResolved)
+	assert.NotEqual(t, [2]int{0, 0}, after.DeclarationPoints,
+		"the three seats that did answer still contest the melds")
 
 	assertRevealPrecedesPlayingState(t, hub, before, winningTeamOf(t, after))
 }
 
-// TestDeclarationPhase_FinalAnswerRevealsBeforePlayingState is the same wire
-// contract on the player-driven path: the fourth seat's own declare closes the
-// contest, so the reveal and the trick-1 state ride out of a single action.
+// TestDeclarationPhase_FinalAnswerRevealsBeforePlayingState is the wire contract
+// on the player-driven path: the fourth seat's own declare closes the contest,
+// so the reveal and the trick-1 state ride out of a single action.
 func TestDeclarationPhase_FinalAnswerRevealsBeforePlayingState(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(106)
 	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
 
-	state := gs
-	for _, seat := range []int{1, 2, 3} {
-		require.Equal(t, seat, state.ActivePlayerSeat)
-		next, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
-		require.NoError(t, err)
-		state = next
-	}
-	require.Equal(t, 0, state.ActivePlayerSeat)
+	state := answerAll(t, gs, []int{1, 2, 3}, game.ActionDeclare)
+	require.Equal(t, game.PhaseDeclaring, state.Phase)
 	mgr.SetGameStateForTest(roomID, state)
 
 	before := len(hub.snapshot())
@@ -308,17 +296,66 @@ func TestDeclarationPhase_FinalAnswerRevealsBeforePlayingState(t *testing.T) {
 	assert.True(t, after.DeclarationsResolved)
 
 	assertRevealPrecedesPlayingState(t, hub, before, winningTeamOf(t, after))
-	events := wireEvents(t, hub.snapshot()[before:])
-	assert.GreaterOrEqual(t, indexOfKind(events, ws.EventPlayerDeclared), 0,
-		"a manual declare still announces who declared")
 }
 
-// TestDeclarationPhase_NoMeldHandStillRevealsOnPick is the edge the pick_trump
-// broadcast arm owns: when NO seat holds a meld the phase opens and closes
-// inside the pick_trump transition, so DeclarationsResolved flips there and the
-// fire-once latch must be spent by an arm that actually emits. Otherwise the
-// hand silently loses its reveal while the equivalent Bitola hand fires one.
-func TestDeclarationPhase_NoMeldHandStillRevealsOnPick(t *testing.T) {
+// TestDeclarationPhase_DeclareIsNotAnnouncedDuringThePhase is the information-
+// hiding rule at the wire. Bitola broadcasts event:player_declared the moment a
+// declare commits, so the table learns a meld exists; here that would out
+// whoever clicked first, before the contest has even decided whose melds become
+// public — and the losing team's never do. The reveal that follows is the whole
+// announcement.
+func TestDeclarationPhase_DeclareIsNotAnnouncedDuringThePhase(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(121)
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
+
+	before := len(hub.snapshot())
+	client := &ws.Client{UserID: gs.Players[1].UserID}
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:declare", Payload: []byte(`{}`)})
+
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Players[1].DeclarationAnswered
+	}, 2*time.Second, 5*time.Millisecond, "the declare must commit")
+
+	mid := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, mid)
+	require.Equal(t, game.PhaseDeclaring, mid.Phase, "three seats still owe an answer")
+	require.NotEmpty(t, mid.Players[1].Declarations, "the melds are banked server-side")
+
+	events := wireEvents(t, hub.snapshot()[before:])
+	assert.Equal(t, -1, indexOfKind(events, ws.EventPlayerDeclared),
+		"no seat may be named to the table while the contest is still open")
+	assert.Equal(t, -1, indexOfKind(events, ws.EventDeclarationsResolved),
+		"and nothing is revealed until every seat has answered")
+}
+
+// TestDeclarationPhase_OtherSeatsMeldsStayMaskedMidPhase is the same rule one
+// layer down: even though the melds are on the server the instant a seat
+// declares, the per-recipient projection must keep them off every other seat's
+// snapshot until the contest resolves.
+func TestDeclarationPhase_OtherSeatsMeldsStayMaskedMidPhase(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(122)
+	_, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
+
+	state := answerAll(t, gs, []int{1}, game.ActionDeclare)
+	require.NotEmpty(t, state.Players[1].Declarations)
+	require.False(t, state.DeclarationsResolved)
+
+	// Seat 2 is an opponent of seat 1 and has not answered.
+	seen := game.ProjectForSeat(state, 2)
+	assert.Empty(t, seen.Players[1].Declarations, "seat 1's melds must not reach seat 2")
+	assert.True(t, seen.Players[1].DeclarationAnswered,
+		"that seat 1 has ANSWERED is public — it says nothing about what they hold")
+	assert.False(t, seen.Players[3].DeclarationAnswered)
+}
+
+// TestDeclarationPhase_NoMeldHandStillOpensThePhase is the reversal that closes
+// the last leak: when NOBODY holds a meld the phase still opens and still asks
+// all four seats. A phase that resolved instantly in that case would announce,
+// by its very absence, that somebody holds one.
+func TestDeclarationPhase_NoMeldHandStillOpensThePhase(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(107)
 
@@ -355,57 +392,96 @@ func TestDeclarationPhase_NoMeldHandStillRevealsOnPick(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		st := mgr.GetStateSnapshot(roomID)
-		return st != nil && st.Phase == game.PhasePlaying
-	}, 2*time.Second, 5*time.Millisecond, "a meld-less hand goes straight to trick 1")
+		return st != nil && st.Phase == game.PhaseDeclaring
+	}, 2*time.Second, 5*time.Millisecond, "a meld-less hand still opens the phase")
 
-	after := mgr.GetStateSnapshot(roomID)
-	require.NotNil(t, after)
-	assert.Equal(t, 1, after.TrickNumber)
-	assert.True(t, after.DeclarationsResolved, "the contest resolved with nothing declared")
-	assert.Equal(t, [2]int{0, 0}, after.DeclarationPoints)
+	opened := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, opened)
+	assert.Equal(t, 0, opened.TrickNumber)
+	assert.False(t, opened.DeclarationsResolved, "nothing is revealed before the seats answer")
+	assert.Nil(t, opened.TurnExpiresAt, "no per-move clock in this phase")
+	assert.False(t, mgr.DeclarationExpiresAtForTest(roomID).IsZero(), "the fixed window is armed")
 
-	// No team scored, so the reveal names no winner — but it must still fire.
-	assertRevealPrecedesPlayingState(t, hub, before, nil)
+	events := wireEvents(t, hub.snapshot()[before:])
+	assert.Equal(t, -1, indexOfKind(events, ws.EventDeclarationsResolved),
+		"a meld-less hand must be indistinguishable from any other until the seats answer")
+
+	// And it closes normally once they do.
+	state := answerAll(t, opened, []int{1, 2, 3, 0}, game.ActionSkipDeclare)
+	assert.Equal(t, game.PhasePlaying, state.Phase)
+	assert.Equal(t, [2]int{0, 0}, state.DeclarationPoints)
 }
 
-// TestDeclarationPhase_ActionArmsTimerForNextSeat guards the timer-arm branch in
-// HandleAction: a declare/skip that advances the cursor must issue a fresh
-// window for the next seat, not silently leave the phase unclocked.
-func TestDeclarationPhase_ActionArmsTimerForNextSeat(t *testing.T) {
+// TestDeclarationPhase_ActionDoesNotExtendTheWindow guards the fixed-deadline
+// rule in HandleAction's PhaseDeclaring arm. The deadline is set on ENTRY only;
+// if each answer refreshed it, three prompt players could keep extending the
+// wait on a fourth who never answers.
+func TestDeclarationPhase_ActionDoesNotExtendTheWindow(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(102)
-	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, -time.Second)
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
+	original := mgr.DeclarationExpiresAtForTest(roomID)
+	require.False(t, original.IsZero())
 
-	client := &ws.Client{UserID: gs.Players[gs.ActivePlayerSeat].UserID}
+	client := &ws.Client{UserID: gs.Players[1].UserID}
 	mgr.HandleAction(client, ws.WSMessage{Type: "action:skip_declare", Payload: []byte(`{}`)})
 
 	require.Eventually(t, func() bool {
 		st := mgr.GetStateSnapshot(roomID)
-		return st != nil && st.ActivePlayerSeat == 2
-	}, 2*time.Second, 5*time.Millisecond, "the answer must advance the cursor")
+		return st != nil && st.Players[1].DeclarationAnswered
+	}, 2*time.Second, 5*time.Millisecond, "the answer must commit")
 
 	after := mgr.GetStateSnapshot(roomID)
 	require.NotNil(t, after)
-	assert.Equal(t, game.PhaseDeclaring, after.Phase)
-	require.NotNil(t, after.TurnExpiresAt)
-	assert.True(t, after.TurnExpiresAt.After(time.Now()),
-		"the next seat gets a fresh window, not the previous seat's elapsed one")
+	assert.Equal(t, game.PhaseDeclaring, after.Phase, "three seats still owe an answer")
+	assert.Nil(t, after.TurnExpiresAt, "no seat is ever put on the clock")
+	assert.True(t, mgr.DeclarationExpiresAtForTest(roomID).Equal(original),
+		"an answer must not push the shared window back")
 }
 
-// TestDeclarationPhase_SurrenderDeclinePreservesTheTurnBudget is the other half
-// of the same timer branch — the WITHIN-turn one. A surrender request and its
-// decline leave both seat and phase unchanged, so preserveTimer must keep the
-// ORIGINAL deadline: minting a fresh window would let any client extend the
-// prompted player's turn indefinitely by proposing and declining.
-func TestDeclarationPhase_SurrenderDeclinePreservesTheTurnBudget(t *testing.T) {
+// TestDeclarationPhase_RejectedActionKeepsTheWindowArmed is the error path of
+// the same arm. HandleAction cancels the turn timer BEFORE applying, so a
+// rejected action — a second answer from a seat that already spoke is the common
+// one — would permanently disarm the phase's only clock unless the error branch
+// re-creates it against the same deadline.
+func TestDeclarationPhase_RejectedActionKeepsTheWindowArmed(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(123)
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 40*time.Millisecond)
+
+	client := &ws.Client{UserID: gs.Players[1].UserID}
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:skip_declare", Payload: []byte(`{}`)})
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Players[1].DeclarationAnswered
+	}, 2*time.Second, 5*time.Millisecond)
+
+	// Same seat answers again — rejected, and the rejection must not disarm the
+	// window that is about to fire.
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:declare", Payload: []byte(`{}`)})
+
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Phase == game.PhasePlaying
+	}, 2*time.Second, 5*time.Millisecond,
+		"the window must still fire after a rejected action")
+
+	after := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, after)
+	assert.True(t, after.DeclarationsResolved)
+	assert.Empty(t, after.Players[1].Declarations, "the rejected declare did not overwrite the skip")
+}
+
+// TestDeclarationPhase_SurrenderLeavesTheWindowAlone replaces the old
+// turn-budget test: there is no per-seat budget in this phase to preserve, but a
+// surrender detour must still not disturb the shared window or the answers.
+func TestDeclarationPhase_SurrenderLeavesTheWindowAlone(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(108)
 	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
-	cursorSeat := gs.ActivePlayerSeat
-	originalDeadline := *gs.TurnExpiresAt
+	original := mgr.DeclarationExpiresAtForTest(roomID)
 
-	// Seat 3 proposes; its partner is seat 1 — the seat currently on the clock,
-	// which is exactly the budget that must not be refreshed.
+	// Seat 3 proposes; its partner is seat 1.
 	proposer := &ws.Client{UserID: gs.Players[3].UserID}
 	mgr.HandleAction(proposer, ws.WSMessage{Type: "action:surrender_request", Payload: []byte(`{}`)})
 
@@ -417,12 +493,11 @@ func TestDeclarationPhase_SurrenderDeclinePreservesTheTurnBudget(t *testing.T) {
 	proposed := mgr.GetStateSnapshot(roomID)
 	require.NotNil(t, proposed)
 	assert.Equal(t, game.PhaseDeclaring, proposed.Phase, "proposing does not leave the phase")
-	assert.True(t, proposed.AwaitingDeclaration, "the prompt survives the proposal")
-	require.NotNil(t, proposed.TurnExpiresAt)
-	assert.True(t, proposed.TurnExpiresAt.Equal(originalDeadline),
-		"a proposal must not mint a fresh window for the prompted seat")
+	assert.Nil(t, proposed.TurnExpiresAt)
+	assert.True(t, mgr.DeclarationExpiresAtForTest(roomID).Equal(original),
+		"a proposal must not mint a fresh window")
 
-	partner := &ws.Client{UserID: gs.Players[cursorSeat].UserID}
+	partner := &ws.Client{UserID: gs.Players[1].UserID}
 	mgr.HandleAction(partner, ws.WSMessage{Type: "action:surrender_decline", Payload: []byte(`{}`)})
 
 	require.Eventually(t, func() bool {
@@ -433,70 +508,55 @@ func TestDeclarationPhase_SurrenderDeclinePreservesTheTurnBudget(t *testing.T) {
 	declined := mgr.GetStateSnapshot(roomID)
 	require.NotNil(t, declined)
 	assert.Equal(t, game.PhaseDeclaring, declined.Phase)
-	assert.Equal(t, cursorSeat, declined.ActivePlayerSeat, "the cursor never moved")
-	assert.True(t, declined.AwaitingDeclaration, "the declaration is still owed")
-	require.NotNil(t, declined.TurnExpiresAt)
-	assert.True(t, declined.TurnExpiresAt.Equal(originalDeadline),
-		"declining must preserve the original deadline, not restart the turn")
+	assert.True(t, mgr.DeclarationExpiresAtForTest(roomID).Equal(original),
+		"declining must preserve the window, not restart it")
+	for seat, p := range declined.Players {
+		assert.False(t, p.DeclarationAnswered, "seat %d's answer is unaffected by the detour", seat)
+	}
 
 	// And the phase still resolves normally afterwards.
 	mgr.HandleAction(partner, ws.WSMessage{Type: "action:skip_declare", Payload: []byte(`{}`)})
 	require.Eventually(t, func() bool {
 		st := mgr.GetStateSnapshot(roomID)
-		return st != nil && st.ActivePlayerSeat != cursorSeat
-	}, 2*time.Second, 5*time.Millisecond, "the phase must still advance after the surrender detour")
+		return st != nil && st.Players[1].DeclarationAnswered
+	}, 2*time.Second, 5*time.Millisecond, "the phase must still accept answers after the surrender detour")
 }
 
-// TestDeclarationPhase_IsPausable pins the phase into the pause allowlist and
-// checks the session manager restores it — a pause that silently failed here
-// would also break disconnect handling, which rides on the same path.
-func TestDeclarationPhase_IsPausable(t *testing.T) {
+// TestDeclarationPhase_IsNotPausable pins the phase OUT of the pause allowlist.
+// It is a fixed-length window with no active turn and no TurnExpiresAt, so
+// pause/unpause — whose whole job is preserving and restoring TurnTimeRemaining
+// — has nothing to carry.
+func TestDeclarationPhase_IsNotPausable(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(103)
-	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, -time.Second)
-	cursorSeat := gs.ActivePlayerSeat
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
 
-	// Pause from a seat that is NOT on the clock — pausing must not depend on
-	// owning the turn.
 	pauser := &ws.Client{UserID: gs.Players[3].UserID}
 	mgr.HandleAction(pauser, ws.WSMessage{Type: "action:pause", Payload: []byte(`{}`)})
 
-	require.Eventually(t, func() bool {
+	// Nothing to wait for — assert the phase never changes.
+	assert.Never(t, func() bool {
 		st := mgr.GetStateSnapshot(roomID)
 		return st != nil && st.Phase == game.PhasePaused
-	}, 2*time.Second, 5*time.Millisecond, "the phase must be pausable")
+	}, 200*time.Millisecond, 10*time.Millisecond, "the phase must not be pausable")
 
-	paused := mgr.GetStateSnapshot(roomID)
-	require.NotNil(t, paused)
-	assert.Equal(t, game.PhaseDeclaring, paused.PreviousPhase)
-	assert.Nil(t, paused.TurnExpiresAt, "the turn clock is held during the pause")
-
-	mgr.HandleAction(pauser, ws.WSMessage{Type: "action:unpause", Payload: []byte(`{}`)})
-
-	require.Eventually(t, func() bool {
-		st := mgr.GetStateSnapshot(roomID)
-		return st != nil && st.Phase == game.PhaseDeclaring
-	}, 2*time.Second, 5*time.Millisecond, "unpause must restore the declaration phase")
-
-	resumed := mgr.GetStateSnapshot(roomID)
-	require.NotNil(t, resumed)
-	assert.Equal(t, cursorSeat, resumed.ActivePlayerSeat, "the cursor survives the pause")
-	assert.True(t, resumed.AwaitingDeclaration)
-	require.NotNil(t, resumed.TurnExpiresAt, "the clock restarts on resume")
-	assert.True(t, resumed.TurnExpiresAt.After(time.Now()))
+	after := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, after)
+	assert.Equal(t, game.PhaseDeclaring, after.Phase)
+	assert.False(t, after.PauseUsed[3], "a refused pause must not spend the player's one pause")
 }
 
-// TestDeclarationPhase_DisconnectAndReconnectRestoreCursor is the matrix's
+// TestDeclarationPhase_DisconnectAndReconnectRestoreThePhase is the matrix's
 // disconnect/reconnect pair. HandleDisconnect's phase switch has a silent
 // `default` arm: without the phase listed, a drop opens no reconnect window at
-// all, leaves the seat marked Connected, and the table waits on a player who is
-// gone.
-func TestDeclarationPhase_DisconnectAndReconnectRestoreCursor(t *testing.T) {
+// all and leaves the seat marked Connected — so the close gate, which counts
+// connected seats, waits out the whole window for an answer that can never come.
+func TestDeclarationPhase_DisconnectAndReconnectRestoreThePhase(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(104)
-	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, -time.Second)
-	cursorSeat := gs.ActivePlayerSeat
-	droppedUserID := gs.Players[cursorSeat].UserID
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
+	droppedSeat := 1
+	droppedUserID := gs.Players[droppedSeat].UserID
 
 	mgr.HandleDisconnect(droppedUserID)
 
@@ -508,10 +568,9 @@ func TestDeclarationPhase_DisconnectAndReconnectRestoreCursor(t *testing.T) {
 	dropped := mgr.GetStateSnapshot(roomID)
 	require.NotNil(t, dropped)
 	assert.Equal(t, game.PhaseDeclaring, dropped.PreviousPhase, "the phase is the restore target")
-	assert.False(t, dropped.Players[cursorSeat].Connected)
-	assert.Equal(t, cursorSeat, dropped.DisconnectedSeat)
+	assert.False(t, dropped.Players[droppedSeat].Connected)
+	assert.Equal(t, droppedSeat, dropped.DisconnectedSeat)
 	assert.NotNil(t, dropped.ReconnectExpiresAt)
-	assert.Nil(t, dropped.TurnExpiresAt, "the turn clock is frozen for the outage")
 
 	mgr.HandleReconnect(droppedUserID)
 
@@ -522,40 +581,87 @@ func TestDeclarationPhase_DisconnectAndReconnectRestoreCursor(t *testing.T) {
 
 	back := mgr.GetStateSnapshot(roomID)
 	require.NotNil(t, back)
-	assert.Equal(t, cursorSeat, back.ActivePlayerSeat, "the cursor is exactly where it was")
-	assert.True(t, back.AwaitingDeclaration, "the returning player still owes an answer")
-	assert.True(t, back.Players[cursorSeat].Connected)
+	assert.True(t, back.Players[droppedSeat].Connected)
 	assert.Equal(t, -1, back.DisconnectedSeat)
-	require.NotNil(t, back.TurnExpiresAt, "their turn timer is re-armed")
-	assert.True(t, back.TurnExpiresAt.After(time.Now()))
+	assert.Nil(t, back.TurnExpiresAt, "the phase still has no per-move clock")
+	assert.False(t, back.Players[droppedSeat].DeclarationAnswered,
+		"the returning player still owes an answer")
+	assert.True(t, mgr.DeclarationExpiresAtForTest(roomID).After(time.Now()),
+		"the outage bought them a fresh window rather than an elapsed one")
+
+	// They can still answer, and the phase still closes.
+	client := &ws.Client{UserID: droppedUserID}
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:declare", Payload: []byte(`{}`)})
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Players[droppedSeat].DeclarationAnswered
+	}, 2*time.Second, 5*time.Millisecond, "the returning player's answer must be accepted")
 }
 
-// TestDeclarationPhase_BotAnswersPrompt pins the bot scheduler: botDecisionSeats
-// returns an empty list for any phase it does not name, and an empty list stalls
-// the table with no error and no log line.
-func TestDeclarationPhase_BotAnswersPrompt(t *testing.T) {
+// TestDeclarationPhase_AnsweredSeatCannotAnswerAgain is the reconnect row's
+// fairness half: a client that rejoins mid-phase re-renders its dialog from the
+// snapshot, and the answered flag is what stops a skip being upgraded to a
+// declare after the fact.
+func TestDeclarationPhase_AnsweredSeatCannotAnswerAgain(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(124)
+	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
+
+	client := &ws.Client{UserID: gs.Players[1].UserID}
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:skip_declare", Payload: []byte(`{}`)})
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Players[1].DeclarationAnswered
+	}, 2*time.Second, 5*time.Millisecond)
+
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:declare", Payload: []byte(`{}`)})
+
+	assert.Never(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && len(st.Players[1].Declarations) > 0
+	}, 200*time.Millisecond, 10*time.Millisecond,
+		"the first answer stands — a skip may not become a declare")
+}
+
+// TestDeclarationPhase_AllBotSeatsAnswer pins the bot scheduler. Under the
+// simultaneous phase botDecisionSeats must return EVERY unanswered bot seat, not
+// one: scheduling a single seat would leave the rest silent until the window
+// elapsed, turning every hand with bots into a full-ceiling stall.
+func TestDeclarationPhase_AllBotSeatsAnswer(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(105)
 
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	mgr.SetBotDelayForTest(5*time.Millisecond, 10*time.Millisecond)
-	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-	gs := markBots(testfixtures.NewGameCroatianDeclaring(game.SuitHearts), 1)
+	gs := markBots(testfixtures.NewGameCroatianDeclaring(game.SuitHearts), 1, 2, 3)
 	gs.RoomID = roomID
-	require.Equal(t, 1, gs.ActivePlayerSeat, "the bot seat is the one on the clock")
+	gs.TurnExpiresAt = nil
 	mgr.SetGameStateForTest(roomID, gs)
+	mgr.SetDeclarationExpiresAtForTest(roomID, time.Now().Add(30*time.Second))
 	mgr.BotSchedule(roomID)
 
 	require.Eventually(t, func() bool {
 		st := mgr.GetStateSnapshot(roomID)
-		return st != nil && st.ActivePlayerSeat != 1
-	}, 2*time.Second, 5*time.Millisecond, "the bot must answer its declaration prompt")
+		if st == nil {
+			return false
+		}
+		for _, seat := range []int{1, 2, 3} {
+			if !st.Players[seat].DeclarationAnswered {
+				return false
+			}
+		}
+		return true
+	}, 2*time.Second, 5*time.Millisecond, "every bot seat must answer, not just one")
 
 	after := mgr.GetStateSnapshot(roomID)
 	require.NotNil(t, after)
-	assert.NotEmpty(t, after.Players[1].Declarations, "the bot declares whenever it can")
+	assert.Equal(t, game.PhaseDeclaring, after.Phase, "the human seat 0 has not answered yet")
+	for _, seat := range []int{1, 2, 3} {
+		assert.NotEmpty(t, after.Players[seat].Declarations, "bot seat %d declares whenever it can", seat)
+	}
 	assert.Empty(t, after.CurrentTrick, "no card may be played in this phase")
 }
 
@@ -593,13 +699,8 @@ func TestDeclarationPhase_RevealCarriesEveryMeldPerSeat(t *testing.T) {
 	const roomID = uint(118)
 	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
 
-	state := gs
-	for _, seat := range []int{1, 2, 3} {
-		next, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
-		require.NoError(t, err)
-		state = next
-	}
-	require.Equal(t, 0, state.ActivePlayerSeat)
+	state := answerAll(t, gs, []int{1, 2, 3}, game.ActionDeclare)
+	require.Equal(t, game.PhaseDeclaring, state.Phase, "seat 0 still owes an answer")
 	mgr.SetGameStateForTest(roomID, state)
 
 	before := len(hub.snapshot())
@@ -697,7 +798,7 @@ func TestDeclarationPhase_RevealReportsAnUncontestedWin(t *testing.T) {
 		require.NoError(t, err)
 		state = next
 	}
-	require.Equal(t, 0, state.ActivePlayerSeat)
+	require.Equal(t, game.PhaseDeclaring, state.Phase, "seat 0 still owes an answer")
 	require.Equal(t, game.TeamA, game.TeamForSeat(0), "seat 0 must be the second skipping seat")
 	mgr.SetGameStateForTest(roomID, state)
 
@@ -741,9 +842,9 @@ func TestDeclarationPhase_RevealReportsAContestWonByAnEarlierSeat(t *testing.T) 
 	const roomID = uint(120)
 	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
 
-	// Cursor order is 1 → 2 → 3 → 0. Seats 1 and 3 are team B and declare;
-	// seat 2 (team A) skips, so seat 0 — answering last — is team A's only
-	// declarer.
+	// Seats 1 and 3 are team B and declare; seat 2 (team A) skips, and seat 0 is
+	// held back so that team A's ONLY declarer is the seat whose answer closes
+	// the phase.
 	require.Equal(t, game.TeamA, game.TeamForSeat(0))
 	require.Equal(t, game.TeamA, game.TeamForSeat(2))
 	state := gs
@@ -756,7 +857,7 @@ func TestDeclarationPhase_RevealReportsAContestWonByAnEarlierSeat(t *testing.T) 
 		require.NoError(t, err)
 		state = next
 	}
-	require.Equal(t, 0, state.ActivePlayerSeat, "seat 0 must be the last to answer")
+	require.Equal(t, game.PhaseDeclaring, state.Phase, "seat 0 must be the last to answer")
 	require.Empty(t, state.Players[0].Declarations,
 		"seat 0 has not answered yet — its melds are absent from the pre-action state")
 	mgr.SetGameStateForTest(roomID, state)

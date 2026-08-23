@@ -36,7 +36,8 @@
       "isBot": false,
       "level": 3,
       "faceDownCount": 0,
-      "handCount": 1
+      "handCount": 1,
+      "declarationAnswered": false
     },
     {
       "hand": [],
@@ -49,7 +50,8 @@
       "isBot": false,
       "level": 1,
       "faceDownCount": 0,
-      "handCount": 1
+      "handCount": 1,
+      "declarationAnswered": false
     },
     {
       "hand": [],
@@ -62,7 +64,8 @@
       "isBot": false,
       "level": 2,
       "faceDownCount": 0,
-      "handCount": 1
+      "handCount": 1,
+      "declarationAnswered": false
     },
     {
       "hand": [],
@@ -75,7 +78,8 @@
       "isBot": false,
       "level": 0,
       "faceDownCount": 0,
-      "handCount": 1
+      "handCount": 1,
+      "declarationAnswered": false
     }
   ],
   "teamScores": [

@@ -154,6 +154,56 @@ func (m *Manager) SetHandCompleteExpiresAtForTest(roomID uint, t time.Time) {
 	lm.mu.Unlock()
 }
 
+// DeclarationExpiresAtForTest returns the session's fixed declaration-phase
+// deadline (zero if unset). Exposed so tests can assert that one seat's answer
+// never pushes the window back for the others.
+func (m *Manager) DeclarationExpiresAtForTest(roomID uint) time.Time {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return time.Time{}
+	}
+	lm.mu.RLock()
+	defer lm.mu.RUnlock()
+	return lm.declarationExpiresAt
+}
+
+// SetDeclarationExpiresAtForTest seeds the declaration-phase deadline,
+// simulating a phase that has already been entered (in real flow the deadline is
+// set when the transition into PhaseDeclaring first occurs).
+func (m *Manager) SetDeclarationExpiresAtForTest(roomID uint, t time.Time) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.mu.Lock()
+	lm.declarationExpiresAt = t
+	lm.mu.Unlock()
+}
+
+// TriggerDeclarationTimeoutForTest cancels any pending timer and re-arms a
+// short-duration one against handleDeclarationTimeout, then returns. Drives the
+// window-elapsed path without waiting out declarationAutoClose. Mirrors
+// TriggerTimerExpiryForTest for the phase that has no per-move timer.
+func (m *Manager) TriggerDeclarationTimeoutForTest(roomID uint, fireAfter time.Duration) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.mu.Lock()
+	lm.cancelTurnTimer()
+	gen := lm.timerGeneration
+	lm.turnTimer = time.AfterFunc(fireAfter, func() {
+		m.handleDeclarationTimeout(lm, gen)
+	})
+	lm.mu.Unlock()
+}
+
 // TriggerTimerExpiryForTest cancels any pending turn timer and re-arms a
 // short-duration timer for the given expectedSeat, then waits for it to fire.
 // Used by tests that drive the auto-action code path on an injected game state

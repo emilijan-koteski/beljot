@@ -34,6 +34,13 @@ type View struct {
 	ActivePlayerSeat int
 
 	AwaitingDeclaration bool
+	// HasDeclarations is true when this seat holds at least one meld it could
+	// declare. Handed over as a boolean for the same reason MustPickTrump is:
+	// the bot reads rule CONSEQUENCES (the overlap rule that decides what counts
+	// lives in the engine), never a variant name. Only meaningful in the
+	// dedicated declaration phase, where every seat is asked and the bot must
+	// choose between declare and skip on its own.
+	HasDeclarations bool
 	// PendingBelot is true when the engine is waiting on THIS seat's
 	// Belote/Rebelote announcement decision.
 	PendingBelot bool

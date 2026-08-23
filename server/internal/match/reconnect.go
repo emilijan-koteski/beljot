@@ -90,9 +90,10 @@ func (m *Manager) HandleDisconnect(userID uint) {
 	// acknowledgement that can never arrive, jamming the table (seen when a
 	// mobile client's socket drops during the pause).
 	// PhaseDeclaring (the dedicated declaration phase) is included for the same
-	// reason bidding is: it is a turn-taking phase with a live per-move timer, so
-	// a drop must freeze the clock and open a reconnect window rather than fall
-	// into the transient default and leave the seat marked Connected.
+	// reason PhaseHandComplete is: the phase closes once every CONNECTED seat has
+	// answered, so a seat that stays marked Connected while its socket is gone
+	// makes that gate wait out the full window for an answer that can never
+	// arrive — the same jam the score-reveal pause hits.
 	switch gs.Phase {
 	case game.PhasePlaying, game.PhaseBidding, game.PhaseDeclaring, game.PhasePaused, game.PhaseHandComplete:
 		// These are valid phases for disconnect handling — proceed
@@ -426,8 +427,17 @@ func (m *Manager) HandleReconnect(userID uint) {
 			// clears.
 			gs.PreviousPhase = gs.Phase
 			gs.Phase = game.PhasePaused
+			if gs.PreviousPhase == game.PhaseDeclaring {
+				// The declaration phase carries no TurnTimeRemaining for unpause
+				// to recompute from — its only clock is the session's fixed
+				// window. Seed it here so the resume has a deadline to fall
+				// through to, rather than a zero time that fires instantly on
+				// the first answer. (Unreachable while pause is refused inside
+				// the phase; kept so the invariant does not depend on that.)
+				session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
+			}
 		} else if session.timerStyle == "per-move" &&
-			(gs.Phase == game.PhasePlaying || gs.Phase == game.PhaseBidding || gs.Phase == game.PhaseDeclaring) {
+			(gs.Phase == game.PhasePlaying || gs.Phase == game.PhaseBidding) {
 			// Restore turn timer (same pattern as unpause timer resume in HandleAction).
 			const minResumeMs int64 = 3000
 			remaining := time.Duration(gs.TurnTimeRemaining) * time.Millisecond
@@ -444,6 +454,21 @@ func (m *Manager) HandleReconnect(userID uint) {
 			// restored turn keeps the players-see-0-first contract too.
 			session.cancelTurnTimer()
 			m.armTurnTimerLocked(session, remaining, gs.ActivePlayerSeat)
+		} else if gs.Phase == game.PhaseDeclaring {
+			// Restored into the dedicated declaration phase. The disconnect
+			// interrupted a fixed window, so give the table a FRESH one rather
+			// than resuming a deadline that may already have elapsed during the
+			// outage — the returning player needs time to read their own melds.
+			// Their answer, if they gave one, survives on
+			// PlayerState.DeclarationAnswered, so this is not a second chance.
+			// Applies regardless of timer style: the phase has no per-move clock.
+			gs.TurnExpiresAt = nil
+			session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
+			session.cancelTurnTimer()
+			gen := session.timerGeneration
+			session.turnTimer = time.AfterFunc(declarationAutoClose, func() {
+				m.handleDeclarationTimeout(session, gen)
+			})
 		} else if gs.Phase == game.PhaseHandComplete {
 			// Restored into the score-reveal pause. The disconnect interrupted the
 			// pause, so give the returning player a FRESH auto-continue window to

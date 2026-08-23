@@ -61,6 +61,22 @@ type PlayerState struct {
 	// FaceDownCount there is no sync call for any dealing or playing path to
 	// forget. In-process it is always stale/zero; nothing server-side may read it.
 	HandCount int `json:"handCount"`
+	// DeclarationAnswered records that this seat has answered the dedicated
+	// declaration phase — declared or skipped. The phase closes on the earlier
+	// of every connected seat answering (allDeclarationsAnswered) or the
+	// session manager's fixed window, so this is the per-seat half of that
+	// gate, mirroring HandCompleteReady for the score-reveal pause.
+	//
+	// PUBLIC on the wire, and safe only because of how the phase asks: ALL FOUR
+	// seats answer regardless of what they hold, so the flag says who has
+	// clicked and never who holds a meld. (The one-at-a-time cursor it replaced
+	// leaked exactly that through ActivePlayerSeat.) The client needs it to
+	// hold its own dialog in the "waiting for the others" state and to survive
+	// a reconnect mid-phase without being handed a second answer.
+	//
+	// Always false outside PhaseDeclaring — openDeclarationPhase clears all
+	// four on entry and the close clears them again on the way to trick 1.
+	DeclarationAnswered bool `json:"declarationAnswered"`
 }
 
 // syncFaceDownCounts refreshes every seat's public FaceDownCount from its
@@ -185,18 +201,6 @@ type GameState struct {
 	TrickWinnerSeat      *int        `json:"trickWinnerSeat"`
 	AwaitingDeclaration  bool        `json:"awaitingDeclaration"`
 	DeclarationsResolved bool        `json:"declarationsResolved"`
-	// DeclarationSeatsAnswered counts how many seats the PhaseDeclaring cursor
-	// has already visited, walking counter-clockwise from (DealerSeat+1)%4. A
-	// seat counts as visited once it declares, skips, or is stepped past for
-	// holding no meld — so the phase ends exactly when this reaches 4, and a
-	// skip is never confused with "not asked yet" (stored Declarations cannot
-	// tell those two apart). Always 0 outside the phase.
-	//
-	// Server-only (json:"-"): the client drives the prompt entirely from phase +
-	// awaitingDeclaration + activePlayerSeat, so this must not widen
-	// match_state. Value-typed, so cloneGameState's shallow struct copy carries
-	// it with no clone line of its own.
-	DeclarationSeatsAnswered int `json:"-"`
 	// DeclarationsContested records whether BOTH teams put a meld on the table
 	// in this hand's declaration contest — i.e. whether a comparison, rather
 	// than one team being the sole declarer, decided the winner.

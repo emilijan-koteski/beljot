@@ -15,6 +15,14 @@ package game
 //     unresolved: declaration cards ARE in-hand cards. Once DeclarationsResolved
 //     is true the engine has already nil'd the losing team's melds, so what
 //     remains is the public reveal and passes through.
+//   - DeclarationAnswered passes through UNMASKED on all four seats, and that
+//     is deliberate. In the dedicated declaration phase every seat answers
+//     whatever it holds, so the flag reports who has clicked and never who
+//     holds a meld — the clients need it to render "waiting for the others"
+//     honestly. The melds themselves stay masked by the rule above until the
+//     contest resolves. (This only holds while ALL seats are asked: an
+//     optimisation that stopped asking meld-less seats would turn this field
+//     into the leak the phase was rebuilt to close.)
 //   - PendingBelotSeat is nil'd unless it names the recipient: broadcasting it
 //     tells everyone a player holds the second trump royal before they choose
 //     to announce — the exact secret the announce/decline choice protects. The

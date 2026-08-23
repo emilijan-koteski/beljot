@@ -33,7 +33,13 @@ type LiveMatch struct {
 	// auto-continue. Set once when the pause STARTS; the timer is re-created
 	// against this same deadline (remaining time) on every action so a player's
 	// acknowledgement never pushes it back. Reset on reconnect into the pause.
-	handCompleteExpiresAt    time.Time
+	handCompleteExpiresAt time.Time
+	// declarationExpiresAt is the fixed ceiling on the dedicated declaration
+	// phase. Set once when the phase is ENTERED and, like
+	// handCompleteExpiresAt, never pushed back by an answer — otherwise three
+	// prompt players' clicks would keep extending the wait on the fourth.
+	// Reset on reconnect into the phase.
+	declarationExpiresAt     time.Time
 	reconnectWindowSec       int            // seconds to wait for disconnected player (default 120)
 	seatReconnectTimers      [4]*time.Timer // per-seat reconnect countdown timers; nil when seat is online
 	seatReconnectGenerations [4]uint64      // per-seat staleness counters — bumped on cancel + start
@@ -426,6 +432,18 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 			session.turnTimer = time.AfterFunc(remaining, func() {
 				m.handleHandCompleteTimeout(session, gen)
 			})
+		} else if oldState.Phase == game.PhaseDeclaring {
+			// Same reasoning as the score-reveal pause above: the declaration
+			// phase's only clock is this fixed-deadline fallback, and the
+			// per-move restore branch below can never re-arm it (TurnExpiresAt
+			// is nil for the whole phase). A rejected action — a repeat answer
+			// from a seat that already spoke is the common one — would
+			// otherwise permanently disarm it and strand the table.
+			remaining := max(time.Until(session.declarationExpiresAt), 0)
+			gen := session.timerGeneration
+			session.turnTimer = time.AfterFunc(remaining, func() {
+				m.handleDeclarationTimeout(session, gen)
+			})
 		} else if oldState.Phase != game.PhasePaused && session.timerStyle == "per-move" && oldState.TurnExpiresAt != nil {
 			m.armTurnTimerLocked(session, time.Until(*oldState.TurnExpiresAt), oldState.ActivePlayerSeat)
 		}
@@ -452,8 +470,18 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 		}
 		newState.TurnExpiresAt = nil
 		// Do NOT start timer — game is paused
-	} else if (action.Type == game.ActionUnpause || action.Type == game.ActionOwnerUnpause) && newState.Phase != game.PhasePaused {
-		// Game resumed — restore timer from preserved remaining time
+	} else if (action.Type == game.ActionUnpause || action.Type == game.ActionOwnerUnpause) &&
+		newState.Phase != game.PhasePaused && newState.Phase != game.PhaseDeclaring {
+		// Game resumed — restore timer from preserved remaining time.
+		//
+		// PhaseDeclaring is excluded so a resume INTO the declaration phase falls
+		// through to its own arm below and gets a fresh fixed window. Handling it
+		// here would arm a per-move timer for a phase that has no active turn,
+		// against a declarationExpiresAt left over from before the pause — and
+		// since session.turnTimer is one shared field, that would also be the
+		// phase's only clock. Unreachable today (handlePause refuses the phase,
+		// so PreviousPhase can never be `declaring`), but the branch order is
+		// what makes it unreachable, and branch order is easy to disturb.
 		if session.timerStyle == "per-move" {
 			// Enforce a minimum floor of 3 seconds to give the player reaction time after unpause
 			const minResumeMs int64 = 3000
@@ -474,8 +502,27 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 		} else {
 			newState.TurnTimeRemaining = 0
 		}
-	} else if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding ||
-		newState.Phase == game.PhaseDeclaring {
+	} else if newState.Phase == game.PhaseDeclaring {
+		// Dedicated declaration phase: no active turn, so no per-move timer —
+		// every seat is answering at once. Arm the fixed-window fallback so an
+		// absent or idle seat cannot stall the table; the phase closes early the
+		// moment every connected seat has answered.
+		//
+		// The deadline is fixed when the phase is ENTERED and is NOT pushed back
+		// by each answer, or three prompt players would keep extending the wait
+		// on the fourth. cancelTurnTimer() at the top of HandleAction already
+		// stopped the prior tick, so we always re-create the timer here, but
+		// against the SAME deadline (remaining time) rather than a fresh window.
+		newState.TurnExpiresAt = nil
+		if oldState.Phase != game.PhaseDeclaring {
+			session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
+		}
+		remaining := max(time.Until(session.declarationExpiresAt), 0)
+		gen := session.timerGeneration
+		session.turnTimer = time.AfterFunc(remaining, func() {
+			m.handleDeclarationTimeout(session, gen)
+		})
+	} else if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding {
 		// Within-turn predicate: when seat and phase are unchanged, the action
 		// resolved a prompt (declare/skip_declare, play_card-into-belot,
 		// surrender request/decline) without advancing the turn. The original
@@ -928,7 +975,16 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// learns a declaration exists (seat only — the melds themselves stay
 		// secret until event:declarations_resolved). Timer expiry only ever
 		// auto-SKIPS, so this fires for manual declares only.
-		if action.Type == game.ActionDeclare {
+		//
+		// Suppressed inside the dedicated phase (oldState is the pre-action
+		// state, so this reads the phase the answer was GIVEN in, not the
+		// playing phase a closing answer lands in). There the four seats answer
+		// simultaneously and in secret; a live banner would out whoever clicked
+		// first, before the contest has decided whose melds are public at all —
+		// and the losing team's are never revealed. The reveal that follows
+		// milliseconds later is the whole announcement. Bitola, whose
+		// declarations happen inside a visibly progressing trick, is unchanged.
+		if action.Type == game.ActionDeclare && oldState.Phase != game.PhaseDeclaring {
 			declared := ws.PlayerDeclaredPayload{PlayerSeat: action.PlayerSeat}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventPlayerDeclared, declared))
 		}
@@ -1454,6 +1510,64 @@ func (m *Manager) startTimerLocked(session *LiveMatch, expectedSeat int) {
 // acknowledgements (see handCompleteExpiresAt).
 const handCompleteAutoContinue = 14 * time.Second
 
+// declarationAutoClose is the server's fallback ceiling on the dedicated
+// declaration phase before force-closing it when not every connected player has
+// answered.
+//
+// Sized exactly the way handCompleteAutoContinue is, and for the same reason.
+// Each client auto-skips 8s after its dialog MOUNTS
+// (DECLARATION_PHASE_AUTO_SKIP on the client), and that mount trails this
+// deadline's start by the trump-take reveal, itself an 8s auto-dismissing
+// dialog that suppresses the declaration prompt. A ceiling that did not cover
+// 8s of reveal + the 8s window + network grace would force-close underneath the
+// clients and turn every hand's auto-skips into wrong-phase races. 20s keeps
+// the answer-driven path comfortably ahead while still capping how long one
+// stuck seat can hold the table — and is measured from when the phase STARTS,
+// never extended by later answers (see declarationExpiresAt).
+const declarationAutoClose = 20 * time.Second
+
+// handleDeclarationTimeout force-closes the dedicated declaration phase when its
+// window elapses without every connected player answering. Unanswered seats are
+// treated as having skipped.
+//
+// Mirrors handleHandCompleteTimeout: it reproduces the answer-action advance
+// path (resolve, open trick 1, arm the per-move timer, broadcast) but bypasses
+// ApplyAction since it is a server-initiated advance, not a player action.
+func (m *Manager) handleDeclarationTimeout(session *LiveMatch, generation uint64) {
+	session.mu.Lock()
+	if session.closed || session.timerGeneration != generation {
+		session.mu.Unlock()
+		return
+	}
+	oldState := session.gameState
+	if oldState.Phase != game.PhaseDeclaring {
+		session.mu.Unlock()
+		return
+	}
+
+	newState, err := game.ForceCloseDeclarationPhase(oldState)
+	if err != nil {
+		session.mu.Unlock()
+		return
+	}
+	// Trick 1 is open — this is a real turn again, so the per-move timer comes
+	// back exactly as it does on the answer-driven close.
+	m.setTurnExpiry(session, newState)
+	m.startTimerLocked(session, newState.ActivePlayerSeat)
+	session.gameState = newState
+	playerIDs := session.playerIDs
+	session.mu.Unlock()
+	userIDs := humanUserIDs(playerIDs)
+
+	// Same ordered pair the answer path sends: the reveal rides ahead of the
+	// playing-phase snapshot so the panel is on screen before trick 1 renders.
+	m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
+	m.broadcastState(playerIDs, newState)
+
+	// Trick 1's leader may be a bot.
+	m.maybeScheduleBotAction(session)
+}
+
 // handleHandCompleteTimeout force-advances the hand-complete pause when the
 // auto-continue window elapses without every connected player acknowledging.
 // Mirrors the continue-action advance path (deal next hand, arm the per-move
@@ -1480,8 +1594,9 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 		newState.Phase = game.PhaseBidding
 		game.RefreshDerivedFlags(newState)
 	}
-	if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding ||
-		newState.Phase == game.PhaseDeclaring {
+	// A freshly dealt hand can only be bidding — reaching the declaration phase
+	// takes a resolved bid — so PhaseDeclaring is deliberately absent here.
+	if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding {
 		m.setTurnExpiry(session, newState)
 		m.startTimerLocked(session, newState.ActivePlayerSeat)
 	}
@@ -1573,38 +1688,38 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 			Type:       game.ActionPassTrump,
 			PlayerSeat: expectedSeat,
 		}
-	case (gs.Phase == game.PhasePlaying || gs.Phase == game.PhaseDeclaring) && gs.AwaitingDeclaration:
-		// Auto-skip declaration on timer expiry — inside trick 1 under
-		// DeclarationTimingDuringFirstTrick, or inside the dedicated phase.
+	case gs.Phase == game.PhasePlaying && gs.AwaitingDeclaration:
+		// Auto-skip declaration on timer expiry, inside trick 1 under
+		// DeclarationTimingDuringFirstTrick. The dedicated phase is deliberately
+		// absent: it runs no per-move timer at all, so it never reaches this
+		// function — its whole clock is declarationExpiresAt /
+		// handleDeclarationTimeout, which force-closes for every unanswered seat
+		// at once rather than auto-skipping one.
 		//
 		// This auto-action can never be rejected: the prompted seat IS the active
 		// seat and AwaitingDeclaration is set, so skip_declare always applies.
-		// There is therefore no reject → re-arm cycle to stall on, and the
-		// dedicated phase advances to the next seat (or resolves into trick 1) on
-		// this one action.
+		// There is therefore no reject → re-arm cycle to stall on.
 		action = game.Action{
 			Type:       game.ActionSkipDeclare,
 			PlayerSeat: expectedSeat,
 		}
 	case gs.Phase == game.PhaseDeclaring:
-		// Defensive: the dedicated declaration phase only ever exists with a
-		// prompt outstanding — it resolves the instant the last seat answers — so
-		// arriving here means the state machine produced a shape it should not.
-		// Log it as loudly as every sibling defensive re-arm below, then re-arm
-		// for the seat actually holding the cursor (expectedSeat may be stale)
-		// rather than falling into the default's silent return, which would leave
-		// the phase with no clock at all. The refreshed deadline is broadcast too,
-		// or all four clients would keep rendering the elapsed one while the
-		// server quietly holds a fresh full window.
-		slog.Error("session: declaring phase reached timer expiry with no prompt outstanding; re-arming",
+		// Defensive: the phase arms no per-move timer, so this is unreachable —
+		// but session.turnTimer is ONE field shared by the turn timer, the
+		// score-reveal fallback and the declaration window, so anything that did
+		// arm a turn timer here would have clobbered the window on its way in.
+		// Falling into the default's silent return would then leave the phase
+		// with no clock at all and the table stuck until someone answers. Log it
+		// as loudly as the sibling re-arms below and restore the window.
+		slog.Error("session: declaring phase reached the per-move timer expiry; re-arming its window",
 			"roomID", session.roomID, "activeSeat", gs.ActivePlayerSeat, "expectedSeat", expectedSeat)
-		m.setTurnExpiry(session, gs)
-		m.startTimerLocked(session, gs.ActivePlayerSeat)
-		// Build under the lock, send after releasing it — same pattern as
-		// HandleDisconnect / SyncStateOnConnect.
-		staleFrames := buildStateFrames(session.playerIDs, gs, -1)
+		session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
+		session.cancelTurnTimer()
+		gen := session.timerGeneration
+		session.turnTimer = time.AfterFunc(declarationAutoClose, func() {
+			m.handleDeclarationTimeout(session, gen)
+		})
 		session.mu.Unlock()
-		m.hub.SendFrames(staleFrames)
 		return
 	case gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == expectedSeat:
 		// Auto-skip belot announcement on timer expiry
@@ -1686,7 +1801,9 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		if cur.ActivePlayerSeat != oldState.ActivePlayerSeat || cur.Phase != oldState.Phase {
 			break
 		}
-		if cur.Phase != game.PhasePlaying && cur.Phase != game.PhaseDeclaring {
+		// PhasePlaying only: the dedicated declaration phase runs no per-move
+		// timer, so no chain can start or continue inside it.
+		if cur.Phase != game.PhasePlaying {
 			break
 		}
 		// Pick the next auto-action structurally — no action-type enumeration.
@@ -1698,12 +1815,6 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 			next = game.Action{Type: game.ActionSkipBelot, PlayerSeat: cur.ActivePlayerSeat}
 		case cur.AwaitingDeclaration:
 			next = game.Action{Type: game.ActionSkipDeclare, PlayerSeat: cur.ActivePlayerSeat}
-		case cur.Phase == game.PhaseDeclaring:
-			// The dedicated declaration phase with no prompt outstanding — an
-			// unreachable shape (an answer either moves the cursor to another
-			// seat, which the checks above already broke on, or ends the phase).
-			// Leave next empty so the loop breaks rather than reaching AutoPlay,
-			// which has no legal card to offer here.
 		default:
 			cardID, autoErr := game.AutoPlay(cur)
 			if autoErr != nil {
@@ -1743,8 +1854,23 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	//    violation; arming a fresh timer keeps the game moving while operator
 	//    debugs.
 	//  • Phase is match_end / paused — outer guard skips both.
-	if finalState.Phase == game.PhasePlaying || finalState.Phase == game.PhaseBidding ||
-		finalState.Phase == game.PhaseDeclaring {
+	if finalState.Phase == game.PhaseDeclaring {
+		// Reachable, and only one way: a bidding timeout on a seat forbidden to
+		// pass auto-picks a suit (AllPassDealerMustPick), and that pick opens
+		// the dedicated declaration phase in the same step. The phase has no
+		// active turn, so it gets its fixed window rather than a per-move timer
+		// — the same arm HandleAction gives it on the human-driven path.
+		finalState.TurnExpiresAt = nil
+		session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
+		// cancelTurnTimer bumps the generation so the captured gen is current
+		// and the just-fired callback cannot act again — same as the
+		// PhaseHandComplete branch below.
+		session.cancelTurnTimer()
+		gen := session.timerGeneration
+		session.turnTimer = time.AfterFunc(declarationAutoClose, func() {
+			m.handleDeclarationTimeout(session, gen)
+		})
+	} else if finalState.Phase == game.PhasePlaying || finalState.Phase == game.PhaseBidding {
 		// Pass finalState.ActivePlayerSeat explicitly: session.gameState is
 		// reassigned to finalState only after this block, so a state-less
 		// startTimerLocked would capture the OLD (timed-out) seat and the next

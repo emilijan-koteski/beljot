@@ -691,8 +691,9 @@ func TestCroatianPickRound1(t *testing.T) {
 			require.NotNil(t, result.TrumpCallerSeat)
 			assert.Equal(t, tc.activeSeat, *result.TrumpCallerSeat)
 			assert.Equal(t, 1, result.ActivePlayerSeat,
-				"declarations open at (DealerSeat+1)%4 — the seat that will lead trick 1")
-			assert.True(t, result.AwaitingDeclaration, "that seat holds a meld, so it is prompted")
+				"pinned to (DealerSeat+1)%4 — the seat that will lead trick 1")
+			assert.False(t, result.AwaitingDeclaration,
+				"the dedicated phase asks all four seats at once; nobody is on the clock")
 			assert.Equal(t, 0, result.TrickNumber, "no trick is open during the declaration phase")
 			assert.Empty(t, result.CurrentTrick)
 
@@ -1141,18 +1142,21 @@ func TestCroatianFullBiddingFromNewGame(t *testing.T) {
 	}
 	assert.ElementsMatch(t, startingCards, collectCards(final), "all 32 cards preserved end to end")
 
-	// Walk the declaration phase to its end. Every prompted seat skips; the
-	// phase must terminate in at most four answers whatever the random deal
-	// produced.
-	for i := 0; final.Phase == game.PhaseDeclaring; i++ {
-		require.Less(t, i, 4, "the declaration phase must resolve within four answers")
-		require.True(t, final.AwaitingDeclaration, "the phase only persists with a prompt outstanding")
+	// Walk the declaration phase to its end. All four seats are asked at once,
+	// so every seat answers for itself; the phase must close on the fourth
+	// answer whatever the random deal produced.
+	require.Equal(t, game.PhaseDeclaring, final.Phase)
+	for seat := 0; seat < 4; seat++ {
+		require.Equal(t, game.PhaseDeclaring, final.Phase,
+			"the phase stays open until every seat has answered (seat %d)", seat)
+		require.False(t, final.AwaitingDeclaration, "no seat is ever on the clock here")
 		final, err = game.ApplyAction(final, game.Action{
 			Type:       game.ActionSkipDeclare,
-			PlayerSeat: final.ActivePlayerSeat,
+			PlayerSeat: seat,
 		})
-		require.NoError(t, err, "skip_declare %d", i+1)
+		require.NoError(t, err, "skip_declare from seat %d", seat)
 	}
+	require.NotEqual(t, game.PhaseDeclaring, final.Phase, "the fourth answer closes the phase")
 	assert.Equal(t, game.PhasePlaying, final.Phase, "the phase hands off to trick 1")
 	assert.Equal(t, 1, final.TrickNumber)
 	assert.True(t, final.DeclarationsResolved)

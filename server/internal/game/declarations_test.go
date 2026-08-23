@@ -1600,8 +1600,12 @@ func TestCroatianBidOpensDeclarationPhase(t *testing.T) {
 			assert.Equal(t, 0, state.TrickNumber, "no trick is open yet")
 			assert.Empty(t, state.CurrentTrick)
 			assert.Equal(t, (state.DealerSeat+1)%4, state.ActivePlayerSeat,
-				"the cursor opens on the seat that will lead trick 1")
-			assert.True(t, state.AwaitingDeclaration)
+				"pinned to the trick-1 leader for the phase — a positional constant, not a cursor")
+			assert.False(t, state.AwaitingDeclaration,
+				"nobody is on the clock: all four seats are asked at once")
+			for seat, p := range state.Players {
+				assert.False(t, p.DeclarationAnswered, "seat %d starts unanswered", seat)
+			}
 			assert.False(t, state.DeclarationsResolved)
 			assert.Equal(t, [2]int{0, 0}, state.DeclarationPoints, "nothing is awarded before the phase ends")
 		})
@@ -1622,28 +1626,32 @@ func TestBitolaBidStillOpensTrick1(t *testing.T) {
 	assert.Equal(t, game.PhasePlaying, state.Phase)
 	assert.Equal(t, 1, state.TrickNumber)
 	assert.Equal(t, (state.DealerSeat+1)%4, state.ActivePlayerSeat)
-	assert.Equal(t, 0, state.DeclarationSeatsAnswered, "the phase counter stays untouched under Bitola timing")
+	for seat, p := range state.Players {
+		assert.False(t, p.DeclarationAnswered,
+			"seat %d: the dedicated-phase flag stays untouched under Bitola timing", seat)
+	}
 }
 
-// TestCroatianDeclarationPhaseTurnOrder walks the cursor counter-clockwise
-// through all four seats. The standard fixture gives every seat a meld, so the
-// phase stops at each one in turn and nothing resolves until the fourth answer.
-func TestCroatianDeclarationPhaseTurnOrder(t *testing.T) {
+// TestCroatianDeclarationPhaseAcceptsAnyOrder is the heart of the simultaneous
+// model: all four seats are asked at once, so any of them may answer at any
+// time. The order below is deliberately NOT the play order — if the engine
+// still walked a cursor this would fail on the first action.
+func TestCroatianDeclarationPhaseAcceptsAnyOrder(t *testing.T) {
 	state := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
 
-	for i, seat := range []int{1, 2, 3, 0} {
+	for i, seat := range []int{3, 0, 2, 1} {
 		require.Equal(t, game.PhaseDeclaring, state.Phase, "still in the phase before answer %d", i+1)
-		require.True(t, state.AwaitingDeclaration)
-		require.Equal(t, seat, state.ActivePlayerSeat, "answer %d belongs to seat %d", i+1, seat)
-		require.False(t, state.DeclarationsResolved, "the contest resolves only on the fourth answer")
+		require.False(t, state.AwaitingDeclaration, "no seat is ever on the clock here")
+		require.False(t, state.DeclarationsResolved, "the contest resolves only once all four have answered")
 
 		var err error
 		state, err = game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
-		require.NoError(t, err)
+		require.NoError(t, err, "seat %d may answer out of play order", seat)
 		if state.Phase == game.PhaseDeclaring {
-			// Before resolution every answer is simply banked. On the fourth the
+			// Before resolution every answer is simply banked. On the last the
 			// contest settles and the losing team's melds are cleared, so this
 			// only holds while the phase is still open.
+			assert.True(t, state.Players[seat].DeclarationAnswered)
 			assert.NotEmpty(t, state.Players[seat].Declarations, "seat %d's melds are stored", seat)
 		}
 	}
@@ -1658,38 +1666,108 @@ func TestCroatianDeclarationPhaseTurnOrder(t *testing.T) {
 	assert.NotEqual(t, [2]int{0, 0}, state.DeclarationPoints)
 }
 
-// TestCroatianDeclarationPhaseStepsPastMeldlessSeats pins the "meld-less seats
-// between" row: only seats holding a meld are ever prompted, so the cursor
-// jumps from seat 1 straight to seat 0 and seats 2 and 3 never see a prompt.
-func TestCroatianDeclarationPhaseStepsPastMeldlessSeats(t *testing.T) {
-	state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
+// TestCroatianDeclarationOutcomeIsOrderIndependent is the guarantee that makes
+// simultaneous answering safe to ship: whoever speaks first, the same team wins
+// the same points. resolveDeclarations breaks ties on trickLeaderSeat, a
+// positional fact, so answer order must be invisible in the result.
+func TestCroatianDeclarationOutcomeIsOrderIndependent(t *testing.T) {
+	orders := [][]int{
+		{1, 2, 3, 0},
+		{0, 3, 2, 1},
+		{2, 0, 1, 3},
+	}
 
-	require.Equal(t, game.PhaseDeclaring, state.Phase)
-	require.Equal(t, 1, state.ActivePlayerSeat)
-	require.True(t, state.AwaitingDeclaration)
-
-	state, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: 1})
-	require.NoError(t, err)
-
-	assert.Equal(t, game.PhaseDeclaring, state.Phase, "two seats owe nothing, but seat 0 still does")
-	assert.Equal(t, 0, state.ActivePlayerSeat, "the cursor jumps past seats 2 and 3")
-	assert.True(t, state.AwaitingDeclaration)
-	assert.Empty(t, state.Players[2].Declarations)
-	assert.Empty(t, state.Players[3].Declarations)
-
-	// Seats 2 and 3 were never on the clock, so neither can answer.
-	for _, seat := range []int{2, 3} {
-		rejected, err := game.ApplyAction(state, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: seat})
-		assert.Nil(t, rejected)
-		assert.ErrorIs(t, err, apperr.ErrNotYourTurn, "seat %d was stepped past, not prompted", seat)
+	var want [2]int
+	for i, order := range orders {
+		state := croatianDeclaringWith(t, game.SuitClubs, allMeldLayout)
+		for _, seat := range order {
+			var err error
+			state, err = game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
+			require.NoError(t, err)
+		}
+		require.Equal(t, game.PhasePlaying, state.Phase)
+		if i == 0 {
+			want = state.DeclarationPoints
+			require.NotEqual(t, [2]int{0, 0}, want, "the layout must actually produce a contest")
+			continue
+		}
+		assert.Equal(t, want, state.DeclarationPoints, "order %v changed the outcome", order)
 	}
 }
 
-// TestCroatianDeclarationPhaseWithNoMeldsResolvesImmediately pins the
-// "no seat holds a meld" row: the phase opens and resolves inside the same
-// transition, so AwaitingDeclaration is never set and trick 1 starts at once.
-func TestCroatianDeclarationPhaseWithNoMeldsResolvesImmediately(t *testing.T) {
+// TestCroatianDeclarationPhaseAsksMeldlessSeatsToo is the information-hiding
+// rule in test form. A seat holding nothing is NOT stepped past — it is asked
+// like everyone else and must answer, which is precisely why no observer can
+// tell the two apart. The old cursor skipped these seats, and that skip was the
+// leak.
+func TestCroatianDeclarationPhaseAsksMeldlessSeatsToo(t *testing.T) {
+	state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
+	require.Equal(t, game.PhaseDeclaring, state.Phase)
+
+	// Seats 2 and 3 hold nothing under this layout.
+	for _, seat := range []int{2, 3} {
+		require.False(t, game.HasDeclarableCombinations(state, seat), "fixture: seat %d holds no meld", seat)
+
+		answered, err := game.ApplyAction(state, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: seat})
+		require.NoError(t, err, "seat %d must be able to answer despite holding nothing", seat)
+		assert.True(t, answered.Players[seat].DeclarationAnswered)
+		assert.Equal(t, game.PhaseDeclaring, answered.Phase, "two other seats still owe an answer")
+	}
+
+	// And declaring with nothing is still refused — the button is disabled
+	// client-side, but the engine is the authority.
+	for _, seat := range []int{2, 3} {
+		rejected, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
+		assert.Nil(t, rejected)
+		assert.ErrorIs(t, err, apperr.ErrDeclarationNotAvailable, "seat %d holds no meld", seat)
+	}
+}
+
+// TestCroatianDeclarationPhaseRejectsSecondAnswer pins the double-answer row.
+// The first answer stands: a stale click, a double-tap, or a client that
+// reconnected mid-phase and re-rendered its dialog must not be able to turn a
+// skip into a declare after the fact.
+func TestCroatianDeclarationPhaseRejectsSecondAnswer(t *testing.T) {
+	base := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
+
+	skipped, err := game.ApplyAction(base, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: 1})
+	require.NoError(t, err)
+	require.True(t, skipped.Players[1].DeclarationAnswered)
+	require.Empty(t, skipped.Players[1].Declarations)
+
+	for _, action := range []game.Action{
+		{Type: game.ActionDeclare, PlayerSeat: 1},
+		{Type: game.ActionSkipDeclare, PlayerSeat: 1},
+	} {
+		rejected, err := game.ApplyAction(skipped, action)
+		assert.Nil(t, rejected)
+		assert.ErrorIs(t, err, apperr.ErrWrongPhase, "%s after answering", action.Type)
+	}
+
+	// The skip is untouched by the rejected attempts.
+	assert.Empty(t, skipped.Players[1].Declarations)
+}
+
+// TestCroatianDeclarationPhaseWithNoMeldsStillOpens is the other half of the
+// hiding rule, and a deliberate reversal of the old behaviour. When NOBODY
+// holds a meld the phase still opens and still asks all four seats — because a
+// phase that were skipped in that case would announce, by its very absence,
+// that somebody holds one.
+func TestCroatianDeclarationPhaseWithNoMeldsStillOpens(t *testing.T) {
 	state := croatianDeclaringWith(t, game.SuitSpades, noMeldLayout)
+
+	require.Equal(t, game.PhaseDeclaring, state.Phase, "the phase opens even with nothing to declare")
+	assert.Equal(t, 0, state.TrickNumber)
+	assert.False(t, state.DeclarationsResolved)
+	for seat := range state.Players {
+		require.False(t, game.HasDeclarableCombinations(state, seat), "fixture: seat %d holds no meld", seat)
+	}
+
+	for _, seat := range []int{1, 2, 3, 0} {
+		var err error
+		state, err = game.ApplyAction(state, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: seat})
+		require.NoError(t, err)
+	}
 
 	assert.Equal(t, game.PhasePlaying, state.Phase)
 	assert.Equal(t, 1, state.TrickNumber)
@@ -1709,18 +1787,25 @@ func TestCroatianDeclarationPhaseWithNoMeldsResolvesImmediately(t *testing.T) {
 func TestCroatianDeclarationPhaseResolvesIntoTrick1(t *testing.T) {
 	state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
 
-	state, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: 1})
-	require.NoError(t, err)
-	require.Equal(t, 0, state.ActivePlayerSeat)
-
-	state, err = game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
-	require.NoError(t, err)
+	for _, seat := range []int{1, 0} {
+		var err error
+		state, err = game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
+		require.NoError(t, err)
+		require.Equal(t, game.PhaseDeclaring, state.Phase, "the meld-less seats have not answered yet")
+	}
+	for _, seat := range []int{2, 3} {
+		var err error
+		state, err = game.ApplyAction(state, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: seat})
+		require.NoError(t, err)
+	}
 
 	assert.Equal(t, game.PhasePlaying, state.Phase)
 	assert.Equal(t, 1, state.TrickNumber)
 	assert.Empty(t, state.CurrentTrick)
 	assert.False(t, state.AwaitingDeclaration)
-	assert.Equal(t, 0, state.DeclarationSeatsAnswered, "the cursor counter is spent")
+	for seat, p := range state.Players {
+		assert.False(t, p.DeclarationAnswered, "seat %d's answered flag is cleared on the way out", seat)
+	}
 	assert.Equal(t, (state.DealerSeat+1)%4, state.ActivePlayerSeat, "the seat after the dealer leads trick 1")
 
 	assert.True(t, state.DeclarationsResolved)
@@ -1741,17 +1826,16 @@ func TestCroatianDeclarationPhaseResolvesIntoTrick1(t *testing.T) {
 }
 
 // TestCroatianDeclarationPhaseSkipStoresNothing pins the skip row: no melds are
-// recorded, no points are awarded, and the cursor still advances.
+// recorded and no points are awarded, but the seat still counts as answered.
 func TestCroatianDeclarationPhaseSkipStoresNothing(t *testing.T) {
 	state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
 
-	state, err := game.ApplyAction(state, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: 1})
-	require.NoError(t, err)
-	assert.Empty(t, state.Players[1].Declarations)
-	assert.Equal(t, 0, state.ActivePlayerSeat)
-
-	state, err = game.ApplyAction(state, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: 0})
-	require.NoError(t, err)
+	for _, seat := range []int{1, 0, 2, 3} {
+		var err error
+		state, err = game.ApplyAction(state, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: seat})
+		require.NoError(t, err)
+		assert.Empty(t, state.Players[seat].Declarations)
+	}
 
 	assert.Equal(t, game.PhasePlaying, state.Phase)
 	assert.True(t, state.DeclarationsResolved)
@@ -1759,12 +1843,83 @@ func TestCroatianDeclarationPhaseSkipStoresNothing(t *testing.T) {
 	assert.Equal(t, 1, state.TrickNumber)
 }
 
+// TestCroatianDeclarationPhaseIgnoresDisconnectedSeats pins the disconnect row:
+// the close gate counts CONNECTED seats only, so a dropped player cannot hold
+// the table until the session manager's window elapses.
+func TestCroatianDeclarationPhaseIgnoresDisconnectedSeats(t *testing.T) {
+	state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
+	state.Players[3].Connected = false
+
+	for _, seat := range []int{1, 0, 2} {
+		var err error
+		state, err = game.ApplyAction(state, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: seat})
+		require.NoError(t, err)
+	}
+
+	assert.Equal(t, game.PhasePlaying, state.Phase,
+		"the three connected seats answered; the dropped seat is not waited on")
+	assert.True(t, state.DeclarationsResolved)
+	assert.Equal(t, 1, state.TrickNumber)
+}
+
+// TestForceCloseDeclarationPhase pins the window-elapsed row: every unanswered
+// seat is treated as having skipped, and the phase lands in exactly the same
+// place the answer-driven close does.
+func TestForceCloseDeclarationPhase(t *testing.T) {
+	t.Run("closes with nobody having answered", func(t *testing.T) {
+		state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
+
+		closed, err := game.ForceCloseDeclarationPhase(state)
+
+		require.NoError(t, err)
+		assert.Equal(t, game.PhasePlaying, closed.Phase)
+		assert.Equal(t, 1, closed.TrickNumber)
+		assert.Equal(t, (closed.DealerSeat+1)%4, closed.ActivePlayerSeat)
+		assert.True(t, closed.DeclarationsResolved)
+		assert.Equal(t, [2]int{0, 0}, closed.DeclarationPoints, "an unanswered seat forfeits its melds")
+		for seat, p := range closed.Players {
+			assert.False(t, p.DeclarationAnswered, "seat %d's flag is cleared on the way out", seat)
+			assert.Empty(t, p.Declarations, "seat %d never declared", seat)
+		}
+	})
+
+	t.Run("keeps the answers already given", func(t *testing.T) {
+		state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
+		state, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
+		require.NoError(t, err)
+		require.Equal(t, game.PhaseDeclaring, state.Phase)
+
+		closed, err := game.ForceCloseDeclarationPhase(state)
+
+		require.NoError(t, err)
+		assert.Equal(t, game.PhasePlaying, closed.Phase)
+		assert.Equal(t, 50, closed.DeclarationPoints[game.TeamA], "seat 0's quarte still counts")
+		assert.Equal(t, 0, closed.DeclarationPoints[game.TeamB])
+	})
+
+	t.Run("rejects any other phase", func(t *testing.T) {
+		gs := testfixtures.NewGameJustDealt()
+		closed, err := game.ForceCloseDeclarationPhase(gs)
+		assert.Nil(t, closed)
+		assert.ErrorIs(t, err, apperr.ErrWrongPhase)
+	})
+
+	t.Run("does not mutate its input", func(t *testing.T) {
+		state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
+
+		_, err := game.ForceCloseDeclarationPhase(state)
+
+		require.NoError(t, err)
+		assert.Equal(t, game.PhaseDeclaring, state.Phase, "the caller's state is untouched")
+		assert.Equal(t, 0, state.TrickNumber)
+	})
+}
+
 // TestCroatianDeclarationPhaseRejectsOtherActions pins the phase's action
-// allowlist: declare and skip_declare from the prompted seat only, and no card
-// can be played before the contest closes.
+// allowlist: declare and skip_declare only, and no card can be played before
+// the contest closes.
 func TestCroatianDeclarationPhaseRejectsOtherActions(t *testing.T) {
 	base := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
-	require.Equal(t, 1, base.ActivePlayerSeat)
 
 	card := base.Players[1].Hand[0]
 	suit := game.SuitSpades
@@ -1783,6 +1938,7 @@ func TestCroatianDeclarationPhaseRejectsOtherActions(t *testing.T) {
 		{"announce_belot", game.Action{Type: game.ActionAnnounceBelot, PlayerSeat: 1}},
 		{"skip_belot", game.Action{Type: game.ActionSkipBelot, PlayerSeat: 1}},
 		{"continue", game.Action{Type: game.ActionContinue, PlayerSeat: 1}},
+		{"pause", game.Action{Type: game.ActionPause, PlayerSeat: 2}},
 	}
 
 	for _, tc := range rejected {
@@ -1792,34 +1948,22 @@ func TestCroatianDeclarationPhaseRejectsOtherActions(t *testing.T) {
 			assert.ErrorIs(t, err, apperr.ErrWrongPhase)
 		})
 	}
-
-	t.Run("declare from a seat that is not on the clock is rejected", func(t *testing.T) {
-		state, err := game.ApplyAction(base, game.Action{Type: game.ActionDeclare, PlayerSeat: 2})
-		assert.Nil(t, state)
-		assert.ErrorIs(t, err, apperr.ErrNotYourTurn)
-	})
 }
 
-// TestCroatianDeclarationPhaseIsPausableAndSurrenderable pins the phase into
-// the pause and surrender allowlists — a phase where either silently failed
-// would be a hole, and disconnect handling rides on pause.
-func TestCroatianDeclarationPhaseIsPausableAndSurrenderable(t *testing.T) {
+// TestCroatianDeclarationPhaseIsNotPausable pins the phase OUT of the pause
+// allowlist. It is a fixed-length window with no active turn and no
+// TurnExpiresAt, so pause/unpause — which exists to preserve and restore
+// TurnTimeRemaining — has nothing to carry. Surrender stays allowed.
+func TestCroatianDeclarationPhaseIsNotPausable(t *testing.T) {
 	base := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
 
-	t.Run("pause and unpause round-trip through the phase", func(t *testing.T) {
+	t.Run("pause is refused", func(t *testing.T) {
 		paused, err := game.ApplyAction(base, game.Action{Type: game.ActionPause, PlayerSeat: 2})
-		require.NoError(t, err)
-		assert.Equal(t, game.PhasePaused, paused.Phase)
-		assert.Equal(t, game.PhaseDeclaring, paused.PreviousPhase)
-
-		resumed, err := game.ApplyAction(paused, game.Action{Type: game.ActionUnpause, PlayerSeat: 2})
-		require.NoError(t, err)
-		assert.Equal(t, game.PhaseDeclaring, resumed.Phase, "the phase is restored, not skipped")
-		assert.True(t, resumed.AwaitingDeclaration)
-		assert.Equal(t, base.ActivePlayerSeat, resumed.ActivePlayerSeat)
+		assert.Nil(t, paused)
+		assert.ErrorIs(t, err, apperr.ErrWrongPhase)
 	})
 
-	t.Run("surrender can be proposed in the phase", func(t *testing.T) {
+	t.Run("surrender can still be proposed in the phase", func(t *testing.T) {
 		proposed, err := game.ApplyAction(base, game.Action{Type: game.ActionSurrenderRequest, PlayerSeat: 1})
 		require.NoError(t, err)
 		require.NotNil(t, proposed.SurrenderProposerSeat)
@@ -1827,39 +1971,42 @@ func TestCroatianDeclarationPhaseIsPausableAndSurrenderable(t *testing.T) {
 	})
 }
 
-// TestCroatianDeclarationCounterDoesNotLeakIntoHand2 guards the reset in
-// startNewHand: the cursor counter is per-hand, and a stale value would make
-// hand 2's phase open mid-walk and silently skip seats. ForceAdvanceHandComplete
-// is the exported door onto startNewHand.
-func TestCroatianDeclarationCounterDoesNotLeakIntoHand2(t *testing.T) {
+// TestCroatianDeclarationFlagsDoNotLeakIntoHand2 guards the reset in
+// startNewHand: the answered flags are per-hand, and stale ones would make
+// hand 2's phase close the instant it opened — silently denying every seat its
+// answer. ForceAdvanceHandComplete is the exported door onto startNewHand.
+func TestCroatianDeclarationFlagsDoNotLeakIntoHand2(t *testing.T) {
 	gs := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
 	gs.Phase = game.PhaseHandComplete
-	gs.DeclarationSeatsAnswered = 3
+	for seat := range gs.Players {
+		gs.Players[seat].DeclarationAnswered = true
+	}
 	gs.DeclarationsResolved = true
 
 	next, err := game.ForceAdvanceHandComplete(gs)
 
 	require.NoError(t, err)
-	assert.Equal(t, 0, next.DeclarationSeatsAnswered, "the cursor counter must not survive the hand")
+	for seat, p := range next.Players {
+		assert.False(t, p.DeclarationAnswered, "seat %d's answer must not survive the hand", seat)
+	}
 	assert.False(t, next.AwaitingDeclaration)
 	assert.False(t, next.DeclarationsResolved)
 	assert.Equal(t, 2, next.HandNumber)
 	require.Equal(t, 1, next.DealerSeat, "startNewHand rotates the dealer counter-clockwise")
 	require.NotEqual(t, game.PhaseMatchEnd, next.Phase, "hand 2 must have dealt normally")
 
-	// Drive hand 2 to its own declaration phase. The cursor origin is
-	// (DealerSeat+1)%4, so the reset only really holds if the NEW dealer's left
-	// is where the walk starts — a counter that survived at 3 would open the
-	// phase three seats along and silently deny those seats their answer.
+	// Drive hand 2 to its own declaration phase. Stale flags would close it on
+	// entry, so this proves the reset by watching the phase actually stay open
+	// and wait for all four seats.
 	//
 	// Hand 2's deal is random, so the hands are replaced with a layout where
-	// every seat holds a meld: that makes the opening position observable
+	// every seat holds a meld: that makes the phase's behaviour observable
 	// instead of dependent on who happened to be dealt a run.
 	for seat, hand := range allMeldLayout {
 		next.Players[seat].Hand = append([]game.Card(nil), hand[:6]...)
 		next.Players[seat].FaceDownCards = append([]game.Card(nil), hand[6:]...)
 	}
-	next.Phase = game.PhaseBidding // the session manager's dealing → bidding step
+	next.Phase = game.PhaseBidding // the session manager's dealing -> bidding step
 
 	suit := game.SuitClubs
 	opened, err := game.ApplyAction(next, game.Action{
@@ -1869,10 +2016,12 @@ func TestCroatianDeclarationCounterDoesNotLeakIntoHand2(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, game.PhaseDeclaring, opened.Phase)
+	assert.Equal(t, game.PhaseDeclaring, opened.Phase, "the phase opens rather than closing on stale flags")
 	assert.Equal(t, 2, opened.ActivePlayerSeat,
-		"hand 2 opens at the new dealer's left (seat 1 deals, so seat 2 leads)")
+		"hand 2 pins to the new dealer's left (seat 1 deals, so seat 2 leads trick 1)")
 	assert.Equal(t, (opened.DealerSeat+1)%4, opened.ActivePlayerSeat)
-	assert.Equal(t, 0, opened.DeclarationSeatsAnswered, "the walk starts from zero")
-	assert.True(t, opened.AwaitingDeclaration)
+	for seat, p := range opened.Players {
+		assert.False(t, p.DeclarationAnswered, "seat %d starts hand 2's phase unanswered", seat)
+	}
+	assert.False(t, opened.AwaitingDeclaration)
 }

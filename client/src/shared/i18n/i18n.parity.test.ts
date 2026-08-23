@@ -135,3 +135,52 @@ describe("card-deck suit name casing", () => {
     }
   });
 });
+
+// The declaration-phase copy replaced a per-seat "waiting for {name}" banner
+// whose own test carried the only cross-locale assertion for these strings.
+// Parity above proves the keys EXIST; this proves they were actually translated
+// — an untranslated locale most often shows up as an English word left in place
+// or a Latin string in the Cyrillic bundle.
+describe("declaration phase copy", () => {
+  const KEYS = ["noneTitle", "noneBody", "waitingOthers"] as const;
+
+  function decl(locale: Record<string, unknown>): Record<string, string> {
+    const match = locale.match as Record<string, unknown>;
+    return match.declaration as Record<string, string>;
+  }
+
+  it.each([
+    ["hr", hr],
+    ["mk", mk],
+    ["sr", sr],
+  ])("%s translates every declaration-phase string away from the English", (name, locale) => {
+    const localised = decl(locale as unknown as Record<string, unknown>);
+    const english = decl(en as unknown as Record<string, unknown>);
+    for (const key of KEYS) {
+      expect(localised[key], `${name}.${key}`).toBeTruthy();
+      expect(localised[key], `${name}.${key} is still the English string`).not.toBe(english[key]);
+    }
+  });
+
+  it("keeps the Macedonian declaration-phase copy all-Cyrillic", () => {
+    const localised = decl(mk as unknown as Record<string, unknown>);
+    for (const key of KEYS) {
+      // Strip the interpolation placeholder — {{answered}} is Latin by design.
+      const prose = (localised[key] ?? "").replace(/\{\{.*?\}\}/g, "");
+      expect(prose, `mk.${key}`).not.toMatch(/[A-Za-z]/);
+    }
+  });
+
+  it("keeps the answered/total readout in every locale", () => {
+    for (const [name, locale] of [
+      ["en", en],
+      ["hr", hr],
+      ["mk", mk],
+      ["sr", sr],
+    ] as const) {
+      const value = decl(locale as unknown as Record<string, unknown>).waitingOthers;
+      expect(value, `${name}.waitingOthers`).toContain("{{answered}}");
+      expect(value, `${name}.waitingOthers`).toContain("/4");
+    }
+  });
+});

@@ -22,6 +22,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     level: 1,
     faceDownCount: 0,
     handCount: 0,
+    declarationAnswered: false,
     ...overrides,
   };
 }

@@ -239,7 +239,7 @@ export const en: RulesLangData = {
           variant: "croatia",
           otherVariantNote:
             "Bitola rules have no separate phase: you declare on your turn during the first trick, as you play your card, and lay the cards face-up at the start of the second.",
-          text: "Declaring gets a phase of its own, between bidding and the first trick. Each seat in turn declares or skips, the whole table’s declarations are then revealed together, and only after that does the first trick begin.",
+          text: "Declaring gets a phase of its own, between bidding and the first trick. All four seats are asked at the same time and have eight seconds to declare or skip, so nobody can tell who is holding what; the whole table’s declarations are then revealed together, and only after that does the first trick begin.",
         },
         { kind: "melds" },
         {

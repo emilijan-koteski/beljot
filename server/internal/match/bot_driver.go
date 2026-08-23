@@ -50,8 +50,9 @@ func (m *Manager) maybeScheduleBotAction(session *LiveMatch) {
 // fresh delay instead of acting.
 //
 // The dedicated declaration phase needs no field of its own: `phase` separates
-// it from bidding and playing, and `awaitingDecl` is per-seat, so a delay armed
-// for one seat's prompt never matches another seat's.
+// it from bidding and playing, and a seat that has already answered drops out
+// of botDecisionSeats, so the fire path's "does this seat still owe a decision"
+// check short-circuits before the context is ever compared.
 type botDecisionContext struct {
 	phase            game.Phase
 	handNumber       int
@@ -71,10 +72,10 @@ func botDecisionContextFor(gs *game.GameState, seat int) botDecisionContext {
 }
 
 // botDecisionSeats resolves which BOT seats owe a decision in the given
-// state. Phase table per the story: bidding → active bidder; declaring → the
-// prompted seat (the dedicated declaration phase always has exactly one, and
-// only seats holding a meld are ever prompted, so the bot's declare can never
-// be rejected); playing → pending belote seat, else active player (covers the
+// state. Phase table per the story: bidding → active bidder; declaring → every
+// seat that has not yet answered (the phase asks all four at once and closes
+// only when every connected seat has answered); playing → pending belote seat,
+// else active player (covers the
 // trick-1 declaration prompt — it always belongs to the active player);
 // hand_complete → every bot that has not acknowledged the score reveal; a
 // pending surrender adds the proposer's partner (surrender is team-internal —
@@ -98,12 +99,20 @@ func botDecisionSeats(gs *game.GameState) []int {
 	case game.PhaseBidding:
 		add(gs.ActivePlayerSeat)
 	case game.PhaseDeclaring:
-		// Scheduling only the PROMPTED seat matters: a meld-less seat is stepped
-		// past by the engine and never becomes active with AwaitingDeclaration
-		// set, so an unconditional add would hand a bot a decision it cannot
-		// legally make and spin the reject → reschedule loop.
-		if gs.AwaitingDeclaration {
-			add(gs.ActivePlayerSeat)
+		// Every bot seat that has not answered, not just one: the dedicated
+		// phase asks all four at once and closes only when every connected seat
+		// has answered, so scheduling a single seat would leave the rest silent
+		// until the window elapsed — turning every hand with bots into a full
+		// declarationAutoClose stall.
+		//
+		// Gating on DeclarationAnswered (not AwaitingDeclaration, which the
+		// phase never sets) also makes the reject → reschedule loop
+		// unreachable: the engine accepts an answer from any unanswered seat,
+		// and a seat drops out of this list the moment it answers.
+		for seat := range gs.Players {
+			if !gs.Players[seat].DeclarationAnswered {
+				add(seat)
+			}
 		}
 	case game.PhasePlaying:
 		if gs.PendingBelotSeat != nil {
@@ -129,12 +138,17 @@ func botDecisionSeats(gs *game.GameState) []int {
 }
 
 // botThinkDelay returns the humanized delay before a bot acts: uniform
-// random in [botDelayMin, botDelayMax] for game decisions — bidding, the
-// dedicated declaration phase, and play alike — and a single short beat
-// (botDelayMin) for score-reveal acknowledgements, where humans plus the
-// existing 14 s fallback still pace the reveal.
+// random in [botDelayMin, botDelayMax] for game decisions — bidding and play —
+// and a single short beat (botDelayMin) for the two fixed-window phases,
+// score-reveal acknowledgements and the dedicated declaration phase, where the
+// human players plus the window itself already pace things.
+//
+// The declaration phase is not merely a preference: the window is short, all
+// four seats must answer to close it early, and a bot drawing near botDelayMax
+// on every seat would routinely push a table of bots to the full ceiling. The
+// humans are the ones the pacing exists for, and they are answering in parallel.
 func (m *Manager) botThinkDelay(phase game.Phase) time.Duration {
-	if phase == game.PhaseHandComplete {
+	if phase == game.PhaseHandComplete || phase == game.PhaseDeclaring {
 		return m.botDelayMin
 	}
 	spread := m.botDelayMax - m.botDelayMin
@@ -230,10 +244,14 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		LeadSuit:            gs.LeadSuit,
 		ActivePlayerSeat:    gs.ActivePlayerSeat,
 		AwaitingDeclaration: gs.AwaitingDeclaration && gs.ActivePlayerSeat == seat,
-		PendingBelot:        gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,
-		TeamScores:          gs.TeamScores,
-		HandPoints:          gs.HandPoints,
-		TricksWon:           gs.TricksWon,
+		// Only meaningful in the dedicated declaration phase, and meld detection
+		// walks the whole hand — so it is not paid on every bid and every card
+		// play as well.
+		HasDeclarations: gs.Phase == game.PhaseDeclaring && game.HasDeclarableCombinations(gs, seat),
+		PendingBelot:    gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,
+		TeamScores:      gs.TeamScores,
+		HandPoints:      gs.HandPoints,
+		TricksWon:       gs.TricksWon,
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true

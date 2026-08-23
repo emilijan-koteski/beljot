@@ -31,6 +31,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		LeadSuit:            gs.LeadSuit,
 		ActivePlayerSeat:    gs.ActivePlayerSeat,
 		AwaitingDeclaration: gs.AwaitingDeclaration && gs.ActivePlayerSeat == seat,
+		HasDeclarations:     game.HasDeclarableCombinations(gs, seat),
 		PendingBelot:        gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,
 		TeamScores:          gs.TeamScores,
 		HandPoints:          gs.HandPoints,
@@ -399,21 +400,43 @@ func TestDecide_AlwaysDeclares(t *testing.T) {
 	assert.Equal(t, 0, action.PlayerSeat)
 }
 
-// TestDecide_AnswersDedicatedDeclarationPhase pins the Croatian phase guard.
+// TestDecide_AnswersDedicatedDeclarationPhase pins the Croatian phase branch.
+// Every seat is asked at once there, so the bot decides for itself from what it
+// holds rather than being told by a prompt flag. It is also a crash guard:
 // View.LegalCards is populated only in PhasePlaying, so a fall-through to
 // chooseCard here would index legal[0] on a nil slice and panic INSIDE the
 // session's critical section — taking the table down, not just the bot.
 func TestDecide_AnswersDedicatedDeclarationPhase(t *testing.T) {
 	gs := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
 	require.Equal(t, game.PhaseDeclaring, gs.Phase)
-	require.True(t, gs.AwaitingDeclaration)
+	require.False(t, gs.AwaitingDeclaration, "the phase never puts a seat on the clock")
 	require.Nil(t, viewFromState(gs, gs.ActivePlayerSeat, nil).LegalCards,
 		"the phase has no legal cards — that is the panic this guard prevents")
 
-	t.Run("the prompted seat declares", func(t *testing.T) {
-		action := bot.Decide(viewFromState(gs, gs.ActivePlayerSeat, nil))
-		assert.Equal(t, game.ActionDeclare, action.Type)
-		assert.Equal(t, gs.ActivePlayerSeat, action.PlayerSeat)
+	t.Run("a seat holding a meld declares", func(t *testing.T) {
+		for seat := 0; seat < 4; seat++ {
+			require.True(t, game.HasDeclarableCombinations(gs, seat), "fixture: seat %d holds a meld", seat)
+			action := bot.Decide(viewFromState(gs, seat, nil))
+			assert.Equal(t, game.ActionDeclare, action.Type, "seat %d", seat)
+			assert.Equal(t, seat, action.PlayerSeat)
+
+			// Not merely non-empty: the engine must actually accept it, or the
+			// scheduler re-arms the seat on rejection and livelocks.
+			_, err := game.ApplyAction(gs, action)
+			require.NoError(t, err, "seat %d: the bot's declare must be legal", seat)
+		}
+	})
+
+	t.Run("a seat holding nothing skips", func(t *testing.T) {
+		bare := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
+		for seat := range bare.Players {
+			bare.Players[seat].Hand = nil
+		}
+		for seat := 0; seat < 4; seat++ {
+			require.False(t, game.HasDeclarableCombinations(bare, seat))
+			action := bot.Decide(viewFromState(bare, seat, nil))
+			assert.Equal(t, game.ActionSkipDeclare, action.Type, "seat %d", seat)
+		}
 	})
 
 	t.Run("no seat ever reaches for a card", func(t *testing.T) {
@@ -421,16 +444,6 @@ func TestDecide_AnswersDedicatedDeclarationPhase(t *testing.T) {
 			action := bot.Decide(viewFromState(gs, seat, nil))
 			assert.NotEqual(t, game.ActionPlayCard, action.Type, "seat %d", seat)
 		}
-	})
-
-	t.Run("an unprompted seat skips", func(t *testing.T) {
-		// Defensive shape: the scheduler only ever hands the phase to the
-		// prompted seat, but Decide must still answer rather than fall through.
-		noPrompt := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
-		noPrompt.AwaitingDeclaration = false
-
-		action := bot.Decide(viewFromState(noPrompt, noPrompt.ActivePlayerSeat, nil))
-		assert.Equal(t, game.ActionSkipDeclare, action.Type)
 	})
 }
 
