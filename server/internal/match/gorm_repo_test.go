@@ -545,14 +545,21 @@ func TestGormMatchRepository_GetLastMatchForRoomAndUser(t *testing.T) {
 	newest := newMatch(roomOne, -1*time.Hour, "abandoned")
 	// Newer in wall-clock terms, but a DIFFERENT room — must never be picked.
 	otherRoom := newMatch(roomTwo, 0, "completed")
-	require.NoError(t, repo.Create(older))
+	// Every fixture here carries at least one hand: the read requires recorded
+	// play, so a hand-less row would be skipped and "newest wins" / "scoped to
+	// one room" would then pass for the wrong reason.
+	require.NoError(t, repo.CreateWithHands(older, []match.HandResult{
+		{HandNumber: 1, TeamAHandTotal: 100, TeamBHandTotal: 62},
+	}))
 	// Hands are inserted OUT of order so the ASC preload has something to sort.
 	require.NoError(t, repo.CreateWithHands(newest, []match.HandResult{
 		{HandNumber: 3, TeamAHandTotal: 60, TeamBHandTotal: 102},
 		{HandNumber: 1, TeamAHandTotal: 90, TeamBHandTotal: 72},
 		{HandNumber: 2, TeamAHandTotal: 81, TeamBHandTotal: 81},
 	}))
-	require.NoError(t, repo.Create(otherRoom))
+	require.NoError(t, repo.CreateWithHands(otherRoom, []match.HandResult{
+		{HandNumber: 1, TeamAHandTotal: 88, TeamBHandTotal: 74},
+	}))
 
 	t.Run("participant gets the room's newest match with ordered hands", func(t *testing.T) {
 		got, err := repo.GetLastMatchForRoomAndUser(roomOne, b)
@@ -602,5 +609,39 @@ func TestGormMatchRepository_GetLastMatchForRoomAndUser(t *testing.T) {
 		got, err := repo.GetLastMatchForRoomAndUser(room, a)
 		require.NoError(t, err)
 		assert.Nil(t, got, "only completed / abandoned rows count")
+	})
+
+	// Boot reconcile writes a 0-0 `abandoned` row with NO hands for every room
+	// left in `playing` by a crash (reconcile.go). It is a recovery artifact,
+	// not a game anyone played — surfacing it would show a 0-0 scoreline with an
+	// empty breakdown, reading as a match everybody lost.
+	t.Run("a hand-less reconcile placeholder is not the last match", func(t *testing.T) {
+		room := seedRepoRoom(t, db, a, repoFixtureSuffix())
+		placeholder := newMatch(room, time.Hour, "abandoned")
+		placeholder.TeamAScore = 0
+		placeholder.TeamBScore = 0
+		placeholder.WinnerTeam = 0
+		require.NoError(t, repo.Create(placeholder))
+
+		got, err := repo.GetLastMatchForRoomAndUser(room, a)
+		require.NoError(t, err)
+		assert.Nil(t, got, "a row with no scored hand is not a played match")
+	})
+
+	// ...but it must not shadow a real match that came before it in the room.
+	t.Run("a placeholder does not hide the real match beneath it", func(t *testing.T) {
+		room := seedRepoRoom(t, db, a, repoFixtureSuffix())
+		real := newMatch(room, time.Hour, "completed")
+		require.NoError(t, repo.CreateWithHands(real, []match.HandResult{
+			{HandNumber: 1, TeamAHandTotal: 120, TeamBHandTotal: 42},
+		}))
+		// Written LATER, so it wins on completed_at and would be returned first.
+		placeholder := newMatch(room, 2*time.Hour, "abandoned")
+		require.NoError(t, repo.Create(placeholder))
+
+		got, err := repo.GetLastMatchForRoomAndUser(room, a)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, real.ID, got.ID, "falls through the placeholder to real play")
 	})
 }

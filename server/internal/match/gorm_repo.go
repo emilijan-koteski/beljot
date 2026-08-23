@@ -235,6 +235,13 @@ func (r *GormMatchRepository) GetLastMatchForRoomAndUser(roomID, userID uint) (*
 			"player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?",
 			userID, userID, userID, userID,
 		).
+		// A row with no scored hand is not a match anyone played: boot reconcile
+		// writes a 0-0 `abandoned` placeholder with no hands for every room left
+		// in `playing` by a crash (reconcile.go), and a real abandonment inside
+		// the first hand lands in the same shape. Surfacing either as "the last
+		// match" shows a 0-0 scoreline and an empty breakdown, which reads as a
+		// played game that everybody lost. Require recorded play instead.
+		Where("EXISTS (SELECT 1 FROM hand_results hr WHERE hr.match_id = matches.id)").
 		Preload("Hands", func(db *gorm.DB) *gorm.DB {
 			return db.Order("hand_number ASC")
 		}).
