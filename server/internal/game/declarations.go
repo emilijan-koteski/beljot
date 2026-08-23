@@ -43,7 +43,13 @@ func detectDeclarations(hand []Card, overlap bool) []Declaration {
 		bySuit[c.Suit] = append(bySuit[c.Suit], c)
 	}
 
-	for suit, cards := range bySuit {
+	// AllSuits order, never the map's: Go randomizes map iteration per run, and
+	// the order melds are appended in is the order they reach the wire, the
+	// declaration-contract golden, and the client's reveal panel. Iterating
+	// bySuit directly made TestVariantRulesAndDeclarationsContract fail roughly
+	// one run in four on any hand holding two melds.
+	for _, suit := range AllSuits {
+		cards := bySuit[suit]
 		if len(cards) < 3 {
 			continue
 		}
@@ -75,7 +81,6 @@ func detectDeclarations(hand []Card, overlap bool) []Declaration {
 				seqStart = i
 			}
 		}
-		_ = suit // used via bySuit iteration
 	}
 
 	// --- Four-of-a-kind: player holds all 4 suits of the same rank ---
@@ -83,7 +88,10 @@ func detectDeclarations(hand []Card, overlap bool) []Declaration {
 	for _, c := range hand {
 		byRank[c.Rank] = append(byRank[c.Rank], c)
 	}
-	for rank, cards := range byRank {
+	// AllRanks order, for the same reason as AllSuits above: a hand with two
+	// four-of-a-kinds must emit them in a fixed order.
+	for _, rank := range AllRanks {
+		cards := byRank[rank]
 		if len(cards) == 4 {
 			if pts, ok := fourOfAKindPoints[rank]; ok {
 				foakCards := make([]Card, 4)

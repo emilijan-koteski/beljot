@@ -169,3 +169,57 @@ func mustCards(t *testing.T, ids []string) []Card {
 	}
 	return out
 }
+
+// TestDetectDeclarationsIsDeterministic is the guard that keeps the golden above
+// honest, and it exists because the golden alone could not.
+//
+// detectDeclarations groups cards into `bySuit` and `byRank` maps. Go randomizes
+// map iteration order per run, so for any hand holding more than one meld the
+// detector used to emit them in a different order from run to run — same melds,
+// same values, different list order. That order is not cosmetic: it is the order
+// melds reach the wire, this golden, and the client's reveal panel.
+//
+// The golden DOES catch it, but only when the dice fall the wrong way — measured
+// at roughly one run in four, which reads as "flaky CI" rather than "bug" and
+// invites a retry instead of a fix. This test catches it every single run: it
+// asks for the same hand many times in one process and requires byte-identical
+// output, so a reintroduced map range fails immediately and unambiguously.
+//
+// Multi-meld hands only — a single-meld hand has nothing to reorder and would
+// make this vacuous.
+func TestDetectDeclarationsIsDeterministic(t *testing.T) {
+	hands := []struct {
+		name string
+		ids  []string
+	}{
+		// A run and a carré sharing the Jack of spades — the exact hand whose
+		// two melds used to swap places in declaration_melds.json.
+		{"run_and_carre", []string{"9S", "TS", "JS", "JH", "JD", "JC", "7H", "8D"}},
+		// Two runs in different suits: the bySuit range, with nothing else in play.
+		{"two_runs_two_suits", []string{"7S", "8S", "9S", "TH", "JH", "QH", "7D", "8C"}},
+		// Two carrés: the byRank range, with nothing else in play.
+		{"two_carres", []string{"JS", "JH", "JD", "JC", "9S", "9H", "9D", "9C"}},
+	}
+
+	for _, h := range hands {
+		t.Run(h.name, func(t *testing.T) {
+			hand := mustCards(t, h.ids)
+
+			for _, overlap := range []bool{false, true} {
+				first, err := json.Marshal(toMeldFacts(detectDeclarations(hand, overlap)))
+				require.NoError(t, err)
+
+				// 200 iterations: with two melds a coin-flip ordering survives 200
+				// identical draws with probability 2^-199, so a reintroduced map
+				// range is caught on effectively every run rather than one in four.
+				for i := range 200 {
+					again, err := json.Marshal(toMeldFacts(detectDeclarations(hand, overlap)))
+					require.NoError(t, err)
+					require.Equal(t, string(first), string(again),
+						"overlap=%v: meld order changed on iteration %d — detectDeclarations "+
+							"must walk AllSuits/AllRanks, never the bySuit/byRank maps", overlap, i)
+				}
+			}
+		})
+	}
+}
