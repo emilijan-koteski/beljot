@@ -164,16 +164,10 @@ export async function ssoLink(provider: string, data: SSOLinkRequest): Promise<S
   }
 }
 
-export async function refresh(signal?: AbortSignal): Promise<RefreshResponse> {
-  try {
-    const response = await axiosPublic.post<{ data: RefreshResponse }>("/auth/refresh", undefined, {
-      signal,
-    });
-    return response.data.data;
-  } catch (e) {
-    throw new Error(`Refresh failed: ${(e as AxiosError).response?.status ?? "unknown"}`);
-  }
-}
+// NOTE: there is deliberately no `refresh()` here. /auth/refresh has exactly
+// one caller — `refreshAccessToken()` in axiosClient.ts — because refresh
+// tokens rotate and a second, uncoordinated caller races the family into a
+// dead generation. Import that singleton instead.
 
 export async function forgotPassword(data: ForgotPasswordRequest): Promise<void> {
   try {

@@ -12,10 +12,15 @@ import { useAuthStore } from "@/shared/stores/authStore";
 
 vi.mock("@/shared/api/auth", () => ({
   login: vi.fn(),
-  // Reject so useAuthInit settles to the logged-out landing page when <App />
-  // is rendered (no real session in jsdom).
-  refresh: vi.fn(() => Promise.reject(new Error("no session"))),
   logout: vi.fn(),
+}));
+
+// useAuthInit restores through the coordinated singleton (never /auth/refresh
+// directly). Reject it so <App /> settles to the logged-out landing page
+// instead of leaning on a real request failing in jsdom.
+vi.mock("@/shared/api/axiosClient", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/api/axiosClient")>()),
+  refreshAccessToken: vi.fn(() => Promise.reject(new Error("no session"))),
 }));
 
 vi.mock("@/shared/api/rooms", () => ({
