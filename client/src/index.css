@@ -575,12 +575,27 @@
   --whisper-border: rgba(194, 86, 138, 0.4);
   --whisper-ink: #a83d70;
   --whisper-name: #c2568a;
+  /* Count-badge trio, shared by the closed FAB's whisper chip and the open
+     dock's per-friend tab badge, so both read as one system. Split from
+     `--whisper-name` because a fill needs its own ink AND its own halo: the
+     felt skin's bright pink below cannot carry white text, and a fixed glow
+     would leave a dark lobby halo around that bright fill. Contrast measured
+     against the 11px/9px bold these carry: #ffffff on #b0416f = 5.48:1, and on
+     felt #3d0f26 on #f2b8d4 = 9.72:1 — both clear of the 4.5:1 WCAG AA floor.
+     Reusing `--whisper-name`'s #c2568a here would have been 4.21:1, and the
+     tab badge's old white-on-#f2b8d4 in-game was 1.67:1. */
+  --whisper-badge: #b0416f;
+  --whisper-badge-ink: #ffffff;
+  --whisper-badge-glow: rgba(176, 65, 111, 0.55);
 }
 .chat-dock-match {
   --whisper-fill: rgba(240, 168, 204, 0.16);
   --whisper-border: rgba(240, 168, 204, 0.45);
   --whisper-ink: #f2b8d4;
   --whisper-name: #f2b8d4;
+  --whisper-badge: #f2b8d4;
+  --whisper-badge-ink: #3d0f26;
+  --whisper-badge-glow: rgba(242, 184, 212, 0.55);
 }
 
 /* ──────────────────────────────────────────────────────────────────────

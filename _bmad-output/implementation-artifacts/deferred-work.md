@@ -1056,3 +1056,19 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A �
 - source_spec: `_bmad-output/implementation-artifacts/spec-room-last-match-stats.md`
   summary: Five near-identical `MatchListItem` fixtures were added across test files instead of one factory in `test-utils.tsx`.
   evidence: `makeLastMatch` (MatchResult.test), `makeMatch` (LastMatchDialog.test), `makeMatch` (MatchPlayerActions.test), `makeMatch` (MatchStatsCard.test) and the inline `lastMatch` literal in `RoomPage.test.tsx` are the same ~35-line DTO. The repo convention centralizes fixtures — `client/src/test-utils.tsx` already hosts `makeUser`, `makeRoom`, `makeRoomPlayer`, `makeRoomDetail`, `makeRoomInvite`. Adding a `MatchListItem` field now means five edits.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-whisper-unread-chip.md`
+  summary: A third copy of the same `WhisperPayload` fixture was added instead of one factory in `test-utils.tsx`.
+  evidence: Identical factory bodies now sit in `client/src/shared/stores/chatStore.test.ts`, `client/src/features/chat/ChatDock.test.tsx` and (new this story) `client/src/features/match/components/MatchChatDock.test.tsx`. The repo convention centralizes fixtures in `client/src/test-utils.tsx`, which already hosts `makeUser`, `makeRoom`, `makeRoomDetail`. Adding a `WhisperPayload` field now means three edits. The duplication predates this story; this change made it a triple.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-whisper-unread-chip.md`
+  summary: `i18n.parity.test.ts` structurally forbids i18next plural categories, so every count string in the app is stuck with a `Label: {{count}}` form.
+  evidence: The parity test asserts identical flattened key sets across `en/mk/hr/sr`. i18next plural suffixes are per-locale — en needs `_one`/`_other`, hr/sr need `_one`/`_few`/`_other` — so any correctly pluralized key fails parity by construction. `whisper.unreadCount` and `chat.unreadCount` therefore use a labelled-value phrasing that reads acceptably at 1 rather than a grammatically inflected one. Fixing this properly means teaching the parity test to group plural suffix families, which affects every future count string, not just these two.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-whisper-unread-chip.md`
+  summary: A whisper's *arrival* still has no cue — only a static number that changes on an already-visible chip.
+  evidence: Public messages get a 2-second peek bubble (`ChatDock.tsx` `peekPayload`); a whisper deliberately gets none, because previewing private text on a closed FAB is forbidden. But that leaves no arrival signal at all: no pulse, no animation, and nothing announced (the count only reaches a screen reader when the FAB is focused). The codebase already has `animate-[card-in_.2s_ease_both]` and a `pulse-dot` keyframe, and an `aria-live="polite"` node outside the button would announce it. Deferred because a one-shot animation plus a live region is a design decision, and the spec's "Ask First" fences off notification behaviour.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-whisper-unread-chip.md`
+  summary: `RoomChatDock` has no test file, so one of the three dock variants this change alters is entirely uncovered.
+  evidence: `client/src/features/room/components/RoomChatDock.tsx` exists with no sibling `.test.tsx`; `ChatDock.test.tsx` covers the lobby variant and `MatchChatDock.test.tsx` the match variant. The room variant is the one whose `openLabel` differs in every locale, and the new accessible-name composition is variant-keyed. Pre-existing gap, surfaced by a change that claims identical behaviour across all three variants.

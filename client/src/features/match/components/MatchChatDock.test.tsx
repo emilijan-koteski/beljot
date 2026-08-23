@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
-import type { ChatMessagePayload } from "@/shared/types/wsEvents";
+import type { ChatMessagePayload, WhisperPayload } from "@/shared/types/wsEvents";
 import { ACTION_CHAT_MESSAGE } from "@/shared/types/wsEvents";
 
 import { MatchChatDock } from "./MatchChatDock";
@@ -38,6 +38,19 @@ function makeMatchMessage(overrides: Partial<ChatMessagePayload> = {}): ChatMess
   };
 }
 
+// An incoming whisper from bob(2); `me` is 1 in every call below.
+function makeWhisper(overrides: Partial<WhisperPayload> = {}): WhisperPayload {
+  return {
+    fromUserId: 2,
+    fromUsername: "bob",
+    toUserId: 1,
+    toUsername: "alice",
+    message: "psst",
+    timestamp: "2026-04-18T12:00:00Z",
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   mockSendMessage.mockReset();
   mockConnectionState = "connected";
@@ -46,6 +59,16 @@ beforeEach(() => {
     matchMessages: [],
     matchMessagesReceivedTotal: 0,
     hasSentMatch: false,
+    // In-file ordering only — Vitest gives each test file its own module
+    // registry, so the store cannot carry over from another file. Within this
+    // file the FAB's pink chip reads `whisperUnread`, so a thread seeded by an
+    // earlier test would sit beside the brass chip and break the primary-only
+    // assertions below.
+    whisperThreads: {},
+    whisperUnread: {},
+    activeChannel: "primary",
+    dockOpen: false,
+    whisperOpenRequest: 0,
   });
   useMatchStore.setState({ roomId: 42 });
   Element.prototype.scrollIntoView = vi.fn();
@@ -133,6 +156,25 @@ describe("MatchChatDock", () => {
     });
 
     expect(screen.getByTestId("match-chat-unread")).toHaveTextContent("99+");
+  });
+
+  it("renders the whisper chip beside the brass badge on the match FAB", () => {
+    render(<ControlledDock />);
+
+    act(() => {
+      // Authored by bob(2), not the local user: `appendWhisper(..., 1)` below
+      // declares 1 to be me, and a message from me would not raise the brass
+      // chip at all in a dock that knows who I am.
+      useChatStore
+        .getState()
+        .appendMatch(makeMatchMessage({ userId: 2, username: "bob", message: "public" }));
+      useChatStore.getState().appendWhisper(makeWhisper(), 1);
+    });
+
+    // Two independent chips on the felt skin: brass counts the match channel,
+    // pink the whisper. The pre-split badge summed them into one "2".
+    expect(screen.getByTestId("match-chat-unread")).toHaveTextContent("1");
+    expect(screen.getByTestId("match-chat-whisper-unread")).toHaveTextContent("1");
   });
 
   it("clears the unread badge when match history is cleared while closed", () => {

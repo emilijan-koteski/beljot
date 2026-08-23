@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import type { WhisperPayload } from "@/shared/types/wsEvents";
+import type { ChatMessagePayload, WhisperPayload } from "@/shared/types/wsEvents";
 import { ACTION_CHAT_MESSAGE, ACTION_WHISPER } from "@/shared/types/wsEvents";
 import { makeUser } from "@/test-utils";
 
@@ -19,6 +19,19 @@ vi.mock("@/shared/providers/WebSocketContext", () => ({
   useWsSendMessage: () => mockSendMessage,
   useWsConnectionState: () => mockConnectionState,
 }));
+
+// A public lobby-channel message from someone else (bob), so it counts toward
+// the brass unread chip. Own messages (userId 1) never do.
+function lobbyMessage(overrides: Partial<ChatMessagePayload> = {}): ChatMessagePayload {
+  return {
+    userId: 2,
+    username: "bob",
+    message: "hello lobby",
+    timestamp: "2026-04-18T12:00:00Z",
+    scope: "lobby",
+    ...overrides,
+  };
+}
 
 // me = alice(1). bob(2)/carol(3) are the whisper counterparts.
 function whisper(overrides: Partial<WhisperPayload> = {}): WhisperPayload {
@@ -304,20 +317,276 @@ describe("ChatDock — whisper", () => {
     expect(screen.queryByTestId("lobby-chat-tabs")).not.toBeInTheDocument();
   });
 
-  it("surfaces an incoming whisper on the closed FAB unread badge", () => {
+  it("surfaces an incoming whisper on its own pink FAB chip", () => {
     // Dock stays CLOSED (no fab click). Without this, an incoming whisper is
-    // invisible until the dock is opened — the badge must reflect it.
+    // invisible until the dock is opened — the chip must reflect it.
     render(<ChatDock variant="lobby" />);
-    expect(screen.queryByTestId("lobby-chat-unread")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lobby-chat-whisper-unread")).not.toBeInTheDocument();
 
     act(() => {
       useChatStore.getState().appendWhisper(whisper({ message: "psst" }), 1);
     });
 
-    // Numeric count only — the private message text is never previewed on the FAB.
-    const badge = screen.getByTestId("lobby-chat-unread");
-    expect(badge).toHaveTextContent("1");
-    expect(badge).not.toHaveTextContent("psst");
+    // Numeric count only. `textContent` is asserted whole, not with a substring
+    // matcher: that pins the chip to EXACTLY the number, so any extra node
+    // smuggled in beside it (a preview, a label) fails here.
+    const badge = screen.getByTestId("lobby-chat-whisper-unread");
+    expect(badge.textContent).toBe("1");
+    expect(screen.queryByText("psst")).not.toBeInTheDocument();
+  });
+
+  it("renders only the brass chip when the unread is public-channel only", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      useChatStore.getState().appendLobby(lobbyMessage({ message: "m1" }));
+      useChatStore.getState().appendLobby(lobbyMessage({ message: "m2" }));
+    });
+
+    expect(screen.getByTestId("lobby-chat-unread")).toHaveTextContent("2");
+    expect(screen.queryByTestId("lobby-chat-whisper-unread")).not.toBeInTheDocument();
+  });
+
+  it("renders only the pink chip when the unread is whispers only", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper(), 1);
+    });
+
+    expect(screen.getByTestId("lobby-chat-whisper-unread")).toHaveTextContent("1");
+    // The brass chip counts the PUBLIC channel only — a whisper must not inflate
+    // it (the pre-split badge summed both, hiding the whisper in public noise).
+    expect(screen.queryByTestId("lobby-chat-unread")).not.toBeInTheDocument();
+  });
+
+  it("raises no pink chip for a whisper I sent myself", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      // Own-echo: the server delivers my own whisper back to me, keyed to the
+      // recipient's thread. It must never read as something waiting for me.
+      useChatStore
+        .getState()
+        .appendWhisper(
+          whisper({ fromUserId: 1, fromUsername: "alice", toUserId: 2, toUsername: "bob" }),
+          1,
+        );
+    });
+
+    expect(screen.queryByTestId("lobby-chat-whisper-unread")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lobby-chat-unread")).not.toBeInTheDocument();
+  });
+
+  it("announces BOTH counts on the FAB's accessible name, public first", () => {
+    // An sr-only span nested in the button would be swallowed by the button's
+    // own aria-label, so the counts have to be part of that label. Naming only
+    // the whisper count would leave a screen-reader user hearing the same name
+    // whether 0 or 12 public messages were waiting.
+    render(<ChatDock variant="lobby" />);
+    expect(screen.getByTestId("lobby-chat-fab")).toHaveAccessibleName("Open lobby chat");
+
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper(), 1);
+      useChatStore.getState().appendWhisper(whisper({ message: "again" }), 1);
+    });
+    expect(screen.getByTestId("lobby-chat-fab")).toHaveAccessibleName(
+      "Open lobby chat, Unread whispers: 2",
+    );
+
+    act(() => {
+      useChatStore.getState().appendLobby(lobbyMessage({ message: "m1" }));
+    });
+    expect(screen.getByTestId("lobby-chat-fab")).toHaveAccessibleName(
+      "Open lobby chat, Unread messages: 1, Unread whispers: 2",
+    );
+  });
+
+  it("announces the public count with no whisper pending", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      useChatStore.getState().appendLobby(lobbyMessage({ message: "m1" }));
+      useChatStore.getState().appendLobby(lobbyMessage({ message: "m2" }));
+    });
+
+    expect(screen.getByTestId("lobby-chat-fab")).toHaveAccessibleName(
+      "Open lobby chat, Unread messages: 2",
+    );
+  });
+
+  it("keeps the two chips independent: brass = public, pink = whispers across threads", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      useChatStore.getState().appendLobby(lobbyMessage({ message: "m1" }));
+      useChatStore.getState().appendLobby(lobbyMessage({ message: "m2" }));
+      // bob(1) + carol(2) → pink sums to 3 across both threads.
+      useChatStore.getState().appendWhisper(whisper({ message: "b1" }), 1);
+      useChatStore
+        .getState()
+        .appendWhisper(whisper({ fromUserId: 3, fromUsername: "carol", message: "c1" }), 1);
+      useChatStore
+        .getState()
+        .appendWhisper(whisper({ fromUserId: 3, fromUsername: "carol", message: "c2" }), 1);
+    });
+
+    expect(screen.getByTestId("lobby-chat-unread")).toHaveTextContent("2");
+    expect(screen.getByTestId("lobby-chat-whisper-unread")).toHaveTextContent("3");
+  });
+
+  it("caps the pink whisper chip at 99+", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      for (let i = 0; i < 120; i++) {
+        useChatStore.getState().appendWhisper(whisper({ message: `w-${i}` }), 1);
+      }
+    });
+
+    expect(screen.getByTestId("lobby-chat-whisper-unread")).toHaveTextContent("99+");
+  });
+
+  it("narrows both overflow chips to two characters when they are paired", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      for (let i = 0; i < 120; i++) {
+        useChatStore.getState().appendLobby(lobbyMessage({ message: `m-${i}` }));
+        useChatStore.getState().appendWhisper(whisper({ message: `w-${i}` }), 1);
+      }
+    });
+
+    // Two "99+" chips overlapped by 6px overhang the 56px FAB, so the paired
+    // overflow form is two characters wide. The exact totals still reach a
+    // screen reader through the button's name.
+    expect(screen.getByTestId("lobby-chat-unread").textContent).toBe("9+");
+    expect(screen.getByTestId("lobby-chat-whisper-unread").textContent).toBe("9+");
+    expect(screen.getByTestId("lobby-chat-fab")).toHaveAccessibleName(
+      "Open lobby chat, Unread messages: 120, Unread whispers: 120",
+    );
+  });
+
+  it("keeps sub-100 counts exact when the chips are paired", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      for (let i = 0; i < 12; i++) {
+        useChatStore.getState().appendLobby(lobbyMessage({ message: `m-${i}` }));
+      }
+      useChatStore.getState().appendWhisper(whisper(), 1);
+    });
+
+    // The paired narrowing is an OVERFLOW form only — it must not clamp a
+    // two-digit count that fits.
+    expect(screen.getByTestId("lobby-chat-unread").textContent).toBe("12");
+    expect(screen.getByTestId("lobby-chat-whisper-unread").textContent).toBe("1");
+  });
+
+  it("stacks the two chips in one anchored container, pink in front of brass", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      useChatStore.getState().appendLobby(lobbyMessage());
+      useChatStore.getState().appendWhisper(whisper(), 1);
+    });
+
+    const brass = screen.getByTestId("lobby-chat-unread");
+    const pink = screen.getByTestId("lobby-chat-whisper-unread");
+    // ONE shrink-wrapped anchor holds both, so the pair's right edge stays put
+    // however wide the numbers get — the whole point of dropping the two fixed
+    // absolute offsets that buried the brass digit past one character.
+    const anchor = brass.parentElement;
+    expect(anchor).not.toBeNull();
+    expect(pink.parentElement).toBe(anchor);
+    expect(anchor?.className).toContain("absolute");
+    expect(anchor?.className).toContain("-top-0.5");
+    expect(anchor?.className).toContain("-right-0.5");
+    // Brass first in DOM, pink second — pulled 6px over it and winning z-order,
+    // because the whisper is the rarer, higher-signal event.
+    expect(Array.from(anchor?.children ?? [])).toEqual([brass, pink]);
+    expect(pink.className).toContain("-ml-1.5");
+    expect(pink.className).toContain("z-10");
+  });
+
+  it("drops the overlap and z-order from a pink chip that stands alone", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper(), 1);
+    });
+
+    // Lone chip sits on the container's own anchor, so a whisper-only FAB looks
+    // exactly like the single-badge FAB always did.
+    const pink = screen.getByTestId("lobby-chat-whisper-unread");
+    expect(pink.className).not.toContain("-ml-1.5");
+    expect(pink.className).not.toContain("z-10");
+  });
+
+  it("paints the FAB chip and the whisper tab badge from the same badge tokens", () => {
+    render(<ChatDock variant="lobby" />);
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper(), 1);
+    });
+
+    const chip = screen.getByTestId("lobby-chat-whisper-unread");
+    expect(chip.className).toContain("bg-(--whisper-badge)");
+    expect(chip.className).toContain("text-(--whisper-badge-ink)");
+
+    fireEvent.click(screen.getByTestId("lobby-chat-fab"));
+
+    // The open dock's per-friend badge draws from the SAME pair, so closed and
+    // open states read as one system — and the felt skin gets dark ink instead
+    // of the near-invisible white it carried on its bright pink fill.
+    const badge = screen.getByTestId("lobby-chat-whisper-tab-bob-unread");
+    expect(badge.className).toContain("bg-(--whisper-badge)");
+    expect(badge.className).toContain("text-(--whisper-badge-ink)");
+  });
+
+  it("raises no peek bubble for an incoming whisper on the closed dock", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper({ message: "meet me at the bar" }), 1);
+    });
+
+    // The peek is primary-channel ONLY. A whisper reaches the closed FAB as a
+    // bare number and nothing else — no bubble, and above all no private text
+    // on screen for whoever is looking over your shoulder.
+    expect(screen.queryByTestId("lobby-chat-peek")).not.toBeInTheDocument();
+    expect(screen.queryByText("meet me at the bar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lobby-chat-whisper-unread").textContent).toBe("1");
+  });
+
+  it("does raise a peek bubble for an incoming public message", () => {
+    render(<ChatDock variant="lobby" />);
+
+    act(() => {
+      useChatStore.getState().appendLobby(lobbyMessage({ message: "gg everyone" }));
+    });
+
+    // The contrast that makes the whisper assertion above meaningful: the public
+    // channel DOES preview its text, so "no peek for a whisper" is pinning a
+    // real distinction rather than a peek that never fires at all.
+    const peek = screen.getByTestId("lobby-chat-peek");
+    expect(peek).toHaveTextContent("gg everyone");
+    expect(peek).toHaveTextContent("bob");
+  });
+
+  it("shows no FAB chip while the dock is open, only per-thread tab badges", () => {
+    render(<ChatDock variant="lobby" />);
+    act(() => {
+      useChatStore.getState().appendWhisper(whisper(), 1);
+      useChatStore.getState().appendWhisper(whisper({ fromUserId: 3, fromUsername: "carol" }), 1);
+    });
+    fireEvent.click(screen.getByTestId("lobby-chat-fab"));
+
+    expect(screen.queryByTestId("lobby-chat-whisper-unread")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lobby-chat-unread")).not.toBeInTheDocument();
+    // Per-friend counts stay on the whisper tab strip. The active channel is
+    // still `primary`, so neither tab badge is suppressed as "active".
+    expect(screen.getByTestId("lobby-chat-whisper-tab-bob-unread")).toHaveTextContent("1");
+    expect(screen.getByTestId("lobby-chat-whisper-tab-carol-unread")).toHaveTextContent("1");
   });
 
   it("badges a whisper that arrives on the last-selected thread after the dock is closed", () => {
@@ -336,7 +605,7 @@ describe("ChatDock — whisper", () => {
       useChatStore.getState().appendWhisper(whisper({ message: "while you were away" }), 1);
     });
 
-    expect(screen.getByTestId("lobby-chat-unread")).toHaveTextContent("1");
+    expect(screen.getByTestId("lobby-chat-whisper-unread")).toHaveTextContent("1");
     expect(useChatStore.getState().whisperUnread.bob).toBe(1);
   });
 

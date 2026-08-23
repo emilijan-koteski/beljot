@@ -350,13 +350,15 @@
   },
   "chat": {
     "title": "Lobi chat",
-    "placeholderDisabled": "Ponovno povezivanje…"
+    "placeholderDisabled": "Ponovno povezivanje…",
+    "unreadCount": "Nepročitane poruke: {{count}}"
   },
   "whisper": {
     "primaryTab": "Chat",
     "tablistLabel": "Kanali chata",
     "inputPlaceholder": "Šapni {{username}}…",
     "hint": "Ukucaj /w <prijatelj> <poruka> za privatni šapat",
+    "unreadCount": "Nepročitani šapati: {{count}}",
     "errors": {
       "notFriends": "Možeš da šapćeš samo prijateljima.",
       "blockedInGame": "Ne možeš da šapćeš nekome sa kim trenutno igraš.",

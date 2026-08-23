@@ -350,13 +350,15 @@
   },
   "chat": {
     "title": "Lobby chat",
-    "placeholderDisabled": "Reconnecting…"
+    "placeholderDisabled": "Reconnecting…",
+    "unreadCount": "Unread messages: {{count}}"
   },
   "whisper": {
     "primaryTab": "Chat",
     "tablistLabel": "Chat channels",
     "inputPlaceholder": "Whisper to {{username}}…",
     "hint": "Type /w <friend> <message> to whisper a friend privately",
+    "unreadCount": "Unread whispers: {{count}}",
     "errors": {
       "notFriends": "You can only whisper friends.",
       "blockedInGame": "You can't whisper someone you're currently playing with.",

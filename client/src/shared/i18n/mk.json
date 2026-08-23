@@ -350,13 +350,15 @@
   },
   "chat": {
     "title": "Лоби чет",
-    "placeholderDisabled": "Повторно поврзување…"
+    "placeholderDisabled": "Повторно поврзување…",
+    "unreadCount": "Непрочитани пораки: {{count}}"
   },
   "whisper": {
     "primaryTab": "Чет",
     "tablistLabel": "Канали за чет",
     "inputPlaceholder": "Шепни на {{username}}…",
     "hint": "Напиши /w <пријател> <порака> за приватен шепот",
+    "unreadCount": "Непрочитани шепоти: {{count}}",
     "errors": {
       "notFriends": "Можеш да шепнеш само на пријатели.",
       "blockedInGame": "Не можеш да шепнеш на некој со кого моментално играш.",

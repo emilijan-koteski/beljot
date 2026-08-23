@@ -46,6 +46,11 @@ function parseWhisperCommand(
 const PEEK_MS = 2000;
 const PEEK_MAX_CHARS = 90;
 const MAX_MESSAGE_LENGTH = 500;
+/** Shared chrome for the closed FAB's two count chips (public + whisper), so
+ *  the pair is one shape in two colours. `relative` lets the front chip take a
+ *  z-index inside the flex anchor. */
+const FAB_CHIP_CLASS =
+  "border-surface relative inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 px-1.5 text-[11px] font-bold leading-none tabular-nums";
 /** How long a sent `/w` keeps the right to switch the view to its thread. Past
  *  this the send is treated as failed, so a rejected whisper cannot hijack the
  *  view later when that friend whispers first. */
@@ -122,10 +127,11 @@ export function ChatDock(props: ChatDockProps) {
   const whisperOpenRequest = useChatStore((s) => s.whisperOpenRequest);
 
   const threadKeys = useMemo(() => Object.keys(whisperThreads).sort(), [whisperThreads]);
-  // Total unread across all whisper threads. Surfaced on the CLOSED FAB badge so an
-  // incoming whisper is noticed even when the dock is shut — the per-thread tab
-  // badges only render while the dock is open. Numeric only (no content peek), so
-  // private message text never renders on the FAB.
+  // Total unread across all whisper threads. Surfaced on the CLOSED FAB as its
+  // OWN pink chip, beside (never folded into) the brass public-channel chip, so
+  // an incoming whisper is distinguishable from public noise while the dock is
+  // shut — the per-thread tab badges only render while the dock is open.
+  // Numeric only (no content peek), so private message text never hits the FAB.
   const whisperUnreadTotal = useMemo(
     () => Object.values(whisperUnread).reduce((sum, n) => sum + n, 0),
     [whisperUnread],
@@ -357,10 +363,44 @@ export function ChatDock(props: ChatDockProps) {
 
   // ── Closed state ──────────────────────────────────────────────────────
   if (!open) {
-    // The FAB badge combines primary-channel unread with whisper unread so a
-    // private message shut behind the closed dock is still noticed. Content is
-    // never previewed here (the peek stays primary-channel only).
-    const badgeCount = unread + whisperUnreadTotal;
+    // Two independent chips, not one sum: brass counts the public channel,
+    // pink the whisper total across every thread. A single combined number made
+    // a private whisper arithmetically indistinguishable from public noise —
+    // you saw "3" and could not tell whether anyone had whispered you. Content
+    // is still never previewed here (the peek stays primary-channel only).
+    const hasPublicUnread = unread > 0;
+    const hasWhisperUnread = whisperUnreadTotal > 0;
+    const bothChips = hasPublicUnread && hasWhisperUnread;
+    // Stagger mirrors the dealer/trump-caller pair on a PlayerSeat: the pair
+    // overlaps so it reads as one stack, and the higher-signal chip (pink — the
+    // rarer, personal event) sits in front. Laid out as a flex row with a fixed
+    // negative margin rather than two absolute `right` offsets: a chip grows
+    // with its digit count, so a fixed offset that looks right at "2" buries
+    // the brass digit at "12". A margin keeps the overlap at 6px whatever the
+    // widths — enough to read as a stack, never enough to clip a number. The
+    // shrink-wrapped container keeps its anchor, so a whisper-free FAB is
+    // pixel-identical to what it was before the split.
+    //
+    // Overflow form narrows when the chips are paired: two "99+" chips are
+    // ~34px each and, overlapped by 6px, run ~62px across a 56px button — the
+    // pair would hang off both sides. Paired, an over-99 count drops to two
+    // characters; a lone chip keeps the wider, more precise "99+". Counts below
+    // 100 are never abbreviated either way, so brass "12" beside pink "1" still
+    // reads exactly.
+    const overflowLabel = bothChips ? "9+" : "99+";
+    const chipLabel = (n: number) => (n > 99 ? overflowLabel : String(n));
+    // Every count has to ride on the BUTTON's accessible name: an `aria-label`
+    // replaces the name of its whole subtree, so a number rendered in a chip —
+    // or an sr-only span beside it — is never announced. Both counts are named,
+    // public first, matching the chips' left-to-right order; and the announced
+    // numbers are exact, never the visually clamped ones.
+    const fabLabel = [
+      t(keys.openLabel),
+      hasPublicUnread ? t("chat.unreadCount", { count: unread }) : null,
+      hasWhisperUnread ? t("whisper.unreadCount", { count: whisperUnreadTotal }) : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
     return (
       <div
         data-testid={`${testIdRoot}-dock`}
@@ -389,23 +429,42 @@ export function ChatDock(props: ChatDockProps) {
         )}
         <button
           onClick={() => setOpen(true)}
-          aria-label={t(keys.openLabel)}
+          aria-label={fabLabel}
           data-testid={`${testIdRoot}-fab`}
           className={cn(
             "bg-surface text-ink relative inline-flex size-14 items-center justify-center rounded-full transition-transform hover:-translate-y-0.5",
             frosted,
-            badgeCount > 0
+            hasPublicUnread || hasWhisperUnread
               ? "border border-brass shadow-[0_0_0_3px_var(--brass-soft),0_10px_28px_-10px_rgba(14,58,36,0.35)]"
               : "border-border-2 border shadow-(--chat-shadow-fab)",
           )}
         >
           <MessageSquare className="size-5.5" strokeWidth={1.8} />
-          {badgeCount > 0 && (
-            <span
-              data-testid={`${testIdRoot}-unread`}
-              className="bg-brass text-brass-ink border-surface absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 px-1.5 text-[11px] font-bold leading-none tabular-nums shadow-[0_0_10px_rgba(201,168,118,0.55)]"
-            >
-              {badgeCount > 99 ? "99+" : badgeCount}
+          {(hasPublicUnread || hasWhisperUnread) && (
+            <span className="absolute -top-0.5 -right-0.5 flex items-center">
+              {hasPublicUnread && (
+                <span
+                  data-testid={`${testIdRoot}-unread`}
+                  className={cn(
+                    FAB_CHIP_CLASS,
+                    "bg-brass text-brass-ink shadow-[0_0_10px_rgba(201,168,118,0.55)]",
+                  )}
+                >
+                  {chipLabel(unread)}
+                </span>
+              )}
+              {hasWhisperUnread && (
+                <span
+                  data-testid={`${testIdRoot}-whisper-unread`}
+                  className={cn(
+                    FAB_CHIP_CLASS,
+                    "bg-(--whisper-badge) text-(--whisper-badge-ink) shadow-[0_0_10px_var(--whisper-badge-glow)]",
+                    bothChips && "z-10 -ml-1.5",
+                  )}
+                >
+                  {chipLabel(whisperUnreadTotal)}
+                </span>
+              )}
             </span>
           )}
         </button>
@@ -667,7 +726,7 @@ function ChannelTab({
       {unread > 0 && !active && (
         <span
           data-testid={`${testId}-unread`}
-          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-(--whisper-name) px-1 text-[9px] leading-none font-bold text-white tabular-nums"
+          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-(--whisper-badge) px-1 text-[9px] leading-none font-bold text-(--whisper-badge-ink) tabular-nums"
         >
           {unread > 9 ? "9+" : unread}
         </span>
