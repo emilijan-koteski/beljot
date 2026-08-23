@@ -32,7 +32,7 @@ interface TrumpPromptProps {
   onPass: () => void;
   /**
    * Whether a pass is legal for the active bidder right now. False only for the
-   * dealer bidding last in round 2 under a variant where the hand must find a
+   * dealer bidding last (fourth) under a variant where the hand must find a
    * taker: the server refuses that pass outright, so the control must not be
    * offered. Server-derived (matchState.mustPickTrump) — the client never
    * re-derives the rule.
@@ -50,8 +50,8 @@ const SUITS: Suit[] = ["S", "H", "D", "C"];
 /**
  * The four-suit picker grid. One definition serves every case that needs it:
  * Bitola round 2 (where the candidate's suit is locked out as "spent"), and
- * both rounds of a variant with no candidate at all (where nothing is locked
- * because no suit was ever offered and turned down).
+ * the whole single round of a variant with no candidate at all (where nothing
+ * is locked because no suit was ever offered and turned down).
  *
  * Card-style tiles: they take their face treatment from PlayingCard's exported
  * constants rather than restating it, so the tap target keeps reading as "pick
@@ -175,8 +175,8 @@ export function TrumpPrompt({
     // Surface all four suits as little parchment "suit chips" beside the copy
     // whenever the active bidder is choosing freely: Bitola round 2, where the
     // candidate suit is shown muted/disabled (it can't be picked) mirroring the
-    // active bidder's locked tile, and both rounds of a candidate-less variant,
-    // where nothing is locked.
+    // active bidder's locked tile, and the single round of a candidate-less
+    // variant, where nothing is locked.
     const showSuitChips = biddingRound === 2 || trumpCandidate === null;
 
     return (
@@ -261,9 +261,9 @@ export function TrumpPrompt({
   }
 
   // A round-1 take-it-or-pass on a face-up candidate only exists when there IS a
-  // candidate. Without one, trump is a freely named suit in BOTH rounds, so
-  // round 1 gets the same four-suit grid as round 2 and the single "Take"
-  // button — which sends no suit — must not render.
+  // candidate. Without one, trump is a freely named suit for the whole single
+  // round, so the bidder gets the same four-suit grid Bitola shows in round 2,
+  // and the single "Take" button — which sends no suit — must not render.
   const isFreeSuitPick = trumpCandidate === null;
 
   const title = isFreeSuitPick
@@ -339,18 +339,23 @@ export function TrumpPrompt({
           )}
 
           <div className="flex items-center justify-between gap-3">
+            {/* The round counter only makes sense where a second round exists —
+                the candidate variant. A candidate-less variant bids in a single
+                round, so "Round 1 / 2" would promise a round that can never
+                come; an empty span keeps the flex layout's two ends apart. */}
             <span
               className="font-body text-[11px]"
               style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.55 }}
             >
-              {t("match.trumpPrompt.roundLabel", {
-                round: biddingRound,
-                defaultValue: `Round ${biddingRound} / 2`,
-              })}
+              {trumpCandidate !== null &&
+                t("match.trumpPrompt.roundLabel", {
+                  round: biddingRound,
+                  defaultValue: `Round ${biddingRound} / 2`,
+                })}
             </span>
             <div className="flex items-center gap-3.5">
               {/* No Pass control when the server would refuse the pass: the
-                  dealer bidding last in round 2 where the hand must find a
+                  dealer bidding last (fourth) where the hand must find a
                   taker. Hiding it is the fix — offering a button whose only
                   outcome is a rejection toast is the defect, and a dedicated
                   error code for "you must pick" is explicitly not the answer.

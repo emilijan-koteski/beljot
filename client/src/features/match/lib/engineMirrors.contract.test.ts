@@ -59,7 +59,6 @@ describe("variantRules.ts mirrors game.RulesFor", () => {
       "declarationOverlap",
       "declarationTiming",
       "hasTrumpCandidate",
-      "revealFaceDownOnRound2",
       "tieRule",
     ]);
   });

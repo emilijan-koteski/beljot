@@ -34,25 +34,23 @@ const rulesGoldensDir = "testdata/contract"
 // that adding tags to the live config (and risking it leaking onto the wire)
 // is never needed to keep this gate.
 type variantRuleFacts struct {
-	DealShape              string `json:"dealShape"`
-	HasTrumpCandidate      bool   `json:"hasTrumpCandidate"`
-	RevealFaceDownOnRound2 bool   `json:"revealFaceDownOnRound2"`
-	AllPassOutcome         string `json:"allPassOutcome"`
-	DeclarationOverlap     bool   `json:"declarationOverlap"`
-	DeclarationTiming      string `json:"declarationTiming"`
-	TieRule                string `json:"tieRule"`
+	DealShape          string `json:"dealShape"`
+	HasTrumpCandidate  bool   `json:"hasTrumpCandidate"`
+	AllPassOutcome     string `json:"allPassOutcome"`
+	DeclarationOverlap bool   `json:"declarationOverlap"`
+	DeclarationTiming  string `json:"declarationTiming"`
+	TieRule            string `json:"tieRule"`
 }
 
 func factsFor(v Variant) variantRuleFacts {
 	r := RulesFor(v)
 	return variantRuleFacts{
-		DealShape:              string(r.DealShape),
-		HasTrumpCandidate:      r.HasTrumpCandidate,
-		RevealFaceDownOnRound2: r.RevealFaceDownOnRound2,
-		AllPassOutcome:         string(r.AllPassOutcome),
-		DeclarationOverlap:     r.DeclarationOverlap,
-		DeclarationTiming:      string(r.DeclarationTiming),
-		TieRule:                string(r.TieRule),
+		DealShape:          string(r.DealShape),
+		HasTrumpCandidate:  r.HasTrumpCandidate,
+		AllPassOutcome:     string(r.AllPassOutcome),
+		DeclarationOverlap: r.DeclarationOverlap,
+		DeclarationTiming:  string(r.DeclarationTiming),
+		TieRule:            string(r.TieRule),
 	}
 }
 

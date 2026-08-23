@@ -333,7 +333,7 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 	// assertions apply — and ApplyAction's require.NoError inside
 	// playOneHandWith makes a pass an immediate failure.
 	forcedBefore := sawForcedPick
-	forced := testfixtures.NewGameCroatianMidBidding(7)
+	forced := testfixtures.NewGameCroatianMidBidding(3)
 	require.True(t, game.MustPickTrump(forced, forced.ActivePlayerSeat),
 		"the tail fixture must be the state where the dealer has no legal pass")
 	_, _ = playOneHandWith(t, forced, bot.NewMemory(), rng, croatianBotDriver, tailObserver)
@@ -343,7 +343,7 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 
 // croatianBotDriver plays every seat with bot.Decide — no substitutions, no
 // retries. It used to swap in a free-suit pick for the one bid the bot could not
-// make (the dealer bidding last in round 2 under AllPassDealerMustPick has no
+// make (the dealer bidding last under AllPassDealerMustPick has no
 // legal pass); that crutch is gone, so playOneHandWith's require.NoError is now
 // a strict always-legal proof over the bot's OWN decisions, including the forced
 // dealer pick.

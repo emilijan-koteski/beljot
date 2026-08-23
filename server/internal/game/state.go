@@ -30,11 +30,12 @@ type PlayerState struct {
 	// live OUTSIDE Hand until bidding resolves, at which point mergeFaceDownCards
 	// folds them in and every seat holds eight.
 	//
-	// Server-only (json:"-") and deliberately so: a card that must be visible
-	// to exactly one player never rides match_state. Keeping these out of Hand
-	// means they are never serialized into ANYONE's snapshot — not even after
-	// ProjectForSeat masks the rest of the payload per recipient — and their
-	// owner learns them through a per-seat WS event instead.
+	// Server-only (json:"-") and deliberately so: these cards are hidden from
+	// EVERYONE — including their owner — for the whole of bidding, and never
+	// ride match_state. Keeping them out of Hand means they are never
+	// serialized into ANYONE's snapshot — not even after ProjectForSeat masks
+	// the rest of the payload per recipient. Their owner first sees them in the
+	// post-pick snapshot, once mergeFaceDownCards has folded them into Hand.
 	FaceDownCards []Card `json:"-"`
 	// FaceDownCount is how many cards sit in FaceDownCards — the public half of
 	// the field above, and the only half that crosses the wire.
@@ -176,13 +177,6 @@ type GameState struct {
 	// the wire outright rather than masked or counted (D96 / Story 12.10). The
 	// engine keeps dealing from it in-process; only the wire loses it.
 	Deck []Card `json:"-"`
-	// FaceDownRevealed records that round 1 was passed out under
-	// VariantRules.RevealFaceDownOnRound2, so every seat's two face-down cards
-	// are now known to their owner. Server-only (json:"-") — the cards
-	// themselves never ride match_state, so neither does this flag; the match
-	// layer reads it to deliver (and, on reconnect, re-deliver) each seat's own
-	// two cards through a per-seat event.
-	FaceDownRevealed bool `json:"-"`
 
 	// Current trick state
 	TrickNumber          int         `json:"trickNumber"`
@@ -434,9 +428,9 @@ func dealCards(gs *GameState, deck []Card) {
 //
 // Each player therefore physically holds 8 cards, but only 6 sit in Hand — the
 // other 2 live in PlayerState.FaceDownCards, unknown even to their owner until
-// round 1 is passed out (see VariantRules.RevealFaceDownOnRound2) or bidding
-// resolves. There is no trump candidate and nothing is held back, so Deck is
-// empty and bidding is a bare named suit in both rounds.
+// bidding resolves and mergeFaceDownCards folds them in. There is no trump
+// candidate and nothing is held back, so Deck is empty and bidding is a bare
+// named suit.
 func dealAllBeforeBidding(gs *GameState, deck []Card) {
 	cardIdx := 0
 	dealer := gs.DealerSeat
@@ -458,8 +452,7 @@ func dealAllBeforeBidding(gs *GameState, deck []Card) {
 		cardIdx += 2
 	}
 
-	// No candidate, no stage-2 reserve, and nothing revealed yet.
+	// No candidate and no stage-2 reserve.
 	gs.TrumpCandidate = nil
 	gs.Deck = nil
-	gs.FaceDownRevealed = false
 }

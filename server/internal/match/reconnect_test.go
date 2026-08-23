@@ -654,9 +654,8 @@ func TestReconnect_RefreshesDerivedMustPickTrump(t *testing.T) {
 	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-	// Round 2 with three passes behind it: the dealer is on the clock with no
-	// legal pass.
-	gs := testfixtures.NewGameCroatianMidBidding(7)
+	// Three passes behind it: the dealer is on the clock with no legal pass.
+	gs := testfixtures.NewGameCroatianMidBidding(3)
 	gs.RoomID = roomID
 	seat := gs.ActivePlayerSeat
 	gs.DealerSeat = seat

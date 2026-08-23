@@ -35,7 +35,6 @@ import type {
   CardPlayedPayload,
   CoinSettlementPayload,
   DeclarationsResolvedPayload,
-  FaceDownRevealedPayload,
   HandScoredPayload,
   HonorUpdatedPayload,
   MatchAbandonedPayload,
@@ -354,22 +353,6 @@ export const SurrenderDeclinedPayloadSchema = z.strictObject({
   decliningSeat: z.number(),
 });
 
-// Per-seat reveal of a player's OWN two face-down cards.
-//
-// Tight on purpose: the deal places EXACTLY two face-down cards per seat, and a
-// card ID is EXACTLY two characters. A loose `z.array(z.string())` would parse an
-// empty array, eleven ids, or `"10S"` — none of which the server can send, and
-// the last of which slices into a plausible-but-wrong card downstream. The
-// length is pinned with `.length(2)` rather than `z.tuple` so the inferred type
-// stays `string[]` and keeps mirroring the Go `[]string` — the runtime check is
-// identical either way.
-const CardIdSchema = z.string().length(2);
-
-export const FaceDownRevealedPayloadSchema = z.strictObject({
-  playerSeat: z.number().int().min(0).max(3),
-  cardIds: z.array(CardIdSchema).length(2),
-});
-
 // --- Compile-time conformance ---
 //
 // Each `_*Conformance` type asserts the schema's inferred type is mutually
@@ -536,12 +519,6 @@ type _SurrenderDeclinedConformance = MutualExtends<
 >;
 const _surrenderDeclinedConforms: _SurrenderDeclinedConformance = true;
 
-type _FaceDownRevealedConformance = MutualExtends<
-  z.infer<typeof FaceDownRevealedPayloadSchema>,
-  FaceDownRevealedPayload
->;
-const _faceDownRevealedConforms: _FaceDownRevealedConformance = true;
-
 // Suppress unused-locals — these constants exist purely for the type-level
 // assertion above. Re-exporting under a private namespace gives them a
 // reachable use without polluting the public module surface.
@@ -568,5 +545,4 @@ export const _conformanceWitnesses = {
   _playerReconnectedConforms,
   _surrenderProposedConforms,
   _surrenderDeclinedConforms,
-  _faceDownRevealedConforms,
 };

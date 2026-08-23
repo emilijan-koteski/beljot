@@ -16,8 +16,3 @@ const SUITS: ReadonlySet<string> = new Set<Suit>(["S", "H", "D", "C"]);
 export function isCardId(id: unknown): id is CardId {
   return typeof id === "string" && id.length === 2 && RANKS.has(id[0]!) && SUITS.has(id[1]!);
 }
-
-/** Splits a validated card ID into its rank and suit. Call only after `isCardId`. */
-export function splitCardId(id: CardId): { rank: Rank; suit: Suit } {
-  return { rank: id[0] as Rank, suit: id[1] as Suit };
-}

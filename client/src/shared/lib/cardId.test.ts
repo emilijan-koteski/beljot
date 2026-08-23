@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isCardId, splitCardId } from "./cardId";
+import { isCardId } from "./cardId";
 
 describe("isCardId", () => {
   it("accepts every one of the 32 real card IDs", () => {
@@ -43,13 +43,5 @@ describe("isCardId", () => {
     for (const value of bad) {
       expect(isCardId(value), JSON.stringify(value)).toBe(false);
     }
-  });
-});
-
-describe("splitCardId", () => {
-  it("splits rank then suit, never the reverse", () => {
-    expect(splitCardId("JS")).toEqual({ rank: "J", suit: "S" });
-    expect(splitCardId("7C")).toEqual({ rank: "7", suit: "C" });
-    expect(splitCardId("AH")).toEqual({ rank: "A", suit: "H" });
   });
 });

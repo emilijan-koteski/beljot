@@ -646,7 +646,7 @@ func (c *logCapture) matched(roomID uint, sub string) []string {
 
 // TestBot_ForcedDealerPickAdvancesHandWithoutRejection is the driver-level half
 // of the Story 12.8 deadlock fix. The engine refuses the dealer's fourth
-// round-2 pass under AllPassOutcome == AllPassDealerMustPick; a bot that
+// pass under AllPassOutcome == AllPassDealerMustPick; a bot that
 // offered one had its action rejected and re-armed by handleBotActionTimer, so
 // the same rejected pass cycled at the 1 s think-delay floor forever. An
 // engine-level test cannot see that loop — it lives in the driver.
@@ -665,9 +665,9 @@ func TestBot_ForcedDealerPickAdvancesHandWithoutRejection(t *testing.T) {
 		mixedPlayers(0), "relaxed", 0, 10, 120, 0))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-	// passCount 7: round 1 passed out, three round-2 passes recorded, the dealer
-	// (seat 0, the bot) on the clock with no legal pass.
-	gs := markBots(testfixtures.NewGameCroatianMidBidding(7), 0)
+	// passCount 3: the other three seats have passed, so the dealer (seat 0,
+	// the bot) is on the clock with no legal pass.
+	gs := markBots(testfixtures.NewGameCroatianMidBidding(3), 0)
 	gs.RoomID = roomID
 	require.True(t, game.MustPickTrump(gs, gs.ActivePlayerSeat), "the fixture must be the forced-pick state")
 	require.Equal(t, 0, gs.ActivePlayerSeat, "the bot dealer must be the seat on the clock")

@@ -339,25 +339,23 @@ func TestTeamStringForIndex_SafeOnOutOfRange(t *testing.T) {
 
 // TestRulesForPresets locks D-VAR-1's foundation: both presets return a fully
 // populated config, an unknown variant string falls back to Bitola, and the two
-// presets actually differ on the seven divergences.
+// presets actually differ on the six divergences.
 func TestRulesForPresets(t *testing.T) {
 	bitola := game.VariantRules{
-		DealShape:              game.DealShapeCandidate,
-		HasTrumpCandidate:      true,
-		RevealFaceDownOnRound2: false,
-		AllPassOutcome:         game.AllPassReshuffleAndRotate,
-		DeclarationOverlap:     false,
-		DeclarationTiming:      game.DeclarationTimingDuringFirstTrick,
-		TieRule:                game.TieRuleHangingPoints,
+		DealShape:          game.DealShapeCandidate,
+		HasTrumpCandidate:  true,
+		AllPassOutcome:     game.AllPassReshuffleAndRotate,
+		DeclarationOverlap: false,
+		DeclarationTiming:  game.DeclarationTimingDuringFirstTrick,
+		TieRule:            game.TieRuleHangingPoints,
 	}
 	croatia := game.VariantRules{
-		DealShape:              game.DealShapeAllBeforeBidding,
-		HasTrumpCandidate:      false,
-		RevealFaceDownOnRound2: true,
-		AllPassOutcome:         game.AllPassDealerMustPick,
-		DeclarationOverlap:     true,
-		DeclarationTiming:      game.DeclarationTimingDedicatedPhase,
-		TieRule:                game.TieRuleAllToOpponents,
+		DealShape:          game.DealShapeAllBeforeBidding,
+		HasTrumpCandidate:  false,
+		AllPassOutcome:     game.AllPassDealerMustPick,
+		DeclarationOverlap: true,
+		DeclarationTiming:  game.DeclarationTimingDedicatedPhase,
+		TieRule:            game.TieRuleAllToOpponents,
 	}
 
 	tests := []struct {
@@ -389,7 +387,6 @@ func TestRulesForPresets(t *testing.T) {
 	t.Run("the two presets differ on every divergence", func(t *testing.T) {
 		assert.NotEqual(t, bitola.DealShape, croatia.DealShape)
 		assert.NotEqual(t, bitola.HasTrumpCandidate, croatia.HasTrumpCandidate)
-		assert.NotEqual(t, bitola.RevealFaceDownOnRound2, croatia.RevealFaceDownOnRound2)
 		assert.NotEqual(t, bitola.AllPassOutcome, croatia.AllPassOutcome)
 		assert.NotEqual(t, bitola.DeclarationOverlap, croatia.DeclarationOverlap)
 		assert.NotEqual(t, bitola.DeclarationTiming, croatia.DeclarationTiming)
@@ -442,10 +439,6 @@ func TestNewGameCroatianDeal(t *testing.T) {
 	t.Run("no trump candidate and no stage-2 reserve", func(t *testing.T) {
 		assert.Nil(t, gs.TrumpCandidate, "there is no candidate in this deal shape")
 		assert.Empty(t, gs.Deck, "every card is dealt before bidding")
-	})
-
-	t.Run("nothing is revealed yet", func(t *testing.T) {
-		assert.False(t, gs.FaceDownRevealed)
 	})
 
 	// FaceDownCount is the only public trace of the hidden pair, and it is what
@@ -551,7 +544,7 @@ func TestGameStateJSONOmitsServerOnlyRuleFields(t *testing.T) {
 
 			var raw map[string]any
 			require.NoError(t, json.Unmarshal(data, &raw))
-			for _, key := range []string{"rules", "Rules", "faceDownRevealed", "FaceDownRevealed"} {
+			for _, key := range []string{"rules", "Rules"} {
 				_, exists := raw[key]
 				assert.False(t, exists, "server-only field %q must not reach the wire", key)
 			}

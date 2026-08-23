@@ -375,8 +375,8 @@ describe("TrumpPrompt", () => {
     expect(screen.getByTestId("trump-prompt-suit-S")).toBeInTheDocument();
   });
 
-  // --- Candidate-less bidding (a variant that names trump freely in BOTH
-  // rounds). The Bitola assertions above must keep holding unchanged.
+  // --- Candidate-less bidding (a variant that names trump freely in its
+  // single round). The Bitola assertions above must keep holding unchanged.
   describe("no trump candidate (free-suit variant)", () => {
     it("renders the four-suit grid in ROUND 1 with nothing locked and no candidate card", () => {
       render(
@@ -397,7 +397,10 @@ describe("TrumpPrompt", () => {
       expect(screen.queryByTestId(/^playing-card-/)).not.toBeInTheDocument();
     });
 
-    it("renders the four-suit grid in ROUND 2 with nothing locked", () => {
+    it("is driven by candidate-absence, not the round number", () => {
+      // The single-round variant never leaves round 1, but the component must
+      // key off trumpCandidate === null alone — a stray round value from a
+      // stale snapshot must not change the grid.
       render(
         <TrumpPrompt
           trumpCandidate={null}
@@ -423,7 +426,7 @@ describe("TrumpPrompt", () => {
         />,
       );
       expect(screen.queryByTestId("trump-prompt-pick")).not.toBeInTheDocument();
-      // Passing is still offered: only the dealer's last round-2 pass is
+      // Passing is still offered: only the dealer's own (fourth) pass is
       // refused, which the server reports through canPass (see the
       // forced-dealer block below), not something the prompt infers.
       expect(screen.getByTestId("trump-prompt-pass")).toBeInTheDocument();
@@ -545,17 +548,18 @@ describe("TrumpPrompt", () => {
   });
 
   // --- The forced dealer (Story 12.8). Under a variant where the hand must find
-  // a taker, the dealer bidding last in round 2 has no legal pass: the server
-  // refuses it outright. Rendering the button anyway turned the only visible
-  // "get out of this" control into a guaranteed error toast, so it is hidden.
-  // canPass is server-derived (matchState.mustPickTrump) — this component never
-  // infers the rule, which is why every case here sets it explicitly.
+  // a taker, the dealer bidding last (fourth, in the single round) has no legal
+  // pass: the server refuses it outright. Rendering the button anyway turned the
+  // only visible "get out of this" control into a guaranteed error toast, so it
+  // is hidden. canPass is server-derived (matchState.mustPickTrump) — this
+  // component never infers the rule, which is why every case here sets it
+  // explicitly.
   describe("forced pick (canPass=false)", () => {
     it("hides the Pass control from the active bidder", () => {
       render(
         <TrumpPrompt
           trumpCandidate={null}
-          biddingRound={2}
+          biddingRound={1}
           isActiveBidder={true}
           canPass={false}
           onPick={vi.fn()}
@@ -575,7 +579,7 @@ describe("TrumpPrompt", () => {
       const { unmount } = render(
         <TrumpPrompt
           trumpCandidate={null}
-          biddingRound={2}
+          biddingRound={1}
           isActiveBidder={true}
           canPass={true}
           onPick={vi.fn()}
@@ -589,7 +593,7 @@ describe("TrumpPrompt", () => {
       render(
         <TrumpPrompt
           trumpCandidate={null}
-          biddingRound={2}
+          biddingRound={1}
           isActiveBidder={true}
           onPick={vi.fn()}
           onPass={vi.fn()}
@@ -604,7 +608,7 @@ describe("TrumpPrompt", () => {
       render(
         <TrumpPrompt
           trumpCandidate={null}
-          biddingRound={2}
+          biddingRound={1}
           isActiveBidder={true}
           canPass={false}
           onPick={vi.fn()}
@@ -624,7 +628,7 @@ describe("TrumpPrompt", () => {
       render(
         <TrumpPrompt
           trumpCandidate={null}
-          biddingRound={2}
+          biddingRound={1}
           isActiveBidder={false}
           canPass={false}
           activePlayerName="dealer"
@@ -642,7 +646,7 @@ describe("TrumpPrompt", () => {
       render(
         <TrumpPrompt
           trumpCandidate={null}
-          biddingRound={2}
+          biddingRound={1}
           isActiveBidder={false}
           activePlayerName="bidder"
           onPick={vi.fn()}
@@ -650,6 +654,52 @@ describe("TrumpPrompt", () => {
         />,
       );
       expect(screen.getByTestId("trump-prompt")).toHaveTextContent(/or pass/i);
+    });
+  });
+
+  // --- Footer round counter. Only a candidate variant has a second round, so
+  // only a candidate render may count rounds; a candidate-less variant bids in
+  // a single round and must not show "Round 1 / 2".
+  describe("footer round counter", () => {
+    it("shows the round label while a candidate is on the table", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={trumpCandidate}
+          biddingRound={2}
+          isActiveBidder={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId("trump-prompt")).toHaveTextContent("Round 2 / 2");
+    });
+
+    it("shows the round label in round 1 too while a candidate is on the table", () => {
+      // Pins the guard to trumpCandidate !== null, not biddingRound === 2 — a
+      // regression to the round test would pass the other two cases here.
+      render(
+        <TrumpPrompt
+          trumpCandidate={trumpCandidate}
+          biddingRound={1}
+          isActiveBidder={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId("trump-prompt")).toHaveTextContent("Round 1 / 2");
+    });
+
+    it("hides the round label for candidate-less bidding", () => {
+      render(
+        <TrumpPrompt
+          trumpCandidate={null}
+          biddingRound={1}
+          isActiveBidder={true}
+          onPick={vi.fn()}
+          onPass={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId("trump-prompt")).not.toHaveTextContent(/Round \d/);
     });
   });
 

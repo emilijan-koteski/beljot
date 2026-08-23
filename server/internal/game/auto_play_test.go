@@ -127,8 +127,9 @@ func TestAutoPlay_ErrorOnEmptyHand(t *testing.T) {
 
 // TestAutoPickTrumpSuit covers the picker the session manager calls for an
 // absent player who is forbidden to pass. The cases that matter are the two the
-// helper exists for: the face-down pair changing the answer at round 2, and a
-// tie resolving deterministically.
+// helper exists for: the scan staying on the six VISIBLE cards (the face-down
+// pair is still hidden from everyone, its owner included), and a tie resolving
+// deterministically.
 func TestAutoPickTrumpSuit(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -136,40 +137,40 @@ func TestAutoPickTrumpSuit(t *testing.T) {
 		expected game.Suit
 	}{
 		{
-			// Croatian round 2, the forced-pick state. Seat 0's OPEN six are
-			// 7S 8S 9S TS 7H 8H — four spades against two hearts — and its
-			// face-down pair is JS QS, so spades wins either way. The baseline
-			// for the case below.
-			name: "croatian round 2 picks the longest suit",
+			// The forced-pick state. Seat 0's OPEN six are 7S 8S 9S TS 7H 8H —
+			// four spades against two hearts — so spades wins. The baseline for
+			// the case below.
+			name: "forced dealer picks the longest visible suit",
 			setup: func() *game.GameState {
-				return testfixtures.NewGameCroatianMidBidding(7)
+				return testfixtures.NewGameCroatianMidBidding(3)
 			},
 			expected: game.SuitSpades,
 		},
 		{
-			// The whole reason this helper is not a one-liner: the seat's open
-			// hand says hearts 3, spades 2, but the face-down pair is two more
-			// spades. Reading Hand alone would name hearts — a pick from six of
-			// the eight cards the player actually holds.
-			name: "face-down pair changes the answer",
+			// The face-down pair must NOT sway the pick: the open hand says
+			// hearts 3, spades 2, and the two hidden cards happen to be spades.
+			// The forced dealer is choosing mid-bidding, before anything is
+			// revealed, so the answer is hearts — the best of the six cards the
+			// player can actually see.
+			name: "face-down pair does not change the answer",
 			setup: func() *game.GameState {
-				gs := testfixtures.NewGameCroatianMidBidding(7)
+				gs := testfixtures.NewGameCroatianMidBidding(3)
 				seat := gs.ActivePlayerSeat
 				gs.Players[seat].Hand = cardsFrom("7S", "8S", "7H", "8H", "9H", "7D")
 				gs.Players[seat].FaceDownCards = cardsFrom("9S", "TS")
 				return gs
 			},
-			expected: game.SuitSpades,
+			expected: game.SuitHearts,
 		},
 		{
-			// Equal length: spades and hearts both 4. suitOrder puts S before H,
+			// Equal length: spades and hearts both 3. suitOrder puts S before H,
 			// so the answer never depends on hand order or map iteration.
 			name: "ties break on suit order",
 			setup: func() *game.GameState {
-				gs := testfixtures.NewGameCroatianMidBidding(7)
+				gs := testfixtures.NewGameCroatianMidBidding(3)
 				seat := gs.ActivePlayerSeat
-				gs.Players[seat].Hand = cardsFrom("7H", "8H", "9H", "TH", "7S", "8S")
-				gs.Players[seat].FaceDownCards = cardsFrom("9S", "TS")
+				gs.Players[seat].Hand = cardsFrom("7H", "8H", "9H", "7S", "8S", "9S")
+				gs.Players[seat].FaceDownCards = cardsFrom("TS", "TH")
 				return gs
 			},
 			expected: game.SuitSpades,
@@ -179,10 +180,10 @@ func TestAutoPickTrumpSuit(t *testing.T) {
 			// is decided by suit order and not by hearts being unreachable.
 			name: "longer suit beats suit order",
 			setup: func() *game.GameState {
-				gs := testfixtures.NewGameCroatianMidBidding(7)
+				gs := testfixtures.NewGameCroatianMidBidding(3)
 				seat := gs.ActivePlayerSeat
-				gs.Players[seat].Hand = cardsFrom("7H", "8H", "9H", "TH", "JH", "7S")
-				gs.Players[seat].FaceDownCards = cardsFrom("8S", "9S")
+				gs.Players[seat].Hand = cardsFrom("7H", "8H", "9H", "TH", "7S", "8S")
+				gs.Players[seat].FaceDownCards = cardsFrom("9S", "TS")
 				return gs
 			},
 			expected: game.SuitHearts,
@@ -195,7 +196,7 @@ func TestAutoPickTrumpSuit(t *testing.T) {
 			// suit that is actually pickable.
 			name: "a candidate's own suit is never named",
 			setup: func() *game.GameState {
-				gs := testfixtures.NewGameCroatianMidBidding(7)
+				gs := testfixtures.NewGameCroatianMidBidding(3)
 				seat := gs.ActivePlayerSeat
 				gs.Players[seat].Hand = cardsFrom("7S", "8S", "9S", "TS", "7C", "8C")
 				gs.Players[seat].FaceDownCards = cardsFrom("9C", "TC")
@@ -220,7 +221,7 @@ func TestAutoPickTrumpSuit(t *testing.T) {
 // TestAutoPickTrumpSuit_AlwaysAccepted closes the loop the helper exists for:
 // whatever it names must survive the very action the engine was rejecting.
 func TestAutoPickTrumpSuit_AlwaysAccepted(t *testing.T) {
-	gs := testfixtures.NewGameCroatianMidBidding(7)
+	gs := testfixtures.NewGameCroatianMidBidding(3)
 	require.True(t, game.MustPickTrump(gs, gs.ActivePlayerSeat), "fixture must be the forced-pick state")
 	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat)
 
@@ -238,7 +239,7 @@ func TestAutoPickTrumpSuit_AlwaysAccepted(t *testing.T) {
 }
 
 func TestAutoPickTrumpSuit_ErrorOnEmptyHolding(t *testing.T) {
-	gs := testfixtures.NewGameCroatianMidBidding(7)
+	gs := testfixtures.NewGameCroatianMidBidding(3)
 	seat := gs.ActivePlayerSeat
 	gs.Players[seat].Hand = []game.Card{}
 	gs.Players[seat].FaceDownCards = nil

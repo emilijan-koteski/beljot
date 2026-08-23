@@ -14,15 +14,6 @@ type View struct {
 	Seat       int
 	Hand       []game.Card
 	LegalCards []game.Card
-	// FaceDownCards is this seat's OWN two face-down cards, and only once the
-	// round-2 reveal has turned them up to their owner — empty before that, and
-	// empty for every deal shape that produces none. They are deliberately NOT
-	// merged into Hand: `len(v.Hand) == 2` is the endgame marker in chooseCard,
-	// and a six-card bidding hand that suddenly read as eight would trip it.
-	//
-	// Bidding must count them: at round 2 the engine has not merged them yet, so
-	// a bot evaluating Hand alone would bid on six of the eight cards it holds.
-	FaceDownCards []game.Card
 
 	Phase           game.Phase
 	BiddingRound    int
@@ -31,7 +22,7 @@ type View struct {
 	TrumpCallerSeat *int
 	DealerSeat      int
 	// MustPickTrump is true when the engine will refuse a pass at this seat's
-	// bidding turn — the dealer bidding last in round 2 under a config where the
+	// bidding turn — the dealer bidding last (fourth) under a config where the
 	// hand must find a taker (game.MustPickTrump). Handed over as a boolean for
 	// the same reason a nil TrumpCandidate is: the bot reads rule CONSEQUENCES,
 	// never a variant name, so it can never offer an action the engine rejects

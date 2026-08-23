@@ -92,17 +92,20 @@ const (
 	DealShapeAllBeforeBidding DealShape = "all_before_bidding"
 )
 
-// AllPassOutcome names what happens when the second bidding round finds no
-// taker.
+// AllPassOutcome names what happens when bidding threatens to find no taker.
 type AllPassOutcome string
 
 const (
-	// AllPassReshuffleAndRotate pools all 32 cards, rotates the dealer
-	// counter-clockwise, and deals the same hand number again.
+	// AllPassReshuffleAndRotate pools all 32 cards once the second bidding
+	// round is passed out, rotates the dealer counter-clockwise, and deals the
+	// same hand number again.
 	AllPassReshuffleAndRotate AllPassOutcome = "reshuffle_and_rotate"
-	// AllPassDealerMustPick makes the dealer the last bidder of round 2 with no
-	// right to pass, so the hand always finds a taker and the round can never
-	// be passed out.
+	// AllPassDealerMustPick makes the dealer — always the LAST bidder of the
+	// free-suit stage — pick with no right to pass once the other three seats
+	// have passed, so the hand always finds a taker and is never passed out.
+	// With no candidate the free-suit stage IS round 1, so a second round
+	// never opens (the shipped Croatian preset). With a candidate the force
+	// applies at the end of round 2, after a passed-out round 1 opens it.
 	AllPassDealerMustPick AllPassOutcome = "dealer_must_pick"
 )
 
@@ -138,24 +141,19 @@ const (
 // cloneGameState's shallow struct copy carries the whole config correctly with
 // no clone line of its own.
 //
-// All seven fields are populated by both presets from day one. DealShape,
-// HasTrumpCandidate, RevealFaceDownOnRound2, AllPassOutcome,
-// DeclarationOverlap and DeclarationTiming are READ today; TieRule describes
-// each variant's authentic rule and is read once the story that implements it
-// lands.
+// All six fields are populated by both presets from day one. DealShape,
+// HasTrumpCandidate, AllPassOutcome, DeclarationOverlap and DeclarationTiming
+// are READ today; TieRule describes each variant's authentic rule and is read
+// once the story that implements it lands.
 type VariantRules struct {
 	// DealShape selects the dealing sequence — see DealShape.
 	DealShape DealShape
 	// HasTrumpCandidate is true when one card is lifted face-up and round-1
 	// bidding is a take-it-or-pass on that card's suit. False means trump is a
-	// freely named suit in both rounds and the taker draws no card.
+	// freely named suit and the taker draws no card.
 	HasTrumpCandidate bool
-	// RevealFaceDownOnRound2 turns each seat's two face-down cards up — to that
-	// seat alone — when round 1 is passed out, so round 2 is bid on a full
-	// eight-card hand. Only meaningful alongside DealShapeAllBeforeBidding.
-	RevealFaceDownOnRound2 bool
-	// AllPassOutcome selects what a passed-out round 2 does — see
-	// AllPassOutcome.
+	// AllPassOutcome selects what happens when bidding threatens to find no
+	// taker — see AllPassOutcome.
 	AllPassOutcome AllPassOutcome
 	// DeclarationOverlap allows one card to count toward more than one
 	// declaration. False keeps one-card-one-group dedup by higher value.
@@ -183,23 +181,21 @@ type VariantRules struct {
 func RulesFor(v Variant) VariantRules {
 	if v == VariantCroatia {
 		return VariantRules{
-			DealShape:              DealShapeAllBeforeBidding,
-			HasTrumpCandidate:      false,
-			RevealFaceDownOnRound2: true,
-			AllPassOutcome:         AllPassDealerMustPick,
-			DeclarationOverlap:     true,
-			DeclarationTiming:      DeclarationTimingDedicatedPhase,
-			TieRule:                TieRuleAllToOpponents,
+			DealShape:          DealShapeAllBeforeBidding,
+			HasTrumpCandidate:  false,
+			AllPassOutcome:     AllPassDealerMustPick,
+			DeclarationOverlap: true,
+			DeclarationTiming:  DeclarationTimingDedicatedPhase,
+			TieRule:            TieRuleAllToOpponents,
 		}
 	}
 	return VariantRules{
-		DealShape:              DealShapeCandidate,
-		HasTrumpCandidate:      true,
-		RevealFaceDownOnRound2: false,
-		AllPassOutcome:         AllPassReshuffleAndRotate,
-		DeclarationOverlap:     false,
-		DeclarationTiming:      DeclarationTimingDuringFirstTrick,
-		TieRule:                TieRuleHangingPoints,
+		DealShape:          DealShapeCandidate,
+		HasTrumpCandidate:  true,
+		AllPassOutcome:     AllPassReshuffleAndRotate,
+		DeclarationOverlap: false,
+		DeclarationTiming:  DeclarationTimingDuringFirstTrick,
+		TieRule:            TieRuleHangingPoints,
 	}
 }
 

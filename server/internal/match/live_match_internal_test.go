@@ -381,8 +381,8 @@ func TestBroadcastActionResult_DeclareEmitsPlayerDeclared(t *testing.T) {
 // TestHandleTimerExpiry_ForcedDealerPickResolvesBidding is the timeout half of
 // the Story 12.8 deadlock fix, independent of bots.
 //
-// Under AllPassOutcome == AllPassDealerMustPick the dealer bidding last in
-// round 2 has no legal pass. The old auto-action passed anyway, the engine
+// Under AllPassOutcome == AllPassDealerMustPick the dealer bidding last
+// (fourth) has no legal pass. The old auto-action passed anyway, the engine
 // rejected it, and the error path re-armed the SAME seat for a full fresh
 // window — so the hand never advanced and the session logged one rejection per
 // timer period for as long as it lived. Bidding resolving here is the proof
@@ -403,9 +403,9 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0))
 	t.Cleanup(func() { m.RemoveSession(roomID) })
 
-	// passCount 7: round 1 passed out, three round-2 passes recorded, the
-	// dealer on the clock with no legal pass.
-	gs := testfixtures.NewGameCroatianMidBidding(7)
+	// passCount 3: the other three seats have passed and the dealer is on the
+	// clock with no legal pass.
+	gs := testfixtures.NewGameCroatianMidBidding(3)
 	gs.RoomID = roomID
 	require.True(t, game.MustPickTrump(gs, gs.ActivePlayerSeat), "the fixture must be the forced-pick state")
 	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat, "the dealer must be the seat on the clock")
@@ -446,36 +446,25 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 	}
 }
 
-// TestBuildBotView_FaceDownGating pins the no-peeking boundary for bot seats:
-// the two face-down cards reach a bot's View only after the round-2 reveal, and
-// only ever its OWN two.
-func TestBuildBotView_FaceDownGating(t *testing.T) {
-	// Round 1, nothing revealed yet.
-	hidden := testfixtures.NewGameCroatianMidBidding(1)
-	require.False(t, hidden.FaceDownRevealed)
-	for seat := 0; seat < 4; seat++ {
-		v := buildBotView(hidden, seat, nil)
-		assert.Empty(t, v.FaceDownCards,
-			"seat %d must not see its own face-down cards before the reveal", seat)
-	}
-
-	// Round 2 after the reveal: each seat sees exactly its own pair.
-	revealed := testfixtures.NewGameCroatianMidBidding(4)
-	require.True(t, revealed.FaceDownRevealed)
-	for seat := 0; seat < 4; seat++ {
-		v := buildBotView(revealed, seat, nil)
-		assert.Equal(t, revealed.Players[seat].FaceDownCards, v.FaceDownCards, "seat %d", seat)
-		for other := 0; other < 4; other++ {
-			if other == seat {
-				continue
-			}
-			for _, c := range revealed.Players[other].FaceDownCards {
-				assert.NotContains(t, v.FaceDownCards, c,
-					"seat %d's view leaked seat %d's hidden card %s", seat, other, c)
+// TestBuildBotView_FaceDownNeverVisible pins the no-peeking boundary for bot
+// seats: the face-down pair is hidden from EVERYONE — its owner included —
+// for the whole of bidding, so no card from any seat's hidden slot may reach a
+// bot's View at any pass count, and the bot bids on its six visible cards
+// exactly like a human.
+func TestBuildBotView_FaceDownNeverVisible(t *testing.T) {
+	for passCount := 0; passCount <= 3; passCount++ {
+		gs := testfixtures.NewGameCroatianMidBidding(passCount)
+		for seat := 0; seat < 4; seat++ {
+			v := buildBotView(gs, seat, nil)
+			assert.Len(t, v.Hand, 6, "passCount %d seat %d bids on six visible cards", passCount, seat)
+			for other := 0; other < 4; other++ {
+				for _, c := range gs.Players[other].FaceDownCards {
+					assert.NotContains(t, v.Hand, c,
+						"passCount %d: seat %d's view leaked seat %d's hidden card %s",
+						passCount, seat, other, c)
+				}
 			}
 		}
-		// Never merged into Hand: len(Hand) == 2 is chooseCard's endgame marker.
-		assert.Len(t, v.Hand, 6, "seat %d", seat)
 	}
 }
 
@@ -484,7 +473,7 @@ func TestBuildBotView_FaceDownGating(t *testing.T) {
 // the clock and nobody else, and it is derived from the rule config — the bot
 // never learns a variant name.
 func TestBuildBotView_MustPickTrumpIsSeatScoped(t *testing.T) {
-	forced := testfixtures.NewGameCroatianMidBidding(7)
+	forced := testfixtures.NewGameCroatianMidBidding(3)
 	require.True(t, game.MustPickTrump(forced, forced.ActivePlayerSeat))
 	for seat := 0; seat < 4; seat++ {
 		v := buildBotView(forced, seat, nil)
@@ -492,7 +481,7 @@ func TestBuildBotView_MustPickTrumpIsSeatScoped(t *testing.T) {
 	}
 
 	// One pass earlier the dealer is not yet on the clock, so no seat is forced.
-	open := testfixtures.NewGameCroatianMidBidding(6)
+	open := testfixtures.NewGameCroatianMidBidding(2)
 	require.False(t, game.MustPickTrump(open, open.ActivePlayerSeat))
 	for seat := 0; seat < 4; seat++ {
 		assert.False(t, buildBotView(open, seat, nil).MustPickTrump, "seat %d", seat)

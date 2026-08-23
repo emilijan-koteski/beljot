@@ -644,9 +644,9 @@ func NewGameMidBidding(passCount int) *game.GameState {
 // physically holds 8 — 6 open in Hand and 2 in the server-only FaceDownCards
 // slot. There is no trump candidate and Deck is empty.
 //
-// Layout is deterministic and engineered so that no pick (either round, any
-// seat) triggers instant-win — seat 3 holds exactly two cards of every suit, and
-// no seat holds more than six of one suit:
+// Layout is deterministic and engineered so that no pick (by any seat, at any
+// pass count) triggers instant-win — seat 3 holds exactly two cards of every
+// suit, and no seat holds more than six of one suit:
 //
 //	Seat 0 (team A): 7S 8S 9S TS 7H 8H   face-down: JS QS
 //	Seat 1 (team B): 7D 8D 9D TD 9H TH   face-down: JD QD
@@ -748,15 +748,15 @@ func NewGameCroatianJustDealt() *game.GameState {
 }
 
 // NewGameCroatianMidBidding returns a Croatian GameState with the specified
-// number of passes already recorded. Mirrors NewGameMidBidding's contract:
+// number of passes already recorded. Croatian bidding is a SINGLE round —
+// three passes put the dealer on the clock with no right to pass — so:
 //
-// passCount 0: same as NewGameCroatianJustDealt (round 1, seat 1 active)
-// passCount 1-3: round 1 with passes applied
-// passCount 4: round 2 just started, face-down cards revealed, seat 1 active
-// passCount 5-7: round 2 with passes applied (7 puts the dealer on the clock)
+// passCount 0: same as NewGameCroatianJustDealt (seat 1 active)
+// passCount 1-2: passes applied, next seat active
+// passCount 3: the dealer (seat 0) is on the clock and must pick
 //
-// Clamped to 7: round 2 cannot be passed out under this variant's config — the
-// dealer must pick — so passCount 8 is not a reachable state.
+// Clamped to 3: the dealer's own pass is refused under this variant's config,
+// so a fourth pass — and with it a second round — is not a reachable state.
 //
 // Dealer is always seat 0. First bidder is seat 1.
 func NewGameCroatianMidBidding(passCount int) *game.GameState {
@@ -765,25 +765,14 @@ func NewGameCroatianMidBidding(passCount int) *game.GameState {
 	if passCount <= 0 {
 		return gs
 	}
-	if passCount > 7 {
-		passCount = 7
+	if passCount > 3 {
+		passCount = 3
 	}
 
-	if passCount < 4 {
-		gs.BiddingPassCount = passCount
-		gs.ActivePlayerSeat = (1 + passCount) % 4 // seat 1 is first bidder
-		return gs
-	}
-
-	// Round 2: the fourth round-1 pass reset the count and turned every seat's
-	// two face-down cards up to their owner.
-	passesInRound2 := passCount - 4
-	gs.BiddingRound = 2
-	gs.BiddingPassCount = passesInRound2
-	gs.ActivePlayerSeat = (1 + passesInRound2) % 4
-	gs.FaceDownRevealed = true
+	gs.BiddingPassCount = passCount
+	gs.ActivePlayerSeat = (1 + passCount) % 4 // seat 1 is first bidder
 	// Counters set directly, so refresh the derived flag ApplyAction maintains.
-	// True at passCount 7 — the state where the dealer has no legal pass.
+	// True at passCount 3 — the state where the dealer has no legal pass.
 	gs.MustPickTrump = game.MustPickTrump(gs, gs.ActivePlayerSeat)
 	return gs
 }

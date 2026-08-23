@@ -87,7 +87,6 @@ import { TrumpPrompt } from "./components/TrumpPrompt";
 import { TrumpReveal } from "./components/TrumpReveal";
 import { Wordmark } from "./components/Wordmark";
 import { detectDeclarations } from "./lib/declarations";
-import { mergeRevealedFaceDownCards } from "./lib/faceDownCards";
 import { isBelotEligible, legalCardIds } from "./lib/legalCards";
 import { seatTeam } from "./lib/tableTheme";
 import { compassOffset, SLOT_POSITIONS } from "./lib/trickLayout";
@@ -247,7 +246,6 @@ export function MatchPage() {
   const setBelotReveal = useMatchStore((s) => s.setBelotReveal);
   const trumpReveal = useMatchStore((s) => s.trumpReveal);
   const setTrumpReveal = useMatchStore((s) => s.setTrumpReveal);
-  const faceDownReveal = useMatchStore((s) => s.faceDownReveal);
   const scoreRevealData = useMatchStore((s) => s.scoreRevealData);
   const setScoreRevealData = useMatchStore((s) => s.setScoreRevealData);
   const matchEndData = useMatchStore((s) => s.matchEndData);
@@ -1478,20 +1476,11 @@ export function MatchPage() {
     !matchState.awaitingDeclaration &&
     matchState.pendingBelotSeat !== myPlayerSeat;
   const myPlayer = matchState.players.find((p) => p.seat === myPlayerSeat);
-  // Croatian bidding: the viewer's own two face-down cards arrive on a per-seat
-  // event and are deliberately absent from every snapshot, so they are merged in
-  // here for rendering only. The store drops the slice the moment the phase
-  // leaves bidding, by which point the authoritative hand already holds them —
-  // so the two sources can never both contribute the same card.
-  const myHand = mergeRevealedFaceDownCards(
-    myPlayer?.hand ?? [],
-    myPlayerSeat,
-    faceDownReveal?.playerSeat ?? null,
-    faceDownReveal?.cardIds,
-  );
-  // Cards the viewer holds but has not been shown yet (Croatian round 1). The
+  const myHand = myPlayer?.hand ?? [];
+  // Cards the viewer holds but has not been shown yet (Croatian bidding). The
   // server sends a COUNT per seat, never the identities, so this can render
-  // backs without ever putting the cards on the client.
+  // backs without ever putting the cards on the client. The cards themselves
+  // arrive only in the post-pick snapshot, once trump is resolved.
   const myFaceDownCount = myPlayer?.faceDownCount ?? 0;
   const playableCardIds =
     isMyTurn && myPlayerSeat !== null ? legalCardIds(matchState, myPlayerSeat) : [];
@@ -1751,13 +1740,7 @@ export function MatchPage() {
       >
         <HandCards
           hand={myHand}
-          // Only while the pair is still face-down TO THE VIEWER. Once
-          // `event:face_down_revealed` lands, mergeRevealedFaceDownCards folds
-          // the two cards into myHand face-up, and after bidding resolves the
-          // authoritative snapshot carries them — either way they must not be
-          // counted twice. Comparing merged length against the raw snapshot
-          // length is the exact test for "has the reveal happened yet".
-          faceDownCount={myHand.length === (myPlayer?.hand.length ?? 0) ? myFaceDownCount : 0}
+          faceDownCount={myFaceDownCount}
           isMyTurn={isMyTurn}
           playableCardIds={playableCardIds}
           onPlayCard={handlePlayCard}
@@ -2068,8 +2051,8 @@ export function MatchPage() {
               }
               onPick={handlePickTrump}
               onPass={handlePassTrump}
-              // Server-authoritative: false only for the dealer bidding last in
-              // round 2 of a variant where the hand must find a taker. The
+              // Server-authoritative: false only for the dealer bidding last
+              // (fourth) of a variant where the hand must find a taker. The
               // client never re-derives the rule, so no variant branch appears
               // here.
               canPass={!matchState.mustPickTrump}

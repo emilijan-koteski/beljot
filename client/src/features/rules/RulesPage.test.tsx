@@ -126,12 +126,17 @@ describe("RulesPage", () => {
     expect(screen.getByText(SHARED_RULE)).toBeInTheDocument();
   });
 
-  it("describes the Croatian deal, reveal and forced pick under that tab", async () => {
+  it("describes the Croatian single round, forced dealer and post-trump reveal under that tab", async () => {
     const user = userEvent.setup();
     renderRules();
     await user.click(screen.getByTestId("rules-variant-croatia"));
-    expect(screen.getByText("Round two: your last two turn up")).toBeInTheDocument();
-    expect(screen.getByText("The dealer cannot pass")).toBeInTheDocument();
+    expect(screen.getByText("One round: name a suit, or say “dalje”")).toBeInTheDocument();
+    expect(screen.getByText("The dealer speaks last — “pod mus”")).toBeInTheDocument();
+    expect(screen.getByText("Your last two turn up")).toBeInTheDocument();
+    // The reveal happens only AFTER trump is named — never mid-bidding.
+    expect(
+      screen.getByText(/Only once trump is named do the two face-down cards/),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/Declaring gets a phase of its own, between bidding and the first trick/),
     ).toBeInTheDocument();

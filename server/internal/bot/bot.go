@@ -69,14 +69,13 @@ func Decide(v View) game.Action {
 // the 9+Ace pair plus a side Ace; or exactly 2 that are the Jack AND the 9 plus
 // a side Ace (the two strongest trumps, worth a call when backed by an outside
 // winner). A side Ace is any Ace in another suit — it need not be backed by a
-// second card of its suit. Used by both bidding rounds.
+// second card of its suit. Used for every voluntary bid, candidate or
+// free-suit.
 //
 // Callers pass the full bid hand — every card the picker would actually hold
-// after taking (see decideBid), which is the dealt cards plus a candidate and/or
-// a revealed face-down pair. The thresholds were calibrated against a six-card
-// bid hand; a config that bids round 2 on eight feeds strictly MORE information
-// to the same bar, which makes bots keener to take there. Re-deriving the bar is
-// a balance decision, deliberately not made here.
+// after taking (see decideBid), which is the dealt cards plus a candidate when
+// one is on the table. The thresholds were calibrated against a six-card bid
+// hand. Re-deriving the bar is a balance decision, deliberately not made here.
 func wantsTrump(hand []game.Card, suit game.Suit) bool {
 	var count int
 	var hasJack, hasNine, hasAce, has7, has8 bool
@@ -131,8 +130,8 @@ func hasSideAce(hand []game.Card, trump game.Suit) bool {
 	return false
 }
 
-// trumpSuitScore ranks qualifying suits in round 2: trump-order card points
-// plus a per-card length bonus. Constants live here, in one place, for
+// trumpSuitScore ranks qualifying suits in a free-suit bid: trump-order card
+// points plus a per-card length bonus. Constants live here, in one place, for
 // tuning.
 const trumpLengthBonus = 10
 
@@ -148,26 +147,20 @@ func trumpSuitScore(hand []game.Card, suit game.Suit) int {
 
 func decideBid(v View) game.Action {
 	// Bid on the hand the bot would ACTUALLY hold after picking, which is not
-	// always View.Hand:
+	// always View.Hand: when a candidate is on the table the picker always
+	// receives it (the engine appends it in handlePickTrump, both rounds), so
+	// it joins the dealt cards. In round 1 the candidate is a trump (its suit
+	// IS the trump suit); in round 2 it is a guaranteed side card (its suit is
+	// locked out). Under a deal that holds two cards back face-down those cards
+	// stay hidden from everyone — the bot included — until trump resolves, so
+	// the bid is made on the six visible cards, exactly like a human's.
 	//
-	//   - When a candidate is on the table the picker always receives it (the
-	//     engine appends it in handlePickTrump, both rounds), so it joins the
-	//     dealt cards. In round 1 the candidate is a trump (its suit IS the trump
-	//     suit); in round 2 it is a guaranteed side card (its suit is locked out).
-	//   - Under a deal that holds two cards back face-down, round 2 is bid AFTER
-	//     the reveal but BEFORE the engine merges them, so they arrive as their
-	//     own View field and must be counted here or the bot bids on six of the
-	//     eight cards it knows.
-	//
-	// Neither source ever mutates v.Hand's backing array — the clone below is
+	// The candidate never mutates v.Hand's backing array — the clone below is
 	// what keeps a caller's state intact.
 	bidHand := v.Hand
-	if len(v.FaceDownCards) > 0 || v.TrumpCandidate != nil {
+	if v.TrumpCandidate != nil {
 		bidHand = slices.Clone(v.Hand)
-		bidHand = append(bidHand, v.FaceDownCards...)
-		if v.TrumpCandidate != nil {
-			bidHand = append(bidHand, *v.TrumpCandidate)
-		}
+		bidHand = append(bidHand, *v.TrumpCandidate)
 	}
 
 	if v.BiddingRound == 1 && v.TrumpCandidate != nil {
@@ -180,17 +173,17 @@ func decideBid(v View) game.Action {
 		return game.Action{Type: game.ActionPassTrump, PlayerSeat: v.Seat}
 	}
 
-	// Free-suit bid — round 2, and round 1 too when there is no candidate (a
-	// variant that names trump freely in both rounds). Evaluate the available
-	// suits with the same evaluator and pick the best one that clears the
-	// threshold, else pass. A candidate's own suit is locked out by the engine
-	// (already spent in round 1), but the candidate card itself still lands in
-	// the picker's hand as a side card, so it counts toward the side-Ace backup
-	// in wantsTrump. With no candidate, nothing is locked out and the bot draws
-	// no extra card.
+	// Free-suit bid — round 2 under a candidate config, and the whole single
+	// round when there is no candidate (a variant that names trump freely).
+	// Evaluate the available suits with the same evaluator and pick the best
+	// one that clears the threshold, else pass. A candidate's own suit is
+	// locked out by the engine (already spent in round 1), but the candidate
+	// card itself still lands in the picker's hand as a side card, so it counts
+	// toward the side-Ace backup in wantsTrump. With no candidate, nothing is
+	// locked out and the bot draws no extra card.
 	//
 	// View.MustPickTrump says a pass would be REFUSED at this seat this turn (the
-	// dealer bidding last in round 2 where the hand must find a taker). Then
+	// dealer bidding last (fourth) where the hand must find a taker). Then
 	// "nothing clears the bar" cannot mean pass, so the best-scoring available
 	// suit is taken regardless of the threshold — a forced call, made on the
 	// strongest holding rather than an arbitrary one. The threshold itself is

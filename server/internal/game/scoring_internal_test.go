@@ -125,13 +125,12 @@ func TestCheckInstantWin_Seat0TeamA(t *testing.T) {
 // of a Croatian match Bitola-style.
 func TestStartNewHandDealsPerConfig(t *testing.T) {
 	tests := []struct {
-		name              string
-		variant           Variant
-		wantOpen          int
-		wantFaceDown      int
-		wantDeck          int
-		wantCandidate     bool
-		wantRevealedReset bool
+		name          string
+		variant       Variant
+		wantOpen      int
+		wantFaceDown  int
+		wantDeck      int
+		wantCandidate bool
 	}{
 		{
 			name:    "bitola re-deals stage-1 with a fresh candidate",
@@ -139,7 +138,7 @@ func TestStartNewHandDealsPerConfig(t *testing.T) {
 		},
 		{
 			name: "croatia re-deals everything before bidding", variant: VariantCroatia,
-			wantOpen: 6, wantFaceDown: 2, wantDeck: 0, wantCandidate: false, wantRevealedReset: true,
+			wantOpen: 6, wantFaceDown: 2, wantDeck: 0, wantCandidate: false,
 		},
 	}
 
@@ -147,9 +146,6 @@ func TestStartNewHandDealsPerConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			gs := NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
 				[4]bool{}, tc.variant, "1001", 1)
-			// Simulate a finished hand: stale hidden cards and a spent reveal
-			// flag must not survive into the next deal.
-			gs.FaceDownRevealed = true
 			dealer := gs.DealerSeat
 
 			startNewHand(gs)
@@ -158,7 +154,6 @@ func TestStartNewHandDealsPerConfig(t *testing.T) {
 			assert.Equal(t, (dealer+1)%4, gs.DealerSeat, "dealer rotates")
 			assert.Equal(t, tc.wantCandidate, gs.TrumpCandidate != nil)
 			assert.Len(t, gs.Deck, tc.wantDeck)
-			assert.False(t, gs.FaceDownRevealed, "the reveal flag resets with the hand")
 
 			seen := make(map[string]bool, 32)
 			for i, p := range gs.Players {
@@ -203,8 +198,9 @@ func allCardsInPlay(state *GameState) []Card {
 // prevents — so it needs a test rather than a reachability argument.
 //
 // A state carrying face-down cards while resolving to a reshuffle outcome is
-// malformed (the config that deals them refuses the fourth round-2 pass), which
-// is exactly the situation the guard is defending.
+// malformed (the config that deals them refuses the dealer's fourth pass, so
+// its bidding can never pass out), which is exactly the situation the guard is
+// defending.
 func TestReshuffleAndRedealRecoversFaceDownCards(t *testing.T) {
 	// buildPooled lays a given 32-card slice out as 6 open + 2 face-down per
 	// seat under a reshuffle-and-rotate config.
@@ -260,7 +256,6 @@ func TestReshuffleAndRedealRecoversFaceDownCards(t *testing.T) {
 		}
 		assert.Len(t, result.Deck, 11)
 		require.NotNil(t, result.TrumpCandidate)
-		assert.False(t, result.FaceDownRevealed)
 	})
 
 	t.Run("the pool is the state's own cards, not a fresh deck", func(t *testing.T) {

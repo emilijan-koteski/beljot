@@ -45,9 +45,6 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	if gs.Phase == game.PhasePlaying {
 		v.LegalCards = game.LegalCards(gs, seat)
 	}
-	if gs.FaceDownRevealed {
-		v.FaceDownCards = gs.Players[seat].FaceDownCards
-	}
 	v.MustPickTrump = game.MustPickTrump(gs, seat)
 	return v
 }
@@ -78,19 +75,15 @@ func TestDecide_Bidding(t *testing.T) {
 		round     int
 		candidate string // card id; "" keeps the fixture default (AH)
 		// noCandidate switches the row onto a Croatian fixture: no trump
-		// candidate at all, so trump is a freely named suit in BOTH rounds and
-		// the seat holds six open cards plus a face-down pair.
+		// candidate at all, so trump is a freely named suit in the single
+		// bidding round and the seat holds six open cards plus a face-down
+		// pair that stays hidden — from the bot too — until trump resolves.
 		noCandidate bool
 		// faceDown overrides the fixture's face-down pair (noCandidate rows
-		// only). Those two cards are turned up to their owner before round 2, so
-		// the bid must count them.
+		// only). Those two cards never reach the bot's view during bidding.
 		faceDown []game.Card
-		// revealed turns the face-down pair up. Round-2 rows want true; a
-		// round-1 row wants false, which is what proves the bot bids on six
-		// cards before the reveal and eight after.
-		revealed bool
 		// forcedPick puts the row in the state where the engine refuses a pass:
-		// the dealer bidding last in round 2 with no legal pass.
+		// the dealer bidding last (fourth) with no legal pass.
 		forcedPick bool
 		wantType   string
 		wantSuit   *game.Suit
@@ -290,26 +283,12 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:    game.ActionPassTrump,
 		},
 		{
-			// The face-down pair is the whole point. Open six hold three
-			// diamonds and two spades; the revealed pair adds two more
-			// diamonds, making five — a call the bot cannot see if it bids on
-			// Hand alone (three diamonds without the Jack is under the bar).
-			name:        "no candidate round 2 counts the revealed face-down pair",
-			seat:        1,
-			hand:        cards("7D", "8D", "9D", "7S", "8S", "7H"),
-			round:       2,
-			noCandidate: true,
-			faceDown:    cards("TD", "JD"),
-			revealed:    true,
-			wantType:    game.ActionPickTrump,
-			wantSuit:    suitPtr(game.SuitDiamonds),
-		},
-		{
-			// The same hand BEFORE the reveal: the two hidden diamonds are not
-			// in the view, nothing clears the bar, and the bot passes. Pinning
-			// both halves is what proves the reveal gate is real rather than
-			// the bot simply always seeing eight cards.
-			name:        "no candidate round 1 does not count the still-hidden pair",
+			// The face-down pair never reaches the view: the two hidden
+			// diamonds would make five and clear the bar, but the pair is
+			// hidden from the bot for the whole single round — so nothing
+			// qualifies and the bot passes, exactly like a human seeing only
+			// its six open cards.
+			name:        "no candidate does not count the hidden pair",
 			seat:        1,
 			hand:        cards("7D", "8D", "9D", "7S", "8S", "7H"),
 			round:       1,
@@ -320,15 +299,15 @@ func TestDecide_Bidding(t *testing.T) {
 		{
 			// The forced dealer. Deliberately junk — no suit clears the
 			// threshold — so a bot that only knew the threshold would pass and
-			// be rejected forever. Diamonds is the highest-scoring holding
-			// (three cards, one of them the Jack).
+			// be rejected forever. Diamonds is the highest-scoring holding of
+			// the six VISIBLE cards (three of them, one the Jack); the hidden
+			// pair must not sway the call.
 			name:        "forced dealer picks its best suit rather than passing",
 			seat:        0,
 			hand:        cards("7D", "8D", "JD", "7S", "8H", "9C"),
-			round:       2,
+			round:       1,
 			noCandidate: true,
 			faceDown:    cards("QC", "KH"),
-			revealed:    true,
 			forcedPick:  true,
 			wantType:    game.ActionPickTrump,
 			wantSuit:    suitPtr(game.SuitDiamonds),
@@ -340,12 +319,11 @@ func TestDecide_Bidding(t *testing.T) {
 			var gs *game.GameState
 			if tt.noCandidate {
 				gs = testfixtures.NewGameCroatianJustDealt()
-				gs.FaceDownRevealed = tt.revealed
 				if tt.faceDown != nil {
 					gs.Players[tt.seat].FaceDownCards = tt.faceDown
 				}
 				if tt.forcedPick {
-					// Three seats have already passed in round 2, so the dealer
+					// The other three seats have already passed, so the dealer
 					// on the clock has no legal pass. Asserted, not assumed —
 					// the row's whole meaning depends on it.
 					gs.BiddingPassCount = 3
@@ -391,7 +369,7 @@ func TestDecide_ForcedDealerNeverPasses(t *testing.T) {
 	// Every seat takes the dealer's chair in turn, so the assertion does not
 	// rest on one seat's holding.
 	for seat := 0; seat < 4; seat++ {
-		gs := testfixtures.NewGameCroatianMidBidding(7)
+		gs := testfixtures.NewGameCroatianMidBidding(3)
 		gs.DealerSeat = seat
 		gs.ActivePlayerSeat = seat
 		require.True(t, game.MustPickTrump(gs, seat), "seat %d must be the forced picker", seat)

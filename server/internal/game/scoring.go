@@ -169,7 +169,6 @@ func startNewHand(state *GameState) {
 	state.TrumpCandidate = nil
 	state.BiddingRound = 1
 	state.BiddingPassCount = 0
-	state.FaceDownRevealed = false
 
 	// Reset trick state
 	state.TrickNumber = 0

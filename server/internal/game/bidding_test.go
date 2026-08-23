@@ -706,7 +706,6 @@ func TestCroatianPickRound1(t *testing.T) {
 			}
 			assert.Empty(t, result.Deck, "no stage-2 reserve exists")
 			assert.Nil(t, result.TrumpCandidate)
-			assert.False(t, result.FaceDownRevealed, "the reveal flag is spent once bidding resolves")
 
 			assertCardsAreFullDeck(t, collectCards(result))
 			assert.ElementsMatch(t, startingCards, collectCards(result), "all 32 cards preserved")
@@ -714,9 +713,9 @@ func TestCroatianPickRound1(t *testing.T) {
 	}
 }
 
-// TestCroatianPickRejectsBadSuit covers both invalid-suit rows of the matrix in
-// both rounds: a missing suit and an unknown suit are ErrInvalidBid, and the
-// original state is untouched.
+// TestCroatianPickRejectsBadSuit covers both invalid-suit rows of the matrix,
+// for a voluntary early pick and for the dealer's forced pick: a missing suit
+// and an unknown suit are ErrInvalidBid, and the original state is untouched.
 func TestCroatianPickRejectsBadSuit(t *testing.T) {
 	badSuit := game.Suit("X")
 	tests := []struct {
@@ -725,10 +724,10 @@ func TestCroatianPickRejectsBadSuit(t *testing.T) {
 		activeSeat int
 		suit       *game.Suit
 	}{
-		{name: "round 1 pick with no suit", passCount: 0, activeSeat: 1, suit: nil},
-		{name: "round 1 pick with an unknown suit", passCount: 0, activeSeat: 1, suit: &badSuit},
-		{name: "round 2 pick with no suit", passCount: 4, activeSeat: 1, suit: nil},
-		{name: "round 2 pick with an unknown suit", passCount: 4, activeSeat: 1, suit: &badSuit},
+		{name: "early pick with no suit", passCount: 0, activeSeat: 1, suit: nil},
+		{name: "early pick with an unknown suit", passCount: 0, activeSeat: 1, suit: &badSuit},
+		{name: "forced dealer pick with no suit", passCount: 3, activeSeat: 0, suit: nil},
+		{name: "forced dealer pick with an unknown suit", passCount: 3, activeSeat: 0, suit: &badSuit},
 	}
 
 	for _, tc := range tests {
@@ -760,31 +759,30 @@ func TestCroatianPickRejectsBadSuit(t *testing.T) {
 	}
 }
 
-// TestCroatianRound1PassedOutRevealsFaceDown locks the round-2 reveal: the
-// fourth round-1 pass opens round 2 at dealer+1 with all four suits available
-// and marks every seat's two face-down cards as revealed — while keeping them
-// out of Hand, so they still cannot ride any snapshot.
-func TestCroatianRound1PassedOutRevealsFaceDown(t *testing.T) {
-	gs := testfixtures.NewGameCroatianMidBidding(3)
-	require.False(t, gs.FaceDownRevealed, "not revealed before the fourth pass")
+// TestCroatianThirdPassForcesDealer locks the single-round shape: the THIRD
+// pass puts the dealer on the clock with no legal pass, the round stays 1, and
+// every seat's two face-down cards stay hidden — out of Hand, invisible even to
+// their owner — until the dealer's forced call resolves bidding.
+func TestCroatianThirdPassForcesDealer(t *testing.T) {
+	gs := testfixtures.NewGameCroatianMidBidding(2)
 
-	result, err := game.ApplyAction(gs, game.Action{Type: game.ActionPassTrump, PlayerSeat: 0})
+	result, err := game.ApplyAction(gs, game.Action{Type: game.ActionPassTrump, PlayerSeat: 3})
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, game.PhaseBidding, result.Phase)
-	assert.Equal(t, 2, result.BiddingRound)
-	assert.Equal(t, 0, result.BiddingPassCount)
-	assert.Equal(t, (result.DealerSeat+1)%4, result.ActivePlayerSeat)
-	assert.True(t, result.FaceDownRevealed, "the fourth round-1 pass marks the reveal")
+	assert.Equal(t, 1, result.BiddingRound, "there is no second round — bidding stays in round 1")
+	assert.Equal(t, 3, result.BiddingPassCount)
+	assert.Equal(t, result.DealerSeat, result.ActivePlayerSeat, "the dealer speaks last")
+	assert.True(t, result.MustPickTrump, "the dealer has no legal pass — pod mus")
 
 	for i, p := range result.Players {
-		assert.Len(t, p.Hand, 6, "seat %d's open hand is unchanged by the reveal", i)
+		assert.Len(t, p.Hand, 6, "seat %d's open hand is unchanged by the third pass", i)
 		assert.Len(t, p.FaceDownCards, 2, "seat %d's two cards stay OUT of Hand", i)
 	}
 
-	// All four suits are open in round 2 — nothing was spent, because no
-	// candidate ever existed.
+	// All four suits are open for the forced dealer — nothing was spent,
+	// because no candidate ever existed.
 	for _, suit := range game.AllSuits {
 		s := suit
 		picked, err := game.ApplyAction(result, game.Action{
@@ -792,20 +790,21 @@ func TestCroatianRound1PassedOutRevealsFaceDown(t *testing.T) {
 			PlayerSeat: result.ActivePlayerSeat,
 			Suit:       &s,
 		})
-		require.NoError(t, err, "suit %s must be available in round 2", suit)
+		require.NoError(t, err, "suit %s must be available to the forced dealer", suit)
 		require.NotNil(t, picked.TrumpSuit)
 		assert.Equal(t, suit, *picked.TrumpSuit)
 	}
 }
 
-// TestCroatianDealerCannotPassInRound2 locks the forced dealer pick: the fourth
-// round-2 pass is rejected, so reshuffleAndRedeal is unreachable under this
-// config, and pick_trump is the dealer's only legal action.
-func TestCroatianDealerCannotPassInRound2(t *testing.T) {
-	gs := testfixtures.NewGameCroatianMidBidding(7)
-	require.Equal(t, 2, gs.BiddingRound)
+// TestCroatianDealerCannotPass locks the forced dealer pick: after three
+// passes the dealer's own pass is rejected, so both the round-1→2 transition
+// and reshuffleAndRedeal are unreachable under this config, and pick_trump is
+// the dealer's only legal action.
+func TestCroatianDealerCannotPass(t *testing.T) {
+	gs := testfixtures.NewGameCroatianMidBidding(3)
+	require.Equal(t, 1, gs.BiddingRound)
 	require.Equal(t, 3, gs.BiddingPassCount)
-	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat, "the dealer bids last in round 2")
+	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat, "the dealer bids last")
 
 	result, err := game.ApplyAction(gs, game.Action{
 		Type:       game.ActionPassTrump,
@@ -819,7 +818,8 @@ func TestCroatianDealerCannotPassInRound2(t *testing.T) {
 	// the client cannot act on the difference if both arrive as INVALID_BID.
 	assert.ErrorIs(t, err, apperr.ErrMustPickTrump)
 	assert.NotErrorIs(t, err, apperr.ErrInvalidBid, "must be distinguishable from a bad-suit refusal")
-	assert.Equal(t, game.PhaseBidding, gs.Phase, "no reshuffle — state is untouched")
+	assert.Equal(t, game.PhaseBidding, gs.Phase, "no round 2, no reshuffle — state is untouched")
+	assert.Equal(t, 1, gs.BiddingRound)
 	assert.Equal(t, 1, gs.HandNumber)
 	assert.Equal(t, 0, gs.DealerSeat, "the dealer does not rotate")
 
@@ -836,8 +836,55 @@ func TestCroatianDealerCannotPassInRound2(t *testing.T) {
 	assert.Equal(t, game.SuitClubs, *picked.TrumpSuit)
 }
 
+// TestDealerMustPickWithCandidateForcesOnlyInRound2 pins the config-space
+// combination no shipped preset uses: HasTrumpCandidate=true with
+// AllPassDealerMustPick. The force belongs to the FREE-SUIT stage, which with
+// a candidate is round 2 — so the fourth round-1 pass must go through (round
+// 2 opens; the candidate take is never forced on anyone) and only the
+// dealer's fourth round-2 pass is refused. Guards MustPickTrump's
+// candidate-aware conjunct against a future config wiring both together.
+func TestDealerMustPickWithCandidateForcesOnlyInRound2(t *testing.T) {
+	gs := testfixtures.NewGameJustDealt()
+	gs.Rules.AllPassOutcome = game.AllPassDealerMustPick
+
+	// Round 1: all four passes are legal — the dealer is NOT forced to adopt
+	// the candidate — and the fourth opens round 2.
+	for i := 0; i < 4; i++ {
+		require.False(t, game.MustPickTrump(gs, gs.ActivePlayerSeat),
+			"no seat is forced during the candidate round (pass %d)", i+1)
+		next, err := game.ApplyAction(gs, game.Action{
+			Type:       game.ActionPassTrump,
+			PlayerSeat: gs.ActivePlayerSeat,
+		})
+		require.NoError(t, err, "round-1 pass %d must be legal", i+1)
+		gs = next
+	}
+	require.Equal(t, 2, gs.BiddingRound, "a passed-out candidate round opens round 2")
+	require.Equal(t, game.PhaseBidding, gs.Phase)
+
+	// Round 2: three passes are legal, then the dealer has no legal pass.
+	for i := 0; i < 3; i++ {
+		next, err := game.ApplyAction(gs, game.Action{
+			Type:       game.ActionPassTrump,
+			PlayerSeat: gs.ActivePlayerSeat,
+		})
+		require.NoError(t, err, "round-2 pass %d must be legal", i+1)
+		gs = next
+	}
+	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat, "the dealer bids last in round 2")
+	require.True(t, game.MustPickTrump(gs, gs.ActivePlayerSeat))
+
+	rejected, err := game.ApplyAction(gs, game.Action{
+		Type:       game.ActionPassTrump,
+		PlayerSeat: gs.DealerSeat,
+	})
+	assert.Nil(t, rejected)
+	require.ErrorIs(t, err, apperr.ErrMustPickTrump)
+	assert.Equal(t, game.PhaseBidding, gs.Phase, "no reshuffle — the dealer must pick instead")
+}
+
 // TestCroatianEarlierPassesStillLegal guards against the forced-dealer rule
-// over-reaching: only the FOURTH round-2 pass is refused.
+// over-reaching: only the dealer's own (fourth) pass is refused.
 func TestCroatianEarlierPassesStillLegal(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -847,10 +894,9 @@ func TestCroatianEarlierPassesStillLegal(t *testing.T) {
 		expectedPassCount  int
 		expectedActiveSeat int
 	}{
-		{name: "first pass in round 1", passCount: 0, activeSeat: 1, expectedRound: 1, expectedPassCount: 1, expectedActiveSeat: 2},
-		{name: "third pass in round 1", passCount: 2, activeSeat: 3, expectedRound: 1, expectedPassCount: 3, expectedActiveSeat: 0},
-		{name: "first pass in round 2", passCount: 4, activeSeat: 1, expectedRound: 2, expectedPassCount: 1, expectedActiveSeat: 2},
-		{name: "third pass in round 2", passCount: 6, activeSeat: 3, expectedRound: 2, expectedPassCount: 3, expectedActiveSeat: 0},
+		{name: "first pass", passCount: 0, activeSeat: 1, expectedRound: 1, expectedPassCount: 1, expectedActiveSeat: 2},
+		{name: "second pass", passCount: 1, activeSeat: 2, expectedRound: 1, expectedPassCount: 2, expectedActiveSeat: 3},
+		{name: "third pass", passCount: 2, activeSeat: 3, expectedRound: 1, expectedPassCount: 3, expectedActiveSeat: 0},
 	}
 
 	for _, tc := range tests {
@@ -882,10 +928,9 @@ func TestFaceDownCardsNeverSerialized(t *testing.T) {
 		name      string
 		passCount int
 	}{
-		{name: "just dealt, round 1", passCount: 0},
-		{name: "mid round 1", passCount: 2},
-		{name: "round 2 just opened, cards revealed to their owners", passCount: 4},
-		{name: "round 2 with the dealer on the clock", passCount: 7},
+		{name: "just dealt", passCount: 0},
+		{name: "mid bidding", passCount: 2},
+		{name: "dealer on the clock after three passes", passCount: 3},
 	}
 
 	for _, tc := range tests {
@@ -917,9 +962,8 @@ func TestFaceDownCardsNeverSerialized(t *testing.T) {
 					"seat %d's face-down card %s must not appear anywhere in a snapshot", seat, id)
 			}
 
-			// The flag itself is server-only too — nothing about the hidden
-			// cards reaches the wire.
-			assert.NotContains(t, raw, "faceDownRevealed")
+			// Nothing about the hidden cards reaches the wire beyond the public
+			// per-seat count.
 			assert.NotContains(t, raw, "faceDownCards")
 			assert.NotContains(t, raw, "rules")
 		})
@@ -1037,8 +1081,8 @@ func TestPickTrumpRejectsStateContradictingItsDealShape(t *testing.T) {
 }
 
 // TestCroatianFullBiddingFromNewGame walks a real (randomly dealt) Croatian
-// hand from NewGame through a passed-out round 1 to the dealer's forced round-2
-// pick, so the fixtures' hand-built layout is not the only thing under test.
+// hand from NewGame through three passes to the dealer's forced pick, so the
+// fixtures' hand-built layout is not the only thing under test.
 func TestCroatianFullBiddingFromNewGame(t *testing.T) {
 	gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
 		[4]bool{}, game.VariantCroatia, "1001", 1)
@@ -1048,37 +1092,31 @@ func TestCroatianFullBiddingFromNewGame(t *testing.T) {
 	// The session manager performs the dealing→bidding transition.
 	gs.Phase = game.PhaseBidding
 
-	// Round 1: everybody passes.
-	for i := 0; i < 4; i++ {
-		var err error
-		gs, err = game.ApplyAction(gs, game.Action{
-			Type:       game.ActionPassTrump,
-			PlayerSeat: gs.ActivePlayerSeat,
-		})
-		require.NoError(t, err, "round-1 pass %d", i+1)
-	}
-	assert.Equal(t, game.PhaseBidding, gs.Phase, "no reshuffle after round 1")
-	assert.Equal(t, 2, gs.BiddingRound)
-	assert.True(t, gs.FaceDownRevealed)
-	assert.Equal(t, (gs.DealerSeat+1)%4, gs.ActivePlayerSeat)
-
-	// Round 2: three pass, then the dealer is refused a pass.
+	// The three seats before the dealer all pass — the single round never
+	// leaves round 1 and every hand stays at six visible cards.
 	for i := 0; i < 3; i++ {
 		var err error
 		gs, err = game.ApplyAction(gs, game.Action{
 			Type:       game.ActionPassTrump,
 			PlayerSeat: gs.ActivePlayerSeat,
 		})
-		require.NoError(t, err, "round-2 pass %d", i+1)
+		require.NoError(t, err, "pass %d", i+1)
+		assert.Equal(t, 1, gs.BiddingRound, "Croatian bidding never leaves round 1")
 	}
-	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat)
+	require.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat, "the dealer speaks last")
+	for i, p := range gs.Players {
+		assert.Len(t, p.Hand, 6, "seat %d still holds six visible cards", i)
+		assert.Len(t, p.FaceDownCards, 2, "seat %d's pair stays hidden through bidding", i)
+	}
 
+	// The dealer is refused a pass — pod mus.
 	rejected, err := game.ApplyAction(gs, game.Action{
 		Type:       game.ActionPassTrump,
 		PlayerSeat: gs.DealerSeat,
 	})
 	assert.Nil(t, rejected)
 	require.ErrorIs(t, err, apperr.ErrMustPickTrump)
+	assert.Equal(t, 1, gs.BiddingRound)
 
 	// The dealer names a suit and the hand starts.
 	suit := game.SuitHearts
@@ -1088,6 +1126,7 @@ func TestCroatianFullBiddingFromNewGame(t *testing.T) {
 		Suit:       &suit,
 	})
 	require.NoError(t, err)
+	assert.Equal(t, 1, final.BiddingRound, "round 1 throughout — a second round is unreachable")
 	// A resolved Croatian bid opens the dedicated declaration phase, never trick 1
 	// directly — unless the random deal left nobody holding a meld, in which case
 	// the phase opens and resolves inside this same transition.
@@ -1141,20 +1180,20 @@ func TestMustPickTrumpWireFlag(t *testing.T) {
 		gs := testfixtures.NewGameCroatianJustDealt()
 		assert.False(t, gs.MustPickTrump, "nobody is forced on the opening bid")
 
-		// Seven passes: round 1 passed out, then three in round 2. Only the
-		// last one leaves the dealer with no legal pass.
-		for i := 0; i < 7; i++ {
+		// Three passes: only the last one leaves the dealer with no legal pass.
+		for i := 0; i < 3; i++ {
 			next, err := game.ApplyAction(gs, game.Action{
 				Type:       game.ActionPassTrump,
 				PlayerSeat: gs.ActivePlayerSeat,
 			})
 			require.NoError(t, err, "pass %d must be legal", i+1)
 			gs = next
-			assert.Equal(t, i == 6, gs.MustPickTrump,
-				"after %d passes the flag must be %v", i+1, i == 6)
+			assert.Equal(t, i == 2, gs.MustPickTrump,
+				"after %d passes the flag must be %v", i+1, i == 2)
+			assert.Equal(t, 1, gs.BiddingRound, "the flag rises inside round 1")
 		}
 		assert.Equal(t, gs.DealerSeat, gs.ActivePlayerSeat,
-			"the forced seat is the dealer, bidding last in round 2")
+			"the forced seat is the dealer, bidding last")
 
 		// The forced pick clears it again.
 		suit := game.SuitSpades

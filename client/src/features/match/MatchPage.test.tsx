@@ -1883,7 +1883,7 @@ describe("MatchPage", () => {
         trumpSuit: null,
         trumpCallerSeat: null,
         trumpCandidate: null,
-        biddingRound: 2,
+        biddingRound: 1,
         trickNumber: 0,
         activePlayerSeat: 1,
         players: mockMatchState.players.map((p) => ({
@@ -1920,6 +1920,47 @@ describe("MatchPage", () => {
       for (const c of counts) {
         expect(c).toHaveTextContent("×8");
       }
+    });
+
+    it("renders the viewer's own two face-down backs for the whole of bidding", () => {
+      // The backs are the ONLY representation of the hidden pair the viewer
+      // gets until trump resolves — the identities never reach the client.
+      useMatchStore.getState().setMatchState(biddingState(2));
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.getAllByTestId("hand-card-face-down")).toHaveLength(2);
+    });
+
+    it("renders no backs once trump resolves and the snapshot carries all 8", () => {
+      const st = biddingState(0);
+      useMatchStore.getState().setMatchState({
+        ...st,
+        phase: "playing",
+        trumpSuit: "S",
+        trumpCallerSeat: 0,
+        trickNumber: 1,
+        players: st.players.map((p) => ({
+          ...p,
+          hand:
+            p.seat === 0
+              ? ([
+                  ...p.hand,
+                  { rank: "J", suit: "S" },
+                  { rank: "Q", suit: "S" },
+                ] as MatchState["players"][number]["hand"])
+              : [],
+          handCount: 8,
+          faceDownCount: 0,
+        })) as MatchState["players"],
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.queryAllByTestId("hand-card-face-down")).toHaveLength(0);
+      // The merged pair renders face-up instead.
+      expect(screen.getByTestId("hand-card-JS")).toBeInTheDocument();
+      expect(screen.getByTestId("hand-card-QS")).toBeInTheDocument();
     });
 
     // The page-level wiring of mustPickTrump -> TrumpPrompt's canPass. The

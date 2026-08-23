@@ -1570,16 +1570,17 @@ var (
 )
 
 // TestCroatianBidOpensDeclarationPhase covers both Croatian bidding paths into
-// the phase: the round-1 free-suit pick, and the round-2 dealer who cannot pass.
-// Both converge on handlePickTrump, which is the single insertion point.
+// the phase: an early free-suit pick, and the forced pick by the dealer who
+// cannot pass. Both converge on handlePickTrump, which is the single insertion
+// point.
 func TestCroatianBidOpensDeclarationPhase(t *testing.T) {
 	tests := []struct {
 		name      string
 		passCount int
 		seat      int
 	}{
-		{name: "round 1 free-suit pick by the first bidder", passCount: 0, seat: 1},
-		{name: "round 2 forced pick by the dealer", passCount: 7, seat: 0},
+		{name: "free-suit pick by the first bidder", passCount: 0, seat: 1},
+		{name: "forced pick by the dealer after three passes", passCount: 3, seat: 0},
 	}
 
 	for _, tc := range tests {

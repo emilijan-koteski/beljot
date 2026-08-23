@@ -33,7 +33,7 @@ func TestAutoActionTypeFor(t *testing.T) {
 		// Story 12.8 flipped this row. It used to read "pick_trump is not a
 		// timeout action", which was true only while no config could force a
 		// pick. Under AllPassOutcome == AllPassDealerMustPick the dealer bidding
-		// last in round 2 has no legal pass, so the timer names a suit for an
+		// last (fourth) has no legal pass, so the timer names a suit for an
 		// absent one — and that is the one auto-action that FIXES trump for the
 		// whole hand, so it must be announced rather than silently inferred from
 		// the next snapshot.
@@ -253,4 +253,49 @@ func TestAutoAction_SkipBelot_AdvancesSeatAndArmsFreshTimer(t *testing.T) {
 	require.NotNil(t, after.TurnExpiresAt)
 	assert.True(t, after.TurnExpiresAt.After(time.Now()),
 		"fresh timer for next seat must be in the future")
+}
+
+// TestPerMoveTimer_BitolaRoundOnePassoutOpensRoundTwo restores the match-layer
+// proof (previously carried by the deleted face-down reveal suite) that
+// timer-driven auto-passes walk a Bitola round 1 out into round 2 — and only
+// into round 2: no reshuffle fires until round 2 itself passes out.
+func TestPerMoveTimer_BitolaRoundOnePassoutOpensRoundTwo(t *testing.T) {
+	hub := &hubSpy{}
+	mgr := match.NewManager(hub, newMockMatchRepo())
+
+	const roomID = uint(100)
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	t.Cleanup(func() { mgr.RemoveSession(roomID) })
+
+	gs := testfixtures.NewGameMidBidding(0)
+	gs.RoomID = roomID
+	mgr.SetGameStateForTest(roomID, gs)
+
+	// Four timer expiries, each auto-passing the seat on the clock. Waiting on
+	// the observable state between them keeps the sequence honest — expiry N+1
+	// is aimed at the seat expiry N actually advanced to.
+	for pass := 1; pass <= 4; pass++ {
+		before := mgr.GetStateSnapshot(roomID)
+		require.NotNil(t, before)
+		mgr.TriggerTimerExpiryForTest(roomID, before.ActivePlayerSeat, 10*time.Millisecond)
+		require.Eventually(t, func() bool {
+			snap := mgr.GetStateSnapshot(roomID)
+			if snap == nil {
+				return false
+			}
+			if pass < 4 {
+				return snap.BiddingPassCount == pass
+			}
+			return snap.BiddingRound == 2
+		}, 2*time.Second, 5*time.Millisecond, "auto-pass %d must land", pass)
+	}
+
+	after := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, after)
+	assert.Equal(t, 2, after.BiddingRound, "a passed-out Bitola round 1 opens round 2")
+	assert.Equal(t, 0, after.BiddingPassCount, "round 2 starts with a fresh pass count")
+	assert.Equal(t, game.PhaseBidding, after.Phase, "no reshuffle — round 2 is live bidding")
+	assert.Equal(t, gs.DealerSeat, after.DealerSeat, "the dealer does not rotate on a round-1 passout")
+	assert.Equal(t, 1, after.HandNumber)
+	require.NotNil(t, after.TrumpCandidate, "the candidate stays on the table into round 2")
 }

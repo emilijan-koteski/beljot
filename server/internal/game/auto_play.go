@@ -49,7 +49,7 @@ func AutoPlay(state *GameState) (string, error) {
 }
 
 // AutoPickTrumpSuit names a trump suit for `seat` when the engine will not
-// accept a pass — the dealer bidding last in round 2 under AllPassOutcome ==
+// accept a pass — the dealer bidding last (fourth) under AllPassOutcome ==
 // AllPassDealerMustPick (see MustPickTrump). Pure and deterministic, exactly
 // like AutoPlay: the session manager calls it on an absent player's behalf.
 //
@@ -70,10 +70,10 @@ func AutoPlay(state *GameState) (string, error) {
 //
 // Two details are load-bearing:
 //
-//   - The seat's FaceDownCards count. At round 2 the revealed pair still lives
-//     outside Hand (mergeFaceDownCards only runs when the bid resolves), so
-//     reading Hand alone would choose from six of the eight cards the player
-//     actually holds.
+//   - The scan reads Hand ONLY, never FaceDownCards. The forced dealer is
+//     picking mid-bidding, when the face-down pair is still hidden from
+//     everyone — its owner included — so the choice must come from the six
+//     visible cards, exactly as it would for a present player.
 //   - A face-up candidate's own suit is excluded. handlePickTrump rejects it as
 //     already spent in round 1, so naming it would trade one rejected
 //     auto-action for another. Unreachable under the only config that forces a
@@ -87,9 +87,6 @@ func AutoPickTrumpSuit(state *GameState, seat int) (Suit, error) {
 
 	counts := make(map[Suit]int, 4)
 	for _, c := range player.Hand {
-		counts[c.Suit]++
-	}
-	for _, c := range player.FaceDownCards {
 		counts[c.Suit]++
 	}
 

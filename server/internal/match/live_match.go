@@ -729,7 +729,8 @@ func (m *Manager) parseAction(userID uint, session *LiveMatch, msg ws.WSMessage)
 		action.Card = &card
 	}
 
-	// Parse suit from payload for pick_trump action (round 2 requires suit selection)
+	// Parse suit from payload for pick_trump action (every free-suit pick
+	// requires suit selection)
 	if actionType == game.ActionPickTrump {
 		var payload struct {
 			Suit string `json:"suit"`
@@ -738,7 +739,8 @@ func (m *Manager) parseAction(userID uint, session *LiveMatch, msg ws.WSMessage)
 			suit := game.Suit(payload.Suit)
 			action.Suit = &suit
 		}
-		// If no suit provided, it's round 1 (picking the trump candidate) — action.Suit stays nil
+		// If no suit provided, it's a candidate take (Bitola round 1) —
+		// action.Suit stays nil
 	}
 
 	return action, nil
@@ -919,14 +921,6 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionPassTrump:
-		// A pass that emptied round 1 under a reveal config turns every seat's
-		// two face-down cards up — to that seat alone. Emitted BEFORE the
-		// authoritative state, matching every other typed-event-then-state pair
-		// here; the cards are not part of match_state (and must never be), so
-		// the client keeps them in a separate slice until bidding resolves.
-		if newState.FaceDownRevealed && !oldState.FaceDownRevealed {
-			m.sendFaceDownReveals(playerIDs, newState)
-		}
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionDeclare, game.ActionSkipDeclare:
@@ -1074,53 +1068,6 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// For any other action, broadcast full state
 		m.broadcastState(playerIDs, newState)
 	}
-}
-
-// sendFaceDownReveals delivers each seat its OWN two face-down cards and
-// nobody else's — one SendToUser per human seat, never a broadcast. Bot seats
-// are skipped: they read the game state directly through buildBotView, and
-// UserID 0 has no socket.
-//
-// Called when bidding enters round 2 under VariantRules.RevealFaceDownOnRound2,
-// and again by SyncStateOnConnect for a player who reconnects after the reveal.
-func (m *Manager) sendFaceDownReveals(playerIDs [4]uint, state *game.GameState) {
-	for seat := range state.Players {
-		userID := playerIDs[seat]
-		if userID == 0 {
-			continue // bot seat — no socket to send to
-		}
-		m.sendFaceDownRevealToSeat(userID, seat, state)
-	}
-}
-
-// sendFaceDownRevealToSeat sends one seat's own face-down cards to one user.
-// No-op when that seat holds none (already merged, or a deal shape that never
-// produces them).
-func (m *Manager) sendFaceDownRevealToSeat(userID uint, seat int, state *game.GameState) {
-	if msg := buildFaceDownRevealMsg(state, seat); msg != nil {
-		m.hub.SendToUser(userID, msg)
-	}
-}
-
-// buildFaceDownRevealMsg serializes one seat's face-down-card reveal, or returns
-// nil when that seat has none. Split out from the send so SyncStateOnConnect can
-// build it under the session read lock and send it after releasing.
-func buildFaceDownRevealMsg(state *game.GameState, seat int) []byte {
-	if seat < 0 || seat >= len(state.Players) {
-		return nil
-	}
-	cards := state.Players[seat].FaceDownCards
-	if len(cards) == 0 {
-		return nil
-	}
-	cardIDs := make([]string, 0, len(cards))
-	for _, c := range cards {
-		cardIDs = append(cardIDs, c.String())
-	}
-	return buildMessage(ws.EventFaceDownRevealed, ws.FaceDownRevealedPayload{
-		PlayerSeat: seat,
-		CardIDs:    cardIDs,
-	})
 }
 
 // broadcastDeclarationsResolvedIfTransition fires event:declarations_resolved
@@ -1577,7 +1524,7 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	var action game.Action
 	switch {
 	case gs.Phase == game.PhaseBidding && game.MustPickTrump(gs, expectedSeat):
-		// The dealer bidding last in round 2 under AllPassOutcome ==
+		// The dealer bidding last (fourth) under AllPassOutcome ==
 		// AllPassDealerMustPick has no legal pass, so an absent one must be given
 		// a suit instead. Auto-passing here would be REJECTED by the rules engine
 		// and the error path below re-arms the same seat through
@@ -1589,11 +1536,13 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		// path does not go through.)
 		//
 		// The picker is game.AutoPickTrumpSuit — pure and deterministic, mirroring
-		// AutoPlay, and reading the seat's face-down pair as well as its hand
-		// because at round 2 the revealed cards have not merged yet. The rule
-		// config decides this, never the variant name (D-VAR-1). The guard above
-		// already proved expectedSeat is the seat on the clock, so the same value
-		// picks the suit and stamps the action.
+		// AutoPlay, and reading the seat's HAND only: the face-down pair is
+		// still hidden from everyone (its owner included) until trump resolves,
+		// so the forced call comes from the six visible cards, exactly as it
+		// would for a present player. The rule config decides this, never the
+		// variant name (D-VAR-1). The guard above already proved expectedSeat is
+		// the seat on the clock, so the same value picks the suit and stamps the
+		// action.
 		suit, err := game.AutoPickTrumpSuit(gs, expectedSeat)
 		if err != nil {
 			// Defensive: a bidding seat holding no pickable card is a state the

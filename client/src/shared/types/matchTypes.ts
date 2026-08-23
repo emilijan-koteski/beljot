@@ -197,9 +197,10 @@ export interface MatchState {
   biddingRound: number;
   biddingPassCount: number;
   /** Server-authoritative: the seat on the clock has NO legal pass, so
-   *  pick_trump is its only bid (the dealer bidding last in round 2 of a variant
-   *  where the hand must find a taker). Drives whether the trump prompt offers a
-   *  Pass control — the client never re-derives the rule. */
+   *  pick_trump is its only bid (the dealer, speaking fourth in the single
+   *  bidding round of a variant where the hand must find a taker). Drives
+   *  whether the trump prompt offers a Pass control — the client never
+   *  re-derives the rule. */
   mustPickTrump: boolean;
   activePlayerSeat: number;
   trickNumber: number;

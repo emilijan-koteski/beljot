@@ -105,7 +105,7 @@ export const sr: RulesLangData = {
             {
               variant: "bitola",
               otherVariantNote:
-                "U hrvatskim pravilima svih osam karata deli se pre nego što se zove adut, po tri, tri, pa poslednje dve licem nadole, i ništa se ne okreće.",
+                "U hrvatskim pravilima svih osam karata deli se pre nego što se zove adut, po tri, tri, pa poslednje dve licem nadole, koje ostaju skrivene dok se adut ne odredi, i ništa se ne okreće.",
               t: "Podeli po pet, pa okreni jednu",
               d: "Delilac obilazi dvaput, po tri karte pa dve, pa svako počinje sa pet u ruci. Sledeća karta sa špila ide licem nagore na sto kao adutska karta, a jedanaest iza nje ostaju licem nadole na sredini.",
             },
@@ -119,7 +119,7 @@ export const sr: RulesLangData = {
             {
               variant: "bitola",
               otherVariantNote:
-                "U hrvatskim pravilima nema karte za uzimanje: nazivaš bilo koju od četiri boje, na osnovu šest karata koje vidiš, i ne dobijaš dodatnu kartu.",
+                "U hrvatskim pravilima nema karte za uzimanje i zove se samo jedan krug: svaki igrač naziva bilo koju od četiri boje, na osnovu šest karata koje vidi, i ne dobija dodatnu kartu.",
               t: "Prvi krug: uzmi tu kartu ili preskoči",
               d: "Počev zdesna od delioca, svaki igrač ili uzima okrenutu kartu, čime njena boja postaje adut za tu ruku, ili preskače. Ko je uzme, zadržava je kao jednu od svojih osam, a delilac deli dok svaka ruka nije puna. Adut pobeđuje sve iz druge tri boje, bez obzira na rang.",
             },
@@ -127,36 +127,36 @@ export const sr: RulesLangData = {
               variant: "croatia",
               otherVariantNote:
                 "U bitolskim pravilima prvi krug nudi tu jednu okrenutu kartu: ko je uzme, njena boja postaje adut, a karta mu ostaje kao jedna od osam.",
-              t: "Prvi krug: nazovi boju ili preskoči",
-              d: "Ništa se ne okreće i nema adutske karte za uzimanje. Počev zdesna od delioca, svaki igrač ili naziva bilo koju od četiri boje kao adut, na osnovu šest karata koje vidi, ili preskače. Ko je nazove ne dobija dodatnu kartu, ruka mu je već podeljena. Adut pobeđuje sve iz druge tri boje, bez obzira na rang.",
+              t: "Jedan krug: nazovi boju ili reci „dalje“",
+              d: "Ništa se ne okreće i nema adutske karte za uzimanje. Počev zdesna od delioca, svaki igrač redom ili naziva bilo koju od četiri boje kao adut, na osnovu šest karata koje vidi, ili preskače sa „dalje“. Ko nazove boju ne dobija dodatnu kartu, ruka mu je već podeljena. Adut pobeđuje sve iz druge tri boje, bez obzira na rang.",
             },
             {
               variant: "bitola",
               otherVariantNote:
-                "U hrvatskim pravilima i u drugom krugu sve četiri boje ostaju otvorene, jer ništa nije potrošeno na adutsku kartu, a dve karte licem nadole se pre toga otkrivaju samo svom vlasniku.",
+                "U hrvatskim pravilima drugog kruga nema: posle tri preskakanja izbor pada na delioca, koji zove poslednji i mora da nazove boju — „pod mus“.",
               t: "Drugi krug: nazovi boju, ali ne tu",
               d: "Sva četvorica su preskočila? Isti red ide ponovo, ali ovaj put boju nazivaš umesto da uzimaš kartu. Boja okrenute karte je potrošena i zaključana, pa birate između druge tri. Onaj ko zove ipak uzima okrenutu kartu sa ostatkom deljenja.",
             },
             {
               variant: "croatia",
               otherVariantNote:
-                "U bitolskim pravilima ništa se ne deli licem nadole, pa nema šta da se otkriva, a drugi krug naziva bilo koju boju osim one okrenute karte, koja je već potrošena.",
-              t: "Drugi krug: poslednje dve se otkrivaju",
-              d: "Ako sva četvorica preskoče, dve karte licem nadole otkrivaju se samo svom vlasniku. Niko ne vidi tuđe. Drugi krug se zove na punoj ruci od osam karata, a sve četiri boje su još otvorene.",
+                "U bitolskim pravilima delilac nikad nije prisiljen: ako sva četvorica preskoče, otvara se drugi krug u kome se naziva bilo koja boja osim one okrenute karte, a ako propadne i on, deli se ispočetka.",
+              t: "Delilac zove poslednji — „pod mus“",
+              d: "Delilac zove četvrti i nema pravo da preskoči: ako su druga trojica rekla „dalje“, delilac mora da nazove boju, i dalje gledajući samo svojih šest karata. Taj prisilni izbor aduta poznat je kao igranje „pod mus“. U ovim pravilima nema drugog kruga ni ponovnog mešanja, svako deljenje se igra.",
             },
             {
               variant: "bitola",
               otherVariantNote:
-                "U hrvatskim pravilima nijedno deljenje ne propada: delilac zove poslednji u drugom krugu i mora da nazove boju, pa se svako deljenje igra.",
+                "U hrvatskim pravilima nijedno deljenje ne propada: delilac u jedinom krugu zove poslednji i mora da nazove boju, pa se svako deljenje igra.",
               t: "Dvaput preskočeno? Novo deljenje",
               d: "Ako i drugi krug prođe bez ijednog zvanja aduta, ruka se ne igra: sve 32 karte vraćaju se zajedno i mešaju, deljenje prelazi na sledećeg igrača zdesna, i sve počinje ispočetka.",
             },
             {
               variant: "croatia",
               otherVariantNote:
-                "U bitolskim pravilima deljenje može da propadne: ako i drugi krug prođe bez zvanja aduta, sve 32 karte se mešaju zajedno i deljenje prelazi na sledećeg igrača zdesna.",
-              t: "Delilac ne sme da preskoči",
-              d: "U drugom krugu delilac zove poslednji i nema pravo da preskoči. Ako druga trojica preskoče, delilac mora da nazove boju. U ovim pravilima nema ponovnog mešanja, svako deljenje se igra.",
+                "U bitolskim pravilima ništa se ne deli licem nadole, pa nema šta da se otkriva: ruka onoga ko uzme adut popunjava se sa talona, a dvaput preskočeno deljenje meša se ispočetka.",
+              t: "Poslednje dve se otkrivaju",
+              d: "Tek kad je adut nazvan, dve karte licem nadole se okreću, svakom igraču samo njegove. Niko ne vidi tuđe. Od tog trenutka svi drže svih osam karata i ruka se igra do kraja.",
             },
           ],
         },
