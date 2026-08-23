@@ -4,6 +4,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { expectActionBeforeStatusQuo } from "@/test-utils";
+
 import { SurrenderPrompt } from "./SurrenderPrompt";
 
 describe("SurrenderPrompt", () => {
@@ -58,5 +60,12 @@ describe("SurrenderPrompt", () => {
     const wrapper = screen.getByTestId("surrender-prompt");
     expect(wrapper.className).toContain("fixed");
     expect(wrapper.className).not.toMatch(/(^|\s)absolute(\s|$)/);
+  });
+});
+
+describe("SurrenderPrompt footer order", () => {
+  it("places accept before decline so the action sits left of the status quo", () => {
+    render(<SurrenderPrompt proposerUsername="alice" onAccept={vi.fn()} onDecline={vi.fn()} />);
+    expectActionBeforeStatusQuo("surrender-prompt-accept", "surrender-prompt-decline");
   });
 });

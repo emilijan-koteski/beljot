@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FetchError } from "@/shared/api/axiosClient";
 import { i18n } from "@/shared/i18n/i18n";
 import { useAuthStore } from "@/shared/stores/authStore";
-import { QueryWrapper } from "@/test-utils";
+import { expectActionBeforeStatusQuo, QueryWrapper } from "@/test-utils";
 
 import { AuthLayout } from "./AuthLayout";
 import { LoginPage } from "./LoginPage";
@@ -443,6 +443,9 @@ describe("LoginPage", () => {
       await waitFor(() => {
         expect(screen.getByTestId("link-account-dialog")).toBeInTheDocument();
       });
+
+      // Footer convention: submit leads, cancel trails.
+      expectActionBeforeStatusQuo("link-account-submit", "link-account-cancel");
 
       await user.type(screen.getByTestId("link-account-password-input"), "password123");
       await user.click(screen.getByTestId("link-account-submit"));

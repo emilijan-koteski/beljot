@@ -134,6 +134,13 @@ export function LinkAccountDialog({
 
           <DialogFooter>
             <Button
+              type="submit"
+              disabled={pending || password.length === 0}
+              data-testid="link-account-submit"
+            >
+              {pending ? t("auth.sso.linkDialog.submitting") : t("auth.sso.linkDialog.submit")}
+            </Button>
+            <Button
               type="button"
               variant="ghost"
               disabled={pending}
@@ -141,13 +148,6 @@ export function LinkAccountDialog({
               data-testid="link-account-cancel"
             >
               {t("auth.sso.linkDialog.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              disabled={pending || password.length === 0}
-              data-testid="link-account-submit"
-            >
-              {pending ? t("auth.sso.linkDialog.submitting") : t("auth.sso.linkDialog.submit")}
             </Button>
           </DialogFooter>
         </form>

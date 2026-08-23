@@ -354,6 +354,18 @@ export function TrumpPrompt({
                 })}
             </span>
             <div className="flex items-center gap-3.5">
+              {biddingRound === 1 && trumpCandidate && (
+                // Suitless pick — the server binds trump to the candidate's
+                // suit. Never rendered without a candidate: there would be
+                // nothing for the server to bind to and the action is rejected.
+                <ClassicButton
+                  variant="primary"
+                  onClick={() => onPick()}
+                  data-testid="trump-prompt-pick"
+                >
+                  {t("match.trumpPrompt.pick")}
+                </ClassicButton>
+              )}
               {/* No Pass control when the server would refuse the pass: the
                   dealer bidding last (fourth) where the hand must find a
                   taker. Hiding it is the fix — offering a button whose only
@@ -388,18 +400,6 @@ export function TrumpPrompt({
               ) : (
                 <ClassicButton onClick={onPass} data-testid="trump-prompt-pass">
                   {t("match.trumpPrompt.pass")}
-                </ClassicButton>
-              )}
-              {biddingRound === 1 && trumpCandidate && (
-                // Suitless pick — the server binds trump to the candidate's
-                // suit. Never rendered without a candidate: there would be
-                // nothing for the server to bind to and the action is rejected.
-                <ClassicButton
-                  variant="primary"
-                  onClick={() => onPick()}
-                  data-testid="trump-prompt-pick"
-                >
-                  {t("match.trumpPrompt.pick")}
                 </ClassicButton>
               )}
             </div>

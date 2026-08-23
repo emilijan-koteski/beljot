@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { useAuthStore } from "@/shared/stores/authStore";
-import { makeUser, QueryWrapper } from "@/test-utils";
+import { expectActionBeforeStatusQuo, makeUser, QueryWrapper } from "@/test-utils";
 
 import { CreateRoomModal } from "./CreateRoomModal";
 
@@ -691,5 +691,18 @@ describe("CreateRoomModal", () => {
     await user.click(screen.getByTestId("create-room-button"));
 
     expect(await screen.findByTestId("create-room-form-error")).toBeInTheDocument();
+  });
+});
+
+describe("CreateRoomModal footer order", () => {
+  it("places create before cancel so the action sits left of the status quo", () => {
+    renderModal();
+    expectActionBeforeStatusQuo("create-room-button", "cancel-button");
+
+    // Order alone is not enough: justify-between would keep this order while
+    // pushing the pair back to opposite ends of the footer.
+    const footer = screen.getByTestId("create-room-button").parentElement;
+    expect(footer?.className).toContain("justify-end");
+    expect(footer?.className).not.toContain("justify-between");
   });
 });

@@ -76,9 +76,6 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
             </div>
 
             <div className="flex justify-end items-center gap-3.5">
-              <ClassicButton onClick={onDecline} data-testid="surrender-prompt-decline">
-                {t("match.surrender.prompt.decline")}
-              </ClassicButton>
               <ClassicButton
                 variant="primary"
                 onClick={onAccept}
@@ -92,6 +89,9 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
                 }}
               >
                 {t("match.surrender.prompt.accept")}
+              </ClassicButton>
+              <ClassicButton onClick={onDecline} data-testid="surrender-prompt-decline">
+                {t("match.surrender.prompt.decline")}
               </ClassicButton>
             </div>
           </ClassicPanel>

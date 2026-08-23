@@ -4,6 +4,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { expectActionBeforeStatusQuo } from "@/test-utils";
+
 import { BelotPrompt } from "./BelotPrompt";
 
 describe("BelotPrompt", () => {
@@ -142,5 +144,12 @@ describe("BelotPrompt", () => {
       // onExpire would race the server and surface a wrong-phase error toast.
       expect(onDecline).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("BelotPrompt footer order", () => {
+  it("places announce before decline so the action sits left of the status quo", () => {
+    render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
+    expectActionBeforeStatusQuo("belot-prompt-announce", "belot-prompt-decline");
   });
 });

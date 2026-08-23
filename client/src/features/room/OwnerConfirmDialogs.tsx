@@ -257,9 +257,6 @@ function OwnerConfirmDialog({
             background: "color-mix(in srgb, var(--surface-3) 45%, transparent)",
           }}
         >
-          <DialogButton tone="ghost" testId={cancelTestId} onClick={() => onOpenChange(false)}>
-            {cancelLabel}
-          </DialogButton>
           <DialogButton
             tone={tone}
             icon={confirmIcon}
@@ -268,6 +265,9 @@ function OwnerConfirmDialog({
             testId={confirmTestId}
           >
             {confirmLabel}
+          </DialogButton>
+          <DialogButton tone="ghost" testId={cancelTestId} onClick={() => onOpenChange(false)}>
+            {cancelLabel}
           </DialogButton>
         </div>
       </DialogContent>

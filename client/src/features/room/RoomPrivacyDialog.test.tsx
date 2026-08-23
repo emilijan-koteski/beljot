@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RoomPrivacyDialog } from "@/features/room/RoomPrivacyDialog";
 import type { Room } from "@/shared/types/apiTypes";
-import { makeRoom, QueryWrapper } from "@/test-utils";
+import { expectActionBeforeStatusQuo, makeRoom, QueryWrapper } from "@/test-utils";
 
 const mockUpdateRoomPrivacy = vi.fn();
 
@@ -92,5 +92,12 @@ describe("RoomPrivacyDialog", () => {
     expect(screen.getByTestId("room-privacy-submit")).toBeDisabled();
     await user.type(screen.getByTestId("room-privacy-password-input"), "ab");
     expect(screen.getByTestId("room-privacy-submit")).toBeDisabled();
+  });
+});
+
+describe("RoomPrivacyDialog footer order", () => {
+  it("places save before cancel so the action sits left of the status quo", () => {
+    renderDialog();
+    expectActionBeforeStatusQuo("room-privacy-submit", "room-privacy-cancel");
   });
 });

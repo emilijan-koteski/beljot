@@ -109,6 +109,13 @@ export function BelotPrompt({
             </div>
 
             <div className="flex justify-end items-center gap-3.5">
+              <ClassicButton
+                variant="primary"
+                onClick={onAnnounce}
+                data-testid="belot-prompt-announce"
+              >
+                {t(announceKey)}
+              </ClassicButton>
               {showRing ? (
                 // Visual countdown only — the server runs its own per-move
                 // timer and auto-skips the belot announcement on expiry. The
@@ -128,13 +135,6 @@ export function BelotPrompt({
                   {t("match.belot.decline")}
                 </ClassicButton>
               )}
-              <ClassicButton
-                variant="primary"
-                onClick={onAnnounce}
-                data-testid="belot-prompt-announce"
-              >
-                {t(announceKey)}
-              </ClassicButton>
             </div>
           </ClassicPanel>
         </div>

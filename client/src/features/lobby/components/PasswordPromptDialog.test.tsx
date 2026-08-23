@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
+import { expectActionBeforeStatusQuo } from "@/test-utils";
 
 function renderDialog(overrides: Partial<React.ComponentProps<typeof PasswordPromptDialog>> = {}) {
   const props = {
@@ -69,5 +70,21 @@ describe("PasswordPromptDialog", () => {
     const props = renderDialog();
     await user.click(screen.getByTestId("password-prompt-cancel"));
     expect(props.onClose).toHaveBeenCalled();
+  });
+});
+
+describe("PasswordPromptDialog footer order", () => {
+  it("places submit before cancel so the action sits left of the status quo", () => {
+    renderDialog();
+    expectActionBeforeStatusQuo("password-prompt-submit", "password-prompt-cancel");
+  });
+
+  it("stacks the shared footer in DOM order on narrow screens", () => {
+    renderDialog();
+    const footer = document.querySelector('[data-slot="dialog-footer"]');
+    // flex-col-reverse would invert the pair below the sm breakpoint, putting
+    // the status quo on top — the opposite of the desktop reading order.
+    expect(footer?.className).toContain("flex-col");
+    expect(footer?.className).not.toContain("flex-col-reverse");
   });
 });

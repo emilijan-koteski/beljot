@@ -3,6 +3,8 @@ import "@/shared/i18n/i18n";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { expectActionBeforeStatusQuo } from "@/test-utils";
+
 import { KickPlayerDialog, TransferOwnershipDialog } from "./OwnerConfirmDialogs";
 
 describe("KickPlayerDialog", () => {
@@ -114,5 +116,45 @@ describe("TransferOwnershipDialog", () => {
     expect(onConfirm).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByTestId("transfer-cancel"));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("owner confirm dialog footer order", () => {
+  it("places the kick confirm before its cancel", async () => {
+    render(
+      <KickPlayerDialog
+        open
+        onOpenChange={vi.fn()}
+        onConfirm={vi.fn()}
+        pending={false}
+        target={{ name: "ena_h", seat: 1, team: "B" }}
+      />,
+    );
+    await screen.findByTestId("kick-dialog-title");
+    expectActionBeforeStatusQuo("kick-confirm", "kick-cancel");
+
+    // Swapping the footer pair must not disturb the X, which stays pinned to
+    // the top-right corner rather than joining the footer row.
+    const close = screen.getByLabelText("Close");
+    expect(close.style.position).toBe("absolute");
+    expect(
+      close.compareDocumentPosition(screen.getByTestId("kick-confirm")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("places the transfer confirm before its cancel", async () => {
+    render(
+      <TransferOwnershipDialog
+        open
+        onOpenChange={vi.fn()}
+        onConfirm={vi.fn()}
+        pending={false}
+        fromName="owner"
+        target={{ name: "ena_h", seat: 1, team: "B" }}
+      />,
+    );
+    await screen.findByTestId("transfer-dialog-title");
+    expectActionBeforeStatusQuo("transfer-confirm", "transfer-cancel");
   });
 });

@@ -237,20 +237,20 @@ export function RoomInviteModal() {
           <DialogFooter>
             <Button
               type="button"
+              onClick={handleAccept}
+              data-testid="room-invite-accept"
+              disabled={isJoining}
+            >
+              {isJoining ? t("roomInvite.popup.accepting") : t("roomInvite.popup.accept")}
+            </Button>
+            <Button
+              type="button"
               variant="ghost"
               onClick={decline}
               data-testid="room-invite-decline"
               disabled={isJoining}
             >
               {t("roomInvite.popup.decline")}
-            </Button>
-            <Button
-              type="button"
-              onClick={handleAccept}
-              data-testid="room-invite-accept"
-              disabled={isJoining}
-            >
-              {isJoining ? t("roomInvite.popup.accepting") : t("roomInvite.popup.accept")}
             </Button>
           </DialogFooter>
         </DialogContent>

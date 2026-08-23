@@ -4,6 +4,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { expectActionBeforeStatusQuo } from "@/test-utils";
+
 import { SurrenderButton } from "./SurrenderButton";
 
 describe("SurrenderButton", () => {
@@ -86,5 +88,22 @@ describe("SurrenderButton", () => {
     await user.click(screen.getByTestId("surrender-button"));
     await user.click(screen.getByTestId("surrender-cancel"));
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+});
+
+describe("SurrenderConfirmDialog footer order", () => {
+  it("places confirm before cancel so the action sits left of the status quo", async () => {
+    const user = userEvent.setup();
+    render(
+      <SurrenderButton
+        canRequest={true}
+        isExhausted={false}
+        isPending={false}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("surrender-button"));
+    expectActionBeforeStatusQuo("surrender-confirm", "surrender-cancel");
   });
 });

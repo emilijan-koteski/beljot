@@ -60,21 +60,21 @@ export function RemoveFriendDialog({
         <DialogFooter>
           <Button
             type="button"
-            variant="ghost"
-            disabled={pending}
-            onClick={onClose}
-            data-testid="remove-friend-cancel"
-          >
-            {t("friends.removeDialog.cancel")}
-          </Button>
-          <Button
-            type="button"
             variant="destructive"
             disabled={pending}
             onClick={onConfirm}
             data-testid="remove-friend-confirm"
           >
             {pending ? t("friends.removeDialog.submitting") : t("friends.removeDialog.confirm")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={pending}
+            onClick={onClose}
+            data-testid="remove-friend-cancel"
+          >
+            {t("friends.removeDialog.cancel")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { useRoomStore } from "@/shared/stores/roomStore";
+import { expectActionBeforeStatusQuo } from "@/test-utils";
 
 import { RoomEjectionModal } from "./RoomEjectionModal";
 
@@ -202,5 +203,31 @@ describe("RoomEjectionModal", () => {
 
     expect(screen.queryByTestId("room-ejection-browse")).not.toBeInTheDocument();
     expect(screen.queryByTestId("room-ejection-you")).not.toBeInTheDocument();
+  });
+});
+
+describe("RoomEjectionModal footer order", () => {
+  beforeEach(() => {
+    useRoomStore.getState().setRoomEjection(null);
+  });
+  afterEach(() => {
+    useRoomStore.getState().setRoomEjection(null);
+  });
+
+  it("places the browse action before the dismiss on the honour branch", () => {
+    useRoomStore.getState().setRoomEjection({
+      roomId: 7,
+      buyIn: 0,
+      balance: 0,
+      minHonor: 80,
+      honor: 55,
+      reason: "honor",
+    });
+    renderModal();
+    expectActionBeforeStatusQuo("room-ejection-browse", "room-ejection-action");
+
+    const footer = screen.getByTestId("room-ejection-browse").parentElement;
+    expect(footer?.className).toContain("flex-col");
+    expect(footer?.className).not.toContain("flex-col-reverse");
   });
 });

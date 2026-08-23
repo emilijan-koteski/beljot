@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FriendButton } from "@/features/profile/components/FriendButton";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { FriendshipState } from "@/shared/types/apiTypes";
-import { makeUser, QueryWrapper } from "@/test-utils";
+import { expectActionBeforeStatusQuo, makeUser, QueryWrapper } from "@/test-utils";
 
 const mockGetStatus = vi.fn();
 const mockSend = vi.fn();
@@ -118,6 +118,9 @@ describe("FriendButton", () => {
     renderButton(7);
 
     await user.click(await screen.findByTestId("friend-button-remove"));
+    // Footer convention: the destructive action leads, cancel trails.
+    expectActionBeforeStatusQuo("remove-friend-confirm", "remove-friend-cancel");
+
     await user.click(screen.getByTestId("remove-friend-cancel"));
 
     expect(screen.queryByTestId("remove-friend-dialog")).toBeNull();

@@ -168,19 +168,19 @@ export function RoomPrivacyDialog({ open, room, onClose }: RoomPrivacyDialogProp
 
           <DialogFooter>
             <Button
+              type="submit"
+              disabled={mutation.isPending || !passwordValid}
+              data-testid="room-privacy-submit"
+            >
+              {mutation.isPending ? t("room.privacy.saving") : t("room.privacy.save")}
+            </Button>
+            <Button
               type="button"
               variant="ghost"
               onClick={onClose}
               data-testid="room-privacy-cancel"
             >
               {t("room.privacy.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              disabled={mutation.isPending || !passwordValid}
-              data-testid="room-privacy-submit"
-            >
-              {mutation.isPending ? t("room.privacy.saving") : t("room.privacy.save")}
             </Button>
           </DialogFooter>
         </form>

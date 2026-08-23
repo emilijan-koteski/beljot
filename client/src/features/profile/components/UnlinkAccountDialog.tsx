@@ -71,15 +71,6 @@ export function UnlinkAccountDialog({
         <DialogFooter>
           <Button
             type="button"
-            variant="ghost"
-            disabled={pending}
-            onClick={onClose}
-            data-testid="unlink-account-cancel"
-          >
-            {t("profile.linkedAccounts.unlinkDialog.cancel")}
-          </Button>
-          <Button
-            type="button"
             variant="destructive"
             disabled={pending}
             onClick={onConfirm}
@@ -88,6 +79,15 @@ export function UnlinkAccountDialog({
             {pending
               ? t("profile.linkedAccounts.unlinkDialog.submitting")
               : t("profile.linkedAccounts.unlinkDialog.confirm")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={pending}
+            onClick={onClose}
+            data-testid="unlink-account-cancel"
+          >
+            {t("profile.linkedAccounts.unlinkDialog.cancel")}
           </Button>
         </DialogFooter>
       </DialogContent>

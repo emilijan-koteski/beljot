@@ -25,7 +25,7 @@ import { toast } from "sonner";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { useRoomStore } from "@/shared/stores/roomStore";
-import { makeRoomInvite } from "@/test-utils";
+import { expectActionBeforeStatusQuo, makeRoomInvite } from "@/test-utils";
 
 import { RoomInviteModal } from "./RoomInviteModal";
 
@@ -217,5 +217,20 @@ describe("RoomInviteModal", () => {
     renderModal();
 
     await waitFor(() => expect(useRoomStore.getState().roomInvite).toBeNull());
+  });
+});
+
+describe("RoomInviteModal footer order", () => {
+  beforeEach(() => {
+    useRoomStore.getState().setRoomInvite(null);
+  });
+  afterEach(() => {
+    useRoomStore.getState().setRoomInvite(null);
+  });
+
+  it("places accept before decline so the action sits left of the status quo", () => {
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    renderModal();
+    expectActionBeforeStatusQuo("room-invite-accept", "room-invite-decline");
   });
 });

@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
-import { makeUser } from "@/test-utils";
+import { expectActionBeforeStatusQuo, makeUser } from "@/test-utils";
 
 import { TrumpPrompt } from "./TrumpPrompt";
 
@@ -818,5 +818,20 @@ describe("TrumpPrompt", () => {
     expect(panel).not.toBeNull();
     expect(panel!.style.maxHeight).toBe("90vh");
     expect(panel!.style.overflowY).toBe("auto");
+  });
+});
+
+describe("TrumpPrompt footer order", () => {
+  it("places pick before pass so the action sits left of the status quo", () => {
+    render(
+      <TrumpPrompt
+        trumpCandidate={trumpCandidate}
+        biddingRound={1}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+    expectActionBeforeStatusQuo("trump-prompt-pick", "trump-prompt-pass");
   });
 });

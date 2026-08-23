@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { BrowserRouter } from "react-router";
+import { expect } from "vitest";
 
 import type { RoomInvite } from "@/shared/stores/roomStore";
 import type { Room, RoomDetail, RoomPlayer, User } from "@/shared/types/apiTypes";
@@ -139,4 +141,26 @@ export function TestProviders({ children }: { children: ReactNode }) {
       <BrowserRouter>{children}</BrowserRouter>
     </QueryClientProvider>
   );
+}
+
+/**
+ * Asserts the app-wide dialog footer convention: the action-taking control
+ * precedes the status-quo control in the DOM, which is what puts it on the left
+ * of a `justify-end` row (and on top of a narrow-screen stack).
+ *
+ * Takes test ids rather than elements so a failure names the pair that broke.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function expectActionBeforeStatusQuo(actionTestId: string, statusQuoTestId: string) {
+  const action = screen.getByTestId(actionTestId);
+  const statusQuo = screen.getByTestId(statusQuoTestId);
+  // Strict equality, not a bitwise AND: FOLLOWING is also set for
+  // CONTAINED_BY (4|16) and for disconnected trees, so the AND form would pass
+  // if the status-quo control ever ended up nested inside the action one. A
+  // plain following sibling — including one wrapped in ButtonTimerRing — is
+  // exactly FOLLOWING.
+  expect(
+    action.compareDocumentPosition(statusQuo),
+    `expected ${actionTestId} to be followed by a sibling ${statusQuoTestId}`,
+  ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 }

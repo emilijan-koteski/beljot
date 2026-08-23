@@ -149,9 +149,6 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
             </div>
 
             <div className="flex justify-end items-center gap-3.5">
-              <ClassicButton onClick={onCancel} data-testid="surrender-cancel">
-                {t("match.surrender.confirm.cancel")}
-              </ClassicButton>
               <ClassicButton
                 variant="primary"
                 onClick={onConfirm}
@@ -165,6 +162,9 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
                 }}
               >
                 {t("match.surrender.confirm.confirm")}
+              </ClassicButton>
+              <ClassicButton onClick={onCancel} data-testid="surrender-cancel">
+                {t("match.surrender.confirm.cancel")}
               </ClassicButton>
             </div>
           </ClassicPanel>

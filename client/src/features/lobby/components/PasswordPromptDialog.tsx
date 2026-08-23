@@ -128,19 +128,19 @@ export function PasswordPromptDialog({
 
           <DialogFooter>
             <Button
+              type="submit"
+              disabled={pending || password.length === 0}
+              data-testid="password-prompt-submit"
+            >
+              {pending ? t("room.passwordPrompt.submitting") : t("room.passwordPrompt.submit")}
+            </Button>
+            <Button
               type="button"
               variant="ghost"
               onClick={onClose}
               data-testid="password-prompt-cancel"
             >
               {t("room.passwordPrompt.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              disabled={pending || password.length === 0}
-              data-testid="password-prompt-submit"
-            >
-              {pending ? t("room.passwordPrompt.submitting") : t("room.passwordPrompt.submit")}
             </Button>
           </DialogFooter>
         </form>

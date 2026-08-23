@@ -125,40 +125,29 @@ export function PauseOverlay({
             })}
           </div>
 
-          {/* Owner-override + primary action share one row, justified to the
-              edges. The override sits on the left in a red-tinted felt ghost
-              variant — it stays in the ClassicButton family (felt + serif)
-              while a Crown glyph and red border flag it as an admin-only
-              action distinct from the player-level Resume on the right. */}
-          <div className="flex items-center justify-between gap-3">
-            {isRoomOwner ? (
-              <ClassicButton
-                onClick={onOwnerResume}
-                data-testid="pause-owner-resume-button"
-                style={{
-                  border: "1px solid rgba(255,133,133,0.45)",
-                  color: "#ffb1a8",
-                  background: "linear-gradient(180deg, rgba(70,32,32,0.55), rgba(40,18,18,0.45))",
-                  boxShadow: "inset 0 1px 0 rgba(255,133,133,0.18)",
-                  padding: "8px 14px",
-                  fontSize: 13,
-                }}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <Crown size={13} aria-hidden="true" />
-                  {t("match.pause.resumeAll")}
-                </span>
-              </ClassicButton>
-            ) : (
-              <span aria-hidden />
-            )}
-
+          {/* Neither control here keeps the status quo — resuming your own pause
+              and force-resuming everyone are both actions — so they get the
+              both-actions treatment: their own centred, full-width, stacked
+              row rather than a right-anchored action/cancel pair. The
+              player-level control leads; the owner override sits below it in a
+              red-tinted felt ghost variant — still in the ClassicButton family
+              (felt + serif), with a Crown glyph and red border flagging it as
+              admin-only. */}
+          <div
+            className="mt-2 flex w-full flex-col items-stretch gap-2 text-center"
+            data-testid="pause-actions"
+          >
             {hasActivePause ? (
-              <ClassicButton variant="primary" onClick={onResume} data-testid="pause-resume-button">
+              <ClassicButton
+                variant="primary"
+                onClick={onResume}
+                data-testid="pause-resume-button"
+                className="w-full"
+              >
                 {t("match.pause.resume")}
               </ClassicButton>
             ) : canStackPause ? (
-              <ClassicButton onClick={onPause} data-testid="pause-stack-button">
+              <ClassicButton onClick={onPause} data-testid="pause-stack-button" className="w-full">
                 {t("match.pause.pauseButton")}
               </ClassicButton>
             ) : (
@@ -169,6 +158,27 @@ export function PauseOverlay({
               >
                 {t("match.pause.waitingToResume")}
               </p>
+            )}
+
+            {isRoomOwner && (
+              <ClassicButton
+                onClick={onOwnerResume}
+                data-testid="pause-owner-resume-button"
+                className="w-full"
+                style={{
+                  border: "1px solid rgba(255,133,133,0.45)",
+                  color: "#ffb1a8",
+                  background: "linear-gradient(180deg, rgba(70,32,32,0.55), rgba(40,18,18,0.45))",
+                  boxShadow: "inset 0 1px 0 rgba(255,133,133,0.18)",
+                  padding: "8px 14px",
+                  fontSize: 13,
+                }}
+              >
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <Crown size={13} aria-hidden="true" />
+                  {t("match.pause.resumeAll")}
+                </span>
+              </ClassicButton>
             )}
           </div>
         </ClassicPanel>

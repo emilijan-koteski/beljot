@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import type { LinkedIdentity } from "@/shared/api/identities";
-import { QueryWrapper } from "@/test-utils";
+import { expectActionBeforeStatusQuo, QueryWrapper } from "@/test-utils";
 
 import { LinkedAccounts } from "./LinkedAccounts";
 
@@ -122,6 +122,8 @@ describe("LinkedAccounts", () => {
     fireEvent.click(screen.getByTestId("unlink-google-button"));
 
     await waitFor(() => expect(screen.getByTestId("unlink-account-dialog")).toBeInTheDocument());
+    // Footer convention: the destructive action leads, cancel trails.
+    expectActionBeforeStatusQuo("unlink-account-confirm", "unlink-account-cancel");
     fireEvent.click(screen.getByTestId("unlink-account-confirm"));
 
     await waitFor(() => expect(mockUnlinkIdentity).toHaveBeenCalledWith(1, "google"));

@@ -631,15 +631,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               </div>
             )}
 
-            <footer className="border-border bg-surface flex shrink-0 items-center justify-between gap-2 border-t px-8 py-3.5">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => handleOpenChange(false)}
-                data-testid="cancel-button"
-              >
-                {t("lobby.createRoomModal.cancel")}
-              </Button>
+            <footer className="border-border bg-surface flex shrink-0 items-center justify-end gap-2 border-t px-8 py-3.5">
               <Button
                 type="submit"
                 size="cta"
@@ -651,6 +643,14 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 {submitting
                   ? t("lobby.createRoomModal.submitting")
                   : t("lobby.createRoomModal.submit")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => handleOpenChange(false)}
+                data-testid="cancel-button"
+              >
+                {t("lobby.createRoomModal.cancel")}
               </Button>
             </footer>
           </div>

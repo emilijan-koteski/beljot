@@ -244,9 +244,10 @@ export function RoomEjectionModal() {
           </div>
         )}
 
-        {/* Footer. Stacks below sm so two actions never squeeze on a phone. */}
+        {/* Footer. Stacks below sm — in DOM order, so the phone layout keeps
+            the same action-then-dismiss reading as the desktop row. */}
         <div
-          className="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center sm:justify-end"
+          className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-end"
           style={{
             marginTop: 18,
             padding: "16px 28px",

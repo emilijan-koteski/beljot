@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MOTION } from "@/shared/lib/motion";
 import type { Declaration } from "@/shared/types/matchTypes";
+import { expectActionBeforeStatusQuo } from "@/test-utils";
 
 import { DeclarationPrompt } from "./DeclarationPrompt";
 
@@ -329,5 +330,14 @@ describe("DeclarationPrompt", () => {
       });
       expect(onSkip).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("DeclarationPrompt footer order", () => {
+  it("places declare before skip so the action sits left of the status quo", () => {
+    render(
+      <DeclarationPrompt declarations={mockDeclarations} onDeclare={vi.fn()} onSkip={vi.fn()} />,
+    );
+    expectActionBeforeStatusQuo("declaration-prompt-declare", "declaration-prompt-skip");
   });
 });

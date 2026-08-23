@@ -226,6 +226,14 @@ export function DeclarationPrompt({
             )}
 
             <div className="flex justify-end items-center gap-3">
+              <ClassicButton
+                variant="primary"
+                onClick={handleDeclare}
+                disabled={!hasDeclarations || waiting}
+                data-testid="declaration-prompt-declare"
+              >
+                {t("match.declaration.declare")}
+              </ClassicButton>
               {showRing ? (
                 // Bitola: visual countdown only — the server auto-skips on the
                 // turn timer, and a client onExpire racing it surfaces a
@@ -246,14 +254,6 @@ export function DeclarationPrompt({
               ) : (
                 skipButton
               )}
-              <ClassicButton
-                variant="primary"
-                onClick={handleDeclare}
-                disabled={!hasDeclarations || waiting}
-                data-testid="declaration-prompt-declare"
-              >
-                {t("match.declaration.declare")}
-              </ClassicButton>
             </div>
           </ClassicPanel>
         </div>
