@@ -1222,6 +1222,7 @@ export function RoomPage() {
                 <Badge tone="neutral" icon={<Ban className="size-3" />}>
                   <span
                     data-testid="badge-no-declarations"
+                    role="img"
                     aria-label={t("lobby.card.noDeclarationsAriaLabel")}
                   >
                     {t("lobby.card.noDeclarations")}
@@ -1235,6 +1236,7 @@ export function RoomPage() {
                 <Badge tone="neutral" icon={<Flag className="size-3" />}>
                   <span
                     data-testid="badge-stop-at-target"
+                    role="img"
                     aria-label={t("lobby.card.stopAtTargetAriaLabel")}
                   >
                     {t("lobby.card.stopAtTarget")}

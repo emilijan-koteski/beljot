@@ -107,6 +107,17 @@ type TrickCard struct {
 // Populated by scoreHand() before startNewHand() or PhaseMatchEnd,
 // so the match manager can broadcast the full breakdown to clients.
 type HandScore struct {
+	// HandNumber is the hand this result belongs to. Server-only (json:"-"): the
+	// client reads a hand result only in the context of the hand it just played.
+	//
+	// It exists because a HandScore OUTLIVES its hand. startNewHand deliberately
+	// never clears LastHandResult (it must survive for the broadcast that follows
+	// scoring), so from hand 2 onward every state carries the previous hand's
+	// result. Anything that reacts to "LastHandResult is non-nil" therefore has to
+	// ask WHICH hand it describes, or it will re-announce and re-persist a hand
+	// that finished long ago — which is exactly what an accepted surrender in hand
+	// 3 used to do.
+	HandNumber      int `json:"-"`
 	TeamACardPoints int `json:"teamACardPoints"` // Trick-taking card points (Team A) before bonus
 	TeamBCardPoints int `json:"teamBCardPoints"` // Trick-taking card points (Team B) before bonus
 	TeamADeclPoints int `json:"teamADeclPoints"` // Declaration points (Team A)

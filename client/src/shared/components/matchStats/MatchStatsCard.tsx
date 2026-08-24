@@ -592,6 +592,32 @@ export function MatchStatsCard({
           >
             {variantLabel(t, match.variant)}
           </span>
+          {/* The rules this match was played under, shown only when they differ
+              from the default — same "chip only when it carries information"
+              rule the lobby card follows, and the same role="img" reasoning for
+              why the explanation is reliable here. Without these a dosta match
+              in history is indistinguishable from an ordinary one apart from the
+              unfinished-hand row in its breakdown. */}
+          {match.declarationsEnabled === false && (
+            <span
+              className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              data-testid="match-history-no-declarations"
+              role="img"
+              aria-label={t("lobby.card.noDeclarationsAriaLabel")}
+            >
+              {t("lobby.card.noDeclarations")}
+            </span>
+          )}
+          {match.stopAtTarget === true && (
+            <span
+              className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              data-testid="match-history-stop-at-target"
+              role="img"
+              aria-label={t("lobby.card.stopAtTargetAriaLabel")}
+            >
+              {t("lobby.card.stopAtTarget")}
+            </span>
+          )}
         </div>
 
         {/* Players */}

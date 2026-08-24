@@ -117,6 +117,9 @@ func scoreHand(state *GameState) {
 
 	// Step 6: Populate LastHandResult for broadcast
 	state.LastHandResult = &HandScore{
+		// Stamped so consumers can tell this result from a stale one carried
+		// forward by startNewHand. See HandScore.HandNumber.
+		HandNumber:      state.HandNumber,
 		TeamACardPoints: rawTeamACardPoints,
 		TeamBCardPoints: rawTeamBCardPoints,
 		TeamADeclPoints: aDeclTotal,

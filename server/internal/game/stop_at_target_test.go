@@ -1192,3 +1192,65 @@ func TestStopAtTargetSurvivesPerSeatProjection(t *testing.T) {
 		})
 	}
 }
+
+// TestStopAtTargetOutranksASurrenderInsideTheDeferralWindow closes the one hole
+// the trick-1 deferral opens.
+//
+// While the Belote checkpoint is deferred the match is in a state the rule says
+// should not exist: a team is past the target but the match has not ended yet,
+// for the two or three cards it takes trick 1 to finish. A surrender landing in
+// that window used to hand the match to the OTHER team.
+//
+// The concession still decides a match where nobody has crossed — that control is
+// the second half of this test, and without it the fix would look right while
+// having quietly broken ordinary surrenders.
+func TestStopAtTargetOutranksASurrenderInsideTheDeferralWindow(t *testing.T) {
+	// Team A is one Belote short of the target, and the +20 defers because the
+	// trick-1 contest is still open.
+	const seed = 1001 - 20
+
+	t.Run("a team already past the target wins despite the concession", func(t *testing.T) {
+		gs := testfixtures.WithStopAtTarget(testfixtures.NewGameFirstTrick(game.SuitHearts))
+		gs.TeamScores[game.TeamA] = seed
+		announced := announceBeloteAt(t, bitolaTrick1BelotePrompt(t, gs), 0)
+		require.NotEqual(t, game.PhaseMatchEnd, announced.Phase, "the deferral must be holding")
+
+		// Seat 0 (team A) concedes — the team that has actually crossed.
+		requested, err := game.ApplyAction(announced, game.Action{
+			Type: game.ActionSurrenderRequest, PlayerSeat: 0,
+		})
+		require.NoError(t, err)
+		accepted, err := game.ApplyAction(requested, game.Action{
+			Type: game.ActionSurrenderAccept, PlayerSeat: 2,
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, game.PhaseMatchEnd, accepted.Phase)
+		require.NotNil(t, accepted.WinnerTeam)
+		assert.Equal(t, game.TeamA, *accepted.WinnerTeam,
+			"team A reached the target before the concession, so the concession cannot take it")
+		assert.GreaterOrEqual(t, accepted.TeamScores[game.TeamA], 1001,
+			"and the crossing total is banked")
+		assert.Nil(t, accepted.SurrenderProposerSeat)
+	})
+
+	t.Run("an ordinary surrender still awards the opponents", func(t *testing.T) {
+		gs := testfixtures.WithStopAtTarget(testfixtures.NewGameFirstTrick(game.SuitHearts))
+		// Nobody near the target.
+		announced := announceBeloteAt(t, bitolaTrick1BelotePrompt(t, gs), 0)
+
+		requested, err := game.ApplyAction(announced, game.Action{
+			Type: game.ActionSurrenderRequest, PlayerSeat: 0,
+		})
+		require.NoError(t, err)
+		accepted, err := game.ApplyAction(requested, game.Action{
+			Type: game.ActionSurrenderAccept, PlayerSeat: 2,
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, game.PhaseMatchEnd, accepted.Phase)
+		require.NotNil(t, accepted.WinnerTeam)
+		assert.Equal(t, game.TeamB, *accepted.WinnerTeam,
+			"seat 0 conceded and no team had crossed, so team B takes it as always")
+	})
+}

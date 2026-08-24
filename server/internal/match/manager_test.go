@@ -662,9 +662,14 @@ func TestPerMoveTimer_ConcurrentActionAndExpiry(t *testing.T) {
 
 // bufferTestResult produces a game.HandScore populated with distinctive values so
 // mapping correctness can be asserted.
-func bufferTestResult(a, b int) *game.HandScore {
+// handNumber is required, not defaulted: a HandScore outlives its hand, so both
+// the broadcast gate and the persisted row now key off which hand the result
+// actually describes. A fixture that leaves it zero is a result belonging to no
+// hand, which is what a stale carried-forward result looks like.
+func bufferTestResult(handNumber, a, b int) *game.HandScore {
 	capotTeam := game.TeamB
 	return &game.HandScore{
+		HandNumber:      handNumber,
 		TeamACardPoints: a,
 		TeamBCardPoints: b,
 		TeamADeclPoints: 20,
@@ -692,13 +697,14 @@ func TestBufferHandResultIfScored_HandAdvanced(t *testing.T) {
 
 	// Normal hand completion: HandNumber advances from 3 → 4.
 	old := &game.GameState{HandNumber: 3}
-	next := &game.GameState{HandNumber: 4, LastHandResult: bufferTestResult(81, 81)}
+	next := &game.GameState{HandNumber: 4, LastHandResult: bufferTestResult(3, 81, 81)}
 
 	mgr.BufferHandResultIfScored(900, old, next)
 
 	hands := mgr.HandResults(900)
 	require.Len(t, hands, 1)
-	assert.Equal(t, 3, hands[0].HandNumber, "buffered hand number must be oldState.HandNumber (the hand just completed)")
+	assert.Equal(t, 3, hands[0].HandNumber,
+		"buffered hand number must be the RESULT's own hand (the hand just completed)")
 	assert.Equal(t, 81, hands[0].TeamACardPoints)
 	assert.Equal(t, 81, hands[0].TeamBCardPoints)
 	assert.True(t, hands[0].Capot)
@@ -720,13 +726,14 @@ func TestBufferHandResultIfScored_MatchEnd(t *testing.T) {
 
 	// On match end startNewHand does NOT run, so HandNumber stays the same.
 	old := &game.GameState{HandNumber: 7}
-	next := &game.GameState{HandNumber: 7, Phase: game.PhaseMatchEnd, LastHandResult: bufferTestResult(100, 62)}
+	next := &game.GameState{HandNumber: 7, Phase: game.PhaseMatchEnd, LastHandResult: bufferTestResult(7, 100, 62)}
 
 	mgr.BufferHandResultIfScored(901, old, next)
 
 	hands := mgr.HandResults(901)
 	require.Len(t, hands, 1)
-	assert.Equal(t, 7, hands[0].HandNumber, "match-end buffered hand number must be oldState.HandNumber (no startNewHand ran)")
+	assert.Equal(t, 7, hands[0].HandNumber,
+		"match-end buffered hand number must be the result's own hand (no startNewHand ran)")
 }
 
 func TestBufferHandResultIfScored_Noop_NoTransition(t *testing.T) {
@@ -740,7 +747,7 @@ func TestBufferHandResultIfScored_Noop_NoTransition(t *testing.T) {
 
 	// No hand advance, not match end: buffer must stay empty.
 	old := &game.GameState{HandNumber: 2}
-	next := &game.GameState{HandNumber: 2, Phase: game.PhasePlaying, LastHandResult: bufferTestResult(10, 20)}
+	next := &game.GameState{HandNumber: 2, Phase: game.PhasePlaying, LastHandResult: bufferTestResult(2, 10, 20)}
 
 	mgr.BufferHandResultIfScored(902, old, next)
 

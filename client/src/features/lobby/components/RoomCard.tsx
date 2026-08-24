@@ -129,12 +129,19 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               QuickPlay's own room_created, and the lobby-disconnect map). The
               default room stays unchipped so the chip always carries
               information. */}
+          {/* role="img" is what makes the aria-label authoritative. ARIA does not
+                  guarantee aria-label is honoured on a ROLELESS generic element, so on a
+                  bare <span> a screen reader may fall back to the short visible text and
+                  drop the explanation entirely. The role makes the chip one named node.
+                  Kept as aria-label rather than a visually-hidden sibling so the chip's
+                  textContent stays exactly the visible label. */}
           {room.declarationsEnabled === false && (
             <>
               <Dot />
               <span
                 className="inline-flex items-center gap-1"
                 data-testid="room-card-no-declarations"
+                role="img"
                 aria-label={t("lobby.card.noDeclarationsAriaLabel")}
               >
                 <Ban className="size-3" />
@@ -154,6 +161,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               <span
                 className="inline-flex items-center gap-1"
                 data-testid="room-card-stop-at-target"
+                role="img"
                 aria-label={t("lobby.card.stopAtTargetAriaLabel")}
               >
                 <Flag className="size-3" />

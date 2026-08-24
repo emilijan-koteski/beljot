@@ -1,0 +1,27 @@
+-- Record the two per-room RULE flags on the match itself. Additive ALTER style,
+-- mirroring 000022_add_stop_at_target_to_rooms.
+--
+-- `rooms` already stores both, but a room is mutable and reusable: the same room
+-- hosts match after match, and its settings can differ from the ones a finished
+-- match was actually played under. Match history reads the MATCH, so without
+-- these columns a completed match cannot say which rules produced its score.
+--
+-- The gap was visible: a match ended by the stop rule shows a hand breakdown one
+-- hand short of its own final score, and nothing on the row explained why. The
+-- client now labels that hand explicitly, and these columns are what let it (and
+-- anything else reading history) name the rules rather than infer them.
+--
+-- BACKFILL IS THE DEFAULTS, and each default reproduces the past exactly:
+--
+--     declarations_enabled DEFAULT TRUE  -- every match before the toggle
+--                                          existed was played with melds.
+--     stop_at_target       DEFAULT FALSE -- and every one of them played the
+--                                          hand out before checking the target.
+--
+-- Note for the Go side: match.Match declares both WITHOUT a GORM `default` tag,
+-- the same trap allow_new_players and rooms.declarations_enabled document — GORM
+-- omits zero-valued fields from an INSERT when they declare one, which would make
+-- declarations_enabled = FALSE and stop_at_target = TRUE unwritable. The DB-side
+-- defaults above still cover the backfill and any raw insert.
+ALTER TABLE matches ADD COLUMN declarations_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE matches ADD COLUMN stop_at_target BOOLEAN NOT NULL DEFAULT FALSE;

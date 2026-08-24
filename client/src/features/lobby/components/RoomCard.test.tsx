@@ -294,4 +294,25 @@ describe("RoomCard", () => {
       unmount();
     }
   });
+
+  // ARIA does not guarantee aria-label is honoured on a ROLELESS generic element,
+  // so a bare <span aria-label> can lose its explanation entirely in a screen
+  // reader. The role is what makes the label authoritative; without it these
+  // chips read as their short visible text only.
+  it("exposes each rule chip's explanation through a named role", () => {
+    render(
+      <RoomCard
+        room={{ ...baseRoom, declarationsEnabled: false, stopAtTarget: true }}
+        onJoin={() => {}}
+      />,
+    );
+
+    for (const testId of ["room-card-no-declarations", "room-card-stop-at-target"]) {
+      const chip = screen.getByTestId(testId);
+      expect(chip).toHaveAttribute("role", "img");
+      expect(chip.getAttribute("aria-label")?.length ?? 0).toBeGreaterThan(
+        chip.textContent?.length ?? 0,
+      );
+    }
+  });
 });

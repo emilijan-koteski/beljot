@@ -884,7 +884,21 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// PhaseHandComplete (next hand deals on action:continue) instead of dealing
 		// immediately, so detect the phase transition into PhaseHandComplete (or
 		// PhaseMatchEnd) rather than a HandNumber increment.
+		//
+		// The two extra terms both exist because a HandScore outlives its hand
+		// (startNewHand never clears LastHandResult), so "non-nil" alone is not
+		// "a hand just finished":
+		//
+		//   - HandNumber == oldState.HandNumber: the result describes THIS hand.
+		//     Without it, accepting a surrender in hand 3 re-announced hand 2's
+		//     numbers, because a surrender also transitions into match_end.
+		//   - oldState.Phase != PhaseHandComplete: a hand cannot FINISH from
+		//     hand_complete — it already finished. Without it, an instant win on a
+		//     freshly dealt hand (continue -> deal -> all 8 trumps -> match_end)
+		//     re-announced the hand that had just been scored before the deal.
 		handJustScored := newState.LastHandResult != nil &&
+			newState.LastHandResult.HandNumber == oldState.HandNumber &&
+			oldState.Phase != game.PhaseHandComplete &&
 			oldState.Phase != newState.Phase &&
 			(newState.Phase == game.PhaseHandComplete || newState.Phase == game.PhaseMatchEnd)
 		if handJustScored {
@@ -1252,7 +1266,13 @@ func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newStat
 		capotTeam = &v
 	}
 	row := HandResult{
-		HandNumber:      oldState.HandNumber,
+		// The result's OWN hand number, not oldState's. They agree on the normal
+		// paths (buffering rides the continue that deals the next hand, or the
+		// match-end transition), but a stale result reaching a match end — an
+		// accepted surrender, or an instant win on a freshly dealt hand — used to
+		// stamp the previous hand's figures with the current hand's number,
+		// producing a row for a hand that had already been recorded.
+		HandNumber:      hr.HandNumber,
 		TeamACardPoints: hr.TeamACardPoints,
 		TeamBCardPoints: hr.TeamBCardPoints,
 		TeamADeclPoints: hr.TeamADeclPoints,
@@ -1268,8 +1288,19 @@ func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newStat
 		TeamBHandTotal:  hr.TeamBHandTotal,
 	}
 	session.mu.Lock()
+	defer session.mu.Unlock()
+	// Idempotent by hand number. The gate above can fire twice for one hand — the
+	// continue that deals hand N+1 buffers hand N, and a match end reached later
+	// in that same hand carries the same result forward — and `hand_results` has a
+	// UNIQUE (match_id, hand_number) constraint, so a duplicate would fail the
+	// whole CreateWithHands transaction and lose the entire match record rather
+	// than just one row.
+	for _, existing := range session.handResults {
+		if existing.HandNumber == row.HandNumber {
+			return
+		}
+	}
 	session.handResults = append(session.handResults, row)
-	session.mu.Unlock()
 }
 
 // handleMatchEnd persists the match record, updates room status, broadcasts
@@ -1335,30 +1366,34 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	honorMsgs := m.recordHonor(session.roomID, session.playerIDs, botSeats, connected, -1)
 
 	matchRecord := &Match{
-		RoomID:           session.roomID,
-		Player1ID:        ids[0],
-		Player2ID:        ids[1],
-		Player3ID:        ids[2],
-		Player4ID:        ids[3],
-		Player1IsBot:     botFlags[0],
-		Player2IsBot:     botFlags[1],
-		Player3IsBot:     botFlags[2],
-		Player4IsBot:     botFlags[3],
-		HasBots:          hasBots,
-		TeamAScore:       finalState.TeamScores[game.TeamA],
-		TeamBScore:       finalState.TeamScores[game.TeamB],
-		WinnerTeam:       winnerTeam,
-		Variant:          string(finalState.Variant),
-		MatchMode:        finalState.MatchMode,
-		StartedAt:        session.startedAt,
-		CompletedAt:      time.Now(),
-		Status:           "completed",
-		SurrenderedBy:    surrenderedBy,
-		CoinBuyIn:        session.coinBuyIn,
-		Player1CoinDelta: deltas[0],
-		Player2CoinDelta: deltas[1],
-		Player3CoinDelta: deltas[2],
-		Player4CoinDelta: deltas[3],
+		RoomID:       session.roomID,
+		Player1ID:    ids[0],
+		Player2ID:    ids[1],
+		Player3ID:    ids[2],
+		Player4ID:    ids[3],
+		Player1IsBot: botFlags[0],
+		Player2IsBot: botFlags[1],
+		Player3IsBot: botFlags[2],
+		Player4IsBot: botFlags[3],
+		HasBots:      hasBots,
+		TeamAScore:   finalState.TeamScores[game.TeamA],
+		TeamBScore:   finalState.TeamScores[game.TeamB],
+		WinnerTeam:   winnerTeam,
+		Variant:      string(finalState.Variant),
+		MatchMode:    finalState.MatchMode,
+		// From the RESOLVED rule config, which is what the engine actually played
+		// by — not from the room, whose settings may since have changed.
+		DeclarationsEnabled: finalState.Rules.DeclarationsEnabled,
+		StopAtTarget:        finalState.Rules.StopAtTarget,
+		StartedAt:           session.startedAt,
+		CompletedAt:         time.Now(),
+		Status:              "completed",
+		SurrenderedBy:       surrenderedBy,
+		CoinBuyIn:           session.coinBuyIn,
+		Player1CoinDelta:    deltas[0],
+		Player2CoinDelta:    deltas[1],
+		Player3CoinDelta:    deltas[2],
+		Player4CoinDelta:    deltas[3],
 	}
 
 	// Copy buffered hand results under RLock to avoid holding the lock during I/O.
@@ -2057,11 +2092,24 @@ func safeDerefInt(p *int) int {
 // OutcomeReason is always set explicitly so the wire format is fully symmetric:
 // natural-end matches emit "natural", surrender emits "surrender".
 func buildMatchEndPayload(oldState, newState *game.GameState, action game.Action, startedAt time.Time) ws.MatchEndPayload {
+	// A zero startedAt would report the seconds since year 1 — about 6.4e10, which
+	// the client renders as a match duration. Four separate call sites capture
+	// this value from the session, so the failure is one forgotten assignment
+	// away, and nothing downstream would flag a number that absurd. Report an
+	// unknown duration as 0 and say so in the log rather than shipping fiction.
+	durationSec := 0
+	if startedAt.IsZero() {
+		slog.Error("match: match-end payload built with a zero startedAt; duration reported as 0",
+			"roomID", newState.RoomID)
+	} else {
+		durationSec = int(time.Since(startedAt).Seconds())
+	}
+
 	payload := ws.MatchEndPayload{
 		WinnerTeam:       safeDerefInt(newState.WinnerTeam),
 		TeamAFinalScore:  newState.TeamScores[game.TeamA],
 		TeamBFinalScore:  newState.TeamScores[game.TeamB],
-		MatchDurationSec: int(time.Since(startedAt).Seconds()),
+		MatchDurationSec: durationSec,
 		OutcomeReason:    ws.OutcomeReasonNatural,
 	}
 	if action.Type == game.ActionSurrenderAccept && oldState != nil && oldState.SurrenderProposerSeat != nil {

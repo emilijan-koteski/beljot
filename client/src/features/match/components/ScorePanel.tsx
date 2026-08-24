@@ -340,6 +340,7 @@ export function ScorePanel({
                   {(handNumber !== undefined || variantLabel) && " · "}
                   <span
                     data-testid="score-meta-no-declarations"
+                    role="img"
                     aria-label={t("lobby.card.noDeclarationsAriaLabel")}
                   >
                     {t("lobby.card.noDeclarations", { defaultValue: "No declarations" })}
@@ -354,6 +355,7 @@ export function ScorePanel({
                   {(handNumber !== undefined || variantLabel || !declarationsEnabled) && " · "}
                   <span
                     data-testid="score-meta-stop-at-target"
+                    role="img"
                     aria-label={t("lobby.card.stopAtTargetAriaLabel")}
                   >
                     {t("lobby.card.stopAtTarget", { defaultValue: "Stop at target" })}

@@ -867,6 +867,7 @@ function PreviewCard({
               <span
                 className="inline-flex items-center gap-1"
                 data-testid="preview-no-declarations"
+                role="img"
                 aria-label={t("lobby.card.noDeclarationsAriaLabel")}
               >
                 <Ban className="size-3" />
@@ -882,6 +883,7 @@ function PreviewCard({
               <span
                 className="inline-flex items-center gap-1"
                 data-testid="preview-stop-at-target"
+                role="img"
                 aria-label={t("lobby.card.stopAtTargetAriaLabel")}
               >
                 <Flag className="size-3" />

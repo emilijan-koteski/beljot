@@ -65,6 +65,24 @@ func handleSurrenderAccept(state *GameState, action Action) (*GameState, error) 
 	}
 
 	newState := cloneGameState(state)
+
+	// In a "dosta" room a team may ALREADY have reached the target: the Belote
+	// checkpoint defers while a Bitola trick-1 meld contest is still open, so for
+	// two or three cards the match is in a state the rule says should not exist —
+	// it should already be over. A surrender resolving the match inside that
+	// window would hand it to the other team, which the rule does not allow.
+	// Settle the crossing first; only if nobody has crossed does the concession
+	// decide the match.
+	//
+	// The running total here still omits the unresolved melds the deferral was
+	// waiting for, and it always will — this hand is being abandoned, so the
+	// contest can never resolve. An understated total that is already past the
+	// target is the best available answer, and strictly better than awarding the
+	// match to the side that did not reach it.
+	if stopAtTargetIfReached(newState) {
+		return newState, nil
+	}
+
 	opponentTeam := 1 - TeamForSeat(proposer)
 	newState.WinnerTeam = &opponentTeam
 	newState.Phase = PhaseMatchEnd

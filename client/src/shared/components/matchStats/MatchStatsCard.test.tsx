@@ -227,4 +227,34 @@ describe("MatchStatsCard", () => {
       expect(screen.queryByTestId("match-history-unscored-hand")).not.toBeInTheDocument();
     });
   });
+
+  // A match records the rules it was played under (migration 000023), because a
+  // room is reusable and its settings can change between matches. Chipped only
+  // when they differ from the default, so a chip always carries information.
+  describe("rule chips", () => {
+    it("names the rules when they are not the defaults", () => {
+      renderCard({
+        match: makeMatch({ declarationsEnabled: false, stopAtTarget: true }),
+      });
+
+      const decl = screen.getByTestId("match-history-no-declarations");
+      const stop = screen.getByTestId("match-history-stop-at-target");
+      expect(decl).toHaveAccessibleName(/without declarations and without Belote/i);
+      expect(stop).toHaveAccessibleName(/without finishing the hand/i);
+    });
+
+    it("stays unchipped on a default match, and on one from a server without the columns", () => {
+      renderCard({ match: makeMatch({ declarationsEnabled: true, stopAtTarget: false }) });
+      expect(screen.queryByTestId("match-history-no-declarations")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("match-history-stop-at-target")).not.toBeInTheDocument();
+
+      // Absent must never assert a rule — hence `=== false` / `=== true`.
+      const legacy = makeMatch();
+      delete (legacy as { declarationsEnabled?: boolean }).declarationsEnabled;
+      delete (legacy as { stopAtTarget?: boolean }).stopAtTarget;
+      renderCard({ match: legacy });
+      expect(screen.queryByTestId("match-history-no-declarations")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("match-history-stop-at-target")).not.toBeInTheDocument();
+    });
+  });
 });

@@ -52,6 +52,13 @@ export interface MatchListItem {
   /** Optional: an older server (or a cached response) may not send it —
    *  consumers must treat a missing value as "no early-end marker". */
   endReason?: MatchEndReason;
+  /** The two per-room RULE flags this match was played under (migration 000023).
+   *  Recorded on the match, not read back from the room: a room is reusable and
+   *  its settings can change between matches. Optional because a response from a
+   *  server predating the columns omits them — compare `=== false` /
+   *  `=== true`, never truthiness, so an absent value never asserts a rule. */
+  declarationsEnabled?: boolean;
+  stopAtTarget?: boolean;
   players: MatchPlayer[];
   hands: MatchHandView[];
 }
