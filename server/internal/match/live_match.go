@@ -2069,6 +2069,19 @@ func buildMatchEndPayload(oldState, newState *game.GameState, action game.Action
 		payload.OutcomeReason = ws.OutcomeReasonSurrender
 		payload.SurrenderedBySeat = &proposerSeat
 	}
+	// A "dosta" stop. Read from the flag the engine set rather than inferred:
+	// "StopAtTarget on and LastHandResult nil" also describes a surrender and an
+	// instant win. Checked after the surrender branch because the two are
+	// mutually exclusive — a surrender never runs the stop — and because a
+	// surrender's own note is the more specific thing to tell the player.
+	//
+	// The cut-short hand's POINTS are deliberately not carried here. They are
+	// already inside the final scores, and the client recovers them by
+	// subtracting the persisted hand rows from the final score — which works on
+	// the profile's match history too, where no match_end payload exists.
+	if newState.StoppedAtTarget {
+		payload.OutcomeReason = ws.OutcomeReasonTargetReached
+	}
 	return payload
 }
 

@@ -151,6 +151,22 @@ export function MatchResult({
               </p>
             )}
 
+            {/* A "dosta" room's match ends the moment a team reaches the target,
+                so the player is looking at a finished match with cards still in
+                their hand and a score that jumped. Without this line that reads
+                as a bug rather than as the rule the room was created with. The
+                second sentence pre-empts the follow-up question: the hand
+                breakdown below is one hand short, on purpose. */}
+            {data.outcomeReason === "target_reached" && (
+              <p
+                className="font-body text-sm"
+                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+                data-testid="match-result-target-reached-note"
+              >
+                {t("match.matchResult.targetReachedNote")}
+              </p>
+            )}
+
             {/* Final-score columns — viewer-first ordering preserved. */}
             <div className="flex items-center justify-center gap-6 mt-2 mb-2">
               {viewerTeam === "teamA" ? (

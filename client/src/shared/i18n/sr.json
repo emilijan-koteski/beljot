@@ -201,7 +201,8 @@
           "them": "oni",
           "failedUs": "pali · mi",
           "failedThem": "pali · oni"
-        }
+        },
+        "unfinished": "Nedovršena ruka: cilj je dostignut"
       },
       "withBots": "Sa botovima"
     },
@@ -988,7 +989,8 @@
       "returnToRoomNotInRoom": "Više nisi u ovoj sobi.",
       "surrenderNote": "{{username}} je predao meč",
       "statsShow": "Prikaži detalje deljenja",
-      "statsHide": "Sakrij detalje deljenja"
+      "statsHide": "Sakrij detalje deljenja",
+      "targetReachedNote": "Mač je završio u trenutku kad je jedan tim dostigao cilj, pa ova ruka nije dovršena."
     },
     "emote": {
       "button": "Pošalji emotikon",
@@ -1080,6 +1082,9 @@
     },
     "stake": {
       "label": "Ulog"
+    },
+    "rules": {
+      "stopAtTargetNote": "Ovaj stol igra sa dosta: mač završava u trenutku kad jedan tim dostigne cilj, bez dovršavanja ruke. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gde se ruka prvo odigra do kraja."
     }
   },
   "auth": {

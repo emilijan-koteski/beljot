@@ -2278,7 +2278,12 @@ export function MatchPage() {
 
       {/* Settings + rules dialogs — driven by the bottom-right HUD buttons */}
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <RulesDialog open={rulesOpen} onOpenChange={setRulesOpen} variant={matchState.variant} />
+      <RulesDialog
+        open={rulesOpen}
+        onOpenChange={setRulesOpen}
+        variant={matchState.variant}
+        stopAtTarget={matchState.stopAtTarget}
+      />
 
       {/* Error toast */}
       {errorToast && (

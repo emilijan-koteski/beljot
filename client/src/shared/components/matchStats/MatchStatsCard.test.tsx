@@ -186,4 +186,45 @@ describe("MatchStatsCard", () => {
     const chips = screen.getAllByTestId("match-seat-chip");
     expect(chips[0]).toHaveTextContent("—");
   });
+
+  // A room playing "dosta" ends the match the instant a team reaches the target,
+  // and that cut-short hand deliberately gets no hand_results row. Its points are
+  // still inside the final score, so the breakdown would otherwise fall short of
+  // the total with nothing naming the difference. Observed live before this row
+  // existed: hands summing to 407 under a displayed 516.
+  describe("unfinished hand (stop at target)", () => {
+    it("accounts for points the scored hands do not cover", () => {
+      const match = makeMatch({
+        teamAScore: 119,
+        teamBScore: 516,
+        winnerTeam: 1,
+        outcome: "loss",
+        hands: [
+          makeHand({ handNumber: 1, teamAHandTotal: 0, teamBHandTotal: 182 }),
+          makeHand({ handNumber: 2, teamAHandTotal: 14, teamBHandTotal: 148 }),
+          makeHand({ handNumber: 3, teamAHandTotal: 105, teamBHandTotal: 77 }),
+        ],
+      });
+
+      renderCard({ match, isOpen: true });
+
+      const row = screen.getByTestId("match-history-unscored-hand");
+      // Viewer is on team A: 119 - (0+14+105) = 0 for us, 516 - 407 = 109 for them.
+      expect(row).toHaveTextContent("109");
+      // Numbered as the hand it actually was — the fourth.
+      expect(row).toHaveTextContent("04");
+    });
+
+    it("renders nothing when the scored hands already sum to the final score", () => {
+      const match = makeMatch({
+        teamAScore: 120,
+        teamBScore: 72,
+        hands: [makeHand({ handNumber: 1, teamAHandTotal: 120, teamBHandTotal: 72 })],
+      });
+
+      renderCard({ match, isOpen: true });
+
+      expect(screen.queryByTestId("match-history-unscored-hand")).not.toBeInTheDocument();
+    });
+  });
 });

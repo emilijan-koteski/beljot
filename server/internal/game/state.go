@@ -192,6 +192,20 @@ type GameState struct {
 	// the engine actually reads. NewGame seeds it for the pre-first-action
 	// snapshot.
 	StopAtTarget bool `json:"stopAtTarget"`
+	// StoppedAtTarget records that this match ended BECAUSE of the stop rule, as
+	// opposed to a hand completing, a surrender or an instant win. Set once by
+	// stopAtTargetIfReached and cleared by startNewHand.
+	//
+	// It exists so the match layer can state the outcome instead of inferring it.
+	// The inference available otherwise — StopAtTarget on and LastHandResult nil
+	// — also matches a surrender and an instant win, so without this field the
+	// client cannot tell the player why a match ended with cards still in hand.
+	//
+	// Server-only (json:"-"): the client learns the outcome from
+	// event:match_end's outcomeReason, which is where every other end reason
+	// already lives. Nothing about it belongs on a per-trick state snapshot, and
+	// keeping it off the wire leaves the match_state contract untouched.
+	StoppedAtTarget bool `json:"-"`
 
 	// Current hand state
 	HandNumber       int   `json:"handNumber"`

@@ -257,6 +257,7 @@ export const MatchEndPayloadSchema = z.strictObject({
       z.literal("timeout"),
       z.literal("abandonment"),
       z.literal("natural"),
+      z.literal("target_reached"),
     ])
     .optional(),
   surrenderedBySeat: z.number().optional(),

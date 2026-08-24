@@ -84,6 +84,18 @@ interface HandsGridProps {
   hands: MatchHandView[];
   viewerTeamIndex: 0 | 1;
   layout: HandsLayout;
+  // Final match scores, viewer-relative. Used ONLY to detect a hand that was
+  // played but never scored: a room playing "dosta" ends the match the instant a
+  // team reaches the target, and that cut-short hand deliberately gets no
+  // hand_results row. Its points are still inside the final score, so without
+  // this the breakdown silently falls short of the total (observed: hands
+  // summing to 407 under a displayed 516) and reads as broken arithmetic.
+  //
+  // Derived from the persisted match rather than from event:match_end, so the
+  // profile's match history gets the same accounting — there is no payload
+  // there.
+  usFinal: number;
+  themFinal: number;
 }
 
 /** True when a hand has any note badge (capot / last-trick / failed contract). */
@@ -164,7 +176,7 @@ function HandNotes({
   );
 }
 
-function HandsGrid({ hands, viewerTeamIndex, layout }: HandsGridProps) {
+function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: HandsGridProps) {
   const { t } = useTranslation();
   // Phones get a stacked per-hand card layout instead of the dense 7-column
   // table — the table needs ~620px and would otherwise force a horizontal
@@ -189,6 +201,25 @@ function HandsGrid({ hands, viewerTeamIndex, layout }: HandsGridProps) {
 
   const usColor = viewerTeamIndex === 0 ? "var(--team-a)" : "var(--team-b)";
   const themColor = viewerTeamIndex === 0 ? "var(--team-b)" : "var(--team-a)";
+
+  // The hand a "dosta" stop cut short: whatever the final score holds that the
+  // scored hands do not account for. Both sides are shown even when only one
+  // crossed, because the other team's partial points were banked too.
+  //
+  // Guarded on > 0 so a normal match — where the rows sum exactly — renders
+  // nothing at all, and so a mid-hand surrender (which banks nothing) does not
+  // grow a phantom row.
+  const scoredUs = hands.reduce(
+    (n, h) => n + (viewerTeamIndex === 0 ? h.teamAHandTotal : h.teamBHandTotal),
+    0,
+  );
+  const scoredThem = hands.reduce(
+    (n, h) => n + (viewerTeamIndex === 0 ? h.teamBHandTotal : h.teamAHandTotal),
+    0,
+  );
+  const unscoredUs = usFinal - scoredUs;
+  const unscoredThem = themFinal - scoredThem;
+  const hasUnscoredHand = unscoredUs > 0 || unscoredThem > 0;
 
   // Per-hand viewer-relative figures + flags, shared by both layouts.
   const derive = (h: MatchHandView) => {
@@ -299,6 +330,45 @@ function HandsGrid({ hands, viewerTeamIndex, layout }: HandsGridProps) {
             </div>
           );
         })}
+        {hasUnscoredHand && (
+          <div
+            className="border-border/70 bg-surface-2/60 rounded-lg border border-dashed p-3"
+            data-testid="match-history-unscored-hand"
+          >
+            <div className="flex items-baseline gap-2">
+              <span className="text-ink-mute font-mono text-[11px] font-semibold tabular-nums">
+                {String(hands.length + 1).padStart(2, "0")}
+              </span>
+              <span className="text-ink-dim text-[13px]">
+                {t("profile.matchHistory.hand.unfinished")}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center gap-5">
+              <div className="flex items-baseline gap-1.5">
+                <span
+                  className="text-[10px] font-semibold tracking-[1px] uppercase"
+                  style={{ color: usColor }}
+                >
+                  {t("team.us")}
+                </span>
+                <span className="font-display text-[17px] font-bold tabular-nums">
+                  {unscoredUs}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span
+                  className="text-[10px] font-semibold tracking-[1px] uppercase"
+                  style={{ color: themColor }}
+                >
+                  {t("team.them")}
+                </span>
+                <span className="font-display text-[17px] font-bold tabular-nums">
+                  {unscoredThem}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -374,6 +444,25 @@ function HandsGrid({ hands, viewerTeamIndex, layout }: HandsGridProps) {
             </div>
           );
         })}
+        {hasUnscoredHand && (
+          <div
+            className="grid items-center gap-3 rounded-lg px-2.5 py-2 text-[13px]"
+            style={{ gridTemplateColumns: cols, background: "transparent" }}
+            data-testid="match-history-unscored-hand"
+          >
+            <span className="text-ink-mute font-mono text-[11px] font-semibold tabular-nums">
+              {String(hands.length + 1).padStart(2, "0")}
+            </span>
+            <span className="text-ink-dim text-xs italic">
+              {t("profile.matchHistory.hand.unfinished")}
+            </span>
+            <span className="font-display text-right font-bold tabular-nums">{unscoredUs}</span>
+            <span className="font-display text-right font-bold tabular-nums">{unscoredThem}</span>
+            <span />
+            <span />
+            <span />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -627,7 +716,13 @@ export function MatchStatsCard({
           className="border-border border-t px-4 pt-3 pb-4.5"
           style={{ background: "rgba(14,58,36,0.025)" }}
         >
-          <HandsGrid hands={match.hands} viewerTeamIndex={viewerTeamIndex} layout={handsLayout} />
+          <HandsGrid
+            hands={match.hands}
+            viewerTeamIndex={viewerTeamIndex}
+            layout={handsLayout}
+            usFinal={usScore}
+            themFinal={themScore}
+          />
           {footer}
         </div>
       )}

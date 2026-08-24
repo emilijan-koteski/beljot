@@ -303,6 +303,15 @@ func stopAtTargetIfReached(state *GameState) bool {
 	// nil here is load-bearing.
 	state.LastHandResult = nil
 
+	// Records that THIS match end was a stop, so the match layer can say so
+	// rather than infer it. Without this the only signal is "StopAtTarget is on
+	// and LastHandResult is nil", which is also true of a surrender and of an
+	// instant-win, and the client ends up telling the player nothing at all: a
+	// match that stops mid-hand otherwise reads as an unexplained score jump with
+	// cards still in hand. Server-only (json:"-") — the client learns it from
+	// event:match_end's outcome reason, not from the state snapshot.
+	state.StoppedAtTarget = true
+
 	state.TurnExpiresAt = nil
 	state.TurnTimeRemaining = 0
 	state.AwaitingDeclaration = false
@@ -343,6 +352,10 @@ func startNewHand(state *GameState) {
 	state.DeclarationsResolved = !state.Rules.DeclarationsEnabled
 	state.DeclarationsContested = false
 	state.HandCompleteReady = [4]bool{}
+	// Belongs to the hand that just ended, not the one being dealt. Unreachable
+	// in practice (a stop ends the match, so no next hand is dealt) but reset
+	// here so the flag can never outlive its hand.
+	state.StoppedAtTarget = false
 
 	// Reset per-hand scoring
 	state.HandPoints = [2]int{0, 0}

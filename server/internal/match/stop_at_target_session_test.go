@@ -867,3 +867,44 @@ func teamScoreFor(m *match.Match, team int) int {
 	}
 	return m.TeamBScore
 }
+
+// TestStopAtTarget_MatchEndPayloadNamesTheStop is the client's only signal that a
+// match ended mid-hand. Without a distinct outcome reason the match-end screen
+// shows a jumped score, a finished match and cards still in the player's hand,
+// with nothing saying why — observed in a live browser run before this landed.
+//
+// The reason is read from the engine's StoppedAtTarget flag rather than inferred:
+// "StopAtTarget on and LastHandResult nil" also describes a surrender and an
+// instant win.
+func TestStopAtTarget_MatchEndPayloadNamesTheStop(t *testing.T) {
+	const roomID = uint(760)
+	hub := &hubSpy{}
+	repo := newMockMatchRepo()
+	mgr := match.NewManager(hub, repo)
+	require.NoError(t, mgr.StartMatch(
+		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true,
+	))
+	t.Cleanup(func() { mgr.RemoveSession(roomID) })
+
+	mgr.SetGameStateForTest(roomID, beloteStopPrompt(t, roomID, true))
+
+	before := len(hub.snapshot())
+	require.NoError(t, mgr.ApplyActionForTest(roomID, game.Action{
+		Type:       game.ActionAnnounceBelot,
+		PlayerSeat: 2,
+	}))
+
+	var reason string
+	for _, e := range wireEvents(t, hub.snapshot()[before:]) {
+		if e.kind != ws.EventMatchEnd {
+			continue
+		}
+		var p struct {
+			OutcomeReason string `json:"outcomeReason"`
+		}
+		require.NoError(t, json.Unmarshal(e.payload, &p))
+		reason = p.OutcomeReason
+	}
+	assert.Equal(t, string(ws.OutcomeReasonTargetReached), reason,
+		"a stop must not be reported as a natural finish")
+}

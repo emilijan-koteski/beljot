@@ -201,7 +201,8 @@
           "them": "them",
           "failedUs": "failed · us",
           "failedThem": "failed · them"
-        }
+        },
+        "unfinished": "Unfinished hand — target reached"
       },
       "withBots": "With bots"
     },
@@ -988,7 +989,8 @@
       "returnToRoomNotInRoom": "You're no longer in this room.",
       "surrenderNote": "{{username}} surrendered the match",
       "statsShow": "Show hand details",
-      "statsHide": "Hide hand details"
+      "statsHide": "Hide hand details",
+      "targetReachedNote": "The match ended the moment a team reached the target, so this hand was never finished."
     },
     "emote": {
       "button": "Send emote",
@@ -1080,6 +1082,9 @@
     },
     "stake": {
       "label": "Stake"
+    },
+    "rules": {
+      "stopAtTargetNote": "This table stops at the target: the match ends the moment a team reaches it, without finishing the hand. The scoring chapter below describes the usual rule, where the hand is played out first."
     }
   },
   "auth": {

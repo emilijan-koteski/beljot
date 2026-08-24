@@ -229,4 +229,18 @@ describe("RulesDialog (in-game)", () => {
       screen.getByRole("heading", { name: "Адутот игра по свои правила" }),
     ).toBeInTheDocument();
   });
+
+  // The scoring chapter says the match runs until a team is on the target "at the
+  // end of a hand", which is the opposite of what a "dosta" table does. The
+  // content module has no room-level split (Story 12.9 owns that), so the caveat
+  // rides on the dialog — and must NOT appear on an ordinary table.
+  it("caveats the scoring chapter on a stop-at-target table", () => {
+    render(<RulesDialog open onOpenChange={() => {}} stopAtTarget />);
+    expect(screen.getByTestId("rules-dialog-stop-at-target-note")).toBeInTheDocument();
+  });
+
+  it("shows no caveat when the room finishes the hand", () => {
+    render(<RulesDialog open onOpenChange={() => {}} />);
+    expect(screen.queryByTestId("rules-dialog-stop-at-target-note")).not.toBeInTheDocument();
+  });
 });

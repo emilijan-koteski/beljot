@@ -141,7 +141,12 @@ export interface MatchEndPayload {
   // server-side omitempty so existing readers continue to work.
   // surrenderedBySeat is a seat index (0..3); the persistence column
   // match.SurrenderedBy holds a userID — distinct fields, distinct names.
-  outcomeReason?: "surrender" | "timeout" | "abandonment" | "natural";
+  // "target_reached" is a "dosta" room whose match ended part-way through a
+  // hand. The cut-short hand's points are NOT carried here: they are already
+  // inside teamAFinalScore / teamBFinalScore, and MatchStatsCard recovers them
+  // by subtracting the persisted hand rows from the final score — which also
+  // works in the profile's match history, where no match_end payload exists.
+  outcomeReason?: "surrender" | "timeout" | "abandonment" | "natural" | "target_reached";
   surrenderedBySeat?: number;
 }
 

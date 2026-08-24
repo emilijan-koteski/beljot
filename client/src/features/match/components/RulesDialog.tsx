@@ -31,6 +31,13 @@ interface RulesDialogProps {
    * contradicting the table in front of the player.
    */
   variant?: Variant;
+  /**
+   * True when the running match's room plays "dosta" — the match ends the moment
+   * a team reaches the target, mid-hand. The scoring chapter states the opposite
+   * ("at the end of a hand"), so the dialog shows a caveat above the chapters.
+   * Compared with `=== true` so an absent value never claims the rule is on.
+   */
+  stopAtTarget?: boolean;
 }
 
 // The scrolling body is the single region both tabs control, so both name it.
@@ -57,7 +64,7 @@ const useDarkVariant = () => (useContext(DarkRulesCtx) as DarkRulesValue).varian
  * in-game overlays use. A sticky chapter index scroll-spies a single scrolling
  * body. No language switch — the locale is the one chosen in game settings.
  */
-export function RulesDialog({ open, onOpenChange, variant }: RulesDialogProps) {
+export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: RulesDialogProps) {
   const { t, i18n } = useTranslation();
   const content = getRulesContent(i18n.language);
   const { sections, ui } = content;
@@ -309,6 +316,30 @@ export function RulesDialog({ open, onOpenChange, variant }: RulesDialogProps) {
                     );
                   })}
                 </div>
+                {/* This table plays "dosta", and the scoring chapter below says
+                    the match runs until a team is on the target "at the end of a
+                    hand" — true everywhere else, wrong here. The rules content
+                    itself has no variant- or room-level split yet (Story 12.9
+                    owns reconciling it), so the caveat lives on the dialog rather
+                    than in the chapter text. Without it the in-match reference
+                    teaches the opposite of the rule the player is playing under,
+                    which this project treats as worse than any UI defect. */}
+                {stopAtTarget === true && (
+                  <div
+                    className="mt-3 rounded-lg px-3 py-2.5"
+                    style={{
+                      background: "rgba(201,168,118,0.10)",
+                      border: "1px solid rgba(201,168,118,0.32)",
+                      fontFamily: "var(--font-body)",
+                      fontSize: 12.5,
+                      lineHeight: 1.5,
+                      color: INK,
+                    }}
+                    data-testid="rules-dialog-stop-at-target-note"
+                  >
+                    {t("match.rules.stopAtTargetNote")}
+                  </div>
+                )}
                 <DarkRulesCtx.Provider value={{ content, variant: activeVariant }}>
                   <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(activeVariant)}>
                     {sections.map((s, i) => (
