@@ -2396,10 +2396,15 @@ type fakeMatchStarter struct {
 	// notice (Story 12.8).
 	lastVariant   string
 	lastMatchMode string
-	err           error
+	// lastDeclarationsEnabled is captured for the same reason as lastVariant: the
+	// engine cannot validate it either. False is a legal value, so a room that
+	// persisted declarations-on but handed the session manager false would play a
+	// silently meldless match and look entirely healthy from here.
+	lastDeclarationsEnabled bool
+	err                     error
 }
 
-func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int) error {
+func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int, declarationsEnabled bool) error {
 	g.called++
 	g.lastRoom = roomID
 	g.lastPlayers = players
@@ -2408,6 +2413,7 @@ func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode str
 	g.lastTimerDurationSec = timerDurationSec
 	g.lastVariant = variant
 	g.lastMatchMode = matchMode
+	g.lastDeclarationsEnabled = declarationsEnabled
 	return g.err
 }
 

@@ -145,7 +145,7 @@ func TestStartNewHandDealsPerConfig(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			gs := NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-				[4]bool{}, tc.variant, "1001", 1)
+				[4]bool{}, tc.variant, "1001", 1, true)
 			dealer := gs.DealerSeat
 
 			startNewHand(gs)
@@ -322,7 +322,7 @@ func TestFaceDownCountTracksCardsAcrossHands(t *testing.T) {
 
 	t.Run("croatian deal shape", func(t *testing.T) {
 		state := NewGame([4]uint{1, 2, 3, 4}, [4]string{"a", "b", "c", "d"},
-			[4]bool{}, VariantCroatia, "1001", 1)
+			[4]bool{}, VariantCroatia, "1001", 1, true)
 		assertInSync(t, state, 2, "on the opening deal")
 
 		// Bidding resolves: the pair merges into Hand and the count must follow.
@@ -344,7 +344,7 @@ func TestFaceDownCountTracksCardsAcrossHands(t *testing.T) {
 
 	t.Run("candidate deal shape never carries a count", func(t *testing.T) {
 		state := NewGame([4]uint{1, 2, 3, 4}, [4]string{"a", "b", "c", "d"},
-			[4]bool{}, VariantBitola, "1001", 1)
+			[4]bool{}, VariantBitola, "1001", 1, true)
 		assertInSync(t, state, 0, "on the opening deal")
 
 		// Four round-2 passes reshuffle and re-deal — the other transitively

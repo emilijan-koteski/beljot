@@ -291,7 +291,15 @@ func (m *Manager) observeBotMemory(session *LiveMatch, oldState, newState *game.
 	mem.SyncHand(newState.HandNumber)
 	// Once the contest resolves, the engine has nil'd the losing team's
 	// declarations, so this records only the publicly revealed winning cards.
-	if newState.DeclarationsResolved {
+	//
+	// Also gated on the room HAVING declarations. DeclarationsResolved is seeded
+	// true from the deal in a declarations-off room — it means "no contest is
+	// outstanding", not "a contest resolved" — so without this the observation
+	// would run on every action of every hand instead of once, and the sentence
+	// above would not be true of it. Harmless either way (there are no melds to
+	// record), but a bot memory that says it observed a reveal should only say so
+	// when there was one.
+	if newState.DeclarationsResolved && newState.Rules.DeclarationsEnabled {
 		mem.ObserveDeclarations(newState.Players)
 	}
 }

@@ -211,6 +211,22 @@ export interface MatchState {
    *  whether the trump prompt offers a Pass control — the client never
    *  re-derives the rule. */
   mustPickTrump: boolean;
+  /** Whether this room plays WITH melds and the Belote/Rebelote bonus. False is
+   *  "bez zvanja": the engine skips Bitola's trick-1 prompt, Croatian's
+   *  dedicated declaration phase, and the K+Q-of-trump prompt, and both
+   *  declarationPoints and belotPoints stay [0, 0] all match.
+   *
+   *  The owner's room setting, chosen at creation and fixed for the match. The
+   *  client renders a label from it and derives no rule — the server is
+   *  authoritative on the skip, as it is on every rule.
+   *
+   *  REQUIRED, unlike the same field on `Room` and `RoomCreatedPayload`. The
+   *  difference is which surface validates its shape: match_state is parsed by
+   *  EventMatchStateSchema, a z.strictObject that requires this key, so a payload
+   *  without it is rejected before the store ever sees it. Read it directly here.
+   *  The room payloads have no such schema, so they keep the field optional and
+   *  every reader compares `=== false` so that absent means ON. */
+  declarationsEnabled: boolean;
   activePlayerSeat: number;
   trickNumber: number;
   currentTrick: TrickCard[];

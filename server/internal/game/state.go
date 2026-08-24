@@ -152,15 +152,30 @@ type GameState struct {
 	Phase     Phase   `json:"phase"`
 	OwnerSeat int     `json:"ownerSeat"` // Seat index of the room owner (for pause override)
 	// Rules is the resolved per-rule configuration for Variant, set once by
-	// NewGame via RulesFor and never mutated afterwards. Every variant
-	// divergence in this package reads a field here rather than comparing
-	// Variant (D-VAR-1).
+	// NewGame via RulesFor (with the room's DeclarationsEnabled layered over the
+	// preset) and never mutated afterwards. Every variant divergence in this
+	// package reads a field here rather than comparing Variant (D-VAR-1).
 	//
 	// Server-only (json:"-"): the client validates match_state with a strict
 	// schema and derives nothing from the config — the server is authoritative
 	// on every rule it selects. All-value-typed, so cloneGameState's shallow
 	// struct copy carries it correctly.
 	Rules VariantRules `json:"-"`
+	// DeclarationsEnabled mirrors Rules.DeclarationsEnabled onto the wire. It is
+	// the ONE rule-config field the client is told about, and the exception is
+	// deliberate: it is a per-room setting the owner chose, so the UI labels the
+	// table with it ("no declarations" on the scoreboard) the same way the lobby
+	// card does. The client still derives no RULE from it — it renders a chip.
+	//
+	// PER-SEAT VISIBILITY TRIAGE (Story 12.10): PUBLIC. Room configuration,
+	// already on the lobby card before anyone sits down, identical for all four
+	// seats, and revealing nothing about anyone's cards.
+	//
+	// Derived, never independently assigned: RefreshDerivedFlags recomputes it
+	// from Rules at ApplyAction's single exit, so it cannot drift from the config
+	// the engine actually reads. NewGame seeds it for the pre-first-action
+	// snapshot.
+	DeclarationsEnabled bool `json:"declarationsEnabled"`
 
 	// Current hand state
 	HandNumber       int   `json:"handNumber"`
@@ -316,7 +331,18 @@ func ShuffleDeck(deck []Card) {
 // config ONCE (the only place a config is resolved), then shuffles and deals
 // per that config's deal shape. bots marks the server-driven seats (UserID 0,
 // empty username) — see PlayerState.IsBot.
-func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint) *GameState {
+//
+// declarationsEnabled is the room's own choice, layered over the variant preset
+// — the only field of the resolved config that does not come from the variant.
+// Pass true for a normal game; false is "bez zvanja" (no melds, no Belote).
+//
+// It is a POSITIONAL parameter rather than a field on an options struct, and
+// that is deliberate. Its zero value is false, which is the destructive
+// setting: a caller who forgets a struct field silently starts a
+// declarations-less match, whereas a caller who forgets an argument here does
+// not compile. Same reasoning as room.Room.AllowNewPlayers' missing GORM
+// default tag.
+func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint, declarationsEnabled bool) *GameState {
 	// The first-hand dealer is drawn uniformly at random, the way a real
 	// table cuts for the deal. Hardcoding seat 0 handed the same seat the
 	// deal (and the seat after it the opening bid) in every single match;
@@ -324,20 +350,33 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 	// same auto-seeded math/rand/v2 global as ShuffleDeck above.
 	dealerSeat := rand.IntN(4)
 
+	rules := RulesFor(variant)
+	// The room's choice is the one override on the preset. Applied here, before
+	// the config is stored, so the engine only ever sees a settled config.
+	rules.DeclarationsEnabled = declarationsEnabled
+
 	gs := &GameState{
-		RoomID:           roomID,
-		Variant:          variant,
-		Rules:            RulesFor(variant),
-		MatchMode:        matchMode,
-		Phase:            PhaseDealing,
-		HandNumber:       1,
-		DealerSeat:       dealerSeat,
-		ActivePlayerSeat: (dealerSeat + 1) % 4, // player after dealer (counter-clockwise)
-		BiddingRound:     1,
-		BiddingPassCount: 0,
-		TrickNumber:      0,
-		CurrentTrick:     []TrickCard{},
-		DisconnectedSeat: -1,
+		RoomID:              roomID,
+		Variant:             variant,
+		Rules:               rules,
+		DeclarationsEnabled: rules.DeclarationsEnabled,
+		MatchMode:           matchMode,
+		Phase:               PhaseDealing,
+		HandNumber:          1,
+		DealerSeat:          dealerSeat,
+		ActivePlayerSeat:    (dealerSeat + 1) % 4, // player after dealer (counter-clockwise)
+		BiddingRound:        1,
+		BiddingPassCount:    0,
+		TrickNumber:         0,
+		CurrentTrick:        []TrickCard{},
+		DisconnectedSeat:    -1,
+		// Seeded, not left false, when the room plays without declarations. This
+		// single flag is what makes the skip fall out of the EXISTING guards:
+		// checkDeclarationPrompt early-returns on it, resolveTrickWithDeclarations
+		// skips both of its resolve arms, and because it never transitions
+		// false->true the match layer emits no no-op declarations_resolved reveal.
+		// startNewHand re-seeds it the same way for every subsequent hand.
+		DeclarationsResolved: !rules.DeclarationsEnabled,
 	}
 
 	// Assign players to seats and teams

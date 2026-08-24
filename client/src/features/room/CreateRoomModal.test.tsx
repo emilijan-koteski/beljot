@@ -130,6 +130,8 @@ describe("CreateRoomModal", () => {
         // server's nil-pointer fallbacks.
         minHonor: 0,
         allowNewPlayers: true,
+        // Declarations default ON and are always sent, for the same reason.
+        declarationsEnabled: true,
       });
     });
   });
@@ -173,6 +175,8 @@ describe("CreateRoomModal", () => {
         // server's nil-pointer fallbacks.
         minHonor: 0,
         allowNewPlayers: true,
+        // Declarations default ON and are always sent, for the same reason.
+        declarationsEnabled: true,
       });
     });
   });
@@ -669,6 +673,89 @@ describe("CreateRoomModal", () => {
         expect.objectContaining({ name: "Hrvatska Ekipa", variant: "croatia" }),
       );
     });
+  });
+
+  // --- Declarations toggle ---
+
+  it("defaults the declarations toggle to ON and shows no preview chip", () => {
+    renderModal(true);
+
+    expect(screen.getByTestId("declarations-segmented")).toBeInTheDocument();
+    expect(screen.getByTestId("declarations-segmented-on")).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByTestId("preview-no-declarations")).not.toBeInTheDocument();
+  });
+
+  it("mirrors a declarations-off choice into the live preview card", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    await user.click(screen.getByTestId("declarations-segmented-off"));
+
+    expect(await screen.findByTestId("preview-no-declarations")).toBeInTheDocument();
+  });
+
+  it("submits declarationsEnabled false when the off segment is selected", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 11,
+      name: "Bez Zvanja",
+      code: "NOD001",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      coinBuyIn: 500,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-08-24T09:00:00Z",
+      updatedAt: "2026-08-24T09:00:00Z",
+    });
+
+    renderModal(true);
+    await user.type(screen.getByTestId("room-name-input"), "Bez Zvanja");
+    await user.click(screen.getByTestId("declarations-segmented-off"));
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Bez Zvanja", declarationsEnabled: false }),
+      );
+    });
+  });
+
+  it("always explains that Belote goes off with the declarations", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    // Shown in BOTH states: this is the one consequence a player cannot read off
+    // the On/Off label, so it must not be hidden behind flipping the toggle
+    // first. Matched on the hint copy rather than a bare /Belote/i over the whole
+    // modal, which would break the day any other string mentions Belote.
+    expect(screen.getByText(/no declarations and no Belote/i)).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("declarations-segmented-off"));
+
+    expect(screen.getByText(/no declarations and no Belote/i)).toBeInTheDocument();
+  });
+
+  it("resets the toggle back to ON when the modal is dismissed", async () => {
+    const user = userEvent.setup();
+    const { onOpenChange } = renderModal(true);
+
+    await user.click(screen.getByTestId("declarations-segmented-off"));
+    expect(await screen.findByTestId("preview-no-declarations")).toBeInTheDocument();
+
+    // Cancel goes through handleOpenChange, which is where every field is reset.
+    // The test parent never flips `open`, so the modal stays mounted and the
+    // reset is directly observable — which is the point: the NEXT owner to open
+    // this modal must not inherit "off".
+    await user.click(screen.getByTestId("cancel-button"));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.getByTestId("declarations-segmented-on")).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByTestId("preview-no-declarations")).not.toBeInTheDocument();
   });
 
   it("surfaces the server's INVALID_MIN_HONOR rejection in the form banner", async () => {

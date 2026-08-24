@@ -1086,7 +1086,7 @@ func TestPickTrumpRejectsStateContradictingItsDealShape(t *testing.T) {
 // fixtures' hand-built layout is not the only thing under test.
 func TestCroatianFullBiddingFromNewGame(t *testing.T) {
 	gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-		[4]bool{}, game.VariantCroatia, "1001", 1)
+		[4]bool{}, game.VariantCroatia, "1001", 1, true)
 	startingCards := collectCards(gs)
 	require.Len(t, startingCards, 32)
 

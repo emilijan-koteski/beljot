@@ -5,6 +5,7 @@
   "matchMode": "1001",
   "phase": "playing",
   "ownerSeat": 0,
+  "declarationsEnabled": true,
   "handNumber": 3,
   "dealerSeat": 2,
   "trumpSuit": "S",

@@ -110,7 +110,7 @@ func TestBotMatch_ProgressesToNextHandWithoutClientActions(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true))
 
 	reachedNextHand := waitFor(20*time.Second, func() bool {
 		st := mgr.GetStateSnapshot(100)
@@ -153,7 +153,7 @@ func TestBot_ActsAfterMinDelayAndBeforeTimerExpiry(t *testing.T) {
 	// tightening it, by about the setup cost -- a regression bigger than that
 	// (e.g. a sub-second botDelayMin) is still caught. The 10s ceiling only gets
 	// stricter.
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "per-move", 10, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "per-move", 10, 10, 120, 0, true))
 	mgr.SetGameStateForTest(100, markBots(testfixtures.NewGameJustDealt(), 1))
 	mgr.BotSchedule(100)
 
@@ -193,7 +193,7 @@ func TestBot_CardPlayCarriesNoAutoPlayedMarker(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true))
 
 	gs := markBots(testfixtures.NewGameMidPlay(1), 1)
 	gs.ActivePlayerSeat = 1
@@ -238,7 +238,7 @@ func TestBot_StaleTimerNeverFiresAfterStateChange(t *testing.T) {
 	// exercised.
 	mgr.SetBotDelayForTest(300*time.Millisecond, 300*time.Millisecond)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true))
 
 	// The first-hand dealer is randomized, so the bot seat is put on the bidding
 	// decision explicitly: NewGameJustDealt deals from dealer 0, leaving seat 1
@@ -320,7 +320,7 @@ func TestBot_RemoveSessionCancelsPendingBotTimers(t *testing.T) {
 	// Control: left alone, that armed delay really does fire and act. Without
 	// it the teardown assertions below would also hold if no bot timer had
 	// ever been pending.
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true))
 	armBotThinkDelay()
 	require.True(t, waitFor(2*time.Second, func() bool {
 		st := mgr.GetStateSnapshot(100)
@@ -337,7 +337,7 @@ func TestBot_RemoveSessionCancelsPendingBotTimers(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Now tear the session down while the SAME delay is still pending.
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true))
 	armBotThinkDelay()
 
 	teardownAt := time.Now()
@@ -365,7 +365,7 @@ func TestBot_RespondsToBelotPrompt(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true))
 
 	// Bot at seat 1 just played KH (trump) while holding QH — prompt pending.
 	gs := markBots(testfixtures.NewGameMidPlay(1), 1)
@@ -399,7 +399,7 @@ func TestBot_PartnerAcceptsHumanSurrender(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(2), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(2), "relaxed", 0, 10, 120, 0, true))
 
 	// Human seat 0 proposed; its partner (seat 2) is the bot.
 	gs := markBots(testfixtures.NewGameMidPlay(3), 2)
@@ -431,7 +431,7 @@ func TestBot_MatchEndPersistsBotColumns(t *testing.T) {
 
 	// Bots at seats 1 and 2; human seat 0 proposes surrender, partner seat 2
 	// (bot) accepts — the fast path to a completed bot-inclusive record.
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2), "relaxed", 0, 10, 120, 0, true))
 
 	gs := markBots(testfixtures.NewGameMidPlay(2), 1, 2)
 	proposer := 0
@@ -468,7 +468,7 @@ func TestBot_AbandonedMatchPersistsBotColumns(t *testing.T) {
 	mgr.SetBotDelayForTest(time.Minute, time.Minute)
 
 	// 1-second reconnect window so the abandonment fires fast.
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(2, 3), "relaxed", 0, 10, 1, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(2, 3), "relaxed", 0, 10, 1, 0, true))
 
 	mgr.HandleDisconnect(10) // human seat 0 drops and never returns
 
@@ -501,7 +501,7 @@ func TestBot_AcksScoreReveal(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true))
 
 	gs := markBots(testfixtures.NewGameMidPlay(8), 1, 2, 3)
 	gs.Phase = game.PhaseHandComplete
@@ -540,7 +540,7 @@ func TestBot_ResilienceIsolation(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetBotDelayForTest(10*time.Millisecond, 20*time.Millisecond)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true))
 
 	// Park the table mid-play with the bot at seat 1 on turn.
 	gs := markBots(testfixtures.NewGameMidPlay(1), 1, 2, 3)
@@ -587,7 +587,7 @@ func TestBot_HumanOnlyMatchSchedulesNothing(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetBotDelayForTest(time.Millisecond, time.Millisecond)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 
 	time.Sleep(100 * time.Millisecond)
 	st := mgr.GetStateSnapshot(100)
@@ -662,7 +662,7 @@ func TestBot_ForcedDealerPickAdvancesHandWithoutRejection(t *testing.T) {
 
 	const roomID = uint(100)
 	require.NoError(t, mgr.StartMatch(roomID, string(game.VariantCroatia), "1001",
-		mixedPlayers(0), "relaxed", 0, 10, 120, 0))
+		mixedPlayers(0), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	// passCount 3: the other three seats have passed, so the dealer (seat 0,

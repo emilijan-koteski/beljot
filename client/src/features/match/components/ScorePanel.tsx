@@ -26,6 +26,10 @@ interface ScorePanelProps {
   handNumber?: number;
   /** Variant label rendered next to the hand number ("Bitola"). */
   variantLabel?: string;
+  /** Whether this room plays with melds and Belote. Rendered as a third meta
+   *  segment ONLY when false, so a normal table's header is unchanged. Optional
+   *  and defaulted to true so stand-alone test renders stay uncoupled. */
+  declarationsEnabled?: boolean;
 }
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
@@ -156,6 +160,7 @@ export function ScorePanel({
   matchTarget = 1001,
   handNumber,
   variantLabel,
+  declarationsEnabled = true,
 }: ScorePanelProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -297,7 +302,7 @@ export function ScorePanel({
           }}
         >
           <span>{t("match.score.heading", { defaultValue: "Scoreboard" })}</span>
-          {(handNumber !== undefined || variantLabel) && (
+          {(handNumber !== undefined || variantLabel || !declarationsEnabled) && (
             <span style={{ opacity: 0.85 }} data-testid="score-meta">
               {handNumber !== undefined && variantLabel
                 ? t("match.score.handVariant", {
@@ -311,6 +316,20 @@ export function ScorePanel({
                       defaultValue: `Hand ${handNumber}`,
                     })
                   : variantLabel}
+              {/* Third segment, OFF only. Reuses the lobby card's key so the
+                  room, the lobby and the table all name the rule identically —
+                  one word per concept per locale. */}
+              {!declarationsEnabled && (
+                <span
+                  data-testid="score-meta-no-declarations"
+                  aria-label={t("lobby.card.noDeclarationsAriaLabel", {
+                    defaultValue: "This table plays without declarations and without Belote",
+                  })}
+                >
+                  {(handNumber !== undefined || variantLabel) && " · "}
+                  {t("lobby.card.noDeclarations", { defaultValue: "No declarations" })}
+                </span>
+              )}
             </span>
           )}
         </div>

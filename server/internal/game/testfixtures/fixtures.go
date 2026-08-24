@@ -845,3 +845,27 @@ func NewGameCroatianFirstTrick(trump game.Suit) *game.GameState {
 	gs.Rules = game.RulesFor(game.VariantCroatia)
 	return gs
 }
+
+// WithoutDeclarations returns gs configured as a room that plays "bez zvanja":
+// no melds, no Belote/Rebelote. It is the factory for every declarations-off
+// test, in either variant, and it exists so the two-part setup lives in ONE
+// place.
+//
+// Two parts, because one alone is a silently broken fixture:
+//
+//   - Rules.DeclarationsEnabled = false is what handlePickTrump and
+//     shouldPromptBelot read.
+//   - DeclarationsResolved = true is what suppresses the trick-1 meld prompt and
+//     the trick-2 resolve, exactly as NewGame and the per-hand reset seed it.
+//
+// Setting only the config field would leave a fixture whose Bitola seats still
+// get prompted; setting only the flag would leave Belote live. Mutates and
+// returns gs so it composes with any base fixture:
+//
+//	gs := testfixtures.WithoutDeclarations(testfixtures.NewGameFirstTrick(game.SuitHearts))
+func WithoutDeclarations(gs *game.GameState) *game.GameState {
+	gs.Rules.DeclarationsEnabled = false
+	gs.DeclarationsEnabled = false
+	gs.DeclarationsResolved = true
+	return gs
+}

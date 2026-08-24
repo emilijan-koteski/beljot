@@ -670,7 +670,7 @@
         "codeLabel": "CODE",
         "seated": "{{current}}/4"
       },
-      "variantHint": "Bitola deals five cards and turns up a trump candidate; Croatian deals all eight and lets the taker name any suit",
+      "variantHint": "Bitola deals five cards and turns up a trump candidate; Croatian deals six and lets the taker name any suit",
       "matchModeHint": "501 for a quicker match, 1001 for the full race",
       "timerHintRelaxed": "No timer",
       "timerDurationHint": "10–120s · default 30s",
@@ -695,7 +695,11 @@
       "allowNewPlayers": "New players",
       "allowNewPlayersYes": "Welcome",
       "allowNewPlayersNo": "Veterans only",
-      "roomPasswordHint": "At least {{min}} characters"
+      "roomPasswordHint": "At least {{min}} characters",
+      "declarations": "Declarations",
+      "declarationsOn": "On",
+      "declarationsOff": "Off",
+      "declarationsHint": "Off means no declarations and no Belote: hands score on card points alone"
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
     "actions": {
@@ -766,7 +770,9 @@
       "veteransOnly": "Veterans only",
       "veteransOnlyAriaLabel": "This room does not admit new players",
       "locked": "Locked",
-      "minHonorLockedTitle": "Needs honor {{minHonor}}, you're at {{honor}}."
+      "minHonorLockedTitle": "Needs honor {{minHonor}}, you're at {{honor}}.",
+      "noDeclarations": "No declarations",
+      "noDeclarationsAriaLabel": "This room plays without declarations and without Belote"
     },
     "chat": {
       "title": "Lobby chat",

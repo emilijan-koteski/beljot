@@ -1589,6 +1589,11 @@ export function MatchPage() {
         lastTrickTeam={scoreRevealData?.lastTrickTeam}
         handNumber={matchState.handNumber}
         variantLabel={variantLabel(t, matchState.variant)}
+        // Passed straight through, NOT via `!== false` like the room surfaces:
+        // match_state is validated by a strict Zod schema that requires this key,
+        // so a payload without it never reaches the store at all. The absent-means-ON
+        // guard belongs only where nothing validates the shape (Room, RoomCreated).
+        declarationsEnabled={matchState.declarationsEnabled}
         matchTarget={matchTarget}
       />
 

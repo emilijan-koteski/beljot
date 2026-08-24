@@ -252,10 +252,15 @@ func (h *LobbyDisconnectHandler) broadcastRoomUpdated(r *Room) {
 		"matchMode":            r.MatchMode,
 		"timerStyle":           r.TimerStyle,
 		"timerDurationSeconds": r.TimerDurationSeconds,
-		"playerCount":          r.PlayerCount,
-		"status":               r.Status,
-		"createdAt":            r.CreatedAt.UTC().Format(time.RFC3339),
-		"updatedAt":            r.UpdatedAt.UTC().Format(time.RFC3339),
+		// The FOURTH hand-built room payload in this package, and the one easiest
+		// to miss because it fires only on a lobby disconnect. Without this key a
+		// declarations-off room loses its "no declarations" chip the moment any
+		// lobby player drops, and gets it back only on a full refetch.
+		"declarationsEnabled": r.DeclarationsEnabled,
+		"playerCount":         r.PlayerCount,
+		"status":              r.Status,
+		"createdAt":           r.CreatedAt.UTC().Format(time.RFC3339),
+		"updatedAt":           r.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {

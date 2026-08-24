@@ -2181,6 +2181,37 @@ describe("RoomPage honour", () => {
     expect(screen.getByTestId("badge-veterans-only")).toBeInTheDocument();
   });
 
+  it("badges a room that plays without declarations", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1, declarationsEnabled: false },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("badge-no-declarations")).toBeInTheDocument());
+  });
+
+  it("says nothing about declarations on an ordinary room, absent field included", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    // defaultRoom carries no declarationsEnabled at all, which is the shape an
+    // older server sends. Absent must read as ON, so no badge.
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("badge-variant")).toBeInTheDocument());
+    expect(screen.queryByTestId("badge-no-declarations")).not.toBeInTheDocument();
+  });
+
   it("renders no honour badges on an ungated room", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(

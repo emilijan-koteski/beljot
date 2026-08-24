@@ -144,7 +144,7 @@ func TestGameStateJSONCamelCaseKeys(t *testing.T) {
 func TestNewGame(t *testing.T) {
 	playerIDs := [4]uint{10, 20, 30, 40}
 	usernames := [4]string{"alice", "bob", "carol", "dave"}
-	gs := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42)
+	gs := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true)
 
 	t.Run("sets match metadata", func(t *testing.T) {
 		assert.Equal(t, uint(42), gs.RoomID)
@@ -172,7 +172,7 @@ func TestNewGame(t *testing.T) {
 		const draws = 4000
 		var counts [4]int
 		for range draws {
-			g := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42)
+			g := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true)
 			require.GreaterOrEqual(t, g.DealerSeat, 0)
 			require.LessOrEqual(t, g.DealerSeat, 3)
 			require.Equal(t, (g.DealerSeat+1)%4, g.ActivePlayerSeat,
@@ -340,22 +340,28 @@ func TestTeamStringForIndex_SafeOnOutOfRange(t *testing.T) {
 // TestRulesForPresets locks D-VAR-1's foundation: both presets return a fully
 // populated config, an unknown variant string falls back to Bitola, and the two
 // presets actually differ on the six divergences.
+//
+// DeclarationsEnabled is the one field exempt from that last assertion, and the
+// exemption has its own subtest: it is a per-room setting layered over the
+// preset by NewGame, not a variant divergence, so both presets return true.
 func TestRulesForPresets(t *testing.T) {
 	bitola := game.VariantRules{
-		DealShape:          game.DealShapeCandidate,
-		HasTrumpCandidate:  true,
-		AllPassOutcome:     game.AllPassReshuffleAndRotate,
-		DeclarationOverlap: false,
-		DeclarationTiming:  game.DeclarationTimingDuringFirstTrick,
-		TieRule:            game.TieRuleHangingPoints,
+		DealShape:           game.DealShapeCandidate,
+		HasTrumpCandidate:   true,
+		AllPassOutcome:      game.AllPassReshuffleAndRotate,
+		DeclarationOverlap:  false,
+		DeclarationTiming:   game.DeclarationTimingDuringFirstTrick,
+		DeclarationsEnabled: true,
+		TieRule:             game.TieRuleHangingPoints,
 	}
 	croatia := game.VariantRules{
-		DealShape:          game.DealShapeAllBeforeBidding,
-		HasTrumpCandidate:  false,
-		AllPassOutcome:     game.AllPassDealerMustPick,
-		DeclarationOverlap: true,
-		DeclarationTiming:  game.DeclarationTimingDedicatedPhase,
-		TieRule:            game.TieRuleAllToOpponents,
+		DealShape:           game.DealShapeAllBeforeBidding,
+		HasTrumpCandidate:   false,
+		AllPassOutcome:      game.AllPassDealerMustPick,
+		DeclarationOverlap:  true,
+		DeclarationTiming:   game.DeclarationTimingDedicatedPhase,
+		DeclarationsEnabled: true,
+		TieRule:             game.TieRuleAllToOpponents,
 	}
 
 	tests := []struct {
@@ -393,6 +399,16 @@ func TestRulesForPresets(t *testing.T) {
 		assert.NotEqual(t, bitola.TieRule, croatia.TieRule)
 	})
 
+	t.Run("declarations-enabled is a room setting, so both presets AGREE on it", func(t *testing.T) {
+		// The deliberate exception to the divergence assertion above, asserted
+		// rather than left as an absence. It is not a variant property: both
+		// variants play with declarations by default, and only NewGame overrides
+		// it from the room. A preset that returned false here would give one
+		// variant a rule the owner never chose.
+		assert.True(t, bitola.DeclarationsEnabled)
+		assert.True(t, croatia.DeclarationsEnabled)
+	})
+
 	t.Run("the zero-value config is NOT the bitola preset", func(t *testing.T) {
 		// This is why every GameState literal must set Rules explicitly — an
 		// unset config would deal no candidate and reject every round-1 take.
@@ -415,7 +431,7 @@ func TestNewGameResolvesRulesOnce(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-				[4]bool{}, tc.variant, "1001", 1)
+				[4]bool{}, tc.variant, "1001", 1, true)
 			assert.Equal(t, game.RulesFor(tc.variant), gs.Rules)
 			assert.Equal(t, tc.variant, gs.Variant, "the variant string is stored verbatim")
 		})
@@ -427,7 +443,7 @@ func TestNewGameResolvesRulesOnce(t *testing.T) {
 // conservation.
 func TestNewGameCroatianDeal(t *testing.T) {
 	gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-		[4]bool{}, game.VariantCroatia, "1001", 7)
+		[4]bool{}, game.VariantCroatia, "1001", 7, true)
 
 	t.Run("six open cards and two face-down per seat", func(t *testing.T) {
 		for i, p := range gs.Players {
@@ -472,7 +488,7 @@ func TestNewGameCroatianDeal(t *testing.T) {
 		// its own deal: `gs` is a pointer shared with the sibling subtests, and
 		// flipping its phase here would leak into them.
 		bidding := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-			[4]bool{}, game.VariantCroatia, "1001", 7)
+			[4]bool{}, game.VariantCroatia, "1001", 7, true)
 		bidding.Phase = game.PhaseBidding
 		suit := game.SuitSpades
 		resolved, err := game.ApplyAction(bidding, game.Action{
@@ -537,7 +553,7 @@ func TestGameStateJSONOmitsServerOnlyRuleFields(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-				[4]bool{}, tc.variant, "1001", 1)
+				[4]bool{}, tc.variant, "1001", 1, true)
 
 			data, err := json.Marshal(gs)
 			require.NoError(t, err)

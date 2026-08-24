@@ -156,12 +156,20 @@ type CreateRoomRequest struct {
 	// deliberate veterans-only room and must survive.
 	MinHonor        *int  `json:"minHonor"`
 	AllowNewPlayers *bool `json:"allowNewPlayers"`
+	// DeclarationsEnabled turns melds AND the Belote/Rebelote bonus on or off for
+	// the room. A pointer for the same reason as AllowNewPlayers above: nil
+	// (omitted) must default to TRUE — declarations are how the game has always
+	// been played here — while an explicit false is the owner deliberately
+	// choosing "bez zvanja" and has to survive. A plain bool would make every
+	// client that has not shipped the toggle yet silently create
+	// declarations-less rooms.
+	DeclarationsEnabled *bool `json:"declarationsEnabled"`
 }
 
 // MatchStarter is the interface the room handler uses to start a live match.
 // coinBuyIn (Story 9.2) is the per-human stake captured onto the session.
 type MatchStarter interface {
-	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int) error
+	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool) error
 }
 
 // WalletService is the subset of *wallet.Service the room handler needs. Story
@@ -415,11 +423,15 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		// room as ungated until the next full refetch.
 		"minHonor":        r.MinHonor,
 		"allowNewPlayers": r.AllowNewPlayers,
-		"playerCount":     r.PlayerCount,
-		"status":          r.Status,
-		"isQuickPlay":     r.IsQuickPlay,
-		"createdAt":       r.CreatedAt.UTC().Format(time.RFC3339),
-		"updatedAt":       r.UpdatedAt.UTC().Format(time.RFC3339),
+		// Same hand-built-map trap again: the lobby card's "no declarations" chip
+		// reads this key, so omitting it would leave a live card describing a
+		// declarations-less room as a normal one until the next full refetch.
+		"declarationsEnabled": r.DeclarationsEnabled,
+		"playerCount":         r.PlayerCount,
+		"status":              r.Status,
+		"isQuickPlay":         r.IsQuickPlay,
+		"createdAt":           r.CreatedAt.UTC().Format(time.RFC3339),
+		"updatedAt":           r.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -562,6 +574,15 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		allowNewPlayers = *req.AllowNewPlayers
 	}
 
+	// nil DeclarationsEnabled → true, same "omitted means the historical
+	// behaviour" rule as allowNewPlayers above. No range or compatibility check
+	// applies: both values are legal in both variants, so the only wrong answer
+	// here would be defaulting an absent field to false.
+	declarationsEnabled := true
+	if req.DeclarationsEnabled != nil {
+		declarationsEnabled = *req.DeclarationsEnabled
+	}
+
 	// The creator must satisfy their OWN gate (Story 9.8 D7). CreateRoom auto-seats
 	// the creator, so an owner who sets min_honor = 95 while sitting at 60 — or
 	// allow_new_players = false while being a New Player themselves — would be
@@ -636,13 +657,15 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		CoinBuyIn:            coinBuyIn,
 		PasswordHash:         passwordHash,
 		MinHonor:             minHonor,
-		// Set EXPLICITLY, always. room.Room declares AllowNewPlayers without a GORM
-		// `default` tag (see its field comment: a default tag would make `false`
-		// uninsertable), which means a hand-built &Room{} that omits the field
-		// inserts false — a silently veterans-only room.
-		AllowNewPlayers: allowNewPlayers,
-		Status:          "waiting",
-		PlayerCount:     1,
+		// Both set EXPLICITLY, always. room.Room declares AllowNewPlayers and
+		// DeclarationsEnabled without a GORM `default` tag (see their field
+		// comments: a default tag would make `false` uninsertable), which means a
+		// hand-built &Room{} that omits either field inserts false — a silently
+		// veterans-only room, or a silently declarations-less one.
+		AllowNewPlayers:     allowNewPlayers,
+		DeclarationsEnabled: declarationsEnabled,
+		Status:              "waiting",
+		PlayerCount:         1,
 	}
 
 	var createErr error
@@ -2482,7 +2505,7 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 		timerDuration = *autoStartRoom.TimerDurationSeconds
 	}
 	reconnectWindow := resolveReconnectWindow(autoStartRoom.ReconnectWindowSec)
-	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn); serr != nil {
+	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled); serr != nil {
 		// Charge succeeded but the session failed to start: refund every charged
 		// human (no coins destroyed). The caller (autoStartIfFull) reverts the
 		// room to "waiting" and broadcasts error:match_start_failed.
@@ -3651,7 +3674,7 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 				timerDuration = *updatedRoom.TimerDurationSeconds
 			}
 			reconnectWindow := resolveReconnectWindow(updatedRoom.ReconnectWindowSec)
-			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn); serr != nil {
+			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled); serr != nil {
 				// Story 9.3 (deferred-work item 1): the charge succeeded but the
 				// session failed to start. Refund every charged human (no coins
 				// destroyed), revert the room to "waiting" (no room stranded in
@@ -3795,8 +3818,14 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				// turn every Quick Play table veterans-only.
 				MinHonor:        0,
 				AllowNewPlayers: true,
-				Status:          "waiting",
-				PlayerCount:     1,
+				// Quick Play plays WITH declarations, spelled out for exactly the
+				// same reason as AllowNewPlayers above: no GORM `default` tag, so an
+				// omitted field would insert false and silently strip melds and
+				// Belote from every matchmade table. Quick Play offers no rule
+				// choices — it is Bitola, 1001, declarations on.
+				DeclarationsEnabled: true,
+				Status:              "waiting",
+				PlayerCount:         1,
 			}
 			if err := tx.Create(newRoom); err != nil {
 				return err
@@ -3861,9 +3890,15 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 			"timerStyle":           resultRoom.TimerStyle,
 			"timerDurationSeconds": resultRoom.TimerDurationSeconds,
 			"coinBuyIn":            resultRoom.CoinBuyIn,
-			"playerCount":          resultRoom.PlayerCount,
-			"status":               resultRoom.Status,
-			"isQuickPlay":          resultRoom.IsQuickPlay,
+			// Sent even though a synthesized quick-play room is always
+			// declarations-on and the lobby card treats an absent key as on. This
+			// map is the third key list in this file and every omission on it has
+			// been a latent bug waiting for the default to stop matching; state the
+			// value rather than rely on the reader's default.
+			"declarationsEnabled": resultRoom.DeclarationsEnabled,
+			"playerCount":         resultRoom.PlayerCount,
+			"status":              resultRoom.Status,
+			"isQuickPlay":         resultRoom.IsQuickPlay,
 		})
 	} else {
 		// Joined an existing room — broadcast updated player count

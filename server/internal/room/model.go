@@ -75,13 +75,37 @@ type Room struct {
 	// is only a write-path problem) and inverting the column to `veterans_only`
 	// (deviates from the AC-mandated column name and installs a permanent double
 	// negative at every call site).
-	AllowNewPlayers bool           `gorm:"not null" json:"allowNewPlayers"`
-	Status          string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
-	PlayerCount     int            `gorm:"not null;default:1" json:"playerCount"`
-	IsQuickPlay     bool           `gorm:"not null;default:false" json:"isQuickPlay"`
-	CreatedAt       time.Time      `json:"createdAt"`
-	UpdatedAt       time.Time      `json:"updatedAt"`
-	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+	AllowNewPlayers bool `gorm:"not null" json:"allowNewPlayers"`
+	// DeclarationsEnabled is whether this room plays WITH melds and the
+	// Belote/Rebelote bonus. True is the default and reproduces every match
+	// played before this column existed; false is "bez zvanja" — no meld prompt,
+	// no dedicated Croatian declaration phase, no K+Q-of-trump prompt, no +20, so
+	// a hand scores on card points, last trick and Capot alone.
+	//
+	// Variant-independent by construction. It is resolved into VariantRules at
+	// game init and read there as a config field, so neither variant's skip is a
+	// variant-name comparison (Epic 12, D-VAR-1). This is the first per-room
+	// override of a rule-config field.
+	//
+	// NO `default` TAG, DELIBERATELY — the exact trap documented on
+	// AllowNewPlayers above, and here it is even more direct: GORM omits
+	// zero-valued fields from an INSERT when they declare a `default`, so
+	// `gorm:"default:true"` would make declarations_enabled = false
+	// uninsertable, i.e. the toggle could never actually be turned off. The
+	// DB-side DEFAULT TRUE in migration 000021 still covers the backfill and any
+	// raw insert.
+	//
+	// The inverse trap is closed the same way: with no GORM default, a hand-built
+	// &Room{...} that FORGETS this field inserts false — a silently
+	// declarations-less room. Both &Room{} sites therefore set it explicitly:
+	// CreateRoom and the Quick Play synthesis.
+	DeclarationsEnabled bool           `gorm:"not null" json:"declarationsEnabled"`
+	Status              string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
+	PlayerCount         int            `gorm:"not null;default:1" json:"playerCount"`
+	IsQuickPlay         bool           `gorm:"not null;default:false" json:"isQuickPlay"`
+	CreatedAt           time.Time      `json:"createdAt"`
+	UpdatedAt           time.Time      `json:"updatedAt"`
+	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // AfterFind derives the wire-facing IsPrivate flag from PasswordHash on every

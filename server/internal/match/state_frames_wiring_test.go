@@ -54,7 +54,7 @@ func TestMatchState_EachRecipientGetsOwnProjectedFrame(t *testing.T) {
 	mgr := match.NewManager(hub, newMockMatchRepo())
 
 	const roomID = uint(100)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	// Deterministic mid-bidding state: each seat holds the five low cards of
@@ -168,7 +168,7 @@ func TestSyncStateOnConnect_UnicastIsProjectedForReconnectingSeat(t *testing.T) 
 	mgr := match.NewManager(hub, newMockMatchRepo())
 
 	const roomID = uint(100)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameJustDealt()
@@ -202,7 +202,7 @@ func TestHandleDisconnect_RemainingSeatsGetOwnProjections(t *testing.T) {
 	mgr := match.NewManager(hub, newMockMatchRepo())
 
 	const roomID = uint(100)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	// Mid-bidding (a disconnect-eligible phase), all four seats holding cards.
@@ -238,7 +238,7 @@ func TestMatchState_BotSeatsGetNoFrame(t *testing.T) {
 	const roomID = uint(100)
 	players := defaultPlayers()
 	players[2] = match.PlayerSeatInfo{UserID: 0, Username: "", Seat: 2, IsBot: true}
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", players, "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", players, "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameJustDealt()

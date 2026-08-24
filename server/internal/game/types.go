@@ -141,10 +141,14 @@ const (
 // cloneGameState's shallow struct copy carries the whole config correctly with
 // no clone line of its own.
 //
-// All six fields are populated by both presets from day one. DealShape,
-// HasTrumpCandidate, AllPassOutcome, DeclarationOverlap and DeclarationTiming
-// are READ today; TieRule describes each variant's authentic rule and is read
-// once the story that implements it lands.
+// All seven fields are populated by both presets from day one. DealShape,
+// HasTrumpCandidate, AllPassOutcome, DeclarationOverlap, DeclarationTiming and
+// DeclarationsEnabled are READ today; TieRule describes each variant's authentic
+// rule and is read once the story that implements it lands.
+//
+// DeclarationsEnabled is the one field a preset does NOT get the final say on:
+// it is a per-ROOM choice layered over the variant preset by NewGame. Every
+// other field is variant-derived. See its comment below.
 type VariantRules struct {
 	// DealShape selects the dealing sequence — see DealShape.
 	DealShape DealShape
@@ -162,6 +166,31 @@ type VariantRules struct {
 	// DeclarationTiming. Read by handlePickTrump: a dedicated-phase config
 	// opens PhaseDeclaring instead of going straight to trick 1.
 	DeclarationTiming DeclarationTiming
+	// DeclarationsEnabled is whether this game has declarations AT ALL. False is
+	// "bez zvanja": no meld prompt in either variant's timing, no PhaseDeclaring,
+	// no Belote/Rebelote prompt and no +20 — DeclarationPoints and BelotPoints
+	// both stay [0,0] for the whole match and a hand scores on card points, last
+	// trick and Capot alone.
+	//
+	// It disables BELOTE TOO, which is the one thing about this field that is not
+	// self-evident from its name: Belote is a bonus for holding K+Q of trump, not
+	// a meld, and lives on its own code path. Both are off together because a
+	// table that plays without declarations plays without the announcement as
+	// well.
+	//
+	// UNLIKE every other field here, this is a per-ROOM setting, not a variant
+	// property. Both presets return true — the historical and overwhelmingly
+	// common case — and NewGame overrides it from the room's configuration. It is
+	// the first rule-config field exposed at room creation, which is the seam
+	// Epic 12 left open when it made variants presets over a config rather than
+	// hardcoded branches.
+	//
+	// Read in three places, all config reads and never variant comparisons:
+	// handlePickTrump's post-bid branch (skips PhaseDeclaring), the trick-1
+	// prompt check, and shouldPromptBelot. A fourth effect is indirect: NewGame
+	// and the per-hand reset seed DeclarationsResolved from it, which makes the
+	// remaining guards fall out on their own.
+	DeclarationsEnabled bool
 	// TieRule selects how a tied hand is settled — see TieRule. This field
 	// states each variant's AUTHENTIC rule; the engine currently awards every
 	// tied hand to the taker's opponents for both variants as a deliberate
@@ -178,24 +207,30 @@ type VariantRules struct {
 // An unrecognised variant string resolves to the Bitola preset — explicit and
 // tested, never a zero-value config (which would deal no candidate and reject
 // every round-1 take).
+//
+// DeclarationsEnabled is true in both presets because declarations are the
+// default in both variants. It is the one field a caller may override, and only
+// NewGame does so, from the room's setting.
 func RulesFor(v Variant) VariantRules {
 	if v == VariantCroatia {
 		return VariantRules{
-			DealShape:          DealShapeAllBeforeBidding,
-			HasTrumpCandidate:  false,
-			AllPassOutcome:     AllPassDealerMustPick,
-			DeclarationOverlap: true,
-			DeclarationTiming:  DeclarationTimingDedicatedPhase,
-			TieRule:            TieRuleAllToOpponents,
+			DealShape:           DealShapeAllBeforeBidding,
+			HasTrumpCandidate:   false,
+			AllPassOutcome:      AllPassDealerMustPick,
+			DeclarationOverlap:  true,
+			DeclarationTiming:   DeclarationTimingDedicatedPhase,
+			DeclarationsEnabled: true,
+			TieRule:             TieRuleAllToOpponents,
 		}
 	}
 	return VariantRules{
-		DealShape:          DealShapeCandidate,
-		HasTrumpCandidate:  true,
-		AllPassOutcome:     AllPassReshuffleAndRotate,
-		DeclarationOverlap: false,
-		DeclarationTiming:  DeclarationTimingDuringFirstTrick,
-		TieRule:            TieRuleHangingPoints,
+		DealShape:           DealShapeCandidate,
+		HasTrumpCandidate:   true,
+		AllPassOutcome:      AllPassReshuffleAndRotate,
+		DeclarationOverlap:  false,
+		DeclarationTiming:   DeclarationTimingDuringFirstTrick,
+		DeclarationsEnabled: true,
+		TieRule:             TieRuleHangingPoints,
 	}
 }
 

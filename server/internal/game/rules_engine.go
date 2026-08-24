@@ -36,6 +36,10 @@ func ApplyAction(state *GameState, action Action) (*GameState, error) {
 // offered a Pass control the engine refuses.
 func RefreshDerivedFlags(state *GameState) {
 	state.MustPickTrump = MustPickTrump(state, state.ActivePlayerSeat)
+	// Constant for a match's whole life, unlike MustPickTrump — mirrored here
+	// anyway so the wire field has exactly one writer and cannot drift from the
+	// config the engine reads.
+	state.DeclarationsEnabled = state.Rules.DeclarationsEnabled
 }
 
 func applyAction(state *GameState, action Action) (*GameState, error) {

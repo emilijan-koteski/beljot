@@ -1,4 +1,5 @@
 import {
+  Ban,
   Bot,
   ChevronDown,
   Clock,
@@ -1212,6 +1213,20 @@ export function RoomPage() {
               <Badge tone="brass">
                 <span data-testid="badge-match-mode">{matchModeText}</span>
               </Badge>
+              {/* Next to the variant and match mode, because it is the same kind
+                  of fact: what the rules of this table ARE. Rendered only when
+                  declarations are off, and read with `=== false` so an absent
+                  field (an older server) reads as on. */}
+              {room.declarationsEnabled === false && (
+                <Badge tone="neutral" icon={<Ban className="size-3" />}>
+                  <span
+                    data-testid="badge-no-declarations"
+                    aria-label={t("lobby.card.noDeclarationsAriaLabel")}
+                  >
+                    {t("lobby.card.noDeclarations")}
+                  </span>
+                </Badge>
+              )}
               <Badge tone={isRelaxed ? "accent" : "neutral"} icon={<Clock className="size-3" />}>
                 <span data-testid="badge-timer">{timerLabel}</span>
               </Badge>

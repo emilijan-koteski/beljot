@@ -202,7 +202,13 @@ func handlePickTrump(state *GameState, action Action) (*GameState, error) {
 	// dedicated-phase config every seat answers before a card is played, so the
 	// hand enters PhaseDeclaring; otherwise trick 1 starts immediately and each
 	// seat is prompted as its turn comes round.
-	if newState.Rules.DeclarationTiming == DeclarationTimingDedicatedPhase {
+	//
+	// Gated on DeclarationsEnabled first: a room playing without declarations
+	// has nothing to open a phase FOR, so it falls through to trick 1 whatever
+	// its variant's timing says. This is the Croatian half of the skip; the
+	// Bitola half is checkDeclarationPrompt below, which the seeded
+	// DeclarationsResolved already short-circuits.
+	if newState.Rules.DeclarationsEnabled && newState.Rules.DeclarationTiming == DeclarationTimingDedicatedPhase {
 		openDeclarationPhase(newState)
 		return newState, nil
 	}

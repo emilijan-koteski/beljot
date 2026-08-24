@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import {
   ArrowRight,
+  Ban,
   Bot,
   Clock,
   Coins,
@@ -119,6 +120,24 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
           <span>
             {variantLabel(t, room.variant)} · {modeLabel(t, room.matchMode)}
           </span>
+          {/* Rendered ONLY when declarations are off. `=== false`, never
+              truthiness: an absent field means ON (the QuickPlay
+              system:room_created map, or a server that predates the column), and
+              a truthiness check would chip every one of those rooms. The default
+              room stays unchipped so the chip always carries information. */}
+          {room.declarationsEnabled === false && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="room-card-no-declarations"
+                aria-label={t("lobby.card.noDeclarationsAriaLabel")}
+              >
+                <Ban className="size-3" />
+                {t("lobby.card.noDeclarations")}
+              </span>
+            </>
+          )}
           <Dot />
           <span className="inline-flex items-center gap-1">
             <Clock className="size-3" />

@@ -27,7 +27,7 @@ func setupDisconnectedGame(t *testing.T, hub *ws.Hub, disconnectSeat int) (*matc
 	mgr := match.NewManager(hub, repo)
 
 	// Start game with per-move timer (1s short for tests) and 120s reconnect window
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -125,7 +125,7 @@ func TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores(t *testi
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true))
 
 	// Inject the score-reveal pause: hand scored, holding for continue, with the
 	// other three players already acknowledged.
@@ -174,7 +174,7 @@ func TestHandComplete_AckDoesNotExtendAutoContinueDeadline(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true))
 
 	// Put the table in the score-reveal pause with nobody acknowledged yet.
 	gs := mgr.GetStateSnapshot(100)
@@ -213,7 +213,7 @@ func TestHandleReconnect_RejectsExpiredWindow(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 
 	// Start game with very short reconnect window (1 second)
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0, true)
 	require.NoError(t, err)
 
 	// Pick trump to reach playing phase
@@ -394,7 +394,7 @@ func TestHandleReconnect_NoOpWhenNotDisconnectedPhase(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true)
 	require.NoError(t, err)
 
 	// Game is in bidding phase, not disconnected
@@ -441,7 +441,7 @@ func TestHandleReconnect_RelaxedTimer_NoTimerRestore(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 
 	// Start with relaxed timer (no per-move timer)
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true)
 	require.NoError(t, err)
 
 	// Pick trump to reach playing phase
@@ -499,7 +499,7 @@ func setupDisconnectedGameShortWindow(t *testing.T, hub *ws.Hub, disconnectSeat 
 	mgr := match.NewManager(hub, repo)
 
 	// Start game with 1-second reconnect window for fast timeout
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -651,7 +651,7 @@ func TestReconnect_RefreshesDerivedMustPickTrump(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(1288)
 	mgr := match.NewManager(hub, newMockMatchRepo())
-	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	// Three passes behind it: the dealer is on the clock with no legal pass.

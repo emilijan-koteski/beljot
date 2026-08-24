@@ -94,7 +94,7 @@ func TestHandleMatchEnd_AwardsXP(t *testing.T) {
 
 	roomID := uint(200)
 	// coinBuyIn 0 → free match; XP must still be awarded.
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -140,7 +140,7 @@ func TestHandleMatchEnd_NoAwarderNoXP(t *testing.T) {
 	// No SetXPAwarder call.
 
 	roomID := uint(202)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -171,7 +171,7 @@ func TestHandleMatchEnd_BotSeatEarnsNoXP(t *testing.T) {
 
 	roomID := uint(203)
 	// Seat 3 (team B) is a bot.
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(3), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(3), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -212,7 +212,7 @@ func TestAbandonment_AwardsXP(t *testing.T) {
 	mgr.SetXPAwarder(awarder)
 
 	roomID := uint(201)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := mgr.GetStateSnapshot(roomID)

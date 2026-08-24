@@ -176,7 +176,12 @@ func startNewHand(state *GameState) {
 	state.LeadSuit = nil
 	state.TrickWinnerSeat = nil
 	state.AwaitingDeclaration = false
-	state.DeclarationsResolved = false
+	// Re-seeded from the rule config, not blindly reset to false: in a room
+	// playing without declarations this flag starting true is what makes every
+	// downstream guard skip the contest (see NewGame). Resetting it to false
+	// unconditionally would skip declarations in hand 1 only and let them return
+	// from hand 2 onwards.
+	state.DeclarationsResolved = !state.Rules.DeclarationsEnabled
 	state.DeclarationsContested = false
 	state.HandCompleteReady = [4]bool{}
 

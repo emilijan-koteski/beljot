@@ -227,7 +227,12 @@ func (m *Manager) AddUserRemovedHook(fn func(userID uint)) {
 // StartMatch creates a new game session from room data and broadcasts the
 // initial state. coinBuyIn is the per-human stake to capture on the session for
 // match-end settlement (Story 9.2); 0 for no-economy / quick-play matches.
-func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int) error {
+//
+// declarationsEnabled is the room's melds-and-Belote setting, passed straight
+// through to NewGame. Positional and non-optional on purpose — false is the
+// destructive value, so a forgotten argument must be a compile error rather
+// than a silently declarations-less match.
+func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool) error {
 	m.mu.Lock()
 	if _, exists := m.sessions[roomID]; exists {
 		m.mu.Unlock()
@@ -243,7 +248,7 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		botSeats[p.Seat] = p.IsBot
 	}
 
-	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID)
+	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID, declarationsEnabled)
 
 	// Stamp each human seat's static lifetime level (Story: level-in-match).
 	// Levels derive from total_xp via the XP service and are captured ONCE here

@@ -184,4 +184,58 @@ describe("RoomCard", () => {
     expect(screen.getByTestId("room-card-min-honor")).toHaveTextContent("85");
     expect(screen.getByTestId("room-card-veterans-only").textContent ?? "").toMatch(/^[Ѐ-ӿ\s]+$/);
   });
+
+  // --- Declarations toggle ---
+
+  it("leaves an ordinary room unchipped", () => {
+    render(<RoomCard room={{ ...baseRoom, declarationsEnabled: true }} onJoin={() => {}} />);
+
+    expect(screen.queryByTestId("room-card-no-declarations")).not.toBeInTheDocument();
+  });
+
+  it("chips a room that plays without declarations", () => {
+    render(<RoomCard room={{ ...baseRoom, declarationsEnabled: false }} onJoin={() => {}} />);
+
+    const chip = screen.getByTestId("room-card-no-declarations");
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveAccessibleName(/without declarations and without Belote/i);
+  });
+
+  it("treats an absent declarationsEnabled as ON, never as off", () => {
+    // The QuickPlay system:room_created payload is hand-built, and a server that
+    // predates the column sends nothing at all. Both must read as a normal room:
+    // a truthiness check here would chip every one of them.
+    const withoutTheField: Room = { ...baseRoom, declarationsEnabled: true };
+    delete withoutTheField.declarationsEnabled;
+
+    render(<RoomCard room={withoutTheField} onJoin={() => {}} />);
+
+    expect(screen.queryByTestId("room-card-no-declarations")).not.toBeInTheDocument();
+  });
+
+  it("localizes the no-declarations chip in every locale", async () => {
+    // AC: the chip must read as real language in all four locales, not fall back
+    // to the raw i18n key. The parity suite gates that the keys EXIST and are
+    // non-empty; this checks they actually reach the chip, and that mk is
+    // all-Cyrillic rather than a Latin calque of hr/sr.
+    for (const locale of ["en", "mk", "hr", "sr"] as const) {
+      await i18n.changeLanguage(locale);
+
+      const { unmount } = render(
+        <RoomCard room={{ ...baseRoom, declarationsEnabled: false }} onJoin={() => {}} />,
+      );
+
+      const text = (screen.getByTestId("room-card-no-declarations").textContent ?? "").trim();
+      expect(text, `${locale} chip text`).not.toBe("");
+      expect(text, `${locale} must not render the raw key`).not.toContain("lobby.card");
+
+      if (locale === "mk") {
+        expect(text, "mk is all-Cyrillic").toMatch(/^[Ѐ-ӿ\s]+$/);
+      } else {
+        expect(text, `${locale} is Latin`).toMatch(/^[A-Za-zČčĆćĐđŠšŽž\s]+$/);
+      }
+
+      unmount();
+    }
+  });
 });

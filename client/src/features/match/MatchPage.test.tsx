@@ -76,6 +76,7 @@ const mockMatchState: MatchState = {
   biddingRound: 1,
   biddingPassCount: 0,
   mustPickTrump: false,
+  declarationsEnabled: true,
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],
@@ -2234,6 +2235,36 @@ describe("MatchPage", () => {
       const prompt = screen.getByTestId("trump-prompt");
       expect(prompt).toHaveTextContent(/name a suit/i);
       expect(prompt).not.toHaveTextContent(/or pass/i);
+    });
+
+    // The page-level wiring of declarationsEnabled -> ScorePanel, for the same
+    // reason as mustPickTrump above: the component's own suite covers the prop,
+    // and because it DEFAULTS to true, dropping the attribute here would leave
+    // every declarations-off table silently unlabelled.
+    it("labels the scoreboard when the room plays without declarations", () => {
+      useMatchStore.getState().setMatchState({
+        ...biddingState(0),
+        declarationsEnabled: false,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.getByTestId("score-meta-no-declarations")).toBeInTheDocument();
+    });
+
+    // No "missing field" case here, unlike the lobby card's: EventMatchStateSchema
+    // is a z.strictObject requiring declarationsEnabled, so a payload without it
+    // fails the parse and never reaches the store. Testing it would mean casting
+    // past the type to build state the client cannot receive.
+    it("leaves the scoreboard unlabelled on an ordinary table", () => {
+      useMatchStore.getState().setMatchState({
+        ...biddingState(0),
+        declarationsEnabled: true,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.queryByTestId("score-meta-no-declarations")).not.toBeInTheDocument();
     });
 
     it("reads the open hand alone when nothing is held face-down", () => {

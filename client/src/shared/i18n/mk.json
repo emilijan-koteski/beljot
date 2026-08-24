@@ -670,7 +670,7 @@
         "codeLabel": "КОД",
         "seated": "{{current}}/4"
       },
-      "variantHint": "Битолската дели пет карти и отвора адутска карта, хрватската ги дели сите осум и адутот се именува слободно",
+      "variantHint": "Битолската дели пет карти и отвора адутска карта, хрватската дели шест и адутот се именува слободно",
       "matchModeHint": "501 за пократок меч, 1001 за целосна трка",
       "timerHintRelaxed": "Без тајмер",
       "timerDurationHint": "10–120s · стандардно 30s",
@@ -695,7 +695,11 @@
       "allowNewPlayers": "Нови играчи",
       "allowNewPlayersYes": "Дозволи",
       "allowNewPlayersNo": "Само искусни",
-      "roomPasswordHint": "Најмалку {{min}} знаци"
+      "roomPasswordHint": "Најмалку {{min}} знаци",
+      "declarations": "Најави",
+      "declarationsOn": "Вклучени",
+      "declarationsOff": "Исклучени",
+      "declarationsHint": "Без најави нема ниту Бељот, а делењата се сметаат само на поените од картите"
     },
     "footnote": "Прикажани {{shown}} од {{total}} отворени соби · се освежува во живо",
     "actions": {
@@ -766,7 +770,9 @@
       "veteransOnly": "Само искусни",
       "veteransOnlyAriaLabel": "Оваа соба не прима нови играчи",
       "locked": "Заклучено",
-      "minHonorLockedTitle": "Бара чест {{minHonor}}, ти си на {{honor}}."
+      "minHonorLockedTitle": "Бара чест {{minHonor}}, ти си на {{honor}}.",
+      "noDeclarations": "Без најави",
+      "noDeclarationsAriaLabel": "Оваа соба се игра без најави и без Бељот"
     },
     "chat": {
       "title": "Лоби чет",

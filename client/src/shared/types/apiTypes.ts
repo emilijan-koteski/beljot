@@ -157,6 +157,18 @@ export interface Room {
    */
   minHonor: number;
   allowNewPlayers: boolean;
+  /**
+   * Whether the room plays with melds AND the Belote/Rebelote bonus. False is
+   * "bez zvanja" — no melds, no K+Q-of-trump announcement, no +20 — in either
+   * variant.
+   *
+   * OPTIONAL, deliberately. The server sends it on every room payload it builds
+   * from the struct and on `roomLifecyclePayload`, but a server that predates the
+   * column does not, and the correct reading of absent is ON. So every consumer
+   * compares `=== false` — the same explicit-comparison rule the honor gate above
+   * documents, for the same reason.
+   */
+  declarationsEnabled?: boolean;
   status: string;
   playerCount: number;
   isQuickPlay: boolean;
@@ -185,6 +197,12 @@ export interface CreateRoomRequest {
    */
   minHonor: number;
   allowNewPlayers: boolean;
+  /**
+   * Whether the room plays with melds AND the Belote/Rebelote bonus. Required
+   * here, unlike on `Room`: the modal always has a value to send, and the
+   * server's own default only exists for clients that predate the toggle.
+   */
+  declarationsEnabled: boolean;
 }
 
 export interface RoomPlayer {

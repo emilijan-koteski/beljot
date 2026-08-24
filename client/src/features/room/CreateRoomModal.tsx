@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  Ban,
   Clock,
   Coins,
   Eye,
@@ -118,6 +119,10 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [name, setName] = useState("");
   const [variant, setVariant] = useState<"bitola" | "croatia">("bitola");
   const [matchMode, setMatchMode] = useState<"1001" | "501">("1001");
+  // Declarations default ON: it is how both variants have always been played
+  // here, so creating a "bez zvanja" room is an opt-in the modal must never
+  // nudge an owner into, exactly like the honor gate below.
+  const [declarationsEnabled, setDeclarationsEnabled] = useState(true);
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
   const [timerDuration, setTimerDuration] = useState(30);
   const [coinBuyIn, setCoinBuyIn] = useState(DEFAULT_BUY_IN);
@@ -202,6 +207,10 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         // about what the modal chose.
         minHonor: effectiveMinHonor,
         allowNewPlayers,
+        // Always sent, for the same reason as the honor gate above: the server
+        // reads it as a pointer, so sending the value explicitly is what makes
+        // an off room distinguishable from an old client that never mentions it.
+        declarationsEnabled,
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
@@ -263,6 +272,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setName("");
       setVariant("bitola");
       setMatchMode("1001");
+      setDeclarationsEnabled(true);
       setTimerStyle("relaxed");
       setTimerDuration(30);
       setCoinBuyIn(DEFAULT_BUY_IN);
@@ -290,6 +300,20 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const matchModeOptions = (["501", "1001"] as const).map((value) => ({
     value,
     label: modeOptionLabel(t, value),
+  }));
+
+  // On first, so the default sits where the eye lands and the control reads
+  // "Declarations: On" left to right.
+  // Built the same way as variantOptions and matchModeOptions above, so `value`
+  // narrows to "on" | "off" instead of widening to string: a typo in either
+  // literal is then a compile error rather than a segment that never matches.
+  const declarationsOptions = (["on", "off"] as const).map((value) => ({
+    value,
+    label: t(
+      value === "on"
+        ? "lobby.createRoomModal.declarationsOn"
+        : "lobby.createRoomModal.declarationsOff",
+    ),
   }));
 
   const timerOptions = [
@@ -382,6 +406,26 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   options={matchModeOptions}
                   testId="match-mode-segmented"
                   ariaLabel={t("lobby.createRoomModal.matchMode")}
+                />
+              </Field>
+
+              {/* Declarations sit directly under the variant and match mode
+                  because they are the same kind of setting: what the rules ARE,
+                  as opposed to the pacing and access settings further down. The
+                  hint is shown in BOTH states, because "Belote goes off too" is
+                  the one part of this setting a player cannot guess from the
+                  label, and hiding it until they flip the toggle meant only
+                  someone who already knew would ever read it. */}
+              <Field
+                label={t("lobby.createRoomModal.declarations")}
+                hint={t("lobby.createRoomModal.declarationsHint")}
+              >
+                <Segmented
+                  value={declarationsEnabled ? "on" : "off"}
+                  onValueChange={(v) => setDeclarationsEnabled(v === "on")}
+                  options={declarationsOptions}
+                  testId="declarations-segmented"
+                  ariaLabel={t("lobby.createRoomModal.declarations")}
                 />
               </Field>
 
@@ -675,6 +719,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               isPrivate={isPrivate}
               minHonor={effectiveMinHonor}
               allowNewPlayers={allowNewPlayers}
+              declarationsEnabled={declarationsEnabled}
               hostUsername={meUsername || "host"}
             />
 
@@ -717,6 +762,7 @@ function PreviewCard({
   isPrivate,
   minHonor,
   allowNewPlayers,
+  declarationsEnabled,
   hostUsername,
 }: {
   name: string;
@@ -728,6 +774,7 @@ function PreviewCard({
   isPrivate: boolean;
   minHonor: number;
   allowNewPlayers: boolean;
+  declarationsEnabled: boolean;
   hostUsername: string;
 }) {
   const { t } = useTranslation();
@@ -769,6 +816,21 @@ function PreviewCard({
           <span>
             {variantText} · {matchLabel}
           </span>
+          {/* OFF-only, exactly like the real lobby card: a declarations-on room
+              is the norm and gets no chip, so the chip always means something. */}
+          {!declarationsEnabled && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="preview-no-declarations"
+                aria-label={t("lobby.card.noDeclarationsAriaLabel")}
+              >
+                <Ban className="size-3" />
+                {t("lobby.card.noDeclarations")}
+              </span>
+            </>
+          )}
           <Dot />
           <span className="inline-flex items-center gap-1">
             <Clock className="size-3" />

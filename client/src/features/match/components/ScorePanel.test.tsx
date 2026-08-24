@@ -11,6 +11,7 @@ vi.mock("react-i18next", () => ({
         "match.score.trick": "trick",
         "match.score.thisHand": "this hand",
         "match.score.heading": "Scoreboard",
+        "lobby.card.noDeclarations": "No declarations",
       };
       // Honour the component's defaultValue contract so the test mock matches
       // production i18n behavior (interpolated strings used by score-meta etc.).
@@ -150,6 +151,69 @@ describe("ScorePanel", () => {
       />,
     );
     expect(screen.getByTestId("score-meta")).toHaveTextContent("Hand 3 · Bitola");
+  });
+
+  it("appends the no-declarations segment when the room plays without them", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={0}
+        teamBScore={0}
+        teamATricks={0}
+        teamBTricks={0}
+        handNumber={3}
+        variantLabel="Bitola"
+        declarationsEnabled={false}
+      />,
+    );
+    expect(screen.getByTestId("score-meta")).toHaveTextContent("Hand 3 · Bitola · No declarations");
+  });
+
+  it("says nothing about declarations on an ordinary table", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={0}
+        teamBScore={0}
+        teamATricks={0}
+        teamBTricks={0}
+        handNumber={3}
+        variantLabel="Bitola"
+        declarationsEnabled
+      />,
+    );
+    expect(screen.getByTestId("score-meta")).toHaveTextContent("Hand 3 · Bitola");
+    expect(screen.queryByTestId("score-meta-no-declarations")).not.toBeInTheDocument();
+  });
+
+  it("defaults to declarations on, so a bare render is never mislabelled", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={0}
+        teamBScore={0}
+        teamATricks={0}
+        teamBTricks={0}
+        handNumber={3}
+        variantLabel="Bitola"
+      />,
+    );
+    expect(screen.queryByTestId("score-meta-no-declarations")).not.toBeInTheDocument();
+  });
+
+  it("shows the no-declarations segment alone when there is no hand or variant", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={0}
+        teamBScore={0}
+        teamATricks={0}
+        teamBTricks={0}
+        declarationsEnabled={false}
+      />,
+    );
+    // No leading separator when it is the only segment.
+    expect(screen.getByTestId("score-meta")).toHaveTextContent(/^No declarations$/);
   });
 
   it("hides the metadata pill when neither handNumber nor variantLabel is provided", () => {

@@ -1,0 +1,31 @@
+-- Declarations on/off as a per-room setting. Additive ALTER style, mirroring
+-- 000018_add_honor_gate_to_rooms.
+--
+-- Many tables play "bez zvanja" — pure card points, no melds and no
+-- Belote/Rebelote — and until now that was unplayable here. This column is the
+-- owner's choice, made once at room creation and fixed for the room's life.
+--
+-- IT SWITCHES OFF BOTH KINDS OF DECLARATION, not just melds:
+--
+--     FALSE -> no tierce/quarte/quint/carre prompt, no dedicated Croatian
+--              declaration phase, no K+Q-of-trump Belote prompt, no +20.
+--              A hand scores on card points, last trick and Capot alone.
+--
+-- It is deliberately variant-INDEPENDENT: Bitola skips its per-seat trick-1
+-- prompt and Croatian skips its dedicated phase, both selected by reading the
+-- resolved rule config rather than the variant name (Epic 12, D-VAR-1). It is
+-- the first per-room override of a rule-config field, which is the seam Epic 12
+-- left open for exposing individual rules at room creation.
+--
+-- NO BACKFILL IS NEEDED. DEFAULT TRUE reproduces today's behaviour exactly for
+-- every existing row: declarations have always been on. A DEFAULT FALSE here
+-- would silently strip melds and Belote from every live room the moment this
+-- migration ran.
+--
+-- Note for the Go side: room.Room deliberately declares this field WITHOUT a
+-- GORM `default` tag, for the same reason allow_new_players does — GORM omits
+-- zero-valued fields (false) from an INSERT when they declare one, which would
+-- make declarations_enabled = FALSE literally uninsertable, i.e. the toggle
+-- could never be turned off. This DB-side default still covers the backfill
+-- above and any raw insert. See the field comment in internal/room/model.go.
+ALTER TABLE rooms ADD COLUMN declarations_enabled BOOLEAN NOT NULL DEFAULT TRUE;

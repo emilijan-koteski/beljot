@@ -132,6 +132,12 @@ export const EventMatchStateSchema = z.strictObject({
   // as the Go GameState.MustPickTrump field — enforced by the contract test, not
   // at runtime (see faceDownCount above).
   mustPickTrump: z.boolean(),
+  // The room's melds-and-Belote setting — the ONE rule-config field the server
+  // puts on the wire, because it is a setting the owner chose and the UI labels
+  // the table with it. Must land in the same commit as the Go
+  // GameState.DeclarationsEnabled field; the contract test is what enforces
+  // that, not runtime.
+  declarationsEnabled: z.boolean(),
   // No `deck` field: the 11 held-back Bitola cards are hidden information and
   // Story 12.10 removed them from the wire outright (GameState.Deck is
   // json:"-" on the Go side). strictObject means the field cannot quietly

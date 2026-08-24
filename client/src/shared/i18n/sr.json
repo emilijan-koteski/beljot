@@ -670,7 +670,7 @@
         "codeLabel": "KOD",
         "seated": "{{current}}/4"
       },
-      "variantHint": "Bitolska deli pet karata i okreće adutsku kartu, hrvatska deli svih osam i adut se zove slobodno",
+      "variantHint": "Bitolska deli pet karata i okreće adutsku kartu, hrvatska deli šest i adut se zove slobodno",
       "matchModeHint": "501 za kraći meč, 1001 za punu trku",
       "timerHintRelaxed": "Bez tajmera",
       "timerDurationHint": "10–120s · podrazumevano 30s",
@@ -695,7 +695,11 @@
       "allowNewPlayers": "Novi igrači",
       "allowNewPlayersYes": "Dozvoli",
       "allowNewPlayersNo": "Samo iskusni",
-      "roomPasswordHint": "Najmanje {{min}} znakova"
+      "roomPasswordHint": "Najmanje {{min}} znakova",
+      "declarations": "Zvanja",
+      "declarationsOn": "Uključena",
+      "declarationsOff": "Isključena",
+      "declarationsHint": "Bez zvanja nema ni Bele, a deljenja se broje samo na poene iz karata"
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · uživo se osvežava",
     "actions": {
@@ -766,7 +770,9 @@
       "veteransOnly": "Samo iskusni",
       "veteransOnlyAriaLabel": "Ova soba ne prima nove igrače",
       "locked": "Zaključano",
-      "minHonorLockedTitle": "Traži čast {{minHonor}}, ti si na {{honor}}."
+      "minHonorLockedTitle": "Traži čast {{minHonor}}, ti si na {{honor}}.",
+      "noDeclarations": "Bez zvanja",
+      "noDeclarationsAriaLabel": "Ova soba igra bez zvanja i bez Bele"
     },
     "chat": {
       "title": "Lobi chat",

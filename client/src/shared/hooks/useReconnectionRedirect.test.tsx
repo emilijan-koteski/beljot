@@ -43,6 +43,7 @@ const minimalMatchState: MatchState = {
   biddingRound: 1,
   biddingPassCount: 0,
   mustPickTrump: false,
+  declarationsEnabled: true,
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],

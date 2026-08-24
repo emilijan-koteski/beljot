@@ -400,7 +400,7 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 		{UserID: 30, Username: "c", Seat: 2},
 		{UserID: 40, Username: "d", Seat: 3},
 	}
-	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0))
+	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0, true))
 	t.Cleanup(func() { m.RemoveSession(roomID) })
 
 	// passCount 3: the other three seats have passed and the dealer is on the

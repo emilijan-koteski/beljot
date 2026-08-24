@@ -104,7 +104,7 @@ func TestHandleMatchEnd_RecordsHonorForEverySeat(t *testing.T) {
 	mgr.SetHonorRecorder(recorder)
 
 	roomID := uint(300)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -159,7 +159,7 @@ func TestHandleMatchEnd_HonorFollowsXPAndPrecedesMatchState(t *testing.T) {
 	mgr.SetHonorRecorder(&stubHonorRecorder{})
 
 	roomID := uint(301)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -199,7 +199,7 @@ func TestHandleMatchEnd_SurrenderStillCountsCompleted(t *testing.T) {
 	mgr.SetHonorRecorder(recorder)
 
 	roomID := uint(302)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -231,7 +231,7 @@ func TestAbandonment_ChargesOnlyTheExpiredSeat(t *testing.T) {
 	mgr.SetHonorRecorder(recorder)
 
 	roomID := uint(303)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	// Non-zero team scores so the non-abandoning team actually earns XP — the
@@ -332,7 +332,7 @@ func TestDisconnectThenReconnect_EmitsNoHonorEvent(t *testing.T) {
 	mgr.SetHonorRecorder(recorder)
 
 	roomID := uint(304)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	// Seat 2 drops and comes back well inside the reconnect window.
@@ -372,7 +372,7 @@ func TestHandleMatchEnd_NoRecorderNoHonor(t *testing.T) {
 	// No SetHonorRecorder call.
 
 	roomID := uint(305)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -397,7 +397,7 @@ func TestHandleMatchEnd_HonorFailureDoesNotBlockBroadcasts(t *testing.T) {
 	mgr.SetHonorRecorder(&stubHonorRecorder{err: errors.New("db down")})
 
 	roomID := uint(306)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -428,7 +428,7 @@ func TestHandleMatchEnd_BotSeatAccruesNoHonor(t *testing.T) {
 	mgr.SetBotDelayForTest(time.Hour, time.Hour)
 
 	roomID := uint(307)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(3), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(3), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -464,7 +464,7 @@ func TestHandleMatchEnd_NewPlayerStillCarriesScoreAndTier(t *testing.T) {
 	mgr.SetHonorRecorder(&stubHonorRecorder{}) // no prior completions → New Player
 
 	roomID := uint(308)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)

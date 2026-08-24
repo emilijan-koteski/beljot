@@ -559,6 +559,13 @@ func hasBelot(hand []Card, trumpSuit Suit) bool {
 // shouldPromptBelot returns true if the played card triggers a Belot announcement prompt.
 // The hand parameter must be the player's hand BEFORE the card was removed.
 func shouldPromptBelot(state *GameState, playedCard Card, handBeforePlay []Card) bool {
+	// A room playing without declarations has no Belote either — the +20 for
+	// holding K+Q of trump is an announcement, and a table that plays "bez
+	// zvanja" plays without it. Unlike the meld skip this needs its own check:
+	// Belote is not a meld, so DeclarationsResolved does not gate it.
+	if !state.Rules.DeclarationsEnabled {
+		return false
+	}
 	if state.TrumpSuit == nil || state.BelotAnnounced {
 		return false
 	}
@@ -706,6 +713,13 @@ func resolveDeclarationsForHand(state *GameState) {
 
 // checkDeclarationPrompt sets AwaitingDeclaration if the current active player
 // has declarable combinations and it's trick 1.
+//
+// This is also the Bitola half of the declarations-off skip, and it needs no
+// check of its own: a room with Rules.DeclarationsEnabled false starts every
+// hand with DeclarationsResolved already true (NewGame and startNewHand seed
+// it), so the guard below returns before a seat is ever prompted. Do not add a
+// redundant config read here — the seeded flag is the single mechanism, and two
+// mechanisms would be two things to keep in step.
 func checkDeclarationPrompt(state *GameState) {
 	if state.TrickNumber != 1 || state.DeclarationsResolved {
 		return

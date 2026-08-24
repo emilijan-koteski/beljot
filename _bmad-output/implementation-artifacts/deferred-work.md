@@ -1072,3 +1072,11 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A â€
 - source_spec: `_bmad-output/implementation-artifacts/spec-whisper-unread-chip.md`
   summary: `RoomChatDock` has no test file, so one of the three dock variants this change alters is entirely uncovered.
   evidence: `client/src/features/room/components/RoomChatDock.tsx` exists with no sibling `.test.tsx`; `ChatDock.test.tsx` covers the lobby variant and `MatchChatDock.test.tsx` the match variant. The room variant is the one whose `openLabel` differs in every locale, and the new accessible-name composition is variant-keyed. Pre-existing gap, surfaced by a change that claims identical behaviour across all three variants.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-room-declarations-toggle.md`
+  summary: A match played without declarations is indistinguishable in match history, and its per-hand "declarations" column is a permanent all-zero.
+  evidence: `match.Match` (server/internal/match/model.go) persists Variant, MatchMode and CoinBuyIn but no DeclarationsEnabled, so nothing downstream can know the match was bez zvanja. `MatchStatsCard.tsx` renders the per-hand declarations column unconditionally. Explicitly out of scope for the toggle spec (its "Ask First" names persisting the flag on `matches` and surfacing it in history), so it was left for an owner decision rather than inferred.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-room-declarations-toggle.md`
+  summary: The in-match rules reference still teaches melds and Belote at a table that plays without them.
+  evidence: `RulesDialog` (client/src/features/match/components/RulesDialog.tsx) takes only `variant` and renders the full meld/Belote chapters from the static rules content; `matchState.declarationsEnabled` is now on the wire and unused there. Its own prop doc says the variant is passed precisely so the overlay never contradicts the table in front of the player, so the same argument now applies to declarations. Out of scope by the toggle spec's explicit "Never" (the rules reference belongs to Story 12.9), which already owns reconciling that content against real engine behaviour.
