@@ -30,6 +30,11 @@ interface ScorePanelProps {
    *  segment ONLY when false, so a normal table's header is unchanged. Optional
    *  and defaulted to true so stand-alone test renders stay uncoupled. */
   declarationsEnabled?: boolean;
+  /** Whether this room ends the match the instant a team reaches the target
+   *  ("dosta"). Rendered as a further meta segment ONLY when true, so a normal
+   *  table's header is unchanged. Optional and defaulted to false so stand-alone
+   *  test renders stay uncoupled. */
+  stopAtTarget?: boolean;
 }
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
@@ -161,6 +166,7 @@ export function ScorePanel({
   handNumber,
   variantLabel,
   declarationsEnabled = true,
+  stopAtTarget = false,
 }: ScorePanelProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -302,7 +308,7 @@ export function ScorePanel({
           }}
         >
           <span>{t("match.score.heading", { defaultValue: "Scoreboard" })}</span>
-          {(handNumber !== undefined || variantLabel || !declarationsEnabled) && (
+          {(handNumber !== undefined || variantLabel || !declarationsEnabled || stopAtTarget) && (
             <span style={{ opacity: 0.85 }} data-testid="score-meta">
               {handNumber !== undefined && variantLabel
                 ? t("match.score.handVariant", {
@@ -318,17 +324,41 @@ export function ScorePanel({
                   : variantLabel}
               {/* Third segment, OFF only. Reuses the lobby card's key so the
                   room, the lobby and the table all name the rule identically —
-                  one word per concept per locale. */}
+                  one word per concept per locale.
+
+                  The " · " separator sits OUTSIDE the aria-labelled span on
+                  purpose: an aria-label replaces the element's entire accessible
+                  name, so a separator inside it is swallowed by the label and the
+                  segment loses its visual join in the accessibility tree.
+
+                  No hardcoded aria defaultValue either. en.json owns the string,
+                  i18n.parity.test.ts guarantees all four locales have it, and a
+                  copy here only drifts — the previous one already said "table"
+                  where en.json says "room". */}
               {!declarationsEnabled && (
-                <span
-                  data-testid="score-meta-no-declarations"
-                  aria-label={t("lobby.card.noDeclarationsAriaLabel", {
-                    defaultValue: "This table plays without declarations and without Belote",
-                  })}
-                >
+                <>
                   {(handNumber !== undefined || variantLabel) && " · "}
-                  {t("lobby.card.noDeclarations", { defaultValue: "No declarations" })}
-                </span>
+                  <span
+                    data-testid="score-meta-no-declarations"
+                    aria-label={t("lobby.card.noDeclarationsAriaLabel")}
+                  >
+                    {t("lobby.card.noDeclarations", { defaultValue: "No declarations" })}
+                  </span>
+                </>
+              )}
+              {/* Further segment, ON only. Same two rules as above: separator
+                  outside the labelled span, and the aria string comes from
+                  en.json rather than a local copy. */}
+              {stopAtTarget && (
+                <>
+                  {(handNumber !== undefined || variantLabel || !declarationsEnabled) && " · "}
+                  <span
+                    data-testid="score-meta-stop-at-target"
+                    aria-label={t("lobby.card.stopAtTargetAriaLabel")}
+                  >
+                    {t("lobby.card.stopAtTarget", { defaultValue: "Stop at target" })}
+                  </span>
+                </>
               )}
             </span>
           )}

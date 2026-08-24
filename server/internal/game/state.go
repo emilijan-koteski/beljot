@@ -176,6 +176,22 @@ type GameState struct {
 	// the engine actually reads. NewGame seeds it for the pre-first-action
 	// snapshot.
 	DeclarationsEnabled bool `json:"declarationsEnabled"`
+	// StopAtTarget mirrors Rules.StopAtTarget onto the wire, for the same reason
+	// DeclarationsEnabled above does: it is a per-room rule the owner chose, so
+	// the UI labels the table with it (a "dosta" chip on the scoreboard) the same
+	// way the lobby card does. The client still derives no RULE from it — the
+	// engine alone decides when a match stops.
+	//
+	// PER-SEAT VISIBILITY TRIAGE (Story 12.10): PUBLIC. Room configuration,
+	// already on the lobby card before anyone sits down, identical for all four
+	// seats, and revealing nothing about anyone's cards — so no ProjectForSeat
+	// masking.
+	//
+	// Derived, never independently assigned: RefreshDerivedFlags recomputes it
+	// from Rules at ApplyAction's single exit, so it cannot drift from the config
+	// the engine actually reads. NewGame seeds it for the pre-first-action
+	// snapshot.
+	StopAtTarget bool `json:"stopAtTarget"`
 
 	// Current hand state
 	HandNumber       int   `json:"handNumber"`
@@ -332,17 +348,23 @@ func ShuffleDeck(deck []Card) {
 // per that config's deal shape. bots marks the server-driven seats (UserID 0,
 // empty username) — see PlayerState.IsBot.
 //
-// declarationsEnabled is the room's own choice, layered over the variant preset
-// — the only field of the resolved config that does not come from the variant.
-// Pass true for a normal game; false is "bez zvanja" (no melds, no Belote).
+// declarationsEnabled and stopAtTarget are the room's own choices, layered over
+// the variant preset — the only two fields of the resolved config that do not
+// come from the variant. Pass true for declarationsEnabled for a normal game;
+// false is "bez zvanja" (no melds, no Belote). Pass false for stopAtTarget for
+// the historical behaviour (finish the hand, then check the target); true is
+// "dosta" — the match ends the instant a team's running total reaches the target.
 //
-// It is a POSITIONAL parameter rather than a field on an options struct, and
-// that is deliberate. Its zero value is false, which is the destructive
+// Both are POSITIONAL parameters rather than fields on an options struct, and
+// that is deliberate. declarationsEnabled's zero value is the destructive
 // setting: a caller who forgets a struct field silently starts a
 // declarations-less match, whereas a caller who forgets an argument here does
 // not compile. Same reasoning as room.Room.AllowNewPlayers' missing GORM
-// default tag.
-func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint, declarationsEnabled bool) *GameState {
+// default tag. stopAtTarget's zero value is harmless (today's behaviour) but
+// stays positional for consistency with the shipped precedent. It is the SECOND
+// room-level rule field; if a THIRD arrives, that is the moment to introduce a
+// RoomRules struct with a constructor rather than a fourth positional bool.
+func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint, declarationsEnabled bool, stopAtTarget bool) *GameState {
 	// The first-hand dealer is drawn uniformly at random, the way a real
 	// table cuts for the deal. Hardcoding seat 0 handed the same seat the
 	// deal (and the seat after it the opening bid) in every single match;
@@ -351,15 +373,17 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 	dealerSeat := rand.IntN(4)
 
 	rules := RulesFor(variant)
-	// The room's choice is the one override on the preset. Applied here, before
-	// the config is stored, so the engine only ever sees a settled config.
+	// The room's choices are the only overrides on the preset. Applied here,
+	// before the config is stored, so the engine only ever sees a settled config.
 	rules.DeclarationsEnabled = declarationsEnabled
+	rules.StopAtTarget = stopAtTarget
 
 	gs := &GameState{
 		RoomID:              roomID,
 		Variant:             variant,
 		Rules:               rules,
 		DeclarationsEnabled: rules.DeclarationsEnabled,
+		StopAtTarget:        rules.StopAtTarget,
 		MatchMode:           matchMode,
 		Phase:               PhaseDealing,
 		HandNumber:          1,

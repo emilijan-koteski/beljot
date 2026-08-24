@@ -699,7 +699,11 @@
       "declarations": "Zvanja",
       "declarationsOn": "Uključena",
       "declarationsOff": "Isključena",
-      "declarationsHint": "Bez zvanja nema ni Bele, a dijeljenja se broje samo na bodove iz karata"
+      "declarationsHint": "Bez zvanja nema ni Bele, a dijeljenja se broje samo na bodove iz karata",
+      "matchEnd": "Kraj meča",
+      "matchEndFinish": "Dovrši dijeljenje",
+      "matchEndStop": "Dosta",
+      "matchEndHint": "Uz „dosta“ meč završava u trenutku kad ekipa dosegne cilj, i usred dijeljenja, bez bonusa za zadnju ruku i bez kapota"
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · živo se osvježava",
     "actions": {
@@ -772,7 +776,9 @@
       "locked": "Zaključano",
       "minHonorLockedTitle": "Traži čast {{minHonor}}, ti si na {{honor}}.",
       "noDeclarations": "Bez zvanja",
-      "noDeclarationsAriaLabel": "Ova soba igra bez zvanja i bez Bele"
+      "noDeclarationsAriaLabel": "Ova soba igra bez zvanja i bez Bele",
+      "stopAtTarget": "Dosta",
+      "stopAtTargetAriaLabel": "Ova soba završava meč u trenutku kad ekipa dosegne cilj, bez dovršavanja dijeljenja"
     },
     "chat": {
       "title": "Lobi chat",

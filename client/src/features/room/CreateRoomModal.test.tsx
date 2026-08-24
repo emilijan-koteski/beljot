@@ -132,6 +132,8 @@ describe("CreateRoomModal", () => {
         allowNewPlayers: true,
         // Declarations default ON and are always sent, for the same reason.
         declarationsEnabled: true,
+        // "Dosta" defaults OFF (finish the hand) and is always sent too.
+        stopAtTarget: false,
       });
     });
   });
@@ -177,6 +179,8 @@ describe("CreateRoomModal", () => {
         allowNewPlayers: true,
         // Declarations default ON and are always sent, for the same reason.
         declarationsEnabled: true,
+        // "Dosta" defaults OFF (finish the hand) and is always sent too.
+        stopAtTarget: false,
       });
     });
   });
@@ -756,6 +760,92 @@ describe("CreateRoomModal", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(screen.getByTestId("declarations-segmented-on")).toHaveAttribute("aria-checked", "true");
     expect(screen.queryByTestId("preview-no-declarations")).not.toBeInTheDocument();
+  });
+
+  // --- Stop-at-target ("dosta") toggle ---
+  //
+  // The mirror of the declarations block above, with the polarity flipped: the
+  // default here is "finish the hand", and the chip appears on the opt-in.
+
+  it("defaults the match-end control to finishing the hand and shows no preview chip", () => {
+    renderModal(true);
+
+    expect(screen.getByTestId("match-end-segmented")).toBeInTheDocument();
+    expect(screen.getByTestId("match-end-segmented-finish")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.queryByTestId("preview-stop-at-target")).not.toBeInTheDocument();
+  });
+
+  it("mirrors a stop-at-target choice into the live preview card", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    await user.click(screen.getByTestId("match-end-segmented-stop"));
+
+    expect(await screen.findByTestId("preview-stop-at-target")).toBeInTheDocument();
+  });
+
+  it("submits stopAtTarget true when the stop segment is selected", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 12,
+      name: "Dosta",
+      code: "DST001",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      coinBuyIn: 500,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-08-24T09:00:00Z",
+      updatedAt: "2026-08-24T09:00:00Z",
+    });
+
+    renderModal(true);
+    await user.type(screen.getByTestId("room-name-input"), "Dosta");
+    await user.click(screen.getByTestId("match-end-segmented-stop"));
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Dosta", stopAtTarget: true, declarationsEnabled: true }),
+      );
+    });
+  });
+
+  it("always explains that neither end-of-hand bonus is awarded", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    // Shown in BOTH states, like the Belote caveat above: "no last-trick or capot
+    // bonus" is the part of this rule a player cannot read off the label.
+    expect(screen.getByText(/no last-trick or capot bonus/i)).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("match-end-segmented-stop"));
+
+    expect(screen.getByText(/no last-trick or capot bonus/i)).toBeInTheDocument();
+  });
+
+  it("resets the match-end control back to finish-the-hand when the modal is dismissed", async () => {
+    const user = userEvent.setup();
+    const { onOpenChange } = renderModal(true);
+
+    await user.click(screen.getByTestId("match-end-segmented-stop"));
+    expect(await screen.findByTestId("preview-stop-at-target")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("cancel-button"));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.getByTestId("match-end-segmented-finish")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.queryByTestId("preview-stop-at-target")).not.toBeInTheDocument();
   });
 
   it("surfaces the server's INVALID_MIN_HONOR rejection in the form banner", async () => {

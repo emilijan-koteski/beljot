@@ -699,7 +699,11 @@
       "declarations": "Declarations",
       "declarationsOn": "On",
       "declarationsOff": "Off",
-      "declarationsHint": "Off means no declarations and no Belote: hands score on card points alone"
+      "declarationsHint": "Off means no declarations and no Belote: hands score on card points alone",
+      "matchEnd": "Match end",
+      "matchEndFinish": "Finish the hand",
+      "matchEndStop": "Stop at target",
+      "matchEndHint": "Stop at target ends the match the moment a team reaches it, even mid-hand, with no last-trick or capot bonus"
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
     "actions": {
@@ -772,7 +776,9 @@
       "locked": "Locked",
       "minHonorLockedTitle": "Needs honor {{minHonor}}, you're at {{honor}}.",
       "noDeclarations": "No declarations",
-      "noDeclarationsAriaLabel": "This room plays without declarations and without Belote"
+      "noDeclarationsAriaLabel": "This room plays without declarations and without Belote",
+      "stopAtTarget": "Stop at target",
+      "stopAtTargetAriaLabel": "This room ends the match the moment a team reaches the target, without finishing the hand"
     },
     "chat": {
       "title": "Lobby chat",

@@ -6,6 +6,7 @@
   "phase": "playing",
   "ownerSeat": 0,
   "declarationsEnabled": true,
+  "stopAtTarget": false,
   "handNumber": 3,
   "dealerSeat": 2,
   "trumpSuit": "S",

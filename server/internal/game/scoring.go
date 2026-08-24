@@ -153,6 +153,165 @@ func scoreHand(state *GameState) {
 	state.HandCompleteReady = [4]bool{}
 }
 
+// teamRunningTotal returns what team would have banked if the match stopped
+// RIGHT NOW: its match score plus everything it has accumulated so far in the
+// current, unfinished hand.
+//
+// The three accumulators are exactly the three things that move mid-hand — card
+// points from resolved tricks, the declaration contest's award, and Belote's +20
+// — which is why the three stopAtTarget checkpoints sit immediately after each
+// of their write sites.
+//
+// Deliberately NOT the same arithmetic as scoreHand: no last-trick +10 and no
+// Capot +100, because the hand never completed and neither bonus was earned; and
+// no failed-hand transfer, because the taker's "strictly more" test only makes
+// sense on a finished hand. scoreHand:56-59 computes a superficially similar
+// total but does so AFTER bonus application, so it is not reusable here.
+func teamRunningTotal(state *GameState, team int) int {
+	return state.TeamScores[team] +
+		state.HandPoints[team] +
+		state.DeclarationPoints[team] +
+		state.BelotPoints[team]
+}
+
+// stopAtTargetIfReached is the whole "dosta" (enough) rule, in one place. When
+// the room plays with StopAtTarget and either team's RUNNING total has reached
+// the match target, it ends the match on the spot and reports true; otherwise it
+// leaves the state untouched and reports false.
+//
+// THIS COMMENT IS THE CANONICAL STATEMENT OF THE RULE. types.go's
+// VariantRules.StopAtTarget, declarations.go's three call sites, room/model.go's
+// Room.StopAtTarget and migration 000022 all point here rather than restating it,
+// so there is one place to correct if it ever changes.
+//
+// EXACTLY THREE CHECKPOINTS, because there are exactly three places mid-hand
+// points are awarded, each with one write site in this package: a trick resolving
+// (playing.go, resolveTrick), the declaration contest resolving
+// (declarations.go, resolveDeclarationsForHand) and a Belote announcement
+// (declarations.go, handleAnnounceBelot). Callers hook this helper immediately
+// after each award, in the same ApplyAction call, and must abort the rest of
+// their flow when it returns true — a Belote stop in particular must NOT go on to
+// resolve the trick that was in progress.
+//
+// ONE DEFERRAL, and only one: handleAnnounceBelot skips this check while
+// TrickNumber == 1 && !DeclarationsResolved. Under Bitola timing the trick-1 meld
+// contest is still open at that moment, and its award lands only when the trick
+// resolves, so stopping on the +20 would bank a running total with every declared
+// meld missing. See that call site for the full reasoning and for the rejected
+// alternative.
+//
+// It is a no-op in three cases, all cheap and all deliberate:
+//
+//   - StopAtTarget is off (every existing room), so OFF is byte-identical to the
+//     behaviour before this rule existed.
+//
+//   - the state is already PhaseMatchEnd or PhaseHandScoring — a completed hand
+//     belongs to scoreHand, which applies the bonuses and does its own target
+//     check. Trick 8 is not a checkpoint.
+//
+//     PhaseHandComplete is deliberately NOT in that set, and its absence is not
+//     an oversight: no checkpoint can be reached from it. It is the post-scoreHand
+//     pause, where no trick resolves, no contest runs and no Belote is announced —
+//     the next thing that happens is action:continue or the auto-advance, both of
+//     which go through startNewHand. Adding it would be dead code that implied a
+//     path exists.
+//
+//   - nobody has reached the target yet.
+//
+// At the stop it:
+//
+//   - commits each team's running total into TeamScores and LEAVES HandPoints,
+//     DeclarationPoints and BelotPoints POPULATED. That is the same state shape
+//     scoreHand already produces at a normal match end: it too banks a hand's
+//     points into TeamScores without clearing the accumulators they came from.
+//     An earlier draft of this rule zeroed them, to stop the scoreboard's "+N
+//     this hand" bar double-counting banked points — but that bar already behaves
+//     exactly this way at every normal match end, so the zeroing bought nothing
+//     and broke the declaration reveal:
+//     broadcastDeclarationsResolvedIfTransition derives the reveal's winnerTeam
+//     from DeclarationPoints[team] > 0, so a declaration-driven stop shipped a
+//     reveal with winnerTeam null and no winner for the panel to anchor to.
+//
+//   - resolves WinnerTeam through the existing determineMatchWinner, which
+//     dereferences TrumpCallerSeat — always non-nil at all three checkpoints,
+//     since none of them can be reached before a seat has taken trump.
+//
+//     Note what determineMatchWinner is NOT asked to do: there is no failed-hand
+//     transfer here. scoreHand's "the taker must score strictly more" test needs
+//     a finished hand, so a crossing by the taker's OPPONENTS simply wins for
+//     them and the taker keeps whatever it had banked — nothing moves between
+//     teams at a stop.
+//
+//   - nils LastHandResult. LOAD-BEARING, not tidiness: the match layer's
+//     handJustScored and bufferHandResultIfScored both gate on it being non-nil
+//     plus a transition into match_end, and startNewHand deliberately never
+//     clears it. A hand-3 stop still holding hand 2's result would emit a false
+//     event:hand_scored and write hand 2's numbers into the final hand_results
+//     row. The aborted hand deliberately gets NO hand_results row at all.
+//
+//   - clears the timer and prompt fields, so the final snapshot carries no live
+//     turn, meld prompt, Belote prompt or surrender proposal.
+//
+// It deliberately does NOT touch ActivePlayerSeat or the trick state.
+// trickResolvedWinnerSeat reads ActivePlayerSeat as its trick-1..7 winner
+// fallback, so overwriting it would broadcast the wrong winner on the final
+// trick; and an abandoned trick with cards still face up is exactly where play
+// stopped, which is the truthful thing to show.
+func stopAtTargetIfReached(state *GameState) bool {
+	if !state.Rules.StopAtTarget {
+		return false
+	}
+	if state.Phase == PhaseMatchEnd || state.Phase == PhaseHandScoring {
+		return false
+	}
+
+	target := matchTarget(state.MatchMode)
+	aTotal := teamRunningTotal(state, TeamA)
+	bTotal := teamRunningTotal(state, TeamB)
+	aOver := aTotal >= target
+	bOver := bTotal >= target
+	if !aOver && !bOver {
+		return false
+	}
+
+	// Bank the running totals. The accumulators they were built from are left
+	// alone — see the doc comment: clearing DeclarationPoints blinds the
+	// declaration reveal's winner derivation, and scoreHand does not clear them
+	// at a normal match end either.
+	state.TeamScores[TeamA] = aTotal
+	state.TeamScores[TeamB] = bTotal
+
+	// Both teams over at one checkpoint IS reachable, and the trick-1 deferral is
+	// what makes it so. Away from trick 1 only one team can gain at a single
+	// checkpoint, so only one can cross. But the deferral banks a Belote +20 and
+	// then waits for the trick-1 resolution, where TWO awards land in the same
+	// call — the trick's card points and the declaration contest — and they can go
+	// to opposite teams. So the announcing team can cross on its +20 while the
+	// other crosses on the contest, both first observed here.
+	//
+	// determineMatchWinner settles it the same way the end-of-hand path already
+	// settles a hand in which both teams cross: higher score, then the taker.
+	// Deliberately NOT "whoever crossed first chronologically" — that would need
+	// the crossing recorded on the state, and it would make a dosta stop resolve a
+	// double crossing differently from every other match end.
+	winner := determineMatchWinner(state, aOver, bOver)
+	state.WinnerTeam = &winner
+	state.Phase = PhaseMatchEnd
+
+	// No HandScore is fabricated for the aborted hand — no synthetic last-trick
+	// team, Capot flag or failed-hand verdict. See the doc comment above for why
+	// nil here is load-bearing.
+	state.LastHandResult = nil
+
+	state.TurnExpiresAt = nil
+	state.TurnTimeRemaining = 0
+	state.AwaitingDeclaration = false
+	state.PendingBelotSeat = nil
+	state.SurrenderProposerSeat = nil
+
+	return true
+}
+
 // startNewHand resets all per-hand state, rotates the dealer, shuffles and deals
 // a fresh deck, and transitions to PhaseBidding for the next hand.
 //

@@ -202,9 +202,10 @@ describe("RoomCard", () => {
   });
 
   it("treats an absent declarationsEnabled as ON, never as off", () => {
-    // The QuickPlay system:room_created payload is hand-built, and a server that
-    // predates the column sends nothing at all. Both must read as a normal room:
-    // a truthiness check here would chip every one of them.
+    // A server that predates the column sends nothing at all, and that must read
+    // as a normal room: a truthiness check here would chip every one of them.
+    // (Every hand-built room payload on the Go side does carry the key now, each
+    // covered by its own test, so an older server is the remaining case.)
     const withoutTheField: Room = { ...baseRoom, declarationsEnabled: true };
     delete withoutTheField.declarationsEnabled;
 
@@ -226,6 +227,61 @@ describe("RoomCard", () => {
       );
 
       const text = (screen.getByTestId("room-card-no-declarations").textContent ?? "").trim();
+      expect(text, `${locale} chip text`).not.toBe("");
+      expect(text, `${locale} must not render the raw key`).not.toContain("lobby.card");
+
+      if (locale === "mk") {
+        expect(text, "mk is all-Cyrillic").toMatch(/^[Ѐ-ӿ\s]+$/);
+      } else {
+        expect(text, `${locale} is Latin`).toMatch(/^[A-Za-zČčĆćĐđŠšŽž\s]+$/);
+      }
+
+      unmount();
+    }
+  });
+
+  // --- Stop-at-target ("dosta") toggle ---
+  //
+  // The mirror of the declarations block above with the POLARITY FLIPPED: here
+  // the chip appears on true, so the absent-field case must read as OFF.
+
+  it("leaves a finish-the-hand room unchipped", () => {
+    render(<RoomCard room={{ ...baseRoom, stopAtTarget: false }} onJoin={() => {}} />);
+
+    expect(screen.queryByTestId("room-card-stop-at-target")).not.toBeInTheDocument();
+  });
+
+  it("chips a room that stops at the target", () => {
+    render(<RoomCard room={{ ...baseRoom, stopAtTarget: true }} onJoin={() => {}} />);
+
+    const chip = screen.getByTestId("room-card-stop-at-target");
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveAccessibleName(/without finishing the hand/i);
+  });
+
+  it("treats an absent stopAtTarget as OFF, never as on", () => {
+    // A server that predates the column sends nothing at all, and that must read
+    // as an ordinary finish-the-hand room — which is why the reader compares
+    // `=== true`. Every Go-side room payload carries the key today
+    // (TestQuickPlayRoomCreatedPayload_CarriesStopAtTarget and friends assert it),
+    // so this is the older-server case, not a known omitter.
+    const withoutTheField: Room = { ...baseRoom, stopAtTarget: false };
+    delete withoutTheField.stopAtTarget;
+
+    render(<RoomCard room={withoutTheField} onJoin={() => {}} />);
+
+    expect(screen.queryByTestId("room-card-stop-at-target")).not.toBeInTheDocument();
+  });
+
+  it("localizes the stop-at-target chip in every locale", async () => {
+    for (const locale of ["en", "mk", "hr", "sr"] as const) {
+      await i18n.changeLanguage(locale);
+
+      const { unmount } = render(
+        <RoomCard room={{ ...baseRoom, stopAtTarget: true }} onJoin={() => {}} />,
+      );
+
+      const text = (screen.getByTestId("room-card-stop-at-target").textContent ?? "").trim();
       expect(text, `${locale} chip text`).not.toBe("");
       expect(text, `${locale} must not render the raw key`).not.toContain("lobby.card");
 

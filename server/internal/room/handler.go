@@ -164,12 +164,19 @@ type CreateRoomRequest struct {
 	// client that has not shipped the toggle yet silently create
 	// declarations-less rooms.
 	DeclarationsEnabled *bool `json:"declarationsEnabled"`
+	// StopAtTarget is "dosta": end the match the instant a team's running total
+	// reaches the 1001/501 target, hand unfinished. A pointer for symmetry with
+	// DeclarationsEnabled above, though the polarity is the opposite one: nil
+	// (omitted) defaults to FALSE — finish the hand, which is how every match here
+	// has always ended — so a client that has not shipped the toggle keeps
+	// creating rooms that behave exactly as before.
+	StopAtTarget *bool `json:"stopAtTarget"`
 }
 
 // MatchStarter is the interface the room handler uses to start a live match.
 // coinBuyIn (Story 9.2) is the per-human stake captured onto the session.
 type MatchStarter interface {
-	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool) error
+	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool) error
 }
 
 // WalletService is the subset of *wallet.Service the room handler needs. Story
@@ -427,11 +434,16 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		// reads this key, so omitting it would leave a live card describing a
 		// declarations-less room as a normal one until the next full refetch.
 		"declarationsEnabled": r.DeclarationsEnabled,
-		"playerCount":         r.PlayerCount,
-		"status":              r.Status,
-		"isQuickPlay":         r.IsQuickPlay,
-		"createdAt":           r.CreatedAt.UTC().Format(time.RFC3339),
-		"updatedAt":           r.UpdatedAt.UTC().Format(time.RFC3339),
+		// And again for "dosta": the lobby card, the waiting room and the
+		// scoreboard all chip a stop-at-target room, so an omission here would
+		// leave a live card describing it as a finish-the-hand table until the
+		// next full refetch.
+		"stopAtTarget": r.StopAtTarget,
+		"playerCount":  r.PlayerCount,
+		"status":       r.Status,
+		"isQuickPlay":  r.IsQuickPlay,
+		"createdAt":    r.CreatedAt.UTC().Format(time.RFC3339),
+		"updatedAt":    r.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -583,6 +595,16 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		declarationsEnabled = *req.DeclarationsEnabled
 	}
 
+	// nil StopAtTarget → FALSE, the mirror of the block above with the polarity
+	// flipped: "omitted means the historical behaviour" here means finishing the
+	// hand before the target is checked, which is how every match played before
+	// this column existed ended. Both values are legal in both variants, so there
+	// is no range or compatibility check.
+	stopAtTarget := false
+	if req.StopAtTarget != nil {
+		stopAtTarget = *req.StopAtTarget
+	}
+
 	// The creator must satisfy their OWN gate (Story 9.8 D7). CreateRoom auto-seats
 	// the creator, so an owner who sets min_honor = 95 while sitting at 60 — or
 	// allow_new_players = false while being a New Player themselves — would be
@@ -664,8 +686,13 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		// veterans-only room, or a silently declarations-less one.
 		AllowNewPlayers:     allowNewPlayers,
 		DeclarationsEnabled: declarationsEnabled,
-		Status:              "waiting",
-		PlayerCount:         1,
+		// Spelled out for consistency with its two siblings above, even though the
+		// GORM trap inverts for this one: with no `default` tag an omitted field
+		// would insert FALSE, which happens to be the safe historical value. State
+		// what the owner chose rather than lean on that coincidence.
+		StopAtTarget: stopAtTarget,
+		Status:       "waiting",
+		PlayerCount:  1,
 	}
 
 	var createErr error
@@ -2505,7 +2532,7 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 		timerDuration = *autoStartRoom.TimerDurationSeconds
 	}
 	reconnectWindow := resolveReconnectWindow(autoStartRoom.ReconnectWindowSec)
-	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled); serr != nil {
+	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled, autoStartRoom.StopAtTarget); serr != nil {
 		// Charge succeeded but the session failed to start: refund every charged
 		// human (no coins destroyed). The caller (autoStartIfFull) reverts the
 		// room to "waiting" and broadcasts error:match_start_failed.
@@ -3674,7 +3701,7 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 				timerDuration = *updatedRoom.TimerDurationSeconds
 			}
 			reconnectWindow := resolveReconnectWindow(updatedRoom.ReconnectWindowSec)
-			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled); serr != nil {
+			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled, updatedRoom.StopAtTarget); serr != nil {
 				// Story 9.3 (deferred-work item 1): the charge succeeded but the
 				// session failed to start. Refund every charged human (no coins
 				// destroyed), revert the room to "waiting" (no room stranded in
@@ -3824,8 +3851,12 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				// Belote from every matchmade table. Quick Play offers no rule
 				// choices — it is Bitola, 1001, declarations on.
 				DeclarationsEnabled: true,
-				Status:              "waiting",
-				PlayerCount:         1,
+				// Quick Play finishes the hand, spelled out explicitly for the same
+				// reason as its siblings above. Quick Play offers no rule choices — it
+				// is Bitola, 1001, declarations on, finish the hand.
+				StopAtTarget: false,
+				Status:       "waiting",
+				PlayerCount:  1,
 			}
 			if err := tx.Create(newRoom); err != nil {
 				return err
@@ -3896,9 +3927,14 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 			// been a latent bug waiting for the default to stop matching; state the
 			// value rather than rely on the reader's default.
 			"declarationsEnabled": resultRoom.DeclarationsEnabled,
-			"playerCount":         resultRoom.PlayerCount,
-			"status":              resultRoom.Status,
-			"isQuickPlay":         resultRoom.IsQuickPlay,
+			// Same reasoning: a synthesized quick-play room always finishes the hand
+			// and the lobby card treats an absent key as off, but every omission on
+			// this hand-built map has been a latent bug waiting for the default to
+			// stop matching. State the value.
+			"stopAtTarget": resultRoom.StopAtTarget,
+			"playerCount":  resultRoom.PlayerCount,
+			"status":       resultRoom.Status,
+			"isQuickPlay":  resultRoom.IsQuickPlay,
 		})
 	} else {
 		// Joined an existing room — broadcast updated player count

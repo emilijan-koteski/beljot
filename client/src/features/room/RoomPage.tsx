@@ -6,6 +6,7 @@ import {
   Coins,
   Crown,
   DoorOpen,
+  Flag,
   History,
   Lock,
   LockOpen,
@@ -1224,6 +1225,19 @@ export function RoomPage() {
                     aria-label={t("lobby.card.noDeclarationsAriaLabel")}
                   >
                     {t("lobby.card.noDeclarations")}
+                  </span>
+                </Badge>
+              )}
+              {/* Next to it for the same reason, and rendered only when "dosta"
+                  is on. Read with `=== true` so an absent field (an older server,
+                  or a hand-built payload that omits the key) reads as off. */}
+              {room.stopAtTarget === true && (
+                <Badge tone="neutral" icon={<Flag className="size-3" />}>
+                  <span
+                    data-testid="badge-stop-at-target"
+                    aria-label={t("lobby.card.stopAtTargetAriaLabel")}
+                  >
+                    {t("lobby.card.stopAtTarget")}
                   </span>
                 </Badge>
               )}

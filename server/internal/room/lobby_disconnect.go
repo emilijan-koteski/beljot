@@ -16,8 +16,12 @@ const lobbyDisconnectTimeout = 10 * time.Second
 // their seat is freed after a short timeout (10 seconds). If they
 // reconnect within the window, the timer is cancelled.
 type LobbyDisconnectHandler struct {
-	repo     RoomRepository
-	hub      *ws.Hub
+	repo RoomRepository
+	// hub is the Broadcaster interface rather than a concrete *ws.Hub for the
+	// reason that interface was introduced: this handler builds a room payload
+	// by hand, and a test cannot assert the keys it carries unless the broadcast
+	// is observable. *ws.Hub satisfies it, so cmd/api wiring is unchanged.
+	hub      Broadcaster
 	presence *PresenceRegistry
 	invites  *InviteRegistry
 	mu       sync.Mutex
@@ -34,12 +38,23 @@ type lobbyDisconnect struct {
 // invites must be the SAME registry the room and invite handlers share; a nil
 // one is replaced with an empty registry so tests can omit it, matching the
 // presence parameter's affordance.
-func NewLobbyDisconnectHandler(repo RoomRepository, hub *ws.Hub, presence *PresenceRegistry, invites *InviteRegistry) *LobbyDisconnectHandler {
+func NewLobbyDisconnectHandler(repo RoomRepository, hub Broadcaster, presence *PresenceRegistry, invites *InviteRegistry) *LobbyDisconnectHandler {
 	if presence == nil {
 		presence = NewPresenceRegistry()
 	}
 	if invites == nil {
 		invites = NewInviteRegistry()
+	}
+	// Normalizing a typed-nil hub, rather than deleting the `h.hub == nil` guards
+	// the broadcast helpers below still carry. Those guards were written against a
+	// concrete *ws.Hub, where nil really was nil; now that the field is an
+	// interface, a nil *ws.Hub handed in here would sit inside a NON-nil
+	// Broadcaster, slip straight past them and panic on the first broadcast.
+	// Keeping the guards and normalizing preserves the "no hub means no
+	// broadcasting" affordance that presence and invites above already offer;
+	// dropping them would turn the same call into a panic instead.
+	if h, ok := hub.(*ws.Hub); ok && h == nil {
+		hub = nil
 	}
 	return &LobbyDisconnectHandler{
 		repo:     repo,
@@ -252,11 +267,18 @@ func (h *LobbyDisconnectHandler) broadcastRoomUpdated(r *Room) {
 		"matchMode":            r.MatchMode,
 		"timerStyle":           r.TimerStyle,
 		"timerDurationSeconds": r.TimerDurationSeconds,
-		// The FOURTH hand-built room payload in this package, and the one easiest
-		// to miss because it fires only on a lobby disconnect. Without this key a
-		// declarations-off room loses its "no declarations" chip the moment any
-		// lobby player drops, and gets it back only on a full refetch.
+		// The two per-room RULE flags. This is the third and last hand-built room
+		// payload in Go — the others are roomLifecyclePayload and Quick Play's own
+		// room_created — and the one easiest to miss, because it fires only on a
+		// lobby disconnect. Without these keys a bez-zvanja or stop-at-target room
+		// loses its chip the moment any lobby player drops, and gets it back only
+		// on a full refetch.
+		//
+		// It is also the map that actually shipped broken: declarationsEnabled was
+		// missed here and caught in review. Both keys are under test now — see
+		// lobby_disconnect_payload_test.go, which is why hub is a Broadcaster.
 		"declarationsEnabled": r.DeclarationsEnabled,
+		"stopAtTarget":        r.StopAtTarget,
 		"playerCount":         r.PlayerCount,
 		"status":              r.Status,
 		"createdAt":           r.CreatedAt.UTC().Format(time.RFC3339),

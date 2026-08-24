@@ -5,6 +5,7 @@ import {
   Coins,
   Eye,
   EyeOff,
+  Flag,
   KeyRound,
   Lock,
   LockOpen,
@@ -123,6 +124,11 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   // here, so creating a "bez zvanja" room is an opt-in the modal must never
   // nudge an owner into, exactly like the honor gate below.
   const [declarationsEnabled, setDeclarationsEnabled] = useState(true);
+  // "Dosta" defaults OFF: finishing the hand before the target is checked is how
+  // every match here has always ended, so stopping mid-hand is an opt-in the
+  // modal must never nudge an owner into — the same rule as declarations above,
+  // with the polarity flipped.
+  const [stopAtTarget, setStopAtTarget] = useState(false);
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
   const [timerDuration, setTimerDuration] = useState(30);
   const [coinBuyIn, setCoinBuyIn] = useState(DEFAULT_BUY_IN);
@@ -211,6 +217,10 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         // reads it as a pointer, so sending the value explicitly is what makes
         // an off room distinguishable from an old client that never mentions it.
         declarationsEnabled,
+        // Always sent, same reasoning: the server reads it as a pointer, so
+        // sending the value explicitly is what makes a "dosta" room
+        // distinguishable from an old client that never mentions it.
+        stopAtTarget,
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
@@ -273,6 +283,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setVariant("bitola");
       setMatchMode("1001");
       setDeclarationsEnabled(true);
+      setStopAtTarget(false);
       setTimerStyle("relaxed");
       setTimerDuration(30);
       setCoinBuyIn(DEFAULT_BUY_IN);
@@ -313,6 +324,17 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       value === "on"
         ? "lobby.createRoomModal.declarationsOn"
         : "lobby.createRoomModal.declarationsOff",
+    ),
+  }));
+
+  // Finish-the-hand first, so the default sits where the eye lands. Built the
+  // same way as the lists above so `value` narrows to "finish" | "stop".
+  const matchEndOptions = (["finish", "stop"] as const).map((value) => ({
+    value,
+    label: t(
+      value === "finish"
+        ? "lobby.createRoomModal.matchEndFinish"
+        : "lobby.createRoomModal.matchEndStop",
     ),
   }));
 
@@ -426,6 +448,24 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   options={declarationsOptions}
                   testId="declarations-segmented"
                   ariaLabel={t("lobby.createRoomModal.declarations")}
+                />
+              </Field>
+
+              {/* Sits immediately after declarations, its sibling in kind: both
+                  say what the rules of this table ARE. The hint is shown in BOTH
+                  states because "no last-trick or capot bonus" is the part of the
+                  rule a player cannot guess from the label, exactly like the
+                  Belote caveat above it. */}
+              <Field
+                label={t("lobby.createRoomModal.matchEnd")}
+                hint={t("lobby.createRoomModal.matchEndHint")}
+              >
+                <Segmented
+                  value={stopAtTarget ? "stop" : "finish"}
+                  onValueChange={(v) => setStopAtTarget(v === "stop")}
+                  options={matchEndOptions}
+                  testId="match-end-segmented"
+                  ariaLabel={t("lobby.createRoomModal.matchEnd")}
                 />
               </Field>
 
@@ -720,6 +760,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               minHonor={effectiveMinHonor}
               allowNewPlayers={allowNewPlayers}
               declarationsEnabled={declarationsEnabled}
+              stopAtTarget={stopAtTarget}
               hostUsername={meUsername || "host"}
             />
 
@@ -763,6 +804,7 @@ function PreviewCard({
   minHonor,
   allowNewPlayers,
   declarationsEnabled,
+  stopAtTarget,
   hostUsername,
 }: {
   name: string;
@@ -775,6 +817,7 @@ function PreviewCard({
   minHonor: number;
   allowNewPlayers: boolean;
   declarationsEnabled: boolean;
+  stopAtTarget: boolean;
   hostUsername: string;
 }) {
   const { t } = useTranslation();
@@ -828,6 +871,21 @@ function PreviewCard({
               >
                 <Ban className="size-3" />
                 {t("lobby.card.noDeclarations")}
+              </span>
+            </>
+          )}
+          {/* ON-only, the mirror of the chip above: finishing the hand is the
+              norm and gets no chip, so this chip always means something. */}
+          {stopAtTarget && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="preview-stop-at-target"
+                aria-label={t("lobby.card.stopAtTargetAriaLabel")}
+              >
+                <Flag className="size-3" />
+                {t("lobby.card.stopAtTarget")}
               </span>
             </>
           )}

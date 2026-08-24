@@ -1,0 +1,41 @@
+-- "Dosta" (enough) as a per-room setting: does the match stop the instant a team
+-- reaches the 1001/501 target, or does the current hand always play out first?
+-- Additive ALTER style, mirroring 000021_add_declarations_to_rooms.
+--
+-- Until now every match played the current hand to its end and only then checked
+-- the target, so a team that crossed at trick 4 kept playing and the final score
+-- sailed above the target. Many tables play the opposite way — the moment a team
+-- reaches the target the match is over, hand unfinished. This column is the
+-- owner's choice, made once at room creation and fixed for the room's life.
+--
+--     FALSE -> finish the hand (today's behaviour). The target is checked once,
+--              in scoreHand, after trick 8 has awarded its last-trick or Capot
+--              bonus and the failed-hand rule has been applied.
+--     TRUE  -> stop at the target. The engine ends the match the instant a team's
+--              running total reaches it, mid-hand. The aborted hand earns no
+--              last-trick +10 and no Capot +100 (it never completed) and gets no
+--              hand_results row. The rule itself — what the running total is,
+--              where it is checked and why there are exactly three checkpoints —
+--              is stated once, on stopAtTargetIfReached in internal/game/scoring.go,
+--              and deliberately not restated here.
+--
+-- Automatic, not player-callable: there is no button and no action. It is
+-- deliberately variant-INDEPENDENT — it is resolved into the VariantRules config
+-- at game init and read there as a config field, never as a variant-name
+-- comparison (Epic 12, D-VAR-1). It is the second per-room override of a
+-- rule-config field, after declarations_enabled.
+--
+-- NO BACKFILL IS NEEDED. DEFAULT FALSE reproduces today's behaviour exactly for
+-- every existing row: every match ever played here finished its hand first. Note
+-- that the polarity is the OPPOSITE of 000021's — here the zero value is the
+-- safe, historical one.
+--
+-- Note for the Go side: room.Room deliberately declares this field WITHOUT a
+-- GORM `default` tag, for the same reason declarations_enabled and
+-- allow_new_players do — GORM omits zero-valued fields from an INSERT when they
+-- declare one. The trap INVERTS here (the omitted value would be the safe FALSE
+-- rather than a destructive one), but the tag is still left off so an explicit
+-- TRUE stays insertable and the two sibling columns read identically. This
+-- DB-side default still covers the backfill above and any raw insert. See the
+-- field comment in internal/room/model.go.
+ALTER TABLE rooms ADD COLUMN stop_at_target BOOLEAN NOT NULL DEFAULT FALSE;

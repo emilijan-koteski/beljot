@@ -50,7 +50,7 @@ func TestHandleMatchEnd_SettlesCoins(t *testing.T) {
 
 	roomID := uint(100)
 	// coinBuyIn 500 → pot 2000; team A (seats 0,2 → users 10,30) wins.
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 500, true))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 500, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -98,7 +98,7 @@ func TestHandleMatchEnd_NoEconomyNoSettlement(t *testing.T) {
 	mgr.SetWalletSettler(settler)
 
 	roomID := uint(101)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)

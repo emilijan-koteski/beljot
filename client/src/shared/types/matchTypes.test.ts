@@ -92,6 +92,7 @@ describe("gameTypes", () => {
         biddingPassCount: 0,
         mustPickTrump: false,
         declarationsEnabled: true,
+        stopAtTarget: false,
         activePlayerSeat: 1,
         trickNumber: 0,
         currentTrick: [],

@@ -169,6 +169,18 @@ export interface Room {
    * documents, for the same reason.
    */
   declarationsEnabled?: boolean;
+  /**
+   * "Dosta": whether the match ends the INSTANT a team's running total reaches
+   * the 1001/501 target, hand unfinished and neither the last-trick +10 nor the
+   * Capot +100 awarded. False — the default — finishes the hand first.
+   *
+   * OPTIONAL, deliberately, exactly like declarationsEnabled above. The server
+   * sends it on every room payload it builds, but a server that predates the
+   * column does not, and the correct reading of absent is OFF. So every consumer
+   * compares `=== true` — note the POLARITY IS THE OPPOSITE of declarations',
+   * because here the interesting, chipped state is the true one.
+   */
+  stopAtTarget?: boolean;
   status: string;
   playerCount: number;
   isQuickPlay: boolean;
@@ -203,6 +215,12 @@ export interface CreateRoomRequest {
    * server's own default only exists for clients that predate the toggle.
    */
   declarationsEnabled: boolean;
+  /**
+   * "Dosta": end the match the instant a team reaches the target. Required here,
+   * unlike on `Room`: the modal always has a value to send, and the server's own
+   * default only exists for clients that predate the toggle.
+   */
+  stopAtTarget: boolean;
 }
 
 export interface RoomPlayer {

@@ -1594,6 +1594,9 @@ export function MatchPage() {
         // so a payload without it never reaches the store at all. The absent-means-ON
         // guard belongs only where nothing validates the shape (Room, RoomCreated).
         declarationsEnabled={matchState.declarationsEnabled}
+        // Passed straight through for the same reason: the strict schema requires
+        // the key, so there is nothing to guard against here.
+        stopAtTarget={matchState.stopAtTarget}
         matchTarget={matchTarget}
       />
 

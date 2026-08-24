@@ -141,14 +141,14 @@ const (
 // cloneGameState's shallow struct copy carries the whole config correctly with
 // no clone line of its own.
 //
-// All seven fields are populated by both presets from day one. DealShape,
+// All eight fields are populated by both presets from day one. DealShape,
 // HasTrumpCandidate, AllPassOutcome, DeclarationOverlap, DeclarationTiming and
 // DeclarationsEnabled are READ today; TieRule describes each variant's authentic
 // rule and is read once the story that implements it lands.
 //
-// DeclarationsEnabled is the one field a preset does NOT get the final say on:
-// it is a per-ROOM choice layered over the variant preset by NewGame. Every
-// other field is variant-derived. See its comment below.
+// DeclarationsEnabled and StopAtTarget are the two fields a preset does NOT get
+// the final say on: both are per-ROOM choices layered over the variant preset by
+// NewGame. Every other field is variant-derived. See their comments below.
 type VariantRules struct {
 	// DealShape selects the dealing sequence — see DealShape.
 	DealShape DealShape
@@ -191,6 +191,21 @@ type VariantRules struct {
 	// and the per-hand reset seed DeclarationsResolved from it, which makes the
 	// remaining guards fall out on their own.
 	DeclarationsEnabled bool
+	// StopAtTarget is "dosta" (enough): whether the match ends the INSTANT a
+	// team's running total reaches the 1001/501 target, hand unfinished. False —
+	// both presets' value and the historical behaviour — finishes the current hand
+	// and checks the target once, in scoreHand.
+	//
+	// Read by stopAtTargetIfReached (scoring.go) and nowhere else. THAT function's
+	// doc comment is the canonical statement of the rule — what the running total
+	// is, where the checkpoints are and why there are exactly three of them — and
+	// is deliberately not restated here, so there is one place to correct.
+	//
+	// Like DeclarationsEnabled above (and unlike every other field here) this is a
+	// per-ROOM setting, not a variant property. Both presets return false and
+	// NewGame overrides it from the room's configuration. It is the SECOND
+	// rule-config field exposed at room creation.
+	StopAtTarget bool
 	// TieRule selects how a tied hand is settled — see TieRule. This field
 	// states each variant's AUTHENTIC rule; the engine currently awards every
 	// tied hand to the taker's opponents for both variants as a deliberate
@@ -209,8 +224,9 @@ type VariantRules struct {
 // every round-1 take).
 //
 // DeclarationsEnabled is true in both presets because declarations are the
-// default in both variants. It is the one field a caller may override, and only
-// NewGame does so, from the room's setting.
+// default in both variants; StopAtTarget is false in both because finishing the
+// hand is. They are the two fields a caller may override, and only NewGame does
+// so, from the room's settings.
 func RulesFor(v Variant) VariantRules {
 	if v == VariantCroatia {
 		return VariantRules{
@@ -220,6 +236,7 @@ func RulesFor(v Variant) VariantRules {
 			DeclarationOverlap:  true,
 			DeclarationTiming:   DeclarationTimingDedicatedPhase,
 			DeclarationsEnabled: true,
+			StopAtTarget:        false,
 			TieRule:             TieRuleAllToOpponents,
 		}
 	}
@@ -230,6 +247,7 @@ func RulesFor(v Variant) VariantRules {
 		DeclarationOverlap:  false,
 		DeclarationTiming:   DeclarationTimingDuringFirstTrick,
 		DeclarationsEnabled: true,
+		StopAtTarget:        false,
 		TieRule:             TieRuleHangingPoints,
 	}
 }

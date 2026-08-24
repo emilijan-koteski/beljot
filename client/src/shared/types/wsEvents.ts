@@ -371,6 +371,13 @@ export interface RoomCreatedPayload {
    * that predates the column correctly imply.
    */
   declarationsEnabled?: boolean;
+  /**
+   * "Dosta": whether the match ends the instant a team reaches the target, hand
+   * unfinished, so the lobby card's chip stays live. Optional and compared with
+   * `=== true`: absent means OFF (finish the hand), which is what an older server
+   * and any payload that predates the column correctly imply.
+   */
+  stopAtTarget?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -413,6 +420,13 @@ export interface RoomUpdatedPayload {
    * that predates the column correctly imply.
    */
   declarationsEnabled?: boolean;
+  /**
+   * "Dosta": whether the match ends the instant a team reaches the target, hand
+   * unfinished, so the lobby card's chip stays live. Optional and compared with
+   * `=== true`: absent means OFF (finish the hand), which is what an older server
+   * and any payload that predates the column correctly imply.
+   */
+  stopAtTarget?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -40,6 +40,9 @@ func RefreshDerivedFlags(state *GameState) {
 	// anyway so the wire field has exactly one writer and cannot drift from the
 	// config the engine reads.
 	state.DeclarationsEnabled = state.Rules.DeclarationsEnabled
+	// Same deal: constant per match, mirrored here so Rules.StopAtTarget is the
+	// single source and the wire field has exactly one writer.
+	state.StopAtTarget = state.Rules.StopAtTarget
 }
 
 func applyAction(state *GameState, action Action) (*GameState, error) {
