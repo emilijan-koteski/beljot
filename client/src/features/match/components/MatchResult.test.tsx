@@ -432,4 +432,20 @@ describe("MatchResult", () => {
     await waitFor(() => expect(screen.getAllByTestId("friend-button-friends")).toHaveLength(3));
     expect(screen.queryByTestId("friend-button-remove")).toBeNull();
   });
+
+  // A "dosta" match ends with cards still in the player's hand and a score that
+  // jumped, so without a line naming the rule the screen reads as a bug. Verified
+  // live: "They Won!" with three unplayed cards and no explanation.
+  it("explains a match that stopped at the target", () => {
+    renderResult({
+      data: { ...matchData, outcomeReason: "target_reached" },
+    });
+    expect(screen.getByTestId("match-result-target-reached-note")).toBeInTheDocument();
+    expect(screen.queryByTestId("match-result-surrender-note")).not.toBeInTheDocument();
+  });
+
+  it("shows no such note on a normal end", () => {
+    renderResult({ data: { ...matchData, outcomeReason: "natural" } });
+    expect(screen.queryByTestId("match-result-target-reached-note")).not.toBeInTheDocument();
+  });
 });

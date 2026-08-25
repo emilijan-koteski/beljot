@@ -283,7 +283,7 @@ func playFinalTrick(t *testing.T, gs *game.GameState) *game.GameState {
 func TestNoDeclarationsCarriesOntoTheWire(t *testing.T) {
 	t.Run("off", func(t *testing.T) {
 		gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"}, [4]bool{},
-			game.VariantBitola, "1001", 1, false)
+			game.VariantBitola, "1001", 1, false, false)
 		assert.False(t, gs.DeclarationsEnabled)
 		assert.Equal(t, gs.Rules.DeclarationsEnabled, gs.DeclarationsEnabled)
 
@@ -296,7 +296,7 @@ func TestNoDeclarationsCarriesOntoTheWire(t *testing.T) {
 
 	t.Run("on", func(t *testing.T) {
 		gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"}, [4]bool{},
-			game.VariantBitola, "1001", 1, true)
+			game.VariantBitola, "1001", 1, true, false)
 		assert.True(t, gs.DeclarationsEnabled)
 		assert.False(t, gs.DeclarationsResolved, "an ordinary hand starts with the contest open")
 	})

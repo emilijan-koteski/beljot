@@ -34,11 +34,12 @@ const rulesGoldensDir = "testdata/contract"
 // that adding tags to the live config (and risking it leaking onto the wire)
 // is never needed to keep this gate.
 //
-// DeclarationsEnabled is deliberately ABSENT. This golden pins what a VARIANT
-// implies, and that field is a per-room setting the owner chooses — both presets
-// return true, so pinning it here would record a constant while implying the TS
-// mirror should model it. The client learns it from the match_state wire flag
-// instead, which is gated by the ws events golden and the Zod schema.
+// DeclarationsEnabled and StopAtTarget are deliberately ABSENT. This golden pins
+// what a VARIANT implies, and both of those are per-room settings the owner
+// chooses — both presets return the same value for each, so pinning them here
+// would record a constant while implying the TS mirror should model them. The
+// client learns both from their match_state wire flags instead, which are gated
+// by the ws events golden and the Zod schema.
 type variantRuleFacts struct {
 	DealShape          string `json:"dealShape"`
 	HasTrumpCandidate  bool   `json:"hasTrumpCandidate"`

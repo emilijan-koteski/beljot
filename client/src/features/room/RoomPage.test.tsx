@@ -2212,6 +2212,38 @@ describe("RoomPage honour", () => {
     expect(screen.queryByTestId("badge-no-declarations")).not.toBeInTheDocument();
   });
 
+  it("badges a room that stops at the target", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1, stopAtTarget: true },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("badge-stop-at-target")).toBeInTheDocument());
+  });
+
+  it("says nothing about dosta on an ordinary room, absent field included", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    // defaultRoom carries no stopAtTarget at all, which is the shape an older
+    // server sends. Absent must read as OFF, so no badge — the mirror of the
+    // declarations case above, with the polarity flipped.
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("badge-variant")).toBeInTheDocument());
+    expect(screen.queryByTestId("badge-stop-at-target")).not.toBeInTheDocument();
+  });
+
   it("renders no honour badges on an ungated room", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(

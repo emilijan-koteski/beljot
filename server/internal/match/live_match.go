@@ -228,11 +228,13 @@ func (m *Manager) AddUserRemovedHook(fn func(userID uint)) {
 // initial state. coinBuyIn is the per-human stake to capture on the session for
 // match-end settlement (Story 9.2); 0 for no-economy / quick-play matches.
 //
-// declarationsEnabled is the room's melds-and-Belote setting, passed straight
-// through to NewGame. Positional and non-optional on purpose — false is the
-// destructive value, so a forgotten argument must be a compile error rather
-// than a silently declarations-less match.
-func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool) error {
+// declarationsEnabled is the room's melds-and-Belote setting and stopAtTarget is
+// its "dosta" setting, both passed straight through to NewGame. Positional and
+// non-optional on purpose: for declarationsEnabled false is the destructive
+// value, so a forgotten argument must be a compile error rather than a silently
+// declarations-less match, and stopAtTarget follows the same shape for
+// consistency with that shipped precedent.
+func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool) error {
 	m.mu.Lock()
 	if _, exists := m.sessions[roomID]; exists {
 		m.mu.Unlock()
@@ -248,7 +250,7 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		botSeats[p.Seat] = p.IsBot
 	}
 
-	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID, declarationsEnabled)
+	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID, declarationsEnabled, stopAtTarget)
 
 	// Stamp each human seat's static lifetime level (Story: level-in-match).
 	// Levels derive from total_xp via the XP service and are captured ONCE here
@@ -882,7 +884,21 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// PhaseHandComplete (next hand deals on action:continue) instead of dealing
 		// immediately, so detect the phase transition into PhaseHandComplete (or
 		// PhaseMatchEnd) rather than a HandNumber increment.
+		//
+		// The two extra terms both exist because a HandScore outlives its hand
+		// (startNewHand never clears LastHandResult), so "non-nil" alone is not
+		// "a hand just finished":
+		//
+		//   - HandNumber == oldState.HandNumber: the result describes THIS hand.
+		//     Without it, accepting a surrender in hand 3 re-announced hand 2's
+		//     numbers, because a surrender also transitions into match_end.
+		//   - oldState.Phase != PhaseHandComplete: a hand cannot FINISH from
+		//     hand_complete — it already finished. Without it, an instant win on a
+		//     freshly dealt hand (continue -> deal -> all 8 trumps -> match_end)
+		//     re-announced the hand that had just been scored before the deal.
 		handJustScored := newState.LastHandResult != nil &&
+			newState.LastHandResult.HandNumber == oldState.HandNumber &&
+			oldState.Phase != game.PhaseHandComplete &&
 			oldState.Phase != newState.Phase &&
 			(newState.Phase == game.PhaseHandComplete || newState.Phase == game.PhaseMatchEnd)
 		if handJustScored {
@@ -999,6 +1015,16 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// on the FOURTH seat's answer, the same action that opens trick 1, so the
 		// reveal rides ahead of the playing-phase match_state below.
 		m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
+		// A "dosta" room can end the match INSIDE the declaration contest: the
+		// award crossed the target, so closeDeclarationPhase's stop fired and the
+		// phase never became playing. The reveal above still goes out (the contest
+		// really did resolve), but match_state must not — handleMatchEnd emits
+		// event:match_end and the trailing match_state itself, after persistence,
+		// and shipping a match_state ahead of match_end races MatchPage's
+		// stale-state redirect (Story 8.5-1 AC4).
+		if newState.Phase == game.PhaseMatchEnd {
+			return
+		}
 		// Always follow with full state so the client clears awaitingDeclaration,
 		// advances activePlayerSeat, and picks up declarationsResolved. The
 		// event:declarations_resolved handler is reveal-only and does not sync state.
@@ -1027,7 +1053,39 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		// gets no collect animation. A Belot prompt can only fire on tricks 1-7 (a
 		// player cannot hold both trump K and Q at trick 8), so no hand_scored
 		// follows here; trick 1 resolving this way still reveals declarations.
-		if len(oldState.CurrentTrick) == 4 {
+		//
+		// The TrickNumber comparison is what makes this arm safe in a "dosta" room,
+		// and it is not the same test as "four cards were on the table". This arm
+		// is SHARED by announce_belot and skip_belot, and three different things
+		// can arrive here with oldState.CurrentTrick full:
+		//
+		//  1. announce_belot whose +20 itself crosses the target. The engine returns
+		//     before finishCardPlay, so the trick is NOT resolved — TrickNumber is
+		//     unchanged — and emitting trick_resolved would broadcast a winner for a
+		//     trick abandoned mid-air.
+		//  2. skip_belot, which awards nothing but still runs finishCardPlay. The
+		//     trick resolves, so checkpoint 1 may cross on its CARD points — and
+		//     that trick really happened, so its trick_resolved (and, at Bitola
+		//     trick 1, its declarations_resolved reveal) must still go out.
+		//  3. announce_belot whose +20 falls short: identical to (2).
+		//
+		// Testing the phase instead of the trick would suppress the events in (2)
+		// and (3) — a real trick with no collect animation and, at trick 1, a lost
+		// meld reveal.
+		// TrickNumber is the discriminator and a phase comparison is NOT a usable
+		// substitute or supplement: an announce-crossing stop also changes the phase
+		// (playing -> match_end) while leaving the trick UNRESOLVED, so a phase term
+		// would fire this block and broadcast a winner for a trick abandoned
+		// mid-air — the exact defect this gate exists to prevent.
+		//
+		// The one shape TrickNumber alone would misread is trick 8, where
+		// resolveTrick sets PhaseHandScoring and returns before incrementing. That
+		// is unreachable here: at trick 8 a seat holds a single card, so it cannot
+		// hold the other trump royal and no Belote can be prompted (the comment
+		// above says tricks 1-7 for this reason). If that ever changes, discriminate
+		// on newState.TrickWinnerSeat != nil, which resolveTrick leaves SET on trick
+		// 8 and nils on tricks 1-7 — never on a phase comparison.
+		if len(oldState.CurrentTrick) == 4 && newState.TrickNumber != oldState.TrickNumber {
 			winnerSeat := trickResolvedWinnerSeat(oldState, newState)
 			trickCards := make([]string, 0, 4)
 			for _, tc := range oldState.CurrentTrick {
@@ -1040,6 +1098,16 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrickResolved, trickResolved))
 			m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
+		}
+		// A "dosta" room can end the match on any of the three crossings above. The
+		// guard sits AFTER every typed event this arm owes — the announcement and,
+		// where the trick really resolved, its winner and reveal all describe things
+		// that happened — and BEFORE broadcastState, because handleMatchEnd emits
+		// event:match_end and the trailing match_state itself, after persistence.
+		// Shipping a match_state first races MatchPage's stale-state redirect
+		// (Story 8.5-1 AC4). Same placement as the ActionPlayCard and declare arms.
+		if newState.Phase == game.PhaseMatchEnd {
+			return
 		}
 		// Always follow with full state so the client clears pendingBelotSeat,
 		// advances activePlayerSeat, and resolves the trick if the belot action
@@ -1198,7 +1266,13 @@ func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newStat
 		capotTeam = &v
 	}
 	row := HandResult{
-		HandNumber:      oldState.HandNumber,
+		// The result's OWN hand number, not oldState's. They agree on the normal
+		// paths (buffering rides the continue that deals the next hand, or the
+		// match-end transition), but a stale result reaching a match end — an
+		// accepted surrender, or an instant win on a freshly dealt hand — used to
+		// stamp the previous hand's figures with the current hand's number,
+		// producing a row for a hand that had already been recorded.
+		HandNumber:      hr.HandNumber,
 		TeamACardPoints: hr.TeamACardPoints,
 		TeamBCardPoints: hr.TeamBCardPoints,
 		TeamADeclPoints: hr.TeamADeclPoints,
@@ -1214,8 +1288,19 @@ func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newStat
 		TeamBHandTotal:  hr.TeamBHandTotal,
 	}
 	session.mu.Lock()
+	defer session.mu.Unlock()
+	// Idempotent by hand number. The gate above can fire twice for one hand — the
+	// continue that deals hand N+1 buffers hand N, and a match end reached later
+	// in that same hand carries the same result forward — and `hand_results` has a
+	// UNIQUE (match_id, hand_number) constraint, so a duplicate would fail the
+	// whole CreateWithHands transaction and lose the entire match record rather
+	// than just one row.
+	for _, existing := range session.handResults {
+		if existing.HandNumber == row.HandNumber {
+			return
+		}
+	}
 	session.handResults = append(session.handResults, row)
-	session.mu.Unlock()
 }
 
 // handleMatchEnd persists the match record, updates room status, broadcasts
@@ -1281,30 +1366,34 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	honorMsgs := m.recordHonor(session.roomID, session.playerIDs, botSeats, connected, -1)
 
 	matchRecord := &Match{
-		RoomID:           session.roomID,
-		Player1ID:        ids[0],
-		Player2ID:        ids[1],
-		Player3ID:        ids[2],
-		Player4ID:        ids[3],
-		Player1IsBot:     botFlags[0],
-		Player2IsBot:     botFlags[1],
-		Player3IsBot:     botFlags[2],
-		Player4IsBot:     botFlags[3],
-		HasBots:          hasBots,
-		TeamAScore:       finalState.TeamScores[game.TeamA],
-		TeamBScore:       finalState.TeamScores[game.TeamB],
-		WinnerTeam:       winnerTeam,
-		Variant:          string(finalState.Variant),
-		MatchMode:        finalState.MatchMode,
-		StartedAt:        session.startedAt,
-		CompletedAt:      time.Now(),
-		Status:           "completed",
-		SurrenderedBy:    surrenderedBy,
-		CoinBuyIn:        session.coinBuyIn,
-		Player1CoinDelta: deltas[0],
-		Player2CoinDelta: deltas[1],
-		Player3CoinDelta: deltas[2],
-		Player4CoinDelta: deltas[3],
+		RoomID:       session.roomID,
+		Player1ID:    ids[0],
+		Player2ID:    ids[1],
+		Player3ID:    ids[2],
+		Player4ID:    ids[3],
+		Player1IsBot: botFlags[0],
+		Player2IsBot: botFlags[1],
+		Player3IsBot: botFlags[2],
+		Player4IsBot: botFlags[3],
+		HasBots:      hasBots,
+		TeamAScore:   finalState.TeamScores[game.TeamA],
+		TeamBScore:   finalState.TeamScores[game.TeamB],
+		WinnerTeam:   winnerTeam,
+		Variant:      string(finalState.Variant),
+		MatchMode:    finalState.MatchMode,
+		// From the RESOLVED rule config, which is what the engine actually played
+		// by — not from the room, whose settings may since have changed.
+		DeclarationsEnabled: finalState.Rules.DeclarationsEnabled,
+		StopAtTarget:        finalState.Rules.StopAtTarget,
+		StartedAt:           session.startedAt,
+		CompletedAt:         time.Now(),
+		Status:              "completed",
+		SurrenderedBy:       surrenderedBy,
+		CoinBuyIn:           session.coinBuyIn,
+		Player1CoinDelta:    deltas[0],
+		Player2CoinDelta:    deltas[1],
+		Player3CoinDelta:    deltas[2],
+		Player4CoinDelta:    deltas[3],
 	}
 
 	// Copy buffered hand results under RLock to avoid holding the lock during I/O.
@@ -1555,18 +1644,44 @@ func (m *Manager) handleDeclarationTimeout(session *LiveMatch, generation uint64
 		session.mu.Unlock()
 		return
 	}
-	// Trick 1 is open — this is a real turn again, so the per-move timer comes
-	// back exactly as it does on the answer-driven close.
-	m.setTurnExpiry(session, newState)
-	m.startTimerLocked(session, newState.ActivePlayerSeat)
+	// In a "dosta" room the forced close can CROSS the target — the contest's
+	// award is one of the three mid-hand point moments — and then trick 1 never
+	// opens. Skip the per-move timer in that case: there is no turn to clock.
+	matchEnded := newState.Phase == game.PhaseMatchEnd
+	if !matchEnded {
+		// Trick 1 is open — this is a real turn again, so the per-move timer comes
+		// back exactly as it does on the answer-driven close.
+		m.setTurnExpiry(session, newState)
+		m.startTimerLocked(session, newState.ActivePlayerSeat)
+	}
 	session.gameState = newState
 	playerIDs := session.playerIDs
+	startedAt := session.startedAt
 	session.mu.Unlock()
 	userIDs := humanUserIDs(playerIDs)
 
 	// Same ordered pair the answer path sends: the reveal rides ahead of the
 	// playing-phase snapshot so the panel is on screen before trick 1 renders.
 	m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
+
+	// A timeout-driven close that crossed the target ends the match HERE, and it
+	// has to go through handleMatchEnd exactly as the action-driven paths do —
+	// mirroring handleHandCompleteTimeout's instant-win branch. This path had no
+	// PhaseMatchEnd check at all before "dosta" existed because nothing could end
+	// a match inside it; without the branch the match would end with no
+	// persistence, no coin settlement, no XP or honor, no event:match_end and a
+	// session that is never removed, leaving the table hung permanently.
+	if matchEnded {
+		// No bufferHandResultIfScored and no observeBotMemory before this call,
+		// unlike handleHandCompleteTimeout's instant-win branch, and that is
+		// deliberate rather than a gap: the stop nils LastHandResult, so the buffer
+		// is a guaranteed no-op, and no hand boundary was crossed (no hand was
+		// dealt or scored), so the bot memory has nothing to observe.
+		matchEndPayload := buildMatchEndPayload(oldState, newState, game.Action{}, startedAt)
+		m.handleMatchEnd(session, newState, nil, matchEndPayload)
+		return
+	}
+
 	m.broadcastState(playerIDs, newState)
 
 	// Trick 1's leader may be a bot.
@@ -1977,17 +2092,43 @@ func safeDerefInt(p *int) int {
 // OutcomeReason is always set explicitly so the wire format is fully symmetric:
 // natural-end matches emit "natural", surrender emits "surrender".
 func buildMatchEndPayload(oldState, newState *game.GameState, action game.Action, startedAt time.Time) ws.MatchEndPayload {
+	// A zero startedAt would report the seconds since year 1 — about 6.4e10, which
+	// the client renders as a match duration. Four separate call sites capture
+	// this value from the session, so the failure is one forgotten assignment
+	// away, and nothing downstream would flag a number that absurd. Report an
+	// unknown duration as 0 and say so in the log rather than shipping fiction.
+	durationSec := 0
+	if startedAt.IsZero() {
+		slog.Error("match: match-end payload built with a zero startedAt; duration reported as 0",
+			"roomID", newState.RoomID)
+	} else {
+		durationSec = int(time.Since(startedAt).Seconds())
+	}
+
 	payload := ws.MatchEndPayload{
 		WinnerTeam:       safeDerefInt(newState.WinnerTeam),
 		TeamAFinalScore:  newState.TeamScores[game.TeamA],
 		TeamBFinalScore:  newState.TeamScores[game.TeamB],
-		MatchDurationSec: int(time.Since(startedAt).Seconds()),
+		MatchDurationSec: durationSec,
 		OutcomeReason:    ws.OutcomeReasonNatural,
 	}
 	if action.Type == game.ActionSurrenderAccept && oldState != nil && oldState.SurrenderProposerSeat != nil {
 		proposerSeat := *oldState.SurrenderProposerSeat
 		payload.OutcomeReason = ws.OutcomeReasonSurrender
 		payload.SurrenderedBySeat = &proposerSeat
+	}
+	// A "dosta" stop. Read from the flag the engine set rather than inferred:
+	// "StopAtTarget on and LastHandResult nil" also describes a surrender and an
+	// instant win. Checked after the surrender branch because the two are
+	// mutually exclusive — a surrender never runs the stop — and because a
+	// surrender's own note is the more specific thing to tell the player.
+	//
+	// The cut-short hand's POINTS are deliberately not carried here. They are
+	// already inside the final scores, and the client recovers them by
+	// subtracting the persisted hand rows from the final score — which works on
+	// the profile's match history too, where no match_end payload exists.
+	if newState.StoppedAtTarget {
+		payload.OutcomeReason = ws.OutcomeReasonTargetReached
 	}
 	return payload
 }

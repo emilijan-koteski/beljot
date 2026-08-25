@@ -427,6 +427,21 @@ func closeDeclarationPhase(state *GameState) {
 	state.ActivePlayerSeat = (state.DealerSeat + 1) % 4
 	state.TrickNumber = 1
 	state.CurrentTrick = []TrickCard{}
+
+	// "Dosta" checkpoint 2 of 3 (the rule itself is stated once, on
+	// stopAtTargetIfReached): the declaration contest just awarded points, so
+	// a team may have crossed the target before a single card was played. Checked
+	// LAST, after PhasePlaying is set, so the stop wins over the transition — the
+	// phase never becomes playing on the wire and trickNumber stays 0 for a
+	// crossing Croatian contest. This is the single choke point for the Croatian
+	// declaring→playing move, so it covers both the answer-driven close and
+	// ForceCloseDeclarationPhase.
+	if stopAtTargetIfReached(state) {
+		// The stop already reverted Phase to PhaseMatchEnd and cleared
+		// AwaitingDeclaration; trick 1's opening is undone here so the aborted
+		// hand's snapshot does not claim a trick was under way.
+		state.TrickNumber = 0
+	}
 }
 
 // ForceCloseDeclarationPhase resolves the declaration contest and opens trick 1
@@ -599,6 +614,38 @@ func handleAnnounceBelot(state *GameState, action Action) (*GameState, error) {
 	newState.BelotAnnounced = true
 	newState.PendingBelotSeat = nil
 
+	// "Dosta" checkpoint 3 of 3 (see stopAtTargetIfReached): the +20 just landed.
+	// Normally the check returns BEFORE finishCardPlay — letting the deferred turn
+	// flow run would advance play, or resolve the whole trick, with a team already
+	// over the target, which is the one thing "dosta" forbids. The cost is a trick
+	// abandoned with up to four cards face up, which is exactly where play stopped
+	// and is truthful to show. handleSkipBelot below awards nothing, so it needs no
+	// hook.
+	//
+	// THE ONE DEFERRAL IN THE WHOLE RULE, and it is a correctness fix rather than a
+	// nicety. Under Bitola timing seats declare DURING trick 1 and the contest is
+	// resolved only when that trick completes (resolveTrickWithDeclarations), and
+	// DeclarationPoints is written in exactly one place — resolveDeclarationsForHand.
+	// So a +20 that crosses part-way through trick 1 would end the match with every
+	// declared meld still unconverted: a player who declared a quarte simply loses
+	// it, and in a close match that decides the winner. Deferring means the +20 is
+	// banked now, trick 1 plays out (at most two or three more cards), and
+	// checkpoint 1 evaluates a COMPLETE running total at the trick-1 resolution.
+	//
+	// The condition needs no variant comparison (D-VAR-1) and no new state field:
+	// Croatian has already resolved its dedicated declaration phase before trick 1
+	// opens, and a declarations-off room starts every hand with DeclarationsResolved
+	// seeded true, so neither of them ever defers. Both non-deferrals are asserted.
+	//
+	// REJECTED, and must not be reintroduced: resolving the contest here, at the
+	// Belote moment, so the checkpoint could fire immediately. At card 2 the later
+	// seats have not been asked yet, so that would settle an INCOMPLETE contest and
+	// clear melds that were never compared — a worse loss than the one it fixes.
+	deferForOpenTrick1Contest := newState.TrickNumber == 1 && !newState.DeclarationsResolved
+	if !deferForOpenTrick1Contest && stopAtTargetIfReached(newState) {
+		return newState, nil
+	}
+
 	// Resume deferred turn flow
 	finishCardPlay(newState)
 
@@ -653,6 +700,21 @@ func resolveTrickWithDeclarations(state *GameState) {
 	// Belot since trickNumber starts at 1 and goes to 8, but for safety):
 	if state.Phase == PhaseHandScoring && !state.DeclarationsResolved {
 		resolveDeclarationsForHand(state)
+	}
+
+	// "Dosta" checkpoint 1 of 3 (see stopAtTargetIfReached), and the one that
+	// covers the most ground: the
+	// trick's card points AND (at trick 1 in Bitola) the declaration contest have
+	// both just landed, so this single site tests one settled total for tricks 1-7
+	// and for Bitola's trick-1 resolve. Hooked on the OUTER function rather than
+	// resolveTrick precisely so there is no window in which a half-updated total
+	// is tested.
+	//
+	// stopAtTargetIfReached self-suppresses on PhaseHandScoring, so trick 8 falls
+	// straight through to its normal scoreHand path below — a completed hand keeps
+	// its bonuses and its own target check in both settings.
+	if stopAtTargetIfReached(state) {
+		return
 	}
 
 	// After all tricks complete, score the hand and start next hand (or end match).

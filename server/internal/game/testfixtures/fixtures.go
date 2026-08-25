@@ -869,3 +869,93 @@ func WithoutDeclarations(gs *game.GameState) *game.GameState {
 	gs.DeclarationsResolved = true
 	return gs
 }
+
+// WithStopAtTarget returns gs configured as a room that plays "dosta" (enough):
+// the match ends the instant a team's running total reaches the 1001/501 target,
+// hand unfinished. It is the factory for every stop-at-target test, in either
+// variant, and it exists so the two-part setup lives in ONE place — the same
+// reason WithoutDeclarations above does.
+//
+// Two parts, mirroring the mutator above:
+//
+//   - Rules.StopAtTarget is what the three engine checkpoints read.
+//   - StopAtTarget is the wire mirror, which RefreshDerivedFlags recomputes at
+//     ApplyAction's exit — set here so a fixture inspected BEFORE any action
+//     already carries the right snapshot.
+//
+// Mutates and returns gs so it composes with any base fixture:
+//
+//	gs := testfixtures.WithStopAtTarget(testfixtures.NewGameMidPlayWithScores(5, 940, 0))
+func WithStopAtTarget(gs *game.GameState) *game.GameState {
+	gs.Rules.StopAtTarget = true
+	gs.StopAtTarget = true
+	return gs
+}
+
+// WithScoredPreviousHand puts gs on hand handNumber (which must be 2 or more)
+// carrying the LastHandResult of the hand BEFORE it — the exact shape a real
+// match has from hand 2 onwards.
+//
+// This exists because startNewHand deliberately never clears LastHandResult: the
+// result of hand N-1 has to survive into the state handed to the session manager
+// so it can be broadcast, and it is only overwritten by the next scoreHand. Every
+// mid-hand fixture in this package starts on hand 1 with a nil result, which
+// makes any "the code nils LastHandResult" assertion pass on the fixture's zero
+// value rather than on the code. Compose this in and the assertion has something
+// to prove:
+//
+//	gs := testfixtures.WithScoredPreviousHand(testfixtures.NewGameMidPlay(5), 3)
+//
+// The numbers are deliberately distinctive (81/81 card points, a +10 last trick
+// to team A, hand totals 111/81) so a leaked result is recognisable in a failure
+// message or a persisted hand_results row rather than looking like plausible
+// output of the hand under test.
+func WithScoredPreviousHand(gs *game.GameState, handNumber int) *game.GameState {
+	if handNumber < 2 {
+		panic("testfixtures: WithScoredPreviousHand needs handNumber >= 2 — hand 1 has no previous hand")
+	}
+	gs.HandNumber = handNumber
+	gs.LastHandResult = &game.HandScore{
+		TeamACardPoints: 81,
+		TeamBCardPoints: 81,
+		TeamADeclPoints: 20,
+		TeamBDeclPoints: 0,
+		LastTrickTeam:   game.TeamA,
+		LastTrickSeat:   0,
+		LastTrickBonus:  10,
+		Capot:           false,
+		CapotTeam:       nil,
+		CapotBonus:      0,
+		FailedContract:  false,
+		ContractingTeam: game.TeamA,
+		TeamAHandTotal:  111,
+		TeamBHandTotal:  81,
+	}
+	return gs
+}
+
+// NewGameMidPlayWithScores is NewGameMidPlay with the MATCH scores set — the one
+// thing it adds, and all its name claims. It exists because NewGameNearEnd, the
+// only other score-configurable factory, forces trick 8: the single trick that is
+// deliberately NOT a "dosta" checkpoint, since a completed hand always goes
+// through scoreHand. So it cannot set up a mid-hand stop at all.
+//
+// Everything else is NewGameMidPlay's table, untouched: Bitola, 1001, trump
+// Hearts, TrumpCallerSeat = seat 1 (team B), declarations and Belote already
+// handled, hands trimmed to 8-(trickNum-1) cards, and HandPoints/TricksWon
+// carrying its simulated history for trickNum > 1.
+//
+// HOW CALLERS USE IT: leave HandPoints as the factory built it and back-compute
+// the match score from the total you want to hit — seed
+// `target - gs.HandPoints[team] - <what the next award is worth>` so the crossing
+// lands on the boundary exactly. That is what every current call site does, and
+// it keeps the fixture's own arithmetic out of the assertion. Overwriting
+// HandPoints instead works too, but then the seed and the fixture disagree about
+// the hand's history.
+//
+// trickNum is clamped to [1,8] by NewGameMidPlay; pass 1-7 for a mid-hand stop.
+func NewGameMidPlayWithScores(trickNum, teamAScore, teamBScore int) *game.GameState {
+	gs := NewGameMidPlay(trickNum)
+	gs.TeamScores = [2]int{teamAScore, teamBScore}
+	return gs
+}

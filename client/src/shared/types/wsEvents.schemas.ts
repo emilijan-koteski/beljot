@@ -138,6 +138,13 @@ export const EventMatchStateSchema = z.strictObject({
   // GameState.DeclarationsEnabled field; the contract test is what enforces
   // that, not runtime.
   declarationsEnabled: z.boolean(),
+  // "Dosta": whether the match ends the instant a team's running total reaches
+  // the target, hand unfinished. The SECOND rule-config field the server puts on
+  // the wire, and for the same reason as declarationsEnabled above — the owner
+  // chose it and the UI labels the table with it. Must land in the same commit as
+  // the Go GameState.StopAtTarget field; the contract test is what enforces that,
+  // not runtime.
+  stopAtTarget: z.boolean(),
   // No `deck` field: the 11 held-back Bitola cards are hidden information and
   // Story 12.10 removed them from the wire outright (GameState.Deck is
   // json:"-" on the Go side). strictObject means the field cannot quietly
@@ -250,6 +257,7 @@ export const MatchEndPayloadSchema = z.strictObject({
       z.literal("timeout"),
       z.literal("abandonment"),
       z.literal("natural"),
+      z.literal("target_reached"),
     ])
     .optional(),
   surrenderedBySeat: z.number().optional(),

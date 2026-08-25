@@ -1594,6 +1594,9 @@ export function MatchPage() {
         // so a payload without it never reaches the store at all. The absent-means-ON
         // guard belongs only where nothing validates the shape (Room, RoomCreated).
         declarationsEnabled={matchState.declarationsEnabled}
+        // Passed straight through for the same reason: the strict schema requires
+        // the key, so there is nothing to guard against here.
+        stopAtTarget={matchState.stopAtTarget}
         matchTarget={matchTarget}
       />
 
@@ -2275,7 +2278,12 @@ export function MatchPage() {
 
       {/* Settings + rules dialogs — driven by the bottom-right HUD buttons */}
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <RulesDialog open={rulesOpen} onOpenChange={setRulesOpen} variant={matchState.variant} />
+      <RulesDialog
+        open={rulesOpen}
+        onOpenChange={setRulesOpen}
+        variant={matchState.variant}
+        stopAtTarget={matchState.stopAtTarget}
+      />
 
       {/* Error toast */}
       {errorToast && (

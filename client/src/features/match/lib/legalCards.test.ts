@@ -63,6 +63,7 @@ function makeState(args: {
     biddingPassCount: 0,
     mustPickTrump: false,
     declarationsEnabled: true,
+    stopAtTarget: false,
     activePlayerSeat: args.mySeat,
     trickNumber: 1,
     currentTrick: args.currentTrick,

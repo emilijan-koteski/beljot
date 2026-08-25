@@ -58,7 +58,7 @@ func TestTrumpSelected_EmittedWithEmptyCardIDWhenNoCandidate(t *testing.T) {
 			mgr := match.NewManager(hub, newMockMatchRepo())
 
 			const roomID = uint(100)
-			require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true))
+			require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 			t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 			gs := tc.state()

@@ -259,6 +259,14 @@ const (
 	OutcomeReasonSurrender   OutcomeReason = "surrender"
 	OutcomeReasonTimeout     OutcomeReason = "timeout"
 	OutcomeReasonAbandonment OutcomeReason = "abandonment"
+	// OutcomeReasonTargetReached is a room playing "dosta": a team's running
+	// total reached the match target part-way through a hand, so the match ended
+	// there and that hand was never finished. Distinct from Natural because the
+	// player's experience is different in a way the UI must explain — the score
+	// jumps and the match is over with cards still in hand, and the hand
+	// breakdown is one hand short because the aborted hand is deliberately never
+	// scored.
+	OutcomeReasonTargetReached OutcomeReason = "target_reached"
 )
 
 // MatchEndPayload is the typed payload for EventMatchEnd events.
@@ -271,7 +279,7 @@ type MatchEndPayload struct {
 	TeamAFinalScore   int           `json:"teamAFinalScore"`
 	TeamBFinalScore   int           `json:"teamBFinalScore"`
 	MatchDurationSec  int           `json:"matchDurationSec"`
-	OutcomeReason     OutcomeReason `json:"outcomeReason,omitempty"`     // "natural" | "surrender" | "timeout" | "abandonment"
+	OutcomeReason     OutcomeReason `json:"outcomeReason,omitempty"`     // "natural" | "surrender" | "timeout" | "abandonment" | "target_reached"
 	SurrenderedBySeat *int          `json:"surrenderedBySeat,omitempty"` // seat index, only when outcomeReason == "surrender"
 }
 

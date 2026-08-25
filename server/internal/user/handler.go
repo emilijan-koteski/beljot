@@ -213,9 +213,15 @@ type MatchListItem struct {
 	// EndReason says why the match ended: "abandonment" (abandoned rows),
 	// "surrender" (completed via an accepted surrender), or "natural". The
 	// client renders the muted "ended early" history marker from it.
-	EndReason string          `json:"endReason"`
-	Players   []MatchPlayer   `json:"players"`
-	Hands     []MatchHandView `json:"hands"`
+	EndReason string `json:"endReason"`
+	// The two per-room RULE flags the match was played under. Chipped in history
+	// only when they differ from the default, so a chip always carries
+	// information. Read from the MATCH, not the room: a room is reusable and its
+	// settings can change between the matches it hosts.
+	DeclarationsEnabled bool            `json:"declarationsEnabled"`
+	StopAtTarget        bool            `json:"stopAtTarget"`
+	Players             []MatchPlayer   `json:"players"`
+	Hands               []MatchHandView `json:"hands"`
 }
 
 // MatchesListResponse is the envelope returned by GET /users/:id/matches.
@@ -987,7 +993,11 @@ func buildMatchListItem(m match.Match, viewerID uint, usernames map[uint]string)
 		ViewerSeat:  viewerSeat,
 		Outcome:     outcome,
 		EndReason:   endReason,
-		Players:     players,
-		Hands:       hands,
+
+		DeclarationsEnabled: m.DeclarationsEnabled,
+		StopAtTarget:        m.StopAtTarget,
+
+		Players: players,
+		Hands:   hands,
 	}
 }

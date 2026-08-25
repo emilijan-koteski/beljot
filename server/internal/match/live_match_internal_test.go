@@ -284,7 +284,12 @@ func TestBroadcastActionResult_HandCompleteEmitsHandScored(t *testing.T) {
 		TrickWinnerSeat: &winner,
 		CurrentTrick:    []game.TrickCard{},
 		TeamScores:      [2]int{70, 92},
-		LastHandResult:  &game.HandScore{LastTrickTeam: 1, LastTrickSeat: 3, LastTrickBonus: 10},
+		LastHandResult: &game.HandScore{
+			// The hand this result describes. Required: the broadcast gate now checks
+			// it against oldState.HandNumber, because a HandScore outlives its hand.
+			HandNumber:    1,
+			LastTrickTeam: 1, LastTrickSeat: 3, LastTrickBonus: 10,
+		},
 	}
 	card := game.Card{Rank: game.Rank7, Suit: game.SuitHearts}
 
@@ -400,7 +405,7 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 		{UserID: 30, Username: "c", Seat: 2},
 		{UserID: 40, Username: "d", Seat: 3},
 	}
-	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0, true))
+	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0, true, false))
 	t.Cleanup(func() { m.RemoveSession(roomID) })
 
 	// passCount 3: the other three seats have passed and the dealer is on the

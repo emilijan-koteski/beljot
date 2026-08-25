@@ -41,7 +41,7 @@ func croatianDeclaringSession(
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	// The session's own variant must match the state it runs, or session-level
 	// code that reads it is exercised in the wrong configuration.
-	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", timerSec, 10, 120, 0, true))
+	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", timerSec, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
@@ -360,7 +360,7 @@ func TestDeclarationPhase_NoMeldHandStillOpensThePhase(t *testing.T) {
 	const roomID = uint(107)
 
 	mgr := match.NewManager(hub, newMockMatchRepo())
-	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true))
+	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	// A Croatian hand one action short of a resolved bid, with a layout in which
@@ -633,7 +633,7 @@ func TestDeclarationPhase_AllBotSeatsAnswer(t *testing.T) {
 
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	mgr.SetBotDelayForTest(5*time.Millisecond, 10*time.Millisecond)
-	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true))
+	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := markBots(testfixtures.NewGameCroatianDeclaring(game.SuitHearts), 1, 2, 3)

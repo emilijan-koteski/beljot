@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,6 +52,23 @@ function renderModal(open = true) {
   return { onOpenChange };
 }
 
+/**
+ * Every field but name/variant/match-mode/timer/buy-in lives inside the
+ * "Advanced settings" accordion (Create Room redesign) and simply doesn't
+ * exist in the DOM until it's opened — so any test touching declarations,
+ * match end, privacy, the honour gate or new-player policy opens it first.
+ */
+async function openAdvanced(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByTestId("advanced-settings-toggle"));
+}
+
+/** Replace the pre-filled random name with an exact, known value. */
+async function setRoomName(user: ReturnType<typeof userEvent.setup>, name: string) {
+  const input = screen.getByTestId("room-name-input");
+  await user.clear(input);
+  await user.type(input, name);
+}
+
 describe("CreateRoomModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,23 +84,49 @@ describe("CreateRoomModal", () => {
     expect(screen.getByTestId("variant-segmented")).toBeInTheDocument();
     expect(screen.getByTestId("match-mode-segmented")).toBeInTheDocument();
     expect(screen.getByTestId("timer-style-segmented")).toBeInTheDocument();
+    expect(screen.getByTestId("coin-buy-in-chips")).toBeInTheDocument();
+    expect(screen.getByTestId("advanced-settings-toggle")).toBeInTheDocument();
     expect(screen.getByTestId("create-room-button")).toBeInTheDocument();
     expect(screen.getByTestId("cancel-button")).toBeInTheDocument();
   });
 
-  it("disables create button when name is empty", () => {
+  // --- Room name (auto-generated, Create Room redesign) ---
+
+  it("enables the create button by default because the name is pre-filled", () => {
     renderModal(true);
 
-    const createButton = screen.getByTestId("create-room-button");
-    expect(createButton).toBeDisabled();
+    const nameInput = screen.getByTestId("room-name-input") as HTMLInputElement;
+    expect(nameInput.value.trim().length).toBeGreaterThan(0);
+    expect(screen.getByTestId("create-room-button")).toBeEnabled();
+  });
+
+  it("disables the create button when the name is cleared", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    await user.clear(screen.getByTestId("room-name-input"));
+    expect(screen.getByTestId("create-room-button")).toBeDisabled();
+  });
+
+  it("rerolls the name when the shuffle button is clicked", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    const nameInput = screen.getByTestId("room-name-input") as HTMLInputElement;
+    const before = nameInput.value;
+    await user.click(screen.getByTestId("room-name-shuffle"));
+
+    expect(nameInput.value.trim().length).toBeGreaterThan(0);
+    // Extremely unlikely to reroll to the exact same combo twice in a row
+    // given the word-list size, but the helper explicitly avoids the repeat.
+    expect(nameInput.value).not.toBe(before);
   });
 
   it("enables create button when name has text", async () => {
     const user = userEvent.setup();
     renderModal(true);
 
-    const nameInput = screen.getByTestId("room-name-input");
-    await user.type(nameInput, "My Room");
+    await setRoomName(user, "My Room");
 
     const createButton = screen.getByTestId("create-room-button");
     expect(createButton).not.toBeDisabled();
@@ -108,9 +151,7 @@ describe("CreateRoomModal", () => {
     });
 
     renderModal(true);
-
-    const nameInput = screen.getByTestId("room-name-input");
-    await user.type(nameInput, "Test Room");
+    await setRoomName(user, "Test Room");
 
     const createButton = screen.getByTestId("create-room-button");
     await user.click(createButton);
@@ -132,6 +173,8 @@ describe("CreateRoomModal", () => {
         allowNewPlayers: true,
         // Declarations default ON and are always sent, for the same reason.
         declarationsEnabled: true,
+        // "Dosta" defaults OFF (finish the hand) and is always sent too.
+        stopAtTarget: false,
       });
     });
   });
@@ -155,8 +198,7 @@ describe("CreateRoomModal", () => {
     });
 
     renderModal(true);
-
-    await user.type(screen.getByTestId("room-name-input"), "Quick Room");
+    await setRoomName(user, "Quick Room");
     await user.click(screen.getByTestId("match-mode-segmented-501"));
     await user.click(screen.getByTestId("create-room-button"));
 
@@ -170,13 +212,10 @@ describe("CreateRoomModal", () => {
         coinBuyIn: 500,
         isPrivate: false,
         password: undefined,
-        // Story 9.8: the ungated defaults are always sent, so the wire is
-        // explicit about what the modal chose rather than relying on the
-        // server's nil-pointer fallbacks.
         minHonor: 0,
         allowNewPlayers: true,
-        // Declarations default ON and are always sent, for the same reason.
         declarationsEnabled: true,
+        stopAtTarget: false,
       });
     });
   });
@@ -200,9 +239,7 @@ describe("CreateRoomModal", () => {
     });
 
     renderModal(true);
-
-    const nameInput = screen.getByTestId("room-name-input");
-    await user.type(nameInput, "Nav Room");
+    await setRoomName(user, "Nav Room");
 
     const createButton = screen.getByTestId("create-room-button");
     await user.click(createButton);
@@ -220,9 +257,7 @@ describe("CreateRoomModal", () => {
     );
 
     renderModal(true);
-
-    const nameInput = screen.getByTestId("room-name-input");
-    await user.type(nameInput, "Taken Room");
+    await setRoomName(user, "Taken Room");
 
     const createButton = screen.getByTestId("create-room-button");
     await user.click(createButton);
@@ -241,7 +276,7 @@ describe("CreateRoomModal", () => {
     );
 
     renderModal(true);
-    await user.type(screen.getByTestId("room-name-input"), "My Room");
+    await setRoomName(user, "My Room");
     await user.click(screen.getByTestId("create-room-button"));
 
     await waitFor(() => {
@@ -268,16 +303,36 @@ describe("CreateRoomModal", () => {
     expect(screen.getByTestId("timer-duration-slider")).toBeInTheDocument();
   });
 
-  it("defaults the coin buy-in field to 500 and shows it in the preview", () => {
+  // --- Buy-in (preset chips, Create Room redesign) ---
+
+  it("defaults the coin buy-in chip to 500 and shows it in the preview", () => {
     renderModal(true);
 
-    const buyInInput = screen.getByTestId("coin-buy-in-input") as HTMLInputElement;
-    expect(buyInInput.value).toBe("500");
+    expect(screen.getByTestId("coin-buy-in-chips-500")).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByTestId("coin-buy-in-input")).not.toBeInTheDocument();
     // Preview mirrors the chosen stake.
     expect(screen.getByTestId("preview-buy-in")).toHaveTextContent("500");
   });
 
-  it("submits the chosen coin buy-in value", async () => {
+  it("submits a preset buy-in chosen from the chips", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({ id: 6 });
+    renderModal(true);
+
+    await setRoomName(user, "Free Table");
+    await user.click(screen.getByTestId("coin-buy-in-chips-0"));
+    expect(screen.getByTestId("preview-buy-in")).toHaveTextContent("No stake");
+
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Free Table", coinBuyIn: 0 }),
+      );
+    });
+  });
+
+  it("reveals a number input and submits the chosen coin buy-in value when Custom is picked", async () => {
     const user = userEvent.setup();
     mockCreateRoom.mockResolvedValueOnce({
       id: 7,
@@ -297,8 +352,9 @@ describe("CreateRoomModal", () => {
     });
 
     renderModal(true);
-    await user.type(screen.getByTestId("room-name-input"), "Stake Room");
+    await setRoomName(user, "Stake Room");
 
+    await user.click(screen.getByTestId("coin-buy-in-chips-custom"));
     const buyInInput = screen.getByTestId("coin-buy-in-input");
     await user.clear(buyInInput);
     await user.type(buyInInput, "1500");
@@ -312,10 +368,11 @@ describe("CreateRoomModal", () => {
     });
   });
 
-  it("clamps a negative buy-in to zero (cosmetic guard; server is authority)", async () => {
+  it("clamps a negative custom buy-in to zero (cosmetic guard; server is authority)", async () => {
     const user = userEvent.setup();
     renderModal(true);
 
+    await user.click(screen.getByTestId("coin-buy-in-chips-custom"));
     const buyInInput = screen.getByTestId("coin-buy-in-input") as HTMLInputElement;
     await user.clear(buyInInput);
     await user.type(buyInInput, "-50");
@@ -328,18 +385,14 @@ describe("CreateRoomModal", () => {
     const user = userEvent.setup();
     setBalance(100);
     renderModal(true);
-    await user.type(screen.getByTestId("room-name-input"), "High Roller");
+    await setRoomName(user, "High Roller");
 
-    const buyInInput = screen.getByTestId("coin-buy-in-input");
-    await user.clear(buyInInput);
-    await user.type(buyInInput, "500");
-
+    // 500 is already the default preset, which now exceeds the 100 balance.
     expect(screen.getByTestId("buy-in-error")).toBeInTheDocument();
     expect(screen.getByTestId("create-room-button")).toBeDisabled();
 
-    // Lowering the stake to within balance clears the guard.
-    await user.clear(buyInInput);
-    await user.type(buyInInput, "100");
+    // Picking the 100 preset instead clears the guard.
+    await user.click(screen.getByTestId("coin-buy-in-chips-100"));
     expect(screen.queryByTestId("buy-in-error")).toBeNull();
     expect(screen.getByTestId("create-room-button")).toBeEnabled();
   });
@@ -354,11 +407,52 @@ describe("CreateRoomModal", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  // --- Advanced settings accordion (Create Room redesign) ---
+
+  it("keeps declarations, match end, privacy and the honour gate collapsed by default", () => {
+    renderModal(true);
+
+    expect(screen.queryByTestId("declarations-segmented")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("match-end-segmented")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("private-room-toggle")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("min-honor-chips")).not.toBeInTheDocument();
+    expect(screen.getByTestId("advanced-settings-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("reveals every advanced field once the accordion is opened", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    await openAdvanced(user);
+
+    expect(screen.getByTestId("declarations-segmented")).toBeInTheDocument();
+    expect(screen.getByTestId("match-end-segmented")).toBeInTheDocument();
+    expect(screen.getByTestId("private-room-toggle")).toBeInTheDocument();
+    expect(screen.getByTestId("min-honor-chips")).toBeInTheDocument();
+    expect(screen.getByTestId("allow-new-players-toggle")).toBeInTheDocument();
+  });
+
+  it("shows no changed-count badge until a default is actually changed", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+
+    expect(screen.queryByTestId("advanced-settings-badge")).not.toBeInTheDocument();
+
+    await openAdvanced(user);
+    await user.click(screen.getByTestId("declarations-segmented-off"));
+
+    expect(screen.getByTestId("advanced-settings-badge")).toHaveTextContent("1");
+  });
+
   // --- Private rooms (Story 9.6) ---
 
   it("reveals the password field when the private toggle is on", async () => {
     const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
     expect(screen.queryByTestId("room-password-input")).toBeNull();
     await user.click(screen.getByTestId("private-room-toggle-private"));
@@ -371,12 +465,13 @@ describe("CreateRoomModal", () => {
   it("puts the password field directly under the privacy toggle, above the honour gate", async () => {
     const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
     await user.click(screen.getByTestId("private-room-toggle-private"));
 
     const toggle = screen.getByTestId("private-room-toggle");
     const password = screen.getByTestId("room-password-input");
-    const honorGate = screen.getByTestId("min-honor-input");
+    const honorGate = screen.getByTestId("min-honor-chips");
 
     expect(
       toggle.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -389,8 +484,9 @@ describe("CreateRoomModal", () => {
   it("blocks submit when private is on but the password is too short", async () => {
     const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
-    await user.type(screen.getByTestId("room-name-input"), "Secret Room");
+    await setRoomName(user, "Secret Room");
     await user.click(screen.getByTestId("private-room-toggle-private"));
     // Empty password — submit disabled.
     expect(screen.getByTestId("create-room-button")).toBeDisabled();
@@ -404,8 +500,9 @@ describe("CreateRoomModal", () => {
     const user = userEvent.setup();
     mockCreateRoom.mockResolvedValueOnce({ id: 3 });
     renderModal(true);
+    await openAdvanced(user);
 
-    await user.type(screen.getByTestId("room-name-input"), "Secret Room");
+    await setRoomName(user, "Secret Room");
     await user.click(screen.getByTestId("private-room-toggle-private"));
     await user.type(screen.getByTestId("room-password-input"), "hunter2");
     await user.click(screen.getByTestId("create-room-button"));
@@ -416,65 +513,66 @@ describe("CreateRoomModal", () => {
       );
     });
   });
-  // --- Honor gate (Story 9.8 AC3/AC5, D7; slider per the honour redesign R5) ---
 
-  /**
-   * Drive the honour threshold. It is a range input now, not a text field, so
-   * clear()/type() do not apply — a range is not an editable element. fireEvent
-   * .change is the standard way to move a slider in jsdom, and it exercises the
-   * same onChange the thumb and the arrow keys do.
-   */
-  function setMinHonor(value: number) {
-    fireEvent.change(screen.getByTestId("min-honor-input"), { target: { value: String(value) } });
-  }
+  // --- Honor gate (Story 9.8 AC3/AC5, D7; preset tier chips per the Create
+  // Room redesign) ---
 
-  it("renders the honor-gate controls", () => {
+  it("renders the honor-gate controls", async () => {
+    const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
-    expect(screen.getByTestId("min-honor-input")).toBeInTheDocument();
+    expect(screen.getByTestId("min-honor-chips")).toBeInTheDocument();
     expect(screen.getByTestId("allow-new-players-toggle")).toBeInTheDocument();
   });
 
-  it("defaults to an ungated room and shows neither preview chip", () => {
+  it("defaults to an ungated room and shows neither preview chip", async () => {
+    const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
-    // Read .value off the element rather than via toHaveValue: for type="range"
-    // jest-dom reports a string, so a numeric matcher is misleading here.
-    expect((screen.getByTestId("min-honor-input") as HTMLInputElement).value).toBe("0");
+    expect(screen.getByTestId("min-honor-chips-0")).toHaveAttribute("aria-checked", "true");
     // 0 reads as a WORD, so the default looks like a deliberate choice rather than
     // an empty field waiting to be filled in.
-    expect(screen.getByTestId("min-honor-input-value")).toHaveTextContent("Anyone");
+    expect(screen.getByTestId("min-honor-chips-0")).toHaveTextContent("Anyone");
     expect(screen.queryByTestId("preview-min-honor")).toBeNull();
     expect(screen.queryByTestId("preview-veterans-only")).toBeNull();
   });
 
-  it("labels the chosen threshold with the tier it falls in", () => {
+  it("labels each threshold chip with the tier it falls in", async () => {
+    const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
-    // The ticks sit on tier boundaries and the caption names the tier, so a host
-    // picks a TIER rather than a digit — which is what replaced the deleted hint.
-    // The tier word is the readout value's sibling unit label, so anchor there
-    // rather than walking a parent chain from the input (which breaks whenever
-    // the slider's internal DOM gains a wrapper).
-    setMinHonor(85);
-    expect(screen.getByTestId("min-honor-input-value")).toHaveAttribute("data-value", "85");
-    expect(screen.getByTestId("min-honor-input-value").parentElement).toHaveTextContent("Trusted");
+    // Each chip IS the tier — a host picks a tier, not a digit — which is what
+    // replaced the deleted continuous slider and its ticks.
+    const trusted = screen.getByTestId("min-honor-chips-85");
+    expect(trusted).toHaveTextContent("Trusted");
+    expect(trusted).toHaveTextContent("85+");
+
+    await user.click(trusted);
+    expect(trusted).toHaveAttribute("aria-checked", "true");
   });
 
-  it("marks the owner's own score on the track", () => {
+  it("shows the owner's own honor score in the min-honor info popover", async () => {
+    const user = userEvent.setup();
     useAuthStore.setState({
       user: makeUser({ id: 5, username: "owner", honorScore: 96, isNewPlayer: false }),
     });
     renderModal(true);
+    await openAdvanced(user);
 
     // The self-gate becomes a place you can see rather than an error you trip.
-    expect(screen.getByTestId("min-honor-input-marker")).toHaveAttribute("data-value", "96");
+    await user.click(screen.getByTestId("min-honor-info"));
+    expect(screen.getByTestId("min-honor-info-content")).toHaveTextContent("96");
   });
 
-  it("mirrors the honor threshold into the live preview card", () => {
+  it("mirrors the honor threshold into the live preview card", async () => {
+    const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
-    setMinHonor(85);
+    await user.click(screen.getByTestId("min-honor-chips-85"));
 
     expect(screen.getByTestId("preview-min-honor")).toHaveAttribute("data-min-honor", "85");
     expect(screen.queryByTestId("preview-veterans-only")).toBeNull();
@@ -483,6 +581,7 @@ describe("CreateRoomModal", () => {
   it("mirrors the veterans-only toggle into the live preview card", async () => {
     const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
     await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
 
@@ -501,32 +600,18 @@ describe("CreateRoomModal", () => {
       user: makeUser({ id: 5, username: "owner", honorScore: 96, isNewPlayer: false }),
     });
     renderModal(true);
+    await openAdvanced(user);
 
-    await user.type(screen.getByTestId("room-name-input"), "Veterans Table");
-    setMinHonor(90);
+    await setRoomName(user, "Veterans Table");
+    await user.click(screen.getByTestId("min-honor-chips-95"));
     await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
     await user.click(screen.getByTestId("create-room-button"));
 
     await waitFor(() => {
       expect(mockCreateRoom).toHaveBeenCalledWith(
-        expect.objectContaining({ minHonor: 90, allowNewPlayers: false }),
+        expect.objectContaining({ minHonor: 95, allowNewPlayers: false }),
       );
     });
-  });
-
-  it("clamps the threshold to the 0-100 range the server validates", () => {
-    renderModal(true);
-
-    // The slider cannot express an out-of-range value at all — min/max are wired
-    // to the same interval the server validates and the rooms.min_honor CHECK
-    // enforces. Belt and braces: effectiveMinHonor also clamps in JS.
-    const input = screen.getByTestId("min-honor-input") as HTMLInputElement;
-    expect(input.min).toBe("0");
-    expect(input.max).toBe("100");
-    expect(input.step).toBe("5");
-
-    setMinHonor(150);
-    expect(screen.getByTestId("min-honor-input-value")).toHaveAttribute("data-value", "100");
   });
 
   // D7: the creator is auto-seated, so a gate they cannot pass would eject them
@@ -537,9 +622,10 @@ describe("CreateRoomModal", () => {
       user: makeUser({ id: 5, username: "owner", honorScore: 60, isNewPlayer: false }),
     });
     renderModal(true);
+    await openAdvanced(user);
 
-    await user.type(screen.getByTestId("room-name-input"), "Self Locked");
-    setMinHonor(95);
+    await setRoomName(user, "Self Locked");
+    await user.click(screen.getByTestId("min-honor-chips-95"));
 
     expect(screen.getByTestId("create-room-button")).toBeDisabled();
     expect(screen.getByTestId("min-honor-error")).toBeInTheDocument();
@@ -551,8 +637,9 @@ describe("CreateRoomModal", () => {
       user: makeUser({ id: 5, username: "owner", isNewPlayer: true }),
     });
     renderModal(true);
+    await openAdvanced(user);
 
-    await user.type(screen.getByTestId("room-name-input"), "Self Barred");
+    await setRoomName(user, "Self Barred");
     await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
 
     expect(screen.getByTestId("create-room-button")).toBeDisabled();
@@ -571,9 +658,10 @@ describe("CreateRoomModal", () => {
       user: makeUser({ id: 5, username: "owner", honorScore: 80, isNewPlayer: true }),
     });
     renderModal(true);
+    await openAdvanced(user);
 
-    await user.type(screen.getByTestId("room-name-input"), "High Bar");
-    setMinHonor(95);
+    await setRoomName(user, "High Bar");
+    await user.click(screen.getByTestId("min-honor-chips-95"));
 
     expect(screen.getByTestId("create-room-button")).toBeDisabled();
     expect(screen.getByTestId("min-honor-error")).toBeInTheDocument();
@@ -582,12 +670,13 @@ describe("CreateRoomModal", () => {
   it("lets a new-player owner set a bar at or below their own score", async () => {
     const user = userEvent.setup();
     useAuthStore.setState({
-      user: makeUser({ id: 5, username: "owner", honorScore: 80, isNewPlayer: true }),
+      user: makeUser({ id: 5, username: "owner", honorScore: 85, isNewPlayer: true }),
     });
     renderModal(true);
+    await openAdvanced(user);
 
-    await user.type(screen.getByTestId("room-name-input"), "Fair Bar");
-    setMinHonor(80);
+    await setRoomName(user, "Fair Bar");
+    await user.click(screen.getByTestId("min-honor-chips-85"));
 
     expect(screen.getByTestId("create-room-button")).toBeEnabled();
     expect(screen.queryByTestId("min-honor-error")).toBeNull();
@@ -602,23 +691,25 @@ describe("CreateRoomModal", () => {
       user: makeUser({ id: 5, username: "owner", honorScore: undefined, isNewPlayer: undefined }),
     });
     renderModal(true);
+    await openAdvanced(user);
 
-    await user.type(screen.getByTestId("room-name-input"), "Unknown Honor");
+    await setRoomName(user, "Unknown Honor");
     await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
 
     expect(screen.getByTestId("create-room-button")).toBeEnabled();
     expect(screen.queryByTestId("allow-new-players-error")).toBeNull();
   });
 
-  it("keeps submit enabled for an owner who clears their own threshold", async () => {
+  it("keeps submit enabled for an owner who sets their threshold to exactly their own score", async () => {
     const user = userEvent.setup();
     useAuthStore.setState({
       user: makeUser({ id: 5, username: "owner", honorScore: 95, isNewPlayer: false }),
     });
     renderModal(true);
+    await openAdvanced(user);
 
-    await user.type(screen.getByTestId("room-name-input"), "Fine");
-    setMinHonor(95);
+    await setRoomName(user, "Fine");
+    await user.click(screen.getByTestId("min-honor-chips-95"));
 
     // The boundary is inclusive on both sides of the wire.
     expect(screen.getByTestId("create-room-button")).toBeEnabled();
@@ -664,7 +755,7 @@ describe("CreateRoomModal", () => {
     });
 
     renderModal(true);
-    await user.type(screen.getByTestId("room-name-input"), "Hrvatska Ekipa");
+    await setRoomName(user, "Hrvatska Ekipa");
     await user.click(screen.getByTestId("variant-segmented-croatia"));
     await user.click(screen.getByTestId("create-room-button"));
 
@@ -677,8 +768,10 @@ describe("CreateRoomModal", () => {
 
   // --- Declarations toggle ---
 
-  it("defaults the declarations toggle to ON and shows no preview chip", () => {
+  it("defaults the declarations toggle to ON and shows no preview chip", async () => {
+    const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
     expect(screen.getByTestId("declarations-segmented")).toBeInTheDocument();
     expect(screen.getByTestId("declarations-segmented-on")).toHaveAttribute("aria-checked", "true");
@@ -688,6 +781,7 @@ describe("CreateRoomModal", () => {
   it("mirrors a declarations-off choice into the live preview card", async () => {
     const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
     await user.click(screen.getByTestId("declarations-segmented-off"));
 
@@ -714,7 +808,8 @@ describe("CreateRoomModal", () => {
     });
 
     renderModal(true);
-    await user.type(screen.getByTestId("room-name-input"), "Bez Zvanja");
+    await openAdvanced(user);
+    await setRoomName(user, "Bez Zvanja");
     await user.click(screen.getByTestId("declarations-segmented-off"));
     await user.click(screen.getByTestId("create-room-button"));
 
@@ -728,21 +823,26 @@ describe("CreateRoomModal", () => {
   it("always explains that Belote goes off with the declarations", async () => {
     const user = userEvent.setup();
     renderModal(true);
+    await openAdvanced(user);
 
-    // Shown in BOTH states: this is the one consequence a player cannot read off
-    // the On/Off label, so it must not be hidden behind flipping the toggle
-    // first. Matched on the hint copy rather than a bare /Belote/i over the whole
-    // modal, which would break the day any other string mentions Belote.
+    // The permanent hint became a "(?)" popover in the redesign — this is the
+    // one consequence a player cannot read off the On/Off label, so it must
+    // still be reachable in BOTH states, not just discoverable after flipping
+    // the toggle first. The popover itself dismisses on an outside click (a
+    // real popover, not a hand-rolled one), so it's reopened for each check
+    // rather than expected to survive the segmented-control click.
+    await user.click(screen.getByTestId("declarations-info-toggle"));
     expect(screen.getByText(/no declarations and no Belote/i)).toBeInTheDocument();
 
     await user.click(screen.getByTestId("declarations-segmented-off"));
-
+    await user.click(screen.getByTestId("declarations-info-toggle"));
     expect(screen.getByText(/no declarations and no Belote/i)).toBeInTheDocument();
   });
 
   it("resets the toggle back to ON when the modal is dismissed", async () => {
     const user = userEvent.setup();
     const { onOpenChange } = renderModal(true);
+    await openAdvanced(user);
 
     await user.click(screen.getByTestId("declarations-segmented-off"));
     expect(await screen.findByTestId("preview-no-declarations")).toBeInTheDocument();
@@ -752,18 +852,113 @@ describe("CreateRoomModal", () => {
     // reset is directly observable — which is the point: the NEXT owner to open
     // this modal must not inherit "off".
     await user.click(screen.getByTestId("cancel-button"));
-
     expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    // The accordion itself resets closed too, so reopen it to observe the reset.
+    await openAdvanced(user);
     expect(screen.getByTestId("declarations-segmented-on")).toHaveAttribute("aria-checked", "true");
     expect(screen.queryByTestId("preview-no-declarations")).not.toBeInTheDocument();
+  });
+
+  // --- Stop-at-target ("dosta") toggle ---
+  //
+  // The mirror of the declarations block above, with the polarity flipped: the
+  // default here is "finish the hand", and the chip appears on the opt-in.
+
+  it("defaults the match-end control to finishing the hand and shows no preview chip", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+    await openAdvanced(user);
+
+    expect(screen.getByTestId("match-end-segmented")).toBeInTheDocument();
+    expect(screen.getByTestId("match-end-segmented-finish")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.queryByTestId("preview-stop-at-target")).not.toBeInTheDocument();
+  });
+
+  it("mirrors a stop-at-target choice into the live preview card", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+    await openAdvanced(user);
+
+    await user.click(screen.getByTestId("match-end-segmented-stop"));
+
+    expect(await screen.findByTestId("preview-stop-at-target")).toBeInTheDocument();
+  });
+
+  it("submits stopAtTarget true when the stop segment is selected", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 12,
+      name: "Dosta",
+      code: "DST001",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      coinBuyIn: 500,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-08-24T09:00:00Z",
+      updatedAt: "2026-08-24T09:00:00Z",
+    });
+
+    renderModal(true);
+    await openAdvanced(user);
+    await setRoomName(user, "Dosta");
+    await user.click(screen.getByTestId("match-end-segmented-stop"));
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Dosta", stopAtTarget: true, declarationsEnabled: true }),
+      );
+    });
+  });
+
+  it("always explains that neither end-of-hand bonus is awarded", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+    await openAdvanced(user);
+
+    await user.click(screen.getByTestId("match-end-info-toggle"));
+    expect(screen.getByText(/no last-trick or capot bonus/i)).toBeInTheDocument();
+
+    // The popover dismisses on an outside click, so reopen it after the
+    // segmented-control click rather than expecting it to survive.
+    await user.click(screen.getByTestId("match-end-segmented-stop"));
+    await user.click(screen.getByTestId("match-end-info-toggle"));
+    expect(screen.getByText(/no last-trick or capot bonus/i)).toBeInTheDocument();
+  });
+
+  it("resets the match-end control back to finish-the-hand when the modal is dismissed", async () => {
+    const user = userEvent.setup();
+    const { onOpenChange } = renderModal(true);
+    await openAdvanced(user);
+
+    await user.click(screen.getByTestId("match-end-segmented-stop"));
+    expect(await screen.findByTestId("preview-stop-at-target")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("cancel-button"));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    await openAdvanced(user);
+    expect(screen.getByTestId("match-end-segmented-finish")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.queryByTestId("preview-stop-at-target")).not.toBeInTheDocument();
   });
 
   it("surfaces the server's INVALID_MIN_HONOR rejection in the form banner", async () => {
     const user = userEvent.setup();
     mockCreateRoom.mockRejectedValueOnce(new FetchError(400, "INVALID_MIN_HONOR", "bad"));
     renderModal(true);
-
-    await user.type(screen.getByTestId("room-name-input"), "Bad Gate");
+    await setRoomName(user, "Bad Gate");
     await user.click(screen.getByTestId("create-room-button"));
 
     expect(await screen.findByTestId("create-room-form-error")).toBeInTheDocument();
@@ -773,8 +968,7 @@ describe("CreateRoomModal", () => {
     const user = userEvent.setup();
     mockCreateRoom.mockRejectedValueOnce(new FetchError(409, "NEW_PLAYER_NOT_ALLOWED", "nope"));
     renderModal(true);
-
-    await user.type(screen.getByTestId("room-name-input"), "Server Says No");
+    await setRoomName(user, "Server Says No");
     await user.click(screen.getByTestId("create-room-button"));
 
     expect(await screen.findByTestId("create-room-form-error")).toBeInTheDocument();

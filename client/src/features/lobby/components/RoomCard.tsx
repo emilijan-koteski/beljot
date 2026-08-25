@@ -5,6 +5,7 @@ import {
   Bot,
   Clock,
   Coins,
+  Flag,
   KeyRound,
   Lock,
   LockOpen,
@@ -121,20 +122,50 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
             {variantLabel(t, room.variant)} · {modeLabel(t, room.matchMode)}
           </span>
           {/* Rendered ONLY when declarations are off. `=== false`, never
-              truthiness: an absent field means ON (the QuickPlay
-              system:room_created map, or a server that predates the column), and
-              a truthiness check would chip every one of those rooms. The default
-              room stays unchipped so the chip always carries information. */}
+              truthiness: an absent field means ON, and a truthiness check would
+              chip every payload that omits it. The only omitter left is a server
+              that predates the column — every hand-built room payload in Go now
+              carries both rule flags, each one under test (roomLifecyclePayload,
+              QuickPlay's own room_created, and the lobby-disconnect map). The
+              default room stays unchipped so the chip always carries
+              information. */}
+          {/* role="img" is what makes the aria-label authoritative. ARIA does not
+                  guarantee aria-label is honoured on a ROLELESS generic element, so on a
+                  bare <span> a screen reader may fall back to the short visible text and
+                  drop the explanation entirely. The role makes the chip one named node.
+                  Kept as aria-label rather than a visually-hidden sibling so the chip's
+                  textContent stays exactly the visible label. */}
           {room.declarationsEnabled === false && (
             <>
               <Dot />
               <span
                 className="inline-flex items-center gap-1"
                 data-testid="room-card-no-declarations"
+                role="img"
                 aria-label={t("lobby.card.noDeclarationsAriaLabel")}
               >
                 <Ban className="size-3" />
                 {t("lobby.card.noDeclarations")}
+              </span>
+            </>
+          )}
+          {/* Rendered ONLY when "dosta" is on — the mirror of the chip above,
+              with the polarity flipped because here the interesting state is the
+              true one. `=== true`, never truthiness: an absent field means OFF,
+              and the only payload that omits the key is one from a server
+              predating the column. The default room stays unchipped so the chip
+              always carries information. */}
+          {room.stopAtTarget === true && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="room-card-stop-at-target"
+                role="img"
+                aria-label={t("lobby.card.stopAtTargetAriaLabel")}
+              >
+                <Flag className="size-3" />
+                {t("lobby.card.stopAtTarget")}
               </span>
             </>
           )}

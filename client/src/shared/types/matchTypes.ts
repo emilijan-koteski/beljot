@@ -227,6 +227,22 @@ export interface MatchState {
    *  The room payloads have no such schema, so they keep the field optional and
    *  every reader compares `=== false` so that absent means ON. */
   declarationsEnabled: boolean;
+  /** "Dosta": true when the match ends the INSTANT a team's running total (match
+   *  score + this hand's card points, declarations and Belote) reaches the
+   *  1001/501 target, with the hand left unfinished and neither the last-trick
+   *  +10 nor the Capot +100 awarded. False — the default — finishes the hand and
+   *  checks the target once, after scoring.
+   *
+   *  The owner's room setting, chosen at creation and fixed for the match. The
+   *  client renders a label from it and derives no rule: the engine alone decides
+   *  when a match stops, as it does for every rule.
+   *
+   *  REQUIRED, for exactly the reason declarationsEnabled above is: match_state
+   *  is parsed by EventMatchStateSchema, a z.strictObject that requires this key,
+   *  so a payload without it never reaches the store. The room payloads have no
+   *  such schema, so they keep the field optional and every reader compares
+   *  `=== true` so that absent means OFF. */
+  stopAtTarget: boolean;
   activePlayerSeat: number;
   trickNumber: number;
   currentTrick: TrickCard[];

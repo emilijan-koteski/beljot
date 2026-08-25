@@ -35,7 +35,7 @@ func TestSimulation_HeuristicBeatsRandomBaseline(t *testing.T) {
 			[4]uint{0, 0, 0, 0},
 			[4]string{"", "", "", ""},
 			[4]bool{true, true, true, true},
-			game.VariantBitola, "1001", 1, true,
+			game.VariantBitola, "1001", 1, true, false,
 		)
 		// NewGame draws the first-hand dealer at random. This experiment measures
 		// heuristic quality, not seat luck, so the dealer is pinned to seat 0 and
@@ -277,7 +277,7 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 			[4]uint{0, 0, 0, 0},
 			[4]string{"", "", "", ""},
 			[4]bool{true, true, true, true},
-			game.VariantCroatia, "1001", 1, true,
+			game.VariantCroatia, "1001", 1, true, false,
 		)
 		require.Equal(t, game.DeclarationTimingDedicatedPhase, gs.Rules.DeclarationTiming)
 		mem := bot.NewMemory()

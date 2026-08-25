@@ -77,6 +77,7 @@ const mockMatchState: MatchState = {
   biddingPassCount: 0,
   mustPickTrump: false,
   declarationsEnabled: true,
+  stopAtTarget: false,
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],
@@ -2265,6 +2266,31 @@ describe("MatchPage", () => {
       renderMatchPage();
 
       expect(screen.queryByTestId("score-meta-no-declarations")).not.toBeInTheDocument();
+    });
+
+    // The same page-level wiring for "dosta". It matters MORE here than for
+    // declarations: this prop defaults to false, so dropping the attribute
+    // leaves every stop-at-target table unlabelled and nothing else notices.
+    it("labels the scoreboard when the room stops at the target", () => {
+      useMatchStore.getState().setMatchState({
+        ...biddingState(0),
+        stopAtTarget: true,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.getByTestId("score-meta-stop-at-target")).toBeInTheDocument();
+    });
+
+    it("leaves the scoreboard unlabelled on a finish-the-hand table", () => {
+      useMatchStore.getState().setMatchState({
+        ...biddingState(0),
+        stopAtTarget: false,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.queryByTestId("score-meta-stop-at-target")).not.toBeInTheDocument();
     });
 
     it("reads the open hand alone when nothing is held face-down", () => {

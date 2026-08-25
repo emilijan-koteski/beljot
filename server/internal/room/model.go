@@ -99,13 +99,45 @@ type Room struct {
 	// &Room{...} that FORGETS this field inserts false — a silently
 	// declarations-less room. Both &Room{} sites therefore set it explicitly:
 	// CreateRoom and the Quick Play synthesis.
-	DeclarationsEnabled bool           `gorm:"not null" json:"declarationsEnabled"`
-	Status              string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
-	PlayerCount         int            `gorm:"not null;default:1" json:"playerCount"`
-	IsQuickPlay         bool           `gorm:"not null;default:false" json:"isQuickPlay"`
-	CreatedAt           time.Time      `json:"createdAt"`
-	UpdatedAt           time.Time      `json:"updatedAt"`
-	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+	DeclarationsEnabled bool `gorm:"not null" json:"declarationsEnabled"`
+	// StopAtTarget is "dosta" (enough): whether the match ends the INSTANT a team
+	// reaches the 1001/501 target, hand unfinished. False is the default and
+	// reproduces every match played before this column existed — the current hand
+	// always plays to trick 8 and the target is checked once, in scoreHand, after
+	// the last-trick or Capot bonus and the failed-hand rule have been applied.
+	//
+	// True makes the engine end the match the moment a team's running total
+	// reaches the target, mid-hand; the aborted hand earns neither end-of-hand
+	// bonus and gets no hand_results row. The rule itself — the running total, the
+	// checkpoints and why there are exactly three — is stated once, on
+	// game.stopAtTargetIfReached, and deliberately not restated here.
+	//
+	// Automatic, never player-callable: no button, no action. Variant-independent
+	// by construction, like DeclarationsEnabled above — it is resolved into
+	// VariantRules at game init and read there as a config field, so neither
+	// variant's stop is a variant-name comparison (Epic 12, D-VAR-1). This is the
+	// SECOND per-room override of a rule-config field.
+	//
+	// NO `default` TAG, DELIBERATELY — the same GORM trap documented on
+	// AllowNewPlayers and DeclarationsEnabled above: GORM omits zero-valued
+	// fields from an INSERT when they declare a `default`, so a tag here would
+	// make one of the two values uninsertable. The DB-side DEFAULT FALSE in
+	// migration 000022 covers the backfill and any raw insert.
+	//
+	// The trap INVERTS here, and that is worth stating rather than leaving the
+	// next reader to work out: the safe default is FALSE, so a hand-built
+	// &Room{...} that FORGETS this field inserts today's behaviour rather than a
+	// silently broken room. The tag is still omitted — an explicit TRUE has to
+	// stay insertable, and the three sibling columns then read identically. Both
+	// &Room{} sites set it explicitly anyway: CreateRoom and the Quick Play
+	// synthesis.
+	StopAtTarget bool           `gorm:"not null" json:"stopAtTarget"`
+	Status       string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
+	PlayerCount  int            `gorm:"not null;default:1" json:"playerCount"`
+	IsQuickPlay  bool           `gorm:"not null;default:false" json:"isQuickPlay"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // AfterFind derives the wire-facing IsPrivate flag from PasswordHash on every
