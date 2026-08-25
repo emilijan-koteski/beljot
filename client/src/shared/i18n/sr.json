@@ -659,7 +659,38 @@
       },
       "eyebrow": "Nova soba",
       "headline": "Kreiraj sobu",
-      "roomNameHint": "{{min}}–{{max}} znakova",
+      "roomNameInfo": "{{min}}–{{max}} znakova. Već ti je generisan slučajan naziv, pritisni ↻ za drugi ili upiši svoj.",
+      "roomNameShuffleAria": "Novi slučajan naziv",
+      "randomName": {
+        "adjectives": [
+          "Večernja",
+          "Tiha",
+          "Zlatna",
+          "Nedeljna",
+          "Stara",
+          "Brza",
+          "Noćna",
+          "Sunčana",
+          "Mala",
+          "Duga",
+          "Topla",
+          "Vesela"
+        ],
+        "nouns": [
+          "Partija",
+          "Ekipa",
+          "Kafana",
+          "Terasa",
+          "Družina",
+          "Noć",
+          "Smena",
+          "Igra",
+          "Sala",
+          "Čaršija",
+          "Ulica",
+          "Runda"
+        ]
+      },
       "matchMode501": "501 bod",
       "timerDurationSuffix": "sekundi / potezu",
       "submit": "Kreiraj sobu",
@@ -675,14 +706,10 @@
       "matchModeHint": "501 za kraći meč, 1001 za punu trku",
       "timerHintRelaxed": "Bez tajmera",
       "timerDurationHint": "10–120s · podrazumevano 30s",
-      "nextSteps": {
-        "title": "Šta sledi",
-        "step1": "Ulaziš u novu sobu kao <strong>domaćin</strong> na 1. mestu.",
-        "step2": "Podeli <code>KOD</code> sa prijateljima, ili sačekaj da te pronađu u lobiju.",
-        "step3": "Kad se popune sva četiri mesta, krećeš sa mečom."
-      },
       "coinBuyIn": "Ulog",
       "coinBuyInHint": "Svaki igrač ulaže ovoliko za meč · podrazumevano 500",
+      "coinBuyInBalance": "stanje {{balance}}",
+      "coinBuyInCustom": "Drugo",
       "privateRoom": "Privatna soba",
       "privateRoomHint": "Privatne sobe ostaju na listi, ali traže lozinku za ulazak",
       "privacyPublic": "Javna",
@@ -693,9 +720,12 @@
       "minHonorHint": "Igrači sa ovolikim ili višim skorom časti",
       "minHonorAnyone": "Svako",
       "minHonorYou": "ti {{honor}}",
+      "minHonorInfoBands": "Svaki prag je granica tiera časti: {{bands}}.",
+      "minHonorInfoYou": "Tvoja čast je {{honor}} · {{tier}}.",
       "allowNewPlayers": "Novi igrači",
       "allowNewPlayersYes": "Dozvoli",
       "allowNewPlayersNo": "Samo iskusni",
+      "allowNewPlayersHint": "Novi igrači nemaju dovoljno odigranih mečeva za ocenu časti. „Samo iskusni“ ih isključuje.",
       "roomPasswordHint": "Najmanje {{min}} znakova",
       "declarations": "Zvanja",
       "declarationsOn": "Uključena",
@@ -704,7 +734,12 @@
       "matchEnd": "Kraj meča",
       "matchEndFinish": "Dovrši deljenje",
       "matchEndStop": "Dosta",
-      "matchEndHint": "Uz „dosta“ meč završava u trenutku kad ekipa dostigne cilj, i usred deljenja, bez bonusa za zadnju ruku i bez kapota"
+      "matchEndHint": "Uz „dosta“ meč završava u trenutku kad ekipa dostigne cilj, i usred deljenja, bez bonusa za zadnju ruku i bez kapota",
+      "advanced": {
+        "title": "Napredna podešavanja",
+        "changedCount": "{{count}} izmenjeno",
+        "summary": "Zvanja, kraj meča, privatnost, ko može da sedne"
+      }
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · uživo se osvežava",
     "actions": {

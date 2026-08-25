@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   Ban,
+  ChevronDown,
   Clock,
   Coins,
   Eye,
@@ -9,21 +10,23 @@ import {
   KeyRound,
   Lock,
   LockOpen,
+  Settings,
+  Shuffle,
   UserCheck,
-  UserPlus,
   Users,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { Button } from "@/shared/components/ui/button";
+import { Chips } from "@/shared/components/ui/chips";
 import { Dialog, DialogContent } from "@/shared/components/ui/dialog";
-import { DurationSlider, type SliderTick } from "@/shared/components/ui/duration-slider";
+import { DurationSlider } from "@/shared/components/ui/duration-slider";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { Field } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
@@ -39,6 +42,7 @@ import {
   honorScoreOrPrior,
   honorTierForScore,
 } from "@/shared/lib/honor";
+import { randomRoomName } from "@/shared/lib/randomRoomName";
 import { modeLabel, modeOptionLabel, variantLabel } from "@/shared/lib/roomLabels";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -51,6 +55,7 @@ interface CreateRoomModalProps {
 const MIN_NAME = 3;
 const MAX_NAME = 32;
 const DEFAULT_BUY_IN = 500; // mirrors the server default (Story 9.2)
+const BUY_IN_PRESETS = [0, 100, 500, 1000];
 // Private-room password bounds (Story 9.6). Cosmetic client guards; the server
 // is authoritative (apperr ROOM_PASSWORD_TOO_SHORT / ROOM_PASSWORD_TOO_LONG).
 const MIN_ROOM_PASSWORD = 4;
@@ -66,25 +71,24 @@ const MIN_HONOR_CEILING = 100;
 const DEFAULT_MIN_HONOR = 0;
 
 /**
- * Slider marks on the TIER BOUNDARIES, derived from the bands themselves rather
- * than restated — retuning a floor server-side moves these with it.
- *
- * Boundary marks only, with no numeric labels under the track: the readout
- * above already carries the chosen number and tier, and dropping the label row
- * keeps the slider box short (user decision 2026-07-31). The boundaries are
- * emphasised because those are the positions that change what the number MEANS
- * — a host picking "85" is really picking Trusted.
+ * The honour gate is a discrete choice between tier BOUNDARIES, not a free
+ * number — so it renders as preset chips rather than a slider (Create Room
+ * redesign). Derived from the bands themselves, same as the old slider's
+ * ticks: retuning a floor server-side moves this with it.
  */
-const MIN_HONOR_TICKS: SliderTick[] = HONOR_TIER_BANDS.filter((b) => b.from > 0).map((b) => ({
-  value: b.from,
-  emphasis: true,
-}));
+const MIN_HONOR_PRESETS = HONOR_TIER_BANDS.map((b) => b.from);
 
 /**
  * Split-panel create-room modal. Left = form (name, variant, match mode,
- * timer, conditional move-duration slider). Right = darker live-preview pane
- * that mirrors the lobby card the room will become so the host sees exactly
- * what the lobby grid will display.
+ * timer, buy-in, then an "Advanced settings" accordion for declarations,
+ * match end, privacy, the honour gate and new-player policy). Right =
+ * darker live-preview pane that mirrors the lobby card the room will
+ * become so the host sees exactly what the lobby grid will display.
+ *
+ * Redesign rationale: five fields (name, variant, match mode, timer, buy-in)
+ * cover what most hosts touch; the other five default to "how it's always
+ * played" and move into the accordion, which reports how many of them the
+ * host changed so nothing is silently different from the norm.
  *
  * Backend contract unchanged — only `name | variant | matchMode | timerStyle
  * | timerDurationSeconds` are submitted. Both variants are selectable as of
@@ -117,7 +121,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     (s) => typeof s.user?.isNewPlayer === "boolean" && typeof s.user?.honorScore === "number",
   );
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => randomRoomName(t));
+  const [nameShuffleSpin, setNameShuffleSpin] = useState(0);
   const [variant, setVariant] = useState<"bitola" | "croatia">("bitola");
   const [matchMode, setMatchMode] = useState<"1001" | "501">("1001");
   // Declarations default ON: it is how both variants have always been played
@@ -132,11 +137,15 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
   const [timerDuration, setTimerDuration] = useState(30);
   const [coinBuyIn, setCoinBuyIn] = useState(DEFAULT_BUY_IN);
+  const [customBuyIn, setCustomBuyIn] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
   const [roomPassword, setRoomPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [minHonor, setMinHonor] = useState(DEFAULT_MIN_HONOR);
   const [allowNewPlayers, setAllowNewPlayers] = useState(true);
+  // Collapsed by default — the five fields above cover the common case. See
+  // the auto-open effect below for the one case this is overridden.
+  const [advOpen, setAdvOpen] = useState(false);
   // Field-level error shown under the room-name input (name validation only).
   const [error, setError] = useState<string | null>(null);
   // General submit error (already-in-room, insolvency race, unexpected) shown
@@ -180,6 +189,26 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const failsOwnNewPlayerGate = honorKnown && meIsNewPlayer && !allowNewPlayers;
   const failsOwnHonorGate = honorKnown && meHonor < effectiveMinHonor;
   const failsOwnGate = failsOwnNewPlayerGate || failsOwnHonorGate;
+
+  // Both live inside the advanced accordion, so a host who set one, then
+  // collapsed the section, would otherwise be stuck on a disabled submit
+  // button with no visible reason. One-way reveal only — it never fights a
+  // host who deliberately re-collapses an already-valid section.
+  useEffect(() => {
+    if (!advOpen && (failsOwnGate || (isPrivate && !passwordValid))) setAdvOpen(true);
+  }, [advOpen, failsOwnGate, isPrivate, passwordValid]);
+
+  // How many of the five advanced settings differ from "how it's always
+  // played" — shown on the collapsed accordion so a host glancing at a
+  // shared room knows something back there isn't the default without
+  // having to open it and re-read all five.
+  const advancedChangedCount = [
+    declarationsEnabled !== true,
+    stopAtTarget !== false,
+    isPrivate !== false,
+    effectiveMinHonor !== DEFAULT_MIN_HONOR,
+    allowNewPlayers !== true,
+  ].filter(Boolean).length;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -279,7 +308,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
-      setName("");
+      setName(randomRoomName(t));
       setVariant("bitola");
       setMatchMode("1001");
       setDeclarationsEnabled(true);
@@ -287,11 +316,13 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setTimerStyle("relaxed");
       setTimerDuration(30);
       setCoinBuyIn(DEFAULT_BUY_IN);
+      setCustomBuyIn(false);
       setIsPrivate(false);
       setRoomPassword("");
       setShowPassword(false);
       setMinHonor(DEFAULT_MIN_HONOR);
       setAllowNewPlayers(true);
+      setAdvOpen(false);
       setError(null);
       setFormError(null);
       createRoomMutation.reset();
@@ -351,6 +382,55 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     },
   ];
 
+  // "Free" reuses the same lobby-card copy the chip's own preview will show;
+  // "Custom" opens the number input below instead of picking a value directly.
+  const buyInOptions = [
+    ...BUY_IN_PRESETS.map((value) => ({
+      value: String(value),
+      label: value > 0 ? formatCoins(value) : t("lobby.card.buyInFree"),
+    })),
+    { value: "custom", label: t("lobby.createRoomModal.coinBuyInCustom") },
+  ];
+  const buyInChipValue = customBuyIn ? "custom" : String(coinBuyIn);
+
+  // Anyone (0) reuses tierPlural, same as the honour-gate copy everywhere else
+  // in the app; each preset's floor label ("50+"…"95+") is the same helper the
+  // lobby card and the preview chip use, so the three never disagree.
+  const minHonorOptions = MIN_HONOR_PRESETS.map((value) => ({
+    value,
+    tone: value === 0 ? undefined : HONOR_TIER_COLOR[honorTierForScore(value)],
+    label:
+      value === 0 ? (
+        t("lobby.createRoomModal.minHonorAnyone")
+      ) : (
+        <span className="inline-flex items-center gap-1">
+          <HonorShield tier={honorTierForScore(value)} size={12} />
+          {t(`profile.honor.tierPlural.${honorTierForScore(value)}`)}
+          <span className="font-mono text-[10px] tracking-[0.4px] opacity-70">
+            {honorFloorLabel(value)}
+          </span>
+        </span>
+      ),
+  }));
+  const minHonorBands = MIN_HONOR_PRESETS.filter((v) => v > 0)
+    .map((v) => `${t(`profile.honor.tierPlural.${honorTierForScore(v)}`)} ${honorFloorLabel(v)}`)
+    .join(", ");
+  const minHonorInfo = (
+    <>
+      <p className="m-0">
+        {t("lobby.createRoomModal.minHonorInfoBands", { bands: minHonorBands })}
+      </p>
+      {honorKnown && (
+        <p className="m-0 mt-1.5">
+          {t("lobby.createRoomModal.minHonorInfoYou", {
+            honor: meHonor,
+            tier: t(`profile.honor.tier.${honorTierForScore(meHonor)}`),
+          })}
+        </p>
+      )}
+    </>
+  );
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
@@ -385,95 +465,82 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               <Field
                 label={t("lobby.createRoomModal.roomName")}
                 htmlFor="room-name"
-                hint={t("lobby.createRoomModal.roomNameHint", { min: MIN_NAME, max: MAX_NAME })}
+                info={t("lobby.createRoomModal.roomNameInfo", { min: MIN_NAME, max: MAX_NAME })}
+                infoTestId="room-name-info"
                 error={error ?? undefined}
                 errorTestId="room-name-error"
-                required
               >
-                <Input
-                  id="room-name"
-                  placeholder={t("lobby.createRoomModal.roomNamePlaceholder")}
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value.slice(0, MAX_NAME));
-                    if (error) setError(null);
-                  }}
-                  aria-invalid={!!error}
-                  data-testid="room-name-input"
-                  maxLength={MAX_NAME}
-                  className="h-11"
-                />
+                <div className="relative">
+                  <Input
+                    id="room-name"
+                    placeholder={t("lobby.createRoomModal.roomNamePlaceholder")}
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value.slice(0, MAX_NAME));
+                      if (error) setError(null);
+                    }}
+                    aria-invalid={!!error}
+                    data-testid="room-name-input"
+                    maxLength={MAX_NAME}
+                    className="font-display h-11 pr-11 text-[15px] font-semibold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setName(randomRoomName(t, name));
+                      setNameShuffleSpin((n) => n + 1);
+                      if (error) setError(null);
+                    }}
+                    aria-label={t("lobby.createRoomModal.roomNameShuffleAria")}
+                    data-testid="room-name-shuffle"
+                    className="text-brass-deep bg-brass-soft border-border-2/60 absolute top-1/2 right-1.5 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-[9px] border"
+                  >
+                    <span
+                      key={nameShuffleSpin}
+                      style={{ display: "flex", animation: "spin .45s ease" }}
+                    >
+                      <Shuffle className="size-4" />
+                    </span>
+                  </button>
+                </div>
               </Field>
 
-              <Field
-                label={t("lobby.createRoomModal.variant")}
-                hint={t("lobby.createRoomModal.variantHint")}
-              >
-                <Segmented
-                  value={variant}
-                  onValueChange={setVariant}
-                  options={variantOptions}
-                  testId="variant-segmented"
-                  ariaLabel={t("lobby.createRoomModal.variant")}
-                />
-              </Field>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field
+                  label={t("lobby.createRoomModal.variant")}
+                  info={t("lobby.createRoomModal.variantHint")}
+                  infoTestId="variant-info"
+                >
+                  <Segmented
+                    value={variant}
+                    onValueChange={setVariant}
+                    options={variantOptions}
+                    testId="variant-segmented"
+                    ariaLabel={t("lobby.createRoomModal.variant")}
+                  />
+                </Field>
 
-              <Field
-                label={t("lobby.createRoomModal.matchMode")}
-                hint={t("lobby.createRoomModal.matchModeHint")}
-              >
-                <Segmented
-                  value={matchMode}
-                  onValueChange={setMatchMode}
-                  options={matchModeOptions}
-                  testId="match-mode-segmented"
-                  ariaLabel={t("lobby.createRoomModal.matchMode")}
-                />
-              </Field>
-
-              {/* Declarations sit directly under the variant and match mode
-                  because they are the same kind of setting: what the rules ARE,
-                  as opposed to the pacing and access settings further down. The
-                  hint is shown in BOTH states, because "Belote goes off too" is
-                  the one part of this setting a player cannot guess from the
-                  label, and hiding it until they flip the toggle meant only
-                  someone who already knew would ever read it. */}
-              <Field
-                label={t("lobby.createRoomModal.declarations")}
-                hint={t("lobby.createRoomModal.declarationsHint")}
-              >
-                <Segmented
-                  value={declarationsEnabled ? "on" : "off"}
-                  onValueChange={(v) => setDeclarationsEnabled(v === "on")}
-                  options={declarationsOptions}
-                  testId="declarations-segmented"
-                  ariaLabel={t("lobby.createRoomModal.declarations")}
-                />
-              </Field>
-
-              {/* Sits immediately after declarations, its sibling in kind: both
-                  say what the rules of this table ARE. The hint is shown in BOTH
-                  states because "no last-trick or capot bonus" is the part of the
-                  rule a player cannot guess from the label, exactly like the
-                  Belote caveat above it. */}
-              <Field
-                label={t("lobby.createRoomModal.matchEnd")}
-                hint={t("lobby.createRoomModal.matchEndHint")}
-              >
-                <Segmented
-                  value={stopAtTarget ? "stop" : "finish"}
-                  onValueChange={(v) => setStopAtTarget(v === "stop")}
-                  options={matchEndOptions}
-                  testId="match-end-segmented"
-                  ariaLabel={t("lobby.createRoomModal.matchEnd")}
-                />
-              </Field>
+                <Field
+                  label={t("lobby.createRoomModal.matchMode")}
+                  info={t("lobby.createRoomModal.matchModeHint")}
+                  infoTestId="match-mode-info"
+                >
+                  <Segmented
+                    value={matchMode}
+                    onValueChange={setMatchMode}
+                    options={matchModeOptions}
+                    testId="match-mode-segmented"
+                    ariaLabel={t("lobby.createRoomModal.matchMode")}
+                  />
+                </Field>
+              </div>
 
               <Field
                 label={t("lobby.createRoomModal.timerStyle")}
-                hint={
+                info={
                   timerStyle === "relaxed" ? t("lobby.createRoomModal.timerHintRelaxed") : undefined
                 }
+                infoTestId="timer-style-info"
               >
                 <Segmented
                   value={timerStyle}
@@ -487,7 +554,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               {timerStyle === "per-move" && (
                 <Field
                   label={t("lobby.createRoomModal.timerDuration")}
-                  hint={t("lobby.createRoomModal.timerDurationHint")}
+                  info={t("lobby.createRoomModal.timerDurationHint")}
+                  infoTestId="timer-duration-info"
                 >
                   <DurationSlider
                     value={timerDuration}
@@ -503,8 +571,11 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
 
               <Field
                 label={t("lobby.createRoomModal.coinBuyIn")}
-                htmlFor="coin-buy-in"
-                hint={t("lobby.createRoomModal.coinBuyInHint")}
+                info={t("lobby.createRoomModal.coinBuyInHint")}
+                infoTestId="coin-buy-in-info"
+                hint={t("lobby.createRoomModal.coinBuyInBalance", {
+                  balance: formatCoins(meBalance),
+                })}
                 error={
                   buyInExceedsBalance
                     ? t("lobby.createRoomModal.errors.buyInTooHigh", {
@@ -514,193 +585,210 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 }
                 errorTestId="buy-in-error"
               >
-                <div className="relative">
-                  {/* Gold coin glyph anchored left to signal the value is coins
-                      (matches the preview pill / header balance treatment). */}
-                  <Coins
-                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-                    style={{ color: COIN_GOLD }}
-                    aria-hidden="true"
+                <div className="flex flex-col gap-2">
+                  <Chips
+                    value={buyInChipValue}
+                    onValueChange={(v) => {
+                      if (v === "custom") {
+                        setCustomBuyIn(true);
+                      } else {
+                        setCustomBuyIn(false);
+                        setCoinBuyIn(Number(v));
+                      }
+                    }}
+                    options={buyInOptions}
+                    ariaLabel={t("lobby.createRoomModal.coinBuyIn")}
+                    testId="coin-buy-in-chips"
                   />
-                  <Input
-                    id="coin-buy-in"
-                    type="number"
-                    min={0}
-                    step={50}
-                    inputMode="numeric"
-                    value={coinBuyIn}
-                    onChange={(e) =>
-                      setCoinBuyIn(Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                    }
-                    data-testid="coin-buy-in-input"
-                    className="h-11 pl-9"
-                  />
+                  {customBuyIn && (
+                    <div className="relative w-fit">
+                      <Coins
+                        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                        style={{ color: COIN_GOLD }}
+                        aria-hidden="true"
+                      />
+                      <Input
+                        id="coin-buy-in"
+                        type="number"
+                        min={0}
+                        step={50}
+                        inputMode="numeric"
+                        value={coinBuyIn}
+                        onChange={(e) =>
+                          setCoinBuyIn(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                        }
+                        data-testid="coin-buy-in-input"
+                        className="h-11 w-36 pl-9"
+                      />
+                    </div>
+                  )}
                 </div>
               </Field>
 
-              <Field
-                label={t("lobby.createRoomModal.privateRoom")}
-                hint={t("lobby.createRoomModal.privateRoomHint")}
-              >
-                <Segmented
-                  value={isPrivate ? "private" : "public"}
-                  onValueChange={(v) => {
-                    setIsPrivate(v === "private");
-                    if (v === "public") setRoomPassword("");
-                  }}
-                  options={[
-                    {
-                      value: "public",
-                      label: t("lobby.createRoomModal.privacyPublic"),
-                      icon: <LockOpen className="size-3.5" />,
-                    },
-                    {
-                      value: "private",
-                      label: t("lobby.createRoomModal.privacyPrivate"),
-                      icon: <Lock className="size-3.5" />,
-                    },
-                  ]}
-                  testId="private-room-toggle"
-                  ariaLabel={t("lobby.createRoomModal.privateRoom")}
-                />
-              </Field>
+              <div className="bg-border my-0.5 h-px shrink-0" aria-hidden="true" />
 
-              {/* Directly under the toggle that reveals it. It used to render last,
-                  after the honour gate, so choosing Приватна grew a required field
-                  two fields further down — off screen on a phone — and the host met
-                  it as a validation error instead of as the consequence of the tap
-                  they just made. */}
-              {isPrivate && (
+              <AdvancedSettings
+                open={advOpen}
+                onToggle={() => setAdvOpen((v) => !v)}
+                changedCount={advancedChangedCount}
+              >
+                {/* Sits directly under the variant/match-mode pair because it is
+                    the same kind of setting: what the rules ARE. */}
                 <Field
-                  label={t("lobby.createRoomModal.roomPassword")}
-                  htmlFor="room-password"
-                  hint={t("lobby.createRoomModal.roomPasswordHint", { min: MIN_ROOM_PASSWORD })}
-                  required
+                  label={t("lobby.createRoomModal.declarations")}
+                  info={t("lobby.createRoomModal.declarationsHint")}
+                  infoTestId="declarations-info-toggle"
                 >
-                  <div className="relative">
-                    <Input
-                      id="room-password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      placeholder={t("lobby.createRoomModal.roomPasswordPlaceholder")}
-                      value={roomPassword}
-                      onChange={(e) => setRoomPassword(e.target.value.slice(0, MAX_ROOM_PASSWORD))}
-                      maxLength={MAX_ROOM_PASSWORD}
-                      data-testid="room-password-input"
-                      className="h-11 pr-10"
+                  <Segmented
+                    value={declarationsEnabled ? "on" : "off"}
+                    onValueChange={(v) => setDeclarationsEnabled(v === "on")}
+                    options={declarationsOptions}
+                    testId="declarations-segmented"
+                    ariaLabel={t("lobby.createRoomModal.declarations")}
+                  />
+                </Field>
+
+                {/* Its sibling in kind, same reasoning as declarations above. */}
+                <Field
+                  label={t("lobby.createRoomModal.matchEnd")}
+                  info={t("lobby.createRoomModal.matchEndHint")}
+                  infoTestId="match-end-info-toggle"
+                >
+                  <Segmented
+                    value={stopAtTarget ? "stop" : "finish"}
+                    onValueChange={(v) => setStopAtTarget(v === "stop")}
+                    options={matchEndOptions}
+                    testId="match-end-segmented"
+                    ariaLabel={t("lobby.createRoomModal.matchEnd")}
+                  />
+                </Field>
+
+                <Field
+                  label={t("lobby.createRoomModal.privateRoom")}
+                  info={t("lobby.createRoomModal.privateRoomHint")}
+                  infoTestId="private-room-info"
+                >
+                  <div className="flex flex-col gap-2">
+                    <Segmented
+                      value={isPrivate ? "private" : "public"}
+                      onValueChange={(v) => {
+                        setIsPrivate(v === "private");
+                        if (v === "public") setRoomPassword("");
+                      }}
+                      options={[
+                        {
+                          value: "public",
+                          label: t("lobby.createRoomModal.privacyPublic"),
+                          icon: <LockOpen className="size-3.5" />,
+                        },
+                        {
+                          value: "private",
+                          label: t("lobby.createRoomModal.privacyPrivate"),
+                          icon: <Lock className="size-3.5" />,
+                        },
+                      ]}
+                      testId="private-room-toggle"
+                      ariaLabel={t("lobby.createRoomModal.privateRoom")}
                     />
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
-                      onClick={() => setShowPassword(!showPassword)}
-                      data-testid="room-password-toggle"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
+
+                    {/* Directly under the toggle that reveals it. It used to
+                          render last, after the honour gate, so choosing
+                          Приватна grew a required field two fields further
+                          down — off screen on a phone — and the host met it as
+                          a validation error instead of as the consequence of
+                          the tap they just made. */}
+                    {isPrivate && (
+                      <Field
+                        label={t("lobby.createRoomModal.roomPassword")}
+                        htmlFor="room-password"
+                        hint={t("lobby.createRoomModal.roomPasswordHint", {
+                          min: MIN_ROOM_PASSWORD,
+                        })}
+                        required
+                      >
+                        <div className="relative">
+                          <Input
+                            id="room-password"
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="new-password"
+                            placeholder={t("lobby.createRoomModal.roomPasswordPlaceholder")}
+                            value={roomPassword}
+                            onChange={(e) =>
+                              setRoomPassword(e.target.value.slice(0, MAX_ROOM_PASSWORD))
+                            }
+                            maxLength={MAX_ROOM_PASSWORD}
+                            data-testid="room-password-input"
+                            className="h-11 pr-10"
+                          />
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
+                            onClick={() => setShowPassword(!showPassword)}
+                            data-testid="room-password-toggle"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="size-4" />
+                            ) : (
+                              <Eye className="size-4" />
+                            )}
+                          </button>
+                        </div>
+                      </Field>
+                    )}
                   </div>
                 </Field>
-              )}
 
-              {/* A discrete slider over the tier bands, not a free-typed number.
-                  Three things it teaches for free that the number field could not:
-                  the ticks sit on TIER BOUNDARIES so the host picks a tier rather
-                  than a digit, the fill takes that tier's colour, and the host's
-                  OWN score is marked on the track — which turns the D7 self-gate
-                  from an error you trip into a place you can see.
-
-                  Both hints are deleted with nothing put back: the ticks and the
-                  "min. honour · trusted" caption say what the number means, and
-                  Welcome / Veterans only needs no explaining. Everything else lives
-                  one tap away in the explainer. The modal already carries seven
-                  fields of copy. */}
-              <Field
-                label={t("lobby.createRoomModal.minHonor")}
-                hint={t("lobby.createRoomModal.minHonorHint")}
-                error={
-                  failsOwnHonorGate
-                    ? t("lobby.createRoomModal.errors.ownHonorTooLow", {
-                        minHonor: effectiveMinHonor,
-                        honor: meHonor,
-                      })
-                    : undefined
-                }
-                errorTestId="min-honor-error"
-              >
-                <DurationSlider
-                  value={effectiveMinHonor}
-                  onChange={setMinHonor}
-                  min={MIN_HONOR_FLOOR}
-                  max={MIN_HONOR_CEILING}
-                  step={5}
-                  // 0 reads as a word, so the default looks like a choice rather
-                  // than an empty field. Above that, honorFloorLabel renders the
-                  // floor ("60+", bare "100" at the ceiling) — the same label the
-                  // lobby chip shows.
-                  valueText={
-                    effectiveMinHonor === 0
-                      ? t("lobby.createRoomModal.minHonorAnyone")
-                      : honorFloorLabel(effectiveMinHonor)
-                  }
-                  // PLURAL tier word: this caption describes the players who may
-                  // sit, not one player's standing — the singular tier.* keys
-                  // stay untouched for badges and the rules ladder.
-                  unitLabel={
-                    effectiveMinHonor === 0
-                      ? ""
-                      : t(`profile.honor.tierPlural.${honorTierForScore(effectiveMinHonor)}`)
-                  }
-                  ticks={MIN_HONOR_TICKS}
-                  fillStyle={
-                    effectiveMinHonor === 0
-                      ? undefined
-                      : HONOR_TIER_COLOR[honorTierForScore(effectiveMinHonor)]
-                  }
-                  // Only when the envelope actually carries honour — the same
-                  // honorKnown guard the self-gate uses, for the same reason: a
-                  // marker at the 80 prior would be a claim about a score the
-                  // server never sent.
-                  marker={
-                    honorKnown
-                      ? {
-                          value: meHonor,
-                          label: t("lobby.createRoomModal.minHonorYou", { honor: meHonor }),
-                        }
+                <Field
+                  label={t("lobby.createRoomModal.allowNewPlayers")}
+                  info={t("lobby.createRoomModal.allowNewPlayersHint")}
+                  infoTestId="allow-new-players-info"
+                  error={
+                    failsOwnNewPlayerGate
+                      ? t("lobby.createRoomModal.errors.ownNewPlayerNotAllowed")
                       : undefined
                   }
-                  testId="min-honor-input"
-                />
-              </Field>
+                  errorTestId="allow-new-players-error"
+                >
+                  <Segmented
+                    value={allowNewPlayers ? "allow" : "veterans"}
+                    onValueChange={(v) => setAllowNewPlayers(v === "allow")}
+                    options={[
+                      { value: "allow", label: t("lobby.createRoomModal.allowNewPlayersYes") },
+                      {
+                        value: "veterans",
+                        label: t("lobby.createRoomModal.allowNewPlayersNo"),
+                      },
+                    ]}
+                    testId="allow-new-players-toggle"
+                    ariaLabel={t("lobby.createRoomModal.allowNewPlayers")}
+                  />
+                </Field>
 
-              <Field
-                label={t("lobby.createRoomModal.allowNewPlayers")}
-                error={
-                  failsOwnNewPlayerGate
-                    ? t("lobby.createRoomModal.errors.ownNewPlayerNotAllowed")
-                    : undefined
-                }
-                errorTestId="allow-new-players-error"
-              >
-                <Segmented
-                  value={allowNewPlayers ? "allow" : "veterans"}
-                  onValueChange={(v) => setAllowNewPlayers(v === "allow")}
-                  options={[
-                    {
-                      value: "allow",
-                      label: t("lobby.createRoomModal.allowNewPlayersYes"),
-                      icon: <UserPlus className="size-3.5" />,
-                    },
-                    {
-                      value: "veterans",
-                      label: t("lobby.createRoomModal.allowNewPlayersNo"),
-                      icon: <UserCheck className="size-3.5" />,
-                    },
-                  ]}
-                  testId="allow-new-players-toggle"
-                  ariaLabel={t("lobby.createRoomModal.allowNewPlayers")}
-                />
-              </Field>
+                <Field
+                  label={t("lobby.createRoomModal.minHonor")}
+                  info={minHonorInfo}
+                  infoTestId="min-honor-info"
+                  error={
+                    failsOwnHonorGate
+                      ? t("lobby.createRoomModal.errors.ownHonorTooLow", {
+                          minHonor: effectiveMinHonor,
+                          honor: meHonor,
+                        })
+                      : undefined
+                  }
+                  errorTestId="min-honor-error"
+                >
+                  <Chips
+                    value={effectiveMinHonor}
+                    onValueChange={setMinHonor}
+                    options={minHonorOptions}
+                    ariaLabel={t("lobby.createRoomModal.minHonor")}
+                    testId="min-honor-chips"
+                  />
+                </Field>
+              </AdvancedSettings>
             </div>
 
             {/* General submit error — pinned above the footer so it's always
@@ -763,33 +851,73 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               stopAtTarget={stopAtTarget}
               hostUsername={meUsername || "host"}
             />
-
-            <div className="bg-surface border-border rounded-[12px] border border-dashed p-4">
-              <Eyebrow>{t("lobby.createRoomModal.nextSteps.title")}</Eyebrow>
-              <ol className="text-ink-dim mt-2 list-decimal pl-4.5 text-[12.5px] leading-[1.65]">
-                <li>
-                  <Trans
-                    i18nKey="lobby.createRoomModal.nextSteps.step1"
-                    components={{ strong: <strong className="text-ink font-semibold" /> }}
-                  />
-                </li>
-                <li>
-                  <Trans
-                    i18nKey="lobby.createRoomModal.nextSteps.step2"
-                    components={{
-                      code: (
-                        <code className="bg-brass-soft text-brass-deep rounded px-1.5 py-px font-mono text-[11.5px] font-semibold tracking-[1.2px]" />
-                      ),
-                    }}
-                  />
-                </li>
-                <li>{t("lobby.createRoomModal.nextSteps.step3")}</li>
-              </ol>
-            </div>
           </aside>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AdvancedSettings({
+  open,
+  onToggle,
+  changedCount,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  changedCount: number;
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section
+      className={cn(
+        "shrink-0 overflow-hidden rounded-[13px] border transition-[border-color,background-color]",
+        open ? "border-border-2 bg-surface-sunken" : "border-border bg-surface-elevated",
+      )}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        data-testid="advanced-settings-toggle"
+        className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left"
+      >
+        <span className="text-brass-deep flex">
+          <Settings className="size-4" />
+        </span>
+        <span className="text-ink text-[13.5px] font-semibold tracking-[-0.1px]">
+          {t("lobby.createRoomModal.advanced.title")}
+        </span>
+        {changedCount > 0 && (
+          <span
+            data-testid="advanced-settings-badge"
+            className="bg-brass-soft text-brass-deep border-border-2/40 rounded-full border px-1.75 py-0.5 font-mono text-[10.5px] font-semibold"
+          >
+            {t("lobby.createRoomModal.advanced.changedCount", { count: changedCount })}
+          </span>
+        )}
+        <span
+          className={cn("text-ink-mute ml-auto flex transition-transform", open && "rotate-180")}
+        >
+          <ChevronDown className="size-4" />
+        </span>
+      </button>
+      {!open && (
+        <p className="text-ink-mute px-3.5 pb-3.5 pl-9.5 text-[12.5px] leading-[1.4]">
+          {t("lobby.createRoomModal.advanced.summary")}
+        </p>
+      )}
+      {open && (
+        <div
+          data-testid="advanced-settings-panel"
+          className="flex flex-col gap-3.5 px-3.5 pt-1 pb-3.5"
+        >
+          {children}
+        </div>
+      )}
+    </section>
   );
 }
 

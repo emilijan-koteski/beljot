@@ -659,7 +659,38 @@
       },
       "eyebrow": "New room",
       "headline": "Create a room",
-      "roomNameHint": "{{min}}–{{max}} characters",
+      "roomNameInfo": "{{min}}–{{max}} characters. A random name is already filled in — press ↻ for another, or type your own.",
+      "roomNameShuffleAria": "New random name",
+      "randomName": {
+        "adjectives": [
+          "Evening",
+          "Quiet",
+          "Golden",
+          "Sunday",
+          "Old",
+          "Quick",
+          "Nightly",
+          "Sunny",
+          "Little",
+          "Long",
+          "Warm",
+          "Merry"
+        ],
+        "nouns": [
+          "Party",
+          "Table",
+          "Crew",
+          "Night",
+          "Terrace",
+          "Tavern",
+          "Shift",
+          "Round",
+          "Squad",
+          "Hall",
+          "Circle",
+          "Session"
+        ]
+      },
       "matchMode501": "501 points",
       "timerDurationSuffix": "seconds / move",
       "submit": "Create room",
@@ -675,14 +706,10 @@
       "matchModeHint": "501 for a quicker match, 1001 for the full race",
       "timerHintRelaxed": "No timer",
       "timerDurationHint": "10–120s · default 30s",
-      "nextSteps": {
-        "title": "What happens next",
-        "step1": "You land in the new room as <strong>host</strong> in seat 1.",
-        "step2": "Share the <code>CODE</code> with friends — or wait for them to find you in the lobby.",
-        "step3": "Once all four seats are filled, you start the match."
-      },
       "coinBuyIn": "Buy-in",
       "coinBuyInHint": "Each player stakes this to play · default 500",
+      "coinBuyInBalance": "balance {{balance}}",
+      "coinBuyInCustom": "Custom",
       "privateRoom": "Private room",
       "privateRoomHint": "Private rooms stay listed but need a password to join",
       "privacyPublic": "Public",
@@ -693,9 +720,12 @@
       "minHonorHint": "Players with this honor score or higher",
       "minHonorAnyone": "Anyone",
       "minHonorYou": "you {{honor}}",
+      "minHonorInfoBands": "Each threshold is an honor-tier boundary: {{bands}}.",
+      "minHonorInfoYou": "Your honor is {{honor}} · {{tier}}.",
       "allowNewPlayers": "New players",
       "allowNewPlayersYes": "Welcome",
       "allowNewPlayersNo": "Veterans only",
+      "allowNewPlayersHint": "New players haven't played enough matches to have an honor score yet. \"Veterans only\" excludes them.",
       "roomPasswordHint": "At least {{min}} characters",
       "declarations": "Declarations",
       "declarationsOn": "On",
@@ -704,7 +734,12 @@
       "matchEnd": "Match end",
       "matchEndFinish": "Finish the hand",
       "matchEndStop": "Stop at target",
-      "matchEndHint": "Stop at target ends the match the moment a team reaches it, even mid-hand, with no last-trick or capot bonus"
+      "matchEndHint": "Stop at target ends the match the moment a team reaches it, even mid-hand, with no last-trick or capot bonus",
+      "advanced": {
+        "title": "Advanced settings",
+        "changedCount": "{{count}} changed",
+        "summary": "Declarations, match end, privacy, who can sit down"
+      }
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
     "actions": {
