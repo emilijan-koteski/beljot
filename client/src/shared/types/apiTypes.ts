@@ -366,8 +366,9 @@ export interface LeaderboardViewer {
 }
 
 /**
- * GET /api/v1/leaderboard?season=current — one offset page of the active
- * season's standings plus the viewer's own position.
+ * GET /api/v1/leaderboard?season=current|<id> — one offset page of one
+ * season's standings plus the viewer's own position (Story 13.3 opened the
+ * selector to prior-season ids; the default stays the active window).
  *
  * `{ items, total, limit, offset }` is the project's one paginated shape (the
  * same as the profile's match history). `total` is the season's whole visible
@@ -383,4 +384,65 @@ export interface LeaderboardResponse {
   limit: number;
   offset: number;
   viewer: LeaderboardViewer | null;
+}
+
+/**
+ * One season window from GET /api/v1/seasons (Story 13.3) — the leaderboard
+ * picker's feed. `name` is the machine-stable "YYYY QN" token, rendered
+ * VERBATIM and never translated; the timestamps are absolute ISO 8601 (the
+ * client derives "is this the current window" by comparing them to its own
+ * clock, the same rule as `seasonDaysRemaining`).
+ */
+export interface SeasonSummary {
+  id: number;
+  name: string;
+  startedAt: string;
+  endsAt: string;
+}
+
+/** GET /api/v1/seasons — every window, newest-first. `items` is never null. */
+export interface SeasonsListResponse {
+  items: SeasonSummary[];
+}
+
+/**
+ * One ended, played season in a player's archive
+ * (GET /api/v1/users/:id/seasons, Story 13.3).
+ *
+ * Membership is the ARCHIVE's rule, not the ladder's: a played season with
+ * `sp: 0` appears here (it is real history) even though it never appeared on
+ * the leaderboard. `tier` is derived server-side from the frozen SP; typed as
+ * `string` rather than the `SeasonTier` union for the same version-skew reason
+ * every other tier on the wire is — normalize through `normalizeSeasonTier`.
+ */
+export interface SeasonArchiveEntry {
+  seasonId: number;
+  seasonName: string;
+  sp: number;
+  tier: string;
+  gamesPlayed: number;
+  startedAt: string;
+  endsAt: string;
+}
+
+/**
+ * GET /api/v1/users/:id/seasons — newest-first; `items` is never null, and an
+ * UNKNOWN user id is an empty list with a 200 (the profile query owns the
+ * not-found surface). The client renders NO archive section at all when empty.
+ */
+export interface SeasonArchiveResponse {
+  items: SeasonArchiveEntry[];
+}
+
+/**
+ * The `seasonRank` block on both profile shapes (Story 13.3): the subject's
+ * standing in the ACTIVE season. The profile carries it as
+ * `SeasonRank | null` — null means "has not played this season" and the client
+ * hides the rank chip; a played season at 0 SP is a REAL rank (Iron), so never
+ * gate on `sp` truthiness.
+ */
+export interface SeasonRank {
+  seasonName: string;
+  tier: string;
+  sp: number;
 }

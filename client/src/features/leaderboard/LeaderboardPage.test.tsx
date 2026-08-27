@@ -8,17 +8,48 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LeaderboardPage } from "@/features/leaderboard/LeaderboardPage";
-import { getSeasonLeaderboard } from "@/shared/api/season";
+import { getSeasonLeaderboard, getSeasons } from "@/shared/api/season";
 import { i18n } from "@/shared/i18n/i18n";
 import { useAuthStore } from "@/shared/stores/authStore";
-import type { LeaderboardResponse, LeaderboardRow } from "@/shared/types/apiTypes";
+import type {
+  LeaderboardResponse,
+  LeaderboardRow,
+  SeasonsListResponse,
+} from "@/shared/types/apiTypes";
 import { makeUser } from "@/test-utils";
 
 vi.mock("@/shared/api/season", () => ({
   getSeasonLeaderboard: vi.fn(),
+  getSeasons: vi.fn(),
 }));
 
 const mockGet = vi.mocked(getSeasonLeaderboard);
+const mockGetSeasons = vi.mocked(getSeasons);
+
+// Two windows for the picker tests, newest-first as the server sends them.
+// Built RELATIVE to the real clock (the page identifies "current" by comparing
+// the windows' timestamps to Date.now()) so the suite never rots with the
+// calendar.
+const DAY = 86_400_000;
+function seasonsFixture(): SeasonsListResponse {
+  const now = Date.now();
+  return {
+    items: [
+      {
+        id: 7,
+        name: "2026 Q3",
+        startedAt: new Date(now - 30 * DAY).toISOString(),
+        endsAt: new Date(now + 60 * DAY).toISOString(),
+      },
+      {
+        id: 5,
+        name: "2026 Q2",
+        startedAt: new Date(now - 120 * DAY).toISOString(),
+        endsAt: new Date(now - 30 * DAY).toISOString(),
+      },
+    ],
+  };
+}
 
 /** n rows starting at `from`, descending SP so position order is obvious. */
 function rows(from: number, n: number): LeaderboardRow[] {
@@ -49,6 +80,9 @@ function renderPage() {
 describe("LeaderboardPage", () => {
   beforeEach(() => {
     mockGet.mockReset();
+    mockGetSeasons.mockReset();
+    // Default: no seasons list → no picker → every pre-13.3 test is unchanged.
+    mockGetSeasons.mockResolvedValue({ items: [] });
     useAuthStore.setState({
       token: "t",
       user: makeUser({ id: 7, username: "kiro" }),
@@ -101,7 +135,7 @@ describe("LeaderboardPage", () => {
     renderPage();
 
     await screen.findAllByTestId("leaderboard-row");
-    expect(mockGet).toHaveBeenCalledWith(25, 0);
+    expect(mockGet).toHaveBeenCalledWith(25, 0, "current");
   });
 
   it("appends the next page from the loaded-row offset when load more is clicked", async () => {
@@ -118,7 +152,7 @@ describe("LeaderboardPage", () => {
       expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(40);
     });
     // Offset comes from the rows already held, not pageSize * pages.
-    expect(mockGet).toHaveBeenLastCalledWith(25, 25);
+    expect(mockGet).toHaveBeenLastCalledWith(25, 25, "current");
     // Fully loaded — the button retires.
     expect(screen.queryByTestId("leaderboard-load-more")).not.toBeInTheDocument();
   });
@@ -413,5 +447,170 @@ describe("LeaderboardPage", () => {
     const skeleton = screen.getByTestId("leaderboard-loading");
     expect(skeleton).toHaveAttribute("role", "status");
     expect(skeleton).toHaveAttribute("aria-busy", "true");
+  });
+
+  // --- Story 13.3: the season picker ---
+
+  it("renders the picker newest-first with season tokens verbatim and the current chip marked", async () => {
+    mockGetSeasons.mockResolvedValue(seasonsFixture());
+    mockGet.mockResolvedValue(response());
+    renderPage();
+
+    const picker = await screen.findByTestId("leaderboard-season-picker");
+    const chips = picker.querySelectorAll('[role="radio"]');
+    expect(chips).toHaveLength(2);
+    // Newest-first, straight off the server's order; tokens rendered verbatim.
+    expect(chips[0]).toHaveTextContent("2026 Q3");
+    expect(chips[1]).toHaveTextContent("2026 Q2");
+    // The current window's chip is selected by default and carries the marker.
+    expect(chips[0]).toHaveAttribute("aria-checked", "true");
+    expect(chips[0]).toHaveTextContent(i18n.t("season.picker.current"));
+    expect(chips[1]).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("renders no picker while the seasons list is empty or failed", async () => {
+    mockGetSeasons.mockRejectedValue(new Error("boom"));
+    mockGet.mockResolvedValue(response());
+    renderPage();
+
+    // The ladder still renders — the picker failing must not take it down.
+    await screen.findAllByTestId("leaderboard-row");
+    expect(screen.queryByTestId("leaderboard-season-picker")).not.toBeInTheDocument();
+    expect(mockGet).toHaveBeenCalledWith(25, 0, "current");
+  });
+
+  it("requests the picked ended season by id and resets to a fresh first page", async () => {
+    const user = userEvent.setup();
+    mockGetSeasons.mockResolvedValue(seasonsFixture());
+    mockGet.mockResolvedValue(response());
+    renderPage();
+
+    await screen.findByTestId("leaderboard-season-picker");
+    await user.click(screen.getByTestId("leaderboard-season-picker-5"));
+
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenLastCalledWith(25, 0, 5);
+    });
+    // The picked chip takes the selection.
+    expect(screen.getByTestId("leaderboard-season-picker-5")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+
+  it("maps picking the current window back to the `current` selector", async () => {
+    const user = userEvent.setup();
+    mockGetSeasons.mockResolvedValue(seasonsFixture());
+    mockGet.mockResolvedValue(response());
+    renderPage();
+
+    await screen.findByTestId("leaderboard-season-picker");
+    await user.click(screen.getByTestId("leaderboard-season-picker-5"));
+    await waitFor(() => expect(mockGet).toHaveBeenLastCalledWith(25, 0, 5));
+
+    // Back to the current window: the request must say `current`, not id 7 —
+    // that reuses the default cache entry and keeps the URL quarter-agnostic.
+    await user.click(screen.getByTestId("leaderboard-season-picker-7"));
+    await waitFor(() => expect(mockGet).toHaveBeenLastCalledWith(25, 0, "current"));
+  });
+
+  // A picker offering one already-selected chip is a control that cannot do
+  // anything — and that is the state of the product's whole first quarter.
+  it("hides the picker when only one window exists", async () => {
+    const now = Date.now();
+    mockGetSeasons.mockResolvedValue({
+      items: [
+        {
+          id: 7,
+          name: "2026 Q3",
+          startedAt: new Date(now - 30 * DAY).toISOString(),
+          endsAt: new Date(now + 60 * DAY).toISOString(),
+        },
+      ],
+    });
+    mockGet.mockResolvedValue(response());
+    renderPage();
+
+    await screen.findByTestId("leaderboard-list");
+    expect(screen.queryByTestId("leaderboard-season-picker")).not.toBeInTheDocument();
+  });
+
+  // A frozen quarter must not be described in the present tense.
+  it("switches the header copy to the past-season variant for an ended season", async () => {
+    const user = userEvent.setup();
+    mockGetSeasons.mockResolvedValue(seasonsFixture());
+    mockGet.mockResolvedValue(response());
+    renderPage();
+
+    await screen.findByTestId("leaderboard-season-picker");
+    expect(screen.getByText(i18n.t("season.leaderboard.sub"))).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("leaderboard-season-picker-5"));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(i18n.t("season.leaderboard.subPast", { season: "2026 Q2" })),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(i18n.t("season.leaderboard.sub"))).not.toBeInTheDocument();
+  });
+
+  // "Nobody has earned Season Points YET this season" is simply false about a
+  // season that is over.
+  it("uses the past-season empty copy for an ended season with no scorers", async () => {
+    const user = userEvent.setup();
+    mockGetSeasons.mockResolvedValue(seasonsFixture());
+    mockGet.mockResolvedValue(response({ items: [], total: 0 }));
+    renderPage();
+
+    await screen.findByTestId("leaderboard-season-picker");
+    await user.click(screen.getByTestId("leaderboard-season-picker-5"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("leaderboard-empty").textContent).toBe(
+        i18n.t("season.leaderboard.emptyPast"),
+      ),
+    );
+  });
+
+  // THE PAGE OBSERVES THE BOUNDARY ITSELF. RankBanner — the only other observer
+  // — is unmounted on this route, so without this a page left open across the
+  // quarter boundary keeps the "Current" marker on the dead window and serves
+  // its frozen standings under the present-tense heading forever.
+  it("invalidates the ladder and the seasons list when the newest window ends", async () => {
+    const now = Date.now();
+    // Every known window is already over: the next one exists only server-side,
+    // which is exactly the state right after a rollover.
+    mockGetSeasons.mockResolvedValue({
+      items: [
+        {
+          id: 7,
+          name: "2026 Q3",
+          startedAt: new Date(now - 120 * DAY).toISOString(),
+          endsAt: new Date(now - DAY).toISOString(),
+        },
+        {
+          id: 5,
+          name: "2026 Q2",
+          startedAt: new Date(now - 210 * DAY).toISOString(),
+          endsAt: new Date(now - 120 * DAY).toISOString(),
+        },
+      ],
+    });
+    mockGet.mockResolvedValue(response());
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    render(<LeaderboardPage />, {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={qc}>
+          <MemoryRouter>{children}</MemoryRouter>
+        </QueryClientProvider>
+      ),
+    });
+
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ queryKey: ["season", "leaderboard"] }));
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["season", "list"] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["season", "current"] });
   });
 });

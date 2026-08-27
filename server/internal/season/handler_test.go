@@ -40,6 +40,16 @@ type mockRepo struct {
 	aheadCalls   int
 	entryCalls   int
 	lastPageArgs [3]int
+
+	// Story 13.3 state. `seasons` are the EXTRA windows beside `current` (the
+	// mock's stand-in for the seasons table); FindSeasonByID / ListSeasons /
+	// PlayerSeasonArchive all read them plus `current`, mirroring the one real
+	// table the GORM repo queries.
+	seasons       []season.Season
+	listErr       error
+	findSeasonErr error
+	archiveErr    error
+	archiveCalls  int
 }
 
 func newMockRepo(current *season.Season) *mockRepo {
@@ -193,6 +203,83 @@ func (m *mockRepo) CountAhead(seasonID uint, sp int, userID uint) (int64, error)
 		}
 	}
 	return ahead, nil
+}
+
+// allWindows is the mock's seasons table: the extra seeded windows plus the
+// current one, deduped by id — every Story 13.3 read consults this one list the
+// way the real reads consult the one real table.
+func (m *mockRepo) allWindows() []season.Season {
+	out := make([]season.Season, 0, len(m.seasons)+1)
+	out = append(out, m.seasons...)
+	if m.current != nil {
+		dup := false
+		for _, s := range out {
+			if s.ID == m.current.ID {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out = append(out, *m.current)
+		}
+	}
+	return out
+}
+
+func (m *mockRepo) FindSeasonByID(id uint) (*season.Season, error) {
+	if m.findSeasonErr != nil {
+		return nil, m.findSeasonErr
+	}
+	for _, s := range m.allWindows() {
+		if s.ID == id {
+			found := s
+			return &found, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockRepo) ListSeasons() ([]season.Season, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	out := m.allWindows()
+	sort.Slice(out, func(i, j int) bool { return out[i].StartedAt.After(out[j].StartedAt) })
+	return out, nil
+}
+
+// PlayerSeasonArchive mirrors the real predicate — games_played >= 1 AND the
+// window ENDED — over the same rows map the other reads use, so a service bug
+// that reused leaderboardScope's sp > 0 rule would fail here too.
+func (m *mockRepo) PlayerSeasonArchive(userID uint, now time.Time) ([]season.ArchiveEntry, error) {
+	m.archiveCalls++
+	if m.archiveErr != nil {
+		return nil, m.archiveErr
+	}
+	windows := map[uint]season.Season{}
+	for _, s := range m.allWindows() {
+		windows[s.ID] = s
+	}
+	entries := make([]season.ArchiveEntry, 0, len(m.rows))
+	for _, row := range m.rows {
+		if row.UserID != userID || row.GamesPlayed < 1 {
+			continue
+		}
+		w, ok := windows[row.SeasonID]
+		if !ok || w.EndsAt.After(now) {
+			continue
+		}
+		entries = append(entries, season.ArchiveEntry{
+			SeasonID:    w.ID,
+			SeasonName:  w.Name,
+			StartedAt:   w.StartedAt,
+			EndsAt:      w.EndsAt,
+			SP:          row.SP,
+			GamesPlayed: row.GamesPlayed,
+		})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].StartedAt.After(entries[j].StartedAt) })
+	return entries, nil
 }
 
 // seed adds one visible player to the season under test.
@@ -621,8 +708,22 @@ func TestGetLeaderboard_RejectsBadQueryParams(t *testing.T) {
 		{"offset negative", "offset=-1"},
 		{"offset not a number", "offset=x"},
 		{"season is a quarter token", "season=2026Q1"},
-		{"season is an id", "season=7"},
 		{"season is a bare word", "season=previous"},
+		// Story 13.3 opened the selector to POSITIVE INTEGERS — everything
+		// below is still malformed, not merely unknown, so it must 400 before
+		// the database is touched (an unknown-but-well-formed id is the 404
+		// tested separately).
+		{"season not a number", "season=abc"},
+		{"season negative", "season=-1"},
+		{"season zero", "season=0"},
+		{"season with a sign", "season=+5"},
+		{"season a decimal", "season=1.5"},
+		// Ids are 32-bit SERIALs. A 64-bit parse followed by uint() would
+		// TRUNCATE these on a 32-bit build and serve a DIFFERENT season's
+		// standings under the requested id; bit size 32 makes them 400s
+		// everywhere. 4294967296 is 2^32 exactly -- the first value that lies.
+		{"season above the 32-bit range", "season=4294967296"},
+		{"season absurdly large", "season=99999999999999999999"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1074,4 +1175,363 @@ func TestGetLeaderboard_ViewerLookupFailureSurfaces(t *testing.T) {
 	require.Error(t, err)
 	assert.NotErrorIs(t, err, apperr.ErrBadRequest)
 	assert.NotErrorIs(t, err, apperr.ErrUnauthorized)
+}
+
+// --- Story 13.3: prior-season selector, GET /seasons, GET /users/:id/seasons ---
+
+// endedWindow is the quarter BEFORE testWindow — the archive's and the
+// prior-season selector's subject.
+var endedWindow = &season.Season{
+	ID:        5,
+	Name:      "2026 Q2",
+	StartedAt: time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC),
+	EndsAt:    time.Date(2026, time.July, 1, 0, 0, 0, 0, time.UTC),
+}
+
+// seedEnded drops one player into endedWindow directly (mockRepo.seed only
+// writes into testWindow).
+func seedEnded(repo *mockRepo, userID uint, username string, sp, gamesPlayed int) {
+	repo.rows[key(userID, endedWindow.ID)] = &season.PlayerSeason{
+		UserID: userID, SeasonID: endedWindow.ID, SP: sp,
+		RankTier: season.TierForSP(sp), GamesPlayed: gamesPlayed, GamesCompleted: gamesPlayed,
+	}
+	repo.usernames[userID] = username
+}
+
+func callSeasons(t *testing.T, repo *mockRepo, userID uint) (*httptest.ResponseRecorder, error) {
+	t.Helper()
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/seasons", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if userID != 0 {
+		c.Set("userID", userID)
+	}
+	h := season.NewHandler(season.NewService(repo))
+	return rec, h.GetSeasons(c)
+}
+
+func callArchive(t *testing.T, repo *mockRepo, userID uint, subjectParam string) (*httptest.ResponseRecorder, error) {
+	t.Helper()
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+subjectParam+"/seasons", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(subjectParam)
+	if userID != 0 {
+		c.Set("userID", userID)
+	}
+	h := season.NewHandler(season.NewService(repo))
+	return rec, h.GetPlayerSeasonArchive(c)
+}
+
+// A WELL-FORMED but unknown ?season=<id> is a 404 SEASON_NOT_FOUND with no
+// body — a MISS, distinct from the 400 a malformed selector gets, and never a
+// silent fallback to the current window.
+func TestGetLeaderboard_UnknownSeasonIdIs404(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+
+	rec, err := callLeaderboard(t, repo, 1, "season=999")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, apperr.ErrSeasonNotFound)
+	assert.Empty(t, rec.Body.String(), "a rejected request writes no body")
+	assert.Zero(t, repo.pageCalls, "no page is read for a season that does not exist")
+}
+
+// Picking an ENDED season renders THAT season's standings — and the viewer
+// block runs under the same sp > 0 rule it has on the current window.
+func TestGetLeaderboard_EndedSeasonByIdRendersItsStandings(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seasons = []season.Season{*endedWindow}
+	// Current window: a ladder that must NOT leak into the prior season's view.
+	seedLadder(repo, 3)
+	// The ended season: two earners and the viewer at 0 SP.
+	seedEnded(repo, 21, "past-top", 4000, 12)
+	seedEnded(repo, 22, "past-second", 900, 8)
+	seedEnded(repo, 23, "past-zero", 0, 3)
+
+	rec, err := callLeaderboard(t, repo, 22, "season=5")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Equal(t, int64(2), got.Total, "the prior season's OWN population, sp > 0 only")
+	require.Len(t, got.Items, 2)
+	assert.Equal(t, []uint{21, 22}, []uint{got.Items[0].UserID, got.Items[1].UserID})
+	assert.Equal(t, "gold", got.Items[0].Tier, "tier derived from the frozen SP")
+
+	require.NotNil(t, got.Viewer, "the viewer earned SP in that season")
+	assert.Equal(t, 2, got.Viewer.Position)
+	assert.Equal(t, 900, got.Viewer.SP)
+
+	// And the resolved id — not the current window's — reached the repository.
+	assert.Equal(t, [3]int{int(endedWindow.ID), 10, 0}, repo.lastPageArgs)
+	assert.Zero(t, repo.currentCalls, "a by-id read never resolves (or creates) the current window")
+}
+
+// The current window's own id is also a legal selector — an id is an id.
+func TestGetLeaderboard_CurrentSeasonByIdWorksToo(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+
+	rec, err := callLeaderboard(t, repo, 1, fmt.Sprintf("season=%d", testWindow.ID))
+	require.NoError(t, err)
+	assert.Len(t, decodeLeaderboard(t, rec).Items, 3)
+	assert.Equal(t, [3]int{int(testWindow.ID), 10, 0}, repo.lastPageArgs)
+}
+
+// THE JSON TAGS ARE THE CONTRACT — the same gate the other two wire tests are.
+// GET /seasons feeds the picker; the client's SeasonsListResponse is
+// hand-maintained against these literal keys.
+func TestGetSeasons_WirePayloadKeysAreExact(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seasons = []season.Season{*endedWindow}
+
+	rec, err := callSeasons(t, repo, 42)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var env map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env))
+	require.Contains(t, env, "data")
+	assert.Len(t, env, 1, "nothing rides beside `data`")
+
+	data, ok := env["data"].(map[string]any)
+	require.True(t, ok, "data must be an object")
+	assert.Equal(t, []string{"items"}, sortedKeys(data))
+
+	items, ok := data["items"].([]any)
+	require.True(t, ok, "items must be an array")
+	require.Len(t, items, 2)
+	row, ok := items[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, []string{"endsAt", "id", "name", "startedAt"}, sortedKeys(row),
+		"exact wire key set for a season row")
+
+	assert.IsType(t, float64(0), row["id"])
+	assert.IsType(t, "", row["name"])
+	for _, ts := range []string{"startedAt", "endsAt"} {
+		_, parseErr := time.Parse(time.RFC3339, row[ts].(string))
+		assert.NoError(t, parseErr, "%s must be an absolute ISO 8601 timestamp", ts)
+	}
+}
+
+// Newest-first — the order the picker renders verbatim — and the current
+// window is present because the read resolves it before listing (the same lazy
+// self-heal every other read leans on).
+func TestGetSeasons_NewestFirstIncludingCurrent(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seasons = []season.Season{*endedWindow}
+
+	rec, err := callSeasons(t, repo, 42)
+	require.NoError(t, err)
+
+	var env struct {
+		Data season.SeasonsListView `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env))
+	require.Len(t, env.Data.Items, 2)
+	assert.Equal(t, "2026 Q3", env.Data.Items[0].Name, "the current window leads")
+	assert.Equal(t, "2026 Q2", env.Data.Items[1].Name)
+	assert.Positive(t, repo.currentCalls, "the listing resolves the current window first")
+}
+
+func TestGetSeasons_RequiresAuth(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	_, err := callSeasons(t, repo, 0)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, apperr.ErrUnauthorized)
+}
+
+func TestGetSeasons_ResolverFailureSurfaces(t *testing.T) {
+	repo := newMockRepo(nil)
+	repo.currentErr = errors.New("db down")
+
+	_, err := callSeasons(t, repo, 42)
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, apperr.ErrUnauthorized)
+}
+
+// The archive payload's exact wire keys — the client's SeasonArchiveResponse is
+// hand-maintained against them, and the matrix names all seven.
+func TestGetPlayerSeasonArchive_WirePayloadKeysAreExact(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seasons = []season.Season{*endedWindow}
+	seedEnded(repo, 42, "archiver", 1800, 14)
+
+	rec, err := callArchive(t, repo, 7, "42")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var env map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env))
+	require.Contains(t, env, "data")
+	assert.Len(t, env, 1)
+
+	data, ok := env["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, []string{"items"}, sortedKeys(data))
+
+	items, ok := data["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+	row, ok := items[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t,
+		[]string{"endsAt", "gamesPlayed", "seasonId", "seasonName", "sp", "startedAt", "tier"},
+		sortedKeys(row), "exact wire key set for an archive row")
+
+	assert.IsType(t, "", row["seasonName"])
+	assert.IsType(t, "", row["tier"])
+	assert.Equal(t, "silver", row["tier"], "1800 SP derives Silver — never the stored column")
+	for _, numeric := range []string{"seasonId", "sp", "gamesPlayed"} {
+		assert.IsType(t, float64(0), row[numeric], "%s must be a JSON number", numeric)
+	}
+	for _, ts := range []string{"startedAt", "endsAt"} {
+		_, parseErr := time.Parse(time.RFC3339, row[ts].(string))
+		assert.NoError(t, parseErr, "%s must be an absolute ISO 8601 timestamp", ts)
+	}
+}
+
+// The archive's membership through the HTTP surface: the ACTIVE season is
+// excluded, a played-but-0-SP ended season is included, newest-first.
+func TestGetPlayerSeasonArchive_ActiveExcludedZeroSPKept(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	older := season.Season{
+		ID:        4,
+		Name:      "2026 Q1",
+		StartedAt: time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
+		EndsAt:    time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC),
+	}
+	repo.seasons = []season.Season{*endedWindow, older}
+	// Active season: must not appear.
+	repo.seed(42, "archiver", 5000, 9)
+	// Ended seasons: one earned, one played at 0 SP — BOTH archive rows.
+	seedEnded(repo, 42, "archiver", 900, 8)
+	repo.rows[key(42, older.ID)] = &season.PlayerSeason{
+		UserID: 42, SeasonID: older.ID, SP: 0, RankTier: "iron", GamesPlayed: 2,
+	}
+
+	rec, err := callArchive(t, repo, 42, "42")
+	require.NoError(t, err)
+
+	var env struct {
+		Data season.ArchiveView `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env))
+	require.Len(t, env.Data.Items, 2, "the active season is not history yet")
+
+	assert.Equal(t, "2026 Q2", env.Data.Items[0].SeasonName, "newest-first")
+	assert.Equal(t, 900, env.Data.Items[0].SP)
+	assert.Equal(t, "bronze", env.Data.Items[0].Tier)
+
+	assert.Equal(t, "2026 Q1", env.Data.Items[1].SeasonName)
+	assert.Equal(t, 0, env.Data.Items[1].SP, "a played 0-SP season stays in the archive")
+	assert.Equal(t, "iron", env.Data.Items[1].Tier)
+	assert.Equal(t, 2, env.Data.Items[1].GamesPlayed)
+}
+
+// An unknown subject is `{items: []}` with a 200 — DELIBERATELY no
+// user-existence 404 (the profile query owns that surface) — and the empty
+// slice serializes as [], never null.
+func TestGetPlayerSeasonArchive_UnknownUserIsEmpty200(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seasons = []season.Season{*endedWindow}
+
+	rec, err := callArchive(t, repo, 7, "424242")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"items":[]`, "an empty archive must serialize as [], not null")
+}
+
+// Malformed subject ids are 400s, mirroring every other :id route.
+func TestGetPlayerSeasonArchive_RejectsBadSubjectIds(t *testing.T) {
+	// 4294967296 is 2^32: parsed at 64 bits and cast to uint it would truncate
+	// to a DIFFERENT user's id on a 32-bit build and serve their archive.
+	for _, bad := range []string{"abc", "0", "-1", "1.5", "4294967296", "99999999999999999999"} {
+		t.Run(bad, func(t *testing.T) {
+			repo := newMockRepo(testWindow)
+			_, err := callArchive(t, repo, 7, bad)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, apperr.ErrBadRequest)
+			assert.Zero(t, repo.archiveCalls, "validation runs before the repository is touched")
+		})
+	}
+}
+
+func TestGetPlayerSeasonArchive_RequiresAuth(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	_, err := callArchive(t, repo, 0, "42")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, apperr.ErrUnauthorized)
+	assert.Zero(t, repo.archiveCalls)
+}
+
+func TestGetPlayerSeasonArchive_RepositoryFailureSurfaces(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.archiveErr = errors.New("db down")
+
+	_, err := callArchive(t, repo, 7, "42")
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, apperr.ErrBadRequest)
+	assert.NotErrorIs(t, err, apperr.ErrUnauthorized)
+}
+
+// --- Story 13.3: CurrentSeasonRank (the profile's narrow reader) ---
+
+// The service satisfies user.SeasonRankReader structurally; these pin the
+// contract the profile depends on without importing `user` (season_test must
+// not — the edge is one-way).
+func TestCurrentSeasonRank_NilWhenNeverPlayed(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	svc := season.NewService(repo)
+
+	rank, err := svc.CurrentSeasonRank(42, time.Now().UTC())
+	require.NoError(t, err)
+	assert.Nil(t, rank, "no row means seasonRank: null, never a fabricated zero block")
+	assert.Empty(t, repo.rows, "the read must not create a player_seasons row")
+}
+
+func TestCurrentSeasonRank_DerivesTierFromSP(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
+		UserID: 42, SeasonID: testWindow.ID, SP: 4000,
+		RankTier:    "iron", // deliberately stale — must be ignored (D7)
+		GamesPlayed: 30, GamesCompleted: 28,
+	}
+	svc := season.NewService(repo)
+
+	rank, err := svc.CurrentSeasonRank(42, time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, rank)
+	assert.Equal(t, "2026 Q3", rank.SeasonName)
+	assert.Equal(t, "gold", rank.Tier, "derived from SP, whatever the column says")
+	assert.Equal(t, 4000, rank.SP)
+}
+
+// A 0-SP row is a REAL rank (Iron) — the row's existence gates the block, not
+// leaderboardScope's sp > 0 membership rule.
+func TestCurrentSeasonRank_ZeroSPRowIsIronNotNil(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
+		UserID: 42, SeasonID: testWindow.ID, SP: 0, GamesPlayed: 2,
+	}
+	svc := season.NewService(repo)
+
+	rank, err := svc.CurrentSeasonRank(42, time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, rank, "played-at-0-SP is Iron, not unranked")
+	assert.Equal(t, "iron", rank.Tier)
+	assert.Equal(t, 0, rank.SP)
+}
+
+func TestCurrentSeasonRank_ResolverFailureSurfaces(t *testing.T) {
+	repo := newMockRepo(nil)
+	repo.currentErr = errors.New("db down")
+	svc := season.NewService(repo)
+
+	rank, err := svc.CurrentSeasonRank(42, time.Now().UTC())
+	require.Error(t, err)
+	assert.Nil(t, rank)
 }

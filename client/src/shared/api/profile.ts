@@ -1,4 +1,5 @@
 import { axiosClient } from "@/shared/api/axiosClient";
+import type { SeasonRank } from "@/shared/types/apiTypes";
 import type { CardDeck } from "@/shared/types/matchTypes";
 
 export interface ProfileResponse {
@@ -40,6 +41,12 @@ export interface ProfileResponse {
   isNewPlayer: boolean;
   honorTrendDelta: number;
   honorTrendDirection: string;
+  // Seasonal rank (Story 13.3): the subject's standing in the ACTIVE season,
+  // or null when they have not played in it — the chip hides on null. The key
+  // is ALWAYS present on the wire (no omitempty server-side), so null means
+  // "no standing", never "an older server". Public-safe: the public shape
+  // below carries it verbatim.
+  seasonRank: SeasonRank | null;
 }
 
 /**
@@ -69,6 +76,9 @@ export interface PublicProfileResponse {
   isNewPlayer: boolean;
   honorTrendDelta: number;
   honorTrendDirection: string;
+  // Seasonal rank (Story 13.3) — public per the epic AC. Same null semantics
+  // as the self shape.
+  seasonRank: SeasonRank | null;
 }
 
 /**

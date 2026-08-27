@@ -150,7 +150,15 @@ func main() {
 
 	// Authenticated route group
 	matchRepo := match.NewGormMatchRepository(db)
-	userHandler := user.NewUserHandler(userRepo, matchRepo)
+	// Season repo + service (Story 13.1/13.3). Constructed HERE -- above the user
+	// handler -- because Story 13.3 injects the service into it as the narrow
+	// SeasonRankReader behind the profile's seasonRank block. The same single
+	// instance is also the match manager's SPAwarder (set further down, once the
+	// session manager exists) and the season handler's service: one service,
+	// several narrow consumers, exactly the honorService shape.
+	seasonRepo := season.NewGormRepository(db)
+	seasonService := season.NewService(seasonRepo)
+	userHandler := user.NewUserHandler(userRepo, matchRepo, seasonService)
 	api := e.Group("/api/v1", auth.AuthMiddleware(cfg.JWTSecret))
 	api.GET("/users", userHandler.SearchUsers)
 	api.GET("/users/:id/profile", userHandler.GetProfile)
@@ -218,14 +226,17 @@ func main() {
 	// Story 13.1: the match manager accrues Season Points and refreshes the rank
 	// tier at match end via the season service. Same injection shape as the XP
 	// awarder and honor recorder above, and for the same reason — season imports
-	// match, so match must never import season.
-	//
-	// One instance, several narrow consumers (as with honorService): the season
-	// handler below reads GET /api/v1/seasons/current off the same service, and
-	// Story 13.2's leaderboard will sit beside it.
-	seasonRepo := season.NewGormRepository(db)
-	seasonService := season.NewService(seasonRepo)
+	// match, so match must never import season. The service itself is built
+	// earlier (above the user handler, which consumes it as its SeasonRankReader).
 	sessionManager.SetSPAwarder(seasonService)
+
+	// Story 13.3: the nightly rollover job — a thin wrapper over the same lazy
+	// resolver every read uses, so a ZERO-TRAFFIC deployment still gets its new
+	// quarter row (and a log line proving it ran). Idempotent by construction
+	// (ON CONFLICT (started_at) DO NOTHING); correctness never depends on it.
+	// Stopped in the graceful-shutdown path below, after hub.Shutdown().
+	seasonRollover := season.NewRollover(seasonRepo, 0, nil)
+	seasonRollover.Start()
 
 	// Reconcile rooms left in status="playing" by a previous process. Sessions
 	// live only in process memory, so any "playing" row at boot has no live
@@ -384,9 +395,20 @@ func main() {
 	// beside it, on the same seasonService constructed above.
 	seasonHandler := season.NewHandler(seasonService)
 	api.GET("/seasons/current", seasonHandler.GetCurrentSeason)
+	// Seasons list (Story 13.3) — every window newest-first, feeding the
+	// leaderboard page's season picker. Echo resolves the static
+	// /seasons/current above ahead of nothing here: both are static segments,
+	// no collision.
+	api.GET("/seasons", seasonHandler.GetSeasons)
+	// Prior-season archive (Story 13.3) — the SUBJECT's ended, played seasons.
+	// A /users path served by the season handler (like /rooms/:id/last-match is
+	// served by userHandler): the data is season-domain, only the URL is
+	// user-shaped. No user-existence 404 here — the profile query owns that.
+	api.GET("/users/:id/seasons", seasonHandler.GetPlayerSeasonArchive)
 	// Seasonal leaderboard (Story 13.2) — an SP-ordered page of the active season
 	// plus the CALLER'S OWN position under the same order. Same service, same
-	// repository, no new construction.
+	// repository, no new construction. Story 13.3 extended ?season= to accept a
+	// prior season's id.
 	//
 	// PULL-ONLY BY DESIGN: the lobby widget polls it and the /leaderboard page
 	// re-reads it on mount. Standings get no WebSocket push (epic decision), so
@@ -418,6 +440,9 @@ func main() {
 
 	slog.Info("shutting down server")
 	hub.Shutdown()
+	// Stop the rollover ticker after the hub, per the shutdown order the job
+	// documents; waits for any in-flight pass, which is one bounded DB read.
+	seasonRollover.Shutdown()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := e.Shutdown(ctx); err != nil {

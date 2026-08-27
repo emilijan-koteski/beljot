@@ -224,8 +224,10 @@ export function IdentityHero({
 
         {/* Lifetime XP progress bar (Story 9.5, AC4). Level + numeric progress
             on top, the bar below. xpIntoLevel / xpForNextLevel are server-
-            provided; the bar fill is cosmetic. Leaves room for the not-yet-built
-            prior-season rank surface (render nothing for it).
+            provided; the bar fill is cosmetic. The seasonal rank deliberately
+            does NOT live in this column: Story 13.3 built it as the page-level
+            SeasonSection (current-rank chip + prior-season archive), which has
+            the width this slot lacks.
 
             Honour is NOT in this column, and the original reason still holds —
             the score, tier, meter, counts and trend need more width than this

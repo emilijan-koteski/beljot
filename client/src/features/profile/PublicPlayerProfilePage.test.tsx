@@ -31,6 +31,13 @@ vi.mock("@/shared/api/matches", () => ({
   getUserMatches: (...args: unknown[]) => mockGetUserMatches(...args),
 }));
 
+// Story 13.3: SeasonSection is in the page tree, so the archive read must be
+// mocked (default: nothing to show — the section stays out of the DOM).
+const mockGetSeasonArchive = vi.fn();
+vi.mock("@/shared/api/season", () => ({
+  getSeasonArchive: (...args: unknown[]) => mockGetSeasonArchive(...args),
+}));
+
 function publicProfileFixture(
   overrides: Partial<PublicProfileResponse> = {},
 ): PublicProfileResponse {
@@ -53,6 +60,9 @@ function publicProfileFixture(
     isNewPlayer: false,
     honorTrendDelta: 0,
     honorTrendDirection: "flat",
+    // Story 13.3: null is the wire default for a subject with no standing in
+    // the active season.
+    seasonRank: null,
     ...overrides,
   };
 }
@@ -117,6 +127,8 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     mockGetPublicProfile.mockReset();
     mockGetCareer.mockReset();
     mockGetUserMatches.mockReset();
+    mockGetSeasonArchive.mockReset();
+    mockGetSeasonArchive.mockResolvedValue({ items: [] });
     mockGetCareer.mockResolvedValue(careerFixture());
     mockGetUserMatches.mockResolvedValue(emptyMatches());
     // A viewer with a DISTINCT honor from the subject, so a hydration leak would
@@ -230,13 +242,48 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     expect(within(history).queryByText("You")).not.toBeInTheDocument();
   });
 
-  it("renders no seasonal-rank section (Epic 13 unbuilt)", async () => {
-    mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
+  // Story 13.3 INVERTED the old graceful-absence test: the reserved slot is now
+  // filled — with the SUBJECT's rank chip and archive — while the
+  // hidden-when-empty contract survives as the variant below.
+  it("renders the subject's seasonal rank chip and prior-season archive", async () => {
+    mockGetPublicProfile.mockResolvedValue(
+      publicProfileFixture({ seasonRank: { seasonName: "2026 Q3", tier: "silver", sp: 1700 } }),
+    );
+    mockGetSeasonArchive.mockResolvedValue({
+      items: [
+        {
+          seasonId: 5,
+          seasonName: "2026 Q2",
+          sp: 900,
+          tier: "bronze",
+          gamesPlayed: 8,
+          startedAt: "2026-04-01T00:00:00Z",
+          endsAt: "2026-07-01T00:00:00Z",
+        },
+      ],
+    });
+
+    renderAt("2");
+
+    const chip = await screen.findByTestId("profile-season");
+    expect(chip).toHaveAttribute("data-tier", "silver");
+    expect(chip.textContent).toContain("2026 Q3");
+    const list = await screen.findByTestId("prior-season-archive");
+    expect(list.querySelectorAll('[data-testid="season-archive-row"]')).toHaveLength(1);
+    // The archive is the SUBJECT's, keyed on the path id — never the viewer's.
+    expect(mockGetSeasonArchive).toHaveBeenCalledWith(2);
+  });
+
+  // The hidden-when-empty variant of the same contract: a subject with no
+  // season history renders NO season surface at all — never an empty state.
+  it("renders no seasonal-rank section for a subject without season history", async () => {
+    mockGetPublicProfile.mockResolvedValue(publicProfileFixture({ seasonRank: null }));
+    mockGetSeasonArchive.mockResolvedValue({ items: [] });
 
     renderAt("2");
 
     await waitFor(() => expect(screen.getByTestId("public-profile-page")).toBeInTheDocument());
-    // Pins the graceful-absence contract for when Epic 13 lands.
+    await waitFor(() => expect(mockGetSeasonArchive).toHaveBeenCalled());
     expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
     expect(screen.queryByTestId("prior-season-archive")).not.toBeInTheDocument();
   });

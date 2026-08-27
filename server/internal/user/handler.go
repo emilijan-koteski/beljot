@@ -12,7 +12,26 @@ import (
 
 	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/match"
+	"github.com/emilijan/beljot/server/internal/season"
 )
+
+// SeasonRankReader is the ONE read the profile needs from the season domain:
+// the subject's standing in the active season, or (nil, nil) when they have
+// not played in it (Story 13.3).
+//
+// THE INTERFACE LIVES HERE, in `user`, exactly the way match.SPAwarder /
+// HonorRecorder live in `match`: the CONSUMER declares its narrow need,
+// season.Service satisfies it structurally, and cmd/api/main.go wires the two.
+// The import direction is user -> season (a NEW edge, permitted by Story 13.3);
+// `season` must never import `user`, which is why the view type this returns is
+// season's own rather than one declared here that season would have to name.
+//
+// The profile is ONE response assembled server-side -- a second client
+// round-trip for the rank would leak the composition to every consumer of
+// either profile shape.
+type SeasonRankReader interface {
+	CurrentSeasonRank(userID uint, now time.Time) (*season.SeasonRankView, error)
+}
 
 // ProfileResponse is the SELF profile DTO returned by GetProfile when the
 // path id equals the authenticated viewer (Story 11.3 made the endpoint
@@ -67,11 +86,19 @@ type ProfileResponse struct {
 	IsNewPlayer         bool      `json:"isNewPlayer"`
 	HonorTrendDelta     int       `json:"honorTrendDelta"`
 	HonorTrendDirection string    `json:"honorTrendDirection"`
-	CreatedAt           time.Time `json:"createdAt"`
-	TotalGamesPlayed    int       `json:"totalGamesPlayed"`
-	Wins                int       `json:"wins"`
-	Losses              int       `json:"losses"`
-	Abandoned           int       `json:"abandoned"`
+	// SeasonRank is the subject's standing in the ACTIVE season (Story 13.3):
+	// {seasonName, tier, sp}, or null when they have not played in it -- the
+	// client hides the rank chip on null. PUBLIC-SAFE, like the honor block
+	// above: the leaderboard already exposes tier + SP for every player, so
+	// PublicProfileResponse carries it verbatim. NO omitempty -- the key must
+	// always be present so the client can tell "no standing" from "an older
+	// server that does not send this".
+	SeasonRank       *season.SeasonRankView `json:"seasonRank"`
+	CreatedAt        time.Time              `json:"createdAt"`
+	TotalGamesPlayed int                    `json:"totalGamesPlayed"`
+	Wins             int                    `json:"wins"`
+	Losses           int                    `json:"losses"`
+	Abandoned        int                    `json:"abandoned"`
 }
 
 // PublicProfileResponse is the PUBLIC projection returned by GET
@@ -101,10 +128,14 @@ type PublicProfileResponse struct {
 	IsNewPlayer         bool   `json:"isNewPlayer"`
 	HonorTrendDelta     int    `json:"honorTrendDelta"`
 	HonorTrendDirection string `json:"honorTrendDirection"`
-	TotalGamesPlayed    int    `json:"totalGamesPlayed"`
-	Wins                int    `json:"wins"`
-	Losses              int    `json:"losses"`
-	Abandoned           int    `json:"abandoned"`
+	// Seasonal rank (Story 13.3) -- public-safe per the epic AC (the current
+	// rank becomes part of the public profile response). Same null-when-unplayed
+	// semantics as the self shape; no omitempty for the same reason.
+	SeasonRank       *season.SeasonRankView `json:"seasonRank"`
+	TotalGamesPlayed int                    `json:"totalGamesPlayed"`
+	Wins             int                    `json:"wins"`
+	Losses           int                    `json:"losses"`
+	Abandoned        int                    `json:"abandoned"`
 }
 
 // UpdatePreferencesRequest is a PARTIAL update: both fields are pointers so
@@ -287,10 +318,15 @@ const careerListLimit = 4
 type UserHandler struct {
 	userRepo  UserRepository
 	matchRepo match.MatchRepository
+	// seasonRank is the narrow season-domain reader behind the profile's
+	// seasonRank block (Story 13.3). Nil-tolerant: a handler built without one
+	// serves seasonRank: null rather than panicking, so tests (and any future
+	// season-less deployment) need not wire it.
+	seasonRank SeasonRankReader
 }
 
-func NewUserHandler(userRepo UserRepository, matchRepo match.MatchRepository) *UserHandler {
-	return &UserHandler{userRepo: userRepo, matchRepo: matchRepo}
+func NewUserHandler(userRepo UserRepository, matchRepo match.MatchRepository, seasonRank SeasonRankReader) *UserHandler {
+	return &UserHandler{userRepo: userRepo, matchRepo: matchRepo, seasonRank: seasonRank}
 }
 
 func getUserID(c echo.Context) (uint, error) {
@@ -375,6 +411,25 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		)
 	}
 
+	// Seasonal rank (Story 13.3): the SUBJECT's standing in the active season,
+	// keyed on subjectID like every other figure here. BEST-EFFORT, mirroring
+	// the honor trend above: a failed season read degrades to seasonRank: null
+	// rather than failing the whole profile -- the identity/honor/stats sections
+	// matter more than the chip, and nil is already the documented "not played"
+	// shape the client handles.
+	// The error is scoped to this block rather than reusing the function's `err`:
+	// a swallowed failure must not leave `err` non-nil for whatever is written
+	// below it next.
+	var seasonRank *season.SeasonRankView
+	if h.seasonRank != nil {
+		rank, rankErr := h.seasonRank.CurrentSeasonRank(subjectID, now)
+		if rankErr != nil {
+			slog.Error("profile: failed to read season rank", "userID", subjectID, "error", rankErr)
+		} else {
+			seasonRank = rank
+		}
+	}
+
 	// Self → the full private profile (wallet / streak / language / username
 	// cooldown); any other viewer → the narrower public projection. The branch
 	// compares paramID as uint64 to stay wraparound-safe, mirroring the old
@@ -400,6 +455,7 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 				IsNewPlayer:         honor.IsNewPlayer,
 				HonorTrendDelta:     trendDelta,
 				HonorTrendDirection: trendDirection,
+				SeasonRank:          seasonRank,
 				CreatedAt:           u.CreatedAt,
 				TotalGamesPlayed:    wins + losses + abandoned,
 				Wins:                wins,
@@ -425,6 +481,7 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 			IsNewPlayer:         honor.IsNewPlayer,
 			HonorTrendDelta:     trendDelta,
 			HonorTrendDirection: trendDirection,
+			SeasonRank:          seasonRank,
 			TotalGamesPlayed:    wins + losses + abandoned,
 			Wins:                wins,
 			Losses:              losses,

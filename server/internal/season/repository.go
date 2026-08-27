@@ -109,4 +109,31 @@ type Repository interface {
 	// The row need not exist: the caller only calls this once FindPlayerSeason has
 	// returned one.
 	CountAhead(seasonID uint, sp int, userID uint) (int64, error)
+
+	// --- Story 13.3 reads. NONE of the three methods below writes anything: ---
+	// they never create a player_seasons row (FindPlayerSeason's contract above),
+	// and unlike CurrentSeason they never create a SEASON row either — a by-id
+	// lookup, a listing, and an archive read have no window to lazily heal.
+
+	// FindSeasonByID returns the season row with that id, or (nil, nil) on a
+	// miss. The miss is data, not an error: the leaderboard's ?season=<id>
+	// selector maps it to apperr.ErrSeasonNotFound at the service layer.
+	FindSeasonByID(id uint) (*Season, error)
+
+	// ListSeasons returns every season row, newest-first (started_at DESC) —
+	// the order the leaderboard picker renders verbatim. Never nil on success:
+	// an empty table is an empty slice.
+	ListSeasons() ([]Season, error)
+
+	// PlayerSeasonArchive returns the player's ENDED, PLAYED seasons,
+	// newest-first (seasons.started_at DESC). Membership is
+	//
+	//   row exists AND games_played >= 1 AND seasons.ends_at <= now
+	//
+	// — deliberately NOT leaderboardScope's `sp > 0`: the archive is "seasons
+	// you actually played", so a played season with 0 SP is included, while the
+	// ACTIVE window is always excluded (its record is still moving; the archive
+	// is immutable history). An unknown user is an empty slice, not an error —
+	// the profile query owns user-existence 404s. Never nil on success.
+	PlayerSeasonArchive(userID uint, now time.Time) ([]ArchiveEntry, error)
 }

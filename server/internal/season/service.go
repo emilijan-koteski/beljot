@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/match"
 )
 
@@ -153,9 +154,20 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 	}, nil
 }
 
-// LeaderboardView is the read path behind GET /api/v1/leaderboard?season=current
-// (Story 13.2): one SP-ordered page of the active season plus the viewer's own
-// position under that same order.
+// LeaderboardView is the read path behind GET /api/v1/leaderboard (Story 13.2,
+// prior-season selector added by Story 13.3): one SP-ordered page of one season
+// plus the viewer's own position under that same order.
+//
+// `seasonID` selects the window: 0 means THE CURRENT SEASON (the handler maps
+// the absent / "current" selector to it), any other value is a by-id lookup of
+// a specific — usually ended — season, and a miss is apperr.ErrSeasonNotFound
+// (404), never a silent fallback to the active window, which would show the
+// wrong standings under the right heading.
+//
+// The viewer block runs under the SAME rules for a prior season as for the
+// current one (the sp > 0 membership predicate included) — a season's ladder is
+// frozen when it ends, but the question "where did I finish" has the same
+// answer shape either way.
 //
 // PULL-ONLY. There is deliberately no WebSocket event for standings (epic
 // decision, restated as a Story 13.2 boundary): the client loads this on mount
@@ -164,18 +176,32 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 //
 // Like CurrentSeasonView this never creates a PLAYER record -- it only reads
 // player_seasons -- while resolveSeason may still lazily create the SEASON
-// window, which is idempotent and bounded to one row per quarter.
+// window, which is idempotent and bounded to one row per quarter. The BY-ID
+// path creates nothing at all: FindSeasonByID is a pure read.
 //
 // `limit` and `offset` arrive already validated by the handler
 // (parseLeaderboardQuery); the service does not re-clamp them, so a caller that
 // bypasses the handler gets exactly what it asked for.
-func (s *Service) LeaderboardView(userID uint, limit, offset int, now time.Time) (*LeaderboardView, error) {
-	current, err := s.resolveSeason(now)
-	if err != nil {
-		return nil, err
+func (s *Service) LeaderboardView(userID, seasonID uint, limit, offset int, now time.Time) (*LeaderboardView, error) {
+	var window *Season
+	if seasonID == 0 {
+		current, err := s.resolveSeason(now)
+		if err != nil {
+			return nil, err
+		}
+		window = current
+	} else {
+		found, err := s.repo.FindSeasonByID(seasonID)
+		if err != nil {
+			return nil, fmt.Errorf("reading season %d: %w", seasonID, err)
+		}
+		if found == nil {
+			return nil, apperr.ErrSeasonNotFound
+		}
+		window = found
 	}
 
-	entries, total, err := s.repo.LeaderboardPage(current.ID, limit, offset)
+	entries, total, err := s.repo.LeaderboardPage(window.ID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("reading leaderboard page: %w", err)
 	}
@@ -198,7 +224,7 @@ func (s *Service) LeaderboardView(userID uint, limit, offset int, now time.Time)
 		})
 	}
 
-	viewer, err := s.viewerPosition(userID, current.ID)
+	viewer, err := s.viewerPosition(userID, window.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -265,5 +291,101 @@ func (s *Service) viewerPosition(userID, seasonID uint) (*LeaderboardViewerView,
 		// authStore, and the wire block stays name-free (Story 13.2 D3). It is
 		// selected only because it rides the shared scope's SELECT list.
 		GamesPlayed: entry.GamesPlayed,
+	}, nil
+}
+
+// --- Story 13.3: seasons list, prior-season archive, profile rank ---
+
+// SeasonsView is the read path behind GET /api/v1/seasons: every window,
+// newest-first, feeding the leaderboard's season picker.
+//
+// It resolves the CURRENT season first — through the same lazy resolver every
+// other read uses — so the listing always contains the window covering `now`
+// even on a zero-traffic deployment the nightly job has not reached yet. That
+// is the one write this path can cause (a season row, idempotent, one per
+// quarter); it never touches player_seasons.
+func (s *Service) SeasonsView(now time.Time) (*SeasonsListView, error) {
+	if _, err := s.resolveSeason(now); err != nil {
+		return nil, err
+	}
+
+	seasons, err := s.repo.ListSeasons()
+	if err != nil {
+		return nil, fmt.Errorf("listing seasons: %w", err)
+	}
+
+	items := make([]SeasonListItemView, 0, len(seasons))
+	for _, se := range seasons {
+		items = append(items, SeasonListItemView{
+			ID:        se.ID,
+			Name:      se.Name,
+			StartedAt: se.StartedAt,
+			EndsAt:    se.EndsAt,
+		})
+	}
+	return &SeasonsListView{Items: items}, nil
+}
+
+// ArchiveView is the read path behind GET /api/v1/users/:id/seasons: the
+// subject's ENDED, PLAYED seasons, newest-first, with the tier DERIVED per row
+// (TierForSP over the immutable SP total — never the stored rank_tier column,
+// 13.1 D7).
+//
+// An unknown subject is an EMPTY archive, not a 404 — the profile query owns
+// user existence, and this endpoint answers the narrower question "which ended
+// seasons did this id play". A pure read: no season row, no player row.
+func (s *Service) ArchiveView(userID uint, now time.Time) (*ArchiveView, error) {
+	entries, err := s.repo.PlayerSeasonArchive(userID, now)
+	if err != nil {
+		return nil, fmt.Errorf("reading season archive: %w", err)
+	}
+
+	items := make([]ArchiveRowView, 0, len(entries))
+	for _, e := range entries {
+		items = append(items, ArchiveRowView{
+			SeasonID:    e.SeasonID,
+			SeasonName:  e.SeasonName,
+			SP:          e.SP,
+			Tier:        TierForSP(e.SP),
+			GamesPlayed: e.GamesPlayed,
+			StartedAt:   e.StartedAt,
+			EndsAt:      e.EndsAt,
+		})
+	}
+	return &ArchiveView{Items: items}, nil
+}
+
+// CurrentSeasonRank is the narrow read the user package's profile assembly
+// injects (Story 13.3): the subject's standing in the ACTIVE season, or nil
+// when they have not played in it — the profile serializes that nil as
+// `seasonRank: null` and the client hides the chip.
+//
+// nil MEANS "NO ROW", NOT "NO SP": a played season at 0 SP still has a rank
+// (Iron — there is no unranked state), so the row's existence is the gate, not
+// leaderboardScope's sp > 0 membership rule. Satisfies user.SeasonRankReader
+// structurally; `season` never imports `user` (the same one-way discipline as
+// match.SPAwarder, mirrored).
+//
+// Like every read: may lazily create the SEASON window via resolveSeason,
+// never a player_seasons row.
+func (s *Service) CurrentSeasonRank(userID uint, now time.Time) (*SeasonRankView, error) {
+	current, err := s.resolveSeason(now)
+	if err != nil {
+		return nil, err
+	}
+
+	record, err := s.repo.FindPlayerSeason(userID, current.ID)
+	if err != nil {
+		return nil, fmt.Errorf("reading player season: %w", err)
+	}
+	if record == nil {
+		return nil, nil
+	}
+
+	return &SeasonRankView{
+		SeasonName: current.Name,
+		// Derived, never the stored rank_tier column (D7).
+		Tier: TierForSP(record.SP),
+		SP:   record.SP,
 	}, nil
 }

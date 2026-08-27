@@ -62,7 +62,15 @@ export const queryKeys = {
   // event:season_points_awarded WS handler rather than polled.
   season: {
     current: () => ["season", "current"] as const,
-    // Story 13.2: the seasonal leaderboard, keyed by PAGE SIZE only.
+    // Story 13.3: the seasons list (the leaderboard picker's feed) and a
+    // player's prior-season archive. The archive is keyed per subject id — the
+    // endpoint takes one, unlike `current` above.
+    list: () => ["season", "list"] as const,
+    archive: (userId: number) => ["season", "archive", userId] as const,
+    // Story 13.2: the seasonal leaderboard, keyed by PAGE SIZE and (since
+    // Story 13.3) the SEASON SELECTOR — a season id, or "current" for the
+    // active window — so a prior season's frozen standings and the live
+    // ladder are separate cache entries.
     //
     // No `offset` in the key, deliberately. Neither consumer needs one: the
     // lobby widget only ever reads offset 0, and the full page is a single
@@ -75,8 +83,13 @@ export const queryKeys = {
     // 25-row pages cannot overwrite each other with differently-sized lists.
     //
     // NOT invalidated from the socket — standings are pull-only (page load plus
-    // poll), by epic decision.
-    leaderboard: (limit: number) => ["season", "leaderboard", limit] as const,
+    // poll), by epic decision. The ONE non-pull invalidation is the boundary
+    // effect in RankBanner: when the season rolls over it invalidates
+    // `leaderboardAll()` (this whole prefix) so no surface keeps rendering the
+    // dead window's ladder as current.
+    leaderboard: (limit: number, season: number | "current") =>
+      ["season", "leaderboard", limit, season] as const,
+    leaderboardAll: () => ["season", "leaderboard"] as const,
   },
   stats: {
     public: ["stats", "public"] as const,

@@ -15,6 +15,9 @@ import { makeUser } from "@/test-utils";
 
 vi.mock("@/shared/api/season", () => ({
   getSeasonLeaderboard: vi.fn(),
+  // Story 13.3: the hooks module also exports the seasons-list reader; the
+  // widget never calls it, but the mocked module must still define it.
+  getSeasons: vi.fn(),
 }));
 
 const mockGet = vi.mocked(getSeasonLeaderboard);
@@ -85,7 +88,7 @@ describe("LeaderboardPanel", () => {
     renderPanel();
 
     await screen.findAllByTestId("leaderboard-row");
-    expect(mockGet).toHaveBeenCalledWith(10, 0);
+    expect(mockGet).toHaveBeenCalledWith(10, 0, "current");
   });
 
   it("marks the viewer's own row and leaves the others unmarked", async () => {

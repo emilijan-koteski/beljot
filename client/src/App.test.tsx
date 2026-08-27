@@ -74,6 +74,9 @@ vi.mock("@/shared/api/season", () => ({
     offset: 0,
     viewer: null,
   }),
+  // Story 13.3: the season picker's list and the profile archive.
+  getSeasons: vi.fn().mockResolvedValue({ items: [] }),
+  getSeasonArchive: vi.fn().mockResolvedValue({ items: [] }),
 }));
 
 describe("App routing", () => {

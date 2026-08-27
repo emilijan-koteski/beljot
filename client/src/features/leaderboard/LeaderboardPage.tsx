@@ -1,14 +1,29 @@
-import { useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SectionHeader } from "@/features/profile/components/SectionHeader";
+import { queryKeys } from "@/shared/api/queryKeys";
+import type { SeasonSelector } from "@/shared/api/season";
 import { LeaderboardRow } from "@/shared/components/season/LeaderboardRow";
-import { useSeasonLeaderboardInfiniteQuery } from "@/shared/hooks/queries/useSeasonLeaderboard";
+import { Chips } from "@/shared/components/ui/chips";
+import {
+  useSeasonLeaderboardInfiniteQuery,
+  useSeasonsQuery,
+} from "@/shared/hooks/queries/useSeasonLeaderboard";
+import { getTimeTick, subscribeTimeTick } from "@/shared/lib/timeTick";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { LeaderboardRow as LeaderboardRowData } from "@/shared/types/apiTypes";
 
 /** Rows per request on the full page. Comfortably under the server's cap of 50. */
 const PAGE_SIZE = 25;
+
+/**
+ * Re-arm delay for the boundary effect, matching RankBanner's. Only reachable
+ * when this client's clock runs ahead of the server's, where the early refetch
+ * returns the same still-active window.
+ */
+const SEASON_BOUNDARY_RETRY_MS = 5 * 60 * 1000;
 
 /**
  * The full seasonal leaderboard (Story 13.2 AC2), reached from the top nav's
@@ -28,7 +43,74 @@ const PAGE_SIZE = 25;
  */
 export function LeaderboardPage() {
   const { t } = useTranslation();
-  const query = useSeasonLeaderboardInfiniteQuery(PAGE_SIZE);
+
+  // The season picker (Story 13.3). `null` means "the current window" — the
+  // DEFAULT, and deliberately not a season id: the page must render the active
+  // ladder before (and even without) the seasons list resolving, and
+  // `season=current` keeps the request URL independent of which quarter it is.
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const seasonsQuery = useSeasonsQuery();
+  const seasons = seasonsQuery.data?.items ?? [];
+  const queryClient = useQueryClient();
+
+  // The same shared 30s tick the lobby's RankBanner uses. THE PAGE MUST OBSERVE
+  // THE BOUNDARY TOO: this is the only surface whose entire content is the
+  // ladder, and RankBanner — the sole other observer — is unmounted while this
+  // route is active. Without the subscription a page left open across the
+  // quarter boundary keeps the "Current" marker on the dead window and keeps
+  // rendering its frozen standings under the present-tense heading.
+  const tick = useSyncExternalStore(subscribeTimeTick, getTimeTick, getTimeTick);
+
+  // Re-derived on every render, and the tick subscription above is what makes
+  // renders happen on a 30s cadence — so this ages instead of freezing at mount.
+  const nowMs = Date.now();
+
+  // The window covering "now" — identified by its own timestamps rather than
+  // by list position, so a pre-created future row could never mislabel it.
+  const currentId = seasons.find(
+    (s) => Date.parse(s.startedAt) <= nowMs && nowMs < Date.parse(s.endsAt),
+  )?.id;
+
+  // The page's own boundary effect, mirroring RankBanner's.
+  //
+  // IT WATCHES THE NEWEST WINDOW WE KNOW OF, NOT "the current one": at the
+  // moment the boundary passes, NO listed window covers now (that is the whole
+  // problem — the next one exists only on the server), so keying on `currentId`
+  // would go undefined exactly when the effect needs to fire. Once the newest
+  // endsAt we hold is in the past, this page's list AND its `current` ladder
+  // are both provably stale. The refetch brings the new window in, its endsAt
+  // is in the future, and the guard is re-armed for the next quarter. The `at`
+  // stamp is the same clock-skew escape RankBanner carries.
+  let newestEndsAt: string | undefined;
+  for (const s of seasons) {
+    if (newestEndsAt === undefined || Date.parse(s.endsAt) > Date.parse(newestEndsAt)) {
+      newestEndsAt = s.endsAt;
+    }
+  }
+  const invalidatedForRef = useRef<{ endsAt: string; at: number } | null>(null);
+  useEffect(() => {
+    if (newestEndsAt === undefined) return;
+    const end = Date.parse(newestEndsAt);
+    const now = Date.now();
+    if (!Number.isFinite(end) || now < end) return;
+    const last = invalidatedForRef.current;
+    if (last?.endsAt === newestEndsAt && now - last.at < SEASON_BOUNDARY_RETRY_MS) return;
+    invalidatedForRef.current = { endsAt: newestEndsAt, at: now };
+    void queryClient.invalidateQueries({ queryKey: queryKeys.season.leaderboardAll() });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.season.list() });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.season.current() });
+  }, [tick, newestEndsAt, queryClient]);
+
+  // PAST-SEASON COPY. A frozen quarter must not be described in the present
+  // tense ("who is climbing fastest this season", "nobody has earned SP yet
+  // this season" — the latter is simply false about a season that is over).
+  // Decided from the selected window's OWN endsAt, so it stays right even while
+  // `currentId` is still resolving.
+  const selectedSeason = selectedId === null ? undefined : seasons.find((s) => s.id === selectedId);
+  const isPastSeason = selectedSeason !== undefined && Date.parse(selectedSeason.endsAt) <= nowMs;
+
+  const seasonParam: SeasonSelector = selectedId === null ? "current" : selectedId;
+  const query = useSeasonLeaderboardInfiniteQuery(PAGE_SIZE, seasonParam);
   const viewer = useAuthStore((s) => s.user);
 
   const items = useMemo<LeaderboardRowData[]>(() => {
@@ -102,7 +184,9 @@ export function LeaderboardPage() {
         className="bg-surface border-border rounded-lg border border-dashed p-10 text-center text-sm"
         data-testid="leaderboard-empty"
       >
-        <p className="text-ink-dim m-0">{t("season.leaderboard.empty")}</p>
+        <p className="text-ink-dim m-0">
+          {t(isPastSeason ? "season.leaderboard.emptyPast" : "season.leaderboard.empty")}
+        </p>
       </div>
     );
   } else {
@@ -216,8 +300,58 @@ export function LeaderboardPage() {
       <SectionHeader
         eyebrow={t("season.leaderboard.eyebrow")}
         title={t("season.leaderboard.title")}
-        sub={t("season.leaderboard.sub")}
+        sub={t(isPastSeason ? "season.leaderboard.subPast" : "season.leaderboard.sub", {
+          season: selectedSeason?.name ?? "",
+        })}
       />
+
+      {/* Season picker (Story 13.3): newest-first straight off the server's
+          order, season tokens rendered VERBATIM. Absent until the list
+          resolves — the page defaults to the current window regardless, so
+          there is nothing to pick from an empty or failed list (a picker whose
+          only row is unclickable would be noise, and the picker failing must
+          not take the ladder with it). Picking the current window maps back to
+          the `current` selector rather than its id, so the default cache entry
+          is reused.
+
+          `seasons.length > 1`, NOT `> 0`: on a fresh deployment — and through
+          the whole of the product's first quarter — the list holds exactly one
+          window, and a picker offering a single already-selected chip is a
+          control that cannot do anything.
+
+          When `currentId` is undefined (no listed window covers this client's
+          clock — skew right at a boundary, or a list fetched a moment before
+          the rollover) the value falls back to the sentinel so no chip reads as
+          selected, and picking any window sends its id. That path is correct
+          rather than merely tolerable: an explicit id is exactly what the
+          reader asked for, and `selectedId` still collapses back to `current`
+          as soon as a covering window is identifiable. */}
+      {seasons.length > 1 && (
+        <Chips
+          value={selectedId ?? currentId ?? -1}
+          onValueChange={(id) =>
+            setSelectedId(currentId !== undefined && id === currentId ? null : id)
+          }
+          options={seasons.map((s) => ({
+            value: s.id,
+            label:
+              s.id === currentId ? (
+                <>
+                  {s.name}
+                  <span className="text-[10px] tracking-[0.3px] uppercase opacity-70">
+                    {t("season.picker.current")}
+                  </span>
+                </>
+              ) : (
+                s.name
+              ),
+          }))}
+          ariaLabel={t("season.picker.label")}
+          testId="leaderboard-season-picker"
+          className="mb-4"
+        />
+      )}
+
       {body}
     </div>
   );

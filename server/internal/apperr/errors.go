@@ -215,6 +215,13 @@ var (
 	ErrInvalidAction           = NewAppError("INVALID_ACTION", "action is not valid in this context", http.StatusBadRequest)
 	ErrSurrenderExhausted      = NewAppError("SURRENDER_EXHAUSTED", "player has already used their surrender for this match", http.StatusConflict)
 
+	// Season domain errors (Story 13.3). ErrSeasonNotFound is returned by the
+	// leaderboard's ?season=<id> selector when no season row carries that id —
+	// a MISS, not a validation failure (a malformed selector is ErrBadRequest
+	// before the database is ever touched). 404 matches ErrUserNotFound /
+	// ErrRoomNotFound: the resource named by the identifier does not exist.
+	ErrSeasonNotFound = NewAppError("SEASON_NOT_FOUND", "season not found", http.StatusNotFound)
+
 	// WebSocket domain errors
 	ErrWSAuthTimeout    = NewAppError("WS_AUTH_TIMEOUT", "WebSocket authentication timed out", http.StatusUnauthorized)
 	ErrWSAuthFailed     = NewAppError("WS_AUTH_FAILED", "WebSocket authentication failed", http.StatusUnauthorized)

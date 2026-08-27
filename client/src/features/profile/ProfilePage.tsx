@@ -13,6 +13,7 @@ import { LinkedAccounts } from "./components/LinkedAccounts";
 import { Milestones } from "./components/Milestones";
 import { PartnerSpotlight } from "./components/PartnerSpotlight";
 import { Rivalries } from "./components/Rivalries";
+import { SeasonSection } from "./components/SeasonSection";
 import { StatsGrid } from "./components/StatsGrid";
 import { StreakCallout } from "./components/StreakCallout";
 import { MatchHistory } from "./MatchHistory";
@@ -158,6 +159,12 @@ export function ProfilePage() {
       ) : (
         <StatsGrid games={games} wins={wins} losses={losses} abandoned={abandoned} />
       )}
+
+      {/* Story 13.3: current seasonal rank + prior-season archive. Renders
+          nothing at all when the viewer has neither — the section owns its own
+          absence, so the page stays byte-identical for a player with no season
+          history. */}
+      <SeasonSection userId={user?.id} seasonRank={profile?.seasonRank} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <MatchHistory userId={user?.id} counts={counts} />

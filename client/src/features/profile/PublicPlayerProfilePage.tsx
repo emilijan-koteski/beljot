@@ -11,6 +11,7 @@ import { IdentityHero } from "./components/IdentityHero";
 import { Milestones } from "./components/Milestones";
 import { PartnerSpotlight } from "./components/PartnerSpotlight";
 import { Rivalries } from "./components/Rivalries";
+import { SeasonSection } from "./components/SeasonSection";
 import { StatsGrid } from "./components/StatsGrid";
 import { StreakCallout } from "./components/StreakCallout";
 import { MatchHistory } from "./MatchHistory";
@@ -178,8 +179,11 @@ export function PublicPlayerProfilePage() {
 
       <StatsGrid games={games} wins={wins} losses={losses} abandoned={abandoned} />
 
-      {/* No seasonal-rank / prior-season section: Epic 13 is unbuilt and there is
-          no season data anywhere, so AC5 is satisfied by rendering nothing here. */}
+      {/* Story 13.3: the SUBJECT's current seasonal rank + prior-season
+          archive, in the slot reserved since Epic 11. Renders nothing at all
+          when the subject has neither, which preserves the original graceful
+          absence for players without season history. */}
+      <SeasonSection userId={validId} seasonRank={profile.seasonRank} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         {/* subjectIsSelf=false → the subject's seat shows their username, never a

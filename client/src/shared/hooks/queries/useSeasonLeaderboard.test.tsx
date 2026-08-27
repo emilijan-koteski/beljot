@@ -13,6 +13,7 @@ import type { LeaderboardResponse, LeaderboardRow } from "@/shared/types/apiType
 
 vi.mock("@/shared/api/season", () => ({
   getSeasonLeaderboard: vi.fn(),
+  getSeasons: vi.fn(),
 }));
 
 const mockGet = vi.mocked(getSeasonLeaderboard);
@@ -48,7 +49,8 @@ describe("useSeasonLeaderboardQuery (widget)", () => {
     const { result } = renderHook(() => useSeasonLeaderboardQuery(10), { wrapper: wrapper() });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockGet).toHaveBeenCalledWith(10, 0);
+    // ALWAYS the current window: the widget has no season picker by design.
+    expect(mockGet).toHaveBeenCalledWith(10, 0, "current");
   });
 
   it("polls on an interval, unlike the pushed useCurrentSeason", async () => {
@@ -66,7 +68,9 @@ describe("useSeasonLeaderboardQuery (widget)", () => {
     // channel, so a missing interval freezes the widget for the whole session.
     // Read off the live observer rather than by advancing timers, which would
     // make this a slow and flaky clock test.
-    const entry = qc.getQueryCache().find({ queryKey: queryKeys.season.leaderboard(10) });
+    const entry = qc
+      .getQueryCache()
+      .find({ queryKey: queryKeys.season.leaderboard(10, "current") });
     const options = entry?.observers[0]?.options as
       | { refetchInterval?: number; refetchOnWindowFocus?: boolean }
       | undefined;
@@ -77,11 +81,27 @@ describe("useSeasonLeaderboardQuery (widget)", () => {
     expect(options?.refetchOnWindowFocus).toBe(true);
   });
 
-  it("keys entries by page size so the widget and the page cannot collide", () => {
+  it("keys entries by page size and season so surfaces cannot collide", () => {
     // The widget reads 10 rows and the full page 25. One shared key would let a
-    // 10-row response be served to a component expecting 25.
-    expect(queryKeys.season.leaderboard(10)).not.toEqual(queryKeys.season.leaderboard(25));
-    expect(queryKeys.season.leaderboard(10)).toEqual(["season", "leaderboard", 10]);
+    // 10-row response be served to a component expecting 25 — and since Story
+    // 13.3, a prior season's frozen page must not overwrite the live ladder.
+    expect(queryKeys.season.leaderboard(10, "current")).not.toEqual(
+      queryKeys.season.leaderboard(25, "current"),
+    );
+    expect(queryKeys.season.leaderboard(25, "current")).not.toEqual(
+      queryKeys.season.leaderboard(25, 5),
+    );
+    expect(queryKeys.season.leaderboard(10, "current")).toEqual([
+      "season",
+      "leaderboard",
+      10,
+      "current",
+    ]);
+    // The boundary effect invalidates by this prefix — it must actually BE a
+    // prefix of every leaderboard key.
+    expect(queryKeys.season.leaderboard(10, "current").slice(0, 2)).toEqual([
+      ...queryKeys.season.leaderboardAll(),
+    ]);
   });
 });
 
@@ -96,7 +116,24 @@ describe("useSeasonLeaderboardInfiniteQuery (page)", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockGet).toHaveBeenCalledWith(25, 0);
+    expect(mockGet).toHaveBeenCalledWith(25, 0, "current");
+  });
+
+  // Story 13.3: the page's picker threads a prior season's id through — into
+  // the request AND onward through every load-more offset.
+  it("threads a picked season id into every page request", async () => {
+    mockGet
+      .mockResolvedValueOnce(page({ items: rows(1, 25), total: 30 }))
+      .mockResolvedValueOnce(page({ items: rows(26, 5), total: 30, offset: 25 }));
+
+    const { result } = renderHook(() => useSeasonLeaderboardInfiniteQuery(25, 5), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockGet).toHaveBeenCalledWith(25, 0, 5);
+
+    await result.current.fetchNextPage();
+    expect(mockGet).toHaveBeenLastCalledWith(25, 25, 5);
   });
 
   // THE ARITHMETIC THE HOOK'S OWN COMMENT CALLS OUT: the next offset is the
@@ -115,7 +152,7 @@ describe("useSeasonLeaderboardInfiniteQuery (page)", () => {
     await result.current.fetchNextPage();
 
     // 20, not 25: asking for offset 25 would silently skip rows 21-25.
-    expect(mockGet).toHaveBeenLastCalledWith(25, 20);
+    expect(mockGet).toHaveBeenLastCalledWith(25, 20, "current");
   });
 
   it("stops paging when an empty page comes back", async () => {
@@ -181,8 +218,8 @@ describe("useSeasonLeaderboardInfiniteQuery (page)", () => {
   it("keys separately from the widget query at the same page size", () => {
     // Same page size, DIFFERENT cached shape (pages[] vs a single response), so
     // the two must not share a cache entry.
-    expect([...queryKeys.season.leaderboard(25), "infinite"]).not.toEqual(
-      queryKeys.season.leaderboard(25),
+    expect([...queryKeys.season.leaderboard(25, "current"), "infinite"]).not.toEqual(
+      queryKeys.season.leaderboard(25, "current"),
     );
   });
 });

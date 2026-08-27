@@ -19,8 +19,28 @@ import (
 	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/auth"
 	"github.com/emilijan/beljot/server/internal/match"
+	"github.com/emilijan/beljot/server/internal/season"
 	"github.com/emilijan/beljot/server/internal/user"
 )
+
+// fakeSeasonReader is the LOCAL fake behind user.SeasonRankReader (Story 13.3)
+// — the same pattern as the mock repos here: the handler tests must not drag a
+// real season service (and its repository) into user's test graph.
+type fakeSeasonReader struct {
+	rank       *season.SeasonRankView
+	err        error
+	calls      int
+	lastUserID uint
+}
+
+func (f *fakeSeasonReader) CurrentSeasonRank(userID uint, _ time.Time) (*season.SeasonRankView, error) {
+	f.calls++
+	f.lastUserID = userID
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.rank, nil
+}
 
 // --- Mock Match Repository (for user handler tests) ---
 
@@ -583,9 +603,18 @@ func setupUserHandler() (*mockUserRepo, *echo.Echo) {
 }
 
 func setupUserHandlerWithMatches() (*mockUserRepo, *mockMatchRepo, *echo.Echo) {
+	repo, matchRepo, _, e := setupUserHandlerWithSeason()
+	return repo, matchRepo, e
+}
+
+// setupUserHandlerWithSeason also exposes the season fake, for the Story 13.3
+// seasonRank tests. The default fake answers (nil, nil) — "not played this
+// season" — so every pre-13.3 test reads seasonRank: null without setup.
+func setupUserHandlerWithSeason() (*mockUserRepo, *mockMatchRepo, *fakeSeasonReader, *echo.Echo) {
 	repo := newMockUserRepo()
 	matchRepo := newMockMatchRepo()
-	handler := user.NewUserHandler(repo, matchRepo)
+	seasonReader := &fakeSeasonReader{}
+	handler := user.NewUserHandler(repo, matchRepo, seasonReader)
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
 
@@ -600,7 +629,7 @@ func setupUserHandlerWithMatches() (*mockUserRepo, *mockMatchRepo, *echo.Echo) {
 	// user handler, so the route wiring is covered by the same tests.
 	api.GET("/rooms/:id/last-match", handler.GetRoomLastMatch)
 
-	return repo, matchRepo, e
+	return repo, matchRepo, seasonReader, e
 }
 
 func doGetCareer(e *echo.Echo, userID string, token string) *httptest.ResponseRecorder {
@@ -1028,9 +1057,126 @@ func TestGetProfile_PublicProjection_NeverLeaksPrivateFields(t *testing.T) {
 	assert.NotContains(t, body, "languagePreference", "language preference is private")
 	assert.NotContains(t, body, "cardDeckPreference", "card deck preference is private")
 	assert.NotContains(t, body, "usernameChangedAt", "username-cooldown state is private")
-	// The public-safe fields ARE present.
+	// The public-safe fields ARE present — seasonRank included (Story 13.3):
+	// the key must ride the public shape (as an object or null), and nothing
+	// private may join it.
 	assert.Contains(t, body, "honorScore")
 	assert.Contains(t, body, "totalXp")
+	assert.Contains(t, body, "seasonRank")
+}
+
+// --- Story 13.3: seasonRank on both profile shapes ---
+
+// The SELF branch carries the reader's block verbatim, keyed on the subject.
+func TestGetProfile_SeasonRankPresentOnSelf(t *testing.T) {
+	repo, _, seasonReader, e := setupUserHandlerWithSeason()
+	u := repo.addUser("ranked", "ranked@example.com", "en")
+	seasonReader.rank = &season.SeasonRankView{SeasonName: "2026 Q3", Tier: "gold", SP: 4000}
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	require.NotNil(t, data.SeasonRank)
+	assert.Equal(t, "2026 Q3", data.SeasonRank.SeasonName)
+	assert.Equal(t, "gold", data.SeasonRank.Tier)
+	assert.Equal(t, 4000, data.SeasonRank.SP)
+	assert.Equal(t, u.ID, seasonReader.lastUserID, "the rank is the SUBJECT's")
+
+	// THE LITERAL WIRE KEYS of the nested block — the client's SeasonRank type
+	// is hand-maintained against them and decode-into-struct cannot police a
+	// renamed tag.
+	var raw struct {
+		SeasonRank map[string]any `json:"seasonRank"`
+	}
+	require.NoError(t, json.Unmarshal(resp["data"], &raw))
+	keys := make([]string, 0, len(raw.SeasonRank))
+	for k := range raw.SeasonRank {
+		keys = append(keys, k)
+	}
+	sortpkg.Strings(keys)
+	assert.Equal(t, []string{"seasonName", "sp", "tier"}, keys)
+}
+
+// The absent case: a subject who has not played this season serializes
+// `"seasonRank": null` — THE KEY IS PRESENT (no omitempty), so the client can
+// tell "no standing" from "an older server".
+func TestGetProfile_SeasonRankNullWhenNotPlayed(t *testing.T) {
+	repo, _, seasonReader, e := setupUserHandlerWithSeason()
+	u := repo.addUser("unranked", "unranked@example.com", "en")
+	seasonReader.rank = nil
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"seasonRank":null`)
+}
+
+// The PUBLIC branch: the subject's rank (keyed on paramID, never the viewer),
+// riding the public projection.
+func TestGetProfile_SeasonRankPresentOnPublicProjection(t *testing.T) {
+	repo, matchRepo, seasonReader, e := setupUserHandlerWithSeason()
+	viewer := repo.addUser("viewer", "viewer@example.com", "en")
+	subject := repo.addUser("subject", "subject@example.com", "en")
+	matchRepo.statsOverride = &struct{ wins, losses, abandoned int }{1, 0, 0}
+	seasonReader.rank = &season.SeasonRankView{SeasonName: "2026 Q3", Tier: "silver", SP: 1700}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(subject.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.PublicProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	require.NotNil(t, data.SeasonRank)
+	assert.Equal(t, "silver", data.SeasonRank.Tier)
+	assert.Equal(t, 1700, data.SeasonRank.SP)
+	assert.Equal(t, subject.ID, seasonReader.lastUserID,
+		"CurrentSeasonRank must be keyed on paramID (the subject), not authUserID")
+}
+
+func TestGetProfile_SeasonRankNullOnPublicProjectionWhenNotPlayed(t *testing.T) {
+	repo, matchRepo, _, e := setupUserHandlerWithSeason()
+	viewer := repo.addUser("viewer", "viewer@example.com", "en")
+	subject := repo.addUser("subject", "subject@example.com", "en")
+	matchRepo.statsOverride = &struct{ wins, losses, abandoned int }{0, 0, 0}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(subject.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"seasonRank":null`)
+}
+
+// BEST-EFFORT, mirroring the honor trend: a failed season read degrades to
+// seasonRank: null rather than failing the profile — identity, honor and stats
+// matter more than the chip.
+func TestGetProfile_SeasonReaderFailureDegradesToNull(t *testing.T) {
+	repo, _, seasonReader, e := setupUserHandlerWithSeason()
+	u := repo.addUser("degrade", "degrade@example.com", "en")
+	seasonReader.err = errors.New("db down")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, strconvUint(u.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code, "a season failure must not fail the profile")
+	assert.Contains(t, rec.Body.String(), `"seasonRank":null`)
+	assert.Contains(t, rec.Body.String(), `"username":"degrade"`, "the rest of the profile still renders")
 }
 
 // A public subject under the completed-match floor is flagged New Player, but

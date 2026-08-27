@@ -46,6 +46,10 @@ vi.mock("@/shared/api/lobby", () => ({
 vi.mock("@/shared/api/season", () => ({
   getCurrentSeason: (...args: unknown[]) => mockGetCurrentSeason(...args),
   getSeasonLeaderboard: (...args: unknown[]) => mockGetSeasonLeaderboard(...args),
+  // Story 13.3 additions — unused by the lobby, defined so the mocked module
+  // matches the real one's export set.
+  getSeasons: vi.fn(),
+  getSeasonArchive: vi.fn(),
 }));
 
 const mockGetSeasonLeaderboard = vi.fn();

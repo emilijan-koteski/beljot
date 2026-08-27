@@ -329,6 +329,76 @@ func (r *GormRepository) FindLeaderboardEntry(seasonID, userID uint) (*Leaderboa
 	return &entries[0], nil
 }
 
+// FindSeasonByID implements Repository.FindSeasonByID. A model query — no join,
+// no scope subtleties — with the usual (nil, nil) miss convention.
+func (r *GormRepository) FindSeasonByID(id uint) (*Season, error) {
+	var s Season
+	if err := r.db.First(&s, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading season %d: %w", id, err)
+	}
+	return &s, nil
+}
+
+// ListSeasons implements Repository.ListSeasons: every window, newest-first.
+// The table grows by four rows a year, so there is no pagination to design.
+func (r *GormRepository) ListSeasons() ([]Season, error) {
+	seasons := make([]Season, 0, 8)
+	if err := r.db.Order("started_at DESC").Find(&seasons).Error; err != nil {
+		return nil, fmt.Errorf("listing seasons: %w", err)
+	}
+	return seasons, nil
+}
+
+// PlayerSeasonArchive implements Repository.PlayerSeasonArchive.
+//
+// The joins are written BY TABLE NAME, copying leaderboardScope's style — but
+// NOT its membership rule. The predicate here is the archive's own
+// (games_played >= 1 AND seasons.ends_at <= now): a played season with 0 SP
+// belongs in a player's history even though it never belonged on the ladder,
+// and the ACTIVE window is excluded because its record is still accumulating.
+//
+// `users.deleted_at IS NULL` IS SPELLED OUT, same as leaderboardScope and for
+// the same reason: Table()/Joins() takes GORM out of model-land, so the
+// soft-delete scope does not apply on its own — and without the join, any
+// authenticated caller could read a DELETED account's full season history
+// through this endpoint while the leaderboard scrubs the same user. A
+// soft-deleted subject therefore answers an EMPTY archive — indistinguishable
+// from an unknown id, and still a 200 `{items: []}`, never a 404 (the profile
+// query owns user existence).
+//
+// Columns are aliased explicitly, like LeaderboardPage's: the joins carry
+// multiple `id`/`created_at` columns, and seasons.name must land in
+// ArchiveEntry's season_name without guessing.
+//
+// The read is served by idx_player_seasons_user_season (user_id leads it), so
+// no new index is needed — see migration 000024.
+func (r *GormRepository) PlayerSeasonArchive(userID uint, now time.Time) ([]ArchiveEntry, error) {
+	entries := make([]ArchiveEntry, 0, 4)
+	err := r.db.
+		Table("player_seasons").
+		Joins("JOIN seasons ON seasons.id = player_seasons.season_id").
+		Joins("JOIN users ON users.id = player_seasons.user_id").
+		Where("player_seasons.user_id = ?", userID).
+		Where("users.deleted_at IS NULL").
+		Where("player_seasons.games_played >= 1").
+		Where("seasons.ends_at <= ?", now.UTC()).
+		Select(`player_seasons.season_id    AS season_id,
+		        seasons.name                AS season_name,
+		        seasons.started_at          AS started_at,
+		        seasons.ends_at             AS ends_at,
+		        player_seasons.sp           AS sp,
+		        player_seasons.games_played AS games_played`).
+		Order("seasons.started_at DESC").
+		Scan(&entries).Error
+	if err != nil {
+		return nil, fmt.Errorf("reading season archive user=%d: %w", userID, err)
+	}
+	return entries, nil
+}
+
 func (r *GormRepository) CountAhead(seasonID uint, sp int, userID uint) (int64, error) {
 	var ahead int64
 	err := r.leaderboardScope(seasonID).

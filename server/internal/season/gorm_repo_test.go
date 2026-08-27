@@ -1,4 +1,8 @@
-package season
+// package season_test, NOT season, and the distinction is MANDATORY: this file
+// imports `user` for its fixtures, and Story 13.3 opened the `user` -> `season`
+// edge (the profile's SeasonRankReader). An in-package test importing `user`
+// would close the cycle season(test) -> user -> season and stop compiling.
+package season_test
 
 import (
 	"fmt"
@@ -11,6 +15,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"github.com/emilijan/beljot/server/internal/season"
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
@@ -51,17 +56,17 @@ func makeUser(t *testing.T, db *gorm.DB, email string) *user.User {
 // makeSeason inserts a window that does NOT collide with the migration's seeded
 // quarter, so a test can assert against a season it fully controls. Far-future
 // quarters are used for exactly that reason.
-func makeSeason(t *testing.T, db *gorm.DB, start time.Time) *Season {
+func makeSeason(t *testing.T, db *gorm.DB, start time.Time) *season.Season {
 	t.Helper()
 	end := start.AddDate(0, 3, 0)
-	s := &Season{Name: QuarterName(start), StartedAt: start, EndsAt: end}
+	s := &season.Season{Name: season.QuarterName(start), StartedAt: start, EndsAt: end}
 	require.NoError(t, db.Create(s).Error)
 	return s
 }
 
 func TestCurrentSeason_ReadsTheCoveringWindow(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 
 	start := time.Date(2099, time.April, 1, 0, 0, 0, 0, time.UTC)
 	want := makeSeason(t, db, start)
@@ -77,7 +82,7 @@ func TestCurrentSeason_ReadsTheCoveringWindow(t *testing.T) {
 // end instant belongs to the NEXT quarter — which the lazy resolver then creates.
 func TestCurrentSeason_BoundariesAreHalfOpen(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 
 	start := time.Date(2099, time.July, 1, 0, 0, 0, 0, time.UTC)
 	existing := makeSeason(t, db, start)
@@ -101,7 +106,7 @@ func TestCurrentSeason_BoundariesAreHalfOpen(t *testing.T) {
 // It is also idempotent: a second call for the same quarter returns the same row.
 func TestCurrentSeason_LazilyCreatesAndIsIdempotent(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 
 	now := time.Date(2098, time.November, 20, 13, 45, 0, 0, time.UTC)
 
@@ -117,13 +122,13 @@ func TestCurrentSeason_LazilyCreatesAndIsIdempotent(t *testing.T) {
 	assert.Equal(t, created.ID, again.ID, "ON CONFLICT DO NOTHING — no duplicate window")
 
 	var count int64
-	require.NoError(t, db.Model(&Season{}).Where("started_at = ?", created.StartedAt).Count(&count).Error)
+	require.NoError(t, db.Model(&season.Season{}).Where("started_at = ?", created.StartedAt).Count(&count).Error)
 	assert.Equal(t, int64(1), count)
 }
 
 func TestFindPlayerSeason_MissIsNilNotAnError(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	u := makeUser(t, db, "sp-miss@s.test")
 	s := makeSeason(t, db, time.Date(2097, time.January, 1, 0, 0, 0, 0, time.UTC))
 
@@ -135,12 +140,12 @@ func TestFindPlayerSeason_MissIsNilNotAnError(t *testing.T) {
 // AC1/AC4: the first award INSERTS, and every counter starts from the right base.
 func TestApplySeasonPoints_FirstAwardInserts(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2097, time.April, 1, 0, 0, 0, 0, time.UTC))
 	winner := makeUser(t, db, "sp-w@s.test")
 	absent := makeUser(t, db, "sp-a@s.test")
 
-	snaps, err := repo.ApplySeasonPoints(s.ID, map[uint]SPAward{
+	snaps, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{
 		winner.ID: {SP: 250, Completed: true},
 		absent.ID: {SP: 0, Completed: false},
 	})
@@ -173,14 +178,14 @@ func TestApplySeasonPoints_FirstAwardInserts(t *testing.T) {
 // read.
 func TestApplySeasonPoints_AccumulatesAndReportsPreviousSP(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2097, time.July, 1, 0, 0, 0, 0, time.UTC))
 	u := makeUser(t, db, "sp-acc@s.test")
 
-	_, err := repo.ApplySeasonPoints(s.ID, map[uint]SPAward{u.ID: {SP: 400, Completed: true}})
+	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{u.ID: {SP: 400, Completed: true}})
 	require.NoError(t, err)
 
-	snaps, err := repo.ApplySeasonPoints(s.ID, map[uint]SPAward{u.ID: {SP: 150, Completed: true}})
+	snaps, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{u.ID: {SP: 150, Completed: true}})
 	require.NoError(t, err)
 
 	assert.Equal(t, 550, snaps[u.ID].SP, "sp accumulates")
@@ -195,21 +200,21 @@ func TestApplySeasonPoints_AccumulatesAndReportsPreviousSP(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, row)
 	assert.Equal(t, "bronze", row.RankTier, "rank_tier is refreshed on every SP write")
-	assert.Equal(t, TierForSP(row.SP), row.RankTier, "stored and derived must agree")
+	assert.Equal(t, season.TierForSP(row.SP), row.RankTier, "stored and derived must agree")
 }
 
 // A player's rows are per-season: a second window starts them from zero (the
 // "soft reset" is a new season_id, never an update of the old row).
 func TestApplySeasonPoints_SeasonsAreIndependent(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	first := makeSeason(t, db, time.Date(2096, time.January, 1, 0, 0, 0, 0, time.UTC))
 	second := makeSeason(t, db, time.Date(2096, time.April, 1, 0, 0, 0, 0, time.UTC))
 	u := makeUser(t, db, "sp-two@s.test")
 
-	_, err := repo.ApplySeasonPoints(first.ID, map[uint]SPAward{u.ID: {SP: 2000, Completed: true}})
+	_, err := repo.ApplySeasonPoints(first.ID, map[uint]season.SPAward{u.ID: {SP: 2000, Completed: true}})
 	require.NoError(t, err)
-	snaps, err := repo.ApplySeasonPoints(second.ID, map[uint]SPAward{u.ID: {SP: 100, Completed: true}})
+	snaps, err := repo.ApplySeasonPoints(second.ID, map[uint]season.SPAward{u.ID: {SP: 100, Completed: true}})
 	require.NoError(t, err)
 
 	assert.Equal(t, 100, snaps[u.ID].SP, "the new season starts from zero")
@@ -224,7 +229,7 @@ func TestApplySeasonPoints_SeasonsAreIndependent(t *testing.T) {
 
 func TestApplySeasonPoints_EmptyIsANoOp(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2096, time.July, 1, 0, 0, 0, 0, time.UTC))
 
 	snaps, err := repo.ApplySeasonPoints(s.ID, nil)
@@ -236,13 +241,13 @@ func TestApplySeasonPoints_EmptyIsANoOp(t *testing.T) {
 // back rather than half-crediting the table.
 func TestApplySeasonPoints_UnknownUserRollsBackTheBatch(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2095, time.October, 1, 0, 0, 0, 0, time.UTC))
 	good := makeUser(t, db, "sp-good@s.test")
 
 	// A deliberately unassigned id, ordered AFTER the real one so the good write
 	// has already happened inside the transaction when the bad one fails.
-	_, err := repo.ApplySeasonPoints(s.ID, map[uint]SPAward{
+	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{
 		good.ID:              {SP: 200, Completed: true},
 		good.ID + 10_000_000: {SP: 200, Completed: true},
 	})
@@ -258,16 +263,16 @@ func TestApplySeasonPoints_UnknownUserRollsBackTheBatch(t *testing.T) {
 // seedStanding creates a user and drops them into the season with a fixed SP
 // total, going through ApplySeasonPoints so the rows are written exactly the way
 // the match-end path writes them.
-func seedStanding(t *testing.T, db *gorm.DB, repo *GormRepository, seasonID uint, email string, sp int) *user.User {
+func seedStanding(t *testing.T, db *gorm.DB, repo *season.GormRepository, seasonID uint, email string, sp int) *user.User {
 	t.Helper()
 	u := makeUser(t, db, email)
-	_, err := repo.ApplySeasonPoints(seasonID, map[uint]SPAward{u.ID: {SP: sp, Completed: true}})
+	_, err := repo.ApplySeasonPoints(seasonID, map[uint]season.SPAward{u.ID: {SP: sp, Completed: true}})
 	require.NoError(t, err)
 	return u
 }
 
 // The whole page in one call, for tests that need the full order.
-func fullLadder(t *testing.T, repo *GormRepository, seasonID uint) []LeaderboardEntry {
+func fullLadder(t *testing.T, repo *season.GormRepository, seasonID uint) []season.LeaderboardEntry {
 	t.Helper()
 	entries, _, err := repo.LeaderboardPage(seasonID, 100, 0)
 	require.NoError(t, err)
@@ -276,7 +281,7 @@ func fullLadder(t *testing.T, repo *GormRepository, seasonID uint) []Leaderboard
 
 func TestLeaderboardPage_OrdersBySPDescending(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2095, time.January, 1, 0, 0, 0, 0, time.UTC))
 
 	low := seedStanding(t, db, repo, s.ID, "lb-lo@s.test", 100)
@@ -303,7 +308,7 @@ func TestLeaderboardPage_OrdersBySPDescending(t *testing.T) {
 // skipped. Ascending user_id is the tiebreak, and CountAhead counts under it.
 func TestLeaderboardPage_BreaksTiesByAscendingUserID(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2095, time.April, 1, 0, 0, 0, 0, time.UTC))
 
 	// Created in ascending id order, all on the same SP.
@@ -325,7 +330,7 @@ func TestLeaderboardPage_BreaksTiesByAscendingUserID(t *testing.T) {
 // from the items AND from the total, or the two contradict each other.
 func TestLeaderboardPage_ExcludesSoftDeletedUsers(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2095, time.July, 1, 0, 0, 0, 0, time.UTC))
 
 	alive := seedStanding(t, db, repo, s.ID, "lb-al@s.test", 1000)
@@ -354,7 +359,7 @@ func TestLeaderboardPage_ExcludesSoftDeletedUsers(t *testing.T) {
 // gap and no repeat across page boundaries.
 func TestLeaderboardPage_OffsetPagingHasNoGapsOrDuplicates(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2095, time.October, 1, 0, 0, 0, 0, time.UTC))
 
 	const n = 7
@@ -388,7 +393,7 @@ func TestLeaderboardPage_OffsetPagingHasNoGapsOrDuplicates(t *testing.T) {
 
 func TestLeaderboardPage_EmptySeasonIsEmptyNotAnError(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2094, time.January, 1, 0, 0, 0, 0, time.UTC))
 
 	entries, total, err := repo.LeaderboardPage(s.ID, 10, 0)
@@ -404,7 +409,7 @@ func TestLeaderboardPage_EmptySeasonIsEmptyNotAnError(t *testing.T) {
 // they are standing in, and nothing else would notice.
 func TestLeaderboardCountAhead_AgreesWithEveryRowsListPosition(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2094, time.April, 1, 0, 0, 0, 0, time.UTC))
 
 	// Deliberately messy: a clear leader, a three-way tie in the middle, and a
@@ -444,7 +449,7 @@ func TestLeaderboardCountAhead_AgreesWithEveryRowsListPosition(t *testing.T) {
 // not push a live player down a slot.
 func TestLeaderboardCountAhead_ExcludesSoftDeletedUsers(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2094, time.July, 1, 0, 0, 0, 0, time.UTC))
 
 	gone := seedStanding(t, db, repo, s.ID, "lb-dg@s.test", 50000)
@@ -465,7 +470,7 @@ func TestLeaderboardCountAhead_ExcludesSoftDeletedUsers(t *testing.T) {
 // list, total or positions.
 func TestLeaderboardPage_IsScopedToOneSeason(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	this := makeSeason(t, db, time.Date(2093, time.January, 1, 0, 0, 0, 0, time.UTC))
 	other := makeSeason(t, db, time.Date(2093, time.April, 1, 0, 0, 0, 0, time.UTC))
 
@@ -492,7 +497,7 @@ func TestLeaderboardPage_IsScopedToOneSeason(t *testing.T) {
 // proof that `player_seasons.sp > 0` keeps them out of the items AND the total.
 func TestLeaderboardPage_ExcludesZeroSPRows(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2093, time.July, 1, 0, 0, 0, 0, time.UTC))
 
 	earner := seedStanding(t, db, repo, s.ID, "lb-z1@s.test", 700)
@@ -517,7 +522,7 @@ func TestLeaderboardPage_ExcludesZeroSPRows(t *testing.T) {
 // "Nobody has earned Season Points yet" copy true rather than a lie.
 func TestLeaderboardPage_SeasonOfOnlyZeroSPRowsIsEmpty(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2093, time.October, 1, 0, 0, 0, 0, time.UTC))
 
 	seedStanding(t, db, repo, s.ID, "lb-y1@s.test", 0)
@@ -533,7 +538,7 @@ func TestLeaderboardPage_SeasonOfOnlyZeroSPRowsIsEmpty(t *testing.T) {
 // rows in the season, CountAhead + 1 still equals each listed row's own slot.
 func TestLeaderboardCountAhead_UnaffectedByZeroSPRows(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2092, time.January, 1, 0, 0, 0, 0, time.UTC))
 
 	// Two 0-SP rows deliberately interleaved with the earners by creation order.
@@ -559,7 +564,7 @@ func TestLeaderboardCountAhead_UnaffectedByZeroSPRows(t *testing.T) {
 // "no standing" cases are decided in one place instead of being re-derived in Go.
 func TestLeaderboardFindEntry_MissesTheThreeUnlistableCases(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2092, time.April, 1, 0, 0, 0, 0, time.UTC))
 
 	never := makeUser(t, db, "lb-e1@s.test") // no player_seasons row at all
@@ -599,7 +604,7 @@ func TestLeaderboardFindEntry_MissesTheThreeUnlistableCases(t *testing.T) {
 // FindLeaderboardEntry is scoped to one season like every other leaderboard read.
 func TestLeaderboardFindEntry_IsScopedToOneSeason(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	this := makeSeason(t, db, time.Date(2091, time.January, 1, 0, 0, 0, 0, time.UTC))
 	other := makeSeason(t, db, time.Date(2091, time.April, 1, 0, 0, 0, 0, time.UTC))
 
@@ -616,7 +621,7 @@ func TestLeaderboardFindEntry_IsScopedToOneSeason(t *testing.T) {
 // either a crash or a silent full-table read, neither attributable to the caller.
 func TestLeaderboardPage_RejectsOutOfRangeArguments(t *testing.T) {
 	db := getTestDB(t)
-	repo := NewGormRepository(db)
+	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2091, time.July, 1, 0, 0, 0, 0, time.UTC))
 	seedStanding(t, db, repo, s.ID, "lb-v1@s.test", 100)
 	seedStanding(t, db, repo, s.ID, "lb-v2@s.test", 200)
@@ -644,4 +649,209 @@ func TestLeaderboardPage_RejectsOutOfRangeArguments(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, entries, 1)
 	assert.Equal(t, int64(2), total)
+}
+
+// --- Story 13.3: archive, seasons list, by-id lookup, rollover ---
+
+// THE ARCHIVE'S MEMBERSHIP RULE, spelled out against real Postgres:
+// row exists AND games_played >= 1 AND the season ENDED — deliberately NOT
+// leaderboardScope's sp > 0. One test seeds all four boundary cases at once so
+// the predicate is proven as a whole, plus the newest-first order.
+func TestPlayerSeasonArchive_MembershipAndOrder(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	u := makeUser(t, db, "ar-u1@s.test")
+
+	// Three ended windows (2089 Q1..Q3) and the "active" one (2089 Q4) — active
+	// relative to the `now` this test passes, which sits inside Q4.
+	q1 := makeSeason(t, db, time.Date(2089, time.January, 1, 0, 0, 0, 0, time.UTC))
+	q2 := makeSeason(t, db, time.Date(2089, time.April, 1, 0, 0, 0, 0, time.UTC))
+	q3 := makeSeason(t, db, time.Date(2089, time.July, 1, 0, 0, 0, 0, time.UTC))
+	q4 := makeSeason(t, db, time.Date(2089, time.October, 1, 0, 0, 0, 0, time.UTC))
+	now := time.Date(2089, time.November, 15, 12, 0, 0, 0, time.UTC)
+
+	// Q1: played, earned SP — the ordinary archive row.
+	_, err := repo.ApplySeasonPoints(q1.ID, map[uint]season.SPAward{u.ID: {SP: 1800, Completed: true}})
+	require.NoError(t, err)
+	// Q2: played but 0 SP (an absent seat) — MUST be included; the archive is
+	// "seasons you actually played", not "SP earners".
+	_, err = repo.ApplySeasonPoints(q2.ID, map[uint]season.SPAward{u.ID: {SP: 0, Completed: false}})
+	require.NoError(t, err)
+	// Q3: a row with games_played = 0. ApplySeasonPoints can never write one
+	// (it always counts the game), so it is inserted raw purely to prove the
+	// games_played >= 1 half of the predicate is real and not vacuous.
+	require.NoError(t, db.Exec(`
+		INSERT INTO player_seasons (user_id, season_id, sp, rank_tier, games_played, games_completed, created_at, updated_at)
+		VALUES (?, ?, 0, 'iron', 0, 0, NOW(), NOW())`, u.ID, q3.ID).Error)
+	// Q4: played in the ACTIVE window — excluded, its record is still moving.
+	_, err = repo.ApplySeasonPoints(q4.ID, map[uint]season.SPAward{u.ID: {SP: 500, Completed: true}})
+	require.NoError(t, err)
+
+	entries, err := repo.PlayerSeasonArchive(u.ID, now)
+	require.NoError(t, err)
+	require.Len(t, entries, 2, "Q1 (earned) and Q2 (played, 0 SP) only")
+
+	// Newest-first: Q2 (Apr) before Q1 (Jan).
+	assert.Equal(t, q2.ID, entries[0].SeasonID)
+	assert.Equal(t, "2089 Q2", entries[0].SeasonName)
+	assert.Equal(t, 0, entries[0].SP, "the 0-SP played season is archive history")
+	assert.Equal(t, 1, entries[0].GamesPlayed)
+	assert.True(t, q2.StartedAt.UTC().Equal(entries[0].StartedAt.UTC()))
+	assert.True(t, q2.EndsAt.UTC().Equal(entries[0].EndsAt.UTC()))
+
+	assert.Equal(t, q1.ID, entries[1].SeasonID)
+	assert.Equal(t, 1800, entries[1].SP, "the prior row is read back unchanged")
+}
+
+// The exact boundary: a season whose ends_at IS now has ended (ends_at is
+// exclusive on the window, so the instant it ends it is history).
+func TestPlayerSeasonArchive_EndsAtBoundaryIsInclusive(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	u := makeUser(t, db, "ar-u2@s.test")
+	s := makeSeason(t, db, time.Date(2088, time.January, 1, 0, 0, 0, 0, time.UTC))
+
+	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{u.ID: {SP: 100, Completed: true}})
+	require.NoError(t, err)
+
+	entries, err := repo.PlayerSeasonArchive(u.ID, s.EndsAt)
+	require.NoError(t, err)
+	require.Len(t, entries, 1, "at the exact end instant the season is already archived")
+
+	before, err := repo.PlayerSeasonArchive(u.ID, s.EndsAt.Add(-time.Second))
+	require.NoError(t, err)
+	assert.Empty(t, before, "a second earlier it is still the active window")
+}
+
+// An unknown user is an EMPTY archive with a 200-shaped answer — a non-nil
+// empty slice, never an error and never a nil that serializes as null. The
+// profile query owns user-existence 404s.
+func TestPlayerSeasonArchive_UnknownUserIsEmpty(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+
+	entries, err := repo.PlayerSeasonArchive(99_999_999, time.Date(2088, time.July, 1, 0, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+	assert.NotNil(t, entries)
+	assert.Empty(t, entries)
+}
+
+// A SOFT-DELETED SUBJECT HAS NO READABLE HISTORY. Same reasoning as
+// TestLeaderboardPage_ExcludesSoftDeletedUsers, and the same hand-written
+// `users.deleted_at IS NULL`: without the users join this endpoint would serve a
+// deleted account's whole season history to any authenticated caller while the
+// ladder scrubs the same user. The answer must be an EMPTY archive — a 200 with
+// no items, indistinguishable from an unknown id — never a 404, which is the
+// profile query's job, not this endpoint's.
+func TestPlayerSeasonArchive_ExcludesSoftDeletedUser(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	gone := makeUser(t, db, "ar-del@s.test")
+	s := makeSeason(t, db, time.Date(2085, time.January, 1, 0, 0, 0, 0, time.UTC))
+	now := time.Date(2085, time.June, 1, 0, 0, 0, 0, time.UTC)
+
+	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{
+		gone.ID: {SP: 700, Completed: true},
+	})
+	require.NoError(t, err)
+
+	// Present before the delete, so the test proves the FILTER did the work.
+	entries, err := repo.PlayerSeasonArchive(gone.ID, now)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+
+	require.NoError(t, db.Delete(&user.User{}, gone.ID).Error)
+
+	entries, err = repo.PlayerSeasonArchive(gone.ID, now)
+	require.NoError(t, err)
+	assert.NotNil(t, entries)
+	assert.Empty(t, entries, "a deleted account's season history is not readable")
+
+	// Visibility filter, not a cascade: the row itself survives.
+	row, err := repo.FindPlayerSeason(gone.ID, s.ID)
+	require.NoError(t, err)
+	require.NotNil(t, row)
+}
+
+// The archive is per-player: another player's rows in the same windows never
+// leak into this player's history.
+func TestPlayerSeasonArchive_IsScopedToOneUser(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	mine := makeUser(t, db, "ar-u3@s.test")
+	theirs := makeUser(t, db, "ar-u4@s.test")
+	s := makeSeason(t, db, time.Date(2087, time.January, 1, 0, 0, 0, 0, time.UTC))
+	now := time.Date(2087, time.June, 1, 0, 0, 0, 0, time.UTC)
+
+	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{
+		mine.ID:   {SP: 100, Completed: true},
+		theirs.ID: {SP: 90000, Completed: true},
+	})
+	require.NoError(t, err)
+
+	entries, err := repo.PlayerSeasonArchive(mine.ID, now)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, 100, entries[0].SP, "my row, not the other player's")
+}
+
+// ListSeasons: newest-first by started_at, every window included (the picker
+// renders this order verbatim).
+func TestListSeasons_NewestFirst(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+
+	older := makeSeason(t, db, time.Date(2086, time.January, 1, 0, 0, 0, 0, time.UTC))
+	newer := makeSeason(t, db, time.Date(2086, time.April, 1, 0, 0, 0, 0, time.UTC))
+	newest := makeSeason(t, db, time.Date(2086, time.July, 1, 0, 0, 0, 0, time.UTC))
+
+	seasons, err := repo.ListSeasons()
+	require.NoError(t, err)
+	// The migration seed (and other tests' windows inside this transaction) may
+	// add rows; assert the RELATIVE order of the three this test owns.
+	pos := map[uint]int{}
+	for i, s := range seasons {
+		pos[s.ID] = i
+	}
+	require.Contains(t, pos, older.ID)
+	require.Contains(t, pos, newer.ID)
+	require.Contains(t, pos, newest.ID)
+	assert.Less(t, pos[newest.ID], pos[newer.ID], "started_at DESC")
+	assert.Less(t, pos[newer.ID], pos[older.ID], "started_at DESC")
+}
+
+func TestFindSeasonByID_HitAndMiss(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	s := makeSeason(t, db, time.Date(2085, time.January, 1, 0, 0, 0, 0, time.UTC))
+
+	got, err := repo.FindSeasonByID(s.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, s.Name, got.Name)
+
+	missing, err := repo.FindSeasonByID(s.ID + 10_000_000)
+	require.NoError(t, err)
+	assert.Nil(t, missing, "a miss is (nil, nil), mapped to 404 by the service — never an error here")
+}
+
+// THE ROLLOVER JOB'S WHOLE CONTRACT against real Postgres: past a boundary one
+// pass creates exactly one quarter row, and a second pass changes nothing —
+// the uq_seasons_started_at conflict target is the idempotency anchor.
+func TestRollover_RunOnceIsIdempotent(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+
+	// A fixed clock in a quarter no other test creates.
+	now := time.Date(2084, time.August, 10, 3, 0, 0, 0, time.UTC)
+	job := season.NewRollover(repo, 0, func() time.Time { return now })
+
+	require.NoError(t, job.RunOnce())
+	require.NoError(t, job.RunOnce(), "the rerun is a no-op, not an error")
+
+	var count int64
+	require.NoError(t, db.Model(&season.Season{}).
+		Where("started_at = ?", time.Date(2084, time.July, 1, 0, 0, 0, 0, time.UTC)).
+		Count(&count).Error)
+	assert.Equal(t, int64(1), count, "two runs, one row")
 }

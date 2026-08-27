@@ -1,7 +1,8 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/shared/api/queryKeys";
-import { getSeasonLeaderboard } from "@/shared/api/season";
+import type { SeasonSelector } from "@/shared/api/season";
+import { getSeasonLeaderboard, getSeasons } from "@/shared/api/season";
 
 /**
  * Widget poll interval.
@@ -29,8 +30,10 @@ const REFETCH_INTERVAL_MS = 60_000;
  */
 export function useSeasonLeaderboardQuery(limit: number = 10, enabled: boolean = true) {
   return useQuery({
-    queryKey: queryKeys.season.leaderboard(limit),
-    queryFn: () => getSeasonLeaderboard(limit, 0),
+    // ALWAYS the current window: the lobby widget has no season picker by
+    // design (Story 13.3 boundary), so the selector is pinned here.
+    queryKey: queryKeys.season.leaderboard(limit, "current"),
+    queryFn: () => getSeasonLeaderboard(limit, 0, "current"),
     enabled,
     refetchInterval: REFETCH_INTERVAL_MS,
     refetchOnWindowFocus: true,
@@ -39,30 +42,54 @@ export function useSeasonLeaderboardQuery(limit: number = 10, enabled: boolean =
 
 /**
  * The full page's load-more paging (Story 13.2 AC2), modelled on
- * `useUserMatchesInfiniteQuery`.
+ * `useUserMatchesInfiniteQuery`. Story 13.3 threads the season selector
+ * through: the picker hands a prior season's id, and the default stays the
+ * active window.
  *
  * `pageParam` is the OFFSET, advanced by the number of rows already loaded
  * rather than by `pageSize * pages`: those agree only while every page comes
  * back full, and a short page (the last one) would otherwise re-request rows the
  * client already holds.
  *
- * NOT polled. A `refetchInterval` here would re-fetch every loaded page on every
- * tick, and a re-ordered ladder underneath a reader who has paged three deep is
- * worse than slightly stale numbers. The page is fresh on mount, which is when
- * it is read.
+ * NOT polled — for the current season OR a prior one. A `refetchInterval` here
+ * would re-fetch every loaded page on every tick, and a re-ordered ladder
+ * underneath a reader who has paged three deep is worse than slightly stale
+ * numbers; an ENDED season's standings additionally never change at all. The
+ * page is fresh on mount, which is when it is read.
  */
-export function useSeasonLeaderboardInfiniteQuery(pageSize: number = 25) {
+export function useSeasonLeaderboardInfiniteQuery(
+  pageSize: number = 25,
+  season: SeasonSelector = "current",
+) {
   return useInfiniteQuery({
     // The "infinite" suffix keeps this entry distinct from the widget's plain
     // query at the same page size: same key, different cached SHAPE (pages[]
     // versus one response), which React Query would happily mix up.
-    queryKey: [...queryKeys.season.leaderboard(pageSize), "infinite"] as const,
-    queryFn: ({ pageParam }) => getSeasonLeaderboard(pageSize, pageParam as number),
+    queryKey: [...queryKeys.season.leaderboard(pageSize, season), "infinite"] as const,
+    queryFn: ({ pageParam }) => getSeasonLeaderboard(pageSize, pageParam as number, season),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.items.length === 0) return undefined;
       const loaded = allPages.reduce((n, p) => n + p.items.length, 0);
       return loaded < lastPage.total ? loaded : undefined;
     },
+  });
+}
+
+/**
+ * The seasons list behind the leaderboard's season picker (Story 13.3),
+ * newest-first from the server and rendered in that order.
+ *
+ * Not polled and no focus refetch: the list gains one row a QUARTER. That is
+ * safe because the rollover boundary INVALIDATES this key explicitly —
+ * RankBanner's boundary effect (lobby) and LeaderboardPage's own (the page)
+ * both invalidate `season.list()` alongside the ladder, so the picker gains the
+ * new window without this query having to poll for it.
+ */
+export function useSeasonsQuery() {
+  return useQuery({
+    queryKey: queryKeys.season.list(),
+    queryFn: getSeasons,
+    refetchOnWindowFocus: false,
   });
 }

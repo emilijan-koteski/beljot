@@ -1378,7 +1378,20 @@
       "progressLabel": "{{tier}}, {{current}} od {{next}} SP do sledećeg ranga",
       "progressLabelTop": "{{tier}}, {{sp}} SP, vrh lestvice",
       "atTop": "Vrh lestvice",
-      "daysLeft": "Završava za {{days}}d"
+      "daysLeft": "Završava za {{days}}d",
+      "newSeason": "Nova sezona: {{season}}"
+    },
+    "picker": {
+      "label": "Sezona",
+      "current": "Trenutna"
+    },
+    "archive": {
+      "eyebrow": "Sezona",
+      "title": "Sezone",
+      "sub": "Trenutni rang i rezultati iz prošlih sezona.",
+      "listLabel": "Prošle sezone",
+      "currentAria": "Trenutna sezona {{season}}: {{tier}}, {{sp}} SP",
+      "rowAria": "{{season}}: {{tier}}, {{sp}} SP, odigrani mečevi: {{games}}"
     },
     "tier": {
       "iron": "Gvožđe",
@@ -1397,10 +1410,12 @@
       "eyebrow": "Sezona",
       "title": "Rang lista",
       "sub": "Ko se najbrže penje ove sezone, po sezonskim poenima.",
+      "subPast": "Konačan poredak za sezonu {{season}}, po sezonskim poenima.",
       "heading": "Najbolji igrači",
       "loading": "Učitavanje…",
       "error": "Neuspešno učitavanje rang liste. Pokušaj ponovo",
       "empty": "Još niko nije osvojio sezonske poene ove sezone.",
+      "emptyPast": "Niko nije osvojio sezonske poene u ovoj sezoni.",
       "loadMore": "Učitaj još",
       "retry": "Pokušaj ponovo",
       "stale": "Osvežavanje nije uspelo.",
@@ -1410,7 +1425,7 @@
       "yourPosition": "Tvoja pozicija",
       "spValue": "{{sp}} SP",
       "rowAria": "{{position}}. {{username}}, {{tier}}, {{sp}} SP",
-      "gamesAria": "{{games}} odigranih mečeva",
+      "gamesAria": "Odigrani mečevi: {{games}}",
       "columns": {
         "position": "Pozicija",
         "sp": "SP",

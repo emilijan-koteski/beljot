@@ -39,6 +39,13 @@ vi.mock("@/shared/api/identities", () => ({
   unlinkIdentity: vi.fn(),
 }));
 
+// Story 13.3: SeasonSection is in the page tree, so the archive read must be
+// mocked (default: nothing to show — the section stays out of the DOM).
+const mockGetSeasonArchive = vi.fn();
+vi.mock("@/shared/api/season", () => ({
+  getSeasonArchive: (...args: unknown[]) => mockGetSeasonArchive(...args),
+}));
+
 function renderProfilePage() {
   return render(
     <QueryWrapper>
@@ -73,6 +80,9 @@ function profileFixture(overrides: Partial<ProfileResponse> = {}): ProfileRespon
     isNewPlayer: true,
     honorTrendDelta: 0,
     honorTrendDirection: "flat",
+    // Story 13.3: null is the wire default for a player who has not played
+    // this season — the rank chip hides on it.
+    seasonRank: null,
     ...overrides,
   };
 }
@@ -95,6 +105,9 @@ describe("ProfilePage", () => {
     mockGetCareer.mockReset();
     mockGetUserMatches.mockReset();
     mockGetIdentities.mockReset();
+    mockGetSeasonArchive.mockReset();
+    // Default: no season history → SeasonSection contributes nothing.
+    mockGetSeasonArchive.mockResolvedValue({ items: [] });
     mockGetCareer.mockResolvedValue(careerFixture());
     // Default: MatchHistory renders the empty state so existing tests need no per-case setup.
     mockGetUserMatches.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
@@ -413,5 +426,52 @@ describe("ProfilePage", () => {
     const callout = await screen.findByTestId("profile-streak");
     expect(callout).toHaveTextContent(/Shake it off/);
     expect(screen.getByTestId("profile-streak-play")).toBeInTheDocument();
+  });
+
+  // --- Story 13.3: seasonal rank + prior-season archive ---
+
+  it("renders the season chip and the archive when the viewer has season history", async () => {
+    mockGetProfile.mockResolvedValueOnce(
+      profileFixture({ seasonRank: { seasonName: "2026 Q3", tier: "gold", sp: 4000 } }),
+    );
+    mockGetSeasonArchive.mockResolvedValue({
+      items: [
+        {
+          seasonId: 5,
+          seasonName: "2026 Q2",
+          sp: 1800,
+          tier: "silver",
+          gamesPlayed: 14,
+          startedAt: "2026-04-01T00:00:00Z",
+          endsAt: "2026-07-01T00:00:00Z",
+        },
+      ],
+    });
+
+    renderProfilePage();
+
+    const chip = await screen.findByTestId("profile-season");
+    expect(chip).toHaveAttribute("data-tier", "gold");
+    expect(chip.textContent).toContain("2026 Q3");
+    const list = await screen.findByTestId("prior-season-archive");
+    expect(list.querySelectorAll('[data-testid="season-archive-row"]')).toHaveLength(1);
+    // The archive is the VIEWER's — keyed on their own id.
+    expect(mockGetSeasonArchive).toHaveBeenCalledWith(1);
+  });
+
+  // The hidden-when-empty contract, preserved from the pre-13.3 pages: a null
+  // seasonRank and an empty archive leave nothing in the DOM at all.
+  it("renders neither the season chip nor the archive without season history", async () => {
+    mockGetProfile.mockResolvedValueOnce(profileFixture({ seasonRank: null }));
+    mockGetSeasonArchive.mockResolvedValue({ items: [] });
+
+    renderProfilePage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-username")).toHaveTextContent("testuser");
+    });
+    await waitFor(() => expect(mockGetSeasonArchive).toHaveBeenCalled());
+    expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("prior-season-archive")).not.toBeInTheDocument();
   });
 });

@@ -100,3 +100,25 @@ type LeaderboardEntry struct {
 	SP          int    `gorm:"column:sp"`
 	GamesPlayed int    `gorm:"column:games_played"`
 }
+
+// ArchiveEntry is ONE ROW OF THE JOINED READ behind Story 13.3's prior-season
+// archive: a player_seasons row plus the window it was earned in, read back
+// UNCHANGED (the rows are immutable once their season ends — see PlayerSeason).
+//
+// A SCAN TARGET, like LeaderboardEntry above, and its own struct for the same
+// reasons: it mixes columns from two tables, and the handler's ArchiveRowView
+// adds the DERIVED `tier` (TierForSP over SP — the stored rank_tier column is
+// never selected, 13.1 D7) so the join's shape never reaches the wire directly.
+//
+// MEMBERSHIP IS NOT leaderboardScope's. The archive lists "seasons you actually
+// played" (games_played >= 1, season ended), NOT "SP earners" (sp > 0) — a
+// played season with 0 SP stays in a player's own history while staying off the
+// ladder. Two predicates, two documented homes; never share the scope helper.
+type ArchiveEntry struct {
+	SeasonID    uint      `gorm:"column:season_id"`
+	SeasonName  string    `gorm:"column:season_name"`
+	StartedAt   time.Time `gorm:"column:started_at"`
+	EndsAt      time.Time `gorm:"column:ends_at"`
+	SP          int       `gorm:"column:sp"`
+	GamesPlayed int       `gorm:"column:games_played"`
+}
