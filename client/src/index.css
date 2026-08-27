@@ -216,6 +216,64 @@
   --h2-line: rgba(154, 87, 19, 0.42);
   --h1-line: rgba(147, 41, 28, 0.28);
 
+  /* ── Season rank tier ramp (rt1 = Iron … rt8 = Radiant) ────────────────
+     The eight seasonal rank tiers (Story 13.1). A SEPARATE ramp from the
+     honour one above, deliberately: honour has five tiers and answers
+     "is this player reliable", rank has eight and answers "how far have
+     they climbed this season". Sharing tokens would make a Diamond
+     player's badge and an Unreliable player's shield the same colour.
+
+     The ladder climbs cool→warm→cool→bright, so adjacent tiers never
+     share a hue: graphite → bronze → steel blue → gold → teal →
+     sapphire → violet → accent. Iron and Silver are the one pair that
+     could read alike, so they are split by HUE not lightness — Iron is
+     a neutral graphite, Silver a distinctly blue steel.
+
+     Radiant is the accent plus a glow (UX spec: "Radiant = accent +
+     glow"), which is why `--rt8` points at `--accent` rather than a
+     literal: the top of the ladder is the same colour as the app's
+     primary action, and it re-roots to lime on felt for free. ALL THREE
+     Radiant tokens derive from `--accent` for that reason -- the fill via
+     `var()`, the soft via `--accent-soft`, and the hairline via
+     `color-mix` off the same token. Hardcoding the accent's RGB in the
+     `-line` value (which is what shipped first) desynced the Radiant
+     border from its own fill the moment the accent was retuned, which is
+     precisely the drift this indirection exists to prevent.
+
+     Consumed only through the maps in `shared/lib/seasonTier.ts` — no
+     component should name these directly, for the reason honor.ts's
+     header records (HonorPanel and TopBar had already drifted on `fair`
+     before that map was centralised).
+
+     No `--color-*` alias in `@theme inline`, same as the honour ramp:
+     the tier is a RUNTIME value, so it cannot be a static class name. ── */
+  --rt1: #5a6068; /* iron      · graphite   */
+  --rt2: #96581f; /* bronze    · burnt      */
+  --rt3: #5f7590; /* silver    · steel blue */
+  --rt4: #a8801c; /* gold      · deep gold  */
+  --rt5: #2f7f7c; /* platinum  · teal       */
+  --rt6: #2a63ad; /* diamond   · sapphire   */
+  --rt7: #6c3a9c; /* immortal  · violet     */
+  --rt8: var(--accent); /* radiant · accent + glow */
+
+  --rt1-soft: rgba(90, 96, 104, 0.12);
+  --rt2-soft: rgba(150, 88, 31, 0.12);
+  --rt3-soft: rgba(95, 117, 144, 0.13);
+  --rt4-soft: rgba(168, 128, 28, 0.13);
+  --rt5-soft: rgba(47, 127, 124, 0.12);
+  --rt6-soft: rgba(42, 99, 173, 0.12);
+  --rt7-soft: rgba(108, 58, 156, 0.12);
+  --rt8-soft: var(--accent-soft);
+
+  --rt1-line: rgba(90, 96, 104, 0.3);
+  --rt2-line: rgba(150, 88, 31, 0.34);
+  --rt3-line: rgba(95, 117, 144, 0.34);
+  --rt4-line: rgba(168, 128, 28, 0.4);
+  --rt5-line: rgba(47, 127, 124, 0.34);
+  --rt6-line: rgba(42, 99, 173, 0.34);
+  --rt7-line: rgba(108, 58, 156, 0.34);
+  --rt8-line: color-mix(in srgb, var(--accent) 45%, transparent);
+
   /* ── Playing card — intrinsic colours, scope-stable (a card face is the
        same cream on parchment and on felt, so these are NOT re-rooted by
        `.felt-surface`/`.game-table`). Used by the marketing card graphics. */
@@ -426,6 +484,42 @@
   --h3-line: rgba(198, 201, 110, 0.4);
   --h2-line: rgba(224, 160, 90, 0.5);
   --h1-line: rgba(255, 133, 133, 0.45);
+
+  /* Season rank tier ramp — lifted for felt. Same eight hues in the same
+     order; the parchment ramp is unreadable on a dark surface (the #5a6068
+     graphite and the #2a63ad sapphire both sink into the felt). Re-rooted
+     under the SAME names rather than exposed as separate `--rt*-felt`
+     tokens, exactly as the honour ramp and --accent are above, so
+     SEASON_TIER_COLOR in shared/lib/seasonTier.ts stays a single
+     scope-blind map: a rank surface that ends up inside .game-table (the
+     tier-up toast fired while the player is still at the table) themes
+     itself with no fork and no per-component branch. */
+  --rt1: #a3adb6;
+  --rt2: #d99a5c;
+  --rt3: #9db4d0;
+  --rt4: #e8c25a;
+  --rt5: #5fd4cc;
+  --rt6: #6ba8f5;
+  --rt7: #b98ce8;
+  --rt8: var(--accent);
+
+  --rt1-soft: rgba(163, 173, 182, 0.16);
+  --rt2-soft: rgba(217, 154, 92, 0.18);
+  --rt3-soft: rgba(157, 180, 208, 0.16);
+  --rt4-soft: rgba(232, 194, 90, 0.18);
+  --rt5-soft: rgba(95, 212, 204, 0.16);
+  --rt6-soft: rgba(107, 168, 245, 0.16);
+  --rt7-soft: rgba(185, 140, 232, 0.16);
+  --rt8-soft: var(--accent-soft);
+
+  --rt1-line: rgba(163, 173, 182, 0.45);
+  --rt2-line: rgba(217, 154, 92, 0.5);
+  --rt3-line: rgba(157, 180, 208, 0.45);
+  --rt4-line: rgba(232, 194, 90, 0.5);
+  --rt5-line: rgba(95, 212, 204, 0.45);
+  --rt6-line: rgba(107, 168, 245, 0.45);
+  --rt7-line: rgba(185, 140, 232, 0.45);
+  --rt8-line: color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 /* ──────────────────────────────────────────────────────────────────────

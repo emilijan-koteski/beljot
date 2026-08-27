@@ -195,6 +195,9 @@ func handlePickTrump(state *GameState, action Action) (*GameState, error) {
 	if winnerTeam := checkInstantWin(newState); winnerTeam != nil {
 		newState.WinnerTeam = winnerTeam
 		newState.Phase = PhaseMatchEnd
+		// Records WHY this match ended, so the match layer states the outcome
+		// instead of inferring it — see GameState.WonByInstantWin.
+		newState.WonByInstantWin = true
 		return newState, nil
 	}
 

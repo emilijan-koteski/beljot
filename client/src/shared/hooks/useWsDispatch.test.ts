@@ -2206,3 +2206,122 @@ describe("useWsDispatch — whisper (Story 11.4)", () => {
     expect(toast.error).toHaveBeenCalledTimes(3);
   });
 });
+
+// event:season_points_awarded (Story 13.1). The branch has three jobs and no
+// other test reaches it: RankBanner.test.tsx feeds the season in as a prop and
+// never mounts a QueryClient, and the WS contract test only pins payload shape.
+//
+// The invalidation matters more here than for most handlers: useCurrentSeasonQuery
+// is deliberately NOT polled, so this is the ONLY path that refreshes the banner
+// after a match. Drop the invalidateQueries call and the banner shows a stale SP
+// total until a full reload, with nothing failing.
+describe("useWsDispatch - season points", () => {
+  const validPayload = {
+    spEarned: 251,
+    newSeasonSp: 1751,
+    rankTier: "silver",
+    tieredUp: false,
+    seasonName: "2026 Q3",
+  };
+
+  beforeEach(async () => {
+    queryClient.clear();
+    useMatchStore.getState().reset();
+    __resetWsDispatchStateForTests();
+    vi.restoreAllMocks();
+    await i18n.changeLanguage("en");
+  });
+
+  it("invalidates the current-season query so the banner refetches", () => {
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({ type: "event:season_points_awarded", payload: validPayload });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.season.current() });
+  });
+
+  it("fires exactly one tier-up toast when the award crossed a tier floor", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: { ...validPayload, tieredUp: true },
+    });
+
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    // The tier NAME is resolved through i18n, never the raw token.
+    expect(toast.success).toHaveBeenCalledWith(
+      expect.stringContaining(i18n.t("season.tier.silver")),
+      expect.anything(),
+    );
+  });
+
+  it("fires no toast when the award did not cross a tier floor", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({ type: "event:season_points_awarded", payload: validPayload });
+
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("still invalidates for a zero-SP award, which is a real value", () => {
+    // The absent seat's payload. `spEarned: 0` and `tieredUp: false` are both
+    // falsy and both legitimate, so a truthiness guard would drop this frame.
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: { ...validPayload, spEarned: 0, newSeasonSp: 0, rankTier: "iron" },
+    });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.season.current() });
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the SP bucket for an unrecognised tier token in the toast", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: { ...validPayload, rankTier: "mythic", newSeasonSp: 9000, tieredUp: true },
+    });
+
+    // Version skew: 9000 SP buckets to Diamond, so the toast reads Diamond
+    // rather than a missing `season.tier.mythic` key.
+    expect(toast.success).toHaveBeenCalledWith(
+      expect.stringContaining(i18n.t("season.tier.diamond")),
+      expect.anything(),
+    );
+  });
+
+  it("rejects a malformed payload without invalidating, toasting, or throwing", () => {
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useWsDispatch());
+
+    const malformed: unknown[] = [
+      null,
+      undefined,
+      "not-an-object",
+      {},
+      { ...validPayload, spEarned: "251" },
+      { ...validPayload, spEarned: 1.5 },
+      { ...validPayload, newSeasonSp: null },
+      { ...validPayload, rankTier: "" },
+      { ...validPayload, rankTier: 7 },
+      { ...validPayload, tieredUp: "yes" },
+      { ...validPayload, seasonName: 3 },
+    ];
+
+    for (const payload of malformed) {
+      expect(() => result.current({ type: "event:season_points_awarded", payload })).not.toThrow();
+    }
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+});

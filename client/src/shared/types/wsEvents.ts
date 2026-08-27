@@ -268,6 +268,39 @@ export interface HonorUpdatedPayload {
   isNewPlayer: boolean;
 }
 
+// --- Seasonal rank events (Story 13.1) ---
+// Sent per-human at match end, slotted after event:honor_updated and before the
+// trailing event:match_state. Carries that player's own Season Points earned this
+// match, their new season total, the derived rank tier, whether the award crossed
+// a tier floor, and the season identifier.
+//
+// A NEW event type rather than extra fields on event:xp_awarded: the payload
+// schemas are z.strictObject, so widening an existing event breaks stale tabs
+// still running the old bundle, whereas an unknown type is simply ignored.
+//
+// rankTier is a STABLE MACHINE TOKEN ("iron" | "bronze" | "silver" | "gold" |
+// "platinum" | "diamond" | "immortal" | "radiant") that the client maps to an
+// i18n label and colour via shared/lib/seasonTier.ts; a display string never
+// crosses the wire. SP and the tier are server-authoritative — the client mirror
+// is presentation only and decides nothing.
+//
+// seasonName is the machine-stable "YYYY QN" window identifier, rendered VERBATIM
+// and never translated.
+//
+// spEarned is 0 for a player who was absent at the terminal end. That is a REAL
+// value, as is `tieredUp: false` — both are falsy, so the dispatch handler must
+// type-guard them and never test truthiness. Keep in sync with server events.go
+// (EventSeasonPointsAwarded).
+export const EVENT_SEASON_POINTS_AWARDED = "event:season_points_awarded" as const;
+
+export interface SeasonPointsAwardedPayload {
+  spEarned: number;
+  newSeasonSp: number;
+  rankTier: string;
+  tieredUp: boolean;
+  seasonName: string;
+}
+
 // --- Disconnect/reconnect events (server -> client) ---
 export const EVENT_PLAYER_DISCONNECTED = "event:player_disconnected" as const;
 export const EVENT_PLAYER_RECONNECTED = "event:player_reconnected" as const;

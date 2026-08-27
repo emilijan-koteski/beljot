@@ -120,6 +120,55 @@ type HonorUpdatedPayload struct {
 	IsNewPlayer         bool   `json:"isNewPlayer"`
 }
 
+// --- Seasonal rank events (Story 13.1) ---
+
+// EventSeasonPointsAwarded is sent per-human at match end, slotted AFTER
+// event:honor_updated and BEFORE the trailing event:match_state. The full
+// ordering contract on both finalizers is therefore:
+//
+//	match_end | match_abandoned
+//	  -> coin_settlement
+//	  -> xp_awarded
+//	  -> honor_updated
+//	  -> season_points_awarded
+//	  -> match_state
+//
+// It is a NEW event type rather than extra fields on event:xp_awarded (the
+// obvious place, since both are progression), for the same reason
+// EventHonorUpdated is: the client's payload schemas are z.strictObject, so
+// WIDENING an existing payload breaks every stale tab still running the old
+// bundle, whereas an unknown event type is simply ignored by them.
+//
+// Sent per-user (not broadcast) because the values differ per player — the
+// winners' SP, the losers' SP and an absent seat's zero all land in the same
+// burst.
+const EventSeasonPointsAwarded = "event:season_points_awarded"
+
+// SeasonPointsAwardedPayload is the typed payload for EventSeasonPointsAwarded.
+//
+// SPEarned is the Season Points this match awarded this player: 50 (completion)
+// + 100 (if their team won) + floor(teamGamePoints/10) + 50 (if a Capot or an
+// instant win occurred anywhere in the match). It is 0 for a player who was
+// absent at the terminal end — a REAL value, not a missing one.
+//
+// NewSeasonSP is the post-award season total. RankTier is a STABLE MACHINE TOKEN
+// ("iron" | "bronze" | "silver" | "gold" | "platinum" | "diamond" | "immortal" |
+// "radiant") that the client maps to an i18n label and colour — a display string
+// must never cross the wire, the same non-negotiable HonorUpdatedPayload's
+// HonorTier states. It is the AUTHORITATIVE derived tier, not the lagging
+// player_seasons.rank_tier snapshot column.
+//
+// TieredUp is true when this award crossed a tier floor, and drives the tier-up
+// toast. SeasonName is the machine-stable "YYYY QN" window identifier, rendered
+// VERBATIM by the client and never translated.
+type SeasonPointsAwardedPayload struct {
+	SPEarned    int    `json:"spEarned"`
+	NewSeasonSP int    `json:"newSeasonSp"`
+	RankTier    string `json:"rankTier"`
+	TieredUp    bool   `json:"tieredUp"`
+	SeasonName  string `json:"seasonName"`
+}
+
 // --- Game event payload structs ---
 
 // CardPlayedPayload is the typed payload for EventCardPlayed events.

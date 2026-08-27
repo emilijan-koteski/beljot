@@ -1369,5 +1369,28 @@
       "earned": "+{{amount}} XP",
       "continue": "Continue"
     }
+  },
+  "season": {
+    "banner": {
+      "sp": "{{sp}} SP",
+      "progress": "{{current}} / {{next}} SP",
+      "progressLabel": "{{tier}}, {{current}} of {{next}} SP into the next tier",
+      "progressLabelTop": "{{tier}}, {{sp}} SP, top of the ladder",
+      "atTop": "Top of the ladder",
+      "daysLeft": "Ends in {{days}}d"
+    },
+    "tier": {
+      "iron": "Iron",
+      "bronze": "Bronze",
+      "silver": "Silver",
+      "gold": "Gold",
+      "platinum": "Platinum",
+      "diamond": "Diamond",
+      "immortal": "Immortal",
+      "radiant": "Radiant"
+    },
+    "tierUp": {
+      "toast": "New rank: {{tier}}"
+    }
   }
 }

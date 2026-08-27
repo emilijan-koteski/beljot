@@ -301,6 +301,17 @@ func TestEventsJSONContract(t *testing.T) {
 			goldenFile: "honor_updated.json",
 		},
 		{
+			name: "SeasonPointsAwardedPayload",
+			sample: ws.SeasonPointsAwardedPayload{
+				SPEarned:    200,
+				NewSeasonSP: 1700,
+				RankTier:    "silver",
+				TieredUp:    true,
+				SeasonName:  "2026 Q3",
+			},
+			goldenFile: "season_points_awarded.json",
+		},
+		{
 			name: "PlayerDisconnectedPayload",
 			sample: ws.PlayerDisconnectedPayload{
 				PlayerSeat:         3,

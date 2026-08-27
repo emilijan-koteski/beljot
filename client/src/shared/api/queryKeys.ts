@@ -56,6 +56,13 @@ export const queryKeys = {
   lobby: {
     stats: ["lobby", "stats"] as const,
   },
+  // Story 13.1: the viewer's own standing in the active season. NOT keyed by
+  // user id — the endpoint answers for the JWT subject only, so a per-id key
+  // would imply a lookup the API does not offer. Invalidated by the
+  // event:season_points_awarded WS handler rather than polled.
+  season: {
+    current: () => ["season", "current"] as const,
+  },
   stats: {
     public: ["stats", "public"] as const,
   },

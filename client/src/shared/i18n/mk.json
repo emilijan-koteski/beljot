@@ -1369,5 +1369,28 @@
       "earned": "+{{amount}} поени",
       "continue": "Продолжи"
     }
+  },
+  "season": {
+    "banner": {
+      "sp": "{{sp}} SP",
+      "progress": "{{current}} / {{next}} SP",
+      "progressLabel": "{{tier}}, {{current}} од {{next}} SP до следниот ранг",
+      "progressLabelTop": "{{tier}}, {{sp}} SP, врв на скалата",
+      "atTop": "Врв на скалата",
+      "daysLeft": "Завршува за {{days}}д"
+    },
+    "tier": {
+      "iron": "Железо",
+      "bronze": "Бронза",
+      "silver": "Сребро",
+      "gold": "Злато",
+      "platinum": "Платина",
+      "diamond": "Дијамант",
+      "immortal": "Бесмртник",
+      "radiant": "Блескав"
+    },
+    "tierUp": {
+      "toast": "Нов ранг: {{tier}}"
+    }
   }
 }

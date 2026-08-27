@@ -272,3 +272,51 @@ export interface QuickPlayResponse {
   seat: number;
   matchStarted: boolean;
 }
+
+/**
+ * GET /api/v1/seasons/current (Story 13.1) — the active season window plus the
+ * caller's own record. This is the UNWRAPPED payload: axiosClient strips the
+ * `{ data: ... }` envelope.
+ *
+ * A player who has not played this season gets the zero state — `sp: 0`,
+ * `rankTier: "iron"` — never a 404. There is no unranked state in this ladder.
+ *
+ * Every numeric field is a real Go value, so 0 is meaningful throughout: check
+ * with `Number.isFinite`, never truthiness.
+ */
+export interface CurrentSeasonResponse {
+  /**
+   * Machine-stable window identifier, "YYYY QN" (e.g. "2026 Q3"). Rendered
+   * VERBATIM — it is an identifier, not a display string, and is never
+   * translated.
+   */
+  seasonName: string;
+  /**
+   * ABSOLUTE ISO 8601 timestamp for the end of the window. The days-remaining
+   * countdown is derived client-side (see `seasonDaysRemaining`); the server
+   * never sends a relative duration.
+   */
+  endsAt: string;
+  /** Accumulated Season Points this window. Monotonic — SP has no decay. */
+  sp: number;
+  /**
+   * Stable machine token ("iron" | "bronze" | ... | "radiant"), mapped to an
+   * i18n label and a colour by shared/lib/seasonTier.ts. Typed as `string`
+   * rather than the `SeasonTier` union on purpose: a server-side retune that
+   * adds a tier must degrade on a stale bundle via `normalizeSeasonTier`, not
+   * fail a type check.
+   */
+  rankTier: string;
+  /** SP earned past the current tier's floor, in [0, spForNextTier). */
+  spIntoTier: number;
+  /**
+   * Size of the current tier's band. ZERO AT RADIANT — the top of the ladder has
+   * no next tier, and the bar renders full (see `seasonBarFill`). Never divide by
+   * this without checking it.
+   */
+  spForNextTier: number;
+  /** Matches played this season, present at the terminal end or not. */
+  gamesPlayed: number;
+  /** Matches finished this season — exactly those that earned SP. */
+  gamesCompleted: number;
+}

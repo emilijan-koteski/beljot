@@ -30,6 +30,7 @@ import phasesGolden from "../../../../server/internal/ws/testdata/events/phases.
 import playerDeclaredGolden from "../../../../server/internal/ws/testdata/events/player_declared.json";
 import playerDisconnectedGolden from "../../../../server/internal/ws/testdata/events/player_disconnected.json";
 import playerReconnectedGolden from "../../../../server/internal/ws/testdata/events/player_reconnected.json";
+import seasonPointsAwardedGolden from "../../../../server/internal/ws/testdata/events/season_points_awarded.json";
 import surrenderDeclinedGolden from "../../../../server/internal/ws/testdata/events/surrender_declined.json";
 import surrenderProposedGolden from "../../../../server/internal/ws/testdata/events/surrender_proposed.json";
 import trickResolvedGolden from "../../../../server/internal/ws/testdata/events/trick_resolved.json";
@@ -52,6 +53,7 @@ import {
   PlayerDeclaredPayloadSchema,
   PlayerDisconnectedPayloadSchema,
   PlayerReconnectedPayloadSchema,
+  SeasonPointsAwardedPayloadSchema,
   SurrenderDeclinedPayloadSchema,
   SurrenderProposedPayloadSchema,
   TrickResolvedPayloadSchema,
@@ -86,6 +88,7 @@ const cases = [
   ["CoinSettlementPayload", CoinSettlementPayloadSchema, coinSettlementGolden],
   ["XpAwardedPayload", XpAwardedPayloadSchema, xpAwardedGolden],
   ["HonorUpdatedPayload", HonorUpdatedPayloadSchema, honorUpdatedGolden],
+  ["SeasonPointsAwardedPayload", SeasonPointsAwardedPayloadSchema, seasonPointsAwardedGolden],
   ["PlayerDisconnectedPayload", PlayerDisconnectedPayloadSchema, playerDisconnectedGolden],
   ["PlayerReconnectedPayload", PlayerReconnectedPayloadSchema, playerReconnectedGolden],
   ["SurrenderProposedPayload", SurrenderProposedPayloadSchema, surrenderProposedGolden],

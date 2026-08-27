@@ -1369,5 +1369,28 @@
       "earned": "+{{amount}} XP",
       "continue": "Nastavi"
     }
+  },
+  "season": {
+    "banner": {
+      "sp": "{{sp}} SP",
+      "progress": "{{current}} / {{next}} SP",
+      "progressLabel": "{{tier}}, {{current}} od {{next}} SP do sledećeg ranga",
+      "progressLabelTop": "{{tier}}, {{sp}} SP, vrh lestvice",
+      "atTop": "Vrh lestvice",
+      "daysLeft": "Završava za {{days}}d"
+    },
+    "tier": {
+      "iron": "Gvožđe",
+      "bronze": "Bronza",
+      "silver": "Srebro",
+      "gold": "Zlato",
+      "platinum": "Platina",
+      "diamond": "Dijamant",
+      "immortal": "Besmrtnik",
+      "radiant": "Blistavi"
+    },
+    "tierUp": {
+      "toast": "Novi rang: {{tier}}"
+    }
   }
 }

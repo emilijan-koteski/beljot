@@ -30,6 +30,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/passwordreset"
 	"github.com/emilijan/beljot/server/internal/refreshtoken"
 	"github.com/emilijan/beljot/server/internal/room"
+	"github.com/emilijan/beljot/server/internal/season"
 	"github.com/emilijan/beljot/server/internal/user"
 	"github.com/emilijan/beljot/server/internal/wallet"
 	"github.com/emilijan/beljot/server/internal/ws"
@@ -214,6 +215,17 @@ func main() {
 	// declares its own narrow interface, so one instance satisfies both.
 	honorService := user.NewHonorService(userRepo)
 	sessionManager.SetHonorRecorder(honorService)
+	// Story 13.1: the match manager accrues Season Points and refreshes the rank
+	// tier at match end via the season service. Same injection shape as the XP
+	// awarder and honor recorder above, and for the same reason — season imports
+	// match, so match must never import season.
+	//
+	// One instance, several narrow consumers (as with honorService): the season
+	// handler below reads GET /api/v1/seasons/current off the same service, and
+	// Story 13.2's leaderboard will sit beside it.
+	seasonRepo := season.NewGormRepository(db)
+	seasonService := season.NewService(seasonRepo)
+	sessionManager.SetSPAwarder(seasonService)
 
 	// Reconcile rooms left in status="playing" by a previous process. Sessions
 	// live only in process memory, so any "playing" row at boot has no live
@@ -364,6 +376,14 @@ func main() {
 	// Unfriend — party-agnostic removal of an accepted friendship. DELETE is a
 	// distinct method from the GET/POST /friends routes above, so no collision.
 	api.DELETE("/friends/:id", friendHandler.Unfriend)
+
+	// Seasonal rank (Story 13.1) — the active season window plus the CALLER'S OWN
+	// record, keyed off the JWT subject rather than any path/query id. Feeds the
+	// lobby RankBanner; the WS event:season_points_awarded push invalidates the
+	// query rather than this being polled. Story 13.2's leaderboard endpoint sits
+	// beside it, on the same seasonService constructed above.
+	seasonHandler := season.NewHandler(seasonService)
+	api.GET("/seasons/current", seasonHandler.GetCurrentSeason)
 
 	// Lobby stats endpoint — bucket-counts connected users into in-lobby /
 	// in-room / in-game and reports registered totals.

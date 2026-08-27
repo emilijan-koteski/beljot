@@ -130,6 +130,55 @@ type HonorRecorder interface {
 	ApplyHonorEvents(events map[uint]HonorEvent, now time.Time) (map[uint]HonorSnapshot, error)
 }
 
+// SPAward is one finished match's Season Points contribution for one player
+// (Story 13.1).
+//
+// A ZERO SP AWARD IS NOT A NO-OP, which is what separates this from XPAwarder's
+// map[uint]int: every human seat gets an entry, absent seats included, because
+// games_played increments for all of them (Story 13.1 D10). Completed is the
+// per-seat presence gate — true means the seat was at the table when the match
+// ended — and it drives games_completed, making that counter exactly "matches
+// where this player earned SP".
+type SPAward struct {
+	SP        int
+	Completed bool
+}
+
+// PlayerSeasonSnapshot is one player's season standing immediately after the
+// match-end write, as returned by SPAwarder.
+//
+// Everything here is PRECOMPUTED by the season service: SeasonName, the derived
+// RankTier and TieredUp all arrive resolved, so the manager never runs ladder
+// arithmetic it cannot see (the same shape HonorSnapshot uses, and for the same
+// reason). RankTier is the AUTHORITATIVE derived tier, never the lagging
+// player_seasons.rank_tier column.
+type PlayerSeasonSnapshot struct {
+	SeasonName string
+	SP         int
+	RankTier   string
+	TieredUp   bool
+}
+
+// SPAwarder is the subset of the season service the match manager needs at match
+// end (Story 13.1). It mirrors XPAwarder's and HonorRecorder's shape and exists
+// for exactly the same reason: `season` imports `match`, so MATCH MUST NEVER
+// IMPORT SEASON (Story 13.1 D8 / 9.7 D4 / 9.5 D1). Both SPAward and
+// PlayerSeasonSnapshot are declared HERE, in match, so the interface is
+// satisfiable by a *season.Service without match taking a dependency on the
+// season package.
+//
+// `now` is passed in rather than read inside: the season a match lands in must
+// be decided by the finalizer's own stamp, not by a clock read somewhere further
+// down. The implementation resolves (and, at a quarter boundary, creates) the
+// covering window from it.
+//
+// Injected via SetSPAwarder; nil → SP is skipped entirely (no mutation, no
+// event), mirroring walletSettler's, xpAwarder's and honorRecorder's
+// nil-tolerance. Match end must never break because SP is unwired.
+type SPAwarder interface {
+	ApplySeasonPoints(awards map[uint]SPAward, now time.Time) (map[uint]PlayerSeasonSnapshot, error)
+}
+
 // Broadcaster is the subset of *ws.Hub the manager depends on. Mirrors the
 // chat / emote pattern (chat/handler.go, emote/handler.go) so tests can swap
 // in a hubSpy without spinning up a real hub. *ws.Hub satisfies this directly.
@@ -156,6 +205,7 @@ type Manager struct {
 	walletSettler    WalletSettler
 	xpAwarder        XPAwarder
 	honorRecorder    HonorRecorder
+	spAwarder        SPAwarder
 	userRemovedHooks []func(userID uint)
 	// Bot think-delay bounds (Story 10.3). Uniform random in [min, max] per
 	// decision; injectable so manager tests don't sleep for real. The 2.5 s
@@ -213,6 +263,13 @@ func (m *Manager) SetXPAwarder(awarder XPAwarder) {
 // honor is skipped entirely (no mutation, no event).
 func (m *Manager) SetHonorRecorder(recorder HonorRecorder) {
 	m.honorRecorder = recorder
+}
+
+// SetSPAwarder injects the season service used to accrue Season Points and
+// refresh the rank tier at match end (Story 13.1). Optional — when unset, SP is
+// skipped entirely (no mutation, no event).
+func (m *Manager) SetSPAwarder(awarder SPAwarder) {
+	m.spAwarder = awarder
 }
 
 // AddUserRemovedHook registers fn to be called (outside the manager lock)
@@ -1335,6 +1392,18 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	}
 	ids, botFlags, hasBots := matchSeatColumns(session.playerIDs, botSeats)
 
+	// Copy buffered hand results under RLock to avoid holding the lock during I/O.
+	//
+	// HOISTED HERE FROM JUST ABOVE CreateWithHands (Story 13.1 D4). The Season
+	// Points award below needs to know whether any hand was a Capot, and reading
+	// session.handResults unlocked at that point would be a data race that `make
+	// test` cannot catch for us (the suite does not pass -race). ONE copy, used by
+	// both the SP award and the persist call — do not add a second acquisition.
+	session.mu.RLock()
+	handsCopy := make([]HandResult, len(session.handResults))
+	copy(handsCopy, session.handResults)
+	session.mu.RUnlock()
+
 	// Story 9.2: settle coins (no-op when coinBuyIn == 0). The winner is the
 	// normally-resolved WinnerTeam — surrender routes through here with the
 	// engine's non-surrendering team already set, so it needs no special case
@@ -1364,6 +1433,31 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 		connected[i] = finalState.Players[i].Connected
 	}
 	honorMsgs := m.recordHonor(session.roomID, session.playerIDs, botSeats, connected, -1)
+
+	// Story 13.1: accrue Season Points and refresh the rank tier (no-op when no
+	// awarder wired). Natural end → abandonedSeat -1, so every human seat counts
+	// as present and earns the full formula; the `connected` snapshot above is
+	// passed for symmetry with the abandonment finalizer and is not consulted.
+	//
+	// winnerTeam is the value already resolved at the top of this function — never
+	// re-derived from scores, because surrender and stop-at-target both route
+	// through here with the winner set. capotOccurred reads the hoisted handsCopy.
+	// finalState.WonByInstantWin is the engine's own record of an instant win,
+	// which has no other trace at this layer (TeamScores can be [0,0] with no hand
+	// results, but it can equally fire on hand 5 of a 500:300 match).
+	//
+	// Best-effort like settlement, XP and honor: a failure logs and skips the
+	// events but never blocks the broadcasts below. The season_points_awarded
+	// messages are slotted after honor_updated and before match_state.
+	//
+	// finalizedAt is stamped HERE, in the finalizer, and threaded down: it is what
+	// decides which season window this match lands in, so at a quarter boundary
+	// the answer must come from the moment the match ended, not from a later clock
+	// read inside the awarder.
+	finalizedAt := time.Now().UTC()
+	spMsgs := m.awardSeasonPoints(session.roomID, session.playerIDs, botSeats, connected,
+		finalState.TeamScores, winnerTeam,
+		capotOccurred(handsCopy) || finalState.WonByInstantWin, -1, finalizedAt)
 
 	matchRecord := &Match{
 		RoomID:       session.roomID,
@@ -1396,12 +1490,6 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 		Player4CoinDelta:    deltas[3],
 	}
 
-	// Copy buffered hand results under RLock to avoid holding the lock during I/O.
-	session.mu.RLock()
-	handsCopy := make([]HandResult, len(session.handResults))
-	copy(handsCopy, session.handResults)
-	session.mu.RUnlock()
-
 	if err := m.matchRepo.CreateWithHands(matchRecord, handsCopy); err != nil {
 		slog.Error("session: failed to persist match", "roomID", session.roomID, "error", err)
 	} else {
@@ -1430,6 +1518,9 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	}
 	for _, hm := range honorMsgs {
 		m.hub.SendToUser(hm.userID, hm.msg)
+	}
+	for _, spm := range spMsgs {
+		m.hub.SendToUser(spm.userID, spm.msg)
 	}
 	m.broadcastState(session.playerIDs, finalState)
 

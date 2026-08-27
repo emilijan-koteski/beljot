@@ -9,6 +9,7 @@ import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
+import { RankBanner } from "@/features/lobby/components/RankBanner";
 import { RoomEjectionModal } from "@/features/lobby/components/RoomEjectionModal";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
 import { Toast } from "@/features/lobby/components/Toast";
@@ -19,6 +20,7 @@ import {
   useQuickJoinMutation,
   useQuickPlayMutation,
 } from "@/shared/hooks/mutations/useRooms";
+import { useCurrentSeasonQuery } from "@/shared/hooks/queries/useCurrentSeason";
 import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
 import { useMarkLobbyRoot } from "@/shared/hooks/useLobbyReturn";
@@ -81,6 +83,9 @@ export function LobbyPage() {
   // Lobby grid is always-on now — no separate "options" vs "browse" view.
   const roomsQuery = useRoomsQuery("waiting", true);
   const statsQuery = useLobbyStatsQuery();
+  // Story 13.1: the viewer's seasonal standing. Push-invalidated by the
+  // event:season_points_awarded handler, never polled.
+  const seasonQuery = useCurrentSeasonQuery();
   const quickPlayMutation = useQuickPlayMutation();
   const quickJoinMutation = useQuickJoinMutation();
   const joinRoomMutation = useJoinRoomMutation();
@@ -220,6 +225,11 @@ export function LobbyPage() {
         onCreateRoom={() => setShowCreate(true)}
         quickPlayDisabled={quickPlayMutation.isPending}
       />
+
+      {/* Story 13.1: the seasonal rank banner — tier badge, tier name, SP,
+          progress to the next tier and days left in the season. Renders nothing
+          until its query resolves, so it never shifts the stack twice. */}
+      <RankBanner season={seasonQuery.data} />
 
       {/* Story 11.2: the friends card, full width — one card for the whole
           relationship. It carries the pending-requests section, the roster with

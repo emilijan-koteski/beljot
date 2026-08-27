@@ -44,6 +44,7 @@ import type {
   PlayerDeclaredPayload,
   PlayerDisconnectedPayload,
   PlayerReconnectedPayload,
+  SeasonPointsAwardedPayload,
   SurrenderDeclinedPayload,
   SurrenderProposedPayload,
   TrickResolvedPayload,
@@ -352,6 +353,20 @@ export const HonorUpdatedPayloadSchema = z.strictObject({
   isNewPlayer: z.boolean(),
 });
 
+// Story 13.1: per-human match-end Season Points award. rankTier is left as a
+// plain string rather than a union of the eight tokens for the same reason
+// honorTier is — a server-side retune that adds a tier must not hard-fail a stale
+// client bundle; normalizeSeasonTier in shared/lib/seasonTier.ts falls back to the
+// SP's own bucket instead. seasonName is likewise a free string: it is a
+// machine-stable "YYYY QN" identifier the client renders verbatim.
+export const SeasonPointsAwardedPayloadSchema = z.strictObject({
+  spEarned: z.number().int(),
+  newSeasonSp: z.number().int(),
+  rankTier: z.string(),
+  tieredUp: z.boolean(),
+  seasonName: z.string(),
+});
+
 export const PlayerDisconnectedPayloadSchema = z.strictObject({
   playerSeat: z.number(),
   username: z.string(),
@@ -516,6 +531,12 @@ type _HonorUpdatedConformance = MutualExtends<
 >;
 const _honorUpdatedConforms: _HonorUpdatedConformance = true;
 
+type _SeasonPointsAwardedConformance = MutualExtends<
+  z.infer<typeof SeasonPointsAwardedPayloadSchema>,
+  SeasonPointsAwardedPayload
+>;
+const _seasonPointsAwardedConforms: _SeasonPointsAwardedConformance = true;
+
 type _PlayerDisconnectedConformance = MutualExtends<
   z.infer<typeof PlayerDisconnectedPayloadSchema>,
   PlayerDisconnectedPayload
@@ -562,6 +583,7 @@ export const _conformanceWitnesses = {
   _coinSettlementConforms,
   _xpAwardedConforms,
   _honorUpdatedConforms,
+  _seasonPointsAwardedConforms,
   _playerDisconnectedConforms,
   _playerReconnectedConforms,
   _surrenderProposedConforms,

@@ -8,6 +8,7 @@ import { queryKeys } from "@/shared/api/queryKeys";
 import { isCardId } from "@/shared/lib/cardId";
 import { honorIsNewPlayer, honorScoreOrPrior } from "@/shared/lib/honor";
 import { MOTION } from "@/shared/lib/motion";
+import { normalizeSeasonTier } from "@/shared/lib/seasonTier";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useLevelUpStore } from "@/shared/stores/levelUpStore";
@@ -45,6 +46,7 @@ import type {
   RoomKickedPayload,
   RoomOwnerChangedPayload,
   RoomUpdatedPayload,
+  SeasonPointsAwardedPayload,
   SeatUpdatedPayload,
   SurrenderDeclinedPayload,
   SurrenderProposedPayload,
@@ -86,6 +88,7 @@ import {
   EVENT_PLAYER_DECLARED,
   EVENT_PLAYER_DISCONNECTED,
   EVENT_PLAYER_RECONNECTED,
+  EVENT_SEASON_POINTS_AWARDED,
   EVENT_SURRENDER_DECLINED,
   EVENT_SURRENDER_PROPOSED,
   EVENT_TRICK_RESOLVED,
@@ -420,6 +423,57 @@ function dispatchGameEvent(message: WsMessage): void {
         honorTier: payload.honorTier,
         isNewPlayer: payload.isNewPlayer,
       });
+    }
+    return;
+  }
+
+  if (type === EVENT_SEASON_POINTS_AWARDED) {
+    // Story 13.1: per-human Season Points award, arriving right after
+    // event:honor_updated and before the trailing event:match_state.
+    //
+    // Unlike XP and honor this does NOT write to authStore.user: the season
+    // record is not on the auth envelope (extending it would force a season
+    // dependency into AuthHandler and every one of its call sites, for data one
+    // surface reads). Instead the query the RankBanner consumes is invalidated —
+    // the same WS-to-query bridge the friend-request push uses — so the banner
+    // is correct the moment the player lands back in the lobby, whichever value
+    // the server actually has.
+    const payload = message.payload as SeasonPointsAwardedPayload;
+    // Defensive validation — Go zero values are real values, so guard on type,
+    // not truthiness. `spEarned: 0` (an absent seat) and `tieredUp: false` (the
+    // overwhelmingly common case) are both legitimate, and both are falsy.
+    //
+    // The object check comes FIRST: a null or absent payload would otherwise
+    // throw a TypeError on the field read below, which is the opposite of what
+    // this block is for — a malformed frame must warn and return, not blow up the
+    // dispatcher mid-burst and strand the rest of the match-end sequence.
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      !Number.isInteger(payload.spEarned) ||
+      !Number.isInteger(payload.newSeasonSp) ||
+      typeof payload.rankTier !== "string" ||
+      payload.rankTier === "" ||
+      typeof payload.tieredUp !== "boolean" ||
+      typeof payload.seasonName !== "string"
+    ) {
+      console.warn("WS: ignoring malformed event:season_points_awarded payload", payload);
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: queryKeys.season.current() });
+    if (payload.tieredUp) {
+      // A TOAST, not a dialog (AC2). Deliberately NOT the levelUpStore +
+      // LevelUpDialog pattern: that store exists because a DIALOG must survive
+      // the navigation away that wipes gameStore, and a toast has no such need —
+      // sonner renders above the whole app. Fired from here rather than from a
+      // lobby effect so it lands whether the player is mid-navigation or already
+      // back in the lobby.
+      toast.success(
+        i18n.t("season.tierUp.toast", {
+          tier: i18n.t(`season.tier.${normalizeSeasonTier(payload.rankTier, payload.newSeasonSp)}`),
+        }),
+        { duration: MOTION.TOAST_LONG },
+      );
     }
     return;
   }

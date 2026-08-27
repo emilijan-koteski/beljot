@@ -217,6 +217,27 @@ type GameState struct {
 	// already lives. Nothing about it belongs on a per-trick state snapshot, and
 	// keeping it off the wire leaves the match_state contract untouched.
 	StoppedAtTarget bool `json:"-"`
+	// WonByInstantWin records that this match ended BECAUSE a player was dealt all
+	// 8 trump cards, as opposed to a hand completing, a surrender or the stop
+	// rule. Set by both checkInstantWin call sites (handlePickTrump and
+	// startNewHand) and cleared by startNewHand.
+	//
+	// It exists for the same reason StoppedAtTarget above does: so the match layer
+	// can state the outcome instead of inferring it. There is NO inference
+	// available at the match layer at all here — checkInstantWin fires right
+	// after a deal, so an instant-win match can have zero hand results and
+	// TeamScores of [0,0], but it can equally fire on hand 5 of a match sitting
+	// at 500:300. Without this field the Season-Points bonus cannot tell a
+	// spectacular finish from an ordinary one.
+	//
+	// An EVENT RECORD, not a config mirror: unlike StopAtTarget it is NOT
+	// recomputed by RefreshDerivedFlags, because there is nothing in Rules to
+	// recompute it from and ApplyAction's exit would wipe it.
+	//
+	// Server-only (json:"-"), exactly as StoppedAtTarget is: the client learns
+	// nothing new from it (the outcome already rides event:match_end), and keeping
+	// it off the wire leaves the match_state contract and its golden untouched.
+	WonByInstantWin bool `json:"-"`
 
 	// Current hand state
 	HandNumber       int   `json:"handNumber"`

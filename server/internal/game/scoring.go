@@ -359,6 +359,10 @@ func startNewHand(state *GameState) {
 	// in practice (a stop ends the match, so no next hand is dealt) but reset
 	// here so the flag can never outlive its hand.
 	state.StoppedAtTarget = false
+	// Same reasoning, and cleared HERE — before the deal below — so the
+	// instant-win check at the end of this function is the only thing that can
+	// set it for the hand being dealt.
+	state.WonByInstantWin = false
 
 	// Reset per-hand scoring
 	state.HandPoints = [2]int{0, 0}
@@ -398,6 +402,9 @@ func startNewHand(state *GameState) {
 	if winnerTeam := checkInstantWin(state); winnerTeam != nil {
 		state.WinnerTeam = winnerTeam
 		state.Phase = PhaseMatchEnd
+		// Records WHY this match ended, so the match layer states the outcome
+		// instead of inferring it — see GameState.WonByInstantWin.
+		state.WonByInstantWin = true
 		return
 	}
 
