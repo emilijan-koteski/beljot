@@ -33,9 +33,9 @@ type Props = {
 /**
  * The seasonal tier badge — colour ring, tinted ground and a coloured glow.
  *
- * EXTRACTED FROM RankBanner (Story 13.2), verbatim, because the leaderboard now
- * renders the same treatment in two more places (the lobby widget and the full
- * page). seasonTier.ts's own header names this story as the duplication the
+ * EXTRACTED FROM RankBanner (Story 13.2), verbatim, because the same treatment
+ * is now rendered on the leaderboard's rows, the profile's season archive and
+ * the header's rank chip. seasonTier.ts's own header names this story as the duplication the
  * colour maps exist to prevent; this is the JSX half of the same argument.
  *
  * The colours come from SEASON_TIER_COLOR / _SOFT, which are `var()` references

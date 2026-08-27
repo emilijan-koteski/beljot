@@ -1373,12 +1373,13 @@
   },
   "season": {
     "banner": {
-      "sp": "{{sp}} SP",
-      "progress": "{{current}} / {{next}} SP",
-      "progressLabel": "{{tier}}, {{current}} од {{next}} SP до следниот ранг",
-      "progressLabelTop": "{{tier}}, {{sp}} SP, врв на скалата",
+      "sp": "{{sp}} СП",
+      "progress": "{{current}} / {{next}} СП",
+      "progressLabel": "{{tier}}, {{current}} од {{next}} СП до следниот ранг",
+      "progressLabelTop": "{{tier}}, {{sp}} СП, врв на скалата",
       "atTop": "Врв на скалата",
       "daysLeft": "Завршува за {{days}}д",
+      "rankAria": "Ранг: {{tier}}",
       "newSeason": "Нова сезона: {{season}}"
     },
     "picker": {
@@ -1389,9 +1390,10 @@
       "eyebrow": "Сезона",
       "title": "Сезони",
       "sub": "Тековен ранг и резултати од минатите сезони.",
+      "subArchiveOnly": "Резултати од минатите сезони.",
       "listLabel": "Минати сезони",
-      "currentAria": "Тековна сезона {{season}}: {{tier}}, {{sp}} SP",
-      "rowAria": "{{season}}: {{tier}}, {{sp}} SP, одиграни мечеви: {{games}}"
+      "currentAria": "Тековна сезона {{season}}: {{tier}}, {{sp}} СП",
+      "rowAria": "{{season}}: {{tier}}, {{sp}} СП, одиграни мечеви: {{games}}"
     },
     "tier": {
       "iron": "Железо",
@@ -1401,7 +1403,7 @@
       "platinum": "Платина",
       "diamond": "Дијамант",
       "master": "Мајстор",
-      "grandmaster": "Гросмајстор"
+      "grandmaster": "Велемајстор"
     },
     "tierUp": {
       "toast": "Нов ранг: {{tier}}"
@@ -1411,24 +1413,23 @@
       "title": "Ранг листа",
       "sub": "Кој се качува најбрзо оваа сезона, по сезонски поени.",
       "subPast": "Конечен пласман за сезоната {{season}}, по сезонски поени.",
-      "heading": "Најдобри играчи",
       "loading": "Се вчитува…",
       "error": "Не успеа да се вчита ранг листата. Обиди се повторно",
       "empty": "Сè уште никој нема освоено сезонски поени оваа сезона.",
       "emptyPast": "Никој не освои сезонски поени во оваа сезона.",
       "loadMore": "Вчитај повеќе",
       "retry": "Обиди се повторно",
-      "stale": "Освежувањето не успеа.",
       "showing": "Прикажани {{shown}} од {{total}} играчи",
-      "viewAll": "Прикажи ги сите",
       "you": "Ти",
       "yourPosition": "Твојата позиција",
-      "spValue": "{{sp}} SP",
-      "rowAria": "{{position}}. {{username}}, {{tier}}, {{sp}} SP",
+      "spValue": "{{sp}} СП",
+      "rowAria": "{{position}}. {{username}}, {{tier}}, {{sp}} СП",
       "gamesAria": "Одиграни мечеви: {{games}}",
+      "yourProfileAria": "Погледни го твојот профил",
       "columns": {
         "position": "Позиција",
-        "sp": "SP",
+        "tier": "Ранг",
+        "sp": "СП",
         "games": "Одиграни мечеви"
       }
     }

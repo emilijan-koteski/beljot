@@ -1,11 +1,7 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 
-import { queryKeys } from "@/shared/api/queryKeys";
 import { TierBadge } from "@/shared/components/season/TierBadge";
-import { MOTION } from "@/shared/lib/motion";
 import {
   normalizeSeasonTier,
   SEASON_TIER_COLOR,
@@ -23,23 +19,31 @@ type Props = {
 };
 
 /**
- * How long the boundary effect waits before re-firing for a window it has
- * already acted on. Only reachable when the client's clock runs AHEAD of the
- * server's: the early refetch returns the same still-active season, and this is
- * what lets the real boundary still be caught instead of being swallowed by an
- * already-consumed guard.
- */
-const SEASON_BOUNDARY_RETRY_MS = 5 * 60 * 1000;
-
-/**
- * The lobby's seasonal rank banner (Story 13.1 AC3). Renders exactly the five
- * elements the AC names: tier badge (tier colour + glow), tier name, current SP,
- * a progress bar to the next tier, and days remaining in the season.
+ * The seasonal rank banner (Story 13.1 AC3). Renders exactly the five elements
+ * the AC names: tier badge (tier colour + glow), tier name, current SP, a
+ * progress bar to the next tier, and days remaining in the season.
  *
- * PRESENTATIONAL ONLY. Every number arrives decided by the server — the SP total,
- * the tier token, and the spIntoTier / spForNextTier decomposition. Nothing here
- * computes a rank and nothing gates on one (no feature in this product unlocks on
- * tier or SP).
+ * IT LIVES ON THE PROFILE, not the lobby it shipped in. The rank's IDENTITY is
+ * always on screen now — the header's HeaderRankChip carries the badge and the
+ * tier name on every authed route — so the lobby no longer needs a second, much
+ * larger copy of the same fact above the room grid. What the chip deliberately
+ * omits is the arithmetic (the SP total, the band decomposition, the countdown),
+ * and this is the surface for reading that: the profile, where every other
+ * progression figure already lives. It replaced the SeasonSection's small
+ * current-rank chip rather than joining it — two rank readouts on one page is
+ * the contradiction that chip's own section header warned about.
+ *
+ * PRESENTATIONAL ONLY, and now literally so. Every number arrives decided by the
+ * server — the SP total, the tier token, and the spIntoTier / spForNextTier
+ * decomposition. Nothing here computes a rank and nothing gates on one (no
+ * feature in this product unlocks on tier or SP). The one non-visual job it used
+ * to carry, the season-rollover watch, moved out with the move: it now hangs off
+ * the header chip (see `useSeasonWindowWatch`), which is mounted everywhere this
+ * page is and everywhere it is not. Do NOT re-add it here — the hook fires a
+ * toast, and a second caller would double it.
+ *
+ * The one subscription that stays is the shared 30s tick, which is what ages the
+ * days-remaining figure instead of freezing it at mount.
  *
  * There is NO unranked state and NO placement state. The older UX spec describes
  * unranked / "Placement: X/3" / LP states from the retired ELO model; a player at
@@ -47,66 +51,13 @@ const SEASON_BOUNDARY_RETRY_MS = 5 * 60 * 1000;
  */
 export function RankBanner({ season }: Props) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  // Subscribe to the single shared 30s tick so the days-remaining figure ages
-  // without this component owning an interval of its own — and so the boundary
-  // effect below re-evaluates as the countdown crosses zero.
-  const tick = useSyncExternalStore(subscribeTimeTick, getTimeTick, getTimeTick);
-
-  // THE BOUNDARY EFFECT (Story 13.3): `seasonDaysRemaining` floors at 0
-  // forever, so without this a lobby tab left open across the quarter boundary
-  // renders the dead season indefinitely — the deferred bug from 13.1. When
-  // the shared tick observes endsAt in the past, invalidate `season.current`
-  // (the banner's own query), every leaderboard entry (widget + full page) and
-  // the seasons list (the picker's feed, which gains a window at every
-  // boundary). Pull-only stays intact: this is client-side clock observation,
-  // not a push.
-  //
-  // ONCE PER BOUNDARY, BUT NOT ONCE ONLY. The ref keys on the endsAt value, so
-  // the refetched NEW season re-arms it for the next quarter while re-renders
-  // and further ticks of the dead one do nothing. The `at` stamp is the
-  // CLOCK-SKEW ESCAPE: if this client's clock runs ahead of the server, the
-  // first firing refetches the SAME still-active window, and a ref consumed
-  // forever would leave nothing to fire at the real boundary (season.current is
-  // deliberately unpolled). Re-arming after RETRY_MS turns that dead end into a
-  // slow retry that costs one refetch per five minutes of skew at most.
-  const invalidatedForRef = useRef<{ endsAt: string; at: number } | null>(null);
-  const endsAt = season?.endsAt;
-  useEffect(() => {
-    if (endsAt === undefined) return;
-    const end = new Date(endsAt).getTime();
-    const now = Date.now();
-    if (!Number.isFinite(end) || now < end) return;
-    const last = invalidatedForRef.current;
-    if (last?.endsAt === endsAt && now - last.at < SEASON_BOUNDARY_RETRY_MS) return;
-    invalidatedForRef.current = { endsAt, at: now };
-    void queryClient.invalidateQueries({ queryKey: queryKeys.season.current() });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.season.leaderboardAll() });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.season.list() });
-  }, [tick, endsAt, queryClient]);
-
-  // THE TRANSITION TOAST, once per observed season change: the invalidation
-  // above refetches, the new window's name arrives, and the flip from a KNOWN
-  // previous name fires exactly one toast. Initial mount sets the ref without
-  // toasting (loading a season is not a transition), and the same plumbing the
-  // tier-up toast uses (sonner + MOTION duration) keeps the two moments
-  // consistent. The season token is rendered verbatim inside localized copy.
-  const prevSeasonNameRef = useRef<string | null>(null);
-  const seasonName = season?.seasonName;
-  useEffect(() => {
-    if (seasonName === undefined) return;
-    const prev = prevSeasonNameRef.current;
-    prevSeasonNameRef.current = seasonName;
-    if (prev !== null && prev !== seasonName) {
-      toast.success(t("season.banner.newSeason", { season: seasonName }), {
-        duration: MOTION.TOAST_LONG,
-      });
-    }
-  }, [seasonName, t]);
+  // The shared 30s tick, so the countdown below ages without this component
+  // owning an interval of its own.
+  useSyncExternalStore(subscribeTimeTick, getTimeTick, getTimeTick);
 
   // Nothing to show until the query resolves. Deliberately null rather than a
   // skeleton: the banner sits in a single-column stack, so a placeholder would
-  // shift the whole lobby down and then back up again on a fast response.
+  // shift the whole page down and then back up again on a fast response.
   if (!season) return null;
 
   const sp = seasonSpOrZero(season.sp);

@@ -8,8 +8,8 @@
 // The SERVER IS AUTHORITATIVE for both the SP total and the tier: both arrive on
 // event:season_points_awarded and on GET /api/v1/seasons/current. Nothing here
 // ever makes a decision — no tier or SP total gates anything in this product, and
-// the progress decomposition the RankBanner renders comes from the server's own
-// spIntoTier / spForNextTier. These helpers exist for the cases where only an SP
+// the progress decomposition the profile's RankBanner renders comes from the
+// server's own spIntoTier / spForNextTier. These helpers exist for the cases where only an SP
 // number is on hand (a toast fired from a WS payload) and for the colour map.
 // Keep this the ONLY client copy of the ladder.
 

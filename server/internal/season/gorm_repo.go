@@ -293,11 +293,6 @@ func (r *GormRepository) LeaderboardPage(seasonID uint, limit, offset int) ([]Le
 	return entries, total, nil
 }
 
-// CountAhead implements Repository.CountAhead.
-//
-// One order, two consumers: the predicate below is the strict-ahead form of
-// LeaderboardPage's ORDER BY, and if the two ever diverge the viewer's position
-// silently drifts away from their own row in the list.
 // FindLeaderboardEntry implements Repository.FindLeaderboardEntry.
 //
 // WHY THIS EXISTS INSTEAD OF REUSING FindPlayerSeason. FindPlayerSeason is a
@@ -399,6 +394,11 @@ func (r *GormRepository) PlayerSeasonArchive(userID uint, now time.Time) ([]Arch
 	return entries, nil
 }
 
+// CountAhead implements Repository.CountAhead.
+//
+// One order, two consumers: the predicate below is the strict-ahead form of
+// LeaderboardPage's ORDER BY, and if the two ever diverge the viewer's position
+// silently drifts away from their own row in the list.
 func (r *GormRepository) CountAhead(seasonID uint, sp int, userID uint) (int64, error) {
 	var ahead int64
 	err := r.leaderboardScope(seasonID).

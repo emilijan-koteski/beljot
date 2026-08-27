@@ -39,12 +39,26 @@ vi.mock("@/shared/api/identities", () => ({
   unlinkIdentity: vi.fn(),
 }));
 
-// Story 13.3: SeasonSection is in the page tree, so the archive read must be
-// mocked (default: nothing to show — the section stays out of the DOM).
+// SeasonSection is in the page tree, so the archive read must be mocked
+// (default: nothing to show — the section stays out of the DOM), and the page
+// now also mounts the RankBanner, which reads the viewer's current standing.
 const mockGetSeasonArchive = vi.fn();
+const mockGetCurrentSeason = vi.fn();
 vi.mock("@/shared/api/season", () => ({
   getSeasonArchive: (...args: unknown[]) => mockGetSeasonArchive(...args),
+  getCurrentSeason: (...args: unknown[]) => mockGetCurrentSeason(...args),
 }));
+
+const currentSeason = {
+  seasonName: "2026 Q3",
+  endsAt: "2099-10-01T00:00:00Z",
+  sp: 4000,
+  rankTier: "gold",
+  spIntoTier: 1000,
+  spForNextTier: 2500,
+  gamesPlayed: 31,
+  gamesCompleted: 29,
+};
 
 function renderProfilePage() {
   return render(
@@ -108,6 +122,10 @@ describe("ProfilePage", () => {
     mockGetSeasonArchive.mockReset();
     // Default: no season history → SeasonSection contributes nothing.
     mockGetSeasonArchive.mockResolvedValue({ items: [] });
+    mockGetCurrentSeason.mockReset();
+    // The endpoint answers a zero state rather than a 404 for a player who has
+    // not played, so the banner has something to render in every test here.
+    mockGetCurrentSeason.mockResolvedValue(currentSeason);
     mockGetCareer.mockResolvedValue(careerFixture());
     // Default: MatchHistory renders the empty state so existing tests need no per-case setup.
     mockGetUserMatches.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
@@ -428,9 +446,37 @@ describe("ProfilePage", () => {
     expect(screen.getByTestId("profile-streak-play")).toBeInTheDocument();
   });
 
-  // --- Story 13.3: seasonal rank + prior-season archive ---
+  // --- seasonal rank banner + prior-season archive ---
 
-  it("renders the season chip and the archive when the viewer has season history", async () => {
+  // THE RANK BANNER IS THIS PAGE'S RANK SURFACE, and it is fed by
+  // GET /seasons/current — not by the profile response's `seasonRank` block,
+  // which carries no band decomposition and no countdown to draw a bar from.
+  it("renders the rank banner from the current-season endpoint", async () => {
+    renderProfilePage();
+
+    const banner = await screen.findByTestId("rank-banner");
+    expect(banner).toHaveAttribute("data-tier", "gold");
+    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Gold");
+    // The progress the header chip deliberately omits: 1000 of a 2500 band.
+    expect(screen.getByTestId("rank-progress")).toHaveAttribute("aria-valuenow", "40");
+  });
+
+  // ABOVE the streak callout, per the page's stated order: the season standing
+  // is the longer-running fact and the streak is a note on current form.
+  it("places the rank banner above the streak callout", async () => {
+    mockGetCareer.mockResolvedValue(careerFixture({ streak: { kind: "win", length: 3 } }));
+
+    renderProfilePage();
+
+    const banner = await screen.findByTestId("rank-banner");
+    const callout = await screen.findByTestId("profile-streak");
+    expect(banner.compareDocumentPosition(callout)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  // ONE RANK READOUT PER PAGE. SeasonSection's own current-rank chip is
+  // suppressed here (showCurrentRank={false}) precisely so the banner is not
+  // shadowed by a smaller copy of the same standing a few sections down.
+  it("renders the archive without the section's rank chip when the viewer has season history", async () => {
     mockGetProfile.mockResolvedValueOnce(
       profileFixture({ seasonRank: { seasonName: "2026 Q3", tier: "gold", sp: 4000 } }),
     );
@@ -450,18 +496,19 @@ describe("ProfilePage", () => {
 
     renderProfilePage();
 
-    const chip = await screen.findByTestId("profile-season");
-    expect(chip).toHaveAttribute("data-tier", "gold");
-    expect(chip.textContent).toContain("2026 Q3");
     const list = await screen.findByTestId("prior-season-archive");
     expect(list.querySelectorAll('[data-testid="season-archive-row"]')).toHaveLength(1);
     // The archive is the VIEWER's — keyed on their own id.
     expect(mockGetSeasonArchive).toHaveBeenCalledWith(1);
+    // ...and the chip stays out even though the profile carries a seasonRank.
+    expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
   });
 
-  // The hidden-when-empty contract, preserved from the pre-13.3 pages: a null
-  // seasonRank and an empty archive leave nothing in the DOM at all.
-  it("renders neither the season chip nor the archive without season history", async () => {
+  // The hidden-when-empty contract, preserved from the pre-13.3 pages: with no
+  // played seasons the whole SeasonSection leaves nothing in the DOM at all.
+  // (The banner above is unaffected — every authed player has a current
+  // standing, even if it is the Iron zero state.)
+  it("renders no archive section at all without season history", async () => {
     mockGetProfile.mockResolvedValueOnce(profileFixture({ seasonRank: null }));
     mockGetSeasonArchive.mockResolvedValue({ items: [] });
 

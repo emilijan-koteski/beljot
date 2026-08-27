@@ -19,9 +19,9 @@ import type { LeaderboardRow as LeaderboardRowData } from "@/shared/types/apiTyp
 const PAGE_SIZE = 25;
 
 /**
- * Re-arm delay for the boundary effect, matching RankBanner's. Only reachable
- * when this client's clock runs ahead of the server's, where the early refetch
- * returns the same still-active window.
+ * Re-arm delay for the boundary effect, matching `useSeasonWindowWatch`'s. Only
+ * reachable when this client's clock runs ahead of the server's, where the
+ * early refetch returns the same still-active window.
  */
 const SEASON_BOUNDARY_RETRY_MS = 5 * 60 * 1000;
 
@@ -53,12 +53,12 @@ export function LeaderboardPage() {
   const seasons = seasonsQuery.data?.items ?? [];
   const queryClient = useQueryClient();
 
-  // The same shared 30s tick the lobby's RankBanner uses. THE PAGE MUST OBSERVE
-  // THE BOUNDARY TOO: this is the only surface whose entire content is the
-  // ladder, and RankBanner — the sole other observer — is unmounted while this
-  // route is active. Without the subscription a page left open across the
-  // quarter boundary keeps the "Current" marker on the dead window and keeps
-  // rendering its frozen standings under the present-tense heading.
+  // The same shared 30s tick `useSeasonWindowWatch` uses. THE PAGE MUST OBSERVE
+  // THE BOUNDARY TOO: that watch keys on the ACTIVE window's endsAt, and this
+  // page also has to notice when the newest window in its own picker list has
+  // ended. Without the subscription a page left open across the quarter
+  // boundary keeps the "Current" marker on the dead window and keeps rendering
+  // its frozen standings under the present-tense heading.
   const tick = useSyncExternalStore(subscribeTimeTick, getTimeTick, getTimeTick);
 
   // Re-derived on every render, and the tick subscription above is what makes
@@ -71,7 +71,7 @@ export function LeaderboardPage() {
     (s) => Date.parse(s.startedAt) <= nowMs && nowMs < Date.parse(s.endsAt),
   )?.id;
 
-  // The page's own boundary effect, mirroring RankBanner's.
+  // The page's own boundary effect, mirroring `useSeasonWindowWatch`'s.
   //
   // IT WATCHES THE NEWEST WINDOW WE KNOW OF, NOT "the current one": at the
   // moment the boundary passes, NO listed window covers now (that is the whole
@@ -80,7 +80,7 @@ export function LeaderboardPage() {
   // endsAt we hold is in the past, this page's list AND its `current` ladder
   // are both provably stale. The refetch brings the new window in, its endsAt
   // is in the future, and the guard is re-armed for the next quarter. The `at`
-  // stamp is the same clock-skew escape RankBanner carries.
+  // stamp is the same clock-skew escape the header's watch carries.
   let newestEndsAt: string | undefined;
   for (const s of seasons) {
     if (newestEndsAt === undefined || Date.parse(s.endsAt) > Date.parse(newestEndsAt)) {

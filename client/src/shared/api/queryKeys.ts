@@ -79,14 +79,14 @@ export const queryKeys = {
     // and defeat the point. It previously took an `offset` argument that both
     // callers passed as 0, which described a cache layout the code did not have.
     //
-    // `limit` does separate entries, so the widget's top ten and the page's
-    // 25-row pages cannot overwrite each other with differently-sized lists.
+    // `limit` does separate entries, so two surfaces asking for differently
+    // sized pages cannot overwrite each other's lists.
     //
     // NOT invalidated from the socket — standings are pull-only (page load plus
-    // poll), by epic decision. The ONE non-pull invalidation is the boundary
-    // effect in RankBanner: when the season rolls over it invalidates
-    // `leaderboardAll()` (this whole prefix) so no surface keeps rendering the
-    // dead window's ladder as current.
+    // poll), by epic decision. The ONE non-pull invalidation is the season
+    // rollover: `useSeasonWindowWatch` invalidates `leaderboardAll()` (this
+    // whole prefix) at the boundary so no surface keeps rendering the dead
+    // window's ladder as current.
     leaderboard: (limit: number, season: number | "current") =>
       ["season", "leaderboard", limit, season] as const,
     leaderboardAll: () => ["season", "leaderboard"] as const,

@@ -40,21 +40,6 @@ vi.mock("@/shared/api/lobby", () => ({
   getLobbyStats: (...args: unknown[]) => mockGetLobbyStats(...args),
 }));
 
-// Story 13.2 put the LeaderboardPanel in the lobby aside, so EVERY test in this
-// file now mounts a component that fetches. Without this mock each one fired an
-// unmocked request and leaned on the query simply never resolving.
-vi.mock("@/shared/api/season", () => ({
-  getCurrentSeason: (...args: unknown[]) => mockGetCurrentSeason(...args),
-  getSeasonLeaderboard: (...args: unknown[]) => mockGetSeasonLeaderboard(...args),
-  // Story 13.3 additions — unused by the lobby, defined so the mocked module
-  // matches the real one's export set.
-  getSeasons: vi.fn(),
-  getSeasonArchive: vi.fn(),
-}));
-
-const mockGetSeasonLeaderboard = vi.fn();
-const mockGetCurrentSeason = vi.fn();
-
 vi.mock("@/shared/providers/WebSocketContext", () => ({
   useWsSendMessage: () => vi.fn(),
   useWsConnectionState: () => "connected" as const,
@@ -77,23 +62,6 @@ function renderLobbyPage() {
     inMatch: 0,
     online: 0,
     registered: 0,
-  });
-  mockGetSeasonLeaderboard.mockResolvedValue({
-    items: [],
-    total: 0,
-    limit: 10,
-    offset: 0,
-    viewer: null,
-  });
-  mockGetCurrentSeason.mockResolvedValue({
-    seasonName: "2026 Q3",
-    endsAt: "2026-10-01T00:00:00Z",
-    sp: 0,
-    rankTier: "iron",
-    spIntoTier: 0,
-    spForNextTier: 500,
-    gamesPlayed: 0,
-    gamesCompleted: 0,
   });
   render(
     <QueryWrapper>
@@ -137,22 +105,19 @@ describe("LobbyPage", () => {
     expect(screen.getByTestId("stats-active-ratio")).toBeInTheDocument();
   });
 
-  it("renders the seasonal leaderboard panel in the aside", async () => {
+  // NO SEASON SURFACE ON THE LOBBY AT ALL. Story 13.2's top-ten aside and
+  // Story 13.1's rank banner both left: the standings have a dedicated page one
+  // click away in the top nav, and the rank's badge + tier name now ride the
+  // header on every route. Asserted as an ABSENCE because the page must stay
+  // free of the fetches they brought with them — `@/shared/api/season` is
+  // deliberately not mocked in this file any more, so a re-added season query
+  // would surface as a real unmocked request rather than as a quiet re-render.
+  it("mounts no seasonal surface — no rank banner, no leaderboard aside", () => {
     renderLobbyPage();
 
-    // The lobby is the widget's ONLY production surface, so its presence here is
-    // the one thing that catches it being dropped from the page.
-    expect(screen.getByTestId("lobby-sidebar")).toBeInTheDocument();
-    const panel = screen.getByTestId("leaderboard-panel");
-    expect(panel).toBeInTheDocument();
-    expect(screen.getByTestId("lobby-sidebar")).toContainElement(panel);
-    // And it links onward to the full page (AC1).
-    await waitFor(() => {
-      expect(screen.getByTestId("leaderboard-panel-view-all")).toHaveAttribute(
-        "href",
-        "/leaderboard",
-      );
-    });
+    expect(screen.queryByTestId("rank-banner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("leaderboard-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lobby-sidebar")).not.toBeInTheDocument();
   });
 
   it("opens CreateRoomModal when Create Room card is clicked", async () => {

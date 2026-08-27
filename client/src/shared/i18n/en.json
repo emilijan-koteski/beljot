@@ -1379,6 +1379,7 @@
       "progressLabelTop": "{{tier}}, {{sp}} SP, top of the ladder",
       "atTop": "Top of the ladder",
       "daysLeft": "Ends in {{days}}d",
+      "rankAria": "Rank: {{tier}}",
       "newSeason": "New season: {{season}}"
     },
     "picker": {
@@ -1389,6 +1390,7 @@
       "eyebrow": "Season",
       "title": "Seasons",
       "sub": "Current rank and results from past seasons.",
+      "subArchiveOnly": "Results from past seasons.",
       "listLabel": "Past seasons",
       "currentAria": "Current season {{season}}: {{tier}}, {{sp}} SP",
       "rowAria": "{{season}}: {{tier}}, {{sp}} SP, matches played: {{games}}"
@@ -1411,23 +1413,22 @@
       "title": "Leaderboard",
       "sub": "Who is climbing fastest this season, by Season Points.",
       "subPast": "Final standings for {{season}}, by Season Points.",
-      "heading": "Top players",
       "loading": "Loading…",
       "error": "Could not load the leaderboard — try again",
       "empty": "Nobody has earned Season Points yet this season.",
       "emptyPast": "Nobody earned Season Points in this season.",
       "loadMore": "Load more",
       "retry": "Retry",
-      "stale": "Could not refresh just now.",
       "showing": "Showing {{shown}} of {{total}} players",
-      "viewAll": "View all",
       "you": "You",
       "yourPosition": "Your position",
       "spValue": "{{sp}} SP",
       "rowAria": "{{position}}. {{username}}, {{tier}}, {{sp}} SP",
       "gamesAria": "Matches played: {{games}}",
+      "yourProfileAria": "View your profile",
       "columns": {
         "position": "Position",
+        "tier": "Tier",
         "sp": "SP",
         "games": "Matches played"
       }

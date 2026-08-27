@@ -433,11 +433,11 @@ function dispatchGameEvent(message: WsMessage): void {
     //
     // Unlike XP and honor this does NOT write to authStore.user: the season
     // record is not on the auth envelope (extending it would force a season
-    // dependency into AuthHandler and every one of its call sites, for data one
-    // surface reads). Instead the query the RankBanner consumes is invalidated —
-    // the same WS-to-query bridge the friend-request push uses — so the banner
-    // is correct the moment the player lands back in the lobby, whichever value
-    // the server actually has.
+    // dependency into AuthHandler and every one of its call sites, for data a
+    // couple of surfaces read). Instead `season.current` is invalidated — the
+    // same WS-to-query bridge the friend-request push uses — so the header's
+    // rank chip and the profile's RankBanner both hold whatever value the
+    // server actually has, the moment the player is back out of the match.
     const payload = message.payload as SeasonPointsAwardedPayload;
     // Defensive validation — Go zero values are real values, so guard on type,
     // not truthiness. `spEarned: 0` (an absent seat) and `tieredUp: false` (the

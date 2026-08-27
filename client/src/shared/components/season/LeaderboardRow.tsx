@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
 import { TierBadge } from "@/shared/components/season/TierBadge";
-import { normalizeSeasonTier } from "@/shared/lib/seasonTier";
+import { normalizeSeasonTier, SEASON_TIER_COLOR } from "@/shared/lib/seasonTier";
 import { cn } from "@/shared/lib/utils";
 
 /**
@@ -29,7 +30,7 @@ type Props = {
   sp: number;
   /** The server's raw tier token — normalized here, never trusted as-is. */
   tier: string;
-  /** Omitted by the lobby widget, where the aside is too narrow to spend a column. */
+  /** Optional: a caller too narrow to spend a column on it may leave it off. */
   gamesPlayed?: number;
   /** True for the viewer's own row: tinted ground, a "you" pill, and `data-self`. */
   isSelf?: boolean;
@@ -37,9 +38,9 @@ type Props = {
 };
 
 /**
- * One leaderboard row — the SINGLE renderer behind all three places a standing
- * appears: the lobby's top-10 widget, the full page's list, and the pinned
- * own-row the page shows when the viewer sits outside the loaded pages.
+ * One leaderboard row — the SINGLE renderer behind both places a standing
+ * appears: the leaderboard page's list, and the pinned own-row that page shows
+ * when the viewer sits outside the loaded pages.
  *
  * That last case is why `username` is a plain prop rather than something read
  * from the row data: the server's viewer block deliberately carries no username
@@ -52,21 +53,31 @@ type Props = {
  * still render a real colour and a real i18n label on a stale bundle, falling
  * back to the SP's own bucket, rather than printing `season.tier.mythic`.
  *
- * ACCESSIBILITY: ONE SPOKEN SUMMARY, EVERYTHING ELSE HIDDEN.
- * The visible cells are terse by design — a bare "4", "kiro", "4,000 SP", "31" —
+ * ACCESSIBILITY: ONE SPOKEN SUMMARY, EVERYTHING ELSE HIDDEN — EXCEPT THE LINK.
+ * The visible cells are terse by design — a bare "4", "Gold", "4,000 SP", "31" —
  * which reads as a meaningless number soup cell by cell. So the row carries an
  * `sr-only` sentence naming every value, and every visible cell (plus the badge)
  * is `aria-hidden`. The earlier version put an `aria-label` on the `<li>` while
  * leaving the children exposed, which is the one arrangement that can be
  * announced TWICE — label and contents — depending on the AT.
  *
- * That also fixes what the badge's own `aria-hidden` was resting on. TierBadge
- * justifies hiding itself with "every surface renders the tier NAME as text
- * beside it" — true of RankBanner, false here, where the tier only ever appeared
- * as a tooltip. The sr-only summary is now that text.
+ * The USERNAME is the deliberate exception, because it is now a link, and
+ * `aria-hidden` on a focusable element is the one thing that arrangement must
+ * never do: it hides the control from the accessibility tree while leaving it
+ * in the tab order, so a keyboard screen-reader user lands on something that
+ * announces nothing at all. It carries its own label instead.
  *
- * NOT a link. A leaderboard row is a standing, not a navigation affordance;
- * profile navigation lives in the friend list and in match history.
+ * The tier NAME is rendered as text beside the badge (Story 13.2 shipped the
+ * badge alone, with the tier only in a tooltip), which is also what TierBadge's
+ * own `aria-hidden` rests on — it justifies hiding itself with "every surface
+ * renders the tier NAME as text beside it", and now this one does too.
+ *
+ * THE USERNAME LINKS TO THE PLAYER'S PROFILE, and the viewer's own row links to
+ * `/profile` rather than to `/players/<their own id>`: the self page is the
+ * richer surface (linked accounts, the deck picker, the editable username), and
+ * the public page would show the viewer a read-only, friend-button-less copy of
+ * themselves. `/players/:id` is otherwise the same target the friend list, the
+ * partner/rival cards and match history's seat chips all use.
  */
 export function LeaderboardRow({
   position,
@@ -98,8 +109,9 @@ export function LeaderboardRow({
         className,
       )}
     >
-      {/* The row's entire accessible name. Everything below is aria-hidden, so
-          this sentence is announced once and nothing competes with it. */}
+      {/* The row's spoken summary. Every visible cell below is aria-hidden —
+          the ONE exception being the username link, which cannot be (see the
+          header) and carries its own destination label instead. */}
       <span className="sr-only" data-testid="leaderboard-row-summary">
         {t("season.leaderboard.rowAria", {
           position,
@@ -124,17 +136,27 @@ export function LeaderboardRow({
 
       <TierBadge tier={safeTier} size="sm" data-testid="leaderboard-tier-badge" />
 
-      <span
+      <Link
         data-testid="leaderboard-username"
-        aria-hidden="true"
+        to={isSelf ? "/profile" : `/players/${userId}`}
+        // NOT aria-hidden (see the header): the row summary above already names
+        // this player, so the link states its DESTINATION instead of repeating
+        // the name on its own. The pinned own-row can fall back to "You" as its
+        // username, which is why the self case takes a label of its own rather
+        // than interpolating whatever name is on hand.
+        aria-label={
+          isSelf
+            ? t("season.leaderboard.yourProfileAria")
+            : t("friends.viewProfileAria", { username })
+        }
         // The player's OWN name, so a truncated one can still be read on hover.
         // It used to carry the tier name instead, which meant hovering "kiro"
         // reported "Gold" — the wrong tooltip on the wrong element.
         title={username}
-        className="text-ink min-w-0 flex-1 truncate text-sm font-medium"
+        className="text-ink focus-visible:ring-ring/50 min-w-0 flex-1 truncate rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
       >
         {username}
-      </span>
+      </Link>
 
       {isSelf && (
         <span
@@ -145,6 +167,21 @@ export function LeaderboardRow({
           {t("season.leaderboard.you")}
         </span>
       )}
+
+      {/* The tier as WORDS, not only as a coloured shield. The badge alone
+          asked every reader to have memorised eight ramp colours, which is a
+          quiz rather than a label — and the sr-only summary was the only place
+          the tier was ever spelled out. Same treatment as SeasonArchiveRow's
+          tier cell, so the two season lists read identically. */}
+      <span
+        data-testid="leaderboard-tier"
+        aria-hidden="true"
+        title={t("season.leaderboard.columns.tier")}
+        className="shrink-0 text-xs font-semibold"
+        style={{ color: SEASON_TIER_COLOR[safeTier] }}
+      >
+        {tierName}
+      </span>
 
       <span
         data-testid="leaderboard-sp"

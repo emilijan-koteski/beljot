@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { MatchFilter } from "@/shared/api/matches";
 import { useCareerQuery } from "@/shared/hooks/queries/useCareer";
+import { useCurrentSeasonQuery } from "@/shared/hooks/queries/useCurrentSeason";
 import { useProfileQuery } from "@/shared/hooks/queries/useProfile";
 import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -12,6 +13,7 @@ import { IdentityHero } from "./components/IdentityHero";
 import { LinkedAccounts } from "./components/LinkedAccounts";
 import { Milestones } from "./components/Milestones";
 import { PartnerSpotlight } from "./components/PartnerSpotlight";
+import { RankBanner } from "./components/RankBanner";
 import { Rivalries } from "./components/Rivalries";
 import { SeasonSection } from "./components/SeasonSection";
 import { StatsGrid } from "./components/StatsGrid";
@@ -23,6 +25,11 @@ export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const { data: profile, isPending, isError } = useProfileQuery(user?.id);
   const career = useCareerQuery(user?.id);
+  // The viewer's seasonal standing, for the RankBanner below the hero. The same
+  // cache entry the header's rank chip reads, so this costs no extra request —
+  // and it is push-invalidated by the event:season_points_awarded handler, so a
+  // match settled in another tab moves both readouts together.
+  const seasonQuery = useCurrentSeasonQuery();
 
   // Story 9.7: adopt the profile response's honor into the auth store.
   //
@@ -145,6 +152,12 @@ export function ProfilePage() {
         }
       />
 
+      {/* The seasonal rank, with the progress the header chip deliberately
+          omits: SP total, distance to the next tier, days left in the window.
+          ABOVE the streak callout — the season standing is the longer-running
+          fact, and the streak reads as a note on current form beneath it. */}
+      <RankBanner season={seasonQuery.data} />
+
       {career.data && <StreakCallout streak={career.data.streak} />}
 
       {isError ? (
@@ -160,11 +173,13 @@ export function ProfilePage() {
         <StatsGrid games={games} wins={wins} losses={losses} abandoned={abandoned} />
       )}
 
-      {/* Story 13.3: current seasonal rank + prior-season archive. Renders
-          nothing at all when the viewer has neither — the section owns its own
-          absence, so the page stays byte-identical for a player with no season
-          history. */}
-      <SeasonSection userId={user?.id} seasonRank={profile?.seasonRank} />
+      {/* Story 13.3: the prior-season archive. Its current-rank chip is
+          suppressed here — the RankBanner above the streak callout is this
+          page's rank surface, and two readouts of one standing on one page is
+          exactly the contradiction the chip was added to avoid. Renders nothing
+          at all for a viewer with no ended seasons, so the page stays
+          byte-identical for a player with no season history. */}
+      <SeasonSection userId={user?.id} seasonRank={profile?.seasonRank} showCurrentRank={false} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <MatchHistory userId={user?.id} counts={counts} />

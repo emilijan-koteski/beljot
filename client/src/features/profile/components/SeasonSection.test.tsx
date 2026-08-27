@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SeasonSection } from "@/features/profile/components/SeasonSection";
 import { getSeasonArchive } from "@/shared/api/season";
+import { i18n } from "@/shared/i18n/i18n";
 import type { SeasonArchiveResponse, SeasonRank } from "@/shared/types/apiTypes";
 
 vi.mock("@/shared/api/season", () => ({
@@ -46,6 +47,7 @@ const rank: SeasonRank = { seasonName: "2026 Q3", tier: "gold", sp: 4000 };
 function renderSection(props: {
   userId: number | undefined;
   seasonRank: SeasonRank | null | undefined;
+  showCurrentRank?: boolean;
 }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -178,5 +180,59 @@ describe("SeasonSection", () => {
         .getByTestId("prior-season-archive")
         .querySelectorAll('[data-testid="season-archive-row"]'),
     ).toHaveLength(2);
+  });
+
+  // --- showCurrentRank: the self profile suppresses the chip ---
+
+  // The self page's RankBanner already states the viewer's tier, SP and
+  // progress above the streak callout; the chip would be a second, smaller
+  // readout of the same standing further down the same page.
+  it("omits the chip when the caller suppresses it, keeping the archive", async () => {
+    mockGetArchive.mockResolvedValue(archive());
+
+    renderSection({ userId: 2, seasonRank: rank, showCurrentRank: false });
+
+    await waitFor(() => expect(screen.getByTestId("prior-season-archive")).toBeInTheDocument());
+    expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
+  });
+
+  // With the chip gone the whole section is the archive, so the subtitle must
+  // stop promising a current rank above it.
+  it("drops the current-rank clause from the subtitle when the chip is suppressed", async () => {
+    mockGetArchive.mockResolvedValue(archive());
+
+    renderSection({ userId: 2, seasonRank: rank, showCurrentRank: false });
+
+    const section = await screen.findByTestId("profile-season-section");
+    expect(section.textContent).toContain(i18n.t("season.archive.subArchiveOnly"));
+    expect(section.textContent).not.toContain(i18n.t("season.archive.sub"));
+  });
+
+  // THE SUBTITLE FOLLOWS THE CHIP, NOT THE FLAG: a public profile whose subject
+  // has not played this season renders no chip either, and the same promise
+  // would be just as wrong there.
+  it("drops the clause for a subject with no current standing, chip left enabled", async () => {
+    mockGetArchive.mockResolvedValue(archive());
+
+    renderSection({ userId: 2, seasonRank: null });
+
+    const section = await screen.findByTestId("profile-season-section");
+    expect(section.textContent).toContain(i18n.t("season.archive.subArchiveOnly"));
+  });
+
+  // Suppressing the chip does NOT keep an archive-less section alive on a
+  // technicality: with nothing left to show the component still contributes
+  // nothing to the DOM.
+  it("renders nothing at all with the chip suppressed and an empty archive", async () => {
+    mockGetArchive.mockResolvedValue({ items: [] });
+
+    const { container } = renderSection({
+      userId: 2,
+      seasonRank: rank,
+      showCurrentRank: false,
+    });
+
+    await waitFor(() => expect(mockGetArchive).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
   });
 });

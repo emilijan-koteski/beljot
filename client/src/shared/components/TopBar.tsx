@@ -5,6 +5,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { LevelRing } from "@/shared/components/LevelRing";
+import { HeaderRankChip } from "@/shared/components/season/HeaderRankChip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -170,6 +171,15 @@ export function TopBar({
           than the viewport. Every fixed-size pill below is shrink-0 + nowrap, so
           none of them can collapse or wrap onto a second line. */}
       <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2 lg:gap-2.5">
+        {/* Seasonal rank. Tier badge + tier name, and the badge alone on
+            phones — the header carries the rank's IDENTITY, never its SP total
+            (the profile's RankBanner owns the arithmetic). Placed left of the
+            lifetime level so the two progression readouts read as one cluster,
+            ahead of the wallet. Gated on `user` like every other pill here: the
+            endpoint behind it is auth-only, and AuthLayout mounts this same bar
+            with no one signed in. */}
+        {user && <HeaderRankChip />}
+
         {/* Lifetime level + XP progress (Story 9.5). Level is server-authoritative
             (user.level); the fill is cosmetic display math. Live-updates via the
             event:xp_awarded handler that writes user.level / user.totalXp on the

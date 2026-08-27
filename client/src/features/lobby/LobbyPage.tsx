@@ -7,10 +7,8 @@ import { FriendList } from "@/features/friends/FriendList";
 import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
 import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
-import { LeaderboardPanel } from "@/features/lobby/components/LeaderboardPanel";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
-import { RankBanner } from "@/features/lobby/components/RankBanner";
 import { RoomEjectionModal } from "@/features/lobby/components/RoomEjectionModal";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
 import { Toast } from "@/features/lobby/components/Toast";
@@ -21,7 +19,6 @@ import {
   useQuickJoinMutation,
   useQuickPlayMutation,
 } from "@/shared/hooks/mutations/useRooms";
-import { useCurrentSeasonQuery } from "@/shared/hooks/queries/useCurrentSeason";
 import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
 import { useMarkLobbyRoot } from "@/shared/hooks/useLobbyReturn";
@@ -84,9 +81,6 @@ export function LobbyPage() {
   // Lobby grid is always-on now — no separate "options" vs "browse" view.
   const roomsQuery = useRoomsQuery("waiting", true);
   const statsQuery = useLobbyStatsQuery();
-  // Story 13.1: the viewer's seasonal standing. Push-invalidated by the
-  // event:season_points_awarded handler, never polled.
-  const seasonQuery = useCurrentSeasonQuery();
   const quickPlayMutation = useQuickPlayMutation();
   const quickJoinMutation = useQuickJoinMutation();
   const joinRoomMutation = useJoinRoomMutation();
@@ -227,11 +221,6 @@ export function LobbyPage() {
         quickPlayDisabled={quickPlayMutation.isPending}
       />
 
-      {/* Story 13.1: the seasonal rank banner — tier badge, tier name, SP,
-          progress to the next tier and days left in the season. Renders nothing
-          until its query resolves, so it never shifts the stack twice. */}
-      <RankBanner season={seasonQuery.data} />
-
       {/* Story 11.2: the friends card, full width — one card for the whole
           relationship. It carries the pending-requests section, the roster with
           online status and whisper, and player search behind its header icon, so
@@ -239,46 +228,35 @@ export function LobbyPage() {
           three of each. */}
       <FriendList />
 
-      {/* Story 13.2: the lobby's main/aside split — the room browser on the
-          left, the seasonal leaderboard on the right. Only this block splits:
-          HeroBlock, RankBanner and FriendList stay full width above it, because
-          a 320px column beside them would either squeeze the hero's stat row or
-          leave the aside empty for most of the page's height.
+      {/* NO MAIN/ASIDE SPLIT. Story 13.2 put a 320px seasonal-leaderboard
+          column here; it was removed once the dedicated /leaderboard page (one
+          click away in the top nav) made a lobby preview of the same ten rows
+          redundant. Nothing else wanted the aside, so the room browser takes
+          the full width back rather than leaving a column empty beside it.
 
-          Same grid as ProfilePage's, the only main/aside precedent in the app,
-          so the aside collapses UNDER the room grid below lg rather than
-          shrinking beside it. */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        <div>
-          {/* The room filters belong to the room grid, so they sit directly above
-              it — with the friends row above, the search field is no longer
-              separated from the list it filters by two unrelated cards. */}
-          <FilterRail
-            search={search}
-            setSearch={setSearch}
-            filter={filter}
-            setFilter={setFilter}
-            sort={sort}
-            setSort={setSort}
-            counts={counts}
-          />
+          The room filters belong to the room grid, so they sit directly above
+          it — with the friends row above, the search field is no longer
+          separated from the list it filters by two unrelated cards. */}
+      <FilterRail
+        search={search}
+        setSearch={setSearch}
+        filter={filter}
+        setFilter={setFilter}
+        sort={sort}
+        setSort={setSort}
+        counts={counts}
+      />
 
-          <RoomGrid
-            rooms={filtered}
-            onJoin={handleJoinRoom}
-            hasSearch={search.trim().length > 0}
-            onClearSearch={() => setSearch("")}
-          />
+      <RoomGrid
+        rooms={filtered}
+        onJoin={handleJoinRoom}
+        hasSearch={search.trim().length > 0}
+        onClearSearch={() => setSearch("")}
+      />
 
-          <p className="text-ink-mute mt-8 text-center text-xs">
-            {t("lobby.footnote", { shown: filtered.length, total: rooms.length })}
-          </p>
-        </div>
-
-        <aside className="lg:sticky lg:top-20" data-testid="lobby-sidebar">
-          <LeaderboardPanel />
-        </aside>
-      </div>
+      <p className="text-ink-mute mt-8 text-center text-xs">
+        {t("lobby.footnote", { shown: filtered.length, total: rooms.length })}
+      </p>
 
       <CreateRoomModal open={showCreate} onOpenChange={setShowCreate} />
       <PasswordPromptDialog

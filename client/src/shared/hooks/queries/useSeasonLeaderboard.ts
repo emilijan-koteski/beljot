@@ -82,9 +82,10 @@ export function useSeasonLeaderboardInfiniteQuery(
  *
  * Not polled and no focus refetch: the list gains one row a QUARTER. That is
  * safe because the rollover boundary INVALIDATES this key explicitly —
- * RankBanner's boundary effect (lobby) and LeaderboardPage's own (the page)
- * both invalidate `season.list()` alongside the ladder, so the picker gains the
- * new window without this query having to poll for it.
+ * `useSeasonWindowWatch` (mounted on the header's rank chip, so it runs on
+ * every authed route) and LeaderboardPage's own effect both invalidate
+ * `season.list()` alongside the ladder, so the picker gains the new window
+ * without this query having to poll for it.
  */
 export function useSeasonsQuery() {
   return useQuery({

@@ -573,10 +573,13 @@ describe("LeaderboardPage", () => {
     );
   });
 
-  // THE PAGE OBSERVES THE BOUNDARY ITSELF. RankBanner — the only other observer
-  // — is unmounted on this route, so without this a page left open across the
-  // quarter boundary keeps the "Current" marker on the dead window and serves
-  // its frozen standings under the present-tense heading forever.
+  // THE PAGE OBSERVES THE BOUNDARY ITSELF, rather than leaning on the header's
+  // `useSeasonWindowWatch`: this page's own list of windows is the thing that
+  // has to gain a row, and it watches the newest endsAt it holds — which the
+  // header's watch, keyed on the ACTIVE window, does not. Without it a page
+  // left open across the quarter boundary keeps the "Current" marker on the
+  // dead window and serves its frozen standings under the present-tense
+  // heading forever.
   it("invalidates the ladder and the seasons list when the newest window ends", async () => {
     const now = Date.now();
     // Every known window is already over: the next one exists only server-side,

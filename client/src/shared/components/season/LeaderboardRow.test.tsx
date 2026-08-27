@@ -1,6 +1,7 @@
 import "@/shared/i18n/i18n";
 
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LeaderboardRow } from "@/shared/components/season/LeaderboardRow";
@@ -15,11 +16,15 @@ const base = {
   gamesPlayed: 31,
 };
 
+// The username cell is a <Link> since the row became a way into a player's
+// profile, so every render needs a router around it.
 function renderRow(props: Partial<typeof base> & { isSelf?: boolean } = {}) {
   return render(
-    <ul>
-      <LeaderboardRow {...base} {...props} />
-    </ul>,
+    <MemoryRouter>
+      <ul>
+        <LeaderboardRow {...base} {...props} />
+      </ul>
+    </MemoryRouter>,
   );
 }
 
@@ -53,9 +58,11 @@ describe("LeaderboardRow", () => {
 
   it("omits the games cell when no count is supplied (the lobby widget)", () => {
     render(
-      <ul>
-        <LeaderboardRow {...base} gamesPlayed={undefined} />
-      </ul>,
+      <MemoryRouter>
+        <ul>
+          <LeaderboardRow {...base} gamesPlayed={undefined} />
+        </ul>
+      </MemoryRouter>,
     );
     expect(screen.queryByTestId("leaderboard-games")).not.toBeInTheDocument();
   });
@@ -70,13 +77,15 @@ describe("LeaderboardRow", () => {
   // seasonSpOrZero. Both are generic today; only one stays generic by contract.
   it("survives absent numbers from a newer server without printing NaN", () => {
     render(
-      <ul>
-        <LeaderboardRow
-          {...base}
-          sp={undefined as unknown as number}
-          gamesPlayed={undefined as unknown as number}
-        />
-      </ul>,
+      <MemoryRouter>
+        <ul>
+          <LeaderboardRow
+            {...base}
+            sp={undefined as unknown as number}
+            gamesPlayed={undefined as unknown as number}
+          />
+        </ul>
+      </MemoryRouter>,
     );
     const row = screen.getByTestId("leaderboard-row");
     expect(row.textContent).not.toContain("NaN");
@@ -116,7 +125,7 @@ describe("LeaderboardRow", () => {
 
     for (const id of [
       "leaderboard-position",
-      "leaderboard-username",
+      "leaderboard-tier",
       "leaderboard-sp",
       "leaderboard-games",
       "leaderboard-you",
@@ -126,6 +135,20 @@ describe("LeaderboardRow", () => {
     }
     // And no competing label on the list item itself.
     expect(row).not.toHaveAttribute("aria-label");
+  });
+
+  // THE ONE EXCEPTION, and it is not a slip: the username is a focusable link,
+  // and aria-hidden on a focusable element hides it from the accessibility tree
+  // while leaving it in the tab order — a keyboard screen-reader user would land
+  // on a control that announces nothing. It carries its own label instead.
+  it("leaves the username link exposed to assistive tech, with its own label", () => {
+    renderRow();
+    const name = screen.getByTestId("leaderboard-username");
+    expect(name).not.toHaveAttribute("aria-hidden");
+    expect(name).toHaveAttribute(
+      "aria-label",
+      i18n.t("friends.viewProfileAria", { username: "kiro" }),
+    );
   });
 
   // P13, part 3: the tier name used to be the USERNAME cell's tooltip, so
@@ -157,6 +180,58 @@ describe("LeaderboardRow", () => {
     renderRow();
     expect(screen.getByTestId("leaderboard-row-summary")).toHaveTextContent(
       i18n.t("season.tier.gold"),
+    );
+  });
+
+  // --- the tier NAME, beside the badge ---
+
+  // The badge alone asked every reader to have memorised eight ramp colours.
+  it("renders the tier name as text, in the tier's own colour", () => {
+    renderRow();
+    const tier = screen.getByTestId("leaderboard-tier");
+    expect(tier.textContent).toBe(i18n.t("season.tier.gold"));
+    expect(tier.getAttribute("style")).toContain("--rt4");
+  });
+
+  it("localizes the visible tier name", async () => {
+    await i18n.changeLanguage("mk");
+    renderRow();
+    expect(screen.getByTestId("leaderboard-tier").textContent).toBe(i18n.t("season.tier.gold"));
+  });
+
+  it("shows the normalized tier name for an unknown token, never the raw string", () => {
+    renderRow({ tier: "mythic" });
+    expect(screen.getByTestId("leaderboard-tier").textContent).toBe(i18n.t("season.tier.gold"));
+  });
+
+  // --- the username link ---
+
+  it("links another player's name to their public profile", () => {
+    renderRow();
+    expect(screen.getByTestId("leaderboard-username")).toHaveAttribute("href", "/players/42");
+  });
+
+  // THE SELF ROW GOES TO /profile, not to /players/<own id>: the self page is
+  // the richer surface (linked accounts, deck picker, editable username), and
+  // the public one would show the viewer a read-only copy of themselves with no
+  // friend button.
+  it("links the viewer's own row to their own profile page", () => {
+    renderRow({ isSelf: true });
+    const name = screen.getByTestId("leaderboard-username");
+    expect(name).toHaveAttribute("href", "/profile");
+    expect(name).toHaveAttribute("aria-label", i18n.t("season.leaderboard.yourProfileAria"));
+  });
+
+  // The pinned own-row falls back to "You" as its username when the auth store
+  // is unhydrated, which is exactly why the self label is its own key rather
+  // than that name interpolated into "View {{username}}'s profile" — which
+  // would read "View You's profile".
+  it("keeps the fixed self label even when the row's username is the generic You", () => {
+    renderRow({ isSelf: true, username: i18n.t("season.leaderboard.you") });
+    const name = screen.getByTestId("leaderboard-username");
+    expect(name).toHaveAttribute("aria-label", i18n.t("season.leaderboard.yourProfileAria"));
+    expect(name.getAttribute("aria-label")).not.toBe(
+      i18n.t("friends.viewProfileAria", { username: i18n.t("season.leaderboard.you") }),
     );
   });
 });

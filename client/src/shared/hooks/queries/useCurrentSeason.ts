@@ -4,8 +4,8 @@ import { queryKeys } from "@/shared/api/queryKeys";
 import { getCurrentSeason } from "@/shared/api/season";
 
 /**
- * The viewer's standing in the active season (Story 13.1), behind the lobby
- * RankBanner.
+ * The viewer's standing in the active season (Story 13.1), behind the header's
+ * rank chip and the profile's RankBanner — one cache entry, read twice.
  *
  * PUSHED, NOT POLLED. There is deliberately no `refetchInterval`: SP only ever
  * changes at match end, and the `event:season_points_awarded` handler in
