@@ -24,13 +24,13 @@ var ladder = []struct {
 	{"gold", 3000, 2500},
 	{"platinum", 5500, 3000},
 	{"diamond", 8500, 4000},
-	{"immortal", 12500, 5500},
-	{"radiant", 18000, 0},
+	{"master", 12500, 5500},
+	{"grandmaster", 18000, 0},
 }
 
 func TestSeasonTiers_OrderAndIsolation(t *testing.T) {
 	assert.Equal(t,
-		[]string{"iron", "bronze", "silver", "gold", "platinum", "diamond", "immortal", "radiant"},
+		[]string{"iron", "bronze", "silver", "gold", "platinum", "diamond", "master", "grandmaster"},
 		season.SeasonTiers(),
 		"eight tiers, lowest first")
 
@@ -71,11 +71,11 @@ func TestTierForSP(t *testing.T) {
 		{"exactly Platinum", 5500, "platinum"},
 		{"one below Diamond", 8499, "platinum"},
 		{"exactly Diamond", 8500, "diamond"},
-		{"one below Immortal", 12499, "diamond"},
-		{"exactly Immortal", 12500, "immortal"},
-		{"one below Radiant", 17999, "immortal"},
-		{"exactly Radiant", 18000, "radiant"},
-		{"above Radiant stays Radiant", 250000, "radiant"},
+		{"one below Master", 12499, "diamond"},
+		{"exactly Master", 12500, "master"},
+		{"one below Grandmaster", 17999, "master"},
+		{"exactly Grandmaster", 18000, "grandmaster"},
+		{"above Grandmaster stays Grandmaster", 250000, "grandmaster"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -102,11 +102,11 @@ func TestTierProgress(t *testing.T) {
 		{"mid Gold", 4000, "gold", 1000, 2500},
 		{"exactly Platinum", 5500, "platinum", 0, 3000},
 		{"exactly Diamond", 8500, "diamond", 0, 4000},
-		{"one below Radiant", 17999, "immortal", 5499, 5500},
+		{"one below Grandmaster", 17999, "master", 5499, 5500},
 		// The terminal case. A finite table HAS a top, so unlike LevelProgress's
 		// strictly-increasing quadratic this branch is real and reachable.
-		{"exactly Radiant has no next tier", 18000, "radiant", 0, 0},
-		{"far above Radiant still has no next tier", 99999, "radiant", 81999, 0},
+		{"exactly Grandmaster has no next tier", 18000, "grandmaster", 0, 0},
+		{"far above Grandmaster still has no next tier", 99999, "grandmaster", 81999, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestTierProgress(t *testing.T) {
 }
 
 // TierProgress and TierForSP must never disagree, and spIntoTier must stay inside
-// the band everywhere below Radiant — the two properties the progress bar relies
+// the band everywhere below Grandmaster — the two properties the progress bar relies
 // on. Swept across every boundary and every band interior.
 func TestTierProgress_AgreesWithTierForSP(t *testing.T) {
 	for _, l := range ladder {
@@ -134,9 +134,9 @@ func TestTierProgress_AgreesWithTierForSP(t *testing.T) {
 	}
 }
 
-func TestTierProgress_RadiantSpForNextTierIsZero(t *testing.T) {
+func TestTierProgress_GrandmasterSpForNextTierIsZero(t *testing.T) {
 	// Called out on its own because it is the one case a caller must branch on:
 	// dividing by spForNextTier without checking it is a division by zero.
 	_, _, forNext := season.TierProgress(18000)
-	require.Zero(t, forNext, "Radiant is terminal — the client renders a full bar")
+	require.Zero(t, forNext, "Grandmaster is terminal — the client renders a full bar")
 }

@@ -94,13 +94,13 @@ describe("RankBanner", () => {
     expect(screen.getByTestId("rank-progress").getAttribute("aria-valuenow")).toBe("0");
   });
 
-  it("renders a full bar at Radiant, where there is no next tier", () => {
+  it("renders a full bar at Grandmaster, where there is no next tier", () => {
     render(
       <RankBanner
         season={{
           ...baseSeason,
           sp: 20000,
-          rankTier: "radiant",
+          rankTier: "grandmaster",
           spIntoTier: 2000,
           spForNextTier: 0,
         }}

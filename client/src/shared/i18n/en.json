@@ -1386,8 +1386,8 @@
       "gold": "Gold",
       "platinum": "Platinum",
       "diamond": "Diamond",
-      "immortal": "Immortal",
-      "radiant": "Radiant"
+      "master": "Master",
+      "grandmaster": "Grandmaster"
     },
     "tierUp": {
       "toast": "New rank: {{tier}}"

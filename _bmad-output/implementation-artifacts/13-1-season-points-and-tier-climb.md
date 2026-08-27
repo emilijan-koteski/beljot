@@ -40,7 +40,7 @@ This story delivers **SP accrual + a derived 8-tier ladder + the lobby RankBanne
 **Given** a player's cumulative SP crosses a tier threshold
 **When** the next match ends
 **Then** their tier updates and a tier-up toast is shown
-**And** the 8 tiers and thresholds are: Iron (0), Bronze (500), Silver (1 500), Gold (3 000), Platinum (5 500), Diamond (8 500), Immortal (12 500), Radiant (18 000)
+**And** the 8 tiers and thresholds are: Iron (0), Bronze (500), Silver (1 500), Gold (3 000), Platinum (5 500), Diamond (8 500), Master (12 500), Grandmaster (18 000)
 
 **AC3 — RankBanner renders in the lobby**
 
@@ -172,11 +172,11 @@ Bot seats and empty seats (`playerIDs[seat] == 0`) increment neither. Use the ex
 
 - [x] **Task 2 — `season` package: tier curve** (AC: 2)
   - [x] `server/internal/season/tier.go`. Single source of truth for the ladder. Every function **pure**: no DB, no clock reads (time is always a parameter). Header comment naming `client/src/shared/lib/seasonTier.ts` as the one permitted mirror, per the manual-sync convention.
-  - [x] `SeasonTiers` — ordered token list `["iron","bronze","silver","gold","platinum","diamond","immortal","radiant"]`.
+  - [x] `SeasonTiers` — ordered token list `["iron","bronze","silver","gold","platinum","diamond","master","grandmaster"]`.
   - [x] Thresholds as **named consts or one ordered table**, not scattered literals: 0 / 500 / 1500 / 3000 / 5500 / 8500 / 12500 / 18000. A retune must be a one-place change (the `levelCurveCoefficient` / `honorHalfLifeDays` convention).
   - [x] `TierForSP(sp int) string` — highest tier whose floor `<= sp`. `sp <= 0` → `"iron"`. Integer arithmetic only.
-  - [x] `TierProgress(sp int) (tier string, spIntoTier, spForNextTier int)` — mirrors `LevelProgress` (`level.go:44`). At **Radiant** there is no next tier: return `spForNextTier = 0` and document that the client renders a full/terminal bar. `LevelProgress` can rely on a strictly-increasing quadratic; a finite table cannot, so this case is real — cover it in tests.
-  - [x] `tier_test.go` — Go **table-driven** (`[]struct{name string; ...}` + `t.Run`). Cases: 0, each threshold exactly, each threshold −1, negative, above 18000, Radiant's `spForNextTier == 0`.
+  - [x] `TierProgress(sp int) (tier string, spIntoTier, spForNextTier int)` — mirrors `LevelProgress` (`level.go:44`). At **Grandmaster** there is no next tier: return `spForNextTier = 0` and document that the client renders a full/terminal bar. `LevelProgress` can rely on a strictly-increasing quadratic; a finite table cannot, so this case is real — cover it in tests.
+  - [x] `tier_test.go` — Go **table-driven** (`[]struct{name string; ...}` + `t.Run`). Cases: 0, each threshold exactly, each threshold −1, negative, above 18000, Grandmaster's `spForNextTier == 0`.
 
 - [x] **Task 3 — `season` package: model + repository** (AC: 1, 4)
   - [x] `model.go` — `Season`, `PlayerSeason`. GORM default naming (`snake_case`, auto-plural). All JSON tags `camelCase`. Every JSON-bound field exported.
@@ -238,7 +238,7 @@ Bot seats and empty seats (`playerIDs[seat] == 0`) increment neither. Use the ex
 
 - [x] **Task 9 — Client: tier mirror + API client** (AC: 2, 3)
   - [x] `client/src/shared/lib/seasonTier.ts` — the **only** client copy of the ladder. Header must state it mirrors `server/internal/season/tier.go` and that the server is authoritative for tier. Export: `SEASON_TIERS`, threshold table, `seasonTierForSp`, `normalizeSeasonTier(tier, sp)` (version-skew guard — an unrecognised token falls back to the SP's own bucket, which is why the Zod schema types `rankTier` as a plain `string`), `seasonBarFill`, and `SEASON_TIER_COLOR` / `SEASON_TIER_SOFT` / `SEASON_TIER_LINE` maps. Model on `honor.ts` — read its header on why the colour map must be centralised (`HonorPanel` and `TopBar` had already drifted on `fair` before it was).
-  - [x] `seasonTier.test.ts` — thresholds, boundaries, Radiant terminal case, unknown-token fallback.
+  - [x] `seasonTier.test.ts` — thresholds, boundaries, Grandmaster terminal case, unknown-token fallback.
   - [x] `shared/api/season.ts` + `shared/hooks/queries/useCurrentSeason.ts` + `queryKeys.season.current()`. API client files map 1:1 to backend domain packages.
   - [x] Add the season response type to `shared/types/apiTypes.ts`.
   - [x] **Eight tier colours do not exist in `index.css`.** The honour ramp (`--h1`…`--h5`, `index.css:197-217` light / `:412-428` dark) is five tokens and is honour's. Declare a new `--rt1`…`--rt8` ramp (+ `-soft` / `-line`) in **both** the light `:root` block and the dark block, following the honour ramp's exact structure. Tailwind v4 is **CSS-first** — `@theme` directives in `index.css`, and there is no `tailwind.config.js` to touch.
@@ -346,7 +346,7 @@ Add no library for the tier ladder, the quarter math, or the countdown. Go's `ti
 - [Source: _bmad-output/planning-artifacts/prd.md#L168] — SP formula, quarterly seasons, no decay, soft reset
 - [Source: _bmad-output/planning-artifacts/prd.md#L225] — **STALE** ELO/placement/Silver-II journey prose; superseded (D6)
 - [Source: _bmad-output/planning-artifacts/sprint-change-proposal-2026-04-18.md#L130] — SP tier thresholds as reset; #L50 flags the un-done architecture pass for `seasons`/`player_seasons`; #L51 flags the un-done "RankBanner in SP mode" UX pass
-- [Source: _bmad-output/planning-artifacts/ux-design-specification.md#L753] — **STALE** RankBanner states (unranked/placement/LP); superseded (D6). #L331 — rank badges use tier-specific colours, Radiant = accent + glow
+- [Source: _bmad-output/planning-artifacts/ux-design-specification.md#L753] — **STALE** RankBanner states (unranked/placement/LP); superseded (D6). #L331 — rank badges use tier-specific colours, Grandmaster = accent + glow
 - [Source: _bmad-output/planning-artifacts/architecture.md#L887] — Progression FR33-FR40 mapping (stale, see Project Structure Notes); #L640 — flat RankBanner path (stale); #L199 — data architecture (PostgreSQL/GORM, no caching in Phase 1, design queries caching-ready)
 - [Source: _bmad-output/implementation-artifacts/9-5-xp-and-level-system.md#L17] — the scope guardrail that deferred RankBanner/rank/LP/season to Epic 13; #L231 (D2) — epic AC overrides PRD prose, no gating
 - [Source: _bmad-output/implementation-artifacts/9-7-honor-score-system.md] — presence gate, tier tokens, stored-vs-authoritative split, client mirror convention
@@ -393,8 +393,8 @@ claude-opus-5[1m]
 - **D3's flag was needed exactly as predicted.** `checkInstantWin` leaves no trace at the match layer, so `GameState.WonByInstantWin` (`json:"-"`, set at both call sites, cleared in `startNewHand`) is the only signal. It is an *event record*, not a config mirror, so `RefreshDerivedFlags` was deliberately left alone — `TestWonByInstantWin_SurvivesApplyActionsDerivedFlagRefresh` locks that in, and `TestWonByInstantWin_IsNotSerialised` locks the `match_state` contract staying untouched. No `OutcomeReasonInstantWin` was added.
 - **D4's hoist is in.** The `handsCopy` RLock block moved from just above `CreateWithHands` to just above `settleMatch`; one copy now feeds both the SP award and the persist call. Verified no code between the old and new snapshot points can append to `session.handResults`, and that `bufferHandResultIfScored` precedes `handleMatchEnd` on every call site where buffering is not a documented no-op (`live_match.go:650/668`, `:1813/1820`, `:2125/2140`, and the stop-at-target path at `:1760` which nils `LastHandResult`).
 - **A zero SP award is NOT a no-op**, which is the one place this diverges structurally from `xp_award.go`. `awardXP` skips zero deltas; `awardSeasonPoints` must not, because `games_played` increments for every human seat while `games_completed` increments only for present ones (D10). Skipping the zero-delta seats would silently lose the in-season absence record.
-- **`spForNextTier == 0` at Radiant is load-bearing on both sides.** `TierProgress` returns 0 (a finite table has a top, unlike `LevelProgress`'s quadratic) and `seasonBarFill` renders that as a FULL bar — a naive guard returning 0 would show the top of the ladder as empty. Covered in `tier_test.go` and `seasonTier.test.ts`.
-- **The rank ramp is a new `--rt1`…`--rt8` family**, declared in both palette scopes. Note the "dark block" in this project is the `.game-table` felt scope, not a `prefers-color-scheme` block — there is no theme toggle — so the ramp mirrors the honour ramp's exact two-block structure (`:root` + `.game-table`). `--rt8` (Radiant) points at `var(--accent)` per the UX spec's "Radiant = accent + glow", so it re-roots to lime on felt for free.
+- **`spForNextTier == 0` at Grandmaster is load-bearing on both sides.** `TierProgress` returns 0 (a finite table has a top, unlike `LevelProgress`'s quadratic) and `seasonBarFill` renders that as a FULL bar — a naive guard returning 0 would show the top of the ladder as empty. Covered in `tier_test.go` and `seasonTier.test.ts`.
+- **The rank ramp is a new `--rt1`…`--rt8` family**, declared in both palette scopes. Note the "dark block" in this project is the `.game-table` felt scope, not a `prefers-color-scheme` block — there is no theme toggle — so the ramp mirrors the honour ramp's exact two-block structure (`:root` + `.game-table`). `--rt8` (Grandmaster) points at `var(--accent)` per the UX spec's "Grandmaster = accent + glow", so it re-roots to lime on felt for free.
 - **`XpBar` was NOT reused.** It hardcodes `bg-accent` and the rank bar must take the tier's own colour, so `RankBanner` carries a sibling with the identical a11y contract (`role="progressbar"` + `aria-valuemin/max/now` + `aria-label`). No shadcn `progress` primitive was hand-written.
 - **i18next pluralization was deliberately avoided** for "days remaining". The parity test asserts identical key SETS across locales, and en/mk (one/other) and sr/hr (one/few/other) have different plural categories — suffixed plural keys would either fail parity or force wrong agreement. `season.banner.daysLeft` therefore uses a single compact `{{days}}` form, which is the convention `wallet.streakTooltip` and `ageCompact` already follow. No em dash appears in `mk`/`sr`/`hr`; `mk` reuses the existing `поени` (matching `xp.progress`) rather than coining a synonym, and `sr`/`hr` keep the `SP` abbreviation the way they keep `XP`.
 - Left for 13.2/13.3 as scoped: no leaderboard, no scheduler, no prior-season archive. `idx_player_seasons_season_sp` ships here for 13.2's read; `player_seasons` rows are immutable across seasons so 13.3's archive can read them back unchanged.
@@ -410,7 +410,7 @@ claude-opus-5[1m]
 - **P7.** `TestGetCurrentSeason_WirePayloadKeysAreExact` unmarshals into `map[string]any` and asserts the exact 8-key set plus JSON types and that `endsAt` parses as RFC 3339. Mutation-verified: renaming the `spForNextTier` tag now fails (it previously passed every Go and TS test while silently rendering every player's bar 100% full).
 - **P8.** `!payload || typeof payload !== "object"` added as the first condition in the new branch only; sibling handlers left alone as instructed.
 - **P9.** (a) The "to next tier" clause dropped from `season.banner.progress` in all four locales, aligning to `xp.progress`'s bare fraction - the visible line was labelling the band WIDTH as the remainder. The aria label keeps its correct "into the next tier" wording. (b) `mk` now renders SP as `SP` rather than `поени`, removing the collision with the existing `xp` block; flagged to the owner as their call, no new Macedonian term coined. Parity green, no em dash in mk/sr/hr.
-- **P10.** `--rt8-line` now derives from `var(--accent)` via `color-mix` in both scopes, so all three Radiant tokens track the accent. The ramp comment records why hardcoding the RGB defeated the indirection it sits under.
+- **P10.** `--rt8-line` now derives from `var(--accent)` via `color-mix` in both scopes, so all three Grandmaster tokens track the accent. The ramp comment records why hardcoding the RGB defeated the indirection it sits under.
 - **P11.** Both comment corrections applied: the `gorm_repo.go` upsert now explains that `TierForSP(award.SP)` is correct only on the INSERT branch and that deleting the follow-up UPDATE would freeze every returning player's stored tier; the "READS MUST NOT WRITE" claims in `repository.go` and `service.go` are reworded to "a read never writes `player_seasons`", stating explicitly that the read path CAN create the `seasons` row via the lazy resolver.
 
 Left alone as instructed: the double `rank_tier` write, the `getTestDB` DB-skip, `queryKeys.season.current()` as a function, `useCurrentSeasonQuery`'s `enabled` parameter, and `server/.golangci.yml`.
@@ -511,7 +511,7 @@ Left alone as instructed: the double `rank_tier` write, the `getTestDB` DB-skip,
 - Thresholds and tokens in one ordered table so a retune is a one-place change
   [`tier.go:54`](../../server/internal/season/tier.go#L54)
 
-- Radiant has no next tier; a finite table has a top, unlike the XP quadratic
+- Grandmaster has no next tier; a finite table has a top, unlike the XP quadratic
   [`tier.go:116`](../../server/internal/season/tier.go#L116)
 
 **Persistence**
@@ -549,7 +549,7 @@ Left alone as instructed: the double `rank_tier` write, the `getTestDB` DB-skip,
 
 **Client**
 
-- The five AC3 elements, and the terminal-bar case at Radiant
+- The five AC3 elements, and the terminal-bar case at Grandmaster
   [`RankBanner.tsx:36`](../../client/src/features/lobby/components/RankBanner.tsx#L36)
 
 - WS-to-query bridge plus the tier-up toast; guards on type, never truthiness
@@ -566,7 +566,7 @@ Left alone as instructed: the double `rank_tier` write, the `getTestDB` DB-skip,
 
 **Peripherals**
 
-- New `--rt1`…`--rt8` ramp; Radiant derives from `--accent` in both scopes
+- New `--rt1`…`--rt8` ramp; Grandmaster derives from `--accent` in both scopes
   [`index.css:250`](../../client/src/index.css#L250)
 
 - The HTTP DTO mirror, hand-synced and now pinned by a wire-key assertion

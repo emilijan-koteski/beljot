@@ -27,14 +27,14 @@ package season
 // player_seasons.rank_tier, and key the client's i18n labels and colour map. A
 // display string must never be substituted for one of these.
 const (
-	TierIron     = "iron"
-	TierBronze   = "bronze"
-	TierSilver   = "silver"
-	TierGold     = "gold"
-	TierPlatinum = "platinum"
-	TierDiamond  = "diamond"
-	TierImmortal = "immortal"
-	TierRadiant  = "radiant"
+	TierIron        = "iron"
+	TierBronze      = "bronze"
+	TierSilver      = "silver"
+	TierGold        = "gold"
+	TierPlatinum    = "platinum"
+	TierDiamond     = "diamond"
+	TierMaster      = "master"
+	TierGrandmaster = "grandmaster"
 )
 
 // tierFloor pairs a tier token with the INCLUSIVE lower bound of its band.
@@ -58,8 +58,8 @@ var tierFloors = [...]tierFloor{
 	{TierGold, 3000},
 	{TierPlatinum, 5500},
 	{TierDiamond, 8500},
-	{TierImmortal, 12500},
-	{TierRadiant, 18000},
+	{TierMaster, 12500},
+	{TierGrandmaster, 18000},
 }
 
 // SeasonTiers returns the ordered tier tokens, lowest first. A fresh slice per
@@ -108,8 +108,8 @@ func TierForSP(sp int) string {
 //
 // The bar fill is spIntoTier / spForNextTier.
 //
-// AT RADIANT THERE IS NO NEXT TIER: spForNextTier is 0 and spIntoTier is
-// everything above the Radiant floor, and the client renders a full/terminal
+// AT GRANDMASTER THERE IS NO NEXT TIER: spForNextTier is 0 and spIntoTier is
+// everything above the Grandmaster floor, and the client renders a full/terminal
 // bar. LevelProgress can lean on a strictly-increasing quadratic and never hit
 // this case; a FINITE table has a top, so this branch is real. Divide only
 // after checking spForNextTier > 0.

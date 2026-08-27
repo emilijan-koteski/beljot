@@ -1386,8 +1386,8 @@
       "gold": "Злато",
       "platinum": "Платина",
       "diamond": "Дијамант",
-      "immortal": "Бесмртник",
-      "radiant": "Блескав"
+      "master": "Мајстор",
+      "grandmaster": "Гросмајстор"
     },
     "tierUp": {
       "toast": "Нов ранг: {{tier}}"

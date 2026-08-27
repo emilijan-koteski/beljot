@@ -19,7 +19,7 @@ import (
 // the wire rule across this project is absolute timestamps, and the countdown is
 // display state the client recomputes on its own tick.
 //
-// RankTier is a stable machine token ("iron" ... "radiant") that the client maps
+// RankTier is a stable machine token ("iron" ... "grandmaster") that the client maps
 // to an i18n label and a colour. A display string never crosses the wire.
 type CurrentSeasonView struct {
 	SeasonName     string    `json:"seasonName"`

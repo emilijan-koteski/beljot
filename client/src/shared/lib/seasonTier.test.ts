@@ -24,8 +24,8 @@ describe("SEASON_TIERS", () => {
       "gold",
       "platinum",
       "diamond",
-      "immortal",
-      "radiant",
+      "master",
+      "grandmaster",
     ]);
   });
 
@@ -51,10 +51,10 @@ describe("seasonTierForSp", () => {
     [8499, "platinum"],
     [8500, "diamond"],
     [12499, "diamond"],
-    [12500, "immortal"],
-    [17999, "immortal"],
-    [18000, "radiant"],
-    [250000, "radiant"],
+    [12500, "master"],
+    [17999, "master"],
+    [18000, "grandmaster"],
+    [250000, "grandmaster"],
   ])("buckets %i SP as %s", (sp, tier) => {
     expect(seasonTierForSp(sp)).toBe(tier);
   });
@@ -111,7 +111,7 @@ describe("seasonBarFill", () => {
     expect(seasonBarFill(250, 500)).toBe(0.5);
   });
 
-  it("is FULL at Radiant, where there is no next tier", () => {
+  it("is FULL at Grandmaster, where there is no next tier", () => {
     // spForNextTier 0 is the terminal case. An empty bar at the top of the
     // ladder would be the exact opposite of the truth.
     expect(seasonBarFill(2000, 0)).toBe(1);

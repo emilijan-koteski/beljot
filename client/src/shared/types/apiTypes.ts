@@ -300,7 +300,7 @@ export interface CurrentSeasonResponse {
   /** Accumulated Season Points this window. Monotonic — SP has no decay. */
   sp: number;
   /**
-   * Stable machine token ("iron" | "bronze" | ... | "radiant"), mapped to an
+   * Stable machine token ("iron" | "bronze" | ... | "grandmaster"), mapped to an
    * i18n label and a colour by shared/lib/seasonTier.ts. Typed as `string`
    * rather than the `SeasonTier` union on purpose: a server-side retune that
    * adds a tier must degrade on a stale bundle via `normalizeSeasonTier`, not
@@ -310,7 +310,7 @@ export interface CurrentSeasonResponse {
   /** SP earned past the current tier's floor, in [0, spForNextTier). */
   spIntoTier: number;
   /**
-   * Size of the current tier's band. ZERO AT RADIANT — the top of the ladder has
+   * Size of the current tier's band. ZERO AT GRANDMASTER — the top of the ladder has
    * no next tier, and the bar renders full (see `seasonBarFill`). Never divide by
    * this without checking it.
    */

@@ -234,17 +234,17 @@ func TestGetCurrentSeason_IgnoresAStaleStoredTier(t *testing.T) {
 
 // At the top of the ladder there is no next tier, and the client must be able to
 // tell: spForNextTier is 0 rather than a fabricated band.
-func TestGetCurrentSeason_RadiantIsTerminal(t *testing.T) {
+func TestGetCurrentSeason_GrandmasterIsTerminal(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
-		UserID: 42, SeasonID: testWindow.ID, SP: 20000, RankTier: "radiant",
+		UserID: 42, SeasonID: testWindow.ID, SP: 20000, RankTier: "grandmaster",
 	}
 
 	rec, err := call(t, repo, 42)
 	require.NoError(t, err)
 
 	got := decode(t, rec)
-	assert.Equal(t, "radiant", got.RankTier)
+	assert.Equal(t, "grandmaster", got.RankTier)
 	assert.Equal(t, 2000, got.SPIntoTier)
 	assert.Zero(t, got.SPForNextTier)
 }

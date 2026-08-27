@@ -279,7 +279,7 @@ export interface HonorUpdatedPayload {
 // still running the old bundle, whereas an unknown type is simply ignored.
 //
 // rankTier is a STABLE MACHINE TOKEN ("iron" | "bronze" | "silver" | "gold" |
-// "platinum" | "diamond" | "immortal" | "radiant") that the client maps to an
+// "platinum" | "diamond" | "master" | "grandmaster") that the client maps to an
 // i18n label and colour via shared/lib/seasonTier.ts; a display string never
 // crosses the wire. SP and the tier are server-authoritative — the client mirror
 // is presentation only and decides nothing.

@@ -152,8 +152,8 @@ const EventSeasonPointsAwarded = "event:season_points_awarded"
 // absent at the terminal end — a REAL value, not a missing one.
 //
 // NewSeasonSP is the post-award season total. RankTier is a STABLE MACHINE TOKEN
-// ("iron" | "bronze" | "silver" | "gold" | "platinum" | "diamond" | "immortal" |
-// "radiant") that the client maps to an i18n label and colour — a display string
+// ("iron" | "bronze" | "silver" | "gold" | "platinum" | "diamond" | "master" |
+// "grandmaster") that the client maps to an i18n label and colour — a display string
 // must never cross the wire, the same non-negotiable HonorUpdatedPayload's
 // HonorTier states. It is the AUTHORITATIVE derived tier, not the lagging
 // player_seasons.rank_tier snapshot column.

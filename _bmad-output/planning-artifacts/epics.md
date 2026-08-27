@@ -59,7 +59,7 @@ FR33: Players earn XP from completed matches proportional to game points scored 
 FR34: Players advance through a lifetime level system as XP accumulates; the level is a career signal only with no gating behavior
 FR35: [retired — ranked/ELO queue removed; competitive pairing replaced by honor-gated rooms (FR57) and seasonal rank visibility (FR37)]
 FR36: [retired — placement matches removed; no ELO to calibrate in the new system]
-FR37: Players can view their current seasonal rank tier (8 tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Immortal → Radiant) based on Season Points earned in the current quarterly season
+FR37: Players can view their current seasonal rank tier (8 tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster) based on Season Points earned in the current quarterly season
 FR38: [retired — ELO penalty removed; abandonment is deterred via the Honor system (FR56)]
 FR39: Players can view a seasonal leaderboard of top Season-Point earners
 FR40: The system runs 3-month quarterly seasons with soft rank resets (all players start the next season at Iron with 0 SP); prior-season archive is preserved on the profile, with zero-game seasons omitted
@@ -363,7 +363,7 @@ Players can play the Croatian variant, choose the card deck style they play with
 
 ### Epic 13: Seasonal Rank & Leaderboard
 
-Players earn Season Points (SP) per match, climb an 8-tier seasonal ladder (Iron → Radiant) across 3-month quarterly seasons, and view a seasonal leaderboard. Prior seasons are archived on the profile (zero-game seasons skipped).
+Players earn Season Points (SP) per match, climb an 8-tier seasonal ladder (Iron → Grandmaster) across 3-month quarterly seasons, and view a seasonal leaderboard. Prior seasons are archived on the profile (zero-game seasons skipped).
 
 **FRs covered:** FR37, FR39, FR40
 **Phase:** 4
@@ -2565,7 +2565,7 @@ So that the variant is available rather than merely implemented.
 
 ## Epic 13: Seasonal Rank & Leaderboard
 
-Players earn Season Points (SP) per match, climb an 8-tier seasonal ladder (Iron → Radiant) across 3-month quarterly seasons, and view a seasonal leaderboard. Prior seasons are archived on the profile (zero-game seasons skipped).
+Players earn Season Points (SP) per match, climb an 8-tier seasonal ladder (Iron → Grandmaster) across 3-month quarterly seasons, and view a seasonal leaderboard. Prior seasons are archived on the profile (zero-game seasons skipped).
 
 ### Story 13.1: Season Points (SP) & Tier Climb
 
@@ -2584,7 +2584,7 @@ So that I have an active competitive goal distinct from lifetime level.
 **Given** a player's cumulative SP crosses a tier threshold
 **When** the next match ends
 **Then** their tier updates and a tier-up toast is shown
-**And** the 8 tiers and thresholds are: Iron (0), Bronze (500), Silver (1 500), Gold (3 000), Platinum (5 500), Diamond (8 500), Immortal (12 500), Radiant (18 000)
+**And** the 8 tiers and thresholds are: Iron (0), Bronze (500), Silver (1 500), Gold (3 000), Platinum (5 500), Diamond (8 500), Master (12 500), Grandmaster (18 000)
 
 **Given** a player views their rank
 **When** the RankBanner renders in the lobby

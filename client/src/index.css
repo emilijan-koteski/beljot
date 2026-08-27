@@ -216,7 +216,7 @@
   --h2-line: rgba(154, 87, 19, 0.42);
   --h1-line: rgba(147, 41, 28, 0.28);
 
-  /* ── Season rank tier ramp (rt1 = Iron … rt8 = Radiant) ────────────────
+  /* ── Season rank tier ramp (rt1 = Iron … rt8 = Grandmaster) ────────────────
      The eight seasonal rank tiers (Story 13.1). A SEPARATE ramp from the
      honour one above, deliberately: honour has five tiers and answers
      "is this player reliable", rank has eight and answers "how far have
@@ -229,14 +229,14 @@
      could read alike, so they are split by HUE not lightness — Iron is
      a neutral graphite, Silver a distinctly blue steel.
 
-     Radiant is the accent plus a glow (UX spec: "Radiant = accent +
+     Grandmaster is the accent plus a glow (UX spec: "Grandmaster = accent +
      glow"), which is why `--rt8` points at `--accent` rather than a
      literal: the top of the ladder is the same colour as the app's
      primary action, and it re-roots to lime on felt for free. ALL THREE
-     Radiant tokens derive from `--accent` for that reason -- the fill via
+     Grandmaster tokens derive from `--accent` for that reason -- the fill via
      `var()`, the soft via `--accent-soft`, and the hairline via
      `color-mix` off the same token. Hardcoding the accent's RGB in the
-     `-line` value (which is what shipped first) desynced the Radiant
+     `-line` value (which is what shipped first) desynced the Grandmaster
      border from its own fill the moment the accent was retuned, which is
      precisely the drift this indirection exists to prevent.
 
@@ -253,8 +253,8 @@
   --rt4: #a8801c; /* gold      · deep gold  */
   --rt5: #2f7f7c; /* platinum  · teal       */
   --rt6: #2a63ad; /* diamond   · sapphire   */
-  --rt7: #6c3a9c; /* immortal  · violet     */
-  --rt8: var(--accent); /* radiant · accent + glow */
+  --rt7: #6c3a9c; /* master  · violet     */
+  --rt8: var(--accent); /* grandmaster · accent + glow */
 
   --rt1-soft: rgba(90, 96, 104, 0.12);
   --rt2-soft: rgba(150, 88, 31, 0.12);

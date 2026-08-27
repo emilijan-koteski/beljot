@@ -21,8 +21,8 @@ export const SEASON_TIERS = [
   "gold",
   "platinum",
   "diamond",
-  "immortal",
-  "radiant",
+  "master",
+  "grandmaster",
 ] as const;
 
 export type SeasonTier = (typeof SEASON_TIERS)[number];
@@ -39,8 +39,8 @@ export const SEASON_TIER_FLOORS: ReadonlyArray<readonly [SeasonTier, number]> = 
   ["gold", 3000],
   ["platinum", 5500],
   ["diamond", 8500],
-  ["immortal", 12500],
-  ["radiant", 18000],
+  ["master", 12500],
+  ["grandmaster", 18000],
 ];
 
 /**
@@ -89,7 +89,7 @@ export function normalizeSeasonTier(tier: string, sp: number): SeasonTier {
 /**
  * Progress-bar fill in [0, 1] from the server's own decomposition.
  *
- * AT RADIANT `spForNextTier` IS 0 — there is no next tier — and the bar renders
+ * AT GRANDMASTER `spForNextTier` IS 0 — there is no next tier — and the bar renders
  * FULL rather than empty. That is the whole reason this is a function and not an
  * inline division: `spIntoTier / 0` is Infinity, and a naive guard that returned
  * 0 would show the top of the ladder as an empty bar.
@@ -120,8 +120,8 @@ export const SEASON_TIER_COLOR: Record<SeasonTier, string> = {
   gold: "var(--rt4)",
   platinum: "var(--rt5)",
   diamond: "var(--rt6)",
-  immortal: "var(--rt7)",
-  radiant: "var(--rt8)",
+  master: "var(--rt7)",
+  grandmaster: "var(--rt8)",
 };
 
 /** Tier -> low-alpha fill, for badge/chip grounds and bar tracks. */
@@ -132,8 +132,8 @@ export const SEASON_TIER_SOFT: Record<SeasonTier, string> = {
   gold: "var(--rt4-soft)",
   platinum: "var(--rt5-soft)",
   diamond: "var(--rt6-soft)",
-  immortal: "var(--rt7-soft)",
-  radiant: "var(--rt8-soft)",
+  master: "var(--rt7-soft)",
+  grandmaster: "var(--rt8-soft)",
 };
 
 /** Tier -> hairline/border tone, for outlined variants. */
@@ -144,8 +144,8 @@ export const SEASON_TIER_LINE: Record<SeasonTier, string> = {
   gold: "var(--rt4-line)",
   platinum: "var(--rt5-line)",
   diamond: "var(--rt6-line)",
-  immortal: "var(--rt7-line)",
-  radiant: "var(--rt8-line)",
+  master: "var(--rt7-line)",
+  grandmaster: "var(--rt8-line)",
 };
 
 /**
