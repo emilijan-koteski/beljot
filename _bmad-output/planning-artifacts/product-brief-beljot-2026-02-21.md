@@ -40,7 +40,7 @@ A purpose-built desktop web application for Balkan Belot, designed from the grou
 - Authentic rules implementation supporting both Croatian and Bitola (Bitola) trump variants, selectable per room
 - Full account system with profiles, match history, and statistics
 - Casual social play via CIV 6-style lobbies (Browse/Create/Quick Play)
-- Competitive ranked mode with ELO matchmaking, 8-tier rank system (Iron → Radiant), quarterly seasons, and leaderboards
+- Competitive ranked mode with ELO matchmaking, 8-tier rank system (Iron → Grandmaster), quarterly seasons, and leaderboards
 - English and Serbian (Latin) language support at launch
 
 ### Key Differentiators
@@ -230,7 +230,7 @@ Phased, reflecting passion project → public launch trajectory:
 
 - Separate ranked queue (Level 5+ only, registration required)
 - ELO matchmaking engine (hidden from players)
-- 8 visible rank tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Immortal → Radiant (each with I/II/III sub-ranks; Radiant = top-N players only)
+- 8 visible rank tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster (each with I/II/III sub-ranks; Grandmaster = top-N players only)
 - Quarterly seasons (3 months); rank silently preserved across seasons
 - 3-game placement matches at season start; rank revealed after placement
 - Ranked only supports 1001-point matches

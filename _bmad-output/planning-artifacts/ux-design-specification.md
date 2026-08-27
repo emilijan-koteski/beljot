@@ -328,7 +328,7 @@ The core card-play interaction uses **established patterns** adapted for Belot's
 - Playable card (your turn) → lift transform + `accent-glow` shadow
 - Unplayable card → `opacity: 0.4`, no glow
 - Trump suit indicator → `accent` coloured suit icon, always visible in HUD
-- Rank badges → tier-specific colours (Iron = grey, Bronze = `#cd7f32`, ... Radiant = `accent` + glow)
+- Rank badges → tier-specific colours (Iron = grey, Bronze = `#cd7f32`, ... Grandmaster = `accent` + glow)
 
 **Accessibility:** All text/background combinations target WCAG AA (4.5:1 contrast ratio minimum). `text-primary` on `background` = ~15:1. `accent` on `background` = ~8:1.
 

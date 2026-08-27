@@ -165,7 +165,7 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 
 ### Phase 4 — Competitive Climb & Access Expansion
 
-- **Seasonal rank system:** 8 tiers (Iron → Bronze → Silver → Gold → Platinum → Diamond → Immortal → Radiant) across 3-month quarterly seasons. Climb via Season Points (SP) earned per match: 50 (completion) + 100 (win) + floor(team_game_points / 10) + 50 (Capot or instant-win). Abandoners earn 0 SP. No decay. Season end → soft reset (all players start next season at Iron). Profile archives every played season; seasons with zero games are skipped on display.
+- **Seasonal rank system:** 8 tiers (Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster) across 3-month quarterly seasons. Climb via Season Points (SP) earned per match: 50 (completion) + 100 (win) + floor(team_game_points / 10) + 50 (Capot or instant-win). Abandoners earn 0 SP. No decay. Season end → soft reset (all players start next season at Iron). Profile archives every played season; seasons with zero games are skipped on display.
 - Seasonal leaderboard (top players by SP, per season)
 - Social login (Facebook, Google)
 - Mobile support (PWA or native)
@@ -222,7 +222,7 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 
 **Rising Action:** His first few casual games are smooth — Croatian variant, 1001 mode, per-move timer. The rules are correct. He notices the card point table is right, declarations work properly, failed hands transfer points correctly. He earns XP from game points. After roughly 20 games, he hits Level 5. Ranked mode unlocks.
 
-**Climax:** Marko queues for ranked. The system matches him with players around his hidden ELO. First match — it's tight, competitive, the timer keeps things moving. One opponent hesitates too long on a critical trick — timer expires, and the system auto-plays their first eligible card (sorted by suit, then rank). It's a weak play. Marko capitalizes. He wins. Then two more placement matches. After three games, his rank reveals: Silver II. He can see the tier ladder — Iron through Radiant. The season has just started. He has three months to climb.
+**Climax:** Marko queues for ranked. The system matches him with players around his hidden ELO. First match — it's tight, competitive, the timer keeps things moving. One opponent hesitates too long on a critical trick — timer expires, and the system auto-plays their first eligible card (sorted by suit, then rank). It's a weak play. Marko capitalizes. He wins. Then two more placement matches. After three games, his rank reveals: Silver II. He can see the tier ladder — Iron through Grandmaster. The season has just started. He has three months to climb.
 
 **Resolution:** Two weeks in, Marko checks the seasonal leaderboard. He's Gold I now, 47th on the board. He sees names he recognizes from café tournaments. For the first time, the competitive Belot scene exists online — and he has a number next to his name. He queues another match.
 
@@ -372,7 +372,7 @@ Single Page Application (SPA) for desktop browsers. Real-time multiplayer with p
 - FR34: Players advance through a level system as XP accumulates, with Level 5 unlocking access to ranked mode
 - FR35: Level 5+ players can queue for ranked competitive matches with ELO-based opponent pairing
 - FR36: The system conducts 3 placement matches per season before revealing a player's initial rank
-- FR37: Players can view their current rank tier (8 tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Immortal → Radiant)
+- FR37: Players can view their current rank tier (8 tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster)
 - FR38: The system applies scaled ELO penalties to players who abandon ranked matches, with penalty scaling by game progress at time of abandonment
 - FR39: Players can view a seasonal leaderboard of top-ranked players
 - FR40: The system runs quarterly ranked seasons with rank resets; prior season rank history is preserved and viewable

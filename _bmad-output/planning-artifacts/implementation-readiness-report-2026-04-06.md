@@ -83,7 +83,7 @@ documents:
 | FR34  | Level progression system, Level 5 unlocks ranked                                                                               |
 | FR35  | Ranked competitive matches with ELO-based matchmaking (Level 5+)                                                               |
 | FR36  | 3 placement matches per season before rank reveal                                                                              |
-| FR37  | 8-tier rank system: Iron → Bronze → Silver → Gold → Platinum → Diamond → Immortal → Radiant                                    |
+| FR37  | 8-tier rank system: Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster                                    |
 | FR38  | Scaled ELO penalties for ranked match abandonment                                                                              |
 | FR39  | Seasonal leaderboard                                                                                                           |
 | FR40  | Quarterly ranked seasons with rank resets; history preserved                                                                   |

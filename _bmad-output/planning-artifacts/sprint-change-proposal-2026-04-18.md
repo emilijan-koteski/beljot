@@ -127,7 +127,7 @@ Key incremental edits applied in sequence:
 | Honor "New Player" threshold | < 20 completed matches                                                                                       |
 | Honor tiers                  | Exemplary 95+, Trusted 85–94, Fair 70–84, Unreliable 50–69, Problematic < 50                                 |
 | SP formula                   | 50 (completion) + 100 (win) + floor(team_game_points/10) + 50 (Capot/instant-win); 0 for abandoners          |
-| SP tier thresholds           | Iron 0, Bronze 500, Silver 1 500, Gold 3 000, Platinum 5 500, Diamond 8 500, Immortal 12 500, Radiant 18 000 |
+| SP tier thresholds           | Iron 0, Bronze 500, Silver 1 500, Gold 3 000, Platinum 5 500, Diamond 8 500, Master 12 500, Grandmaster 18 000 |
 | Season length                | 3 months (quarterly)                                                                                         |
 | Season reset                 | Soft — all players start at Iron with 0 SP; prior-season records archived                                    |
 | Prior-season archive display | Every season with ≥ 1 game played; zero-game seasons omitted                                                 |
