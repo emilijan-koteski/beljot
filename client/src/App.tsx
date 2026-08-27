@@ -14,6 +14,7 @@ import { LoginPage } from "@/features/auth/LoginPage";
 import { RegisterPage } from "@/features/auth/RegisterPage";
 import { ResetPasswordPage } from "@/features/auth/ResetPasswordPage";
 import { LandingPage } from "@/features/landing/LandingPage";
+import { LeaderboardPage } from "@/features/leaderboard/LeaderboardPage";
 import { PrivacyPage } from "@/features/legal/PrivacyPage";
 import { TermsPage } from "@/features/legal/TermsPage";
 import { LobbyPage } from "@/features/lobby/LobbyPage";
@@ -88,6 +89,10 @@ function createAppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/lobby" element={<LobbyPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            {/* Seasonal leaderboard (Story 13.2). Inside ProtectedRoute AND
+                AppLayout: the endpoint behind it is auth-gated, and the page is
+                reached from the TopBar tab that only AppLayout renders. */}
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
             {/* Public player profile (Story 11.3): any logged-in viewer, under
                 the TopBar + auth gate. "Public" = not self-restricted, not
                 unauthenticated. */}

@@ -189,3 +189,154 @@ func (r *GormRepository) ApplySeasonPoints(seasonID uint, awards map[uint]SPAwar
 	}
 	return snapshots, nil
 }
+
+// leaderboardScope is THE ONE PLACE the leaderboard's visibility predicate is
+// written. Every leaderboard read starts here -- the page, its total, and the
+// viewer's CountAhead -- so the three cannot drift apart. Divergence would not
+// fail loudly: it would just make the viewer's reported position disagree with
+// the slot they are standing in.
+//
+// A FRESH BUILDER PER CALL, on purpose. The alternative (one *gorm.DB handed to
+// Count and then to Scan) reuses a statement across two executions; a helper
+// returning a new scope gives the same single-source guarantee with none of that
+// coupling, and reads the same at every call site.
+//
+// `users.deleted_at IS NULL` IS THE LINE TO CHECK FIRST IN REVIEW. Table()/Joins()
+// takes GORM out of model-land, so the soft-delete scope that PlayerSeason reads
+// get for free does NOT apply here -- exactly the hole left open at
+// internal/room/gorm_repo.go:298. Without it a deleted account keeps its slot at
+// the top of the ladder forever.
+//
+// `sp > 0` IS THE SECOND HALF OF THE PREDICATE, and it is a MEMBERSHIP RULE
+// rather than an optimisation (owner decision 2026-08-27). A player_seasons row
+// is written for every human seat in a finished match, INCLUDING seats that were
+// absent at the terminal end and earned nothing -- so 0-SP rows arise in normal
+// operation. Listing them would put a player on the ladder at a real position
+// while the viewer block tells that same player they have no standing (the AC
+// marks an own-row only for a player with ANY SP), and would falsify the empty
+// state ("Nobody has earned Season Points yet") the moment one such row lands.
+//
+// THE LADDER IS SP EARNERS ONLY. Because this lives in the shared scope, the
+// exclusion applies identically to `items`, to `total` and to CountAhead -- a
+// 0-SP row cannot be listed, cannot inflate the count, and cannot push anyone
+// down a slot. Do not move it into the page query alone.
+func (r *GormRepository) leaderboardScope(seasonID uint) *gorm.DB {
+	return r.db.
+		Table("player_seasons").
+		Joins("JOIN users ON users.id = player_seasons.user_id").
+		Where("player_seasons.season_id = ?", seasonID).
+		Where("users.deleted_at IS NULL").
+		Where("player_seasons.sp > 0")
+}
+
+// allocHintCap bounds the pre-allocation hint taken from `limit`.
+//
+// make([]LeaderboardEntry, 0, limit) trusts its argument with the process memory
+// budget: a limit of 1e9 reserves tens of gigabytes before a single row is read.
+// The handler caps requests far below this, so the ceiling never binds in
+// practice -- it exists so a future in-process caller (Story 13.3) cannot turn a
+// typo into an OOM. It is deliberately NOT a page-size policy: an over-large
+// limit still runs, it just grows the slice incrementally instead.
+const allocHintCap = 1000
+
+// LeaderboardPage implements Repository.LeaderboardPage.
+//
+// THE BOUNDS CHECK IS NOT PARANOIA. `limit` reaches both make(..., 0, limit),
+// which PANICS on a negative, and GORM Limit(), where a negative means "no
+// limit" and quietly returns the entire season. Neither failure mode is one a
+// caller would attribute to its own bad argument. The handler validates user
+// input and answers 400; this guards the GO boundary against a caller that never
+// saw a query string, and returns an ordinary error (a 500) because reaching it
+// is a programming bug rather than a bad request.
+//
+// Count first, then the page: the total drives load-more, and an offset past the
+// end must still report the real total rather than 0 (see the story edge-case
+// matrix). Both statements run through leaderboardScope, so they apply the SAME
+// PREDICATE -- but they are two statements, not one snapshot: under READ
+// COMMITTED a write landing between them can leave `total` disagreeing with the
+// rows by a row or two. That is accepted (the client re-reads on its next poll).
+// What the shared scope guarantees is that the two never describe different
+// POPULATIONS -- the failure that would be permanent rather than transient.
+//
+// Columns are aliased explicitly rather than selected as `*`: the join puts two
+// `id` and two `created_at` columns on the result set, and an unaliased scan
+// would silently take whichever the driver returned last.
+//
+// ORDER BY sp DESC, user_id ASC -- the same order CountAhead counts under.
+func (r *GormRepository) LeaderboardPage(seasonID uint, limit, offset int) ([]LeaderboardEntry, int64, error) {
+	if limit < 1 {
+		return nil, 0, fmt.Errorf("season: leaderboard limit must be >= 1, got %d", limit)
+	}
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("season: leaderboard offset must be >= 0, got %d", offset)
+	}
+
+	var total int64
+	if err := r.leaderboardScope(seasonID).Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("counting leaderboard rows season=%d: %w", seasonID, err)
+	}
+
+	entries := make([]LeaderboardEntry, 0, min(limit, allocHintCap))
+	err := r.leaderboardScope(seasonID).
+		Select(`player_seasons.user_id      AS user_id,
+		        users.username              AS username,
+		        player_seasons.sp           AS sp,
+		        player_seasons.games_played AS games_played`).
+		Order("player_seasons.sp DESC").
+		Order("player_seasons.user_id ASC").
+		Limit(limit).
+		Offset(offset).
+		Scan(&entries).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("reading leaderboard page season=%d: %w", seasonID, err)
+	}
+	return entries, total, nil
+}
+
+// CountAhead implements Repository.CountAhead.
+//
+// One order, two consumers: the predicate below is the strict-ahead form of
+// LeaderboardPage's ORDER BY, and if the two ever diverge the viewer's position
+// silently drifts away from their own row in the list.
+// FindLeaderboardEntry implements Repository.FindLeaderboardEntry.
+//
+// WHY THIS EXISTS INSTEAD OF REUSING FindPlayerSeason. FindPlayerSeason is a
+// MODEL query over player_seasons alone: it carries no `users` join, so it
+// happily returns the row of a SOFT-DELETED account. A deleted player holding an
+// unexpired JWT would then get a viewer block and a pinned row while being
+// absent from the very list they are looking at -- a position counted against a
+// population that excludes them. Routing the viewer through leaderboardScope
+// closes that by construction: a player who is not listable has no standing.
+//
+// (nil, nil) on a miss, which now covers three cases the caller treats
+// identically: no row at all, a 0-SP row, and a soft-deleted account.
+func (r *GormRepository) FindLeaderboardEntry(seasonID, userID uint) (*LeaderboardEntry, error) {
+	var entries []LeaderboardEntry
+	err := r.leaderboardScope(seasonID).
+		Select(`player_seasons.user_id      AS user_id,
+		        users.username              AS username,
+		        player_seasons.sp           AS sp,
+		        player_seasons.games_played AS games_played`).
+		Where("player_seasons.user_id = ?", userID).
+		Limit(1).
+		Scan(&entries).Error
+	if err != nil {
+		return nil, fmt.Errorf("reading leaderboard entry season=%d user=%d: %w", seasonID, userID, err)
+	}
+	if len(entries) == 0 {
+		return nil, nil
+	}
+	return &entries[0], nil
+}
+
+func (r *GormRepository) CountAhead(seasonID uint, sp int, userID uint) (int64, error) {
+	var ahead int64
+	err := r.leaderboardScope(seasonID).
+		Where("(player_seasons.sp > ? OR (player_seasons.sp = ? AND player_seasons.user_id < ?))",
+			sp, sp, userID).
+		Count(&ahead).Error
+	if err != nil {
+		return 0, fmt.Errorf("counting rows ahead season=%d user=%d: %w", seasonID, userID, err)
+	}
+	return ahead, nil
+}

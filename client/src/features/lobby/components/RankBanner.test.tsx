@@ -42,6 +42,20 @@ describe("RankBanner", () => {
     expect(screen.getByTestId("rank-badge")).toBeTruthy();
   });
 
+  // Story 13.2 lifted this badge into the shared TierBadge, which the leaderboard
+  // rows render at `sm`. Nothing then pinned the BANNER's geometry, so a retune
+  // of the shared `md` scale would silently resize the AC3 banner badge — the one
+  // element the AC names by size — with every test still green.
+  it("renders its badge at the md scale, with the tier token attached", () => {
+    render(<RankBanner season={baseSeason} />);
+    const badge = screen.getByTestId("rank-badge");
+    expect(badge.className).toContain("size-11");
+    expect(badge.getAttribute("data-tier")).toBe("gold");
+    // Decorative: the tier NAME is rendered as text beside it.
+    expect(badge.getAttribute("aria-hidden")).toBe("true");
+    expect(badge.querySelector("svg")?.getAttribute("class")).toContain("size-5");
+  });
+
   it("marks the banner with the tier token so the colour can be asserted", () => {
     render(<RankBanner season={baseSeason} />);
     expect(screen.getByTestId("rank-banner").getAttribute("data-tier")).toBe("gold");

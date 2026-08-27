@@ -1,12 +1,11 @@
-import { Shield } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
+import { TierBadge } from "@/shared/components/season/TierBadge";
 import {
   normalizeSeasonTier,
   SEASON_TIER_COLOR,
   SEASON_TIER_LINE,
-  SEASON_TIER_SOFT,
   seasonBarFill,
   seasonDaysRemaining,
   seasonSpOrZero,
@@ -64,20 +63,10 @@ export function RankBanner({ season }: Props) {
       style={{ borderColor: SEASON_TIER_LINE[tier] }}
     >
       {/* Tier badge — colour AND glow, per AC3. The glow is a coloured drop
-          shadow off the same token, so it re-roots on felt with the ramp. */}
-      <span
-        data-testid="rank-badge"
-        aria-hidden="true"
-        className="grid size-11 shrink-0 place-items-center rounded-full"
-        style={{
-          background: SEASON_TIER_SOFT[tier],
-          border: `1px solid ${color}`,
-          boxShadow: `0 0 14px -2px ${color}`,
-          color,
-        }}
-      >
-        <Shield className="size-5" />
-      </span>
+          shadow off the same token, so it re-roots on felt with the ramp.
+          Story 13.2 lifted the markup into TierBadge so the leaderboard's rows
+          show the identical treatment; the test id is unchanged. */}
+      <TierBadge tier={tier} size="md" data-testid="rank-badge" />
 
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">

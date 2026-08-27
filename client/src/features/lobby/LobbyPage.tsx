@@ -7,6 +7,7 @@ import { FriendList } from "@/features/friends/FriendList";
 import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
 import { FilterRail } from "@/features/lobby/components/FilterRail";
 import { HeroBlock } from "@/features/lobby/components/HeroBlock";
+import { LeaderboardPanel } from "@/features/lobby/components/LeaderboardPanel";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { RankBanner } from "@/features/lobby/components/RankBanner";
@@ -238,29 +239,46 @@ export function LobbyPage() {
           three of each. */}
       <FriendList />
 
-      {/* The room filters belong to the room grid, so they sit directly above it
-          — with the friends row above, the search field is no longer separated
-          from the list it filters by two unrelated cards. */}
-      <FilterRail
-        search={search}
-        setSearch={setSearch}
-        filter={filter}
-        setFilter={setFilter}
-        sort={sort}
-        setSort={setSort}
-        counts={counts}
-      />
+      {/* Story 13.2: the lobby's main/aside split — the room browser on the
+          left, the seasonal leaderboard on the right. Only this block splits:
+          HeroBlock, RankBanner and FriendList stay full width above it, because
+          a 320px column beside them would either squeeze the hero's stat row or
+          leave the aside empty for most of the page's height.
 
-      <RoomGrid
-        rooms={filtered}
-        onJoin={handleJoinRoom}
-        hasSearch={search.trim().length > 0}
-        onClearSearch={() => setSearch("")}
-      />
+          Same grid as ProfilePage's, the only main/aside precedent in the app,
+          so the aside collapses UNDER the room grid below lg rather than
+          shrinking beside it. */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <div>
+          {/* The room filters belong to the room grid, so they sit directly above
+              it — with the friends row above, the search field is no longer
+              separated from the list it filters by two unrelated cards. */}
+          <FilterRail
+            search={search}
+            setSearch={setSearch}
+            filter={filter}
+            setFilter={setFilter}
+            sort={sort}
+            setSort={setSort}
+            counts={counts}
+          />
 
-      <p className="text-ink-mute mt-8 text-center text-xs">
-        {t("lobby.footnote", { shown: filtered.length, total: rooms.length })}
-      </p>
+          <RoomGrid
+            rooms={filtered}
+            onJoin={handleJoinRoom}
+            hasSearch={search.trim().length > 0}
+            onClearSearch={() => setSearch("")}
+          />
+
+          <p className="text-ink-mute mt-8 text-center text-xs">
+            {t("lobby.footnote", { shown: filtered.length, total: rooms.length })}
+          </p>
+        </div>
+
+        <aside className="lg:sticky lg:top-20" data-testid="lobby-sidebar">
+          <LeaderboardPanel />
+        </aside>
+      </div>
 
       <CreateRoomModal open={showCreate} onOpenChange={setShowCreate} />
       <PasswordPromptDialog

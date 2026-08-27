@@ -72,3 +72,31 @@ type PlayerSeasonSnapshot struct {
 	GamesPlayed    int
 	GamesCompleted int
 }
+
+// LeaderboardEntry is ONE ROW OF THE JOINED READ behind Story 13.2's
+// leaderboard: a player_seasons row plus the username it belongs to.
+//
+// It is a SCAN TARGET, not a wire type and not a model. Three separate reasons
+// keep it its own struct:
+//
+//  1. It is not PlayerSeason. PlayerSeason mirrors the table; this carries a
+//     column from `users` that no table holds together with SP, so scanning the
+//     join into PlayerSeason would mean adding a phantom Username field to the
+//     model and hoping nobody ever writes it back.
+//  2. It is not the DTO either. The handler's LeaderboardRowView adds `position`
+//     and the DERIVED `tier` and drops nothing; keeping them apart is what stops
+//     the join's shape from leaking onto the wire (or the wire's `position` from
+//     looking like something the database supplied).
+//  3. THERE IS NO `season` -> `user` GO IMPORT. Story 13.3 will likely have
+//     `user` import `season` (seasonal rank on the public profile), so the
+//     reverse edge must stay closed. The join is written by TABLE NAME and lands
+//     here instead of in a user.User (Story 13.2 D2).
+//
+// The explicit `column:sp` tag matches PlayerSeason's: the default naming
+// strategy is not relied on for an all-caps field name.
+type LeaderboardEntry struct {
+	UserID      uint   `gorm:"column:user_id"`
+	Username    string `gorm:"column:username"`
+	SP          int    `gorm:"column:sp"`
+	GamesPlayed int    `gorm:"column:games_played"`
+}

@@ -28,10 +28,26 @@ type mockRepo struct {
 	// rows is keyed "userID:seasonID"; a missing key is the zero state.
 	rows    map[string]*season.PlayerSeason
 	findErr error
+	// usernames backs the join the GORM repo does against `users`. A row with no
+	// entry here is treated as INVISIBLE — the mock's stand-in for
+	// `users.deleted_at IS NULL`, applied to the page, the total AND CountAhead
+	// exactly as the real predicate is.
+	usernames    map[uint]string
+	pageErr      error
+	countErr     error
+	entryErr     error
+	pageCalls    int
+	aheadCalls   int
+	entryCalls   int
+	lastPageArgs [3]int
 }
 
 func newMockRepo(current *season.Season) *mockRepo {
-	return &mockRepo{current: current, rows: map[string]*season.PlayerSeason{}}
+	return &mockRepo{
+		current:   current,
+		rows:      map[string]*season.PlayerSeason{},
+		usernames: map[uint]string{},
+	}
 }
 
 func key(userID, seasonID uint) string {
@@ -77,6 +93,115 @@ func (m *mockRepo) FindPlayerSeason(userID, seasonID uint) (*season.PlayerSeason
 		return nil, m.findErr
 	}
 	return m.rows[key(userID, seasonID)], nil
+}
+
+// visibleRows is the mock's copy of leaderboardScope: every LISTABLE row of the
+// season, in the repository's own total order (sp DESC, user_id ASC). ONE helper
+// feeds LeaderboardPage, CountAhead AND FindLeaderboardEntry here for the same
+// reason the GORM repo has one scope — if the mock let them diverge it would
+// happily pass a test the real repository fails.
+//
+// Two exclusions, mirroring the real predicate: no username entry stands in for
+// `users.deleted_at IS NOT NULL`, and `sp <= 0` is the SP-earners-only
+// membership rule.
+func (m *mockRepo) visibleRows(seasonID uint) []*season.PlayerSeason {
+	out := make([]*season.PlayerSeason, 0, len(m.rows))
+	for _, row := range m.rows {
+		if row.SeasonID != seasonID {
+			continue
+		}
+		if _, visible := m.usernames[row.UserID]; !visible {
+			continue
+		}
+		// THE LADDER IS SP EARNERS ONLY (owner decision 2026-08-27). Mirrors the
+		// real `player_seasons.sp > 0` in leaderboardScope. A row at 0 SP is
+		// written for any seat absent at a match end, so these exist normally --
+		// and listing one would contradict the viewer block, which reports no
+		// standing at 0 SP.
+		if row.SP <= 0 {
+			continue
+		}
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].SP != out[j].SP {
+			return out[i].SP > out[j].SP
+		}
+		return out[i].UserID < out[j].UserID
+	})
+	return out
+}
+
+func (m *mockRepo) LeaderboardPage(seasonID uint, limit, offset int) ([]season.LeaderboardEntry, int64, error) {
+	m.pageCalls++
+	m.lastPageArgs = [3]int{int(seasonID), limit, offset}
+	if m.pageErr != nil {
+		return nil, 0, m.pageErr
+	}
+	// The interface documents limit >= 1 and offset >= 0 as a PRECONDITION, so the
+	// mock enforces it too: otherwise a service bug that passed limit=0 would sail
+	// through here and fail only against Postgres.
+	if limit < 1 || offset < 0 {
+		return nil, 0, fmt.Errorf("mock: precondition violated limit=%d offset=%d", limit, offset)
+	}
+	rows := m.visibleRows(seasonID)
+	total := int64(len(rows))
+
+	entries := make([]season.LeaderboardEntry, 0, limit)
+	for i := offset; i < len(rows) && len(entries) < limit; i++ {
+		entries = append(entries, season.LeaderboardEntry{
+			UserID:      rows[i].UserID,
+			Username:    m.usernames[rows[i].UserID],
+			SP:          rows[i].SP,
+			GamesPlayed: rows[i].GamesPlayed,
+		})
+	}
+	return entries, total, nil
+}
+
+// FindLeaderboardEntry runs through visibleRows, so it inherits BOTH exclusions
+// -- which is the entire reason the real implementation exists separately from
+// FindPlayerSeason, whose model query sees neither.
+func (m *mockRepo) FindLeaderboardEntry(seasonID, userID uint) (*season.LeaderboardEntry, error) {
+	m.entryCalls++
+	if m.entryErr != nil {
+		return nil, m.entryErr
+	}
+	for _, row := range m.visibleRows(seasonID) {
+		if row.UserID != userID {
+			continue
+		}
+		return &season.LeaderboardEntry{
+			UserID:      row.UserID,
+			Username:    m.usernames[row.UserID],
+			SP:          row.SP,
+			GamesPlayed: row.GamesPlayed,
+		}, nil
+	}
+	return nil, nil
+}
+
+func (m *mockRepo) CountAhead(seasonID uint, sp int, userID uint) (int64, error) {
+	m.aheadCalls++
+	if m.countErr != nil {
+		return 0, m.countErr
+	}
+	var ahead int64
+	for _, row := range m.visibleRows(seasonID) {
+		if row.SP > sp || (row.SP == sp && row.UserID < userID) {
+			ahead++
+		}
+	}
+	return ahead, nil
+}
+
+// seed adds one visible player to the season under test.
+func (m *mockRepo) seed(userID uint, username string, sp, gamesPlayed int) {
+	m.rows[key(userID, testWindow.ID)] = &season.PlayerSeason{
+		UserID: userID, SeasonID: testWindow.ID, SP: sp,
+		RankTier: season.TierForSP(sp), GamesPlayed: gamesPlayed, GamesCompleted: gamesPlayed,
+	}
+	m.usernames[userID] = username
 }
 
 // --- Test harness ---
@@ -334,4 +459,619 @@ func TestApplySeasonPoints_PrecomputesTheSnapshot(t *testing.T) {
 	assert.Equal(t, match.PlayerSeasonSnapshot{
 		SeasonName: "2026 Q3", SP: 499, RankTier: "iron", TieredUp: false,
 	}, got[3], "a 0-SP absent seat never tiers up")
+}
+
+// --- Story 13.2: GET /api/v1/leaderboard ---
+
+// callLeaderboard issues GET /leaderboard with the given raw query string and
+// userID already on the context, the way the auth middleware leaves it.
+func callLeaderboard(t *testing.T, repo *mockRepo, userID uint, rawQuery string) (*httptest.ResponseRecorder, error) {
+	t.Helper()
+	e := echo.New()
+	target := "/api/v1/leaderboard"
+	if rawQuery != "" {
+		target += "?" + rawQuery
+	}
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if userID != 0 {
+		c.Set("userID", userID)
+	}
+	h := season.NewHandler(season.NewService(repo))
+	return rec, h.GetLeaderboard(c)
+}
+
+func decodeLeaderboard(t *testing.T, rec *httptest.ResponseRecorder) season.LeaderboardView {
+	t.Helper()
+	var env struct {
+		Data season.LeaderboardView `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env), "response must be wrapped in a data envelope")
+	return env.Data
+}
+
+func sortedKeys(m map[string]any) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// seedLadder fills the season with n players named p1..pn, descending SP so
+// user 1 is first. SP steps of 100 keep every player untied.
+func seedLadder(repo *mockRepo, n int) {
+	for i := 1; i <= n; i++ {
+		repo.seed(uint(i), fmt.Sprintf("p%d", i), (n-i+1)*100, i)
+	}
+}
+
+// The same gate TestGetCurrentSeason_WirePayloadKeysAreExact is: `decode` above
+// unmarshals into the handler's own structs, so it agrees with whatever spelling
+// they currently carry. Rename `gamesPlayed` and every Go and TS test still
+// passes while the client silently renders `undefined`.
+//
+// Assert the LITERAL wire keys for all three shapes -- envelope, row and viewer --
+// since the client's LeaderboardResponse is hand-maintained against them and
+// there is no golden for HTTP payloads.
+func TestGetLeaderboard_WirePayloadKeysAreExact(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+
+	rec, err := callLeaderboard(t, repo, 2, "season=current")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var env map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env))
+	require.Contains(t, env, "data", "the response is always wrapped in a data envelope")
+	assert.Len(t, env, 1, "nothing rides beside `data`")
+
+	data, ok := env["data"].(map[string]any)
+	require.True(t, ok, "data must be an object")
+	assert.Equal(t, []string{"items", "limit", "offset", "total", "viewer"}, sortedKeys(data),
+		"exact envelope key set -- the paginated shape is {items,total,limit,offset} plus viewer")
+
+	items, ok := data["items"].([]any)
+	require.True(t, ok, "items must be an array")
+	require.Len(t, items, 3)
+	row, ok := items[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, []string{"gamesPlayed", "position", "sp", "tier", "userId", "username"},
+		sortedKeys(row), "exact row key set")
+
+	viewer, ok := data["viewer"].(map[string]any)
+	require.True(t, ok, "viewer must be an object when the caller has SP")
+	// No `username`: the viewer is the authenticated caller and the client
+	// already holds their name (Story 13.2 D3).
+	assert.Equal(t, []string{"gamesPlayed", "position", "sp", "tier", "userId"},
+		sortedKeys(viewer), "the viewer block deliberately carries no username")
+
+	// A tag that survives but changes shape is the same class of silent break.
+	assert.IsType(t, "", row["username"])
+	assert.IsType(t, "", row["tier"])
+	for _, numeric := range []string{"position", "userId", "sp", "gamesPlayed"} {
+		assert.IsType(t, float64(0), row[numeric], "%s must be a JSON number", numeric)
+	}
+	for _, numeric := range []string{"total", "limit", "offset"} {
+		assert.IsType(t, float64(0), data[numeric], "%s must be a JSON number", numeric)
+	}
+}
+
+// The lobby widget sends no limit at all and must get a TOP TEN.
+func TestGetLeaderboard_DefaultsToTenRows(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 25)
+
+	rec, err := callLeaderboard(t, repo, 1, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Equal(t, 10, got.Limit)
+	assert.Equal(t, 0, got.Offset)
+	assert.Equal(t, int64(25), got.Total, "total is the season's row count, not the page length")
+	require.Len(t, got.Items, 10)
+	for i, row := range got.Items {
+		assert.Equal(t, i+1, row.Position)
+	}
+}
+
+// The `season` selector is accepted when absent, so a client that omits it gets
+// the active window rather than a 400.
+func TestGetLeaderboard_SeasonSelectorIsOptional(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+
+	rec, err := callLeaderboard(t, repo, 1, "")
+	require.NoError(t, err)
+	assert.Len(t, decodeLeaderboard(t, rec).Items, 3)
+}
+
+// Positions are absolute in the season order, NOT indices into the page -- that
+// is the whole point of echoing `offset` back.
+func TestGetLeaderboard_ExplicitPagingNumbersRowsAbsolutely(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 70)
+
+	rec, err := callLeaderboard(t, repo, 1, "season=current&limit=20&offset=40")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Equal(t, 20, got.Limit)
+	assert.Equal(t, 40, got.Offset)
+	require.Len(t, got.Items, 20)
+	assert.Equal(t, 41, got.Items[0].Position)
+	assert.Equal(t, 60, got.Items[19].Position)
+	assert.Equal(t, uint(41), got.Items[0].UserID, "row 41 of a descending ladder is player 41")
+}
+
+// Every malformed parameter is a 400, never a silent coercion to the default:
+// a client bug must surface, not quietly serve the wrong page.
+func TestGetLeaderboard_RejectsBadQueryParams(t *testing.T) {
+	cases := []struct {
+		name  string
+		query string
+	}{
+		{"limit below the floor", "limit=0"},
+		{"limit above the cap", "limit=51"},
+		{"limit not a number", "limit=abc"},
+		{"limit negative", "limit=-5"},
+		{"offset negative", "offset=-1"},
+		{"offset not a number", "offset=x"},
+		{"season is a quarter token", "season=2026Q1"},
+		{"season is an id", "season=7"},
+		{"season is a bare word", "season=previous"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newMockRepo(testWindow)
+			seedLadder(repo, 3)
+
+			rec, err := callLeaderboard(t, repo, 1, tc.query)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, apperr.ErrBadRequest)
+			assert.Empty(t, rec.Body.String(), "a rejected request writes no body")
+			assert.Zero(t, repo.pageCalls, "validation runs before the repository is touched")
+		})
+	}
+}
+
+// The boundary values on the accepted side of each bound.
+func TestGetLeaderboard_AcceptsTheBoundaryLimits(t *testing.T) {
+	for _, limit := range []int{1, 50} {
+		repo := newMockRepo(testWindow)
+		seedLadder(repo, 60)
+
+		rec, err := callLeaderboard(t, repo, 1, fmt.Sprintf("season=current&limit=%d", limit))
+		require.NoError(t, err)
+		assert.Equal(t, limit, decodeLeaderboard(t, rec).Limit)
+	}
+}
+
+// An empty season is a normal 200 with an EMPTY ARRAY -- never `null`, which the
+// client would have to guard on every map().
+func TestGetLeaderboard_EmptySeasonSerializesAnEmptyArray(t *testing.T) {
+	repo := newMockRepo(testWindow)
+
+	rec, err := callLeaderboard(t, repo, 42, "season=current")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	assert.Contains(t, rec.Body.String(), `"items":[]`, "an empty page must serialize as [], not null")
+	got := decodeLeaderboard(t, rec)
+	assert.Empty(t, got.Items)
+	assert.Equal(t, int64(0), got.Total)
+	assert.Nil(t, got.Viewer)
+}
+
+// Offset past the end: an empty page, but the TOTAL is unchanged so the client
+// can still tell how long the list is.
+func TestGetLeaderboard_OffsetPastTheEndKeepsTheTotal(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 5)
+
+	rec, err := callLeaderboard(t, repo, 1, "season=current&offset=99")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Empty(t, got.Items)
+	assert.Equal(t, int64(5), got.Total)
+	assert.Contains(t, rec.Body.String(), `"items":[]`)
+}
+
+// AC4: a viewer who never played has no own-row marker and nothing pinned, and
+// the request still succeeds.
+func TestGetLeaderboard_ViewerWhoNeverPlayedIsNull(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+
+	rec, err := callLeaderboard(t, repo, 999, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Nil(t, got.Viewer)
+	assert.Len(t, got.Items, 3, "the list is unaffected by the viewer having no standing")
+	assert.Zero(t, repo.aheadCalls, "no position is counted for a player with no row")
+}
+
+// AC4 again, the case a `record != nil` check alone would get wrong: the row
+// EXISTS (they played) but carries no SP, and the AC marks an own-row only for a
+// player with ANY SP.
+func TestGetLeaderboard_ViewerWithZeroSPIsNull(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+	repo.seed(50, "zero", 0, 4)
+
+	rec, err := callLeaderboard(t, repo, 50, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Nil(t, got.Viewer, "0 SP is a real Iron player, but has no ladder position to pin")
+	assert.Zero(t, repo.aheadCalls)
+
+	// THE HALF THIS TEST USED TO MISS, and exactly why the 0-SP leak survived
+	// review: asserting only `Viewer` allowed the 0-SP row to be LISTED at a real
+	// position while its owner was told they had no standing. The list and the
+	// viewer block have to agree, so both halves are asserted now.
+	assert.Len(t, got.Items, 3, "the 0-SP row is not on the ladder either")
+	assert.Equal(t, int64(3), got.Total, "and it does not inflate the total")
+	for _, row := range got.Items {
+		assert.NotEqual(t, uint(50), row.UserID)
+	}
+}
+
+// The `viewer` KEY is always present, even when null: the client distinguishes
+// "no standing" from "a server that does not send this field".
+func TestGetLeaderboard_ViewerKeyIsPresentWhenNull(t *testing.T) {
+	repo := newMockRepo(testWindow)
+
+	rec, err := callLeaderboard(t, repo, 42, "season=current")
+	require.NoError(t, err)
+
+	var env struct {
+		Data map[string]any `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env))
+	require.Contains(t, env.Data, "viewer", "the key must be emitted, never omitempty'd away")
+	assert.Nil(t, env.Data["viewer"])
+}
+
+// The viewer's position and their own row in the list must be the SAME NUMBER.
+// They come from two different queries, so nothing but a shared order makes them
+// agree.
+func TestGetLeaderboard_ViewerPositionMatchesTheirRowOnPage(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 10)
+
+	rec, err := callLeaderboard(t, repo, 4, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	require.NotNil(t, got.Viewer)
+	assert.Equal(t, uint(4), got.Viewer.UserID)
+
+	var own *season.LeaderboardRowView
+	for i := range got.Items {
+		if got.Items[i].UserID == 4 {
+			own = &got.Items[i]
+		}
+	}
+	require.NotNil(t, own, "the viewer is inside the returned page")
+	assert.Equal(t, own.Position, got.Viewer.Position)
+	assert.Equal(t, own.SP, got.Viewer.SP)
+	assert.Equal(t, own.Tier, got.Viewer.Tier)
+	assert.Equal(t, own.GamesPlayed, got.Viewer.GamesPlayed)
+}
+
+// THE CASE THAT KILLS `COUNT(sp > x)`: three players tied at 900 SP. The list
+// numbers them 1,2,3 by ascending user id, and a tied viewer's `position` must
+// be their OWN slot -- not the 1 that every tied player would share.
+func TestGetLeaderboard_TiedPlayersGetDistinctAgreeingPositions(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seed(7, "seven", 900, 5)
+	repo.seed(3, "three", 900, 5)
+	repo.seed(5, "five", 900, 5)
+
+	rec, err := callLeaderboard(t, repo, 7, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	require.Len(t, got.Items, 3)
+	assert.Equal(t, []uint{3, 5, 7}, []uint{got.Items[0].UserID, got.Items[1].UserID, got.Items[2].UserID},
+		"ties break by ASCENDING user_id")
+	assert.Equal(t, []int{1, 2, 3}, []int{got.Items[0].Position, got.Items[1].Position, got.Items[2].Position})
+
+	require.NotNil(t, got.Viewer)
+	assert.Equal(t, 3, got.Viewer.Position,
+		"the tied viewer sits in slot 3 of the list they are looking at -- a COUNT(sp > x) would say 1")
+}
+
+// A soft-deleted player (no `users` row the join can see) is missing from the
+// items, from the total, AND from every position -- all three, or the numbers
+// contradict each other.
+func TestGetLeaderboard_InvisibleUserIsExcludedEverywhere(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seed(1, "top", 5000, 10)
+	repo.seed(2, "second", 3000, 10)
+	// A row with no username -- the mock's stand-in for users.deleted_at NOT NULL.
+	repo.rows[key(9, testWindow.ID)] = &season.PlayerSeason{
+		UserID: 9, SeasonID: testWindow.ID, SP: 99000, GamesPlayed: 1,
+	}
+
+	rec, err := callLeaderboard(t, repo, 2, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Equal(t, int64(2), got.Total, "the deleted account is not counted in the total")
+	require.Len(t, got.Items, 2)
+	for _, row := range got.Items {
+		assert.NotEqual(t, uint(9), row.UserID, "the deleted account is not listed")
+	}
+	require.NotNil(t, got.Viewer)
+	assert.Equal(t, 2, got.Viewer.Position,
+		"the deleted account does not push the viewer down a slot")
+}
+
+// D7: every response tier is DERIVED from `sp`, never the stored rank_tier
+// column, in the rows AND in the viewer block.
+func TestGetLeaderboard_TierIsDerivedNotTheStoredColumn(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seed(1, "gm", 20000, 40)
+	repo.seed(2, "viewer", 9000, 30)
+	// Deliberately wrong snapshots, as a lagging column would be.
+	repo.rows[key(1, testWindow.ID)].RankTier = "iron"
+	repo.rows[key(2, testWindow.ID)].RankTier = "iron"
+
+	rec, err := callLeaderboard(t, repo, 2, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	require.Len(t, got.Items, 2)
+	assert.Equal(t, "grandmaster", got.Items[0].Tier, "20000 SP is Grandmaster, whatever the column says")
+	assert.Equal(t, "diamond", got.Items[1].Tier)
+	require.NotNil(t, got.Viewer)
+	assert.Equal(t, "diamond", got.Viewer.Tier)
+}
+
+// The endpoint is keyed off the JWT subject only -- with no authenticated user it
+// is a 401, and the repository is never reached.
+func TestGetLeaderboard_RequiresAuth(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+
+	_, err := callLeaderboard(t, repo, 0, "season=current")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, apperr.ErrUnauthorized)
+	assert.Zero(t, repo.pageCalls)
+}
+
+// A READ MUST NOT WRITE. FindPlayerSeason's contract is explicit that a GET which
+// lazily created a player_seasons row would put everyone who merely opened the
+// lobby onto this very leaderboard -- so the read path is asserted to leave the
+// row set exactly as it found it.
+func TestGetLeaderboard_ReadCreatesNoPlayerRecord(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+	before := len(repo.rows)
+
+	// A caller with no row of their own is the case that would create one.
+	_, err := callLeaderboard(t, repo, 4242, "season=current")
+	require.NoError(t, err)
+
+	assert.Len(t, repo.rows, before, "the leaderboard read must not materialise a player_seasons row")
+	assert.NotContains(t, repo.rows, key(4242, testWindow.ID))
+}
+
+// A repository failure surfaces as a plain wrapped error (a 500 through
+// appErrorHandler), never as an auth or bad-request error.
+func TestGetLeaderboard_RepositoryFailureSurfaces(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.pageErr = errors.New("db down")
+
+	_, err := callLeaderboard(t, repo, 1, "season=current")
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, apperr.ErrUnauthorized)
+	assert.NotErrorIs(t, err, apperr.ErrBadRequest)
+}
+
+func TestGetLeaderboard_CountAheadFailureSurfaces(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+	repo.countErr = errors.New("db down")
+
+	_, err := callLeaderboard(t, repo, 1, "season=current")
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, apperr.ErrBadRequest)
+}
+
+// The same contract-violation guard the current-season path has: a repository
+// that returns (nil, nil) must produce an error, not a nil dereference.
+func TestGetLeaderboard_NilSeasonIsAnErrorNotAPanic(t *testing.T) {
+	repo := newMockRepo(nil)
+
+	_, err := callLeaderboard(t, repo, 42, "season=current")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no season")
+}
+
+// --- Review follow-ups (P1, P7, P9, P12) ---
+
+// P12: nothing previously proved that the handler's PARSED parameters, and the
+// resolved season id, arrive at the repository unchanged. A parse that clamped
+// silently, or a service that swapped limit and offset, would still produce a
+// well-formed response — the numbers would just describe a different page than
+// the one asked for.
+func TestGetLeaderboard_ParsedParamsReachTheRepositoryUnchanged(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 60)
+
+	_, err := callLeaderboard(t, repo, 1, "season=current&limit=20&offset=40")
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, repo.pageCalls, "exactly one page read per request")
+	assert.Equal(t, [3]int{int(testWindow.ID), 20, 40}, repo.lastPageArgs,
+		"the resolved season id, the parsed limit and the parsed offset, in that order")
+}
+
+// And the defaults travel just as literally: the widget sends no limit at all.
+func TestGetLeaderboard_DefaultParamsReachTheRepositoryUnchanged(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 60)
+
+	_, err := callLeaderboard(t, repo, 1, "season=current")
+	require.NoError(t, err)
+
+	assert.Equal(t, [3]int{int(testWindow.ID), 10, 0}, repo.lastPageArgs)
+}
+
+// P10: `?limit=` and `?offset=` are PRESENT BUT EMPTY. They take the defaults
+// rather than 400, matching parseMatchesQuery — so a client that interpolates an
+// undefined value gets the same answer from both endpoints. Pinned because the
+// doc now makes a claim about it.
+func TestGetLeaderboard_EmptyParamValuesTakeTheDefaults(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 30)
+
+	rec, err := callLeaderboard(t, repo, 1, "season=current&limit=&offset=")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Equal(t, 10, got.Limit, "an empty value is an absent value")
+	assert.Equal(t, 0, got.Offset)
+	assert.Equal(t, [3]int{int(testWindow.ID), 10, 0}, repo.lastPageArgs)
+}
+
+// P9: `offset` had two bounds fewer than `limit`. A caller-chosen offset in the
+// billions parses cleanly and makes Postgres sort and discard that many rows, so
+// the cost of a request grew with a number the client picked freely.
+func TestGetLeaderboard_RejectsAnOffsetPastTheCeiling(t *testing.T) {
+	cases := []string{
+		"offset=10001",
+		"offset=9223372036854775807",
+		"offset=99999999",
+	}
+	for _, query := range cases {
+		t.Run(query, func(t *testing.T) {
+			repo := newMockRepo(testWindow)
+			seedLadder(repo, 3)
+
+			_, err := callLeaderboard(t, repo, 1, "season=current&"+query)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, apperr.ErrBadRequest)
+			assert.Zero(t, repo.pageCalls, "rejected before the database is touched")
+		})
+	}
+}
+
+// The accepted side of the same bound.
+func TestGetLeaderboard_AcceptsTheOffsetCeilingItself(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+
+	rec, err := callLeaderboard(t, repo, 1, "season=current&offset=10000")
+	require.NoError(t, err)
+	assert.Equal(t, 10000, decodeLeaderboard(t, rec).Offset)
+}
+
+// P1: THE LADDER IS SP EARNERS ONLY. A 0-SP row is written for every seat absent
+// at a match end, so these are ordinary rows, not corruption. Listing one would
+// give a player a real position while the viewer block told that same player
+// they had no standing, and would falsify the empty state's copy.
+func TestGetLeaderboard_ZeroSPRowsAreNotOnTheLadder(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seed(1, "earner", 500, 5)
+	repo.seed(2, "absentee", 0, 3)
+	repo.seed(3, "other", 250, 4)
+
+	rec, err := callLeaderboard(t, repo, 1, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Equal(t, int64(2), got.Total, "the 0-SP row is excluded from the total")
+	require.Len(t, got.Items, 2)
+	assert.Equal(t, []uint{1, 3}, []uint{got.Items[0].UserID, got.Items[1].UserID})
+	assert.Equal(t, []int{1, 2}, []int{got.Items[0].Position, got.Items[1].Position},
+		"positions close up — an excluded row leaves no gap")
+}
+
+// A season whose ONLY rows are 0-SP reads as empty, which is what makes the
+// empty-state copy ("Nobody has earned Season Points yet") true.
+func TestGetLeaderboard_SeasonOfOnlyZeroSPRowsReadsAsEmpty(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seed(1, "a", 0, 2)
+	repo.seed(2, "b", 0, 1)
+
+	rec, err := callLeaderboard(t, repo, 42, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Empty(t, got.Items)
+	assert.Equal(t, int64(0), got.Total)
+	assert.Nil(t, got.Viewer)
+	assert.Contains(t, rec.Body.String(), `"items":[]`)
+}
+
+// The agreement that the exclusion must not break: with a 0-SP row present in
+// the season, every listed row's position still equals its own CountAhead + 1.
+func TestGetLeaderboard_PositionsStillAgreeWithAZeroSPRowPresent(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seed(1, "top", 5000, 9)
+	repo.seed(2, "absentee", 0, 1)
+	repo.seed(3, "mid", 900, 7)
+	repo.seed(4, "tied", 900, 7)
+
+	// Each listed player asks for their own standing in turn.
+	for _, viewerID := range []uint{1, 3, 4} {
+		rec, err := callLeaderboard(t, repo, viewerID, "season=current")
+		require.NoError(t, err)
+		got := decodeLeaderboard(t, rec)
+
+		require.NotNil(t, got.Viewer, "user %d earned SP and must have a standing", viewerID)
+		var own *season.LeaderboardRowView
+		for i := range got.Items {
+			if got.Items[i].UserID == viewerID {
+				own = &got.Items[i]
+			}
+		}
+		require.NotNil(t, own)
+		assert.Equal(t, own.Position, got.Viewer.Position,
+			"user %d: the viewer block and the list must not disagree", viewerID)
+	}
+}
+
+// P7: a SOFT-DELETED account holding an unexpired JWT used to receive a viewer
+// block (FindPlayerSeason has no `users` join) while being absent from the list —
+// a position counted against a population that excluded it, plus a pinned row the
+// caller could never find. The viewer now runs through the list's own predicate.
+func TestGetLeaderboard_SoftDeletedViewerHasNoStanding(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.seed(1, "alive", 1000, 10)
+	// A row with SP but no username entry: the mock's soft-deleted account.
+	repo.rows[key(9, testWindow.ID)] = &season.PlayerSeason{
+		UserID: 9, SeasonID: testWindow.ID, SP: 50000, GamesPlayed: 40,
+	}
+
+	rec, err := callLeaderboard(t, repo, 9, "season=current")
+	require.NoError(t, err)
+
+	got := decodeLeaderboard(t, rec)
+	assert.Nil(t, got.Viewer,
+		"a player who is not listable has no standing — no phantom position, no pinned row")
+	require.Len(t, got.Items, 1)
+	assert.Equal(t, uint(1), got.Items[0].UserID)
+	assert.Zero(t, repo.aheadCalls, "and no position is counted for them")
+}
+
+// The viewer lookup failing is a 500, not a 400 and not a silent nil standing.
+func TestGetLeaderboard_ViewerLookupFailureSurfaces(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 3)
+	repo.entryErr = errors.New("db down")
+
+	_, err := callLeaderboard(t, repo, 1, "season=current")
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, apperr.ErrBadRequest)
+	assert.NotErrorIs(t, err, apperr.ErrUnauthorized)
 }

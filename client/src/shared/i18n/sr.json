@@ -13,6 +13,7 @@
   },
   "nav": {
     "play": "Igraj",
+    "leaderboard": "Rang lista",
     "profile": "Profil",
     "rules": "Pravila",
     "appName": "Beljot",
@@ -1391,6 +1392,30 @@
     },
     "tierUp": {
       "toast": "Novi rang: {{tier}}"
+    },
+    "leaderboard": {
+      "eyebrow": "Sezona",
+      "title": "Rang lista",
+      "sub": "Ko se najbrže penje ove sezone, po sezonskim poenima.",
+      "heading": "Najbolji igrači",
+      "loading": "Učitavanje…",
+      "error": "Neuspešno učitavanje rang liste. Pokušaj ponovo",
+      "empty": "Još niko nije osvojio sezonske poene ove sezone.",
+      "loadMore": "Učitaj još",
+      "retry": "Pokušaj ponovo",
+      "stale": "Osvežavanje nije uspelo.",
+      "showing": "Prikazano {{shown}} od {{total}} igrača",
+      "viewAll": "Prikaži sve",
+      "you": "Ti",
+      "yourPosition": "Tvoja pozicija",
+      "spValue": "{{sp}} SP",
+      "rowAria": "{{position}}. {{username}}, {{tier}}, {{sp}} SP",
+      "gamesAria": "{{games}} odigranih mečeva",
+      "columns": {
+        "position": "Pozicija",
+        "sp": "SP",
+        "games": "Odigranih mečeva"
+      }
     }
   }
 }

@@ -152,3 +152,118 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 		GamesCompleted: gamesCompleted,
 	}, nil
 }
+
+// LeaderboardView is the read path behind GET /api/v1/leaderboard?season=current
+// (Story 13.2): one SP-ordered page of the active season plus the viewer's own
+// position under that same order.
+//
+// PULL-ONLY. There is deliberately no WebSocket event for standings (epic
+// decision, restated as a Story 13.2 boundary): the client loads this on mount
+// and re-reads it on a poll. Nothing here is pushed and nothing invalidates it
+// from the socket.
+//
+// Like CurrentSeasonView this never creates a PLAYER record -- it only reads
+// player_seasons -- while resolveSeason may still lazily create the SEASON
+// window, which is idempotent and bounded to one row per quarter.
+//
+// `limit` and `offset` arrive already validated by the handler
+// (parseLeaderboardQuery); the service does not re-clamp them, so a caller that
+// bypasses the handler gets exactly what it asked for.
+func (s *Service) LeaderboardView(userID uint, limit, offset int, now time.Time) (*LeaderboardView, error) {
+	current, err := s.resolveSeason(now)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, total, err := s.repo.LeaderboardPage(current.ID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("reading leaderboard page: %w", err)
+	}
+
+	items := make([]LeaderboardRowView, 0, len(entries))
+	for i, e := range entries {
+		items = append(items, LeaderboardRowView{
+			// The list's own numbering. Derived from the page window rather than
+			// read back from SQL, which is only correct because the repository
+			// guarantees a TOTAL order (sp DESC, user_id ASC) -- with a partial
+			// order, row 41 of one request need not be row 41 of the next.
+			Position: offset + i + 1,
+			UserID:   e.UserID,
+			Username: e.Username,
+			SP:       e.SP,
+			// DERIVED, never the stored rank_tier column (Story 13.1 D7). The
+			// repository does not even select that column.
+			Tier:        TierForSP(e.SP),
+			GamesPlayed: e.GamesPlayed,
+		})
+	}
+
+	viewer, err := s.viewerPosition(userID, current.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &LeaderboardView{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+		Viewer: viewer,
+	}, nil
+}
+
+// viewerPosition resolves the caller's own standing, or nil when there is
+// nothing to pin.
+//
+// NIL IN THREE CASES, deliberately indistinguishable on the wire:
+//
+//	no row       the viewer has not played this season at all.
+//	sp == 0      the viewer has a row (they played, and were absent at every
+//	             terminal end, or the formula paid nothing) but earned no SP.
+//	soft-deleted the account is gone but still holds an unexpired JWT.
+//
+// ALL THREE ARE DECIDED BY THE REPOSITORY, not re-derived here, and that is the
+// point: FindLeaderboardEntry applies the LIST'S OWN visibility predicate. The
+// earlier version of this function called FindPlayerSeason and checked
+// `record.SP <= 0` in Go, which got the first two cases right and the third
+// wrong -- FindPlayerSeason has no `users` join, so a deleted account received a
+// viewer block and a pinned row while being absent from the list, with a position
+// counted against a population that excluded it.
+//
+// Keeping the rule in ONE place also means the answer cannot drift: if a row is
+// listable, it has a standing; if it is not, it has none. There is no third
+// state for this function to invent.
+//
+// The AC marks the viewer's own row only when they have ANY SP. Note this is NOT
+// the same as saying 0 SP is unranked -- a 0-SP player is Iron and the RankBanner
+// renders them normally; they simply have no meaningful ladder position to point
+// at, and every 0-SP player would otherwise share the same last-place block.
+//
+// The position comes from CountAhead under the LIST'S OWN ORDER, so a viewer who
+// is on the page they are looking at reads the same number twice.
+func (s *Service) viewerPosition(userID, seasonID uint) (*LeaderboardViewerView, error) {
+	entry, err := s.repo.FindLeaderboardEntry(seasonID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("reading viewer leaderboard entry: %w", err)
+	}
+	if entry == nil {
+		return nil, nil
+	}
+
+	ahead, err := s.repo.CountAhead(seasonID, entry.SP, userID)
+	if err != nil {
+		return nil, fmt.Errorf("counting leaderboard rows ahead: %w", err)
+	}
+
+	return &LeaderboardViewerView{
+		Position: int(ahead) + 1,
+		UserID:   userID,
+		SP:       entry.SP,
+		Tier:     TierForSP(entry.SP),
+		// entry.Username is deliberately DROPPED rather than forwarded: the viewer
+		// IS the authenticated caller, so the client already holds their name in
+		// authStore, and the wire block stays name-free (Story 13.2 D3). It is
+		// selected only because it rides the shared scope's SELECT list.
+		GamesPlayed: entry.GamesPlayed,
+	}, nil
+}

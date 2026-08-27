@@ -62,6 +62,21 @@ export const queryKeys = {
   // event:season_points_awarded WS handler rather than polled.
   season: {
     current: () => ["season", "current"] as const,
+    // Story 13.2: the seasonal leaderboard, keyed by PAGE SIZE only.
+    //
+    // No `offset` in the key, deliberately. Neither consumer needs one: the
+    // lobby widget only ever reads offset 0, and the full page is a single
+    // useInfiniteQuery whose pages live inside ONE cache entry with the offsets
+    // as page params — an offset in the key would fragment that entry per page
+    // and defeat the point. It previously took an `offset` argument that both
+    // callers passed as 0, which described a cache layout the code did not have.
+    //
+    // `limit` does separate entries, so the widget's top ten and the page's
+    // 25-row pages cannot overwrite each other with differently-sized lists.
+    //
+    // NOT invalidated from the socket — standings are pull-only (page load plus
+    // poll), by epic decision.
+    leaderboard: (limit: number) => ["season", "leaderboard", limit] as const,
   },
   stats: {
     public: ["stats", "public"] as const,

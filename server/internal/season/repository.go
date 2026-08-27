@@ -44,4 +44,69 @@ type Repository interface {
 	// per-player row is neither. So the invariant is "reads do not create PLAYER
 	// records", not "reads do not write".
 	FindPlayerSeason(userID, seasonID uint) (*PlayerSeason, error)
+
+	// LeaderboardPage returns one offset page of a season's standings, ordered
+	// best-first, plus the TOTAL number of rows the same predicate matches (not
+	// the page length) so the caller can drive load-more paging.
+	//
+	// PRECONDITION: limit >= 1 and offset >= 0. Violations return an error rather
+	// than a page -- `limit` reaches both a slice pre-allocation (which panics on
+	// a negative) and SQL LIMIT (where a negative means "no limit" and returns the
+	// whole season). The HTTP handler rejects bad user input with 400 long before
+	// this; the check exists for in-process callers that never saw a query string.
+	//
+	// LeaderboardPage, CountAhead and FindLeaderboardEntry below share ONE
+	// VISIBILITY PREDICATE and ONE TOTAL ORDER, and both properties are
+	// load-bearing:
+	//
+	//   predicate  season_id = ? AND users.deleted_at IS NULL AND sp > 0.
+	//              The join is written by table name, so GORM's soft-delete scope
+	//              does NOT apply and the filter is spelled out (see
+	//              internal/room/gorm_repo.go:298 for the live leak this avoids).
+	//              `sp > 0` is a MEMBERSHIP RULE, not a filter for tidiness: the
+	//              ladder is SP earners only (owner decision 2026-08-27), because
+	//              a 0-SP row is written for any seat absent at a match end and
+	//              listing it would contradict the viewer block, which reports no
+	//              standing at 0 SP. Excluded rows are missing from `items`,
+	//              missing from `total`, and counted in nobody's position -- all
+	//              three, or the numbers contradict each other.
+	//   order      sp DESC, user_id ASC. The tiebreak is not cosmetic: without a
+	//              second column, two players on equal SP can swap between the
+	//              page-1 and page-2 queries and be duplicated or skipped.
+	//
+	// The TIER IS NOT SELECTED. rank_tier is a denormalized snapshot allowed to
+	// lag (Story 13.1 D7); callers derive it with TierForSP(sp). Sorting is by
+	// `sp`, which is authoritative.
+	//
+	// NO METHOD BELOW WRITES ANYTHING -- see FindPlayerSeason's contract above. A
+	// leaderboard read that materialised a player_seasons row would list everyone
+	// who merely opened the lobby.
+	LeaderboardPage(seasonID uint, limit, offset int) ([]LeaderboardEntry, int64, error)
+
+	// FindLeaderboardEntry returns the player's own listable standing, or
+	// (nil, nil) when they have none.
+	//
+	// It answers the viewer block, and it exists SEPARATELY FROM FindPlayerSeason
+	// precisely so the viewer is subject to the LIST'S OWN VISIBILITY PREDICATE.
+	// FindPlayerSeason sees no `users` join, so it returns rows for soft-deleted
+	// accounts and for 0-SP rows -- either of which would hand a caller a position
+	// counted against a population that does not include them, plus a pinned row
+	// they cannot find in the list. A miss therefore covers three cases the caller
+	// treats identically: no row, a 0-SP row, and a soft-deleted account.
+	FindLeaderboardEntry(seasonID, userID uint) (*LeaderboardEntry, error)
+
+	// CountAhead returns how many of the season's visible rows sort STRICTLY
+	// AHEAD of (sp, userID) under LeaderboardPage's own total order, so the
+	// viewer's position is CountAhead + 1.
+	//
+	// It is a bounded COUNT, not a window function: `sp > ? OR (sp = ? AND
+	// user_id < ?)`. A plain COUNT(sp > vSP) would hand every player tied at, say,
+	// 900 SP the SAME position, while the list numbers them offset+i+1 -- so a
+	// tied viewer could be told "position 4" while standing in slot 6 of the page
+	// they are looking at. Counting rows that sort ahead under the FULL order is
+	// what makes the two agree.
+	//
+	// The row need not exist: the caller only calls this once FindPlayerSeason has
+	// returned one.
+	CountAhead(seasonID uint, sp int, userID uint) (int64, error)
 }

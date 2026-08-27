@@ -40,6 +40,17 @@ vi.mock("@/shared/api/lobby", () => ({
   getLobbyStats: (...args: unknown[]) => mockGetLobbyStats(...args),
 }));
 
+// Story 13.2 put the LeaderboardPanel in the lobby aside, so EVERY test in this
+// file now mounts a component that fetches. Without this mock each one fired an
+// unmocked request and leaned on the query simply never resolving.
+vi.mock("@/shared/api/season", () => ({
+  getCurrentSeason: (...args: unknown[]) => mockGetCurrentSeason(...args),
+  getSeasonLeaderboard: (...args: unknown[]) => mockGetSeasonLeaderboard(...args),
+}));
+
+const mockGetSeasonLeaderboard = vi.fn();
+const mockGetCurrentSeason = vi.fn();
+
 vi.mock("@/shared/providers/WebSocketContext", () => ({
   useWsSendMessage: () => vi.fn(),
   useWsConnectionState: () => "connected" as const,
@@ -62,6 +73,23 @@ function renderLobbyPage() {
     inMatch: 0,
     online: 0,
     registered: 0,
+  });
+  mockGetSeasonLeaderboard.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 10,
+    offset: 0,
+    viewer: null,
+  });
+  mockGetCurrentSeason.mockResolvedValue({
+    seasonName: "2026 Q3",
+    endsAt: "2026-10-01T00:00:00Z",
+    sp: 0,
+    rankTier: "iron",
+    spIntoTier: 0,
+    spForNextTier: 500,
+    gamesPlayed: 0,
+    gamesCompleted: 0,
   });
   render(
     <QueryWrapper>
@@ -103,6 +131,24 @@ describe("LobbyPage", () => {
     expect(screen.getByTestId("stats-in-room")).toBeInTheDocument();
     expect(screen.getByTestId("stats-in-game")).toBeInTheDocument();
     expect(screen.getByTestId("stats-active-ratio")).toBeInTheDocument();
+  });
+
+  it("renders the seasonal leaderboard panel in the aside", async () => {
+    renderLobbyPage();
+
+    // The lobby is the widget's ONLY production surface, so its presence here is
+    // the one thing that catches it being dropped from the page.
+    expect(screen.getByTestId("lobby-sidebar")).toBeInTheDocument();
+    const panel = screen.getByTestId("leaderboard-panel");
+    expect(panel).toBeInTheDocument();
+    expect(screen.getByTestId("lobby-sidebar")).toContainElement(panel);
+    // And it links onward to the full page (AC1).
+    await waitFor(() => {
+      expect(screen.getByTestId("leaderboard-panel-view-all")).toHaveAttribute(
+        "href",
+        "/leaderboard",
+      );
+    });
   });
 
   it("opens CreateRoomModal when Create Room card is clicked", async () => {

@@ -13,6 +13,7 @@
   },
   "nav": {
     "play": "Play",
+    "leaderboard": "Leaderboard",
     "profile": "Profile",
     "rules": "Rules",
     "appName": "Beljot",
@@ -1391,6 +1392,30 @@
     },
     "tierUp": {
       "toast": "New rank: {{tier}}"
+    },
+    "leaderboard": {
+      "eyebrow": "Season",
+      "title": "Leaderboard",
+      "sub": "Who is climbing fastest this season, by Season Points.",
+      "heading": "Top players",
+      "loading": "Loading…",
+      "error": "Could not load the leaderboard — try again",
+      "empty": "Nobody has earned Season Points yet this season.",
+      "loadMore": "Load more",
+      "retry": "Retry",
+      "stale": "Could not refresh just now.",
+      "showing": "Showing {{shown}} of {{total}} players",
+      "viewAll": "View all",
+      "you": "You",
+      "yourPosition": "Your position",
+      "spValue": "{{sp}} SP",
+      "rowAria": "{{position}}. {{username}}, {{tier}}, {{sp}} SP",
+      "gamesAria": "{{games}} matches played",
+      "columns": {
+        "position": "Position",
+        "sp": "SP",
+        "games": "Matches played"
+      }
     }
   }
 }

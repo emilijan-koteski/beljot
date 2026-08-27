@@ -320,3 +320,67 @@ export interface CurrentSeasonResponse {
   /** Matches finished this season — exactly those that earned SP. */
   gamesCompleted: number;
 }
+
+/**
+ * One row of GET /api/v1/leaderboard (Story 13.2).
+ *
+ * `position` is the row's 1-based slot in the WHOLE season order (sp desc, then
+ * ascending user id), not its index in the page — which is why the response
+ * echoes `offset` back.
+ */
+export interface LeaderboardRow {
+  position: number;
+  userId: number;
+  username: string;
+  /** Accumulated Season Points this window. */
+  sp: number;
+  /**
+   * Stable machine token ("iron" | ... | "grandmaster"), DERIVED server-side from
+   * `sp` rather than read off the denormalized rank_tier column. Typed as
+   * `string` rather than the `SeasonTier` union for the same reason
+   * `CurrentSeasonResponse.rankTier` is: a server-side retune that adds a tier
+   * must degrade through `normalizeSeasonTier` on a stale bundle, not fail a
+   * type check.
+   */
+  tier: string;
+  gamesPlayed: number;
+}
+
+/**
+ * The VIEWER'S OWN standing, so their row can be marked in the list and pinned
+ * into view when it falls outside the loaded pages.
+ *
+ * NO USERNAME, on purpose: the viewer is the authenticated caller and the client
+ * already holds their name in `authStore`, so the pinned row renders through the
+ * same component with the name supplied locally.
+ *
+ * `position` is counted under the list's own total order, so a viewer tied on SP
+ * reads the same number as the slot they occupy.
+ */
+export interface LeaderboardViewer {
+  position: number;
+  userId: number;
+  sp: number;
+  tier: string;
+  gamesPlayed: number;
+}
+
+/**
+ * GET /api/v1/leaderboard?season=current — one offset page of the active
+ * season's standings plus the viewer's own position.
+ *
+ * `{ items, total, limit, offset }` is the project's one paginated shape (the
+ * same as the profile's match history). `total` is the season's whole visible
+ * row count, not the page length, so load-more can tell when it is done.
+ *
+ * `viewer` is NULL when the caller has no season row OR has earned no SP — the
+ * own-row marker appears only for a player with any SP. The key is always
+ * present, so `null` means "no standing", never "an older server".
+ */
+export interface LeaderboardResponse {
+  items: LeaderboardRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  viewer: LeaderboardViewer | null;
+}

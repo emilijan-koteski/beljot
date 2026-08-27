@@ -384,6 +384,14 @@ func main() {
 	// beside it, on the same seasonService constructed above.
 	seasonHandler := season.NewHandler(seasonService)
 	api.GET("/seasons/current", seasonHandler.GetCurrentSeason)
+	// Seasonal leaderboard (Story 13.2) — an SP-ordered page of the active season
+	// plus the CALLER'S OWN position under the same order. Same service, same
+	// repository, no new construction.
+	//
+	// PULL-ONLY BY DESIGN: the lobby widget polls it and the /leaderboard page
+	// re-reads it on mount. Standings get no WebSocket push (epic decision), so
+	// nothing in ws/events.go corresponds to this route — do not add one.
+	api.GET("/leaderboard", seasonHandler.GetLeaderboard)
 
 	// Lobby stats endpoint — bucket-counts connected users into in-lobby /
 	// in-room / in-game and reports registered totals.

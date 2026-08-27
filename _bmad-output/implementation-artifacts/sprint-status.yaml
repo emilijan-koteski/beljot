@@ -194,7 +194,7 @@ development_status:
   # --- Epic 13: Seasonal Rank & Leaderboard (Phase 4) ---
   epic-13: in-progress
   13-1-season-points-and-tier-climb: review
-  13-2-seasonal-leaderboard: backlog
+  13-2-seasonal-leaderboard: review
   13-3-season-rollover-and-prior-season-archive: backlog
   epic-13-retrospective: optional
 

@@ -19,8 +19,18 @@ import { cn } from "@/shared/lib/utils";
 import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
+// One list, two renderers: the ≥md link row AND the mobile dropdown below both
+// map over this, and each item's `data-testid` derives from the second segment
+// of its labelKey (`nav.play` -> `nav-play` / `nav-menu-play`).
+//
+// Leaderboard sits second, next to Play: it is a play-adjacent destination, and
+// the pair reads as "what's on" before the personal/reference tabs. Adding it
+// puts a FOURTH tab into the md..lg band the brand wordmark already yielded to
+// (see the note on `app-name` below) — re-measure that band before adding a
+// fifth.
 const navItems = [
   { path: "/lobby", labelKey: "nav.play" },
+  { path: "/leaderboard", labelKey: "nav.leaderboard" },
   { path: "/profile", labelKey: "nav.profile" },
   { path: "/rules", labelKey: "nav.rules" },
 ] as const;

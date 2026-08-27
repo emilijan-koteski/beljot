@@ -222,3 +222,54 @@ describe("TopBar history-stack shaping", () => {
     expect(passedThrough).toBe(true);
   });
 });
+
+// Story 13.2 added a fourth tab. navItems feeds BOTH renderers — the >=md link
+// row and the mobile dropdown — so a tab that appears in one and not the other
+// means someone stopped mapping over the shared list.
+describe("TopBar leaderboard tab", () => {
+  beforeEach(() => {
+    setAuthUser();
+  });
+
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  it("renders the Leaderboard tab in the desktop nav row, linking to /leaderboard", () => {
+    renderWithRouter();
+
+    const tab = screen.getByTestId("nav-leaderboard");
+    expect(tab).toHaveTextContent("Leaderboard");
+    expect(tab).toHaveAttribute("href", "/leaderboard");
+  });
+
+  it("renders the Leaderboard entry in the mobile menu too", async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    // The mobile menu is its own dropdown (`nav-menu`), separate from the
+    // desktop user pill (`nav-user`).
+    await user.click(screen.getByTestId("nav-menu"));
+    await waitFor(() => {
+      expect(screen.getByTestId("nav-menu-leaderboard")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("nav-menu-leaderboard")).toHaveTextContent("Leaderboard");
+  });
+
+  it("navigates to /leaderboard when the tab is activated", async () => {
+    const router = createMemoryRouter(
+      [
+        { path: "/lobby", element: <TopBar showNav showUserMenu /> },
+        { path: "/leaderboard", element: <div data-testid="leaderboard-page">Leaderboard</div> },
+      ],
+      { initialEntries: ["/lobby"] },
+    );
+    render(<RouterProvider router={router} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("nav-leaderboard"));
+    });
+
+    expect(router.state.location.pathname).toBe("/leaderboard");
+  });
+});
