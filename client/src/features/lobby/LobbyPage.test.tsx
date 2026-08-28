@@ -578,3 +578,27 @@ describe("LobbyPage", () => {
     expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
   });
 });
+
+describe("LobbyPage support note", () => {
+  it("renders one quiet support line, last on the page", () => {
+    renderLobbyPage();
+
+    const note = screen.getByTestId("support-note");
+    expect(note.textContent).toContain("A hobby project — you can always buy me a coffee.");
+    // Below the room-count footnote, i.e. the very bottom of the page — never
+    // near the hero or the room grid.
+    const footnote = screen.getByText(/Showing/);
+    expect(footnote.compareDocumentPosition(note)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("shows no support dialog until the line is used", async () => {
+    const user = userEvent.setup();
+    renderLobbyPage();
+
+    expect(screen.queryByTestId("support-dialog")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("support-note-link"));
+
+    expect(await screen.findByTestId("support-dialog")).toBeInTheDocument();
+  });
+});

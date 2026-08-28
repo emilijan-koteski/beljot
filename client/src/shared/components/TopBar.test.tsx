@@ -402,3 +402,81 @@ describe("TopBar seasonal rank chip", () => {
     expect(mockGetCurrentSeason).not.toHaveBeenCalled();
   });
 });
+
+describe("TopBar support entry", () => {
+  beforeEach(() => {
+    setAuthUser();
+  });
+
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  it("offers support from the desktop user menu, above logout", async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await user.click(screen.getByTestId("nav-user"));
+    await waitFor(() => {
+      expect(screen.getByTestId("nav-support")).toBeInTheDocument();
+    });
+
+    const item = screen.getByTestId("nav-support");
+    expect(item).toHaveTextContent("Support Beljot.online");
+    // Support sits above logout: logout is the menu's terminal action and stays
+    // last, the way it did before this entry joined.
+    expect(item.compareDocumentPosition(screen.getByTestId("nav-logout"))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it("opens the explainer dialog from the desktop user menu", async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await user.click(screen.getByTestId("nav-user"));
+    await waitFor(() => {
+      expect(screen.getByTestId("nav-support")).toBeInTheDocument();
+    });
+    await user.click(screen.getByTestId("nav-support"));
+
+    // The dialog is mounted outside the dropdown, so it must survive the
+    // dropdown unmounting itself on select.
+    expect(await screen.findByTestId("support-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("support-cta")).toHaveAttribute(
+      "href",
+      "https://buymeacoffee.com/emilijan",
+    );
+  });
+
+  it("offers support from the mobile menu too", async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await user.click(screen.getByTestId("nav-menu"));
+    await waitFor(() => {
+      expect(screen.getByTestId("nav-menu-support")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("nav-menu-support")).toHaveTextContent("Support Beljot.online");
+
+    await user.click(screen.getByTestId("nav-menu-support"));
+    expect(await screen.findByTestId("support-dialog")).toBeInTheDocument();
+  });
+
+  it("adds no support entry to a bar that renders no menus", () => {
+    // AuthLayout's configuration: no nav, no user menu. The auth pages get
+    // their reminder from the footer note instead, so a second one here would
+    // be the duplicate this feature is specifically trying to avoid.
+    render(
+      withQuery(
+        <MemoryRouter initialEntries={["/login"]}>
+          <TopBar showFullBrand />
+        </MemoryRouter>,
+      ),
+    );
+
+    expect(screen.queryByTestId("nav-menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("nav-support")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("nav-menu-support")).not.toBeInTheDocument();
+  });
+});

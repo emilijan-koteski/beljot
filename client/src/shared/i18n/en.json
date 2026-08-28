@@ -1433,5 +1433,17 @@
         "games": "Matches played"
       }
     }
+  },
+  "support": {
+    "label": "Support Beljot.online",
+    "note": "A hobby project — you can always <action>buy me a coffee</action>.",
+    "dialog": {
+      "eyebrow": "Hobby project",
+      "title": "I build Beljot.online in my free time",
+      "body": "The server and the domain come out of my own pocket. A coffee covers a bit of it — playing and bringing friends along helps just as much.",
+      "cta": "Buy me a coffee",
+      "qrToggle": "Scan with your phone",
+      "qrAlt": "QR code linking to Emilijan's Buy Me a Coffee page"
+    }
   }
 }

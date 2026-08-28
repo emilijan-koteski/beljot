@@ -1433,5 +1433,17 @@
         "games": "Odigranih mečeva"
       }
     }
+  },
+  "support": {
+    "label": "Podrži Beljot.online",
+    "note": "Hobi projekat. Uvek mi možeš <action>kupiti kafu</action>.",
+    "dialog": {
+      "eyebrow": "Hobi projekat",
+      "title": "Beljot.online radim u slobodno vreme",
+      "body": "Server i domen plaćam iz svog džepa. Jedna kafa pokriva deo toga, a igranje i pozivanje prijatelja pomažu jednako.",
+      "cta": "Kupi mi kafu",
+      "qrToggle": "Skeniraj telefonom",
+      "qrAlt": "QR kod koji vodi na Buy Me a Coffee stranicu Emilijana Koteskog"
+    }
   }
 }

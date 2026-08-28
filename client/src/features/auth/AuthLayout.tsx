@@ -1,6 +1,7 @@
 import { Trans } from "react-i18next";
 import { Outlet } from "react-router";
 
+import { SupportNote } from "@/shared/components/support/SupportNote";
 import { TopBar } from "@/shared/components/TopBar";
 
 const LINKEDIN_URL = "https://www.linkedin.com/in/emilijan-koteski/";
@@ -48,6 +49,11 @@ export function AuthLayout() {
             ),
           }}
         />
+
+        {/* Second line, under the credit: the quiet support reminder. Mounted
+            on the LAYOUT, so login, register, forgot-password and
+            reset-password all carry it without four separate edits. */}
+        <SupportNote variant="auth" />
       </footer>
     </div>
   );

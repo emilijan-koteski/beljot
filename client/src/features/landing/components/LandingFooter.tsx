@@ -1,15 +1,18 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
 import { BrandLockup } from "@/features/landing/components/BrandLockup";
 import { ContactDialog } from "@/features/landing/components/ContactDialog";
+import { SupportDialog } from "@/shared/components/support/SupportDialog";
 
 // Felt footer — brand, a row of links, and the copyright. Rules reaches the
 // public reference page; Privacy + Terms the public legal pages;
-// Contact opens a dialog.
+// Contact and Support each open a dialog.
 
 export function LandingFooter() {
   const { t } = useTranslation();
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const links: Array<{ label: string; to: string }> = [
     { label: t("landing.foot.rules"), to: "/rules" },
@@ -28,9 +31,21 @@ export function LandingFooter() {
             </Link>
           ))}
           <ContactDialog />
+          {/* Labelled "Support Beljot.online" rather than a bare "Support":
+              next to Contact, the short form would read as a help desk. */}
+          <button
+            type="button"
+            onClick={() => setSupportOpen(true)}
+            data-testid="support-footer-link"
+            className="hover:text-ink cursor-pointer transition-colors"
+          >
+            {t("support.label")}
+          </button>
         </nav>
         <span className="text-ink-off font-mono text-[11px]">{t("landing.foot.copyright")}</span>
       </div>
+
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
     </footer>
   );
 }

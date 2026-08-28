@@ -626,3 +626,35 @@ describe("LoginPage", () => {
     });
   });
 });
+
+// The support reminder lives on AuthLayout, not on any one page, so login /
+// register / forgot-password / reset-password all inherit it. Asserted here
+// because this file already renders the real layout around its page.
+describe("AuthLayout support note", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  it("renders a second footer line offering support, under the credit", () => {
+    renderLoginPage();
+
+    const note = screen.getByTestId("support-note");
+    expect(note.textContent).toContain("hobby project");
+    // Under the existing credit line, inside the same footer.
+    const footer = screen.getByTestId("auth-footer");
+    expect(footer).toContainElement(note);
+    expect(screen.getByTestId("auth-footer-link").compareDocumentPosition(note)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it("opens the explainer without leaving the login page", async () => {
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.click(screen.getByTestId("support-note-link"));
+
+    expect(await screen.findByTestId("support-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("login-form")).toBeInTheDocument();
+  });
+});

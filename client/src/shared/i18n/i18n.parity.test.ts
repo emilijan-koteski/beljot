@@ -184,3 +184,80 @@ describe("declaration phase copy", () => {
     }
   });
 });
+
+// The support surfaces are the one place the app asks players for money, so
+// their copy gets its own gate. Parity above proves the keys EXIST; this proves
+// they were translated, that the Macedonian stayed Cyrillic, and that the
+// clickable slot survived translation — a locale that drops <action> renders a
+// sentence with nothing to click, and naming that slot <link> breaks silently
+// (`link` is a real HTML void element, so Trans's parser closes it immediately
+// and spills the label into the surrounding sentence).
+describe("support copy", () => {
+  const PROSE_KEYS = ["label", "note"] as const;
+  const DIALOG_KEYS = ["eyebrow", "title", "body", "cta", "qrToggle"] as const;
+
+  type Support = {
+    label: string;
+    note: string;
+    dialog: Record<string, string>;
+  };
+
+  function support(locale: unknown): Support {
+    return (locale as { support: Support }).support;
+  }
+
+  it.each([
+    ["hr", hr],
+    ["mk", mk],
+    ["sr", sr],
+  ])("%s translates every support string away from the English", (name, locale) => {
+    const localised = support(locale);
+    const english = support(en);
+    for (const key of PROSE_KEYS) {
+      expect(localised[key], `${name}.support.${key}`).toBeTruthy();
+      expect(localised[key], `${name}.support.${key} is still the English string`).not.toBe(
+        english[key],
+      );
+    }
+    for (const key of DIALOG_KEYS) {
+      expect(
+        localised.dialog[key],
+        `${name}.support.dialog.${key} is still the English string`,
+      ).not.toBe(english.dialog[key]);
+    }
+  });
+
+  it("keeps the Macedonian support copy Cyrillic apart from the brand name", () => {
+    const localised = support(mk);
+    const entries: Array<[string, string]> = [
+      ...PROSE_KEYS.map((k): [string, string] => [k, localised[k]]),
+      ...DIALOG_KEYS.map((k): [string, string] => [`dialog.${k}`, localised.dialog[k] ?? ""]),
+    ];
+    for (const [key, value] of entries) {
+      // Allowed Latin: the <action> markup slot and the brand name itself.
+      // `qrAlt` is deliberately excluded from this list — it carries both the
+      // "QR" abbreviation and the full "Buy Me a Coffee" brand name.
+      const prose = value.replace(/<\/?action>/g, "").replace(/Beljot(\.online)?/g, "");
+      expect(prose, `mk.support.${key}`).not.toMatch(/[A-Za-z]/);
+    }
+  });
+
+  it("keeps the clickable slot intact in the inline note, in every locale", () => {
+    for (const [name, locale] of [
+      ["en", en],
+      ["hr", hr],
+      ["mk", mk],
+      ["sr", sr],
+    ] as const) {
+      for (const key of ["note"] as const) {
+        const value = support(locale)[key];
+        expect(value, `${name}.support.${key} lost its <action> slot`).toMatch(
+          /<action>.+<\/action>/,
+        );
+        expect(value, `${name}.support.${key} must not use the void <link> tag`).not.toContain(
+          "<link>",
+        );
+      }
+    }
+  });
+});

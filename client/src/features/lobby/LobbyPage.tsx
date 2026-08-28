@@ -14,6 +14,7 @@ import { RoomGrid } from "@/features/lobby/components/RoomGrid";
 import { Toast } from "@/features/lobby/components/Toast";
 import { CreateRoomModal } from "@/features/room/CreateRoomModal";
 import { FetchError } from "@/shared/api/axiosClient";
+import { SupportNote } from "@/shared/components/support/SupportNote";
 import {
   useJoinRoomMutation,
   useQuickJoinMutation,
@@ -257,6 +258,11 @@ export function LobbyPage() {
       <p className="text-ink-mute mt-8 text-center text-xs">
         {t("lobby.footnote", { shown: filtered.length, total: rooms.length })}
       </p>
+
+      {/* Bottom of the page, under the room count — the one support surface in
+          the lobby, and deliberately the last thing on it rather than anything
+          near the hero or the grid. */}
+      <SupportNote variant="lobby" />
 
       <CreateRoomModal open={showCreate} onOpenChange={setShowCreate} />
       <PasswordPromptDialog

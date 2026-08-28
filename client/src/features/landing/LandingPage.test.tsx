@@ -83,4 +83,19 @@ describe("LandingPage", () => {
     );
     expect(screen.getByText(/beta build/i)).toBeInTheDocument();
   });
+
+  it("opens the support dialog from the footer", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+
+    // A button, not a link — it opens the in-app explainer rather than
+    // navigating, so the Rules/Privacy/Terms link queries above stay unaffected.
+    await user.click(screen.getByTestId("support-footer-link"));
+
+    expect(await screen.findByTestId("support-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("support-cta")).toHaveAttribute(
+      "href",
+      "https://buymeacoffee.com/emilijan",
+    );
+  });
 });

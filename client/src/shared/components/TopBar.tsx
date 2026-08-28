@@ -1,11 +1,12 @@
-import { ChevronDown, Coins, LogOut, Menu } from "lucide-react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import { ChevronDown, Coins, HandHeart, LogOut, Menu } from "lucide-react";
+import { type MouseEvent as ReactMouseEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { LevelRing } from "@/shared/components/LevelRing";
 import { HeaderRankChip } from "@/shared/components/season/HeaderRankChip";
+import { SupportDialog } from "@/shared/components/support/SupportDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,6 +70,10 @@ export function TopBar({
   const returnToLobby = useLobbyReturn();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  // Support explainer, opened from either menu. The dialog is mounted OUTSIDE
+  // both dropdowns — a dropdown unmounts its own subtree on select, which
+  // would close the dialog in the same tick it opened.
+  const [supportOpen, setSupportOpen] = useState(false);
 
   // History-stack shaping: navigating between the top-level pages must not
   // grow the stack — only the lobby → X hop is a push. Links whose target is
@@ -264,12 +269,21 @@ export function TopBar({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="bg-surface-elevated min-w-44 border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
+              className="bg-surface-elevated w-max min-w-44 max-w-(--available-width) border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
             >
               <div className="text-ink-mute px-2.5 pt-2 pb-1.5 text-[11px] tracking-[0.3px]">
                 {t("nav.signedInAs", { defaultValue: "Signed in as" })}{" "}
                 <span className="text-ink font-semibold">{user.username}</span>
               </div>
+              <div className="mx-1 my-1 h-px bg-border" />
+              <DropdownMenuItem
+                onClick={() => setSupportOpen(true)}
+                data-testid="nav-support"
+                className="text-ink hover:bg-surface-sunken flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium"
+              >
+                <HandHeart className="text-ink-dim size-3.5" />
+                <span className="whitespace-nowrap">{t("support.label")}</span>
+              </DropdownMenuItem>
               <div className="mx-1 my-1 h-px bg-border" />
               <DropdownMenuItem
                 onClick={handleLogout}
@@ -283,8 +297,9 @@ export function TopBar({
           </DropdownMenu>
         )}
 
-        {/* Phones (<md): one hamburger folds the nav links + logout that the
-            bar can't fit. The language picker stays beside it as its own icon. */}
+        {/* Phones (<md): one hamburger folds the nav links, the support entry and
+            logout that the bar can't fit. The language picker stays beside it as
+            its own icon. */}
         {(showNav || (showUserMenu && user)) && (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -296,7 +311,7 @@ export function TopBar({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="bg-surface-elevated min-w-48 border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
+              className="bg-surface-elevated w-max min-w-48 max-w-(--available-width) border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
             >
               {showUserMenu && user && (
                 <>
@@ -332,7 +347,16 @@ export function TopBar({
                     </DropdownMenuItem>
                   );
                 })}
-              {showNav && showUserMenu && user && <div className="mx-1 my-1 h-px bg-border" />}
+              {showNav && <div className="mx-1 my-1 h-px bg-border" />}
+              <DropdownMenuItem
+                onClick={() => setSupportOpen(true)}
+                data-testid="nav-menu-support"
+                className="text-ink hover:bg-surface-sunken flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium"
+              >
+                <HandHeart className="text-ink-dim size-3.5" />
+                <span className="whitespace-nowrap">{t("support.label")}</span>
+              </DropdownMenuItem>
+              {showUserMenu && user && <div className="mx-1 my-1 h-px bg-border" />}
               {showUserMenu && user && (
                 <DropdownMenuItem
                   onClick={handleLogout}
@@ -347,6 +371,10 @@ export function TopBar({
           </DropdownMenu>
         )}
       </div>
+
+      {/* Reaches every page that renders a TopBar menu — which excludes the
+          match route, so nothing support-related can appear mid-game. */}
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
     </nav>
   );
 }
