@@ -1,15 +1,28 @@
+version: "2"
+
 run:
   timeout: 5m
 
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
-
-issues:
-  exclude-dirs:
-    - internal/game/testfixtures
+  exclusions:
+    # std-error-handling is the v2 preset carrying the same default exclusions
+    # golangci-lint v1 applied — it drops errcheck reports for the conventionally
+    # ignored Close/Flush/print/os.* return values. Keeps the enforced set equal
+    # to the previous v1 baseline across the migration.
+    presets:
+      - std-error-handling
+    paths:
+      - internal/game/testfixtures
+    rules:
+      # staticcheck's "quickfix" (QF*) category is stylistic auto-fix advice the
+      # v1 baseline never ran; keep it off so the migration changes tooling, not
+      # the enforced ruleset. Stylistic churn stays opt-in.
+      - linters:
+          - staticcheck
+        text: "QF[0-9]{4}"
