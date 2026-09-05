@@ -12,8 +12,9 @@ export type CardId = `${Rank}${Suit}`;
 // derives its list from the union instead of hand-copying it. `Variant` is
 // derived FROM this array, so the two can never disagree.
 //
-// Order is presentation order: `bitola` first, the variant Quick Play offers and
-// the default everywhere a variant is unknown.
+// Order is presentation order: `bitola` first — the create-room default and the
+// fallback everywhere a variant is unknown (Quick Play itself now synthesizes
+// Croatian/501 rooms).
 export const VARIANTS = ["bitola", "croatia"] as const;
 
 export type Variant = (typeof VARIANTS)[number];

@@ -106,6 +106,7 @@ func setupHonorTest(
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
 	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet, honor, nil)
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler

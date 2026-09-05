@@ -251,6 +251,10 @@ type RoomHandler struct {
 	// ever CONSUMES and VOIDS them — grants are issued by InviteHandler, which must
 	// be constructed with this same registry.
 	invites *InviteRegistry
+	// quickFill is the server-authoritative auto-fill scheduler that backfills
+	// empty Quick Play seats with bots on a paced cadence (see quick_fill.go).
+	// Always non-nil after NewRoomHandler; the intervals are test-overridable.
+	quickFill *quickFillScheduler
 }
 
 func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster, presence *PresenceRegistry, walletService WalletService, honorService HonorService, invites *InviteRegistry) *RoomHandler {
@@ -264,7 +268,7 @@ func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcas
 	if invites == nil {
 		invites = NewInviteRegistry()
 	}
-	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence, walletService: walletService, honorService: honorService, invites: invites}
+	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence, walletService: walletService, honorService: honorService, invites: invites, quickFill: newQuickFillScheduler(defaultQuickFillFastInterval, defaultQuickFillPatientInterval)}
 }
 
 // broadcastToRoom sends a WebSocket message to all players in a room.
@@ -2445,7 +2449,7 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 // nil when no matchStarter is wired (test setups skip this) or when StartMatch
 // succeeds. The caller is responsible for reverting the status flip when this
 // returns a non-nil error (Story 8.5-1 AC2).
-func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomPlayer) error {
+func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomPlayer, bots []RoomBot) error {
 	if h.matchStarter == nil {
 		return nil
 	}
@@ -2459,14 +2463,26 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 			}
 		}
 	}
+	// Bot-filled seats travel into the rules-engine seat info flagged IsBot,
+	// mirroring the manual-start block: without this a bot seat would be a
+	// zero-valued {Seat:0, IsBot:false} entry and clobber seat 0's human. Bots
+	// carry no UserID/Username — identity is seat-derived and rendered client-side.
+	for _, b := range bots {
+		if b.Seat >= 0 && b.Seat <= 3 {
+			seatInfo[b.Seat] = match.PlayerSeatInfo{
+				Seat:  b.Seat,
+				IsBot: true,
+			}
+		}
+	}
 
 	// Story 9.4 (AC2/AC3): charge the bracket stake atomically BEFORE the session
-	// goes live, mirroring the manual /start path (StartMatch). Quick Play always
-	// seats four humans (never bots), so every seat pays. The whole block is
-	// skipped for the free bracket (CoinBuyIn == 0). ChargeStakes is the
-	// AUTHORITATIVE money guard (FOR UPDATE) — the join-time bracket gate is never
-	// trusted here. `charged`/`chargedIDs` record the debit so a later StartMatch
-	// failure can refund it.
+	// goes live, mirroring the manual /start path (StartMatch). Only human seats
+	// pay — `players` is the room_players (humans only); bot seats live in `bots`
+	// and never accrue a stake. The whole block is skipped for the free bracket
+	// (CoinBuyIn == 0). ChargeStakes is the AUTHORITATIVE money guard (FOR UPDATE)
+	// — the join-time bracket gate is never trusted here. `charged`/`chargedIDs`
+	// record the debit so a later StartMatch failure can refund it.
 	//
 	// Insolvency at quick-play auto-start is a near-impossible edge (a >=500
 	// player held by ALREADY_IN_ROOM cannot spend elsewhere, and balances only
@@ -2664,6 +2680,7 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 	matchStarted := false
 	var autoStartRoom *Room
 	var autoStartPlayers []RoomPlayer
+	var autoStartBots []RoomBot
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
 		// Story 8.5-1 AC3 + P1: row-lock the room AND re-fetch players INSIDE
 		// the auto-start tx so a concurrent LeaveRoom committing between the
@@ -2680,13 +2697,20 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 		if err != nil {
 			return fmt.Errorf("fetching players for auto-start check: %w", err)
 		}
+		// Bot-filled seats count toward the four (Quick Play bot auto-fill):
+		// a room fills when seated humans + bots cover all four seats. Bots and
+		// humans never share a seat, so the sum is a faithful coverage count.
+		bots, err := tx.FindBotsByRoomID(roomID)
+		if err != nil {
+			return fmt.Errorf("fetching bots for auto-start check: %w", err)
+		}
 		seatedCount := 0
 		for _, p := range freshPlayers {
 			if p.Seat != nil {
 				seatedCount++
 			}
 		}
-		if seatedCount < 4 {
+		if seatedCount+len(bots) < 4 {
 			return nil
 		}
 		r.Status = "playing"
@@ -2696,6 +2720,7 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 		matchStarted = true
 		autoStartRoom = r
 		autoStartPlayers = freshPlayers
+		autoStartBots = bots
 		return nil
 	}); err != nil {
 		return false, fmt.Errorf("auto-start check: %w", err)
@@ -2706,7 +2731,7 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 		// broadcast on matchStarter.StartMatch success. On failure, revert the
 		// status flip so the room is not stranded in "playing" with no live
 		// session and tell the four would-be participants to stay put.
-		startErr := h.startAutoStartedMatch(autoStartRoom, autoStartPlayers)
+		startErr := h.startAutoStartedMatch(autoStartRoom, autoStartPlayers, autoStartBots)
 		if startErr != nil {
 			slog.Error("failed to start auto-started game session", "roomID", roomID, "error", startErr)
 			// Story 9.4: an insolvency at charge time was fully handled inside
@@ -2723,6 +2748,10 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 			// the manual StartMatch path).
 			h.presence.Clear(roomID)
 			h.invites.VoidRoom(roomID)
+			// The room started, so the auto-fill scheduler has nothing left to
+			// do — cancel it (single source of truth for the started transition,
+			// shared by SelectSeat / QuickPlay / QuickJoin).
+			h.cancelQuickFill(roomID)
 			h.broadcastToRoom(roomID, ws.SystemMatchStarted, map[string]interface{}{
 				"roomId": roomID,
 			})
@@ -3818,8 +3847,8 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				Name:      "Quick Play " + code,
 				Code:      code,
 				OwnerID:   userID,
-				Variant:   "bitola",
-				MatchMode: "1001",
+				Variant:   "croatia",
+				MatchMode: "501",
 				// Story 9.4 (AC5, Decision D5): quick-play games default to a
 				// per-move 30s timer (was relaxed/no timer) so casual matchmade
 				// games keep moving. The value flows through StartMatch unchanged
@@ -3849,11 +3878,11 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				// same reason as AllowNewPlayers above: no GORM `default` tag, so an
 				// omitted field would insert false and silently strip melds and
 				// Belote from every matchmade table. Quick Play offers no rule
-				// choices — it is Bitola, 1001, declarations on.
+				// choices — it is Croatian, 501, declarations on.
 				DeclarationsEnabled: true,
 				// Quick Play finishes the hand, spelled out explicitly for the same
 				// reason as its siblings above. Quick Play offers no rule choices — it
-				// is Bitola, 1001, declarations on, finish the hand.
+				// is Croatian, 501, declarations on, finish the hand.
 				StopAtTarget: false,
 				Status:       "waiting",
 				PlayerCount:  1,
@@ -3949,6 +3978,19 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 	matchStarted, err := h.autoStartIfFull(resultRoom.ID)
 	if err != nil {
 		return err
+	}
+
+	// Arm / reset the bot auto-fill scheduler unless the match already started
+	// (autoStartIfFull cancels it on a successful start). A brand-new room arms a
+	// fresh timer whose cadence is chosen from the idle-lobby count; joining an
+	// existing waiting room resets its inactivity timer so a fresh human never has
+	// a bot dropped on them within the patient window.
+	if !matchStarted {
+		if createdNew {
+			h.startQuickFill(resultRoom.ID, userID)
+		} else {
+			h.resetQuickFill(resultRoom.ID)
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -4059,6 +4101,13 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 	matchStarted, err := h.autoStartIfFull(resultRoom.ID)
 	if err != nil {
 		return err
+	}
+
+	// A human joined a specific waiting Quick Play room: reset its inactivity
+	// timer so an already-armed patient countdown restarts (autoStartIfFull
+	// cancels the scheduler outright when this join started the match).
+	if !matchStarted {
+		h.resetQuickFill(resultRoom.ID)
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{

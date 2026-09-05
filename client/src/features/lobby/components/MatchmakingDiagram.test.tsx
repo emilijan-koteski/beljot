@@ -21,6 +21,21 @@ function player(userId: number, username: string, seat: number): RoomPlayer {
   };
 }
 
+// A bot occupant as it arrives over the wire (Quick Play auto-fill): userId 0,
+// an EMPTY username, isBot true. Its display name is seat-derived client-side.
+function botPlayer(seat: number): RoomPlayer {
+  return {
+    id: 0,
+    roomId: 1,
+    userId: 0,
+    username: "",
+    seat,
+    team: seat % 2 === 0 ? "teamA" : "teamB",
+    isBot: true,
+    createdAt: "2026-01-01T00:00:00Z",
+  };
+}
+
 // Defaults to the real Quick Play config: a per-move 30s timer with a coin
 // stake. Overrides let individual tests exercise the relaxed / free variants.
 function room(overrides: Partial<Room> = {}): Room {
@@ -127,6 +142,48 @@ describe("MatchmakingDiagram", () => {
 
     expect(screen.getByText("Relaxed")).toBeInTheDocument();
     expect(screen.getByText("No stake")).toBeInTheDocument();
+  });
+
+  it("renders bot occupants with the localized bot name and glyph, never a blank", () => {
+    render(
+      <MatchmakingDiagram
+        room={room()}
+        found={4}
+        players={[player(7, "dejan_k", 0), botPlayer(1), botPlayer(2), botPlayer(3)]}
+        viewerSeat={0}
+        currentUsername="dejan_k"
+        elapsed="00:09"
+        onCancel={() => {}}
+      />,
+    );
+
+    // Each bot seat shows its seat-derived name (Bot n = seat + 1), not the
+    // empty wire username and not a "searching" placeholder.
+    expect(screen.getByTestId("matchmaking-bot-name-1")).toHaveTextContent("Bot 2");
+    expect(screen.getByTestId("matchmaking-bot-name-2")).toHaveTextContent("Bot 3");
+    expect(screen.getByTestId("matchmaking-bot-name-3")).toHaveTextContent("Bot 4");
+    expect(screen.queryByText("searching")).not.toBeInTheDocument();
+    // The three bot avatars render the Bot glyph in place of an initial.
+    expect(screen.getAllByTestId("avatar-icon")).toHaveLength(3);
+    // A full room reads 4 / 4 seated.
+    expect(screen.getByText("4 / 4 seated")).toBeInTheDocument();
+  });
+
+  it("surfaces a Croatia / 501 quick-play room's chips", () => {
+    render(
+      <MatchmakingDiagram
+        room={room({ variant: "croatia", matchMode: "501" })}
+        found={1}
+        players={[player(7, "dejan_k", 0)]}
+        viewerSeat={0}
+        currentUsername="dejan_k"
+        elapsed="00:03"
+        onCancel={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Croatian")).toBeInTheDocument();
+    expect(screen.getByText("501 pts")).toBeInTheDocument();
   });
 
   it("invokes onCancel when the cancel button is pressed", async () => {

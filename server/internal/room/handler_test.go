@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,8 +23,15 @@ import (
 // --- Mock Repository ---
 
 type mockRoomRepo struct {
-	rooms          []*room.Room
-	players        []*room.RoomPlayer
+	rooms   []*room.Room
+	players []*room.RoomPlayer
+	// botMu guards the bot slice + counter ONLY. The Quick Play auto-fill
+	// scheduler seats bots from a background AfterFunc goroutine, so bot access
+	// can race a test goroutine's read (e.g. the real-timer smoke test polling
+	// countBots). The rest of the mock is touched only from a single goroutine
+	// per test, so it stays lock-free — a blanket mutex would deadlock on the
+	// re-entrant RunInTransaction (fn(m)) and FindQuickPlayRoom self-call.
+	botMu          sync.Mutex
 	bots           []*room.RoomBot
 	nextID         uint
 	nextPID        uint
@@ -203,11 +211,11 @@ func (m *mockRoomRepo) FindQuickPlayRoomExcluding(excluded map[uint]bool, buyIn 
 		}
 		// Story 9.4: only return a room in the caller's affordability bracket.
 		// The variant predicate mirrors GormRepository.FindQuickPlayRoomExcluding
-		// (Story 12.8) — Quick Play is Bitola-only, and the mock must not be a
-		// looser filter than production or a quick-play test could pass against
-		// behaviour the real query rejects.
+		// — Quick Play is Croatian-only (croatia/501 default), and the mock must
+		// not be a looser filter than production or a quick-play test could pass
+		// against behaviour the real query rejects.
 		if r.IsQuickPlay && r.Status == "waiting" && r.PlayerCount < 4 &&
-			r.CoinBuyIn == buyIn && r.Variant == "bitola" {
+			r.CoinBuyIn == buyIn && r.Variant == "croatia" {
 			return r, nil
 		}
 	}
@@ -265,6 +273,8 @@ func (m *mockRoomRepo) FindPlayersByRoomIDs(roomIDs []uint) (map[uint][]room.Roo
 }
 
 func (m *mockRoomRepo) AddBot(roomID uint, seat int) error {
+	m.botMu.Lock()
+	defer m.botMu.Unlock()
 	for _, b := range m.bots {
 		if b.RoomID == roomID && b.Seat == seat {
 			return apperr.ErrSeatTaken
@@ -276,6 +286,8 @@ func (m *mockRoomRepo) AddBot(roomID uint, seat int) error {
 }
 
 func (m *mockRoomRepo) RemoveBot(roomID uint, seat int) error {
+	m.botMu.Lock()
+	defer m.botMu.Unlock()
 	for i, b := range m.bots {
 		if b.RoomID == roomID && b.Seat == seat {
 			m.bots = append(m.bots[:i], m.bots[i+1:]...)
@@ -286,6 +298,8 @@ func (m *mockRoomRepo) RemoveBot(roomID uint, seat int) error {
 }
 
 func (m *mockRoomRepo) UpdateBotSeat(roomID uint, fromSeat, toSeat int) error {
+	m.botMu.Lock()
+	defer m.botMu.Unlock()
 	for _, b := range m.bots {
 		if b.RoomID == roomID && b.Seat == toSeat {
 			return apperr.ErrSeatTaken
@@ -301,6 +315,8 @@ func (m *mockRoomRepo) UpdateBotSeat(roomID uint, fromSeat, toSeat int) error {
 }
 
 func (m *mockRoomRepo) FindBotsByRoomID(roomID uint) ([]room.RoomBot, error) {
+	m.botMu.Lock()
+	defer m.botMu.Unlock()
 	var result []room.RoomBot
 	for _, b := range m.bots {
 		if b.RoomID == roomID {
@@ -311,6 +327,8 @@ func (m *mockRoomRepo) FindBotsByRoomID(roomID uint) ([]room.RoomBot, error) {
 }
 
 func (m *mockRoomRepo) FindBotsByRoomIDs(roomIDs []uint) (map[uint][]room.RoomBot, error) {
+	m.botMu.Lock()
+	defer m.botMu.Unlock()
 	out := make(map[uint][]room.RoomBot)
 	for _, id := range roomIDs {
 		for _, b := range m.bots {
@@ -379,6 +397,11 @@ func testErrorHandler(err error, c echo.Context) {
 func setupTest() (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
 	handler := room.NewRoomHandler(repo, nil, nil, nil, nil, nil, nil)
+	// Neutralize the auto-fill cadence so a QuickPlay handler unit test never
+	// arms a real 3s AfterFunc that would fire against the abandoned mock after
+	// the test returns. The scheduler stays ARMED (observable via QuickFillState),
+	// it just never fires on its own within a unit test's lifetime.
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -409,6 +432,7 @@ func setupTestWithBroadcast() (*echo.Echo, *mockRoomRepo, *mockBroadcaster) {
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
 	handler := room.NewRoomHandler(repo, nil, broadcaster, nil, nil, nil, nil)
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -466,6 +490,7 @@ func setupTestWithPresence() (*echo.Echo, *mockRoomRepo, *room.PresenceRegistry)
 	repo := newMockRoomRepo()
 	reg := room.NewPresenceRegistry()
 	handler := room.NewRoomHandler(repo, nil, &mockBroadcaster{}, reg, nil, nil, nil)
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -482,6 +507,7 @@ func setupTestWithBroadcastAndPresence() (*echo.Echo, *mockRoomRepo, *mockBroadc
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
 	handler := room.NewRoomHandler(repo, nil, broadcaster, reg, nil, nil, nil)
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -1998,8 +2024,8 @@ func TestQuickPlay_CreatesNewRoom(t *testing.T) {
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
 
 	assert.True(t, data.Room.IsQuickPlay)
-	assert.Equal(t, "bitola", data.Room.Variant)
-	assert.Equal(t, "1001", data.Room.MatchMode)
+	assert.Equal(t, "croatia", data.Room.Variant)
+	assert.Equal(t, "501", data.Room.MatchMode)
 	// Story 9.4 (AC5): synthesized quick-play rooms default to per-move 30s.
 	assert.Equal(t, "per-move", data.Room.TimerStyle)
 	require.NotNil(t, data.Room.TimerDurationSeconds)
@@ -2030,8 +2056,8 @@ func TestQuickPlay_JoinsExistingRoom(t *testing.T) {
 		Name:        "Quick Play ABC123",
 		Code:        "ABC123",
 		OwnerID:     20,
-		Variant:     "bitola",
-		MatchMode:   "1001",
+		Variant:     "croatia",
+		MatchMode:   "501",
 		TimerStyle:  "relaxed",
 		IsQuickPlay: true,
 		Status:      "waiting",
@@ -2156,32 +2182,31 @@ func TestQuickPlay_SkipsNonQuickPlayRooms(t *testing.T) {
 	assert.False(t, data.MatchStarted)
 }
 
-// TestQuickPlay_NeverMatchesCroatianRooms pins the "Quick Play stays
-// Bitola-only" limit of Epic 12. It was true by construction before this test
-// existed — QuickPlay's room synthesis hardcodes Variant "bitola", the only
-// place is_quick_play is ever set true — but nothing STATED it, so a future
-// change to that synthesis would have silently dropped queued players into a
-// variant matchmaking was never sized for.
+// TestQuickPlay_NeverMatchesBitolaRooms pins the "Quick Play is Croatian-only"
+// limit. It is true by construction — QuickPlay's room synthesis hardcodes
+// Variant "croatia", the only place is_quick_play is ever set true — but nothing
+// STATED it, so a future change to that synthesis would silently drop queued
+// players into a variant matchmaking was never sized for.
 //
-// The Croatian room here is deliberately given every other matchable
-// attribute (quick-play flag, waiting, seats free, matching buy-in) so the
-// variant is the only reason it is skipped.
-func TestQuickPlay_NeverMatchesCroatianRooms(t *testing.T) {
+// The Bitola room here is deliberately given every other matchable attribute
+// (quick-play flag, waiting, seats free, matching buy-in) so the variant is the
+// only reason it is skipped.
+func TestQuickPlay_NeverMatchesBitolaRooms(t *testing.T) {
 	e, repo := setupTest()
 
-	croatianRoom := &room.Room{
-		Name:        "Quick Play CRO001",
-		Code:        "CRO001",
+	bitolaRoom := &room.Room{
+		Name:        "Quick Play BIT001",
+		Code:        "BIT001",
 		OwnerID:     50,
-		Variant:     "croatia",
+		Variant:     "bitola",
 		MatchMode:   "1001",
 		TimerStyle:  "per-move",
 		IsQuickPlay: true,
 		Status:      "waiting",
 		PlayerCount: 1,
 	}
-	_ = repo.Create(croatianRoom)
-	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: croatianRoom.ID, UserID: 50})
+	_ = repo.Create(bitolaRoom)
+	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: bitolaRoom.ID, UserID: 50})
 
 	// Queue repeatedly: matchmaking must never land in it, not merely usually.
 	for attempt, uid := range []uint{60, 61, 62} {
@@ -2196,9 +2221,9 @@ func TestQuickPlay_NeverMatchesCroatianRooms(t *testing.T) {
 		}
 		require.NoError(t, json.Unmarshal(resp["data"], &data))
 
-		assert.NotEqual(t, croatianRoom.ID, data.Room.ID,
-			"attempt %d landed in the Croatian quick-play room", attempt)
-		assert.Equal(t, "bitola", data.Room.Variant, "attempt %d", attempt)
+		assert.NotEqual(t, bitolaRoom.ID, data.Room.ID,
+			"attempt %d landed in the Bitola quick-play room", attempt)
+		assert.Equal(t, "croatia", data.Room.Variant, "attempt %d", attempt)
 	}
 }
 
@@ -2211,8 +2236,8 @@ func TestQuickPlay_FillsFirstEmptySeat(t *testing.T) {
 		Name:        "Quick Play GAPS",
 		Code:        "GAPSEA",
 		OwnerID:     400,
-		Variant:     "bitola",
-		MatchMode:   "1001",
+		Variant:     "croatia",
+		MatchMode:   "501",
 		TimerStyle:  "relaxed",
 		IsQuickPlay: true,
 		Status:      "waiting",
@@ -2267,8 +2292,8 @@ func TestQuickPlay_AutoStartsOnFourthJoiner(t *testing.T) {
 		Name:        "Quick Play FILL",
 		Code:        "FILLED",
 		OwnerID:     500,
-		Variant:     "bitola",
-		MatchMode:   "1001",
+		Variant:     "croatia",
+		MatchMode:   "501",
 		TimerStyle:  "relaxed",
 		IsQuickPlay: true,
 		Status:      "waiting",
@@ -2426,6 +2451,7 @@ func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode str
 func setupTestWithStarter(starter room.MatchStarter, broadcaster room.Broadcaster) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
 	handler := room.NewRoomHandler(repo, starter, broadcaster, nil, nil, nil, nil)
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -2500,15 +2526,16 @@ func TestStartGame_PassesTheRoomsVariantToTheSessionManager(t *testing.T) {
 	}
 }
 
-// TestQuickPlay_StartsABitolaMatch pins the other half: quick play synthesizes
-// its own room and hardcodes Bitola, so the match it starts must be Bitola too.
-func TestQuickPlay_StartsABitolaMatch(t *testing.T) {
+// TestQuickPlay_StartsACroatianMatch pins the other half: quick play synthesizes
+// its own room and hardcodes Croatian, so the match it starts must be Croatian
+// (and 501) too.
+func TestQuickPlay_StartsACroatianMatch(t *testing.T) {
 	starter := &fakeMatchStarter{}
 	e, repo := setupTestWithStarter(starter, &mockBroadcaster{})
 
 	qpRoom := &room.Room{
 		Name: "Quick Play QPVAR1", Code: "QPVAR1", OwnerID: 500,
-		Variant: "bitola", MatchMode: "1001", TimerStyle: "relaxed",
+		Variant: "croatia", MatchMode: "501", TimerStyle: "relaxed",
 		IsQuickPlay: true, Status: "waiting", PlayerCount: 3,
 	}
 	require.NoError(t, repo.Create(qpRoom))
@@ -2522,8 +2549,63 @@ func TestQuickPlay_StartsABitolaMatch(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	require.Equal(t, 1, starter.called, "the 4th joiner auto-starts the match")
-	assert.Equal(t, "bitola", starter.lastVariant,
-		"Quick Play is Bitola-only — the started match must be too")
+	assert.Equal(t, "croatia", starter.lastVariant,
+		"Quick Play is Croatian-only — the started match must be too")
+	assert.Equal(t, "501", starter.lastMatchMode,
+		"Quick Play is 501 — the started match must be too")
+}
+
+func decodeQuickPlayRoomID(t *testing.T, rec *httptest.ResponseRecorder) uint {
+	t.Helper()
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data struct {
+		Room room.Room `json:"room"`
+	}
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+	return data.Room.ID
+}
+
+// TestQuickPlay_WiresQuickFillScheduler pins the handler→scheduler wiring — the
+// feature's activation trigger, which is otherwise unverified (a regression that
+// dropped the start/reset calls would ship green). It asserts a brand-new
+// QuickPlay room ARMS the auto-fill scheduler, and that a later human arriving
+// via QuickPlay (join-existing branch) or QuickJoin RESETS it — a fresh
+// generation, still armed. Huge intervals keep the scheduler observable without
+// a real timer firing mid-assertion.
+func TestQuickPlay_WiresQuickFillScheduler(t *testing.T) {
+	repo := newMockRoomRepo()
+	handler := room.NewRoomHandler(repo, nil, nil, nil, nil, nil, nil)
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
+
+	e := echo.New()
+	e.HTTPErrorHandler = testErrorHandler
+	api := e.Group("/api/v1", auth.AuthMiddleware("test-jwt-secret"))
+	api.POST("/rooms/quick-play", handler.QuickPlay)
+	api.POST("/rooms/:id/quick-join", handler.QuickJoin)
+
+	// (a) Creating a NEW quick-play room arms the scheduler.
+	rec := doQuickPlay(e, validToken(1))
+	require.Equal(t, http.StatusOK, rec.Code)
+	roomID := decodeQuickPlayRoomID(t, rec)
+	require.Equal(t, uint(1), roomID, "the first synthesized room has ID 1 in a fresh mock repo")
+	gen1, _, armed := handler.QuickFillState(roomID)
+	require.True(t, armed, "creating a new QP room must arm the auto-fill scheduler")
+
+	// (b) A second human QuickPlay-ing into that same room resets the scheduler.
+	rec = doQuickPlay(e, validToken(2))
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, roomID, decodeQuickPlayRoomID(t, rec), "the second QuickPlay must join the existing room")
+	gen2, _, armed2 := handler.QuickFillState(roomID)
+	require.True(t, armed2, "still armed after a join")
+	assert.Greater(t, gen2, gen1, "join-existing must reset the scheduler (fresh generation)")
+
+	// (c) A QuickJoin into the waiting room also resets the scheduler.
+	rec = doQuickJoin(e, "1", validToken(3))
+	require.Equal(t, http.StatusOK, rec.Code)
+	gen3, _, armed3 := handler.QuickFillState(roomID)
+	require.True(t, armed3, "still armed after a quick-join")
+	assert.Greater(t, gen3, gen2, "quick-join must reset the scheduler (fresh generation)")
 }
 
 // TestSelectSeat_AutoStart_BroadcastsWhenStartGameSucceeds locks in Story
@@ -2645,8 +2727,8 @@ func TestQuickPlay_AutoStart_RevertsWhenStartGameFails(t *testing.T) {
 		Name:        "Quick Play AC2QPFAIL",
 		Code:        "AC2QF1",
 		OwnerID:     700,
-		Variant:     "bitola",
-		MatchMode:   "1001",
+		Variant:     "croatia",
+		MatchMode:   "501",
 		TimerStyle:  "relaxed",
 		IsQuickPlay: true,
 		Status:      "waiting",
@@ -2696,8 +2778,8 @@ func TestQuickPlay_RetriesOnErrRoomFull(t *testing.T) {
 		Name:        "Quick Play DRIFT",
 		Code:        "DRIFT1",
 		OwnerID:     900,
-		Variant:     "bitola",
-		MatchMode:   "1001",
+		Variant:     "croatia",
+		MatchMode:   "501",
 		TimerStyle:  "relaxed",
 		IsQuickPlay: true,
 		Status:      "waiting",

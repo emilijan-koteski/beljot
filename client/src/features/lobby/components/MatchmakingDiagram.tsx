@@ -1,4 +1,4 @@
-import { Clock, Coins, Trophy, X } from "lucide-react";
+import { Bot, Clock, Coins, Trophy, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
@@ -6,6 +6,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
+import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { modeLabel, variantLabel } from "@/shared/lib/roomLabels";
@@ -183,6 +184,15 @@ export function MatchmakingDiagram({
           const occupant = players.find((p) => p.seat === seatIndex);
           const isUs = seatIndex % 2 === viewerSeat % 2;
           const team = isUs ? "A" : "B";
+          // Bot occupants carry an empty wire username — their identity is
+          // seat-derived and localized ("Bot N"), rendered with the Bot glyph
+          // instead of the blank initial (mirrors SeatTile / RoomCard).
+          const occupantIsBot = occupant?.isBot === true;
+          const occupantName = occupant
+            ? occupantIsBot
+              ? botDisplayName(t, seatIndex)
+              : occupant.username
+            : "";
           return (
             <div
               key={seatIndex}
@@ -191,7 +201,12 @@ export function MatchmakingDiagram({
               style={{ left: `calc(50% + ${offset.x}%)`, top: `calc(50% + ${offset.y}%)` }}
             >
               {occupant ? (
-                <Avatar name={occupant.username} size={orbitSize} team={team} />
+                <Avatar
+                  name={occupantName}
+                  size={orbitSize}
+                  team={team}
+                  icon={occupantIsBot ? <Bot aria-hidden="true" /> : undefined}
+                />
               ) : (
                 <div
                   className={`bg-surface-elevated flex items-center justify-center rounded-full border-2 border-dashed ${
@@ -212,8 +227,9 @@ export function MatchmakingDiagram({
                 style={{
                   color: occupant ? (isUs ? "var(--team-a)" : "var(--team-b)") : "var(--ink-mute)",
                 }}
+                data-testid={occupantIsBot ? `matchmaking-bot-name-${seatIndex}` : undefined}
               >
-                {occupant ? occupant.username : t("lobby.matchmaking.searching")}
+                {occupant ? occupantName : t("lobby.matchmaking.searching")}
               </span>
             </div>
           );

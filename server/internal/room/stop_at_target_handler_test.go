@@ -174,7 +174,7 @@ func TestQuickPlay_SynthesizedRoomFinishesTheHand(t *testing.T) {
 	require.NotNil(t, persisted)
 	require.True(t, persisted.IsQuickPlay, "this test is meaningless unless a quick-play room was synthesized")
 	assert.False(t, persisted.StopAtTarget,
-		"Quick Play is Bitola, 1001, declarations on, finish the hand")
+		"Quick Play is Croatian, 501, declarations on, finish the hand")
 }
 
 // QuickPlay's system:room_created is the SECOND hand-built room payload in the

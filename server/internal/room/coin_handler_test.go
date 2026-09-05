@@ -84,6 +84,7 @@ func (s *stubWallet) ApplySettlement(credits map[uint]int) error {
 func setupCoinTest(starter room.MatchStarter, wallet room.WalletService) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
 	handler := room.NewRoomHandler(repo, starter, &mockBroadcaster{}, nil, wallet, nil, nil)
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -105,6 +106,7 @@ func setupCoinTestBC(starter room.MatchStarter, wallet room.WalletService) (*ech
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
 	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet, nil, nil)
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -290,8 +292,8 @@ func seedQuickPlayRoomWithStake(t *testing.T, repo *mockRoomRepo, code string, b
 		Name:                 "Quick Play " + code,
 		Code:                 code,
 		OwnerID:              seatedUserIDs[0],
-		Variant:              "bitola",
-		MatchMode:            "1001",
+		Variant:              "croatia",
+		MatchMode:            "501",
 		TimerStyle:           "per-move",
 		TimerDurationSeconds: &dur,
 		IsQuickPlay:          true,

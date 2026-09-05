@@ -231,14 +231,14 @@ func (r *GormRepository) FindQuickPlayRoomExcluding(excludedRoomIDs map[uint]boo
 	// serves this as a prefix; coin_buy_in is a low-cardinality residual filter.
 	//
 	// The variant predicate is DEFENCE IN DEPTH, not the mechanism: Quick Play is
-	// Bitola-only because the only place is_quick_play is ever set true
-	// (QuickPlay's room synthesis) hardcodes Variant "bitola", so no Croatian row
+	// Croatian-only because the only place is_quick_play is ever set true
+	// (QuickPlay's room synthesis) hardcodes Variant "croatia", so no Bitola row
 	// can match this filter in the first place. Stating it here means a future
 	// code path that synthesizes a differently-configured quick-play room cannot
 	// silently drop players into a variant matchmaking was never sized for.
 	q := r.db.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("is_quick_play = ? AND status = ? AND player_count < 4 AND coin_buy_in = ? AND variant = ?",
-			true, "waiting", buyIn, "bitola")
+			true, "waiting", buyIn, "croatia")
 	if len(excludedRoomIDs) > 0 {
 		ids := make([]uint, 0, len(excludedRoomIDs))
 		for id := range excludedRoomIDs {

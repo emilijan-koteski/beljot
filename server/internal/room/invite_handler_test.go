@@ -119,6 +119,7 @@ func setupInviteTest(honor room.HonorService) *inviteHarness {
 	notifier := &spyNotifier{}
 
 	roomHandler := room.NewRoomHandler(repo, nil, &mockBroadcaster{}, room.NewPresenceRegistry(), nil, honor, invites)
+	roomHandler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
 	inviteHandler := room.NewInviteHandler(repo, invites, friends, presence, presence, notifier)
 
 	e := echo.New()
