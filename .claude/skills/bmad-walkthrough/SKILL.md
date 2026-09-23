@@ -1,9 +1,9 @@
 ---
-name: bmad-checkpoint-preview
-description: 'LLM-assisted human-in-the-loop review. Make sense of a change, focus attention where it matters, test. Use when the user says "checkpoint", "human review", or "walk me through this change".'
+name: bmad-walkthrough
+description: 'Walk the user through reviewing a change: what it is for, what to look at closely, and how to test it. Use when the user says "walkthrough", "walk me through this change", or "human review"'
 ---
 
-# Checkpoint Review Workflow
+# Walkthrough Workflow
 
 **Goal:** Guide a human through reviewing a change — from purpose and context into details.
 
@@ -20,7 +20,7 @@ description: 'LLM-assisted human-in-the-loop review. Make sense of a change, foc
 
 ### Step 1: Resolve the Workflow Block
 
-Run: `uv run {project-root}/_bmad/scripts/resolve_customization.py --skill {skill-root} --key workflow`
+Run: `uv run {project-root}/_bmad/scripts/resolve_customization.py --skill {skill-root} --project-root {project-root} --key workflow`
 
 **If the script fails**, resolve the `workflow` block yourself by reading these three files in base → team → user order and applying the same structural merge rules as the resolver:
 
