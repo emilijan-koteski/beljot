@@ -63,12 +63,12 @@ func (f *fakeHonorRepo) FindManyByIDs(ids []uint) ([]User, error) {
 	return f.rows, nil
 }
 
-func (f *fakeHonorRepo) Count() (int64, error)                          { panic("unused") }
-func (f *fakeHonorRepo) UpdatePreferences(uint, *string, *string) error { panic("unused") }
-func (f *fakeHonorRepo) UpdatePasswordHash(uint, string) error          { panic("unused") }
-func (f *fakeHonorRepo) UpdateUsername(uint, string) (time.Time, error) { panic("unused") }
-func (f *fakeHonorRepo) AddXP(map[uint]int) (map[uint]int, error)       { panic("unused") }
-func (f *fakeHonorRepo) TotalXPForUsers([]uint) (map[uint]int, error)   { panic("unused") }
+func (f *fakeHonorRepo) Count() (int64, error)                           { panic("unused") }
+func (f *fakeHonorRepo) UpdatePreferences(uint, PreferencesUpdate) error { panic("unused") }
+func (f *fakeHonorRepo) UpdatePasswordHash(uint, string) error           { panic("unused") }
+func (f *fakeHonorRepo) UpdateUsername(uint, string) (time.Time, error)  { panic("unused") }
+func (f *fakeHonorRepo) AddXP(map[uint]int) (map[uint]int, error)        { panic("unused") }
+func (f *fakeHonorRepo) TotalXPForUsers([]uint) (map[uint]int, error)    { panic("unused") }
 
 // TestHonorService_ApplyHonorEvents_TranslatesBothDirections covers the only
 // logic this adapter has: mapping match-package DTOs onto their user-package

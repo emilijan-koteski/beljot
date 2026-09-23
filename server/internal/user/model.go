@@ -21,6 +21,25 @@ type User struct {
 	// "french" / "croatian". Unrelated enums that happen to share a country —
 	// never cross-wire them.
 	CardDeckPreference string `gorm:"default:french;not null" json:"cardDeckPreference"`
+	// SoundEnabled / MusicEnabled are the in-match audio switches (migration
+	// 000025): card sound effects and the background playlist, independently.
+	// CLIENT-ONLY — nothing on the server reads them. Both default ON: GORM
+	// treats the zero value false as "unset" on Create and writes the tag
+	// default instead, so a registration that never names them gets true, the
+	// same value the migration backfilled. Turning one off therefore always
+	// goes through UpdatePreferences, never through Create.
+	SoundEnabled bool `gorm:"default:true;not null" json:"soundEnabled"`
+	MusicEnabled bool `gorm:"default:true;not null" json:"musicEnabled"`
+	// SoundVolume / MusicVolume are the in-match levels for the same two
+	// channels (migration 000026): whole percentages 0-100, SMALLINT columns
+	// with a CHECK. CLIENT-ONLY, like the switches beside them, which they do
+	// not replace — a switch decides whether a channel plays, the volume how
+	// loud. Both default to 70, the level the client played at before volumes
+	// existed. GORM treats a zero-value 0 as "unset" on Create and writes the
+	// tag default instead, so 0 (silent) is only ever reachable through
+	// UpdatePreferences — never through Create, which never names them.
+	SoundVolume int `gorm:"default:70;not null" json:"soundVolume"`
+	MusicVolume int `gorm:"default:70;not null" json:"musicVolume"`
 	// Wallet fields (Story 9.1). State lives on the users table rather than a
 	// dedicated wallet table; the wallet domain package owns the mutation logic.
 	// WalletBalance default mirrors migration 000009 / wallet.StartingBalance.

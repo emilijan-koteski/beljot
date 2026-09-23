@@ -24,6 +24,10 @@ function setAuthState(res: {
   email: string;
   languagePreference: string;
   cardDeckPreference: CardDeck;
+  soundEnabled: boolean;
+  musicEnabled: boolean;
+  soundVolume: number;
+  musicVolume: number;
   walletBalance: number;
   loginStreakDays: number;
   totalXp: number;
@@ -40,6 +44,10 @@ function setAuthState(res: {
     email: res.email,
     languagePreference: res.languagePreference,
     cardDeckPreference: res.cardDeckPreference,
+    soundEnabled: res.soundEnabled,
+    musicEnabled: res.musicEnabled,
+    soundVolume: res.soundVolume,
+    musicVolume: res.musicVolume,
     walletBalance: res.walletBalance,
     loginStreakDays: res.loginStreakDays,
     totalXp: res.totalXp,

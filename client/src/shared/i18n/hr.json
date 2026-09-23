@@ -28,6 +28,15 @@
       "title": "Špil karata",
       "description": "Odaberite grafiku kojom se crtaju vaše karte."
     },
+    "audio": {
+      "eyebrow": "Zvuk",
+      "title": "Zvuk i glazba",
+      "description": "Zvukovi karata i glazba u pozadini tijekom meča.",
+      "sound": "Zvučni efekti",
+      "music": "Glazba",
+      "soundVolume": "Glasnoća zvučnih efekata",
+      "musicVolume": "Glasnoća glazbe"
+    },
     "eyebrow": "Profil",
     "memberSince": "Član od {{date}}",
     "winRate": "Postotak pobjeda",
@@ -1103,12 +1112,19 @@
     "hud": {
       "pause": "Pauza",
       "rules": "Pravila",
-      "settings": "Postavke"
+      "settings": "Postavke",
+      "mute": "Isključi zvuk",
+      "unmute": "Uključi zvuk"
     },
     "settings": {
       "title": "Postavke",
       "languageHeading": "Jezik",
       "deckHeading": "Špil karata",
+      "soundHeading": "Zvuk",
+      "soundEffects": "Zvučni efekti",
+      "music": "Glazba",
+      "soundVolume": "Glasnoća zvučnih efekata",
+      "musicVolume": "Glasnoća glazbe",
       "close": "Zatvori"
     },
     "settlement": {

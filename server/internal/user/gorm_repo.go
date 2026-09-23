@@ -138,17 +138,32 @@ func (r *GormUserRepository) Count() (int64, error) {
 	return n, nil
 }
 
-// UpdatePreferences writes both preference columns in a single UPDATE, so a
-// both-fields request cannot half-apply. The multi-column Updates(map[...]) form
-// mirrors UpdateUsername below, which writes username + username_changed_at the
-// same way and for the same reason.
-func (r *GormUserRepository) UpdatePreferences(id uint, lang *string, deck *string) error {
-	columns := make(map[string]interface{}, 2)
-	if lang != nil {
-		columns["language_preference"] = *lang
+// UpdatePreferences writes every supplied preference column in a single
+// UPDATE, so a multi-field request cannot half-apply. The multi-column
+// Updates(map[...]) form mirrors UpdateUsername below, which writes username +
+// username_changed_at the same way and for the same reason. A map (not a
+// struct) is also what lets a boolean switch be written as false and a volume
+// as 0: GORM skips zero-value struct fields in Updates, but writes every map
+// entry verbatim.
+func (r *GormUserRepository) UpdatePreferences(id uint, prefs PreferencesUpdate) error {
+	columns := make(map[string]interface{}, 6)
+	if prefs.LanguagePreference != nil {
+		columns["language_preference"] = *prefs.LanguagePreference
 	}
-	if deck != nil {
-		columns["card_deck_preference"] = *deck
+	if prefs.CardDeckPreference != nil {
+		columns["card_deck_preference"] = *prefs.CardDeckPreference
+	}
+	if prefs.SoundEnabled != nil {
+		columns["sound_enabled"] = *prefs.SoundEnabled
+	}
+	if prefs.MusicEnabled != nil {
+		columns["music_enabled"] = *prefs.MusicEnabled
+	}
+	if prefs.SoundVolume != nil {
+		columns["sound_volume"] = *prefs.SoundVolume
+	}
+	if prefs.MusicVolume != nil {
+		columns["music_volume"] = *prefs.MusicVolume
 	}
 	if len(columns) == 0 {
 		// GORM errors on an empty Updates map anyway; answering explicitly keeps

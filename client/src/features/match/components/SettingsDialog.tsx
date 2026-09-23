@@ -1,10 +1,17 @@
-import { Globe, Spade } from "lucide-react";
-import type { ReactNode } from "react";
+import { Globe, Spade, Volume1, Volume2 } from "lucide-react";
+import { type ReactNode, useId } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import { updatePreferences } from "@/shared/api/profile";
+import { useAudioVolume } from "@/shared/audio/useAudioVolume";
+import { Slider } from "@/shared/components/ui/slider";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
+import {
+  type AudioVolumeField,
+  persistAudioPreferences,
+  resolveAudioEnabled,
+} from "@/shared/lib/audioPreference";
 import { persistCardDeck } from "@/shared/lib/cardDeckPreference";
 import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -109,16 +116,151 @@ function SettingRow({
   );
 }
 
-/** Brass eyebrow + radiogroup — one per settings group. */
+/**
+ * One brass on/off row — the switch counterpart of `SettingRow`, same frame, so
+ * a section of switches sits flush with the radio sections above it. The row's
+ * text is its accessible name; the track/thumb is decoration for
+ * `aria-checked`.
+ */
+function SettingSwitchRow({
+  checked,
+  onToggle,
+  testId,
+  children,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  testId: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onToggle}
+      data-testid={testId}
+      className="flex items-center justify-between rounded-lg px-3 py-2 text-left transition-[background,border-color,box-shadow] cursor-pointer"
+      style={{
+        border: checked ? `1px solid ${BRASS}` : "1px solid rgba(201,168,118,0.32)",
+        background: checked
+          ? "linear-gradient(90deg, rgba(80,60,30,0.55), rgba(50,38,20,0.35))"
+          : "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
+        color: "var(--ink-light, #f5f2e8)",
+        boxShadow: checked
+          ? "inset 0 1px 0 rgba(201,168,118,0.22), 0 0 0 1px rgba(201,168,118,0.25)"
+          : "inset 0 1px 0 rgba(201,168,118,0.10)",
+      }}
+    >
+      <span
+        className="font-body text-sm font-medium"
+        style={{
+          fontFamily: "var(--font-body)",
+          letterSpacing: 0.2,
+        }}
+      >
+        {children}
+      </span>
+      <span
+        aria-hidden
+        className="relative inline-flex shrink-0 items-center rounded-full"
+        style={{
+          width: 34,
+          height: 18,
+          background: checked ? "rgba(201,168,118,0.85)" : "rgba(0,0,0,0.3)",
+          border: checked ? `1px solid ${BRASS}` : "1px solid rgba(201,168,118,0.45)",
+          boxShadow: checked ? "0 0 6px rgba(201,168,118,0.45)" : "none",
+        }}
+      >
+        <span
+          className="absolute rounded-full motion-safe:transition-transform"
+          style={{
+            left: 2,
+            width: 12,
+            height: 12,
+            background: checked ? "#1d3a26" : "rgba(201,168,118,0.6)",
+            transform: checked ? "translateX(16px)" : "none",
+          }}
+        />
+      </span>
+    </button>
+  );
+}
+
+/**
+ * One brass volume row, sitting under its channel's switch. The slider moves
+ * the level live and persists it on release (see `useAudioVolume`); it is
+ * disabled — value kept — while the switch above it is off. The accessible
+ * name comes from `label`; the `N%` readout is its visible counterpart.
+ */
+function SettingVolumeRow({
+  field,
+  label,
+  disabled,
+  testId,
+}: {
+  field: AudioVolumeField;
+  label: string;
+  disabled: boolean;
+  testId: string;
+}) {
+  const { value, onValueChange, onValueCommitted } = useAudioVolume(field);
+  return (
+    <div
+      data-testid={testId}
+      data-disabled={disabled ? "" : undefined}
+      className="flex items-center gap-3 px-3 py-1 transition-opacity data-disabled:opacity-45"
+    >
+      <Volume1 size={14} aria-hidden="true" style={{ color: BRASS, flexShrink: 0 }} />
+      <Slider
+        min={0}
+        max={100}
+        step={1}
+        value={value}
+        onValueChange={onValueChange}
+        onValueCommitted={onValueCommitted}
+        disabled={disabled}
+        aria-label={label}
+        getAriaValueText={(v) => `${v}%`}
+        className="data-disabled:opacity-100"
+        trackClassName="bg-[rgba(0,0,0,0.3)] shadow-[inset_0_0_0_1px_rgba(201,168,118,0.45)]"
+        indicatorClassName="bg-[rgba(201,168,118,0.85)]"
+        thumbClassName="border-[#c9a876] bg-[#1d3a26] shadow-[0_0_6px_rgba(201,168,118,0.45)] has-[:focus-visible]:ring-[rgba(201,168,118,0.5)]"
+      />
+      <span
+        aria-hidden
+        className="text-xs tabular-nums"
+        style={{
+          color: BRASS,
+          fontFamily: "var(--font-body)",
+          minWidth: "4ch",
+          textAlign: "right",
+        }}
+      >
+        {value}%
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Brass eyebrow + a group of rows — one per settings group. A radiogroup by
+ * default (language, deck); a section of independent switches passes
+ * `role="group"`, since its rows are not mutually exclusive. Either way the
+ * heading names the group, via `aria-labelledby`.
+ */
 function SettingSection({
   icon,
   heading,
+  role = "radiogroup",
   children,
 }: {
   icon: ReactNode;
   heading: string;
+  role?: "radiogroup" | "group";
   children: ReactNode;
 }) {
+  const headingId = useId();
   return (
     <section className="flex flex-col gap-3">
       <div
@@ -130,10 +272,10 @@ function SettingSection({
         }}
       >
         {icon}
-        <span>{heading}</span>
+        <span id={headingId}>{heading}</span>
       </div>
 
-      <div className="flex flex-col gap-2" role="radiogroup">
+      <div className="flex flex-col gap-2" role={role} aria-labelledby={headingId}>
         {children}
       </div>
     </section>
@@ -141,15 +283,17 @@ function SettingSection({
 }
 
 /**
- * In-game settings dialog. Exposes the UI language and the card deck; the layout
- * is sectioned so future settings (sound, table theme, timer preference, etc.)
- * can drop in without rework.
+ * In-game settings dialog. Exposes the UI language, the card deck, and the two
+ * audio switches each with its volume slider; the layout is sectioned so
+ * future settings (table theme, timer preference, etc.) can drop in without
+ * rework.
  *
- * Both changes persist to the user's profile via `updatePreferences`, mirroring
+ * Every change persists to the user's profile via `updatePreferences`, mirroring
  * the lobby's [LanguageSelector] behavior — optimistic store write, silent
  * revert on failure, no reload and no interruption to play. The deck is read
  * straight back off the auth store, so every mounted `PlayingCard` re-skins the
- * moment the optimistic write lands, mid-hand included.
+ * moment the optimistic write lands, mid-hand included; the audio engine reads
+ * the same store, so a switch takes effect on the very next sound.
  *
  * Renders inside the same classic-felt overlay shell (ClassicPanel +
  * OverlayBackdrop) used by the bidding / belot / surrender / rules prompts so
@@ -160,6 +304,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { t, i18n } = useTranslation();
   const dialogRef = useFocusTrap<HTMLDivElement>({ onEscape: () => onOpenChange(false) });
   const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
+  const soundEnabled = resolveAudioEnabled(useAuthStore((s) => s.user?.soundEnabled));
+  const musicEnabled = resolveAudioEnabled(useAuthStore((s) => s.user?.musicEnabled));
 
   async function handleLanguageChange(lang: string) {
     if (lang === i18n.language) return;
@@ -218,8 +364,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </span>
             }
           >
-            {/* One sectioned group per setting, so the next one (sound, table
-                theme, timer preference) drops in below without shifting these. */}
+            {/* One sectioned group per setting, so the next one (table theme,
+                timer preference) drops in below without shifting these. */}
             <div className="flex flex-col gap-5">
               <SettingSection
                 icon={<Globe size={14} aria-hidden="true" />}
@@ -253,6 +399,43 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     {t(d.labelKey)}
                   </SettingRow>
                 ))}
+              </SettingSection>
+
+              {/* Sound — two independent switches, each writing only its own
+                  field through the shared latest-wins helper (the HUD mute and
+                  the profile panel write the same fields), each with its
+                  channel's volume slider underneath. */}
+              <SettingSection
+                icon={<Volume2 size={14} aria-hidden="true" />}
+                heading={t("match.settings.soundHeading")}
+                role="group"
+              >
+                <SettingSwitchRow
+                  checked={soundEnabled}
+                  onToggle={() => void persistAudioPreferences({ soundEnabled: !soundEnabled })}
+                  testId="settings-sound-toggle"
+                >
+                  {t("match.settings.soundEffects")}
+                </SettingSwitchRow>
+                <SettingVolumeRow
+                  field="soundVolume"
+                  label={t("match.settings.soundVolume")}
+                  disabled={!soundEnabled}
+                  testId="settings-sound-volume"
+                />
+                <SettingSwitchRow
+                  checked={musicEnabled}
+                  onToggle={() => void persistAudioPreferences({ musicEnabled: !musicEnabled })}
+                  testId="settings-music-toggle"
+                >
+                  {t("match.settings.music")}
+                </SettingSwitchRow>
+                <SettingVolumeRow
+                  field="musicVolume"
+                  label={t("match.settings.musicVolume")}
+                  disabled={!musicEnabled}
+                  testId="settings-music-volume"
+                />
               </SettingSection>
             </div>
 

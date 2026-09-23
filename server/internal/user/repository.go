@@ -2,6 +2,27 @@ package user
 
 import "time"
 
+// PreferencesUpdate is a PARTIAL write to the player's preference columns. A
+// nil pointer leaves that column untouched; a non-nil one writes its value —
+// including false for the audio switches and 0 for the audio volumes, which is
+// why they are *bool / *int rather than bool / int (a plain false or 0 would be
+// indistinguishable from "not sent").
+type PreferencesUpdate struct {
+	LanguagePreference *string
+	CardDeckPreference *string
+	SoundEnabled       *bool
+	MusicEnabled       *bool
+	SoundVolume        *int
+	MusicVolume        *int
+}
+
+// IsEmpty reports whether the update names no column at all.
+func (p PreferencesUpdate) IsEmpty() bool {
+	return p.LanguagePreference == nil && p.CardDeckPreference == nil &&
+		p.SoundEnabled == nil && p.MusicEnabled == nil &&
+		p.SoundVolume == nil && p.MusicVolume == nil
+}
+
 type UserRepository interface {
 	Create(user *User) error
 	// Delete soft-deletes the user (GORM DeletedAt). The users unique indexes
@@ -28,17 +49,20 @@ type UserRepository interface {
 	// Count returns the total number of registered (non-soft-deleted) users.
 	Count() (int64, error)
 	// UpdatePreferences writes the supplied preference columns in ONE statement.
-	// A nil argument means "leave that column alone", so a deck-only PATCH does
-	// not have to resend the language and vice versa (Story 12.4).
+	// A nil field means "leave that column alone", so a deck-only PATCH does
+	// not have to resend the language, a music toggle does not resend the
+	// sound switch, a volume change resends nothing else, and so on (Story
+	// 12.4; audio switches, migration 000025; audio volumes, migration 000026).
 	//
-	// One statement, not two, is the point: with sequential per-column writes a
-	// both-fields request whose second write failed answered 500 with the FIRST
-	// change already committed, leaving the client's optimistic state and the row
-	// disagreeing with no way to tell. Either both land or neither does.
+	// One statement, not several, is the point: with sequential per-column
+	// writes a multi-field request whose second write failed answered 500 with
+	// the FIRST change already committed, leaving the client's optimistic state
+	// and the row disagreeing with no way to tell. Either all land or none does.
 	//
-	// Returns ErrUserNotFound when no row matches. Passing two nils is a
-	// programming error and returns ErrBadRequest rather than a no-op UPDATE.
-	UpdatePreferences(id uint, lang *string, deck *string) error
+	// Returns ErrUserNotFound when no row matches. An update with every field
+	// nil is a programming error and returns ErrBadRequest rather than a no-op
+	// UPDATE.
+	UpdatePreferences(id uint, prefs PreferencesUpdate) error
 	// UpdatePasswordHash replaces the user's bcrypt password hash (used by the
 	// password-reset flow). Returns ErrUserNotFound when no row matches.
 	UpdatePasswordHash(id uint, hash string) error

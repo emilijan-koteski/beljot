@@ -28,6 +28,15 @@
       "title": "Шпил карти",
       "description": "Изберете графиката со која се цртаат вашите карти."
     },
+    "audio": {
+      "eyebrow": "Звук",
+      "title": "Звук и музика",
+      "description": "Звуци од картите и музика во позадина за време на мечот.",
+      "sound": "Звучни ефекти",
+      "music": "Музика",
+      "soundVolume": "Јачина на звучните ефекти",
+      "musicVolume": "Јачина на музиката"
+    },
     "eyebrow": "Профил",
     "memberSince": "Член од {{date}}",
     "winRate": "Процент на победи",
@@ -1103,12 +1112,19 @@
     "hud": {
       "pause": "Пауза",
       "rules": "Правила",
-      "settings": "Поставки"
+      "settings": "Поставки",
+      "mute": "Исклучи звук",
+      "unmute": "Вклучи звук"
     },
     "settings": {
       "title": "Поставки",
       "languageHeading": "Јазик",
       "deckHeading": "Шпил карти",
+      "soundHeading": "Звук",
+      "soundEffects": "Звучни ефекти",
+      "music": "Музика",
+      "soundVolume": "Јачина на звучните ефекти",
+      "musicVolume": "Јачина на музиката",
       "close": "Затвори"
     },
     "settlement": {

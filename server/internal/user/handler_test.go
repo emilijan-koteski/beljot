@@ -413,22 +413,34 @@ func (m *mockUserRepo) Count() (int64, error) {
 	return int64(len(m.users)), nil
 }
 
-// UpdatePreferences mirrors the real repo's ALL-OR-NOTHING contract: both
-// columns are applied to the in-memory row together, so a test asserting the
-// half-applied case has to force the failure rather than rely on ordering.
+// UpdatePreferences mirrors the real repo's ALL-OR-NOTHING contract: every
+// supplied column is applied to the in-memory row together, so a test asserting
+// the half-applied case has to force the failure rather than rely on ordering.
 // failUpdatePreferences, when set, fails BEFORE writing anything.
-func (m *mockUserRepo) UpdatePreferences(id uint, lang *string, deck *string) error {
+func (m *mockUserRepo) UpdatePreferences(id uint, prefs user.PreferencesUpdate) error {
 	m.updatePreferencesCalls++
 	if m.failUpdatePreferences != nil {
 		return m.failUpdatePreferences
 	}
 	for _, u := range m.users {
 		if u.ID == id {
-			if lang != nil {
-				u.LanguagePreference = *lang
+			if prefs.LanguagePreference != nil {
+				u.LanguagePreference = *prefs.LanguagePreference
 			}
-			if deck != nil {
-				u.CardDeckPreference = *deck
+			if prefs.CardDeckPreference != nil {
+				u.CardDeckPreference = *prefs.CardDeckPreference
+			}
+			if prefs.SoundEnabled != nil {
+				u.SoundEnabled = *prefs.SoundEnabled
+			}
+			if prefs.MusicEnabled != nil {
+				u.MusicEnabled = *prefs.MusicEnabled
+			}
+			if prefs.SoundVolume != nil {
+				u.SoundVolume = *prefs.SoundVolume
+			}
+			if prefs.MusicVolume != nil {
+				u.MusicVolume = *prefs.MusicVolume
 			}
 			return nil
 		}
@@ -560,10 +572,14 @@ func (m *mockUserRepo) addUser(username, email, lang string) *user.User {
 		ID:       m.nextID,
 		Username: username,
 		Email:    email,
-		// Both preferences are seeded to their DB defaults so a test asserting
+		// Every preference is seeded to its DB default so a test asserting
 		// "the other field was left alone" has a real value to compare against.
 		LanguagePreference: lang,
 		CardDeckPreference: user.CardDeckFrench,
+		SoundEnabled:       true,
+		MusicEnabled:       true,
+		SoundVolume:        70,
+		MusicVolume:        70,
 		CreatedAt:          time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
 	}
 	m.nextID++
@@ -705,6 +721,51 @@ func TestGetProfile_IncludesStoredCardDeck(t *testing.T) {
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
 
 	assert.Equal(t, user.CardDeckCroatian, data.CardDeckPreference)
+}
+
+// Same for the audio switches: the self profile reports what is stored, so the
+// profile panel shows a switch the player turned off in a match as off.
+func TestGetProfile_IncludesStoredAudioPreferences(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("audiouser", "audio@example.com", "en")
+	u.SoundEnabled = false
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, "1", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(resp["data"], &raw))
+
+	assert.JSONEq(t, "false", string(raw["soundEnabled"]))
+	assert.JSONEq(t, "true", string(raw["musicEnabled"]))
+}
+
+// And the two volumes: the profile panel's sliders must open on the stored
+// levels, 0 included — a silent channel is a real value, not "unset".
+func TestGetProfile_IncludesStoredAudioVolumes(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("volumeuser", "volume@example.com", "en")
+	u.SoundVolume = 0
+	u.MusicVolume = 30
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, "1", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(resp["data"], &raw))
+
+	assert.JSONEq(t, "0", string(raw["soundVolume"]))
+	assert.JSONEq(t, "30", string(raw["musicVolume"]))
 }
 
 // TestGetProfile_IncludesWalletFields pins AC #4: the self-only profile carries
@@ -1056,6 +1117,10 @@ func TestGetProfile_PublicProjection_NeverLeaksPrivateFields(t *testing.T) {
 	assert.NotContains(t, body, "loginStreakDays", "login streak must never appear on a public profile")
 	assert.NotContains(t, body, "languagePreference", "language preference is private")
 	assert.NotContains(t, body, "cardDeckPreference", "card deck preference is private")
+	assert.NotContains(t, body, "soundEnabled", "audio preferences are private")
+	assert.NotContains(t, body, "musicEnabled", "audio preferences are private")
+	assert.NotContains(t, body, "soundVolume", "audio volumes are private")
+	assert.NotContains(t, body, "musicVolume", "audio volumes are private")
 	assert.NotContains(t, body, "usernameChangedAt", "username-cooldown state is private")
 	// The public-safe fields ARE present — seasonRank included (Story 13.3):
 	// the key must ride the public shape (as an object or null), and nothing
@@ -1531,6 +1596,290 @@ func TestUpdatePreferences_BothFields_OneInvalid_WritesNeither(t *testing.T) {
 		assert.Equal(t, "en", repo.users[0].LanguagePreference)
 		assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
 	})
+}
+
+// --- Audio preferences (migration 000025) ---
+//
+// Two independent switches on the same PARTIAL endpoint. They are *bool on the
+// wire so an absent switch is left alone rather than read as "off".
+
+// decodePreferencesEcho returns the echoed data object with raw values, so a
+// test can assert an echoed false as well as a key that is absent.
+func decodePreferencesEcho(t *testing.T, rec *httptest.ResponseRecorder) map[string]json.RawMessage {
+	t.Helper()
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+	return data
+}
+
+func TestUpdatePreferences_AudioSwitchOnly_LeavesEverythingElseAlone(t *testing.T) {
+	cases := []struct {
+		name      string
+		body      string
+		key       string
+		wantSound bool
+		wantMusic bool
+	}{
+		{name: "sound off", body: `{"soundEnabled":false}`, key: "soundEnabled", wantSound: false, wantMusic: true},
+		{name: "music off", body: `{"musicEnabled":false}`, key: "musicEnabled", wantSound: true, wantMusic: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "mk")
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", tc.body, token)
+			require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+			// Echo only what was written: a false echo for the switch the caller
+			// did NOT send would turn it off in the client's cached user.
+			data := decodePreferencesEcho(t, rec)
+			assert.Len(t, data, 1)
+			assert.JSONEq(t, "false", string(data[tc.key]))
+
+			assert.Equal(t, tc.wantSound, repo.users[0].SoundEnabled)
+			assert.Equal(t, tc.wantMusic, repo.users[0].MusicEnabled)
+			assert.Equal(t, "mk", repo.users[0].LanguagePreference)
+			assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
+		})
+	}
+}
+
+// The HUD mute button writes both switches in ONE request.
+func TestUpdatePreferences_BothAudioSwitches(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"soundEnabled":false,"musicEnabled":false}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	data := decodePreferencesEcho(t, rec)
+	assert.JSONEq(t, "false", string(data["soundEnabled"]))
+	assert.JSONEq(t, "false", string(data["musicEnabled"]))
+	assert.NotContains(t, data, "languagePreference")
+	assert.NotContains(t, data, "cardDeckPreference")
+	assert.False(t, repo.users[0].SoundEnabled)
+	assert.False(t, repo.users[0].MusicEnabled)
+	assert.Equal(t, 1, repo.updatePreferencesCalls)
+
+	// And back on again — true is a value like any other, not "unset".
+	rec = doUpdatePreferences(e, "1", `{"soundEnabled":true,"musicEnabled":true}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+	data = decodePreferencesEcho(t, rec)
+	assert.JSONEq(t, "true", string(data["soundEnabled"]))
+	assert.JSONEq(t, "true", string(data["musicEnabled"]))
+	assert.True(t, repo.users[0].SoundEnabled)
+	assert.True(t, repo.users[0].MusicEnabled)
+}
+
+func TestUpdatePreferences_AudioWithLanguage(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"languagePreference":"hr","musicEnabled":false}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	data := decodePreferencesEcho(t, rec)
+	assert.JSONEq(t, `"hr"`, string(data["languagePreference"]))
+	assert.JSONEq(t, "false", string(data["musicEnabled"]))
+	assert.NotContains(t, data, "soundEnabled")
+	assert.Equal(t, "hr", repo.users[0].LanguagePreference)
+	assert.True(t, repo.users[0].SoundEnabled)
+	assert.False(t, repo.users[0].MusicEnabled)
+}
+
+// A switch must be a JSON boolean. Anything else fails the decode, answers 400,
+// and — because decoding happens before any write — changes nothing, including
+// a valid field sent alongside it.
+func TestUpdatePreferences_InvalidAudioValue_WritesNothing(t *testing.T) {
+	bodies := []string{
+		`{"soundEnabled":"yes"}`,
+		`{"soundEnabled":"true"}`,
+		`{"musicEnabled":1}`,
+		`{"musicEnabled":0}`,
+		`{"soundEnabled":{}}`,
+		`{"languagePreference":"mk","soundEnabled":"yes"}`,
+		// null decodes to "absent", so a body that is ONLY nulls names nothing.
+		`{"soundEnabled":null,"musicEnabled":null}`,
+	}
+	for _, body := range bodies {
+		t.Run(body, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "en")
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", body, token)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+			assert.Equal(t, 0, repo.updatePreferencesCalls)
+			assert.True(t, repo.users[0].SoundEnabled)
+			assert.True(t, repo.users[0].MusicEnabled)
+			assert.Equal(t, "en", repo.users[0].LanguagePreference)
+		})
+	}
+}
+
+// A bad deck alongside a valid audio switch must not let the switch through.
+func TestUpdatePreferences_AudioWithInvalidDeck_WritesNeither(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"cardDeckPreference":"german","soundEnabled":false}`, token)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, 0, repo.updatePreferencesCalls)
+	assert.True(t, repo.users[0].SoundEnabled)
+	assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
+}
+
+// --- Audio volumes (migration 000026) ---
+//
+// Two 0-100 levels on the same PARTIAL endpoint. *int on the wire so an absent
+// volume is left alone rather than read as 0 (silent).
+
+func TestUpdatePreferences_AudioVolumeOnly_LeavesEverythingElseAlone(t *testing.T) {
+	cases := []struct {
+		name      string
+		body      string
+		key       string
+		echo      string
+		wantSound int
+		wantMusic int
+	}{
+		{name: "sound to 0", body: `{"soundVolume":0}`, key: "soundVolume", echo: "0", wantSound: 0, wantMusic: 70},
+		{name: "sound to 100", body: `{"soundVolume":100}`, key: "soundVolume", echo: "100", wantSound: 100, wantMusic: 70},
+		{name: "music to 0", body: `{"musicVolume":0}`, key: "musicVolume", echo: "0", wantSound: 70, wantMusic: 0},
+		{name: "music to 100", body: `{"musicVolume":100}`, key: "musicVolume", echo: "100", wantSound: 70, wantMusic: 100},
+		{name: "music to 30", body: `{"musicVolume":30}`, key: "musicVolume", echo: "30", wantSound: 70, wantMusic: 30},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "mk")
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", tc.body, token)
+			require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+			// Echo only what was written: a 0 echo for the volume the caller did
+			// NOT send would silence it in the client's cached user.
+			data := decodePreferencesEcho(t, rec)
+			assert.Len(t, data, 1)
+			assert.JSONEq(t, tc.echo, string(data[tc.key]))
+
+			assert.Equal(t, tc.wantSound, repo.users[0].SoundVolume)
+			assert.Equal(t, tc.wantMusic, repo.users[0].MusicVolume)
+			// A volume is not a switch: both stay on, and nothing else moves.
+			assert.True(t, repo.users[0].SoundEnabled)
+			assert.True(t, repo.users[0].MusicEnabled)
+			assert.Equal(t, "mk", repo.users[0].LanguagePreference)
+			assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
+			assert.Equal(t, 1, repo.updatePreferencesCalls)
+		})
+	}
+}
+
+func TestUpdatePreferences_BothAudioVolumes(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "en")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"soundVolume":30,"musicVolume":80}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	data := decodePreferencesEcho(t, rec)
+	assert.Len(t, data, 2)
+	assert.JSONEq(t, "30", string(data["soundVolume"]))
+	assert.JSONEq(t, "80", string(data["musicVolume"]))
+	assert.Equal(t, 30, repo.users[0].SoundVolume)
+	assert.Equal(t, 80, repo.users[0].MusicVolume)
+	assert.Equal(t, 1, repo.updatePreferencesCalls)
+}
+
+// Muting writes the switches only, so the levels a player chose survive a mute
+// and come back on unmute.
+func TestUpdatePreferences_SwitchesLeaveVolumesAlone(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "en")
+	u.SoundVolume = 30
+	u.MusicVolume = 80
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"soundEnabled":false,"musicEnabled":false}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+	rec = doUpdatePreferences(e, "1", `{"soundEnabled":true,"musicEnabled":true}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	data := decodePreferencesEcho(t, rec)
+	assert.NotContains(t, data, "soundVolume")
+	assert.NotContains(t, data, "musicVolume")
+	assert.Equal(t, 30, repo.users[0].SoundVolume)
+	assert.Equal(t, 80, repo.users[0].MusicVolume)
+}
+
+// A volume must be a JSON integer in 0-100. Out of range fails validation; a
+// fraction, string or boolean fails the decode. Either way the answer is 400
+// and — because both happen before any write — nothing changes, including a
+// valid field sent alongside the bad one.
+func TestUpdatePreferences_InvalidAudioVolume_WritesNothing(t *testing.T) {
+	bodies := []string{
+		`{"soundVolume":-1}`,
+		`{"soundVolume":101}`,
+		`{"musicVolume":-1}`,
+		`{"musicVolume":101}`,
+		`{"soundVolume":50.5}`,
+		`{"musicVolume":50.5}`,
+		`{"soundVolume":"x"}`,
+		`{"musicVolume":"50"}`,
+		`{"soundVolume":true}`,
+		`{"musicVolume":{}}`,
+		`{"soundVolume":1e2}`,
+		`{"soundVolume":99999999999999999999}`,
+		`{"soundVolume":40,"musicVolume":101}`,
+		`{"soundEnabled":false,"musicVolume":-1}`,
+		`{"languagePreference":"mk","soundVolume":"x"}`,
+		// null decodes to "absent", so a body that is ONLY nulls names nothing.
+		`{"soundVolume":null,"musicVolume":null}`,
+	}
+	for _, body := range bodies {
+		t.Run(body, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "en")
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", body, token)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+			assert.Equal(t, 0, repo.updatePreferencesCalls)
+			assert.Equal(t, 70, repo.users[0].SoundVolume)
+			assert.Equal(t, 70, repo.users[0].MusicVolume)
+			assert.True(t, repo.users[0].SoundEnabled)
+			assert.Equal(t, "en", repo.users[0].LanguagePreference)
+		})
+	}
 }
 
 // --- UpdateUsername tests (Change Username feature) ---
@@ -2672,6 +3021,10 @@ func TestUpdatePreferences_IssuesOneWritePerRequest(t *testing.T) {
 		{name: "deck only", body: `{"cardDeckPreference":"croatian"}`},
 		{name: "language only", body: `{"languagePreference":"mk"}`},
 		{name: "both", body: `{"languagePreference":"mk","cardDeckPreference":"croatian"}`},
+		{name: "both audio switches", body: `{"soundEnabled":false,"musicEnabled":false}`},
+		{name: "all four", body: `{"languagePreference":"mk","cardDeckPreference":"croatian","soundEnabled":false,"musicEnabled":true}`},
+		{name: "both audio volumes", body: `{"soundVolume":0,"musicVolume":100}`},
+		{name: "all six", body: `{"languagePreference":"mk","cardDeckPreference":"croatian","soundEnabled":false,"musicEnabled":true,"soundVolume":25,"musicVolume":55}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

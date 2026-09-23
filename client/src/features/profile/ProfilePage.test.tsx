@@ -76,6 +76,10 @@ function profileFixture(overrides: Partial<ProfileResponse> = {}): ProfileRespon
     username: "testuser",
     languagePreference: "en",
     cardDeckPreference: "french",
+    soundEnabled: true,
+    musicEnabled: true,
+    soundVolume: 70,
+    musicVolume: 70,
     createdAt: "2026-01-15T10:00:00Z",
     totalGamesPlayed: 0,
     wins: 0,
@@ -428,6 +432,25 @@ describe("ProfilePage", () => {
       "aria-checked",
       "false",
     );
+  });
+
+  // Same placement rule as the deck: the audio switches are auth-store
+  // preferences, so they render for an account with no career data at all.
+  it("renders the audio switches with the store's state, even with no career data", async () => {
+    mockGetProfile.mockResolvedValueOnce(profileFixture());
+    mockGetCareer.mockRejectedValueOnce(new Error("no career yet"));
+    useAuthStore.setState({
+      token: "test-token",
+      user: makeUser({ soundEnabled: false, musicEnabled: true }),
+      isLoading: false,
+    });
+
+    renderProfilePage();
+
+    const panel = await screen.findByTestId("profile-audio");
+    expect(within(screen.getByTestId("profile-sidebar")).getByTestId("profile-audio")).toBe(panel);
+    expect(screen.getByTestId("profile-sound-toggle")).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByTestId("profile-music-toggle")).toHaveAttribute("aria-checked", "true");
   });
 
   // The self page is the one place the second-person copy is correct — the

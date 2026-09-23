@@ -44,8 +44,19 @@ type RegisterResponseData struct {
 	// level/honor above: the FIRST card the player sees must already be in
 	// their chosen deck, without waiting on a separate profile fetch.
 	CardDeckPreference string `json:"cardDeckPreference"`
-	WalletBalance      int    `json:"walletBalance"`
-	LoginStreakDays    int    `json:"loginStreakDays"`
+	// SoundEnabled / MusicEnabled are the in-match audio switches (migration
+	// 000025), echoed for the same first-paint reason as the deck: the first
+	// card played in a session must already honour a switch the player turned
+	// off on another device.
+	SoundEnabled bool `json:"soundEnabled"`
+	MusicEnabled bool `json:"musicEnabled"`
+	// SoundVolume / MusicVolume are the 0-100 levels for the same two channels
+	// (migration 000026), echoed for the same reason: the first sound of a
+	// session must already play at the level set on another device.
+	SoundVolume     int `json:"soundVolume"`
+	MusicVolume     int `json:"musicVolume"`
+	WalletBalance   int `json:"walletBalance"`
+	LoginStreakDays int `json:"loginStreakDays"`
 	// XP & level (Story 9.5) — read-only echoes so the top-nav banner has the
 	// level + XP immediately on auth, without a separate profile fetch. TotalXP
 	// is the loaded lifetime total (0 for a fresh registration); Level is derived
@@ -186,6 +197,10 @@ func authResponseData(u *user.User, accessToken string) RegisterResponseData {
 		Email:              u.Email,
 		LanguagePreference: u.LanguagePreference,
 		CardDeckPreference: u.CardDeckPreference,
+		SoundEnabled:       u.SoundEnabled,
+		MusicEnabled:       u.MusicEnabled,
+		SoundVolume:        u.SoundVolume,
+		MusicVolume:        u.MusicVolume,
 		WalletBalance:      u.WalletBalance,
 		LoginStreakDays:    u.LoginStreakDays,
 		TotalXP:            u.TotalXP,

@@ -37,14 +37,14 @@ func (f *fakeLevelRepo) FindByUsername(string) (*User, error) { panic("unused") 
 func (f *fakeLevelRepo) SearchByUsername(string, uint, int) ([]User, error) {
 	panic("unused")
 }
-func (f *fakeLevelRepo) FindByID(uint) (*User, error)                   { panic("unused") }
-func (f *fakeLevelRepo) FindManyByIDs([]uint) ([]User, error)           { panic("unused") }
-func (f *fakeLevelRepo) Count() (int64, error)                          { panic("unused") }
-func (f *fakeLevelRepo) UpdatePreferences(uint, *string, *string) error { panic("unused") }
-func (f *fakeLevelRepo) UpdatePasswordHash(uint, string) error          { panic("unused") }
-func (f *fakeLevelRepo) UpdateUsername(uint, string) (time.Time, error) { panic("unused") }
-func (f *fakeLevelRepo) AddXP(map[uint]int) (map[uint]int, error)       { panic("unused") }
-func (f *fakeLevelRepo) ResetHonor(uint) error                          { panic("unused") }
+func (f *fakeLevelRepo) FindByID(uint) (*User, error)                    { panic("unused") }
+func (f *fakeLevelRepo) FindManyByIDs([]uint) ([]User, error)            { panic("unused") }
+func (f *fakeLevelRepo) Count() (int64, error)                           { panic("unused") }
+func (f *fakeLevelRepo) UpdatePreferences(uint, PreferencesUpdate) error { panic("unused") }
+func (f *fakeLevelRepo) UpdatePasswordHash(uint, string) error           { panic("unused") }
+func (f *fakeLevelRepo) UpdateUsername(uint, string) (time.Time, error)  { panic("unused") }
+func (f *fakeLevelRepo) AddXP(map[uint]int) (map[uint]int, error)        { panic("unused") }
+func (f *fakeLevelRepo) ResetHonor(uint) error                           { panic("unused") }
 
 func (f *fakeLevelRepo) ApplyHonorEvents(map[uint]HonorEvent, time.Time) (map[uint]HonorSnapshot, error) {
 	panic("unused")

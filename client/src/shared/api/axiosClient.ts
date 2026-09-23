@@ -128,6 +128,10 @@ async function doRefresh(): Promise<string> {
         email: string;
         languagePreference: string;
         cardDeckPreference: CardDeck;
+        soundEnabled: boolean;
+        musicEnabled: boolean;
+        soundVolume: number;
+        musicVolume: number;
         walletBalance: number;
         loginStreakDays: number;
         totalXp: number;
@@ -141,15 +145,20 @@ async function doRefresh(): Promise<string> {
     .then((res) => {
       const r = res.data.data;
       useAuthStore.getState().setToken(r.token);
-      // Re-hydrate the full user incl. wallet / XP / honor fields — a 401-retry
-      // refresh that dropped these would blank the header coin pill, XP bar and
-      // honor chip mid-session.
+      // Re-hydrate the full user incl. wallet / XP / honor / audio fields — a
+      // 401-retry refresh that dropped these would blank the header coin pill,
+      // XP bar and honor chip mid-session (and forget a muted table and its
+      // chosen volumes).
       useAuthStore.getState().setUser({
         id: r.id,
         username: r.username,
         email: r.email,
         languagePreference: r.languagePreference,
         cardDeckPreference: r.cardDeckPreference,
+        soundEnabled: r.soundEnabled,
+        musicEnabled: r.musicEnabled,
+        soundVolume: r.soundVolume,
+        musicVolume: r.musicVolume,
         walletBalance: r.walletBalance,
         loginStreakDays: r.loginStreakDays,
         totalXp: r.totalXp,

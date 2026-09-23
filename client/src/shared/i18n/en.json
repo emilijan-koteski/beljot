@@ -28,6 +28,15 @@
       "title": "Card deck",
       "description": "Choose the artwork your cards are drawn with."
     },
+    "audio": {
+      "eyebrow": "Sound",
+      "title": "Sound & music",
+      "description": "Card sounds and background music during matches.",
+      "sound": "Sound effects",
+      "music": "Music",
+      "soundVolume": "Sound effects volume",
+      "musicVolume": "Music volume"
+    },
     "eyebrow": "Profile",
     "memberSince": "Member since {{date}}",
     "winRate": "Win rate",
@@ -1103,12 +1112,19 @@
     "hud": {
       "pause": "Pause",
       "rules": "Rules",
-      "settings": "Settings"
+      "settings": "Settings",
+      "mute": "Mute",
+      "unmute": "Unmute"
     },
     "settings": {
       "title": "Settings",
       "languageHeading": "Language",
       "deckHeading": "Card deck",
+      "soundHeading": "Sound",
+      "soundEffects": "Sound effects",
+      "music": "Music",
+      "soundVolume": "Sound effects volume",
+      "musicVolume": "Music volume",
       "close": "Close"
     },
     "settlement": {

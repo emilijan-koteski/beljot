@@ -8,6 +8,7 @@ import { useProfileQuery } from "@/shared/hooks/queries/useProfile";
 import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
+import { AudioPanel } from "./components/AudioPanel";
 import { CardDeckPanel } from "./components/CardDeckPanel";
 import { IdentityHero } from "./components/IdentityHero";
 import { LinkedAccounts } from "./components/LinkedAccounts";
@@ -191,6 +192,10 @@ export function ProfilePage() {
               from the auth store, not career data, so it must still render for
               a brand-new account whose career query has nothing to show. */}
           <CardDeckPanel />
+
+          {/* Same reasoning as the deck: the audio switches are preferences read
+              from the auth store, so they render for a brand-new account too. */}
+          <AudioPanel />
 
           {career.isError ? (
             <p className="text-ink-mute text-sm" data-testid="profile-career-error">

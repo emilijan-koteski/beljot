@@ -198,6 +198,17 @@ func TestSSOLogin_RegistersNewUser(t *testing.T) {
 	assert.Equal(t, "en", u.LanguagePreference)
 	assert.Equal(t, user.CardDeckFrench, u.CardDeckPreference)
 	assert.Equal(t, user.CardDeckFrench, data.CardDeckPreference)
+	// Audio defaults ON, same as a password registration (migration 000025).
+	assert.True(t, u.SoundEnabled)
+	assert.True(t, u.MusicEnabled)
+	assert.True(t, data.SoundEnabled)
+	assert.True(t, data.MusicEnabled)
+	// Volumes at the default level of 70, same as a password registration
+	// (migration 000026).
+	assert.Equal(t, 70, u.SoundVolume)
+	assert.Equal(t, 70, u.MusicVolume)
+	assert.Equal(t, 70, data.SoundVolume)
+	assert.Equal(t, 70, data.MusicVolume)
 	require.NotNil(t, u.LastLoginAt)
 	gotY, gotM, gotD := u.LastLoginAt.UTC().Date()
 	wantY, wantM, wantD := time.Now().UTC().Date()

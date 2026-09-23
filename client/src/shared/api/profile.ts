@@ -13,6 +13,12 @@ export interface ProfileResponse {
   // PublicProfileResponse below. Mirrors the server DTO; the auth envelope is
   // what the renderer actually reads.
   cardDeckPreference: CardDeck;
+  // Audio switches (migration 000025) and their 0-100 volumes (migration
+  // 000026) — PRIVATE and self-only, like the deck.
+  soundEnabled: boolean;
+  musicEnabled: boolean;
+  soundVolume: number;
+  musicVolume: number;
   createdAt: string;
   totalGamesPlayed: number;
   wins: number;
@@ -82,23 +88,35 @@ export interface PublicProfileResponse {
 }
 
 /**
- * A PARTIAL preferences update — both fields are optional, and the server
- * validates and writes each independently (Story 12.4). Sending only the deck
- * leaves the language untouched and vice versa; a body with neither is a 400.
+ * A PARTIAL preferences update — every field is optional, and the server
+ * validates and writes each independently (Story 12.4; audio switches,
+ * migration 000025; audio volumes, migration 000026). Sending only the deck
+ * leaves the language untouched and vice versa, a music toggle never resends
+ * the sound switch, and a volume never resends anything else; a body naming no
+ * field is a 400, and so is a volume that is not an integer in 0-100.
  */
 export interface UpdatePreferencesRequest {
   languagePreference?: string;
   cardDeckPreference?: CardDeck;
+  soundEnabled?: boolean;
+  musicEnabled?: boolean;
+  soundVolume?: number;
+  musicVolume?: number;
 }
 
 /**
- * The server echoes back ONLY the fields it wrote, so both keys are optional
+ * The server echoes back ONLY the fields it wrote, so every key is optional
  * here too. Merging a `cardDeckPreference: undefined` into the cached user is a
- * no-op; merging an echoed `""` would have clobbered the untouched preference.
+ * no-op; merging an echoed `""` (or a `false` for an untouched switch, or a
+ * `0` for an untouched volume) would have clobbered the untouched preference.
  */
 export interface UpdatePreferencesResponse {
   languagePreference?: string;
   cardDeckPreference?: CardDeck;
+  soundEnabled?: boolean;
+  musicEnabled?: boolean;
+  soundVolume?: number;
+  musicVolume?: number;
 }
 
 export function getProfile(userId: number): Promise<ProfileResponse> {

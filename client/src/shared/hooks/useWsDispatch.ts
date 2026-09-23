@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { handleWsMessage as handleRoomListMessage } from "@/features/lobby/useRoomUpdates";
 import { queryClient } from "@/shared/api/queryClient";
 import { queryKeys } from "@/shared/api/queryKeys";
+import { playSfx } from "@/shared/audio/audioEngine";
 import { isCardId } from "@/shared/lib/cardId";
 import { honorIsNewPlayer, honorScoreOrPrior } from "@/shared/lib/honor";
 import { MOTION } from "@/shared/lib/motion";
@@ -189,6 +190,18 @@ function dispatchGameEvent(message: WsMessage): void {
     const current = store.matchState;
     if (current) {
       if (!payload.cardId || payload.cardId.length < 2) return;
+      // One card sound per card_played message — keyed to the WS event, not to
+      // the throw flight, because reduced-motion players get no flights and the
+      // 4th card of a trick can land in the same batch as trick_resolved (its
+      // flight never runs, but it was still played). The one exception is the
+      // local player's own manual play: MatchPage sounds that at the click, in
+      // step with the optimistic throw, so its non-auto server echo stays
+      // silent here. A server auto-play for the local seat has no click, so it
+      // sounds here like everyone else's card. event:match_state (resync)
+      // never reaches this branch, so a reconnect is silent.
+      if (payload.playerSeat !== store.myPlayerSeat || payload.autoPlayed) {
+        playSfx("cardPlay");
+      }
       const rank = payload.cardId[0];
       const suit = payload.cardId[1];
       const isLocalAutoPlay = payload.autoPlayed && payload.playerSeat === store.myPlayerSeat;

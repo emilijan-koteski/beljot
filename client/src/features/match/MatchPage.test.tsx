@@ -7,6 +7,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
+import { resetAudioPreferenceRequestSequence } from "@/shared/lib/audioPreference";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
@@ -27,6 +28,25 @@ vi.mock("@/shared/providers/WebSocketContext", () => ({
 
 vi.mock("@/shared/providers/WebSocketProvider", () => ({
   WebSocketProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// The audio engine is a jsdom no-op anyway; spying on it lets the "audio" block
+// assert what the page asks for and when.
+const audioEngine = vi.hoisted(() => ({
+  playSfx: vi.fn(),
+  preloadSfx: vi.fn(() => Promise.resolve()),
+  startMusic: vi.fn(),
+  stopMusic: vi.fn(),
+  setMusicVolume: vi.fn(),
+  openAudioSession: vi.fn(() => () => {}),
+}));
+vi.mock("@/shared/audio/audioEngine", () => audioEngine);
+
+// Preference writes (HUD mute, Settings dialog) resolve by default so the
+// optimistic store write is what the tests observe.
+const mockUpdatePreferences = vi.fn((..._args: unknown[]) => Promise.resolve({}));
+vi.mock("@/shared/api/profile", () => ({
+  updatePreferences: (...args: unknown[]) => mockUpdatePreferences(...args),
 }));
 
 // MatchResult reads the room's last match for its collapsible hand breakdown.
@@ -1491,6 +1511,10 @@ describe("MatchPage", () => {
   });
 
   describe("belote/rebelote pre-play prompt", () => {
+    beforeEach(() => {
+      audioEngine.playSfx.mockClear();
+    });
+
     // Seat 0 holds both trump (spades) K and Q and it is their turn to lead.
     function belotEligibleState(): MatchState {
       return {
@@ -1524,9 +1548,11 @@ describe("MatchPage", () => {
         fireEvent.click(screen.getByTestId("playing-card-KS"));
       });
 
-      // The announce/pass dialog appears and the card has NOT been sent.
+      // The announce/pass dialog appears and the card has NOT been sent — nor
+      // sounded: the card-play sound belongs to the throw, not the click.
       expect(screen.getByTestId("belot-prompt")).toBeInTheDocument();
       expect(mockSendMessage).not.toHaveBeenCalledWith("action:play_card", expect.anything());
+      expect(audioEngine.playSfx).not.toHaveBeenCalled();
     });
 
     it("throws the card on confirm, then announces only once the server confirms the deferred play", () => {
@@ -1537,9 +1563,13 @@ describe("MatchPage", () => {
       act(() => {
         fireEvent.click(screen.getByTestId("playing-card-KS"));
       });
+      expect(audioEngine.playSfx).not.toHaveBeenCalled();
       act(() => {
         fireEvent.click(screen.getByTestId("belot-prompt-announce"));
       });
+      // The deferred throw sounds once, when it actually happens.
+      expect(audioEngine.playSfx).toHaveBeenCalledTimes(1);
+      expect(audioEngine.playSfx).toHaveBeenCalledWith("cardPlay");
 
       // Card is thrown immediately; the announce is held back so it can't race
       // play_card on the server (the race that produced "Невалидна акција" and
@@ -1563,9 +1593,12 @@ describe("MatchPage", () => {
       act(() => {
         fireEvent.click(screen.getByTestId("playing-card-KS"));
       });
+      expect(audioEngine.playSfx).not.toHaveBeenCalled();
       act(() => {
         fireEvent.click(screen.getByTestId("belot-prompt-decline"));
       });
+      expect(audioEngine.playSfx).toHaveBeenCalledTimes(1);
+      expect(audioEngine.playSfx).toHaveBeenCalledWith("cardPlay");
 
       expect(mockSendMessage).toHaveBeenCalledWith("action:play_card", { cardId: "KS" });
       expect(mockSendMessage).not.toHaveBeenCalledWith("action:decline_belot", {});
@@ -1871,6 +1904,235 @@ describe("MatchPage", () => {
       );
       expect(screen.getByText("Deal five each, then turn one up")).toBeInTheDocument();
       expect(screen.queryByText("Deal all eight up front")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("audio", () => {
+    const collectSnapshot: { trick: TrickCard[]; winnerSeat: number } = {
+      trick: [
+        { card: { rank: "K", suit: "S" }, playerSeat: 0 },
+        { card: { rank: "7", suit: "H" }, playerSeat: 1 },
+        { card: { rank: "A", suit: "D" }, playerSeat: 2 },
+        { card: { rank: "9", suit: "C" }, playerSeat: 3 },
+      ],
+      winnerSeat: 2,
+    };
+
+    function audioPrefs() {
+      const u = useAuthStore.getState().user;
+      return { sound: u?.soundEnabled, music: u?.musicEnabled };
+    }
+
+    function collectCalls() {
+      return audioEngine.playSfx.mock.calls.filter(([name]) => name === "trickCollect");
+    }
+
+    beforeEach(() => {
+      Object.values(audioEngine).forEach((fn) => fn.mockClear());
+      mockUpdatePreferences.mockClear();
+      resetAudioPreferenceRequestSequence();
+      useMatchStore.getState().setMatchState(mockMatchState);
+      useMatchStore.getState().setMyPlayerSeat(0);
+    });
+
+    it("opens the audio session with music on entry, and stops the music on leaving", () => {
+      const { unmount } = renderMatchPage();
+
+      expect(audioEngine.openAudioSession).toHaveBeenCalledTimes(1);
+      expect(audioEngine.startMusic).toHaveBeenCalledTimes(1);
+      expect(audioEngine.stopMusic).not.toHaveBeenCalled();
+
+      unmount();
+      expect(audioEngine.stopMusic).toHaveBeenCalledTimes(1);
+    });
+
+    it("mutes BOTH switches when both are on, then un-mutes both", () => {
+      renderMatchPage();
+      const mute = screen.getByTestId("mute-button");
+      expect(mute).toHaveAccessibleName("Mute");
+
+      fireEvent.click(mute);
+
+      expect(audioPrefs()).toEqual({ sound: false, music: false });
+      expect(mockUpdatePreferences).toHaveBeenCalledTimes(1);
+      expect(mockUpdatePreferences).toHaveBeenCalledWith(10, {
+        soundEnabled: false,
+        musicEnabled: false,
+      });
+      expect(audioEngine.stopMusic).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("mute-button")).toHaveAccessibleName("Unmute");
+
+      fireEvent.click(screen.getByTestId("mute-button"));
+
+      expect(audioPrefs()).toEqual({ sound: true, music: true });
+      expect(mockUpdatePreferences).toHaveBeenLastCalledWith(10, {
+        soundEnabled: true,
+        musicEnabled: true,
+      });
+      expect(audioEngine.startMusic).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId("mute-button")).toHaveAccessibleName("Mute");
+    });
+
+    it("brings the chosen volumes back after a mute and unmute", () => {
+      useAuthStore.setState({
+        user: makeUser({ id: 10, soundVolume: 30, musicVolume: 80 }),
+      });
+      renderMatchPage();
+      expect(audioEngine.setMusicVolume).toHaveBeenLastCalledWith(80);
+
+      fireEvent.click(screen.getByTestId("mute-button"));
+      fireEvent.click(screen.getByTestId("mute-button"));
+
+      const u = useAuthStore.getState().user;
+      expect({ sound: u?.soundVolume, music: u?.musicVolume }).toEqual({ sound: 30, music: 80 });
+      expect(audioEngine.setMusicVolume).toHaveBeenLastCalledWith(80);
+      expect(audioEngine.startMusic).toHaveBeenCalledTimes(2);
+      // The mute writes the switches only; the levels are never part of it.
+      for (const [, body] of mockUpdatePreferences.mock.calls) {
+        expect(body).not.toHaveProperty("soundVolume");
+        expect(body).not.toHaveProperty("musicVolume");
+      }
+    });
+
+    it("treats ANY switch on as unmuted — one press turns both off", () => {
+      useAuthStore.setState({
+        user: makeUser({ id: 10, soundEnabled: false, musicEnabled: true }),
+      });
+      renderMatchPage();
+      expect(screen.getByTestId("mute-button")).toHaveAccessibleName("Mute");
+
+      fireEvent.click(screen.getByTestId("mute-button"));
+
+      expect(audioPrefs()).toEqual({ sound: false, music: false });
+      // Only the switch that actually moves is sent.
+      expect(mockUpdatePreferences).toHaveBeenCalledWith(10, { musicEnabled: false });
+    });
+
+    it("offers the same mute in the phone HUD menu", () => {
+      renderMatchPage();
+      fireEvent.click(screen.getByTestId("hud-menu-button"));
+
+      const item = screen.getByTestId("hud-menu-mute");
+      expect(item).toHaveTextContent("Mute");
+      fireEvent.click(item);
+
+      expect(audioPrefs()).toEqual({ sound: false, music: false });
+      expect(screen.queryByTestId("hud-menu")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("hud-menu-button"));
+      expect(screen.getByTestId("hud-menu-mute")).toHaveTextContent("Unmute");
+    });
+
+    it("sounds the player's own card at the click, before the server echo", () => {
+      renderMatchPage();
+
+      act(() => {
+        fireEvent.click(within(screen.getByTestId("hand-cards")).getByTestId("playing-card-KS"));
+      });
+
+      expect(mockSendMessage).toHaveBeenCalledWith("action:play_card", { cardId: "KS" });
+      expect(audioEngine.playSfx).toHaveBeenCalledTimes(1);
+      expect(audioEngine.playSfx).toHaveBeenCalledWith("cardPlay");
+    });
+
+    it("sounds the trick collect once, as the cards leave the table", () => {
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+      });
+      const receivedAt = useMatchStore.getState().pendingResolvedTrick!.receivedAt;
+      // The winner glow holds first — no sound while the cards sit there.
+      expect(collectCalls()).toHaveLength(0);
+
+      act(() => {
+        vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE);
+      });
+      expect(collectCalls()).toEqual([["trickCollect", { dedupeKey: String(receivedAt) }]]);
+    });
+
+    it("re-asks with the SAME dedupe key when a remount re-runs the collect for a live snapshot", () => {
+      // Real rects so the collect flights launch and the snapshot outlives the
+      // glow (jsdom never fires animationend) — the reconnect-mid-collect case.
+      const gbcrSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+        left: 100,
+        top: 100,
+        width: 72,
+        height: 104,
+        right: 172,
+        bottom: 204,
+        x: 100,
+        y: 100,
+        toJSON: () => ({}),
+      } as DOMRect);
+
+      try {
+        const first = renderMatchPage();
+        act(() => {
+          useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+        });
+        act(() => {
+          vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE);
+        });
+        const snapshot = useMatchStore.getState().pendingResolvedTrick;
+        expect(snapshot).not.toBeNull();
+        first.unmount();
+
+        renderMatchPage();
+        act(() => {
+          vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE);
+        });
+
+        // The engine drops a repeated key, so this is ONE audible collect.
+        const calls = collectCalls();
+        expect(calls).toHaveLength(2);
+        expect(calls[0]![1]).toEqual({ dedupeKey: String(snapshot!.receivedAt) });
+        expect(calls[1]![1]).toEqual(calls[0]![1]);
+      } finally {
+        gbcrSpy.mockRestore();
+      }
+    });
+
+    it("sounds the collect under reduced motion too", () => {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("prefers-reduced-motion"),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+      });
+      expect(collectCalls()).toHaveLength(0);
+
+      act(() => {
+        vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE);
+      });
+      expect(collectCalls()).toHaveLength(1);
+      expect(useMatchStore.getState().pendingResolvedTrick).toBeNull();
+    });
+
+    it("plays nothing for a resync snapshot", () => {
+      renderMatchPage();
+
+      act(() => {
+        useMatchStore.getState().setMatchState({
+          ...mockMatchState,
+          activePlayerSeat: 3,
+          currentTrick: [
+            { playerSeat: 1, card: { rank: "7", suit: "H" } },
+            { playerSeat: 2, card: { rank: "A", suit: "D" } },
+          ],
+        });
+      });
+
+      expect(audioEngine.playSfx).not.toHaveBeenCalled();
     });
   });
 

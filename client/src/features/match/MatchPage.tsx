@@ -4,6 +4,8 @@ import {
   Menu as MenuIcon,
   Pause,
   Settings as SettingsIcon,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -19,9 +21,12 @@ import {
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { getRoom, leaveRoom, returnToRoom } from "@/shared/api/rooms";
+import { playSfx } from "@/shared/audio/audioEngine";
+import { useMatchAudio } from "@/shared/audio/useMatchAudio";
 import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
+import { persistAudioPreferences, resolveAudioEnabled } from "@/shared/lib/audioPreference";
 import { playerDisplayName } from "@/shared/lib/botName";
 import { honorScoreOrPrior } from "@/shared/lib/honor";
 import { FLAG_LIFETIME, MOTION } from "@/shared/lib/motion";
@@ -262,6 +267,21 @@ export function MatchPage() {
   const pendingResolvedTrick = useMatchStore((s) => s.pendingResolvedTrick);
   const setPendingResolvedTrick = useMatchStore((s) => s.setPendingResolvedTrick);
 
+  // Card sounds + background music. The page's mount is the audio session: music
+  // runs only while this page is mounted, and stops when the player leaves.
+  useMatchAudio();
+  // HUD mute reflects "any audio on" and toggles BOTH switches together: if
+  // either is on it turns both off, and only when both are off does it turn
+  // both back on. One PATCH carries whichever of the two actually changes.
+  const audioOn =
+    resolveAudioEnabled(user?.soundEnabled) || resolveAudioEnabled(user?.musicEnabled);
+  const handleToggleMute = useCallback(() => {
+    const next = !audioOn;
+    void persistAudioPreferences({ soundEnabled: next, musicEnabled: next });
+  }, [audioOn]);
+  const muteLabel = audioOn ? t("match.hud.mute") : t("match.hud.unmute");
+  const MuteIcon = audioOn ? Volume2 : VolumeX;
+
   // "Game is starting…" splash gate — holds the themed loading screen for a
   // deliberate minimum duration when arriving from RoomPage (or LobbyPage
   // quick-play auto-start). The triggering navigation passes
@@ -475,11 +495,19 @@ export function MatchPage() {
     if (!pendingResolvedTrick) return;
     if (myPlayerSeat === null) return;
 
+    // The collect sound marks the moment the cards LEAVE the table, in both
+    // motion modes. It is keyed by the snapshot's capture stamp, so a remount
+    // that re-runs this effect for the same still-live snapshot (reconnect
+    // mid-collect) cannot sound the same trick twice.
+    const collectSoundKey = String(pendingResolvedTrick.receivedAt);
+
     if (prefersReducedMotion) {
       // Hold the snapshot long enough for the user to register the winner
       // glow — match the full-motion glow phase so reduced-motion users
-      // don't get a sub-second flash they can't process. No flights run.
+      // don't get a sub-second flash they can't process. No flights run, but
+      // the sound still does: reduced motion is not reduced audio.
       const reducedTimer = window.setTimeout(() => {
+        playSfx("trickCollect", { dedupeKey: collectSoundKey });
         setPendingResolvedTrick(null);
       }, MOTION.TRICK_RESOLVE_PAUSE);
       return () => clearTimeout(reducedTimer);
@@ -509,6 +537,7 @@ export function MatchPage() {
     // slots — the cards would appear to snap back to center and fly again.
 
     const glowTimer = window.setTimeout(() => {
+      playSfx("trickCollect", { dedupeKey: collectSoundKey });
       // Winner destination — compass-anchored to the viewport, no DOM read.
       // (See `winnerCollectRect` for the rationale.)
       const destRect = winnerCollectRect(winner, myPlayerSeat);
@@ -1055,6 +1084,9 @@ export function MatchPage() {
         setFlyingCardId(null);
         flyingClearTimerRef.current = null;
       }, FLAG_LIFETIME.FLYING_CARD);
+      // The own manual play sounds HERE, at the click, in step with the
+      // optimistic throw — the WS dispatcher skips this play's non-auto echo.
+      playSfx("cardPlay");
       sendMessage(ACTION_PLAY_CARD, { cardId });
     },
     [sendMessage, prefersReducedMotion, myPlayerSeat],
@@ -1799,10 +1831,11 @@ export function MatchPage() {
         </div>
       )}
 
-      {/* Rules + settings + emote — bottom-right HUD cluster sitting LEFT of
-          the chat FAB. The whole cluster is hidden while the chat dock is open,
-          since the floating panel covers this corner; it returns on close. The
-          Sound button is intentionally omitted until audio ships. */}
+      {/* Rules + settings + mute + emote — bottom-right HUD cluster sitting LEFT
+          of the chat FAB. The whole cluster is hidden while the chat dock is
+          open, since the floating panel covers this corner; it returns on close.
+          Mute flips BOTH audio switches at once; its icon and label say what a
+          press will do. */}
       {overlayPhase === "normal" && !isChatOpen && (
         <div
           className="absolute bottom-4 right-24 hidden items-center gap-2 md:flex"
@@ -1821,6 +1854,13 @@ export function MatchPage() {
             title={t("match.hud.settings")}
             onClick={() => setSettingsOpen(true)}
             data-testid="settings-button"
+          />
+          <HUDButton
+            icon={<MuteIcon className="h-4 w-4" aria-hidden="true" />}
+            aria-label={muteLabel}
+            title={muteLabel}
+            onClick={handleToggleMute}
+            data-testid="mute-button"
           />
           {(matchState.phase === "dealing" || isTurnPhase) &&
             matchEndData === null &&
@@ -1943,6 +1983,16 @@ export function MatchPage() {
                   }}
                   style={{ width: "100%", justifyContent: "flex-start" }}
                   data-testid="hud-menu-settings"
+                />
+                <HUDButton
+                  icon={<MuteIcon className="h-4 w-4" aria-hidden="true" />}
+                  label={muteLabel}
+                  onClick={() => {
+                    handleToggleMute();
+                    setHudMenuOpen(false);
+                  }}
+                  style={{ width: "100%", justifyContent: "flex-start" }}
+                  data-testid="hud-menu-mute"
                 />
                 {(matchState.phase === "dealing" || isTurnPhase) &&
                   matchEndData === null &&

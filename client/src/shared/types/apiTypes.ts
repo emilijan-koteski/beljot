@@ -25,6 +25,18 @@ export interface User {
   // path. NOT the game variant: the deck is "croatian", the variant is
   // "croatia" (see `Variant` in matchTypes).
   cardDeckPreference: CardDeck;
+  // In-match audio switches (migration 000025): card sound effects and the
+  // background playlist, independently. Account-level so they follow the
+  // player across devices. Always read them through `resolveAudioEnabled` —
+  // a missing value means ON, never off.
+  soundEnabled: boolean;
+  musicEnabled: boolean;
+  // The 0-100 level of each channel (migration 000026). A switch decides
+  // whether a channel plays, the volume how loud; muting never touches these.
+  // Always read them through `resolveAudioVolume` — a missing value means the
+  // default of 70, never silence.
+  soundVolume: number;
+  musicVolume: number;
   // Wallet fields (Story 9.1). Go zero values (0) serialize as real numbers, not
   // null — never use JS truthiness on these; compare explicitly (e.g. > 1).
   walletBalance: number;

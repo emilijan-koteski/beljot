@@ -177,6 +177,19 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     expect(screen.queryByTestId("profile-deck-option-croatian")).not.toBeInTheDocument();
   });
 
+  it("never mounts the audio switches (private self-only preferences)", async () => {
+    mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
+
+    renderAt("2");
+
+    await waitFor(() => expect(screen.getByTestId("public-profile-page")).toBeInTheDocument());
+    // A switch here could only ever flip the VIEWER's own audio from somebody
+    // else's page — structurally absent, not merely disabled.
+    expect(screen.queryByTestId("profile-audio")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("profile-sound-toggle")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("profile-music-toggle")).not.toBeInTheDocument();
+  });
+
   it("never mounts the LinkedAccounts (SSO) surface", async () => {
     mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
 

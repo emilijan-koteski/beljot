@@ -12,6 +12,13 @@ vi.mock("sonner", () => ({
   },
 }));
 
+// The audio engine is a no-op in jsdom anyway; mocking it lets the card-sound
+// block at the bottom assert exactly which WS messages ask for a sound.
+const mockPlaySfx = vi.hoisted(() => vi.fn());
+vi.mock("@/shared/audio/audioEngine", () => ({
+  playSfx: mockPlaySfx,
+}));
+
 import { toast } from "sonner";
 
 import { queryClient } from "@/shared/api/queryClient";
@@ -2323,5 +2330,92 @@ describe("useWsDispatch - season points", () => {
     expect(spy).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
     consoleWarnSpy.mockRestore();
+  });
+});
+
+describe("useWsDispatch — card sounds", () => {
+  beforeEach(() => {
+    useMatchStore.getState().reset();
+    useMatchStore.getState().setMatchState(mockMatchState);
+    useMatchStore.getState().setMyPlayerSeat(0);
+    mockPlaySfx.mockClear();
+  });
+
+  function send(message: WsMessage) {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current(message);
+  }
+
+  it("sounds another seat's card (human or bot) exactly once", () => {
+    send({
+      type: "event:card_played",
+      payload: { playerSeat: 1, cardId: "7H", autoPlayed: false },
+    });
+
+    expect(mockPlaySfx).toHaveBeenCalledTimes(1);
+    expect(mockPlaySfx).toHaveBeenCalledWith("cardPlay");
+  });
+
+  it("keeps the echo of the local player's own manual play silent", () => {
+    // MatchPage already sounded it at the click, in step with the throw.
+    send({
+      type: "event:card_played",
+      payload: { playerSeat: 0, cardId: "KS", autoPlayed: false },
+    });
+
+    expect(mockPlaySfx).not.toHaveBeenCalled();
+  });
+
+  it("sounds the local player's server auto-play — there was no click", () => {
+    send({ type: "event:card_played", payload: { playerSeat: 0, cardId: "KS", autoPlayed: true } });
+
+    expect(mockPlaySfx).toHaveBeenCalledTimes(1);
+    expect(mockPlaySfx).toHaveBeenCalledWith("cardPlay");
+  });
+
+  it("still sounds the 4th card when trick_resolved arrives in the same batch", () => {
+    // The 4th card's flight never runs (the snapshot takes over), which is why
+    // the sound is keyed to the WS message rather than to the flight.
+    useMatchStore.getState().setMatchState({
+      ...mockMatchState,
+      currentTrick: [
+        { card: { rank: "K", suit: "S" }, playerSeat: 0 },
+        { card: { rank: "7", suit: "H" }, playerSeat: 1 },
+        { card: { rank: "A", suit: "D" }, playerSeat: 2 },
+      ],
+    });
+
+    send({
+      type: "event:card_played",
+      payload: { playerSeat: 3, cardId: "9C", autoPlayed: false },
+    });
+    send({
+      type: "event:trick_resolved",
+      payload: { winnerSeat: 2, winnerTeam: 0, cards: ["KS", "7H", "AD", "9C"] },
+    });
+
+    expect(mockPlaySfx).toHaveBeenCalledTimes(1);
+    expect(mockPlaySfx).toHaveBeenCalledWith("cardPlay");
+  });
+
+  it("never sounds a resync snapshot", () => {
+    send({
+      type: "event:match_state",
+      payload: {
+        ...mockMatchState,
+        currentTrick: [
+          { card: { rank: "7", suit: "H" }, playerSeat: 1 },
+          { card: { rank: "A", suit: "D" }, playerSeat: 2 },
+        ],
+      },
+    });
+
+    expect(mockPlaySfx).not.toHaveBeenCalled();
+  });
+
+  it("stays silent for a malformed card id", () => {
+    send({ type: "event:card_played", payload: { playerSeat: 1, cardId: "", autoPlayed: false } });
+
+    expect(mockPlaySfx).not.toHaveBeenCalled();
   });
 });

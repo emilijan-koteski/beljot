@@ -45,6 +45,23 @@ func (m *mockUserRepo) Create(u *user.User) error {
 	}
 	u.ID = m.nextID
 	u.CreatedAt = time.Now()
+	// Mirror GORM's Create for the two `default:true` bool columns and the two
+	// `default:70` volume columns: a zero value is treated as unset and replaced
+	// by the tag default, in the row AND in the struct the handler then echoes.
+	// Nothing creates a user with audio off or silent, so this is the only
+	// behaviour the real repo can produce here.
+	if !u.SoundEnabled {
+		u.SoundEnabled = true
+	}
+	if !u.MusicEnabled {
+		u.MusicEnabled = true
+	}
+	if u.SoundVolume == 0 {
+		u.SoundVolume = 70
+	}
+	if u.MusicVolume == 0 {
+		u.MusicVolume = 70
+	}
 	m.nextID++
 	m.users = append(m.users, u)
 	return nil
@@ -97,17 +114,29 @@ func (m *mockUserRepo) SearchByUsername(string, uint, int) ([]user.User, error) 
 // columns are applied to the in-memory row together, so a test asserting the
 // half-applied case has to force the failure rather than rely on ordering.
 // failUpdatePreferences, when set, fails BEFORE writing anything.
-func (m *mockUserRepo) UpdatePreferences(id uint, lang *string, deck *string) error {
+func (m *mockUserRepo) UpdatePreferences(id uint, prefs user.PreferencesUpdate) error {
 	if m.failUpdatePreferences != nil {
 		return m.failUpdatePreferences
 	}
 	for _, u := range m.users {
 		if u.ID == id {
-			if lang != nil {
-				u.LanguagePreference = *lang
+			if prefs.LanguagePreference != nil {
+				u.LanguagePreference = *prefs.LanguagePreference
 			}
-			if deck != nil {
-				u.CardDeckPreference = *deck
+			if prefs.CardDeckPreference != nil {
+				u.CardDeckPreference = *prefs.CardDeckPreference
+			}
+			if prefs.SoundEnabled != nil {
+				u.SoundEnabled = *prefs.SoundEnabled
+			}
+			if prefs.MusicEnabled != nil {
+				u.MusicEnabled = *prefs.MusicEnabled
+			}
+			if prefs.SoundVolume != nil {
+				u.SoundVolume = *prefs.SoundVolume
+			}
+			if prefs.MusicVolume != nil {
+				u.MusicVolume = *prefs.MusicVolume
 			}
 			return nil
 		}
@@ -928,4 +957,126 @@ func TestRefresh_EchoesWalletFields(t *testing.T) {
 
 	assert.Equal(t, 5000, data.WalletBalance)
 	assert.Equal(t, 0, data.LoginStreakDays)
+}
+
+// --- Audio preferences echo (migration 000025) ---
+
+// decodeAuthEnvelope returns both the typed payload and its raw key set, so a
+// test can tell an echoed false apart from a key that is missing altogether
+// (which the typed decode would also read as false).
+func decodeAuthEnvelope(t *testing.T, rec *httptest.ResponseRecorder) (RegisterResponseData, map[string]json.RawMessage) {
+	t.Helper()
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data RegisterResponseData
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(resp["data"], &raw))
+	return data, raw
+}
+
+// A fresh account starts with sound and music ON. Register never names the two
+// fields, so this pins that the default reaches both the row and the envelope.
+func TestRegister_EchoesAudioPreferencesOnByDefault(t *testing.T) {
+	handler, e := setupHandler()
+	rec := registerUser(e)
+	require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
+
+	data, _ := decodeAuthEnvelope(t, rec)
+	assert.True(t, data.SoundEnabled)
+	assert.True(t, data.MusicEnabled)
+
+	repo, ok := handler.userRepo.(*mockUserRepo)
+	require.True(t, ok)
+	require.Len(t, repo.users, 1)
+	assert.True(t, repo.users[0].SoundEnabled)
+	assert.True(t, repo.users[0].MusicEnabled)
+}
+
+// Login and refresh echo the STORED switches, not the defaults: a player who
+// turned sound off on one device must not hear the first card on another.
+func TestLogin_EchoesStoredAudioPreferences(t *testing.T) {
+	handler, e := setupHandler()
+	registerUser(e)
+	repo, ok := handler.userRepo.(*mockUserRepo)
+	require.True(t, ok)
+	repo.users[0].SoundEnabled = false
+
+	rec := doLogin(e, `{"email":"test@example.com","password":"password123"}`)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	data, raw := decodeAuthEnvelope(t, rec)
+	assert.JSONEq(t, "false", string(raw["soundEnabled"]))
+	assert.True(t, data.MusicEnabled)
+}
+
+func TestRefresh_EchoesStoredAudioPreferences(t *testing.T) {
+	handler, e := setupHandler()
+	regRec := registerUser(e)
+	repo, ok := handler.userRepo.(*mockUserRepo)
+	require.True(t, ok)
+	repo.users[0].MusicEnabled = false
+
+	rec := doRefresh(e, regRec.Result().Cookies())
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	data, raw := decodeAuthEnvelope(t, rec)
+	assert.True(t, data.SoundEnabled)
+	assert.JSONEq(t, "false", string(raw["musicEnabled"]))
+}
+
+// --- Audio volumes echo (migration 000026) ---
+
+// A fresh account starts at the default level of 70 on both channels — the
+// loudness the client played at before volumes existed. Register never names
+// the two fields, so this pins that the default reaches both the row and the
+// envelope.
+func TestRegister_EchoesAudioVolumesAtDefault(t *testing.T) {
+	handler, e := setupHandler()
+	rec := registerUser(e)
+	require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
+
+	data, _ := decodeAuthEnvelope(t, rec)
+	assert.Equal(t, 70, data.SoundVolume)
+	assert.Equal(t, 70, data.MusicVolume)
+
+	repo, ok := handler.userRepo.(*mockUserRepo)
+	require.True(t, ok)
+	require.Len(t, repo.users, 1)
+	assert.Equal(t, 70, repo.users[0].SoundVolume)
+	assert.Equal(t, 70, repo.users[0].MusicVolume)
+}
+
+// Login and refresh echo the STORED levels, 0 included: a channel turned all
+// the way down on one device must stay silent on another.
+func TestLogin_EchoesStoredAudioVolumes(t *testing.T) {
+	handler, e := setupHandler()
+	registerUser(e)
+	repo, ok := handler.userRepo.(*mockUserRepo)
+	require.True(t, ok)
+	repo.users[0].SoundVolume = 0
+	repo.users[0].MusicVolume = 30
+
+	rec := doLogin(e, `{"email":"test@example.com","password":"password123"}`)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	_, raw := decodeAuthEnvelope(t, rec)
+	assert.JSONEq(t, "0", string(raw["soundVolume"]))
+	assert.JSONEq(t, "30", string(raw["musicVolume"]))
+}
+
+func TestRefresh_EchoesStoredAudioVolumes(t *testing.T) {
+	handler, e := setupHandler()
+	regRec := registerUser(e)
+	repo, ok := handler.userRepo.(*mockUserRepo)
+	require.True(t, ok)
+	repo.users[0].SoundVolume = 100
+	repo.users[0].MusicVolume = 45
+
+	rec := doRefresh(e, regRec.Result().Cookies())
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	data, _ := decodeAuthEnvelope(t, rec)
+	assert.Equal(t, 100, data.SoundVolume)
+	assert.Equal(t, 45, data.MusicVolume)
 }

@@ -20,6 +20,13 @@ export interface RegisterResponse {
   // the session already draws in the player's chosen deck, with no separate
   // profile fetch. Seeded `croatian` at registration only when `hr` was picked.
   cardDeckPreference: CardDeck;
+  // Audio switches (migration 000025) — echoed for the same first-paint reason:
+  // a switch turned off on another device must hold for the first card played.
+  soundEnabled: boolean;
+  musicEnabled: boolean;
+  // Audio volumes (migration 000026), 0-100 — echoed for the same reason.
+  soundVolume: number;
+  musicVolume: number;
   walletBalance: number;
   loginStreakDays: number;
   // XP & level (Story 9.5) — echoed on auth so the top-nav banner has them on
@@ -50,6 +57,11 @@ export interface RefreshResponse {
   languagePreference: string;
   // Card deck (Story 12.4) — see RegisterResponse.
   cardDeckPreference: CardDeck;
+  // Audio switches and volumes — see RegisterResponse.
+  soundEnabled: boolean;
+  musicEnabled: boolean;
+  soundVolume: number;
+  musicVolume: number;
   walletBalance: number;
   loginStreakDays: number;
   // XP & level (Story 9.5) — see RegisterResponse.
