@@ -2419,3 +2419,87 @@ describe("useWsDispatch — card sounds", () => {
     expect(mockPlaySfx).not.toHaveBeenCalled();
   });
 });
+
+describe("useWsDispatch — avatar popup sounds", () => {
+  beforeEach(() => {
+    useMatchStore.getState().reset();
+    useMatchStore.getState().setMatchState(mockMatchState);
+    useMatchStore.getState().setMyPlayerSeat(0);
+    mockPlaySfx.mockClear();
+  });
+
+  function send(message: WsMessage) {
+    const { result } = renderHook(() => useWsDispatch());
+    result.current(message);
+  }
+
+  const emote: WsMessage = {
+    type: "system:emote",
+    payload: { playerSeat: 1, emote: "thumbs_up" },
+  };
+
+  it("pops an emote bubble with the popup sound", () => {
+    send(emote);
+
+    expect(useMatchStore.getState().activeEmotes[1]).not.toBeNull();
+    expect(mockPlaySfx).toHaveBeenCalledTimes(1);
+    expect(mockPlaySfx).toHaveBeenCalledWith("popup");
+  });
+
+  it.each([
+    ["paused", { phase: "paused" as const }],
+    ["disconnected", { phase: "disconnected" as const }],
+  ])("keeps an emote silent while the table is %s (no bubble is shown)", (_label, patch) => {
+    useMatchStore.getState().setMatchState({ ...mockMatchState, ...patch });
+
+    send(emote);
+
+    expect(mockPlaySfx).not.toHaveBeenCalled();
+  });
+
+  it("keeps an emote silent behind the match result", () => {
+    useMatchStore.getState().setMatchEndData({
+      winnerTeam: 0,
+      teamAFinalScore: 1001,
+      teamBFinalScore: 800,
+      matchDurationSec: 300,
+    });
+
+    send(emote);
+
+    expect(mockPlaySfx).not.toHaveBeenCalled();
+  });
+
+  it("pops the Bitola declare banner with the popup sound", () => {
+    send({ type: "event:player_declared", payload: { playerSeat: 2 } });
+
+    expect(mockPlaySfx).toHaveBeenCalledWith("popup");
+  });
+
+  it("pops a surrender proposal for the partner and the opponents", () => {
+    send({
+      type: "event:surrender_proposed",
+      payload: { proposerSeat: 1, proposerTeam: 1, proposerUsername: "Bob", partnerSeat: 3 },
+    });
+
+    expect(mockPlaySfx).toHaveBeenCalledWith("popup");
+  });
+
+  it("keeps the proposer's own surrender silent", () => {
+    send({
+      type: "event:surrender_proposed",
+      payload: { proposerSeat: 0, proposerTeam: 0, proposerUsername: "Alice", partnerSeat: 2 },
+    });
+
+    expect(mockPlaySfx).not.toHaveBeenCalled();
+  });
+
+  it("never pops anything for a resync snapshot", () => {
+    send({
+      type: "event:match_state",
+      payload: { ...mockMatchState, surrenderProposerSeat: 1 },
+    });
+
+    expect(mockPlaySfx).not.toHaveBeenCalled();
+  });
+});

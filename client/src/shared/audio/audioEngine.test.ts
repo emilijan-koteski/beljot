@@ -213,11 +213,32 @@ describe("sound effects", () => {
   it("preloads every variant of every effect", async () => {
     await preloadSfx();
 
-    const all = [...SFX_URLS.cardPlay, ...SFX_URLS.trickCollect];
-    expect(all).toHaveLength(12);
+    const all = Object.values(SFX_URLS).flat();
+    expect(all).toHaveLength(29);
     expect(fetchMock.mock.calls.map(([url]) => url).sort()).toEqual([...all].sort());
-    expect(context().decodeAudioData).toHaveBeenCalledTimes(12);
+    expect(context().decodeAudioData).toHaveBeenCalledTimes(29);
     expect(all.every((url) => url.endsWith(".mp3"))).toBe(true);
+  });
+
+  it.each([
+    ["deal", /card-shuffle\.mp3$/],
+    ["dealPacket", /card-place-1\.mp3$/],
+    ["declaration", /chips-stack-1\.mp3$/],
+    ["capot", /jingle-capot\.mp3$/],
+    ["matchWin", /jingle-win\.mp3$/],
+    ["matchLose", /jingle-lose\.mp3$/],
+    ["popup", /popup-1\.mp3$/],
+    ["clockTick", /clock-tick\.mp3$/],
+  ] as const)("plays %s from its own recording set", async (name, file) => {
+    openAudioSession();
+    await preloadSfx();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    playSfx(name);
+
+    expect(context().sources).toHaveLength(1);
+    expect(context().sources[0]!.buffer).toEqual({ url: SFX_URLS[name][0] });
+    expect(SFX_URLS[name][0]).toMatch(file);
   });
 
   it("plays one random card-slide variant through the sfx bus", async () => {
@@ -336,11 +357,12 @@ describe("sound effects", () => {
       arrayBuffer: async () => Object.assign(new ArrayBuffer(0), { url: "" }),
     }));
 
+    const total = Object.values(SFX_URLS).flat().length;
     await expect(preloadSfx()).resolves.toBeUndefined();
-    expect(context().decodeAudioData).toHaveBeenCalledTimes(11);
+    expect(context().decodeAudioData).toHaveBeenCalledTimes(total - 1);
 
     await preloadSfx();
-    expect(context().decodeAudioData).toHaveBeenCalledTimes(12);
+    expect(context().decodeAudioData).toHaveBeenCalledTimes(total);
   });
 });
 
@@ -777,7 +799,7 @@ describe("audio assets", () => {
   const PUBLIC_DIR = join(process.cwd(), "public");
   const BASE = import.meta.env.BASE_URL;
 
-  it.each([...SFX_URLS.cardPlay, ...SFX_URLS.trickCollect, ...MUSIC_TRACKS])("ships %s", (url) => {
+  it.each([...Object.values(SFX_URLS).flat(), ...MUSIC_TRACKS])("ships %s", (url) => {
     expect(url.startsWith(`${BASE}audio/`)).toBe(true);
     expect(existsSync(join(PUBLIC_DIR, url.slice(BASE.length)))).toBe(true);
   });

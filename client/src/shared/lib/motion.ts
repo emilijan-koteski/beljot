@@ -56,19 +56,31 @@ export const MOTION = {
   CARD_STATE: 150,
 
   // ─── Deal sequence ───────────────────────────────────────────────
-  /** Per-card slide as cards deal to seats. Mirrors Tailwind
-   *  `duration-300` in DealAnimation. */
-  DEAL_CARD: 300,
-  /** Inter-card stagger during the deal. */
-  DEAL_STAGGER: 80,
-  /** Phase 1 of dealing: cards visibly dealt to seats. */
-  DEAL_PHASE_DEAL: 800,
-  /** Phase 2 of dealing: trump candidate flipped face-up. */
-  DEAL_PHASE_TRUMP: 1200,
-
-  // ─── Reshuffle ───────────────────────────────────────────────────
-  RESHUFFLE_PULSE: 1200,
-  RESHUFFLE_STAGGER: 100,
+  // One schedule (features/match/lib/dealSchedule.ts) drives every deal, in
+  // full and reduced motion alike: packets leave the dealer's seat one after
+  // another, each seat's cards appear as its packet lands, and the bidding
+  // prompt waits for the end.
+  /** The deck rests at the dealer's seat while the shuffle sounds, before the
+   *  first packet leaves. Opening deals only; the second deal has no shuffle. */
+  DEAL_LEAD_IN: 400,
+  /** One packet's flight from the dealer's seat to its recipient. */
+  DEAL_PACKET_FLIGHT: 320,
+  /** Start-to-start gap between consecutive packets. */
+  DEAL_PACKET_STAGGER: 140,
+  /** The face-up trump candidate turning over at the table centre, after the
+   *  last packet of a candidate deal has landed. */
+  DEAL_CANDIDATE_FLIP: 400,
+  /** Whole-deal lengths, one per deal shape — the schedule's own totals,
+   *  pinned by dealSchedule.test.ts. The server adds exactly these to the next
+   *  actor's deadline and a bot's think delay (server/internal/match/
+   *  deal_grace.go); keep the two sides equal. */
+  /** 3 then 2 cards to each seat, then the candidate flip. */
+  DEAL_DURATION_CANDIDATE_FIRST: 2100,
+  /** 3, 3, then 2 face-down cards to each seat. */
+  DEAL_DURATION_ALL_BEFORE_BIDDING: 2260,
+  /** After the candidate is taken: 3 to each seat, 2 plus the candidate to the
+   *  taker. */
+  DEAL_DURATION_CANDIDATE_SECOND: 740,
 
   // ─── Game-start splash ───────────────────────────────────────────
   /** Minimum hold time for the "Game is starting…" splash on MatchPage when
@@ -77,7 +89,9 @@ export const MOTION = {
    *  without feeling like a spinner — slightly longer than
    *  `TRICK_RESOLVE_PAUSE` so the beat reads as a phase transition, not a
    *  per-trick interaction. Reload / reconnect mounts skip this hold via the
-   *  `fromRoom` route-state flag. */
+   *  `fromRoom` route-state flag. The server's match-start deal grace counts
+   *  this hold too (deal_grace.go `matchStartSplash`), since the opening deal
+   *  only starts once it ends — keep the two equal. */
   GAME_STARTING_SPLASH: 1500,
   /** Reduced-motion variant — short enough to feel near-instant, long enough
    *  to mask the deal animation's first frame so the splash still serves its

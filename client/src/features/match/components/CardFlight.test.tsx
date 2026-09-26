@@ -44,6 +44,23 @@ describe("CardFlight", () => {
     expect(screen.getByTestId("playing-card-7H")).toBeInTheDocument();
   });
 
+  it("flies a face-down back when the flight carries no card", () => {
+    render(
+      <CardFlight
+        flights={[descriptor({ id: "deal-1:0-0-0", card: null })]}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    const flight = screen.getByTestId("card-flight-deal-1:0-0-0-animated");
+    expect(flight.querySelector('[data-testid="playing-card-facedown"]')).not.toBeNull();
+    expect(
+      flight.querySelector(
+        '[data-testid^="playing-card-"]:not([data-testid="playing-card-facedown"])',
+      ),
+    ).toBeNull();
+  });
+
   it("emits a uniquely-named keyframe per flight", () => {
     render(<CardFlight flights={[descriptor()]} onComplete={vi.fn()} />);
 

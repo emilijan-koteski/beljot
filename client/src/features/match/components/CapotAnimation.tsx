@@ -1,6 +1,7 @@
 import { type CSSProperties, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useSfxOnce } from "@/shared/audio/useSfxOnce";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION, motionDuration } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
@@ -15,6 +16,12 @@ interface CapotAnimationProps {
   /** Capot bonus actually awarded this hand (from the `hand_scored` payload). */
   capotBonus: number;
   onComplete: () => void;
+  /**
+   * Dedupe key for the capot jingle (see `payloadSoundKey`), played once when
+   * the banner mounts. Null for a banner rebuilt on reconnect from the saved
+   * hand result, which describes a moment that has already sounded.
+   */
+  soundKey?: string | null;
 }
 
 /**
@@ -28,8 +35,10 @@ export function CapotAnimation({
   viewerSeat,
   capotBonus,
   onComplete,
+  soundKey,
 }: CapotAnimationProps) {
   const { t } = useTranslation();
+  useSfxOnce("capot", soundKey);
   const prefersReducedMotion = useReducedMotion();
 
   const done = useRef(false);

@@ -13,7 +13,7 @@ import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
-import type { MatchState, TrickCard } from "@/shared/types/matchTypes";
+import type { HandResult, MatchState, TrickCard } from "@/shared/types/matchTypes";
 import type { HandScoredPayload } from "@/shared/types/wsEvents";
 
 import { MatchPage } from "./MatchPage";
@@ -2206,16 +2206,29 @@ describe("MatchPage", () => {
       expect(within(prompt).getByTestId("declaration-prompt-skip")).toBeEnabled();
     });
 
-    // The leak this phase was rebuilt to close. A seat holding nothing must get
-    // the SAME dialog, so that having one tells nobody anything.
-    it("shows the same prompt to a seat holding nothing, with Declare disabled", () => {
+    // A seat holding nothing gets the same dialog, but has nothing to decide:
+    // it answers on mount (owner decision — an instant skip, accepting that the
+    // table can tell) and waits on the others with its own answer counted.
+    it("answers at once for a seat holding nothing and shows it waiting", () => {
       renderDeclaring(meldlessOverride());
 
+      expect(mockSendMessage).toHaveBeenCalledWith("action:skip_declare", {});
+      expect(mockSendMessage).toHaveBeenCalledTimes(1);
       const prompt = screen.getByTestId("declaration-prompt");
+      expect(within(prompt).getByText("No declarations")).toBeInTheDocument();
       expect(within(prompt).getByTestId("declaration-prompt-none")).toBeInTheDocument();
       expect(within(prompt).queryByTestId("declaration-prompt-total")).not.toBeInTheDocument();
       expect(within(prompt).getByTestId("declaration-prompt-declare")).toBeDisabled();
-      expect(within(prompt).getByTestId("declaration-prompt-skip")).toBeEnabled();
+      const skip = within(prompt).getByTestId("declaration-prompt-skip");
+      expect(skip).toBeDisabled();
+      // Nobody had answered yet; the viewer's own skip already counts.
+      expect(skip).toHaveTextContent("1/4");
+
+      // Sent once — the window elapsing does not send a second answer.
+      act(() => {
+        vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP + 100);
+      });
+      expect(mockSendMessage).toHaveBeenCalledTimes(1);
     });
 
     it("shows the prompt to a seat that is not the pinned activePlayerSeat", () => {
@@ -2631,6 +2644,964 @@ describe("MatchPage", () => {
       for (const c of screen.getAllByTestId("player-seat-card-count")) {
         expect(c).toHaveTextContent("×6");
       }
+    });
+  });
+  // Spec: match-audio-deal-transition-polish — the I/O matrix rows.
+  describe("match polish: deal, collect sequencing, event sounds, belote", () => {
+    const sfxCalls = (name: string) =>
+      audioEngine.playSfx.mock.calls.filter(([called]) => called === name);
+
+    beforeEach(() => {
+      audioEngine.playSfx.mockClear();
+    });
+
+    function seatCount(seat: number): string {
+      return within(screen.getByTestId(`player-seat-${seat}`)).getByTestId("player-seat-card-count")
+        .textContent!;
+    }
+
+    function handCardIds(): string[] {
+      return Array.from(
+        within(screen.getByTestId("hand-cards")).queryAllByTestId(/^hand-card-(?!face-down)/),
+      ).map((el) => el.getAttribute("data-testid")!.slice("hand-card-".length));
+    }
+
+    const FIVE: MatchState["players"][number]["hand"] = [
+      { rank: "7", suit: "S" },
+      { rank: "8", suit: "S" },
+      { rank: "9", suit: "S" },
+      { rank: "T", suit: "H" },
+      { rank: "J", suit: "H" },
+    ];
+
+    /** A freshly dealt candidate hand: bidding round 1, nobody has bid. */
+    function dealtState(overrides: Partial<MatchState> = {}): MatchState {
+      return {
+        ...mockMatchState,
+        phase: "bidding",
+        handNumber: 2,
+        dealerSeat: 1,
+        activePlayerSeat: 2,
+        trumpSuit: null,
+        trumpCallerSeat: null,
+        trumpCandidate: { rank: "A", suit: "H" },
+        biddingRound: 1,
+        biddingPassCount: 0,
+        trickNumber: 0,
+        players: mockMatchState.players.map((p) => ({
+          ...p,
+          hand: p.seat === 0 ? FIVE : [],
+          handCount: 5,
+        })) as MatchState["players"],
+        ...overrides,
+      };
+    }
+
+    describe("deal animation", () => {
+      // Real rects so the deal's flights launch (jsdom zeroes them otherwise,
+      // and the flight builder then has nothing to measure).
+      let gbcrSpy: ReturnType<typeof vi.spyOn>;
+      beforeEach(() => {
+        gbcrSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+          left: 100,
+          top: 100,
+          width: 72,
+          height: 104,
+          right: 172,
+          bottom: 204,
+          x: 100,
+          y: 100,
+          toJSON: () => ({}),
+        } as DOMRect);
+      });
+      afterEach(() => {
+        gbcrSpy.mockRestore();
+      });
+
+      const dealFlights = () =>
+        document.querySelectorAll('[data-testid^="card-flight-deal-"][data-testid$="-animated"]');
+
+      it("deals the next hand packet by packet before the bidding prompt", () => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          useMatchStore.getState().setMatchState(dealtState());
+        });
+
+        // The very first frame of the new hand: empty seats, no prompt, and the
+        // packets already in the overlay (8 packets of 3 and 2 backs).
+        expect(dealFlights()).toHaveLength(20);
+        expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
+        expect(screen.queryByTestId("trump-prompt")).not.toBeInTheDocument();
+        expect(seatCount(2)).toBe("×0");
+        expect(handCardIds()).toEqual([]);
+
+        // Dealer is seat 1, so seat 2 gets the first packet of three.
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_LEAD_IN + MOTION.DEAL_PACKET_FLIGHT);
+        });
+        expect(sfxCalls("deal")).toHaveLength(1);
+        expect(sfxCalls("dealPacket")).toHaveLength(1);
+        expect(seatCount(2)).toBe("×3");
+        expect(seatCount(3)).toBe("×0");
+
+        // Seat 0 (the viewer) is third in line: its first three cards appear
+        // with its packet.
+        act(() => {
+          vi.advanceTimersByTime(2 * MOTION.DEAL_PACKET_STAGGER);
+        });
+        expect(handCardIds()).toHaveLength(3);
+        expect(screen.queryByTestId("trump-prompt")).not.toBeInTheDocument();
+
+        // Every packet down, the candidate flipped: bidding opens.
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_FIRST);
+        });
+        expect(sfxCalls("dealPacket")).toHaveLength(8);
+        expect(screen.queryByTestId("deal-animation")).not.toBeInTheDocument();
+        // jsdom never reports animationend: the deal takes its flights back.
+        expect(dealFlights()).toHaveLength(0);
+        expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
+        expect(seatCount(2)).toBe("×5");
+        expect(handCardIds()).toHaveLength(5);
+      });
+
+      it("turns the candidate face-up at the end of the deal", () => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        act(() => {
+          useMatchStore.getState().setMatchState(dealtState());
+        });
+
+        expect(screen.queryByTestId("deal-candidate")).not.toBeInTheDocument();
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_FIRST - MOTION.DEAL_CANDIDATE_FLIP);
+        });
+        expect(
+          within(screen.getByTestId("deal-candidate")).getByTestId("playing-card-AH"),
+        ).toBeInTheDocument();
+      });
+
+      it("holds the first bidder's seat ring until the deal is down", () => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        act(() => {
+          useMatchStore.getState().setMatchState(
+            dealtState({
+              turnExpiresAt: new Date(Date.now() + 12_100).toISOString(),
+              timerDurationSec: 10,
+            }),
+          );
+        });
+
+        expect(screen.getByTestId("player-seat-2")).toHaveAttribute("data-active", "false");
+        expect(screen.queryByTestId("timer-ring")).not.toBeInTheDocument();
+
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_FIRST);
+        });
+        expect(screen.getByTestId("player-seat-2")).toHaveAttribute("data-active", "true");
+        expect(screen.getByTestId("timer-ring")).toBeInTheDocument();
+      });
+
+      it("animates a reshuffle (same hand, rotated dealer) and says so", () => {
+        useMatchStore
+          .getState()
+          .setMatchState(dealtState({ biddingRound: 2, biddingPassCount: 3, activePlayerSeat: 1 }));
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        expect(screen.queryByTestId("deal-animation")).not.toBeInTheDocument();
+
+        act(() => {
+          useMatchStore
+            .getState()
+            .setMatchState(dealtState({ dealerSeat: 2, activePlayerSeat: 3 }));
+        });
+
+        expect(screen.getByTestId("deal-reshuffle-caption")).toHaveTextContent("Reshuffling deck…");
+        expect(screen.queryByTestId("trump-prompt")).not.toBeInTheDocument();
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_FIRST);
+        });
+        expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
+      });
+
+      it("deals 3, 3 and 2 face-down in a candidate-less (all-before-bidding) hand", () => {
+        const SIX = [...FIVE, { rank: "Q" as const, suit: "H" as const }];
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        act(() => {
+          useMatchStore.getState().setMatchState(
+            dealtState({
+              variant: "croatia",
+              trumpCandidate: null,
+              dealerSeat: 3, // the viewer (seat 0) is first in line
+              activePlayerSeat: 0,
+              players: dealtState().players.map((p) => ({
+                ...p,
+                hand: p.seat === 0 ? SIX : [],
+                handCount: 6,
+                faceDownCount: 2,
+              })) as MatchState["players"],
+            }),
+          );
+        });
+
+        const packetLand = (i: number) =>
+          MOTION.DEAL_LEAD_IN + i * MOTION.DEAL_PACKET_STAGGER + MOTION.DEAL_PACKET_FLIGHT;
+        act(() => {
+          vi.advanceTimersByTime(packetLand(0));
+        });
+        expect(handCardIds()).toHaveLength(3);
+        expect(screen.queryAllByTestId("hand-card-face-down")).toHaveLength(0);
+        act(() => {
+          vi.advanceTimersByTime(packetLand(4) - packetLand(0));
+        });
+        expect(handCardIds()).toHaveLength(6);
+        expect(screen.queryAllByTestId("hand-card-face-down")).toHaveLength(0);
+        act(() => {
+          vi.advanceTimersByTime(packetLand(8) - packetLand(4));
+        });
+        expect(screen.queryAllByTestId("hand-card-face-down")).toHaveLength(2);
+        expect(screen.queryByTestId("trump-prompt")).not.toBeInTheDocument();
+
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_DURATION_ALL_BEFORE_BIDDING - packetLand(8));
+        });
+        expect(sfxCalls("dealPacket")).toHaveLength(12);
+        expect(seatCount(1)).toBe("×8");
+        expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
+      });
+
+      it("animates the second deal and holds the leader's cards until it lands", () => {
+        // Dealer 3: the viewer leads trick 1 and is first in the second deal.
+        const bidding = dealtState({ dealerSeat: 3, activePlayerSeat: 1, handNumber: 1 });
+        useMatchStore.getState().setMatchState(bidding);
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        const EIGHT = [
+          ...FIVE,
+          { rank: "Q" as const, suit: "D" as const },
+          { rank: "K" as const, suit: "D" as const },
+          { rank: "A" as const, suit: "D" as const },
+        ];
+        act(() => {
+          useMatchStore.getState().setMatchState({
+            ...bidding,
+            phase: "playing",
+            trumpSuit: "H",
+            trumpCallerSeat: 1,
+            trumpCandidate: null,
+            activePlayerSeat: 0,
+            trickNumber: 1,
+            currentTrick: [],
+            players: bidding.players.map((p) => ({
+              ...p,
+              hand: p.seat === 0 ? EIGHT : [],
+              handCount: 8,
+            })) as MatchState["players"],
+          });
+        });
+
+        // The taker's packet carries the face-up candidate with it.
+        expect(
+          document.querySelector('[data-testid^="card-flight-deal-"][data-testid$="-candidate"]'),
+        ).not.toBeNull();
+        // Before the viewer's packet: only the five cards they already held.
+        expect(handCardIds()).toHaveLength(5);
+        expect(seatCount(1)).toBe("×5");
+        expect(sfxCalls("deal")).toHaveLength(0);
+
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_PACKET_FLIGHT);
+        });
+        expect(handCardIds()).toHaveLength(8);
+        // Still dealing: the lead is not playable yet.
+        expect(screen.getByTestId("playing-card-7S")).toHaveAttribute("tabindex", "-1");
+
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_SECOND);
+        });
+        // The taker got 2 + the candidate.
+        expect(seatCount(1)).toBe("×8");
+        expect(sfxCalls("dealPacket")).toHaveLength(4);
+        expect(screen.getByTestId("playing-card-7S")).toHaveAttribute("tabindex", "0");
+      });
+
+      it("never replays a deal when mounting into a hand in progress (reconnect mid-bidding)", () => {
+        useMatchStore.getState().setMatchState(dealtState());
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        expect(screen.queryByTestId("deal-animation")).not.toBeInTheDocument();
+        expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_FIRST);
+        });
+        expect(audioEngine.playSfx).not.toHaveBeenCalled();
+      });
+
+      it("deals the opening hand after the splash when arriving from the room", () => {
+        useMatchStore.getState().setMatchState(dealtState({ handNumber: 1 }));
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage({ fromRoom: true });
+
+        expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
+        expect(screen.queryByTestId("trump-prompt")).not.toBeInTheDocument();
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_FIRST);
+        });
+        expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
+        expect(sfxCalls("deal")).toHaveLength(1);
+      });
+
+      it("drops the arrival flag from the history entry, so a reload replays neither splash nor deal", () => {
+        useMatchStore.getState().setMatchState(dealtState({ handNumber: 1 }));
+        useMatchStore.getState().setMyPlayerSeat(0);
+        const { router } = renderMatchPage({ fromRoom: true });
+
+        // The live arrival still got its deal…
+        expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
+        // …but the entry a reload would restore no longer says "from the room".
+        expect(router.state.location.state).toBeNull();
+        expect(router.state.location.pathname).toBe("/match/1");
+      });
+
+      it("keeps the beat and the sounds under reduced motion, without flights", () => {
+        window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+          matches: query.includes("prefers-reduced-motion"),
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })) as unknown as typeof window.matchMedia;
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        act(() => {
+          useMatchStore.getState().setMatchState(dealtState());
+        });
+
+        // Rects are measurable here, so no flight is down to reduced motion alone.
+        expect(document.querySelector('[data-testid^="card-flight-deal-"]')).toBeNull();
+        expect(screen.queryByTestId("trump-prompt")).not.toBeInTheDocument();
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_FIRST);
+        });
+        expect(sfxCalls("dealPacket")).toHaveLength(8);
+        expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
+      });
+    });
+
+    describe("trick-collect sequencing", () => {
+      // Seat 0's card is one nobody holds: the viewer's hand (K♠) must not
+      // also sit in the trick.
+      const trickA: { trick: TrickCard[]; winnerSeat: number } = {
+        trick: [
+          { card: { rank: "8", suit: "C" }, playerSeat: 0 },
+          { card: { rank: "7", suit: "H" }, playerSeat: 1 },
+          { card: { rank: "A", suit: "D" }, playerSeat: 2 },
+          { card: { rank: "9", suit: "C" }, playerSeat: 3 },
+        ],
+        winnerSeat: 2,
+      };
+      const trickB: { trick: TrickCard[]; winnerSeat: number } = {
+        trick: [
+          { card: { rank: "Q", suit: "S" }, playerSeat: 2 },
+          { card: { rank: "8", suit: "H" }, playerSeat: 3 },
+          { card: { rank: "J", suit: "D" }, playerSeat: 0 },
+          { card: { rank: "T", suit: "C" }, playerSeat: 1 },
+        ],
+        winnerSeat: 3,
+      };
+      const handScore: HandScoredPayload = {
+        teamACardPoints: 90,
+        teamBCardPoints: 72,
+        teamADeclPoints: 0,
+        teamBDeclPoints: 0,
+        lastTrickTeam: 1,
+        lastTrickBonus: 10,
+        capot: false,
+        capotTeam: null,
+        capotBonus: 0,
+        failedContract: false,
+        contractingTeam: 0,
+        teamAHandTotal: 90,
+        teamBHandTotal: 82,
+        teamAMatchScore: 90,
+        teamBMatchScore: 82,
+      };
+
+      // Real rects so collect flights launch (jsdom zeroes them otherwise).
+      let gbcrSpy: ReturnType<typeof vi.spyOn>;
+      beforeEach(() => {
+        gbcrSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+          left: 100,
+          top: 100,
+          width: 72,
+          height: 104,
+          right: 172,
+          bottom: 204,
+          x: 100,
+          y: 100,
+          toJSON: () => ({}),
+        } as DOMRect);
+      });
+      afterEach(() => {
+        gbcrSpy.mockRestore();
+      });
+
+      const collectFlights = () =>
+        Array.from(document.querySelectorAll('[data-testid^="card-flight-collect-"]')).filter(
+          (el) => !el.getAttribute("data-testid")!.endsWith("-animated"),
+        );
+
+      it("finalises the old sweep at once when the next trick resolves, and gives the new one its full glow and sweep", () => {
+        useMatchStore.getState().setMatchState(mockMatchState);
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          useMatchStore.getState().setPendingResolvedTrick(trickA);
+        });
+        act(() => {
+          vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE);
+        });
+        expect(collectFlights()).toHaveLength(4);
+
+        // Trick B resolves mid-sweep (fast plays), with the hand's score.
+        act(() => {
+          useMatchStore.getState().setPendingResolvedTrick(trickB);
+          useMatchStore.getState().setScoreRevealData(handScore);
+        });
+        // A is gone at once; B's four cards sit in their slots for the glow.
+        expect(collectFlights()).toHaveLength(0);
+        expect(screen.getAllByTestId(/^trick-slot-card-\d-resolved$/)).toHaveLength(4);
+        expect(screen.getByTestId("playing-card-QS")).toBeInTheDocument();
+        expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
+
+        // B's glow runs its full length, then B sweeps.
+        act(() => {
+          vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE - 1);
+        });
+        expect(collectFlights()).toHaveLength(0);
+        act(() => {
+          vi.advanceTimersByTime(1);
+        });
+        expect(collectFlights()).toHaveLength(4);
+        expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
+
+        // The reveal waits for B's sweep to land, then opens.
+        act(() => {
+          for (const el of document.querySelectorAll(
+            '[data-testid^="card-flight-collect-"][data-testid$="-animated"]',
+          )) {
+            el.dispatchEvent(new Event("animationend", { bubbles: true }));
+          }
+        });
+        expect(useMatchStore.getState().pendingResolvedTrick).toBeNull();
+        expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
+      });
+
+      it("still clears on the fallback timer when no flight reports its end", () => {
+        useMatchStore.getState().setMatchState(mockMatchState);
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          useMatchStore.getState().setPendingResolvedTrick(trickA);
+        });
+        act(() => {
+          vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE + 100);
+        });
+        act(() => {
+          useMatchStore.getState().setPendingResolvedTrick(trickB);
+        });
+        act(() => {
+          vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE + MOTION.CARD_FLIGHT_COLLECT + 400);
+        });
+        expect(useMatchStore.getState().pendingResolvedTrick).toBeNull();
+      });
+
+      it("never lets a late finish of the old trick clear the new one", () => {
+        const store = useMatchStore.getState();
+        store.setPendingResolvedTrick(trickA);
+        const a = useMatchStore.getState().pendingResolvedTrick!.receivedAt;
+        store.setPendingResolvedTrick(trickB);
+        const b = useMatchStore.getState().pendingResolvedTrick!.receivedAt;
+
+        expect(b).toBeGreaterThan(a);
+        useMatchStore.getState().clearPendingResolvedTrick(a);
+        expect(useMatchStore.getState().pendingResolvedTrick?.receivedAt).toBe(b);
+        useMatchStore.getState().clearPendingResolvedTrick(b);
+        expect(useMatchStore.getState().pendingResolvedTrick).toBeNull();
+      });
+
+      it("holds the viewer's card until the last trick has swept away", () => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, activePlayerSeat: 0 });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        act(() => {
+          useMatchStore.getState().setPendingResolvedTrick(trickA);
+        });
+
+        const card = () => screen.getByTestId("playing-card-KS");
+        expect(
+          within(screen.getByTestId("hand-cards")).getByTestId("playing-card-KS"),
+        ).toHaveAttribute("tabindex", "-1");
+        fireEvent.click(within(screen.getByTestId("hand-cards")).getByTestId("playing-card-KS"));
+        expect(mockSendMessage).not.toHaveBeenCalledWith("action:play_card", expect.anything());
+
+        act(() => {
+          useMatchStore.getState().setPendingResolvedTrick(null);
+        });
+        expect(card()).toHaveAttribute("tabindex", "0");
+      });
+    });
+
+    describe("event sounds", () => {
+      const endPayload = {
+        winnerTeam: 0,
+        teamAFinalScore: 1020,
+        teamBFinalScore: 850,
+        matchDurationSec: 300,
+      };
+
+      it.each([
+        ["matchWin", 0],
+        ["matchLose", 1],
+      ] as const)("plays %s once when the result opens for seat %i", (sound, seat) => {
+        useMatchStore.getState().setMatchState({
+          ...mockMatchState,
+          phase: "match_end",
+          players: mockMatchState.players.map((p) => ({
+            ...p,
+            userId: p.seat === seat ? 10 : p.userId === 10 ? 99 : p.userId,
+          })) as MatchState["players"],
+        });
+        useMatchStore.getState().setMatchEndData(endPayload);
+        const { unmount } = renderMatchPage();
+
+        expect(screen.getByTestId("match-result")).toBeInTheDocument();
+        expect(sfxCalls(sound)).toHaveLength(1);
+        const key = sfxCalls(sound)[0]![1];
+        unmount();
+        // A remount of the same result asks with the same key (the engine drops it).
+        renderMatchPage();
+        expect(sfxCalls(sound).at(-1)![1]).toEqual(key);
+        expect(sfxCalls(sound === "matchWin" ? "matchLose" : "matchWin")).toHaveLength(0);
+      });
+
+      it.each([
+        ["the team left at the table wins", 0, 1, "matchWin"],
+        ["the abandoner's partner loses", 3, 1, "matchLose"],
+      ] as const)("abandonment: %s", (_label, viewerSeat, abandoner, sound) => {
+        useMatchStore.getState().setMatchState({
+          ...mockMatchState,
+          players: mockMatchState.players.map((p) => ({
+            ...p,
+            userId: p.seat === viewerSeat ? 10 : p.userId === 10 ? 99 : p.userId,
+          })) as MatchState["players"],
+        });
+        useMatchStore.getState().setMatchAbandonedData({
+          abandonedByPlayer: abandoner,
+          teamAFinalScore: 300,
+          teamBFinalScore: 200,
+          matchDurationSec: 200,
+        });
+        renderMatchPage();
+
+        expect(screen.getByTestId("reconnect-overlay")).toBeInTheDocument();
+        expect(sfxCalls(sound)).toHaveLength(1);
+      });
+
+      it("keeps the abandoner's own late view of the result silent", () => {
+        useMatchStore.getState().setMatchState(mockMatchState);
+        useMatchStore.getState().setMatchAbandonedData({
+          abandonedByPlayer: 0,
+          teamAFinalScore: 300,
+          teamBFinalScore: 200,
+          matchDurationSec: 200,
+        });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        expect(sfxCalls("matchWin")).toHaveLength(0);
+        expect(sfxCalls("matchLose")).toHaveLength(0);
+      });
+
+      const capotScore: HandResult = {
+        teamACardPoints: 162,
+        teamBCardPoints: 0,
+        teamADeclPoints: 0,
+        teamBDeclPoints: 0,
+        lastTrickTeam: 0,
+        lastTrickBonus: 10,
+        capot: true,
+        capotTeam: 0,
+        capotBonus: 90,
+        failedContract: false,
+        contractingTeam: 0,
+        teamAHandTotal: 252,
+        teamBHandTotal: 0,
+      };
+
+      it("plays the capot jingle once when the banner opens", () => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          useMatchStore
+            .getState()
+            .setScoreRevealData({ ...capotScore, teamAMatchScore: 252, teamBMatchScore: 0 });
+        });
+        expect(screen.getByTestId("capot-animation")).toBeInTheDocument();
+        expect(sfxCalls("capot")).toHaveLength(1);
+      });
+
+      it("keeps a capot banner rebuilt on reconnect silent", () => {
+        useMatchStore.getState().setMatchState({
+          ...mockMatchState,
+          phase: "hand_complete",
+          lastHandResult: capotScore,
+          teamScores: [252, 0],
+        });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        expect(screen.getByTestId("capot-animation")).toBeInTheDocument();
+        expect(sfxCalls("capot")).toHaveLength(0);
+      });
+
+      it("plays the declaration sound once for a declaration reveal and for a Belote reveal", () => {
+        useMatchStore.getState().setMatchState(mockMatchState);
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          useMatchStore.getState().setDeclarationReveal({
+            winnerTeam: 0,
+            contested: false,
+            declarations: [
+              { playerSeat: 0, type: "sequence", cards: ["9S", "TS", "JS"], value: 20 },
+            ],
+          });
+        });
+        expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
+        expect(sfxCalls("declaration")).toHaveLength(1);
+
+        act(() => {
+          useMatchStore.getState().setBelotReveal({ playerSeat: 1, team: 1, cardId: "KS" });
+        });
+        expect(screen.getByTestId("belot-reveal")).toBeInTheDocument();
+        expect(sfxCalls("declaration")).toHaveLength(2);
+        expect(sfxCalls("declaration")[0]![1]).not.toEqual(sfxCalls("declaration")[1]![1]);
+      });
+    });
+
+    describe("urgent clock tick", () => {
+      function onTheClock(seat: number, remainingMs: number): MatchState {
+        return {
+          ...mockMatchState,
+          activePlayerSeat: seat,
+          timerDurationSec: 24,
+          turnExpiresAt: new Date(Date.now() + remainingMs).toISOString(),
+        };
+      }
+
+      it("ticks once per second in the viewer's red zone, down to 1", () => {
+        // 24 s window: red from 3 s left (1/8).
+        useMatchStore.getState().setMatchState(onTheClock(0, 5_000));
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        expect(sfxCalls("clockTick")).toHaveLength(0);
+
+        act(() => {
+          vi.advanceTimersByTime(2_100); // 2.9 s left → "3"
+        });
+        expect(sfxCalls("clockTick")).toHaveLength(1);
+        act(() => {
+          vi.advanceTimersByTime(1_000);
+        });
+        act(() => {
+          vi.advanceTimersByTime(1_000);
+        });
+        expect(sfxCalls("clockTick")).toHaveLength(3);
+        act(() => {
+          vi.advanceTimersByTime(2_000); // 0 and past: silent
+        });
+        expect(sfxCalls("clockTick")).toHaveLength(3);
+        expect(new Set(sfxCalls("clockTick").map(([, opts]) => opts.dedupeKey)).size).toBe(3);
+      });
+
+      it("only asks for the seconds still to come when remounting into a red timer", () => {
+        useMatchStore.getState().setMatchState(onTheClock(0, 2_500));
+        useMatchStore.getState().setMyPlayerSeat(0);
+        const { unmount } = renderMatchPage();
+        expect(sfxCalls("clockTick")).toHaveLength(1);
+        unmount();
+
+        // Same deadline, same second: the same key, so the engine drops it.
+        renderMatchPage();
+        const keys = () => sfxCalls("clockTick").map(([, opts]) => opts.dedupeKey);
+        expect(new Set(keys()).size).toBe(1);
+
+        // What is left of the countdown: "2" and "1", each once, then silence.
+        for (let s = 0; s < 4; s++) {
+          act(() => {
+            vi.advanceTimersByTime(1_000);
+          });
+        }
+        expect(new Set(keys()).size).toBe(3);
+      });
+
+      it("stays silent on another seat's red timer", () => {
+        useMatchStore.getState().setMatchState(onTheClock(1, 2_500));
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        act(() => {
+          vi.advanceTimersByTime(3_000);
+        });
+        expect(sfxCalls("clockTick")).toHaveLength(0);
+      });
+
+      // Each answer silences the rest of the red zone at the click — the
+      // server's echo never arrives here, so only the page's own marker can.
+      const bidding = (overrides: Partial<MatchState> = {}): Partial<MatchState> => ({
+        phase: "bidding",
+        trumpSuit: null,
+        trumpCallerSeat: null,
+        trumpCandidate: { rank: "A", suit: "H" },
+        biddingRound: 1,
+        biddingPassCount: 0,
+        trickNumber: 0,
+        ...overrides,
+      });
+      it.each<[string, Partial<MatchState>, () => HTMLElement]>([
+        [
+          "a card",
+          {},
+          () => within(screen.getByTestId("hand-cards")).getByTestId("playing-card-KS"),
+        ],
+        ["a pass", bidding(), () => screen.getByTestId("trump-prompt-pass")],
+        ["a pick", bidding(), () => screen.getByTestId("trump-prompt-pick")],
+        [
+          "a Belote answer",
+          {
+            pendingBelotSeat: 0,
+            currentTrick: [{ playerSeat: 0, card: { rank: "Q", suit: "S" } }],
+          },
+          () => screen.getByTestId("belot-prompt-announce"),
+        ],
+      ])("stops as soon as the viewer answers with %s", (_label, patch, target) => {
+        useMatchStore.getState().setMatchState({ ...onTheClock(0, 2_500), ...patch });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        expect(sfxCalls("clockTick")).toHaveLength(1);
+
+        act(() => {
+          fireEvent.click(target());
+        });
+        act(() => {
+          vi.advanceTimersByTime(3_000);
+        });
+        expect(sfxCalls("clockTick")).toHaveLength(1);
+      });
+
+      it("stays silent for a declaration window the viewer has already skipped", () => {
+        // The window is 8 s, so its red zone is its last second alone: skip
+        // early, and nothing may tick when that second comes.
+        useMatchStore.getState().setMatchState({
+          ...mockMatchState,
+          phase: "declaring",
+          trumpSuit: "S",
+          players: mockMatchState.players.map((p) =>
+            p.seat === 0
+              ? {
+                  ...p,
+                  hand: [
+                    { rank: "9", suit: "S" },
+                    { rank: "T", suit: "S" },
+                    { rank: "J", suit: "S" },
+                  ],
+                }
+              : p,
+          ) as MatchState["players"],
+        });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          fireEvent.click(screen.getByTestId("declaration-prompt-skip"));
+        });
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP - 900);
+        });
+        expect(sfxCalls("clockTick")).toHaveLength(0);
+      });
+
+      it("ticks again for a turn whose answer the server refused", () => {
+        useMatchStore.getState().setMatchState(onTheClock(0, 2_500));
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        act(() => {
+          fireEvent.click(within(screen.getByTestId("hand-cards")).getByTestId("playing-card-KS"));
+        });
+
+        act(() => {
+          useMatchStore.getState().setLastError("error:illegal_play");
+        });
+        act(() => {
+          vi.advanceTimersByTime(1_000); // "2" left, still the viewer's turn
+        });
+        // The engine drops a re-asked key, so count distinct seconds: "3" (at
+        // mount) and "2" (after the refusal).
+        const seconds = new Set(sfxCalls("clockTick").map(([, opts]) => opts.dedupeKey));
+        expect(seconds.size).toBe(2);
+      });
+
+      it("ticks for the declaration window while it is unanswered", () => {
+        useMatchStore.getState().setMatchState({
+          ...mockMatchState,
+          phase: "declaring",
+          trumpSuit: "S",
+          players: mockMatchState.players.map((p) =>
+            p.seat === 0
+              ? {
+                  ...p,
+                  hand: [
+                    { rank: "9", suit: "S" },
+                    { rank: "T", suit: "S" },
+                    { rank: "J", suit: "S" },
+                  ],
+                }
+              : p,
+          ) as MatchState["players"],
+        });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP - 900); // "1" left of 8
+        });
+        expect(sfxCalls("clockTick")).toHaveLength(1);
+      });
+    });
+
+    describe("belote prompt", () => {
+      function belotTurn(overrides: Partial<MatchState> = {}): MatchState {
+        return {
+          ...mockMatchState,
+          trumpSuit: "S",
+          activePlayerSeat: 0,
+          timerDurationSec: 10,
+          turnExpiresAt: new Date(Date.now() + 8_000).toISOString(),
+          players: mockMatchState.players.map((p) =>
+            p.seat === 0
+              ? {
+                  ...p,
+                  hand: [
+                    { rank: "K", suit: "S" },
+                    { rank: "Q", suit: "S" },
+                    { rank: "7", suit: "H" },
+                  ],
+                }
+              : p,
+          ) as MatchState["players"],
+          ...overrides,
+        };
+      }
+
+      it("shows the running per-move ring on the local prompt", () => {
+        useMatchStore.getState().setMatchState(belotTurn());
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          fireEvent.click(screen.getByTestId("playing-card-KS"));
+        });
+        const prompt = screen.getByTestId("belot-prompt");
+        expect(within(prompt).getByTestId("button-timer-ring")).toBeInTheDocument();
+      });
+
+      it("closes the local prompt when the server auto-plays the card, keeping no choice", () => {
+        useMatchStore.getState().setMatchState(belotTurn());
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        act(() => {
+          fireEvent.click(screen.getByTestId("playing-card-KS"));
+        });
+        expect(screen.getByTestId("belot-prompt")).toBeInTheDocument();
+
+        // Timeout: the server played KS itself (auto-skipping the announcement)
+        // and moved the turn on.
+        act(() => {
+          useMatchStore.getState().setMatchState(
+            belotTurn({
+              activePlayerSeat: 1,
+              currentTrick: [{ playerSeat: 0, card: { rank: "K", suit: "S" } }],
+              players: belotTurn().players.map((p) =>
+                p.seat === 0
+                  ? {
+                      ...p,
+                      hand: [
+                        { rank: "Q", suit: "S" },
+                        { rank: "7", suit: "H" },
+                      ],
+                    }
+                  : p,
+              ) as MatchState["players"],
+            }),
+          );
+        });
+        expect(screen.queryByTestId("belot-prompt")).not.toBeInTheDocument();
+
+        // A later server-driven prompt is answered by the player, not by a
+        // stale stored choice.
+        act(() => {
+          useMatchStore.getState().setMatchState(belotTurn({ pendingBelotSeat: 0 }));
+        });
+        expect(mockSendMessage).not.toHaveBeenCalledWith("action:announce_belot", {});
+        expect(mockSendMessage).not.toHaveBeenCalledWith("action:decline_belot", {});
+      });
+
+      it("drops a stored answer whose play the server never took", () => {
+        useMatchStore.getState().setMatchState(belotTurn());
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+        act(() => {
+          fireEvent.click(screen.getByTestId("playing-card-KS"));
+        });
+        act(() => {
+          fireEvent.click(screen.getByTestId("belot-prompt-announce"));
+        });
+        expect(mockSendMessage).toHaveBeenCalledWith("action:play_card", { cardId: "KS" });
+
+        // The auto-play won the race: another card went, the turn moved on.
+        act(() => {
+          useMatchStore.getState().setMatchState(
+            belotTurn({
+              activePlayerSeat: 1,
+              currentTrick: [{ playerSeat: 0, card: { rank: "7", suit: "H" } }],
+            }),
+          );
+        });
+        // Back on the clock later with a server prompt: no stale announce fires.
+        act(() => {
+          useMatchStore.getState().setMatchState(belotTurn({ pendingBelotSeat: 0 }));
+        });
+        expect(mockSendMessage).not.toHaveBeenCalledWith("action:announce_belot", {});
+      });
     });
   });
 });

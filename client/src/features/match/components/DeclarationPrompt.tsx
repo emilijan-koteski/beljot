@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
@@ -68,6 +68,13 @@ function declarationLabel(
  * nothing about what they held. (That a seat HAS answered is public — every
  * client counts it for this dialog — but what they answered is not, and the
  * melds themselves stay masked until the contest resolves.)
+ *
+ * A seat with nothing to declare answers at once: the skip goes out the moment
+ * the dialog mounts and it opens straight into "no declarations, waiting for
+ * the others". Nothing is left for that player to decide, and making them click
+ * Skip only held the table. The owner accepted the trade-off that this lets the
+ * table tell which seats hold nothing (an instant answer), overriding the
+ * uniform-footprint rationale above for those seats.
  */
 export function DeclarationPrompt({
   declarations,
@@ -107,10 +114,22 @@ export function DeclarationPrompt({
   const handleSkip = () => sendOnce(onSkip);
   const handleDeclare = () => sendOnce(onDeclare);
 
+  // Nothing to declare: answer on mount (once — the latch above), unless the
+  // server already has this seat's answer (a remount after a reconnect).
+  const autoSkip = simultaneous && !hasDeclarations && !answered;
+  useEffect(() => {
+    if (autoSkip) sendOnce(onSkip);
+    // sendOnce and onSkip are stable in intent; the latch makes a re-run a no-op.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSkip]);
+
   // Waiting state: the viewer is done, whether or not the server has echoed it
   // back yet. The local half stops the dialog flickering back to live buttons
   // for the duration of the round-trip.
   const waiting = simultaneous && (answered || sent);
+  // The viewer's own answer counts from the moment it is sent, not a
+  // round-trip later, so the waiting line never reads one short of the truth.
+  const shownAnsweredCount = Math.min(4, answeredCount + (sent && !answered ? 1 : 0));
 
   // Bitola tracks the server's turn deadline; the simultaneous phase has none
   // (turnExpiresAt is null for its whole duration) and counts down from mount.
@@ -124,7 +143,7 @@ export function DeclarationPrompt({
         ? // `answered`, not `count` — i18next reserves `count` for plural
           // resolution and would look for a `_other` suffixed key that does not
           // exist.
-          t("match.declaration.waitingOthers", { answered: answeredCount })
+          t("match.declaration.waitingOthers", { answered: shownAnsweredCount })
         : t("match.declaration.skip")}
     </ClassicButton>
   );

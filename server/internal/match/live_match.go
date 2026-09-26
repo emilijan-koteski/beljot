@@ -57,7 +57,12 @@ type LiveMatch struct {
 	botActionTimers      [4]*time.Timer
 	botActionGenerations [4]uint64
 	botMemory            *bot.Memory
-	mu                   sync.RWMutex
+	// dealGraceUntil is when the client's animation of the deal that opened
+	// the current turn finishes (see deal_grace.go). Zero when the current turn
+	// was not opened by a deal. Read by setTurnExpiry / startTimerLocked and
+	// the bot scheduler; guarded by mu.
+	dealGraceUntil time.Time
+	mu             sync.RWMutex
 }
 
 // RoomStatusUpdater updates a room's status in the database.
@@ -213,18 +218,24 @@ type Manager struct {
 	// bot never trips timeout auto-play.
 	botDelayMin time.Duration
 	botDelayMax time.Duration
-	mu          sync.RWMutex
+	// dealGraceEnabled adds each deal's client animation length to the next
+	// actor's deadline and to a bot actor's think delay (deal_grace.go).
+	// Always on in production; tests that are not about the deal switch it
+	// off so their timings stay exact.
+	dealGraceEnabled bool
+	mu               sync.RWMutex
 }
 
 // NewManager creates a session manager wired to the WebSocket hub and match repository.
 func NewManager(hub Broadcaster, matchRepo MatchRepository) *Manager {
 	return &Manager{
-		sessions:    make(map[uint]*LiveMatch),
-		userToRoom:  make(map[uint]uint),
-		hub:         hub,
-		matchRepo:   matchRepo,
-		botDelayMin: time.Second,
-		botDelayMax: 2500 * time.Millisecond,
+		sessions:         make(map[uint]*LiveMatch),
+		userToRoom:       make(map[uint]uint),
+		hub:              hub,
+		matchRepo:        matchRepo,
+		botDelayMin:      time.Second,
+		botDelayMax:      2500 * time.Millisecond,
+		dealGraceEnabled: true,
 	}
 }
 
@@ -371,11 +382,14 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 	// Broadcast dealing-phase state (client shows deal animation)
 	m.broadcastState(playerIDs, gs)
 
-	// Auto-transition to bidding phase (client's DealAnimation handles visual timing)
+	// Auto-transition to bidding phase. The client shows its "match is
+	// starting" splash and then animates the opening deal, so the first bidder
+	// (and a first-bidder bot) gets both on top of the normal window.
 	if gs.Phase == game.PhaseDealing {
 		session.mu.Lock()
 		gs.Phase = game.PhaseBidding
 		game.RefreshDerivedFlags(gs)
+		m.setDealGraceLocked(session, matchStartSplash+firstDealGrace(gs.Rules))
 		m.setTurnExpiry(session, gs)
 		m.startTimerLocked(session, gs.ActivePlayerSeat)
 		session.mu.Unlock()
@@ -522,6 +536,10 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 		newState.Phase = game.PhaseBidding
 		game.RefreshDerivedFlags(newState)
 	}
+
+	// A transition that dealt (next hand, reshuffle, second deal) buys the next
+	// actor the deal's animation length; any other clears the previous one.
+	m.setDealGraceLocked(session, dealGraceFor(oldState, newState))
 
 	// Timer management for pause/unpause
 	if action.Type == game.ActionPause && newState.Phase == game.PhasePaused {
@@ -1623,10 +1641,13 @@ func buildMessage(eventType string, payload interface{}) []byte {
 
 // setTurnExpiry sets TurnExpiresAt on the game state based on timer config.
 // For "per-move" style, sets an absolute expiry timestamp. For "relaxed", sets nil.
-// Must be called under session.mu.Lock().
+// A turn opened by a deal starts its window once the deal animation has played
+// out (session.dealGraceRemaining, deal_grace.go), so the ring is full when the
+// prompt appears. Must be called under session.mu.Lock().
 func (m *Manager) setTurnExpiry(session *LiveMatch, gs *game.GameState) {
 	if session.timerStyle == "per-move" && session.timerDurationSec > 0 {
-		expiry := time.Now().Add(time.Duration(session.timerDurationSec) * time.Second)
+		window := time.Duration(session.timerDurationSec)*time.Second + session.dealGraceRemaining()
+		expiry := time.Now().Add(window)
 		gs.TurnExpiresAt = &expiry
 		gs.TimerDurationSec = session.timerDurationSec
 	} else {
@@ -1678,7 +1699,9 @@ func (m *Manager) startTimerLocked(session *LiveMatch, expectedSeat int) {
 		return
 	}
 	session.cancelTurnTimer()
-	m.armTurnTimerLocked(session, time.Duration(session.timerDurationSec)*time.Second, expectedSeat)
+	// Same window setTurnExpiry advertises, deal grace included.
+	window := time.Duration(session.timerDurationSec)*time.Second + session.dealGraceRemaining()
+	m.armTurnTimerLocked(session, window, expectedSeat)
 }
 
 // handCompleteAutoContinue is the server's fallback ceiling on the score-reveal
@@ -1742,6 +1765,7 @@ func (m *Manager) handleDeclarationTimeout(session *LiveMatch, generation uint64
 	if !matchEnded {
 		// Trick 1 is open — this is a real turn again, so the per-move timer comes
 		// back exactly as it does on the answer-driven close.
+		m.setDealGraceLocked(session, 0)
 		m.setTurnExpiry(session, newState)
 		m.startTimerLocked(session, newState.ActivePlayerSeat)
 	}
@@ -1807,6 +1831,7 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 	}
 	// A freshly dealt hand can only be bidding — reaching the declaration phase
 	// takes a resolved bid — so PhaseDeclaring is deliberately absent here.
+	m.setDealGraceLocked(session, dealGraceFor(oldState, newState))
 	if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding {
 		m.setTurnExpiry(session, newState)
 		m.startTimerLocked(session, newState.ActivePlayerSeat)
@@ -2056,6 +2081,9 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	}
 
 	finalState := steps[len(steps)-1].post
+
+	// An auto-pass can reshuffle, and an auto-pick can open the second deal.
+	m.setDealGraceLocked(session, dealGraceFor(oldState, finalState))
 
 	// Set expiry and start timer for the next player. Three cases:
 	//  • Seat or phase advanced past oldState — fresh timer for the new turn.

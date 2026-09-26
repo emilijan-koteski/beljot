@@ -277,6 +277,37 @@ describe("TrumpPrompt", () => {
     expect(screen.getByTestId("trump-prompt-suit-C")).toBeInTheDocument();
   });
 
+  it("orders the picker tiles and the waiting chips spades, hearts, clubs, diamonds", () => {
+    const suitsInDomOrder = (prefix: string) =>
+      Array.from(document.querySelectorAll(`[data-testid^="${prefix}"]`)).map((el) =>
+        el.getAttribute("data-testid")?.slice(prefix.length),
+      );
+
+    const { unmount } = render(
+      <TrumpPrompt
+        trumpCandidate={null}
+        biddingRound={1}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+    expect(suitsInDomOrder("trump-prompt-suit-")).toEqual(["S", "H", "C", "D"]);
+    unmount();
+
+    render(
+      <TrumpPrompt
+        trumpCandidate={null}
+        biddingRound={1}
+        isActiveBidder={false}
+        activePlayerName="Bob"
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+    expect(suitsInDomOrder("trump-prompt-considering-")).toEqual(["S", "H", "C", "D"]);
+  });
+
   it("calls onPick with suit when suit button clicked in round 2", async () => {
     const user = userEvent.setup();
     const onPick = vi.fn();

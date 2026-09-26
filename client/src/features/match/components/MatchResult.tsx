@@ -2,6 +2,7 @@ import { ChevronDown, Coins } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useSfxOnce } from "@/shared/audio/useSfxOnce";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { MatchPlayerActions } from "@/shared/components/matchStats/MatchPlayerActions";
 import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
@@ -46,6 +47,9 @@ interface MatchResultProps {
    *  breakdown — without it there is no room to read the stats from, and the
    *  section simply never renders. */
   roomId?: number;
+  /** Dedupe key for the win/lose jingle (see `payloadSoundKey`), played once
+   *  when the result mounts, for the viewer's team. Omitted or null: silent. */
+  soundKey?: string | null;
 }
 
 // Loss accent — the soft red shared with the surrender overlay, kept local
@@ -68,6 +72,7 @@ export function MatchResult({
   coinDelta,
   honorSettlement,
   roomId,
+  soundKey,
 }: MatchResultProps) {
   const { t } = useTranslation();
 
@@ -101,6 +106,7 @@ export function MatchResult({
 
   const winnerTeamString = teamStringForIndex(data.winnerTeam === 0 ? 0 : 1);
   const isUs = winnerTeamString === viewerTeam;
+  useSfxOnce(isUs ? "matchWin" : "matchLose", soundKey);
   const winnerGradient: TeamGradient = isUs ? TEAM_GOLD : TEAM_SILVER;
   const glowColor = winnerGradient[0];
 

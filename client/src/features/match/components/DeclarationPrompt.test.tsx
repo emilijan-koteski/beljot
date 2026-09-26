@@ -229,23 +229,55 @@ describe("DeclarationPrompt", () => {
       expect(onSkip).toHaveBeenCalledTimes(1);
     });
 
-    it("renders an empty state with Declare disabled when the seat holds nothing", () => {
-      renderSim({ declarations: [] });
+    it("answers at once for a seat that holds nothing, and waits on the others", () => {
+      const onSkip = vi.fn();
+      renderSim({ declarations: [], onSkip, answeredCount: 1 });
 
+      // Sent on mount — nothing is left for the player to decide.
+      expect(onSkip).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("No declarations")).toBeInTheDocument();
       expect(screen.getByTestId("declaration-prompt-none")).toBeInTheDocument();
       expect(screen.queryByTestId("declaration-prompt-total")).not.toBeInTheDocument();
       expect(screen.getByTestId("declaration-prompt-declare")).toBeDisabled();
-      expect(screen.getByTestId("declaration-prompt-skip")).toBeEnabled();
+      const skip = screen.getByTestId("declaration-prompt-skip");
+      expect(skip).toBeDisabled();
+      // One seat had answered; the viewer's own skip counts before the echo.
+      expect(skip).toHaveTextContent("2/4");
+      expect(screen.queryByTestId("button-timer-ring")).not.toBeInTheDocument();
+
+      // Sent once: neither a re-render nor the window's end sends it again.
+      act(() => {
+        vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP + 100);
+      });
+      expect(onSkip).toHaveBeenCalledTimes(1);
     });
 
-    // The two panels must be the same DIALOG — same role, same title slot, same
-    // button row — so that having one tells an onlooker nothing. Asserting
-    // rendered width would be worthless here: jsdom has no layout and returns 0
-    // for every element, so `0 === 0` would pass for two totally different
-    // panels. Structure is what is actually checkable.
-    it("keeps the same dialog shape for a meld holder and a meld-less seat", () => {
+    it("does not answer again for a meld-less seat the server already has", () => {
+      const onSkip = vi.fn();
+      renderSim({ declarations: [], onSkip, answered: true, answeredCount: 2 });
+
+      expect(onSkip).not.toHaveBeenCalled();
+      expect(screen.getByTestId("declaration-prompt-skip")).toHaveTextContent("2/4");
+    });
+
+    it("counts the viewer's own answer as soon as it is sent", () => {
+      renderSim({ answeredCount: 2 });
+
+      fireEvent.click(screen.getByTestId("declaration-prompt-skip"));
+
+      expect(screen.getByTestId("declaration-prompt-skip")).toHaveTextContent("3/4");
+    });
+
+    // Once answered, the two waiting panels must be the same DIALOG — same
+    // role, same title slot, same button row. (Before answering they differ by
+    // design: a meld-less seat answers at once, so it never shows the live
+    // countdown.) Asserting rendered width would be worthless here: jsdom has no
+    // layout and returns 0 for every element, so `0 === 0` would pass for two
+    // totally different panels. Structure is what is actually checkable.
+    it("keeps the same waiting dialog shape for a meld holder and a meld-less seat", () => {
       function shapeOf(declarations: Declaration[]) {
         const { unmount } = renderSim({ declarations });
+        if (declarations.length > 0) fireEvent.click(screen.getByTestId("declaration-prompt-skip"));
         const root = screen.getByTestId("declaration-prompt");
         const dialog = root.querySelector('[role="dialog"]')!;
         const shape = {

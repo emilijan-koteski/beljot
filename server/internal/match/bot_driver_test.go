@@ -135,6 +135,7 @@ func TestBot_ActsAfterMinDelayAndBeforeTimerExpiry(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo) // production delays: 1–2.5s
+	mgr.SetDealGraceForTest(false)
 
 	start := time.Now()
 	// Per-move timer at the 10s minimum. The first-hand dealer is randomized, so
@@ -191,6 +192,7 @@ func TestBot_CardPlayCarriesNoAutoPlayedMarker(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true, false))
@@ -231,6 +233,7 @@ func TestBot_StaleTimerNeverFiresAfterStateChange(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 	// 300ms rather than 50ms: the delay must outlast the setup below. When the
 	// random dealer is 0 the clock starts back at StartMatch, so with a 50ms
 	// delay a loaded machine could let the bot act BEFORE the pause is injected
@@ -298,6 +301,7 @@ func TestBot_RemoveSessionCancelsPendingBotTimers(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(50*time.Millisecond, 50*time.Millisecond)
 
 	// The first-hand dealer is randomized, so the bot's decision point is set
@@ -363,6 +367,7 @@ func TestBot_RespondsToBelotPrompt(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true, false))
@@ -397,6 +402,7 @@ func TestBot_PartnerAcceptsHumanSurrender(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(2), "relaxed", 0, 10, 120, 0, true, false))
@@ -427,6 +433,7 @@ func TestBot_MatchEndPersistsBotColumns(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
 	// Bots at seats 1 and 2; human seat 0 proposes surrender, partner seat 2
@@ -499,6 +506,7 @@ func TestBot_AcksScoreReveal(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false))
@@ -538,6 +546,7 @@ func TestBot_ResilienceIsolation(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(10*time.Millisecond, 20*time.Millisecond)
 
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false))
@@ -658,6 +667,7 @@ func TestBot_ForcedDealerPickAdvancesHandWithoutRejection(t *testing.T) {
 	logs := captureLogs(t)
 	hub := &hubSpy{}
 	mgr := match.NewManager(hub, newMockMatchRepo())
+	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
 	const roomID = uint(100)

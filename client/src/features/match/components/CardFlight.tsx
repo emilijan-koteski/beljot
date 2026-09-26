@@ -17,7 +17,11 @@ export interface FlightRect {
 export interface CardFlightDescriptor {
   /** Stable id used for keyframe naming + onComplete dedup. */
   id: string;
-  card: Card;
+  /**
+   * The face shown in flight. `null` flies a face-down back — a dealt card,
+   * whose identity the viewer either may not see or has not been shown yet.
+   */
+  card: Card | null;
   fromRect: FlightRect;
   toRect: FlightRect;
   /**
@@ -146,7 +150,11 @@ function FlightCard({ flight: f, animScope, overlayOffset, onComplete }: FlightC
           willChange: "transform, opacity",
         }}
       >
-        <PlayingCard card={f.card} state="default" size="md" withTransition={false} />
+        {f.card === null ? (
+          <PlayingCard card={null} state="face-down" size="md" withTransition={false} />
+        ) : (
+          <PlayingCard card={f.card} state="default" size="md" withTransition={false} />
+        )}
       </div>
     </div>
   );

@@ -32,7 +32,9 @@ func (m *Manager) maybeScheduleBotAction(session *LiveMatch) {
 		if session.botActionTimers[seat] != nil {
 			continue // a think delay is already pending for this seat
 		}
-		delay := m.botThinkDelay(gs.Phase)
+		// A deal still animating on the clients delays the bot by what is left
+		// of it, exactly as it delays a human's deadline (deal_grace.go).
+		delay := m.botThinkDelay(gs, seat) + session.dealGraceRemaining()
 		gen := session.botActionGenerations[seat]
 		ctx := botDecisionContextFor(gs, seat)
 		s := seat
@@ -137,17 +139,30 @@ func botDecisionSeats(gs *game.GameState) []int {
 	return seats
 }
 
-// botThinkDelay returns the humanized delay before a bot acts: uniform
-// random in [botDelayMin, botDelayMax] for game decisions — bidding and play —
-// and a single short beat (botDelayMin) for the two fixed-window phases,
-// score-reveal acknowledgements and the dedicated declaration phase, where the
-// human players plus the window itself already pace things.
+// botBelotBeat is how long a bot takes to answer its own Belote/Rebelote
+// prompt. The decision was made when it chose to play the K/Q — a human answers
+// the same prompt BEFORE the card leaves their hand — so a second full think
+// delay here only froze the turn on the announcer, with the card already on
+// the table and the reveal not yet shown. A short beat keeps the announcement
+// in step with the card landing.
+const botBelotBeat = 150 * time.Millisecond
+
+// botThinkDelay returns the humanized delay before the bot at `seat` acts on
+// gs: uniform random in [botDelayMin, botDelayMax] for game decisions —
+// bidding and play — and a single short beat (botDelayMin) for the two
+// fixed-window phases, score-reveal acknowledgements and the dedicated
+// declaration phase, where the human players plus the window itself already
+// pace things. Its own pending Belote answer takes botBelotBeat.
 //
 // The declaration phase is not merely a preference: the window is short, all
 // four seats must answer to close it early, and a bot drawing near botDelayMax
 // on every seat would routinely push a table of bots to the full ceiling. The
 // humans are the ones the pacing exists for, and they are answering in parallel.
-func (m *Manager) botThinkDelay(phase game.Phase) time.Duration {
+func (m *Manager) botThinkDelay(gs *game.GameState, seat int) time.Duration {
+	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat {
+		return min(botBelotBeat, m.botDelayMax)
+	}
+	phase := gs.Phase
 	if phase == game.PhaseHandComplete || phase == game.PhaseDeclaring {
 		return m.botDelayMin
 	}

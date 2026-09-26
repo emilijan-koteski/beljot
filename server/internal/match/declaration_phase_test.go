@@ -632,6 +632,7 @@ func TestDeclarationPhase_AllBotSeatsAnswer(t *testing.T) {
 	const roomID = uint(105)
 
 	mgr := match.NewManager(hub, newMockMatchRepo())
+	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(5*time.Millisecond, 10*time.Millisecond)
 	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })

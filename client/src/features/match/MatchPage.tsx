@@ -23,6 +23,7 @@ import { FetchError } from "@/shared/api/axiosClient";
 import { getRoom, leaveRoom, returnToRoom } from "@/shared/api/rooms";
 import { playSfx } from "@/shared/audio/audioEngine";
 import { useMatchAudio } from "@/shared/audio/useMatchAudio";
+import { payloadSoundKey } from "@/shared/audio/useSfxOnce";
 import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
@@ -55,6 +56,7 @@ import {
   ACTION_SURRENDER_REQUEST,
   ACTION_UNPAUSE,
   type EmoteID,
+  type HandScoredPayload,
 } from "@/shared/types/wsEvents";
 
 import { BelotPrompt } from "./components/BelotPrompt";
@@ -74,7 +76,6 @@ import { MatchResult } from "./components/MatchResult";
 import { PauseOverlay } from "./components/PauseOverlay";
 import { PlayerSeat, type SeatOrientation } from "./components/PlayerSeat";
 import { ReconnectOverlay } from "./components/ReconnectOverlay";
-import { ReshuffleAnimation } from "./components/ReshuffleAnimation";
 import { RulesDialog } from "./components/RulesDialog";
 import { ScorePanel } from "./components/ScorePanel";
 import { ScoreReveal } from "./components/ScoreReveal";
@@ -89,11 +90,13 @@ import { TRICK_SLOT_H, TRICK_SLOT_W, TrickArea } from "./components/TrickArea";
 import { TrumpIndicator } from "./components/TrumpIndicator";
 import { TrumpPrompt } from "./components/TrumpPrompt";
 import { TrumpReveal } from "./components/TrumpReveal";
+import { UrgentTick } from "./components/UrgentTick";
 import { Wordmark } from "./components/Wordmark";
 import { detectDeclarations } from "./lib/declarations";
 import { isBelotEligible, legalCardIds } from "./lib/legalCards";
 import { seatTeam } from "./lib/tableTheme";
 import { compassOffset, SLOT_POSITIONS } from "./lib/trickLayout";
+import { useDealController } from "./lib/useDealController";
 import { rulesForVariant } from "./lib/variantRules";
 
 function rectFrom(el: Element | null): FlightRect | null {
@@ -207,6 +210,13 @@ function winnerCollectRect(winner: number, myPlayerSeat: number): FlightRect {
   };
 }
 
+/** Collect flights are named `collect-<receivedAt>-<cardId>`, so every flight
+ *  can be traced to the resolved trick it sweeps. */
+const COLLECT_FLIGHT = "collect-";
+function collectFlightPrefix(receivedAt: number): string {
+  return `${COLLECT_FLIGHT}${receivedAt}-`;
+}
+
 const SEAT_POSITIONS: Record<number, string> = {
   // Phones hug the screen edges (matching the scoreboard inset); md+ insets off
   // the wood rim as before.
@@ -265,7 +275,7 @@ export function MatchPage() {
   const pendingAutoPlayedCard = useMatchStore((s) => s.pendingAutoPlayedCard);
   const setPendingAutoPlayedCard = useMatchStore((s) => s.setPendingAutoPlayedCard);
   const pendingResolvedTrick = useMatchStore((s) => s.pendingResolvedTrick);
-  const setPendingResolvedTrick = useMatchStore((s) => s.setPendingResolvedTrick);
+  const clearPendingResolvedTrick = useMatchStore((s) => s.clearPendingResolvedTrick);
 
   // Card sounds + background music. The page's mount is the audio session: music
   // runs only while this page is mounted, and stops when the player leaves.
@@ -290,7 +300,22 @@ export function MatchPage() {
   // snappy. Reduced-motion users get a shorter beat. Duration is captured at
   // mount — mid-splash OS motion-preference flips do NOT reset the timer.
   const location = useLocation();
-  const cameFromRoom = (location.state as { fromRoom?: boolean } | null)?.fromRoom === true;
+  // Read once, at mount, then dropped from the history entry: browsers keep
+  // `history.state` across a reload, so a flag left there would replay the
+  // splash — and, in a fresh hand 1, the opening deal the server no longer
+  // holds the clock for — on every refresh.
+  const [cameFromRoom] = useState(
+    () => (location.state as { fromRoom?: boolean } | null)?.fromRoom === true,
+  );
+  useEffect(() => {
+    if (!cameFromRoom) return;
+    navigate(
+      { pathname: location.pathname, search: location.search, hash: location.hash },
+      { replace: true, state: null },
+    );
+    // Mount-only: the arrival flag is consumed exactly once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const prefersReducedMotion = useReducedMotion();
   // Phone layout: compact seats (vertical, smaller avatars, name-only) and a
   // tighter center trick area. Matches Tailwind's `md` breakpoint (768px).
@@ -309,7 +334,6 @@ export function MatchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameFromRoom]);
 
-  const [showReshuffle, setShowReshuffle] = useState(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const errorToastTimerRef = useRef<number | null>(null);
   // Story 9.3: the room's buy-in, captured from the mount-time getRoom fetch so
@@ -339,6 +363,21 @@ export function MatchPage() {
   const [flyingCardId, setFlyingCardId] = useState<string | null>(null);
   const flyingClearTimerRef = useRef<number | null>(null);
 
+  // What the viewer has already answered, so the urgent clock tick stops at
+  // the click rather than a round-trip later: the deadline of a turn they
+  // ended (card, bid, Belote answer), and the hand whose declaration window
+  // they answered. A Bitola trick-1 declare/skip is deliberately not recorded:
+  // the same deadline then runs on for the card they still owe.
+  const [answeredDeadline, setAnsweredDeadline] = useState<string | null>(null);
+  const [answeredWindowHand, setAnsweredWindowHand] = useState<number | null>(null);
+  const markTurnAnswered = useCallback(() => {
+    setAnsweredDeadline(useMatchStore.getState().matchState?.turnExpiresAt ?? null);
+  }, []);
+  const markWindowAnswered = useCallback(() => {
+    const live = useMatchStore.getState().matchState;
+    if (live?.phase === "declaring") setAnsweredWindowHand(live.handNumber);
+  }, []);
+
   // Belote/Rebelote is decided BEFORE the card is thrown: clicking a trump K/Q
   // while holding the other stashes the card id here and shows a local prompt
   // instead of sending play_card, so opponents don't see the card land until
@@ -353,35 +392,90 @@ export function MatchPage() {
   // had set PendingBelotSeat — the engine then rejected it as an invalid action
   // ("Невалидна акција") and the turn stalled until a refresh. Gating the send
   // on the confirmed pending seat removes the race entirely.
-  const [pendingLocalBelotChoice, setPendingLocalBelotChoice] = useState<boolean | null>(null);
+  //
+  // The choice carries the card it was made for, so it can be recognised as
+  // stale once the server has moved past that card without ever holding it for
+  // us (below).
+  const [pendingLocalBelotChoice, setPendingLocalBelotChoice] = useState<{
+    cardId: string;
+    announce: boolean;
+  } | null>(null);
   const pendingBelotSeat = useMatchStore((s) => s.matchState?.pendingBelotSeat ?? null);
   useEffect(() => {
     if (pendingLocalBelotChoice === null) return;
     if (pendingBelotSeat !== myPlayerSeat) return;
-    sendMessage(pendingLocalBelotChoice ? ACTION_ANNOUNCE_BELOT : ACTION_DECLINE_BELOT, {});
+    sendMessage(
+      pendingLocalBelotChoice.announce ? ACTION_ANNOUNCE_BELOT : ACTION_DECLINE_BELOT,
+      {},
+    );
     setPendingLocalBelotChoice(null);
   }, [pendingBelotSeat, pendingLocalBelotChoice, myPlayerSeat, sendMessage]);
+
+  // The server can move past the Belote card without us: the per-move timer
+  // expires while the local prompt is open and it auto-plays (and, for the K/Q
+  // itself, auto-skips the announcement), or our deferred play_card loses that
+  // race and is rejected. Either way the prompt is for a decision that no longer
+  // exists and must close, and a stored answer must not linger to fire on some
+  // later, server-driven prompt. "Moved past" is read off the state the server
+  // sent: it is no longer our turn in play, or the card has left our hand
+  // without the server holding the prompt for us.
+  const belotTurnOpen = useMatchStore((s) => {
+    const live = s.matchState;
+    return live !== null && live.phase === "playing" && live.activePlayerSeat === myPlayerSeat;
+  });
+  // A string, so the selector result is stable between unrelated updates.
+  const myHandIds = useMatchStore(
+    (s) =>
+      s.matchState?.players
+        .find((p) => p.seat === myPlayerSeat)
+        ?.hand.map((c) => `${c.rank}${c.suit}`)
+        .join(",") ?? "",
+  );
+  const holdsCard = (cardId: string | null) =>
+    cardId !== null && myHandIds.split(",").includes(cardId);
+  const promptCardHeld = holdsCard(belotPromptCardId);
+  const choiceCardHeld = holdsCard(pendingLocalBelotChoice?.cardId ?? null);
+  useEffect(() => {
+    if (belotPromptCardId !== null && (!belotTurnOpen || !promptCardHeld)) {
+      setBelotPromptCardId(null);
+    }
+  }, [belotPromptCardId, belotTurnOpen, promptCardHeld]);
+  useEffect(() => {
+    if (pendingLocalBelotChoice === null || pendingBelotSeat === myPlayerSeat) return;
+    if (!belotTurnOpen || !choiceCardHeld) setPendingLocalBelotChoice(null);
+  }, [pendingLocalBelotChoice, pendingBelotSeat, myPlayerSeat, belotTurnOpen, choiceCardHeld]);
 
   // CardFlight overlay state — viewport-fixed flying cards that handle all
   // throw and collect motion in one continuous element per card. While a
   // cardId is in flight, both HandCards (source) and TrickArea (slot) hide
   // their static rendering of that card so the overlay is the only painter.
   const [activeFlights, setActiveFlights] = useState<CardFlightDescriptor[]>([]);
+  // Face-up cards the overlay is painting right now. Deal packets fly face-down
+  // and name no card, so they never hide anything on the table.
   const flightingCardIds = useMemo(
-    () => new Set(activeFlights.map((f) => `${f.card.rank}${f.card.suit}`)),
+    () =>
+      new Set(
+        activeFlights.flatMap((f) => (f.card === null ? [] : [`${f.card.rank}${f.card.suit}`])),
+      ),
     [activeFlights],
   );
-  // True from the moment the four collect flights are pushed until the resolved-
-  // trick snapshot is torn down. While collecting, TrickArea keeps ALL four
-  // snapshot cards suppressed — not just the ones with a live flight. The four
-  // collect flights finish on separate `animationend` events (slightly
-  // staggered, each its own React batch), so a card leaves `flightingCardIds`
-  // the instant its flight ends while the snapshot still drives the static slot
-  // render — re-painting that card at center for a frame or two before the
-  // snapshot finally clears. That stagger is the "cards blink back to the middle
-  // then vanish" bug; suppressing the whole snapshot for the collect window
-  // closes the gap.
-  const [isCollecting, setIsCollecting] = useState(false);
+  // The resolved trick whose collect sweep is under way: set (to the snapshot's
+  // `receivedAt`) the moment its four collect flights are pushed. While it names
+  // the live snapshot, TrickArea keeps ALL four snapshot cards suppressed — not
+  // just the ones with a live flight. The four collect flights finish on
+  // separate `animationend` events (slightly staggered, each its own React
+  // batch), so a card leaves `flightingCardIds` the instant its flight ends
+  // while the snapshot still drives the static slot render — re-painting that
+  // card at center for a frame or two before the snapshot finally clears. That
+  // stagger is the "cards blink back to the middle then vanish" bug;
+  // suppressing the whole snapshot for the collect window closes the gap.
+  //
+  // Keyed by trick rather than a boolean so a NEW snapshot is never mistaken
+  // for one mid-sweep: when trick N resolves while N-1 is still sweeping, N
+  // starts out un-collected and gets its full winner glow.
+  const [collectingReceivedAt, setCollectingReceivedAt] = useState<number | null>(null);
+  const isCollecting =
+    pendingResolvedTrick !== null && collectingReceivedAt === pendingResolvedTrick.receivedAt;
   // Tracks the last currentTrick length we processed so opponent-throw flights
   // fire exactly once per growth event (and not on, e.g., a reconnect that
   // shrinks the trick).
@@ -508,7 +602,7 @@ export function MatchPage() {
       // the sound still does: reduced motion is not reduced audio.
       const reducedTimer = window.setTimeout(() => {
         playSfx("trickCollect", { dedupeKey: collectSoundKey });
-        setPendingResolvedTrick(null);
+        clearPendingResolvedTrick(pendingResolvedTrick.receivedAt);
       }, MOTION.TRICK_RESOLVE_PAUSE);
       return () => clearTimeout(reducedTimer);
     }
@@ -518,11 +612,11 @@ export function MatchPage() {
     // throttling) the snapshot would otherwise stick and superimpose the
     // resolved trick over the next hand. Schedule a guaranteed clear
     // slightly past the natural collect animation end. handleFlightComplete
-    // clears via the same setter on the happy path, and clearing twice is
-    // a no-op.
+    // clears via the same guarded setter on the happy path, and clearing twice
+    // is a no-op — as is clearing a snapshot that a newer trick has replaced.
     const FALLBACK_CLEAR_MS = MOTION.TRICK_RESOLVE_PAUSE + MOTION.CARD_FLIGHT_COLLECT + 400;
     const fallbackClearTimer = window.setTimeout(() => {
-      setPendingResolvedTrick(null);
+      clearPendingResolvedTrick(pendingResolvedTrick.receivedAt);
     }, FALLBACK_CLEAR_MS);
 
     const winner = pendingResolvedTrick.winnerSeat;
@@ -549,7 +643,7 @@ export function MatchPage() {
         if (!fromRect) continue;
         const cardId = `${tc.card.rank}${tc.card.suit}`;
         newFlights.push({
-          id: `collect-${cardId}-${receivedAt}`,
+          id: `${collectFlightPrefix(receivedAt)}${cardId}`,
           card: tc.card,
           fromRect,
           toRect: destRect,
@@ -560,12 +654,12 @@ export function MatchPage() {
       }
 
       if (newFlights.length === 0) {
-        setPendingResolvedTrick(null);
+        clearPendingResolvedTrick(receivedAt);
         return;
       }
       // Enter the collect window: TrickArea now suppresses every snapshot card
       // (see `isCollecting`) so none re-paints at center as the flights finish.
-      setIsCollecting(true);
+      setCollectingReceivedAt(receivedAt);
       setActiveFlights((prev) => [...prev, ...newFlights]);
     }, MOTION.TRICK_RESOLVE_PAUSE);
 
@@ -573,34 +667,43 @@ export function MatchPage() {
       clearTimeout(glowTimer);
       clearTimeout(fallbackClearTimer);
     };
-  }, [pendingResolvedTrick, myPlayerSeat, prefersReducedMotion, setPendingResolvedTrick]);
+  }, [pendingResolvedTrick, myPlayerSeat, prefersReducedMotion, clearPendingResolvedTrick]);
 
-  // Flight completion — remove the flight; if it was the last collect flight,
-  // also clear pendingResolvedTrick so the snapshot disappears in the same
-  // render as the last flight unmounts (no slot-card flicker). React 18+
-  // automatically batches the two state setters when both run inside the
-  // same handler, so we don't need queueMicrotask trickery.
-  const handleFlightComplete = useCallback(
-    (flightId: string) => {
-      let clearSnapshot = false;
-      setActiveFlights((prev) => {
-        const next = prev.filter((f) => f.id !== flightId);
-        const wasCollect = flightId.startsWith("collect-");
-        const stillCollecting = next.some((f) => f.id.startsWith("collect-"));
-        if (wasCollect && !stillCollecting) clearSnapshot = true;
-        return next;
-      });
-      if (clearSnapshot) setPendingResolvedTrick(null);
-    },
-    [setPendingResolvedTrick],
-  );
+  // A newer resolved trick finalises the previous one at once. Trick N can
+  // resolve while N-1 is still sweeping (fast plays, timeout chains): the store
+  // snapshot is already N's, so N-1's flights are dropped here, before paint —
+  // otherwise their `animationend` would land mid-way through N's glow and
+  // clear N's snapshot with them (the cut sweeps and vanishing cards). Any
+  // flight of an older trick goes; only the live one's may stay.
+  const liveResolvedAt = pendingResolvedTrick?.receivedAt ?? null;
+  useLayoutEffect(() => {
+    const livePrefix = liveResolvedAt === null ? null : collectFlightPrefix(liveResolvedAt);
+    setActiveFlights((prev) => {
+      const next = prev.filter(
+        (f) =>
+          !f.id.startsWith(COLLECT_FLIGHT) || (livePrefix !== null && f.id.startsWith(livePrefix)),
+      );
+      return next.length === prev.length ? prev : next;
+    });
+  }, [liveResolvedAt]);
 
-  // Leave the collect window whenever the snapshot is torn down (last flight
-  // completed, reduced-motion hold elapsed, or the fallback safety clear). Tied
-  // to the snapshot rather than the flight set so it can't get stuck on.
-  useEffect(() => {
-    if (pendingResolvedTrick === null) setIsCollecting(false);
-  }, [pendingResolvedTrick]);
+  // Flight completion — the overlay is done painting it.
+  const handleFlightComplete = useCallback((flightId: string) => {
+    setActiveFlights((prev) => prev.filter((f) => f.id !== flightId));
+  }, []);
+
+  // The live trick's sweep is over once its last collect flight has landed:
+  // clear its snapshot before paint. Its cards are already suppressed for the
+  // whole collect window (`isCollecting`), so nothing flickers in between. The
+  // clear matches this trick's own stamp, so it can never tear down a newer
+  // snapshot.
+  useLayoutEffect(() => {
+    if (!isCollecting || pendingResolvedTrick === null) return;
+    const prefix = collectFlightPrefix(pendingResolvedTrick.receivedAt);
+    if (!activeFlights.some((f) => f.id.startsWith(prefix))) {
+      clearPendingResolvedTrick(pendingResolvedTrick.receivedAt);
+    }
+  }, [activeFlights, isCollecting, pendingResolvedTrick, clearPendingResolvedTrick]);
 
   // Cards TrickArea must not statically paint because the CardFlight overlay
   // owns them right now: every in-flight card, plus — once the collect sweep
@@ -616,6 +719,24 @@ export function MatchPage() {
     }
     return ids;
   }, [isCollecting, pendingResolvedTrick, flightingCardIds]);
+
+  // Deal controller — every deal (opening deal, all-pass reshuffle, the
+  // candidate's second deal) animates: face-down packets fly from the dealer's
+  // seat, each seat's cards appear as its packet lands, and nothing asks for a
+  // decision until the last one is down. The server holds the next actor's
+  // deadline back by the same length (deal_grace.go). A mount into a hand in
+  // progress (reload, reconnect) never replays one; arriving straight from the
+  // room animates the opening deal once the splash is gone.
+  const dealView = useDealController({
+    matchState,
+    myPlayerSeat,
+    tableVisible: splashElapsed && matchState !== null && myPlayerSeat !== null,
+    animateOpening: cameFromRoom,
+    prefersReducedMotion,
+    compact: isCompactTable,
+    updateFlights: setActiveFlights,
+  });
+  const dealing = dealView.dealing;
 
   // ScoreReveal needs the trump suit / caller seat AND the hand number from
   // the just-finished hand (for its title + contract-held subtitle). The
@@ -709,17 +830,22 @@ export function MatchPage() {
   // match_state (phase "hand_complete") but missed the event:hand_scored that
   // normally arms the score dialog. Reconstruct it from the persisted
   // lastHandResult so the player still sees the recap and can acknowledge.
+  // The rebuilt payload is remembered so its capot banner stays silent: it
+  // describes a moment the table already heard (or this client never saw).
+  const rebuiltScoreRevealRef = useRef<HandScoredPayload | null>(null);
   useEffect(() => {
     if (
       matchState?.phase === "hand_complete" &&
       scoreRevealData === null &&
       matchState.lastHandResult
     ) {
-      setScoreRevealData({
+      const rebuilt: HandScoredPayload = {
         ...matchState.lastHandResult,
         teamAMatchScore: matchState.teamScores[0],
         teamBMatchScore: matchState.teamScores[1],
-      });
+      };
+      rebuiltScoreRevealRef.current = rebuilt;
+      setScoreRevealData(rebuilt);
     }
   }, [matchState, scoreRevealData, setScoreRevealData]);
 
@@ -777,9 +903,6 @@ export function MatchPage() {
       setDeclRevealReady(true);
     }
   }, [declarationReveal, pendingResolvedTrick]);
-
-  // Track previous phase to detect bidding→dealing transition (reshuffle)
-  const prevPhaseRef = useRef<string | null>(null);
 
   // Derive myPlayerSeat on first game state
   useEffect(() => {
@@ -914,17 +1037,6 @@ export function MatchPage() {
     }
   }, [matchState?.phase, matchEndData, setMatchEndData]);
 
-  // Detect reshuffle: bidding → dealing transition within same match
-  const currentPhase = matchState?.phase;
-  useEffect(() => {
-    if (currentPhase) {
-      if (prevPhaseRef.current === "bidding" && currentPhase === "dealing") {
-        setShowReshuffle(true);
-      }
-      prevPhaseRef.current = currentPhase;
-    }
-  }, [currentPhase]);
-
   // Track whether the most recent client action was a surrender so the next
   // ErrInvalidAction / ErrWrongPhase rejection can route to the
   // surrender-specific i18n strings instead of the generic ones.
@@ -935,6 +1047,11 @@ export function MatchPage() {
   // cancelled by the re-run triggered by setLastError(null).
   useEffect(() => {
     if (!lastError) return;
+    // The server refused something the viewer sent, so a turn or window they
+    // were marked as having answered may still be theirs: let the urgent tick
+    // run for it again.
+    setAnsweredDeadline(null);
+    setAnsweredWindowHand(null);
     const ERROR_I18N: Record<string, string> = {
       "error:wrong_phase": "match.errors.wrongPhase",
       "error:not_your_turn": "match.errors.notYourTurn",
@@ -1087,9 +1204,10 @@ export function MatchPage() {
       // The own manual play sounds HERE, at the click, in step with the
       // optimistic throw — the WS dispatcher skips this play's non-auto echo.
       playSfx("cardPlay");
+      markTurnAnswered();
       sendMessage(ACTION_PLAY_CARD, { cardId });
     },
-    [sendMessage, prefersReducedMotion, myPlayerSeat],
+    [sendMessage, prefersReducedMotion, myPlayerSeat, markTurnAnswered],
   );
 
   // Card click entry point. If the clicked card is Belote/Rebelote-eligible
@@ -1123,7 +1241,7 @@ export function MatchPage() {
       const cardId = belotPromptCardId;
       if (cardId === null) return;
       setBelotPromptCardId(null);
-      setPendingLocalBelotChoice(announce);
+      setPendingLocalBelotChoice({ cardId, announce });
       executePlayCard(cardId);
     },
     [belotPromptCardId, executePlayCard],
@@ -1131,30 +1249,36 @@ export function MatchPage() {
 
   const handlePickTrump = useCallback(
     (suit?: Suit) => {
+      markTurnAnswered();
       sendMessage(ACTION_PICK_TRUMP, suit ? { suit } : {});
     },
-    [sendMessage],
+    [sendMessage, markTurnAnswered],
   );
 
   const handlePassTrump = useCallback(() => {
+    markTurnAnswered();
     sendMessage(ACTION_PASS_TRUMP, {});
-  }, [sendMessage]);
+  }, [sendMessage, markTurnAnswered]);
 
   const handleDeclare = useCallback(() => {
+    markWindowAnswered();
     sendMessage(ACTION_DECLARE, {});
-  }, [sendMessage]);
+  }, [sendMessage, markWindowAnswered]);
 
   const handleSkipDeclare = useCallback(() => {
+    markWindowAnswered();
     sendMessage(ACTION_SKIP_DECLARE, {});
-  }, [sendMessage]);
+  }, [sendMessage, markWindowAnswered]);
 
   const handleAnnounceBelot = useCallback(() => {
+    markTurnAnswered();
     sendMessage(ACTION_ANNOUNCE_BELOT, {});
-  }, [sendMessage]);
+  }, [sendMessage, markTurnAnswered]);
 
   const handleDeclineBelot = useCallback(() => {
+    markTurnAnswered();
     sendMessage(ACTION_DECLINE_BELOT, {});
-  }, [sendMessage]);
+  }, [sendMessage, markTurnAnswered]);
 
   const handlePause = useCallback(() => {
     sendMessage(ACTION_PAUSE, {});
@@ -1189,10 +1313,6 @@ export function MatchPage() {
     surrenderActionInFlightRef.current = true;
     sendMessage(ACTION_SURRENDER_DECLINE, {});
   }, [sendMessage]);
-
-  const handleReshuffleComplete = useCallback(() => {
-    setShowReshuffle(false);
-  }, []);
 
   const handleDeclarationRevealComplete = useCallback(() => {
     setDeclarationReveal(null);
@@ -1512,19 +1632,29 @@ export function MatchPage() {
     matchState.phase === "playing" &&
     !matchState.awaitingDeclaration &&
     matchState.pendingBelotSeat !== myPlayerSeat;
+  // The hand takes a click only once the table is settled: not while the last
+  // trick is still glowing or sweeping to its winner (the viewer usually leads
+  // the next one, and a throw there landed on top of the sweep), and not while
+  // the second deal is still bringing the rest of the hand in. The server's
+  // clock is unaffected — this only holds the click.
+  const canPlayNow = isMyTurn && pendingResolvedTrick === null && !dealing;
   const myPlayer = matchState.players.find((p) => p.seat === myPlayerSeat);
-  const myHand = myPlayer?.hand ?? [];
   // Cards the viewer holds but has not been shown yet (Croatian bidding). The
   // server sends a COUNT per seat, never the identities, so this can render
   // backs without ever putting the cards on the client. The cards themselves
   // arrive only in the post-pick snapshot, once trump is resolved.
-  const myFaceDownCount = myPlayer?.faceDownCount ?? 0;
+  //
+  // Mid-deal only the packets that have landed are in the fan.
+  const shownHand = dealView.visibleHand(myPlayer?.hand ?? [], myPlayer?.faceDownCount ?? 0);
+  const myHand = shownHand.hand;
+  const myFaceDownCount = shownHand.faceDownCount;
   const playableCardIds =
-    isMyTurn && myPlayerSeat !== null ? legalCardIds(matchState, myPlayerSeat) : [];
+    canPlayNow && myPlayerSeat !== null ? legalCardIds(matchState, myPlayerSeat) : [];
 
-  // Bidding state
+  // Bidding state. The prompt waits for the deal to finish.
   const isBiddingPhase = matchState.phase === "bidding";
-  const isActiveBidder = isBiddingPhase && matchState.activePlayerSeat === myPlayerSeat;
+  const showTrumpPrompt = isBiddingPhase && !dealing;
+  const isActiveBidder = showTrumpPrompt && matchState.activePlayerSeat === myPlayerSeat;
 
   // Declaration state. Held while a trump-take reveal is on screen so the two
   // don't stack: after a pick the server sends trump_selected then a match_state
@@ -1534,11 +1664,14 @@ export function MatchPage() {
   // prompt surfaces — a deliberate beat between the two.
   //
   // The dedicated phase (Croatian) asks all four seats AT ONCE, so every seat
-  // sees the dialog — a seat holding nothing included, with an empty state and
-  // a disabled Declare. That uniformity is the feature: the phase used to prompt
-  // meld holders one at a time, so activePlayerSeat named exactly who held a
-  // meld and the table learned it before they chose. Keyed off the server's
-  // phase and the seat's own answered flag, never off the variant.
+  // sees the dialog — a seat holding nothing included: it answers (skips) the
+  // moment the dialog mounts and opens straight into "no declarations, waiting
+  // for the others" (owner decision: an instant answer may tell the table
+  // which seats hold nothing; clicking Skip for them only held the table).
+  // The phase used to prompt meld holders one at a time, so activePlayerSeat
+  // named exactly who held a meld and the table learned it before they chose.
+  // Keyed off the server's phase and the seat's own answered flag, never off
+  // the variant.
   //
   // Bitola keeps its seat gate: promptDeclarations is built from the VIEWER's
   // own hand, so without it all four seats would render a trick-1 prompt and
@@ -1547,9 +1680,28 @@ export function MatchPage() {
   const declarationAnsweredCount = matchState.players.filter((p) => p.declarationAnswered).length;
   const showDeclarationPrompt =
     trumpReveal === null &&
+    !dealing &&
     (isDeclarationPhase
       ? myPlayer !== undefined && declarationReveal === null
       : matchState.awaitingDeclaration === true && matchState.activePlayerSeat === myPlayerSeat);
+
+  // The viewer's own decision on the clock, for the urgent tick: their turn in
+  // play (a card, a Bitola trick-1 declaration, or a Belote answer — all on
+  // the same per-move deadline) or their bid, once the deal has landed; or the
+  // dedicated declaration window while it is open and unanswered.
+  const ownTurnDeadline =
+    !dealing &&
+    (matchState.phase === "bidding" || matchState.phase === "playing") &&
+    matchState.activePlayerSeat === myPlayerSeat &&
+    matchState.turnExpiresAt !== answeredDeadline
+      ? matchState.turnExpiresAt
+      : null;
+  const ownWindowOpen =
+    isDeclarationPhase &&
+    showDeclarationPrompt &&
+    myPlayer !== undefined &&
+    !myPlayer.declarationAnswered &&
+    answeredWindowHand !== matchState.handNumber;
 
   // Belot state. The local pre-play prompt (belotPromptCardId) takes priority;
   // the server-driven prompt is the fallback and is suppressed while the local
@@ -1569,9 +1721,6 @@ export function MatchPage() {
     ? (matchState.currentTrick[matchState.currentTrick.length - 1] ?? null)
     : null;
   const belotPromptIsKing = belotPromptLastTrickCard?.card.rank === "K";
-
-  // Deal animation state
-  const isDealingPhase = matchState.phase === "dealing";
 
   // Emote bubbles are suppressed while an overlay or pause owns the screen; the
   // store still records the latest emote so re-emergence renders the live one.
@@ -1674,7 +1823,11 @@ export function MatchPage() {
         // and its countdown ring are suppressed on the phase rather than on the
         // seat. Leaving one seat lit would both misdescribe the phase and, back
         // when it was a cursor, name a meld holder.
-        const isActive = !isDeclarationPhase && matchState.activePlayerSeat === player.seat;
+        //
+        // Nor mid-deal: nobody is asked for anything until the last packet has
+        // landed, so no seat is lit and no ring runs before its prompt exists.
+        const isActive =
+          !dealing && !isDeclarationPhase && matchState.activePlayerSeat === player.seat;
         // Caller chip only shows the suit when this seat IS the trump caller.
         const isCaller =
           matchState.trumpCallerSeat !== null &&
@@ -1729,10 +1882,13 @@ export function MatchPage() {
               // every seat. A client-first rolling deploy is exactly that
               // window — an old server still sends full hands and no handCount,
               // and hand.length keeps rendering them correctly until it flips.
+              //
+              // Mid-deal the stack shows only the packets that have landed.
               cardCount={
                 isSelf
                   ? undefined
-                  : (player.handCount ?? player.hand.length) + (player.faceDownCount ?? 0)
+                  : (dealView.seatCardCount(player.seat) ??
+                    (player.handCount ?? player.hand.length) + (player.faceDownCount ?? 0))
               }
               turnExpiresAt={isActive && isTurnPhase ? matchState.turnExpiresAt : null}
               timerDuration={matchState.timerDurationSec}
@@ -1796,7 +1952,7 @@ export function MatchPage() {
         <HandCards
           hand={myHand}
           faceDownCount={myFaceDownCount}
-          isMyTurn={isMyTurn}
+          isMyTurn={canPlayNow}
           playableCardIds={playableCardIds}
           onPlayCard={handlePlayCard}
           flyingId={flyingCardId}
@@ -2093,6 +2249,7 @@ export function MatchPage() {
           viewerTeam={viewerTeam}
           viewerSeat={myPlayerSeat}
           onReturnToLobby={handleAbandonReturnToLobby}
+          soundKey={matchAbandonedData ? payloadSoundKey(matchAbandonedData) : null}
         />
       )}
 
@@ -2106,11 +2263,22 @@ export function MatchPage() {
           new-hand prompts surface in sequence as the player dismisses it. */}
       {overlayPhase === "normal" && (
         <>
-          {/* Deal animation overlay */}
-          {isDealingPhase && <DealAnimation trumpCandidate={matchState.trumpCandidate} />}
+          {/* Deal in progress: the candidate turning over at the centre and
+              the reshuffle caption. The packets fly in the CardFlight overlay. */}
+          {dealing && dealView.deal !== null && (
+            <DealAnimation
+              flippedCandidate={
+                dealView.deal.kind === "candidateFirst" && dealView.deal.flipped
+                  ? dealView.deal.candidate
+                  : null
+              }
+              isReshuffle={dealView.deal.isReshuffle}
+              prefersReducedMotion={prefersReducedMotion}
+            />
+          )}
 
-          {/* Trump bidding prompt overlay */}
-          {isBiddingPhase && (
+          {/* Trump bidding prompt overlay — once the deal has landed */}
+          {showTrumpPrompt && (
             <TrumpPrompt
               trumpCandidate={matchState.trumpCandidate}
               biddingRound={matchState.biddingRound}
@@ -2140,9 +2308,6 @@ export function MatchPage() {
         </>
       )}
 
-      {/* Reshuffle animation overlay */}
-      {showReshuffle && <ReshuffleAnimation onComplete={handleReshuffleComplete} />}
-
       {/* Declaration prompt overlay. In the dedicated phase this is on every
           seat's screen at once, in the same shape, and stays up in a waiting
           state after the viewer answers — so nobody can read anyone else's
@@ -2162,14 +2327,18 @@ export function MatchPage() {
 
       {/* Local Belote/Rebelote prompt — shown the instant the player clicks a
           trump K/Q while holding the other, BEFORE the card is thrown. The
-          decision sends play_card + announce/skip; no turn ring because the
-          card hasn't been played yet (the move timer is still on the play). */}
+          decision sends play_card + announce/skip. The move timer is still on
+          the play, so the prompt carries that same per-move ring: if it runs
+          out, the server auto-plays and the prompt closes (see the belot
+          effects above). */}
       {showLocalBelotPrompt && matchState.trumpSuit && (
         <BelotPrompt
           isKing={localBelotIsKing}
           trumpSuit={matchState.trumpSuit}
           onAnnounce={() => handleLocalBelotDecision(true)}
           onDecline={() => handleLocalBelotDecision(false)}
+          turnExpiresAt={matchState.turnExpiresAt}
+          timerDurationSec={matchState.timerDurationSec}
         />
       )}
 
@@ -2201,6 +2370,7 @@ export function MatchPage() {
           players={matchState.players}
           viewerTeam={viewerTeam}
           onComplete={handleDeclarationRevealComplete}
+          soundKey={payloadSoundKey(declarationReveal)}
         />
       )}
 
@@ -2220,6 +2390,7 @@ export function MatchPage() {
           isKing={belotReveal.cardId.startsWith("K")}
           players={matchState.players}
           onComplete={handleBelotRevealComplete}
+          soundKey={payloadSoundKey(belotReveal)}
         />
       )}
 
@@ -2289,6 +2460,11 @@ export function MatchPage() {
             viewerSeat={myPlayerSeat}
             capotBonus={scoreRevealData.capotBonus}
             onComplete={handleCapotComplete}
+            soundKey={
+              scoreRevealData === rebuiltScoreRevealRef.current
+                ? null
+                : payloadSoundKey(scoreRevealData)
+            }
           />
         )}
 
@@ -2317,8 +2493,17 @@ export function MatchPage() {
           coinDelta={coinSettlement?.coinDelta}
           honorSettlement={honorSettlement}
           roomId={roomIdNum ?? undefined}
+          soundKey={payloadSoundKey(matchEndData)}
         />
       )}
+
+      {/* Urgent clock tick for the viewer's own decision (renders nothing). */}
+      <UrgentTick
+        turnDeadline={ownTurnDeadline}
+        turnTotalSec={matchState.timerDurationSec}
+        windowOpen={ownWindowOpen}
+        windowTotalSec={MOTION.DECLARATION_PHASE_AUTO_SKIP / 1000}
+      />
 
       {/* CardFlight overlay — viewport-fixed layer that paints all in-flight
           cards (self throw, opponent throw, take-collect). Mounted last so

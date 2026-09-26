@@ -57,6 +57,7 @@ func TestPerMoveTimer_FiresAfterAdvertisedDeadlineNotBefore(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 
 	start := time.Now()
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false))

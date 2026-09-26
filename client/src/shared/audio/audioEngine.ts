@@ -32,14 +32,40 @@ import { useAuthStore } from "@/shared/stores/authStore";
  * feedback, never something a player should see an error for.
  */
 
-export type SfxName = "cardPlay" | "trickCollect";
+export type SfxName =
+  | "cardPlay"
+  | "trickCollect"
+  | "deal"
+  | "dealPacket"
+  | "declaration"
+  | "capot"
+  | "matchWin"
+  | "matchLose"
+  | "popup"
+  | "clockTick";
 
 const AUDIO_BASE = `${import.meta.env.BASE_URL}audio`;
 
-/** Several recordings per sound, picked at random so repeats don't sound canned. */
+function sfxSet(stem: string, count: number): string[] {
+  return Array.from({ length: count }, (_, i) => `${AUDIO_BASE}/sfx/${stem}-${i + 1}.mp3`);
+}
+
+/**
+ * Recordings per sound. Where there are several, one is picked at random so
+ * repeats don't sound canned; the one-off moments (a jingle, the shuffle, the
+ * clock) have a single recording each.
+ */
 export const SFX_URLS: Readonly<Record<SfxName, readonly string[]>> = {
-  cardPlay: Array.from({ length: 8 }, (_, i) => `${AUDIO_BASE}/sfx/card-slide-${i + 1}.mp3`),
-  trickCollect: Array.from({ length: 4 }, (_, i) => `${AUDIO_BASE}/sfx/card-shove-${i + 1}.mp3`),
+  cardPlay: sfxSet("card-slide", 8),
+  trickCollect: sfxSet("card-shove", 4),
+  deal: [`${AUDIO_BASE}/sfx/card-shuffle.mp3`],
+  dealPacket: sfxSet("card-place", 4),
+  declaration: sfxSet("chips-stack", 6),
+  capot: [`${AUDIO_BASE}/sfx/jingle-capot.mp3`],
+  matchWin: [`${AUDIO_BASE}/sfx/jingle-win.mp3`],
+  matchLose: [`${AUDIO_BASE}/sfx/jingle-lose.mp3`],
+  popup: sfxSet("popup", 2),
+  clockTick: [`${AUDIO_BASE}/sfx/clock-tick.mp3`],
 };
 
 /** The rotating playlist. A random track starts; the rest follow in order. */
@@ -56,8 +82,13 @@ const MUSIC_FADE_IN_S = 1.5;
 const MUSIC_FADE_OUT_S = 0.4;
 /** How fast a live music-volume change glides to its new level. */
 const MUSIC_VOLUME_RAMP_S = 0.1;
-/** How many dedupe keys are remembered — far more than one trick can reuse. */
-const DEDUPE_MEMORY = 64;
+/**
+ * How many dedupe keys are remembered. A hand spends about 25–35: a shuffle,
+ * 12 deal packets (8 + 4, or 12), 8 collects, a reveal or two — more with a
+ * reshuffle or urgent ticks. So this holds the last seven or so hands, far
+ * more than any remount can reach back for.
+ */
+const DEDUPE_MEMORY = 256;
 /**
  * How long after the last session closes the context is suspended: past the
  * music fade-out, so the fade is heard to the end rather than cut off.

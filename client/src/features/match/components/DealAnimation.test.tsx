@@ -1,100 +1,53 @@
-import { act, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import "@/shared/i18n/i18n";
 
-import { MOTION } from "@/shared/lib/motion";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { DealAnimation } from "./DealAnimation";
 
-beforeEach(() => {
-  Object.defineProperty(window, "matchMedia", {
-    writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })),
-  });
-});
-
 describe("DealAnimation", () => {
-  it("renders deal animation container", () => {
-    render(<DealAnimation trumpCandidate={{ rank: "K", suit: "H" }} />);
-    expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
+  it("announces the deal and shows nothing at the centre before the flip", () => {
+    render(
+      <DealAnimation flippedCandidate={null} isReshuffle={false} prefersReducedMotion={false} />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("Dealing cards…");
+    expect(screen.queryByTestId("deal-candidate")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("deal-reshuffle-caption")).not.toBeInTheDocument();
   });
 
-  it("shows trump candidate card when available", () => {
-    vi.useFakeTimers();
-    render(<DealAnimation trumpCandidate={{ rank: "K", suit: "H" }} />);
-    // Advance to revealing phase
-    vi.advanceTimersByTime(900);
-    expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
-    vi.useRealTimers();
+  it("turns the candidate face-up once the deal flips it", () => {
+    render(
+      <DealAnimation
+        flippedCandidate={{ rank: "K", suit: "H" }}
+        isReshuffle={false}
+        prefersReducedMotion={false}
+      />,
+    );
+
+    const candidate = screen.getByTestId("deal-candidate");
+    expect(candidate).toContainElement(screen.getByTestId("playing-card-KH"));
+    expect(candidate.style.animation).toContain("deal-candidate-flip");
   });
 
-  it("renders without trump candidate", () => {
-    render(<DealAnimation trumpCandidate={null} />);
-    expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
+  it("shows the candidate without the flip under reduced motion", () => {
+    render(
+      <DealAnimation
+        flippedCandidate={{ rank: "K", suit: "H" }}
+        isReshuffle={false}
+        prefersReducedMotion={true}
+      />,
+    );
+
+    expect(screen.getByTestId("deal-candidate").style.animation).toBe("");
   });
 
-  // Story 12.8: with no candidate the reveal phase has nothing to show, so the
-  // component used to sit invisible on an empty table centre for the whole
-  // trump-flip beat before bidding opened. It must be gone the moment the deal
-  // beat ends.
-  it("ends at the deal beat when there is no trump candidate to flip", () => {
-    vi.useFakeTimers();
-    try {
-      render(<DealAnimation trumpCandidate={null} />);
-      expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
+  it("says the deck is being reshuffled after an all-pass", () => {
+    render(
+      <DealAnimation flippedCandidate={null} isReshuffle={true} prefersReducedMotion={false} />,
+    );
 
-      // Read the constant rather than restating it: the assertion is "still on
-      // screen right up to the deal beat, gone just after", which must follow
-      // the constant if it is ever retuned.
-      act(() => vi.advanceTimersByTime(MOTION.DEAL_PHASE_DEAL - 1));
-      expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
-
-      act(() => vi.advanceTimersByTime(2));
-      expect(screen.queryByTestId("deal-animation")).not.toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("keeps the trump-flip beat when there IS a candidate", () => {
-    vi.useFakeTimers();
-    try {
-      render(<DealAnimation trumpCandidate={{ rank: "K", suit: "H" }} />);
-
-      // Past the deal beat the candidate is on the table, not gone.
-      act(() => vi.advanceTimersByTime(MOTION.DEAL_PHASE_DEAL + 100));
-      expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
-      expect(screen.getByTestId("playing-card-KH")).toBeInTheDocument();
-
-      // And it stays rendered after `done`, because the candidate is still
-      // face-up on the table (the self-hide only applies with no candidate).
-      act(() => vi.advanceTimersByTime(MOTION.DEAL_PHASE_TRUMP));
-      expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("has aria-label for deal animation", () => {
-    render(<DealAnimation trumpCandidate={{ rank: "K", suit: "H" }} />);
-    expect(screen.getByTestId("deal-animation")).toHaveAttribute("aria-label");
-  });
-
-  it("skips animation instantly when prefers-reduced-motion is set", () => {
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: vi.fn().mockImplementation((query: string) => ({
-        matches: true,
-        media: query,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      })),
-    });
-    render(<DealAnimation trumpCandidate={{ rank: "K", suit: "H" }} />);
-    // With reduced motion, deal phase goes to done immediately
+    expect(screen.getByTestId("deal-reshuffle-caption")).toHaveTextContent("Reshuffling deck…");
+    expect(screen.getByRole("status")).toHaveTextContent("Reshuffling deck…");
   });
 });

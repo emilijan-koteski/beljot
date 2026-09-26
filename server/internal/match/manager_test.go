@@ -511,6 +511,7 @@ func TestHandleAction_PerMoveTimer_ResetsOnAction(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false)
 	require.NoError(t, err)

@@ -23,7 +23,15 @@ export function useReconnectionRedirect(): void {
     ) {
       // Push only when leaving from the lobby (stack becomes [lobby, match] so
       // a later return can pop); from anywhere else replace as before.
-      navigate(`/match/${matchState.roomId}`, { replace: location.pathname !== "/lobby" });
+      //
+      // Leaving a room or the quick-play queue is the match starting, not a
+      // reconnect: the first state can beat that page's own redirect here, so
+      // carry the same arrival flag it would (starting splash, opening deal).
+      const fromPreMatch = /^\/(rooms|matchmaking)\//.test(location.pathname);
+      navigate(`/match/${matchState.roomId}`, {
+        replace: location.pathname !== "/lobby",
+        ...(fromPreMatch ? { state: { fromRoom: true } } : {}),
+      });
     }
   }, [matchState, location.pathname, navigate]);
 }

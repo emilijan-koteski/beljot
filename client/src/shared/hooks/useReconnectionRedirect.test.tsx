@@ -164,6 +164,23 @@ describe("useReconnectionRedirect", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/match/42", { replace: true });
   });
 
+  // The first match_state can beat the room / quick-play page's own redirect;
+  // arriving that way is still the match starting, so the flag rides along.
+  it.each(["/matchmaking/42", "/rooms/42"])(
+    "carries the arrival flag when the match starts under %s",
+    (path) => {
+      currentPathname = path;
+      useMatchStore.setState({ matchState: minimalMatchState, roomId: 42 });
+
+      renderHook(() => useReconnectionRedirect(), { wrapper });
+
+      expect(mockNavigate).toHaveBeenCalledWith("/match/42", {
+        replace: true,
+        state: { fromRoom: true },
+      });
+    },
+  );
+
   it("does not redirect when already on game page", () => {
     currentPathname = "/match/42";
     useMatchStore.setState({ matchState: minimalMatchState, roomId: 42 });

@@ -537,6 +537,8 @@ function dispatchGameEvent(message: WsMessage): void {
     }
     if (useMatchStore.getState().matchState === null) return;
     useMatchStore.getState().setActiveDeclare(payload.playerSeat, true);
+    // The seat banner pops up now; it has its own avatar popup sound.
+    playSfx("popup");
     return;
   }
 
@@ -644,6 +646,15 @@ function dispatchGameEvent(message: WsMessage): void {
     if (store.matchState === null) return;
     const payload = message.payload as SurrenderProposedPayload;
     store.setSurrenderProposed(payload);
+    // The partner's prompt and the opponents' banner pop up with it. The
+    // proposer sees neither — they just asked — so they hear nothing.
+    if (
+      payload.proposerSeat !== store.myPlayerSeat &&
+      store.matchEndData === null &&
+      store.matchAbandonedData === null
+    ) {
+      playSfx("popup");
+    }
     // Full game state update follows via event:match_state — clears the
     // pending flag on resolve.
     return;
@@ -1023,8 +1034,21 @@ function dispatchSystemEvent(message: WsMessage): void {
     // Defence in depth (Story 8.1 dispatcher hardening): only commit when the
     // user is in an active match. A stray emote frame after clearGame() must
     // not seed the next match's bubble state.
-    if (useMatchStore.getState().matchState === null) return;
-    useMatchStore.getState().setActiveEmote(payload.playerSeat, payload.emote);
+    const matchStore = useMatchStore.getState();
+    if (matchStore.matchState === null) return;
+    matchStore.setActiveEmote(payload.playerSeat, payload.emote);
+    // The bubble pops up with a sound — only when it is actually shown: the
+    // same gate MatchPage's `emotesVisible` applies (no bubbles over the
+    // match-end / abandon overlays, a pause or a disconnect).
+    const phase = matchStore.matchState.phase;
+    if (
+      matchStore.matchEndData === null &&
+      matchStore.matchAbandonedData === null &&
+      phase !== "paused" &&
+      phase !== "disconnected"
+    ) {
+      playSfx("popup");
+    }
     return;
   }
 

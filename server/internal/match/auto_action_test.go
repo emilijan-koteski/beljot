@@ -62,6 +62,7 @@ func TestPerMoveTimer_BiddingPhaseAutoPasses(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 
 	// 1-second timer so it expires quickly
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false))

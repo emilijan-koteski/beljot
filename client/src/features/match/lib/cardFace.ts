@@ -59,6 +59,13 @@ export const CARD_SIZES: Record<CardSize, CardDimensions> = {
  * is — the ink is drawn straight onto it, at its exact token colour, with no
  * blend layer in between. Shared so every card-face surface is the same material.
  */
+/**
+ * Width of one card back in a seat's back stack (PlayerSeat's CardBackStack),
+ * desktop and phone. The deal's packets fly to that stack and land at this
+ * width, so the two read it from here.
+ */
+export const SEAT_STACK_CARD_WIDTH = { desktop: 26, compact: 15 } as const;
+
 export const CARD_FACE_BACKGROUND = "linear-gradient(180deg, #fdfaf0 0%, #f4ecd8 100%)";
 
 /**

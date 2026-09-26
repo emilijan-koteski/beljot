@@ -45,7 +45,10 @@ interface TrumpPromptProps {
   timerDurationSec?: number;
 }
 
-const SUITS: Suit[] = ["S", "H", "D", "C"];
+// Picker and waiting-chip order: spades, hearts, clubs, diamonds, so the two
+// red suits never sit side by side. The hand fan keeps its own order (HandCards
+// SUIT_ORDER); this one is only the bidding surfaces'.
+const SUITS: Suit[] = ["S", "H", "C", "D"];
 
 /**
  * The four-suit picker grid. One definition serves every case that needs it:

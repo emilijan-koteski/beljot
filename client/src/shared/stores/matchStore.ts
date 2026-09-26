@@ -24,8 +24,10 @@ import type {
 export interface PendingResolvedTrick {
   trick: TrickCard[];
   winnerSeat: number;
-  /** Stamped on capture so consumers can debounce duplicate captures during
-   *  rapid trick cycles. */
+  /** Stamped on capture, strictly increasing across captures, so it names ONE
+   *  resolved trick: the collect effect, its flights and its sound are all
+   *  keyed by it, and two tricks resolved in the same millisecond (a timeout
+   *  chain) still get distinct stamps. */
   receivedAt: number;
 }
 
@@ -118,6 +120,11 @@ export interface MatchStoreState {
   setSurrenderDeclined: (payload: SurrenderDeclinedPayload | null) => void;
   setPendingAutoPlayedCard: (cardId: string | null) => void;
   setPendingResolvedTrick: (snapshot: { trick: TrickCard[]; winnerSeat: number } | null) => void;
+  /** Clear the resolved-trick snapshot only if it is still the one stamped
+   *  `receivedAt`. Every end-of-collect path (last flight landed, fallback
+   *  timer, reduced-motion hold) clears through this, so a late finish of
+   *  trick N-1 can never tear down trick N's snapshot mid-glow. */
+  clearPendingResolvedTrick: (receivedAt: number) => void;
   setActiveEmote: (seat: number, emote: EmoteID | null) => void;
   setActiveDeclare: (seat: number, active: boolean) => void;
   setLastEmoteSentAt: (value: number) => void;
@@ -144,6 +151,10 @@ function normalizeMatchState(gs: MatchState): MatchState {
     })) as MatchState["players"],
   };
 }
+
+// Last stamp handed out by setPendingResolvedTrick — module-level so it stays
+// monotonic across clearGame/reset too.
+let lastResolvedTrickStamp = 0;
 
 const initialState = {
   matchState: null,
@@ -220,9 +231,19 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
               // snapshot of the just-resolved trick.
               trick: [...snapshot.trick],
               winnerSeat: snapshot.winnerSeat,
-              receivedAt: Date.now(),
+              receivedAt: (lastResolvedTrickStamp = Math.max(
+                Date.now(),
+                lastResolvedTrickStamp + 1,
+              )),
             },
     }),
+
+  clearPendingResolvedTrick: (receivedAt) =>
+    set((state) =>
+      state.pendingResolvedTrick !== null && state.pendingResolvedTrick.receivedAt === receivedAt
+        ? { pendingResolvedTrick: null }
+        : state,
+    ),
 
   setActiveEmote: (seat, emote) =>
     set((state) => {

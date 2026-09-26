@@ -6,7 +6,7 @@ import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { PlayerState, Suit } from "@/shared/types/matchTypes";
 
-import { resolveCardDeck } from "../lib/cardFace";
+import { resolveCardDeck, SEAT_STACK_CARD_WIDTH } from "../lib/cardFace";
 import { suitAccent, suitNameKey } from "../lib/suitArt";
 import { type SeatTeam, teamColors, teamLabelKey } from "../lib/tableTheme";
 import { isCountdownUrgent, useTurnCountdown } from "../lib/turnCountdown";
@@ -128,7 +128,7 @@ function CardBackStack({
 }) {
   const visible = Math.min(count, 5);
   // Extra-small card backs on phones so the seat stays tight.
-  const cw = compact ? 15 : 26;
+  const cw = compact ? SEAT_STACK_CARD_WIDTH.compact : SEAT_STACK_CARD_WIDTH.desktop;
   const ch = compact ? 22 : 38;
   const overlap = compact ? 12 : 22;
   // Render the wrapper div even when count === 0 so the CardFlight overlay

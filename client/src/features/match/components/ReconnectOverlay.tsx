@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useSfxOnce } from "@/shared/audio/useSfxOnce";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
@@ -60,6 +61,11 @@ interface ReconnectOverlayProps {
    *  window can pass it explicitly so the ring still reads "fills full → empty"
    *  rather than starting partially-full. */
   totalSeconds?: number;
+  /** Dedupe key for the abandoned panel's win/lose jingle (see
+   *  `payloadSoundKey`). It sounds for the same viewers the result line is
+   *  shown to: a win for the team left at the table, a loss for the
+   *  abandoner's partner, nothing for the abandoner. Omitted or null: silent. */
+  soundKey?: string | null;
 }
 
 const RECONNECT_TOTAL_SECONDS_DEFAULT = 120;
@@ -80,6 +86,34 @@ const RING_CIRC = 2 * Math.PI * RING_RADIUS;
 // ring track sits on a matching field instead of a default surface.
 const FELT_DARK = "#0e2818";
 
+/**
+ * The viewer's result in an abandoned match — pure display derivation from seat
+ * parity (seats 0/2 → teamA, 1/3 → teamB, mirroring game.TeamForSeat). Sharing
+ * the abandoner's team means the match counts as a loss for the viewer,
+ * otherwise a win. None for the abandoner themselves (their record says
+ * "abandoned", not "loss" — and they see this overlay on a late reconnect),
+ * when the viewer's seat is unknown, or when the payload's seat is out of range.
+ */
+function abandonResult(
+  abandonedData: MatchAbandonedPayload,
+  viewerSeat: number | null,
+): "win" | "loss" | null {
+  const abandonerSeat = abandonedData.abandonedByPlayer;
+  const abandonerSeatValid =
+    Number.isInteger(abandonerSeat) && abandonerSeat >= 0 && abandonerSeat <= 3;
+  if (
+    !abandonerSeatValid ||
+    viewerSeat === null ||
+    !Number.isInteger(viewerSeat) ||
+    viewerSeat < 0 ||
+    viewerSeat > 3 ||
+    viewerSeat === abandonerSeat
+  ) {
+    return null;
+  }
+  return viewerSeat % 2 === abandonerSeat % 2 ? "loss" : "win";
+}
+
 function formatCountdown(totalSeconds: number): string {
   if (totalSeconds <= 0) return "0:00";
   const minutes = Math.floor(totalSeconds / 60);
@@ -96,6 +130,7 @@ export function ReconnectOverlay({
   viewerSeat = null,
   onReturnToLobby,
   totalSeconds = RECONNECT_TOTAL_SECONDS_DEFAULT,
+  soundKey,
 }: ReconnectOverlayProps) {
   const chipPlayers: DisconnectedPlayerInfo[] =
     disconnectedPlayers && disconnectedPlayers.length > 0
@@ -120,6 +155,11 @@ export function ReconnectOverlay({
   // run above the abandoned-state early return (hooks order); the quantized
   // dashoffset at the render site stays as the reduced-motion fallback.
   const ringDrain = useRingDrain(reconnectExpiresAt, totalSeconds, RING_CIRC);
+
+  // The abandoned panel's result, and its jingle. Above the early return
+  // (hooks order); silent while the overlay is still counting down.
+  const result = abandonedData ? abandonResult(abandonedData, viewerSeat) : null;
+  useSfxOnce(result === "loss" ? "matchLose" : "matchWin", result !== null ? soundKey : null);
 
   // Auto-redirect to lobby after match abandonment
   useEffect(() => {
@@ -154,24 +194,9 @@ export function ReconnectOverlay({
     const teamBValue = abandonedData.teamBFinalScore;
     const usValue = viewerTeam === "teamA" ? teamAValue : teamBValue;
     const themValue = viewerTeam === "teamA" ? teamBValue : teamAValue;
-    // Per-player result line — pure display derivation from seat parity
-    // (seats 0/2 → teamA, 1/3 → teamB, mirroring game.TeamForSeat). Sharing
-    // the abandoner's team means the match counts as a loss for the viewer,
-    // otherwise a win. Never shown to the abandoner themselves (their record
-    // says "abandoned", not "loss" — and they see this overlay on a late
-    // reconnect), when the viewer's seat is unknown, or when the payload's
-    // seat is out of range.
-    const abandonerSeat = abandonedData.abandonedByPlayer;
-    const abandonerSeatValid =
-      Number.isInteger(abandonerSeat) && abandonerSeat >= 0 && abandonerSeat <= 3;
-    const showResultLine =
-      abandonerSeatValid &&
-      viewerSeat !== null &&
-      Number.isInteger(viewerSeat) &&
-      viewerSeat >= 0 &&
-      viewerSeat <= 3 &&
-      viewerSeat !== abandonerSeat;
-    const viewerLost = showResultLine && viewerSeat % 2 === abandonerSeat % 2;
+    // Per-player result line (see abandonResult).
+    const showResultLine = result !== null;
+    const viewerLost = result === "loss";
 
     return (
       <div

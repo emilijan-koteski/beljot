@@ -15,6 +15,33 @@ func (m *Manager) SetBotDelayForTest(minDelay, maxDelay time.Duration) {
 	m.botDelayMax = maxDelay
 }
 
+// SetDealGraceForTest switches the deal grace (deal_grace.go) on or off. Tests
+// that are not about the deal turn it off so deadlines and bot delays stay at
+// their bare values.
+func (m *Manager) SetDealGraceForTest(enabled bool) {
+	m.dealGraceEnabled = enabled
+}
+
+// DealGraceRemainingForTest reports how much deal grace the room's current
+// turn still carries.
+func (m *Manager) DealGraceRemainingForTest(roomID uint) time.Duration {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return 0
+	}
+	lm.mu.RLock()
+	defer lm.mu.RUnlock()
+	return lm.dealGraceRemaining()
+}
+
+// BotThinkDelayForTest exposes botThinkDelay: the delay a bot at `seat` would
+// draw before acting on gs.
+func (m *Manager) BotThinkDelayForTest(gs *game.GameState, seat int) time.Duration {
+	return m.botThinkDelay(gs, seat)
+}
+
 // BotSchedule exposes maybeScheduleBotAction for tests that inject a game
 // state via SetGameStateForTest and need the driver to re-evaluate it.
 func (m *Manager) BotSchedule(roomID uint) {

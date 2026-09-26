@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useSfxOnce } from "@/shared/audio/useSfxOnce";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
 import { Z } from "@/shared/lib/zLayers";
@@ -26,6 +27,11 @@ interface DeclarationRevealProps {
   players: readonly PlayerState[];
   viewerTeam: TeamString;
   onComplete: () => void;
+  /**
+   * Dedupe key for this reveal's sound (see `payloadSoundKey`), played once when
+   * it mounts. Omitted or null: silent.
+   */
+  soundKey?: string | null;
 }
 
 function parseCardId(id: string) {
@@ -48,8 +54,10 @@ export function DeclarationReveal({
   players,
   viewerTeam,
   onComplete,
+  soundKey,
 }: DeclarationRevealProps) {
   const { t } = useTranslation();
+  useSfxOnce("declaration", soundKey);
   const [visible, setVisible] = useState(true);
 
   const prefersReducedMotion = useReducedMotion();

@@ -74,6 +74,7 @@ func TestHandComplete_LateContinueIsSilentlyIgnored(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
+	mgr.SetDealGraceForTest(false)
 	// 1s per-move window so the auto-pass assertion below stays fast.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false))
 

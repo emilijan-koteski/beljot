@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useSfxOnce } from "@/shared/audio/useSfxOnce";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
 import { Z } from "@/shared/lib/zLayers";
@@ -20,6 +21,12 @@ interface BelotRevealProps {
    *  the eyebrow line. Tests render the reveal without players, in which
    *  case we just show the team chip. */
   players?: readonly PlayerState[];
+  /**
+   * Dedupe key for the announcement's sound — the declaration sound, since
+   * Belote-Rebelote is scored as one (see `payloadSoundKey`) — played once when
+   * the reveal mounts. Omitted or null: silent.
+   */
+  soundKey?: string | null;
 }
 
 function parseCardId(id: string) {
@@ -39,8 +46,10 @@ export function BelotReveal({
   isKing,
   onComplete,
   players,
+  soundKey,
 }: BelotRevealProps) {
   const { t } = useTranslation();
+  useSfxOnce("declaration", soundKey);
   const [visible, setVisible] = useState(true);
 
   const prefersReducedMotion = useReducedMotion();

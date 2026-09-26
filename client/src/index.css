@@ -773,6 +773,20 @@
   }
 }
 
+/* The trump candidate turning face-up at the end of a candidate deal: the card
+   narrows to an edge and opens out showing its face. Duration is
+   MOTION.DEAL_CANDIDATE_FLIP, set inline. */
+@keyframes deal-candidate-flip {
+  0% {
+    transform: scaleX(0.05);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
 /* Game animation — preserved from Story 4.6 */
 @keyframes capot-scale {
   0% {

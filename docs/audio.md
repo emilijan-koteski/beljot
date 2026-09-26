@@ -5,12 +5,18 @@ played by `client/src/shared/audio/audioEngine.ts`.
 
 ```text
 client/public/audio/
-  sfx/    12 MP3 (mono, 96 kb/s)   — card-slide-1..8 (card played),
-                                     card-shove-1..4 (trick collected)
+  sfx/    29 MP3 (mono, 96 kb/s)   — card-slide-1..8 (card played),
+                                     card-shove-1..4 (trick collected),
+                                     card-shuffle (a deal starts),
+                                     card-place-1..4 (a deal packet lands),
+                                     chips-stack-1..6 (declarations, Belote),
+                                     jingle-capot, jingle-win, jingle-lose,
+                                     popup-1..2 (avatar popups),
+                                     clock-tick (own timer in the red)
   music/   3 MP3 (stereo, 96 kb/s) — the rotating playlist
 ```
 
-Sound effects total ~100 KB (102,713 bytes) and are fetched and decoded when
+Sound effects total ~210 KB (214,109 bytes) and are fetched and decoded when
 the match page mounts with sound on, or the moment sound is switched on. The
 three music tracks total ~8.3 MB and are streamed one at a time by
 an `<audio>` element, so only the playing track is downloaded.
@@ -49,10 +55,36 @@ key is released, not one PATCH per auto-repeat.
 - **Trick collected** — one random `card-shove` when the cards leave the table
   (after the winner glow), in both full and reduced motion. It is keyed to the
   resolved-trick snapshot, so a remount mid-collect cannot sound it twice.
+- **Deal** — `card-shuffle` as a deal starts (the opening deal of a hand,
+  including an all-pass reshuffle; not the second deal after a pick), then one
+  random `card-place` as each packet lands, in both motion modes. Keyed to the
+  deal, so a remount cannot repeat it; a mount into a hand in progress never
+  replays a deal at all.
+- **Declarations and Belote** — one random `chips-stack` when the declaration
+  reveal or the Belote/Rebelote reveal opens.
+- **Capot** — `jingle-capot` when the capot banner opens. A banner rebuilt on
+  reconnect from the saved hand result stays silent.
+- **Match won / lost** — `jingle-win` or `jingle-lose`, for the viewer's own
+  team, when the match result opens; after an abandonment, a win for the team
+  left at the table and a loss for the abandoner's partner (the abandoner
+  hears nothing).
+- **Avatar popups** — one random `popup` when an emote bubble appears (only
+  when it is shown: not behind the result, a pause or a disconnect), when a
+  Bitola "has a declaration" banner appears, and when a surrender proposal
+  reaches the partner (prompt) or the opponents (banner). The proposer hears
+  nothing.
+- **Urgent clock** — `clock-tick` once per whole second, down to 1, while the
+  viewer's OWN decision timer is in the countdown ring's red zone (≤ 1/8 of the
+  window): their turn, their bid, a Belote or Bitola declaration prompt, and
+  the Croatian declaration window while unanswered. It stops at the click.
+  Other seats' timers and the auto-close, score-reveal and reconnect rings
+  never tick.
 - **Music** — only while `MatchPage` is mounted. A random track starts, the
   others follow in order, and it loops round. It fades in over ~1.5 s and out
   over ~0.4 s.
-- A resync (`event:match_state`) never makes a sound.
+- A resync (`event:match_state`, or a reveal rebuilt from `lastHandResult`)
+  never makes a sound. Every one-off sound is dedupe-keyed to the moment it
+  marks, so a remount that re-renders the same surface cannot repeat it.
 - On a cold load or reload straight onto `/match/:id`, nothing sounds until the
   first pointer or key input on the page (browser autoplay rules). Arriving
   through in-app navigation, the click that got the player there already
@@ -74,18 +106,46 @@ MP3 and no other format is shipped.
 
 ## Sound effects — provenance
 
-**Kenney "Casino Audio" 1.1** by Kenney Vleugels (<https://kenney.nl>).
+All three packs are by Kenney Vleugels (<https://kenney.nl>) and ship the same
+licence. **Licence: Creative Commons Zero (CC0).** From each zip's
+`License.txt`: "You may use these assets in personal and commercial projects.
+Credit (Kenney or www.kenney.nl) would be nice but is not mandatory." (Interface
+Sounds words it "This content is free to use in personal, educational and
+commercial projects. Support us by crediting Kenney or www.kenney.nl (this is
+not mandatory)".)
+
+**Kenney "Casino Audio" 1.1**
 
 - Download: <https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip>
   (sha256 `f36250766ac5bc378c13708ddf12a23a8e54a3251f8d482c7536e51b5dbafa18`)
-- **Licence: Creative Commons Zero (CC0).** From the zip's `License.txt`: "You
-  may use these assets in personal and commercial projects. Credit (Kenney or
-  www.kenney.nl) would be nice but is not mandatory."
 
-| Original (in the zip) | Shipped |
-| --- | --- |
-| `Audio/card-slide-1.ogg` … `Audio/card-slide-8.ogg` | `sfx/card-slide-1.mp3` … `sfx/card-slide-8.mp3` |
-| `Audio/card-shove-1.ogg` … `Audio/card-shove-4.ogg` | `sfx/card-shove-1.mp3` … `sfx/card-shove-4.mp3` |
+**Kenney "Music Jingles"**
+
+- Download: <https://kenney.nl/media/pages/assets/music-jingles/f37e530b9e-1677590399/kenney_music-jingles.zip>
+  (sha256 `b729ba57959bd58793d2c5cafa348aaf2655d354f3da35ec4729e03ec77197b8`)
+
+**Kenney "Interface Sounds" 1.0**
+
+- Download: <https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip>
+  (sha256 `f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232`)
+
+| Pack | Original (in the zip) | Shipped |
+| --- | --- | --- |
+| Casino | `Audio/card-slide-1.ogg` … `Audio/card-slide-8.ogg` | `sfx/card-slide-1.mp3` … `sfx/card-slide-8.mp3` |
+| Casino | `Audio/card-shove-1.ogg` … `Audio/card-shove-4.ogg` | `sfx/card-shove-1.mp3` … `sfx/card-shove-4.mp3` |
+| Casino | `Audio/card-shuffle.ogg` (first 0.9 s) | `sfx/card-shuffle.mp3` |
+| Casino | `Audio/card-place-1.ogg` … `Audio/card-place-4.ogg` | `sfx/card-place-1.mp3` … `sfx/card-place-4.mp3` |
+| Casino | `Audio/chips-stack-1.ogg` … `Audio/chips-stack-6.ogg` | `sfx/chips-stack-1.mp3` … `sfx/chips-stack-6.mp3` |
+| Jingles | `Audio/Hit jingles/jingles_HIT11.ogg` | `sfx/jingle-capot.mp3` |
+| Jingles | `Audio/Sax jingles/jingles_SAX02.ogg` (rising run) | `sfx/jingle-win.mp3` |
+| Jingles | `Audio/Sax jingles/jingles_SAX07.ogg` (falling "wah-wah") | `sfx/jingle-lose.mp3` |
+| Interface | `Audio/drop_002.ogg`, `Audio/drop_003.ogg` | `sfx/popup-1.mp3`, `sfx/popup-2.mp3` |
+| Interface | `Audio/tick_004.ogg` | `sfx/clock-tick.mp3` |
+
+The sax jingles were picked to sit with the jazz playlist. Levels were matched
+by measurement against the card sounds, whose loudest 50 ms runs at about −13
+to −20 dBFS RMS: the jingles land a little above that, the popup and the tick
+a little below — that is all the `volume=` filters in the recipe do.
 
 ## Music — provenance
 
@@ -118,6 +178,12 @@ MIRROR=https://raw.githubusercontent.com/0lhi/FreePD/stream
 curl -sSLf -o "$SRC/kenney.zip" \
   "https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip"
 unzip -q -o "$SRC/kenney.zip" -d "$SRC/kenney"
+curl -sSLf -o "$SRC/kenney-jingles.zip" \
+  "https://kenney.nl/media/pages/assets/music-jingles/f37e530b9e-1677590399/kenney_music-jingles.zip"
+unzip -q -o "$SRC/kenney-jingles.zip" -d "$SRC/kenney-jingles"
+curl -sSLf -o "$SRC/kenney-interface.zip" \
+  "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip"
+unzip -q -o "$SRC/kenney-interface.zip" -d "$SRC/kenney-interface"
 curl -sSLf -o "$SRC/lucky-break.mp3"              "$MIRROR/Romance/Lucky%20Break.mp3"
 curl -sSLf -o "$SRC/a-good-bass-for-gambling.mp3" "$MIRROR/Miscellaneous/A%20Good%20Bass%20for%20Gambling.mp3"
 curl -sSLf -o "$SRC/bass-meant-jazz.mp3"          "$MIRROR/Miscellaneous/Bass%20Meant%20Jazz.mp3"
@@ -133,6 +199,31 @@ for n in 1 2 3 4; do
   "$FF" -hide_banner -loglevel error -y -i "$SRC/kenney/Audio/card-shove-$n.ogg" \
     -map 0:a -map_metadata -1 -ac 1 -ar 44100 -c:a libmp3lame -b:a 96k "$OUT/sfx/card-shove-$n.mp3"
 done
+
+# The same encode for every new effect, with a per-sound filter chain.
+sfx() { # sfx <input> <filter chain> <output>
+  "$FF" -hide_banner -loglevel error -y -i "$1" -af "$2" \
+    -map 0:a -map_metadata -1 -ac 1 -ar 44100 -c:a libmp3lame -b:a 96k "$3"
+}
+# The shuffle: the pack's clip is three riffles over 3 s; the deal wants one
+# short one, so keep the first 0.9 s and fade its tail.
+sfx "$SRC/kenney/Audio/card-shuffle.ogg" "atrim=0:0.9,afade=t=out:st=0.7:d=0.2,volume=4dB" \
+  "$OUT/sfx/card-shuffle.mp3"
+# A packet lands: trim the slide-in before the thump so the sound lands with it.
+for n in 1 2 3 4; do
+  sfx "$SRC/kenney/Audio/card-place-$n.ogg" \
+    "silenceremove=start_periods=1:start_threshold=-30dB:start_silence=0.02:detection=rms:window=0.005" \
+    "$OUT/sfx/card-place-$n.mp3"
+done
+for n in 1 2 3 4 5 6; do
+  sfx "$SRC/kenney/Audio/chips-stack-$n.ogg" "anull" "$OUT/sfx/chips-stack-$n.mp3"
+done
+sfx "$SRC/kenney-jingles/Audio/Hit jingles/jingles_HIT11.ogg" "volume=-2dB" "$OUT/sfx/jingle-capot.mp3"
+sfx "$SRC/kenney-jingles/Audio/Sax jingles/jingles_SAX02.ogg" "volume=2dB" "$OUT/sfx/jingle-win.mp3"
+sfx "$SRC/kenney-jingles/Audio/Sax jingles/jingles_SAX07.ogg" "volume=2dB" "$OUT/sfx/jingle-lose.mp3"
+sfx "$SRC/kenney-interface/Audio/drop_002.ogg" "volume=-4dB" "$OUT/sfx/popup-1.mp3"
+sfx "$SRC/kenney-interface/Audio/drop_003.ogg" "volume=-4dB" "$OUT/sfx/popup-2.mp3"
+sfx "$SRC/kenney-interface/Audio/tick_004.ogg" "volume=-4dB" "$OUT/sfx/clock-tick.mp3"
 
 # Music: stereo, 96 kb/s, loudness-normalised to -18 LUFS (true peak -1.5 dBTP)
 # so the three tracks sit at one level under the same gain.
@@ -150,5 +241,5 @@ build); measured afterwards, the three tracks land at -18.0, -17.9 and
 -18.4 LUFS integrated.
 
 `*.mp3` is marked `binary` in `.gitattributes`, so the repo-wide `eol=lf` rule
-never touches these files. `audioEngine.test.ts` fails if any of the fifteen
-files the engine references goes missing.
+never touches these files. `audioEngine.test.ts` fails if any of the 32 files
+the engine references goes missing.
