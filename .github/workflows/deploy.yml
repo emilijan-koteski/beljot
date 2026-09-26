@@ -108,6 +108,15 @@ jobs:
             ENVEOF
             chmod 600 .env
 
+            # Fail loudly if PROD_ENV_FILE isn't valid shell (e.g. an unquoted
+            # value containing spaces/special chars), instead of silently
+            # breaking anything that sources .env, like the backup cron job.
+            if ! (set -a; . ./.env; set +a) 2>/tmp/env-check.err; then
+              echo "ERROR: .env failed to source cleanly, aborting deploy:" >&2
+              cat /tmp/env-check.err >&2
+              exit 1
+            fi
+
             # Pin this deploy to the commit SHA. Removes any existing IMAGE_TAG line first.
             sed -i '/^IMAGE_TAG=/d' .env
             echo "IMAGE_TAG=${GITHUB_SHA}" >> .env
