@@ -287,10 +287,12 @@ export interface HonorUpdatedPayload {
 // seasonName is the machine-stable "YYYY QN" window identifier, rendered VERBATIM
 // and never translated.
 //
-// spEarned is 0 for a player who was absent at the terminal end. That is a REAL
-// value, as is `tieredUp: false` — both are falsy, so the dispatch handler must
-// type-guard them and never test truthiness. Keep in sync with server events.go
-// (EventSeasonPointsAwarded).
+// spEarned is the SIGNED change the match applied to the player's season SP
+// (Story 13.4): negative for a loss or an abandonment, and at the 0 floor the
+// applied change, so it can be 0. A 0 is a REAL value, as is `tieredUp: false`
+// (true only for a climb, never a drop) — both are falsy, so the dispatch
+// handler must type-guard them and never test truthiness. Keep in sync with
+// server events.go (EventSeasonPointsAwarded).
 export const EVENT_SEASON_POINTS_AWARDED = "event:season_points_awarded" as const;
 
 export interface SeasonPointsAwardedPayload {

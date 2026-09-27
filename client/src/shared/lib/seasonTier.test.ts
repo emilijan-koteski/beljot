@@ -29,9 +29,9 @@ describe("SEASON_TIERS", () => {
     ]);
   });
 
-  it("mirrors the server thresholds", () => {
+  it("mirrors the server floors", () => {
     expect(SEASON_TIER_FLOORS.map(([, floor]) => floor)).toEqual([
-      0, 500, 1500, 3000, 5500, 8500, 12500, 18000,
+      0, 150, 300, 600, 800, 1000, 1200, 1400,
     ]);
   });
 });
@@ -39,21 +39,21 @@ describe("SEASON_TIERS", () => {
 describe("seasonTierForSp", () => {
   it.each([
     [0, "iron"],
-    [250, "iron"],
-    [499, "iron"],
-    [500, "bronze"],
-    [1499, "bronze"],
-    [1500, "silver"],
-    [2999, "silver"],
-    [3000, "gold"],
-    [5499, "gold"],
-    [5500, "platinum"],
-    [8499, "platinum"],
-    [8500, "diamond"],
-    [12499, "diamond"],
-    [12500, "master"],
-    [17999, "master"],
-    [18000, "grandmaster"],
+    [75, "iron"],
+    [149, "iron"],
+    [150, "bronze"],
+    [299, "bronze"],
+    [300, "silver"],
+    [599, "silver"],
+    [600, "gold"],
+    [799, "gold"],
+    [800, "platinum"],
+    [999, "platinum"],
+    [1000, "diamond"],
+    [1199, "diamond"],
+    [1200, "master"],
+    [1399, "master"],
+    [1400, "grandmaster"],
     [250000, "grandmaster"],
   ])("buckets %i SP as %s", (sp, tier) => {
     expect(seasonTierForSp(sp)).toBe(tier);
@@ -88,13 +88,13 @@ describe("seasonSpOrZero", () => {
 
 describe("normalizeSeasonTier", () => {
   it("passes a known token through", () => {
-    expect(normalizeSeasonTier("diamond", 9000)).toBe("diamond");
+    expect(normalizeSeasonTier("diamond", 1100)).toBe("diamond");
   });
 
   it("falls back to the SP bucket for an unknown token", () => {
     // The version-skew case: a server that grows a ninth tier must not make a
     // stale bundle render a missing i18n key.
-    expect(normalizeSeasonTier("mythic", 9000)).toBe("diamond");
+    expect(normalizeSeasonTier("mythic", 1100)).toBe("diamond");
   });
 
   it("falls back to iron for an unknown token at zero SP", () => {

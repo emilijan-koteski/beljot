@@ -453,8 +453,8 @@ function dispatchGameEvent(message: WsMessage): void {
     // server actually has, the moment the player is back out of the match.
     const payload = message.payload as SeasonPointsAwardedPayload;
     // Defensive validation — Go zero values are real values, so guard on type,
-    // not truthiness. `spEarned: 0` (an absent seat) and `tieredUp: false` (the
-    // overwhelmingly common case) are both legitimate, and both are falsy.
+    // not truthiness. `spEarned: 0` (a loss at the 0 floor) and `tieredUp: false`
+    // (the overwhelmingly common case) are both legitimate, and both are falsy.
     //
     // The object check comes FIRST: a null or absent payload would otherwise
     // throw a TypeError on the field read below, which is the opposite of what

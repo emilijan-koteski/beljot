@@ -302,11 +302,13 @@ func TestEventsJSONContract(t *testing.T) {
 		},
 		{
 			name: "SeasonPointsAwardedPayload",
+			// A loss: the change is signed (Story 13.4) and a drop is never a
+			// tier-up. 743 SP is Gold on the live ladder.
 			sample: ws.SeasonPointsAwardedPayload{
-				SPEarned:    200,
-				NewSeasonSP: 1700,
-				RankTier:    "silver",
-				TieredUp:    true,
+				SPEarned:    -17,
+				NewSeasonSP: 743,
+				RankTier:    "gold",
+				TieredUp:    false,
 				SeasonName:  "2026 Q3",
 			},
 			goldenFile: "season_points_awarded.json",

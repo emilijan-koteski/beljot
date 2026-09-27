@@ -223,11 +223,12 @@ func main() {
 	// declares its own narrow interface, so one instance satisfies both.
 	honorService := user.NewHonorService(userRepo)
 	sessionManager.SetHonorRecorder(honorService)
-	// Story 13.1: the match manager accrues Season Points and refreshes the rank
-	// tier at match end via the season service. Same injection shape as the XP
-	// awarder and honor recorder above, and for the same reason — season imports
-	// match, so match must never import season. The service itself is built
-	// earlier (above the user handler, which consumes it as its SeasonRankReader).
+	// Story 13.1 / 13.4: the match manager hands each finished match's outcome to
+	// the season service, which applies Season Points and refreshes the rank
+	// tier. Same injection shape as the XP awarder and honor recorder above, and
+	// for the same reason — season imports match, so match must never import
+	// season. The service itself is built earlier (above the user handler, which
+	// consumes it as its SeasonRankReader).
 	sessionManager.SetSPAwarder(seasonService)
 
 	// Story 13.3: the nightly rollover job — a thin wrapper over the same lazy

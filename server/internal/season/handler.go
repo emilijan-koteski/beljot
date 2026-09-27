@@ -128,10 +128,11 @@ type LeaderboardViewerView struct {
 // season's visible row count, not the page length, so the client's load-more can
 // tell when it has reached the end.
 //
-// Viewer is NULL when the caller has no season row or has earned no SP -- the AC
-// marks an own-row only for a player with any SP. `omitempty` is deliberately
-// NOT set: the key must always be present so the client can distinguish "no
-// standing" from "an older server that does not send this".
+// Viewer is NULL when the caller has not played the season (no listable row);
+// a player who has played is on the ladder even at 0 SP (Story 13.4), and gets
+// a viewer block. `omitempty` is deliberately NOT set: the key must always be
+// present so the client can distinguish "no standing" from "an older server
+// that does not send this".
 type LeaderboardView struct {
 	Items  []LeaderboardRowView   `json:"items"`
 	Total  int64                  `json:"total"`

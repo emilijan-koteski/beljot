@@ -1,9 +1,10 @@
 // Season rank tiers — display math only.
 //
 // MUST stay in sync with the server: server/internal/season/tier.go (the tier
-// tokens and the SP thresholds). This is the same manual-sync convention as
-// xpLevel.ts <-> level.go, honor.ts <-> honor.go and wsEvents.ts <-> events.go —
-// there is no generated shared type.
+// tokens and the SP floors). SP rises and falls on the win/loss ladder (Story
+// 13.4), so a player moves down this table as well as up it. This is the same
+// manual-sync convention as xpLevel.ts <-> level.go, honor.ts <-> honor.go and
+// wsEvents.ts <-> events.go — there is no generated shared type.
 //
 // The SERVER IS AUTHORITATIVE for both the SP total and the tier: both arrive on
 // event:season_points_awarded and on GET /api/v1/seasons/current. Nothing here
@@ -28,19 +29,19 @@ export const SEASON_TIERS = [
 export type SeasonTier = (typeof SEASON_TIERS)[number];
 
 /**
- * Inclusive SP floor of each tier band, ASCENDING. Mirrors `tierFloors` in
- * tier.go. One ordered table rather than scattered literals, so a server-side
- * retune is a one-place change here too.
+ * Inclusive SP floor of each tier band, ASCENDING. Mirrors the `ladder` table in
+ * tier.go (the floor constants there). One ordered table rather than scattered
+ * literals, so a server-side retune is a one-place change here too.
  */
 export const SEASON_TIER_FLOORS: ReadonlyArray<readonly [SeasonTier, number]> = [
   ["iron", 0],
-  ["bronze", 500],
-  ["silver", 1500],
-  ["gold", 3000],
-  ["platinum", 5500],
-  ["diamond", 8500],
-  ["master", 12500],
-  ["grandmaster", 18000],
+  ["bronze", 150],
+  ["silver", 300],
+  ["gold", 600],
+  ["platinum", 800],
+  ["diamond", 1000],
+  ["master", 1200],
+  ["grandmaster", 1400],
 ];
 
 /**

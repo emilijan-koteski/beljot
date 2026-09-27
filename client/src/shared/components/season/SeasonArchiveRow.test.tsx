@@ -74,7 +74,7 @@ describe("SeasonArchiveRow", () => {
   // The version-skew guard: an unknown token from a newer server falls back to
   // the SP's own bucket instead of a missing colour and a raw i18n key.
   it("falls back to the SP bucket for an unrecognised tier token", () => {
-    renderRow({ tier: "mythic", sp: 4000 });
+    renderRow({ tier: "mythic", sp: 700 });
 
     expect(screen.getByTestId("season-archive-row")).toHaveAttribute("data-tier", "gold");
     expect(screen.getByTestId("season-archive-tier").textContent).toBe("Gold");

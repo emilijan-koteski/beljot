@@ -57,7 +57,7 @@ function rows(from: number, n: number): LeaderboardRow[] {
     position: from + i,
     userId: from + i,
     username: `p${from + i}`,
-    sp: 10_000 - (from + i) * 10,
+    sp: 800 - (from + i) * 4,
     tier: "gold",
     gamesPlayed: 5,
   }));
@@ -172,7 +172,7 @@ describe("LeaderboardPage", () => {
       response({
         items: rows(1, 25),
         total: 25,
-        viewer: { position: 7, userId: 7, sp: 9930, tier: "gold", gamesPlayed: 5 },
+        viewer: { position: 7, userId: 7, sp: 772, tier: "gold", gamesPlayed: 5 },
       }),
     );
     renderPage();
@@ -223,7 +223,7 @@ describe("LeaderboardPage", () => {
     mockGet.mockResolvedValue(
       response({
         items: [
-          { position: 1, userId: 1, username: "ada", sp: 4000, tier: "gold", gamesPlayed: 31 },
+          { position: 1, userId: 1, username: "ada", sp: 700, tier: "gold", gamesPlayed: 31 },
         ],
         total: 1,
       }),
@@ -233,7 +233,7 @@ describe("LeaderboardPage", () => {
     const row = await screen.findByTestId("leaderboard-row");
     expect(row.querySelector('[data-testid="leaderboard-games"]')).toHaveTextContent("31");
     expect(row.querySelector('[data-testid="leaderboard-sp"]')).toHaveTextContent(
-      (4000).toLocaleString(),
+      (700).toLocaleString(),
     );
   });
 

@@ -140,27 +140,30 @@ type HonorUpdatedPayload struct {
 // bundle, whereas an unknown event type is simply ignored by them.
 //
 // Sent per-user (not broadcast) because the values differ per player — the
-// winners' SP, the losers' SP and an absent seat's zero all land in the same
-// burst.
+// winners' gains, the losers' losses and an abandoner's penalty all land in the
+// same burst.
 const EventSeasonPointsAwarded = "event:season_points_awarded"
 
 // SeasonPointsAwardedPayload is the typed payload for EventSeasonPointsAwarded.
 //
-// SPEarned is the Season Points this match awarded this player: 50 (completion)
-// + 100 (if their team won) + floor(teamGamePoints/10) + 50 (if a Capot or an
-// instant win occurred anywhere in the match). It is 0 for a player who was
-// absent at the terminal end — a REAL value, not a missing one.
+// SPEarned is the SIGNED change this match applied to this player's season SP
+// (Story 13.4): positive for a win, negative for a loss or an abandonment, and
+// the APPLIED change, new total minus previous, so at the 0 floor it can be
+// smaller than the formula's own number (a player on 10 SP whose loss computes
+// to -18 receives -10). The formula lives in season/sp_formula.go. 0 is a REAL
+// value, not a missing one.
 //
-// NewSeasonSP is the post-award season total. RankTier is a STABLE MACHINE TOKEN
-// ("iron" | "bronze" | "silver" | "gold" | "platinum" | "diamond" | "master" |
-// "grandmaster") that the client maps to an i18n label and colour — a display string
-// must never cross the wire, the same non-negotiable HonorUpdatedPayload's
-// HonorTier states. It is the AUTHORITATIVE derived tier, not the lagging
-// player_seasons.rank_tier snapshot column.
+// NewSeasonSP is the post-match season total, never below 0. RankTier is a
+// STABLE MACHINE TOKEN ("iron" | "bronze" | "silver" | "gold" | "platinum" |
+// "diamond" | "master" | "grandmaster") that the client maps to an i18n label
+// and colour — a display string must never cross the wire, the same
+// non-negotiable HonorUpdatedPayload's HonorTier states. It is the AUTHORITATIVE
+// derived tier, not the lagging player_seasons.rank_tier snapshot column.
 //
-// TieredUp is true when this award crossed a tier floor, and drives the tier-up
-// toast. SeasonName is the machine-stable "YYYY QN" window identifier, rendered
-// VERBATIM by the client and never translated.
+// TieredUp is true only when this match took the player UP into a higher tier,
+// and drives the tier-up toast; a drop is false. SeasonName is the
+// machine-stable "YYYY QN" window identifier, rendered VERBATIM by the client
+// and never translated.
 type SeasonPointsAwardedPayload struct {
 	SPEarned    int    `json:"spEarned"`
 	NewSeasonSP int    `json:"newSeasonSp"`

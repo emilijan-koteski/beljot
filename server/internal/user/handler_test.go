@@ -1136,7 +1136,7 @@ func TestGetProfile_PublicProjection_NeverLeaksPrivateFields(t *testing.T) {
 func TestGetProfile_SeasonRankPresentOnSelf(t *testing.T) {
 	repo, _, seasonReader, e := setupUserHandlerWithSeason()
 	u := repo.addUser("ranked", "ranked@example.com", "en")
-	seasonReader.rank = &season.SeasonRankView{SeasonName: "2026 Q3", Tier: "gold", SP: 4000}
+	seasonReader.rank = &season.SeasonRankView{SeasonName: "2026 Q3", Tier: "gold", SP: 680}
 
 	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
 	require.NoError(t, err)
@@ -1152,7 +1152,7 @@ func TestGetProfile_SeasonRankPresentOnSelf(t *testing.T) {
 	require.NotNil(t, data.SeasonRank)
 	assert.Equal(t, "2026 Q3", data.SeasonRank.SeasonName)
 	assert.Equal(t, "gold", data.SeasonRank.Tier)
-	assert.Equal(t, 4000, data.SeasonRank.SP)
+	assert.Equal(t, 680, data.SeasonRank.SP)
 	assert.Equal(t, u.ID, seasonReader.lastUserID, "the rank is the SUBJECT's")
 
 	// THE LITERAL WIRE KEYS of the nested block — the client's SeasonRank type
@@ -1193,7 +1193,7 @@ func TestGetProfile_SeasonRankPresentOnPublicProjection(t *testing.T) {
 	viewer := repo.addUser("viewer", "viewer@example.com", "en")
 	subject := repo.addUser("subject", "subject@example.com", "en")
 	matchRepo.statsOverride = &struct{ wins, losses, abandoned int }{1, 0, 0}
-	seasonReader.rank = &season.SeasonRankView{SeasonName: "2026 Q3", Tier: "silver", SP: 1700}
+	seasonReader.rank = &season.SeasonRankView{SeasonName: "2026 Q3", Tier: "silver", SP: 420}
 
 	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
 	require.NoError(t, err)
@@ -1208,7 +1208,7 @@ func TestGetProfile_SeasonRankPresentOnPublicProjection(t *testing.T) {
 
 	require.NotNil(t, data.SeasonRank)
 	assert.Equal(t, "silver", data.SeasonRank.Tier)
-	assert.Equal(t, 1700, data.SeasonRank.SP)
+	assert.Equal(t, 420, data.SeasonRank.SP)
 	assert.Equal(t, subject.ID, seasonReader.lastUserID,
 		"CurrentSeasonRank must be keyed on paramID (the subject), not authUserID")
 }

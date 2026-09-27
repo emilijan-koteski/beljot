@@ -162,8 +162,8 @@ describe("LeaderboardRow", () => {
   });
 
   it("normalizes an unknown tier token from the SP bucket", () => {
-    renderRow({ tier: "mythic" });
-    // 4000 SP is Gold.
+    renderRow({ tier: "mythic", sp: 700 });
+    // 700 SP is Gold.
     expect(screen.getByTestId("leaderboard-tier-badge")).toHaveAttribute("data-tier", "gold");
     expect(screen.getByTestId("leaderboard-row-summary")).toHaveTextContent(
       i18n.t("season.tier.gold"),
@@ -200,7 +200,7 @@ describe("LeaderboardRow", () => {
   });
 
   it("shows the normalized tier name for an unknown token, never the raw string", () => {
-    renderRow({ tier: "mythic" });
+    renderRow({ tier: "mythic", sp: 700 });
     expect(screen.getByTestId("leaderboard-tier").textContent).toBe(i18n.t("season.tier.gold"));
   });
 

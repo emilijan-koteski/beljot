@@ -65,8 +65,8 @@ func TestWonByInstantWin_SetOnPickTrump(t *testing.T) {
 }
 
 // The flag must stay FALSE for an ordinary pick. Without this, "instant win"
-// would be indistinguishable from "a trump was chosen" and every match would pay
-// the spectacular bonus.
+// would be indistinguishable from "a trump was chosen" and every match would be
+// scored at the maximum Season Points margin an instant win gets.
 func TestWonByInstantWin_NotSetOnAnOrdinaryPick(t *testing.T) {
 	gs := testfixtures.NewGameJustDealt()
 

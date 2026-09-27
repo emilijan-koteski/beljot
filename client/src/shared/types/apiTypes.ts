@@ -309,7 +309,10 @@ export interface CurrentSeasonResponse {
    * never sends a relative duration.
    */
   endsAt: string;
-  /** Accumulated Season Points this window. Monotonic — SP has no decay. */
+  /**
+   * The player's Season Points this window. Rises with wins and falls with
+   * losses (never below 0); no decay.
+   */
   sp: number;
   /**
    * Stable machine token ("iron" | "bronze" | ... | "grandmaster"), mapped to an
@@ -319,7 +322,7 @@ export interface CurrentSeasonResponse {
    * fail a type check.
    */
   rankTier: string;
-  /** SP earned past the current tier's floor, in [0, spForNextTier). */
+  /** The player's SP past the current tier's floor, in [0, spForNextTier). */
   spIntoTier: number;
   /**
    * Size of the current tier's band. ZERO AT GRANDMASTER — the top of the ladder has
@@ -329,7 +332,10 @@ export interface CurrentSeasonResponse {
   spForNextTier: number;
   /** Matches played this season, present at the terminal end or not. */
   gamesPlayed: number;
-  /** Matches finished this season — exactly those that earned SP. */
+  /**
+   * Matches this season at which the player was present at the end — a presence
+   * counter. Every match changes SP by its result, present or not.
+   */
   gamesCompleted: number;
 }
 
@@ -386,9 +392,10 @@ export interface LeaderboardViewer {
  * same as the profile's match history). `total` is the season's whole visible
  * row count, not the page length, so load-more can tell when it is done.
  *
- * `viewer` is NULL when the caller has no season row OR has earned no SP — the
- * own-row marker appears only for a player with any SP. The key is always
- * present, so `null` means "no standing", never "an older server".
+ * `viewer` is NULL only when the caller has not played the season. Anyone who
+ * has played is on the ladder and gets a viewer block, a player at 0 SP
+ * included. The key is always present, so `null` means "no standing", never
+ * "an older server".
  */
 export interface LeaderboardResponse {
   items: LeaderboardRow[];

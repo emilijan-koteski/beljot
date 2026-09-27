@@ -22,7 +22,7 @@ function archive(over: Partial<SeasonArchiveResponse> = {}): SeasonArchiveRespon
       {
         seasonId: 5,
         seasonName: "2026 Q2",
-        sp: 1800,
+        sp: 450,
         tier: "silver",
         gamesPlayed: 14,
         startedAt: "2026-04-01T00:00:00Z",
@@ -42,7 +42,7 @@ function archive(over: Partial<SeasonArchiveResponse> = {}): SeasonArchiveRespon
   };
 }
 
-const rank: SeasonRank = { seasonName: "2026 Q3", tier: "gold", sp: 4000 };
+const rank: SeasonRank = { seasonName: "2026 Q3", tier: "gold", sp: 680 };
 
 function renderSection(props: {
   userId: number | undefined;
@@ -69,7 +69,7 @@ describe("SeasonSection", () => {
     const chip = screen.getByTestId("profile-season");
     expect(chip).toHaveAttribute("data-tier", "gold");
     expect(screen.getByTestId("profile-season-tier").textContent).toBe("Gold");
-    expect(chip.textContent).toContain((4000).toLocaleString());
+    expect(chip.textContent).toContain((680).toLocaleString());
     // The machine token, verbatim.
     expect(chip.textContent).toContain("2026 Q3");
 
@@ -149,7 +149,7 @@ describe("SeasonSection", () => {
   it("falls back to the SP bucket for an unrecognised rank tier token", () => {
     mockGetArchive.mockResolvedValue({ items: [] });
 
-    renderSection({ userId: 2, seasonRank: { seasonName: "2026 Q3", tier: "mythic", sp: 4000 } });
+    renderSection({ userId: 2, seasonRank: { seasonName: "2026 Q3", tier: "mythic", sp: 700 } });
 
     expect(screen.getByTestId("profile-season")).toHaveAttribute("data-tier", "gold");
   });

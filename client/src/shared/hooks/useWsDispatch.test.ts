@@ -2224,8 +2224,8 @@ describe("useWsDispatch — whisper (Story 11.4)", () => {
 // total until a full reload, with nothing failing.
 describe("useWsDispatch - season points", () => {
   const validPayload = {
-    spEarned: 251,
-    newSeasonSp: 1751,
+    spEarned: 24,
+    newSeasonSp: 424,
     rankTier: "silver",
     tieredUp: false,
     seasonName: "2026 Q3",
@@ -2274,7 +2274,7 @@ describe("useWsDispatch - season points", () => {
   });
 
   it("still invalidates for a zero-SP award, which is a real value", () => {
-    // The absent seat's payload. `spEarned: 0` and `tieredUp: false` are both
+    // A loss at the 0 floor. `spEarned: 0` and `tieredUp: false` are both
     // falsy and both legitimate, so a truthiness guard would drop this frame.
     const spy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useWsDispatch());
@@ -2288,15 +2288,37 @@ describe("useWsDispatch - season points", () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
+  it("accepts a loss, a negative change, and invalidates without a toast", () => {
+    // SP falls on a loss (Story 13.4): the change arrives signed, and a drop is
+    // never a tier-up, so nothing celebrates it.
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: {
+        ...validPayload,
+        spEarned: -17,
+        newSeasonSp: 743,
+        rankTier: "gold",
+        tieredUp: false,
+      },
+    });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.season.current() });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
   it("falls back to the SP bucket for an unrecognised tier token in the toast", () => {
     const { result } = renderHook(() => useWsDispatch());
 
     result.current({
       type: "event:season_points_awarded",
-      payload: { ...validPayload, rankTier: "mythic", newSeasonSp: 9000, tieredUp: true },
+      payload: { ...validPayload, rankTier: "mythic", newSeasonSp: 1100, tieredUp: true },
     });
 
-    // Version skew: 9000 SP buckets to Diamond, so the toast reads Diamond
+    // Version skew: 1100 SP buckets to Diamond, so the toast reads Diamond
     // rather than a missing `season.tier.mythic` key.
     expect(toast.success).toHaveBeenCalledWith(
       expect.stringContaining(i18n.t("season.tier.diamond")),
@@ -2314,7 +2336,7 @@ describe("useWsDispatch - season points", () => {
       undefined,
       "not-an-object",
       {},
-      { ...validPayload, spEarned: "251" },
+      { ...validPayload, spEarned: "24" },
       { ...validPayload, spEarned: 1.5 },
       { ...validPayload, newSeasonSp: null },
       { ...validPayload, rankTier: "" },

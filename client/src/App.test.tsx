@@ -63,7 +63,7 @@ vi.mock("@/shared/api/season", () => ({
     sp: 0,
     rankTier: "iron",
     spIntoTier: 0,
-    spForNextTier: 500,
+    spForNextTier: 150,
     gamesPlayed: 0,
     gamesCompleted: 0,
   }),

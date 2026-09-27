@@ -29,8 +29,9 @@ type PlayerSeason struct {
 	ID       uint `gorm:"primaryKey" json:"id"`
 	UserID   uint `gorm:"column:user_id" json:"userId"`
 	SeasonID uint `gorm:"column:season_id" json:"seasonId"`
-	// Accumulated Season Points. Monotonic -- there is no decay (PRD: "No
-	// decay") and no spend.
+	// The player's Season Points this season. Rises with wins and falls with
+	// losses (sp_formula.go), never below 0 (the engine floors every total and
+	// the column keeps CHECK (sp >= 0)). No decay (PRD: "No decay") and no spend.
 	SP int `gorm:"column:sp" json:"sp"`
 	// DENORMALIZED SNAPSHOT, never authoritative (Story 13.1 D7). It exists only
 	// so operators and Story 13.2's leaderboard can sort/filter in SQL. Always
@@ -39,32 +40,32 @@ type PlayerSeason struct {
 	RankTier string `gorm:"column:rank_tier" json:"rankTier"`
 	// +1 for every human seat in a finished match, present or not.
 	GamesPlayed int `gorm:"column:games_played" json:"gamesPlayed"`
-	// +1 only for seats present at the terminal end -- exactly "matches where
-	// this player earned SP" (Story 13.1 D10).
+	// +1 only for seats present at the terminal end (Story 13.1 D10). A
+	// PRESENCE counter: since Story 13.4 every seat is scored by its team's
+	// result whether present or not, so this no longer means "matches that
+	// earned SP".
 	GamesCompleted int       `gorm:"column:games_completed" json:"gamesCompleted"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
-// SPAward is one finished match's Season Points contribution for one player, as
-// the repository consumes it.
+// SPChanges computes one finished match's Season Points changes from every
+// seated human's CURRENT season total, as read (and locked) inside the award
+// transaction. A player with no row yet is passed as 0. It returns the formula's
+// change per player, before the 0 floor, which the repository applies.
 //
-// A ZERO SP AWARD IS NOT A NO-OP. Every human seat in the match gets an entry,
-// including seats that earned nothing by being absent at the terminal end,
-// because GamesPlayed increments for all of them. Completed is the per-seat
-// presence gate: true means the seat was at the table when the match ended, and
-// it drives GamesCompleted.
-type SPAward struct {
-	SP        int
-	Completed bool
-}
+// It is how the formula (sp_formula.go) runs inside the repository's
+// transaction while the repository stays persistence-only: the service supplies
+// the closure, the repository supplies the locked totals.
+type SPChanges func(current map[uint]int) (map[uint]int, error)
 
 // PlayerSeasonSnapshot is one player's season state immediately after the
 // match-end write, as returned by ApplySeasonPoints.
 //
-// PreviousSP is the total BEFORE this award, returned so the caller can decide
-// tieredUp without a second read. Tier is the AUTHORITATIVE derived value
-// (TierForSP over the new total), never the lagging rank_tier column.
+// PreviousSP is the total BEFORE this match, as read under the row lock, so the
+// applied change is SP - PreviousSP and the caller can tell a climb from a drop
+// without a second read. Tier is the AUTHORITATIVE derived value (TierForSP over
+// the new total), never the lagging rank_tier column.
 type PlayerSeasonSnapshot struct {
 	SP             int
 	PreviousSP     int
@@ -111,9 +112,10 @@ type LeaderboardEntry struct {
 // never selected, 13.1 D7) so the join's shape never reaches the wire directly.
 //
 // MEMBERSHIP IS NOT leaderboardScope's. The archive lists "seasons you actually
-// played" (games_played >= 1, season ended), NOT "SP earners" (sp > 0) — a
-// played season with 0 SP stays in a player's own history while staying off the
-// ladder. Two predicates, two documented homes; never share the scope helper.
+// played" (games_played >= 1) that have ENDED, where the ladder lists everyone who
+// played the season in view, running or not. The two agree on games_played but
+// not on the window, so they stay two predicates in two documented homes; never
+// share the scope helper.
 type ArchiveEntry struct {
 	SeasonID    uint      `gorm:"column:season_id"`
 	SeasonName  string    `gorm:"column:season_name"`

@@ -7,6 +7,7 @@ package season_test
 import (
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"github.com/emilijan/beljot/server/internal/match"
 	"github.com/emilijan/beljot/server/internal/season"
 	"github.com/emilijan/beljot/server/internal/user"
 )
@@ -137,70 +139,181 @@ func TestFindPlayerSeason_MissIsNilNotAnError(t *testing.T) {
 	assert.Nil(t, got, "a player who has not played this season has no row — not an error")
 }
 
-// AC1/AC4: the first award INSERTS, and every counter starts from the right base.
-func TestApplySeasonPoints_FirstAwardInserts(t *testing.T) {
+// fixedAward is one player's entry in a hand-built match: the change to apply
+// (bypassing the formula) and their presence at the terminal end.
+type fixedAward struct {
+	change    int
+	completed bool
+}
+
+// applyAwards writes one match through ApplySeasonPoints with FIXED changes, so a
+// persistence test controls the numbers exactly. The formula's own wiring into
+// the transaction is covered by the Service tests below.
+func applyAwards(repo *season.GormRepository, seasonID uint, awards map[uint]fixedAward) (map[uint]season.PlayerSeasonSnapshot, error) {
+	completed := make(map[uint]bool, len(awards))
+	changes := make(map[uint]int, len(awards))
+	for id, a := range awards {
+		completed[id] = a.completed
+		changes[id] = a.change
+	}
+	return repo.ApplySeasonPoints(seasonID, completed, func(map[uint]int) (map[uint]int, error) {
+		return changes, nil
+	})
+}
+
+// The first match INSERTS a row, and every counter starts from the right base.
+// A first-ever LOSS writes 0, never a negative total (the old upsert wrote the
+// award straight in as the total).
+func TestApplySeasonPoints_FirstMatchInsertsTheRow(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2097, time.April, 1, 0, 0, 0, 0, time.UTC))
 	winner := makeUser(t, db, "sp-w@s.test")
+	loser := makeUser(t, db, "sp-l@s.test")
 	absent := makeUser(t, db, "sp-a@s.test")
 
-	snaps, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{
-		winner.ID: {SP: 250, Completed: true},
-		absent.ID: {SP: 0, Completed: false},
+	snaps, err := applyAwards(repo, s.ID, map[uint]fixedAward{
+		winner.ID: {change: 250, completed: true},
+		loser.ID:  {change: -18, completed: true},
+		absent.ID: {change: 36, completed: false},
 	})
 	require.NoError(t, err)
 
 	require.Contains(t, snaps, winner.ID)
 	assert.Equal(t, 250, snaps[winner.ID].SP)
-	assert.Equal(t, 0, snaps[winner.ID].PreviousSP)
-	assert.Equal(t, "iron", snaps[winner.ID].Tier)
+	assert.Equal(t, 0, snaps[winner.ID].PreviousSP, "a missing row is 0 SP")
+	assert.Equal(t, "bronze", snaps[winner.ID].Tier)
 	assert.Equal(t, 1, snaps[winner.ID].GamesPlayed)
 	assert.Equal(t, 1, snaps[winner.ID].GamesCompleted)
 
-	// A ZERO AWARD IS NOT A NO-OP: the absent seat still counts a games_played,
-	// which is what makes games_played - games_completed the absence count.
-	require.Contains(t, snaps, absent.ID)
-	assert.Equal(t, 0, snaps[absent.ID].SP)
+	assert.Equal(t, 0, snaps[loser.ID].SP, "a first-ever loss writes 0")
+	assert.Equal(t, 0, snaps[loser.ID].PreviousSP)
+	assert.Equal(t, "iron", snaps[loser.ID].Tier)
+
+	// Presence no longer gates the change; it only drives games_completed.
+	assert.Equal(t, 36, snaps[absent.ID].SP)
 	assert.Equal(t, 1, snaps[absent.ID].GamesPlayed)
 	assert.Equal(t, 0, snaps[absent.ID].GamesCompleted)
 
-	row, err := repo.FindPlayerSeason(absent.ID, s.ID)
+	row, err := repo.FindPlayerSeason(loser.ID, s.ID)
 	require.NoError(t, err)
-	require.NotNil(t, row, "the row is written even for a 0-SP award")
+	require.NotNil(t, row, "the row is written for a floored loss too")
 	assert.Equal(t, 0, row.SP)
 	assert.Equal(t, 1, row.GamesPlayed)
-	assert.Equal(t, 0, row.GamesCompleted)
+	assert.Equal(t, 1, row.GamesCompleted)
 }
 
-// AC1: SP ACCUMULATES across matches rather than being overwritten, and the
-// pre-award total comes back so the caller can decide tieredUp without a second
-// read.
-func TestApplySeasonPoints_AccumulatesAndReportsPreviousSP(t *testing.T) {
+// SP moves in both directions across matches, the pre-match total comes back so
+// the caller can tell a climb from a drop without a second read, and the
+// denormalized rank_tier follows the total down as well as up.
+func TestApplySeasonPoints_RisesAndFallsAndReportsPreviousSP(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2097, time.July, 1, 0, 0, 0, 0, time.UTC))
 	u := makeUser(t, db, "sp-acc@s.test")
 
-	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{u.ID: {SP: 400, Completed: true}})
+	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{u.ID: {change: 200, completed: true}})
 	require.NoError(t, err)
 
-	snaps, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{u.ID: {SP: 150, Completed: true}})
+	snaps, err := applyAwards(repo, s.ID, map[uint]fixedAward{u.ID: {change: 150, completed: true}})
 	require.NoError(t, err)
+	assert.Equal(t, 350, snaps[u.ID].SP, "a win adds to the total")
+	assert.Equal(t, 200, snaps[u.ID].PreviousSP, "the pre-match total comes back")
+	assert.Equal(t, "silver", snaps[u.ID].Tier, "350 SP crosses the 300 Silver floor")
 
-	assert.Equal(t, 550, snaps[u.ID].SP, "sp accumulates")
-	assert.Equal(t, 400, snaps[u.ID].PreviousSP, "the pre-award total comes back")
-	assert.Equal(t, 2, snaps[u.ID].GamesPlayed)
-	assert.Equal(t, 2, snaps[u.ID].GamesCompleted)
-	// AC2 + D7: the tier is DERIVED from the new total, and the denormalized
-	// column is refreshed to match on every write.
-	assert.Equal(t, "bronze", snaps[u.ID].Tier, "550 SP crosses the 500 Bronze floor")
+	snaps, err = applyAwards(repo, s.ID, map[uint]fixedAward{u.ID: {change: -100, completed: true}})
+	require.NoError(t, err)
+	assert.Equal(t, 250, snaps[u.ID].SP, "a loss takes SP away")
+	assert.Equal(t, 350, snaps[u.ID].PreviousSP)
+	assert.Equal(t, "bronze", snaps[u.ID].Tier, "250 SP is back in Bronze")
+	assert.Equal(t, 3, snaps[u.ID].GamesPlayed)
+	assert.Equal(t, 3, snaps[u.ID].GamesCompleted)
 
 	row, err := repo.FindPlayerSeason(u.ID, s.ID)
 	require.NoError(t, err)
 	require.NotNil(t, row)
-	assert.Equal(t, "bronze", row.RankTier, "rank_tier is refreshed on every SP write")
+	assert.Equal(t, 250, row.SP)
+	assert.Equal(t, "bronze", row.RankTier, "rank_tier is refreshed on a drop too")
 	assert.Equal(t, season.TierForSP(row.SP), row.RankTier, "stored and derived must agree")
+}
+
+// The floor: a player on 10 SP whose loss computes to -18 ends on 0, and the
+// snapshot's previous total makes the applied change -10.
+func TestApplySeasonPoints_FloorsTheTotalAtZero(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	s := makeSeason(t, db, time.Date(2097, time.October, 1, 0, 0, 0, 0, time.UTC))
+	u := makeUser(t, db, "sp-flr@s.test")
+
+	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{u.ID: {change: 10, completed: true}})
+	require.NoError(t, err)
+	snaps, err := applyAwards(repo, s.ID, map[uint]fixedAward{u.ID: {change: -18, completed: true}})
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, snaps[u.ID].SP)
+	assert.Equal(t, 10, snaps[u.ID].PreviousSP)
+	assert.Equal(t, -10, snaps[u.ID].SP-snaps[u.ID].PreviousSP, "the applied change")
+}
+
+// The changes callback receives every listed player's LOCKED current total at
+// once, a missing row as 0, and nothing else.
+func TestApplySeasonPoints_ChangesSeeTheLockedTotals(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	s := makeSeason(t, db, time.Date(2094, time.January, 1, 0, 0, 0, 0, time.UTC))
+	veteran := makeUser(t, db, "sp-vet@s.test")
+	rookie := makeUser(t, db, "sp-rk@s.test")
+	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{veteran.ID: {change: 500, completed: true}})
+	require.NoError(t, err)
+
+	var seen map[uint]int
+	snaps, err := repo.ApplySeasonPoints(s.ID, map[uint]bool{veteran.ID: true, rookie.ID: true},
+		func(current map[uint]int) (map[uint]int, error) {
+			seen = current
+			return map[uint]int{veteran.ID: -20, rookie.ID: 30}, nil
+		})
+	require.NoError(t, err)
+
+	assert.Equal(t, map[uint]int{veteran.ID: 500, rookie.ID: 0}, seen)
+	assert.Equal(t, 480, snaps[veteran.ID].SP)
+	assert.Equal(t, 30, snaps[rookie.ID].SP)
+}
+
+// A failing computation rolls the whole match back, INCLUDING the zero rows the
+// lock step inserted: a player whose first match failed to score has no row.
+func TestApplySeasonPoints_AFailedComputationWritesNothing(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	s := makeSeason(t, db, time.Date(2094, time.April, 1, 0, 0, 0, 0, time.UTC))
+	veteran := makeUser(t, db, "sp-fv@s.test")
+	rookie := makeUser(t, db, "sp-fr@s.test")
+	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{veteran.ID: {change: 500, completed: true}})
+	require.NoError(t, err)
+
+	cases := map[string]season.SPChanges{
+		"the formula errors": func(map[uint]int) (map[uint]int, error) {
+			return nil, fmt.Errorf("malformed outcome")
+		},
+		"a listed player has no change": func(map[uint]int) (map[uint]int, error) {
+			return map[uint]int{veteran.ID: 30}, nil
+		},
+	}
+	for name, changes := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := repo.ApplySeasonPoints(s.ID, map[uint]bool{veteran.ID: true, rookie.ID: true}, changes)
+			require.Error(t, err)
+
+			row, err := repo.FindPlayerSeason(rookie.ID, s.ID)
+			require.NoError(t, err)
+			assert.Nil(t, row, "the inserted zero row must roll back with the batch")
+
+			row, err = repo.FindPlayerSeason(veteran.ID, s.ID)
+			require.NoError(t, err)
+			require.NotNil(t, row)
+			assert.Equal(t, 500, row.SP)
+			assert.Equal(t, 1, row.GamesPlayed, "no counter moved")
+		})
+	}
 }
 
 // A player's rows are per-season: a second window starts them from zero (the
@@ -212,19 +325,20 @@ func TestApplySeasonPoints_SeasonsAreIndependent(t *testing.T) {
 	second := makeSeason(t, db, time.Date(2096, time.April, 1, 0, 0, 0, 0, time.UTC))
 	u := makeUser(t, db, "sp-two@s.test")
 
-	_, err := repo.ApplySeasonPoints(first.ID, map[uint]season.SPAward{u.ID: {SP: 2000, Completed: true}})
+	_, err := applyAwards(repo, first.ID, map[uint]fixedAward{u.ID: {change: 2000, completed: true}})
 	require.NoError(t, err)
-	snaps, err := repo.ApplySeasonPoints(second.ID, map[uint]season.SPAward{u.ID: {SP: 100, Completed: true}})
+	snaps, err := applyAwards(repo, second.ID, map[uint]fixedAward{u.ID: {change: 100, completed: true}})
 	require.NoError(t, err)
 
 	assert.Equal(t, 100, snaps[u.ID].SP, "the new season starts from zero")
+	assert.Equal(t, 0, snaps[u.ID].PreviousSP)
 	assert.Equal(t, "iron", snaps[u.ID].Tier)
 
 	old, err := repo.FindPlayerSeason(u.ID, first.ID)
 	require.NoError(t, err)
 	require.NotNil(t, old)
 	assert.Equal(t, 2000, old.SP, "the prior season's row is left untouched")
-	assert.Equal(t, "silver", old.RankTier)
+	assert.Equal(t, "grandmaster", old.RankTier)
 }
 
 func TestApplySeasonPoints_EmptyIsANoOp(t *testing.T) {
@@ -232,9 +346,14 @@ func TestApplySeasonPoints_EmptyIsANoOp(t *testing.T) {
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2096, time.July, 1, 0, 0, 0, 0, time.UTC))
 
-	snaps, err := repo.ApplySeasonPoints(s.ID, nil)
+	called := false
+	snaps, err := repo.ApplySeasonPoints(s.ID, nil, func(map[uint]int) (map[uint]int, error) {
+		called = true
+		return nil, nil
+	})
 	require.NoError(t, err)
 	assert.Empty(t, snaps)
+	assert.False(t, called, "no players, no computation")
 }
 
 // All-or-nothing: an unknown user violates the FK, and the whole batch rolls
@@ -245,17 +364,158 @@ func TestApplySeasonPoints_UnknownUserRollsBackTheBatch(t *testing.T) {
 	s := makeSeason(t, db, time.Date(2095, time.October, 1, 0, 0, 0, 0, time.UTC))
 	good := makeUser(t, db, "sp-good@s.test")
 
-	// A deliberately unassigned id, ordered AFTER the real one so the good write
-	// has already happened inside the transaction when the bad one fails.
-	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{
-		good.ID:              {SP: 200, Completed: true},
-		good.ID + 10_000_000: {SP: 200, Completed: true},
+	// A deliberately unassigned id, ordered AFTER the real one so the good row
+	// has already been inserted inside the transaction when the bad one fails.
+	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{
+		good.ID:              {change: 200, completed: true},
+		good.ID + 10_000_000: {change: 200, completed: true},
 	})
 	require.Error(t, err)
 
 	row, err := repo.FindPlayerSeason(good.ID, s.ID)
 	require.NoError(t, err)
 	assert.Nil(t, row, "the successful seat's write must have rolled back with the batch")
+}
+
+// THE LOST-UPDATE GUARD, against real Postgres with two real transactions. Two
+// matches finish at once and share a player. The first to lock the shared row
+// holds it through a slow computation; the second must WAIT, then compute from
+// the first's committed total, so both changes land. It needs committed rows two
+// separate transactions can contend on, so it commits and hard-deletes its own
+// rows on cleanup (the wallet concurrency tests' pattern), and it runs only
+// against the database BELJOT_DB_URL names.
+func TestApplySeasonPoints_ConcurrentMatchesSharingAPlayerLoseNoChange(t *testing.T) {
+	dsn := os.Getenv("BELJOT_DB_URL")
+	if dsn == "" {
+		t.Skip("skipping concurrency test: BELJOT_DB_URL not set (it commits rows)")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Skip("skipping integration test: database not available")
+	}
+	// Registered first so it runs LAST, after the row cleanup below.
+	if sqlDB, err := db.DB(); err == nil {
+		t.Cleanup(func() { _ = sqlDB.Close() })
+	}
+
+	// A quarter no other test uses; a run that crashed before its cleanup is
+	// cleared first so the unique started_at cannot fail this one.
+	start := time.Date(2150, time.January, 1, 0, 0, 0, 0, time.UTC)
+	db.Exec(`DELETE FROM player_seasons WHERE season_id IN (SELECT id FROM seasons WHERE started_at = ?)`, start)
+	db.Exec(`DELETE FROM seasons WHERE started_at = ?`, start)
+
+	stamp := fmt.Sprintf("%08d", time.Now().UnixNano()%1e8)
+	shared := makeUser(t, db, "cc"+stamp+"s@s.test")
+	a := makeUser(t, db, "cc"+stamp+"a@s.test")
+	b := makeUser(t, db, "cc"+stamp+"b@s.test")
+	s := makeSeason(t, db, start)
+	t.Cleanup(func() {
+		db.Exec(`DELETE FROM player_seasons WHERE season_id = ?`, s.ID)
+		db.Exec(`DELETE FROM seasons WHERE id = ?`, s.ID)
+		for _, u := range []*user.User{shared, a, b} {
+			db.Unscoped().Delete(&user.User{}, u.ID)
+		}
+	})
+	repo := season.NewGormRepository(db)
+
+	// A COMMITTED prior total for the shared player, so both matches find an
+	// existing row and only SELECT ... FOR UPDATE can serialise them (with no
+	// prior row the unique-index wait on the zero-row INSERT would do it alone).
+	_, err = applyAwards(repo, s.ID, map[uint]fixedAward{shared.ID: {change: 100, completed: true}})
+	require.NoError(t, err)
+
+	var (
+		mu    sync.Mutex
+		seen  []int
+		first sync.Once
+		wg    sync.WaitGroup
+		errs  [2]error
+	)
+	match := func(i int, other uint) {
+		defer wg.Done()
+		_, errs[i] = repo.ApplySeasonPoints(s.ID, map[uint]bool{shared.ID: true, other: true},
+			func(current map[uint]int) (map[uint]int, error) {
+				mu.Lock()
+				seen = append(seen, current[shared.ID])
+				mu.Unlock()
+				// Whoever locks first holds the row long enough for the other
+				// transaction to reach the lock and wait on it.
+				first.Do(func() { time.Sleep(300 * time.Millisecond) })
+				return map[uint]int{shared.ID: 30, other: 10}, nil
+			})
+	}
+	wg.Add(2)
+	go match(0, a.ID)
+	go match(1, b.ID)
+	wg.Wait()
+	require.NoError(t, errs[0])
+	require.NoError(t, errs[1])
+
+	assert.ElementsMatch(t, []int{100, 130}, seen,
+		"the second match computed from the first's committed total, not from the same stale 100")
+	row, err := repo.FindPlayerSeason(shared.ID, s.ID)
+	require.NoError(t, err)
+	require.NotNil(t, row)
+	assert.Equal(t, 160, row.SP, "neither match's change was lost")
+	assert.Equal(t, 3, row.GamesPlayed)
+}
+
+// THE AWARD PATH END TO END: the service computes each human's change with
+// ComputeSPChanges over the totals the repository locked, inside the same
+// transaction, and no total lands below 0.
+func TestService_ApplySeasonPoints_ScoresFromThePreMatchRows(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	svc := season.NewService(repo)
+	s := makeSeason(t, db, time.Date(2086, time.January, 1, 0, 0, 0, 0, time.UTC))
+	now := time.Date(2086, time.February, 1, 0, 0, 0, 0, time.UTC)
+
+	strong := makeUser(t, db, "sv-st@s.test")
+	weak := makeUser(t, db, "sv-wk@s.test")
+	mid := makeUser(t, db, "sv-md@s.test")
+	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{
+		strong.ID: {change: 900, completed: true},
+		weak.ID:   {change: 10, completed: true},
+		mid.ID:    {change: 400, completed: true},
+	})
+	require.NoError(t, err)
+	pre := map[uint]int{strong.ID: 900, weak.ID: 10, mid.ID: 400}
+
+	// mid + a bot (avg 500) beat strong + weak (avg 455) 1100:700, so the losers
+	// were the underdogs and lose about 16; weak is on 10 SP, so the floor binds.
+	// mid dropped before the end and is scored anyway.
+	outcome := match.MatchOutcome{
+		Seats: [4]match.OutcomeSeat{
+			{UserID: strong.ID, Team: 0, Completed: true},
+			{UserID: mid.ID, Team: 1, Completed: false},
+			{UserID: weak.ID, Team: 0, Completed: true},
+			{IsBot: true, Team: 1},
+		},
+		WinnerTeam: 1, TeamScores: [2]int{700, 1100}, Target: 1001, AbandonedSeat: -1,
+	}
+	want, err := season.ComputeSPChanges(outcome, pre)
+	require.NoError(t, err)
+
+	got, err := svc.ApplySeasonPoints(outcome, now)
+	require.NoError(t, err)
+	require.Len(t, got, 3, "the bot seat gets no row")
+
+	for id, prev := range pre {
+		next := season.ApplySPChange(prev, want[id])
+		assert.Equal(t, next, got[id].SP, "user %d", id)
+		assert.Equal(t, next-prev, got[id].SPChange, "user %d: the applied change", id)
+		assert.GreaterOrEqual(t, got[id].SP, 0)
+		row, err := repo.FindPlayerSeason(id, s.ID)
+		require.NoError(t, err)
+		assert.Equal(t, next, row.SP, "user %d: the row matches the snapshot", id)
+	}
+	assert.Equal(t, 0, got[weak.ID].SP, "the floored loser")
+	assert.Equal(t, -10, got[weak.ID].SPChange)
+
+	row, err := repo.FindPlayerSeason(mid.ID, s.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, row.GamesCompleted, "an absent seat is scored but completes nothing")
+	assert.Equal(t, 2, row.GamesPlayed)
 }
 
 // --- Story 13.2: leaderboard reads ---
@@ -266,7 +526,7 @@ func TestApplySeasonPoints_UnknownUserRollsBackTheBatch(t *testing.T) {
 func seedStanding(t *testing.T, db *gorm.DB, repo *season.GormRepository, seasonID uint, email string, sp int) *user.User {
 	t.Helper()
 	u := makeUser(t, db, email)
-	_, err := repo.ApplySeasonPoints(seasonID, map[uint]season.SPAward{u.ID: {SP: sp, Completed: true}})
+	_, err := applyAwards(repo, seasonID, map[uint]fixedAward{u.ID: {change: sp, completed: true}})
 	require.NoError(t, err)
 	return u
 }
@@ -491,42 +751,57 @@ func TestLeaderboardPage_IsScopedToOneSeason(t *testing.T) {
 
 // --- Review follow-ups (P1, P7, P8) ---
 
-// P1: THE LADDER IS SP EARNERS ONLY (owner decision 2026-08-27). A 0-SP row is
-// what ApplySeasonPoints writes for a seat that was absent at the terminal end,
-// so these rows are ordinary, not corruption — and this is the real-Postgres
-// proof that `player_seasons.sp > 0` keeps them out of the items AND the total.
-func TestLeaderboardPage_ExcludesZeroSPRows(t *testing.T) {
+// insertUnplayedRow writes a player_seasons row with games_played = 0.
+// ApplySeasonPoints never commits one (its zero row is updated in the same
+// transaction), so it is inserted raw purely to prove the games_played >= 1
+// half of the membership predicate is real and not vacuous.
+func insertUnplayedRow(t *testing.T, db *gorm.DB, seasonID uint, email string) *user.User {
+	t.Helper()
+	u := makeUser(t, db, email)
+	require.NoError(t, db.Exec(`
+		INSERT INTO player_seasons (user_id, season_id, sp, rank_tier, games_played, games_completed, created_at, updated_at)
+		VALUES (?, ?, 0, 'iron', 0, 0, NOW(), NOW())`, u.ID, seasonID).Error)
+	return u
+}
+
+// THE LADDER IS EVERYONE WHO PLAYED (Story 13.4). A player who has lost back
+// down to 0 SP is still on it, at a real position, while a row with no games
+// played is not: the real-Postgres proof that `games_played >= 1` governs the
+// items AND the total.
+func TestLeaderboardPage_ListsPlayersAtZeroSP(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2093, time.July, 1, 0, 0, 0, 0, time.UTC))
 
 	earner := seedStanding(t, db, repo, s.ID, "lb-z1@s.test", 700)
-	absentee := seedStanding(t, db, repo, s.ID, "lb-z2@s.test", 0)
+	floored := seedStanding(t, db, repo, s.ID, "lb-z2@s.test", -18)
+	unplayed := insertUnplayedRow(t, db, s.ID, "lb-z3@s.test")
 
 	entries, total, err := repo.LeaderboardPage(s.ID, 10, 0)
 	require.NoError(t, err)
-	assert.Equal(t, int64(1), total, "the 0-SP row is excluded from the total too")
-	require.Len(t, entries, 1)
+	assert.Equal(t, int64(2), total, "the 0-SP player counts; the unplayed row does not")
+	require.Len(t, entries, 2)
 	assert.Equal(t, earner.ID, entries[0].UserID)
+	assert.Equal(t, floored.ID, entries[1].UserID, "0 SP after a loss is still a place on the ladder")
+	assert.Equal(t, 0, entries[1].SP)
+	assert.Equal(t, 1, entries[1].GamesPlayed)
 
-	// The row exists and still counts a game played — it is simply not ON the
-	// ladder. This is a VISIBILITY rule, not a delete.
-	row, err := repo.FindPlayerSeason(absentee.ID, s.ID)
+	// The unplayed row exists; it is simply not ON the ladder. A visibility rule,
+	// not a delete.
+	row, err := repo.FindPlayerSeason(unplayed.ID, s.ID)
 	require.NoError(t, err)
 	require.NotNil(t, row)
-	assert.Equal(t, 0, row.SP)
-	assert.Equal(t, 1, row.GamesPlayed)
+	assert.Equal(t, 0, row.GamesPlayed)
 }
 
-// A season whose only rows are 0-SP is EMPTY, which is what makes the client's
-// "Nobody has earned Season Points yet" copy true rather than a lie.
-func TestLeaderboardPage_SeasonOfOnlyZeroSPRowsIsEmpty(t *testing.T) {
+// A season whose only rows have no games played is EMPTY.
+func TestLeaderboardPage_SeasonOfOnlyUnplayedRowsIsEmpty(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2093, time.October, 1, 0, 0, 0, 0, time.UTC))
 
-	seedStanding(t, db, repo, s.ID, "lb-y1@s.test", 0)
-	seedStanding(t, db, repo, s.ID, "lb-y2@s.test", 0)
+	insertUnplayedRow(t, db, s.ID, "lb-y1@s.test")
+	insertUnplayedRow(t, db, s.ID, "lb-y2@s.test")
 
 	entries, total, err := repo.LeaderboardPage(s.ID, 10, 0)
 	require.NoError(t, err)
@@ -534,48 +809,54 @@ func TestLeaderboardPage_SeasonOfOnlyZeroSPRowsIsEmpty(t *testing.T) {
 	assert.Equal(t, int64(0), total)
 }
 
-// The exclusion must not break the invariant the whole story turns on: with 0-SP
-// rows in the season, CountAhead + 1 still equals each listed row's own slot.
-func TestLeaderboardCountAhead_UnaffectedByZeroSPRows(t *testing.T) {
+// The invariant the whole story turns on still holds with 0-SP players listed
+// and an unplayed row in the season: CountAhead + 1 equals each listed row's own
+// slot, ties at 0 broken by user id like any other tie.
+func TestLeaderboardCountAhead_AgreesWithTheListAtZeroSP(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2092, time.January, 1, 0, 0, 0, 0, time.UTC))
 
-	// Two 0-SP rows deliberately interleaved with the earners by creation order.
+	// 0-SP players deliberately interleaved with the others by creation order.
 	seedStanding(t, db, repo, s.ID, "lb-x0@s.test", 0)
 	seedStanding(t, db, repo, s.ID, "lb-x1@s.test", 4000)
+	insertUnplayedRow(t, db, s.ID, "lb-x5@s.test")
 	seedStanding(t, db, repo, s.ID, "lb-x2@s.test", 0)
 	seedStanding(t, db, repo, s.ID, "lb-x3@s.test", 900)
 	seedStanding(t, db, repo, s.ID, "lb-x4@s.test", 900)
 
 	entries := fullLadder(t, repo, s.ID)
-	require.Len(t, entries, 3, "only the SP earners are listed")
+	require.Len(t, entries, 5, "every player who played is listed, 0 SP included")
+	assert.Zero(t, entries[3].SP)
+	assert.Less(t, entries[3].UserID, entries[4].UserID, "a tie at 0 breaks by ascending user id")
 
 	for i, e := range entries {
 		ahead, err := repo.CountAhead(s.ID, e.SP, e.UserID)
 		require.NoError(t, err)
 		assert.Equal(t, int64(i), ahead,
-			"user %d (sp %d) sits in slot %d — a 0-SP row must not push anyone down",
+			"user %d (sp %d) sits in slot %d — an unplayed row must not push anyone down",
 			e.UserID, e.SP, i+1)
 	}
 }
 
-// P7: the viewer block now runs through the LIST'S OWN predicate, so the three
-// "no standing" cases are decided in one place instead of being re-derived in Go.
+// P7: the viewer block runs through the LIST'S OWN predicate, so the three
+// "no standing" cases are decided in one place instead of being re-derived in
+// Go — and a player at 0 SP who has played is NOT one of them.
 func TestLeaderboardFindEntry_MissesTheThreeUnlistableCases(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2092, time.April, 1, 0, 0, 0, 0, time.UTC))
 
 	never := makeUser(t, db, "lb-e1@s.test") // no player_seasons row at all
-	zero := seedStanding(t, db, repo, s.ID, "lb-e2@s.test", 0)
+	unplayed := insertUnplayedRow(t, db, s.ID, "lb-e2@s.test")
 	gone := seedStanding(t, db, repo, s.ID, "lb-e3@s.test", 8000)
 	live := seedStanding(t, db, repo, s.ID, "lb-e4@s.test", 1200)
+	zero := seedStanding(t, db, repo, s.ID, "lb-e5@s.test", 0)
 	require.NoError(t, db.Delete(&user.User{}, gone.ID).Error)
 
 	for name, id := range map[string]uint{
 		"never played":         never.ID,
-		"played but 0 SP":      zero.ID,
+		"row with no games":    unplayed.ID,
 		"soft-deleted account": gone.ID,
 	} {
 		got, err := repo.FindLeaderboardEntry(s.ID, id)
@@ -583,7 +864,8 @@ func TestLeaderboardFindEntry_MissesTheThreeUnlistableCases(t *testing.T) {
 		assert.Nil(t, got, "%s must have no listable standing", name)
 	}
 
-	// The control: a live earner does get one, and it carries the joined username.
+	// The controls: a live player gets one, carrying the joined username, and so
+	// does a player who has played down to 0 SP.
 	got, err := repo.FindLeaderboardEntry(s.ID, live.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
@@ -591,6 +873,11 @@ func TestLeaderboardFindEntry_MissesTheThreeUnlistableCases(t *testing.T) {
 	assert.Equal(t, live.Username, got.Username)
 	assert.Equal(t, 1200, got.SP)
 	assert.Equal(t, 1, got.GamesPlayed)
+
+	got, err = repo.FindLeaderboardEntry(s.ID, zero.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got, "a played 0-SP player has a standing")
+	assert.Equal(t, 0, got.SP)
 
 	// AND THE POINT OF THE WHOLE FINDING: FindPlayerSeason — the method the viewer
 	// block used to call — still happily returns the soft-deleted account's row.
@@ -654,9 +941,9 @@ func TestLeaderboardPage_RejectsOutOfRangeArguments(t *testing.T) {
 // --- Story 13.3: archive, seasons list, by-id lookup, rollover ---
 
 // THE ARCHIVE'S MEMBERSHIP RULE, spelled out against real Postgres:
-// row exists AND games_played >= 1 AND the season ENDED — deliberately NOT
-// leaderboardScope's sp > 0. One test seeds all four boundary cases at once so
-// the predicate is proven as a whole, plus the newest-first order.
+// row exists AND games_played >= 1 AND the season ENDED. One test seeds all four
+// boundary cases at once so the predicate is proven as a whole, plus the
+// newest-first order.
 func TestPlayerSeasonArchive_MembershipAndOrder(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
@@ -671,11 +958,11 @@ func TestPlayerSeasonArchive_MembershipAndOrder(t *testing.T) {
 	now := time.Date(2089, time.November, 15, 12, 0, 0, 0, time.UTC)
 
 	// Q1: played, earned SP — the ordinary archive row.
-	_, err := repo.ApplySeasonPoints(q1.ID, map[uint]season.SPAward{u.ID: {SP: 1800, Completed: true}})
+	_, err := applyAwards(repo, q1.ID, map[uint]fixedAward{u.ID: {change: 1800, completed: true}})
 	require.NoError(t, err)
-	// Q2: played but 0 SP (an absent seat) — MUST be included; the archive is
-	// "seasons you actually played", not "SP earners".
-	_, err = repo.ApplySeasonPoints(q2.ID, map[uint]season.SPAward{u.ID: {SP: 0, Completed: false}})
+	// Q2: played but ended on 0 SP (a floored loss) — MUST be included; the
+	// archive is "seasons you actually played".
+	_, err = applyAwards(repo, q2.ID, map[uint]fixedAward{u.ID: {change: -30, completed: false}})
 	require.NoError(t, err)
 	// Q3: a row with games_played = 0. ApplySeasonPoints can never write one
 	// (it always counts the game), so it is inserted raw purely to prove the
@@ -684,7 +971,7 @@ func TestPlayerSeasonArchive_MembershipAndOrder(t *testing.T) {
 		INSERT INTO player_seasons (user_id, season_id, sp, rank_tier, games_played, games_completed, created_at, updated_at)
 		VALUES (?, ?, 0, 'iron', 0, 0, NOW(), NOW())`, u.ID, q3.ID).Error)
 	// Q4: played in the ACTIVE window — excluded, its record is still moving.
-	_, err = repo.ApplySeasonPoints(q4.ID, map[uint]season.SPAward{u.ID: {SP: 500, Completed: true}})
+	_, err = applyAwards(repo, q4.ID, map[uint]fixedAward{u.ID: {change: 500, completed: true}})
 	require.NoError(t, err)
 
 	entries, err := repo.PlayerSeasonArchive(u.ID, now)
@@ -711,7 +998,7 @@ func TestPlayerSeasonArchive_EndsAtBoundaryIsInclusive(t *testing.T) {
 	u := makeUser(t, db, "ar-u2@s.test")
 	s := makeSeason(t, db, time.Date(2088, time.January, 1, 0, 0, 0, 0, time.UTC))
 
-	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{u.ID: {SP: 100, Completed: true}})
+	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{u.ID: {change: 100, completed: true}})
 	require.NoError(t, err)
 
 	entries, err := repo.PlayerSeasonArchive(u.ID, s.EndsAt)
@@ -750,8 +1037,8 @@ func TestPlayerSeasonArchive_ExcludesSoftDeletedUser(t *testing.T) {
 	s := makeSeason(t, db, time.Date(2085, time.January, 1, 0, 0, 0, 0, time.UTC))
 	now := time.Date(2085, time.June, 1, 0, 0, 0, 0, time.UTC)
 
-	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{
-		gone.ID: {SP: 700, Completed: true},
+	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{
+		gone.ID: {change: 700, completed: true},
 	})
 	require.NoError(t, err)
 
@@ -783,9 +1070,9 @@ func TestPlayerSeasonArchive_IsScopedToOneUser(t *testing.T) {
 	s := makeSeason(t, db, time.Date(2087, time.January, 1, 0, 0, 0, 0, time.UTC))
 	now := time.Date(2087, time.June, 1, 0, 0, 0, 0, time.UTC)
 
-	_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SPAward{
-		mine.ID:   {SP: 100, Completed: true},
-		theirs.ID: {SP: 90000, Completed: true},
+	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{
+		mine.ID:   {change: 100, completed: true},
+		theirs.ID: {change: 90000, completed: true},
 	})
 	require.NoError(t, err)
 

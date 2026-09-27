@@ -28,10 +28,10 @@ vi.mock("@/shared/api/season", () => ({
 const seasonFixture: CurrentSeasonResponse = {
   seasonName: "2026 Q3",
   endsAt: "2099-10-01T00:00:00Z",
-  sp: 4000,
+  sp: 680,
   rankTier: "gold",
-  spIntoTier: 1000,
-  spForNextTier: 2500,
+  spIntoTier: 80,
+  spForNextTier: 200,
   gamesPlayed: 31,
   gamesCompleted: 29,
 };
@@ -339,8 +339,7 @@ describe("TopBar seasonal rank chip", () => {
     renderWithRouter();
 
     const chip = await screen.findByTestId("header-rank");
-    expect(chip.textContent).not.toContain("4,000");
-    expect(chip.textContent).not.toContain("4000");
+    expect(chip.textContent).not.toContain("680");
     expect(chip.textContent).not.toContain("SP");
   });
 
@@ -369,10 +368,10 @@ describe("TopBar seasonal rank chip", () => {
 
   it("falls back to the SP bucket for an unrecognised tier token", async () => {
     // Version skew: a newer server sends a tier this bundle has never heard of.
-    mockGetCurrentSeason.mockResolvedValue({ ...seasonFixture, rankTier: "mythic" });
+    mockGetCurrentSeason.mockResolvedValue({ ...seasonFixture, rankTier: "mythic", sp: 700 });
     renderWithRouter();
 
-    // 4000 SP is Gold.
+    // 700 SP is Gold.
     expect(await screen.findByTestId("header-rank")).toHaveAttribute("data-tier", "gold");
   });
 

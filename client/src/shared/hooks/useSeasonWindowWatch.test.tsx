@@ -20,10 +20,10 @@ const NOW = Date.parse("2026-08-27T12:00:00Z");
 const baseSeason: CurrentSeasonResponse = {
   seasonName: "2026 Q3",
   endsAt: "2026-10-01T00:00:00Z",
-  sp: 4000,
+  sp: 680,
   rankTier: "gold",
-  spIntoTier: 1000,
-  spForNextTier: 2500,
+  spIntoTier: 80,
+  spForNextTier: 200,
   gamesPlayed: 31,
   gamesCompleted: 29,
 };
@@ -189,7 +189,7 @@ describe("useSeasonWindowWatch", () => {
       sp: 0,
       rankTier: "iron",
       spIntoTier: 0,
-      spForNextTier: 500,
+      spForNextTier: 150,
     };
     view.rerender(
       <QueryClientProvider client={qc}>

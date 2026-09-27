@@ -11,19 +11,19 @@ import (
 // Service is the thin match-end SP awarder injected into the match manager as
 // its SPAwarder, plus the read path GET /api/v1/seasons/current goes through.
 //
-// It owns no ladder logic: the tier math is pure (tier.go), the quarter math is
-// pure (quarter.go), the atomic write is the repository's, and the per-seat
-// bucketing lives in the match package. What this type exists for is the DTO
-// TRANSLATION below.
+// It owns no arithmetic of its own: the formula is pure (sp_formula.go), the
+// tier math is pure (tier.go), the quarter math is pure (quarter.go), and the
+// locked read-compute-write is the repository's. What this type does is JOIN
+// them: it hands the repository a closure that runs the formula over the totals
+// the repository locked, and translates the result into match's DTOs.
 //
 // THE IMPORT DIRECTION IS THE WHOLE POINT. `season` may import `match`; `match`
 // MUST NEVER IMPORT `season` -- the same rule XPService and HonorService call
 // out in capitals (Story 9.5 D1 / 9.7 D4, restated as Story 13.1 D8). So
-// match.SPAward and match.PlayerSeasonSnapshot are declared in MATCH, and this
-// adapter maps them onto the season-domain equivalents. It also means the
-// snapshot the manager receives is fully PRECOMPUTED -- season name, derived
-// tier and tieredUp all resolved here -- so the manager never runs ladder
-// arithmetic it cannot see.
+// match.MatchOutcome and match.PlayerSeasonSnapshot are declared in MATCH. It
+// also means the snapshot the manager receives is fully PRECOMPUTED -- season
+// name, applied change, derived tier and tieredUp all resolved here -- so the
+// manager never runs ladder arithmetic it cannot see.
 type Service struct {
 	repo Repository
 }
@@ -62,15 +62,29 @@ func (s *Service) resolveSeason(now time.Time) (*Season, error) {
 }
 
 // ApplySeasonPoints resolves the season covering `now` (creating it if needed --
-// see Repository.CurrentSeason), applies every seat's award in one transaction,
-// and returns each player's post-write snapshot. Satisfies match.SPAwarder.
+// see Repository.CurrentSeason), scores the match for every human seat in one
+// transaction, and returns each player's post-write snapshot. Satisfies
+// match.SPAwarder.
+//
+// The changes are computed INSIDE the repository's transaction, by
+// ComputeSPChanges over the totals it has just locked, so each human's change is
+// the formula over their pre-match standing and the standings of everyone at
+// the table as they were at that instant -- not over a read taken earlier that a
+// concurrent match could have moved.
 //
 // `now` is a parameter rather than a clock read so the season a match lands in
 // is decided by the finalizer's own stamp, and so this is testable at a quarter
-// boundary. An empty map is a no-op that never touches the DB -- notably it does
-// NOT create a season row for a match with no human seats.
-func (s *Service) ApplySeasonPoints(awards map[uint]match.SPAward, now time.Time) (map[uint]match.PlayerSeasonSnapshot, error) {
-	if len(awards) == 0 {
+// boundary. An outcome with no human seat is a no-op that never touches the DB
+// -- notably it does NOT create a season row for an all-bot match.
+func (s *Service) ApplySeasonPoints(outcome match.MatchOutcome, now time.Time) (map[uint]match.PlayerSeasonSnapshot, error) {
+	completed := make(map[uint]bool, len(outcome.Seats))
+	for _, seat := range outcome.Seats {
+		if seat.IsBot || seat.UserID == 0 {
+			continue
+		}
+		completed[seat.UserID] = seat.Completed
+	}
+	if len(completed) == 0 {
 		return map[uint]match.PlayerSeasonSnapshot{}, nil
 	}
 
@@ -79,12 +93,9 @@ func (s *Service) ApplySeasonPoints(awards map[uint]match.SPAward, now time.Time
 		return nil, err
 	}
 
-	repoAwards := make(map[uint]SPAward, len(awards))
-	for userID, a := range awards {
-		repoAwards[userID] = SPAward{SP: a.SP, Completed: a.Completed}
-	}
-
-	snapshots, err := s.repo.ApplySeasonPoints(current.ID, repoAwards)
+	snapshots, err := s.repo.ApplySeasonPoints(current.ID, completed, func(sp map[uint]int) (map[uint]int, error) {
+		return ComputeSPChanges(outcome, sp)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("applying season points: %w", err)
 	}
@@ -94,12 +105,12 @@ func (s *Service) ApplySeasonPoints(awards map[uint]match.SPAward, now time.Time
 		out[userID] = match.PlayerSeasonSnapshot{
 			SeasonName: current.Name,
 			SP:         snap.SP,
-			RankTier:   snap.Tier,
-			// Derived from the pre-award total the repository returned, so no
-			// second read is needed. SP is monotonic, so this can only ever be a
-			// climb -- but it is still computed rather than assumed, because a
-			// zero-SP award (an absent seat) must report false.
-			TieredUp: TierForSP(snap.PreviousSP) != snap.Tier,
+			// The APPLIED change: at the 0 floor it is smaller than the formula's.
+			SPChange: snap.SP - snap.PreviousSP,
+			RankTier: snap.Tier,
+			// A CLIMB only. SP now falls too, so "the tier changed" would also be
+			// true on a drop and fire the rank-up celebration for a demotion.
+			TieredUp: TierClimbed(snap.PreviousSP, snap.SP),
 		}
 	}
 	return out, nil
@@ -165,9 +176,9 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 // wrong standings under the right heading.
 //
 // The viewer block runs under the SAME rules for a prior season as for the
-// current one (the sp > 0 membership predicate included) — a season's ladder is
-// frozen when it ends, but the question "where did I finish" has the same
-// answer shape either way.
+// current one (the games_played >= 1 membership predicate included) — a
+// season's ladder is frozen when it ends, but the question "where did I finish"
+// has the same answer shape either way.
 //
 // PULL-ONLY. There is deliberately no WebSocket event for standings (epic
 // decision, restated as a Story 13.2 boundary): the client loads this on mount
@@ -244,26 +255,24 @@ func (s *Service) LeaderboardView(userID, seasonID uint, limit, offset int, now 
 // NIL IN THREE CASES, deliberately indistinguishable on the wire:
 //
 //	no row       the viewer has not played this season at all.
-//	sp == 0      the viewer has a row (they played, and were absent at every
-//	             terminal end, or the formula paid nothing) but earned no SP.
+//	no games     a row with games_played = 0, which no match end commits.
 //	soft-deleted the account is gone but still holds an unexpired JWT.
 //
 // ALL THREE ARE DECIDED BY THE REPOSITORY, not re-derived here, and that is the
 // point: FindLeaderboardEntry applies the LIST'S OWN visibility predicate. The
-// earlier version of this function called FindPlayerSeason and checked
-// `record.SP <= 0` in Go, which got the first two cases right and the third
-// wrong -- FindPlayerSeason has no `users` join, so a deleted account received a
-// viewer block and a pinned row while being absent from the list, with a position
+// earlier version of this function called FindPlayerSeason and checked the row
+// in Go, which got the first two cases right and the third wrong --
+// FindPlayerSeason has no `users` join, so a deleted account received a viewer
+// block and a pinned row while being absent from the list, with a position
 // counted against a population that excluded it.
 //
 // Keeping the rule in ONE place also means the answer cannot drift: if a row is
 // listable, it has a standing; if it is not, it has none. There is no third
 // state for this function to invent.
 //
-// The AC marks the viewer's own row only when they have ANY SP. Note this is NOT
-// the same as saying 0 SP is unranked -- a 0-SP player is Iron and the RankBanner
-// renders them normally; they simply have no meaningful ladder position to point
-// at, and every 0-SP player would otherwise share the same last-place block.
+// A player at 0 SP who has played DOES get a viewer block (Story 13.4): they are
+// Iron 1 at a real position on the ladder, and a player who loses back down to
+// 0 must not lose their place in the list they were climbing.
 //
 // The position comes from CountAhead under the LIST'S OWN ORDER, so a viewer who
 // is on the page they are looking at reads the same number twice.
@@ -361,8 +370,8 @@ func (s *Service) ArchiveView(userID uint, now time.Time) (*ArchiveView, error) 
 // `seasonRank: null` and the client hides the chip.
 //
 // nil MEANS "NO ROW", NOT "NO SP": a played season at 0 SP still has a rank
-// (Iron — there is no unranked state), so the row's existence is the gate, not
-// leaderboardScope's sp > 0 membership rule. Satisfies user.SeasonRankReader
+// (Iron — there is no unranked state), so the row's existence is the gate.
+// Satisfies user.SeasonRankReader
 // structurally; `season` never imports `user` (the same one-way discipline as
 // match.SPAwarder, mirrored).
 //

@@ -260,14 +260,14 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
   // hidden-when-empty contract survives as the variant below.
   it("renders the subject's seasonal rank chip and prior-season archive", async () => {
     mockGetPublicProfile.mockResolvedValue(
-      publicProfileFixture({ seasonRank: { seasonName: "2026 Q3", tier: "silver", sp: 1700 } }),
+      publicProfileFixture({ seasonRank: { seasonName: "2026 Q3", tier: "silver", sp: 420 } }),
     );
     mockGetSeasonArchive.mockResolvedValue({
       items: [
         {
           seasonId: 5,
           seasonName: "2026 Q2",
-          sp: 900,
+          sp: 200,
           tier: "bronze",
           gamesPlayed: 8,
           startedAt: "2026-04-01T00:00:00Z",

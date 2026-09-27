@@ -72,27 +72,47 @@ func (m *mockRepo) CurrentSeason(time.Time) (*season.Season, error) {
 	return m.current, nil
 }
 
-func (m *mockRepo) ApplySeasonPoints(seasonID uint, awards map[uint]season.SPAward) (map[uint]season.PlayerSeasonSnapshot, error) {
-	out := make(map[uint]season.PlayerSeasonSnapshot, len(awards))
-	for userID, a := range awards {
+// ApplySeasonPoints mirrors the GORM transaction's shape: every listed player's
+// current total (missing = 0) goes to `changes` at once, each new total is
+// floored at 0, and the counters move. Nothing is written if `changes` fails.
+func (m *mockRepo) ApplySeasonPoints(seasonID uint, completed map[uint]bool, changes season.SPChanges) (map[uint]season.PlayerSeasonSnapshot, error) {
+	current := make(map[uint]int, len(completed))
+	for userID := range completed {
+		if row := m.rows[key(userID, seasonID)]; row != nil {
+			current[userID] = row.SP
+		} else {
+			current[userID] = 0
+		}
+	}
+	deltas, err := changes(current)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[uint]season.PlayerSeasonSnapshot, len(completed))
+	for userID, present := range completed {
 		row := m.rows[key(userID, seasonID)]
-		prev := 0
-		played, completed := 0, 0
+		played, done := 0, 0
 		if row != nil {
-			prev, played, completed = row.SP, row.GamesPlayed, row.GamesCompleted
+			played, done = row.GamesPlayed, row.GamesCompleted
 		}
 		played++
-		if a.Completed {
-			completed++
+		if present {
+			done++
 		}
-		next := prev + a.SP
+		delta, ok := deltas[userID]
+		if !ok {
+			return nil, fmt.Errorf("mock: no change for user %d", userID)
+		}
+		prev := current[userID]
+		next := season.ApplySPChange(prev, delta)
 		m.rows[key(userID, seasonID)] = &season.PlayerSeason{
 			UserID: userID, SeasonID: seasonID, SP: next,
-			RankTier: season.TierForSP(next), GamesPlayed: played, GamesCompleted: completed,
+			RankTier: season.TierForSP(next), GamesPlayed: played, GamesCompleted: done,
 		}
 		out[userID] = season.PlayerSeasonSnapshot{
 			SP: next, PreviousSP: prev, Tier: season.TierForSP(next),
-			GamesPlayed: played, GamesCompleted: completed,
+			GamesPlayed: played, GamesCompleted: done,
 		}
 	}
 	return out, nil
@@ -112,8 +132,8 @@ func (m *mockRepo) FindPlayerSeason(userID, seasonID uint) (*season.PlayerSeason
 // happily pass a test the real repository fails.
 //
 // Two exclusions, mirroring the real predicate: no username entry stands in for
-// `users.deleted_at IS NOT NULL`, and `sp <= 0` is the SP-earners-only
-// membership rule.
+// `users.deleted_at IS NOT NULL`, and `games_played < 1` is outside the
+// played-this-season membership rule.
 func (m *mockRepo) visibleRows(seasonID uint) []*season.PlayerSeason {
 	out := make([]*season.PlayerSeason, 0, len(m.rows))
 	for _, row := range m.rows {
@@ -123,12 +143,10 @@ func (m *mockRepo) visibleRows(seasonID uint) []*season.PlayerSeason {
 		if _, visible := m.usernames[row.UserID]; !visible {
 			continue
 		}
-		// THE LADDER IS SP EARNERS ONLY (owner decision 2026-08-27). Mirrors the
-		// real `player_seasons.sp > 0` in leaderboardScope. A row at 0 SP is
-		// written for any seat absent at a match end, so these exist normally --
-		// and listing one would contradict the viewer block, which reports no
-		// standing at 0 SP.
-		if row.SP <= 0 {
+		// THE LADDER IS EVERYONE WHO PLAYED (Story 13.4). Mirrors the real
+		// `player_seasons.games_played >= 1` in leaderboardScope: a player at
+		// 0 SP who has played is listed.
+		if row.GamesPlayed < 1 {
 			continue
 		}
 		out = append(out, row)
@@ -250,7 +268,7 @@ func (m *mockRepo) ListSeasons() ([]season.Season, error) {
 
 // PlayerSeasonArchive mirrors the real predicate — games_played >= 1 AND the
 // window ENDED — over the same rows map the other reads use, so a service bug
-// that reused leaderboardScope's sp > 0 rule would fail here too.
+// that dropped either half would fail here too.
 func (m *mockRepo) PlayerSeasonArchive(userID uint, now time.Time) ([]season.ArchiveEntry, error) {
 	m.archiveCalls++
 	if m.archiveErr != nil {
@@ -338,7 +356,7 @@ func decode(t *testing.T, rec *httptest.ResponseRecorder) season.CurrentSeasonVi
 func TestGetCurrentSeason_WirePayloadKeysAreExact(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
-		UserID: 42, SeasonID: testWindow.ID, SP: 4000,
+		UserID: 42, SeasonID: testWindow.ID, SP: 680,
 		RankTier: "gold", GamesPlayed: 31, GamesCompleted: 29,
 	}
 
@@ -401,7 +419,7 @@ func TestGetCurrentSeason_ZeroStateForANewPlayer(t *testing.T) {
 	assert.Equal(t, 0, got.SP)
 	assert.Equal(t, "iron", got.RankTier, "0 SP is Iron — there is no unranked state")
 	assert.Equal(t, 0, got.SPIntoTier)
-	assert.Equal(t, 500, got.SPForNextTier)
+	assert.Equal(t, 150, got.SPForNextTier)
 	assert.Equal(t, 0, got.GamesPlayed)
 	assert.Equal(t, 0, got.GamesCompleted)
 
@@ -412,7 +430,7 @@ func TestGetCurrentSeason_ZeroStateForANewPlayer(t *testing.T) {
 func TestGetCurrentSeason_MidTierProgressDecomposition(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
-		UserID: 42, SeasonID: testWindow.ID, SP: 4000,
+		UserID: 42, SeasonID: testWindow.ID, SP: 700,
 		RankTier: "gold", GamesPlayed: 31, GamesCompleted: 29,
 	}
 
@@ -420,11 +438,11 @@ func TestGetCurrentSeason_MidTierProgressDecomposition(t *testing.T) {
 	require.NoError(t, err)
 
 	got := decode(t, rec)
-	assert.Equal(t, 4000, got.SP)
+	assert.Equal(t, 700, got.SP)
 	assert.Equal(t, "gold", got.RankTier)
-	// 4000 sits 1000 into Gold's 2500-wide band (3000 -> 5500).
-	assert.Equal(t, 1000, got.SPIntoTier)
-	assert.Equal(t, 2500, got.SPForNextTier)
+	// 700 sits 100 into Gold's 200-wide band (600 -> 800).
+	assert.Equal(t, 100, got.SPIntoTier)
+	assert.Equal(t, 200, got.SPForNextTier)
 	assert.Equal(t, 31, got.GamesPlayed)
 	assert.Equal(t, 29, got.GamesCompleted)
 }
@@ -434,14 +452,14 @@ func TestGetCurrentSeason_MidTierProgressDecomposition(t *testing.T) {
 func TestGetCurrentSeason_IgnoresAStaleStoredTier(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
-		UserID: 42, SeasonID: testWindow.ID, SP: 9000,
+		UserID: 42, SeasonID: testWindow.ID, SP: 1100,
 		RankTier:    "iron", // deliberately wrong
 		GamesPlayed: 60, GamesCompleted: 60,
 	}
 
 	rec, err := call(t, repo, 42)
 	require.NoError(t, err)
-	assert.Equal(t, "diamond", decode(t, rec).RankTier, "9000 SP is Diamond, whatever the column says")
+	assert.Equal(t, "diamond", decode(t, rec).RankTier, "1100 SP is Diamond, whatever the column says")
 }
 
 // At the top of the ladder there is no next tier, and the client must be able to
@@ -449,7 +467,7 @@ func TestGetCurrentSeason_IgnoresAStaleStoredTier(t *testing.T) {
 func TestGetCurrentSeason_GrandmasterIsTerminal(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
-		UserID: 42, SeasonID: testWindow.ID, SP: 20000, RankTier: "grandmaster",
+		UserID: 42, SeasonID: testWindow.ID, SP: 1600, RankTier: "grandmaster",
 	}
 
 	rec, err := call(t, repo, 42)
@@ -457,7 +475,7 @@ func TestGetCurrentSeason_GrandmasterIsTerminal(t *testing.T) {
 
 	got := decode(t, rec)
 	assert.Equal(t, "grandmaster", got.RankTier)
-	assert.Equal(t, 2000, got.SPIntoTier)
+	assert.Equal(t, 200, got.SPIntoTier)
 	assert.Zero(t, got.SPForNextTier)
 }
 
@@ -491,61 +509,93 @@ func TestGetCurrentSeason_NilSeasonIsAnErrorNotAPanic(t *testing.T) {
 	assert.Contains(t, err.Error(), "no season")
 }
 
+// fourHumanOutcome is a natural 1001 finish with users 1 and 3 (team A) beating
+// users 2 and 4 (team B) 1100:700.
+func fourHumanOutcome() match.MatchOutcome {
+	return match.MatchOutcome{
+		Seats: [4]match.OutcomeSeat{
+			{UserID: 1, Team: 0, Completed: true},
+			{UserID: 2, Team: 1, Completed: true},
+			{UserID: 3, Team: 0, Completed: true},
+			{UserID: 4, Team: 1, Completed: true},
+		},
+		WinnerTeam: 0, TeamScores: [2]int{1100, 700}, Target: 1001, AbandonedSeat: -1,
+	}
+}
+
 func TestApplySeasonPoints_NilSeasonIsAnErrorNotAPanic(t *testing.T) {
 	svc := season.NewService(newMockRepo(nil))
 
-	out, err := svc.ApplySeasonPoints(map[uint]match.SPAward{10: {SP: 200, Completed: true}}, time.Now().UTC())
+	out, err := svc.ApplySeasonPoints(fourHumanOutcome(), time.Now().UTC())
 	require.Error(t, err)
 	assert.Nil(t, out)
 	assert.Contains(t, err.Error(), "no season")
 }
 
-// The awarder path never touches the DB for an empty award set — notably it must
-// not create a season row for a match with no human seats.
-func TestApplySeasonPoints_EmptyAwardsResolvesNoSeason(t *testing.T) {
+// The awarder path never touches the DB for an outcome with no human seat —
+// notably it must not create a season row for an all-bot match.
+func TestApplySeasonPoints_AllBotOutcomeResolvesNoSeason(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	svc := season.NewService(repo)
 
-	out, err := svc.ApplySeasonPoints(nil, time.Now().UTC())
+	allBots := match.MatchOutcome{
+		Seats: [4]match.OutcomeSeat{
+			{IsBot: true, Team: 0}, {IsBot: true, Team: 1}, {IsBot: true, Team: 0}, {IsBot: true, Team: 1},
+		},
+		Target: 1001, AbandonedSeat: -1,
+	}
+	out, err := svc.ApplySeasonPoints(allBots, time.Now().UTC())
 	require.NoError(t, err)
 	assert.Empty(t, out)
-	assert.Zero(t, repo.currentCalls, "no season is resolved (or created) for an empty batch")
+	assert.Zero(t, repo.currentCalls, "no season is resolved (or created) for an all-bot match")
+}
+
+// A malformed outcome fails the award (the finalizer logs and skips) instead of
+// writing a guessed change.
+func TestApplySeasonPoints_MalformedOutcomeWritesNothing(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	svc := season.NewService(repo)
+
+	bad := fourHumanOutcome()
+	bad.Target = 0
+	_, err := svc.ApplySeasonPoints(bad, time.Now().UTC())
+	require.Error(t, err)
+	assert.Empty(t, repo.rows)
 }
 
 // The service hands the match manager a FULLY PRECOMPUTED snapshot — season
-// name, derived tier and tieredUp — so the manager never runs ladder arithmetic
-// it cannot see (Story 13.1 D8).
+// name, the APPLIED change, derived tier and tieredUp — so the manager never runs
+// ladder arithmetic it cannot see (Story 13.1 D8). TieredUp is a climb only.
 func TestApplySeasonPoints_PrecomputesTheSnapshot(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	svc := season.NewService(repo)
 
-	// User 1 sits just below Bronze and crosses it. User 2 sits inside Iron and
-	// stays. User 3 was absent, earns 0, and must report tieredUp false.
-	repo.rows[key(1, testWindow.ID)] = &season.PlayerSeason{UserID: 1, SeasonID: testWindow.ID, SP: 450}
-	repo.rows[key(2, testWindow.ID)] = &season.PlayerSeason{UserID: 2, SeasonID: testWindow.ID, SP: 100}
-	repo.rows[key(3, testWindow.ID)] = &season.PlayerSeason{UserID: 3, SeasonID: testWindow.ID, SP: 499}
+	// Team A averages 120, team B 85: E_A = 0.552, so A wins +24, B loses -16.
+	repo.rows[key(1, testWindow.ID)] = &season.PlayerSeason{UserID: 1, SeasonID: testWindow.ID, SP: 140}
+	repo.rows[key(2, testWindow.ID)] = &season.PlayerSeason{UserID: 2, SeasonID: testWindow.ID, SP: 160}
+	repo.rows[key(3, testWindow.ID)] = &season.PlayerSeason{UserID: 3, SeasonID: testWindow.ID, SP: 100}
+	repo.rows[key(4, testWindow.ID)] = &season.PlayerSeason{UserID: 4, SeasonID: testWindow.ID, SP: 10}
 
-	got, err := svc.ApplySeasonPoints(map[uint]match.SPAward{
-		1: {SP: 200, Completed: true},
-		2: {SP: 200, Completed: true},
-		3: {SP: 0, Completed: false},
-	}, time.Now().UTC())
+	got, err := svc.ApplySeasonPoints(fourHumanOutcome(), time.Now().UTC())
 	require.NoError(t, err)
 
 	assert.Equal(t, match.PlayerSeasonSnapshot{
-		SeasonName: "2026 Q3", SP: 650, RankTier: "bronze", TieredUp: true,
-	}, got[1], "450 -> 650 crosses the 500 Bronze floor")
+		SeasonName: "2026 Q3", SP: 164, SPChange: 24, RankTier: "bronze", TieredUp: true,
+	}, got[1], "140 -> 164 crosses the 150 Bronze floor")
 
 	assert.Equal(t, match.PlayerSeasonSnapshot{
-		SeasonName: "2026 Q3", SP: 300, RankTier: "iron", TieredUp: false,
-	}, got[2], "100 -> 300 stays inside Iron")
+		SeasonName: "2026 Q3", SP: 124, SPChange: 24, RankTier: "iron", TieredUp: false,
+	}, got[3], "100 -> 124 stays inside Iron")
 
-	// The one that a naive "SP changed, so they must have climbed" shortcut would
-	// get wrong: sitting one point below a floor and earning nothing is NOT a
-	// tier-up, even though the seat is right on the edge.
+	// The one a "the tier changed" shortcut gets wrong: a DROP is not a tier-up.
 	assert.Equal(t, match.PlayerSeasonSnapshot{
-		SeasonName: "2026 Q3", SP: 499, RankTier: "iron", TieredUp: false,
-	}, got[3], "a 0-SP absent seat never tiers up")
+		SeasonName: "2026 Q3", SP: 144, SPChange: -16, RankTier: "iron", TieredUp: false,
+	}, got[2], "160 -> 144 drops from Bronze to Iron")
+
+	// The floor: the formula's -16 applies as -10.
+	assert.Equal(t, match.PlayerSeasonSnapshot{
+		SeasonName: "2026 Q3", SP: 0, SPChange: -10, RankTier: "iron", TieredUp: false,
+	}, got[4], "10 -> 0 reports the applied change")
 }
 
 // --- Story 13.2: GET /api/v1/leaderboard ---
@@ -797,10 +847,11 @@ func TestGetLeaderboard_ViewerWhoNeverPlayedIsNull(t *testing.T) {
 	assert.Zero(t, repo.aheadCalls, "no position is counted for a player with no row")
 }
 
-// AC4 again, the case a `record != nil` check alone would get wrong: the row
-// EXISTS (they played) but carries no SP, and the AC marks an own-row only for a
-// player with ANY SP.
-func TestGetLeaderboard_ViewerWithZeroSPIsNull(t *testing.T) {
+// A player who has played down to 0 SP is ON THE LADDER (Story 13.4): listed at
+// a real position, counted in the total, and given a viewer block that agrees
+// with their row. The list and the viewer block have to agree, so both halves
+// are asserted.
+func TestGetLeaderboard_ViewerAtZeroSPHasAStanding(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	seedLadder(repo, 3)
 	repo.seed(50, "zero", 0, 4)
@@ -809,18 +860,15 @@ func TestGetLeaderboard_ViewerWithZeroSPIsNull(t *testing.T) {
 	require.NoError(t, err)
 
 	got := decodeLeaderboard(t, rec)
-	assert.Nil(t, got.Viewer, "0 SP is a real Iron player, but has no ladder position to pin")
-	assert.Zero(t, repo.aheadCalls)
+	require.NotNil(t, got.Viewer, "0 SP after playing is a real Iron 1 player with a place")
+	assert.Equal(t, 4, got.Viewer.Position)
+	assert.Equal(t, 0, got.Viewer.SP)
+	assert.Equal(t, "iron", got.Viewer.Tier)
 
-	// THE HALF THIS TEST USED TO MISS, and exactly why the 0-SP leak survived
-	// review: asserting only `Viewer` allowed the 0-SP row to be LISTED at a real
-	// position while its owner was told they had no standing. The list and the
-	// viewer block have to agree, so both halves are asserted now.
-	assert.Len(t, got.Items, 3, "the 0-SP row is not on the ladder either")
-	assert.Equal(t, int64(3), got.Total, "and it does not inflate the total")
-	for _, row := range got.Items {
-		assert.NotEqual(t, uint(50), row.UserID)
-	}
+	assert.Len(t, got.Items, 4, "the 0-SP player is listed")
+	assert.Equal(t, int64(4), got.Total, "and counted")
+	assert.Equal(t, uint(50), got.Items[3].UserID)
+	assert.Equal(t, 4, got.Items[3].Position, "the viewer block and the row agree")
 }
 
 // The `viewer` KEY is always present, even when null: the client distinguishes
@@ -919,8 +967,8 @@ func TestGetLeaderboard_InvisibleUserIsExcludedEverywhere(t *testing.T) {
 // column, in the rows AND in the viewer block.
 func TestGetLeaderboard_TierIsDerivedNotTheStoredColumn(t *testing.T) {
 	repo := newMockRepo(testWindow)
-	repo.seed(1, "gm", 20000, 40)
-	repo.seed(2, "viewer", 9000, 30)
+	repo.seed(1, "gm", 1600, 40)
+	repo.seed(2, "viewer", 1100, 30)
 	// Deliberately wrong snapshots, as a lagging column would be.
 	repo.rows[key(1, testWindow.ID)].RankTier = "iron"
 	repo.rows[key(2, testWindow.ID)].RankTier = "iron"
@@ -930,7 +978,7 @@ func TestGetLeaderboard_TierIsDerivedNotTheStoredColumn(t *testing.T) {
 
 	got := decodeLeaderboard(t, rec)
 	require.Len(t, got.Items, 2)
-	assert.Equal(t, "grandmaster", got.Items[0].Tier, "20000 SP is Grandmaster, whatever the column says")
+	assert.Equal(t, "grandmaster", got.Items[0].Tier, "1600 SP is Grandmaster, whatever the column says")
 	assert.Equal(t, "diamond", got.Items[1].Tier)
 	require.NotNil(t, got.Viewer)
 	assert.Equal(t, "diamond", got.Viewer.Tier)
@@ -1076,33 +1124,31 @@ func TestGetLeaderboard_AcceptsTheOffsetCeilingItself(t *testing.T) {
 	assert.Equal(t, 10000, decodeLeaderboard(t, rec).Offset)
 }
 
-// P1: THE LADDER IS SP EARNERS ONLY. A 0-SP row is written for every seat absent
-// at a match end, so these are ordinary rows, not corruption. Listing one would
-// give a player a real position while the viewer block told that same player
-// they had no standing, and would falsify the empty state's copy.
-func TestGetLeaderboard_ZeroSPRowsAreNotOnTheLadder(t *testing.T) {
+// THE LADDER IS EVERYONE WHO PLAYED (Story 13.4). A 0-SP player is listed in SP
+// order like anyone else; only a row with no games played stays off.
+func TestGetLeaderboard_ZeroSPPlayersAreOnTheLadder(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.seed(1, "earner", 500, 5)
-	repo.seed(2, "absentee", 0, 3)
+	repo.seed(2, "floored", 0, 3)
 	repo.seed(3, "other", 250, 4)
+	repo.seed(4, "unplayed", 0, 0)
 
 	rec, err := callLeaderboard(t, repo, 1, "season=current")
 	require.NoError(t, err)
 
 	got := decodeLeaderboard(t, rec)
-	assert.Equal(t, int64(2), got.Total, "the 0-SP row is excluded from the total")
-	require.Len(t, got.Items, 2)
-	assert.Equal(t, []uint{1, 3}, []uint{got.Items[0].UserID, got.Items[1].UserID})
-	assert.Equal(t, []int{1, 2}, []int{got.Items[0].Position, got.Items[1].Position},
+	assert.Equal(t, int64(3), got.Total, "the 0-SP player counts; the unplayed row does not")
+	require.Len(t, got.Items, 3)
+	assert.Equal(t, []uint{1, 3, 2}, []uint{got.Items[0].UserID, got.Items[1].UserID, got.Items[2].UserID})
+	assert.Equal(t, []int{1, 2, 3}, []int{got.Items[0].Position, got.Items[1].Position, got.Items[2].Position},
 		"positions close up — an excluded row leaves no gap")
 }
 
-// A season whose ONLY rows are 0-SP reads as empty, which is what makes the
-// empty-state copy ("Nobody has earned Season Points yet") true.
-func TestGetLeaderboard_SeasonOfOnlyZeroSPRowsReadsAsEmpty(t *testing.T) {
+// A season whose ONLY rows have no games played reads as empty.
+func TestGetLeaderboard_SeasonOfOnlyUnplayedRowsReadsAsEmpty(t *testing.T) {
 	repo := newMockRepo(testWindow)
-	repo.seed(1, "a", 0, 2)
-	repo.seed(2, "b", 0, 1)
+	repo.seed(1, "a", 0, 0)
+	repo.seed(2, "b", 0, 0)
 
 	rec, err := callLeaderboard(t, repo, 42, "season=current")
 	require.NoError(t, err)
@@ -1114,22 +1160,26 @@ func TestGetLeaderboard_SeasonOfOnlyZeroSPRowsReadsAsEmpty(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), `"items":[]`)
 }
 
-// The agreement that the exclusion must not break: with a 0-SP row present in
-// the season, every listed row's position still equals its own CountAhead + 1.
-func TestGetLeaderboard_PositionsStillAgreeWithAZeroSPRowPresent(t *testing.T) {
+// The agreement the membership rule must not break: with 0-SP players listed and
+// an unplayed row present, every listed row's position still equals its own
+// CountAhead + 1 — including the tied 0-SP players at the bottom.
+func TestGetLeaderboard_PositionsAgreeWithZeroSPPlayersListed(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.seed(1, "top", 5000, 9)
-	repo.seed(2, "absentee", 0, 1)
+	repo.seed(2, "floored", 0, 1)
 	repo.seed(3, "mid", 900, 7)
 	repo.seed(4, "tied", 900, 7)
+	repo.seed(5, "floored2", 0, 2)
+	repo.seed(6, "unplayed", 0, 0)
 
 	// Each listed player asks for their own standing in turn.
-	for _, viewerID := range []uint{1, 3, 4} {
+	for _, viewerID := range []uint{1, 2, 3, 4, 5} {
 		rec, err := callLeaderboard(t, repo, viewerID, "season=current")
 		require.NoError(t, err)
 		got := decodeLeaderboard(t, rec)
+		require.Len(t, got.Items, 5)
 
-		require.NotNil(t, got.Viewer, "user %d earned SP and must have a standing", viewerID)
+		require.NotNil(t, got.Viewer, "user %d played and must have a standing", viewerID)
 		var own *season.LeaderboardRowView
 		for i := range got.Items {
 			if got.Items[i].UserID == viewerID {
@@ -1241,29 +1291,29 @@ func TestGetLeaderboard_UnknownSeasonIdIs404(t *testing.T) {
 }
 
 // Picking an ENDED season renders THAT season's standings — and the viewer
-// block runs under the same sp > 0 rule it has on the current window.
+// block runs under the same games_played >= 1 rule it has on the current window.
 func TestGetLeaderboard_EndedSeasonByIdRendersItsStandings(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.seasons = []season.Season{*endedWindow}
 	// Current window: a ladder that must NOT leak into the prior season's view.
 	seedLadder(repo, 3)
-	// The ended season: two earners and the viewer at 0 SP.
-	seedEnded(repo, 21, "past-top", 4000, 12)
-	seedEnded(repo, 22, "past-second", 900, 8)
+	// The ended season: three players, one of them finished on 0 SP.
+	seedEnded(repo, 21, "past-top", 1000, 12)
+	seedEnded(repo, 22, "past-second", 400, 8)
 	seedEnded(repo, 23, "past-zero", 0, 3)
 
 	rec, err := callLeaderboard(t, repo, 22, "season=5")
 	require.NoError(t, err)
 
 	got := decodeLeaderboard(t, rec)
-	assert.Equal(t, int64(2), got.Total, "the prior season's OWN population, sp > 0 only")
-	require.Len(t, got.Items, 2)
-	assert.Equal(t, []uint{21, 22}, []uint{got.Items[0].UserID, got.Items[1].UserID})
-	assert.Equal(t, "gold", got.Items[0].Tier, "tier derived from the frozen SP")
+	assert.Equal(t, int64(3), got.Total, "the prior season's OWN population, everyone who played")
+	require.Len(t, got.Items, 3)
+	assert.Equal(t, []uint{21, 22, 23}, []uint{got.Items[0].UserID, got.Items[1].UserID, got.Items[2].UserID})
+	assert.Equal(t, "diamond", got.Items[0].Tier, "tier derived from the frozen SP")
 
-	require.NotNil(t, got.Viewer, "the viewer earned SP in that season")
+	require.NotNil(t, got.Viewer, "the viewer played in that season")
 	assert.Equal(t, 2, got.Viewer.Position)
-	assert.Equal(t, 900, got.Viewer.SP)
+	assert.Equal(t, 400, got.Viewer.SP)
 
 	// And the resolved id — not the current window's — reached the repository.
 	assert.Equal(t, [3]int{int(endedWindow.ID), 10, 0}, repo.lastPageArgs)
@@ -1358,7 +1408,7 @@ func TestGetSeasons_ResolverFailureSurfaces(t *testing.T) {
 func TestGetPlayerSeasonArchive_WirePayloadKeysAreExact(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.seasons = []season.Season{*endedWindow}
-	seedEnded(repo, 42, "archiver", 1800, 14)
+	seedEnded(repo, 42, "archiver", 450, 14)
 
 	rec, err := callArchive(t, repo, 7, "42")
 	require.NoError(t, err)
@@ -1384,7 +1434,7 @@ func TestGetPlayerSeasonArchive_WirePayloadKeysAreExact(t *testing.T) {
 
 	assert.IsType(t, "", row["seasonName"])
 	assert.IsType(t, "", row["tier"])
-	assert.Equal(t, "silver", row["tier"], "1800 SP derives Silver — never the stored column")
+	assert.Equal(t, "silver", row["tier"], "450 SP derives Silver — never the stored column")
 	for _, numeric := range []string{"seasonId", "sp", "gamesPlayed"} {
 		assert.IsType(t, float64(0), row[numeric], "%s must be a JSON number", numeric)
 	}
@@ -1408,7 +1458,7 @@ func TestGetPlayerSeasonArchive_ActiveExcludedZeroSPKept(t *testing.T) {
 	// Active season: must not appear.
 	repo.seed(42, "archiver", 5000, 9)
 	// Ended seasons: one earned, one played at 0 SP — BOTH archive rows.
-	seedEnded(repo, 42, "archiver", 900, 8)
+	seedEnded(repo, 42, "archiver", 200, 8)
 	repo.rows[key(42, older.ID)] = &season.PlayerSeason{
 		UserID: 42, SeasonID: older.ID, SP: 0, RankTier: "iron", GamesPlayed: 2,
 	}
@@ -1423,7 +1473,7 @@ func TestGetPlayerSeasonArchive_ActiveExcludedZeroSPKept(t *testing.T) {
 	require.Len(t, env.Data.Items, 2, "the active season is not history yet")
 
 	assert.Equal(t, "2026 Q2", env.Data.Items[0].SeasonName, "newest-first")
-	assert.Equal(t, 900, env.Data.Items[0].SP)
+	assert.Equal(t, 200, env.Data.Items[0].SP)
 	assert.Equal(t, "bronze", env.Data.Items[0].Tier)
 
 	assert.Equal(t, "2026 Q1", env.Data.Items[1].SeasonName)
@@ -1496,7 +1546,7 @@ func TestCurrentSeasonRank_NilWhenNeverPlayed(t *testing.T) {
 func TestCurrentSeasonRank_DerivesTierFromSP(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
-		UserID: 42, SeasonID: testWindow.ID, SP: 4000,
+		UserID: 42, SeasonID: testWindow.ID, SP: 700,
 		RankTier:    "iron", // deliberately stale — must be ignored (D7)
 		GamesPlayed: 30, GamesCompleted: 28,
 	}
@@ -1507,11 +1557,10 @@ func TestCurrentSeasonRank_DerivesTierFromSP(t *testing.T) {
 	require.NotNil(t, rank)
 	assert.Equal(t, "2026 Q3", rank.SeasonName)
 	assert.Equal(t, "gold", rank.Tier, "derived from SP, whatever the column says")
-	assert.Equal(t, 4000, rank.SP)
+	assert.Equal(t, 700, rank.SP)
 }
 
-// A 0-SP row is a REAL rank (Iron) — the row's existence gates the block, not
-// leaderboardScope's sp > 0 membership rule.
+// A 0-SP row is a REAL rank (Iron) — the row's existence gates the block.
 func TestCurrentSeasonRank_ZeroSPRowIsIronNotNil(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
