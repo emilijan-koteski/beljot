@@ -50,7 +50,7 @@ Settings → Secrets and variables → Actions → *Variables*:
 
 | Variable | Required | Secret | Description |
 |---|---|---|---|
-| `BELJOT_DB_URL` | yes | yes | `postgres://beljot_user:<password>@infrastructure-postgres-qopj51:5432/beljot_db?sslmode=disable`. `sslmode=disable` is intentional (same-host overlay). Percent-encode the password if it contains `@ / ? # %` or `:`. |
+| `BELJOT_DB_URL` | yes | yes | `postgres://beljot_user:<password>@infrastructure-postgres-qopj51:5432/beljot_db?sslmode=disable&connect_timeout=5`. `sslmode=disable` is intentional (same-host overlay); `connect_timeout=5` makes an unreachable database fail the start within seconds instead of hanging until the health check kills the task. Percent-encode the password if it contains `@ / ? # %` or `:`. |
 | `BELJOT_JWT_SECRET` | yes | yes | HMAC key for access and refresh tokens. The process refuses to start with the default value outside development. Reuse the old server's value so nobody is logged out by the move. |
 | `BELJOT_ENV` | yes | no | `production`. Any value but `development` makes a missing JWT secret fatal and turns on the production warnings. |
 | `BELJOT_APP_BASE_URL` | yes | no | `https://beljot.online`. Origin used in password-reset links. |
@@ -69,7 +69,7 @@ Settings → Secrets and variables → Actions → *Variables*:
 
 The backend applies pending migrations at start (golang-migrate, `schema_migrations` table, files embedded from `server/migrations`). The restored production database is at version 29 (`000029_queue_2026_q3_recalculation`), so the first start logs `database schema up to date version=29` and changes nothing. A failed migration ends the process with `database migration failed: …`; with the Swarm settings below the previous task keeps serving.
 
-The connection pool is capped at 10 open connections; the shared instance's `max_connections` is 100.
+The connection pool is capped at 10 open connections so Beljot takes a small share of the shared instance's connection budget (Postgres defaults `max_connections` to 100; the actual value is a server-side setting, not confirmed here).
 
 ## Frontend service
 

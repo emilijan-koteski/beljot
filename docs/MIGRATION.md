@@ -28,7 +28,7 @@ Add `next.beljot.online` as an **A** record → `178.18.243.34`, **DNS only** (g
 1. Project **Beljot**.
 2. Application **beljot-backend**: Provider *Docker*, image `ghcr.io/emilijan-koteski/beljot-backend:latest` (the workflow replaces the tag with a pinned `sha-…` on every deploy), registry GHCR (already configured for the panel).
    - Environment tab: every variable in the backend table of [DEPLOYMENT.md](DEPLOYMENT.md), values copied from the old `.env`. Two differ from the old host:
-     `BELJOT_DB_URL=postgres://beljot_user:<new password>@infrastructure-postgres-qopj51:5432/beljot_db?sslmode=disable` (percent-encode the password if it contains `@ / ? # % :`), and
+     `BELJOT_DB_URL=postgres://beljot_user:<new password>@infrastructure-postgres-qopj51:5432/beljot_db?sslmode=disable&connect_timeout=5` (percent-encode the password if it contains `@ / ? # % :`; the timeout makes a wrong hostname fail the start in seconds instead of hanging), and
      `BELJOT_CORS_ORIGINS=https://beljot.online,https://next.beljot.online` (trimmed back in 3.1).
      `POSTGRES_*`, `IMAGE_TAG`, `ACME_EMAIL` and `CLOUDFLARE_API_TOKEN` from the old `.env` are not used anymore.
    - Advanced → Cluster Settings → Swarm Settings: the Health Check, Update Config and Resources values from DEPLOYMENT.md.
@@ -51,7 +51,7 @@ starting server port=8080
 
 Then, on Winterfell:
 ```bash
-PG=$(docker ps -q --filter name=infrastructure-postgres-qopj51)
+PG=$(docker ps -q --filter name=infrastructure-postgres-qopj51 --filter status=running | head -n1)
 docker exec "$PG" psql -U beljot_user -d beljot_db -tAc 'select version, dirty from schema_migrations'   # 29|f
 curl -fsS https://next.beljot.online/health; echo          # {"status":"ok"}  (backend, through Traefik)
 curl -fsS https://next.beljot.online/version.json; echo    # {"version":"<full commit sha>"}
@@ -82,49 +82,63 @@ There is no read-only mode; stopping `api` is the freeze. Visitors get a Cloudfl
 set -a; . ./.env; set +a
 docker compose -f docker-compose.prod.yml exec -T postgres \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-privileges \
-  | gzip -9 > /var/backups/beljot/beljot-final.sql.gz
-ls -la /var/backups/beljot/beljot-final.sql.gz
+  | gzip -9 > ~/beljot-final.sql.gz
+ls -la ~/beljot-final.sql.gz
 ```
-Anything played on the old host after this dump is not carried over; that is why `api` is stopped first.
+The dump goes to the home directory on purpose: `/var/backups/beljot` belongs to root (the old cron job created it), so writing there as `deploy` fails. Anything played on the old host after this dump is not carried over; that is why `api` is stopped first.
 
 ### 2.3 Copy it ☐
 From the laptop (or straight from Winterfell if it has SSH access to the old host):
 ```bash
-scp deploy@<old-host>:/var/backups/beljot/beljot-final.sql.gz .
+scp deploy@<old-host>:beljot-final.sql.gz .
 scp beljot-final.sql.gz root@178.18.243.34:/root/
 ```
 
 ### 2.4 Restore into beljot_db (Winterfell) ☐
 Stop the backend first (Dokploy → beljot-backend → Stop) so no connection is open during the load; the frontend can stay up.
 ```bash
-PG=$(docker ps -q --filter name=infrastructure-postgres-qopj51)
+PG=$(docker ps -q --filter name=infrastructure-postgres-qopj51 --filter status=running | head -n1)
 zcat /root/beljot-final.sql.gz | docker exec -i "$PG" psql -U beljot_user -d beljot_db -v ON_ERROR_STOP=1 --single-transaction -q
 ```
 The dump was taken with `--clean --if-exists`, so every table is dropped and recreated: the trial data is replaced, not merged. With `--no-owner --no-privileges` there are no references to the old `beljot` role, so `beljot_user` owns everything it creates. The whole load is one transaction: on any error nothing changes and the command exits non-zero.
 
 ### 2.5 Verify row counts on both sides ☐
-Run the query below on the old host
+Exact counts for every table, on the old host:
 ```bash
-docker compose -f docker-compose.prod.yml exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f - > /tmp/counts-old.txt
-```
-and on Winterfell
-```bash
-docker exec -i "$PG" psql -U beljot_user -d beljot_db -f - > /tmp/counts-new.txt
-```
-feeding it this on stdin (exact counts for every table):
-```sql
+cd /opt/beljot && set -a && . ./.env && set +a
+docker compose -f docker-compose.prod.yml exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tA -f - > /tmp/counts-old.txt <<'SQL'
 SELECT table_name,
        (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I', table_name), false, true, '')))[1]::text::int AS rows
 FROM information_schema.tables
 WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
 ORDER BY table_name;
+SQL
+cat /tmp/counts-old.txt
 ```
-`diff` the two files: they must be identical. Then Dokploy → beljot-backend → Start and confirm the log shows `version=29` again.
+and on Winterfell:
+```bash
+PG=$(docker ps -q --filter name=infrastructure-postgres-qopj51 --filter status=running | head -n1)
+docker exec -i "$PG" psql -U beljot_user -d beljot_db -tA -f - > /tmp/counts-new.txt <<'SQL'
+SELECT table_name,
+       (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I', table_name), false, true, '')))[1]::text::int AS rows
+FROM information_schema.tables
+WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+ORDER BY table_name;
+SQL
+cat /tmp/counts-new.txt
+```
+Compare from the laptop:
+```bash
+ssh deploy@<old-host> cat /tmp/counts-old.txt > counts-old.txt
+ssh root@178.18.243.34 cat /tmp/counts-new.txt > counts-new.txt
+diff counts-old.txt counts-new.txt && echo "row counts identical"
+```
+The files must be identical. Then Dokploy → beljot-backend → Start and confirm the log shows `version=29` again.
 
 ### 2.6 Switch the domains ☐
 1. Dokploy → beljot-frontend → Domains: add `beljot.online` (path `/`) and `www.beljot.online` (path `/`), port `8080`, HTTPS with Let's Encrypt. Advanced → Redirects: preset **www to non-www**.
 2. Dokploy → beljot-backend → Domains: add host `beljot.online` three times with paths `/api`, `/ws`, `/health`, port `8080`, HTTPS.
-3. Cloudflare → DNS: point every A/AAAA record for `beljot.online` and `www` at `178.18.243.34`, still proxied. SSL/TLS → *Full (strict)*; Edge Certificates → *Always Use HTTPS* off (Traefik does the redirect; the HTTP path must stay open for the Let's Encrypt challenge).
+3. Cloudflare → DNS: first note the current values (rollback needs them), then set the **A** records for `beljot.online` and `www` to `178.18.243.34` (still proxied) and **delete any AAAA records**: Winterfell is reached over IPv4 only, and a leftover AAAA would send part of the traffic to the old host. SSL/TLS → *Full (strict)*; Edge Certificates → *Always Use HTTPS* off (Traefik does the redirect; the HTTP path must stay open for the Let's Encrypt challenge).
 4. Wait for the certificates. Until Traefik has them, Cloudflare answers **526** on the new hostnames; on Winterfell `docker service logs dokploy-traefik --since 5m 2>&1 | grep -i acme` shows progress. Usually under a minute:
    ```bash
    curl -fsS https://beljot.online/health; echo
@@ -142,7 +156,7 @@ Cutover is done; players can play.
 3. ☐ UptimeRobot: keep or add monitors for `https://beljot.online/health` (backend, through Traefik) and `https://beljot.online/` (frontend).
 4. ☐ Remove the `next.beljot.online` domains from both applications and delete its DNS record.
 5. ☐ GitHub: delete the secrets `VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_KEY`, `PROD_ENV_FILE`, `GHCR_PULL_TOKEN` and the `production` environment; the new workflow uses none of them.
-6. ☐ Old host: copy `/var/backups/beljot/*.sql.gz` (the last seven nightly dumps plus `beljot-final.sql.gz`) off the machine, for example `scp 'deploy@<old-host>:/var/backups/beljot/*.sql.gz' ~/beljot-old-backups/`. Winterfell's nightly job has covered `beljot_db` since it was created.
+6. ☐ Old host: copy the last seven nightly dumps and the final one off the machine, for example `scp 'deploy@<old-host>:/var/backups/beljot/*.sql.gz' 'deploy@<old-host>:beljot-final.sql.gz' ~/beljot-old-backups/`. Winterfell's nightly job has covered `beljot_db` since it was created.
 7. ☐ **Irreversible.** Cloudflare → API Tokens: revoke the token Caddy used for DNS challenges (it carries `Zone:DNS:Edit` on the zone). Do this only once the rollback window (section 4) is over.
 8. ☐ **Irreversible.** Decommission the Contabo VPS after a quiet week. The snapshot taken before this migration is the only way back afterwards.
 
@@ -150,6 +164,6 @@ Cutover is done; players can play.
 
 Valid until 3.8. Matches played on Winterfell after 2.6 are lost by rolling back, so decide within the first hour of the cutover.
 
-1. Cloudflare → DNS: A/AAAA records for `beljot.online` and `www` back to the old host's IP (still proxied).
+1. Cloudflare → DNS: restore the A records (and any AAAA records) for `beljot.online` and `www` exactly as noted in 2.6, still proxied.
 2. Old host: `cd /opt/beljot && docker compose -f docker-compose.prod.yml start api web`.
 3. `curl -fsS https://beljot.online/version.json` shows the old build's SHA. The Dokploy applications can stay running; nothing routes to them.
