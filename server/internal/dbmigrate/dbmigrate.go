@@ -19,7 +19,9 @@ import (
 // Up applies every pending migration and returns the resulting schema version.
 // It opens its own short-lived connection: the driver closes whatever *sql.DB
 // it is handed, so sharing the app's pool would tear the pool down. A Postgres
-// advisory lock inside golang-migrate keeps two replicas from racing.
+// advisory lock inside golang-migrate keeps two replicas from racing. A dirty
+// version (a half-applied migration) is reported by Up itself as
+// migrate.ErrDirty, so it cannot slip through to Version.
 func Up(databaseURL string) (uint, error) {
 	src, err := iofs.New(migrations.FS, ".")
 	if err != nil {
@@ -48,12 +50,9 @@ func Up(databaseURL string) (uint, error) {
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return 0, fmt.Errorf("apply migrations: %w", err)
 	}
-	version, dirty, err := m.Version()
+	version, _, err := m.Version()
 	if err != nil {
 		return 0, fmt.Errorf("read migration version: %w", err)
-	}
-	if dirty {
-		return version, fmt.Errorf("migration version %d is dirty; repair it by hand before restarting", version)
 	}
 	return version, nil
 }

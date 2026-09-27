@@ -8,9 +8,11 @@ import (
 )
 
 // Runs only where a disposable Postgres is available (CI sets the variable;
-// see .github/workflows/ci.yml). Applying the full set twice proves the second
-// run is a no-op, which is exactly what the first production start must be
-// against the restored database.
+// see .github/workflows/ci.yml). CI migrates that database with the
+// golang-migrate CLI before the tests run, so the first Up already finds a
+// schema_migrations table written by the old tool and must accept it as a
+// no-op: exactly the restored-production case. Against an empty database the
+// first Up applies everything and the second is the no-op.
 func TestUpIsIdempotent(t *testing.T) {
 	url := os.Getenv("BELJOT_TEST_DB_URL")
 	if url == "" {
