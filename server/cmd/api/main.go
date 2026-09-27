@@ -21,6 +21,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/auth"
 	"github.com/emilijan/beljot/server/internal/chat"
 	"github.com/emilijan/beljot/server/internal/config"
+	"github.com/emilijan/beljot/server/internal/dbmigrate"
 	"github.com/emilijan/beljot/server/internal/emote"
 	"github.com/emilijan/beljot/server/internal/friend"
 	"github.com/emilijan/beljot/server/internal/identity"
@@ -42,6 +43,13 @@ func main() {
 
 	cfg := config.Load()
 
+	schemaVersion, err := dbmigrate.Up(cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("database migration failed", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("database schema up to date", "version", schemaVersion)
+
 	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{
 		Logger: gormlogger.New(
 			log.New(os.Stdout, "", log.LstdFlags),
@@ -56,6 +64,18 @@ func main() {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		slog.Error("failed to access database pool", "error", err)
+		os.Exit(1)
+	}
+	// The Postgres instance is shared with other projects: keep this app's
+	// share of max_connections small and recycle connections so a failover or
+	// restart on the database side is picked up.
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+
 	userRepo := user.NewGormUserRepository(db)
 	refreshRepo := refreshtoken.NewGormRepository(db)
 	identityRepo := identity.NewGormRepository(db)
@@ -88,6 +108,7 @@ func main() {
 
 	e := echo.New()
 	e.HideBanner = true
+	e.IPExtractor = clientIPExtractor()
 
 	// Middleware registration order is load-bearing: CORS -> Logging -> Error Handler -> Auth
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
@@ -109,11 +130,12 @@ func main() {
 		LogURI:      true,
 		LogMethod:   true,
 		LogError:    true,
+		LogRemoteIP: true,
 		HandleError: true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			// Failures log at ERROR/WARN so they surface without grepping every
 			// request line. 5xx is ours, 4xx is the caller's.
-			attrs := []any{"method", v.Method, "uri", v.URI, "status", v.Status}
+			attrs := []any{"method", v.Method, "uri", v.URI, "status", v.Status, "ip", v.RemoteIP}
 			if v.Error != nil {
 				attrs = append(attrs, "error", v.Error.Error())
 			}
@@ -133,9 +155,13 @@ func main() {
 
 	// Routes
 	// HEAD is registered explicitly so health-check probes (UptimeRobot,
-	// load balancers, k8s) that default to HEAD don't get 405s.
-	e.GET("/health", healthHandler)
-	e.HEAD("/health", healthHandler)
+	// load balancers, Swarm) that default to HEAD don't get 405s. /health is
+	// the public path (Traefik routes it here); /healthz is the container probe.
+	health := healthHandler(sqlDB)
+	e.GET("/health", health)
+	e.HEAD("/health", health)
+	e.GET("/healthz", health)
+	e.HEAD("/healthz", health)
 
 	// Auth routes — public, no auth middleware
 	authGroup := e.Group("/api/v1/auth")
@@ -465,10 +491,6 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("server stopped")
-}
-
-func healthHandler(c echo.Context) error {
-	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // logSeasonRecalculation logs one finished recalculation job: how many rows it

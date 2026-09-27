@@ -1,23 +1,20 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS vite-build
+FROM node:22-alpine AS builder
 WORKDIR /src
-ARG VITE_GOOGLE_CLIENT_ID=""
-ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
-ARG APP_VERSION=""
-ENV APP_VERSION=$APP_VERSION
-COPY client/package.json client/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
-COPY client/ ./
+COPY . .
+ARG VITE_GOOGLE_CLIENT_ID=""
+ARG APP_VERSION=""
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID \
+    APP_VERSION=$APP_VERSION
 RUN npm run build
 
-FROM caddy:2.10-builder-alpine AS caddy-build
-RUN xcaddy build \
-    --with github.com/caddy-dns/cloudflare
-
-FROM caddy:2.10-alpine
-COPY --from=caddy-build /usr/bin/caddy /usr/bin/caddy
-COPY --from=vite-build /src/dist /srv
-COPY Caddyfile.prod /etc/caddy/Caddyfile
-EXPOSE 80 443
+FROM nginxinc/nginx-unprivileged:1.28-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /src/dist /usr/share/nginx/html
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1

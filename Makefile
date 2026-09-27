@@ -1,4 +1,4 @@
-.PHONY: dev build test lint migrate seed deploy backup
+.PHONY: dev build test lint migrate seed
 
 -include .env
 export
@@ -27,9 +27,3 @@ migrate:
 
 seed:
 	@echo "Seed script not yet implemented"
-
-deploy:
-	bash scripts/deploy.sh
-
-backup:
-	bash scripts/backup-db.sh
