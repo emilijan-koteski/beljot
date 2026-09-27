@@ -59,9 +59,9 @@ FR33: Players earn XP from completed matches proportional to game points scored 
 FR34: Players advance through a lifetime level system as XP accumulates; the level is a career signal only with no gating behavior
 FR35: [retired — ranked/ELO queue removed; competitive pairing replaced by honor-gated rooms (FR57) and seasonal rank visibility (FR37)]
 FR36: [retired — placement matches removed; no ELO to calibrate in the new system]
-FR37: Players can view their current seasonal rank tier (8 tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster) based on Season Points earned in the current quarterly season
+FR37: Players can view their current seasonal rank (8 tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster; Iron through Diamond each split into divisions 1–3, 3 highest; Master and Grandmaster single) based on their Season Points in the current quarterly season; rank rises and falls with SP
 FR38: [retired — ELO penalty removed; abandonment is deterred via the Honor system (FR56)]
-FR39: Players can view a seasonal leaderboard of top Season-Point earners
+FR39: Players can view a seasonal leaderboard of players ranked by current Season Points
 FR40: The system runs 3-month quarterly seasons with soft rank resets (all players start the next season at Iron with 0 SP); prior-season archive is preserved on the profile, with zero-game seasons omitted
 FR41: Players can view their full match history with per-match scoring detail and outcomes
 FR42: Players can view career statistics including win/loss record, total game points scored, lifetime XP/level, honor score with raw counts, and prior-season rank archive
@@ -87,6 +87,8 @@ FR61: Friends can exchange private one-on-one "whisper" messages, initiated with
 FR62: Room members can invite "available" friends (online, in the lobby, not in any room or match) into a room in `waiting` status. A host (owner) invite bypasses the room password via a server-authorized one-time grant; a non-host member's invite still requires the invitee to enter the room password if one is set. Invites are delivered as a popup, expire on timeout, and auto-void if the room fills/closes or the friend leaves the lobby. The honor gate (FR57) and seat capacity still apply to all invitees (added 2026-08-14)
 FR63: Players can choose a card deck style (French-suited default, Croatian/German-suited alternative) as a persisted account preference, selectable from the in-game Settings dialog alongside language. The choice is purely visual, applies to every card surface in a match, is free of charge, and has no gameplay effect — it is not a purchasable cosmetic (see FR50) (added 2026-08-18)
 FR64: The Bitola variant applies the **hanging points** tie rule: when the taker's team total equals the opponents', neither team scores and the hand's points are carried over to the side that wins the next decisive hand. Interacts with the 1001/501 match target and match-end resolution. Croatian keeps all-points-to-opponents, which is what ships today for both variants as an interim stand-in. Split out of Story 3.5 (added 2026-08-18)
+FR65: The system changes each human player's Season Points after every match: winners gain and losers lose SP, scaled by the score margin relative to the match target and by the gap between the two teams' average SP (Elo-style expected result; bot seats count as a fixed SP at the Gold 1 floor); a team that makes a Capot gains a small flat bonus; season SP never drops below 0 (added 2026-09-26)
+FR66: The system penalizes abandonment in SP: the abandoning player loses a fixed amount equal to twice the largest possible match loss; their teammate loses half of what a surrender at that moment would have cost; the opponents are scored as winning by surrender (added 2026-09-26)
 
 ### NonFunctional Requirements
 
@@ -172,7 +174,7 @@ NFR17: A single player's disconnection must not affect game state integrity or c
 - Phase 1: ~25 FRs (auth, Bitola variant only, lobby/rooms, real-time session, chat, disconnect handling, basic match history, i18n EN+SR, desktop web)
 - Phase 2: Coin economy (FR53–55), XP/lifetime level (FR33–34), honor system (FR56–57), private rooms (FR60), room owner kick/seat (FR58), team surrender (FR28a), in-game emotes (FR32), additional languages MK+HR (FR45), 501 mode (FR15 — moved from Phase 3 on 2026-06-11, see sprint-change-proposal-2026-06-11.md)
 - Phase 3: Player search (FR5), friends (FR6), friend whisper chat (FR61), friend room invites (FR62), public profiles (FR47), Croatian variant (FR8), in-app rules reference (FR29)
-- Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40), social login (FR3 — Google shipped early via Story 14.1; Facebook Story 14.2 pending). Mobile (FR52) descoped 2026-08-14 — Epic 15 removed (see sprint-change-proposal-2026-08-14.md)
+- Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40, FR65, FR66), social login (FR3 — Google shipped early via Story 14.1; Facebook Story 14.2 pending). Mobile (FR52) descoped 2026-08-14 — Epic 15 removed (see sprint-change-proposal-2026-08-14.md)
 - Phase 5: Spectator (FR48), achievements (FR49), cosmetics (FR50), tournaments (FR51)
 - Agents must NOT implement the Croatian variant before Phase 3 (501 mode was moved to Phase 2 / Epic 10 on 2026-06-11 and is no longer phase-gated)
 - Tied-hand rule diverges by variant (deferred to Epic 12 / Phase 3): the interim engine applies the **Croatian** rule (a tie sends all points to the taker's opponents) to all variants; the **Bitola** variant must later use **hanging points (carry-over)** instead. See `deferred-work.md`. Do not treat the current Bitola tie behavior as a bug before then.
@@ -261,6 +263,8 @@ FR61: Epic 11 — Friend whisper chat (private friend-to-friend messaging, anti-
 FR62: Epic 11 — Friend room invites (host password-bypass; non-host password-required; added 2026-08-14)
 FR63: Epic 12 — Card deck style preference (free, Settings-level; added 2026-08-18)
 FR64: Epic 12 — Bitola hanging-points tie rule (added 2026-08-18)
+FR65: Epic 13 — Competitive SP formula (win/loss, margin, opponent strength; added 2026-09-26)
+FR66: Epic 13 — SP abandonment penalties (added 2026-09-26)
 
 ## Epic List
 
@@ -363,9 +367,9 @@ Players can play the Croatian variant, choose the card deck style they play with
 
 ### Epic 13: Seasonal Rank & Leaderboard
 
-Players earn Season Points (SP) per match, climb an 8-tier seasonal ladder (Iron → Grandmaster) across 3-month quarterly seasons, and view a seasonal leaderboard. Prior seasons are archived on the profile (zero-game seasons skipped).
+Players win and lose Season Points (SP) per match on a competitive seasonal ladder: 8 tiers (Iron → Grandmaster), with Iron through Diamond split into divisions 1–3, where players can climb and drop, across 3-month quarterly seasons. They can view a seasonal leaderboard. Prior seasons are archived on the profile (zero-game seasons skipped). *Reworked 2026-09-26 (sprint-change-proposal-2026-09-26): the original SP ladder only went up (13.1); Stories 13.4–13.5 replace it with a win/loss ladder.*
 
-**FRs covered:** FR37, FR39, FR40
+**FRs covered:** FR37, FR39, FR40, FR65, FR66
 **Phase:** 4
 
 ### Epic 14: Social Login
@@ -2565,9 +2569,11 @@ So that the variant is available rather than merely implemented.
 
 ## Epic 13: Seasonal Rank & Leaderboard
 
-Players earn Season Points (SP) per match, climb an 8-tier seasonal ladder (Iron → Grandmaster) across 3-month quarterly seasons, and view a seasonal leaderboard. Prior seasons are archived on the profile (zero-game seasons skipped).
+Players win and lose Season Points (SP) per match on a competitive seasonal ladder: 8 tiers (Iron → Grandmaster), with Iron through Diamond split into divisions 1–3, where players can climb and drop, across 3-month quarterly seasons. They can view a seasonal leaderboard. Prior seasons are archived on the profile (zero-game seasons skipped). *Reworked 2026-09-26 (sprint-change-proposal-2026-09-26): the original SP ladder only went up (13.1); Stories 13.4–13.5 replace it with a win/loss ladder.*
 
 ### Story 13.1: Season Points (SP) & Tier Climb
+
+> **Superseded in part (2026-09-26):** the SP formula AC and the flat 8-tier thresholds below describe what was delivered, and are replaced by Story 13.4 (formula) and Story 13.5 (divisions and demotion). The schema AC still holds. See sprint-change-proposal-2026-09-26.md.
 
 As a player,
 I want to earn Season Points for every match I play and watch my rank tier advance,
@@ -2597,6 +2603,8 @@ So that I have an active competitive goal distinct from lifetime level.
 
 ### Story 13.2: Seasonal Leaderboard
 
+> **Amended (2026-09-26):** leaderboard membership becomes "played ≥ 1 match this season" rather than "has any SP" (Story 13.4), so players who lose back down to 0 SP stay on the ladder.
+
 As a competitive player,
 I want to view a leaderboard of top SP earners in the current season,
 So that I can see where I stand in the community.
@@ -2621,6 +2629,8 @@ So that I can see where I stand in the community.
 
 ### Story 13.3: Season Rollover & Prior-Season Archive
 
+> **Amended (2026-09-26):** the archive's "final tier" is the stored end-of-season snapshot, not re-derived from SP with the current tier table. Seasons before 2026 Q4 show a tier without a division (Story 13.5).
+
 As a competitive player,
 I want a fresh start each quarter with my past seasons preserved,
 So that newcomers can compete fairly while my history is still on record.
@@ -2641,6 +2651,115 @@ So that newcomers can compete fairly while my history is still on record.
 **Given** the player has never played a ranked season
 **When** the archive section renders
 **Then** the section is hidden (not shown as "no history") until they complete their first post-Epic-13 season match
+
+### Story 13.4: Competitive SP Formula (Win/Loss Ladder)
+
+As a competitive player,
+I want wins to raise my Season Points and losses to lower them, scaled by the score and by how strong the opponents were,
+So that the seasonal ladder shows who is actually best, not who played the most.
+
+Added 2026-09-26 by sprint-change-proposal-2026-09-26 (input: `_bmad-output/forge/win-loss-rank-ladder/forged-idea.md`). Constants marked *placeholder* are set by the tuning step below.
+
+**Acceptance Criteria:**
+
+**Given** a match ends naturally, at the target ("dosta"), by surrender, or by instant win
+**When** SP is calculated for each human seat
+**Then** winners gain `base_win × margin × 2·(1 − E_winner)` and losers lose `base_loss × margin × 2·E_loser`, rounded, with both teammates receiving the same change
+**And** `margin = 0.5 + (winner points − loser points) ÷ match target` (501 or 1001), clamped to 0.5–1.5; on surrender the winners' points count as the target; on an instant win the margin is 1.5
+**And** `E = 1 / (1 + 10^((opponent avg SP − own avg SP) / S))`, where a team's average is the mean of its two seats' current-season SP and every bot seat counts as the SP floor of Gold 1
+**And** `base_win > base_loss` (*placeholder* +30 / −20), so a player winning half their matches against equal opponents slowly gains SP
+**And** each team that made at least one Capot in the match gains a flat +5 SP, once per match, added after scaling
+**And** a player's season SP never drops below 0
+**And** the old terms are gone: the +50 for finishing, the flat +100 for winning, game points ÷ 10, and the +50 Capot / instant-win bonus for all seats
+
+**Given** a seat's reconnect window expires and the match is abandoned
+**When** SP is calculated
+**Then** the abandoning seat loses a fixed `2 × worst possible loss`, where the worst possible loss is `base_loss × 1.5 × 2` (*placeholder* −120)
+**And** the abandoner's teammate loses half of what a surrender at that moment would have cost them, in every room type
+**And** the opponents receive a normal win, scored as a surrender
+**And** every other human seat is scored by its team's result whether or not it was connected at that moment; `games_completed` keeps its presence meaning
+
+**Given** a match includes bot seats (including Quick Play auto-fill)
+**When** SP is calculated
+**Then** bot seats neither gain nor lose SP, the humans at the table are scored normally, and the match counts for rank
+
+**Given** the seasonal leaderboard (Story 13.2)
+**When** membership is evaluated for the page, the total count and the viewer's position
+**Then** a player is on the ladder if they have played at least one match this season, including at 0 SP
+
+**Given** the offline tuning command, which is not shipped in the production image
+**When** it replays every stored 2026 Q3 match in completion order through the new formula
+**Then** it reports each player's final SP, tier and division, their win rate overall, and their win rate on bot-only tables
+**And** the constants (`base_win`, `base_loss`, `S`, the Gold 1 floor, all tier floors) are chosen so that a sustained ~85% win rate on bot-only tables settles at the Grandmaster floor (roughly 50% → Gold, 60% → Platinum, 70% → Diamond, 80% → Master), and a player winning 50% reaches Silver within about 20 matches from Iron 0
+**And** instant wins are recognised from stored data (a 0–0 score and no hands), because the flag isn't persisted
+**And** if time runs out, the release ships the constants derived from the 85% target plus placeholders, to be retuned after a few weeks of Q4
+
+**Given** the release is deployed on or after 2026-10-01 00:00 UTC
+**When** its migration runs
+**Then** any 2026 Q4 `player_seasons` rows already present are cleared, so Q4 standings come only from the new formula
+**And** rows for 2026 Q3 and earlier are untouched
+
+**Technical notes:**
+- Move the calculation into the season service's award transaction. It reads every seated human's current-season row (a missing row means 0 SP) under the existing ascending-user-ID lock, computes the deltas, clamps totals at 0 and writes them.
+- `match` builds a per-match outcome: seat teams, winner, bot seats, final scores, match target, surrender flag, instant-win flag, teams that made a Capot, abandoning seat. `match` must still never import `season`.
+- Keep the DB `CHECK (sp >= 0)`. Fix the first-row INSERT so a first match that is a loss writes 0, not a negative total.
+- Export a match-target helper from `game` (today `matchTarget()` is unexported).
+- Merge or collapse the duplicated `SPAward` / `PlayerSeasonSnapshot` types if that's cheap. Every signature change touches both packages and both test fakes.
+- Tests to update are listed in sprint-change-proposal-2026-09-26.md §2, item 13.
+
+### Story 13.5: Divisions, Demotion & SP Feedback
+
+As a competitive player,
+I want to see my rank with its division, know when I move up or down, and see what each match did to my SP,
+So that I understand where I stand and why it changed.
+
+Added 2026-09-26 by sprint-change-proposal-2026-09-26. Ships with Story 13.4.
+
+**Acceptance Criteria:**
+
+**Given** the season ladder
+**When** a player's SP is placed on it
+**Then** Iron, Bronze, Silver, Gold, Platinum and Diamond each have divisions 1–3, with 1 lowest and 3 highest, splitting that tier's SP band into three equal parts; Master and Grandmaster have no divisions
+**And** the server tier table stays the single source of truth; the client mirror is display-only and changes in the same commit
+
+**Given** any API or wire shape that carries a season tier (current season, leaderboard rows and viewer row, profile `seasonRank`, archive rows, `season_points_awarded`)
+**When** it is served
+**Then** it also carries the division: 1–3, or none for Master, Grandmaster and seasons before 2026 Q4
+**And** the division is stored with the tier snapshot in `player_seasons`
+
+**Given** a player views the prior-season archive
+**When** it renders
+**Then** each season shows its stored final tier and division, not a tier re-derived from SP with the current table
+**And** seasons before 2026 Q4 show their tier without a division
+
+**Given** a match ends and SP is applied
+**When** `event:season_points_awarded` is sent
+**Then** it carries the signed SP change, the new season SP, the tier, the division, the rank change (`promoted` / `demoted` / `none`) and the reason (`normal` / `abandoned` / `partner_abandoned`)
+**And** the Go payload, the golden fixture, the TS type and the zod schema change together
+
+**Given** a player's division or tier goes up
+**When** the event arrives
+**Then** the existing celebratory rank-up toast shows the new tier and division (e.g. "Gold 3")
+
+**Given** a player's division or tier goes down
+**When** the event arrives
+**Then** a subdued notice shows the new rank (e.g. "Dropped to Gold 2"), never the rank-up celebration
+
+**Given** the match result screen
+**When** it renders after a ranked match
+**Then** it shows the player's SP change (+ or −) and their resulting tier and division
+**And** if their partner abandoned, it says so with the reduced loss (e.g. "Partner abandoned: −12 SP (half loss)")
+**And** if the player abandoned, it shows the abandonment penalty
+
+**Given** the RankBanner, the header rank chip, tier badges, leaderboard rows and profile season sections
+**When** they render
+**Then** the rank reads as tier plus division (e.g. "Gold 2"), and the progress bar fills toward the next division (next tier at Diamond 3 / Master; terminal at Grandmaster)
+**And** a negative SP change is displayed as negative, not clamped to 0; totals are still never below 0
+
+**Given** the four locales (en, mk, hr, sr)
+**When** the new strings are added (division label, demotion notice, match-end SP line, partner-abandoned reason)
+**Then** they follow the localization terminology reference: mk in Cyrillic with the SP abbreviation as СП, tier names from the season-tier table, the division as a numeral after the tier name (e.g. „Злато 2"), no em-dashes outside en
+**And** the i18n parity test passes
 
 ## Epic 14: Social Login
 

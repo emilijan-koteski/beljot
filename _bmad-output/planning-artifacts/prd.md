@@ -38,7 +38,7 @@ workflowType: "prd"
 
 ## Executive Summary
 
-Beljot is a purpose-built desktop web platform for Balkan Belot — the team-based card game deeply embedded in the culture of Macedonia, Serbia, and Croatia. Despite a large, passionate, multigenerational player base, no dedicated online platform exists that implements authentic regional rule variants or provides competitive infrastructure. Beljot fills this gap with a modern multiplayer experience supporting both Croatian and Bitola trump variants, a full account and progression system, CIV 6-style lobby matchmaking, and the first-ever competitive ecosystem for Balkan Belot: ELO-based ranked play, an 8-tier ranking system, quarterly seasons, and leaderboards.
+Beljot is a purpose-built desktop web platform for Balkan Belot — the team-based card game deeply embedded in the culture of Macedonia, Serbia, and Croatia. Despite a large, passionate, multigenerational player base, no dedicated online platform exists that implements authentic regional rule variants or provides competitive infrastructure. Beljot fills this gap with a modern multiplayer experience supporting both Croatian and Bitola trump variants, a full account and progression system, CIV 6-style lobby matchmaking, and the first-ever competitive ecosystem for Balkan Belot: a win/loss seasonal ladder (8 tiers with divisions), quarterly seasons, and leaderboards.
 
 The platform targets three core user profiles: competitive regulars seeking ranked progression, casual/social players recreating the kitchen-table experience with friends online, and diaspora players reconnecting with family across borders through the game. Launch supports English and Serbian (Latin script), with 1001-point matches for competitive play and both 1001/501 modes for casual rooms.
 
@@ -60,7 +60,7 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 - **Rule correctness is priority #1.** A rule implementation bug is more damaging than any UI or matchmaking issue. Players who know Belot will immediately detect incorrect behavior, and trust in the platform depends on getting the game right for both Croatian and Bitola variants.
 - Players complete their first game within 5 minutes of registration (zero-friction onboarding).
 - Casual players (Ana profile) can create a private room and be playing with friends in under 2 minutes.
-- Competitive players (Marko profile) experience meaningful rank progression — placement matches, tier promotions, and seasonal resets create a compelling loop.
+- Competitive players (Marko profile) experience meaningful rank progression — division and tier promotions (and the risk of dropping), plus seasonal resets, create a compelling loop.
 - Diaspora players (Ivan profile) can reliably play real-time games across geographic distance without technical friction.
 
 ### Business Success
@@ -165,7 +165,7 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 
 ### Phase 4 — Competitive Climb & Access Expansion
 
-- **Seasonal rank system:** 8 tiers (Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster) across 3-month quarterly seasons. Climb via Season Points (SP) earned per match: 50 (completion) + 100 (win) + floor(team_game_points / 10) + 50 (Capot or instant-win). Abandoners earn 0 SP. No decay. Season end → soft reset (all players start next season at Iron). Profile archives every played season; seasons with zero games are skipped on display.
+- **Seasonal rank system:** 8 tiers (Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster) across 3-month quarterly seasons; Iron through Diamond each have divisions 1–3 (3 highest), Master and Grandmaster are single. Season Points (SP) rise with wins and fall with losses: each match's change is scaled by the score margin relative to the match target and by the gap between the two teams' average SP (Elo-style expected result; bot seats count as a fixed SP at the Gold 1 floor), and a team that makes a Capot gains a small flat bonus. Rank follows SP in both directions, so players can drop a division or a whole tier. Abandoners lose a fixed penalty of twice the largest possible loss; their teammate takes half of a surrender-scored loss. SP never goes below 0. No matchmaking by rank; rooms stay gated by honor and coin buy-in. No decay. Season end → soft reset (all players start next season at Iron with 0 SP). Profile archives every played season; seasons with zero games are skipped on display. *(Reworked 2026-09-26, see sprint-change-proposal-2026-09-26.md.)*
 - Seasonal leaderboard (top players by SP, per season)
 - Social login (Facebook, Google)
 - Mobile support (PWA or native)
@@ -216,6 +216,8 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 
 ### Journey 2: Marko's Climb — Ranked Competitive Play
 
+*Historical narrative (pre-2026-04-18): the Level 5 gate, ranked queue, placement matches and Elo penalties were retired; see FR37, FR65, FR66.*
+
 **Marko**, 31, Belgrade. Played Belot semi-professionally in local café tournaments. He's sharp, strategic, and frustrated — there's nowhere online to test himself against other serious players. No rankings, no stakes, no way to know where he stands.
 
 **Opening Scene:** Marko registers, picks a username. He wants to go straight to ranked but sees it's locked — Level 5 required. Fair enough. He hits Quick Play to start grinding XP.
@@ -263,6 +265,8 @@ Beljot is the only platform built specifically for the Balkan Belot community �
 ---
 
 ### Journey 5: Edge Case — Disconnection and Timer Expiry
+
+*Historical narrative (pre-2026-04-18): the Level 5 gate, ranked queue, placement matches and Elo penalties were retired; see FR37, FR65, FR66.*
 
 **Scenario A — Disconnection Mid-Game:** Competitive ranked match, 1001 mode, Croatian variant. Four players, mid-game — the score is close (Team A 620, Team B 580). Player 3 (Team B) loses internet connection during trick 4 of a hand.
 
@@ -368,12 +372,14 @@ Single Page Application (SPA) for desktop browsers. Real-time multiplayer with p
 
 ### Player Progression & Competitive System
 
+*`epics.md` Requirements Inventory is the FR list of record; this list is frozen at FR52 except for these alignments (2026-09-26). The SP formula and SP abandonment penalties are FR65 and FR66 there.*
+
 - FR33: Players earn XP from completed matches proportional to game points scored in that match
-- FR34: Players advance through a level system as XP accumulates, with Level 5 unlocking access to ranked mode
-- FR35: Level 5+ players can queue for ranked competitive matches with ELO-based opponent pairing
-- FR36: The system conducts 3 placement matches per season before revealing a player's initial rank
-- FR37: Players can view their current rank tier (8 tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster)
-- FR38: The system applies scaled ELO penalties to players who abandon ranked matches, with penalty scaling by game progress at time of abandonment
+- FR34: Players advance through a lifetime level system as XP accumulates; the level is a career signal only with no gating behavior
+- FR35: [retired — ranked/ELO queue removed; competitive pairing replaced by honor-gated rooms (FR57) and seasonal rank visibility (FR37)]
+- FR36: [retired — placement matches removed; no ELO to calibrate in the new system]
+- FR37: Players can view their current seasonal rank (8 tiers: Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster; Iron through Diamond each split into divisions 1–3, 3 highest; Master and Grandmaster single) based on their Season Points in the current quarterly season; rank rises and falls with SP
+- FR38: [retired — ELO penalty removed; abandonment is deterred via the Honor system (FR56)]
 - FR39: Players can view a seasonal leaderboard of top-ranked players
 - FR40: The system runs quarterly ranked seasons with rank resets; prior season rank history is preserved and viewable
 

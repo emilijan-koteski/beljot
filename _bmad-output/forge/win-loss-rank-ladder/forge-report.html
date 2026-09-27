@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rank Ladder Forge</title>
+<style>
+  :root {
+    --bg: #f4ecdc;
+    --paper: #fbf6ec;
+    --ink: #2a211a;
+    --muted: #6b5d50;
+    --rule: #dccfb8;
+    --accent: #8a2a1f;
+    --wax: #9b1f17;
+    --wax-dark: #6e140e;
+    --wax-text: #f7e6c4;
+    --chip: #efe3cc;
+    --kill: #7a6a5b;
+    --code-bg: #2a211a;
+    --code-ink: #f4ecdc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17130f;
+      --paper: #211b16;
+      --ink: #efe6d6;
+      --muted: #a8998a;
+      --rule: #3a3029;
+      --accent: #e0826f;
+      --wax: #b3261e;
+      --wax-dark: #7d1711;
+      --wax-text: #fbeacb;
+      --chip: #2c241e;
+      --kill: #9a8b7c;
+      --code-bg: #0f0c0a;
+      --code-ink: #efe6d6;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17130f;
+    --paper: #211b16;
+    --ink: #efe6d6;
+    --muted: #a8998a;
+    --rule: #3a3029;
+    --accent: #e0826f;
+    --wax: #b3261e;
+    --wax-dark: #7d1711;
+    --wax-text: #fbeacb;
+    --chip: #2c241e;
+    --kill: #9a8b7c;
+    --code-bg: #0f0c0a;
+    --code-ink: #efe6d6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .page {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 40px 16px 64px;
+  }
+  header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: center;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--rule);
+  }
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(28px, 5vw, 42px);
+    line-height: 1.1;
+    margin: 0 0 12px;
+  }
+  .lede { margin: 0; color: var(--muted); max-width: 58ch; }
+  .seal { width: 190px; height: 190px; transform: rotate(-9deg); }
+  h2 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 22px;
+    margin: 40px 0 12px;
+  }
+  h3 {
+    font-size: 13px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 8px;
+  }
+  .formula {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 10px;
+    padding: 18px 20px;
+    font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card ul { margin: 0; padding-left: 18px; }
+  .card li { margin: 4px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 15px;
+  }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--rule); }
+  th { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  tr:last-child td { border-bottom: 0; }
+  .rejected li { color: var(--ink); }
+  .rejected li strong { text-decoration: line-through; text-decoration-color: var(--kill); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .chips li { background: var(--chip); border: 1px solid var(--rule); border-radius: 999px; padding: 6px 12px; font-size: 14px; }
+  .voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .voice {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .voice .who { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
+  .voice .icon { font-size: 22px; line-height: 1; }
+  .voice .name { font-weight: 600; }
+  .voice .role { font-size: 13px; color: var(--muted); }
+  .voice blockquote { margin: 0; font-family: Georgia, serif; font-style: italic; font-size: 15px; }
+  .tag { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 14px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  @media (max-width: 600px) {
+    header { grid-template-columns: 1fr; }
+    .seal { width: 150px; height: 150px; justify-self: center; order: -1; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <p class="eyebrow">Beljot · Forge session · 2026-09-26</p>
+      <h1>Win/loss rank ladder</h1>
+      <p class="lede">Replace the Season Points ladder, where every finished match added SP, with one where losses cost SP, players can drop a division or a whole rank, and rank means who is actually best. Every open question was settled. Next step: <code>bmad-correct-course</code>.</p>
+    </div>
+    <svg class="seal" viewBox="0 0 200 200" role="img" aria-label="Wax seal stamped HARDENED">
+      <defs>
+        <path id="ring" d="M100,100 m-62,0 a62,62 0 1,1 124,0 a62,62 0 1,1 -124,0"/>
+      </defs>
+      <g fill="var(--wax)">
+        <circle cx="100" cy="100" r="84"/>
+        <circle cx="100" cy="14" r="14"/><circle cx="143" cy="25.5" r="13"/><circle cx="174.5" cy="57" r="14"/>
+        <circle cx="186" cy="100" r="13"/><circle cx="174.5" cy="143" r="14"/><circle cx="143" cy="174.5" r="13"/>
+        <circle cx="100" cy="186" r="14"/><circle cx="57" cy="174.5" r="13"/><circle cx="25.5" cy="143" r="14"/>
+        <circle cx="14" cy="100" r="13"/><circle cx="25.5" cy="57" r="14"/><circle cx="57" cy="25.5" r="13"/>
+        <ellipse cx="160" cy="190" rx="7" ry="9"/>
+      </g>
+      <circle cx="100" cy="100" r="74" fill="none" stroke="var(--wax-dark)" stroke-width="3"/>
+      <circle cx="100" cy="100" r="50" fill="none" stroke="var(--wax-dark)" stroke-width="2"/>
+      <text font-family="Georgia, serif" font-size="11" letter-spacing="3" fill="var(--wax-text)">
+        <textPath href="#ring" startOffset="0">FORGED · BELJOT · RANK LADDER · 2026 ·</textPath>
+      </text>
+      <text x="100" y="97" text-anchor="middle" font-family="Georgia, serif" font-size="17" font-weight="700" letter-spacing="1.5" fill="var(--wax-text)">HARDENED</text>
+      <text x="100" y="116" text-anchor="middle" font-family="Georgia, serif" font-size="10" letter-spacing="2" fill="var(--wax-text)">SP · DIVISIONS</text>
+    </svg>
+  </header>
+
+  <h2>The formula</h2>
+  <div class="formula">SP change = base × margin × opponent   (+5 to the Capot team)
+
+base      wins pay more than losses cost   (placeholder +30 / −20)
+margin    0.5 + (winner − loser points) ÷ target, capped 0.5–1.5
+          surrender = as if winners reached target · instant win = 1.5
+opponent  Elo-style expected result from the team-average SP gap
+          every bot seat counts as the start of Gold</div>
+
+  <h2>Locked decisions</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Purpose</h3>
+      <ul>
+        <li>Rank is the true list of who's best. Losers sit below winners.</li>
+        <li>No matchmaking by rank. Honor and coin buy-in still gate rooms.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Ladder</h3>
+      <ul>
+        <li>Iron through Diamond: 3 divisions each, with <strong>3 highest</strong> (Gold 1 &lt; 2 &lt; 3).</li>
+        <li>Master and Grandmaster are single.</li>
+        <li>Players can drop through divisions and ranks freely. SP never goes below 0.</li>
+        <li>Everyone restarts at Iron 0 each quarter.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Removed from today's formula</h3>
+      <ul>
+        <li>+50 for finishing</li>
+        <li>Flat +100 for winning</li>
+        <li>Game points ÷ 10 (why SP looked like XP)</li>
+        <li>+50 Capot bonus to all four seats</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Abandonment</h3>
+      <ul>
+        <li><strong>Abandoner:</strong> a fixed loss of 2× the worst possible loss.</li>
+        <li><strong>Teammate:</strong> half the loss a surrender at that moment would have cost, in every room type, with the reason shown on screen.</li>
+        <li><strong>Opponents:</strong> a normal win, scored as a surrender.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Tuning</h3>
+      <ul>
+        <li>First build step: an offline script runs Q3 2026's matches through the formula.</li>
+        <li>A player winning 50% reaches Silver within about 20 matches.</li>
+        <li>Curve steepness is calculated from the 85% target. Division borders are split evenly.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Cutover</h3>
+      <ul>
+        <li>Release 2026-10-01 (Q4 starts 00:00 UTC). The release resets Q4 to 0.</li>
+        <li>Q3 and earlier stay archived as flat ranks, with no division.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Solo players against bots</h2>
+  <p style="margin:0 0 12px;color:var(--muted)">Bot matches count for rank. A solo player settles at the rank that matches their long-run win rate against bots, so Grandmaster takes real dominance, not just a lot of matches.</p>
+  <table>
+    <thead><tr><th>Win rate vs bots</th><th>Settles around</th></tr></thead>
+    <tbody>
+      <tr><td>50%</td><td>Gold (the bot value)</td></tr>
+      <tr><td>60%</td><td>Platinum</td></tr>
+      <tr><td>70%</td><td>Diamond</td></tr>
+      <tr><td>80%</td><td>Master</td></tr>
+      <tr><td><strong>~85%+</strong></td><td><strong>Grandmaster</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Deferred</h2>
+  <ul class="chips">
+    <li>Shields against dropping a division</li>
+    <li>Remove bot matches from rank</li>
+    <li>Carry part of last season's SP over</li>
+  </ul>
+
+  <h2>Rejected, and why</h2>
+  <div class="card rejected">
+    <ul>
+      <li><strong>Zero-sum ladder starting at Iron 0</strong>: the typical player gets stuck in Iron.</li>
+      <li><strong>Mid-ladder season start</strong>: new players get a rank they didn't earn.</li>
+      <li><strong>Linear opponent gap</strong>: can't make Grandmaster reachable through bots without rewarding volume.</li>
+      <li><strong>Cancel the teammate's loss on abandon</strong>: lets a second account take losses for a main.</li>
+      <li><strong>Full loss in private rooms, half in Quick Play</strong>: one rule everywhere is simpler.</li>
+      <li><strong>Showing each player's share of bot matches</strong>: not wanted.</li>
+      <li><strong>Replay Q4 / map old SP onto divisions / wait until 2027 Q1</strong>: none needed with a boundary release and a reset.</li>
+    </ul>
+  </div>
+
+  <h2>Weak points that survived</h2>
+  <div class="grid">
+    <div class="card"><h3>Quick Play</h3>No honor gate and random partners, so the teammate penalty teaches less there.</div>
+    <div class="card"><h3>The 0 floor</h3>A loss can't go below 0, so SP quietly leaks into the system from the bottom.</div>
+    <div class="card"><h3>Bot value</h3>Start of Gold was accepted with low conviction. It's one constant, to retune with data.</div>
+  </div>
+
+  <h2>Who pressure-tested it</h2>
+  <div class="voices">
+    <div class="voice"><div class="who"><span class="icon">📋</span><div><div class="name">John</div><div class="role">Product Manager · BMad</div></div></div><blockquote>"Leaving must always cost more than losing by any margin."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🔬</span><div><div class="name">Dr. Quinn</div><div class="role">Problem Solver · BMad</div></div></div><blockquote>"Without matchmaking, scaling by opponent strength is the only thing that makes the ladder settle."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🏗️</span><div><div class="name">Winston</div><div class="role">Architect · BMad</div></div></div><blockquote>"Choose how the ladder grows on purpose, instead of letting the floor decide."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🎨</span><div><div class="name">Sally</div><div class="role">UX Designer · BMad</div></div></div><blockquote>"Solo players will judge the whole system by how fast they get out of Iron."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">📊</span><div><div class="name">Mary</div><div class="role">Analyst · BMad</div></div></div><blockquote>"Measuring surrender against the target closes the early-surrender loophole."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">💻</span><div><div class="name">Amelia</div><div class="role">Developer · BMad</div></div></div><blockquote>"A player's SP settles at the level that matches their long-run win rate against bots."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🧪</span><div><div class="name">Murat</div><div class="role">Test Architect · BMad</div></div></div><blockquote>"If your best solo player comes out as Iron or as Grandmaster, the constants are wrong."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🃏</span><div><div class="name">Vesna</div><div class="role">Friday private-room regular · <span class="tag">generated</span></div></div></div><blockquote>"You'd be ranking our friendship."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🎲</span><div><div class="name">Goran</div><div class="role">40 matches a night · <span class="tag">generated</span></div></div></div><blockquote>"Showing up should count for something."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🌱</span><div><div class="name">Ana</div><div class="role">Joins in week 10 · <span class="tag">generated</span></div></div></div><blockquote>"If I start in Silver without playing a single hand, the rank looks fake."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🤖</span><div><div class="name">Marko</div><div class="role">Plays alone with bots · <span class="tag">generated</span></div></div></div><blockquote>"Don't let me reach Grandmaster off them, fine, but don't leave me stuck in Bronze either."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🃏</span><div><div class="name">Stojan</div><div class="role">30 years of café Belot · <span class="tag">generated</span></div></div></div><blockquote>"If the ladder ignores a Capot, you've taken the soul out."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🃏</span><div><div class="name">Ivana</div><div class="role">Best human-only player · <span class="tag">generated</span></div></div></div><blockquote>"The badge would mean two different things."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🕵️</span><div><div class="name">Filip</div><div class="role">Has a second account · <span class="tag">generated</span></div></div></div><blockquote>"Free protection for my main."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🚆</span><div><div class="name">Petar</div><div class="role">Quick Play on the tram · <span class="tag">generated</span></div></div></div><blockquote>"At least make it clearly smaller than a real loss."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">🥇</span><div><div class="name">Kiril</div><div class="role">Gold from grinding losses · <span class="tag">generated</span></div></div></div><blockquote>"At least tell me why."</blockquote></div>
+    <div class="voice"><div class="who"><span class="icon">⏱️</span><div><div class="name">Jana</div><div class="role">3 matches a week · <span class="tag">generated</span></div></div></div><blockquote>"If climbing out of Iron takes the whole season, I'll stop looking at rank."</blockquote></div>
+  </div>
+
+  <footer>Handoff: <code>forged-idea.md</code> in this folder → <code>bmad-correct-course</code>. Session log: <code>.memlog.md</code>.</footer>
+</div>
+</body>
+</html>
