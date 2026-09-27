@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["*"]
+    branches-ignore: [master]
   pull_request:
     branches: [master]
   workflow_call: {}
@@ -29,6 +29,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       BELJOT_DB_URL: postgres://beljot:beljot_test_password@localhost:5432/beljot_test?sslmode=disable
+      BELJOT_TEST_DB_URL: postgres://beljot:beljot_test_password@localhost:5432/beljot_test?sslmode=disable
       BELJOT_JWT_SECRET: test-secret
       BELJOT_PORT: 8080
 
