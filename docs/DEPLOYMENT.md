@@ -102,7 +102,7 @@ WebSockets need nothing extra: the browser opens `wss://beljot.online/ws` from t
 
 | Service | Path | Auth | Behaviour |
 |---|---|---|---|
-| backend | `GET`/`HEAD` `/healthz` | none | Pings the database with a 2 s timeout: `200 {"status":"ok"}` or `503 {"status":"unavailable"}`. `/health` is the same handler and is the path Traefik exposes publicly. |
+| backend | `GET`/`HEAD` `/healthz` | none | Pings the database with a 2 s timeout: `200 {"status":"ok"}` or `503 {"status":"unavailable"}`. `/health` is the same handler and is the path Traefik exposes publicly. The ping needs a free pool connection, so a 503 can also mean all 10 connections were busy for 2 s; check the request log before blaming the database. |
 | frontend | `GET /health` | none | `200 OK` from nginx. |
 
 Both images declare a Docker `HEALTHCHECK` with busybox `wget`; the same probe goes into Dokploy → Advanced → Cluster Settings → Swarm Settings → Health Check:
@@ -146,6 +146,8 @@ Rolling back an image does not undo a migration; an older binary against a newer
 ## Manual deploy
 
 Actions → Deploy → *Run workflow* on `master` builds and deploys both services regardless of what changed; a manual run on any other branch stops after the tests. Merging a PR into `master` deploys the changed halves.
+
+If a push builds only one half and that build fails, nothing is deployed. A later push that touches only the other half deploys only that half, so the image that was left behind stays undeployed until a manual run rebuilds and deploys both.
 
 The deploy job returns as soon as Dokploy accepts the request ("Deploy requested for …"); the rollout itself is visible in the application's Deployments tab and in Dozzle.
 
