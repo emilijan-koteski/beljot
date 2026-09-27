@@ -25,6 +25,7 @@ function rows(from: number, n: number): LeaderboardRow[] {
     username: `p${from + i}`,
     sp: 10_000 - (from + i) * 10,
     tier: "gold",
+    division: 2,
     gamesPlayed: 5,
   }));
 }

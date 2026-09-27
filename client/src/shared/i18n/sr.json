@@ -1424,6 +1424,15 @@
     "tierUp": {
       "toast": "Novi rang: {{tier}}"
     },
+    "rank": "{{tier}} {{division}}",
+    "demoted": {
+      "toast": "Pad na {{rank}}"
+    },
+    "result": {
+      "line": "{{change}} SP · {{rank}}",
+      "partnerAbandoned": "Partner je napustio meč: {{change}} SP (pola gubitka)",
+      "abandoned": "Napuštanje meča: {{change}} SP"
+    },
     "leaderboard": {
       "eyebrow": "Sezona",
       "title": "Rang lista",

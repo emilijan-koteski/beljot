@@ -109,7 +109,8 @@ func (r *GormRepository) FindPlayerSeason(userID, seasonID uint) (*PlayerSeason,
 //  2. COMPUTE. Every locked total goes to `changes` at once, because the formula
 //     needs the whole table (both teams' averages), not one player at a time.
 //  3. WRITE. Each new total is floored at 0 (ApplySPChange) and written with its
-//     rank_tier and counters, again in ascending order.
+//     rank snapshot (rank_tier, rank_division) and counters, again in
+//     ascending order.
 //
 // Reading the totals and writing the results under the same lock is what the
 // old in-SQL increment (sp = sp + EXCLUDED.sp) could not do once a change
@@ -118,9 +119,11 @@ func (r *GormRepository) FindPlayerSeason(userID, seasonID uint) (*PlayerSeason,
 // retires the old first-row INSERT, which wrote the award straight in as the
 // total and would have written a negative first total after a loss.
 //
-// rank_tier is Go arithmetic (TierForSP) written alongside sp, so D7 keeps the
-// ladder single-sourced -- restating it as a SQL CASE would be a second copy
-// that could drift.
+// The rank snapshot is Go arithmetic (RankForSP) written alongside sp, so the
+// ladder stays single-sourced -- restating it as a SQL CASE would be a second
+// copy that could drift. It is written on EVERY award, so when a season ends
+// each row already holds the rank it finished on, which is what ended-season
+// reads return (Story 13.5).
 func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]bool, changes SPChanges) (map[uint]PlayerSeasonSnapshot, error) {
 	snapshots := make(map[uint]PlayerSeasonSnapshot, len(completed))
 	if len(completed) == 0 {
@@ -136,12 +139,13 @@ func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]boo
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		current := make(map[uint]int, len(ids))
 		for _, id := range ids {
+			zeroTier, zeroDivision := RankForSP(0)
 			if err := tx.Exec(`
 				INSERT INTO player_seasons
-					(user_id, season_id, sp, rank_tier, games_played, games_completed, created_at, updated_at)
-				VALUES (?, ?, 0, ?, 0, 0, NOW(), NOW())
+					(user_id, season_id, sp, rank_tier, rank_division, games_played, games_completed, created_at, updated_at)
+				VALUES (?, ?, 0, ?, ?, 0, 0, NOW(), NOW())
 				ON CONFLICT (user_id, season_id) DO NOTHING`,
-				id, seasonID, TierForSP(0),
+				id, seasonID, zeroTier, divisionOrNil(zeroDivision),
 			).Error; err != nil {
 				return fmt.Errorf("ensuring player_season user=%d season=%d: %w", id, seasonID, err)
 			}
@@ -170,7 +174,7 @@ func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]boo
 				return fmt.Errorf("computing season points: no change for user %d", id)
 			}
 			next := ApplySPChange(current[id], delta)
-			tier := TierForSP(next)
+			tier, division := RankForSP(next)
 			present := 0
 			if completed[id] {
 				present = 1
@@ -184,12 +188,13 @@ func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]boo
 				UPDATE player_seasons
 				SET sp              = ?,
 					rank_tier       = ?,
+					rank_division   = ?,
 					games_played    = games_played + 1,
 					games_completed = games_completed + ?,
 					updated_at      = NOW()
 				WHERE user_id = ? AND season_id = ?
 				RETURNING games_played, games_completed`,
-				next, tier, present, id, seasonID,
+				next, tier, divisionOrNil(division), present, id, seasonID,
 			).Scan(&row).Error; err != nil {
 				return fmt.Errorf("writing player_season user=%d season=%d: %w", id, seasonID, err)
 			}
@@ -198,6 +203,7 @@ func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]boo
 				SP:             next,
 				PreviousSP:     current[id],
 				Tier:           tier,
+				Division:       division,
 				GamesPlayed:    row.GamesPlayed,
 				GamesCompleted: row.GamesCompleted,
 			}
@@ -300,10 +306,12 @@ func (r *GormRepository) LeaderboardPage(seasonID uint, limit, offset int) ([]Le
 
 	entries := make([]LeaderboardEntry, 0, min(limit, allocHintCap))
 	err := r.leaderboardScope(seasonID).
-		Select(`player_seasons.user_id      AS user_id,
-		        users.username              AS username,
-		        player_seasons.sp           AS sp,
-		        player_seasons.games_played AS games_played`).
+		Select(`player_seasons.user_id       AS user_id,
+		        users.username               AS username,
+		        player_seasons.sp            AS sp,
+		        player_seasons.rank_tier     AS rank_tier,
+		        player_seasons.rank_division AS rank_division,
+		        player_seasons.games_played  AS games_played`).
 		Order("player_seasons.sp DESC").
 		Order("player_seasons.user_id ASC").
 		Limit(limit).
@@ -331,10 +339,12 @@ func (r *GormRepository) LeaderboardPage(seasonID uint, limit, offset int) ([]Le
 func (r *GormRepository) FindLeaderboardEntry(seasonID, userID uint) (*LeaderboardEntry, error) {
 	var entries []LeaderboardEntry
 	err := r.leaderboardScope(seasonID).
-		Select(`player_seasons.user_id      AS user_id,
-		        users.username              AS username,
-		        player_seasons.sp           AS sp,
-		        player_seasons.games_played AS games_played`).
+		Select(`player_seasons.user_id       AS user_id,
+		        users.username               AS username,
+		        player_seasons.sp            AS sp,
+		        player_seasons.rank_tier     AS rank_tier,
+		        player_seasons.rank_division AS rank_division,
+		        player_seasons.games_played  AS games_played`).
 		Where("player_seasons.user_id = ?", userID).
 		Limit(1).
 		Scan(&entries).Error
@@ -389,7 +399,9 @@ func (r *GormRepository) ListSeasons() ([]Season, error) {
 //
 // Columns are aliased explicitly, like LeaderboardPage's: the joins carry
 // multiple `id`/`created_at` columns, and seasons.name must land in
-// ArchiveEntry's season_name without guessing.
+// ArchiveEntry's season_name without guessing. The stored rank snapshot is
+// selected because every archived season has ENDED, so it is the rank the
+// row finished on (Story 13.5).
 //
 // The read is served by idx_player_seasons_user_season (user_id leads it), so
 // no new index is needed — see migration 000024.
@@ -403,12 +415,14 @@ func (r *GormRepository) PlayerSeasonArchive(userID uint, now time.Time) ([]Arch
 		Where("users.deleted_at IS NULL").
 		Where("player_seasons.games_played >= 1").
 		Where("seasons.ends_at <= ?", now.UTC()).
-		Select(`player_seasons.season_id    AS season_id,
-		        seasons.name                AS season_name,
-		        seasons.started_at          AS started_at,
-		        seasons.ends_at             AS ends_at,
-		        player_seasons.sp           AS sp,
-		        player_seasons.games_played AS games_played`).
+		Select(`player_seasons.season_id     AS season_id,
+		        seasons.name                 AS season_name,
+		        seasons.started_at           AS started_at,
+		        seasons.ends_at              AS ends_at,
+		        player_seasons.sp            AS sp,
+		        player_seasons.rank_tier     AS rank_tier,
+		        player_seasons.rank_division AS rank_division,
+		        player_seasons.games_played  AS games_played`).
 		Order("seasons.started_at DESC").
 		Scan(&entries).Error
 	if err != nil {

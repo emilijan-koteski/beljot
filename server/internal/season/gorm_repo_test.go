@@ -234,7 +234,131 @@ func TestApplySeasonPoints_RisesAndFallsAndReportsPreviousSP(t *testing.T) {
 	require.NotNil(t, row)
 	assert.Equal(t, 250, row.SP)
 	assert.Equal(t, "bronze", row.RankTier, "rank_tier is refreshed on a drop too")
-	assert.Equal(t, season.TierForSP(row.SP), row.RankTier, "stored and derived must agree")
+	require.NotNil(t, row.RankDivision)
+	assert.Equal(t, 3, *row.RankDivision, "250 SP is Bronze 3, and the division moves with the tier")
+	assert.Equal(t, 3, snaps[u.ID].Division)
+}
+
+// EVERY AWARD WRITES THE WHOLE RANK (Story 13.5): rank_tier and rank_division
+// together, the division NULL for Master and Grandmaster, so a season that
+// ends already holds the rank each row finished on.
+func TestApplySeasonPoints_WritesTheDivision(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	s := makeSeason(t, db, time.Date(2083, time.January, 1, 0, 0, 0, 0, time.UTC))
+	floored := makeUser(t, db, "dv-fl@s.test")
+	gold := makeUser(t, db, "dv-gd@s.test")
+	master := makeUser(t, db, "dv-ms@s.test")
+	gm := makeUser(t, db, "dv-gm@s.test")
+
+	snaps, err := applyAwards(repo, s.ID, map[uint]fixedAward{
+		floored.ID: {change: -18, completed: true},
+		gold.ID:    {change: 700, completed: true},
+		master.ID:  {change: 1250, completed: true},
+		gm.ID:      {change: 1500, completed: true},
+	})
+	require.NoError(t, err)
+
+	cases := []struct {
+		name     string
+		id       uint
+		tier     string
+		division *int
+	}{
+		{"a first-ever loss is Iron 1", floored.ID, "iron", intPtr(1)},
+		{"700 SP is Gold 2", gold.ID, "gold", intPtr(2)},
+		{"Master has no division", master.ID, "master", nil},
+		{"Grandmaster has no division", gm.ID, "grandmaster", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			row, err := repo.FindPlayerSeason(tc.id, s.ID)
+			require.NoError(t, err)
+			require.NotNil(t, row)
+			assert.Equal(t, tc.tier, row.RankTier)
+			assert.Equal(t, tc.division, row.RankDivision)
+			assert.Equal(t, tc.tier, snaps[tc.id].Tier)
+			if tc.division == nil {
+				assert.Zero(t, snaps[tc.id].Division)
+			} else {
+				assert.Equal(t, *tc.division, snaps[tc.id].Division)
+			}
+		})
+	}
+
+	// A drop out of Master writes the division back.
+	snaps, err = applyAwards(repo, s.ID, map[uint]fixedAward{master.ID: {change: -100, completed: true}})
+	require.NoError(t, err)
+	row, err := repo.FindPlayerSeason(master.ID, s.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "diamond", row.RankTier)
+	assert.Equal(t, intPtr(3), row.RankDivision, "1150 SP is Diamond 3")
+	assert.Equal(t, 3, snaps[master.ID].Division)
+}
+
+func intPtr(v int) *int { return &v }
+
+// insertPreDivisionRow writes a row the way a pre-000028 award left it: the
+// old formula's total with a bare tier and NULL rank_division.
+func insertPreDivisionRow(t *testing.T, db *gorm.DB, userID, seasonID uint, sp int, tier string, gamesPlayed int) {
+	t.Helper()
+	require.NoError(t, db.Exec(`
+		INSERT INTO player_seasons (user_id, season_id, sp, rank_tier, games_played, games_completed, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`, userID, seasonID, sp, tier, gamesPlayed, gamesPlayed).Error)
+}
+
+// THE ACCEPTANCE CRITERION, end to end on real Postgres (Story 13.5): given a
+// mix of Q3 and Q4 rows, the archive and both seasons' leaderboards show Q3's
+// stored tier with no division, and Q4's tier plus division.
+func TestService_EndedSeasonsReadTheStoredRank(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	svc := season.NewService(repo)
+	q3 := makeSeason(t, db, time.Date(2082, time.July, 1, 0, 0, 0, 0, time.UTC))
+	q4 := makeSeason(t, db, time.Date(2082, time.October, 1, 0, 0, 0, 0, time.UTC))
+	now := time.Date(2082, time.November, 15, 0, 0, 0, 0, time.UTC)
+
+	u := makeUser(t, db, "mx-u1@s.test")
+	// Q3: the old climb-only formula's 3500 SP, stored as a bare "gold". On the
+	// live floors 3500 would derive Grandmaster.
+	insertPreDivisionRow(t, db, u.ID, q3.ID, 3500, "gold", 90)
+	// Q4: written by the new award path, so it carries its division.
+	_, err := applyAwards(repo, q4.ID, map[uint]fixedAward{u.ID: {change: 700, completed: true}})
+	require.NoError(t, err)
+
+	archive, err := svc.ArchiveView(u.ID, now)
+	require.NoError(t, err)
+	require.Len(t, archive.Items, 1, "Q4 is running, so only Q3 is history")
+	assert.Equal(t, "gold", archive.Items[0].Tier, "the stored tier, never Grandmaster")
+	assert.Nil(t, archive.Items[0].Division)
+
+	past, err := svc.LeaderboardView(u.ID, q3.ID, 10, 0, now)
+	require.NoError(t, err)
+	require.Len(t, past.Items, 1)
+	assert.Equal(t, "gold", past.Items[0].Tier)
+	assert.Nil(t, past.Items[0].Division)
+	require.NotNil(t, past.Viewer)
+	assert.Equal(t, "gold", past.Viewer.Tier)
+	assert.Nil(t, past.Viewer.Division)
+
+	current, err := svc.LeaderboardView(u.ID, 0, 10, 0, now)
+	require.NoError(t, err)
+	require.Len(t, current.Items, 1)
+	assert.Equal(t, "gold", current.Items[0].Tier)
+	assert.Equal(t, intPtr(2), current.Items[0].Division, "Q4 shows tier plus division")
+	require.NotNil(t, current.Viewer)
+	assert.Equal(t, intPtr(2), current.Viewer.Division)
+
+	// The same Q4 row once Q4 has ENDED: the archive now lists it, from its
+	// stored snapshot, division included.
+	later := q4.EndsAt.Add(time.Hour)
+	archive, err = svc.ArchiveView(u.ID, later)
+	require.NoError(t, err)
+	require.Len(t, archive.Items, 2)
+	assert.Equal(t, q4.ID, archive.Items[0].SeasonID, "newest-first")
+	assert.Equal(t, "gold", archive.Items[0].Tier)
+	assert.Equal(t, intPtr(2), archive.Items[0].Division)
+	assert.Nil(t, archive.Items[1].Division, "Q3 still has none")
 }
 
 // The floor: a player on 10 SP whose loss computes to -18 ends on 0, and the
@@ -566,6 +690,33 @@ func TestLeaderboardPage_OrdersBySPDescending(t *testing.T) {
 // The tiebreak is not cosmetic: without a second ORDER BY column two players on
 // equal SP can swap between the page-1 and page-2 queries and be duplicated or
 // skipped. Ascending user_id is the tiebreak, and CountAhead counts under it.
+// The page and the viewer entry select the stored rank snapshot beside SP, so
+// an ended season can show the rank each row finished on (Story 13.5).
+func TestLeaderboardReads_SelectTheStoredRank(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	s := makeSeason(t, db, time.Date(2082, time.January, 1, 0, 0, 0, 0, time.UTC))
+
+	divided := seedStanding(t, db, repo, s.ID, "lb-rk1@s.test", 700)
+	old := makeUser(t, db, "lb-rk2@s.test")
+	insertPreDivisionRow(t, db, old.ID, s.ID, 3500, "gold", 40)
+
+	entries := fullLadder(t, repo, s.ID)
+	require.Len(t, entries, 2)
+	assert.Equal(t, old.ID, entries[0].UserID)
+	assert.Equal(t, "gold", entries[0].RankTier)
+	assert.Nil(t, entries[0].RankDivision, "a pre-division row reads back NULL")
+	assert.Equal(t, divided.ID, entries[1].UserID)
+	assert.Equal(t, "gold", entries[1].RankTier)
+	assert.Equal(t, intPtr(2), entries[1].RankDivision)
+
+	viewer, err := repo.FindLeaderboardEntry(s.ID, divided.ID)
+	require.NoError(t, err)
+	require.NotNil(t, viewer)
+	assert.Equal(t, "gold", viewer.RankTier)
+	assert.Equal(t, intPtr(2), viewer.RankDivision)
+}
+
 func TestLeaderboardPage_BreaksTiesByAscendingUserID(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
@@ -988,6 +1139,11 @@ func TestPlayerSeasonArchive_MembershipAndOrder(t *testing.T) {
 
 	assert.Equal(t, q1.ID, entries[1].SeasonID)
 	assert.Equal(t, 1800, entries[1].SP, "the prior row is read back unchanged")
+	// The stored rank snapshot rides along (Story 13.5): what the award wrote.
+	assert.Equal(t, "grandmaster", entries[1].RankTier)
+	assert.Nil(t, entries[1].RankDivision)
+	assert.Equal(t, "iron", entries[0].RankTier)
+	assert.Equal(t, intPtr(1), entries[0].RankDivision)
 }
 
 // The exact boundary: a season whose ends_at IS now has ended (ends_at is

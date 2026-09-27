@@ -212,6 +212,7 @@ export function LeaderboardPage() {
               username={row.username}
               sp={row.sp}
               tier={row.tier}
+              division={row.division}
               gamesPlayed={row.gamesPlayed}
               isSelf={standing !== null && row.userId === standing.userId}
             />
@@ -236,6 +237,7 @@ export function LeaderboardPage() {
                 username={viewer?.username || t("season.leaderboard.you")}
                 sp={pinned.sp}
                 tier={pinned.tier}
+                division={pinned.division}
                 gamesPlayed={pinned.gamesPlayed}
                 isSelf
               />

@@ -28,6 +28,17 @@ vi.mock("react-i18next", () => ({
       if (key === "match.disconnect.matchAbandonedScores" && opts) {
         return `Final: Us ${opts.us} : Them ${opts.them}`;
       }
+      if (key === "season.result.partnerAbandoned" && opts) {
+        return `Partner abandoned: ${String(opts.change)} SP (half loss)`;
+      }
+      if (key === "season.result.abandoned" && opts) {
+        return `You abandoned: ${String(opts.change)} SP`;
+      }
+      if (key === "season.result.line" && opts) {
+        return `${String(opts.change)} SP · ${String(opts.rank)}`;
+      }
+      if (key === "season.rank" && opts) return `${String(opts.tier)} ${String(opts.division)}`;
+      if (key === "season.tier.gold") return "Gold";
       return translations[key] ?? key;
     },
   }),
@@ -259,6 +270,129 @@ describe("ReconnectOverlay", () => {
 
     expect(screen.getByTestId("abandon-title")).toBeInTheDocument();
     expect(screen.queryByTestId("abandon-result-line")).not.toBeInTheDocument();
+  });
+
+  // --- Season Points line (Story 13.5) ---
+
+  // The matrix's partner-abandoned row, and the Design Notes' timing: the SP
+  // event trails match_abandoned in the same burst, so the line must appear
+  // when the prop arrives AFTER the panel has mounted.
+  it("shows the teammate's half-loss line, arriving after the panel mounted", () => {
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
+    const abandonedData = {
+      abandonedByPlayer: 2,
+      teamAFinalScore: 450,
+      teamBFinalScore: 380,
+      matchDurationSec: 600,
+    };
+    const props = {
+      disconnectedPlayerName: "Eve",
+      reconnectExpiresAt: expiresAt,
+      abandonedData,
+      viewerTeam: "teamA" as const,
+      viewerSeat: 0,
+      onReturnToLobby: vi.fn(),
+    };
+
+    const view = render(<ReconnectOverlay {...props} />);
+    expect(screen.queryByTestId("season-sp-line")).not.toBeInTheDocument();
+
+    view.rerender(
+      <ReconnectOverlay
+        {...props}
+        seasonSettlement={{
+          spChange: -12,
+          newSeasonSp: 488,
+          rankTier: "silver",
+          rankDivision: 2,
+          reason: "partner_abandoned",
+        }}
+      />,
+    );
+
+    const line = screen.getByTestId("season-sp-line");
+    expect(line).toHaveTextContent("Partner abandoned: \u221212 SP (half loss)");
+    expect(line).toHaveAttribute("data-trend", "loss");
+    // Both lines together: the record's win/loss and the SP it cost.
+    expect(screen.getByTestId("abandon-result-line")).toHaveAttribute("data-result", "loss");
+  });
+
+  it("shows an opponent's ordinary SP line", () => {
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={expiresAt}
+        abandonedData={{
+          abandonedByPlayer: 1,
+          teamAFinalScore: 450,
+          teamBFinalScore: 380,
+          matchDurationSec: 600,
+        }}
+        viewerTeam="teamA"
+        viewerSeat={0}
+        seasonSettlement={{
+          spChange: 18,
+          newSeasonSp: 700,
+          rankTier: "gold",
+          rankDivision: 2,
+          reason: "normal",
+        }}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("season-sp-line")).toHaveTextContent("+18 SP · Gold 2");
+  });
+
+  // The abandoner gets no win/loss line (their record says "abandoned"), but a
+  // late reconnect that did receive the event still states the penalty.
+  it("states the abandoner's own penalty even though the result line is omitted", () => {
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={expiresAt}
+        abandonedData={{
+          abandonedByPlayer: 2,
+          teamAFinalScore: 450,
+          teamBFinalScore: 380,
+          matchDurationSec: 600,
+        }}
+        viewerTeam="teamA"
+        viewerSeat={2}
+        seasonSettlement={{
+          spChange: -120,
+          newSeasonSp: 380,
+          rankTier: "silver",
+          rankDivision: 1,
+          reason: "abandoned",
+        }}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("abandon-result-line")).not.toBeInTheDocument();
+    expect(screen.getByTestId("season-sp-line")).toHaveTextContent("You abandoned: \u2212120 SP");
+  });
+
+  it("never shows an SP line on the reconnect countdown", () => {
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={expiresAt}
+        seasonSettlement={{
+          spChange: 18,
+          newSeasonSp: 700,
+          rankTier: "gold",
+          rankDivision: 2,
+          reason: "normal",
+        }}
+      />,
+    );
+
+    expect(screen.queryByTestId("season-sp-line")).not.toBeInTheDocument();
   });
 
   it("omits the result line when abandonedByPlayer is out of range", () => {

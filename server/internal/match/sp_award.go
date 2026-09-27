@@ -140,7 +140,8 @@ func buildSPOutcome(f spMatchFacts) MatchOutcome {
 // (Story 13.1 D10), and the SP change follows the team's result either way.
 //
 // Each event carries the APPLIED change (snap.SPChange, new total minus the
-// previous one), which differs from the formula's own number at the 0 floor.
+// previous one), which differs from the formula's own number at the 0 floor,
+// plus the rank, rank change and reason the season service resolved.
 //
 // Mirrors settleMatch's, awardXP's and recordHonor's best-effort degradation: an
 // ApplySeasonPoints failure is logged and the events are skipped, but the caller
@@ -179,11 +180,13 @@ func (m *Manager) awardSeasonPoints(roomID uint, outcome MatchOutcome, now time.
 			continue
 		}
 		payload := ws.SeasonPointsAwardedPayload{
-			SPEarned:    snap.SPChange,
-			NewSeasonSP: snap.SP,
-			RankTier:    snap.RankTier,
-			TieredUp:    snap.TieredUp,
-			SeasonName:  snap.SeasonName,
+			SPChange:     snap.SPChange,
+			NewSeasonSP:  snap.SP,
+			RankTier:     snap.RankTier,
+			RankDivision: snap.RankDivision,
+			RankChange:   snap.RankChange,
+			Reason:       snap.Reason,
+			SeasonName:   snap.SeasonName,
 		}
 		msgs = append(msgs, spAwardMsg{userID: s.UserID, msg: buildMessage(ws.EventSeasonPointsAwarded, payload)})
 	}

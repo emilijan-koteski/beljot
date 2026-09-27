@@ -17,9 +17,11 @@ import (
 )
 
 // stubSPAwarder records the outcome ApplySeasonPoints received and scores it with
-// the REAL formula (season.ComputeSPChanges, the 0 floor, the real ladder), so the
-// emitted events reflect production arithmetic rather than canned values.
-// Satisfies match.SPAwarder.
+// the REAL formula (season.ComputeSPChanges, the 0 floor, the real ladder and
+// rank change), so the emitted events reflect production arithmetic rather than
+// canned values. The reason is resolved from the outcome's abandoned seat the
+// way the season service resolves it (pinned there by
+// TestApplySeasonPoints_AbandonmentReasons). Satisfies match.SPAwarder.
 type stubSPAwarder struct {
 	mu          sync.Mutex
 	applyCalls  int
@@ -44,16 +46,36 @@ func (s *stubSPAwarder) ApplySeasonPoints(outcome match.MatchOutcome, now time.T
 	if err != nil {
 		return nil, err
 	}
+	reasons := map[uint]string{}
+	for seat, st := range outcome.Seats {
+		switch {
+		case outcome.AbandonedSeat < 0:
+			reasons[st.UserID] = ws.SPReasonNormal
+		case seat == outcome.AbandonedSeat:
+			reasons[st.UserID] = ws.SPReasonAbandoned
+		case st.Team == outcome.Seats[outcome.AbandonedSeat].Team:
+			reasons[st.UserID] = ws.SPReasonPartnerAbandoned
+		default:
+			reasons[st.UserID] = ws.SPReasonNormal
+		}
+	}
 	out := make(map[uint]match.PlayerSeasonSnapshot, len(changes))
 	for id, change := range changes {
 		prior := s.priorSP[id]
 		next := season.ApplySPChange(prior, change)
+		tier, division := season.RankForSP(next)
+		var div *int
+		if division != 0 {
+			div = &division
+		}
 		out[id] = match.PlayerSeasonSnapshot{
-			SeasonName: "2026 Q3",
-			SP:         next,
-			SPChange:   next - prior,
-			RankTier:   season.TierForSP(next),
-			TieredUp:   season.TierClimbed(prior, next),
+			SeasonName:   "2026 Q3",
+			SP:           next,
+			SPChange:     next - prior,
+			RankTier:     tier,
+			RankDivision: div,
+			RankChange:   season.RankChange(prior, next),
+			Reason:       reasons[id],
 		}
 	}
 	return out, nil
@@ -199,17 +221,20 @@ func TestHandleMatchEnd_AwardsSeasonPoints(t *testing.T) {
 	// m = 0.5 + 310/1001 = 0.81, E = 0.5: winners +24, losers -16 floored to 0.
 	got := seasonPointsByUser(t, hub)
 	for _, id := range []uint{10, 30} {
-		assert.Equal(t, 24, got[id].SPEarned, "user %d", id)
+		assert.Equal(t, 24, got[id].SPChange, "user %d", id)
 		assert.Equal(t, 24, got[id].NewSeasonSP)
 	}
 	for _, id := range []uint{20, 40} {
-		assert.Equal(t, 0, got[id].SPEarned, "user %d: the event carries the applied change, not -16", id)
+		assert.Equal(t, 0, got[id].SPChange, "user %d: the event carries the applied change, not -16", id)
 		assert.Equal(t, 0, got[id].NewSeasonSP)
 	}
 	for id, p := range got {
 		assert.Equal(t, "2026 Q3", p.SeasonName, "user %d: the machine-stable window token rides along", id)
 		assert.Equal(t, "iron", p.RankTier, "a stable token, never a display string")
-		assert.False(t, p.TieredUp)
+		require.NotNil(t, p.RankDivision, "user %d", id)
+		assert.Equal(t, 1, *p.RankDivision, "user %d: 0 and 24 SP are both Iron 1", id)
+		assert.Equal(t, ws.RankChangeNone, p.RankChange, "user %d: no rank moved", id)
+		assert.Equal(t, ws.SPReasonNormal, p.Reason, "user %d: a natural end", id)
 	}
 }
 
@@ -248,10 +273,10 @@ func TestHandleMatchEnd_SeasonPointsFollowHonorAndPrecedeMatchState(t *testing.T
 	assert.Less(t, lastHonorIdx, trailingStateIdx)
 }
 
-// TIER CHANGES ARE PER PLAYER, AND ONLY A CLIMB IS A TIER-UP. User 10 climbs
-// from Iron into Bronze; user 20 drops from Bronze into Iron, which must not
-// read as a tier-up.
-func TestHandleMatchEnd_TierUpIsPerPlayerAndOnlyForAClimb(t *testing.T) {
+// RANK CHANGES ARE PER PLAYER, AND COMPARE RANKS. User 10 climbs from Iron 3
+// into Bronze 1 (promoted); user 20 drops from Bronze 1 into Iron 3 (demoted,
+// never a promotion); users 30 and 40 stay in Iron 1 (none).
+func TestHandleMatchEnd_RankChangeIsPerPlayer(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
 	// Team A averages 70, team B 80, so E_A = 0.485: A wins +25, B loses -17.
@@ -268,19 +293,56 @@ func TestHandleMatchEnd_TierUpIsPerPlayerAndOnlyForAClimb(t *testing.T) {
 	got := seasonPointsByUser(t, hub)
 	require.Len(t, got, 4)
 
-	assert.True(t, got[10].TieredUp, "140 + 25 crosses the 150 Bronze floor")
+	assert.Equal(t, ws.RankChangePromoted, got[10].RankChange, "140 + 25 crosses the 150 Bronze floor")
 	assert.Equal(t, 165, got[10].NewSeasonSP)
 	assert.Equal(t, "bronze", got[10].RankTier)
+	require.NotNil(t, got[10].RankDivision)
+	assert.Equal(t, 1, *got[10].RankDivision)
 
-	assert.False(t, got[20].TieredUp, "a drop from Bronze to Iron is not a tier-up")
-	assert.Equal(t, -17, got[20].SPEarned, "a loss is carried as a negative change")
+	assert.Equal(t, ws.RankChangeDemoted, got[20].RankChange, "a drop from Bronze to Iron is a demotion")
+	assert.Equal(t, -17, got[20].SPChange, "a loss is carried as a negative change")
 	assert.Equal(t, 143, got[20].NewSeasonSP)
 	assert.Equal(t, "iron", got[20].RankTier)
+	require.NotNil(t, got[20].RankDivision)
+	assert.Equal(t, 3, *got[20].RankDivision)
 
-	assert.False(t, got[30].TieredUp)
-	assert.Equal(t, 25, got[30].SPEarned)
-	assert.False(t, got[40].TieredUp)
-	assert.Equal(t, 0, got[40].SPEarned, "a loss from 0 SP applies nothing")
+	assert.Equal(t, ws.RankChangeNone, got[30].RankChange)
+	assert.Equal(t, 25, got[30].SPChange)
+	assert.Equal(t, ws.RankChangeNone, got[40].RankChange)
+	assert.Equal(t, 0, got[40].SPChange, "a loss from 0 SP applies nothing")
+}
+
+// A single tier crosses the wire as a LITERAL null division (Story 13.5), never
+// an omitted key and never 0: users 10 and 30 sit in Master and Grandmaster.
+func TestHandleMatchEnd_SingleTiersCarryANullDivision(t *testing.T) {
+	repo := &timestampedRepo{}
+	hub := &hubSpy{}
+	awarder := &stubSPAwarder{priorSP: map[uint]int{10: 1250, 20: 700, 30: 1500, 40: 700}}
+	mgr := match.NewManager(hub, repo)
+	mgr.SetSPAwarder(awarder)
+
+	roomID := uint(420)
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	t.Cleanup(func() { mgr.RemoveSession(roomID) })
+
+	endMatch(t, mgr, roomID, game.TeamA, 1010, 700, nil, ws.MatchEndPayload{}, nil)
+
+	got := seasonPointsByUser(t, hub)
+	require.Len(t, got, 4)
+	assert.Equal(t, "master", got[10].RankTier)
+	assert.Nil(t, got[10].RankDivision)
+	assert.Equal(t, "grandmaster", got[30].RankTier)
+	assert.Nil(t, got[30].RankDivision)
+	require.NotNil(t, got[20].RankDivision)
+
+	found := false
+	for _, c := range hub.snapshot() {
+		if containsType(c.msg, "event:season_points_awarded") && c.userIDs[0] == 10 {
+			found = true
+			assert.Contains(t, string(c.msg), `"rankDivision":null`)
+		}
+	}
+	require.True(t, found, "user 10's season_points_awarded frame must be sent")
 }
 
 // A Capot reaches the outcome from the BUFFERED hand results, for the team that
@@ -304,9 +366,9 @@ func TestHandleMatchEnd_CapotBonusGoesToTheCapotTeam(t *testing.T) {
 	assert.Equal(t, [2]bool{false, true}, outcome.CapotTeams)
 
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, 24, got[10].SPEarned, "the winners made no Capot")
-	assert.Equal(t, -16+5, got[20].SPEarned, "the losing team's Capot softens its loss")
-	assert.Equal(t, -11, got[40].SPEarned)
+	assert.Equal(t, 24, got[10].SPChange, "the winners made no Capot")
+	assert.Equal(t, -16+5, got[20].SPChange, "the losing team's Capot softens its loss")
+	assert.Equal(t, -11, got[40].SPChange)
 }
 
 // The 501 target reaches the outcome from the match mode, so the margin scales by
@@ -327,8 +389,8 @@ func TestHandleMatchEnd_The501TargetScalesTheMargin(t *testing.T) {
 	_, outcome := awarder.snapshotCalls()
 	assert.Equal(t, 501, outcome.Target)
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, 33, got[10].SPEarned)
-	assert.Equal(t, -22, got[20].SPEarned)
+	assert.Equal(t, 33, got[10].SPChange)
+	assert.Equal(t, -22, got[20].SPChange)
 }
 
 // An instant win on a fresh deal: TeamScores [0,0] and no hand results, yet the
@@ -352,8 +414,8 @@ func TestHandleMatchEnd_InstantWinIsTheMaximumMargin(t *testing.T) {
 	_, outcome := awarder.snapshotCalls()
 	assert.True(t, outcome.InstantWin)
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, 45, got[10].SPEarned, "m = 1.5: 30 × 1.5 × 2 × 0.5")
-	assert.Equal(t, -30, got[20].SPEarned)
+	assert.Equal(t, 45, got[10].SPChange, "m = 1.5: 30 × 1.5 × 2 × 0.5")
+	assert.Equal(t, -30, got[20].SPChange)
 }
 
 // An accepted surrender routes through handleMatchEnd with the engine's winner
@@ -382,10 +444,10 @@ func TestHandleMatchEnd_SurrenderScoresAsIfTheWinnersReachedTheTarget(t *testing
 
 	// m = 0.5 + (1001 - 900)/1001 = 0.60, E = 0.5: B +18, A -12.
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, 18, got[20].SPEarned, "the win follows the resolved winner, not the score")
-	assert.Equal(t, 18, got[40].SPEarned)
-	assert.Equal(t, -12, got[10].SPEarned)
-	assert.Equal(t, -12, got[30].SPEarned)
+	assert.Equal(t, 18, got[20].SPChange, "the win follows the resolved winner, not the score")
+	assert.Equal(t, 18, got[40].SPChange)
+	assert.Equal(t, -12, got[10].SPChange)
+	assert.Equal(t, -12, got[30].SPChange)
 }
 
 // The same, end to end: a real surrender request and accept through the action
@@ -416,8 +478,8 @@ func TestSurrender_ThroughTheActionPathIsScoredAsASurrender(t *testing.T) {
 	assert.Equal(t, -1, outcome.AbandonedSeat)
 	// 0:0 before any hand, scored as a surrender: m = 0.5 + 1001/1001 = 1.5.
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, 45, got[20].SPEarned)
-	assert.Equal(t, -30, got[10].SPEarned)
+	assert.Equal(t, 45, got[20].SPChange)
+	assert.Equal(t, -30, got[10].SPChange)
 }
 
 // A surrender accepted with a team already over the target in a "dosta" room
@@ -446,8 +508,8 @@ func TestHandleMatchEnd_SurrenderThatFinalizesAtTargetIsANaturalMargin(t *testin
 	// Natural m = 0.5 + 500/1001 = 1.00: +30 / -20. Scored as a surrender the
 	// winners' 1100 would have been cut to the 1001 target, m = 0.90: +27 / -18.
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, 30, got[10].SPEarned)
-	assert.Equal(t, -20, got[20].SPEarned)
+	assert.Equal(t, 30, got[10].SPChange)
+	assert.Equal(t, -20, got[20].SPChange)
 }
 
 // ABANDONMENT. The abandoner takes the fixed penalty, the teammate half of the
@@ -503,12 +565,16 @@ func TestAbandonment_ScoresEverySeatByItsRole(t *testing.T) {
 
 	// Surrender margin m = 0.5 + (1001 - 900)/1001 = 0.60, E = 0.5.
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, -120, got[30].SPEarned, "the abandoner: -2 × (20 × 1.5 × 2)")
+	assert.Equal(t, -120, got[30].SPChange, "the abandoner: -2 × (20 × 1.5 × 2)")
 	assert.Equal(t, 380, got[30].NewSeasonSP)
-	assert.False(t, got[30].TieredUp)
-	assert.Equal(t, -6, got[10].SPEarned, "the teammate: half of the -12 a surrender costs")
-	assert.Equal(t, 18, got[20].SPEarned, "the opponents: a surrender-scored win")
-	assert.Equal(t, 18, got[40].SPEarned)
+	assert.Equal(t, ws.RankChangeDemoted, got[30].RankChange, "Silver 3 (500) to Silver 1 (380)")
+	assert.Equal(t, ws.SPReasonAbandoned, got[30].Reason)
+	assert.Equal(t, -6, got[10].SPChange, "the teammate: half of the -12 a surrender costs")
+	assert.Equal(t, ws.SPReasonPartnerAbandoned, got[10].Reason)
+	assert.Equal(t, 18, got[20].SPChange, "the opponents: a surrender-scored win")
+	assert.Equal(t, ws.SPReasonNormal, got[20].Reason)
+	assert.Equal(t, 18, got[40].SPChange)
+	assert.Equal(t, ws.SPReasonNormal, got[40].Reason)
 }
 
 // The abandonment finalizer reads the 501 target too: its surrender margin is
@@ -536,9 +602,9 @@ func TestAbandonment_The501TargetScalesTheMargin(t *testing.T) {
 	_, outcome := awarder.snapshotCalls()
 	assert.Equal(t, 501, outcome.Target)
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, 33, got[20].SPEarned)
-	assert.Equal(t, -11, got[10].SPEarned)
-	assert.Equal(t, -120, got[30].SPEarned)
+	assert.Equal(t, 33, got[20].SPChange)
+	assert.Equal(t, -11, got[10].SPChange)
+	assert.Equal(t, -120, got[30].SPChange)
 }
 
 // The Capot teams are captured on the ABANDONMENT finalizer too, from its own
@@ -569,9 +635,9 @@ func TestAbandonment_CapotBonusSkipsOnlyTheAbandoner(t *testing.T) {
 	_, outcome := awarder.snapshotCalls()
 	assert.Equal(t, [2]bool{true, false}, outcome.CapotTeams)
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, -120, got[30].SPEarned, "no Capot bonus for the abandoner")
-	assert.Equal(t, -6+5, got[10].SPEarned, "the teammate keeps the team's Capot bonus")
-	assert.Equal(t, 18, got[20].SPEarned)
+	assert.Equal(t, -120, got[30].SPChange, "no Capot bonus for the abandoner")
+	assert.Equal(t, -6+5, got[10].SPChange, "the teammate keeps the team's Capot bonus")
+	assert.Equal(t, 18, got[20].SPChange)
 }
 
 // PRESENCE DOES NOT GATE SP. Seat 3 drops first and is still inside its own
@@ -604,9 +670,9 @@ func TestAbandonment_AnAbsentOpponentIsStillScoredByTheResult(t *testing.T) {
 	assert.True(t, outcome.Seats[1].Completed)
 
 	got := seasonPointsByUser(t, hub)
-	assert.Equal(t, 18, got[40].SPEarned, "the absent opponent still gets the team's win")
-	assert.Equal(t, -120, got[30].SPEarned, "only the expired seat takes the penalty")
-	assert.Equal(t, -6, got[10].SPEarned)
+	assert.Equal(t, 18, got[40].SPChange, "the absent opponent still gets the team's win")
+	assert.Equal(t, -120, got[30].SPChange, "only the expired seat takes the penalty")
+	assert.Equal(t, -6, got[10].SPChange)
 }
 
 // BOT AVERAGING. A bot seat is never an SP subject and never receives the event,
@@ -634,9 +700,9 @@ func TestHandleMatchEnd_BotSeatCountsAsTheGoldFloor(t *testing.T) {
 	// (With the bot counted as 0 SP, team B would average 50 and A get +24.)
 	got := seasonPointsByUser(t, hub)
 	require.Len(t, got, 3, "only the three humans receive season_points_awarded")
-	assert.Equal(t, 37, got[10].SPEarned)
-	assert.Equal(t, 37, got[30].SPEarned)
-	assert.Equal(t, -25, got[20].SPEarned)
+	assert.Equal(t, 37, got[10].SPChange)
+	assert.Equal(t, 37, got[30].SPChange)
+	assert.Equal(t, -25, got[20].SPChange)
 	assert.Equal(t, 75, got[20].NewSeasonSP)
 	_, hasBot := got[0]
 	assert.False(t, hasBot, "bot seat (userID 0) must never receive an event")

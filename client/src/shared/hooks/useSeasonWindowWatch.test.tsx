@@ -22,8 +22,9 @@ const baseSeason: CurrentSeasonResponse = {
   endsAt: "2026-10-01T00:00:00Z",
   sp: 680,
   rankTier: "gold",
-  spIntoTier: 80,
-  spForNextTier: 200,
+  rankDivision: 2,
+  spIntoDivision: 13,
+  spForNextDivision: 67,
   gamesPlayed: 31,
   gamesCompleted: 29,
 };
@@ -188,8 +189,9 @@ describe("useSeasonWindowWatch", () => {
       endsAt: "2027-01-01T00:00:00Z",
       sp: 0,
       rankTier: "iron",
-      spIntoTier: 0,
-      spForNextTier: 150,
+      rankDivision: 1,
+      spIntoDivision: 0,
+      spForNextDivision: 50,
     };
     view.rerender(
       <QueryClientProvider client={qc}>

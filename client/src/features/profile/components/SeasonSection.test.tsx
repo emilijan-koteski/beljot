@@ -22,8 +22,10 @@ function archive(over: Partial<SeasonArchiveResponse> = {}): SeasonArchiveRespon
       {
         seasonId: 5,
         seasonName: "2026 Q2",
-        sp: 450,
+        // A PRE-DIVISION season: an old-formula total with its stored bare tier.
+        sp: 3500,
         tier: "silver",
+        division: null,
         gamesPlayed: 14,
         startedAt: "2026-04-01T00:00:00Z",
         endsAt: "2026-07-01T00:00:00Z",
@@ -33,6 +35,7 @@ function archive(over: Partial<SeasonArchiveResponse> = {}): SeasonArchiveRespon
         seasonName: "2026 Q1",
         sp: 0,
         tier: "iron",
+        division: null,
         gamesPlayed: 2,
         startedAt: "2026-01-01T00:00:00Z",
         endsAt: "2026-04-01T00:00:00Z",
@@ -42,7 +45,7 @@ function archive(over: Partial<SeasonArchiveResponse> = {}): SeasonArchiveRespon
   };
 }
 
-const rank: SeasonRank = { seasonName: "2026 Q3", tier: "gold", sp: 680 };
+const rank: SeasonRank = { seasonName: "2026 Q4", tier: "gold", division: 2, sp: 680 };
 
 function renderSection(props: {
   userId: number | undefined;
@@ -68,10 +71,15 @@ describe("SeasonSection", () => {
 
     const chip = screen.getByTestId("profile-season");
     expect(chip).toHaveAttribute("data-tier", "gold");
-    expect(screen.getByTestId("profile-season-tier").textContent).toBe("Gold");
+    expect(screen.getByTestId("profile-season-tier").textContent).toBe("Gold 2");
     expect(chip.textContent).toContain((680).toLocaleString());
     // The machine token, verbatim.
-    expect(chip.textContent).toContain("2026 Q3");
+    expect(chip.textContent).toContain("2026 Q4");
+    // The chip's ONLY accessible name (the visible cells are aria-hidden), so it
+    // must carry the full rank, division included.
+    expect(chip.querySelector(".sr-only")?.textContent).toBe(
+      `Current season 2026 Q4: Gold 2, ${(680).toLocaleString()} SP`,
+    );
 
     const list = await screen.findByTestId("prior-season-archive");
     const rows = list.querySelectorAll('[data-testid="season-archive-row"]');
@@ -79,6 +87,21 @@ describe("SeasonSection", () => {
     expect(rows[0]).toHaveAttribute("data-season", "2026 Q2");
     expect(rows[1]).toHaveAttribute("data-season", "2026 Q1");
     expect(mockGetArchive).toHaveBeenCalledWith(2);
+  });
+
+  // The current season shows tier PLUS division, the ended pre-division season
+  // beside it its STORED tier with none — never a rank re-derived from its SP
+  // (3500 old-formula SP would bucket as Grandmaster).
+  it("shows the current rank with its division and a pre-division archive row without", async () => {
+    mockGetArchive.mockResolvedValue(archive());
+
+    renderSection({ userId: 2, seasonRank: rank });
+
+    const list = await screen.findByTestId("prior-season-archive");
+    const first = list.querySelector('[data-testid="season-archive-row"]');
+    expect(first).toHaveAttribute("data-tier", "silver");
+    expect(first?.querySelector('[data-testid="season-archive-tier"]')?.textContent).toBe("Silver");
+    expect(screen.getByTestId("profile-season-tier").textContent).toBe("Gold 2");
   });
 
   // The epic AC: the whole archive is OMITTED from the DOM for players with no
@@ -139,17 +162,23 @@ describe("SeasonSection", () => {
   it("renders a 0-SP current rank as Iron", () => {
     mockGetArchive.mockResolvedValue({ items: [] });
 
-    renderSection({ userId: 2, seasonRank: { seasonName: "2026 Q3", tier: "iron", sp: 0 } });
+    renderSection({
+      userId: 2,
+      seasonRank: { seasonName: "2026 Q3", tier: "iron", division: 1, sp: 0 },
+    });
 
     const chip = screen.getByTestId("profile-season");
     expect(chip).toHaveAttribute("data-tier", "iron");
-    expect(screen.getByTestId("profile-season-tier").textContent).toBe("Iron");
+    expect(screen.getByTestId("profile-season-tier").textContent).toBe("Iron 1");
   });
 
   it("falls back to the SP bucket for an unrecognised rank tier token", () => {
     mockGetArchive.mockResolvedValue({ items: [] });
 
-    renderSection({ userId: 2, seasonRank: { seasonName: "2026 Q3", tier: "mythic", sp: 700 } });
+    renderSection({
+      userId: 2,
+      seasonRank: { seasonName: "2026 Q3", tier: "mythic", division: 2, sp: 700 },
+    });
 
     expect(screen.getByTestId("profile-season")).toHaveAttribute("data-tier", "gold");
   });

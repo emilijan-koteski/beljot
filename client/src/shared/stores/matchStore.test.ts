@@ -175,6 +175,24 @@ describe("matchStore", () => {
     expect(state.matchEndData).toBeNull();
   });
 
+  // Story 13.5: the SP line's slot starts empty and leaves with the match, so a
+  // later match can never inherit this one's change.
+  it("stores the season settlement and clears it with the game", () => {
+    expect(useMatchStore.getState().seasonSettlement).toBeNull();
+
+    useMatchStore.getState().setSeasonSettlement({
+      spChange: -13,
+      newSeasonSp: 590,
+      rankTier: "silver",
+      rankDivision: 3,
+      reason: "normal",
+    });
+    expect(useMatchStore.getState().seasonSettlement?.spChange).toBe(-13);
+
+    useMatchStore.getState().clearGame();
+    expect(useMatchStore.getState().seasonSettlement).toBeNull();
+  });
+
   it("resets to initial state via reset", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setLoading(true);

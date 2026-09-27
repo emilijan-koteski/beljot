@@ -266,6 +266,7 @@ export function MatchPage() {
   const setMatchEndData = useMatchStore((s) => s.setMatchEndData);
   const coinSettlement = useMatchStore((s) => s.coinSettlement);
   const honorSettlement = useMatchStore((s) => s.honorSettlement);
+  const seasonSettlement = useMatchStore((s) => s.seasonSettlement);
   const matchAbandonedData = useMatchStore((s) => s.matchAbandonedData);
   const setMatchAbandonedData = useMatchStore((s) => s.setMatchAbandonedData);
   const activeEmotes = useMatchStore((s) => s.activeEmotes);
@@ -2248,6 +2249,7 @@ export function MatchPage() {
           abandonedData={matchAbandonedData}
           viewerTeam={viewerTeam}
           viewerSeat={myPlayerSeat}
+          seasonSettlement={seasonSettlement}
           onReturnToLobby={handleAbandonReturnToLobby}
           soundKey={matchAbandonedData ? payloadSoundKey(matchAbandonedData) : null}
         />
@@ -2492,6 +2494,7 @@ export function MatchPage() {
           surrenderedByUsername={surrenderedByUsername}
           coinDelta={coinSettlement?.coinDelta}
           honorSettlement={honorSettlement}
+          seasonSettlement={seasonSettlement}
           roomId={roomIdNum ?? undefined}
           soundKey={payloadSoundKey(matchEndData)}
         />

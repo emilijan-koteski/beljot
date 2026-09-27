@@ -567,6 +567,73 @@ describe("MatchPage", () => {
     expect(screen.getByTestId("match-result-team-a-score")).toHaveTextContent("1020");
   });
 
+  // Story 13.5: the SP line reads the store's seasonSettlement, which lands in
+  // the same burst as match_end — so it must reach the overlay live.
+  it("shows the Season Points line on the result overlay from the match store", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    renderMatchPage();
+
+    act(() => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
+      useMatchStore.getState().setMatchEndData({
+        winnerTeam: 0,
+        teamAFinalScore: 1020,
+        teamBFinalScore: 850,
+        matchDurationSec: 300,
+      });
+    });
+    expect(screen.getByTestId("match-result")).toBeInTheDocument();
+    expect(screen.queryByTestId("season-sp-line")).not.toBeInTheDocument();
+
+    act(() => {
+      useMatchStore.getState().setSeasonSettlement({
+        spChange: 24,
+        newSeasonSp: 690,
+        rankTier: "gold",
+        rankDivision: 2,
+        reason: "normal",
+      });
+    });
+
+    expect(screen.getByTestId("season-sp-line")).toHaveTextContent("+24 SP · Gold 2");
+  });
+
+  // The abandonment surface reads the same slot: the SP event trails
+  // match_abandoned, so the line arrives while the overlay is already up.
+  it("shows the Season Points line on the abandonment overlay when it arrives late", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    renderMatchPage();
+
+    act(() => {
+      useMatchStore.getState().setMatchAbandonedData({
+        abandonedByPlayer: 2,
+        teamAFinalScore: 450,
+        teamBFinalScore: 380,
+        matchDurationSec: 600,
+      });
+    });
+    expect(screen.getByTestId("reconnect-overlay")).toBeInTheDocument();
+    expect(screen.queryByTestId("season-sp-line")).not.toBeInTheDocument();
+
+    act(() => {
+      useMatchStore.getState().setSeasonSettlement({
+        spChange: -12,
+        newSeasonSp: 488,
+        rankTier: "silver",
+        rankDivision: 2,
+        reason: "partner_abandoned",
+      });
+    });
+
+    expect(screen.getByTestId("season-sp-line")).toHaveTextContent(
+      "Partner abandoned: \u221212 SP (half loss)",
+    );
+  });
+
   // The roomId prop is the ONLY thing that turns the result overlay's hand
   // breakdown on; deleting it left every other test in this file green, so the
   // wiring gets its own assertion — the request must reach the API with the

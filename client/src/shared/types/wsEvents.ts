@@ -268,38 +268,52 @@ export interface HonorUpdatedPayload {
   isNewPlayer: boolean;
 }
 
-// --- Seasonal rank events (Story 13.1) ---
+// --- Seasonal rank events (Story 13.1, reshaped by 13.5) ---
 // Sent per-human at match end, slotted after event:honor_updated and before the
-// trailing event:match_state. Carries that player's own Season Points earned this
-// match, their new season total, the derived rank tier, whether the award crossed
-// a tier floor, and the season identifier.
+// trailing event:match_state. Carries that player's signed SP change this match,
+// their new season total, the rank it lands on (tier + division), how the rank
+// moved, why the change is what it is, and the season identifier.
 //
 // A NEW event type rather than extra fields on event:xp_awarded: the payload
 // schemas are z.strictObject, so widening an existing event breaks stale tabs
-// still running the old bundle, whereas an unknown type is simply ignored.
+// still running the old bundle, whereas an unknown type is simply ignored. Story
+// 13.5 reshaped THIS payload in place (spEarned and tieredUp are gone), which a
+// stale tab drops; that is accepted at the release boundary.
 //
 // rankTier is a STABLE MACHINE TOKEN ("iron" | "bronze" | "silver" | "gold" |
 // "platinum" | "diamond" | "master" | "grandmaster") that the client maps to an
 // i18n label and colour via shared/lib/seasonTier.ts; a display string never
-// crosses the wire. SP and the tier are server-authoritative — the client mirror
-// is presentation only and decides nothing.
+// crosses the wire. rankDivision is 1–3, or null for Master and Grandmaster. SP
+// and the rank are server-authoritative — the client mirror is presentation
+// only and decides nothing.
 //
 // seasonName is the machine-stable "YYYY QN" window identifier, rendered VERBATIM
 // and never translated.
 //
-// spEarned is the SIGNED change the match applied to the player's season SP
-// (Story 13.4): negative for a loss or an abandonment, and at the 0 floor the
-// applied change, so it can be 0. A 0 is a REAL value, as is `tieredUp: false`
-// (true only for a climb, never a drop) — both are falsy, so the dispatch
-// handler must type-guard them and never test truthiness. Keep in sync with
-// server events.go (EventSeasonPointsAwarded).
+// spChange is the SIGNED change the match applied to the player's season SP:
+// negative for a loss or an abandonment, and at the 0 floor the applied change,
+// so it can be 0. A 0 is a REAL value — falsy, so the dispatch handler must
+// type-guard it and never test truthiness — and it must never pass through a
+// helper that clamps negatives to 0. rankChange compares the rank (tier, then
+// division) before and after, never SP alone; reason is "abandoned" for the
+// seat whose reconnect window expired, "partner_abandoned" for its teammate,
+// "normal" for everyone else. Keep in sync with server events.go
+// (EventSeasonPointsAwarded, RankChange*, SPReason*).
 export const EVENT_SEASON_POINTS_AWARDED = "event:season_points_awarded" as const;
 
+export const SEASON_RANK_CHANGES = ["promoted", "demoted", "none"] as const;
+export type SeasonRankChange = (typeof SEASON_RANK_CHANGES)[number];
+
+export const SEASON_SP_REASONS = ["normal", "abandoned", "partner_abandoned"] as const;
+export type SeasonSpReason = (typeof SEASON_SP_REASONS)[number];
+
 export interface SeasonPointsAwardedPayload {
-  spEarned: number;
+  spChange: number;
   newSeasonSp: number;
   rankTier: string;
-  tieredUp: boolean;
+  rankDivision: number | null;
+  rankChange: SeasonRankChange;
+  reason: SeasonSpReason;
   seasonName: string;
 }
 

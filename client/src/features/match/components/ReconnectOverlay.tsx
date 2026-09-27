@@ -6,6 +6,7 @@ import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
+import type { SeasonSettlement } from "@/shared/stores/matchStore";
 import type { TeamString } from "@/shared/types/matchTypes";
 import type { MatchAbandonedPayload } from "@/shared/types/wsEvents";
 
@@ -18,6 +19,7 @@ import {
 } from "../lib/turnCountdown";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
+import { SeasonSpLine } from "./SeasonSpLine";
 
 interface DisconnectedPlayerInfo {
   /** Display name for the chip. */
@@ -55,6 +57,13 @@ interface ReconnectOverlayProps {
    *  team alone can't tell abandoner from partner, only the seat can. When
    *  omitted/null, the result line is not rendered. */
   viewerSeat?: number | null;
+  /** The viewer's Season Points outcome for the abandoned match (Story 13.5),
+   *  read live from the match store by the caller. It usually lands a beat
+   *  AFTER event:match_abandoned mounts this panel (it trails in the same
+   *  burst), so the line appears inside the redirect window rather than with
+   *  the panel. Carries its own reason: a teammate of the abandoner sees the
+   *  half-loss copy, the abandoner (on a late reconnect) their penalty. */
+  seasonSettlement?: SeasonSettlement | null;
   onReturnToLobby?: () => void;
   /** Total reconnect window in seconds — used to drive the progress ring's
    *  sweep. Defaults to 120 (server default). Custom rooms with a different
@@ -128,6 +137,7 @@ export function ReconnectOverlay({
   abandonedData,
   viewerTeam = null,
   viewerSeat = null,
+  seasonSettlement = null,
   onReturnToLobby,
   totalSeconds = RECONNECT_TOTAL_SECONDS_DEFAULT,
   soundKey,
@@ -262,6 +272,10 @@ export function ReconnectOverlay({
                     : t("match.disconnect.abandonCountsWin")}
                 </p>
               )}
+
+              {/* Independent of the result line above: the abandoner never gets
+                  that line, but their own penalty is still worth stating. */}
+              {seasonSettlement && <SeasonSpLine settlement={seasonSettlement} />}
 
               <p
                 className="font-body text-xs mt-1 animate-pulse"

@@ -1424,6 +1424,15 @@
     "tierUp": {
       "toast": "Нов ранг: {{tier}}"
     },
+    "rank": "{{tier}} {{division}}",
+    "demoted": {
+      "toast": "Пад на {{rank}}"
+    },
+    "result": {
+      "line": "{{change}} СП · {{rank}}",
+      "partnerAbandoned": "Партнерот го напушти мечот: {{change}} СП (половина од загубата)",
+      "abandoned": "Го напушти мечот: {{change}} СП"
+    },
     "leaderboard": {
       "eyebrow": "Сезона",
       "title": "Ранг листа",

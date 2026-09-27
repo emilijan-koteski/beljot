@@ -1391,7 +1391,7 @@
     "banner": {
       "sp": "{{sp}} SP",
       "progress": "{{current}} / {{next}} SP",
-      "progressLabel": "{{tier}}, {{current}} of {{next}} SP into the next tier",
+      "progressLabel": "{{tier}}, {{current}} of {{next}} SP to the next rank",
       "progressLabelTop": "{{tier}}, {{sp}} SP, top of the ladder",
       "atTop": "Top of the ladder",
       "daysLeft": "Ends in {{days}}d",
@@ -1423,6 +1423,15 @@
     },
     "tierUp": {
       "toast": "New rank: {{tier}}"
+    },
+    "rank": "{{tier}} {{division}}",
+    "demoted": {
+      "toast": "Dropped to {{rank}}"
+    },
+    "result": {
+      "line": "{{change}} SP · {{rank}}",
+      "partnerAbandoned": "Partner abandoned: {{change}} SP (half loss)",
+      "abandoned": "You abandoned: {{change}} SP"
     },
     "leaderboard": {
       "eyebrow": "Season",

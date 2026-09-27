@@ -51,16 +51,16 @@ CREATE TABLE player_seasons (
     -- as INTEGER and had to be widened. SP never decreases (PRD: "No decay"),
     -- so the CHECK is a guard against a bad write, not a business rule.
     sp         BIGINT NOT NULL DEFAULT 0 CHECK (sp >= 0),
-    -- DENORMALIZED SNAPSHOT - READ THIS BEFORE USING IT.
-    -- rank_tier exists ONLY so operators and Story 13.2's leaderboard query can
-    -- sort and filter in SQL. It is refreshed on every SP write and is
-    -- therefore ALLOWED TO LAG. The authoritative tier is always
-    -- season.TierForSP(sp) -- pure arithmetic over a value already loaded.
-    --
-    -- Unlike users.honor_score (000017) there is no decay here and SP is
-    -- monotonic, so stored and derived can never actually disagree. The derived
-    -- call stays the single source anyway, so no future reader learns the wrong
-    -- habit from this column.
+    -- RANK SNAPSHOT - READ THIS BEFORE USING IT. (Comment revised by Story
+    -- 13.5; the column itself is unchanged.)
+    -- rank_tier is the tier the row's sp stood at after its last SP write, and
+    -- 000028 adds rank_division beside it. For a RUNNING season it is only a
+    -- snapshot: the tier is derived from sp with the live ladder
+    -- (season/tier.go), never read from here. For an ENDED season
+    -- (seasons.ends_at <= now) the snapshot IS the answer: the archive and a
+    -- prior season's leaderboard read it as stored, because the floors and the
+    -- formula that produced an old season's sp are not the live ones. See
+    -- 000028 for the full rule.
     rank_tier  VARCHAR(16) NOT NULL DEFAULT 'iron',
     -- +1 for EVERY human seat in a finished match, present at the terminal end
     -- or not. Bot and empty seats increment neither counter.

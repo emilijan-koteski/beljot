@@ -3,6 +3,8 @@ package season
 import (
 	"fmt"
 	"slices"
+
+	"github.com/emilijan/beljot/server/internal/ws"
 )
 
 // Season Points (SP) rank ladder. THIS FILE IS ITS SINGLE SOURCE OF TRUTH.
@@ -10,15 +12,22 @@ import (
 // The client carries one documented mirror at
 // client/src/shared/lib/seasonTier.ts, under the same manual-sync convention as
 // user/level.go <-> xpLevel.ts, user/honor.go <-> honor.ts and
-// ws/events.go <-> wsEvents.ts. That mirror is DISPLAY ONLY: it buckets a
-// server-supplied SP total for colouring and bar fill and never makes a
-// decision. If a floor or a token changes here, change it there in the same
-// commit.
+// ws/events.go <-> wsEvents.ts. That mirror is DISPLAY ONLY: it carries the
+// tokens, floors and division rule so it can label a rank and bucket an SP
+// total when a token is unrecognised, and it never makes a decision. If a floor
+// or a token changes here, change it there in the same commit.
 //
 // Every function here is PURE: no DB, no clock reads (time is always a
 // parameter), no side effects. That is what lets the same arithmetic run in the
-// match-end write path, in GET /api/v1/seasons/current, and inside
-// event:season_points_awarded without any of them disagreeing.
+// match-end write path (RankForSP for the stored snapshot, RankChange for the
+// event), in every running-season read (RankForSP, RankProgress for
+// GET /api/v1/seasons/current), and inside event:season_points_awarded without
+// any of them disagreeing.
+//
+// The rank an award lands on is also STORED with the row (player_seasons
+// rank_tier / rank_division), and that snapshot, not this table, is what an
+// ENDED season shows: an old season's SP was scored under the floors that were
+// live then (migration 000028, Story 13.5). A running season always derives.
 //
 // A WIN/LOSS LADDER WITH DIVISIONS (sprint-change-proposal-2026-09-26, which
 // reverses the flat, climb-only ladder of 2026-04-18; that proposal's rejection
@@ -46,7 +55,9 @@ import (
 
 // Season tier tokens. STABLE MACHINE TOKENS: they cross the wire, land in
 // player_seasons.rank_tier, and key the client's i18n labels and colour map. A
-// display string must never be substituted for one of these.
+// display string must never be substituted for one of these. Since ended
+// seasons show the stored rank_tier, renaming a token now needs a data
+// migration of player_seasons.rank_tier.
 const (
 	TierIron        = "iron"
 	TierBronze      = "bronze"
@@ -150,38 +161,42 @@ func TierFloor(tier string) (int, bool) {
 	return ladder.Floor(tier)
 }
 
-// TierForSP returns the highest tier whose floor is <= sp. Integer arithmetic
-// only. sp <= 0 is Iron (the DB CHECK forbids a negative, but a negative input
-// clamps rather than falling off the bottom of the table).
-func TierForSP(sp int) string {
-	tier, _, _ := ladder.Progress(sp)
-	return tier
-}
-
-// TierProgress decomposes an SP total into the current tier plus the position
-// within that tier's band, for driving the rank progress bar. See
-// Ladder.Progress.
-func TierProgress(sp int) (tier string, spIntoTier, spForNextTier int) {
-	return ladder.Progress(sp)
-}
-
 // RankForSP returns the tier and division an SP total sits at on the live
 // ladder. See Ladder.Rank.
 func RankForSP(sp int) (tier string, division int) {
 	return ladder.Rank(sp)
 }
 
-// TierClimbed reports whether moving from previousSP to sp raised the TIER. A
-// drop, a move inside one tier and no move at all are all false, so a demotion
-// can never read as a promotion.
-func TierClimbed(previousSP, sp int) bool {
-	return ladder.index(sp) > ladder.index(previousSP)
+// RankProgress returns the rank an SP total sits at on the live ladder and the
+// position within its rank step, for driving the rank progress bar. See
+// Ladder.RankProgress.
+func RankProgress(sp int) (tier string, division, spIntoStep, spForNextStep int) {
+	return ladder.RankProgress(sp)
+}
+
+// RankChange compares the RANK before and after a match: ws.RankChangePromoted
+// when (tier, division) went up, ws.RankChangeDemoted when it went down, and
+// ws.RankChangeNone otherwise. It compares ranks, never SP alone, so a loss that
+// stays inside one division is "none" and a win across a division line inside
+// one tier (Gold 1 -> Gold 2) is a promotion. See Ladder.RankChange.
+func RankChange(previousSP, sp int) string {
+	return ladder.RankChange(previousSP, sp)
 }
 
 // HasDivisions reports whether a tier splits into divisions. Master and
 // Grandmaster are single; every lower tier has divisions 1-3.
 func HasDivisions(tier string) bool {
 	return tier != TierMaster && tier != TierGrandmaster
+}
+
+// divisionOrNil maps the ladder's "no division" 0 to nil, the NULL / null that
+// player_seasons.rank_division and every wire `division` carry for Master and
+// Grandmaster.
+func divisionOrNil(division int) *int {
+	if division == 0 {
+		return nil
+	}
+	return &division
 }
 
 // Floor returns the inclusive SP floor of a tier token, and whether the token
@@ -208,20 +223,19 @@ func (l Ladder) index(sp int) int {
 }
 
 // Progress decomposes an SP total into the current tier plus the position within
-// that tier's band, for driving the rank progress bar. Mirrors LevelProgress
-// (user/level.go):
+// that tier's band, the base RankProgress splits into steps. Mirrors
+// LevelProgress (user/level.go):
 //
 //	tier           - the highest tier whose floor is <= sp
 //	spIntoTier     - SP past the current tier's floor, in [0, band)
 //	spForNextTier  - size of the current tier's band, nextFloor - thisFloor
 //
-// The bar fill is spIntoTier / spForNextTier.
-//
 // AT GRANDMASTER THERE IS NO NEXT TIER: spForNextTier is 0 and spIntoTier is
-// everything above the Grandmaster floor, and the client renders a full/terminal
-// bar. LevelProgress can lean on a strictly-increasing quadratic and never hit
-// this case; a FINITE table has a top, so this branch is real. Divide only
-// after checking spForNextTier > 0.
+// everything above the Grandmaster floor, which is also what RankProgress
+// reports there, and the client renders a full/terminal bar. LevelProgress
+// can lean on a strictly-increasing quadratic and never hit this case; a
+// FINITE table has a top, so this branch is real. Divide only after checking
+// spForNextTier > 0.
 func (l Ladder) Progress(sp int) (tier string, spIntoTier, spForNextTier int) {
 	if sp < 0 {
 		sp = 0
@@ -242,9 +256,66 @@ func (l Ladder) Progress(sp int) (tier string, spIntoTier, spForNextTier int) {
 // division 3 at 134. Master and Grandmaster, which have no divisions, report 0.
 // A negative total clamps to Iron 1, like Progress.
 func (l Ladder) Rank(sp int) (tier string, division int) {
+	tier, division, _, _ = l.RankProgress(sp)
+	return tier, division
+}
+
+// RankProgress decomposes an SP total into its rank plus the position within
+// the current RANK STEP, the unit the progress bar fills (Story 13.5):
+//
+//	tier, division  - as Rank
+//	spIntoStep      - SP past the start of the current step
+//	spForNextStep   - size of the current step, 0 at Grandmaster
+//
+// The next step of a divided tier is the next division, or the next tier from
+// division 3; Master steps to the Grandmaster floor; Grandmaster is terminal.
+// So Gold 2 (667-733 on a 600-800 band) fills 0 -> 67 toward Gold 3, Diamond 3
+// fills toward the Master floor, and Master fills toward Grandmaster.
+//
+// Division d of a band starts at the smallest offset x with 1 + x·3/band >= d,
+// which is ceil((d-1)·band / 3): the exact inverse of Rank's split, so the bar
+// resets to empty at precisely the SP where the division number changes.
+//
+// AT GRANDMASTER spForNextStep IS 0 and spIntoStep is everything above the
+// floor; divide only after checking spForNextStep > 0.
+func (l Ladder) RankProgress(sp int) (tier string, division, spIntoStep, spForNextStep int) {
 	tier, into, band := l.Progress(sp)
 	if !HasDivisions(tier) || band <= 0 {
-		return tier, 0
+		return tier, 0, into, band
 	}
-	return tier, 1 + into*divisionsPerTier/band
+	division = 1 + into*divisionsPerTier/band
+	start := divisionStart(division, band)
+	next := band
+	if division < divisionsPerTier {
+		next = divisionStart(division+1, band)
+	}
+	return tier, division, into - start, next - start
+}
+
+// divisionStart is the offset into a band at which division d begins,
+// ceil((d-1)·band / divisionsPerTier) in integer arithmetic.
+func divisionStart(division, band int) int {
+	return ((division-1)*band + divisionsPerTier - 1) / divisionsPerTier
+}
+
+// RankChange reports how the rank moved between two SP totals on this ladder,
+// as a wire token (ws.RankChangePromoted / Demoted / None).
+func (l Ladder) RankChange(previousSP, sp int) string {
+	prev, next := l.rankOrdinal(previousSP), l.rankOrdinal(sp)
+	switch {
+	case next > prev:
+		return ws.RankChangePromoted
+	case next < prev:
+		return ws.RankChangeDemoted
+	default:
+		return ws.RankChangeNone
+	}
+}
+
+// rankOrdinal orders ranks by tier first and division second. Master and
+// Grandmaster carry division 0, which never matters: no other rank shares
+// their tier.
+func (l Ladder) rankOrdinal(sp int) int {
+	_, division := l.Rank(sp)
+	return l.index(sp)*(divisionsPerTier+1) + division
 }

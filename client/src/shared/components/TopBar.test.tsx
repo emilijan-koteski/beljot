@@ -30,8 +30,9 @@ const seasonFixture: CurrentSeasonResponse = {
   endsAt: "2099-10-01T00:00:00Z",
   sp: 680,
   rankTier: "gold",
-  spIntoTier: 80,
-  spForNextTier: 200,
+  rankDivision: 2,
+  spIntoDivision: 13,
+  spForNextDivision: 67,
   gamesPlayed: 31,
   gamesCompleted: 29,
 };
@@ -322,13 +323,26 @@ describe("TopBar seasonal rank chip", () => {
     await i18n.changeLanguage("en");
   });
 
-  it("renders the tier badge and the tier name once the standing resolves", async () => {
+  it("renders the tier badge and the rank once the standing resolves", async () => {
     renderWithRouter();
 
     const chip = await screen.findByTestId("header-rank");
     expect(chip).toHaveAttribute("data-tier", "gold");
     expect(screen.getByTestId("header-rank-badge")).toHaveAttribute("data-tier", "gold");
-    expect(screen.getByTestId("header-rank-tier").textContent).toBe(i18n.t("season.tier.gold"));
+    expect(screen.getByTestId("header-rank-tier").textContent).toBe("Gold 2");
+  });
+
+  it("names a single tier without a division", async () => {
+    mockGetCurrentSeason.mockResolvedValue({
+      ...seasonFixture,
+      sp: 1250,
+      rankTier: "master",
+      rankDivision: null,
+    });
+    renderWithRouter();
+
+    await screen.findByTestId("header-rank");
+    expect(screen.getByTestId("header-rank-tier").textContent).toBe("Master");
   });
 
   // THE POINT OF THE CHIP: identity, not arithmetic. The SP total, the band
@@ -361,9 +375,7 @@ describe("TopBar seasonal rank chip", () => {
 
     const chip = await screen.findByTestId("header-rank");
     const label = chip.querySelector(".sr-only");
-    expect(label?.textContent).toBe(
-      i18n.t("season.banner.rankAria", { tier: i18n.t("season.tier.gold") }),
-    );
+    expect(label?.textContent).toBe("Rank: Gold 2");
   });
 
   it("falls back to the SP bucket for an unrecognised tier token", async () => {
@@ -375,12 +387,12 @@ describe("TopBar seasonal rank chip", () => {
     expect(await screen.findByTestId("header-rank")).toHaveAttribute("data-tier", "gold");
   });
 
-  it("localizes the tier name", async () => {
+  it("localizes the rank", async () => {
     await i18n.changeLanguage("mk");
     renderWithRouter();
 
     await screen.findByTestId("header-rank");
-    expect(screen.getByTestId("header-rank-tier").textContent).toBe(i18n.t("season.tier.gold"));
+    expect(screen.getByTestId("header-rank-tier").textContent).toBe("Злато 2");
   });
 
   // AuthLayout mounts this same bar with nobody signed in, and the endpoint

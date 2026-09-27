@@ -33,11 +33,17 @@ type PlayerSeason struct {
 	// losses (sp_formula.go), never below 0 (the engine floors every total and
 	// the column keeps CHECK (sp >= 0)). No decay (PRD: "No decay") and no spend.
 	SP int `gorm:"column:sp" json:"sp"`
-	// DENORMALIZED SNAPSHOT, never authoritative (Story 13.1 D7). It exists only
-	// so operators and Story 13.2's leaderboard can sort/filter in SQL. Always
-	// read the tier as TierForSP(SP) instead -- see the column comment in
-	// 000024_create_seasons_and_player_seasons.up.sql.
-	RankTier string `gorm:"column:rank_tier" json:"rankTier"`
+	// THE RANK SNAPSHOT: the tier and division SP stood at after the row's last
+	// award, written together by every award (Story 13.5). RankDivision is 1-3,
+	// or nil for Master, Grandmaster and every row written before migration
+	// 000028 (2026 Q3 and earlier had no divisions).
+	//
+	// WHO READS IT depends on the season (see 000028): a RUNNING season derives
+	// its rank from SP with the live ladder and ignores these two fields; an
+	// ENDED season reads them as stored, because its SP was scored under
+	// floors and a formula that are no longer live.
+	RankTier     string `gorm:"column:rank_tier" json:"rankTier"`
+	RankDivision *int   `gorm:"column:rank_division" json:"rankDivision"`
 	// +1 for every human seat in a finished match, present or not.
 	GamesPlayed int `gorm:"column:games_played" json:"gamesPlayed"`
 	// +1 only for seats present at the terminal end (Story 13.1 D10). A
@@ -63,13 +69,15 @@ type SPChanges func(current map[uint]int) (map[uint]int, error)
 // match-end write, as returned by ApplySeasonPoints.
 //
 // PreviousSP is the total BEFORE this match, as read under the row lock, so the
-// applied change is SP - PreviousSP and the caller can tell a climb from a drop
-// without a second read. Tier is the AUTHORITATIVE derived value (TierForSP over
-// the new total), never the lagging rank_tier column.
+// applied change is SP - PreviousSP and the caller can compare the rank before
+// and after without a second read. Tier and Division are the rank of the new
+// total (RankForSP), exactly as written to rank_tier / rank_division; Division
+// is 0 for Master and Grandmaster, which the column stores as NULL.
 type PlayerSeasonSnapshot struct {
 	SP             int
 	PreviousSP     int
 	Tier           string
+	Division       int
 	GamesPlayed    int
 	GamesCompleted int
 }
@@ -85,8 +93,9 @@ type PlayerSeasonSnapshot struct {
 //     join into PlayerSeason would mean adding a phantom Username field to the
 //     model and hoping nobody ever writes it back.
 //  2. It is not the DTO either. The handler's LeaderboardRowView adds `position`
-//     and the DERIVED `tier` and drops nothing; keeping them apart is what stops
-//     the join's shape from leaking onto the wire (or the wire's `position` from
+//     and the resolved rank (derived from SP for a running season, the stored
+//     snapshot below for an ended one); keeping them apart is what stops the
+//     join's shape from leaking onto the wire (or the wire's `position` from
 //     looking like something the database supplied).
 //  3. THERE IS NO `season` -> `user` GO IMPORT. Story 13.3 will likely have
 //     `user` import `season` (seasonal rank on the public profile), so the
@@ -95,11 +104,16 @@ type PlayerSeasonSnapshot struct {
 //
 // The explicit `column:sp` tag matches PlayerSeason's: the default naming
 // strategy is not relied on for an all-caps field name.
+//
+// RankTier and RankDivision are the row's stored rank snapshot. The service
+// reads them only for an ENDED season (see PlayerSeason.RankTier).
 type LeaderboardEntry struct {
-	UserID      uint   `gorm:"column:user_id"`
-	Username    string `gorm:"column:username"`
-	SP          int    `gorm:"column:sp"`
-	GamesPlayed int    `gorm:"column:games_played"`
+	UserID       uint   `gorm:"column:user_id"`
+	Username     string `gorm:"column:username"`
+	SP           int    `gorm:"column:sp"`
+	RankTier     string `gorm:"column:rank_tier"`
+	RankDivision *int   `gorm:"column:rank_division"`
+	GamesPlayed  int    `gorm:"column:games_played"`
 }
 
 // ArchiveEntry is ONE ROW OF THE JOINED READ behind Story 13.3's prior-season
@@ -108,8 +122,12 @@ type LeaderboardEntry struct {
 //
 // A SCAN TARGET, like LeaderboardEntry above, and its own struct for the same
 // reasons: it mixes columns from two tables, and the handler's ArchiveRowView
-// adds the DERIVED `tier` (TierForSP over SP — the stored rank_tier column is
-// never selected, 13.1 D7) so the join's shape never reaches the wire directly.
+// is built from it field by field, so the join's shape never reaches the wire
+// directly.
+//
+// RankTier and RankDivision are the stored snapshot, and for the archive they
+// ARE the rank: every archived season has ended, so its rank is the one it
+// finished on, never re-derived from SP on today's floors (Story 13.5).
 //
 // MEMBERSHIP IS NOT leaderboardScope's. The archive lists "seasons you actually
 // played" (games_played >= 1) that have ENDED, where the ladder lists everyone who
@@ -117,10 +135,12 @@ type LeaderboardEntry struct {
 // not on the window, so they stay two predicates in two documented homes; never
 // share the scope helper.
 type ArchiveEntry struct {
-	SeasonID    uint      `gorm:"column:season_id"`
-	SeasonName  string    `gorm:"column:season_name"`
-	StartedAt   time.Time `gorm:"column:started_at"`
-	EndsAt      time.Time `gorm:"column:ends_at"`
-	SP          int       `gorm:"column:sp"`
-	GamesPlayed int       `gorm:"column:games_played"`
+	SeasonID     uint      `gorm:"column:season_id"`
+	SeasonName   string    `gorm:"column:season_name"`
+	StartedAt    time.Time `gorm:"column:started_at"`
+	EndsAt       time.Time `gorm:"column:ends_at"`
+	SP           int       `gorm:"column:sp"`
+	RankTier     string    `gorm:"column:rank_tier"`
+	RankDivision *int      `gorm:"column:rank_division"`
+	GamesPlayed  int       `gorm:"column:games_played"`
 }

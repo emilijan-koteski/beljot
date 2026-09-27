@@ -6,6 +6,7 @@ import (
 
 	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/match"
+	"github.com/emilijan/beljot/server/internal/ws"
 )
 
 // Service is the thin match-end SP awarder injected into the match manager as
@@ -22,8 +23,16 @@ import (
 // out in capitals (Story 9.5 D1 / 9.7 D4, restated as Story 13.1 D8). So
 // match.MatchOutcome and match.PlayerSeasonSnapshot are declared in MATCH. It
 // also means the snapshot the manager receives is fully PRECOMPUTED -- season
-// name, applied change, derived tier and tieredUp all resolved here -- so the
-// manager never runs ladder arithmetic it cannot see.
+// name, applied change, rank, rank change and reason all resolved here -- so
+// the manager never runs ladder arithmetic it cannot see.
+//
+// RUNNING VS ENDED SEASONS (Story 13.5). Every read of a RUNNING season derives
+// its tier and division from SP with the live ladder (RankForSP). Every read
+// of an ENDED season (ends_at <= now: the archive, and a prior season picked on
+// the leaderboard) returns the rank snapshot stored with the row instead,
+// because an ended season's SP was scored under floors and a formula that may
+// no longer be live: 2026 Q3's old totals would read as Grandmaster on the
+// 13.4 floors.
 type Service struct {
 	repo Repository
 }
@@ -100,28 +109,82 @@ func (s *Service) ApplySeasonPoints(outcome match.MatchOutcome, now time.Time) (
 		return nil, fmt.Errorf("applying season points: %w", err)
 	}
 
+	reasons := spReasons(outcome)
 	out := make(map[uint]match.PlayerSeasonSnapshot, len(snapshots))
 	for userID, snap := range snapshots {
+		reason, ok := reasons[userID]
+		if !ok {
+			reason = ws.SPReasonNormal
+		}
 		out[userID] = match.PlayerSeasonSnapshot{
 			SeasonName: current.Name,
 			SP:         snap.SP,
 			// The APPLIED change: at the 0 floor it is smaller than the formula's.
-			SPChange: snap.SP - snap.PreviousSP,
-			RankTier: snap.Tier,
-			// A CLIMB only. SP now falls too, so "the tier changed" would also be
-			// true on a drop and fire the rank-up celebration for a demotion.
-			TieredUp: TierClimbed(snap.PreviousSP, snap.SP),
+			SPChange:     snap.SP - snap.PreviousSP,
+			RankTier:     snap.Tier,
+			RankDivision: divisionOrNil(snap.Division),
+			// The RANK before and after, never SP alone: a loss inside one
+			// division is "none", and a drop is never a promotion.
+			RankChange: RankChange(snap.PreviousSP, snap.SP),
+			Reason:     reason,
 		}
 	}
 	return out, nil
 }
 
+// spReasons names why each human seat's change is what it is, keyed by user ID:
+// the seat whose reconnect window expired is "abandoned", its teammate
+// "partner_abandoned", and everyone else, including every seat of a match that
+// ended normally, "normal". The same seat walk ComputeSPChanges scores by.
+func spReasons(outcome match.MatchOutcome) map[uint]string {
+	abandonedTeam := -1
+	if a := outcome.AbandonedSeat; a >= 0 && a < len(outcome.Seats) {
+		abandonedTeam = outcome.Seats[a].Team
+	}
+	out := make(map[uint]string, len(outcome.Seats))
+	for seat, s := range outcome.Seats {
+		if !isHumanSeat(s) {
+			continue
+		}
+		switch {
+		case seat == outcome.AbandonedSeat:
+			out[s.UserID] = ws.SPReasonAbandoned
+		case s.Team == abandonedTeam:
+			out[s.UserID] = ws.SPReasonPartnerAbandoned
+		default:
+			out[s.UserID] = ws.SPReasonNormal
+		}
+	}
+	return out
+}
+
+// derivedRank is a RUNNING season's rank: the live ladder over the SP total,
+// with Master and Grandmaster's missing division as nil.
+func derivedRank(sp int) (string, *int) {
+	tier, division := RankForSP(sp)
+	return tier, divisionOrNil(division)
+}
+
+// seasonRank resolves the rank a read shows for one row: derived from SP for a
+// running season, the stored snapshot for an ended one (see the Service doc).
+func seasonRank(ended bool, sp int, storedTier string, storedDivision *int) (string, *int) {
+	if ended {
+		return storedTier, storedDivision
+	}
+	return derivedRank(sp)
+}
+
 // CurrentSeasonView is the read path behind GET /api/v1/seasons/current: the
 // active window plus the viewer's own record, decomposed for the RankBanner.
 //
-// A player with no player_seasons row yet gets the ZERO STATE (0 SP, Iron, a
-// full Iron band to climb) rather than a 404 or a lazily created row: this path
-// never creates a PLAYER record.
+// A player with no player_seasons row yet gets the ZERO STATE (0 SP, Iron 1,
+// the whole Iron 1 step to climb) rather than a 404 or a lazily created row:
+// this path never creates a PLAYER record.
+//
+// The season is RUNNING by construction, so the rank is derived from SP and the
+// stored snapshot is ignored. The progress pair is the current RANK STEP
+// (RankProgress): the next division, or the next tier from Diamond 3 and
+// Master, and 0 at Grandmaster.
 //
 // It can, however, create the SEASON row -- resolveSeason is the lazy resolver,
 // so a GET that lands in a quarter with no window yet inserts it. That is
@@ -147,21 +210,22 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 		gamesCompleted = record.GamesCompleted
 	}
 
-	// Derived, never read off the rank_tier column (D7).
-	tier, intoTier, forNextTier := TierProgress(sp)
+	// Derived: a running season never reads the stored snapshot.
+	tier, division, intoStep, forNextStep := RankProgress(sp)
 
 	return &CurrentSeasonView{
 		SeasonName: current.Name,
 		// ABSOLUTE timestamp, never a "daysRemaining" duration: a relative value
 		// is stale the moment it is serialised and cannot survive a cached
 		// response. The client owns the countdown.
-		EndsAt:         current.EndsAt,
-		SP:             sp,
-		RankTier:       tier,
-		SPIntoTier:     intoTier,
-		SPForNextTier:  forNextTier,
-		GamesPlayed:    gamesPlayed,
-		GamesCompleted: gamesCompleted,
+		EndsAt:            current.EndsAt,
+		SP:                sp,
+		RankTier:          tier,
+		RankDivision:      divisionOrNil(division),
+		SPIntoDivision:    intoStep,
+		SPForNextDivision: forNextStep,
+		GamesPlayed:       gamesPlayed,
+		GamesCompleted:    gamesCompleted,
 	}, nil
 }
 
@@ -180,6 +244,14 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 // season's ladder is frozen when it ends, but the question "where did I finish"
 // has the same answer shape either way.
 //
+// THE RANK is where the two differ (Story 13.5). The current window, and any
+// by-id window that has not ended, derives every row's tier and division from
+// SP; a by-id window that HAS ended (ends_at <= now) shows each row's stored
+// snapshot, rows and viewer alike, so a 2026 Q3 total in the thousands reads
+// as the tier it finished on and never as Grandmaster. The current-window
+// selector is running by definition (the resolver returns the window covering
+// now), so it is never treated as ended.
+//
 // PULL-ONLY. There is deliberately no WebSocket event for standings (epic
 // decision, restated as a Story 13.2 boundary): the client loads this on mount
 // and re-reads it on a poll. Nothing here is pushed and nothing invalidates it
@@ -195,6 +267,7 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 // bypasses the handler gets exactly what it asked for.
 func (s *Service) LeaderboardView(userID, seasonID uint, limit, offset int, now time.Time) (*LeaderboardView, error) {
 	var window *Season
+	ended := false
 	if seasonID == 0 {
 		current, err := s.resolveSeason(now)
 		if err != nil {
@@ -210,6 +283,7 @@ func (s *Service) LeaderboardView(userID, seasonID uint, limit, offset int, now 
 			return nil, apperr.ErrSeasonNotFound
 		}
 		window = found
+		ended = !found.EndsAt.After(now)
 	}
 
 	entries, total, err := s.repo.LeaderboardPage(window.ID, limit, offset)
@@ -219,23 +293,23 @@ func (s *Service) LeaderboardView(userID, seasonID uint, limit, offset int, now 
 
 	items := make([]LeaderboardRowView, 0, len(entries))
 	for i, e := range entries {
+		tier, division := seasonRank(ended, e.SP, e.RankTier, e.RankDivision)
 		items = append(items, LeaderboardRowView{
 			// The list's own numbering. Derived from the page window rather than
 			// read back from SQL, which is only correct because the repository
 			// guarantees a TOTAL order (sp DESC, user_id ASC) -- with a partial
 			// order, row 41 of one request need not be row 41 of the next.
-			Position: offset + i + 1,
-			UserID:   e.UserID,
-			Username: e.Username,
-			SP:       e.SP,
-			// DERIVED, never the stored rank_tier column (Story 13.1 D7). The
-			// repository does not even select that column.
-			Tier:        TierForSP(e.SP),
+			Position:    offset + i + 1,
+			UserID:      e.UserID,
+			Username:    e.Username,
+			SP:          e.SP,
+			Tier:        tier,
+			Division:    division,
 			GamesPlayed: e.GamesPlayed,
 		})
 	}
 
-	viewer, err := s.viewerPosition(userID, window.ID)
+	viewer, err := s.viewerPosition(userID, window.ID, ended)
 	if err != nil {
 		return nil, err
 	}
@@ -275,8 +349,10 @@ func (s *Service) LeaderboardView(userID, seasonID uint, limit, offset int, now 
 // 0 must not lose their place in the list they were climbing.
 //
 // The position comes from CountAhead under the LIST'S OWN ORDER, so a viewer who
-// is on the page they are looking at reads the same number twice.
-func (s *Service) viewerPosition(userID, seasonID uint) (*LeaderboardViewerView, error) {
+// is on the page they are looking at reads the same number twice, and the rank
+// follows the list's own running / ended rule (`ended`), so the pinned row and
+// the listed row agree.
+func (s *Service) viewerPosition(userID, seasonID uint, ended bool) (*LeaderboardViewerView, error) {
 	entry, err := s.repo.FindLeaderboardEntry(seasonID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("reading viewer leaderboard entry: %w", err)
@@ -290,11 +366,13 @@ func (s *Service) viewerPosition(userID, seasonID uint) (*LeaderboardViewerView,
 		return nil, fmt.Errorf("counting leaderboard rows ahead: %w", err)
 	}
 
+	tier, division := seasonRank(ended, entry.SP, entry.RankTier, entry.RankDivision)
 	return &LeaderboardViewerView{
 		Position: int(ahead) + 1,
 		UserID:   userID,
 		SP:       entry.SP,
-		Tier:     TierForSP(entry.SP),
+		Tier:     tier,
+		Division: division,
 		// entry.Username is deliberately DROPPED rather than forwarded: the viewer
 		// IS the authenticated caller, so the client already holds their name in
 		// authStore, and the wire block stays name-free (Story 13.2 D3). It is
@@ -336,9 +414,10 @@ func (s *Service) SeasonsView(now time.Time) (*SeasonsListView, error) {
 }
 
 // ArchiveView is the read path behind GET /api/v1/users/:id/seasons: the
-// subject's ENDED, PLAYED seasons, newest-first, with the tier DERIVED per row
-// (TierForSP over the immutable SP total — never the stored rank_tier column,
-// 13.1 D7).
+// subject's ENDED, PLAYED seasons, newest-first, each with the rank it
+// FINISHED on: the stored rank_tier / rank_division snapshot, never re-derived
+// from the SP total on today's floors (Story 13.5). Rows from before divisions
+// existed (2026 Q3 and earlier) carry no division and render as the bare tier.
 //
 // An unknown subject is an EMPTY archive, not a 404 — the profile query owns
 // user existence, and this endpoint answers the narrower question "which ended
@@ -351,11 +430,14 @@ func (s *Service) ArchiveView(userID uint, now time.Time) (*ArchiveView, error) 
 
 	items := make([]ArchiveRowView, 0, len(entries))
 	for _, e := range entries {
+		// Every archive row has ended (the repository's own predicate).
+		tier, division := seasonRank(true, e.SP, e.RankTier, e.RankDivision)
 		items = append(items, ArchiveRowView{
 			SeasonID:    e.SeasonID,
 			SeasonName:  e.SeasonName,
 			SP:          e.SP,
-			Tier:        TierForSP(e.SP),
+			Tier:        tier,
+			Division:    division,
 			GamesPlayed: e.GamesPlayed,
 			StartedAt:   e.StartedAt,
 			EndsAt:      e.EndsAt,
@@ -370,10 +452,10 @@ func (s *Service) ArchiveView(userID uint, now time.Time) (*ArchiveView, error) 
 // `seasonRank: null` and the client hides the chip.
 //
 // nil MEANS "NO ROW", NOT "NO SP": a played season at 0 SP still has a rank
-// (Iron — there is no unranked state), so the row's existence is the gate.
-// Satisfies user.SeasonRankReader
-// structurally; `season` never imports `user` (the same one-way discipline as
-// match.SPAwarder, mirrored).
+// (Iron 1 — there is no unranked state), so the row's existence is the gate.
+// The active season is running, so the rank is derived from SP. Satisfies
+// user.SeasonRankReader structurally; `season` never imports `user` (the same
+// one-way discipline as match.SPAwarder, mirrored).
 //
 // Like every read: may lazily create the SEASON window via resolveSeason,
 // never a player_seasons row.
@@ -391,10 +473,11 @@ func (s *Service) CurrentSeasonRank(userID uint, now time.Time) (*SeasonRankView
 		return nil, nil
 	}
 
+	tier, division := derivedRank(record.SP)
 	return &SeasonRankView{
 		SeasonName: current.Name,
-		// Derived, never the stored rank_tier column (D7).
-		Tier: TierForSP(record.SP),
-		SP:   record.SP,
+		Tier:       tier,
+		Division:   division,
+		SP:         record.SP,
 	}, nil
 }

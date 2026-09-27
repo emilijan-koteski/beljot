@@ -9,7 +9,11 @@ import { playSfx } from "@/shared/audio/audioEngine";
 import { isCardId } from "@/shared/lib/cardId";
 import { honorIsNewPlayer, honorScoreOrPrior } from "@/shared/lib/honor";
 import { MOTION } from "@/shared/lib/motion";
-import { normalizeSeasonTier } from "@/shared/lib/seasonTier";
+import {
+  normalizeSeasonDivision,
+  normalizeSeasonTier,
+  seasonRankLabel,
+} from "@/shared/lib/seasonTier";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useLevelUpStore } from "@/shared/stores/levelUpStore";
@@ -95,6 +99,8 @@ import {
   EVENT_TRICK_RESOLVED,
   EVENT_TRUMP_SELECTED,
   EVENT_XP_AWARDED,
+  SEASON_RANK_CHANGES,
+  SEASON_SP_REASONS,
   SYSTEM_AUTHENTICATED,
   SYSTEM_BOT_ADDED,
   SYSTEM_BOT_REMOVED,
@@ -311,6 +317,9 @@ function dispatchGameEvent(message: WsMessage): void {
     // Same for honour: event:honor_updated follows in the same burst, so clearing
     // here means the overlay shows this match's movement or none at all.
     store.setHonorSettlement(null);
+    // And for Season Points (Story 13.5): event:season_points_awarded follows in
+    // the same burst, so the SP line shows this match's change or nothing.
+    store.setSeasonSettlement(null);
     // Drop the room last-match cache. The key is per-ROOM, so whatever sits
     // there right now describes the PREVIOUS match — the room lobby populated
     // it before this one started, and the client-wide 30s staleTime means a
@@ -441,8 +450,8 @@ function dispatchGameEvent(message: WsMessage): void {
   }
 
   if (type === EVENT_SEASON_POINTS_AWARDED) {
-    // Story 13.1: per-human Season Points award, arriving right after
-    // event:honor_updated and before the trailing event:match_state.
+    // Story 13.1, reshaped by 13.5: per-human Season Points award, arriving right
+    // after event:honor_updated and before the trailing event:match_state.
     //
     // Unlike XP and honor this does NOT write to authStore.user: the season
     // record is not on the auth envelope (extending it would force a season
@@ -451,10 +460,14 @@ function dispatchGameEvent(message: WsMessage): void {
     // same WS-to-query bridge the friend-request push uses — so the header's
     // rank chip and the profile's RankBanner both hold whatever value the
     // server actually has, the moment the player is back out of the match.
+    //
+    // It ALSO stashes the outcome on the match store for the SP line on the
+    // result screens (MatchResult, ReconnectOverlay). The store read there is
+    // live, so the line appears even when this lands after the overlay mounted.
     const payload = message.payload as SeasonPointsAwardedPayload;
     // Defensive validation — Go zero values are real values, so guard on type,
-    // not truthiness. `spEarned: 0` (a loss at the 0 floor) and `tieredUp: false`
-    // (the overwhelmingly common case) are both legitimate, and both are falsy.
+    // not truthiness. `spChange: 0` (a loss at the 0 floor), `rankDivision: null`
+    // (Master, Grandmaster) and `rankChange: "none"` are all legitimate.
     //
     // The object check comes FIRST: a null or absent payload would otherwise
     // throw a TypeError on the field read below, which is the opposite of what
@@ -463,30 +476,50 @@ function dispatchGameEvent(message: WsMessage): void {
     if (
       !payload ||
       typeof payload !== "object" ||
-      !Number.isInteger(payload.spEarned) ||
+      !Number.isInteger(payload.spChange) ||
       !Number.isInteger(payload.newSeasonSp) ||
       typeof payload.rankTier !== "string" ||
       payload.rankTier === "" ||
-      typeof payload.tieredUp !== "boolean" ||
+      !(payload.rankDivision === null || Number.isInteger(payload.rankDivision)) ||
+      !(SEASON_RANK_CHANGES as readonly string[]).includes(payload.rankChange) ||
+      !(SEASON_SP_REASONS as readonly string[]).includes(payload.reason) ||
       typeof payload.seasonName !== "string"
     ) {
       console.warn("WS: ignoring malformed event:season_points_awarded payload", payload);
       return;
     }
     void queryClient.invalidateQueries({ queryKey: queryKeys.season.current() });
-    if (payload.tieredUp) {
-      // A TOAST, not a dialog (AC2). Deliberately NOT the levelUpStore +
-      // LevelUpDialog pattern: that store exists because a DIALOG must survive
-      // the navigation away that wipes gameStore, and a toast has no such need —
-      // sonner renders above the whole app. Fired from here rather than from a
-      // lobby effect so it lands whether the player is mid-navigation or already
-      // back in the lobby.
-      toast.success(
-        i18n.t("season.tierUp.toast", {
-          tier: i18n.t(`season.tier.${normalizeSeasonTier(payload.rankTier, payload.newSeasonSp)}`),
-        }),
-        { duration: MOTION.TOAST_LONG },
+    useMatchStore.getState().setSeasonSettlement({
+      spChange: payload.spChange,
+      newSeasonSp: payload.newSeasonSp,
+      rankTier: payload.rankTier,
+      rankDivision: payload.rankDivision,
+      reason: payload.reason,
+    });
+    // TOASTS, not dialogs (13.1 AC2). Deliberately NOT the levelUpStore +
+    // LevelUpDialog pattern: that store exists because a DIALOG must survive the
+    // navigation away that wipes gameStore, and a toast has no such need —
+    // sonner renders above the whole app. Fired from here rather than from a
+    // lobby effect so it lands whether the player is mid-navigation or already
+    // back in the lobby.
+    //
+    // A PROMOTION (a division or a tier) keeps the celebratory success toast. A
+    // DEMOTION gets a subdued info notice — no fanfare and no alarm styling —
+    // and must never reach toast.success. "none" shows nothing.
+    if (payload.rankChange === "promoted" || payload.rankChange === "demoted") {
+      const tier = normalizeSeasonTier(payload.rankTier, payload.newSeasonSp);
+      const rank = seasonRankLabel(
+        i18n.t,
+        tier,
+        normalizeSeasonDivision(tier, payload.rankDivision),
       );
+      if (payload.rankChange === "promoted") {
+        toast.success(i18n.t("season.tierUp.toast", { tier: rank }), {
+          duration: MOTION.TOAST_LONG,
+        });
+      } else {
+        toast.info(i18n.t("season.demoted.toast", { rank }), { duration: MOTION.TOAST_INFO });
+      }
     }
     return;
   }
@@ -637,6 +670,9 @@ function dispatchGameEvent(message: WsMessage): void {
     // unqueued no-op for an absent user), so without this reset they would be
     // shown the movement from a PREVIOUS match as if it were this one's.
     store.setHonorSettlement(null);
+    // The same reasoning for the SP line (Story 13.5): the abandoner never
+    // receives event:season_points_awarded either.
+    store.setSeasonSettlement(null);
     return;
   }
 

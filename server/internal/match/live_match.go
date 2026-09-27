@@ -139,10 +139,10 @@ type HonorRecorder interface {
 // match-end write, as returned by SPAwarder.
 //
 // Everything here is PRECOMPUTED by the season service: SeasonName, the applied
-// SPChange, the derived RankTier and TieredUp all arrive resolved, so the manager
-// never runs ladder arithmetic it cannot see (the same shape HonorSnapshot uses,
-// and for the same reason). RankTier is the AUTHORITATIVE derived tier, never the
-// lagging player_seasons.rank_tier column. TieredUp is true only for a climb.
+// SPChange, the derived rank, the rank change and the reason all arrive
+// resolved, so the manager never runs ladder arithmetic it cannot see (the same
+// shape HonorSnapshot uses, and for the same reason). awardSeasonPoints copies
+// it onto ws.SeasonPointsAwardedPayload field for field.
 type PlayerSeasonSnapshot struct {
 	SeasonName string
 	SP         int
@@ -150,8 +150,17 @@ type PlayerSeasonSnapshot struct {
 	// formula's raw output. The two differ at the 0 floor: a player on 10 SP
 	// whose loss computes to -18 reports -10.
 	SPChange int
-	RankTier string
-	TieredUp bool
+	// RankTier and RankDivision are the rank of the NEW total (season/tier.go).
+	// RankDivision is 1-3, or nil for Master and Grandmaster.
+	RankTier     string
+	RankDivision *int
+	// RankChange is ws.RankChangePromoted, ws.RankChangeDemoted or
+	// ws.RankChangeNone, comparing the rank before and after, never SP alone.
+	RankChange string
+	// Reason is ws.SPReasonAbandoned for the abandoning seat,
+	// ws.SPReasonPartnerAbandoned for its teammate and ws.SPReasonNormal for
+	// every other seat.
+	Reason string
 }
 
 // OutcomeSeat is one seat of a finished match as the Season Points formula reads

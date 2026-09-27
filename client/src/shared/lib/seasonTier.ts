@@ -1,17 +1,27 @@
+import type { TFunction } from "i18next";
+
 // Season rank tiers — display math only.
 //
 // MUST stay in sync with the server: server/internal/season/tier.go (the tier
-// tokens and the SP floors). SP rises and falls on the win/loss ladder (Story
-// 13.4), so a player moves down this table as well as up it. This is the same
-// manual-sync convention as xpLevel.ts <-> level.go, honor.ts <-> honor.go and
-// wsEvents.ts <-> events.go — there is no generated shared type.
+// tokens, the SP floors, and which tiers have divisions 1–3). SP rises and falls on the
+// win/loss ladder (Story 13.4), so a player moves down this table as well as up
+// it. This is the same manual-sync convention as xpLevel.ts <-> level.go,
+// honor.ts <-> honor.go and wsEvents.ts <-> events.go — there is no generated
+// shared type.
 //
-// The SERVER IS AUTHORITATIVE for both the SP total and the tier: both arrive on
-// event:season_points_awarded and on GET /api/v1/seasons/current. Nothing here
-// ever makes a decision — no tier or SP total gates anything in this product, and
-// the progress decomposition the profile's RankBanner renders comes from the
-// server's own spIntoTier / spForNextTier. These helpers exist for the cases where only an SP
-// number is on hand (a toast fired from a WS payload) and for the colour map.
+// The SERVER IS AUTHORITATIVE for the SP total, the tier AND the division: all
+// three arrive on event:season_points_awarded and on every season read. Nothing
+// here ever makes a decision — no rank or SP total gates anything in this
+// product, and the progress decomposition the profile's RankBanner renders comes
+// from the server's own spIntoDivision / spForNextDivision. An ENDED season's
+// rank is the server's stored snapshot, which this table must never re-derive
+// (Story 13.5): a 2026 Q3 total bucketed on today's floors would read as
+// Grandmaster. So there is deliberately NO client copy of the division or
+// rank-step arithmetic. These helpers exist for: the colour maps; the rank label
+// ("Gold 2"); the signed-change label ("+24", "−13"); the bar fill from the
+// server's own step pair; the season countdown; and the version-skew guards (an
+// unrecognised tier token falls back to its SP bucket, an out-of-range division
+// to none).
 // Keep this the ONLY client copy of the ladder.
 
 /** The eight stable tier tokens the server emits, in ASCENDING order. */
@@ -43,6 +53,17 @@ export const SEASON_TIER_FLOORS: ReadonlyArray<readonly [SeasonTier, number]> = 
   ["master", 1200],
   ["grandmaster", 1400],
 ];
+
+/** Divisions a divided tier splits into (1 lowest, 3 highest). */
+const DIVISIONS_PER_TIER = 3;
+
+/**
+ * Whether a tier splits into divisions 1–3. Iron through Diamond do; Master and
+ * Grandmaster are single (tier.go `HasDivisions`).
+ */
+export function seasonTierHasDivisions(tier: SeasonTier): boolean {
+  return tier !== "master" && tier !== "grandmaster";
+}
 
 /**
  * Coerce a possibly-absent SP total into a renderable integer.
@@ -88,16 +109,67 @@ export function normalizeSeasonTier(tier: string, sp: number): SeasonTier {
 }
 
 /**
- * Progress-bar fill in [0, 1] from the server's own decomposition.
+ * Narrow a server division to a renderable one: an integer 1–3 on a tier that
+ * HAS divisions, otherwise `null` (render the bare tier name).
  *
- * AT GRANDMASTER `spForNextTier` IS 0 — there is no next tier — and the bar renders
- * FULL rather than empty. That is the whole reason this is a function and not an
- * inline division: `spIntoTier / 0` is Infinity, and a naive guard that returned
- * 0 would show the top of the ladder as an empty bar.
+ * NO SP FALLBACK, on purpose. `null` is a real answer — Master and Grandmaster
+ * are single, and an ENDED pre-division season (2026 Q3 and earlier) has no
+ * division at all — so a missing or malformed value degrades to the bare tier
+ * rather than to a division bucketed from SP, which would invent a rank the
+ * player never held.
  */
-export function seasonBarFill(spIntoTier: number, spForNextTier: number): number {
-  const into = seasonSpOrZero(spIntoTier);
-  const span = seasonSpOrZero(spForNextTier);
+export function normalizeSeasonDivision(
+  tier: SeasonTier,
+  division: number | null | undefined,
+): number | null {
+  if (!seasonTierHasDivisions(tier)) return null;
+  if (!Number.isInteger(division)) return null;
+  const d = division as number;
+  return d >= 1 && d <= DIVISIONS_PER_TIER ? d : null;
+}
+
+/**
+ * The rank as words: "Gold 2" via the `season.rank` key when there is a
+ * division, the bare tier name ("Master", or an ended pre-division "Gold")
+ * when there is not. The ONE rank label every surface renders — header chip,
+ * banner, season section, leaderboard, archive and toasts — so the format
+ * cannot drift between them. Pass an already-normalized tier and division.
+ */
+export function seasonRankLabel(t: TFunction, tier: SeasonTier, division: number | null): string {
+  const tierName = t(`season.tier.${tier}`);
+  return division === null ? tierName : t("season.rank", { tier: tierName, division });
+}
+
+/**
+ * A SIGNED SP change for display: "+24", "−13" (U+2212 MINUS SIGN, not a hyphen)
+ * or "0".
+ *
+ * NEVER route a change through `seasonSpOrZero`, `seasonBarFill` or a
+ * `finiteOrZero` clamp: those floor at 0 because a TOTAL cannot be negative, and
+ * a change can — a loss clamped to "0 SP" would tell the player they lost
+ * nothing. A non-finite value (a malformed frame the dispatcher should already
+ * have dropped) renders as "0" rather than "NaN".
+ */
+export function formatSpChange(change: number): string {
+  if (!Number.isFinite(change)) return "0";
+  const whole = Math.round(change);
+  if (whole > 0) return `+${whole.toLocaleString()}`;
+  if (whole < 0) return `\u2212${Math.abs(whole).toLocaleString()}`;
+  return "0";
+}
+
+/**
+ * Progress-bar fill in [0, 1] from the server's own rank-step decomposition
+ * (`spIntoDivision` / `spForNextDivision`).
+ *
+ * AT GRANDMASTER THE STEP SIZE IS 0 — there is no next rank — and the bar
+ * renders FULL rather than empty. That is the whole reason this is a function
+ * and not an inline division: `into / 0` is Infinity, and a naive guard that
+ * returned 0 would show the top of the ladder as an empty bar.
+ */
+export function seasonBarFill(spIntoStep: number, spForNextStep: number): number {
+  const into = seasonSpOrZero(spIntoStep);
+  const span = seasonSpOrZero(spForNextStep);
   if (span <= 0) return 1;
   return Math.min(1, Math.max(0, into / span));
 }

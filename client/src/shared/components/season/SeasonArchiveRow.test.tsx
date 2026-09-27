@@ -9,7 +9,14 @@ import { i18n } from "@/shared/i18n/i18n";
 function renderRow(over: Partial<Parameters<typeof SeasonArchiveRow>[0]> = {}) {
   return render(
     <ul>
-      <SeasonArchiveRow seasonName="2026 Q2" sp={1800} tier="silver" gamesPlayed={14} {...over} />
+      <SeasonArchiveRow
+        seasonName="2026 Q2"
+        sp={1800}
+        tier="silver"
+        division={null}
+        gamesPlayed={14}
+        {...over}
+      />
     </ul>,
   );
 }
@@ -19,7 +26,10 @@ describe("SeasonArchiveRow", () => {
     await i18n.changeLanguage("en");
   });
 
-  it("renders the season token verbatim, the tier, the SP and the games", () => {
+  // The default row is a PRE-DIVISION season (2026 Q2): an old-formula 1800 SP
+  // stored as a bare Silver. The archive shows the stored rank and never
+  // re-derives it from SP (1800 would bucket as Grandmaster on today's floors).
+  it("renders the season token verbatim, the stored tier, the SP and the games", () => {
     renderRow();
 
     expect(screen.getByTestId("season-archive-name").textContent).toBe("2026 Q2");
@@ -61,12 +71,21 @@ describe("SeasonArchiveRow", () => {
     }
   });
 
+  it("renders a stored division as tier plus division", () => {
+    renderRow({ seasonName: "2026 Q4", sp: 900, tier: "platinum", division: 2 });
+
+    expect(screen.getByTestId("season-archive-tier").textContent).toBe("Platinum 2");
+    expect(screen.getByTestId("season-archive-row-summary").textContent).toContain(
+      "2026 Q4: Platinum 2,",
+    );
+  });
+
   // A played season at 0 SP is REAL history — the row must render a real 0,
   // never blank out on truthiness.
-  it("renders a 0-SP season as Iron with a real zero", () => {
-    renderRow({ sp: 0, tier: "iron", gamesPlayed: 2 });
+  it("renders a 0-SP season as Iron 1 with a real zero", () => {
+    renderRow({ sp: 0, tier: "iron", division: 1, gamesPlayed: 2 });
 
-    expect(screen.getByTestId("season-archive-tier").textContent).toBe("Iron");
+    expect(screen.getByTestId("season-archive-tier").textContent).toBe("Iron 1");
     expect(screen.getByTestId("season-archive-sp").textContent).toContain("0");
     expect(screen.getByTestId("season-archive-row")).toHaveAttribute("data-tier", "iron");
   });

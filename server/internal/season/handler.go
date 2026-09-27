@@ -23,15 +23,23 @@ import (
 //
 // RankTier is a stable machine token ("iron" ... "grandmaster") that the client maps
 // to an i18n label and a colour. A display string never crosses the wire.
+// RankDivision is 1-3, or null for Master and Grandmaster (never omitted).
+//
+// SPIntoDivision / SPForNextDivision decompose the current RANK STEP, the unit
+// the banner's bar fills (Story 13.5): toward the next division, toward the
+// next tier from Diamond 3 and Master, and SPForNextDivision 0 at Grandmaster,
+// which has no next step and renders a full bar. They replace 13.1's tier-band
+// pair (spIntoTier / spForNextTier).
 type CurrentSeasonView struct {
-	SeasonName     string    `json:"seasonName"`
-	EndsAt         time.Time `json:"endsAt"`
-	SP             int       `json:"sp"`
-	RankTier       string    `json:"rankTier"`
-	SPIntoTier     int       `json:"spIntoTier"`
-	SPForNextTier  int       `json:"spForNextTier"`
-	GamesPlayed    int       `json:"gamesPlayed"`
-	GamesCompleted int       `json:"gamesCompleted"`
+	SeasonName        string    `json:"seasonName"`
+	EndsAt            time.Time `json:"endsAt"`
+	SP                int       `json:"sp"`
+	RankTier          string    `json:"rankTier"`
+	RankDivision      *int      `json:"rankDivision"`
+	SPIntoDivision    int       `json:"spIntoDivision"`
+	SPForNextDivision int       `json:"spForNextDivision"`
+	GamesPlayed       int       `json:"gamesPlayed"`
+	GamesCompleted    int       `json:"gamesCompleted"`
 }
 
 // Handler serves the season endpoints.
@@ -66,8 +74,8 @@ func getUserID(c echo.Context) (uint, error) {
 // endpoint that exposes other players, and it exposes them as a ranked list.)
 //
 // A caller who has not played this season gets the zero state, not a 404: at 0
-// SP a player is Iron, which is a real tier that renders normally, and there is
-// no "unranked" state in this ladder.
+// SP a player is Iron 1, which is a real rank that renders normally, and there
+// is no "unranked" state in this ladder.
 func (h *Handler) GetCurrentSeason(c echo.Context) error {
 	userID, err := getUserID(c)
 	if err != nil {
@@ -88,16 +96,19 @@ func (h *Handler) GetCurrentSeason(c echo.Context) error {
 
 // LeaderboardRowView is one row of the seasonal leaderboard.
 //
-// Tier is the DERIVED value (TierForSP over `sp`), never the denormalized
-// rank_tier column, and it is a stable machine token the client maps to a label
-// and a colour -- same contract as CurrentSeasonView.RankTier. Position is the
-// row's 1-based slot in the FULL season order, not its index in this page.
+// Tier is a stable machine token the client maps to a label and a colour --
+// same contract as CurrentSeasonView.RankTier -- and Division is 1-3 or null.
+// For a RUNNING season both are derived from `sp`; for an ENDED one they are
+// the row's stored snapshot, so an old season shows the rank it finished on
+// (Story 13.5). Position is the row's 1-based slot in the FULL season order,
+// not its index in this page.
 type LeaderboardRowView struct {
 	Position    int    `json:"position"`
 	UserID      uint   `json:"userId"`
 	Username    string `json:"username"`
 	SP          int    `json:"sp"`
 	Tier        string `json:"tier"`
+	Division    *int   `json:"division"`
 	GamesPlayed int    `json:"gamesPlayed"`
 }
 
@@ -112,11 +123,15 @@ type LeaderboardRowView struct {
 // Position is counted under the LIST'S OWN total order (sp DESC, user_id ASC),
 // so a tied viewer's number matches the slot they occupy rather than the shared
 // number a COUNT(sp > x) would give every tied player.
+//
+// Tier and Division follow the list's own running / ended rule, so the pinned
+// row and the listed row always show the same rank.
 type LeaderboardViewerView struct {
 	Position    int    `json:"position"`
 	UserID      uint   `json:"userId"`
 	SP          int    `json:"sp"`
 	Tier        string `json:"tier"`
+	Division    *int   `json:"division"`
 	GamesPlayed int    `json:"gamesPlayed"`
 }
 
@@ -273,14 +288,17 @@ type SeasonsListView struct {
 // ArchiveRowView is one ended, played season in a player's archive
 // (GET /api/v1/users/:id/seasons).
 //
-// Tier is DERIVED (TierForSP over the row's immutable SP), never the stored
-// rank_tier column -- the same contract every other tier on the wire follows.
-// SeasonName is the verbatim machine token.
+// Tier and Division are the row's STORED rank snapshot, the rank the season
+// finished on (Story 13.5): every archived season has ended, and re-deriving an
+// old SP total on today's floors would misrank it. Division is null for Master,
+// Grandmaster and every season from before divisions existed. SeasonName is
+// the verbatim machine token.
 type ArchiveRowView struct {
 	SeasonID    uint      `json:"seasonId"`
 	SeasonName  string    `json:"seasonName"`
 	SP          int       `json:"sp"`
 	Tier        string    `json:"tier"`
+	Division    *int      `json:"division"`
 	GamesPlayed int       `json:"gamesPlayed"`
 	StartedAt   time.Time `json:"startedAt"`
 	EndsAt      time.Time `json:"endsAt"`
@@ -299,11 +317,13 @@ type ArchiveView struct {
 // SeasonRankView is the `seasonRank` block on BOTH profile DTOs (Story 13.3):
 // the subject's standing in the ACTIVE season. Nil -- serialized as null --
 // when the subject has not played this season. Public-safe by construction:
-// tier and SP are exactly what the leaderboard already exposes for every
-// player, and SeasonName is the machine token.
+// tier, division and SP are exactly what the leaderboard already exposes for
+// every player, and SeasonName is the machine token. The season is running, so
+// the rank is derived from SP; Division is 1-3 or null.
 type SeasonRankView struct {
 	SeasonName string `json:"seasonName"`
 	Tier       string `json:"tier"`
+	Division   *int   `json:"division"`
 	SP         int    `json:"sp"`
 }
 

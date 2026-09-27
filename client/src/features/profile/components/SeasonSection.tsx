@@ -4,9 +4,11 @@ import { SeasonArchiveRow } from "@/shared/components/season/SeasonArchiveRow";
 import { TierBadge } from "@/shared/components/season/TierBadge";
 import { useSeasonArchiveQuery } from "@/shared/hooks/queries/useSeasonArchive";
 import {
+  normalizeSeasonDivision,
   normalizeSeasonTier,
   SEASON_TIER_COLOR,
   SEASON_TIER_LINE,
+  seasonRankLabel,
   seasonSpOrZero,
 } from "@/shared/lib/seasonTier";
 import type { SeasonRank } from "@/shared/types/apiTypes";
@@ -79,7 +81,7 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
     // Guarded, not trusted: an unrecognised token from a newer server falls
     // back to the SP's own bucket rather than a missing i18n key.
     const tier = normalizeSeasonTier(seasonRank.tier, sp);
-    const tierName = t(`season.tier.${tier}`);
+    const rankName = seasonRankLabel(t, tier, normalizeSeasonDivision(tier, seasonRank.division));
     chip = (
       <div
         data-testid="profile-season"
@@ -90,7 +92,7 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
         <span className="sr-only">
           {t("season.archive.currentAria", {
             season: seasonRank.seasonName,
-            tier: tierName,
+            tier: rankName,
             sp: sp.toLocaleString(),
           })}
         </span>
@@ -101,7 +103,7 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
             className="text-sm leading-tight font-semibold"
             style={{ color: SEASON_TIER_COLOR[tier] }}
           >
-            {tierName}
+            {rankName}
           </span>
           <span className="text-ink-dim text-[11px] leading-tight tabular-nums">
             {t("season.banner.sp", { sp: sp.toLocaleString() })}
@@ -139,6 +141,7 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
               seasonName={row.seasonName}
               sp={row.sp}
               tier={row.tier}
+              division={row.division}
               gamesPlayed={row.gamesPlayed}
             />
           ))}

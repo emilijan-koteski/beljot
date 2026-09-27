@@ -3,11 +3,13 @@ import { useTranslation } from "react-i18next";
 
 import { TierBadge } from "@/shared/components/season/TierBadge";
 import {
+  normalizeSeasonDivision,
   normalizeSeasonTier,
   SEASON_TIER_COLOR,
   SEASON_TIER_LINE,
   seasonBarFill,
   seasonDaysRemaining,
+  seasonRankLabel,
   seasonSpOrZero,
 } from "@/shared/lib/seasonTier";
 import { getTimeTick, subscribeTimeTick } from "@/shared/lib/timeTick";
@@ -19,9 +21,14 @@ type Props = {
 };
 
 /**
- * The seasonal rank banner (Story 13.1 AC3). Renders exactly the five elements
- * the AC names: tier badge (tier colour + glow), tier name, current SP, a
- * progress bar to the next tier, and days remaining in the season.
+ * The seasonal rank banner (Story 13.1 AC3, divisions by 13.5). Renders exactly
+ * the five elements the AC names: tier badge (tier colour + glow), the rank
+ * ("Gold 2", or "Master" for a single tier), current SP, a progress bar to the
+ * next RANK STEP, and days remaining in the season.
+ *
+ * THE BAR FILLS PER RANK STEP, not per tier: toward the next division, toward
+ * the next tier from Diamond 3 and Master, and full (terminal) at Grandmaster.
+ * The server sends the step as spIntoDivision / spForNextDivision.
  *
  * IT LIVES ON THE PROFILE, not the lobby it shipped in. The rank's IDENTITY is
  * always on screen now — the header's HeaderRankChip carries the badge and the
@@ -34,9 +41,10 @@ type Props = {
  * the contradiction that chip's own section header warned about.
  *
  * PRESENTATIONAL ONLY, and now literally so. Every number arrives decided by the
- * server — the SP total, the tier token, and the spIntoTier / spForNextTier
- * decomposition. Nothing here computes a rank and nothing gates on one (no
- * feature in this product unlocks on tier or SP). The one non-visual job it used
+ * server — the SP total, the tier token, the division, and the
+ * spIntoDivision / spForNextDivision decomposition. Nothing here computes a
+ * rank and nothing gates on one (no feature in this product unlocks on tier or
+ * SP). The one non-visual job it used
  * to carry, the season-rollover watch, moved out with the move: it now hangs off
  * the header chip (see `useSeasonWindowWatch`), which is mounted everywhere this
  * page is and everywhere it is not. Do NOT re-add it here — the hook fires a
@@ -64,12 +72,16 @@ export function RankBanner({ season }: Props) {
   // Guarded, not trusted: an unrecognised token from a newer server falls back to
   // the SP's own bucket rather than rendering a missing i18n key.
   const tier = normalizeSeasonTier(season.rankTier, sp);
-  const fill = seasonBarFill(season.spIntoTier, season.spForNextTier);
+  const rankName = seasonRankLabel(t, tier, normalizeSeasonDivision(tier, season.rankDivision));
+  // The step pair is a POSITION and a SIZE, both non-negative, so the clamping
+  // helpers are right here (a signed CHANGE never goes through them).
+  const intoStep = seasonSpOrZero(season.spIntoDivision);
+  const forNextStep = seasonSpOrZero(season.spForNextDivision);
+  const fill = seasonBarFill(intoStep, forNextStep);
   const pct = Math.round(fill * 100);
-  const atTop = seasonSpOrZero(season.spForNextTier) <= 0;
+  const atTop = forNextStep <= 0;
   const daysLeft = seasonDaysRemaining(season.endsAt, Date.now());
 
-  const tierName = t(`season.tier.${tier}`);
   const color = SEASON_TIER_COLOR[tier];
 
   return (
@@ -92,7 +104,7 @@ export function RankBanner({ season }: Props) {
             className="font-display text-base font-semibold"
             style={{ color }}
           >
-            {tierName}
+            {rankName}
           </span>
           <span data-testid="rank-sp" className="text-ink-dim text-xs tabular-nums">
             {t("season.banner.sp", { sp: sp.toLocaleString() })}
@@ -109,7 +121,7 @@ export function RankBanner({ season }: Props) {
           </span>
         </div>
 
-        {/* Progress to the next tier. A sibling of XpBar rather than XpBar
+        {/* Progress to the next rank step. A sibling of XpBar rather than XpBar
             itself: that component hardcodes the accent fill (`bg-accent`) and
             this one must take the tier's own colour. Same a11y contract. */}
         <div
@@ -120,11 +132,11 @@ export function RankBanner({ season }: Props) {
           aria-valuenow={pct}
           aria-label={
             atTop
-              ? t("season.banner.progressLabelTop", { tier: tierName, sp: sp.toLocaleString() })
+              ? t("season.banner.progressLabelTop", { tier: rankName, sp: sp.toLocaleString() })
               : t("season.banner.progressLabel", {
-                  tier: tierName,
-                  current: seasonSpOrZero(season.spIntoTier).toLocaleString(),
-                  next: seasonSpOrZero(season.spForNextTier).toLocaleString(),
+                  tier: rankName,
+                  current: intoStep.toLocaleString(),
+                  next: forNextStep.toLocaleString(),
                 })
           }
           className="bg-surface-sunken h-1.5 overflow-hidden rounded-full"
@@ -142,8 +154,8 @@ export function RankBanner({ season }: Props) {
           {atTop
             ? t("season.banner.atTop")
             : t("season.banner.progress", {
-                current: seasonSpOrZero(season.spIntoTier).toLocaleString(),
-                next: seasonSpOrZero(season.spForNextTier).toLocaleString(),
+                current: intoStep.toLocaleString(),
+                next: forNextStep.toLocaleString(),
               })}
         </span>
       </div>

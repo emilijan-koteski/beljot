@@ -2214,9 +2214,10 @@ describe("useWsDispatch — whisper (Story 11.4)", () => {
   });
 });
 
-// event:season_points_awarded (Story 13.1). The branch has three jobs and no
-// other test reaches it: RankBanner.test.tsx feeds the season in as a prop and
-// never mounts a QueryClient, and the WS contract test only pins payload shape.
+// event:season_points_awarded (Story 13.1, reshaped by 13.5). The branch has four
+// jobs and no other test reaches it: RankBanner.test.tsx feeds the season in as
+// a prop and never mounts a QueryClient, and the WS contract test only pins
+// payload shape.
 //
 // The invalidation matters more here than for most handlers: useCurrentSeasonQuery
 // is deliberately NOT polled, so this is the ONLY path that refreshes the banner
@@ -2224,11 +2225,13 @@ describe("useWsDispatch — whisper (Story 11.4)", () => {
 // total until a full reload, with nothing failing.
 describe("useWsDispatch - season points", () => {
   const validPayload = {
-    spEarned: 24,
+    spChange: 24,
     newSeasonSp: 424,
     rankTier: "silver",
-    tieredUp: false,
-    seasonName: "2026 Q3",
+    rankDivision: 2,
+    rankChange: "none",
+    reason: "normal",
+    seasonName: "2026 Q4",
   };
 
   beforeEach(async () => {
@@ -2248,66 +2251,130 @@ describe("useWsDispatch - season points", () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.season.current() });
   });
 
-  it("fires exactly one tier-up toast when the award crossed a tier floor", () => {
+  it("stashes the outcome on the match store for the result screens' SP line", () => {
     const { result } = renderHook(() => useWsDispatch());
 
     result.current({
       type: "event:season_points_awarded",
-      payload: { ...validPayload, tieredUp: true },
+      payload: { ...validPayload, spChange: -12, reason: "partner_abandoned" },
     });
 
-    expect(toast.success).toHaveBeenCalledTimes(1);
-    // The tier NAME is resolved through i18n, never the raw token.
-    expect(toast.success).toHaveBeenCalledWith(
-      expect.stringContaining(i18n.t("season.tier.silver")),
-      expect.anything(),
-    );
-  });
-
-  it("fires no toast when the award did not cross a tier floor", () => {
-    const { result } = renderHook(() => useWsDispatch());
-
-    result.current({ type: "event:season_points_awarded", payload: validPayload });
-
-    expect(toast.success).not.toHaveBeenCalled();
-    expect(toast.info).not.toHaveBeenCalled();
-  });
-
-  it("still invalidates for a zero-SP award, which is a real value", () => {
-    // A loss at the 0 floor. `spEarned: 0` and `tieredUp: false` are both
-    // falsy and both legitimate, so a truthiness guard would drop this frame.
-    const spy = vi.spyOn(queryClient, "invalidateQueries");
-    const { result } = renderHook(() => useWsDispatch());
-
-    result.current({
-      type: "event:season_points_awarded",
-      payload: { ...validPayload, spEarned: 0, newSeasonSp: 0, rankTier: "iron" },
+    expect(useMatchStore.getState().seasonSettlement).toEqual({
+      spChange: -12,
+      newSeasonSp: 424,
+      rankTier: "silver",
+      rankDivision: 2,
+      reason: "partner_abandoned",
     });
-
-    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.season.current() });
-    expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it("accepts a loss, a negative change, and invalidates without a toast", () => {
-    // SP falls on a loss (Story 13.4): the change arrives signed, and a drop is
-    // never a tier-up, so nothing celebrates it.
-    const spy = vi.spyOn(queryClient, "invalidateQueries");
+  // The matrix's division-up row: 650 -> 690 is Gold 1 -> Gold 2.
+  it("fires exactly one success toast with the rank label on a division promotion", () => {
     const { result } = renderHook(() => useWsDispatch());
 
     result.current({
       type: "event:season_points_awarded",
       payload: {
         ...validPayload,
-        spEarned: -17,
-        newSeasonSp: 743,
+        spChange: 40,
+        newSeasonSp: 690,
         rankTier: "gold",
-        tieredUp: false,
+        rankDivision: 2,
+        rankChange: "promoted",
       },
     });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.season.current() });
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(toast.success).toHaveBeenCalledWith("New rank: Gold 2", expect.anything());
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("names a single tier without a division in the promotion toast", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: {
+        ...validPayload,
+        newSeasonSp: 1210,
+        rankTier: "master",
+        rankDivision: null,
+        rankChange: "promoted",
+      },
+    });
+
+    expect(toast.success).toHaveBeenCalledWith("New rank: Master", expect.anything());
+  });
+
+  // THE ACCEPTANCE CRITERION: a demotion is an info notice, and toast.success is
+  // never called. The matrix's tier-down row: 610 -> 590 is Gold 1 -> Silver 3.
+  it("shows a subdued info notice on a demotion and never the success toast", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: {
+        ...validPayload,
+        spChange: -20,
+        newSeasonSp: 590,
+        rankTier: "silver",
+        rankDivision: 3,
+        rankChange: "demoted",
+      },
+    });
+
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith("Dropped to Silver 3", expect.anything());
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("localizes the demotion notice", async () => {
+    await i18n.changeLanguage("mk");
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: { ...validPayload, rankTier: "gold", rankDivision: 2, rankChange: "demoted" },
+    });
+
+    expect(toast.info).toHaveBeenCalledWith("Пад на Злато 2", expect.anything());
+  });
+
+  // The matrix's same-division row: 700 -> 690 stays Gold 2.
+  it("fires no toast when the rank did not change, even on an SP loss", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: {
+        ...validPayload,
+        spChange: -10,
+        newSeasonSp: 690,
+        rankTier: "gold",
+        rankDivision: 2,
+        rankChange: "none",
+      },
+    });
+
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("still accepts a zero-SP award, which is a real value", () => {
+    // The matrix's loss-at-0 row. `spChange: 0` is falsy and legitimate, so a
+    // truthiness guard would drop this frame and lose the "0 SP" line.
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: { ...validPayload, spChange: 0, newSeasonSp: 0, rankTier: "iron", rankDivision: 1 },
+    });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.season.current() });
+    expect(useMatchStore.getState().seasonSettlement?.spChange).toBe(0);
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it("falls back to the SP bucket for an unrecognised tier token in the toast", () => {
@@ -2315,18 +2382,52 @@ describe("useWsDispatch - season points", () => {
 
     result.current({
       type: "event:season_points_awarded",
-      payload: { ...validPayload, rankTier: "mythic", newSeasonSp: 1100, tieredUp: true },
+      payload: {
+        ...validPayload,
+        rankTier: "mythic",
+        newSeasonSp: 1100,
+        rankDivision: 2,
+        rankChange: "promoted",
+      },
     });
 
     // Version skew: 1100 SP buckets to Diamond, so the toast reads Diamond
     // rather than a missing `season.tier.mythic` key.
-    expect(toast.success).toHaveBeenCalledWith(
-      expect.stringContaining(i18n.t("season.tier.diamond")),
-      expect.anything(),
-    );
+    expect(toast.success).toHaveBeenCalledWith("New rank: Diamond 2", expect.anything());
   });
 
-  it("rejects a malformed payload without invalidating, toasting, or throwing", () => {
+  it("is reset by match_end and by match_abandoned, like coins and honor", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({ type: "event:season_points_awarded", payload: validPayload });
+    expect(useMatchStore.getState().seasonSettlement).not.toBeNull();
+    result.current({
+      type: "event:match_end",
+      payload: {
+        winnerTeam: 0,
+        teamAFinalScore: 1001,
+        teamBFinalScore: 700,
+        matchDurationSec: 600,
+        outcomeReason: "natural",
+      },
+    });
+    expect(useMatchStore.getState().seasonSettlement).toBeNull();
+
+    result.current({ type: "event:season_points_awarded", payload: validPayload });
+    expect(useMatchStore.getState().seasonSettlement).not.toBeNull();
+    result.current({
+      type: "event:match_abandoned",
+      payload: {
+        abandonedByPlayer: 1,
+        teamAFinalScore: 300,
+        teamBFinalScore: 200,
+        matchDurationSec: 400,
+      },
+    });
+    expect(useMatchStore.getState().seasonSettlement).toBeNull();
+  });
+
+  it("rejects a malformed payload without invalidating, toasting, storing, or throwing", () => {
     const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const spy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useWsDispatch());
@@ -2336,13 +2437,26 @@ describe("useWsDispatch - season points", () => {
       undefined,
       "not-an-object",
       {},
-      { ...validPayload, spEarned: "24" },
-      { ...validPayload, spEarned: 1.5 },
+      { ...validPayload, spChange: "24" },
+      { ...validPayload, spChange: 1.5 },
       { ...validPayload, newSeasonSp: null },
       { ...validPayload, rankTier: "" },
       { ...validPayload, rankTier: 7 },
-      { ...validPayload, tieredUp: "yes" },
+      { ...validPayload, rankDivision: "2" },
+      { ...validPayload, rankDivision: 1.5 },
+      { ...validPayload, rankDivision: undefined },
+      { ...validPayload, rankChange: "up" },
+      { ...validPayload, rankChange: undefined },
+      { ...validPayload, reason: "quit" },
       { ...validPayload, seasonName: 3 },
+      // The 13.1 shape a stale server would still send.
+      {
+        spEarned: 24,
+        newSeasonSp: 424,
+        rankTier: "silver",
+        tieredUp: true,
+        seasonName: "2026 Q3",
+      },
     ];
 
     for (const payload of malformed) {
@@ -2351,6 +2465,8 @@ describe("useWsDispatch - season points", () => {
 
     expect(spy).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(useMatchStore.getState().seasonSettlement).toBeNull();
     consoleWarnSpy.mockRestore();
   });
 });

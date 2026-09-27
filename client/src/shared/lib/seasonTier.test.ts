@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import "@/shared/i18n/i18n";
+
+import { afterEach, describe, expect, it } from "vitest";
+
+import { i18n } from "@/shared/i18n/i18n";
 
 import {
+  formatSpChange,
+  normalizeSeasonDivision,
   normalizeSeasonTier,
   SEASON_TIER_COLOR,
   SEASON_TIER_FLOORS,
@@ -9,8 +15,10 @@ import {
   SEASON_TIERS,
   seasonBarFill,
   seasonDaysRemaining,
+  seasonRankLabel,
   seasonSpOrZero,
   seasonTierForSp,
+  seasonTierHasDivisions,
 } from "./seasonTier";
 
 describe("SEASON_TIERS", () => {
@@ -167,5 +175,78 @@ describe("seasonDaysRemaining", () => {
 
   it.each([[undefined], [null], [""], ["not-a-date"]])("is zero for %s", (value) => {
     expect(seasonDaysRemaining(value as string | null | undefined, now)).toBe(0);
+  });
+});
+
+describe("seasonTierHasDivisions", () => {
+  it("splits Iron through Diamond, and not Master or Grandmaster", () => {
+    expect(SEASON_TIERS.filter(seasonTierHasDivisions)).toEqual([
+      "iron",
+      "bronze",
+      "silver",
+      "gold",
+      "platinum",
+      "diamond",
+    ]);
+  });
+});
+
+describe("normalizeSeasonDivision", () => {
+  it.each([1, 2, 3])("keeps division %i on a divided tier", (d) => {
+    expect(normalizeSeasonDivision("gold", d)).toBe(d);
+  });
+
+  it.each([[0], [4], [-1], [1.5], [NaN], [null], [undefined]])(
+    "drops an out-of-range or absent division (%s)",
+    (d) => {
+      expect(normalizeSeasonDivision("gold", d as number | null | undefined)).toBeNull();
+    },
+  );
+
+  it("drops any division on a single tier", () => {
+    expect(normalizeSeasonDivision("master", 2)).toBeNull();
+    expect(normalizeSeasonDivision("grandmaster", 1)).toBeNull();
+  });
+});
+
+describe("seasonRankLabel", () => {
+  afterEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  it("reads tier plus division when there is one", () => {
+    expect(seasonRankLabel(i18n.t, "gold", 2)).toBe("Gold 2");
+  });
+
+  it("reads the bare tier name without a division", () => {
+    expect(seasonRankLabel(i18n.t, "master", null)).toBe("Master");
+    // An ended pre-division season: stored tier, no division.
+    expect(seasonRankLabel(i18n.t, "gold", null)).toBe("Gold");
+  });
+
+  it("localizes the tier name, keeping the numeral", async () => {
+    await i18n.changeLanguage("mk");
+    expect(seasonRankLabel(i18n.t, "gold", 2)).toBe("Злато 2");
+    await i18n.changeLanguage("hr");
+    expect(seasonRankLabel(i18n.t, "silver", 3)).toBe("Srebro 3");
+  });
+});
+
+describe("formatSpChange", () => {
+  it("signs a gain", () => {
+    expect(formatSpChange(24)).toBe("+24");
+  });
+
+  it("signs a loss with U+2212, never a hyphen, and never clamps it", () => {
+    expect(formatSpChange(-13)).toBe("\u221213");
+    expect(formatSpChange(-120)).toBe("\u2212120");
+  });
+
+  it("renders no change as a bare 0", () => {
+    expect(formatSpChange(0)).toBe("0");
+  });
+
+  it.each([[NaN], [Infinity], [undefined]])("renders a non-finite value (%s) as 0", (v) => {
+    expect(formatSpChange(v as number)).toBe("0");
   });
 });

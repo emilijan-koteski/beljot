@@ -24,8 +24,9 @@ type Repository interface {
 	// presence at the terminal end. In ascending user-ID order the repository
 	// makes sure each player has a row (a missing row is a zero row) and LOCKS it;
 	// it then hands every locked total to `changes` at once, floors each new
-	// total at 0, and writes sp, the denormalized rank_tier, games_played += 1
-	// and games_completed += 1 for a present seat.
+	// total at 0, and writes sp, the rank snapshot (rank_tier and
+	// rank_division, NULL for Master and Grandmaster), games_played += 1 and
+	// games_completed += 1 for a present seat.
 	//
 	// Reading the totals and writing the new ones under one lock is the point: a
 	// match that finishes concurrently with another sharing a player waits for
@@ -83,9 +84,10 @@ type Repository interface {
 	//              second column, two players on equal SP can swap between the
 	//              page-1 and page-2 queries and be duplicated or skipped.
 	//
-	// The TIER IS NOT SELECTED. rank_tier is a denormalized snapshot allowed to
-	// lag (Story 13.1 D7); callers derive it with TierForSP(sp). Sorting is by
-	// `sp`, which is authoritative.
+	// The RANK SNAPSHOT IS SELECTED (rank_tier, rank_division) but it is the
+	// caller's to interpret (Story 13.5): a running season derives its rank from
+	// sp and ignores it, an ended season reads it as stored. Sorting is by `sp`
+	// in both cases.
 	//
 	// NO METHOD BELOW WRITES ANYTHING -- see FindPlayerSeason's contract above. A
 	// leaderboard read that materialised a player_seasons row would list everyone
