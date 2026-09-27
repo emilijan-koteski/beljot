@@ -9,15 +9,11 @@ import { playSfx } from "@/shared/audio/audioEngine";
 import { isCardId } from "@/shared/lib/cardId";
 import { honorIsNewPlayer, honorScoreOrPrior } from "@/shared/lib/honor";
 import { MOTION } from "@/shared/lib/motion";
-import {
-  normalizeSeasonDivision,
-  normalizeSeasonTier,
-  seasonRankLabel,
-} from "@/shared/lib/seasonTier";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useLevelUpStore } from "@/shared/stores/levelUpStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
+import { rankChangeFromPayload, useRankChangeStore } from "@/shared/stores/rankChangeStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room } from "@/shared/types/apiTypes";
 import type { MatchState } from "@/shared/types/matchTypes";
@@ -496,30 +492,16 @@ function dispatchGameEvent(message: WsMessage): void {
       rankDivision: payload.rankDivision,
       reason: payload.reason,
     });
-    // TOASTS, not dialogs (13.1 AC2). Deliberately NOT the levelUpStore +
-    // LevelUpDialog pattern: that store exists because a DIALOG must survive the
-    // navigation away that wipes gameStore, and a toast has no such need —
-    // sonner renders above the whole app. Fired from here rather than from a
-    // lobby effect so it lands whether the player is mid-navigation or already
-    // back in the lobby.
-    //
-    // A PROMOTION (a division or a tier) keeps the celebratory success toast. A
-    // DEMOTION gets a subdued info notice — no fanfare and no alarm styling —
-    // and must never reach toast.success. "none" shows nothing.
-    if (payload.rankChange === "promoted" || payload.rankChange === "demoted") {
-      const tier = normalizeSeasonTier(payload.rankTier, payload.newSeasonSp);
-      const rank = seasonRankLabel(
-        i18n.t,
-        tier,
-        normalizeSeasonDivision(tier, payload.rankDivision),
-      );
-      if (payload.rankChange === "promoted") {
-        toast.success(i18n.t("season.tierUp.toast", { tier: rank }), {
-          duration: MOTION.TOAST_LONG,
-        });
-      } else {
-        toast.info(i18n.t("season.demoted.toast", { rank }), { duration: MOTION.TOAST_INFO });
-      }
+    // A DIALOG, not a toast (owner request 2026-09-26, superseding 13.1 AC2 and
+    // 13.5's toasts): a promotion or a demotion is stashed on rankChangeStore,
+    // the same pattern as levelUpStore, because the dialog must survive the
+    // navigation away that wipes the match stores. RankChangeGate (AppLayout)
+    // shows it once the player is back in the lobby/room — celebratory for a
+    // promotion, subdued for a demotion. "none" shows nothing and leaves any
+    // unseen change pending.
+    const rankChange = rankChangeFromPayload(payload);
+    if (rankChange) {
+      useRankChangeStore.getState().setPending(rankChange);
     }
     return;
   }

@@ -3,6 +3,7 @@ import { Outlet } from "react-router";
 import { DailyRewardGate } from "@/features/lobby/components/DailyRewardGate";
 import { RoomInviteModal } from "@/features/lobby/components/RoomInviteModal";
 import { LevelUpGate } from "@/shared/components/LevelUpGate";
+import { RankChangeGate } from "@/shared/components/RankChangeGate";
 import { TopBar } from "@/shared/components/TopBar";
 
 export function AppLayout() {
@@ -16,6 +17,9 @@ export function AppLayout() {
           lobby/room — AppLayout doesn't wrap the match route, so it never
           shows on the match-end screen. */}
       <LevelUpGate />
+      {/* Announces a post-match season rank change (promotion or demotion) the
+          same way, and only after any pending level-up has been dismissed. */}
+      <RankChangeGate />
       {/* Story 11.5: the incoming friend room-invite popup. Mounted HERE, not in
           LobbyPage, because the server marks a friend invitable whenever they are
           online, not in a match and not in a room — which includes anyone reading

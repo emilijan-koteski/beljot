@@ -132,7 +132,7 @@ export function normalizeSeasonDivision(
  * The rank as words: "Gold 2" via the `season.rank` key when there is a
  * division, the bare tier name ("Master", or an ended pre-division "Gold")
  * when there is not. The ONE rank label every surface renders — header chip,
- * banner, season section, leaderboard, archive and toasts — so the format
+ * banner, season section, leaderboard, archive and the rank-change dialog — so the format
  * cannot drift between them. Pass an already-normalized tier and division.
  */
 export function seasonRankLabel(t: TFunction, tier: SeasonTier, division: number | null): string {

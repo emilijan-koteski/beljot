@@ -1421,12 +1421,16 @@
       "master": "Majstor",
       "grandmaster": "Velemajstor"
     },
-    "tierUp": {
-      "toast": "Novi rang: {{tier}}"
-    },
     "rank": "{{tier}} {{division}}",
-    "demoted": {
-      "toast": "Pad na {{rank}}"
+    "rankUpDialog": {
+      "title": "Novi rang!"
+    },
+    "rankDownDialog": {
+      "title": "Pad ranga"
+    },
+    "rankDialog": {
+      "sp": "{{change}} SP u ovom meču",
+      "continue": "Nastavi"
     },
     "result": {
       "line": "{{change}} SP · {{rank}}",

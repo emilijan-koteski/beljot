@@ -1421,12 +1421,16 @@
       "master": "Master",
       "grandmaster": "Grandmaster"
     },
-    "tierUp": {
-      "toast": "New rank: {{tier}}"
-    },
     "rank": "{{tier}} {{division}}",
-    "demoted": {
-      "toast": "Dropped to {{rank}}"
+    "rankUpDialog": {
+      "title": "Rank Up!"
+    },
+    "rankDownDialog": {
+      "title": "Rank Down"
+    },
+    "rankDialog": {
+      "sp": "{{change}} SP this match",
+      "continue": "Continue"
     },
     "result": {
       "line": "{{change}} SP · {{rank}}",

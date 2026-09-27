@@ -1421,12 +1421,16 @@
       "master": "Мајстор",
       "grandmaster": "Велемајстор"
     },
-    "tierUp": {
-      "toast": "Нов ранг: {{tier}}"
-    },
     "rank": "{{tier}} {{division}}",
-    "demoted": {
-      "toast": "Пад на {{rank}}"
+    "rankUpDialog": {
+      "title": "Нов ранг!"
+    },
+    "rankDownDialog": {
+      "title": "Пад на рангот"
+    },
+    "rankDialog": {
+      "sp": "{{change}} СП во овој меч",
+      "continue": "Продолжи"
     },
     "result": {
       "line": "{{change}} СП · {{rank}}",
