@@ -4,37 +4,27 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 	"time"
 
 	"gorm.io/gorm"
 
-	"github.com/emilijan/beljot/server/internal/game"
 	"github.com/emilijan/beljot/server/internal/match"
 	"github.com/emilijan/beljot/server/internal/season"
 )
 
-// loadWindow reads every finished match whose completed_at falls in [from, to),
-// in completion order, with its hand rows, plus a display label for every user
-// who sat in one. It only reads; main runs it inside a READ ONLY transaction.
-//
-// The status filter mirrors the one match history uses (match/gorm_repo.go):
-// completed rows plus abandoned rows. Abandoned rows with no abandoned_by are
-// boot-reconcile placeholders, which award nothing live, so the replay skips
-// them too (see outcomeFor) rather than filtering them here, to count them.
+// The replay core (loading the window, rebuilding each outcome, the scoring
+// loop) is season's, shared with the server's season recalculation
+// (season/replay.go), so the tuning report and the recalculated rows can never
+// disagree. What lives here is the report: usernames, win rates, bot-table
+// statistics, the Silver match and the trace.
+
+// loadWindow reads the window's matches (season.LoadWindow) plus a display label
+// for every user who sat in one. It only reads; main runs it inside a READ ONLY
+// transaction.
 func loadWindow(db *gorm.DB, from, to time.Time) ([]match.Match, map[uint]string, error) {
-	var matches []match.Match
-	err := db.Model(&match.Match{}).
-		Where("completed_at >= ? AND completed_at < ?", from, to).
-		Where("status IN ?", []string{"completed", "abandoned"}).
-		Preload("Hands", func(db *gorm.DB) *gorm.DB {
-			return db.Order("hand_number ASC")
-		}).
-		Order("completed_at ASC").
-		Order("id ASC").
-		Find(&matches).Error
+	matches, err := season.LoadWindow(db, from, to)
 	if err != nil {
-		return nil, nil, fmt.Errorf("loading matches: %w", err)
+		return nil, nil, err
 	}
 
 	ids := map[uint]bool{}
@@ -79,80 +69,6 @@ func loadWindow(db *gorm.DB, from, to time.Time) ([]match.Match, map[uint]string
 
 func seatIDs(m match.Match) [4]*uint {
 	return [4]*uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID}
-}
-
-func seatBots(m match.Match) [4]bool {
-	return [4]bool{m.Player1IsBot, m.Player2IsBot, m.Player3IsBot, m.Player4IsBot}
-}
-
-// Reasons a stored match is left out of the replay.
-var (
-	errReconcilePlaceholder = errors.New("abandoned with no abandoner (boot-reconcile placeholder)")
-	errUnknownMode          = errors.New("unknown match mode")
-	errAbandonerNotSeated   = errors.New("abandoner is not seated in the match")
-)
-
-// outcomeFor rebuilds the outcome the live finalizers would have handed the
-// season service, from what the match row stores.
-//
-// Two facts are not stored and are inferred:
-//
-//   - SURRENDER: surrendered_by is set AND the winners finished below the
-//     target. A surrender accepted on a hand that took the winners over the
-//     target finalizes as a target-reached finish, and live scores it as one.
-//   - INSTANT WIN: a completed match with no surrender whose winners finished
-//     below the target. Nothing else ends a completed match short of it.
-//
-// An abandonment is scored as live scores it: the seat of abandoned_by is the
-// abandoned seat, and the winner is the other team, whatever winner_team says.
-func outcomeFor(m match.Match) (match.MatchOutcome, error) {
-	o := match.MatchOutcome{AbandonedSeat: -1}
-	if m.Status == "abandoned" && m.AbandonedBy == nil {
-		return o, errReconcilePlaceholder
-	}
-	// The two stored modes ARE their targets. Anything else is refused rather
-	// than defaulted: a replay that silently scored an unknown mode against 1001
-	// would tune the constants on a wrong margin.
-	target, err := strconv.Atoi(m.MatchMode)
-	if err != nil || (target != 501 && target != 1001) {
-		return o, fmt.Errorf("%w %q", errUnknownMode, m.MatchMode)
-	}
-	o.Target = target
-	o.TeamScores = [2]int{m.TeamAScore, m.TeamBScore}
-	o.WinnerTeam = m.WinnerTeam
-
-	ids, bots := seatIDs(m), seatBots(m)
-	for seat := range o.Seats {
-		s := match.OutcomeSeat{Team: game.TeamForSeat(seat), IsBot: bots[seat], Completed: true}
-		if ids[seat] != nil && !bots[seat] {
-			s.UserID = *ids[seat]
-		}
-		o.Seats[seat] = s
-	}
-
-	if m.Status == "abandoned" {
-		for seat, s := range o.Seats {
-			if s.UserID != 0 && s.UserID == *m.AbandonedBy {
-				o.AbandonedSeat = seat
-			}
-		}
-		if o.AbandonedSeat < 0 {
-			return o, errAbandonerNotSeated
-		}
-		o.Seats[o.AbandonedSeat].Completed = false
-		o.WinnerTeam = 1 - o.Seats[o.AbandonedSeat].Team
-	} else if o.WinnerTeam == 0 || o.WinnerTeam == 1 {
-		belowTarget := o.TeamScores[o.WinnerTeam] < target
-		o.Surrender = m.SurrenderedBy != nil && belowTarget
-		o.InstantWin = m.SurrenderedBy == nil && belowTarget
-	}
-
-	for _, h := range m.Hands {
-		if h.CapotTeam != nil && (*h.CapotTeam == 0 || *h.CapotTeam == 1) {
-			o.CapotTeams[*h.CapotTeam] = true
-		}
-	}
-	return o, nil
 }
 
 // playerResult is one player's line in the replay report.
@@ -202,32 +118,20 @@ type traceRow struct {
 	After  int
 }
 
-// replay runs the window through the formula in order, entirely in memory:
-// every player starts the window on 0 SP, each match reads the running totals,
-// and each total is floored at 0 exactly as the award path floors it.
+// replay runs the window through season.ReplayMatches and builds the report
+// from what it scored: the final totals and ranks are the core's, the per-player
+// statistics and the trace are collected match by match by its observer.
 func replay(matches []match.Match, names map[uint]string, f season.SPFormula, ladder season.Ladder, traceUser uint) ([]playerResult, replaySummary, error) {
 	silver, ok := ladder.Floor(season.TierSilver)
 	if !ok {
 		return nil, replaySummary{}, errors.New("ladder has no silver tier")
 	}
 
-	sum := replaySummary{Loaded: len(matches), Skipped: map[string]int{}}
-	sp := map[uint]int{}
+	var sum replaySummary
 	stats := map[uint]*playerResult{}
 
-	for _, m := range matches {
-		o, err := outcomeFor(m)
-		if err != nil {
-			sum.Skipped[skipReason(err)]++
-			continue
-		}
-		changes, err := f.Changes(o, sp)
-		if err != nil {
-			sum.Skipped[fmt.Sprintf("formula rejected the outcome: %v", err)]++
-			continue
-		}
-
-		sum.Scored++
+	result := season.ReplayMatches(matches, f, ladder, func(rm season.ReplayedMatch) {
+		o := rm.Outcome
 		if o.Surrender {
 			sum.Surrenders++
 		}
@@ -245,7 +149,7 @@ func replay(matches []match.Match, names map[uint]string, f season.SPFormula, la
 			sum.BotOnly++
 		}
 
-		for _, s := range o.Seats {
+		for seat, s := range o.Seats {
 			if s.IsBot || s.UserID == 0 {
 				continue
 			}
@@ -254,8 +158,6 @@ func replay(matches []match.Match, names map[uint]string, f season.SPFormula, la
 				r = &playerResult{UserID: s.UserID, Name: names[s.UserID]}
 				stats[s.UserID] = r
 			}
-			before := sp[s.UserID]
-			sp[s.UserID] = season.ApplySPChange(before, changes[s.UserID])
 
 			won := s.Team == o.WinnerTeam
 			r.Matches++
@@ -268,23 +170,29 @@ func replay(matches []match.Match, names map[uint]string, f season.SPFormula, la
 					r.BotWins++
 				}
 			}
-			if r.SilverAt == 0 && sp[s.UserID] >= silver {
+			if r.SilverAt == 0 && rm.After[seat] >= silver {
 				r.SilverAt = r.Matches
 			}
 			if traceUser != 0 && s.UserID == traceUser {
 				sum.Trace = append(sum.Trace, traceRow{
-					N: r.Matches, MatchID: m.ID, At: m.CompletedAt, BotOnly: botOnly, Won: won,
-					Surrender: o.Surrender, Abandoned: o.AbandonedSeat >= 0 && o.Seats[o.AbandonedSeat].UserID == traceUser,
-					Before: before, Change: sp[s.UserID] - before, After: sp[s.UserID],
+					N: r.Matches, MatchID: rm.Match.ID, At: rm.Match.CompletedAt, BotOnly: botOnly, Won: won,
+					Surrender: o.Surrender, Abandoned: seat == o.AbandonedSeat,
+					Before: rm.Before[seat], Change: rm.After[seat] - rm.Before[seat], After: rm.After[seat],
 				})
 			}
 		}
-	}
+	})
+	sum.Loaded, sum.Scored, sum.Skipped = result.Summary.Loaded, result.Summary.Scored, result.Summary.Skipped
 
-	out := make([]playerResult, 0, len(stats))
-	for id, r := range stats {
-		r.FinalSP = sp[id]
-		r.Tier, r.Division = ladder.Rank(r.FinalSP)
+	out := make([]playerResult, 0, len(result.Players))
+	for _, p := range result.Players {
+		r := stats[p.UserID]
+		if r == nil {
+			// The core scored a player the observer's seat check did not count:
+			// report them with the core's own game count rather than panic.
+			r = &playerResult{UserID: p.UserID, Name: names[p.UserID], Matches: p.GamesPlayed}
+		}
+		r.FinalSP, r.Tier, r.Division = p.SP, p.Tier, p.Division
 		out = append(out, *r)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -307,17 +215,4 @@ func humanCount(o match.MatchOutcome) int {
 		}
 	}
 	return n
-}
-
-func skipReason(err error) string {
-	switch {
-	case errors.Is(err, errReconcilePlaceholder):
-		return errReconcilePlaceholder.Error()
-	case errors.Is(err, errUnknownMode):
-		return errUnknownMode.Error()
-	case errors.Is(err, errAbandonerNotSeated):
-		return errAbandonerNotSeated.Error()
-	default:
-		return err.Error()
-	}
 }

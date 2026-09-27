@@ -15,11 +15,12 @@
 -- leaderboard read rank_tier and rank_division as stored: the rank the player
 -- actually finished on.
 --
--- NULLABLE, NO BACKFILL. Rows written before this migration (2026 Q3 and
--- earlier) had no divisions when they were played, so they keep NULL and
--- render as the bare tier ("Gold"). Q4 rows are all written after the release
--- (000027 cleared any earlier ones), so every Q4 row gets its division on its
--- first award. NULL is also the permanent value for Master and Grandmaster.
+-- NULLABLE, NO BACKFILL HERE. Rows written before this migration keep NULL and
+-- render as the bare tier ("Gold") until something rewrites them: 000029
+-- re-scores 2026 Q3 on the live ladder at the next server start, divisions
+-- included. Q4 rows are all written after the release (000027 clears any
+-- earlier ones), so every Q4 row gets its division on its first award. NULL is
+-- also the permanent value for Master and Grandmaster.
 --
 -- SMALLINT WITH A CHECK: a division is 1, 2 or 3, enforced here as well as by
 -- the ladder arithmetic.

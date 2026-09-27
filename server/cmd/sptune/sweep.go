@@ -43,7 +43,7 @@ type outcomeTemplate struct {
 // win rate, not a quit rate.
 func templatePools(matches []match.Match) (won, lost []outcomeTemplate) {
 	for _, m := range matches {
-		o, err := outcomeFor(m)
+		o, err := season.OutcomeFor(m)
 		if err != nil || o.AbandonedSeat >= 0 || humanCount(o) != 1 {
 			continue
 		}

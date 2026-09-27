@@ -10,6 +10,9 @@
 // which the player first reached Silver), and a synthetic bot-table sweep that
 // gives each win rate's settle point and its SP after the first N matches.
 // Without --db-url only the sweep runs, at a fixed margin.
+//
+// The replay itself is season.ReplayMatches, the same core the server's
+// one-time season recalculation writes its rows from (season/recalc.go).
 package main
 
 import (

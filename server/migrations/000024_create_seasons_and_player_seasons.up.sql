@@ -14,6 +14,8 @@
 -- window: SP starts at zero for everyone, by design, and there is no historical
 -- SP to recover -- the SP formula did not exist when those matches were played,
 -- so any "backfill" would be an invention. Do not later "fix" this omission.
+-- (The one owner-approved exception is 000029, which re-scores 2026 Q3 from its
+-- stored matches once the win/loss formula exists to score them with.)
 --
 -- WHY seasons IS SEEDED BELOW. Story 13.1 ships no scheduler (that is Story
 -- 13.3), so the season resolver in server/internal/season/gorm_repo.go is LAZILY
@@ -48,8 +50,9 @@ CREATE TABLE player_seasons (
     season_id  INTEGER NOT NULL REFERENCES seasons (id) ON DELETE CASCADE,
     -- BIGINT, not INTEGER: this is an accumulator summed by a 64-bit Go int.
     -- Exactly the width trap the Story 9.5 review caught when total_xp shipped
-    -- as INTEGER and had to be widened. SP never decreases (PRD: "No decay"),
-    -- so the CHECK is a guard against a bad write, not a business rule.
+    -- as INTEGER and had to be widened. SP falls with losses since Story 13.4,
+    -- but the engine floors every total at 0, so the CHECK is a guard against
+    -- a bad write, not a business rule.
     sp         BIGINT NOT NULL DEFAULT 0 CHECK (sp >= 0),
     -- RANK SNAPSHOT - READ THIS BEFORE USING IT. (Comment revised by Story
     -- 13.5; the column itself is unchanged.)
@@ -65,10 +68,12 @@ CREATE TABLE player_seasons (
     -- +1 for EVERY human seat in a finished match, present at the terminal end
     -- or not. Bot and empty seats increment neither counter.
     games_played    INTEGER NOT NULL DEFAULT 0 CHECK (games_played >= 0),
-    -- +1 only for seats PRESENT at the terminal end -- the same gate SP
-    -- eligibility uses (Story 13.1 D5, which reuses honor's per-seat presence
-    -- rule). So games_completed is exactly "matches where this player earned
-    -- SP", and games_played - games_completed is their in-season absence count.
+    -- +1 only for seats PRESENT at the terminal end (Story 13.1 D5, which
+    -- reuses honor's per-seat presence rule), so games_played -
+    -- games_completed is their in-season absence count. Since Story 13.4 every
+    -- seat is scored whatever its presence, so this no longer means "matches
+    -- that earned SP". 2026 Q3's recalculated rows (000029) count only the
+    -- abandoner as absent: a stored match keeps no other presence.
     games_completed INTEGER NOT NULL DEFAULT 0 CHECK (games_completed >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

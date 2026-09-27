@@ -15,13 +15,13 @@ import type { TFunction } from "i18next";
 // product, and the progress decomposition the profile's RankBanner renders comes
 // from the server's own spIntoDivision / spForNextDivision. An ENDED season's
 // rank is the server's stored snapshot, which this table must never re-derive
-// (Story 13.5): a 2026 Q3 total bucketed on today's floors would read as
-// Grandmaster. So there is deliberately NO client copy of the division or
-// rank-step arithmetic. These helpers exist for: the colour maps; the rank label
-// ("Gold 2"); the signed-change label ("+24", "−13"); the bar fill from the
-// server's own step pair; the season countdown; and the version-skew guards (an
-// unrecognised tier token falls back to its SP bucket, an out-of-range division
-// to none).
+// (Story 13.5): a climb-only total in the thousands, bucketed on today's floors,
+// would read as Grandmaster. So there is deliberately NO client copy of the
+// division or rank-step arithmetic. These helpers exist for: the colour maps;
+// the rank label ("Gold 2"); the signed-change label ("+24", "−13"); the bar
+// fill from the server's own step pair; the season countdown; and the
+// version-skew guards (an unrecognised tier token falls back to its SP bucket,
+// an out-of-range division to none).
 // Keep this the ONLY client copy of the ladder.
 
 /** The eight stable tier tokens the server emits, in ASCENDING order. */
@@ -113,7 +113,7 @@ export function normalizeSeasonTier(tier: string, sp: number): SeasonTier {
  * HAS divisions, otherwise `null` (render the bare tier name).
  *
  * NO SP FALLBACK, on purpose. `null` is a real answer — Master and Grandmaster
- * are single, and an ENDED pre-division season (2026 Q3 and earlier) has no
+ * are single, and an ENDED season's row scored before divisions existed has no
  * division at all — so a missing or malformed value degrades to the bare tier
  * rather than to a division bucketed from SP, which would invent a rank the
  * player never held.

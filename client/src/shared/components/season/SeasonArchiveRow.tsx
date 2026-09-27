@@ -27,7 +27,7 @@ type Props = {
   sp: number;
   /** The server's raw tier token — normalized here, never trusted as-is. */
   tier: string;
-  /** The stored division, 1–3 or null (Master, Grandmaster, pre-division). */
+  /** The stored division, 1–3 or null (Master, Grandmaster, scored before divisions). */
   division: number | null;
   gamesPlayed: number;
 };
@@ -41,9 +41,9 @@ type Props = {
  * twice and the terse cells never read as number soup.
  *
  * The rank is the season's FINAL standing: the server's STORED tier and
- * division, never re-derived from the SP total (Story 13.5) — a 2026 Q3 total
- * bucketed on today's floors would read as Grandmaster. A pre-division season
- * has no division and renders the bare tier ("Gold"). `normalizeSeasonTier` is
+ * division, never re-derived from the SP total (Story 13.5) — a total scored
+ * under older floors would misrank on today's. A row scored before divisions
+ * existed has none and renders the bare tier ("Gold"). `normalizeSeasonTier` is
  * the version-skew guard, the same as everywhere else a tier token crosses the
  * wire.
  */

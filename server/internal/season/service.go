@@ -31,8 +31,8 @@ import (
 // of an ENDED season (ends_at <= now: the archive, and a prior season picked on
 // the leaderboard) returns the rank snapshot stored with the row instead,
 // because an ended season's SP was scored under floors and a formula that may
-// no longer be live: 2026 Q3's old totals would read as Grandmaster on the
-// 13.4 floors.
+// no longer be live: a climb-only total in the thousands would read as
+// Grandmaster on the 13.4 floors.
 type Service struct {
 	repo Repository
 }
@@ -247,8 +247,8 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 // THE RANK is where the two differ (Story 13.5). The current window, and any
 // by-id window that has not ended, derives every row's tier and division from
 // SP; a by-id window that HAS ended (ends_at <= now) shows each row's stored
-// snapshot, rows and viewer alike, so a 2026 Q3 total in the thousands reads
-// as the tier it finished on and never as Grandmaster. The current-window
+// snapshot, rows and viewer alike, so a total scored under older floors reads
+// as the tier it finished on, never re-bucketed on today's. The current-window
 // selector is running by definition (the resolver returns the window covering
 // now), so it is never treated as ended.
 //
@@ -416,8 +416,9 @@ func (s *Service) SeasonsView(now time.Time) (*SeasonsListView, error) {
 // ArchiveView is the read path behind GET /api/v1/users/:id/seasons: the
 // subject's ENDED, PLAYED seasons, newest-first, each with the rank it
 // FINISHED on: the stored rank_tier / rank_division snapshot, never re-derived
-// from the SP total on today's floors (Story 13.5). Rows from before divisions
-// existed (2026 Q3 and earlier) carry no division and render as the bare tier.
+// from the SP total on today's floors (Story 13.5). A row written before
+// divisions existed, and never recalculated since, carries no division and
+// renders as the bare tier (2026 Q3 is recalculated with divisions, 000029).
 //
 // An unknown subject is an EMPTY archive, not a 404 — the profile query owns
 // user existence, and this endpoint answers the narrower question "which ended

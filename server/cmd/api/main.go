@@ -239,6 +239,20 @@ func main() {
 	seasonRollover := season.NewRollover(seasonRepo, 0, nil)
 	seasonRollover.Start()
 
+	// One-time season recalculations queued by migrations (000029: 2026 Q3
+	// re-scored from its stored matches with the win/loss formula). Run here,
+	// before reconcile and before the server accepts connections, so no live
+	// match can award SP into a season while it is being rewritten. Best-effort
+	// like reconcile: a failure is logged and boot continues, and the failed job
+	// stays pending, so the next start retries it.
+	recalculations, err := season.RunPendingRecalculations(db, time.Now())
+	for _, r := range recalculations {
+		logSeasonRecalculation(r)
+	}
+	if err != nil {
+		slog.Error("season recalculation failed; it stays pending and retries on the next start", "error", err)
+	}
+
 	// Reconcile rooms left in status="playing" by a previous process. Sessions
 	// live only in process memory, so any "playing" row at boot has no live
 	// session — its players would be stranded by FindPlayerRoom (which gates
@@ -455,6 +469,29 @@ func main() {
 
 func healthHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// logSeasonRecalculation logs one finished recalculation job: how many rows it
+// rewrote, what the replay skipped, and any row of the season it left as it was.
+func logSeasonRecalculation(r season.RecalculationResult) {
+	start := r.SeasonStartedAt.UTC().Format(time.RFC3339)
+	if !r.SeasonFound {
+		slog.Warn("season recalculation: no season starts at the job's start; marked done, nothing written",
+			"seasonStartedAt", start)
+		return
+	}
+	slog.Info("season recalculation: done",
+		"season", r.SeasonName,
+		"seasonStartedAt", start,
+		"playersRewritten", r.Rewritten,
+		"matchesLoaded", r.Summary.Loaded,
+		"matchesScored", r.Summary.Scored,
+		"matchesSkipped", r.Summary.Skipped)
+	if len(r.Untouched) > 0 {
+		slog.Warn("season recalculation: rows the replay did not cover were left as they are",
+			"season", r.SeasonName,
+			"userIds", r.Untouched)
+	}
 }
 
 // chatRoomMembership adapts room.RoomRepository to chat.RoomMembership.

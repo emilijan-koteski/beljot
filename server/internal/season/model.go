@@ -22,7 +22,9 @@ type Season struct {
 // PlayerSeason is one player's record inside one season (migration 000024).
 // Rows are IMMUTABLE ACROSS SEASONS: the soft reset at rollover is "a new
 // season_id", never an update or a compression of the old row, which is what
-// lets Story 13.3 archive a prior season by reading it back unchanged.
+// lets Story 13.3 archive a prior season by reading it back unchanged. The one
+// deliberate rewrite is a queued recalculation (recalc.go, migration 000029),
+// which re-scores a whole season from its stored matches.
 //
 // GORM auto-pluralizes to "player_seasons", matching the table.
 type PlayerSeason struct {
@@ -35,8 +37,9 @@ type PlayerSeason struct {
 	SP int `gorm:"column:sp" json:"sp"`
 	// THE RANK SNAPSHOT: the tier and division SP stood at after the row's last
 	// award, written together by every award (Story 13.5). RankDivision is 1-3,
-	// or nil for Master, Grandmaster and every row written before migration
-	// 000028 (2026 Q3 and earlier had no divisions).
+	// or nil for Master, Grandmaster and any row written before migration
+	// 000028 that no recalculation has rewritten since (000029 re-scores 2026
+	// Q3, divisions included).
 	//
 	// WHO READS IT depends on the season (see 000028): a RUNNING season derives
 	// its rank from SP with the live ladder and ignores these two fields; an

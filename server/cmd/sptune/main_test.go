@@ -105,112 +105,6 @@ func TestParseFlags_Rejects(t *testing.T) {
 	}
 }
 
-func TestOutcomeFor(t *testing.T) {
-	t.Run("natural finish", func(t *testing.T) {
-		m := fourHumans(1, [4]uint{1, 2, 3, 4}, 0, 1100, 700)
-		o, err := outcomeFor(m)
-		require.NoError(t, err)
-		assert.Equal(t, match.MatchOutcome{
-			Seats: [4]match.OutcomeSeat{
-				{UserID: 1, Team: 0, Completed: true},
-				{UserID: 2, Team: 1, Completed: true},
-				{UserID: 3, Team: 0, Completed: true},
-				{UserID: 4, Team: 1, Completed: true},
-			},
-			WinnerTeam: 0, TeamScores: [2]int{1100, 700}, Target: 1001, AbandonedSeat: -1,
-		}, o)
-	})
-
-	t.Run("bot seats carry no user", func(t *testing.T) {
-		o, err := outcomeFor(botTable(1, 7, 0, 1100, 700))
-		require.NoError(t, err)
-		assert.Equal(t, match.OutcomeSeat{UserID: 7, Team: 0, Completed: true}, o.Seats[0])
-		for seat := 1; seat < 4; seat++ {
-			assert.True(t, o.Seats[seat].IsBot)
-			assert.Zero(t, o.Seats[seat].UserID)
-			assert.Equal(t, seat%2, o.Seats[seat].Team)
-		}
-	})
-
-	t.Run("surrender: surrendered_by set and the winners below the target", func(t *testing.T) {
-		m := fourHumans(1, [4]uint{1, 2, 3, 4}, 1, 300, 500)
-		m.SurrenderedBy = uid(1)
-		o, err := outcomeFor(m)
-		require.NoError(t, err)
-		assert.True(t, o.Surrender)
-		assert.False(t, o.InstantWin)
-	})
-
-	t.Run("a surrender that finalized at the target is a natural finish", func(t *testing.T) {
-		m := fourHumans(1, [4]uint{1, 2, 3, 4}, 1, 640, 1012)
-		m.SurrenderedBy = uid(1)
-		o, err := outcomeFor(m)
-		require.NoError(t, err)
-		assert.False(t, o.Surrender)
-		assert.False(t, o.InstantWin)
-	})
-
-	t.Run("instant win: completed, no surrender, winners below the target", func(t *testing.T) {
-		o, err := outcomeFor(fourHumans(1, [4]uint{1, 2, 3, 4}, 1, 0, 0))
-		require.NoError(t, err)
-		assert.True(t, o.InstantWin)
-		assert.False(t, o.Surrender)
-	})
-
-	t.Run("the 501 target", func(t *testing.T) {
-		m := fourHumans(1, [4]uint{1, 2, 3, 4}, 0, 520, 200)
-		m.MatchMode = "501"
-		o, err := outcomeFor(m)
-		require.NoError(t, err)
-		assert.Equal(t, 501, o.Target)
-		assert.False(t, o.InstantWin, "520 reached the 501 target")
-	})
-
-	t.Run("abandonment: the abandoner's seat, and the other team wins", func(t *testing.T) {
-		m := fourHumans(1, [4]uint{1, 2, 3, 4}, 0, 200, 400)
-		m.Status = "abandoned"
-		m.AbandonedBy = uid(3)
-		o, err := outcomeFor(m)
-		require.NoError(t, err)
-		assert.Equal(t, 2, o.AbandonedSeat)
-		assert.False(t, o.Seats[2].Completed)
-		assert.Equal(t, 1, o.WinnerTeam, "the winner is the non-abandoning team whatever winner_team says")
-		assert.False(t, o.Surrender, "the formula scores an abandonment as a surrender itself")
-		assert.False(t, o.InstantWin, "an abandonment below the target is not an instant win")
-	})
-
-	t.Run("Capot teams come from the hand rows", func(t *testing.T) {
-		m := fourHumans(1, [4]uint{1, 2, 3, 4}, 0, 1100, 700)
-		m.Hands = []match.HandResult{
-			{HandNumber: 1, Capot: true, CapotTeam: team(1)},
-			{HandNumber: 2},
-			{HandNumber: 3, Capot: true, CapotTeam: team(1)},
-			{HandNumber: 4, Capot: true},
-		}
-		o, err := outcomeFor(m)
-		require.NoError(t, err)
-		assert.Equal(t, [2]bool{false, true}, o.CapotTeams)
-	})
-
-	t.Run("skips", func(t *testing.T) {
-		placeholder := fourHumans(1, [4]uint{1, 2, 3, 4}, 0, 200, 400)
-		placeholder.Status = "abandoned"
-		_, err := outcomeFor(placeholder)
-		assert.ErrorIs(t, err, errReconcilePlaceholder)
-
-		unknown := fourHumans(1, [4]uint{1, 2, 3, 4}, 0, 1100, 700)
-		unknown.MatchMode = "classic"
-		_, err = outcomeFor(unknown)
-		assert.ErrorIs(t, err, errUnknownMode)
-
-		stranger := fourHumans(1, [4]uint{1, 2, 3, 4}, 0, 200, 400)
-		stranger.Status = "abandoned"
-		stranger.AbandonedBy = uid(99)
-		_, err = outcomeFor(stranger)
-		assert.ErrorIs(t, err, errAbandonerNotSeated)
-	})
-}
-
 // A short window worked by hand with W=30, L=20, S=430 and a bot seat on 600,
 // on a test ladder whose Silver floor is 40.
 func TestReplay(t *testing.T) {
@@ -255,8 +149,8 @@ func TestReplay(t *testing.T) {
 	assert.Equal(t, replaySummary{
 		Loaded: 5, Scored: 3, Surrenders: 1, Abandonments: 1, CapotMatches: 1, BotOnly: 1,
 		Skipped: map[string]int{
-			errReconcilePlaceholder.Error(): 1,
-			errUnknownMode.Error():          1,
+			season.ErrReconcilePlaceholder.Error(): 1,
+			season.ErrUnknownMode.Error():          1,
 		},
 	}, sum)
 
@@ -294,7 +188,7 @@ func TestReplay_IsTheAwardPathArithmetic(t *testing.T) {
 	// seat: the replay is only as useful as its agreement with the live formula.
 	f := season.DefaultSPFormula()
 	m := fourHumans(1, [4]uint{1, 2, 3, 4}, 0, 1100, 700)
-	o, err := outcomeFor(m)
+	o, err := season.OutcomeFor(m)
 	require.NoError(t, err)
 	want, err := f.Changes(o, map[uint]int{})
 	require.NoError(t, err)
@@ -490,7 +384,9 @@ func TestReadOnly_PostgresRefusesWrites(t *testing.T) {
 	assert.ErrorIs(t, readOnly(db, func(*gorm.DB) error { return sentinel }), sentinel)
 }
 
-func TestLoadWindow(t *testing.T) {
+// The window itself (bounds, order, hands) is season.LoadWindow's and tested
+// there; what sptune adds is a label for every seated user.
+func TestLoadWindow_LabelsEverySeatedUser(t *testing.T) {
 	db := openTestDB(t)
 	tx := db.Begin()
 	require.NoError(t, tx.Error)
@@ -513,48 +409,21 @@ INSERT INTO rooms (name, code, owner_id, status) VALUES (?, ?, ?, 'completed') R
 		"sptune-"+suffix, "S"+suffix[len(suffix)-5:], alice).Scan(&roomID).Error)
 
 	from := time.Date(2031, 7, 1, 0, 0, 0, 0, time.UTC)
-	to := from.AddDate(0, 3, 0)
-	insert := func(completedAt time.Time, status string, withHands bool) uint {
-		m := match.Match{
-			RoomID: roomID, Player1ID: uid(alice), Player2ID: uid(bob),
-			Player3IsBot: true, Player4IsBot: true, HasBots: true,
-			TeamAScore: 1100, TeamBScore: 700, WinnerTeam: 0, Variant: "bitola", MatchMode: "1001",
-			StartedAt: completedAt.Add(-time.Hour), CompletedAt: completedAt, Status: status,
-		}
-		require.NoError(t, tx.Create(&m).Error)
-		if withHands {
-			for n, capot := range []*int{nil, team(1)} {
-				require.NoError(t, tx.Create(&match.HandResult{
-					MatchID: m.ID, HandNumber: 2 - n, Capot: capot != nil, CapotTeam: capot,
-				}).Error)
-			}
-		}
-		return m.ID
+	m := match.Match{
+		RoomID: roomID, Player1ID: uid(alice), Player2ID: uid(bob),
+		Player3IsBot: true, Player4IsBot: true, HasBots: true,
+		TeamAScore: 1100, TeamBScore: 700, WinnerTeam: 0, Variant: "bitola", MatchMode: "1001",
+		StartedAt: from, CompletedAt: from.Add(time.Hour), Status: "completed",
 	}
-	second := insert(from.Add(48*time.Hour), "completed", true)
-	first := insert(from, "completed", false)
-	tieA := insert(from.Add(72*time.Hour), "abandoned", false)
-	tieB := insert(from.Add(72*time.Hour), "completed", false)
-	insert(from.Add(-time.Second), "completed", false) // before the window
-	insert(to, "completed", false)                     // the end is exclusive
-	insert(from.Add(time.Hour), "in_progress", false)  // not finished
+	require.NoError(t, tx.Create(&m).Error)
 
-	matches, names, err := loadWindow(tx, from, to)
+	matches, names, err := loadWindow(tx, from, from.AddDate(0, 3, 0))
 	require.NoError(t, err)
+	require.Len(t, matches, 1)
+	assert.Equal(t, m.ID, matches[0].ID)
 
-	ids := make([]uint, 0, len(matches))
-	for _, m := range matches {
-		ids = append(ids, m.ID)
-	}
-	assert.Equal(t, []uint{first, second, min(tieA, tieB), max(tieA, tieB)}, ids,
-		"completed_at order, id breaking ties, finished rows inside [from, to) only")
-
-	require.Len(t, matches[1].Hands, 2)
-	assert.Equal(t, 1, matches[1].Hands[0].HandNumber, "hands in hand order")
-	o, err := outcomeFor(matches[1])
-	require.NoError(t, err)
-	assert.Equal(t, [2]bool{false, true}, o.CapotTeams)
-
-	assert.Equal(t, "spa"+suffix, names[alice])
-	assert.Equal(t, "spb"+suffix+" (deleted)", names[bob], "a deleted account is labelled, not dropped")
+	assert.Equal(t, map[uint]string{
+		alice: "spa" + suffix,
+		bob:   "spb" + suffix + " (deleted)",
+	}, names, "a deleted account is labelled, not dropped; bot seats need no label")
 }

@@ -450,9 +450,9 @@ export interface SeasonsListResponse {
  * Membership is the ARCHIVE's rule, not the ladder's: a played season with
  * `sp: 0` appears here (it is real history) even though it never appeared on
  * the leaderboard. `tier` and `division` are the STORED rank the season
- * finished on (Story 13.5), never re-derived from `sp`: a 2026 Q3 total would
- * read as Grandmaster on today's floors. `division` is null for Master,
- * Grandmaster and every pre-division season. `tier` is typed as `string`
+ * finished on (Story 13.5), never re-derived from `sp`: a total scored under
+ * older floors would misrank on today's. `division` is null for Master,
+ * Grandmaster and any row scored before divisions existed. `tier` is typed as `string`
  * rather than the `SeasonTier` union for the same version-skew reason every
  * other tier on the wire is — normalize through `normalizeSeasonTier`.
  */

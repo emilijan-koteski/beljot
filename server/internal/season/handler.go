@@ -291,8 +291,9 @@ type SeasonsListView struct {
 // Tier and Division are the row's STORED rank snapshot, the rank the season
 // finished on (Story 13.5): every archived season has ended, and re-deriving an
 // old SP total on today's floors would misrank it. Division is null for Master,
-// Grandmaster and every season from before divisions existed. SeasonName is
-// the verbatim machine token.
+// Grandmaster and any row scored before divisions existed and never
+// recalculated (2026 Q3 was recalculated with divisions, migration 000029).
+// SeasonName is the verbatim machine token.
 type ArchiveRowView struct {
 	SeasonID    uint      `json:"seasonId"`
 	SeasonName  string    `json:"seasonName"`

@@ -37,7 +37,7 @@ type Props = {
   tier: string;
   /**
    * The server's division, 1–3 or null. For an ENDED season it is the stored
-   * snapshot (null for a pre-division season), so it is never re-derived from
+   * snapshot (null for a row scored before divisions existed), so it is never re-derived from
    * `sp` here — only normalized.
    */
   division: number | null;

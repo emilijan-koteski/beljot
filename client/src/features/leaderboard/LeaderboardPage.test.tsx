@@ -502,10 +502,10 @@ describe("LeaderboardPage", () => {
     expect(mockGet).toHaveBeenCalledWith(25, 0, "current");
   });
 
-  // THE ACCEPTANCE CRITERION on the page: the current season (Q4) shows tier
-  // plus division, and an ended pre-division season (Q3) shows the stored tier
-  // with none — the page renders the server's rank and never re-derives one
-  // from SP (3500 old-formula SP would bucket as Grandmaster).
+  // THE ACCEPTANCE CRITERION on the page: the current season shows tier plus
+  // division, and an earlier ended pre-division season (2026 Q2 here) shows the
+  // stored tier with none — the page renders the server's rank and never
+  // re-derives one from SP (3500 old-formula SP would bucket as Grandmaster).
   it("renders the current season's divisions and an ended season's stored bare tier", async () => {
     const user = userEvent.setup();
     mockGetSeasons.mockResolvedValue(seasonsFixture());
