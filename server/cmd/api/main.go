@@ -21,6 +21,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/auth"
 	"github.com/emilijan/beljot/server/internal/chat"
 	"github.com/emilijan/beljot/server/internal/config"
+	"github.com/emilijan/beljot/server/internal/dbmigrate"
 	"github.com/emilijan/beljot/server/internal/emote"
 	"github.com/emilijan/beljot/server/internal/friend"
 	"github.com/emilijan/beljot/server/internal/identity"
@@ -41,6 +42,13 @@ func main() {
 	slog.SetDefault(logger)
 
 	cfg := config.Load()
+
+	schemaVersion, err := dbmigrate.Up(cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("database migration failed", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("database schema up to date", "version", schemaVersion)
 
 	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{
 		Logger: gormlogger.New(
