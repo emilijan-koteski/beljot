@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CareerResponse } from "@/shared/api/career";
 import type { ProfileResponse } from "@/shared/api/profile";
 import { useAuthStore } from "@/shared/stores/authStore";
+import type { CurrentSeasonResponse } from "@/shared/types/apiTypes";
 import { makeUser, QueryWrapper } from "@/test-utils";
 
 import { ProfilePage } from "./ProfilePage";
@@ -49,13 +50,14 @@ vi.mock("@/shared/api/season", () => ({
   getCurrentSeason: (...args: unknown[]) => mockGetCurrentSeason(...args),
 }));
 
-const currentSeason = {
+const currentSeason: CurrentSeasonResponse = {
   seasonName: "2026 Q3",
   endsAt: "2099-10-01T00:00:00Z",
-  sp: 4000,
+  sp: 680,
   rankTier: "gold",
-  spIntoTier: 1000,
-  spForNextTier: 2500,
+  rankDivision: 2,
+  spIntoDivision: 13,
+  spForNextDivision: 67,
   gamesPlayed: 31,
   gamesCompleted: 29,
 };
@@ -479,9 +481,9 @@ describe("ProfilePage", () => {
 
     const banner = await screen.findByTestId("rank-banner");
     expect(banner).toHaveAttribute("data-tier", "gold");
-    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Gold");
-    // The progress the header chip deliberately omits: 1000 of a 2500 band.
-    expect(screen.getByTestId("rank-progress")).toHaveAttribute("aria-valuenow", "40");
+    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Gold 2");
+    // The progress the header chip deliberately omits: 13 of Gold 2's 67-SP step.
+    expect(screen.getByTestId("rank-progress")).toHaveAttribute("aria-valuenow", "19");
   });
 
   // ABOVE the streak callout, per the page's stated order: the season standing
@@ -501,15 +503,18 @@ describe("ProfilePage", () => {
   // shadowed by a smaller copy of the same standing a few sections down.
   it("renders the archive without the section's rank chip when the viewer has season history", async () => {
     mockGetProfile.mockResolvedValueOnce(
-      profileFixture({ seasonRank: { seasonName: "2026 Q3", tier: "gold", sp: 4000 } }),
+      profileFixture({
+        seasonRank: { seasonName: "2026 Q3", tier: "gold", division: 2, sp: 680 },
+      }),
     );
     mockGetSeasonArchive.mockResolvedValue({
       items: [
         {
           seasonId: 5,
           seasonName: "2026 Q2",
-          sp: 1800,
+          sp: 450,
           tier: "silver",
+          division: null,
           gamesPlayed: 14,
           startedAt: "2026-04-01T00:00:00Z",
           endsAt: "2026-07-01T00:00:00Z",

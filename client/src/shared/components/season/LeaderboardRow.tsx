@@ -2,7 +2,12 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
 import { TierBadge } from "@/shared/components/season/TierBadge";
-import { normalizeSeasonTier, SEASON_TIER_COLOR } from "@/shared/lib/seasonTier";
+import {
+  normalizeSeasonDivision,
+  normalizeSeasonTier,
+  SEASON_TIER_COLOR,
+  seasonRankLabel,
+} from "@/shared/lib/seasonTier";
 import { cn } from "@/shared/lib/utils";
 
 /**
@@ -30,6 +35,12 @@ type Props = {
   sp: number;
   /** The server's raw tier token — normalized here, never trusted as-is. */
   tier: string;
+  /**
+   * The server's division, 1–3 or null. For an ENDED season it is the stored
+   * snapshot (null for a row scored before divisions existed), so it is never re-derived from
+   * `sp` here — only normalized.
+   */
+  division: number | null;
   /** Optional: a caller too narrow to spend a column on it may leave it off. */
   gamesPlayed?: number;
   /** True for the viewer's own row: tinted ground, a "you" pill, and `data-self`. */
@@ -85,6 +96,7 @@ export function LeaderboardRow({
   username,
   sp,
   tier,
+  division,
   gamesPlayed,
   isSelf = false,
   className,
@@ -93,7 +105,7 @@ export function LeaderboardRow({
 
   const total = finiteOrZero(sp);
   const safeTier = normalizeSeasonTier(tier, total);
-  const tierName = t(`season.tier.${safeTier}`);
+  const rankName = seasonRankLabel(t, safeTier, normalizeSeasonDivision(safeTier, division));
   const games = gamesPlayed === undefined ? undefined : finiteOrZero(gamesPlayed);
 
   return (
@@ -116,7 +128,7 @@ export function LeaderboardRow({
         {t("season.leaderboard.rowAria", {
           position,
           username,
-          tier: tierName,
+          tier: rankName,
           sp: total.toLocaleString(),
         })}
         {/* `games`, deliberately NOT `count`: i18next treats a `count` variable
@@ -180,7 +192,7 @@ export function LeaderboardRow({
         className="shrink-0 text-xs font-semibold"
         style={{ color: SEASON_TIER_COLOR[safeTier] }}
       >
-        {tierName}
+        {rankName}
       </span>
 
       <span

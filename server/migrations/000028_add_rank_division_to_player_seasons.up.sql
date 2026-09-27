@@ -1,0 +1,28 @@
+-- Divisions on the stored rank snapshot (Story 13.5).
+--
+-- Iron through Diamond split into divisions 1-3 (season/tier.go); Master and
+-- Grandmaster are single. Every Season Points award now writes the division
+-- here together with rank_tier, so a player_seasons row carries the WHOLE rank
+-- its total stood at after its last match: ("gold", 2), or ("master", NULL).
+--
+-- THE SNAPSHOT IS NOW READ, BY ENDED SEASONS ONLY. 000024 called rank_tier a
+-- lagging copy never to be read, and for a RUNNING season that still holds:
+-- its tier and division are derived from sp with the live ladder. An ENDED
+-- season (seasons.ends_at <= now) is different. Its sp was scored by whatever
+-- formula and floors were live at the time, and 2026 Q3's old climb-only totals
+-- run into the thousands, so re-deriving them on the 13.4 floors would read
+-- nearly everyone as Grandmaster. So the archive and a prior season's
+-- leaderboard read rank_tier and rank_division as stored: the rank the player
+-- actually finished on.
+--
+-- NULLABLE, NO BACKFILL HERE. Rows written before this migration keep NULL and
+-- render as the bare tier ("Gold") until something rewrites them: 000029
+-- re-scores 2026 Q3 on the live ladder at the next server start, divisions
+-- included. Q4 rows are all written after the release (000027 clears any
+-- earlier ones), so every Q4 row gets its division on its first award. NULL is
+-- also the permanent value for Master and Grandmaster.
+--
+-- SMALLINT WITH A CHECK: a division is 1, 2 or 3, enforced here as well as by
+-- the ladder arithmetic.
+ALTER TABLE player_seasons
+  ADD COLUMN rank_division SMALLINT NULL CHECK (rank_division BETWEEN 1 AND 3);

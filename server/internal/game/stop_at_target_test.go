@@ -1054,7 +1054,7 @@ func TestStopAtTargetBothTeamsCrossAtTheTrick1Resolution(t *testing.T) {
 		"determineMatchWinner settles a double crossing: higher score, then the taker")
 }
 
-// TestStopAtTargetRespectsThe501Target proves the rule reads matchTarget rather
+// TestStopAtTargetRespectsThe501Target proves the rule reads MatchTarget rather
 // than a hardcoded 1001, which is the only thing that makes it work in the
 // shorter match mode most tables actually play.
 func TestStopAtTargetRespectsThe501Target(t *testing.T) {

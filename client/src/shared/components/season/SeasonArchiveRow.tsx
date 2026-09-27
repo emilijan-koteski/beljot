@@ -1,7 +1,12 @@
 import { useTranslation } from "react-i18next";
 
 import { TierBadge } from "@/shared/components/season/TierBadge";
-import { normalizeSeasonTier, SEASON_TIER_COLOR } from "@/shared/lib/seasonTier";
+import {
+  normalizeSeasonDivision,
+  normalizeSeasonTier,
+  SEASON_TIER_COLOR,
+  seasonRankLabel,
+} from "@/shared/lib/seasonTier";
 
 /**
  * Coerce a possibly-absent server integer into a renderable one.
@@ -22,6 +27,8 @@ type Props = {
   sp: number;
   /** The server's raw tier token — normalized here, never trusted as-is. */
   tier: string;
+  /** The stored division, 1–3 or null (Master, Grandmaster, scored before divisions). */
+  division: number | null;
   gamesPlayed: number;
 };
 
@@ -33,16 +40,19 @@ type Props = {
  * every visible cell (plus the badge) is `aria-hidden`, so nothing is announced
  * twice and the terse cells never read as number soup.
  *
- * The tier is the season's FINAL standing, derived server-side from the frozen
- * SP; `normalizeSeasonTier` is the version-skew guard, the same as everywhere
- * else a tier token crosses the wire.
+ * The rank is the season's FINAL standing: the server's STORED tier and
+ * division, never re-derived from the SP total (Story 13.5) — a total scored
+ * under older floors would misrank on today's. A row scored before divisions
+ * existed has none and renders the bare tier ("Gold"). `normalizeSeasonTier` is
+ * the version-skew guard, the same as everywhere else a tier token crosses the
+ * wire.
  */
-export function SeasonArchiveRow({ seasonName, sp, tier, gamesPlayed }: Props) {
+export function SeasonArchiveRow({ seasonName, sp, tier, division, gamesPlayed }: Props) {
   const { t } = useTranslation();
 
   const total = finiteOrZero(sp);
   const safeTier = normalizeSeasonTier(tier, total);
-  const tierName = t(`season.tier.${safeTier}`);
+  const rankName = seasonRankLabel(t, safeTier, normalizeSeasonDivision(safeTier, division));
   const games = finiteOrZero(gamesPlayed);
 
   return (
@@ -56,7 +66,7 @@ export function SeasonArchiveRow({ seasonName, sp, tier, gamesPlayed }: Props) {
       <span className="sr-only" data-testid="season-archive-row-summary">
         {t("season.archive.rowAria", {
           season: seasonName,
-          tier: tierName,
+          tier: rankName,
           sp: total.toLocaleString(),
           games,
         })}
@@ -78,7 +88,7 @@ export function SeasonArchiveRow({ seasonName, sp, tier, gamesPlayed }: Props) {
         className="shrink-0 text-xs font-semibold"
         style={{ color: SEASON_TIER_COLOR[safeTier] }}
       >
-        {tierName}
+        {rankName}
       </span>
 
       <span

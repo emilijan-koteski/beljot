@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import "@/shared/i18n/i18n";
+
+import { afterEach, describe, expect, it } from "vitest";
+
+import { i18n } from "@/shared/i18n/i18n";
 
 import {
+  formatSpChange,
+  normalizeSeasonDivision,
   normalizeSeasonTier,
   SEASON_TIER_COLOR,
   SEASON_TIER_FLOORS,
@@ -9,8 +15,10 @@ import {
   SEASON_TIERS,
   seasonBarFill,
   seasonDaysRemaining,
+  seasonRankLabel,
   seasonSpOrZero,
   seasonTierForSp,
+  seasonTierHasDivisions,
 } from "./seasonTier";
 
 describe("SEASON_TIERS", () => {
@@ -29,9 +37,9 @@ describe("SEASON_TIERS", () => {
     ]);
   });
 
-  it("mirrors the server thresholds", () => {
+  it("mirrors the server floors", () => {
     expect(SEASON_TIER_FLOORS.map(([, floor]) => floor)).toEqual([
-      0, 500, 1500, 3000, 5500, 8500, 12500, 18000,
+      0, 150, 300, 600, 800, 1000, 1200, 1400,
     ]);
   });
 });
@@ -39,21 +47,21 @@ describe("SEASON_TIERS", () => {
 describe("seasonTierForSp", () => {
   it.each([
     [0, "iron"],
-    [250, "iron"],
-    [499, "iron"],
-    [500, "bronze"],
-    [1499, "bronze"],
-    [1500, "silver"],
-    [2999, "silver"],
-    [3000, "gold"],
-    [5499, "gold"],
-    [5500, "platinum"],
-    [8499, "platinum"],
-    [8500, "diamond"],
-    [12499, "diamond"],
-    [12500, "master"],
-    [17999, "master"],
-    [18000, "grandmaster"],
+    [75, "iron"],
+    [149, "iron"],
+    [150, "bronze"],
+    [299, "bronze"],
+    [300, "silver"],
+    [599, "silver"],
+    [600, "gold"],
+    [799, "gold"],
+    [800, "platinum"],
+    [999, "platinum"],
+    [1000, "diamond"],
+    [1199, "diamond"],
+    [1200, "master"],
+    [1399, "master"],
+    [1400, "grandmaster"],
     [250000, "grandmaster"],
   ])("buckets %i SP as %s", (sp, tier) => {
     expect(seasonTierForSp(sp)).toBe(tier);
@@ -88,13 +96,13 @@ describe("seasonSpOrZero", () => {
 
 describe("normalizeSeasonTier", () => {
   it("passes a known token through", () => {
-    expect(normalizeSeasonTier("diamond", 9000)).toBe("diamond");
+    expect(normalizeSeasonTier("diamond", 1100)).toBe("diamond");
   });
 
   it("falls back to the SP bucket for an unknown token", () => {
     // The version-skew case: a server that grows a ninth tier must not make a
     // stale bundle render a missing i18n key.
-    expect(normalizeSeasonTier("mythic", 9000)).toBe("diamond");
+    expect(normalizeSeasonTier("mythic", 1100)).toBe("diamond");
   });
 
   it("falls back to iron for an unknown token at zero SP", () => {
@@ -167,5 +175,78 @@ describe("seasonDaysRemaining", () => {
 
   it.each([[undefined], [null], [""], ["not-a-date"]])("is zero for %s", (value) => {
     expect(seasonDaysRemaining(value as string | null | undefined, now)).toBe(0);
+  });
+});
+
+describe("seasonTierHasDivisions", () => {
+  it("splits Iron through Diamond, and not Master or Grandmaster", () => {
+    expect(SEASON_TIERS.filter(seasonTierHasDivisions)).toEqual([
+      "iron",
+      "bronze",
+      "silver",
+      "gold",
+      "platinum",
+      "diamond",
+    ]);
+  });
+});
+
+describe("normalizeSeasonDivision", () => {
+  it.each([1, 2, 3])("keeps division %i on a divided tier", (d) => {
+    expect(normalizeSeasonDivision("gold", d)).toBe(d);
+  });
+
+  it.each([[0], [4], [-1], [1.5], [NaN], [null], [undefined]])(
+    "drops an out-of-range or absent division (%s)",
+    (d) => {
+      expect(normalizeSeasonDivision("gold", d as number | null | undefined)).toBeNull();
+    },
+  );
+
+  it("drops any division on a single tier", () => {
+    expect(normalizeSeasonDivision("master", 2)).toBeNull();
+    expect(normalizeSeasonDivision("grandmaster", 1)).toBeNull();
+  });
+});
+
+describe("seasonRankLabel", () => {
+  afterEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  it("reads tier plus division when there is one", () => {
+    expect(seasonRankLabel(i18n.t, "gold", 2)).toBe("Gold 2");
+  });
+
+  it("reads the bare tier name without a division", () => {
+    expect(seasonRankLabel(i18n.t, "master", null)).toBe("Master");
+    // An ended pre-division season: stored tier, no division.
+    expect(seasonRankLabel(i18n.t, "gold", null)).toBe("Gold");
+  });
+
+  it("localizes the tier name, keeping the numeral", async () => {
+    await i18n.changeLanguage("mk");
+    expect(seasonRankLabel(i18n.t, "gold", 2)).toBe("Злато 2");
+    await i18n.changeLanguage("hr");
+    expect(seasonRankLabel(i18n.t, "silver", 3)).toBe("Srebro 3");
+  });
+});
+
+describe("formatSpChange", () => {
+  it("signs a gain", () => {
+    expect(formatSpChange(24)).toBe("+24");
+  });
+
+  it("signs a loss with U+2212, never a hyphen, and never clamps it", () => {
+    expect(formatSpChange(-13)).toBe("\u221213");
+    expect(formatSpChange(-120)).toBe("\u2212120");
+  });
+
+  it("renders no change as a bare 0", () => {
+    expect(formatSpChange(0)).toBe("0");
+  });
+
+  it.each([[NaN], [Infinity], [undefined]])("renders a non-finite value (%s) as 0", (v) => {
+    expect(formatSpChange(v as number)).toBe("0");
   });
 });

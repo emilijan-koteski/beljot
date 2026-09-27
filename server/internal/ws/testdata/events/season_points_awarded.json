@@ -1,7 +1,9 @@
 {
-  "spEarned": 200,
-  "newSeasonSp": 1700,
+  "spChange": -20,
+  "newSeasonSp": 590,
   "rankTier": "silver",
-  "tieredUp": true,
-  "seasonName": "2026 Q3"
+  "rankDivision": 3,
+  "rankChange": "demoted",
+  "reason": "normal",
+  "seasonName": "2026 Q4"
 }

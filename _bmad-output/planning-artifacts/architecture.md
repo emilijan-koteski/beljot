@@ -33,7 +33,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Lobby & Room Management | FR16–FR22 | FR16–FR22     | —               | Room lifecycle, lobby state broadcasting, matchmaking queue    |
 | Real-Time Game Session  | FR23–FR29 | FR23–FR28     | FR28a, FR29     | WebSocket game sync, pause/reconnect system, auto-play         |
 | Communication           | FR30–FR32 | FR30–FR31     | FR32            | Global + match-scoped chat channels                            |
-| Player Progression      | FR33–FR40 | —             | FR33–FR40       | XP/level system, ELO engine, rank tiers, seasons               |
+| Player Progression      | FR33–FR40, FR65–FR66 | —  | FR33–FR40, FR65–FR66 | XP/level system, SP engine (win/loss, Elo-style expected result), rank tiers with divisions, seasons |
 | Stats & Match History   | FR41–FR43 | FR41 (basic)  | FR42–FR43       | Match recording, career statistics, partial XP                 |
 | Platform & Localization | FR44–FR52 | FR44, FR46    | FR45, FR47–FR52 | i18n framework, future mobile/social extensibility             |
 
@@ -54,7 +54,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 - Primary domain: Full-stack real-time web application (multiplayer card game)
 - Complexity level: Medium-High
-- Estimated architectural components: ~12–15 major components (auth service, rules engine, game session manager, lobby/room manager, matchmaking, chat, WebSocket gateway, timer service, progression/ELO engine, stats recorder, i18n layer, client SPA, data persistence layer)
+- Estimated architectural components: ~12–15 major components (auth service, rules engine, game session manager, lobby/room manager, matchmaking, chat, WebSocket gateway, timer service, progression/SP engine, stats recorder, i18n layer, client SPA, data persistence layer)
 
 ### Technical Constraints & Dependencies
 
@@ -250,6 +250,21 @@ go get nhooyr.io/websocket
 | Rules engine design | Pure function: state + action → new state | No side effects inside engine. Session manager handles broadcasting, persistence, timers. Makes rules engine trivially testable — feed state, feed action, assert output. Critical for "rule correctness is priority #1." |
 | Session manager     | Orchestrator calling rules engine         | Receives player actions via WebSocket, calls rules engine, broadcasts results, manages timers, handles disconnect/reconnect. Side effects live here, not in the rules engine.                                             |
 | Game state shape    | Serializable Go struct                    | Clean struct with JSON tags. Enables: reconnection state snapshots, future Redis serialization, test fixture creation. Not raw maps.                                                                                      |
+
+### Seasonal Rank (SP) Engine
+
+Added 2026-09-26 (sprint-change-proposal-2026-09-26). Formula: FR65/FR66 and Story 13.4.
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Where SP is computed | Inside `season.Service`'s award transaction, not in `match` | Opponent scaling needs every seated human's current-season SP. The transaction already locks users in ascending ID order; reading the rows there avoids a read-then-write race. |
+| Package boundary | `match` builds a per-match outcome (teams, winner, bots, scores, target, surrender, instant win, Capot teams, abandoning seat); `match` never imports `season` | Keeps the existing dependency direction (`season` implements `match.SPAwarder`). |
+| Non-negative SP | DB `CHECK (sp >= 0)` kept; the engine clamps totals at 0 before writing | SP can now fall; the floor is enforced in both places. |
+| Tier + division storage | `player_seasons.rank_tier` plus a division (1–3, null for Master/Grandmaster and seasons before 2026 Q4), written with every award | The archive reads the stored snapshot, so retuning the table never rewrites past seasons. |
+| Tier table | `season/tier.go` is the single source of truth; `client/src/shared/lib/seasonTier.ts` is a display-only mirror changed in the same commit | Same manual-sync convention as `level.go` ↔ `xpLevel.ts`. |
+| Leaderboard membership | `games_played ≥ 1` in the season | Players at 0 SP stay on the ladder. |
+| Wire event | `event:season_points_awarded` carries signed SP change, new SP, tier, division, rank change and reason; Go payload, golden fixture, TS type and zod schema change together | Stale tabs drop unknown shapes (strict schema); acceptable at a release boundary. |
+| Tuning | Offline command under `server/cmd/` replays stored matches; not in the production image | Constants are data-driven (Q3 replay), not guessed. |
 
 ### Infrastructure & Deployment
 
@@ -884,7 +899,7 @@ beljot/
 | Lobby & Rooms (FR16–FR22)     | `internal/lobby/`                   | `features/lobby/`, `shared/api/rooms.ts`         |
 | Real-Time Session (FR23–FR29) | `internal/session/`, `internal/ws/` | `features/game/`, `shared/hooks/useWebSocket.ts` |
 | Communication (FR30–FR32)     | `internal/chat/`                    | `features/chat/`                                 |
-| Progression (FR33–FR40)       | `internal/user/` (extended Phase 2) | `features/lobby/RankBanner.tsx` (Phase 2)        |
+| Progression (FR33–FR40, FR65–FR66) | `internal/user/` (XP, honor), `internal/season/` (SP engine, tiers, seasons), `internal/match/sp_award.go` (per-match outcome) | `features/profile/components/RankBanner.tsx`, `shared/lib/seasonTier.ts`, `shared/components/season/` |
 | Stats & History (FR41–FR43)   | `internal/user/handler.go`          | `features/profile/`, `shared/api/matches.ts`     |
 | i18n (FR44–FR46)              | N/A (frontend-only)                 | `shared/i18n/`                                   |
 
@@ -1001,7 +1016,7 @@ Agents must not implement Croatian variant or 501 mode in Phase 1 — even if re
 These Phase 2 FRs have undefined formulas in the PRD. Do not invent values — they require product decisions:
 
 - **FR28:** "Appropriate XP/ELO outcomes" on match abandonment — outcomes undefined
-- **FR38:** "Scaled ELO penalties by game progress" — scaling formula not specified (brief suggests x0.5 early to x2.0 late but PRD doesn't include it)
+- ~~**FR38:** "Scaled ELO penalties by game progress"~~ — resolved: FR38 retired (2026-04-18); SP abandonment penalties are specified by FR66 (2026-09-26).
 - **FR43:** "Partial XP based on game progress" — no formula or tier table defined
 
 ### Game Domain Specifications

@@ -291,7 +291,9 @@ export interface QuickPlayResponse {
  * `{ data: ... }` envelope.
  *
  * A player who has not played this season gets the zero state — `sp: 0`,
- * `rankTier: "iron"` — never a 404. There is no unranked state in this ladder.
+ * `rankTier: "iron"`, `rankDivision: 1` — never a 404. There is no unranked
+ * state in this ladder. The season is running, so the rank is derived from SP
+ * server-side.
  *
  * Every numeric field is a real Go value, so 0 is meaningful throughout: check
  * with `Number.isFinite`, never truthiness.
@@ -309,7 +311,10 @@ export interface CurrentSeasonResponse {
    * never sends a relative duration.
    */
   endsAt: string;
-  /** Accumulated Season Points this window. Monotonic — SP has no decay. */
+  /**
+   * The player's Season Points this window. Rises with wins and falls with
+   * losses (never below 0); no decay.
+   */
   sp: number;
   /**
    * Stable machine token ("iron" | "bronze" | ... | "grandmaster"), mapped to an
@@ -319,17 +324,29 @@ export interface CurrentSeasonResponse {
    * fail a type check.
    */
   rankTier: string;
-  /** SP earned past the current tier's floor, in [0, spForNextTier). */
-  spIntoTier: number;
   /**
-   * Size of the current tier's band. ZERO AT GRANDMASTER — the top of the ladder has
-   * no next tier, and the bar renders full (see `seasonBarFill`). Never divide by
-   * this without checking it.
+   * Division 1–3 for Iron through Diamond, `null` for Master and Grandmaster
+   * (always present). Normalize through `normalizeSeasonDivision`.
    */
-  spForNextTier: number;
+  rankDivision: number | null;
+  /**
+   * The player's SP past the start of the current RANK STEP, in
+   * [0, spForNextDivision). A step is the next division, or the next tier from
+   * Diamond 3 and Master (Story 13.5).
+   */
+  spIntoDivision: number;
+  /**
+   * Size of the current rank step. ZERO AT GRANDMASTER — the top of the ladder
+   * has no next rank, and the bar renders full (see `seasonBarFill`). Never
+   * divide by this without checking it.
+   */
+  spForNextDivision: number;
   /** Matches played this season, present at the terminal end or not. */
   gamesPlayed: number;
-  /** Matches finished this season — exactly those that earned SP. */
+  /**
+   * Matches this season at which the player was present at the end — a presence
+   * counter. Every match changes SP by its result, present or not.
+   */
   gamesCompleted: number;
 }
 
@@ -347,14 +364,20 @@ export interface LeaderboardRow {
   /** Accumulated Season Points this window. */
   sp: number;
   /**
-   * Stable machine token ("iron" | ... | "grandmaster"), DERIVED server-side from
-   * `sp` rather than read off the denormalized rank_tier column. Typed as
-   * `string` rather than the `SeasonTier` union for the same reason
-   * `CurrentSeasonResponse.rankTier` is: a server-side retune that adds a tier
-   * must degrade through `normalizeSeasonTier` on a stale bundle, not fail a
-   * type check.
+   * Stable machine token ("iron" | ... | "grandmaster"). For a RUNNING season it
+   * is derived server-side from `sp`; for an ENDED one it is the row's stored
+   * snapshot, the rank it finished on (Story 13.5) — so never re-derive it from
+   * `sp` here. Typed as `string` rather than the `SeasonTier` union for the same
+   * reason `CurrentSeasonResponse.rankTier` is: a server-side retune that adds a
+   * tier must degrade through `normalizeSeasonTier` on a stale bundle, not fail
+   * a type check.
    */
   tier: string;
+  /**
+   * 1–3, or `null` for Master, Grandmaster and an ended season from before
+   * divisions existed. Same running / ended rule as `tier`.
+   */
+  division: number | null;
   gamesPlayed: number;
 }
 
@@ -373,7 +396,9 @@ export interface LeaderboardViewer {
   position: number;
   userId: number;
   sp: number;
+  /** Same running / ended rule as `LeaderboardRow.tier`. */
   tier: string;
+  division: number | null;
   gamesPlayed: number;
 }
 
@@ -386,9 +411,10 @@ export interface LeaderboardViewer {
  * same as the profile's match history). `total` is the season's whole visible
  * row count, not the page length, so load-more can tell when it is done.
  *
- * `viewer` is NULL when the caller has no season row OR has earned no SP — the
- * own-row marker appears only for a player with any SP. The key is always
- * present, so `null` means "no standing", never "an older server".
+ * `viewer` is NULL only when the caller has not played the season. Anyone who
+ * has played is on the ladder and gets a viewer block, a player at 0 SP
+ * included. The key is always present, so `null` means "no standing", never
+ * "an older server".
  */
 export interface LeaderboardResponse {
   items: LeaderboardRow[];
@@ -423,15 +449,19 @@ export interface SeasonsListResponse {
  *
  * Membership is the ARCHIVE's rule, not the ladder's: a played season with
  * `sp: 0` appears here (it is real history) even though it never appeared on
- * the leaderboard. `tier` is derived server-side from the frozen SP; typed as
- * `string` rather than the `SeasonTier` union for the same version-skew reason
- * every other tier on the wire is — normalize through `normalizeSeasonTier`.
+ * the leaderboard. `tier` and `division` are the STORED rank the season
+ * finished on (Story 13.5), never re-derived from `sp`: a total scored under
+ * older floors would misrank on today's. `division` is null for Master,
+ * Grandmaster and any row scored before divisions existed. `tier` is typed as `string`
+ * rather than the `SeasonTier` union for the same version-skew reason every
+ * other tier on the wire is — normalize through `normalizeSeasonTier`.
  */
 export interface SeasonArchiveEntry {
   seasonId: number;
   seasonName: string;
   sp: number;
   tier: string;
+  division: number | null;
   gamesPlayed: number;
   startedAt: string;
   endsAt: string;
@@ -450,11 +480,13 @@ export interface SeasonArchiveResponse {
  * The `seasonRank` block on both profile shapes (Story 13.3): the subject's
  * standing in the ACTIVE season. The profile carries it as
  * `SeasonRank | null` — null means "has not played this season" and the client
- * hides the rank chip; a played season at 0 SP is a REAL rank (Iron), so never
- * gate on `sp` truthiness.
+ * hides the rank chip; a played season at 0 SP is a REAL rank (Iron 1), so
+ * never gate on `sp` truthiness. `division` is 1–3, or null for Master and
+ * Grandmaster.
  */
 export interface SeasonRank {
   seasonName: string;
   tier: string;
+  division: number | null;
   sp: number;
 }

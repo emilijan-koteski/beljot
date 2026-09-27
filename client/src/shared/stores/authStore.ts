@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { logout as logoutApi } from "@/shared/api/auth";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
+import { useRankChangeStore } from "@/shared/stores/rankChangeStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { User } from "@/shared/types/apiTypes";
 
@@ -40,6 +41,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useChatStore.getState().clearMatch();
     useChatStore.getState().clearRoom();
     useChatStore.getState().clearWhispers();
+    // A pending rank-change dialog belongs to the account that earned it; it
+    // must not greet the next account to log in on this tab.
+    useRankChangeStore.getState().clear();
     set({ token: null, user: null, isLoading: false });
   },
 }));

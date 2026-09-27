@@ -1421,8 +1421,21 @@
       "master": "Majstor",
       "grandmaster": "Velemajstor"
     },
-    "tierUp": {
-      "toast": "Novi rang: {{tier}}"
+    "rank": "{{tier}} {{division}}",
+    "rankUpDialog": {
+      "title": "Novi rang!"
+    },
+    "rankDownDialog": {
+      "title": "Pad ranga"
+    },
+    "rankDialog": {
+      "sp": "{{change}} SP u ovom meču",
+      "continue": "Nastavi"
+    },
+    "result": {
+      "line": "{{change}} SP · {{rank}}",
+      "partnerAbandoned": "Partner je napustio meč: {{change}} SP (pola gubitka)",
+      "abandoned": "Napuštanje meča: {{change}} SP"
     },
     "leaderboard": {
       "eyebrow": "Sezona",

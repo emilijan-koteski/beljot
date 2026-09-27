@@ -135,42 +135,86 @@ type HonorRecorder interface {
 	ApplyHonorEvents(events map[uint]HonorEvent, now time.Time) (map[uint]HonorSnapshot, error)
 }
 
-// SPAward is one finished match's Season Points contribution for one player
-// (Story 13.1).
-//
-// A ZERO SP AWARD IS NOT A NO-OP, which is what separates this from XPAwarder's
-// map[uint]int: every human seat gets an entry, absent seats included, because
-// games_played increments for all of them (Story 13.1 D10). Completed is the
-// per-seat presence gate — true means the seat was at the table when the match
-// ended — and it drives games_completed, making that counter exactly "matches
-// where this player earned SP".
-type SPAward struct {
-	SP        int
-	Completed bool
-}
-
 // PlayerSeasonSnapshot is one player's season standing immediately after the
 // match-end write, as returned by SPAwarder.
 //
-// Everything here is PRECOMPUTED by the season service: SeasonName, the derived
-// RankTier and TieredUp all arrive resolved, so the manager never runs ladder
-// arithmetic it cannot see (the same shape HonorSnapshot uses, and for the same
-// reason). RankTier is the AUTHORITATIVE derived tier, never the lagging
-// player_seasons.rank_tier column.
+// Everything here is PRECOMPUTED by the season service: SeasonName, the applied
+// SPChange, the derived rank, the rank change and the reason all arrive
+// resolved, so the manager never runs ladder arithmetic it cannot see (the same
+// shape HonorSnapshot uses, and for the same reason). awardSeasonPoints copies
+// it onto ws.SeasonPointsAwardedPayload field for field.
 type PlayerSeasonSnapshot struct {
 	SeasonName string
 	SP         int
-	RankTier   string
-	TieredUp   bool
+	// SPChange is the APPLIED change, new total minus previous total, never the
+	// formula's raw output. The two differ at the 0 floor: a player on 10 SP
+	// whose loss computes to -18 reports -10.
+	SPChange int
+	// RankTier and RankDivision are the rank of the NEW total (season/tier.go).
+	// RankDivision is 1-3, or nil for Master and Grandmaster.
+	RankTier     string
+	RankDivision *int
+	// RankChange is ws.RankChangePromoted, ws.RankChangeDemoted or
+	// ws.RankChangeNone, comparing the rank before and after, never SP alone.
+	RankChange string
+	// Reason is ws.SPReasonAbandoned for the abandoning seat,
+	// ws.SPReasonPartnerAbandoned for its teammate and ws.SPReasonNormal for
+	// every other seat.
+	Reason string
+}
+
+// OutcomeSeat is one seat of a finished match as the Season Points formula reads
+// it (Story 13.4).
+type OutcomeSeat struct {
+	// UserID is 0 for a bot seat.
+	UserID uint
+	IsBot  bool
+	// Team is game.TeamForSeat(seat), carried so the formula never re-derives it.
+	Team int
+	// Completed is the spSeatPresent answer. It drives games_completed and
+	// nothing else: every human seat is scored by its team's result whatever its
+	// presence.
+	Completed bool
+}
+
+// MatchOutcome is everything the season service needs to score one finished
+// match (Story 13.4). It is built by the two finalizers, under the facts they
+// already resolved, and handed over whole so the SP change can be computed
+// inside the season service's award transaction from every seat's current SP.
+//
+// Declared HERE, in match, for the same reason as PlayerSeasonSnapshot: season
+// imports match, never the reverse.
+type MatchOutcome struct {
+	Seats [4]OutcomeSeat
+	// WinnerTeam is the finalizer's resolved winner, never re-derived from the
+	// scores. On an abandonment it is the non-abandoning team.
+	WinnerTeam int
+	// TeamScores are the final (or, on an abandonment, current) totals, [A, B].
+	TeamScores [2]int
+	// Target is the match target, 501 or 1001.
+	Target int
+	// Surrender is true when the match ended by an accepted surrender. The
+	// winners' points then count as the target.
+	Surrender bool
+	// InstantWin is true when the engine ended the match by an instant win.
+	InstantWin bool
+	// CapotTeams marks each team that made at least one Capot in the match.
+	CapotTeams [2]bool
+	// AbandonedSeat is the seat whose reconnect window expired, or -1.
+	AbandonedSeat int
 }
 
 // SPAwarder is the subset of the season service the match manager needs at match
-// end (Story 13.1). It mirrors XPAwarder's and HonorRecorder's shape and exists
-// for exactly the same reason: `season` imports `match`, so MATCH MUST NEVER
-// IMPORT SEASON (Story 13.1 D8 / 9.7 D4 / 9.5 D1). Both SPAward and
-// PlayerSeasonSnapshot are declared HERE, in match, so the interface is
-// satisfiable by a *season.Service without match taking a dependency on the
-// season package.
+// end (Story 13.1, reshaped by 13.4). It mirrors XPAwarder's and HonorRecorder's
+// shape and exists for exactly the same reason: `season` imports `match`, so
+// MATCH MUST NEVER IMPORT SEASON (Story 13.1 D8 / 9.7 D4 / 9.5 D1). Both
+// MatchOutcome and PlayerSeasonSnapshot are declared HERE, in match, so the
+// interface is satisfiable by a *season.Service without match taking a
+// dependency on the season package.
+//
+// It takes the whole OUTCOME, not per-player deltas: a change depends on every
+// seated human's current SP, which only the season service can read, under the
+// same lock it writes with.
 //
 // `now` is passed in rather than read inside: the season a match lands in must
 // be decided by the finalizer's own stamp, not by a clock read somewhere further
@@ -181,7 +225,7 @@ type PlayerSeasonSnapshot struct {
 // event), mirroring walletSettler's, xpAwarder's and honorRecorder's
 // nil-tolerance. Match end must never break because SP is unwired.
 type SPAwarder interface {
-	ApplySeasonPoints(awards map[uint]SPAward, now time.Time) (map[uint]PlayerSeasonSnapshot, error)
+	ApplySeasonPoints(outcome MatchOutcome, now time.Time) (map[uint]PlayerSeasonSnapshot, error)
 }
 
 // Broadcaster is the subset of *ws.Hub the manager depends on. Mirrors the
@@ -276,7 +320,7 @@ func (m *Manager) SetHonorRecorder(recorder HonorRecorder) {
 	m.honorRecorder = recorder
 }
 
-// SetSPAwarder injects the season service used to accrue Season Points and
+// SetSPAwarder injects the season service used to apply Season Points and
 // refresh the rank tier at match end (Story 13.1). Optional — when unset, SP is
 // skipped entirely (no mutation, no event).
 func (m *Manager) SetSPAwarder(awarder SPAwarder) {
@@ -1413,7 +1457,7 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	// Copy buffered hand results under RLock to avoid holding the lock during I/O.
 	//
 	// HOISTED HERE FROM JUST ABOVE CreateWithHands (Story 13.1 D4). The Season
-	// Points award below needs to know whether any hand was a Capot, and reading
+	// Points award below needs to know which teams made a Capot, and reading
 	// session.handResults unlocked at that point would be a data race that `make
 	// test` cannot catch for us (the suite does not pass -race). ONE copy, used by
 	// both the SP award and the persist call — do not add a second acquisition.
@@ -1452,17 +1496,23 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	}
 	honorMsgs := m.recordHonor(session.roomID, session.playerIDs, botSeats, connected, -1)
 
-	// Story 13.1: accrue Season Points and refresh the rank tier (no-op when no
-	// awarder wired). Natural end → abandonedSeat -1, so every human seat counts
-	// as present and earns the full formula; the `connected` snapshot above is
-	// passed for symmetry with the abandonment finalizer and is not consulted.
+	// Story 13.4: apply Season Points and refresh the rank tier (no-op when no
+	// awarder wired). This path builds the match OUTCOME; the season service
+	// computes every change from the current totals it locks.
 	//
-	// winnerTeam is the value already resolved at the top of this function — never
-	// re-derived from scores, because surrender and stop-at-target both route
-	// through here with the winner set. capotOccurred reads the hoisted handsCopy.
-	// finalState.WonByInstantWin is the engine's own record of an instant win,
-	// which has no other trace at this layer (TeamScores can be [0,0] with no hand
-	// results, but it can equally fire on hand 5 of a 500:300 match).
+	// Natural end → abandonedSeat -1, so every human seat counts as present; the
+	// `connected` snapshot above is passed for symmetry with the abandonment
+	// finalizer and is not consulted. winnerTeam is the value already resolved at
+	// the top of this function — never re-derived from scores, because the taker
+	// can win a both-cross hand with fewer points.
+	//
+	// SURRENDER is read off the outcome reason, not off surrenderedBy: an
+	// accepted surrender that finds a team already over the target in a "dosta"
+	// room runs the stop instead (game/surrender.go) and finalizes as
+	// target_reached with surrenderedBy still set. Those winners really did reach
+	// the target, so it is scored on the real margin. finalState.WonByInstantWin
+	// is the engine's own record of an instant win, which has no other trace at
+	// this layer. Capot teams come from the hoisted handsCopy.
 	//
 	// Best-effort like settlement, XP and honor: a failure logs and skips the
 	// events but never blocks the broadcasts below. The season_points_awarded
@@ -1473,9 +1523,18 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	// the answer must come from the moment the match ended, not from a later clock
 	// read inside the awarder.
 	finalizedAt := time.Now().UTC()
-	spMsgs := m.awardSeasonPoints(session.roomID, session.playerIDs, botSeats, connected,
-		finalState.TeamScores, winnerTeam,
-		capotOccurred(handsCopy) || finalState.WonByInstantWin, -1, finalizedAt)
+	spMsgs := m.awardSeasonPoints(session.roomID, buildSPOutcome(spMatchFacts{
+		playerIDs:     session.playerIDs,
+		botSeats:      botSeats,
+		connected:     connected,
+		winnerTeam:    winnerTeam,
+		teamScores:    finalState.TeamScores,
+		matchMode:     finalState.MatchMode,
+		surrender:     matchEndPayload.OutcomeReason == ws.OutcomeReasonSurrender,
+		instantWin:    finalState.WonByInstantWin,
+		hands:         handsCopy,
+		abandonedSeat: -1,
+	}), finalizedAt)
 
 	matchRecord := &Match{
 		RoomID:       session.roomID,
@@ -2238,9 +2297,13 @@ func buildMatchEndPayload(oldState, newState *game.GameState, action game.Action
 	}
 	// A "dosta" stop. Read from the flag the engine set rather than inferred:
 	// "StopAtTarget on and LastHandResult nil" also describes a surrender and an
-	// instant win. Checked after the surrender branch because the two are
-	// mutually exclusive — a surrender never runs the stop — and because a
-	// surrender's own note is the more specific thing to tell the player.
+	// instant win. Checked AFTER the surrender branch, and deliberately allowed to
+	// override it: an accepted surrender CAN run the stop. In a "dosta" room a
+	// team may already be over the target while a deferred Belote checkpoint
+	// waits, and handleSurrenderAccept settles that crossing before the
+	// concession (game/surrender.go). The winners then genuinely reached the
+	// target, so the match ends as target_reached with SurrenderedBySeat still
+	// set, and Season Points score it on the real margin, not as a surrender.
 	//
 	// The cut-short hand's POINTS are deliberately not carried here. They are
 	// already inside the final scores, and the client recovers them by

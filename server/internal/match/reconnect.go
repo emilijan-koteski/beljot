@@ -645,13 +645,11 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	// the match row. Empty when abandonment fires before hand 1 completed.
 	handsCopy := make([]HandResult, len(session.handResults))
 	copy(handsCopy, session.handResults)
-	// Story 13.1: whether the match earned the Capot / instant-win SP bonus,
-	// derived HERE under the session lock from the copy just taken (the natural-end
-	// finalizer hoists its own copy for the same reason). gs.WonByInstantWin is
-	// false on this path in practice — an instant win ends the match, so no
-	// reconnect window can expire afterwards — but it is read rather than assumed
-	// so the two finalizers compute the bonus identically.
-	spectacularMatch := capotOccurred(handsCopy) || gs.WonByInstantWin
+	// Story 13.4: read under the session lock for the SP outcome below.
+	// gs.WonByInstantWin is false on this path in practice — an instant win ends
+	// the match, so no reconnect window can expire afterwards — but it is read
+	// rather than assumed so the two finalizers build the outcome identically.
+	wonByInstantWin := gs.WonByInstantWin
 
 	abandonedPayload := ws.MatchAbandonedPayload{
 		AbandonedByPlayer: abandonedSeat,
@@ -701,16 +699,16 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	// xp_awarded, before the trailing match_state.
 	honorMsgs := m.recordHonor(roomID, playerIDs, botSeats, connected, abandonedSeat)
 
-	// Story 13.1: accrue Season Points. SP forfeits PER-SEAT, not per-team — every
-	// human seat still present at the terminal end earns the full formula, so the
-	// abandoner's teammate keeps their ranked progress. That reuses honor's
-	// presence gate above and diverges from coins and XP, which forfeit team-wide
-	// (Story 13.1 D5; see computeSPAwards for the reasoning and the comparison
-	// table). The abandoner earns 0 but still counts a games_played.
+	// Story 13.4: apply Season Points. The abandoned seat takes the fixed
+	// abandonment penalty, its teammate half of what a surrender at this moment
+	// would cost, and the opponents a surrender-scored win; every other human seat
+	// is scored by its team's result whether or not it was connected. Presence
+	// (the `connected` snapshot) only feeds games_completed. The season service
+	// computes every change from the current totals it locks.
 	//
 	// winnerTeam is the same computed non-abandoning team settlement used, never
-	// re-derived. The presence array and the team scores are the snapshots taken
-	// under the session lock above; spectacularMatch is derived there too.
+	// re-derived. The team scores, presence array and Capot teams (handsCopy) are
+	// the snapshots taken under the session lock above.
 	//
 	// Best-effort like settlement, XP and honor. season_points_awarded is slotted
 	// after honor_updated, before the trailing match_state.
@@ -719,8 +717,17 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	// reason as on the natural-end path: which season window an abandonment lands
 	// in must be decided by the moment the match ended.
 	finalizedAt := time.Now().UTC()
-	spMsgs := m.awardSeasonPoints(roomID, playerIDs, botSeats, connected,
-		[2]int{teamAScore, teamBScore}, winningTeam, spectacularMatch, abandonedSeat, finalizedAt)
+	spMsgs := m.awardSeasonPoints(roomID, buildSPOutcome(spMatchFacts{
+		playerIDs:     playerIDs,
+		botSeats:      botSeats,
+		connected:     connected,
+		winnerTeam:    winningTeam,
+		teamScores:    [2]int{teamAScore, teamBScore},
+		matchMode:     matchMode,
+		instantWin:    wonByInstantWin,
+		hands:         handsCopy,
+		abandonedSeat: abandonedSeat,
+	}), finalizedAt)
 
 	// Broadcast to every human seat still holding a registered socket — the
 	// hub drops unknown IDs, and nothing is queued for a seat that is offline

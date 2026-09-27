@@ -3,11 +3,17 @@ import { useTranslation } from "react-i18next";
 import { TierBadge } from "@/shared/components/season/TierBadge";
 import { useCurrentSeasonQuery } from "@/shared/hooks/queries/useCurrentSeason";
 import { useSeasonWindowWatch } from "@/shared/hooks/useSeasonWindowWatch";
-import { normalizeSeasonTier, SEASON_TIER_COLOR, seasonSpOrZero } from "@/shared/lib/seasonTier";
+import {
+  normalizeSeasonDivision,
+  normalizeSeasonTier,
+  SEASON_TIER_COLOR,
+  seasonRankLabel,
+  seasonSpOrZero,
+} from "@/shared/lib/seasonTier";
 
 /**
- * The header's seasonal rank indicator: tier badge + tier name, and the badge
- * ALONE below `sm`.
+ * The header's seasonal rank indicator: tier badge + rank ("Gold 2", or the bare
+ * tier name for Master and Grandmaster), and the badge ALONE below `sm`.
  *
  * NO SP FIGURE, ANYWHERE. The header carries the identity of the rank, not its
  * arithmetic — the exact total, the band decomposition and the countdown all
@@ -38,14 +44,14 @@ export function HeaderRankChip() {
   // Guarded, not trusted: an unrecognised token from a newer server falls back
   // to the SP's own bucket rather than rendering a missing i18n key.
   const tier = normalizeSeasonTier(season.rankTier, sp);
-  const tierName = t(`season.tier.${tier}`);
+  const rankName = seasonRankLabel(t, tier, normalizeSeasonDivision(tier, season.rankDivision));
 
   return (
     <div className="flex shrink-0 items-center gap-1.5" data-testid="header-rank" data-tier={tier}>
       {/* The chip's whole accessible name. The badge is decorative and the
           visible name is hidden on phones, so without this the rank would be
           announced as nothing at all below `sm`. */}
-      <span className="sr-only">{t("season.banner.rankAria", { tier: tierName })}</span>
+      <span className="sr-only">{t("season.banner.rankAria", { tier: rankName })}</span>
 
       <TierBadge tier={tier} size="sm" data-testid="header-rank-badge" />
 
@@ -55,7 +61,7 @@ export function HeaderRankChip() {
         className="hidden text-xs font-semibold whitespace-nowrap sm:inline"
         style={{ color: SEASON_TIER_COLOR[tier] }}
       >
-        {tierName}
+        {rankName}
       </span>
     </div>
   );

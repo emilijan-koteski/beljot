@@ -137,37 +137,71 @@ type HonorUpdatedPayload struct {
 // obvious place, since both are progression), for the same reason
 // EventHonorUpdated is: the client's payload schemas are z.strictObject, so
 // WIDENING an existing payload breaks every stale tab still running the old
-// bundle, whereas an unknown event type is simply ignored by them.
+// bundle, whereas an unknown event type is simply ignored by them. Story 13.5
+// reshaped THIS payload in place (divisions, rank change, reason), so a stale
+// tab drops it; that is accepted at the release boundary that ships the new
+// ladder. It costs the stale tab the toast AND the season.current invalidation
+// the frame would have triggered, so its rank chip and banner stay stale until
+// that query refetches on its own or the tab reloads.
 //
 // Sent per-user (not broadcast) because the values differ per player — the
-// winners' SP, the losers' SP and an absent seat's zero all land in the same
-// burst.
+// winners' gains, the losers' losses and an abandoner's penalty all land in the
+// same burst.
 const EventSeasonPointsAwarded = "event:season_points_awarded"
 
-// SeasonPointsAwardedPayload is the typed payload for EventSeasonPointsAwarded.
+// SeasonPointsAwardedPayload is the typed payload for EventSeasonPointsAwarded
+// (reshaped by Story 13.5; spEarned and tieredUp are gone).
 //
-// SPEarned is the Season Points this match awarded this player: 50 (completion)
-// + 100 (if their team won) + floor(teamGamePoints/10) + 50 (if a Capot or an
-// instant win occurred anywhere in the match). It is 0 for a player who was
-// absent at the terminal end — a REAL value, not a missing one.
+// SPChange is the SIGNED change this match applied to this player's season SP:
+// positive for a win, negative for a loss or an abandonment, and the APPLIED
+// change, new total minus previous, so at the 0 floor it can be smaller than
+// the formula's own number (a player on 10 SP whose loss computes to -18
+// receives -10). The formula lives in season/sp_formula.go. 0 is a REAL value,
+// not a missing one.
 //
-// NewSeasonSP is the post-award season total. RankTier is a STABLE MACHINE TOKEN
-// ("iron" | "bronze" | "silver" | "gold" | "platinum" | "diamond" | "master" |
-// "grandmaster") that the client maps to an i18n label and colour — a display string
-// must never cross the wire, the same non-negotiable HonorUpdatedPayload's
-// HonorTier states. It is the AUTHORITATIVE derived tier, not the lagging
-// player_seasons.rank_tier snapshot column.
+// NewSeasonSP is the post-match season total, never below 0. RankTier is a
+// STABLE MACHINE TOKEN ("iron" | "bronze" | "silver" | "gold" | "platinum" |
+// "diamond" | "master" | "grandmaster") that the client maps to an i18n label
+// and colour — a display string must never cross the wire, the same
+// non-negotiable HonorUpdatedPayload's HonorTier states. RankDivision is 1-3
+// for Iron through Diamond and null for Master and Grandmaster, which are
+// single. Both are derived from the new total by season/tier.go.
 //
-// TieredUp is true when this award crossed a tier floor, and drives the tier-up
-// toast. SeasonName is the machine-stable "YYYY QN" window identifier, rendered
+// RankChange compares the RANK (tier, then division) before and after the
+// match, never SP alone: one of RankChangePromoted, RankChangeDemoted or
+// RankChangeNone. It drives the client's promotion toast (success) and
+// demotion notice (info). Reason says why the change is what it is:
+// SPReasonAbandoned for the seat whose reconnect window expired,
+// SPReasonPartnerAbandoned for that seat's teammate, SPReasonNormal for
+// everyone else and for every seat of a match that ended normally.
+//
+// SeasonName is the machine-stable "YYYY QN" window identifier, rendered
 // VERBATIM by the client and never translated.
 type SeasonPointsAwardedPayload struct {
-	SPEarned    int    `json:"spEarned"`
-	NewSeasonSP int    `json:"newSeasonSp"`
-	RankTier    string `json:"rankTier"`
-	TieredUp    bool   `json:"tieredUp"`
-	SeasonName  string `json:"seasonName"`
+	SPChange     int    `json:"spChange"`
+	NewSeasonSP  int    `json:"newSeasonSp"`
+	RankTier     string `json:"rankTier"`
+	RankDivision *int   `json:"rankDivision"`
+	RankChange   string `json:"rankChange"`
+	Reason       string `json:"reason"`
+	SeasonName   string `json:"seasonName"`
 }
+
+// Rank-change tokens carried in SeasonPointsAwardedPayload.RankChange. STABLE
+// MACHINE TOKENS, mirrored by the client's wsEvents.ts union.
+const (
+	RankChangePromoted = "promoted"
+	RankChangeDemoted  = "demoted"
+	RankChangeNone     = "none"
+)
+
+// Season Points award reasons carried in SeasonPointsAwardedPayload.Reason.
+// STABLE MACHINE TOKENS, mirrored by the client's wsEvents.ts union.
+const (
+	SPReasonNormal           = "normal"
+	SPReasonAbandoned        = "abandoned"
+	SPReasonPartnerAbandoned = "partner_abandoned"
+)
 
 // --- Game event payload structs ---
 

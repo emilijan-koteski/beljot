@@ -18,14 +18,14 @@ var ladder = []struct {
 	floor int
 	band  int // size of this tier's band; 0 at the top
 }{
-	{"iron", 0, 500},
-	{"bronze", 500, 1000},
-	{"silver", 1500, 1500},
-	{"gold", 3000, 2500},
-	{"platinum", 5500, 3000},
-	{"diamond", 8500, 4000},
-	{"master", 12500, 5500},
-	{"grandmaster", 18000, 0},
+	{"iron", 0, 150},
+	{"bronze", 150, 150},
+	{"silver", 300, 300},
+	{"gold", 600, 200},
+	{"platinum", 800, 200},
+	{"diamond", 1000, 200},
+	{"master", 1200, 200},
+	{"grandmaster", 1400, 0},
 }
 
 func TestSeasonTiers_OrderAndIsolation(t *testing.T) {
@@ -51,7 +51,8 @@ func TestTierFloor(t *testing.T) {
 	assert.False(t, ok, "an unknown token reports not-found rather than floor 0")
 }
 
-func TestTierForSP(t *testing.T) {
+// The tier half of RankForSP at every floor boundary.
+func TestRankForSP_TierAtEveryBoundary(t *testing.T) {
 	cases := []struct {
 		name string
 		sp   int
@@ -60,83 +61,236 @@ func TestTierForSP(t *testing.T) {
 		{"zero SP is Iron, not unranked", 0, "iron"},
 		{"negative clamps to Iron", -1, "iron"},
 		{"deeply negative clamps to Iron", -100000, "iron"},
-		{"mid Iron", 250, "iron"},
-		{"one below Bronze", 499, "iron"},
-		{"exactly Bronze", 500, "bronze"},
-		{"one below Silver", 1499, "bronze"},
-		{"exactly Silver", 1500, "silver"},
-		{"one below Gold", 2999, "silver"},
-		{"exactly Gold", 3000, "gold"},
-		{"one below Platinum", 5499, "gold"},
-		{"exactly Platinum", 5500, "platinum"},
-		{"one below Diamond", 8499, "platinum"},
-		{"exactly Diamond", 8500, "diamond"},
-		{"one below Master", 12499, "diamond"},
-		{"exactly Master", 12500, "master"},
-		{"one below Grandmaster", 17999, "master"},
-		{"exactly Grandmaster", 18000, "grandmaster"},
+		{"mid Iron", 75, "iron"},
+		{"one below Bronze", 149, "iron"},
+		{"exactly Bronze", 150, "bronze"},
+		{"one below Silver", 299, "bronze"},
+		{"exactly Silver", 300, "silver"},
+		{"one below Gold", 599, "silver"},
+		{"exactly Gold", 600, "gold"},
+		{"one below Platinum", 799, "gold"},
+		{"exactly Platinum", 800, "platinum"},
+		{"one below Diamond", 999, "platinum"},
+		{"exactly Diamond", 1000, "diamond"},
+		{"one below Master", 1199, "diamond"},
+		{"exactly Master", 1200, "master"},
+		{"one below Grandmaster", 1399, "master"},
+		{"exactly Grandmaster", 1400, "grandmaster"},
 		{"above Grandmaster stays Grandmaster", 250000, "grandmaster"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, season.TierForSP(tc.sp))
+			tier, _ := season.RankForSP(tc.sp)
+			assert.Equal(t, tc.want, tier)
 		})
 	}
 }
 
-func TestTierProgress(t *testing.T) {
+func TestRankForSP(t *testing.T) {
 	cases := []struct {
-		name        string
-		sp          int
-		wantTier    string
-		wantInto    int
-		wantForNext int
+		name     string
+		sp       int
+		wantTier string
+		wantDiv  int
 	}{
-		{"fresh player", 0, "iron", 0, 500},
-		{"negative clamps to the Iron floor", -50, "iron", 0, 500},
-		{"mid Iron", 200, "iron", 200, 500},
-		{"one below Bronze", 499, "iron", 499, 500},
-		{"exactly Bronze resets the band", 500, "bronze", 0, 1000},
-		{"mid Bronze", 900, "bronze", 400, 1000},
-		{"exactly Silver", 1500, "silver", 0, 1500},
-		{"mid Gold", 4000, "gold", 1000, 2500},
-		{"exactly Platinum", 5500, "platinum", 0, 3000},
-		{"exactly Diamond", 8500, "diamond", 0, 4000},
-		{"one below Grandmaster", 17999, "master", 5499, 5500},
-		// The terminal case. A finite table HAS a top, so unlike LevelProgress's
-		// strictly-increasing quadratic this branch is real and reachable.
-		{"exactly Grandmaster has no next tier", 18000, "grandmaster", 0, 0},
-		{"far above Grandmaster still has no next tier", 99999, "grandmaster", 81999, 0},
+		{"zero SP is Iron 1", 0, "iron", 1},
+		{"negative clamps to Iron 1", -40, "iron", 1},
+		// Iron's 150-SP band: 1 + into·3/150 steps at 50 and 100.
+		{"last SP of Iron 1", 49, "iron", 1},
+		{"first SP of Iron 2", 50, "iron", 2},
+		{"last SP of Iron 2", 99, "iron", 2},
+		{"first SP of Iron 3", 100, "iron", 3},
+		{"top of Iron is still Iron 3", 149, "iron", 3},
+		{"Bronze floor resets to division 1", 150, "bronze", 1},
+		// Silver's 300-SP band steps at 100 and 200 in.
+		{"Silver 1", 300, "silver", 1},
+		{"Silver 2", 400, "silver", 2},
+		{"Silver 3", 500, "silver", 3},
+		// A 200-SP band steps at 67 and 134 in.
+		{"Gold 1 floor", 600, "gold", 1},
+		{"last SP of Gold 1", 666, "gold", 1},
+		{"first SP of Gold 2", 667, "gold", 2},
+		{"last SP of Gold 2", 733, "gold", 2},
+		{"first SP of Gold 3", 734, "gold", 3},
+		{"top of Diamond is Diamond 3", 1199, "diamond", 3},
+		{"Master has no division", 1200, "master", 0},
+		{"top of Master has no division", 1399, "master", 0},
+		{"Grandmaster has no division", 1400, "grandmaster", 0},
+		{"far above Grandmaster", 250000, "grandmaster", 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tier, into, forNext := season.TierProgress(tc.sp)
+			tier, div := season.RankForSP(tc.sp)
 			assert.Equal(t, tc.wantTier, tier, "tier")
-			assert.Equal(t, tc.wantInto, into, "spIntoTier")
-			assert.Equal(t, tc.wantForNext, forNext, "spForNextTier")
+			assert.Equal(t, tc.wantDiv, div, "division")
 		})
 	}
 }
 
-// TierProgress and TierForSP must never disagree, and spIntoTier must stay inside
-// the band everywhere below Grandmaster — the two properties the progress bar relies
-// on. Swept across every boundary and every band interior.
-func TestTierProgress_AgreesWithTierForSP(t *testing.T) {
+// Every SP value maps to a division inside 1-3 on a divided tier, divisions never
+// go down as SP rises inside a tier, and each division gets a third of the band
+// (to within the one SP integer division leaves over).
+func TestRankForSP_DivisionsSplitEachBandInThirds(t *testing.T) {
 	for _, l := range ladder {
-		for _, sp := range []int{l.floor, l.floor + 1, l.floor + l.band/2} {
-			tier, into, forNext := season.TierProgress(sp)
-			assert.Equal(t, season.TierForSP(sp), tier, "sp=%d", sp)
-			assert.Equal(t, l.floor, sp-into, "sp=%d: into must be measured from the tier floor", sp)
-			if forNext > 0 {
-				assert.Less(t, into, forNext, "sp=%d: spIntoTier must stay inside the band", sp)
-			}
+		if !season.HasDivisions(l.tier) {
+			continue
+		}
+		counts := map[int]int{}
+		prev := 1
+		for sp := l.floor; sp < l.floor+l.band; sp++ {
+			tier, div := season.RankForSP(sp)
+			require.Equal(t, l.tier, tier, "sp=%d", sp)
+			require.GreaterOrEqual(t, div, prev, "sp=%d: division went down inside %s", sp, l.tier)
+			require.LessOrEqual(t, div, 3, "sp=%d", sp)
+			counts[div]++
+			prev = div
+		}
+		for div := 1; div <= 3; div++ {
+			assert.InDelta(t, float64(l.band)/3, float64(counts[div]), 1, "%s %d width", l.tier, div)
 		}
 	}
 }
 
-func TestTierProgress_GrandmasterSpForNextTierIsZero(t *testing.T) {
-	// Called out on its own because it is the one case a caller must branch on:
-	// dividing by spForNextTier without checking it is a division by zero.
-	_, _, forNext := season.TierProgress(18000)
-	require.Zero(t, forNext, "Grandmaster is terminal — the client renders a full bar")
+func TestHasDivisions(t *testing.T) {
+	for _, tier := range []string{"iron", "bronze", "silver", "gold", "platinum", "diamond"} {
+		assert.True(t, season.HasDivisions(tier), tier)
+	}
+	assert.False(t, season.HasDivisions("master"))
+	assert.False(t, season.HasDivisions("grandmaster"))
+}
+
+func TestNewLadder(t *testing.T) {
+	l, err := season.NewLadder([]int{0, 100, 250, 450, 700, 1000, 1350, 1750})
+	require.NoError(t, err)
+
+	tier, div := l.Rank(460)
+	assert.Equal(t, "gold", tier, "a candidate ladder ranks by its own floors")
+	assert.Equal(t, 1, div)
+	floor, ok := l.Floor("grandmaster")
+	require.True(t, ok)
+	assert.Equal(t, 1750, floor)
+
+	// The live ladder is untouched by building a candidate.
+	liveTier, _ := season.RankForSP(460)
+	assert.Equal(t, "silver", liveTier)
+
+	bad := []struct {
+		name   string
+		floors []int
+	}{
+		{"too few floors", []int{0, 100, 200}},
+		{"first floor not zero", []int{10, 100, 250, 450, 700, 1000, 1350, 1750}},
+		{"equal floors leave an empty band", []int{0, 100, 100, 450, 700, 1000, 1350, 1750}},
+		{"descending floors", []int{0, 100, 250, 200, 700, 1000, 1350, 1750}},
+	}
+	for _, tc := range bad {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := season.NewLadder(tc.floors)
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestDefaultLadder_IsACopy(t *testing.T) {
+	l := season.DefaultLadder()
+	l[3].Floor = 1
+	tier, _ := season.RankForSP(599)
+	assert.Equal(t, "silver", tier, "mutating DefaultLadder's result must not move the live floors")
+}
+
+// The rank STEP the progress bar fills (Story 13.5): the next division, the next
+// tier from Diamond 3 and Master, nothing at Grandmaster.
+func TestRankProgress(t *testing.T) {
+	cases := []struct {
+		name        string
+		sp          int
+		wantTier    string
+		wantDiv     int
+		wantInto    int
+		wantForNext int
+	}{
+		{"fresh player is the start of Iron 1", 0, "iron", 1, 0, 50},
+		{"negative clamps to the Iron 1 floor", -30, "iron", 1, 0, 50},
+		{"last SP of Iron 1", 49, "iron", 1, 49, 50},
+		{"Iron 2 resets the bar", 50, "iron", 2, 0, 50},
+		{"Iron 3 steps to the Bronze floor", 120, "iron", 3, 20, 50},
+		{"Silver 2 is a 100-SP step", 450, "silver", 2, 50, 100},
+		{"Gold 1 floor", 600, "gold", 1, 0, 67},
+		{"Gold 1, 50 in", 650, "gold", 1, 50, 67},
+		// The spec's worked example: Gold 2 (667-733) fills 0 -> 67 toward Gold 3.
+		{"Gold 2 floor", 667, "gold", 2, 0, 67},
+		{"mid Gold 2", 700, "gold", 2, 33, 67},
+		{"last SP of Gold 2", 733, "gold", 2, 66, 67},
+		{"Gold 3 is the 66-SP remainder", 734, "gold", 3, 0, 66},
+		{"Diamond 3 fills toward the Master floor", 1150, "diamond", 3, 16, 66},
+		{"Master fills toward Grandmaster", 1250, "master", 0, 50, 200},
+		{"top of Master", 1399, "master", 0, 199, 200},
+		{"Grandmaster is terminal", 1400, "grandmaster", 0, 0, 0},
+		{"far above Grandmaster is still terminal", 1500, "grandmaster", 0, 100, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tier, div, into, forNext := season.RankProgress(tc.sp)
+			assert.Equal(t, tc.wantTier, tier, "tier")
+			assert.Equal(t, tc.wantDiv, div, "division")
+			assert.Equal(t, tc.wantInto, into, "spIntoStep")
+			assert.Equal(t, tc.wantForNext, forNext, "spForNextStep")
+		})
+	}
+}
+
+// Swept over every SP below Grandmaster: RankProgress agrees with RankForSP, the
+// bar stays inside its step, and it resets to empty exactly where the rank
+// changes, never one SP early or late.
+func TestRankProgress_StepsResetExactlyWhereTheRankChanges(t *testing.T) {
+	prevTier, prevDiv := season.RankForSP(0)
+	for sp := 0; sp < 1400; sp++ {
+		tier, div, into, forNext := season.RankProgress(sp)
+		wantTier, wantDiv := season.RankForSP(sp)
+		require.Equal(t, wantTier, tier, "sp=%d", sp)
+		require.Equal(t, wantDiv, div, "sp=%d", sp)
+		require.Positive(t, forNext, "sp=%d: only Grandmaster is terminal", sp)
+		require.GreaterOrEqual(t, into, 0, "sp=%d", sp)
+		require.Less(t, into, forNext, "sp=%d: the bar must stay inside its step", sp)
+
+		rankChanged := tier != prevTier || div != prevDiv
+		if sp > 0 {
+			assert.Equal(t, rankChanged, into == 0, "sp=%d: the bar is empty exactly on a new rank", sp)
+		}
+		// The step ends where the next rank begins.
+		if into == forNext-1 {
+			nextTier, nextDiv := season.RankForSP(sp + 1)
+			assert.True(t, nextTier != tier || nextDiv != div, "sp=%d: the last SP of a step", sp)
+		}
+		prevTier, prevDiv = tier, div
+	}
+}
+
+// RankChange compares RANKS, never SP alone (Story 13.5).
+func TestRankChange(t *testing.T) {
+	cases := []struct {
+		name     string
+		prev, sp int
+		want     string
+	}{
+		{"division up inside a tier", 650, 690, "promoted"},
+		{"tier up", 580, 610, "promoted"},
+		{"Diamond 3 to Master", 1190, 1210, "promoted"},
+		{"Master to Grandmaster", 1390, 1405, "promoted"},
+		{"tier down", 610, 590, "demoted"},
+		{"division down inside a tier", 670, 660, "demoted"},
+		{"Master down to Diamond 3", 1205, 1195, "demoted"},
+		{"a loss inside one division", 700, 690, "none"},
+		{"a win inside one division", 690, 700, "none"},
+		{"a move inside Master", 1250, 1300, "none"},
+		{"a move inside Grandmaster", 1500, 1450, "none"},
+		{"no move at all", 700, 700, "none"},
+		{"a loss at 0 SP", 0, 0, "none"},
+		{"a big climb across tiers", 100, 900, "promoted"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, season.RankChange(tc.prev, tc.sp))
+		})
+	}
 }

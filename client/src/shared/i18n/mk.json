@@ -1421,8 +1421,21 @@
       "master": "Мајстор",
       "grandmaster": "Велемајстор"
     },
-    "tierUp": {
-      "toast": "Нов ранг: {{tier}}"
+    "rank": "{{tier}} {{division}}",
+    "rankUpDialog": {
+      "title": "Нов ранг!"
+    },
+    "rankDownDialog": {
+      "title": "Пад на рангот"
+    },
+    "rankDialog": {
+      "sp": "{{change}} СП во овој меч",
+      "continue": "Продолжи"
+    },
+    "result": {
+      "line": "{{change}} СП · {{rank}}",
+      "partnerAbandoned": "Партнерот го напушти мечот: {{change}} СП (половина од загубата)",
+      "abandoned": "Го напушти мечот: {{change}} СП"
     },
     "leaderboard": {
       "eyebrow": "Сезона",

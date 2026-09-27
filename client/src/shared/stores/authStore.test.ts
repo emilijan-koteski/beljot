@@ -10,6 +10,7 @@ import { makeUser } from "@/test-utils";
 import { useAuthStore } from "./authStore";
 import { useChatStore } from "./chatStore";
 import { useMatchStore } from "./matchStore";
+import { useRankChangeStore } from "./rankChangeStore";
 import { useRoomStore } from "./roomStore";
 
 describe("authStore", () => {
@@ -85,6 +86,20 @@ describe("authStore", () => {
     useAuthStore.getState().logout();
 
     expect(useRoomStore.getState().players).toEqual([]);
+  });
+
+  it("drops a pending rank-change dialog on logout", () => {
+    useRankChangeStore.getState().setPending({
+      direction: "demoted",
+      rankTier: "silver",
+      rankDivision: 3,
+      spChange: -20,
+      newSeasonSp: 590,
+    });
+
+    useAuthStore.getState().logout();
+
+    expect(useRankChangeStore.getState().pending).toBeNull();
   });
 
   it("clears chatStore buffers on logout", () => {

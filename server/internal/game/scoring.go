@@ -137,7 +137,7 @@ func scoreHand(state *GameState) {
 	}
 
 	// Step 7: Check match-end condition with tiebreaker logic
-	target := matchTarget(state.MatchMode)
+	target := MatchTarget(state.MatchMode)
 	aOver := state.TeamScores[TeamA] >= target
 	bOver := state.TeamScores[TeamB] >= target
 
@@ -268,7 +268,7 @@ func stopAtTargetIfReached(state *GameState) bool {
 		return false
 	}
 
-	target := matchTarget(state.MatchMode)
+	target := MatchTarget(state.MatchMode)
 	aTotal := teamRunningTotal(state, TeamA)
 	bTotal := teamRunningTotal(state, TeamB)
 	aOver := aTotal >= target
@@ -464,8 +464,11 @@ func determineMatchWinner(state *GameState, aOver, bOver bool) int {
 	return TeamB
 }
 
-// matchTarget returns the point threshold for match completion based on the match mode.
-func matchTarget(mode string) int {
+// MatchTarget returns the point threshold for match completion based on the
+// match mode: 501 for "501", 1001 for anything else. Exported so the Season
+// Points outcome built at match end scales its margin by the same target the
+// engine ended the match on.
+func MatchTarget(mode string) int {
 	if mode == "501" {
 		return 501
 	}

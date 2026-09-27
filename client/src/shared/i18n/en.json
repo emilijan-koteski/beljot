@@ -1391,7 +1391,7 @@
     "banner": {
       "sp": "{{sp}} SP",
       "progress": "{{current}} / {{next}} SP",
-      "progressLabel": "{{tier}}, {{current}} of {{next}} SP into the next tier",
+      "progressLabel": "{{tier}}, {{current}} of {{next}} SP to the next rank",
       "progressLabelTop": "{{tier}}, {{sp}} SP, top of the ladder",
       "atTop": "Top of the ladder",
       "daysLeft": "Ends in {{days}}d",
@@ -1421,8 +1421,21 @@
       "master": "Master",
       "grandmaster": "Grandmaster"
     },
-    "tierUp": {
-      "toast": "New rank: {{tier}}"
+    "rank": "{{tier}} {{division}}",
+    "rankUpDialog": {
+      "title": "Rank Up!"
+    },
+    "rankDownDialog": {
+      "title": "Rank Down"
+    },
+    "rankDialog": {
+      "sp": "{{change}} SP this match",
+      "continue": "Continue"
+    },
+    "result": {
+      "line": "{{change}} SP · {{rank}}",
+      "partnerAbandoned": "Partner abandoned: {{change}} SP (half loss)",
+      "abandoned": "You abandoned: {{change}} SP"
     },
     "leaderboard": {
       "eyebrow": "Season",

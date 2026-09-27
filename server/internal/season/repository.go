@@ -17,17 +17,26 @@ type Repository interface {
 	// Never returns (nil, nil): either a window or an error.
 	CurrentSeason(now time.Time) (*Season, error)
 
-	// ApplySeasonPoints applies every listed player's award to the given season
-	// in ONE transaction and returns each player's post-write snapshot.
+	// ApplySeasonPoints scores one finished match for the given season in ONE
+	// transaction and returns each player's post-write snapshot.
 	//
-	// Per user it upserts on (user_id, season_id): sp += award.SP,
-	// games_played += 1, games_completed += 1 when award.Completed, and refreshes
-	// the denormalized rank_tier from the new total. An empty map is a no-op with
-	// no DB round-trip.
+	// `completed` lists every human seat of the match, keyed by user ID, with its
+	// presence at the terminal end. In ascending user-ID order the repository
+	// makes sure each player has a row (a missing row is a zero row) and LOCKS it;
+	// it then hands every locked total to `changes` at once, floors each new
+	// total at 0, and writes sp, the rank snapshot (rank_tier and
+	// rank_division, NULL for Master and Grandmaster), games_played += 1 and
+	// games_completed += 1 for a present seat.
 	//
-	// All-or-nothing, like the wallet and XP paths: a failure rolls the whole
+	// Reading the totals and writing the new ones under one lock is the point: a
+	// match that finishes concurrently with another sharing a player waits for
+	// the first to commit and then scores from its result, so neither change is
+	// lost. An empty map is a no-op with no DB round-trip.
+	//
+	// All-or-nothing, like the wallet and XP paths: a failure (including an error
+	// from `changes`, or a change missing for a listed player) rolls the whole
 	// batch back and returns the error, so four seats never end up half-credited.
-	ApplySeasonPoints(seasonID uint, awards map[uint]SPAward) (map[uint]PlayerSeasonSnapshot, error)
+	ApplySeasonPoints(seasonID uint, completed map[uint]bool, changes SPChanges) (map[uint]PlayerSeasonSnapshot, error)
 
 	// FindPlayerSeason returns the player's row for a season, or (nil, nil) when
 	// they have not played in it yet.
@@ -59,24 +68,26 @@ type Repository interface {
 	// VISIBILITY PREDICATE and ONE TOTAL ORDER, and both properties are
 	// load-bearing:
 	//
-	//   predicate  season_id = ? AND users.deleted_at IS NULL AND sp > 0.
+	//   predicate  season_id = ? AND users.deleted_at IS NULL
+	//              AND games_played >= 1.
 	//              The join is written by table name, so GORM's soft-delete scope
 	//              does NOT apply and the filter is spelled out (see
 	//              internal/room/gorm_repo.go:298 for the live leak this avoids).
-	//              `sp > 0` is a MEMBERSHIP RULE, not a filter for tidiness: the
-	//              ladder is SP earners only (owner decision 2026-08-27), because
-	//              a 0-SP row is written for any seat absent at a match end and
-	//              listing it would contradict the viewer block, which reports no
-	//              standing at 0 SP. Excluded rows are missing from `items`,
-	//              missing from `total`, and counted in nobody's position -- all
-	//              three, or the numbers contradict each other.
+	//              `games_played >= 1` is a MEMBERSHIP RULE (Story 13.4): the
+	//              ladder is everyone who played the season, INCLUDING players at
+	//              0 SP, because SP now falls and a player who loses back down to
+	//              0 must keep their place and their viewer block. Excluded rows
+	//              are missing from `items`, missing from `total`, and counted in
+	//              nobody's position -- all three, or the numbers contradict each
+	//              other.
 	//   order      sp DESC, user_id ASC. The tiebreak is not cosmetic: without a
 	//              second column, two players on equal SP can swap between the
 	//              page-1 and page-2 queries and be duplicated or skipped.
 	//
-	// The TIER IS NOT SELECTED. rank_tier is a denormalized snapshot allowed to
-	// lag (Story 13.1 D7); callers derive it with TierForSP(sp). Sorting is by
-	// `sp`, which is authoritative.
+	// The RANK SNAPSHOT IS SELECTED (rank_tier, rank_division) but it is the
+	// caller's to interpret (Story 13.5): a running season derives its rank from
+	// sp and ignores it, an ended season reads it as stored. Sorting is by `sp`
+	// in both cases.
 	//
 	// NO METHOD BELOW WRITES ANYTHING -- see FindPlayerSeason's contract above. A
 	// leaderboard read that materialised a player_seasons row would list everyone
@@ -89,10 +100,11 @@ type Repository interface {
 	// It answers the viewer block, and it exists SEPARATELY FROM FindPlayerSeason
 	// precisely so the viewer is subject to the LIST'S OWN VISIBILITY PREDICATE.
 	// FindPlayerSeason sees no `users` join, so it returns rows for soft-deleted
-	// accounts and for 0-SP rows -- either of which would hand a caller a position
-	// counted against a population that does not include them, plus a pinned row
-	// they cannot find in the list. A miss therefore covers three cases the caller
-	// treats identically: no row, a 0-SP row, and a soft-deleted account.
+	// accounts and for rows with no games played -- either of which would hand a
+	// caller a position counted against a population that does not include them,
+	// plus a pinned row they cannot find in the list. A miss therefore covers
+	// three cases the caller treats identically: no row, a row with no games, and
+	// a soft-deleted account.
 	FindLeaderboardEntry(seasonID, userID uint) (*LeaderboardEntry, error)
 
 	// CountAhead returns how many of the season's visible rows sort STRICTLY
@@ -130,10 +142,10 @@ type Repository interface {
 	//
 	//   row exists AND games_played >= 1 AND seasons.ends_at <= now
 	//
-	// — deliberately NOT leaderboardScope's `sp > 0`: the archive is "seasons
-	// you actually played", so a played season with 0 SP is included, while the
-	// ACTIVE window is always excluded (its record is still moving; the archive
-	// is immutable history). An unknown user is an empty slice, not an error —
-	// the profile query owns user-existence 404s. Never nil on success.
+	// — the same games_played rule as leaderboardScope, but its own predicate:
+	// a played season with 0 SP is included, while the ACTIVE window is always
+	// excluded (its record is still moving; the archive is immutable history).
+	// An unknown user is an empty slice, not an error — the profile query owns
+	// user-existence 404s. Never nil on success.
 	PlayerSeasonArchive(userID uint, now time.Time) ([]ArchiveEntry, error)
 }

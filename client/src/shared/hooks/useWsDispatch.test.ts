@@ -28,6 +28,7 @@ import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useLevelUpStore } from "@/shared/stores/levelUpStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
+import { useRankChangeStore } from "@/shared/stores/rankChangeStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room, User } from "@/shared/types/apiTypes";
 import type { MatchState } from "@/shared/types/matchTypes";
@@ -2214,9 +2215,10 @@ describe("useWsDispatch — whisper (Story 11.4)", () => {
   });
 });
 
-// event:season_points_awarded (Story 13.1). The branch has three jobs and no
-// other test reaches it: RankBanner.test.tsx feeds the season in as a prop and
-// never mounts a QueryClient, and the WS contract test only pins payload shape.
+// event:season_points_awarded (Story 13.1, reshaped by 13.5). The branch has four
+// jobs and no other test reaches it: RankBanner.test.tsx feeds the season in as
+// a prop and never mounts a QueryClient, and the WS contract test only pins
+// payload shape.
 //
 // The invalidation matters more here than for most handlers: useCurrentSeasonQuery
 // is deliberately NOT polled, so this is the ONLY path that refreshes the banner
@@ -2224,16 +2226,19 @@ describe("useWsDispatch — whisper (Story 11.4)", () => {
 // total until a full reload, with nothing failing.
 describe("useWsDispatch - season points", () => {
   const validPayload = {
-    spEarned: 251,
-    newSeasonSp: 1751,
+    spChange: 24,
+    newSeasonSp: 424,
     rankTier: "silver",
-    tieredUp: false,
-    seasonName: "2026 Q3",
+    rankDivision: 2,
+    rankChange: "none",
+    reason: "normal",
+    seasonName: "2026 Q4",
   };
 
   beforeEach(async () => {
     queryClient.clear();
     useMatchStore.getState().reset();
+    useRankChangeStore.getState().clear();
     __resetWsDispatchStateForTests();
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
@@ -2248,63 +2253,230 @@ describe("useWsDispatch - season points", () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.season.current() });
   });
 
-  it("fires exactly one tier-up toast when the award crossed a tier floor", () => {
+  it("stashes the outcome on the match store for the result screens' SP line", () => {
     const { result } = renderHook(() => useWsDispatch());
 
     result.current({
       type: "event:season_points_awarded",
-      payload: { ...validPayload, tieredUp: true },
+      payload: { ...validPayload, spChange: -12, reason: "partner_abandoned" },
     });
 
-    expect(toast.success).toHaveBeenCalledTimes(1);
-    // The tier NAME is resolved through i18n, never the raw token.
-    expect(toast.success).toHaveBeenCalledWith(
-      expect.stringContaining(i18n.t("season.tier.silver")),
-      expect.anything(),
-    );
+    expect(useMatchStore.getState().seasonSettlement).toEqual({
+      spChange: -12,
+      newSeasonSp: 424,
+      rankTier: "silver",
+      rankDivision: 2,
+      reason: "partner_abandoned",
+    });
   });
 
-  it("fires no toast when the award did not cross a tier floor", () => {
+  // The matrix's division-up row: 650 -> 690 is Gold 1 -> Gold 2. A rank change
+  // is now announced by the post-match RankChangeDialog (owner request
+  // 2026-09-26), so the handler stores it and fires no toast at all.
+  it("stores a division promotion for the post-match dialog and fires no toast", () => {
     const { result } = renderHook(() => useWsDispatch());
 
-    result.current({ type: "event:season_points_awarded", payload: validPayload });
+    result.current({
+      type: "event:season_points_awarded",
+      payload: {
+        ...validPayload,
+        spChange: 40,
+        newSeasonSp: 690,
+        rankTier: "gold",
+        rankDivision: 2,
+        rankChange: "promoted",
+      },
+    });
 
+    expect(useRankChangeStore.getState().pending).toEqual({
+      direction: "promoted",
+      rankTier: "gold",
+      rankDivision: 2,
+      spChange: 40,
+      newSeasonSp: 690,
+    });
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
   });
 
-  it("still invalidates for a zero-SP award, which is a real value", () => {
-    // The absent seat's payload. `spEarned: 0` and `tieredUp: false` are both
-    // falsy and both legitimate, so a truthiness guard would drop this frame.
+  // The matrix's tier-down row: 610 -> 590 is Gold 1 -> Silver 3. Stored as a
+  // DEMOTION, which the dialog renders subdued; never a success toast.
+  it("stores a demotion for the subdued dialog and never fires the success toast", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: {
+        ...validPayload,
+        spChange: -20,
+        newSeasonSp: 590,
+        rankTier: "silver",
+        rankDivision: 3,
+        rankChange: "demoted",
+      },
+    });
+
+    expect(useRankChangeStore.getState().pending).toEqual({
+      direction: "demoted",
+      rankTier: "silver",
+      rankDivision: 3,
+      spChange: -20,
+      newSeasonSp: 590,
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  // The matrix's same-division row: 700 -> 690 stays Gold 2.
+  it("stores nothing when the rank did not change, even on an SP loss", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: {
+        ...validPayload,
+        spChange: -10,
+        newSeasonSp: 690,
+        rankTier: "gold",
+        rankDivision: 2,
+        rankChange: "none",
+      },
+    });
+
+    expect(useRankChangeStore.getState().pending).toBeNull();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unseen change pending through a later match that kept the rank", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: { ...validPayload, newSeasonSp: 690, rankTier: "gold", rankChange: "promoted" },
+    });
+    // The next match moves 10 SP inside Gold 2: no rank change.
+    result.current({
+      type: "event:season_points_awarded",
+      payload: { ...validPayload, spChange: 10, newSeasonSp: 700, rankTier: "gold" },
+    });
+
+    expect(useRankChangeStore.getState().pending).toMatchObject({
+      direction: "promoted",
+      rankTier: "gold",
+      rankDivision: 2,
+    });
+  });
+
+  it("replaces an unseen change with a later one, so the dialog names the current rank", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({
+      type: "event:season_points_awarded",
+      payload: { ...validPayload, newSeasonSp: 690, rankTier: "gold", rankChange: "promoted" },
+    });
+    result.current({
+      type: "event:season_points_awarded",
+      payload: {
+        ...validPayload,
+        spChange: -20,
+        newSeasonSp: 590,
+        rankTier: "silver",
+        rankDivision: 3,
+        rankChange: "demoted",
+      },
+    });
+
+    expect(useRankChangeStore.getState().pending).toMatchObject({
+      direction: "demoted",
+      rankTier: "silver",
+      rankDivision: 3,
+    });
+  });
+
+  it("still accepts a zero-SP award, which is a real value", () => {
+    // The matrix's loss-at-0 row. `spChange: 0` is falsy and legitimate, so a
+    // truthiness guard would drop this frame and lose the "0 SP" line.
     const spy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useWsDispatch());
 
     result.current({
       type: "event:season_points_awarded",
-      payload: { ...validPayload, spEarned: 0, newSeasonSp: 0, rankTier: "iron" },
+      payload: { ...validPayload, spChange: 0, newSeasonSp: 0, rankTier: "iron", rankDivision: 1 },
     });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.season.current() });
-    expect(toast.success).not.toHaveBeenCalled();
+    expect(useMatchStore.getState().seasonSettlement?.spChange).toBe(0);
+    expect(useRankChangeStore.getState().pending).toBeNull();
   });
 
-  it("falls back to the SP bucket for an unrecognised tier token in the toast", () => {
+  // The whole reason the store exists: unlike the SP line's settlement, a
+  // pending rank change must survive the match ending so the dialog can open
+  // back in the lobby/room.
+  it("keeps a pending rank change across match_end and match_abandoned", () => {
     const { result } = renderHook(() => useWsDispatch());
 
     result.current({
       type: "event:season_points_awarded",
-      payload: { ...validPayload, rankTier: "mythic", newSeasonSp: 9000, tieredUp: true },
+      payload: { ...validPayload, newSeasonSp: 690, rankTier: "gold", rankChange: "promoted" },
     });
+    result.current({
+      type: "event:match_end",
+      payload: {
+        winnerTeam: 0,
+        teamAFinalScore: 1001,
+        teamBFinalScore: 700,
+        matchDurationSec: 600,
+        outcomeReason: "natural",
+      },
+    });
+    result.current({
+      type: "event:match_abandoned",
+      payload: {
+        abandonedByPlayer: 1,
+        teamAFinalScore: 300,
+        teamBFinalScore: 200,
+        matchDurationSec: 400,
+      },
+    });
+    useMatchStore.getState().clearGame();
 
-    // Version skew: 9000 SP buckets to Diamond, so the toast reads Diamond
-    // rather than a missing `season.tier.mythic` key.
-    expect(toast.success).toHaveBeenCalledWith(
-      expect.stringContaining(i18n.t("season.tier.diamond")),
-      expect.anything(),
-    );
+    expect(useRankChangeStore.getState().pending?.direction).toBe("promoted");
   });
 
-  it("rejects a malformed payload without invalidating, toasting, or throwing", () => {
+  it("is reset by match_end and by match_abandoned, like coins and honor", () => {
+    const { result } = renderHook(() => useWsDispatch());
+
+    result.current({ type: "event:season_points_awarded", payload: validPayload });
+    expect(useMatchStore.getState().seasonSettlement).not.toBeNull();
+    result.current({
+      type: "event:match_end",
+      payload: {
+        winnerTeam: 0,
+        teamAFinalScore: 1001,
+        teamBFinalScore: 700,
+        matchDurationSec: 600,
+        outcomeReason: "natural",
+      },
+    });
+    expect(useMatchStore.getState().seasonSettlement).toBeNull();
+
+    result.current({ type: "event:season_points_awarded", payload: validPayload });
+    expect(useMatchStore.getState().seasonSettlement).not.toBeNull();
+    result.current({
+      type: "event:match_abandoned",
+      payload: {
+        abandonedByPlayer: 1,
+        teamAFinalScore: 300,
+        teamBFinalScore: 200,
+        matchDurationSec: 400,
+      },
+    });
+    expect(useMatchStore.getState().seasonSettlement).toBeNull();
+  });
+
+  it("rejects a malformed payload without invalidating, storing, or throwing", () => {
     const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const spy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useWsDispatch());
@@ -2314,13 +2486,26 @@ describe("useWsDispatch - season points", () => {
       undefined,
       "not-an-object",
       {},
-      { ...validPayload, spEarned: "251" },
-      { ...validPayload, spEarned: 1.5 },
+      { ...validPayload, spChange: "24" },
+      { ...validPayload, spChange: 1.5 },
       { ...validPayload, newSeasonSp: null },
       { ...validPayload, rankTier: "" },
       { ...validPayload, rankTier: 7 },
-      { ...validPayload, tieredUp: "yes" },
+      { ...validPayload, rankDivision: "2" },
+      { ...validPayload, rankDivision: 1.5 },
+      { ...validPayload, rankDivision: undefined },
+      { ...validPayload, rankChange: "up" },
+      { ...validPayload, rankChange: undefined },
+      { ...validPayload, reason: "quit" },
       { ...validPayload, seasonName: 3 },
+      // The 13.1 shape a stale server would still send.
+      {
+        spEarned: 24,
+        newSeasonSp: 424,
+        rankTier: "silver",
+        tieredUp: true,
+        seasonName: "2026 Q3",
+      },
     ];
 
     for (const payload of malformed) {
@@ -2329,6 +2514,9 @@ describe("useWsDispatch - season points", () => {
 
     expect(spy).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(useMatchStore.getState().seasonSettlement).toBeNull();
+    expect(useRankChangeStore.getState().pending).toBeNull();
     consoleWarnSpy.mockRestore();
   });
 });

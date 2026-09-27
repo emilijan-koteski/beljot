@@ -24,6 +24,10 @@ vi.mock("react-i18next", () => ({
       }
       if (key === "match.settlement.won" && opts) return `You won ${opts.amount} coins`;
       if (key === "match.settlement.lost" && opts) return `You lost ${opts.amount} coins`;
+      if (key === "season.result.line" && opts) return `${opts.change} SP · ${opts.rank}`;
+      if (key === "season.rank" && opts) return `${opts.tier} ${opts.division}`;
+      if (key === "season.tier.gold") return "Gold";
+      if (key === "season.tier.silver") return "Silver";
       return translations[key] ?? key;
     },
   }),
@@ -53,6 +57,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { FetchError } from "@/shared/api/axiosClient";
 import type { MatchListItem } from "@/shared/api/matches";
 import { queryKeys } from "@/shared/api/queryKeys";
+import type { SeasonSettlement } from "@/shared/stores/matchStore";
 import type { FriendshipStatus } from "@/shared/types/apiTypes";
 import type { TeamString } from "@/shared/types/matchTypes";
 import type { MatchEndPayload } from "@/shared/types/wsEvents";
@@ -138,6 +143,7 @@ interface RenderOverrides {
   onReturnToRoom?: () => void;
   surrenderedByUsername?: string;
   coinDelta?: number;
+  seasonSettlement?: SeasonSettlement | null;
   roomId?: number;
   client?: QueryClient;
 }
@@ -150,6 +156,7 @@ function renderResult(overrides: RenderOverrides = {}) {
     onReturnToRoom: overrides.onReturnToRoom ?? vi.fn(),
     surrenderedByUsername: overrides.surrenderedByUsername,
     coinDelta: overrides.coinDelta,
+    seasonSettlement: overrides.seasonSettlement,
     roomId: overrides.roomId,
   };
   const client = overrides.client ?? makeClient();
@@ -162,6 +169,54 @@ function renderResult(overrides: RenderOverrides = {}) {
     ),
   };
 }
+
+describe("MatchResult — Season Points line (Story 13.5)", () => {
+  beforeEach(() => {
+    mockGetRoomLastMatch.mockReset();
+    mockGetRoomLastMatch.mockReturnValue(new Promise(() => {}));
+  });
+
+  it("shows the signed SP change and the rank beside the coin settlement", () => {
+    renderResult({
+      coinDelta: 50,
+      seasonSettlement: {
+        spChange: 24,
+        newSeasonSp: 690,
+        rankTier: "gold",
+        rankDivision: 2,
+        reason: "normal",
+      },
+    });
+
+    expect(screen.getByTestId("match-result-coins")).toBeInTheDocument();
+    const line = screen.getByTestId("season-sp-line");
+    expect(line).toHaveTextContent("+24 SP · Gold 2");
+    expect(line).toHaveAttribute("data-trend", "gain");
+  });
+
+  it("shows a loss as a negative, never clamped to zero", () => {
+    renderResult({
+      viewerTeam: "teamB",
+      seasonSettlement: {
+        spChange: -20,
+        newSeasonSp: 590,
+        rankTier: "silver",
+        rankDivision: 3,
+        reason: "normal",
+      },
+    });
+
+    const line = screen.getByTestId("season-sp-line");
+    expect(line).toHaveTextContent("\u221220 SP · Silver 3");
+    expect(line).toHaveAttribute("data-sp-change", "-20");
+    expect(line).toHaveAttribute("data-trend", "loss");
+  });
+
+  it("renders no SP line while the award is still in flight", () => {
+    renderResult({ seasonSettlement: null });
+    expect(screen.queryByTestId("season-sp-line")).not.toBeInTheDocument();
+  });
+});
 
 describe("MatchResult", () => {
   beforeEach(() => {

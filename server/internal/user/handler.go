@@ -94,8 +94,8 @@ type ProfileResponse struct {
 	HonorTrendDelta     int       `json:"honorTrendDelta"`
 	HonorTrendDirection string    `json:"honorTrendDirection"`
 	// SeasonRank is the subject's standing in the ACTIVE season (Story 13.3):
-	// {seasonName, tier, sp}, or null when they have not played in it -- the
-	// client hides the rank chip on null. PUBLIC-SAFE, like the honor block
+	// {seasonName, tier, division, sp}, or null when they have not played in
+	// it -- the client hides the rank chip on null. PUBLIC-SAFE, like the honor block
 	// above: the leaderboard already exposes tier + SP for every player, so
 	// PublicProfileResponse carries it verbatim. NO omitempty -- the key must
 	// always be present so the client can tell "no standing" from "an older

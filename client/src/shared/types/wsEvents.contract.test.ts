@@ -31,6 +31,7 @@ import playerDeclaredGolden from "../../../../server/internal/ws/testdata/events
 import playerDisconnectedGolden from "../../../../server/internal/ws/testdata/events/player_disconnected.json";
 import playerReconnectedGolden from "../../../../server/internal/ws/testdata/events/player_reconnected.json";
 import seasonPointsAwardedGolden from "../../../../server/internal/ws/testdata/events/season_points_awarded.json";
+import seasonPointsAwardedPartnerAbandonedGolden from "../../../../server/internal/ws/testdata/events/season_points_awarded_partner_abandoned.json";
 import surrenderDeclinedGolden from "../../../../server/internal/ws/testdata/events/surrender_declined.json";
 import surrenderProposedGolden from "../../../../server/internal/ws/testdata/events/surrender_proposed.json";
 import trickResolvedGolden from "../../../../server/internal/ws/testdata/events/trick_resolved.json";
@@ -89,6 +90,12 @@ const cases = [
   ["XpAwardedPayload", XpAwardedPayloadSchema, xpAwardedGolden],
   ["HonorUpdatedPayload", HonorUpdatedPayloadSchema, honorUpdatedGolden],
   ["SeasonPointsAwardedPayload", SeasonPointsAwardedPayloadSchema, seasonPointsAwardedGolden],
+  // Story 13.5: Master's null division and the partner_abandoned reason token.
+  [
+    "SeasonPointsAwardedPayload (master, partner abandoned)",
+    SeasonPointsAwardedPayloadSchema,
+    seasonPointsAwardedPartnerAbandonedGolden,
+  ],
   ["PlayerDisconnectedPayload", PlayerDisconnectedPayloadSchema, playerDisconnectedGolden],
   ["PlayerReconnectedPayload", PlayerReconnectedPayloadSchema, playerReconnectedGolden],
   ["SurrenderProposedPayload", SurrenderProposedPayloadSchema, surrenderProposedGolden],
@@ -125,6 +132,57 @@ describe("phase vocabulary contract", () => {
     expect(
       EventMatchStateSchema.safeParse({ ...eventMatchStateGolden, phase: "bogus" }).success,
     ).toBe(false);
+  });
+});
+
+// Story 13.5 reshaped event:season_points_awarded in place. The two token sets
+// are closed enums mirroring the Go constants, and the 13.1 shape (spEarned,
+// tieredUp) must no longer parse — the strict schema is what makes a stale tab
+// drop the new payload, and a current bundle the old one.
+describe("season points payload contract", () => {
+  it("rejects the retired 13.1 shape", () => {
+    expect(
+      SeasonPointsAwardedPayloadSchema.safeParse({
+        spEarned: 24,
+        newSeasonSp: 424,
+        rankTier: "silver",
+        tieredUp: true,
+        seasonName: "2026 Q3",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts every rank change and reason token, and rejects an unknown one", () => {
+    for (const rankChange of ["promoted", "demoted", "none"]) {
+      for (const reason of ["normal", "abandoned", "partner_abandoned"]) {
+        const result = SeasonPointsAwardedPayloadSchema.safeParse({
+          ...seasonPointsAwardedGolden,
+          rankChange,
+          reason,
+        });
+        expect(result.success, `${rankChange} / ${reason}`).toBe(true);
+      }
+    }
+    expect(
+      SeasonPointsAwardedPayloadSchema.safeParse({ ...seasonPointsAwardedGolden, rankChange: "up" })
+        .success,
+    ).toBe(false);
+    expect(
+      SeasonPointsAwardedPayloadSchema.safeParse({ ...seasonPointsAwardedGolden, reason: "quit" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("requires rankDivision to be present, as a number or null", () => {
+    const withoutDivision: Record<string, unknown> = { ...seasonPointsAwardedGolden };
+    delete withoutDivision.rankDivision;
+    expect(SeasonPointsAwardedPayloadSchema.safeParse(withoutDivision).success).toBe(false);
+    expect(
+      SeasonPointsAwardedPayloadSchema.safeParse({
+        ...seasonPointsAwardedGolden,
+        rankDivision: null,
+      }).success,
+    ).toBe(true);
   });
 });
 

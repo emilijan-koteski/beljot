@@ -4,8 +4,11 @@ import type { SeasonTier } from "@/shared/lib/seasonTier";
 import { SEASON_TIER_COLOR, SEASON_TIER_SOFT } from "@/shared/lib/seasonTier";
 import { cn } from "@/shared/lib/utils";
 
-/** Badge scale. `md` is the RankBanner's original size; `sm` fits a list row. */
-export type TierBadgeSize = "sm" | "md";
+/**
+ * Badge scale. `md` is the RankBanner's original size; `sm` fits a list row;
+ * `lg` is the medallion of the post-match rank-change dialog.
+ */
+export type TierBadgeSize = "sm" | "md" | "lg";
 
 /**
  * Outer ring / inner glyph sizes per scale. A LOOKUP, NOT INTERPOLATION: Tailwind
@@ -15,6 +18,7 @@ export type TierBadgeSize = "sm" | "md";
 const SIZE_CLASSES: Record<TierBadgeSize, { ring: string; glyph: string }> = {
   sm: { ring: "size-7", glyph: "size-3.5" },
   md: { ring: "size-11", glyph: "size-5" },
+  lg: { ring: "size-20", glyph: "size-9" },
 };
 
 type Props = {
@@ -25,6 +29,11 @@ type Props = {
    */
   tier: SeasonTier;
   size?: TierBadgeSize;
+  /**
+   * The coloured drop-shadow glow, on by default. The rank-DOWN dialog turns it
+   * off: a demotion is announced without the rank-up flourish.
+   */
+  glow?: boolean;
   className?: string;
   /** Test hook. Kept a prop so each surface can name its own badge. */
   "data-testid"?: string;
@@ -51,6 +60,7 @@ type Props = {
 export function TierBadge({
   tier,
   size = "md",
+  glow = true,
   className,
   "data-testid": testId = "tier-badge",
 }: Props) {
@@ -61,12 +71,13 @@ export function TierBadge({
     <span
       data-testid={testId}
       data-tier={tier}
+      data-glow={glow}
       aria-hidden="true"
       className={cn("grid shrink-0 place-items-center rounded-full", ring, className)}
       style={{
         background: SEASON_TIER_SOFT[tier],
         border: `1px solid ${color}`,
-        boxShadow: `0 0 14px -2px ${color}`,
+        boxShadow: glow ? `0 0 14px -2px ${color}` : "none",
         color,
       }}
     >

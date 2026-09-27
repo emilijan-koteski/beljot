@@ -72,9 +72,10 @@ export function useSeasonWindowWatch(season: CurrentSeasonResponse | undefined):
   // THE TRANSITION TOAST, once per observed season change: the invalidation
   // above refetches, the new window's name arrives, and the flip from a KNOWN
   // previous name fires exactly one toast. Initial mount sets the ref without
-  // toasting (loading a season is not a transition), and the same plumbing the
-  // tier-up toast uses (sonner + MOTION duration) keeps the two moments
-  // consistent. The season token is rendered verbatim inside localized copy.
+  // toasting (loading a season is not a transition). A sonner toast with a
+  // MOTION duration, like the app's other passing notices; a rank change is a
+  // dialog instead (RankChangeGate). The season token is rendered verbatim
+  // inside localized copy.
   const prevSeasonNameRef = useRef<string | null>(null);
   const seasonName = season?.seasonName;
   useEffect(() => {

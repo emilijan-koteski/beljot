@@ -227,8 +227,8 @@ type GameState struct {
 	// available at the match layer at all here — checkInstantWin fires right
 	// after a deal, so an instant-win match can have zero hand results and
 	// TeamScores of [0,0], but it can equally fire on hand 5 of a match sitting
-	// at 500:300. Without this field the Season-Points bonus cannot tell a
-	// spectacular finish from an ordinary one.
+	// at 500:300. Without this field Season Points could not give an instant win
+	// its maximum margin.
 	//
 	// An EVENT RECORD, not a config mirror: unlike StopAtTarget it is NOT
 	// recomputed by RefreshDerivedFlags, because there is nothing in Rules to

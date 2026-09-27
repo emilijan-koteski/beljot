@@ -11,8 +11,9 @@ const base = {
   position: 4,
   userId: 42,
   username: "kiro",
-  sp: 4000,
+  sp: 700,
   tier: "gold",
+  division: 2 as number | null,
   gamesPlayed: 31,
 };
 
@@ -39,7 +40,7 @@ describe("LeaderboardRow", () => {
     expect(row.querySelector('[data-testid="leaderboard-position"]')).toHaveTextContent("4");
     expect(row.querySelector('[data-testid="leaderboard-username"]')).toHaveTextContent("kiro");
     expect(row.querySelector('[data-testid="leaderboard-sp"]')).toHaveTextContent(
-      (4000).toLocaleString(),
+      (700).toLocaleString(),
     );
     expect(row.querySelector('[data-testid="leaderboard-games"]')).toHaveTextContent("31");
   });
@@ -101,11 +102,11 @@ describe("LeaderboardRow", () => {
     expect(summary.className).toContain("sr-only");
     expect(summary).toHaveTextContent("4");
     expect(summary).toHaveTextContent("kiro");
-    // THE TIER, as a word. TierBadge hides itself on the grounds that the tier
+    // THE RANK, as words. TierBadge hides itself on the grounds that the tier
     // name is rendered as text nearby; on this surface that text is here and
     // nowhere else.
-    expect(summary).toHaveTextContent(i18n.t("season.tier.gold"));
-    expect(summary).toHaveTextContent((4000).toLocaleString());
+    expect(summary).toHaveTextContent("kiro, Gold 2,");
+    expect(summary).toHaveTextContent((700).toLocaleString());
     expect(summary).toHaveTextContent("31");
   });
 
@@ -162,12 +163,10 @@ describe("LeaderboardRow", () => {
   });
 
   it("normalizes an unknown tier token from the SP bucket", () => {
-    renderRow({ tier: "mythic" });
-    // 4000 SP is Gold.
+    renderRow({ tier: "mythic", sp: 700 });
+    // 700 SP is Gold.
     expect(screen.getByTestId("leaderboard-tier-badge")).toHaveAttribute("data-tier", "gold");
-    expect(screen.getByTestId("leaderboard-row-summary")).toHaveTextContent(
-      i18n.t("season.tier.gold"),
-    );
+    expect(screen.getByTestId("leaderboard-row-summary")).toHaveTextContent("Gold 2");
   });
 
   it("renders the tier badge at the compact list scale", () => {
@@ -178,30 +177,42 @@ describe("LeaderboardRow", () => {
   it("localizes the summary", async () => {
     await i18n.changeLanguage("mk");
     renderRow();
-    expect(screen.getByTestId("leaderboard-row-summary")).toHaveTextContent(
-      i18n.t("season.tier.gold"),
-    );
+    expect(screen.getByTestId("leaderboard-row-summary")).toHaveTextContent("Злато 2");
   });
 
-  // --- the tier NAME, beside the badge ---
+  // --- the RANK, beside the badge ---
 
   // The badge alone asked every reader to have memorised eight ramp colours.
-  it("renders the tier name as text, in the tier's own colour", () => {
+  it("renders the rank as text, tier plus division, in the tier's own colour", () => {
     renderRow();
     const tier = screen.getByTestId("leaderboard-tier");
-    expect(tier.textContent).toBe(i18n.t("season.tier.gold"));
+    expect(tier.textContent).toBe("Gold 2");
     expect(tier.getAttribute("style")).toContain("--rt4");
   });
 
-  it("localizes the visible tier name", async () => {
+  it("renders a single tier by name alone", () => {
+    renderRow({ sp: 1250, tier: "master", division: null });
+    expect(screen.getByTestId("leaderboard-tier").textContent).toBe("Master");
+  });
+
+  // An ENDED pre-division season's row: the server sends its stored tier and a
+  // null division, and the row must not invent one from SP (3500 old-formula SP
+  // would bucket as Grandmaster).
+  it("renders an ended pre-division row as its stored tier, with no division", () => {
+    renderRow({ sp: 3500, tier: "gold", division: null });
+    expect(screen.getByTestId("leaderboard-tier").textContent).toBe("Gold");
+    expect(screen.getByTestId("leaderboard-tier-badge")).toHaveAttribute("data-tier", "gold");
+  });
+
+  it("localizes the visible rank", async () => {
     await i18n.changeLanguage("mk");
     renderRow();
-    expect(screen.getByTestId("leaderboard-tier").textContent).toBe(i18n.t("season.tier.gold"));
+    expect(screen.getByTestId("leaderboard-tier").textContent).toBe("Злато 2");
   });
 
   it("shows the normalized tier name for an unknown token, never the raw string", () => {
-    renderRow({ tier: "mythic" });
-    expect(screen.getByTestId("leaderboard-tier").textContent).toBe(i18n.t("season.tier.gold"));
+    renderRow({ tier: "mythic", sp: 700 });
+    expect(screen.getByTestId("leaderboard-tier").textContent).toBe("Gold 2");
   });
 
   // --- the username link ---

@@ -11,6 +11,7 @@ import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { HONOR_TIER_COLOR, honorTierForScore, normalizeHonorTier } from "@/shared/lib/honor";
 import { Z } from "@/shared/lib/zLayers";
+import type { SeasonSettlement } from "@/shared/stores/matchStore";
 import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 import type { MatchEndPayload } from "@/shared/types/wsEvents";
 
@@ -18,6 +19,7 @@ import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
+import { SeasonSpLine } from "./SeasonSpLine";
 
 interface MatchResultProps {
   data: MatchEndPayload;
@@ -43,6 +45,11 @@ interface MatchResultProps {
    *  tier boundary (user decision 2026-07-31) — a few points inside the same
    *  band is noise, a change of standing is news. */
   honorSettlement?: { before: number; after: number; tier: string } | null;
+  /** The viewer's Season Points outcome (Story 13.5), from the match store.
+   *  Undefined/null while event:season_points_awarded is still in flight (it
+   *  follows match_end in the same burst) and for a player the server scored
+   *  nothing for; the line then simply does not render. */
+  seasonSettlement?: SeasonSettlement | null;
   /** The room this match was played in. Enables the collapsible per-hand
    *  breakdown — without it there is no room to read the stats from, and the
    *  section simply never renders. */
@@ -71,6 +78,7 @@ export function MatchResult({
   surrenderedByUsername,
   coinDelta,
   honorSettlement,
+  seasonSettlement,
   roomId,
   soundKey,
 }: MatchResultProps) {
@@ -285,6 +293,11 @@ export function MatchResult({
                   </div>
                 );
               })()}
+
+            {/* Season Points (Story 13.5): the signed change and the rank it
+                lands on, beside the coin settlement. Shown on every rated
+                finish, a zero change included ("0 SP · Iron 1"). */}
+            {seasonSettlement && <SeasonSpLine settlement={seasonSettlement} />}
 
             <p
               className="font-body text-sm"

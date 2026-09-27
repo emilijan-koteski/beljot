@@ -302,14 +302,34 @@ func TestEventsJSONContract(t *testing.T) {
 		},
 		{
 			name: "SeasonPointsAwardedPayload",
+			// The matrix's tier-down row (Story 13.5): 610 -> 590 drops Gold 1
+			// to Silver 3. The change is signed and the division is a number.
 			sample: ws.SeasonPointsAwardedPayload{
-				SPEarned:    200,
-				NewSeasonSP: 1700,
-				RankTier:    "silver",
-				TieredUp:    true,
-				SeasonName:  "2026 Q3",
+				SPChange:     -20,
+				NewSeasonSP:  590,
+				RankTier:     "silver",
+				RankDivision: ptrInt(3),
+				RankChange:   ws.RankChangeDemoted,
+				Reason:       ws.SPReasonNormal,
+				SeasonName:   "2026 Q4",
 			},
 			goldenFile: "season_points_awarded.json",
+		},
+		{
+			// Master has no division, so rankDivision is a literal null (never
+			// omitted), and a teammate of the abandoning seat carries its own
+			// reason token. Separate golden so the TS side parses both shapes.
+			name: "SeasonPointsAwardedPayload (master, partner abandoned)",
+			sample: ws.SeasonPointsAwardedPayload{
+				SPChange:     -12,
+				NewSeasonSP:  1288,
+				RankTier:     "master",
+				RankDivision: nil,
+				RankChange:   ws.RankChangeNone,
+				Reason:       ws.SPReasonPartnerAbandoned,
+				SeasonName:   "2026 Q4",
+			},
+			goldenFile: "season_points_awarded_partner_abandoned.json",
 		},
 		{
 			name: "PlayerDisconnectedPayload",

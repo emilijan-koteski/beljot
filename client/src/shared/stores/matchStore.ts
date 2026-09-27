@@ -9,6 +9,7 @@ import type {
   HandScoredPayload,
   MatchAbandonedPayload,
   MatchEndPayload,
+  SeasonPointsAwardedPayload,
   SurrenderDeclinedPayload,
   SurrenderProposedPayload,
   TrumpSelectedPayload,
@@ -61,6 +62,14 @@ export interface PendingAutoPlayedCard {
   receivedAt: number;
 }
 
+// The viewer's Season Points outcome for the match that just ended (Story 13.5),
+// taken from event:season_points_awarded for the SP line on the result screens.
+// A subset of the payload: exactly what the line renders.
+export type SeasonSettlement = Pick<
+  SeasonPointsAwardedPayload,
+  "spChange" | "newSeasonSp" | "rankTier" | "rankDivision" | "reason"
+>;
+
 export interface MatchStoreState {
   matchState: MatchState | null;
   myPlayerSeat: number | null;
@@ -90,6 +99,12 @@ export interface MatchStoreState {
   // player is the one who gets no follow-up event, so a stale flourish would
   // otherwise show them someone else's last movement.
   honorSettlement: { before: number; after: number; tier: string } | null;
+  // The SP line on MatchResult (natural end) and ReconnectOverlay (abandonment),
+  // Story 13.5. Reset in BOTH the match_end and match_abandoned handlers, the
+  // same discipline as coinSettlement and honorSettlement: the abandoning player
+  // never receives event:season_points_awarded, so without the reset they would
+  // be shown a previous match's change as this one's.
+  seasonSettlement: SeasonSettlement | null;
   matchAbandonedData: MatchAbandonedPayload | null;
   surrenderProposed: SurrenderProposedPayload | null;
   surrenderDeclined: SurrenderDeclinedPayload | null;
@@ -115,6 +130,7 @@ export interface MatchStoreState {
   setMatchEndData: (data: MatchEndPayload | null) => void;
   setCoinSettlement: (payload: CoinSettlementPayload | null) => void;
   setHonorSettlement: (payload: { before: number; after: number; tier: string } | null) => void;
+  setSeasonSettlement: (payload: SeasonSettlement | null) => void;
   setMatchAbandonedData: (data: MatchAbandonedPayload | null) => void;
   setSurrenderProposed: (payload: SurrenderProposedPayload | null) => void;
   setSurrenderDeclined: (payload: SurrenderDeclinedPayload | null) => void;
@@ -169,6 +185,7 @@ const initialState = {
   matchEndData: null,
   coinSettlement: null,
   honorSettlement: null,
+  seasonSettlement: null,
   matchAbandonedData: null,
   surrenderProposed: null,
   surrenderDeclined: null,
@@ -206,6 +223,7 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
 
   setCoinSettlement: (coinSettlement) => set({ coinSettlement }),
   setHonorSettlement: (honorSettlement) => set({ honorSettlement }),
+  setSeasonSettlement: (seasonSettlement) => set({ seasonSettlement }),
 
   setMatchAbandonedData: (matchAbandonedData) => set({ matchAbandonedData }),
 

@@ -1197,3 +1197,39 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A �
 - source_spec: `_bmad-output/implementation-artifacts/spec-in-match-sound-and-music.md`
   summary: A token refresh that lands while an optimistic preference PATCH is in flight overwrites the optimistic store value with the pre-PATCH server row (deck, language and both audio switches).
   evidence: A 401 on the PATCH triggers `doRefresh`, which rebuilds the whole user from `/auth/refresh` (still the old value), and the retried PATCH's success never writes the store — so the UI shows the old value while the server holds the new one until the next refresh. Pre-existing for `persistCardDeck` and the language handlers; the audio helper inherits it. Fix shape: skip envelope fields with a write in flight, or re-apply pending optimistic values after a refresh.
+
+## Deferred from: correct-course win/loss rank ladder (2026-09-26)
+
+- **Division shields.** Protect a player from dropping a whole division (e.g. a grace match or two after promotion). Owner-deferred; today players can fall through divisions and tiers freely.
+- **Remove bot-filled matches from rank.** Bot matches count for now because the player base is small (~80 registered, ~10 active). Revisit when enough humans play.
+- **Carry part of last season into the next.** For example, keep the final tier, or start one or two tiers below it, instead of the hard restart at Iron 0.
+- **Per-match SP audit trail.** No per-match SP change is stored (only the running total in `player_seasons`), so "why did I lose X SP?" can't be answered after the fact.
+- **Persist the instant-win flag on the match record.** `GameState.WonByInstantWin` is not stored; the Q3 tuning replay has to infer instant wins from a 0–0 score with no hands.
+- **Boot-reconcile path awards no SP** (`reconcile.go:93-107`). A match cut short by a server restart awards nothing. Pre-existing; unchanged by this change.
+- **architecture.md broader refresh.** Elo-matchmaking wording, `internal/session/` naming and other text that predates the April reshape.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-13-4-competitive-sp-formula.md`
+  summary: Ended seasons (2026 Q3 and earlier) re-derive their tier from SP with the NEW floors on the leaderboard (rows and viewer, `?season=<id>`) and in the archive, so old-formula totals read as Grandmaster; Story 13.5 must switch every ended-season read to the stored `rank_tier` snapshot (no division), and 13.4 must not ship without 13.5.
+  evidence: `season/service.go` LeaderboardView, viewerPosition and ArchiveView call `TierForSP(e.SP)`; 13.4 moved the floors to 0–1400 while Q3 totals are in the thousands. The approved proposal assigns the archive's stored-tier read to 13.5; review (2026-09-26) found the prior-season leaderboard has the same re-derivation and is not named in 13.5's archive AC, only implied by its "none for seasons before 2026 Q4" division rule.
+  resolved: 2026-09-26 (Story 13.5) — ended-season reads (the archive, and leaderboard rows plus viewer for a by-id season whose `ends_at <= now`) return the stored `rank_tier` / `rank_division` snapshot via `service.go` `seasonRank`; running seasons still derive. Migration 000028 adds the nullable division, written by every award. Covered by `TestService_EndedSeasonsReadTheStoredRank` (real Postgres), `TestGetLeaderboard_EndedSeasonReadsTheStoredRank` and `TestGetPlayerSeasonArchive_ReadsTheStoredRank`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-13-4-competitive-sp-formula.md`
+  summary: The "deploy on or after 2026-10-01 00:00 UTC" precondition for the win/loss ladder is not enforced in code; `deploy.yml` auto-deploys every push to master, so an early merge would score Q3's last days with the new formula over old-formula totals.
+  evidence: `.github/workflows/deploy.yml` triggers on push to master and runs `migrate` then `up -d`. A time guard inside migration 000027 would fail CI (`ci.yml` migrates a fresh DB) and `reset_migration_test` until Oct 1, so it is an owner decision; meanwhile the release checklist is: merge to master only after 2026-10-01 00:00 UTC, ideally with no live matches (a match finishing between `migrate` and `up -d` is scored by the old binary into Q4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-13-5-divisions-demotion-and-sp-feedback.md`
+  summary: The abandoning player never sees their SP penalty (they have no socket when event:season_points_awarded is sent), and a teammate's "Partner abandoned" line is visible only inside the reconnect overlay's 3 s redirect window; nothing durable carries a match's SP outcome.
+  evidence: `match/reconnect.go` sends the event only to registered sockets; `ReconnectOverlay` redirects after `MOTION.RECONNECT_REDIRECT`. The `reason: "abandoned"` branch in `SeasonSpLine` therefore runs only on a late reconnect. Fix shape: expose the last award on `GET /seasons/current` or store per-match SP changes (see the deferred per-match SP audit trail), then show it on next login or in match history.
+- source_spec: `_bmad-output/implementation-artifacts/spec-rank-change-dialog.md`
+  summary: The planning docs still require the Story 13.5 rank toasts that the owner-requested rank-change dialog replaced (epics.md Story 13.5 ACs on the "celebratory rank-up toast" and the "subdued notice", ux-design-specification.md RankBanner "Rank changes" paragraph, epic-13-context.md UX bullet).
+  evidence: `epics.md` ~2742-2746, `ux-design-specification.md` ~762, `epic-13-context.md` ~66 describe toasts; the code now shows `RankChangeDialog` (owner request 2026-09-26). Updating the ACs is a planning change for the owner (correct-course style), not a code fix; until then a reviewer checking against the ACs would read the dialog as a regression.
+- source_spec: `_bmad-output/implementation-artifacts/spec-rank-change-dialog.md`
+  summary: `levelUpStore` survives logout, so the next account to log in on the same tab can be greeted with the previous player's level-up dialog.
+  evidence: `authStore.logout` clears matchStore, roomStore notices, chat and (now) rankChangeStore, but not levelUpStore; pre-existing since the level-up dialog shipped. Fix: add `useLevelUpStore.getState().clear()` beside the rank-change clear, with an authStore test.
+- source_spec: `_bmad-output/implementation-artifacts/spec-q3-season-recalculation.md`
+  summary: Release checklist for the Q3 recalculation: take a fresh backup right before merging, announce the Q3 rank recalculation to players, and after deploy check the log for "season recalculation: done" (before "starting server") and for any "rows the replay did not cover" warning.
+  evidence: The job overwrites Q3's sp/rank_tier/rank_division/games counters in place with no side copy, and `deploy.yml` takes no backup (the daily VPS backup keeps 7 days). Rehearsal on the 2026-09-26 production copy rewrote 25 rows (e.g. kiro Grandmaster → Silver 3) with no uncovered rows.
+- source_spec: `_bmad-output/implementation-artifacts/spec-q3-season-recalculation.md`
+  summary: Planning docs still describe Q3 as untouched and an early deploy as a risk, superseded by the owner's Q3 recalculation (000029).
+  evidence: epic-13-context.md (~41), epics.md (~2700), sprint-change-proposal-2026-09-26.md (~111, ~225, ~498), spec-13-4 (~50), spec-13-5 (~57, ~90), and the deferred-work entries on early deploy and ended-season re-derivation; an owner planning update, not a code fix.
+- source_spec: `_bmad-output/implementation-artifacts/spec-q3-season-recalculation.md`
+  summary: No test pins that the api runs pending season recalculations at boot, before `e.Start`.
+  evidence: `cmd/api/main_test.go` covers only the health handler; the rehearsal ran the real binary once. Moot once the one-time Q3 job has run in production.

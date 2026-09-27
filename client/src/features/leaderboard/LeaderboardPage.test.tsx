@@ -57,8 +57,9 @@ function rows(from: number, n: number): LeaderboardRow[] {
     position: from + i,
     userId: from + i,
     username: `p${from + i}`,
-    sp: 10_000 - (from + i) * 10,
+    sp: 800 - (from + i) * 4,
     tier: "gold",
+    division: 2,
     gamesPlayed: 5,
   }));
 }
@@ -172,7 +173,7 @@ describe("LeaderboardPage", () => {
       response({
         items: rows(1, 25),
         total: 25,
-        viewer: { position: 7, userId: 7, sp: 9930, tier: "gold", gamesPlayed: 5 },
+        viewer: { position: 7, userId: 7, sp: 772, tier: "gold", division: 3, gamesPlayed: 5 },
       }),
     );
     renderPage();
@@ -191,7 +192,7 @@ describe("LeaderboardPage", () => {
       response({
         items: rows(1, 25),
         total: 400,
-        viewer: { position: 340, userId: 999, sp: 120, tier: "iron", gamesPlayed: 3 },
+        viewer: { position: 340, userId: 999, sp: 120, tier: "iron", division: 3, gamesPlayed: 3 },
       }),
     );
     renderPage();
@@ -223,7 +224,15 @@ describe("LeaderboardPage", () => {
     mockGet.mockResolvedValue(
       response({
         items: [
-          { position: 1, userId: 1, username: "ada", sp: 4000, tier: "gold", gamesPlayed: 31 },
+          {
+            position: 1,
+            userId: 1,
+            username: "ada",
+            sp: 700,
+            tier: "gold",
+            division: 2,
+            gamesPlayed: 31,
+          },
         ],
         total: 1,
       }),
@@ -233,7 +242,7 @@ describe("LeaderboardPage", () => {
     const row = await screen.findByTestId("leaderboard-row");
     expect(row.querySelector('[data-testid="leaderboard-games"]')).toHaveTextContent("31");
     expect(row.querySelector('[data-testid="leaderboard-sp"]')).toHaveTextContent(
-      (4000).toLocaleString(),
+      (700).toLocaleString(),
     );
   });
 
@@ -350,7 +359,14 @@ describe("LeaderboardPage", () => {
         response({
           items: rows(1, 25),
           total: 60,
-          viewer: { position: 340, userId: 999, sp: 120, tier: "iron", gamesPlayed: 3 },
+          viewer: {
+            position: 340,
+            userId: 999,
+            sp: 120,
+            tier: "iron",
+            division: 3,
+            gamesPlayed: 3,
+          },
         }),
       )
       .mockResolvedValueOnce(
@@ -359,7 +375,14 @@ describe("LeaderboardPage", () => {
           total: 55,
           offset: 25,
           // Their position improved while they were reading.
-          viewer: { position: 310, userId: 999, sp: 180, tier: "iron", gamesPlayed: 4 },
+          viewer: {
+            position: 310,
+            userId: 999,
+            sp: 140,
+            tier: "iron",
+            division: 3,
+            gamesPlayed: 4,
+          },
         }),
       );
     renderPage();
@@ -414,7 +437,7 @@ describe("LeaderboardPage", () => {
       response({
         items: rows(1, 25),
         total: 400,
-        viewer: { position: 340, userId: 999, sp: 120, tier: "iron", gamesPlayed: 3 },
+        viewer: { position: 340, userId: 999, sp: 120, tier: "iron", division: 3, gamesPlayed: 3 },
       }),
     );
     renderPage();
@@ -477,6 +500,52 @@ describe("LeaderboardPage", () => {
     await screen.findAllByTestId("leaderboard-row");
     expect(screen.queryByTestId("leaderboard-season-picker")).not.toBeInTheDocument();
     expect(mockGet).toHaveBeenCalledWith(25, 0, "current");
+  });
+
+  // THE ACCEPTANCE CRITERION on the page: the current season shows tier plus
+  // division, and an earlier ended pre-division season (2026 Q2 here) shows the
+  // stored tier with none — the page renders the server's rank and never
+  // re-derives one from SP (3500 old-formula SP would bucket as Grandmaster).
+  it("renders the current season's divisions and an ended season's stored bare tier", async () => {
+    const user = userEvent.setup();
+    mockGetSeasons.mockResolvedValue(seasonsFixture());
+    mockGet.mockImplementation((_limit, _offset, season) =>
+      Promise.resolve(
+        season === 5
+          ? response({
+              items: [
+                {
+                  position: 1,
+                  userId: 3,
+                  username: "veteran",
+                  sp: 3500,
+                  tier: "gold",
+                  division: null,
+                  gamesPlayed: 90,
+                },
+              ],
+              total: 1,
+            })
+          : response({ items: rows(1, 1), total: 1 }),
+      ),
+    );
+    renderPage();
+
+    const current = await screen.findByTestId("leaderboard-row");
+    expect(current.querySelector('[data-testid="leaderboard-tier"]')).toHaveTextContent("Gold 2");
+
+    await user.click(await screen.findByTestId("leaderboard-season-picker-5"));
+
+    await waitFor(() => {
+      const row = screen.getByTestId("leaderboard-row");
+      expect(row).toHaveAttribute("data-user-id", "3");
+    });
+    const past = screen.getByTestId("leaderboard-row");
+    expect(past.querySelector('[data-testid="leaderboard-tier"]')?.textContent).toBe("Gold");
+    expect(past.querySelector('[data-testid="leaderboard-tier-badge"]')).toHaveAttribute(
+      "data-tier",
+      "gold",
+    );
   });
 
   it("requests the picked ended season by id and resets to a fresh first page", async () => {

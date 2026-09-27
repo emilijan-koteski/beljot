@@ -407,7 +407,7 @@ Direction 5 — Competitive / Esports
 Key characteristics:
 
 - Top navigation bar with logo + tabs (Play, Leaderboard, Profile, Rules)
-- Rank banner below the nav — player's current rank tier, LP progress bar, and season countdown visible immediately on entering the lobby
+- Rank banner below the nav — player's current rank tier and division (e.g. "Gold 2"), SP progress bar toward the next division, and season countdown visible immediately on entering the lobby
 - Body split: left column with four equal-weight play options (Quick Play, Ranked, Browse Rooms, Create Room), right panel showing the seasonal leaderboard
 - Rank badge uses tier-specific colour with glow (Bronze = `#cd7f32`, Silver = `#c0c0c0`, etc.)
 
@@ -422,9 +422,9 @@ Key characteristics:
 ### Direction Implementation Approach
 
 - Top nav: fixed, full-width, `surface` background, `border-bottom`
-- Rank banner: card component beneath nav, `surface` background, rank badge left + LP bar + season countdown right
+- Rank banner: card component beneath nav, `surface` background, rank badge left (tier + division) + SP bar to next division + season countdown right
 - Body: CSS grid, `180px` play column + `1fr` leaderboard panel, 16px gap
-- Leaderboard rows: rank number, username, tier label, ELO/LP value
+- Leaderboard rows: rank number, username, tier label with division, SP value
 - Play options: equal-height cards, Quick Play gets `accent-glow` background to signal recommended default action
 - Responsive consideration (future): stack play column above leaderboard at narrower viewports
 
@@ -442,7 +442,7 @@ flowchart TD
     D -- No --> C
     D -- Yes --> E[Account created]
     E --> F[Lobby — Direction 5 layout]
-    F --> G[Rank banner: Unranked · Level 0]
+    F --> G[Rank banner: Iron 1 · Level 0]
     G --> H{What does player do?}
     H --> I[Quick Play]
     H --> J[Browse Rooms]
@@ -452,7 +452,7 @@ flowchart TD
 UX notes:
 
 - Registration is 3 fields — email, username, password. No email verification gate before first session.
-- On first login, rank banner shows "Unranked" with a subtle prompt: "Play 5 games to unlock Ranked mode"
+- On first login, rank banner shows Iron 1 at 0 SP; there is no unranked state and no unlock gate
 - No tutorial modal, no onboarding overlay — players know the game; they want to play
 
 ---
@@ -644,7 +644,7 @@ These components are available from shadcn/ui and will be themed to the Beljot v
 | `Toast`            | Room full, auto-play notification, copy-link confirmation      |
 | `Tooltip`          | Ranked locked state, rules reference hints                     |
 | `Dropdown`         | Variant selector, mode selector in room config                 |
-| `Progress`         | Rank LP progress bar in rank banner, XP level bar              |
+| `Progress`         | Rank SP progress bar (to next division) in rank banner, XP level bar |
 | `Badge`            | Player level display, rank tier label                          |
 | `Avatar`           | Player seat representation in lobby and table                  |
 | `Separator`        | Section dividers in score panel, room list                     |
@@ -752,13 +752,22 @@ These are game-specific components with no shadcn/ui equivalent. All built with 
 
 #### RankBanner
 
-**Purpose:** Lobby element showing player's current rank, LP progress, and season countdown.
+**Purpose:** Lobby element showing player's current rank (tier + division), SP, progress to the next division, and season countdown.
 
 **States:**
 
-- `unranked` — "Unranked" label, empty progress bar, prompt to play placement matches
-- `placement` — "Placement: X/3" during placement matches
-- `ranked` — full rank display with LP and progress bar
+- `ranked` — tier badge, tier name with division (e.g. "Gold 2"), current SP, progress bar to the next division (to the next tier from Diamond 3 / Master), days left in season. A player at 0 SP is Iron 1; there is no unranked or placement state.
+- `top` — Grandmaster: terminal bar, no "next" target.
+
+**Rank changes:** promotion (division or tier up) gets the celebratory toast. Demotion gets a subdued notice ("Dropped to Gold 2"), with no fanfare and no alarm styling. Earn the theatre: only climbing is theatrical.
+
+#### Match result: SP line
+
+**Purpose:** Tells the player what the match did to their seasonal rank.
+
+**Anatomy:** Signed SP change (`+24 SP` / `−13 SP`) and the resulting tier and division, shown with the coin settlement on the match result screen. If a partner abandoned: "Partner abandoned: −12 SP (half loss)". If the player abandoned: the penalty, stated plainly.
+
+**Visual tone:** Informational. A gain can use the accent colour; a loss uses a muted colour, never red alarm styling.
 
 #### ReconnectOverlay
 

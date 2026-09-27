@@ -13,10 +13,12 @@ const NOW = Date.parse("2026-08-27T12:00:00Z");
 const baseSeason: CurrentSeasonResponse = {
   seasonName: "2026 Q3",
   endsAt: "2026-10-01T00:00:00Z",
-  sp: 4000,
+  sp: 680,
   rankTier: "gold",
-  spIntoTier: 1000,
-  spForNextTier: 2500,
+  // 680 SP is Gold 2 (667-733): 13 SP into its 67-SP step toward Gold 3.
+  rankDivision: 2,
+  spIntoDivision: 13,
+  spForNextDivision: 67,
   gamesPlayed: 31,
   gamesCompleted: 29,
 };
@@ -70,9 +72,9 @@ describe("RankBanner", () => {
     expect(screen.getByTestId("rank-banner").getAttribute("data-tier")).toBe("gold");
   });
 
-  it("renders the tier name", () => {
+  it("renders the rank as tier plus division", () => {
     renderBanner(baseSeason);
-    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Gold");
+    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Gold 2");
   });
 
   it("renders the current SP total", () => {
@@ -80,18 +82,19 @@ describe("RankBanner", () => {
     // Grouped via toLocaleString (the same call HeroBlock's stat pills use), so
     // the expectation is built the same way rather than hardcoding a separator
     // the CI host's locale may not use.
-    expect(screen.getByTestId("rank-sp").textContent).toContain((4000).toLocaleString());
+    expect(screen.getByTestId("rank-sp").textContent).toContain((680).toLocaleString());
   });
 
-  it("renders the progress bar with the server's own decomposition", () => {
+  it("fills the bar toward the next rank step, from the server's own decomposition", () => {
     renderBanner(baseSeason);
     const bar = screen.getByTestId("rank-progress");
     expect(bar.getAttribute("role")).toBe("progressbar");
     expect(bar.getAttribute("aria-valuemin")).toBe("0");
     expect(bar.getAttribute("aria-valuemax")).toBe("100");
-    // 1000 of a 2500-wide band.
-    expect(bar.getAttribute("aria-valuenow")).toBe("40");
-    expect(bar.getAttribute("aria-label")).toBeTruthy();
+    // 13 of Gold 2's 67-SP step, NOT 80 of the 200-wide Gold band.
+    expect(bar.getAttribute("aria-valuenow")).toBe("19");
+    expect(bar.getAttribute("aria-label")).toBe("Gold 2, 13 of 67 SP to the next rank");
+    expect(screen.getByTestId("rank-progress-caption").textContent).toBe("13 / 67 SP");
   });
 
   it("renders the days remaining in the season", () => {
@@ -106,33 +109,62 @@ describe("RankBanner", () => {
     expect(screen.getByTestId("rank-season-days").getAttribute("title")).toBe("2026 Q3");
   });
 
-  it("renders a player at zero SP as Iron rather than unranked", () => {
-    renderBanner({ ...baseSeason, sp: 0, rankTier: "iron", spIntoTier: 0, spForNextTier: 500 });
+  it("renders a player at zero SP as Iron 1 rather than unranked", () => {
+    renderBanner({
+      ...baseSeason,
+      sp: 0,
+      rankTier: "iron",
+      rankDivision: 1,
+      spIntoDivision: 0,
+      spForNextDivision: 50,
+    });
     expect(screen.getByTestId("rank-banner").getAttribute("data-tier")).toBe("iron");
-    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Iron");
+    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Iron 1");
     expect(screen.getByTestId("rank-progress").getAttribute("aria-valuenow")).toBe("0");
   });
 
-  it("renders a full bar at Grandmaster, where there is no next tier", () => {
+  it("renders Master without a division, filling toward Grandmaster", () => {
     renderBanner({
       ...baseSeason,
-      sp: 20000,
-      rankTier: "grandmaster",
-      spIntoTier: 2000,
-      spForNextTier: 0,
+      sp: 1250,
+      rankTier: "master",
+      rankDivision: null,
+      spIntoDivision: 50,
+      spForNextDivision: 200,
     });
-    // The terminal case: spForNextTier 0 must read as complete, not empty.
+    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Master");
+    expect(screen.getByTestId("rank-progress").getAttribute("aria-valuenow")).toBe("25");
+  });
+
+  it("renders a full bar at Grandmaster, where there is no next rank", () => {
+    renderBanner({
+      ...baseSeason,
+      sp: 1500,
+      rankTier: "grandmaster",
+      rankDivision: null,
+      spIntoDivision: 100,
+      spForNextDivision: 0,
+    });
+    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Grandmaster");
+    // The terminal case: a 0 step must read as complete, not empty.
     expect(screen.getByTestId("rank-progress").getAttribute("aria-valuenow")).toBe("100");
     expect(screen.getByTestId("rank-progress-caption").textContent).toBe(
       i18n.t("season.banner.atTop"),
     );
   });
 
+  it("drops a division the tier cannot have rather than rendering it", () => {
+    // Version skew the other way: a division on a single tier.
+    renderBanner({ ...baseSeason, sp: 1250, rankTier: "master", rankDivision: 2 });
+    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Master");
+  });
+
   it("falls back to the SP bucket for an unrecognised tier token", () => {
     // Version skew: a newer server sends a tier this bundle has never heard of.
-    renderBanner({ ...baseSeason, rankTier: "mythic" });
+    // 700 SP is Gold.
+    renderBanner({ ...baseSeason, rankTier: "mythic", sp: 700 });
     expect(screen.getByTestId("rank-banner").getAttribute("data-tier")).toBe("gold");
-    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Gold");
+    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Gold 2");
   });
 
   it("renders zero days remaining for a window that has already closed", () => {
@@ -140,9 +172,9 @@ describe("RankBanner", () => {
     expect(screen.getByTestId("rank-season-days").textContent).toContain("0");
   });
 
-  it("renders the localized tier name in mk", async () => {
+  it("renders the localized rank in mk", async () => {
     await i18n.changeLanguage("mk");
     renderBanner(baseSeason);
-    expect(screen.getByTestId("rank-tier-name").textContent).toBe(i18n.t("season.tier.gold"));
+    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Злато 2");
   });
 });

@@ -51,6 +51,7 @@ import type {
   TrumpSelectedPayload,
   XpAwardedPayload,
 } from "./wsEvents";
+import { SEASON_RANK_CHANGES, SEASON_SP_REASONS } from "./wsEvents";
 
 // --- Card / declaration sub-schemas (used by MatchState + DeclarationsResolved) ---
 
@@ -353,17 +354,21 @@ export const HonorUpdatedPayloadSchema = z.strictObject({
   isNewPlayer: z.boolean(),
 });
 
-// Story 13.1: per-human match-end Season Points award. rankTier is left as a
-// plain string rather than a union of the eight tokens for the same reason
-// honorTier is — a server-side retune that adds a tier must not hard-fail a stale
-// client bundle; normalizeSeasonTier in shared/lib/seasonTier.ts falls back to the
-// SP's own bucket instead. seasonName is likewise a free string: it is a
-// machine-stable "YYYY QN" identifier the client renders verbatim.
+// Story 13.1, reshaped by 13.5: per-human match-end Season Points award. rankTier
+// is left as a plain string rather than a union of the eight tokens for the same
+// reason honorTier is — a server-side retune that adds a tier must not hard-fail
+// a stale client bundle; normalizeSeasonTier in shared/lib/seasonTier.ts falls
+// back to the SP's own bucket instead. seasonName is likewise a free string: it
+// is a machine-stable "YYYY QN" identifier the client renders verbatim.
+// rankDivision is null (never absent) for Master and Grandmaster. rankChange and
+// reason are closed token sets mirroring the Go constants, so they are enums.
 export const SeasonPointsAwardedPayloadSchema = z.strictObject({
-  spEarned: z.number().int(),
+  spChange: z.number().int(),
   newSeasonSp: z.number().int(),
   rankTier: z.string(),
-  tieredUp: z.boolean(),
+  rankDivision: z.number().int().nullable(),
+  rankChange: z.enum(SEASON_RANK_CHANGES),
+  reason: z.enum(SEASON_SP_REASONS),
   seasonName: z.string(),
 });
 

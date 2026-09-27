@@ -43,6 +43,21 @@ describe("TierBadge", () => {
     expect(screen.getByTestId("tier-badge").getAttribute("data-tier")).toBe("silver");
   });
 
+  it("scales up to the rank-change medallion", () => {
+    render(<TierBadge tier="gold" size="lg" />);
+    expect(screen.getByTestId("tier-badge").className).toContain("size-20");
+  });
+
+  it("glows by default and drops the glow when asked (the rank-down dialog)", () => {
+    const { rerender } = render(<TierBadge tier="gold" />);
+    expect(screen.getByTestId("tier-badge").getAttribute("style") ?? "").toContain("0 0 14px");
+    expect(screen.getByTestId("tier-badge").getAttribute("data-glow")).toBe("true");
+
+    rerender(<TierBadge tier="gold" glow={false} />);
+    expect(screen.getByTestId("tier-badge").getAttribute("style") ?? "").not.toContain("0 0 14px");
+    expect(screen.getByTestId("tier-badge").getAttribute("data-glow")).toBe("false");
+  });
+
   it("takes a caller-supplied test id so each surface can name its own badge", () => {
     render(<TierBadge tier="iron" data-testid="rank-badge" />);
     expect(screen.getByTestId("rank-badge")).toBeTruthy();
