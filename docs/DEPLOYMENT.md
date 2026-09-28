@@ -155,7 +155,8 @@ The deploy job returns as soon as Dokploy accepts the request ("Deploy requested
 
 ```bash
 cp .env.example .env            # local values only
-docker compose up -d            # PostgreSQL 16 on localhost:5433
+docker compose up -d            # PostgreSQL 16 on localhost:5433, Garage S3 on :3900 (bucket web on :3902)
+docker compose exec garage /garage bucket website --allow beljot-public   # once, so avatars are served
 make dev                        # Vite on :5173 proxying /api and /ws to the Go server on :8080
 ```
 

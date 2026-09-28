@@ -12,5 +12,21 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  garage:
+    image: dxflrs/garage:v2.3.0
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    ports:
+      - "3900:3900"
+      - "3902:3902"
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:-4f1d2e9c7b8a60351c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f708192a3b4c5d6e7}
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_DEFAULT_ACCESS_KEY:-GK0123456789abcdef01234567}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_DEFAULT_SECRET_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      GARAGE_DEFAULT_BUCKET: ${GARAGE_DEFAULT_BUCKET:-beljot-public}
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garagedata:/var/lib/garage
+
 volumes:
   pgdata:
+  garagedata:

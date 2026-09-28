@@ -5,7 +5,7 @@ export
 
 dev:
 	docker compose up -d
-	@echo "PostgreSQL started on port 5433"
+	@echo "PostgreSQL on :5433, Garage S3 on :3900 (bucket web on :3902)"
 	npx -y concurrently -k -n client,server -c blue,green \
 		"cd client && npm run dev" \
 		"cd server && go run ./cmd/api"
