@@ -1,4 +1,4 @@
-.PHONY: dev build test lint migrate seed
+.PHONY: dev build test test-client test-server lint lint-client lint-server migrate seed
 
 -include .env
 export
@@ -14,12 +14,20 @@ build:
 	cd client && npm run build
 	cd server && go build -o bin/api cmd/api/main.go
 
-test:
+test: test-client test-server
+
+test-client:
 	cd client && npx vitest run
+
+test-server:
 	cd server && go test ./...
 
-lint:
+lint: lint-client lint-server
+
+lint-client:
 	cd client && npx tsc --noEmit && npx eslint . && npx prettier --check .
+
+lint-server:
 	cd server && golangci-lint run ./...
 
 migrate:

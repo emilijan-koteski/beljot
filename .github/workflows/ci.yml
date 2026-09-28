@@ -1,14 +1,40 @@
 name: CI
 
 on:
-  push:
-    branches-ignore: [master]
   pull_request:
     branches: [master]
   workflow_call: {}
 
+# run_id when called from Deploy, so master's gate is never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
-  test-and-lint:
+  client:
+    name: Client lint + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: cd client && npm ci
+
+      - name: Lint
+        run: make lint-client
+
+      - name: Test
+        run: make test-client
+
+  server:
+    name: Server lint + test
     runs-on: ubuntu-latest
 
     services:
@@ -27,45 +53,43 @@ jobs:
           --health-retries=5
 
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       BELJOT_DB_URL: postgres://beljot:beljot_test_password@localhost:5432/beljot_test?sslmode=disable
       BELJOT_TEST_DB_URL: postgres://beljot:beljot_test_password@localhost:5432/beljot_test?sslmode=disable
       BELJOT_JWT_SECRET: test-secret
       BELJOT_PORT: 8080
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
-          go-version: "1.26"
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: client/package-lock.json
-
-      - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-
-      - name: Install golang-migrate
-        run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-
-      - name: Install frontend dependencies
-        run: cd client && npm ci
-
-      - name: Run database migrations
-        run: migrate -path server/migrations -database "$BELJOT_DB_URL" up
+      - name: Read tool versions
+        id: tools
+        run: |
+          golangci=$(sed -n 's/^golangci-lint = "\([0-9]*\.[0-9]*\.[0-9]*\)"$/\1/p' mise.toml)
+          migrate=$(cd server && go list -m -f '{{.Version}}' github.com/golang-migrate/migrate/v4)
+          test -n "$golangci" || { echo "::error::no exact golangci-lint version in mise.toml"; exit 1; }
+          echo "golangci-lint=v$golangci" >> "$GITHUB_OUTPUT"
+          echo "migrate=$migrate" >> "$GITHUB_OUTPUT"
 
       - name: Lockfile — forbidden old team tokens
         run: bash scripts/lockfile-old-team-tokens.sh
 
       - name: Lint
-        run: make lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ steps.tools.outputs.golangci-lint }}
+          working-directory: server
+
+      - name: Install golang-migrate
+        run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@${{ steps.tools.outputs.migrate }}
+
+      - name: Run database migrations
+        run: migrate -path server/migrations -database "$BELJOT_DB_URL" up
 
       - name: Test
-        run: make test
+        run: make test-server

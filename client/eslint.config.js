@@ -32,6 +32,35 @@ export default tseslint.config(
   },
   prettier,
   {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.test.{ts,tsx}", "src/test-setup.ts"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        ...[
+          "process",
+          "Buffer",
+          "global",
+          "__dirname",
+          "__filename",
+          "require",
+          "module",
+          "exports",
+          "setImmediate",
+          "clearImmediate",
+        ].map((name) => ({ name, message: "Node-only global: not available in the browser." })),
+      ],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["node:*"], message: "Node built-in: not available in the browser." },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["vite.config.ts", "vitest.config.ts"],
     rules: {
       "no-restricted-syntax": "off",
