@@ -43,6 +43,13 @@ type SeasonRankReader interface {
 type ProfileResponse struct {
 	ID       uint   `json:"id"`
 	Username string `json:"username"`
+	// AvatarURL / AvatarLargeURL are the 128 and 256 px derivatives of the
+	// player's avatar, null when there is none. PUBLIC-SAFE (the picture is on
+	// every roster and seat anyway), so PublicProfileResponse carries both. The
+	// two profile shapes are the ONLY DTOs with the large one: the hero is the
+	// one disc drawn big enough to need it.
+	AvatarURL      *string `json:"avatarUrl"`
+	AvatarLargeURL *string `json:"avatarLargeUrl"`
 	// UsernameChangedAt is when the username was last changed (null if never).
 	// The client derives the change-cooldown state / next-allowed date from it.
 	UsernameChangedAt  *time.Time `json:"usernameChangedAt,omitempty"`
@@ -86,13 +93,13 @@ type ProfileResponse struct {
 	// lifetime score — different sample sizes carry different Bayesian prior drag,
 	// which made flawless players read "Slipping"). The one honor figure that
 	// costs a query.
-	HonorScore          int       `json:"honorScore"`
-	HonorTier           string    `json:"honorTier"`
-	HonorCompletedTotal int64     `json:"honorCompletedTotal"`
-	HonorAbandonedTotal int64     `json:"honorAbandonedTotal"`
-	IsNewPlayer         bool      `json:"isNewPlayer"`
-	HonorTrendDelta     int       `json:"honorTrendDelta"`
-	HonorTrendDirection string    `json:"honorTrendDirection"`
+	HonorScore          int    `json:"honorScore"`
+	HonorTier           string `json:"honorTier"`
+	HonorCompletedTotal int64  `json:"honorCompletedTotal"`
+	HonorAbandonedTotal int64  `json:"honorAbandonedTotal"`
+	IsNewPlayer         bool   `json:"isNewPlayer"`
+	HonorTrendDelta     int    `json:"honorTrendDelta"`
+	HonorTrendDirection string `json:"honorTrendDirection"`
 	// SeasonRank is the subject's standing in the ACTIVE season (Story 13.3):
 	// {seasonName, tier, division, sp}, or null when they have not played in
 	// it -- the client hides the rank chip on null. PUBLIC-SAFE, like the honor block
@@ -119,9 +126,12 @@ type ProfileResponse struct {
 // Every value is computed for the PATH id (the subject), never the viewer — see
 // GetProfile.
 type PublicProfileResponse struct {
-	ID        uint      `json:"id"`
-	Username  string    `json:"username"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+	// Avatar derivatives, same semantics as the self shape.
+	AvatarURL      *string   `json:"avatarUrl"`
+	AvatarLargeURL *string   `json:"avatarLargeUrl"`
+	CreatedAt      time.Time `json:"createdAt"`
 	// Progression (Story 9.5) — public per Story 11.3 D2.
 	TotalXP        int `json:"totalXp"`
 	Level          int `json:"level"`
@@ -236,7 +246,10 @@ type MatchPlayer struct {
 	Seat     int    `json:"seat"`
 	UserID   uint   `json:"userId"`
 	Username string `json:"username"`
-	IsBot    bool   `json:"isBot"`
+	// AvatarURL is the participant's 128 px avatar as it is NOW, not as it was
+	// when the match was played; null for bots and players without one.
+	AvatarURL *string `json:"avatarUrl"`
+	IsBot     bool    `json:"isBot"`
 }
 
 // MatchHandView is the per-hand scoring breakdown embedded in a match list item.
@@ -310,18 +323,20 @@ type BestHand struct {
 
 // PartnerStat is one most-played-teammate row in the career response.
 type PartnerStat struct {
-	UserID   uint   `json:"userId"`
-	Username string `json:"username"`
-	Played   int    `json:"played"`
-	Wins     int    `json:"wins"`
+	UserID    uint    `json:"userId"`
+	Username  string  `json:"username"`
+	AvatarURL *string `json:"avatarUrl"`
+	Played    int     `json:"played"`
+	Wins      int     `json:"wins"`
 }
 
 // RivalStat is one most-faced-opponent row in the career response.
 type RivalStat struct {
-	UserID   uint   `json:"userId"`
-	Username string `json:"username"`
-	Wins     int    `json:"wins"`
-	Losses   int    `json:"losses"`
+	UserID    uint    `json:"userId"`
+	Username  string  `json:"username"`
+	AvatarURL *string `json:"avatarUrl"`
+	Wins      int     `json:"wins"`
+	Losses    int     `json:"losses"`
 }
 
 // CareerResponse is the envelope returned by GET /users/:id/career — the
@@ -470,6 +485,8 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 			"data": ProfileResponse{
 				ID:                  u.ID,
 				Username:            u.Username,
+				AvatarURL:           SmallAvatarURL(u.AvatarKey),
+				AvatarLargeURL:      AvatarURL(u.AvatarKey, AvatarSizeLarge),
 				UsernameChangedAt:   u.UsernameChangedAt,
 				LanguagePreference:  u.LanguagePreference,
 				CardDeckPreference:  u.CardDeckPreference,
@@ -504,6 +521,8 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		"data": PublicProfileResponse{
 			ID:                  u.ID,
 			Username:            u.Username,
+			AvatarURL:           SmallAvatarURL(u.AvatarKey),
+			AvatarLargeURL:      AvatarURL(u.AvatarKey, AvatarSizeLarge),
 			CreatedAt:           u.CreatedAt,
 			TotalXP:             u.TotalXP,
 			Level:               level,
@@ -577,28 +596,32 @@ func (h *UserHandler) GetCareer(c echo.Context) error {
 		return fmt.Errorf("fetching career rivals: %w", err)
 	}
 
-	usernames, err := h.loadUsernamesForAggregates(partnerAggs, rivalAggs)
+	identities, err := h.loadIdentitiesForAggregates(partnerAggs, rivalAggs)
 	if err != nil {
 		return fmt.Errorf("loading career usernames: %w", err)
 	}
 
 	partners := make([]PartnerStat, 0, len(partnerAggs))
 	for _, p := range partnerAggs {
+		who := identities[p.UserID]
 		partners = append(partners, PartnerStat{
-			UserID:   p.UserID,
-			Username: usernames[p.UserID],
-			Played:   p.Played,
-			Wins:     p.Wins,
+			UserID:    p.UserID,
+			Username:  who.username,
+			AvatarURL: SmallAvatarURL(who.avatarKey),
+			Played:    p.Played,
+			Wins:      p.Wins,
 		})
 	}
 
 	rivals := make([]RivalStat, 0, len(rivalAggs))
 	for _, r := range rivalAggs {
+		who := identities[r.UserID]
 		rivals = append(rivals, RivalStat{
-			UserID:   r.UserID,
-			Username: usernames[r.UserID],
-			Wins:     r.Wins,
-			Losses:   r.Losses,
+			UserID:    r.UserID,
+			Username:  who.username,
+			AvatarURL: SmallAvatarURL(who.avatarKey),
+			Wins:      r.Wins,
+			Losses:    r.Losses,
 		})
 	}
 
@@ -631,9 +654,25 @@ func (h *UserHandler) GetCareer(c echo.Context) error {
 	})
 }
 
-// loadUsernamesForAggregates batches the username lookup for all partner +
+// participantIdentity is what every participant DTO shows of a player: the
+// name, and the stored avatar prefix the public URL is derived from.
+type participantIdentity struct {
+	username  string
+	avatarKey *string
+}
+
+// identitiesByID indexes loaded users by id.
+func identitiesByID(users []User) map[uint]participantIdentity {
+	result := make(map[uint]participantIdentity, len(users))
+	for _, u := range users {
+		result[u.ID] = participantIdentity{username: u.Username, avatarKey: u.AvatarKey}
+	}
+	return result
+}
+
+// loadIdentitiesForAggregates batches the identity lookup for all partner +
 // rival IDs into a single FindManyByIDs call, returning a map keyed by userID.
-func (h *UserHandler) loadUsernamesForAggregates(partners []match.PartnerAggregate, rivals []match.RivalAggregate) (map[uint]string, error) {
+func (h *UserHandler) loadIdentitiesForAggregates(partners []match.PartnerAggregate, rivals []match.RivalAggregate) (map[uint]participantIdentity, error) {
 	seen := make(map[uint]struct{}, len(partners)+len(rivals))
 	ids := make([]uint, 0, len(partners)+len(rivals))
 	add := func(id uint) {
@@ -653,17 +692,13 @@ func (h *UserHandler) loadUsernamesForAggregates(partners []match.PartnerAggrega
 		add(r.UserID)
 	}
 	if len(ids) == 0 {
-		return map[uint]string{}, nil
+		return map[uint]participantIdentity{}, nil
 	}
 	users, err := h.userRepo.FindManyByIDs(ids)
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[uint]string, len(users))
-	for _, u := range users {
-		result[u.ID] = u.Username
-	}
-	return result, nil
+	return identitiesByID(users), nil
 }
 
 func (h *UserHandler) UpdatePreferences(c echo.Context) error {
@@ -823,13 +858,16 @@ func (h *UserHandler) UpdateUsername(c echo.Context) error {
 }
 
 // PlayerSearchResult is the minimal per-user DTO returned by SearchUsers
-// (Story 11.1). It deliberately carries ONLY the public id + username — never
+// (Story 11.1). It deliberately carries ONLY the public id + username + avatar — never
 // email, wallet, honor, or any other field — because search results are shown
 // to any authenticated player. Enriching it with honor/level chips is a
 // possible future enhancement, out of scope here (see the story Scope note).
 type PlayerSearchResult struct {
 	ID       uint   `json:"id"`
 	Username string `json:"username"`
+	// AvatarURL is the 128 px avatar (null when none). It is on every roster
+	// already, so it widens nothing the search reveals.
+	AvatarURL *string `json:"avatarUrl"`
 }
 
 // searchResultLimit caps how many rows SearchUsers returns for a single query.
@@ -860,7 +898,7 @@ func (h *UserHandler) SearchUsers(c echo.Context) error {
 
 	items := make([]PlayerSearchResult, 0, len(users))
 	for _, u := range users {
-		items = append(items, PlayerSearchResult{ID: u.ID, Username: u.Username})
+		items = append(items, PlayerSearchResult{ID: u.ID, Username: u.Username, AvatarURL: SmallAvatarURL(u.AvatarKey)})
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": items})
@@ -908,14 +946,14 @@ func (h *UserHandler) ListMatches(c echo.Context) error {
 		return fmt.Errorf("fetching matches: %w", err)
 	}
 
-	usernames, err := h.loadUsernamesForMatches(matches)
+	identities, err := h.loadIdentitiesForMatches(matches)
 	if err != nil {
 		return fmt.Errorf("loading match usernames: %w", err)
 	}
 
 	items := make([]MatchListItem, 0, len(matches))
 	for _, m := range matches {
-		items = append(items, buildMatchListItem(m, subjectID, usernames))
+		items = append(items, buildMatchListItem(m, subjectID, identities))
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -975,14 +1013,14 @@ func parseMatchesQuery(c echo.Context) (limit, offset int, outcome, sort string,
 	return limit, offset, outcome, sort, nil
 }
 
-// loadUsernamesForMatches gathers all participant IDs across the page and
+// loadIdentitiesForMatches gathers all participant IDs across the page and
 // issues a single batched query via userRepo.FindManyByIDs. Returns a map
 // keyed by userID so callers can project the 4 seats per match in O(1).
 // Bot seats (NULL player IDs) never reach the users lookup — the client
 // renders the localized bot name from the isBot flag.
-func (h *UserHandler) loadUsernamesForMatches(matches []match.Match) (map[uint]string, error) {
+func (h *UserHandler) loadIdentitiesForMatches(matches []match.Match) (map[uint]participantIdentity, error) {
 	if len(matches) == 0 {
-		return map[uint]string{}, nil
+		return map[uint]participantIdentity{}, nil
 	}
 	seen := make(map[uint]struct{}, len(matches)*4)
 	ids := make([]uint, 0, len(matches)*4)
@@ -999,17 +1037,13 @@ func (h *UserHandler) loadUsernamesForMatches(matches []match.Match) (map[uint]s
 		}
 	}
 	if len(ids) == 0 {
-		return map[uint]string{}, nil
+		return map[uint]participantIdentity{}, nil
 	}
 	users, err := h.userRepo.FindManyByIDs(ids)
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[uint]string, len(users))
-	for _, u := range users {
-		result[u.ID] = u.Username
-	}
-	return result, nil
+	return identitiesByID(users), nil
 }
 
 // teamForSeat returns 0 for team A, 1 for team B — seats 0/2 are team A, 1/3 are team B.
@@ -1019,7 +1053,7 @@ func teamForSeat(seat int) int { return seat % 2 }
 
 // buildMatchListItem projects a DB Match + preloaded Hands into the viewer-
 // specific response DTO (derives viewerSeat and outcome server-side).
-func buildMatchListItem(m match.Match, viewerID uint, usernames map[uint]string) MatchListItem {
+func buildMatchListItem(m match.Match, viewerID uint, identities map[uint]participantIdentity) MatchListItem {
 	seats := [4]*uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID}
 	botFlags := [4]bool{m.Player1IsBot, m.Player2IsBot, m.Player3IsBot, m.Player4IsBot}
 
@@ -1036,8 +1070,10 @@ func buildMatchListItem(m match.Match, viewerID uint, usernames map[uint]string)
 	for i, id := range seats {
 		p := MatchPlayer{Seat: i, IsBot: botFlags[i]}
 		if id != nil {
+			who := identities[*id]
 			p.UserID = *id
-			p.Username = usernames[*id]
+			p.Username = who.username
+			p.AvatarURL = SmallAvatarURL(who.avatarKey)
 		}
 		players = append(players, p)
 	}

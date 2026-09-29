@@ -37,6 +37,7 @@
       "connected": true,
       "isBot": false,
       "level": 3,
+      "avatarUrl": "https://assets.example.com/avatars/0f8b6c1e-2a4d-4e6f-9a1b-3c5d7e9f1a2b/128.webp",
       "faceDownCount": 0,
       "handCount": 1,
       "declarationAnswered": false
@@ -51,6 +52,7 @@
       "connected": true,
       "isBot": false,
       "level": 1,
+      "avatarUrl": null,
       "faceDownCount": 0,
       "handCount": 1,
       "declarationAnswered": false
@@ -65,6 +67,7 @@
       "connected": true,
       "isBot": false,
       "level": 2,
+      "avatarUrl": null,
       "faceDownCount": 0,
       "handCount": 1,
       "declarationAnswered": false
@@ -79,6 +82,7 @@
       "connected": true,
       "isBot": false,
       "level": 0,
+      "avatarUrl": null,
       "faceDownCount": 0,
       "handCount": 1,
       "declarationAnswered": false

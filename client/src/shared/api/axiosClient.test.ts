@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { axiosClient, axiosPublic, FetchError } from "./axiosClient";
+import { useAuthStore } from "@/shared/stores/authStore";
+
+import { axiosClient, axiosPublic, FetchError, refreshAccessToken } from "./axiosClient";
 
 describe("axiosClient request deadline", () => {
   // A missing timeout means a hung connection never settles the promise, which
@@ -57,5 +59,53 @@ describe("axiosClient request deadline", () => {
       status: 0,
       code: "NETWORK_ERROR",
     });
+  });
+});
+
+describe("refreshAccessToken re-hydrates the avatar", () => {
+  const envelope = {
+    token: "fresh",
+    id: 1,
+    username: "kiro",
+    email: "kiro@example.com",
+    languagePreference: "en",
+    cardDeckPreference: "french",
+    soundEnabled: true,
+    musicEnabled: true,
+    soundVolume: 70,
+    musicVolume: 70,
+    walletBalance: 5000,
+    loginStreakDays: 0,
+    totalXp: 0,
+    level: 0,
+    honorScore: 80,
+    honorTier: "fair",
+    isNewPlayer: false,
+    createdAt: "2026-01-01T00:00:00Z",
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  it("copies the envelope's avatarUrl into the auth store", async () => {
+    const url = "https://assets.test/avatars/k/128.webp";
+    vi.spyOn(axiosPublic, "post").mockResolvedValue({
+      data: { data: { ...envelope, avatarUrl: url } },
+    });
+
+    await refreshAccessToken();
+
+    expect(useAuthStore.getState().user?.avatarUrl).toBe(url);
+  });
+
+  it("stores null when the envelope has no avatarUrl key", async () => {
+    vi.spyOn(axiosPublic, "post").mockResolvedValue({ data: { data: envelope } });
+
+    await refreshAccessToken();
+
+    expect(useAuthStore.getState().user).not.toBeNull();
+    expect(useAuthStore.getState().user?.avatarUrl).toBeNull();
   });
 });

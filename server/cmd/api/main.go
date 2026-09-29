@@ -19,6 +19,7 @@ import (
 
 	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/auth"
+	"github.com/emilijan/beljot/server/internal/avatar"
 	"github.com/emilijan/beljot/server/internal/chat"
 	"github.com/emilijan/beljot/server/internal/config"
 	"github.com/emilijan/beljot/server/internal/dbmigrate"
@@ -106,6 +107,31 @@ func main() {
 	resetRepo := passwordreset.NewGormRepository(db)
 	passwordResetHandler := auth.NewPasswordResetHandler(userRepo, resetRepo, appMailer, cfg.AppBaseURL, time.Hour)
 
+	// Avatar storage: the S3 client exists only when all six variables are set
+	// (config.Load has already exited outside development otherwise). The
+	// handler gets an untyped nil store when it does not, and answers 503. The
+	// public base URL is set only alongside a store, so a storage-less dev
+	// server serializes every avatarUrl as null.
+	var avatarStore avatar.Store
+	if cfg.AvatarStorageConfigured() {
+		s3Store, err := avatar.NewS3Store(context.Background(), avatar.S3Config{
+			Endpoint:  cfg.S3Endpoint,
+			Region:    cfg.S3Region,
+			AccessKey: cfg.S3AccessKey,
+			SecretKey: cfg.S3SecretKey,
+			Bucket:    cfg.S3PublicBucket,
+		})
+		if err != nil {
+			slog.Error("failed to build the avatar object-store client", "error", err)
+			os.Exit(1)
+		}
+		avatarStore = s3Store
+		user.SetPublicAssetsURL(cfg.PublicAssetsURL)
+		slog.Info("avatar storage configured", "endpoint", cfg.S3Endpoint, "bucket", cfg.S3PublicBucket, "publicURL", cfg.PublicAssetsURL)
+	} else {
+		slog.Warn("avatar storage not configured — avatar uploads answer 503")
+	}
+
 	e := echo.New()
 	e.HideBanner = true
 	e.IPExtractor = clientIPExtractor()
@@ -184,6 +210,9 @@ func main() {
 	// several narrow consumers, exactly the honorService shape.
 	seasonRepo := season.NewGormRepository(db)
 	seasonService := season.NewService(seasonRepo)
+	// Leaderboard rows carry each player's avatar URL. The derivation lives in
+	// `user`, which season must not import, so it is injected here.
+	seasonService.SetAvatarURLResolver(user.SmallAvatarURL)
 	userHandler := user.NewUserHandler(userRepo, matchRepo, seasonService)
 	api := e.Group("/api/v1", auth.AuthMiddleware(cfg.JWTSecret))
 	api.GET("/users", userHandler.SearchUsers)
@@ -192,6 +221,11 @@ func main() {
 	api.GET("/users/:id/matches", userHandler.ListMatches)
 	api.PATCH("/users/:id/preferences", userHandler.UpdatePreferences)
 	api.PATCH("/users/:id/username", userHandler.UpdateUsername)
+	// Avatar upload / removal (self-only, like the username route above). With
+	// no object store configured (development only) both answer 503.
+	avatarHandler := avatar.NewHandler(avatarStore, userRepo)
+	api.PUT("/users/:id/avatar", avatarHandler.Upload)
+	api.DELETE("/users/:id/avatar", avatarHandler.Remove)
 	// Profile-side SSO identity management (authed, self-only). The public
 	// /auth/sso/* routes handle login/register/link-during-login; these manage
 	// an already-authenticated user's linked accounts.
@@ -573,10 +607,10 @@ func (d *inviteFriendDirectory) AreFriends(a, b uint) (bool, error) {
 	return d.friends.AreFriends(a, b)
 }
 
-// ListFriends returns the viewer's accepted friends resolved to usernames. The
-// friendship rows are directional, so the "other" party is whichever side is not
-// the viewer. A friend whose user row was soft-deleted is omitted rather than
-// surfaced with a blank name.
+// ListFriends returns the viewer's accepted friends resolved to usernames and
+// avatar URLs. The friendship rows are directional, so the "other" party is
+// whichever side is not the viewer. A friend whose user row was soft-deleted is
+// omitted rather than surfaced with a blank name.
 func (d *inviteFriendDirectory) ListFriends(userID uint) ([]room.FriendSummary, error) {
 	rows, err := d.friends.ListAccepted(userID)
 	if err != nil {
@@ -598,18 +632,18 @@ func (d *inviteFriendDirectory) ListFriends(userID uint) ([]room.FriendSummary, 
 	if err != nil {
 		return nil, err
 	}
-	names := make(map[uint]string, len(users))
+	byID := make(map[uint]user.User, len(users))
 	for _, u := range users {
-		names[u.ID] = u.Username
+		byID[u.ID] = u
 	}
 
 	out := make([]room.FriendSummary, 0, len(ids))
 	for _, id := range ids {
-		name, ok := names[id]
+		u, ok := byID[id]
 		if !ok {
 			continue
 		}
-		out = append(out, room.FriendSummary{UserID: id, Username: name})
+		out = append(out, room.FriendSummary{UserID: id, Username: u.Username, AvatarURL: user.SmallAvatarURL(u.AvatarKey)})
 	}
 	return out, nil
 }

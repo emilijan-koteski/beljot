@@ -16,6 +16,7 @@ export interface BestHand {
 export interface PartnerStat {
   userId: number;
   username: string;
+  avatarUrl: string | null;
   played: number;
   wins: number;
 }
@@ -23,6 +24,7 @@ export interface PartnerStat {
 export interface RivalStat {
   userId: number;
   username: string;
+  avatarUrl: string | null;
   wins: number;
   losses: number;
 }

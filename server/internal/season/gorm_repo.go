@@ -308,6 +308,7 @@ func (r *GormRepository) LeaderboardPage(seasonID uint, limit, offset int) ([]Le
 	err := r.leaderboardScope(seasonID).
 		Select(`player_seasons.user_id       AS user_id,
 		        users.username               AS username,
+		        users.avatar_key             AS avatar_key,
 		        player_seasons.sp            AS sp,
 		        player_seasons.rank_tier     AS rank_tier,
 		        player_seasons.rank_division AS rank_division,
@@ -341,6 +342,7 @@ func (r *GormRepository) FindLeaderboardEntry(seasonID, userID uint) (*Leaderboa
 	err := r.leaderboardScope(seasonID).
 		Select(`player_seasons.user_id       AS user_id,
 		        users.username               AS username,
+		        users.avatar_key             AS avatar_key,
 		        player_seasons.sp            AS sp,
 		        player_seasons.rank_tier     AS rank_tier,
 		        player_seasons.rank_division AS rank_division,

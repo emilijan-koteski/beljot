@@ -45,10 +45,10 @@ function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
     outcome: "win",
     endReason: "natural",
     players: [
-      { seat: 0, userId: 10, username: "viewer", isBot: false },
-      { seat: 1, userId: 11, username: "opp1", isBot: false },
-      { seat: 2, userId: 12, username: "mate", isBot: false },
-      { seat: 3, userId: 13, username: "opp2", isBot: false },
+      { seat: 0, userId: 10, username: "viewer", avatarUrl: null, isBot: false },
+      { seat: 1, userId: 11, username: "opp1", avatarUrl: null, isBot: false },
+      { seat: 2, userId: 12, username: "mate", avatarUrl: null, isBot: false },
+      { seat: 3, userId: 13, username: "opp2", avatarUrl: null, isBot: false },
     ],
     hands: [makeHand({ handNumber: 1 }), makeHand({ handNumber: 2 })],
     ...overrides,
@@ -143,10 +143,10 @@ describe("MatchStatsCard", () => {
       match: makeMatch({
         hasBots: true,
         players: [
-          { seat: 0, userId: 10, username: "viewer", isBot: false },
-          { seat: 1, userId: 0, username: "", isBot: true },
-          { seat: 2, userId: 12, username: "mate", isBot: false },
-          { seat: 3, userId: 0, username: "", isBot: true },
+          { seat: 0, userId: 10, username: "viewer", avatarUrl: null, isBot: false },
+          { seat: 1, userId: 0, username: "", avatarUrl: null, isBot: true },
+          { seat: 2, userId: 12, username: "mate", avatarUrl: null, isBot: false },
+          { seat: 3, userId: 0, username: "", avatarUrl: null, isBot: true },
         ],
       }),
     });
@@ -176,10 +176,10 @@ describe("MatchStatsCard", () => {
     renderCard({
       match: makeMatch({
         players: [
-          { seat: 0, userId: 10, username: "", isBot: false },
-          { seat: 1, userId: 11, username: "opp1", isBot: false },
-          { seat: 2, userId: 12, username: "mate", isBot: false },
-          { seat: 3, userId: 13, username: "opp2", isBot: false },
+          { seat: 0, userId: 10, username: "", avatarUrl: null, isBot: false },
+          { seat: 1, userId: 11, username: "opp1", avatarUrl: null, isBot: false },
+          { seat: 2, userId: 12, username: "mate", avatarUrl: null, isBot: false },
+          { seat: 3, userId: 13, username: "opp2", avatarUrl: null, isBot: false },
         ],
       }),
     });

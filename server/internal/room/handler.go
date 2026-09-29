@@ -418,6 +418,7 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		"code":                 r.Code,
 		"ownerId":              r.OwnerID,
 		"ownerUsername":        r.OwnerUsername,
+		"ownerAvatarUrl":       r.OwnerAvatarURL,
 		"players":              players,
 		"variant":              r.Variant,
 		"matchMode":            r.MatchMode,
@@ -1098,6 +1099,7 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		}
 		if joiner != nil {
 			payload["username"] = joiner.Username
+			payload["avatarUrl"] = joiner.AvatarURL
 			if joiner.HonorScore != nil {
 				payload["honorScore"] = *joiner.HonorScore
 			}
@@ -1109,6 +1111,7 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 			}
 		} else {
 			payload["username"] = ""
+			payload["avatarUrl"] = nil
 		}
 		h.broadcastToUsers(userIDs, ws.SystemPlayerJoined, payload)
 	}
@@ -2412,9 +2415,11 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 	// Broadcast system:seat_updated to room participants
 	if seatChanged {
 		var username string
+		var avatarURL *string
 		for _, p := range players {
 			if p.UserID == userID {
 				username = p.Username
+				avatarURL = p.AvatarURL
 				break
 			}
 		}
@@ -2422,6 +2427,7 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 			"roomId":       roomID,
 			"userId":       userID,
 			"username":     username,
+			"avatarUrl":    avatarURL,
 			"seat":         seat,
 			"team":         team,
 			"previousSeat": previousSeat,
@@ -2457,9 +2463,10 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 	for _, p := range players {
 		if p.Seat != nil {
 			seatInfo[*p.Seat] = match.PlayerSeatInfo{
-				UserID:   p.UserID,
-				Username: p.Username,
-				Seat:     *p.Seat,
+				UserID:    p.UserID,
+				Username:  p.Username,
+				AvatarURL: p.AvatarURL,
+				Seat:      *p.Seat,
 			}
 		}
 	}
@@ -2981,14 +2988,22 @@ func (h *RoomHandler) TransferOwnership(c echo.Context) error {
 	// HOST authority, and that authority has just moved).
 	h.invites.VoidInviter(uint(roomID), previousOwnerID)
 
+	// The promoted player's avatar: FindPlayerRoom (above) reads no user
+	// columns, so hydrate the owner fields here, best-effort. The room_updated
+	// broadcast below then reuses them instead of reading again.
+	if err := h.repo.LoadOwnerUsernames([]*Room{postRoom}); err != nil {
+		slog.Error("transfer ownership: failed to load new owner identity", "roomID", roomID, "error", err)
+	}
+
 	// Broadcast: every room member converges on the new owner. Lobby browse
 	// page also gets system:room_updated so the room card's "Hosted by …"
 	// stays accurate.
 	h.broadcastToRoom(uint(roomID), ws.SystemRoomOwnerChanged, map[string]interface{}{
-		"roomId":           roomID,
-		"newOwnerId":       postRoom.OwnerID,
-		"newOwnerUsername": newOwnerName,
-		"previousOwnerId":  previousOwnerID,
+		"roomId":            roomID,
+		"newOwnerId":        postRoom.OwnerID,
+		"newOwnerUsername":  newOwnerName,
+		"newOwnerAvatarUrl": postRoom.OwnerAvatarURL,
+		"previousOwnerId":   previousOwnerID,
 	})
 	h.broadcastRoomUpdated(postRoom)
 
@@ -3031,6 +3046,7 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 	type swapped struct {
 		userID       uint
 		username     string
+		avatarURL    *string
 		seat         int
 		team         string
 		previousSeat int
@@ -3101,6 +3117,7 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 			humanMoves = append(humanMoves, swapped{
 				userID:       p.UserID,
 				username:     p.Username,
+				avatarURL:    p.AvatarURL,
 				seat:         to,
 				team:         team,
 				previousSeat: from,
@@ -3175,6 +3192,7 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 			"roomId":       roomID,
 			"userId":       mv.userID,
 			"username":     mv.username,
+			"avatarUrl":    mv.avatarURL,
 			"seat":         mv.seat,
 			"team":         mv.team,
 			"previousSeat": mv.previousSeat,
@@ -3466,12 +3484,23 @@ func (h *RoomHandler) LeaveSeat(c echo.Context) error {
 		return fmt.Errorf("fetching players after leave-seat: %w", err)
 	}
 
+	// The leaver is still in the room, so the post-write roster (which JOINs
+	// users) has their avatar; FindPlayerRoom inside the transaction does not.
+	var avatarURL *string
+	for _, p := range players {
+		if p.UserID == userID {
+			avatarURL = p.AvatarURL
+			break
+		}
+	}
+
 	// Broadcast a system:seat_updated with seat=null/team=null so other clients
 	// remove the player from the seat tile but keep them in the room roster.
 	h.broadcastToRoom(uint(roomID), ws.SystemSeatUpdated, map[string]interface{}{
 		"roomId":       roomID,
 		"userId":       userID,
 		"username":     username,
+		"avatarUrl":    avatarURL,
 		"seat":         nil,
 		"team":         nil,
 		"previousSeat": previousSeat,
@@ -3596,9 +3625,10 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 			for _, p := range players {
 				if p.Seat != nil {
 					seatInfo[*p.Seat] = match.PlayerSeatInfo{
-						UserID:   p.UserID,
-						Username: p.Username,
-						Seat:     *p.Seat,
+						UserID:    p.UserID,
+						Username:  p.Username,
+						AvatarURL: p.AvatarURL,
+						Seat:      *p.Seat,
 					}
 				}
 			}
@@ -4131,9 +4161,11 @@ func (h *RoomHandler) broadcastQuickPlayerSeated(r *Room, userID uint, seat int,
 		return
 	}
 	var username string
+	var avatarURL *string
 	for _, p := range roomPlayers {
 		if p.UserID == userID {
 			username = p.Username
+			avatarURL = p.AvatarURL
 			break
 		}
 	}
@@ -4145,12 +4177,14 @@ func (h *RoomHandler) broadcastQuickPlayerSeated(r *Room, userID uint, seat int,
 		"roomId":      r.ID,
 		"userId":      userID,
 		"username":    username,
+		"avatarUrl":   avatarURL,
 		"playerCount": r.PlayerCount,
 	})
 	h.broadcastToUsers(userIDs, ws.SystemSeatUpdated, map[string]interface{}{
 		"roomId":       r.ID,
 		"userId":       userID,
 		"username":     username,
+		"avatarUrl":    avatarURL,
 		"seat":         seat,
 		"team":         team,
 		"previousSeat": nil,

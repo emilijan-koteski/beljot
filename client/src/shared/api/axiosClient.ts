@@ -14,8 +14,9 @@ const BASE_URL = "/api/v1";
 // while pending, so an unsettled request locks them with no way out and
 // `refetchOnWindowFocus` is off, so nothing unsticks them either.
 // 15s is well past the slowest real endpoint here (all are short REST calls —
-// no uploads, no long-polling; live gameplay runs over the WebSocket, which has
-// its own lifecycle and is unaffected by this).
+// no long-polling; live gameplay runs over the WebSocket, which has its own
+// lifecycle and is unaffected by this). The one upload, the avatar, sets its own
+// longer deadline per request (see uploadAvatar in profile.ts).
 const REQUEST_TIMEOUT_MS = 15_000;
 
 // ---------------------------------------------------------------------------
@@ -139,13 +140,14 @@ async function doRefresh(): Promise<string> {
         honorScore: number;
         honorTier: string;
         isNewPlayer: boolean;
+        avatarUrl: string | null;
         createdAt: string;
       };
     }>("/auth/refresh")
     .then((res) => {
       const r = res.data.data;
       useAuthStore.getState().setToken(r.token);
-      // Re-hydrate the full user incl. wallet / XP / honor / audio fields — a
+      // Re-hydrate the full user incl. wallet / XP / honor / audio / avatar — a
       // 401-retry refresh that dropped these would blank the header coin pill,
       // XP bar and honor chip mid-session (and forget a muted table and its
       // chosen volumes).
@@ -166,6 +168,7 @@ async function doRefresh(): Promise<string> {
         honorScore: r.honorScore,
         honorTier: r.honorTier,
         isNewPlayer: r.isNewPlayer,
+        avatarUrl: r.avatarUrl ?? null,
         createdAt: r.createdAt,
       });
       // Tell sibling tabs so they adopt this token rather than each refreshing.

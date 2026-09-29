@@ -1,5 +1,6 @@
-import { Coins } from "lucide-react";
+import { Camera, Coins } from "lucide-react";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
@@ -11,13 +12,22 @@ import { formatLocalizedDate } from "@/shared/lib/formatDate";
 import { xpFraction } from "@/shared/lib/xpLevel";
 
 import { daysSince } from "../lib/format";
+import { AvatarDialog } from "./AvatarDialog";
 import { EditableUsername } from "./EditableUsername";
 import { HonorHeroBand, type HonorHeroBandProps } from "./HonorHeroBand";
 import { WinRateRing } from "./WinRateRing";
 
 type IdentityHeroProps = {
   username: string;
-  /** Authenticated self's id — enables username edit-in-place (undefined = read-only). */
+  /**
+   * The subject's 256 px avatar (the hero is the one disc drawn large enough
+   * to need it), or null for the initial disc.
+   */
+  avatarUrl?: string | null;
+  /**
+   * Authenticated self's id — enables username edit-in-place and the avatar
+   * edit button (undefined = read-only, as on every public profile).
+   */
   userId?: number;
   /** When the username was last changed; drives the edit cooldown. */
   usernameChangedAt?: string | null;
@@ -118,6 +128,7 @@ function HeroPill({
  */
 export function IdentityHero({
   username,
+  avatarUrl = null,
   userId,
   usernameChangedAt,
   createdAt,
@@ -136,6 +147,7 @@ export function IdentityHero({
   hidePrivatePills = false,
 }: IdentityHeroProps) {
   const { t } = useTranslation();
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
 
   const memberSince = createdAt
     ? t("profile.memberSince", { date: formatLocalizedDate(createdAt, t, "long") })
@@ -166,7 +178,33 @@ export function IdentityHero({
           (col-span-2, flush to the left edge) and tuck into the identity column
           to the right of the avatar on sm+ (col-start-2). */}
       <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-5 gap-y-4">
-        <Avatar name={username} size={96} halo="profile" />
+        {/* The hero is above the fold, so its picture loads eagerly; every
+            other disc on the page stays lazy. The edit button exists only on
+            the self profile (userId set), never on a public one. */}
+        <div className="relative shrink-0">
+          <Avatar name={username} avatarUrl={avatarUrl} eager size={96} halo="profile" />
+          {userId !== undefined && (
+            <>
+              <button
+                type="button"
+                onClick={() => setAvatarDialogOpen(true)}
+                aria-label={t("profile.avatar.edit")}
+                title={t("profile.avatar.edit")}
+                className="bg-surface border-border text-ink hover:bg-surface-sunken focus-visible:ring-ring/50 absolute -right-1 -bottom-1 inline-flex size-8 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-colors focus-visible:ring-3 focus-visible:outline-none"
+                data-testid="profile-avatar-edit"
+              >
+                <Camera className="size-4" aria-hidden="true" />
+              </button>
+              <AvatarDialog
+                open={avatarDialogOpen}
+                onClose={() => setAvatarDialogOpen(false)}
+                userId={userId}
+                username={username}
+                avatarUrl={avatarUrl}
+              />
+            </>
+          )}
+        </div>
         <div className="flex min-w-0 flex-col gap-2">
           <Eyebrow>{t("profile.eyebrow")}</Eyebrow>
           <EditableUsername

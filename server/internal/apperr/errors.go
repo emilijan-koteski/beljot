@@ -82,6 +82,21 @@ var (
 	ErrUsernameUnchanged     = NewAppError("USERNAME_UNCHANGED", "new username is the same as the current one", http.StatusBadRequest)
 	ErrUsernameChangeTooSoon = NewAppError("USERNAME_CHANGE_TOO_SOON", "username was changed too recently", http.StatusTooManyRequests)
 
+	// Avatar upload errors (PUT/DELETE /users/:id/avatar). The status carries
+	// the category the client maps to copy: 400 for an image the rules reject,
+	// 413 for bytes or pixels over the caps, 415 for anything that is not a
+	// still JPEG, PNG or WebP (decided by sniffing, never by filename), 429 for
+	// the per-user hourly upload budget, and 503 when the server cannot take the
+	// upload right now (decode slots full, or no object store in development).
+	ErrAvatarMissing            = NewAppError("AVATAR_MISSING", "the request has no avatar file", http.StatusBadRequest)
+	ErrAvatarTooSmall           = NewAppError("AVATAR_TOO_SMALL", "the image must be at least 128 pixels on its shorter side", http.StatusBadRequest)
+	ErrAvatarTooLarge           = NewAppError("AVATAR_TOO_LARGE", "the image file must be at most 2 MiB", http.StatusRequestEntityTooLarge)
+	ErrAvatarDimensionsTooLarge = NewAppError("AVATAR_DIMENSIONS_TOO_LARGE", "the image is too large to process: at most 4096 pixels per side, 16 megapixels, and an encoding that decodes within the memory budget", http.StatusRequestEntityTooLarge)
+	ErrAvatarUnsupportedType    = NewAppError("AVATAR_UNSUPPORTED_TYPE", "the image must be a JPEG, PNG or still WebP", http.StatusUnsupportedMediaType)
+	ErrAvatarUploadRateLimited  = NewAppError("AVATAR_UPLOAD_RATE_LIMITED", "too many avatar uploads, try again later", http.StatusTooManyRequests)
+	ErrAvatarBusy               = NewAppError("AVATAR_BUSY", "the server is busy processing images, try again shortly", http.StatusServiceUnavailable)
+	ErrAvatarStorageUnavailable = NewAppError("AVATAR_STORAGE_UNAVAILABLE", "avatar storage is not available", http.StatusServiceUnavailable)
+
 	// Room domain errors
 	ErrRoomNameRequired          = NewAppError("ROOM_NAME_REQUIRED", "room name is required", http.StatusBadRequest)
 	ErrRoomNameTooLong           = NewAppError("ROOM_NAME_TOO_LONG", "room name must be at most 100 characters", http.StatusBadRequest)

@@ -172,6 +172,37 @@ func TestQuickFill_MixedHumansAndBotsAutoStarts(t *testing.T) {
 	assert.False(t, armed, "the scheduler is cancelled once the match starts")
 }
 
+// A Quick Play match auto-started by the fill carries each seated human's
+// avatar into the session, exactly like a manual start; bot seats carry none.
+func TestQuickFill_AutoStartCarriesSeatAvatars(t *testing.T) {
+	repo := newMockRoomRepo()
+	starter := &capabilityStarter{fakeMatchStarter: &fakeMatchStarter{}}
+	hub := &capabilityHub{mockBroadcaster: &mockBroadcaster{}, connected: []uint{10, 11}}
+	h := room.NewRoomHandler(repo, starter, hub, nil, &stubWallet{balance: 1000}, nil, nil)
+	h.SetQuickFillIntervals(hugeInterval, 2*hugeInterval)
+
+	r := seedCroatiaQuickPlayRoom(repo, "AVATQP", 500, 10, 11)
+	url := "https://assets.test/avatars/88888888-8888-4888-8888-888888888888/128.webp"
+	for _, p := range repo.players {
+		if p.UserID == 10 {
+			p.AvatarURL = &url
+		}
+	}
+
+	h.StartQuickFill(r.ID, 10)
+	defer h.CancelQuickFill(r.ID)
+	h.TriggerQuickFillTick(r.ID)
+	h.TriggerQuickFillTick(r.ID) // full → auto-start
+	require.Equal(t, 1, starter.called)
+
+	require.NotNil(t, starter.lastPlayers[0].AvatarURL)
+	assert.Equal(t, url, *starter.lastPlayers[0].AvatarURL)
+	assert.Nil(t, starter.lastPlayers[1].AvatarURL, "a human without an avatar")
+	for seat := 2; seat <= 3; seat++ {
+		assert.Nil(t, starter.lastPlayers[seat].AvatarURL, "bot seat %d", seat)
+	}
+}
+
 // TestQuickFill_PatientCadenceSelected verifies that at least one idle lobby
 // player selects the patient cadence, and each quiet interval adds exactly one
 // bot.

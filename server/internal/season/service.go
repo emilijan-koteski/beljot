@@ -35,6 +35,10 @@ import (
 // Grandmaster on the 13.4 floors.
 type Service struct {
 	repo Repository
+	// avatarURL turns a stored avatar prefix into the public 128 px URL. It is
+	// injected (SetAvatarURLResolver) because the derivation lives in `user`,
+	// which imports season; nil leaves every leaderboard avatarUrl null.
+	avatarURL func(key *string) *string
 }
 
 // Compile-time proof that the injection in cmd/api/main.go keeps working. The
@@ -44,6 +48,21 @@ var _ match.SPAwarder = (*Service)(nil)
 
 func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
+}
+
+// SetAvatarURLResolver injects the avatar-prefix-to-URL derivation the
+// leaderboard rows need (user.SmallAvatarURL in production). Called once at
+// startup, before the server accepts requests.
+func (s *Service) SetAvatarURLResolver(resolve func(key *string) *string) {
+	s.avatarURL = resolve
+}
+
+// avatarURLFor resolves one stored prefix, or nil with no resolver wired.
+func (s *Service) avatarURLFor(key *string) *string {
+	if s.avatarURL == nil {
+		return nil
+	}
+	return s.avatarURL(key)
 }
 
 // resolveSeason wraps Repository.CurrentSeason with the nil check its own
@@ -302,6 +321,7 @@ func (s *Service) LeaderboardView(userID, seasonID uint, limit, offset int, now 
 			Position:    offset + i + 1,
 			UserID:      e.UserID,
 			Username:    e.Username,
+			AvatarURL:   s.avatarURLFor(e.AvatarKey),
 			SP:          e.SP,
 			Tier:        tier,
 			Division:    division,

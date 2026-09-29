@@ -15,6 +15,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     seat: 0,
     userId: 10,
     username: "Alice",
+    avatarUrl: null,
     team: "teamA",
     declarations: [],
     connected: true,
@@ -327,5 +328,37 @@ describe("PlayerSeat", () => {
     expect(seat.getAttribute("style")).toContain("grayscale");
     expect(seat.getAttribute("style")).toContain("opacity: 0.5");
     expect(seat).toHaveAttribute("aria-label", "Alice, Us, disconnected");
+  });
+});
+
+describe("PlayerSeat avatar", () => {
+  const url = "https://assets.test/avatars/c/128.webp";
+
+  it("shows the player's picture inside the team frame", () => {
+    render(
+      <PlayerSeat
+        player={makePlayer({ username: "Cvete", avatarUrl: url })}
+        isSelf={false}
+        isActive={false}
+        seatTeam="gold"
+      />,
+    );
+    const img = screen.getByTestId("player-seat-avatar").querySelector("img");
+    expect(img).toHaveAttribute("src", url);
+    expect(img).toHaveAttribute("width", "64");
+    expect(img).toHaveAttribute("loading", "lazy");
+  });
+
+  it("never shows a picture on a bot seat", () => {
+    render(
+      <PlayerSeat
+        player={makePlayer({ seat: 1, userId: 0, username: "", isBot: true, avatarUrl: url })}
+        isSelf={false}
+        isActive={false}
+        seatTeam="gold"
+      />,
+    );
+    expect(screen.getByTestId("player-seat-avatar").querySelector("img")).toBeNull();
+    expect(screen.getByTestId("avatar-icon")).toBeInTheDocument();
   });
 });

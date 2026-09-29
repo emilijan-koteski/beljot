@@ -70,7 +70,12 @@ export function FriendRequests() {
               data-testid="friend-request-profile"
               className="hover:bg-surface-sunken focus-visible:ring-ring/50 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md text-left transition-colors focus-visible:ring-3 focus-visible:outline-none"
             >
-              <Avatar name={request.fromUsername} size={28} className="shrink-0" />
+              <Avatar
+                name={request.fromUsername}
+                avatarUrl={request.avatarUrl}
+                size={28}
+                className="shrink-0"
+              />
               <span className="text-ink truncate text-sm font-medium">{request.fromUsername}</span>
             </button>
             {/* Bare glyphs, no chip: a tick and a cross beside a pending name are

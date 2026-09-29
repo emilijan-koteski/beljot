@@ -71,6 +71,30 @@
         "generic": "Could not update username — please try again"
       }
     },
+    "avatar": {
+      "title": "Profile picture",
+      "edit": "Change profile picture",
+      "hint": "JPEG, PNG or WebP, up to 2 MB. It is cropped to a square from the center.",
+      "previewAlt": "Preview of the new picture",
+      "pick": "Choose image",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "progressLabel": "Upload progress",
+      "remove": "Remove picture",
+      "removing": "Removing…",
+      "cancel": "Cancel",
+      "success": "Profile picture updated",
+      "removed": "Profile picture removed",
+      "errors": {
+        "tooLarge": "That image is too large. Use a file up to 2 MB, at most 4096 pixels per side and 16 megapixels in total.",
+        "tooSmall": "That image is too small. Its shorter side must be at least 128 pixels.",
+        "unsupported": "That format isn't supported. Choose a JPEG, PNG or WebP image without animation.",
+        "rateLimited": "Too many uploads in the last hour. Try again later.",
+        "busy": "The server is busy. Try again in a moment.",
+        "unavailable": "Picture uploads are unavailable right now.",
+        "generic": "Could not update your picture — please try again"
+      }
+    },
     "streak": {
       "winTitle": "Win streak — {{count}} in a row",
       "lossTitle": "Cold streak — {{count}} losses in a row",

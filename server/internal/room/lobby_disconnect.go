@@ -263,6 +263,7 @@ func (h *LobbyDisconnectHandler) broadcastRoomUpdated(r *Room) {
 		"code":                 r.Code,
 		"ownerId":              r.OwnerID,
 		"ownerUsername":        r.OwnerUsername,
+		"ownerAvatarUrl":       r.OwnerAvatarURL,
 		"variant":              r.Variant,
 		"matchMode":            r.MatchMode,
 		"timerStyle":           r.TimerStyle,

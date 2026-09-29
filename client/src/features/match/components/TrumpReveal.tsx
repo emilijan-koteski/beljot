@@ -241,6 +241,7 @@ export function TrumpReveal({
             <>
               <Avatar
                 name={pickerName}
+                avatarUrl={picker.isBot === true ? null : picker.avatarUrl}
                 team={avatarTeam}
                 size={24}
                 icon={picker.isBot === true ? <Bot aria-hidden="true" /> : undefined}

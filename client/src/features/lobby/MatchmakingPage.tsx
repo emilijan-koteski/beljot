@@ -232,6 +232,7 @@ export function MatchmakingPage() {
         players={players}
         viewerSeat={viewerSeat}
         currentUsername={currentUsername}
+        currentAvatarUrl={currentUser?.avatarUrl ?? null}
         elapsed={formatElapsed(elapsedSec)}
         onCancel={handleCancel}
         cancelDisabled={leaveRoomMutation.isPending}

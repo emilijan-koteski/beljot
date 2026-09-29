@@ -491,3 +491,32 @@ describe("TopBar support entry", () => {
     expect(screen.queryByTestId("nav-menu-support")).not.toBeInTheDocument();
   });
 });
+
+describe("TopBar nav pill avatar", () => {
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  it("shows the initial without an avatar", () => {
+    setAuthUser({ avatarUrl: null });
+    renderWithRouter();
+    const disc = screen.getByTestId("nav-user-avatar");
+    expect(disc.querySelector("img")).toBeNull();
+    expect(disc).toHaveTextContent("K");
+  });
+
+  it("shows the 128 image lazily and falls back to the initial if it fails", () => {
+    const url = "https://assets.test/avatars/k/128.webp";
+    setAuthUser({ avatarUrl: url });
+    renderWithRouter();
+    const disc = screen.getByTestId("nav-user-avatar");
+    const img = disc.querySelector("img");
+    expect(img).toHaveAttribute("src", url);
+    expect(img).toHaveAttribute("loading", "lazy");
+    expect(img).toHaveAttribute("width", "26");
+
+    fireEvent.error(img!);
+    expect(disc.querySelector("img")).toBeNull();
+    expect(disc).toHaveTextContent("K");
+  });
+});

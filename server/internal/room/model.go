@@ -15,6 +15,9 @@ type Room struct {
 	// before serialization. Not persisted on rooms (no migration), avoids the
 	// extra write-path responsibility a denormalized column would create.
 	OwnerUsername string `gorm:"-" json:"ownerUsername"`
+	// OwnerAvatarURL is the owner's 128 px avatar (null when none), hydrated in
+	// the same users read as OwnerUsername, for the lobby card's host disc.
+	OwnerAvatarURL *string `gorm:"-" json:"ownerAvatarUrl"`
 	// Players is populated by the list-rooms handler so the lobby grid can
 	// render seat chips inline without an extra round-trip per card. Marked
 	// `omitempty` so the GET /rooms/:id detail endpoint, which returns players
@@ -151,12 +154,16 @@ func (r *Room) AfterFind(tx *gorm.DB) error {
 }
 
 type RoomPlayer struct {
-	ID       uint    `gorm:"primaryKey" json:"id"`
-	RoomID   uint    `gorm:"not null;index" json:"roomId"`
-	UserID   uint    `gorm:"not null;index" json:"userId"`
-	Username string  `gorm:"-" json:"username"`
-	Seat     *int    `json:"seat"`
-	Team     *string `gorm:"size:10" json:"team"`
+	ID       uint   `gorm:"primaryKey" json:"id"`
+	RoomID   uint   `gorm:"not null;index" json:"roomId"`
+	UserID   uint   `gorm:"not null;index" json:"userId"`
+	Username string `gorm:"-" json:"username"`
+	// AvatarURL is the player's 128 px avatar (null when none, and always null
+	// for bots), derived from users.avatar_key by the same JOIN that reads the
+	// username. Every roster payload built from RoomPlayer carries it.
+	AvatarURL *string `gorm:"-" json:"avatarUrl"`
+	Seat      *int    `json:"seat"`
+	Team      *string `gorm:"size:10" json:"team"`
 	// IsBot marks synthetic bot entries merged into wire payloads. Bots are
 	// NOT room_players rows (the user_id FK forbids it) — they live in
 	// room_bots and enter players arrays only via mergeBotPlayers as

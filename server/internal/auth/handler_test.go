@@ -1080,3 +1080,37 @@ func TestRefresh_EchoesStoredAudioVolumes(t *testing.T) {
 	assert.Equal(t, 100, data.SoundVolume)
 	assert.Equal(t, 45, data.MusicVolume)
 }
+
+// --- Avatar echo (migration 000030) ---
+
+// The auth envelope carries the 128 avatar URL derived from the stored prefix,
+// so the nav pill shows the picture on first paint: null for a fresh account,
+// the URL once a prefix is stored, and never the large image.
+func TestAuthEnvelope_EchoesAvatarURL(t *testing.T) {
+	user.SetPublicAssetsURL("https://assets.test")
+	t.Cleanup(func() { user.SetPublicAssetsURL("") })
+
+	handler, e := setupHandler()
+	regRec := registerUser(e)
+	require.Equal(t, http.StatusCreated, regRec.Code)
+	_, raw := decodeAuthEnvelope(t, regRec)
+	assert.JSONEq(t, "null", string(raw["avatarUrl"]), "a fresh account has no avatar")
+	assert.NotContains(t, raw, "avatarLargeUrl")
+
+	repo, ok := handler.userRepo.(*mockUserRepo)
+	require.True(t, ok)
+	prefix := "avatars/ffffffff-ffff-4fff-8fff-ffffffffffff"
+	repo.users[0].AvatarKey = &prefix
+
+	rec := doLogin(e, `{"email":"test@example.com","password":"password123"}`)
+	require.Equal(t, http.StatusOK, rec.Code)
+	data, _ := decodeAuthEnvelope(t, rec)
+	require.NotNil(t, data.AvatarURL)
+	assert.Equal(t, "https://assets.test/"+prefix+"/128.webp", *data.AvatarURL)
+
+	rec = doRefresh(e, regRec.Result().Cookies())
+	require.Equal(t, http.StatusOK, rec.Code)
+	data, _ = decodeAuthEnvelope(t, rec)
+	require.NotNil(t, data.AvatarURL)
+	assert.Equal(t, "https://assets.test/"+prefix+"/128.webp", *data.AvatarURL)
+}

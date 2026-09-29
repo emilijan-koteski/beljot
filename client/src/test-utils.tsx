@@ -35,6 +35,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     honorScore: 80,
     honorTier: "fair",
     isNewPlayer: false,
+    avatarUrl: null,
     createdAt: "2026-01-01T00:00:00Z",
     ...overrides,
   };
@@ -54,6 +55,7 @@ export function makeRoom(overrides: Partial<Room> = {}): Room {
     code: "XYZ123",
     ownerId: 10,
     ownerUsername: "owner",
+    ownerAvatarUrl: null,
     variant: "bitola",
     matchMode: "1001",
     timerStyle: "relaxed",
@@ -79,6 +81,7 @@ export function makeRoomPlayer(overrides: Partial<RoomPlayer> = {}): RoomPlayer 
     roomId: 1,
     userId: 1,
     username: "player",
+    avatarUrl: null,
     seat: null,
     team: null,
     isBot: false,

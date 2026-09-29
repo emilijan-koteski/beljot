@@ -393,6 +393,11 @@ export interface RoomCreatedPayload {
   code: string;
   ownerId: number;
   ownerUsername: string;
+  /**
+   * The owner's 128 px avatar, or null. Optional: the Quick Play room_created
+   * map is hand-built without it, and absent reads as "no avatar".
+   */
+  ownerAvatarUrl?: string | null;
   players: RoomPlayer[];
   variant: string;
   matchMode: string;
@@ -442,6 +447,12 @@ export interface RoomUpdatedPayload {
   code: string;
   ownerId: number;
   ownerUsername: string;
+  /**
+   * The owner's 128 px avatar, or null. Both room_updated builders (the
+   * room lifecycle payload and the lobby-disconnect one) send it; optional so a
+   * payload from a server that predates avatars reads as "no avatar".
+   */
+  ownerAvatarUrl?: string | null;
   players: RoomPlayer[];
   variant: string;
   matchMode: string;
@@ -508,6 +519,11 @@ export interface PlayerJoinedPayload {
   roomId: number;
   userId: number;
   username: string;
+  /**
+   * The joiner's 128 px avatar, or null. Room-lobby events are not
+   * zod-validated, so the dispatcher still guards it with `typeof`.
+   */
+  avatarUrl: string | null;
   playerCount: number;
   /**
    * The joiner's roster decoration, so already-seated viewers can draw the new
@@ -537,6 +553,8 @@ export interface RoomOwnerChangedPayload {
   roomId: number;
   newOwnerId: number;
   newOwnerUsername: string;
+  /** The new owner's 128 px avatar, or null. */
+  newOwnerAvatarUrl: string | null;
   previousOwnerId: number;
 }
 
@@ -592,6 +610,11 @@ export interface SeatUpdatedPayload {
   roomId: number;
   userId: number;
   username: string;
+  /**
+   * The mover's 128 px avatar, or null — refreshed onto their roster entry, so
+   * a picture changed since they joined shows on their next seat move.
+   */
+  avatarUrl: string | null;
   // seat/team are null when a player vacates their seat (LeaveSeat) but
   // remains in the room. previousSeat is null only for the initial seat
   // selection from an unseated state.

@@ -411,6 +411,7 @@ func TestEventsJSONContract(t *testing.T) {
 
 func ptrInt(v int) *int              { return &v }
 func ptrSuit(v game.Suit) *game.Suit { return &v }
+func ptrString(v string) *string     { return &v }
 
 // sampleFourPlayers builds a deterministic 4-player roster with hands of
 // varying length so the JSON shape covers populated arrays. Values are
@@ -426,6 +427,9 @@ func sampleFourPlayers() [4]game.PlayerState {
 			Declarations: []game.Declaration{},
 			Connected:    true,
 			Level:        3,
+			// One seat with an avatar, three without: the golden pins both the
+			// string and the null shape of avatarUrl.
+			AvatarURL: ptrString("https://assets.example.com/avatars/0f8b6c1e-2a4d-4e6f-9a1b-3c5d7e9f1a2b/128.webp"),
 		},
 		{
 			Seat:         1,

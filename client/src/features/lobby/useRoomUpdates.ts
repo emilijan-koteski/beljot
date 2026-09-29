@@ -91,6 +91,7 @@ export function handleWsMessage(event: MessageEvent): void {
               roomId: payload.roomId,
               userId: payload.userId,
               username: payload.username,
+              avatarUrl: typeof payload.avatarUrl === "string" ? payload.avatarUrl : null,
               seat: null,
               team: null,
               isBot: false,

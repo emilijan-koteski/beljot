@@ -39,6 +39,9 @@ export interface RegisterResponse {
   honorScore: number;
   honorTier: string;
   isNewPlayer: boolean;
+  // The player's 128 px avatar, or null — echoed so the nav pill shows it on
+  // first paint.
+  avatarUrl: string | null;
   createdAt: string;
 }
 
@@ -71,6 +74,8 @@ export interface RefreshResponse {
   honorScore: number;
   honorTier: string;
   isNewPlayer: boolean;
+  // Avatar — see RegisterResponse.
+  avatarUrl: string | null;
   createdAt: string;
 }
 

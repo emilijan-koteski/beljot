@@ -32,7 +32,10 @@ type mockRepo struct {
 	// entry here is treated as INVISIBLE — the mock's stand-in for
 	// `users.deleted_at IS NULL`, applied to the page, the total AND CountAhead
 	// exactly as the real predicate is.
-	usernames    map[uint]string
+	usernames map[uint]string
+	// avatarKeys backs users.avatar_key on the same join; a missing entry is
+	// NULL (no avatar).
+	avatarKeys   map[uint]*string
 	pageErr      error
 	countErr     error
 	entryErr     error
@@ -181,6 +184,7 @@ func (m *mockRepo) LeaderboardPage(seasonID uint, limit, offset int) ([]season.L
 		entries = append(entries, season.LeaderboardEntry{
 			UserID:       rows[i].UserID,
 			Username:     m.usernames[rows[i].UserID],
+			AvatarKey:    m.avatarKeys[rows[i].UserID],
 			SP:           rows[i].SP,
 			RankTier:     rows[i].RankTier,
 			RankDivision: rows[i].RankDivision,
@@ -205,6 +209,7 @@ func (m *mockRepo) FindLeaderboardEntry(seasonID, userID uint) (*season.Leaderbo
 		return &season.LeaderboardEntry{
 			UserID:       row.UserID,
 			Username:     m.usernames[row.UserID],
+			AvatarKey:    m.avatarKeys[row.UserID],
 			SP:           row.SP,
 			RankTier:     row.RankTier,
 			RankDivision: row.RankDivision,
@@ -763,7 +768,7 @@ func TestGetLeaderboard_WirePayloadKeysAreExact(t *testing.T) {
 	require.Len(t, items, 3)
 	row, ok := items[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, []string{"division", "gamesPlayed", "position", "sp", "tier", "userId", "username"},
+	assert.Equal(t, []string{"avatarUrl", "division", "gamesPlayed", "position", "sp", "tier", "userId", "username"},
 		sortedKeys(row), "exact row key set")
 
 	viewer, ok := data["viewer"].(map[string]any)
@@ -783,6 +788,53 @@ func TestGetLeaderboard_WirePayloadKeysAreExact(t *testing.T) {
 	for _, numeric := range []string{"total", "limit", "offset"} {
 		assert.IsType(t, float64(0), data[numeric], "%s must be a JSON number", numeric)
 	}
+}
+
+// Each row carries the player's 128 px avatar URL, derived from the stored
+// prefix by the injected resolver: a string for a player with an avatar, null
+// for one without, and null everywhere when no resolver is wired. The viewer
+// block stays avatar-free, like it stays name-free.
+func TestGetLeaderboard_RowsCarryTheResolvedAvatarURL(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	seedLadder(repo, 2)
+	prefix := "avatars/44444444-4444-4444-8444-444444444444"
+	repo.avatarKeys = map[uint]*string{1: &prefix}
+
+	call := func(svc *season.Service) map[string]any {
+		t.Helper()
+		e := echo.New()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/leaderboard", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userID", uint(1))
+		require.NoError(t, season.NewHandler(svc).GetLeaderboard(c))
+		var env map[string]map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env))
+		return env["data"]
+	}
+	rowAvatar := func(data map[string]any, i int) any {
+		t.Helper()
+		row, ok := data["items"].([]any)[i].(map[string]any)
+		require.True(t, ok)
+		require.Contains(t, row, "avatarUrl", "the key is always present")
+		return row["avatarUrl"]
+	}
+
+	svc := season.NewService(repo)
+	svc.SetAvatarURLResolver(func(key *string) *string {
+		if key == nil {
+			return nil
+		}
+		url := "https://assets.test/" + *key + "/128.webp"
+		return &url
+	})
+	data := call(svc)
+	assert.Equal(t, "https://assets.test/"+prefix+"/128.webp", rowAvatar(data, 0))
+	assert.Nil(t, rowAvatar(data, 1), "no avatar serializes as null")
+	assert.NotContains(t, data["viewer"], "avatarUrl")
+
+	unwired := call(season.NewService(repo))
+	assert.Nil(t, rowAvatar(unwired, 0), "no resolver means null")
 }
 
 // The lobby widget sends no limit at all and must get a TOP TEN.

@@ -25,6 +25,12 @@ type PlayerState struct {
 	// match start. It is static for the duration of a match (XP is only awarded
 	// at match end), so the match engine never recomputes it. Bot seats are 0.
 	Level int `json:"level"`
+	// AvatarURL is the player's 128 px avatar URL, null for bots and for
+	// players without one. Captured ONCE at match start from the room roster,
+	// like Level. A picture changed mid-match is not pushed here, and the
+	// replaced pair is deleted at once, so a seat disc that had not cached the
+	// old image falls back to the initial until the next match.
+	AvatarURL *string `json:"avatarUrl"`
 	// FaceDownCards holds the two cards dealt face-down to this seat under
 	// DealShapeAllBeforeBidding. They are part of the seat's real holding but
 	// live OUTSIDE Hand until bidding resolves, at which point mergeFaceDownCards

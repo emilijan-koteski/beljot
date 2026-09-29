@@ -76,6 +76,8 @@ function profileFixture(overrides: Partial<ProfileResponse> = {}): ProfileRespon
   return {
     id: 1,
     username: "testuser",
+    avatarUrl: null,
+    avatarLargeUrl: null,
     languagePreference: "en",
     cardDeckPreference: "french",
     soundEnabled: true,
@@ -202,6 +204,32 @@ describe("ProfilePage", () => {
     });
 
     expect(screen.getByTestId("profile-username")).toHaveTextContent("testuser");
+  });
+
+  it("draws the profile's large avatar in the hero", async () => {
+    const large = "https://assets.test/avatars/me/256.webp";
+    mockGetProfile.mockResolvedValueOnce(
+      profileFixture({
+        avatarUrl: "https://assets.test/avatars/me/128.webp",
+        avatarLargeUrl: large,
+      }),
+    );
+
+    renderProfilePage();
+
+    const hero = await screen.findByTestId("profile-identity-hero");
+    await waitFor(() => expect(hero.querySelector("img")).toHaveAttribute("src", large));
+  });
+
+  it("falls back to the auth store's avatar while there is no profile", async () => {
+    const small = "https://assets.test/avatars/me/128.webp";
+    useAuthStore.setState({ user: makeUser({ avatarUrl: small }) });
+    mockGetProfile.mockRejectedValueOnce(new Error("Network error"));
+
+    renderProfilePage();
+
+    const hero = await screen.findByTestId("profile-identity-hero");
+    expect(hero.querySelector("img")).toHaveAttribute("src", small);
   });
 
   it("renders real stats + win-rate ring when profile has played games", async () => {
@@ -359,8 +387,8 @@ describe("ProfilePage", () => {
         capots: 2,
         avgMatchSeconds: 1500,
         streak: { kind: "win", length: 3 },
-        topPartners: [{ userId: 2, username: "partner_a", played: 4, wins: 3 }],
-        topRivals: [{ userId: 3, username: "rival_x", wins: 2, losses: 1 }],
+        topPartners: [{ userId: 2, username: "partner_a", avatarUrl: null, played: 4, wins: 3 }],
+        topRivals: [{ userId: 3, username: "rival_x", avatarUrl: null, wins: 2, losses: 1 }],
       }),
     );
 
@@ -387,10 +415,10 @@ describe("ProfilePage", () => {
         // Two partners so BOTH PartnerSpotlight link paths render: partner_a
         // is the featured block, partner_b takes the rest-list row.
         topPartners: [
-          { userId: 2, username: "partner_a", played: 4, wins: 3 },
-          { userId: 5, username: "partner_b", played: 2, wins: 1 },
+          { userId: 2, username: "partner_a", avatarUrl: null, played: 4, wins: 3 },
+          { userId: 5, username: "partner_b", avatarUrl: null, played: 2, wins: 1 },
         ],
-        topRivals: [{ userId: 3, username: "rival_x", wins: 2, losses: 1 }],
+        topRivals: [{ userId: 3, username: "rival_x", avatarUrl: null, wins: 2, losses: 1 }],
       }),
     );
 

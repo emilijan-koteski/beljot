@@ -19,7 +19,9 @@ const base = {
 
 // The username cell is a <Link> since the row became a way into a player's
 // profile, so every render needs a router around it.
-function renderRow(props: Partial<typeof base> & { isSelf?: boolean } = {}) {
+function renderRow(
+  props: Partial<typeof base> & { isSelf?: boolean; avatarUrl?: string | null } = {},
+) {
   return render(
     <MemoryRouter>
       <ul>
@@ -244,5 +246,22 @@ describe("LeaderboardRow", () => {
     expect(name.getAttribute("aria-label")).not.toBe(
       i18n.t("friends.viewProfileAria", { username: i18n.t("season.leaderboard.you") }),
     );
+  });
+});
+
+describe("LeaderboardRow avatar", () => {
+  it("draws the player's picture in a lazy disc beside the name", () => {
+    const url = "https://assets.test/avatars/k/128.webp";
+    renderRow({ avatarUrl: url });
+    const img = screen.getByTestId("leaderboard-row").querySelector("img");
+    expect(img).toHaveAttribute("src", url);
+    expect(img).toHaveAttribute("loading", "lazy");
+    expect(img).toHaveAttribute("width", "24");
+  });
+
+  it("falls back to the initial without one", () => {
+    renderRow({ avatarUrl: null });
+    const row = screen.getByTestId("leaderboard-row");
+    expect(row.querySelector("img")).toBeNull();
   });
 });

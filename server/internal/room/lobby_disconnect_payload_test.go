@@ -128,3 +128,32 @@ func TestBroadcastRoomUpdated_TolerantOfANilHub(t *testing.T) {
 		})
 	}
 }
+
+// The host disc on a lobby card reads ownerAvatarUrl, so the disconnect-driven
+// room_updated must carry it like the other two hand-built room payloads: the
+// URL when the owner has one, an explicit null when not.
+func TestBroadcastRoomUpdated_CarriesOwnerAvatarURL(t *testing.T) {
+	url := "https://assets.test/avatars/33333333-3333-4333-8333-333333333333/128.webp"
+	for name, avatar := range map[string]*string{"with avatar": &url, "without": nil} {
+		t.Run(name, func(t *testing.T) {
+			hub := &captureBroadcaster{}
+			h := NewLobbyDisconnectHandler(nil, hub, nil, nil)
+			h.broadcastRoomUpdated(&Room{
+				ID: 7, Name: "Test Room", OwnerID: 100, OwnerUsername: "Owner", OwnerAvatarURL: avatar,
+				Variant: "bitola", MatchMode: "1001", Status: "waiting",
+			})
+			require.Len(t, hub.all, 1)
+			var msg ws.WSMessage
+			require.NoError(t, json.Unmarshal(hub.all[0], &msg))
+			var payload map[string]interface{}
+			require.NoError(t, json.Unmarshal(msg.Payload, &payload))
+			got, ok := payload["ownerAvatarUrl"]
+			require.True(t, ok, "ownerAvatarUrl key missing from the payload")
+			if avatar == nil {
+				assert.Nil(t, got)
+			} else {
+				assert.Equal(t, url, got)
+			}
+		})
+	}
+}

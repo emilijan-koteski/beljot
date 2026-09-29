@@ -57,6 +57,7 @@ function rows(from: number, n: number): LeaderboardRow[] {
     position: from + i,
     userId: from + i,
     username: `p${from + i}`,
+    avatarUrl: null,
     sp: 800 - (from + i) * 4,
     tier: "gold",
     division: 2,
@@ -208,6 +209,24 @@ describe("LeaderboardPage", () => {
     );
   });
 
+  // The pinned row takes the avatar from the auth store, like the name: the
+  // viewer block carries neither.
+  it("draws the viewer's own avatar on the pinned row", async () => {
+    const url = "https://assets.test/avatars/kiro/128.webp";
+    useAuthStore.setState({ user: makeUser({ id: 7, username: "kiro", avatarUrl: url }) });
+    mockGet.mockResolvedValue(
+      response({
+        items: rows(1, 25),
+        total: 400,
+        viewer: { position: 340, userId: 999, sp: 120, tier: "iron", division: 3, gamesPlayed: 3 },
+      }),
+    );
+    renderPage();
+
+    const pinned = await screen.findByTestId("leaderboard-pinned");
+    expect(pinned.querySelector("img")).toHaveAttribute("src", url);
+  });
+
   // AC4: no standing at all -> no marker anywhere and nothing pinned.
   it("renders no own-row marker and no pinned row when the viewer has no standing", async () => {
     mockGet.mockResolvedValue(response({ viewer: null }));
@@ -228,6 +247,7 @@ describe("LeaderboardPage", () => {
             position: 1,
             userId: 1,
             username: "ada",
+            avatarUrl: null,
             sp: 700,
             tier: "gold",
             division: 2,
@@ -518,6 +538,7 @@ describe("LeaderboardPage", () => {
                   position: 1,
                   userId: 3,
                   username: "veteran",
+                  avatarUrl: null,
                   sp: 3500,
                   tier: "gold",
                   division: null,

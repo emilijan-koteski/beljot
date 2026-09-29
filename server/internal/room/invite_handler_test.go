@@ -29,6 +29,7 @@ import (
 type stubFriendDirectory struct {
 	friends map[uint][]uint
 	names   map[uint]string
+	avatars map[uint]*string
 }
 
 func (s *stubFriendDirectory) AreFriends(a, b uint) (bool, error) {
@@ -48,7 +49,7 @@ func (s *stubFriendDirectory) AreFriends(a, b uint) (bool, error) {
 func (s *stubFriendDirectory) ListFriends(userID uint) ([]room.FriendSummary, error) {
 	out := make([]room.FriendSummary, 0, len(s.friends[userID]))
 	for _, id := range s.friends[userID] {
-		out = append(out, room.FriendSummary{UserID: id, Username: s.names[id]})
+		out = append(out, room.FriendSummary{UserID: id, Username: s.names[id], AvatarURL: s.avatars[id]})
 	}
 	return out, nil
 }

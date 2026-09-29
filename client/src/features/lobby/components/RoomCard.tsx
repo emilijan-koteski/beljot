@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { RelativeTime } from "@/shared/components/RelativeTime";
+import { AvatarImage } from "@/shared/components/ui/avatar";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
@@ -43,13 +44,13 @@ function seatOf(
   t: TFunction,
   players: RoomPlayer[] | undefined,
   seat: number,
-): { username: string | null; bot: boolean } {
+): { username: string | null; bot: boolean; avatarUrl?: string | null } {
   const found = players?.find((p) => p.seat === seat);
   if (!found) return { username: null, bot: false };
   // Bot identity is seat-derived and localized — an empty wire username must
   // never render as a blank chip.
   if (found.isBot === true) return { username: botDisplayName(t, seat), bot: true };
-  return { username: found.username || null, bot: false };
+  return { username: found.username || null, bot: false, avatarUrl: found.avatarUrl };
 }
 
 /**
@@ -273,8 +274,15 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
 
       <div className="mt-auto flex items-center gap-2.5 border-t border-border bg-[rgba(14,58,36,0.03)] px-5 py-3">
         <span className="text-ink-dim flex items-center gap-1.5 text-xs">
-          <span className="bg-surface-sunken text-ink inline-flex size-4.5 items-center justify-center rounded-full border border-border text-[10px] font-bold">
-            {(room.ownerUsername || "?").charAt(0).toUpperCase()}
+          <span
+            className="bg-surface-sunken text-ink inline-flex size-4.5 items-center justify-center overflow-hidden rounded-full border border-border text-[10px] font-bold"
+            data-testid="room-card-owner-avatar"
+          >
+            <AvatarImage
+              src={room.ownerAvatarUrl}
+              size={18}
+              fallback={(room.ownerUsername || "?").charAt(0).toUpperCase()}
+            />
           </span>
           {room.ownerUsername || "—"}
         </span>

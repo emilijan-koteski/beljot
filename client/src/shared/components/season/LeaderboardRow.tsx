@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
 import { TierBadge } from "@/shared/components/season/TierBadge";
+import { Avatar } from "@/shared/components/ui/avatar";
 import {
   normalizeSeasonDivision,
   normalizeSeasonTier,
@@ -32,6 +33,11 @@ type Props = {
   position: number;
   userId: number;
   username: string;
+  /**
+   * The player's 128 px avatar, or null for the initial. A plain prop for the
+   * same reason `username` is: the pinned own-row reads it from `authStore`.
+   */
+  avatarUrl?: string | null;
   sp: number;
   /** The server's raw tier token — normalized here, never trusted as-is. */
   tier: string;
@@ -94,6 +100,7 @@ export function LeaderboardRow({
   position,
   userId,
   username,
+  avatarUrl,
   sp,
   tier,
   division,
@@ -147,6 +154,10 @@ export function LeaderboardRow({
       </span>
 
       <TierBadge tier={safeTier} size="sm" data-testid="leaderboard-tier-badge" />
+
+      {/* Decorative like every other visible cell (Avatar is aria-hidden);
+          lazy, so a long ladder only fetches the pictures scrolled into view. */}
+      <Avatar name={username} avatarUrl={avatarUrl} size={24} you={isSelf} />
 
       <Link
         data-testid="leaderboard-username"

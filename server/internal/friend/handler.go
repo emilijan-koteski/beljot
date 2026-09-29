@@ -56,19 +56,23 @@ type FriendStatusResponse struct {
 }
 
 // PendingRequestDTO is one incoming pending request (GET /friends/requests).
+// AvatarURL is the SENDER's 128 px avatar, null when they have none.
 type PendingRequestDTO struct {
 	ID           uint      `json:"id"`
 	FromUserID   uint      `json:"fromUserId"`
 	FromUsername string    `json:"fromUsername"`
+	AvatarURL    *string   `json:"avatarUrl"`
 	CreatedAt    time.Time `json:"createdAt"`
 }
 
 // FriendDTO is one accepted friend (GET /friends). Online is derived
-// server-side from the live hub, never trusted from a client.
+// server-side from the live hub, never trusted from a client. AvatarURL is the
+// friend's 128 px avatar, null when they have none.
 type FriendDTO struct {
-	ID       uint   `json:"id"`
-	Username string `json:"username"`
-	Online   bool   `json:"online"`
+	ID        uint    `json:"id"`
+	Username  string  `json:"username"`
+	AvatarURL *string `json:"avatarUrl"`
+	Online    bool    `json:"online"`
 }
 
 type sendRequestBody struct {
@@ -202,14 +206,14 @@ func (h *Handler) ListRequests(c echo.Context) error {
 		return fmt.Errorf("listing friend requests: %w", err)
 	}
 
-	usernames, err := h.usernamesFor(senderIDs(rows))
+	identities, err := h.identitiesFor(senderIDs(rows))
 	if err != nil {
 		return fmt.Errorf("resolving requester usernames: %w", err)
 	}
 
 	items := make([]PendingRequestDTO, 0, len(rows))
 	for _, f := range rows {
-		username, ok := usernames[f.UserID]
+		sender, ok := identities[f.UserID]
 		if !ok {
 			// The sender was soft-deleted after sending — omit rather than 500.
 			continue
@@ -217,7 +221,8 @@ func (h *Handler) ListRequests(c echo.Context) error {
 		items = append(items, PendingRequestDTO{
 			ID:           f.ID,
 			FromUserID:   f.UserID,
-			FromUsername: username,
+			FromUsername: sender.username,
+			AvatarURL:    user.SmallAvatarURL(sender.avatarKey),
 			CreatedAt:    f.CreatedAt,
 		})
 	}
@@ -323,14 +328,14 @@ func (h *Handler) ListFriends(c echo.Context) error {
 		otherIDs = append(otherIDs, other)
 	}
 
-	usernames, err := h.usernamesFor(otherIDs)
+	identities, err := h.identitiesFor(otherIDs)
 	if err != nil {
 		return fmt.Errorf("resolving friend usernames: %w", err)
 	}
 
 	items := make([]FriendDTO, 0, len(otherIDs))
 	for _, id := range otherIDs {
-		username, ok := usernames[id]
+		friend, ok := identities[id]
 		if !ok {
 			// Friend row outlived its (soft-deleted) user — omit, don't 500.
 			continue
@@ -339,7 +344,12 @@ func (h *Handler) ListFriends(c echo.Context) error {
 		if h.notifier != nil {
 			online = h.notifier.IsConnected(id)
 		}
-		items = append(items, FriendDTO{ID: id, Username: username, Online: online})
+		items = append(items, FriendDTO{
+			ID:        id,
+			Username:  friend.username,
+			AvatarURL: user.SmallAvatarURL(friend.avatarKey),
+			Online:    online,
+		})
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": items})
 }
@@ -366,20 +376,27 @@ func (h *Handler) pushFriendRequest(recipientID, requestID, fromUserID uint, fro
 	h.notifier.SendToUser(recipientID, msg)
 }
 
-// usernamesFor batches a username lookup for the given ids into one
+// identity is the display pair a friend row shows: the name and the stored
+// avatar prefix the public URL is derived from.
+type identity struct {
+	username  string
+	avatarKey *string
+}
+
+// identitiesFor batches a username + avatar lookup for the given ids into one
 // FindManyByIDs call, returning a map keyed by userID. Soft-deleted users are
 // simply absent from the result (FindManyByIDs excludes them).
-func (h *Handler) usernamesFor(ids []uint) (map[uint]string, error) {
+func (h *Handler) identitiesFor(ids []uint) (map[uint]identity, error) {
 	if len(ids) == 0 {
-		return map[uint]string{}, nil
+		return map[uint]identity{}, nil
 	}
 	users, err := h.userRepo.FindManyByIDs(ids)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[uint]string, len(users))
+	out := make(map[uint]identity, len(users))
 	for _, u := range users {
-		out[u.ID] = u.Username
+		out[u.ID] = identity{username: u.Username, avatarKey: u.AvatarKey}
 	}
 	return out, nil
 }

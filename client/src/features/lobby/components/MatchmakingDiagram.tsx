@@ -23,6 +23,8 @@ type Props = {
   viewerSeat: number;
   /** The viewer's username (for the centre avatar). */
   currentUsername: string;
+  /** The viewer's 128 px avatar, from the auth store; the initial without one. */
+  currentAvatarUrl?: string | null;
   /** Elapsed wait time, pre-formatted as mm:ss. */
   elapsed: string;
   onCancel: () => void;
@@ -55,6 +57,7 @@ export function MatchmakingDiagram({
   players,
   viewerSeat,
   currentUsername,
+  currentAvatarUrl = null,
   elapsed,
   onCancel,
   cancelDisabled,
@@ -166,7 +169,7 @@ export function MatchmakingDiagram({
           }}
         >
           <div className="relative">
-            <Avatar name={currentUsername} size={youSize} you />
+            <Avatar name={currentUsername} avatarUrl={currentAvatarUrl} size={youSize} you />
             <span
               className="border-accent absolute rounded-full border-2 opacity-40 animate-[pulse-dot_1.6s_ease-in-out_infinite]"
               style={{ inset: -6 }}
@@ -203,6 +206,7 @@ export function MatchmakingDiagram({
               {occupant ? (
                 <Avatar
                   name={occupantName}
+                  avatarUrl={occupantIsBot ? null : occupant.avatarUrl}
                   size={orbitSize}
                   team={team}
                   icon={occupantIsBot ? <Bot aria-hidden="true" /> : undefined}

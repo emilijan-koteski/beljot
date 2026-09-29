@@ -33,10 +33,10 @@ function renderDialog() {
 }
 
 const roster: InvitableFriend[] = [
-  { userId: 200, username: "ana", available: true, reason: "" },
-  { userId: 201, username: "bob", available: false, reason: "offline" },
-  { userId: 202, username: "cvete", available: false, reason: "in_match" },
-  { userId: 203, username: "dime", available: false, reason: "in_room" },
+  { userId: 200, username: "ana", avatarUrl: null, available: true, reason: "" },
+  { userId: 201, username: "bob", avatarUrl: null, available: false, reason: "offline" },
+  { userId: 202, username: "cvete", avatarUrl: null, available: false, reason: "in_match" },
+  { userId: 203, username: "dime", avatarUrl: null, available: false, reason: "in_room" },
 ];
 
 function row(userId: number) {
@@ -104,7 +104,7 @@ describe("InviteFriendsDialog", () => {
 
   it("disables every row when the room itself is full", async () => {
     listInvitableFriendsSpy.mockResolvedValue([
-      { userId: 200, username: "ana", available: false, reason: "room_full" },
+      { userId: 200, username: "ana", avatarUrl: null, available: false, reason: "room_full" },
     ] satisfies InvitableFriend[]);
     renderDialog();
 

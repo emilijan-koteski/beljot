@@ -11,6 +11,8 @@ type SeatChipProps = {
   you?: boolean;
   /** Bot seat — the avatar shows the bot glyph instead of a name initial. */
   bot?: boolean;
+  /** The player's 128 px avatar; the initial renders when absent. */
+  avatarUrl?: string | null;
   /** Real user's id — when set, the chip becomes a link to their public
    *  profile (`/players/:userId`). Leave unset for bot seats, missing seats
    *  and the profile subject's own chip, which stay non-interactive. */
@@ -24,7 +26,14 @@ type SeatChipProps = {
  * renders as a client-side link to that player's public profile; the click is
  * stopped from bubbling so it never toggles the surrounding match row.
  */
-export function SeatChip({ name, team, you = false, bot = false, userId }: SeatChipProps) {
+export function SeatChip({
+  name,
+  team,
+  you = false,
+  bot = false,
+  avatarUrl,
+  userId,
+}: SeatChipProps) {
   const { t } = useTranslation();
   const isA = team === "A";
   const tint = {
@@ -35,6 +44,7 @@ export function SeatChip({ name, team, you = false, bot = false, userId }: SeatC
     <>
       <Avatar
         name={name}
+        avatarUrl={bot ? null : avatarUrl}
         team={team}
         size={20}
         icon={bot ? <Bot aria-hidden="true" /> : undefined}

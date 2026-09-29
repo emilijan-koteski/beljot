@@ -41,6 +41,19 @@ type Config struct {
 	SMTPPassword string
 	SMTPFrom     string
 	SMTPFromName string
+
+	// Avatar object storage (S3-compatible: Garage locally and in production).
+	// All six are required outside development. In development an empty
+	// S3Endpoint disables the feature: the avatar endpoints answer 503 and
+	// everything else runs without an object store. PublicAssetsURL is the
+	// public origin the bucket is served from (no trailing slash); avatar URLs
+	// are derived from it at read time, never stored.
+	S3Endpoint      string
+	S3Region        string
+	S3AccessKey     string
+	S3SecretKey     string
+	S3PublicBucket  string
+	PublicAssetsURL string
 }
 
 // SMTPConfigured reports whether enough SMTP settings are present to send real
@@ -48,6 +61,36 @@ type Config struct {
 // fallback instead.
 func (c *Config) SMTPConfigured() bool {
 	return c.SMTPHost != "" && c.SMTPUsername != "" && c.SMTPPassword != ""
+}
+
+// AvatarStorageConfigured reports whether every avatar-storage setting is
+// present. When false the server runs without an object store and both avatar
+// endpoints answer 503 (development only; Load exits outside it).
+func (c *Config) AvatarStorageConfigured() bool {
+	return len(c.missingAvatarStorageVars()) == 0
+}
+
+// missingAvatarStorageVars names every unset avatar-storage variable, in the
+// order they are documented.
+func (c *Config) missingAvatarStorageVars() []string {
+	vars := []struct {
+		name  string
+		value string
+	}{
+		{"BELJOT_S3_ENDPOINT", c.S3Endpoint},
+		{"BELJOT_S3_REGION", c.S3Region},
+		{"BELJOT_S3_ACCESS_KEY", c.S3AccessKey},
+		{"BELJOT_S3_SECRET_KEY", c.S3SecretKey},
+		{"BELJOT_S3_PUBLIC_BUCKET", c.S3PublicBucket},
+		{"BELJOT_PUBLIC_ASSETS_URL", c.PublicAssetsURL},
+	}
+	var missing []string
+	for _, v := range vars {
+		if v.value == "" {
+			missing = append(missing, v.name)
+		}
+	}
+	return missing
 }
 
 func Load() *Config {
@@ -75,6 +118,13 @@ func Load() *Config {
 		SMTPPassword: stripWhitespace(getEnv("BELJOT_SMTP_PASSWORD", "")),
 		SMTPFrom:     strings.TrimSpace(getEnv("BELJOT_SMTP_FROM", "")),
 		SMTPFromName: getEnv("BELJOT_SMTP_FROM_NAME", "Beljot.online"),
+
+		S3Endpoint:      strings.TrimSpace(getEnv("BELJOT_S3_ENDPOINT", "")),
+		S3Region:        strings.TrimSpace(getEnv("BELJOT_S3_REGION", "")),
+		S3AccessKey:     strings.TrimSpace(getEnv("BELJOT_S3_ACCESS_KEY", "")),
+		S3SecretKey:     strings.TrimSpace(getEnv("BELJOT_S3_SECRET_KEY", "")),
+		S3PublicBucket:  strings.TrimSpace(getEnv("BELJOT_S3_PUBLIC_BUCKET", "")),
+		PublicAssetsURL: strings.TrimRight(strings.TrimSpace(getEnv("BELJOT_PUBLIC_ASSETS_URL", "")), "/"),
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-in-production" {
@@ -83,6 +133,22 @@ func Load() *Config {
 			os.Exit(1)
 		}
 		slog.Warn("BELJOT_JWT_SECRET is not set or uses the default value — do not deploy to production without changing it")
+	}
+
+	// Avatar storage: fail fast outside development, like the JWT secret above.
+	// Every missing variable is named so one restart surfaces all of them.
+	if missing := cfg.missingAvatarStorageVars(); len(missing) > 0 {
+		if cfg.Environment != "development" {
+			for _, name := range missing {
+				slog.Error(name+" must be set in non-development environments", "variable", name)
+			}
+			os.Exit(1)
+		}
+		if cfg.S3Endpoint != "" {
+			// A half-filled local config is almost certainly a mistake; the
+			// feature stays off rather than failing on the first upload.
+			slog.Warn("avatar storage is partly configured — avatar uploads are disabled", "missing", missing)
+		}
 	}
 
 	if cfg.Environment != "development" && (cfg.AppBaseURL == "" || strings.Contains(cfg.AppBaseURL, "localhost")) {

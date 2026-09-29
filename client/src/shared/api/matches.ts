@@ -14,6 +14,9 @@ export interface MatchPlayer {
   // render the localized seat-derived bot name.
   userId: number;
   username: string;
+  // The participant's 128 px avatar as it is NOW (not at match time); null for
+  // bots and players without one.
+  avatarUrl: string | null;
   isBot: boolean;
 }
 

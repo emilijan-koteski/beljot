@@ -151,6 +151,9 @@ export interface PlayerState {
   // Server-authoritative lifetime level (derived from total_xp), captured once
   // at match start and static for the whole match. Bot seats are 0.
   level: number;
+  // The player's 128 px avatar, captured at match start like `level`; null for
+  // bots and players without one.
+  avatarUrl: string | null;
   // How many cards this seat holds face-down, outside `hand`. Non-zero only
   // while a Croatian hand is still bidding; 0 everywhere else.
   //

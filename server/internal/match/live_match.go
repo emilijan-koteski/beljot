@@ -364,6 +364,15 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 
 	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID, declarationsEnabled, stopAtTarget)
 
+	// Stamp each human seat's avatar URL, captured once like the level below.
+	// The room handler already resolved it from the roster JOIN, so this is a
+	// copy, not a lookup. Bot seats stay nil.
+	for _, p := range players {
+		if !p.IsBot {
+			gs.Players[p.Seat].AvatarURL = p.AvatarURL
+		}
+	}
+
 	// Stamp each human seat's static lifetime level (Story: level-in-match).
 	// Levels derive from total_xp via the XP service and are captured ONCE here
 	// — XP only changes at match end, so they never drift mid-match. Best-effort,

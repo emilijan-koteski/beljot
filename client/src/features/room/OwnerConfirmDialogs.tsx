@@ -14,6 +14,8 @@ interface DialogTarget {
   name: string;
   seat: number | null;
   team: "A" | "B" | null;
+  /** The target's 128 px avatar, as the roster shows it; the initial without one. */
+  avatarUrl?: string | null;
 }
 
 // ── Filled brass / danger / ghost footer buttons ────────────────────────────
@@ -276,7 +278,7 @@ function OwnerConfirmDialog({
 }
 
 // ── Compact player row — the subject of the kick dialog ─────────────────────
-function PlayerRow({ name, seat, team, icon }: DialogTarget & { icon?: ReactNode }) {
+function PlayerRow({ name, seat, team, avatarUrl, icon }: DialogTarget & { icon?: ReactNode }) {
   const { t } = useTranslation();
   const seated = seat !== null && seat !== undefined;
   const relation = team === "A" ? "partner" : team === "B" ? "opponent" : null;
@@ -292,7 +294,7 @@ function PlayerRow({ name, seat, team, icon }: DialogTarget & { icon?: ReactNode
         borderRadius: 12,
       }}
     >
-      <Avatar name={name} size={42} team={team} icon={icon} />
+      <Avatar name={name} avatarUrl={avatarUrl} size={42} team={team} icon={icon} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -369,7 +371,12 @@ export function KickPlayerDialog({
       cancelLabel={t("room.kickConfirm.cancel")}
       cancelTestId="kick-cancel"
     >
-      <PlayerRow name={target.name} seat={target.seat} team={target.team} />
+      <PlayerRow
+        name={target.name}
+        seat={target.seat}
+        team={target.team}
+        avatarUrl={target.avatarUrl}
+      />
     </OwnerConfirmDialog>
   );
 }
@@ -430,8 +437,9 @@ export function TransferOwnershipDialog({
   onConfirm,
   pending,
   fromName,
+  fromAvatarUrl = null,
   target,
-}: ActionDialogProps & { fromName: string }) {
+}: ActionDialogProps & { fromName: string; fromAvatarUrl?: string | null }) {
   const { t } = useTranslation();
   const capabilities = [
     {
@@ -512,7 +520,7 @@ export function TransferOwnershipDialog({
             flex: 1,
           }}
         >
-          <Avatar name={fromName} size={44} you owner />
+          <Avatar name={fromName} avatarUrl={fromAvatarUrl} size={44} you owner />
           <span style={{ ...captionStyle, color: "var(--ink-mute)" }}>
             {t("room.ownerConfirm.youHost")}
           </span>
@@ -567,7 +575,7 @@ export function TransferOwnershipDialog({
           }}
         >
           <div style={{ position: "relative" }}>
-            <Avatar name={target.name} size={44} team={target.team} />
+            <Avatar name={target.name} avatarUrl={target.avatarUrl} size={44} team={target.team} />
             <span
               aria-hidden
               style={{

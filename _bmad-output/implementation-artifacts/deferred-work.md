@@ -1233,3 +1233,6 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A â€
 - source_spec: `_bmad-output/implementation-artifacts/spec-q3-season-recalculation.md`
   summary: No test pins that the api runs pending season recalculations at boot, before `e.Start`.
   evidence: `cmd/api/main_test.go` covers only the health handler; the rehearsal ran the real binary once. Moot once the one-time Q3 job has run in production.
+- source_spec: `_bmad-output/implementation-artifacts/spec-user-avatars.md`
+  summary: `system:room_owner_changed` sends an empty `newOwnerUsername` in production, because `TransferOwnership` reads the target with `FindPlayerRoom`, which never JOINs `users`.
+  evidence: `server/internal/room/handler.go` ~2951 (`target, err := tx.FindPlayerRoom(req.UserID)`) and ~2967 (`newOwnerName = target.Username`); `FindPlayerRoom` in `gorm_repo.go` ~168 selects `room_players` only and `RoomPlayer.Username` is `gorm:"-"`. The mock repo returns the stored name, which hides it in tests. Pre-existing (not caused by the avatar change) and no client reads the field today; the avatar change now hydrates `postRoom.OwnerUsername` a few lines later, which would be the one-line fix.

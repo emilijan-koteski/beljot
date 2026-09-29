@@ -143,7 +143,7 @@ function PlayerActionRow({
       data-user-id={player.userId}
       data-seat={player.seat}
     >
-      <Avatar name={player.username} size={24} className="shrink-0" />
+      <Avatar name={player.username} avatarUrl={player.avatarUrl} size={24} className="shrink-0" />
       <span className="text-ink min-w-0 flex-1 truncate text-sm font-medium">
         {player.username}
       </span>

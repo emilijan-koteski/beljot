@@ -73,11 +73,15 @@ type RegisterResponseData struct {
 	// The TREND is deliberately absent: it needs a windowed query over
 	// `matches`, and the auth path must stay a single-row read. The profile
 	// endpoint carries it.
-	HonorScore  int       `json:"honorScore"`
-	HonorTier   string    `json:"honorTier"`
-	IsNewPlayer bool      `json:"isNewPlayer"`
-	CreatedAt   time.Time `json:"createdAt"`
-	Token       string    `json:"token"`
+	HonorScore  int    `json:"honorScore"`
+	HonorTier   string `json:"honorTier"`
+	IsNewPlayer bool   `json:"isNewPlayer"`
+	// AvatarURL is the player's 128 px avatar (null when none), echoed so the
+	// nav pill shows the picture on first paint. Derived from the stored
+	// prefix, never stored as a URL.
+	AvatarURL *string   `json:"avatarUrl"`
+	CreatedAt time.Time `json:"createdAt"`
+	Token     string    `json:"token"`
 }
 
 type AuthHandler struct {
@@ -208,6 +212,7 @@ func authResponseData(u *user.User, accessToken string) RegisterResponseData {
 		HonorScore:         honor.Score,
 		HonorTier:          honor.Tier,
 		IsNewPlayer:        honor.IsNewPlayer,
+		AvatarURL:          user.SmallAvatarURL(u.AvatarKey),
 		CreatedAt:          u.CreatedAt,
 		Token:              accessToken,
 	}

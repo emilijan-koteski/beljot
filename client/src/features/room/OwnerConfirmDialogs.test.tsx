@@ -27,6 +27,22 @@ describe("KickPlayerDialog", () => {
     expect(screen.getByText("Opponent")).toBeInTheDocument();
   });
 
+  it("shows the target's picture, as the roster does", async () => {
+    const url = "https://assets.test/avatars/ena/128.webp";
+    render(
+      <KickPlayerDialog
+        open
+        onOpenChange={vi.fn()}
+        onConfirm={vi.fn()}
+        pending={false}
+        target={{ ...seatedOpponent, avatarUrl: url }}
+      />,
+    );
+    const title = await screen.findByTestId("kick-dialog-title");
+    const dialog = title.closest("[role='dialog']") ?? document.body;
+    expect(dialog.querySelector(`img[src="${url}"]`)).not.toBeNull();
+  });
+
   it("shows 'Standing' and no relation badge for an unseated target", async () => {
     render(
       <KickPlayerDialog

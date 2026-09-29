@@ -58,6 +58,12 @@ export interface User {
   honorScore: number;
   honorTier: string;
   isNewPlayer: boolean;
+  /**
+   * The player's 128 px avatar image (WebP), or null when they have none. A
+   * public, immutable URL derived server-side; render it through `<Avatar
+   * avatarUrl>`, which falls back to the initial if it fails to load.
+   */
+  avatarUrl: string | null;
   createdAt: string;
 }
 
@@ -70,6 +76,8 @@ export interface User {
 export interface PlayerSearchResult {
   id: number;
   username: string;
+  /** 128 px avatar, or null — see `User.avatarUrl`. */
+  avatarUrl: string | null;
 }
 
 /**
@@ -80,6 +88,8 @@ export interface PlayerSearchResult {
 export interface Friend {
   id: number;
   username: string;
+  /** 128 px avatar, or null — see `User.avatarUrl`. */
+  avatarUrl: string | null;
   online: boolean;
 }
 
@@ -92,6 +102,8 @@ export interface FriendRequest {
   id: number;
   fromUserId: number;
   fromUsername: string;
+  /** The SENDER's 128 px avatar, or null — see `User.avatarUrl`. */
+  avatarUrl: string | null;
   createdAt: string;
 }
 
@@ -107,6 +119,8 @@ export interface FriendRequest {
 export interface InvitableFriend {
   userId: number;
   username: string;
+  /** 128 px avatar, or null — see `User.avatarUrl`. */
+  avatarUrl: string | null;
   available: boolean;
   // "in_room" is some OTHER room; "in_this_room" is already seated here. Both
   // block the invite, but only one of them means "look for them elsewhere".
@@ -137,6 +151,11 @@ export interface Room {
    * avatar without an extra round-trip per row.
    */
   ownerUsername: string;
+  /**
+   * The owner's 128 px avatar, or null, hydrated in the same read as
+   * `ownerUsername` for the lobby card's host disc — see `User.avatarUrl`.
+   */
+  ownerAvatarUrl: string | null;
   /**
    * Embedded players, populated only by the GET /rooms list endpoint so the
    * lobby grid can render seat chips inline. The detail endpoint
@@ -240,6 +259,8 @@ export interface RoomPlayer {
   roomId: number;
   userId: number;
   username: string;
+  /** 128 px avatar, or null (always null for bots) — see `User.avatarUrl`. */
+  avatarUrl: string | null;
   seat: number | null;
   team: string | null;
   // Synthetic bot entries arrive as {id:0, userId:0, username:"", isBot:true}.
@@ -361,6 +382,8 @@ export interface LeaderboardRow {
   position: number;
   userId: number;
   username: string;
+  /** 128 px avatar, or null — see `User.avatarUrl`. */
+  avatarUrl: string | null;
   /** Accumulated Season Points this window. */
   sp: number;
   /**

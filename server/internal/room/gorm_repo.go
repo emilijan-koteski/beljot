@@ -11,15 +11,18 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/emilijan/beljot/server/internal/apperr"
+	"github.com/emilijan/beljot/server/internal/user"
 )
 
 // roomPlayerRow is a scan-target struct without gorm:"-" on Username,
-// allowing GORM's Scan to populate the username from a JOIN query.
+// allowing GORM's Scan to populate the username from a JOIN query. AvatarKey
+// is the joined users.avatar_key prefix; toRoomPlayer turns it into the URL.
 type roomPlayerRow struct {
 	ID        uint      `gorm:"column:id"`
 	RoomID    uint      `gorm:"column:room_id"`
 	UserID    uint      `gorm:"column:user_id"`
 	Username  string    `gorm:"column:username"`
+	AvatarKey *string   `gorm:"column:avatar_key"`
 	Seat      *int      `gorm:"column:seat"`
 	Team      *string   `gorm:"column:team"`
 	CreatedAt time.Time `gorm:"column:created_at"`
@@ -34,6 +37,7 @@ func (r roomPlayerRow) toRoomPlayer() RoomPlayer {
 		RoomID:    r.RoomID,
 		UserID:    r.UserID,
 		Username:  r.Username,
+		AvatarURL: user.SmallAvatarURL(r.AvatarKey),
 		Seat:      r.Seat,
 		Team:      r.Team,
 		CreatedAt: r.CreatedAt,
@@ -146,7 +150,7 @@ func (r *GormRepository) RemovePlayer(roomID uint, userID uint) error {
 func (r *GormRepository) FindPlayersByRoomID(roomID uint) ([]RoomPlayer, error) {
 	var rows []roomPlayerRow
 	err := r.db.Table("room_players").
-		Select("room_players.*, users.username").
+		Select("room_players.*, users.username, users.avatar_key").
 		Joins("JOIN users ON users.id = room_players.user_id").
 		Where("room_players.room_id = ?", roomID).
 		Order("room_players.created_at ASC").
@@ -205,7 +209,7 @@ func (r *GormRepository) ClearPlayerSeat(roomID uint, userID uint) error {
 func (r *GormRepository) FindPlayerBySeat(roomID uint, seat int) (*RoomPlayer, error) {
 	var row roomPlayerRow
 	err := r.db.Table("room_players").
-		Select("room_players.*, users.username").
+		Select("room_players.*, users.username, users.avatar_key").
 		Joins("JOIN users ON users.id = room_players.user_id").
 		Where("room_players.room_id = ? AND room_players.seat = ?", roomID, seat).
 		Scan(&row).Error
@@ -269,10 +273,11 @@ func (r *GormRepository) FindUserIDsByRoomStatus(status string) ([]uint, error) 
 	return ids, nil
 }
 
-// LoadOwnerUsernames hydrates the transient OwnerUsername field on each room
-// via a single SELECT against the users table. Skips the query for an empty
-// slice and short-circuits when every room already has a username (the WS
-// broadcast path occasionally pre-populates the field).
+// LoadOwnerUsernames hydrates the transient OwnerUsername and OwnerAvatarURL
+// fields on each room via a single SELECT against the users table. Skips the
+// query for an empty slice and short-circuits when every room already has a
+// username (the WS broadcast path occasionally pre-populates the field); the
+// two are always set together, so the username stands for both.
 func (r *GormRepository) LoadOwnerUsernames(rooms []*Room) error {
 	if len(rooms) == 0 {
 		return nil
@@ -291,23 +296,25 @@ func (r *GormRepository) LoadOwnerUsernames(rooms []*Room) error {
 		idList = append(idList, id)
 	}
 	type ownerRow struct {
-		ID       uint
-		Username string
+		ID        uint
+		Username  string
+		AvatarKey *string
 	}
 	var rows []ownerRow
-	if err := r.db.Table("users").Select("id, username").Where("id IN ?", idList).Scan(&rows).Error; err != nil {
+	if err := r.db.Table("users").Select("id, username, avatar_key").Where("id IN ?", idList).Scan(&rows).Error; err != nil {
 		return fmt.Errorf("loading owner usernames: %w", err)
 	}
-	byID := make(map[uint]string, len(rows))
+	byID := make(map[uint]ownerRow, len(rows))
 	for _, row := range rows {
-		byID[row.ID] = row.Username
+		byID[row.ID] = row
 	}
 	for _, rm := range rooms {
 		if rm == nil || rm.OwnerUsername != "" {
 			continue
 		}
-		if username, ok := byID[rm.OwnerID]; ok {
-			rm.OwnerUsername = username
+		if owner, ok := byID[rm.OwnerID]; ok {
+			rm.OwnerUsername = owner.Username
+			rm.OwnerAvatarURL = user.SmallAvatarURL(owner.AvatarKey)
 		}
 	}
 	return nil
@@ -323,7 +330,7 @@ func (r *GormRepository) FindPlayersByRoomIDs(roomIDs []uint) (map[uint][]RoomPl
 	}
 	var rows []roomPlayerRow
 	err := r.db.Table("room_players").
-		Select("room_players.*, users.username").
+		Select("room_players.*, users.username, users.avatar_key").
 		Joins("JOIN users ON users.id = room_players.user_id").
 		Where("room_players.room_id IN ?", roomIDs).
 		Order("room_players.room_id ASC, room_players.created_at ASC").

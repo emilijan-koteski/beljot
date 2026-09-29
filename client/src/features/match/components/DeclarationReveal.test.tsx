@@ -40,6 +40,7 @@ function testPlayer(seat: number, username: string): PlayerState {
     hand: [],
     userId: seat + 1,
     username,
+    avatarUrl: null,
     team: seat % 2 === 0 ? "teamA" : "teamB",
     declarations: [],
     connected: true,

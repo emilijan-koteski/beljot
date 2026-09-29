@@ -98,8 +98,13 @@ type User struct {
 	// HonorScore(HonorCompletedWeight, HonorAbandonedWeight, HonorDecayedAt,
 	// now) — pure arithmetic on a row you have already loaded. The Go field is
 	// deliberately named ...Snapshot so a misuse reads wrong at the call site.
-	HonorScoreSnapshot int            `gorm:"column:honor_score;not null;default:80" json:"-"`
-	CreatedAt          time.Time      `json:"createdAt"`
-	UpdatedAt          time.Time      `json:"updatedAt"`
-	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+	HonorScoreSnapshot int `gorm:"column:honor_score;not null;default:80" json:"-"`
+	// AvatarKey is the object-store PREFIX of the user's avatar pair,
+	// "avatars/<uuid v4>" (migration 000030), or nil for no avatar. Never
+	// serialized: every DTO carries the derived public URL instead (see
+	// AvatarURL in avatar_url.go), so the storage layout never reaches the wire.
+	AvatarKey *string        `gorm:"column:avatar_key" json:"-"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }

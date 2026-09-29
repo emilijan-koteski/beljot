@@ -189,6 +189,37 @@ func TestStartMatch_CreatesSession(t *testing.T) {
 	assert.Equal(t, uint(40), state.Players[3].UserID)
 }
 
+// Each human seat's avatar URL rides from the room's seat info onto the game
+// state, where every event:match_state carries it; bot seats and players
+// without one stay nil (null on the wire).
+func TestStartMatch_StampsAvatarURLs(t *testing.T) {
+	hub := ws.NewHub()
+	go hub.Run()
+	defer hub.Shutdown()
+
+	mgr := match.NewManager(hub, newMockMatchRepo())
+	url := "https://assets.test/avatars/55555555-5555-4555-8555-555555555555/128.webp"
+	players := [4]match.PlayerSeatInfo{
+		{UserID: 10, Username: "player1", Seat: 0, AvatarURL: &url},
+		{UserID: 20, Username: "player2", Seat: 1},
+		{UserID: 30, Username: "player3", Seat: 2},
+		{Seat: 3, IsBot: true},
+	}
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", players, "relaxed", 0, 10, 120, 0, true, false))
+	t.Cleanup(func() { mgr.RemoveSession(100) })
+
+	state := mgr.GetStateSnapshot(100)
+	require.NotNil(t, state)
+	require.NotNil(t, state.Players[0].AvatarURL)
+	assert.Equal(t, url, *state.Players[0].AvatarURL)
+	assert.Nil(t, state.Players[1].AvatarURL)
+	assert.Nil(t, state.Players[3].AvatarURL, "a bot seat has no avatar")
+
+	projected := game.ProjectForSeat(state, 1)
+	require.NotNil(t, projected.Players[0].AvatarURL, "the per-seat projection keeps every seat's avatar")
+	assert.Equal(t, url, *projected.Players[0].AvatarURL)
+}
+
 func TestStartMatch_501MatchMode_PropagatesToState(t *testing.T) {
 	// "501" was rejected at room creation until story 10.2, so this leg of the
 	// room → StartMatch → GameState seam was previously dead for 501 and is

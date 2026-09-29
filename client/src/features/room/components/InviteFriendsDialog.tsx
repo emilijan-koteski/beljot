@@ -146,7 +146,12 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
                   data-user-id={friend.userId}
                   data-available={friend.available === true ? "true" : "false"}
                 >
-                  <Avatar name={friend.username} size={28} className="shrink-0" />
+                  <Avatar
+                    name={friend.username}
+                    avatarUrl={friend.avatarUrl}
+                    size={28}
+                    className="shrink-0"
+                  />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-ink truncate font-medium">{friend.username}</span>
                     {(rowError !== undefined || friend.available !== true) && (

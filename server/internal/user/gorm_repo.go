@@ -224,6 +224,36 @@ func (r *GormUserRepository) UpdateUsername(id uint, username string) (time.Time
 	return now, nil
 }
 
+// UpdateAvatarKey replaces the user's avatar prefix (nil clears it) and returns
+// the prefix it replaced, read under the same row lock, so the caller deletes
+// exactly the pair this write orphaned even when two uploads race. One
+// transaction: SELECT ... FOR UPDATE, then UPDATE. Returns ErrUserNotFound when
+// no live row matches.
+//
+// Deliberately NOT on the UserRepository interface: the avatar package declares
+// its own one-method interface, so the many UserRepository mocks stay as they
+// are.
+func (r *GormUserRepository) UpdateAvatarKey(id uint, key *string) (*string, error) {
+	var previous *string
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var u User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("id", "avatar_key").
+			First(&u, id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperr.ErrUserNotFound
+			}
+			return err
+		}
+		previous = u.AvatarKey
+		return tx.Model(&User{}).Where("id = ?", id).Update("avatar_key", key).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return previous, nil
+}
+
 // AddXP adds each delta to the matching user's total_xp inside one transaction
 // and returns each user's resulting total (Story 9.5). Mirrors the wallet
 // repo's ChargeStakes/ApplySettlement discipline: rows are locked FOR UPDATE in

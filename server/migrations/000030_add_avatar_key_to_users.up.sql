@@ -1,0 +1,11 @@
+-- User avatars on object storage. avatar_key holds the PREFIX of the user's two
+-- WebP derivatives in the public bucket, "avatars/<uuid v4>", never a full URL:
+-- the objects are "<prefix>/256.webp" (profile hero) and "<prefix>/128.webp"
+-- (every other disc). The public URL is derived at read time from
+-- BELJOT_PUBLIC_ASSETS_URL, so moving the bucket behind a different host is a
+-- config change, not a data migration.
+--
+-- NULL means "no avatar" and is every existing row's value: the client renders
+-- the initial disc. Every upload writes a fresh prefix, so an object is never
+-- overwritten and its year-long immutable cache headers stay truthful.
+ALTER TABLE users ADD COLUMN avatar_key text NULL;

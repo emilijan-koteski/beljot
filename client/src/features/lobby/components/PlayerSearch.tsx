@@ -95,10 +95,15 @@ export function PlayerSearch({ onClose }: PlayerSearchProps) {
                 aria-label={t("lobby.playerSearch.resultAria", { username: player.username })}
                 className="hover:bg-surface-sunken hover:border-border flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left text-sm transition-colors"
               >
-                {/* Same initial-in-circle as the friend and request tiles: one
-                    avatar grammar across the whole card, and a letter identifies
-                    the player a generic person glyph cannot. */}
-                <Avatar name={player.username} size={28} className="shrink-0" />
+                {/* Same avatar disc as the friend and request tiles: one
+                    avatar grammar across the whole card, and a picture or a
+                    letter identifies the player a generic person glyph cannot. */}
+                <Avatar
+                  name={player.username}
+                  avatarUrl={player.avatarUrl}
+                  size={28}
+                  className="shrink-0"
+                />
                 <span className="text-ink truncate font-medium">{player.username}</span>
               </button>
             </li>

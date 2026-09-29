@@ -158,6 +158,7 @@ export function SeatTile({
           <>
             <Avatar
               name={displayName}
+              avatarUrl={isBot ? null : player.avatarUrl}
               size={avatarSize}
               team={mode === "us" ? "A" : mode === "them" ? "B" : null}
               you={isYou}

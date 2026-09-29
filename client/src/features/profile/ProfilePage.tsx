@@ -119,6 +119,9 @@ export function ProfilePage() {
     <div className="mx-auto max-w-330 px-4 py-8 pb-32 md:px-7" data-testid="profile-page">
       <IdentityHero
         username={username}
+        // The large image from the profile; before it resolves (or if it
+        // failed) the auth store's small one is the best picture on hand.
+        avatarUrl={profile ? (profile.avatarLargeUrl ?? null) : (user?.avatarUrl ?? null)}
         userId={user?.id}
         usernameChangedAt={profile?.usernameChangedAt}
         createdAt={createdAt}

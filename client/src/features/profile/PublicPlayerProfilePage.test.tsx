@@ -44,6 +44,8 @@ function publicProfileFixture(
   return {
     id: 2,
     username: "subjectplayer",
+    avatarUrl: null,
+    avatarLargeUrl: null,
     createdAt: "2026-02-01T10:00:00Z",
     totalGamesPlayed: 12,
     wins: 7,
@@ -101,10 +103,10 @@ function subjectMatch(): MatchListItem {
     outcome: "win",
     endReason: "natural",
     players: [
-      { seat: 0, userId: 2, username: "subjectplayer", isBot: false },
-      { seat: 1, userId: 3, username: "opp1", isBot: false },
-      { seat: 2, userId: 4, username: "mate", isBot: false },
-      { seat: 3, userId: 5, username: "opp2", isBot: false },
+      { seat: 0, userId: 2, username: "subjectplayer", avatarUrl: null, isBot: false },
+      { seat: 1, userId: 3, username: "opp1", avatarUrl: null, isBot: false },
+      { seat: 2, userId: 4, username: "mate", avatarUrl: null, isBot: false },
+      { seat: 3, userId: 5, username: "opp2", avatarUrl: null, isBot: false },
     ],
     hands: [],
   };
@@ -150,6 +152,22 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     expect(screen.getByTestId("profile-username")).toHaveTextContent("subjectplayer");
     // The honor band shows the SUBJECT's recomputed score, not the viewer's 90.
     expect(screen.getByTestId("profile-honor")).toHaveAttribute("data-honor", "30");
+  });
+
+  it("draws the subject's large avatar in the hero, with no edit affordance", async () => {
+    const large = "https://assets.test/avatars/subject/256.webp";
+    mockGetPublicProfile.mockResolvedValue(
+      publicProfileFixture({
+        avatarUrl: "https://assets.test/avatars/subject/128.webp",
+        avatarLargeUrl: large,
+      }),
+    );
+
+    renderAt("2");
+
+    const hero = await screen.findByTestId("profile-identity-hero");
+    expect(hero.querySelector("img")).toHaveAttribute("src", large);
+    expect(screen.queryByTestId("profile-avatar-edit")).not.toBeInTheDocument();
   });
 
   it("does not render the wallet pill, streak pill, or username edit pencil", async () => {

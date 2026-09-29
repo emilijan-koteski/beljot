@@ -13,6 +13,7 @@ const baseRoom: Room = {
   code: "ABC123",
   ownerId: 1,
   ownerUsername: "host",
+  ownerAvatarUrl: null,
   variant: "bitola",
   matchMode: "1001",
   timerStyle: "relaxed",
@@ -33,6 +34,7 @@ const baseRoom: Room = {
       roomId: 1,
       userId: 1,
       username: "host",
+      avatarUrl: null,
       seat: 0,
       team: "teamA",
       isBot: false,
@@ -68,6 +70,7 @@ describe("RoomCard", () => {
         roomId: 1,
         userId: 0,
         username: "",
+        avatarUrl: null,
         seat: 1,
         team: "teamB",
         isBot: true,
@@ -314,5 +317,37 @@ describe("RoomCard", () => {
         chip.textContent?.length ?? 0,
       );
     }
+  });
+});
+
+describe("RoomCard avatars", () => {
+  const url = "https://assets.test/avatars/h/128.webp";
+
+  it("shows the host's picture in the footer disc and the seat chip", () => {
+    render(
+      <RoomCard
+        room={{
+          ...baseRoom,
+          ownerAvatarUrl: url,
+          players: baseRoom.players!.map((p) => ({ ...p, avatarUrl: url })),
+        }}
+        onJoin={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("room-card-owner-avatar").querySelector("img")).toHaveAttribute(
+      "src",
+      url,
+    );
+    expect(screen.getByTestId("room-1-seat-0").querySelector("img")).toHaveAttribute("src", url);
+  });
+
+  it("keeps the initials when nobody has a picture, or the payload predates avatars", () => {
+    const legacy: Partial<Room> = { ...baseRoom };
+    delete legacy.ownerAvatarUrl;
+    render(<RoomCard room={legacy as Room} onJoin={() => {}} />);
+    const owner = screen.getByTestId("room-card-owner-avatar");
+    expect(owner.querySelector("img")).toBeNull();
+    expect(owner).toHaveTextContent("H");
+    expect(screen.getByTestId("room-1-seat-0").querySelector("img")).toBeNull();
   });
 });

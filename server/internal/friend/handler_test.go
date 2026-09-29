@@ -653,3 +653,48 @@ func TestFriendEndpoints_RequireAuth(t *testing.T) {
 	rec = doDelete(e, "/api/v1/friends/1", "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
+
+// --- Avatars ---
+
+// Both lists carry each other party's 128 avatar URL (the sender's, on a
+// request), null when they have none.
+func TestLists_CarryAvatarURL(t *testing.T) {
+	user.SetPublicAssetsURL("https://assets.test")
+	t.Cleanup(func() { user.SetPublicAssetsURL("") })
+
+	repo, users, _, e := setup()
+	users.add(1, "alice")
+	bob := users.add(2, "bob")
+	users.add(3, "carol")
+	prefix := "avatars/12121212-1212-4121-8121-121212121212"
+	bob.AvatarKey = &prefix
+	want := "https://assets.test/" + prefix + "/128.webp"
+
+	repo.seed(1, 2, friend.FriendStatusAccepted)
+	repo.seed(3, 1, friend.FriendStatusAccepted)
+	rec := doGet(e, "/api/v1/friends", tokenFor(t, 1))
+	require.Equal(t, http.StatusOK, rec.Code)
+	var friends struct {
+		Data []friend.FriendDTO `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &friends))
+	byID := map[uint]*string{}
+	for _, f := range friends.Data {
+		byID[f.ID] = f.AvatarURL
+	}
+	require.NotNil(t, byID[2])
+	assert.Equal(t, want, *byID[2])
+	assert.Nil(t, byID[3])
+	assert.Contains(t, rec.Body.String(), `"avatarUrl":null`, "the key is present when null")
+
+	repo.seed(2, 3, friend.FriendStatusPending) // bob -> carol
+	rec = doGet(e, "/api/v1/friends/requests", tokenFor(t, 3))
+	require.Equal(t, http.StatusOK, rec.Code)
+	var requests struct {
+		Data []friend.PendingRequestDTO `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &requests))
+	require.Len(t, requests.Data, 1)
+	require.NotNil(t, requests.Data[0].AvatarURL)
+	assert.Equal(t, want, *requests.Data[0].AvatarURL, "a request shows the sender's avatar")
+}

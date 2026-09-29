@@ -1,6 +1,7 @@
 import { Bot } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { AvatarImage } from "@/shared/components/ui/avatar";
 import { cn } from "@/shared/lib/utils";
 
 export type SeatTeam = "A" | "B";
@@ -10,6 +11,8 @@ type Props = {
   team: SeatTeam;
   /** Bot seat — the disc shows the bot glyph instead of a name initial. */
   bot?: boolean;
+  /** The seated player's 128 px avatar; the initial renders without one. */
+  avatarUrl?: string | null;
   testId?: string;
 };
 
@@ -34,10 +37,10 @@ const TOKENS = {
  * Single seat slot inside the lobby card's 2×2 team grid.
  *
  * Empty seats render a dashed brass-tinted outline; filled seats show the
- * player's initial inside a colored disc + their username, with the team
- * color signaling Us (Gold) vs Them (Silver) at a glance.
+ * player's picture (or initial) inside a colored disc + their username, with
+ * the team color signaling Us (Gold) vs Them (Silver) at a glance.
  */
-export function SeatChip({ username, team, bot = false, testId }: Props) {
+export function SeatChip({ username, team, bot = false, avatarUrl, testId }: Props) {
   const { t } = useTranslation();
   const tone = TOKENS[team];
 
@@ -66,7 +69,7 @@ export function SeatChip({ username, team, bot = false, testId }: Props) {
     >
       <span
         className={cn(
-          "inline-flex size-4.5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-brass-ink",
+          "inline-flex size-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-brass-ink",
           tone.fill,
         )}
         data-testid={bot ? "seat-chip-bot-icon" : undefined}
@@ -74,7 +77,7 @@ export function SeatChip({ username, team, bot = false, testId }: Props) {
         {bot ? (
           <Bot className="size-3 -translate-y-[5%]" aria-hidden="true" />
         ) : (
-          username.charAt(0).toUpperCase()
+          <AvatarImage src={avatarUrl} size={18} fallback={username.charAt(0).toUpperCase()} />
         )}
       </span>
       <span className="truncate">{username}</span>

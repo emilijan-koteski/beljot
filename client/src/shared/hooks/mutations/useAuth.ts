@@ -35,6 +35,7 @@ function setAuthState(res: {
   honorScore: number;
   honorTier: string;
   isNewPlayer: boolean;
+  avatarUrl: string | null;
   createdAt: string;
 }) {
   useAuthStore.getState().setToken(res.token);
@@ -55,6 +56,9 @@ function setAuthState(res: {
     honorScore: res.honorScore,
     honorTier: res.honorTier,
     isNewPlayer: res.isNewPlayer,
+    // `?? null`: an envelope from a server that predates avatars has no key,
+    // and the disc must read that as "no avatar", not as undefined.
+    avatarUrl: res.avatarUrl ?? null,
     createdAt: res.createdAt,
   });
 }

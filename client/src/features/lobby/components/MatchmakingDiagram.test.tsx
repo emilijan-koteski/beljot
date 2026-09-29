@@ -14,6 +14,7 @@ function player(userId: number, username: string, seat: number): RoomPlayer {
     roomId: 1,
     userId,
     username,
+    avatarUrl: null,
     seat,
     team: seat % 2 === 0 ? "teamA" : "teamB",
     isBot: false,
@@ -29,6 +30,7 @@ function botPlayer(seat: number): RoomPlayer {
     roomId: 1,
     userId: 0,
     username: "",
+    avatarUrl: null,
     seat,
     team: seat % 2 === 0 ? "teamA" : "teamB",
     isBot: true,
@@ -103,6 +105,35 @@ describe("MatchmakingDiagram", () => {
     expect(screen.getAllByText("searching")).toHaveLength(1);
     expect(screen.getByText("3 / 4 seated")).toBeInTheDocument();
     expect(screen.getByText("1 more to go")).toBeInTheDocument();
+  });
+
+  it("draws the viewer's and each human occupant's picture, never a bot's", () => {
+    const you = "https://assets.test/avatars/you/128.webp";
+    const them = "https://assets.test/avatars/ena/128.webp";
+    const { container } = render(
+      <MatchmakingDiagram
+        room={room()}
+        found={3}
+        players={[
+          { ...player(7, "dejan_k", 0), avatarUrl: you },
+          { ...player(8, "ena_h", 1), avatarUrl: them },
+          { ...botPlayer(2), avatarUrl: them },
+        ]}
+        viewerSeat={0}
+        currentUsername="dejan_k"
+        currentAvatarUrl={you}
+        elapsed="00:21"
+        onCancel={() => {}}
+      />,
+    );
+
+    const srcs = Array.from(container.querySelectorAll("img")).map((i) => i.getAttribute("src"));
+    expect(srcs).toContain(you);
+    expect(screen.getByTestId("matchmaking-orbit-1").querySelector("img")).toHaveAttribute(
+      "src",
+      them,
+    );
+    expect(screen.getByTestId("matchmaking-orbit-2").querySelector("img")).toBeNull();
   });
 
   it("surfaces the room's real variant, mode, per-move timer, and coin stake", () => {

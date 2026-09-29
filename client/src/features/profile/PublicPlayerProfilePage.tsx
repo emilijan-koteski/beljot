@@ -132,6 +132,7 @@ export function PublicPlayerProfilePage() {
     >
       <IdentityHero
         username={profile.username}
+        avatarUrl={profile.avatarLargeUrl ?? null}
         // No userId → the username edit pencil stays hidden (read-only switch).
         userId={undefined}
         createdAt={profile.createdAt}

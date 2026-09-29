@@ -23,6 +23,7 @@ function rows(from: number, n: number): LeaderboardRow[] {
     position: from + i,
     userId: from + i,
     username: `p${from + i}`,
+    avatarUrl: null,
     sp: 10_000 - (from + i) * 10,
     tier: "gold",
     division: 2,

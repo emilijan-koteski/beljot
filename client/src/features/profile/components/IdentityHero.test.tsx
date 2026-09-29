@@ -1,6 +1,7 @@
 import "@/shared/i18n/i18n";
 
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { QueryWrapper } from "@/test-utils";
@@ -69,5 +70,31 @@ describe("IdentityHero private pills (Story 11.3)", () => {
 
     expect(container.querySelector('[aria-label^="Coins"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Day streak"]')).toBeNull();
+  });
+});
+
+describe("IdentityHero avatar", () => {
+  const LARGE = "https://assets.test/avatars/p/256.webp";
+
+  it("draws the large avatar eagerly in the hero disc", () => {
+    const { container } = renderHero({ avatarUrl: LARGE });
+    const img = container.querySelector("img");
+    expect(img).toHaveAttribute("src", LARGE);
+    expect(img).toHaveAttribute("loading", "eager");
+    expect(img).toHaveAttribute("width", "96");
+  });
+
+  it("offers the edit button on the self profile and opens the dialog", async () => {
+    const user = userEvent.setup();
+    renderHero({ userId: 1, avatarUrl: null });
+
+    await user.click(screen.getByTestId("profile-avatar-edit"));
+    expect(screen.getByTestId("avatar-dialog")).toBeInTheDocument();
+  });
+
+  it("renders no avatar edit affordance on a public profile", () => {
+    renderHero({ userId: undefined, avatarUrl: LARGE, hidePrivatePills: true });
+    expect(screen.queryByTestId("profile-avatar-edit")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("avatar-dialog")).not.toBeInTheDocument();
   });
 });

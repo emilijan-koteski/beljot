@@ -23,6 +23,9 @@ import (
 type FriendSummary struct {
 	UserID   uint
 	Username string
+	// AvatarURL is the friend's derived 128 px avatar URL (nil when none),
+	// resolved by the same adapter that resolves the username.
+	AvatarURL *string
 }
 
 // FriendDirectory is the subset of the friend domain the invite handler needs
@@ -122,10 +125,11 @@ type InviteToRoomRequest struct {
 // InvitableFriendDTO is one row of GET /rooms/:id/invitable-friends. Available
 // is computed server-side from the presence trio; Reason is empty when Available.
 type InvitableFriendDTO struct {
-	UserID    uint   `json:"userId"`
-	Username  string `json:"username"`
-	Available bool   `json:"available"`
-	Reason    string `json:"reason"`
+	UserID    uint    `json:"userId"`
+	Username  string  `json:"username"`
+	AvatarURL *string `json:"avatarUrl"`
+	Available bool    `json:"available"`
+	Reason    string  `json:"reason"`
 }
 
 // ListInvitableFriends handles GET /rooms/:id/invitable-friends (AC1). It returns
@@ -156,6 +160,7 @@ func (h *InviteHandler) ListInvitableFriends(c echo.Context) error {
 		items = append(items, InvitableFriendDTO{
 			UserID:    f.UserID,
 			Username:  f.Username,
+			AvatarURL: f.AvatarURL,
 			Available: reason == "",
 			Reason:    reason,
 		})

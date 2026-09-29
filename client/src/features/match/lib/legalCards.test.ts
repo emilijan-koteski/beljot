@@ -22,6 +22,7 @@ function player(seat: number, cards: Card[]): PlayerState {
     hand: cards,
     userId: seat + 1,
     username: `p${seat}`,
+    avatarUrl: null,
     team: seat % 2 === 0 ? "teamA" : "teamB",
     declarations: [],
     connected: true,

@@ -17,7 +17,7 @@ import (
 //
 // It lives on UserHandler rather than RoomHandler even though the path is
 // /rooms/:id/last-match: the response is a MatchListItem, which needs the
-// batched username hydration (loadUsernamesForMatches) plus buildMatchListItem,
+// batched identity hydration (loadIdentitiesForMatches) plus buildMatchListItem,
 // and RoomHandler holds no user repository. Moving the DTO would fork it.
 //
 // AUTHORIZATION IS MATCH PARTICIPATION, not room membership: the repository
@@ -50,12 +50,12 @@ func (h *UserHandler) GetRoomLastMatch(c echo.Context) error {
 		return apperr.ErrNotFound
 	}
 
-	usernames, err := h.loadUsernamesForMatches([]match.Match{*m})
+	identities, err := h.loadIdentitiesForMatches([]match.Match{*m})
 	if err != nil {
 		return fmt.Errorf("loading match usernames: %w", err)
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"data": buildMatchListItem(*m, viewerID, usernames),
+		"data": buildMatchListItem(*m, viewerID, identities),
 	})
 }

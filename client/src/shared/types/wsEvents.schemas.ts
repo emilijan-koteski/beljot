@@ -81,6 +81,10 @@ const PlayerStateSchema = z.strictObject({
   // Server-authoritative lifetime level (from total_xp), captured at match
   // start and static for the match. Must match the Go PlayerState.Level field.
   level: z.number().int(),
+  // The seat's 128 px avatar URL, null for bots and players without one.
+  // Captured at match start like level. Must match the Go PlayerState.AvatarURL
+  // field (same build-time gate as the fields below).
+  avatarUrl: z.string().nullable(),
   // Story 12.8: how many cards the seat holds face-down, outside `hand`. Must
   // land in the same commit as the Go PlayerState.FaceDownCount field or the
   // contract test fails. Note the gate is BUILD-time, not runtime: these schemas

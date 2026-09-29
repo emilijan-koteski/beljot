@@ -1,9 +1,64 @@
+import type { ReactNode } from "react";
+import { useState } from "react";
+
 import { cn } from "@/shared/lib/utils";
 
 type AvatarTeam = "A" | "B" | null;
 
+type AvatarImageProps = {
+  /** The picture; null, undefined or "" renders the fallback straight away. */
+  src?: string | null;
+  /** Rendered box in CSS px, reserved up front so nothing shifts on load. */
+  size: number;
+  /** Load now instead of near the viewport (above-the-fold discs only). */
+  eager?: boolean;
+  /** What shows when there is no picture or it fails to load. */
+  fallback: ReactNode;
+  className?: string;
+};
+
+/**
+ * The picture inside an avatar disc, with the disc's own content as the
+ * fallback. Shared by `Avatar` and the hand-built discs (match seat, nav pill,
+ * lobby chips, leaderboard) so every disc loads and fails the same way: a
+ * reserved width/height box, async decoding, lazy unless `eager`, and on error
+ * the fallback instead of a broken-image glyph.
+ */
+export function AvatarImage({ src, size, eager = false, fallback, className }: AvatarImageProps) {
+  // The URL that failed to load, not a boolean: a new upload is a new URL, so
+  // it gets its own attempt without an effect to reset the flag.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (typeof src !== "string" || src === "" || src === failedUrl) {
+    return <>{fallback}</>;
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      decoding="async"
+      loading={eager ? "eager" : "lazy"}
+      draggable={false}
+      className={cn("size-full rounded-full object-cover", className)}
+      onError={() => setFailedUrl(src)}
+    />
+  );
+}
+
 type AvatarProps = {
   name: string;
+  /**
+   * The player's uploaded picture. When set it fills the disc (inside the
+   * ring); when absent, or if it fails to load, the initial renders instead.
+   */
+  avatarUrl?: string | null;
+  /**
+   * Load the picture immediately instead of when it scrolls near the
+   * viewport. Only for the one above-the-fold disc (the profile hero); every
+   * list and seat disc stays lazy so off-screen discs cost nothing.
+   */
+  eager?: boolean;
   size?: number;
   team?: AvatarTeam;
   owner?: boolean;
@@ -19,18 +74,22 @@ type AvatarProps = {
    * Pass a bare lucide icon — it is sized proportionally to the avatar the
    * same way the initial is.
    */
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   className?: string;
 };
 
 /**
- * Initials-in-circle avatar used by seat tiles, roster dropdown, and chat
- * rows. Fill follows team colors when set; the ring color encodes role —
- * brass for owner, accent for "you", team color otherwise. Owner gets a soft
- * brass halo via box-shadow so they read at a glance across the diamond.
+ * Circular player avatar used by seat tiles, rosters, lists and the profile
+ * hero: the uploaded picture when there is one, else the initial. Fill follows
+ * team colors when set; the ring color encodes role — brass for owner, accent
+ * for "you", team color otherwise. Owner gets a soft brass halo via box-shadow
+ * so they read at a glance across the diamond. The ring and halo frame the
+ * picture exactly as they frame the initial.
  */
 export function Avatar({
   name,
+  avatarUrl,
+  eager = false,
   size = 36,
   team = null,
   owner,
@@ -105,7 +164,7 @@ export function Avatar({
           {icon}
         </span>
       ) : (
-        initial
+        <AvatarImage src={avatarUrl} size={size} eager={eager} fallback={initial} />
       )}
     </div>
   );

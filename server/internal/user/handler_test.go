@@ -3263,3 +3263,163 @@ func TestGetRoomLastMatch_AbandonedRowIsReturned(t *testing.T) {
 	assert.Equal(t, "abandonment", item.EndReason)
 	assert.Equal(t, "win", item.Outcome, "non-abandoner on the winning team")
 }
+
+// --- Avatars: every identity DTO carries the derived 128 URL ---
+
+const testAssetsBase = "https://assets.test"
+
+// withAvatarBase configures the public base for one test; the package-level
+// base is restored to empty afterwards so no other test sees URLs.
+func withAvatarBase(t *testing.T) {
+	t.Helper()
+	user.SetPublicAssetsURL(testAssetsBase)
+	t.Cleanup(func() { user.SetPublicAssetsURL("") })
+}
+
+func setAvatar(u *user.User, prefix string) {
+	p := prefix
+	u.AvatarKey = &p
+}
+
+func smallURL(prefix string) string { return testAssetsBase + "/" + prefix + "/128.webp" }
+func largeURL(prefix string) string { return testAssetsBase + "/" + prefix + "/256.webp" }
+
+// decodeData unmarshals the `data` envelope into a generic value, so the tests
+// see the literal wire keys (a present-but-null key included).
+func decodeData(t *testing.T, rec *httptest.ResponseRecorder) any {
+	t.Helper()
+	var env struct {
+		Data any `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env))
+	return env.Data
+}
+
+func TestGetProfile_BothShapesCarryBothAvatarURLs(t *testing.T) {
+	withAvatarBase(t)
+	repo, _, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "viewer@example.com", "en")
+	subject := repo.addUser("subject", "subject@example.com", "en")
+	prefix := "avatars/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	setAvatar(subject, prefix)
+
+	for name, callerID := range map[string]uint{"self": subject.ID, "public": viewer.ID} {
+		t.Run(name, func(t *testing.T) {
+			token, err := auth.GenerateAccessToken(callerID, testJWTSecret)
+			require.NoError(t, err)
+			rec := doGetProfile(e, strconvUint(subject.ID), token)
+			require.Equal(t, http.StatusOK, rec.Code)
+			data := decodeData(t, rec).(map[string]any)
+			assert.Equal(t, smallURL(prefix), data["avatarUrl"])
+			assert.Equal(t, largeURL(prefix), data["avatarLargeUrl"])
+		})
+	}
+
+	// A player without an avatar: both keys present, both null.
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+	data := decodeData(t, doGetProfile(e, strconvUint(viewer.ID), token)).(map[string]any)
+	require.Contains(t, data, "avatarUrl")
+	require.Contains(t, data, "avatarLargeUrl")
+	assert.Nil(t, data["avatarUrl"])
+	assert.Nil(t, data["avatarLargeUrl"])
+}
+
+// Without a configured public base (tests, or development without storage)
+// even a stored prefix serializes as null.
+func TestGetProfile_AvatarURLNullWithoutPublicBase(t *testing.T) {
+	repo, _, e := setupUserHandlerWithMatches()
+	u := repo.addUser("nobase", "nobase@example.com", "en")
+	setAvatar(u, "avatars/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+	data := decodeData(t, doGetProfile(e, strconvUint(u.ID), token)).(map[string]any)
+	assert.Nil(t, data["avatarUrl"])
+	assert.Nil(t, data["avatarLargeUrl"])
+}
+
+func TestSearchUsers_ResultsCarryAvatarURL(t *testing.T) {
+	withAvatarBase(t)
+	repo, e := setupUserHandler()
+	me := repo.addUser("searcher", "me@example.com", "en")
+	withPic := repo.addUser("alice", "alice@example.com", "en")
+	repo.addUser("albert", "albert@example.com", "en")
+	prefix := "avatars/cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+	setAvatar(withPic, prefix)
+
+	token, err := auth.GenerateAccessToken(me.ID, testJWTSecret)
+	require.NoError(t, err)
+	rec := doSearchUsers(e, "?search=al", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "avatarLargeUrl", "only the profile shapes carry the large image")
+
+	byName := map[string]any{}
+	for _, item := range decodeData(t, rec).([]any) {
+		row := item.(map[string]any)
+		require.Contains(t, row, "avatarUrl")
+		byName[row["username"].(string)] = row["avatarUrl"]
+	}
+	assert.Equal(t, smallURL(prefix), byName["alice"])
+	assert.Nil(t, byName["albert"])
+}
+
+func TestGetCareer_PartnersAndRivalsCarryAvatarURL(t *testing.T) {
+	withAvatarBase(t)
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "v@example.com", "en")
+	mate := repo.addUser("mate", "m@example.com", "en")
+	rival := repo.addUser("rival", "r@example.com", "en")
+	prefix := "avatars/dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+	setAvatar(mate, prefix)
+	matchRepo.partners = []match.PartnerAggregate{{UserID: mate.ID, Played: 8, Wins: 6}}
+	matchRepo.rivals = []match.RivalAggregate{{UserID: rival.ID, Wins: 4, Losses: 2}}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+	rec := doGetCareer(e, strconvUint(viewer.ID), token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "avatarLargeUrl")
+
+	data := decodeData(t, rec).(map[string]any)
+	partner := data["topPartners"].([]any)[0].(map[string]any)
+	rivalRow := data["topRivals"].([]any)[0].(map[string]any)
+	assert.Equal(t, smallURL(prefix), partner["avatarUrl"])
+	require.Contains(t, rivalRow, "avatarUrl")
+	assert.Nil(t, rivalRow["avatarUrl"])
+}
+
+func TestListMatches_PlayersCarryAvatarURL(t *testing.T) {
+	withAvatarBase(t)
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("alice", "alice@example.com", "en")
+	mate := repo.addUser("bob", "bob@example.com", "en")
+	prefix := "avatars/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+	setAvatar(viewer, prefix)
+
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	viewerID, mateID := viewer.ID, mate.ID
+	matchRepo.matches = []match.Match{{
+		ID: 1, RoomID: 1, Player1ID: &viewerID, Player3ID: &mateID,
+		Player2IsBot: true, Player4IsBot: true, HasBots: true,
+		TeamAScore: 1004, TeamBScore: 730, WinnerTeam: 0,
+		Variant: "bitola", MatchMode: "1001",
+		StartedAt: now.Add(-30 * time.Minute), CompletedAt: now, Status: "completed",
+	}}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+	rec := doListMatches(e, strconvUint(viewer.ID), "", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "avatarLargeUrl")
+
+	resp := decodeMatchesResponse(t, rec.Body.Bytes())
+	require.Len(t, resp.Items, 1)
+	for _, p := range resp.Items[0].Players {
+		if p.Seat == 0 {
+			require.NotNil(t, p.AvatarURL)
+			assert.Equal(t, smallURL(prefix), *p.AvatarURL)
+			continue
+		}
+		assert.Nil(t, p.AvatarURL, "seat %d: bots and players without one are null", p.Seat)
+	}
+}

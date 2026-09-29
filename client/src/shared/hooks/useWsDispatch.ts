@@ -805,6 +805,8 @@ function dispatchSystemEvent(message: WsMessage): void {
         roomId: payload.roomId,
         userId: payload.userId,
         username: payload.username,
+        // Not zod-validated (see below): anything but a string means no avatar.
+        avatarUrl: typeof payload.avatarUrl === "string" ? payload.avatarUrl : null,
         seat: null,
         team: null,
         isBot: false,
@@ -838,7 +840,19 @@ function dispatchSystemEvent(message: WsMessage): void {
     const payload = message.payload as SeatUpdatedPayload;
     const store = useRoomStore.getState();
     if (store.currentRoomId !== null && store.currentRoomId !== payload.roomId) return;
-    store.updatePlayerSeat(payload.userId, payload.seat, payload.team, payload.previousSeat);
+    store.updatePlayerSeat(
+      payload.userId,
+      payload.seat,
+      payload.team,
+      payload.previousSeat,
+      // Refresh only from a payload that carries the key; an older server's
+      // seat_updated leaves the stored avatar as it is.
+      payload.avatarUrl === undefined
+        ? undefined
+        : typeof payload.avatarUrl === "string"
+          ? payload.avatarUrl
+          : null,
+    );
     return;
   }
 

@@ -102,10 +102,10 @@ function makeLastMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
     outcome: "win",
     endReason: "natural",
     players: [
-      { seat: 0, userId: 10, username: "viewer", isBot: false },
-      { seat: 1, userId: 11, username: "opp1", isBot: false },
-      { seat: 2, userId: 12, username: "mate", isBot: false },
-      { seat: 3, userId: 13, username: "opp2", isBot: false },
+      { seat: 0, userId: 10, username: "viewer", avatarUrl: null, isBot: false },
+      { seat: 1, userId: 11, username: "opp1", avatarUrl: null, isBot: false },
+      { seat: 2, userId: 12, username: "mate", avatarUrl: null, isBot: false },
+      { seat: 3, userId: 13, username: "opp2", avatarUrl: null, isBot: false },
     ],
     hands: [
       {

@@ -81,6 +81,7 @@ function fourSeated(viewerSeat: number) {
     roomId: 1,
     userId: seat === viewerSeat ? 100 : 200 + seat,
     username: usernames[seat]!,
+    avatarUrl: null,
     seat,
     team: seat % 2 === 0 ? "teamA" : "teamB",
     isBot: false,

@@ -7,6 +7,7 @@ import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { LevelRing } from "@/shared/components/LevelRing";
 import { HeaderRankChip } from "@/shared/components/season/HeaderRankChip";
 import { SupportDialog } from "@/shared/components/support/SupportDialog";
+import { AvatarImage } from "@/shared/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -257,10 +258,15 @@ export function TopBar({
               data-testid="nav-user"
             >
               <span
-                className="bg-accent text-accent-ink flex size-6.5 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                className="bg-accent text-accent-ink flex size-6.5 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold"
                 aria-hidden="true"
+                data-testid="nav-user-avatar"
               >
-                {(user.username.charAt(0) || "?").toUpperCase()}
+                <AvatarImage
+                  src={user.avatarUrl}
+                  size={26}
+                  fallback={(user.username.charAt(0) || "?").toUpperCase()}
+                />
               </span>
               <span className="text-ink max-w-24 truncate text-sm font-medium lg:max-w-40">
                 {user.username}

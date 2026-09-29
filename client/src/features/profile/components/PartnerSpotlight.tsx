@@ -27,7 +27,7 @@ function FeaturedPartner({ featured }: { featured: PartnerStat }) {
   const { t } = useTranslation();
   return (
     <>
-      <Avatar name={featured.username} team="A" size={56} />
+      <Avatar name={featured.username} avatarUrl={featured.avatarUrl} team="A" size={56} />
       <div className="min-w-0">
         <div className="text-ink font-display truncate text-lg font-semibold tracking-[-0.1px] underline-offset-2 group-hover:underline">
           {featured.username}
@@ -111,12 +111,12 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
                     aria-label={t("friends.viewProfileAria", { username: p.username })}
                     className="focus-visible:ring-ring/50 flex min-w-0 flex-1 items-center gap-2.5 rounded-md underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
                   >
-                    <Avatar name={p.username} team="A" size={24} />
+                    <Avatar name={p.username} avatarUrl={p.avatarUrl} team="A" size={24} />
                     <span className="text-ink truncate text-[13px] font-medium">{p.username}</span>
                   </Link>
                 ) : (
                   <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                    <Avatar name={p.username} team="A" size={24} />
+                    <Avatar name={p.username} avatarUrl={p.avatarUrl} team="A" size={24} />
                     <span className="text-ink truncate text-[13px] font-medium">{p.username}</span>
                   </div>
                 )}

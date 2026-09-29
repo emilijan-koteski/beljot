@@ -421,3 +421,76 @@ func TestGormUserRepository_UpdatePreferences_AudioVolumeOutOfRangeRejectedByDB(
 		})
 	}
 }
+
+// UpdateAvatarKey writes the new prefix and hands back the one it replaced, so
+// the caller can delete exactly the orphaned pair; clearing returns the last
+// prefix too, and a missing row is ErrUserNotFound.
+func TestGormUserRepository_UpdateAvatarKey(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormUserRepository(db)
+
+	u := &User{
+		Email:              "avatar@test.com",
+		Username:           "avataruser",
+		PasswordHash:       "hashedpassword",
+		LanguagePreference: "en",
+	}
+	require.NoError(t, repo.Create(u))
+
+	fresh, err := repo.FindByID(u.ID)
+	require.NoError(t, err)
+	assert.Nil(t, fresh.AvatarKey, "a new account has no avatar")
+
+	p1 := "avatars/11111111-1111-4111-8111-111111111111"
+	previous, err := repo.UpdateAvatarKey(u.ID, &p1)
+	require.NoError(t, err)
+	assert.Nil(t, previous, "first upload replaces nothing")
+
+	p2 := "avatars/22222222-2222-4222-8222-222222222222"
+	previous, err = repo.UpdateAvatarKey(u.ID, &p2)
+	require.NoError(t, err)
+	require.NotNil(t, previous)
+	assert.Equal(t, p1, *previous, "replace returns the orphaned prefix")
+
+	stored, err := repo.FindByID(u.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.AvatarKey)
+	assert.Equal(t, p2, *stored.AvatarKey)
+
+	previous, err = repo.UpdateAvatarKey(u.ID, nil)
+	require.NoError(t, err)
+	require.NotNil(t, previous)
+	assert.Equal(t, p2, *previous, "clearing returns the removed prefix")
+
+	cleared, err := repo.FindByID(u.ID)
+	require.NoError(t, err)
+	assert.Nil(t, cleared.AvatarKey, "the column is NULL again")
+
+	previous, err = repo.UpdateAvatarKey(u.ID, nil)
+	require.NoError(t, err)
+	assert.Nil(t, previous, "clearing an empty column is a no-op")
+
+	_, err = repo.UpdateAvatarKey(u.ID+1_000_000, &p1)
+	assert.ErrorIs(t, err, apperr.ErrUserNotFound)
+}
+
+func TestAvatarURL(t *testing.T) {
+	t.Cleanup(func() { SetPublicAssetsURL("") })
+	key := "avatars/33333333-3333-4333-8333-333333333333"
+	empty := ""
+
+	SetPublicAssetsURL("")
+	assert.Nil(t, AvatarURL(&key, AvatarSizeSmall), "no base configured")
+
+	SetPublicAssetsURL("https://assets.example.com")
+	assert.Nil(t, AvatarURL(nil, AvatarSizeSmall), "no avatar")
+	assert.Nil(t, AvatarURL(&empty, AvatarSizeSmall), "empty key")
+
+	small := SmallAvatarURL(&key)
+	require.NotNil(t, small)
+	assert.Equal(t, "https://assets.example.com/avatars/33333333-3333-4333-8333-333333333333/128.webp", *small)
+
+	large := AvatarURL(&key, AvatarSizeLarge)
+	require.NotNil(t, large)
+	assert.Equal(t, "https://assets.example.com/avatars/33333333-3333-4333-8333-333333333333/256.webp", *large)
+}

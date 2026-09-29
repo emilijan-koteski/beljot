@@ -110,13 +110,18 @@ type PlayerSeasonSnapshot struct {
 //
 // RankTier and RankDivision are the row's stored rank snapshot. The service
 // reads them only for an ENDED season (see PlayerSeason.RankTier).
+//
+// AvatarKey is the users.avatar_key PREFIX, never a URL: the service derives
+// the row view's public avatarUrl from it through the resolver main.go injects
+// (season cannot import user, which owns the derivation).
 type LeaderboardEntry struct {
-	UserID       uint   `gorm:"column:user_id"`
-	Username     string `gorm:"column:username"`
-	SP           int    `gorm:"column:sp"`
-	RankTier     string `gorm:"column:rank_tier"`
-	RankDivision *int   `gorm:"column:rank_division"`
-	GamesPlayed  int    `gorm:"column:games_played"`
+	UserID       uint    `gorm:"column:user_id"`
+	Username     string  `gorm:"column:username"`
+	AvatarKey    *string `gorm:"column:avatar_key"`
+	SP           int     `gorm:"column:sp"`
+	RankTier     string  `gorm:"column:rank_tier"`
+	RankDivision *int    `gorm:"column:rank_division"`
+	GamesPlayed  int     `gorm:"column:games_played"`
 }
 
 // ArchiveEntry is ONE ROW OF THE JOINED READ behind Story 13.3's prior-season

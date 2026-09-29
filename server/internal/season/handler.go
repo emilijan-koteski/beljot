@@ -103,13 +103,16 @@ func (h *Handler) GetCurrentSeason(c echo.Context) error {
 // (Story 13.5). Position is the row's 1-based slot in the FULL season order,
 // not its index in this page.
 type LeaderboardRowView struct {
-	Position    int    `json:"position"`
-	UserID      uint   `json:"userId"`
-	Username    string `json:"username"`
-	SP          int    `json:"sp"`
-	Tier        string `json:"tier"`
-	Division    *int   `json:"division"`
-	GamesPlayed int    `json:"gamesPlayed"`
+	Position int    `json:"position"`
+	UserID   uint   `json:"userId"`
+	Username string `json:"username"`
+	// AvatarURL is the player's 128 px avatar, null when they have none (or
+	// when no avatar resolver is wired).
+	AvatarURL   *string `json:"avatarUrl"`
+	SP          int     `json:"sp"`
+	Tier        string  `json:"tier"`
+	Division    *int    `json:"division"`
+	GamesPlayed int     `json:"gamesPlayed"`
 }
 
 // LeaderboardViewerView is the CALLER'S OWN standing, so the client can mark

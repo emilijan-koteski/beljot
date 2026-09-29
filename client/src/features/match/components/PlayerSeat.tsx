@@ -1,6 +1,7 @@
 import { Bot } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { AvatarImage } from "@/shared/components/ui/avatar";
 import { botDisplayName } from "@/shared/lib/botName";
 import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -268,7 +269,8 @@ export function PlayerSeat({
     : player.isBot === true
       ? botDisplayName(t, player.seat)
       : player.username || `P${player.seat + 1}`;
-  // Humans only — bot discs render the Bot glyph below, never an initial.
+  // Humans only — bot discs render the Bot glyph below, never an initial (or a
+  // picture). The initial is also the fallback while a picture fails to load.
   const initial = (player.username || "?").charAt(0).toUpperCase();
 
   const showRing =
@@ -350,7 +352,7 @@ export function PlayerSeat({
           }}
         >
           <div
-            className="rounded-full flex items-center justify-center font-display font-semibold"
+            className="rounded-full flex items-center justify-center overflow-hidden font-display font-semibold"
             style={{
               width: "100%",
               height: "100%",
@@ -362,7 +364,9 @@ export function PlayerSeat({
           >
             {/* Bot seats show the bot glyph instead of a name initial,
                 mirroring the room-lobby avatars. The 5% upward shift is
-                optical — the glyph's visual mass sits low in its viewBox. */}
+                optical — the glyph's visual mass sits low in its viewBox.
+                Humans show their picture inside the team frame, or the
+                initial without one. */}
             {player.isBot === true ? (
               <Bot
                 size={discPx * 0.5}
@@ -371,7 +375,7 @@ export function PlayerSeat({
                 style={{ transform: "translateY(-5%)" }}
               />
             ) : (
-              initial
+              <AvatarImage src={player.avatarUrl} size={discPx} fallback={initial} />
             )}
           </div>
         </div>

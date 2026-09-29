@@ -5,6 +5,11 @@ import type { CardDeck } from "@/shared/types/matchTypes";
 export interface ProfileResponse {
   id: number;
   username: string;
+  // Avatar derivatives, null when the player has none: the 128 px image every
+  // disc uses and the 256 px one only the profile hero draws. The two profile
+  // shapes are the only responses that carry the large one.
+  avatarUrl: string | null;
+  avatarLargeUrl: string | null;
   // When the username was last changed; absent/null if never. Drives the
   // client-side change-cooldown UX (see shared/lib/usernameChange).
   usernameChangedAt?: string | null;
@@ -66,6 +71,9 @@ export interface ProfileResponse {
 export interface PublicProfileResponse {
   id: number;
   username: string;
+  // Avatar derivatives — same semantics as the self shape.
+  avatarUrl: string | null;
+  avatarLargeUrl: string | null;
   createdAt: string;
   totalGamesPlayed: number;
   wins: number;
@@ -154,4 +162,46 @@ export function updateUsername(
   req: UpdateUsernameRequest,
 ): Promise<UpdateUsernameResponse> {
   return axiosClient.patch(`/users/${userId}/username`, req);
+}
+
+/** The two public URLs of a freshly uploaded avatar (128 and 256 px WebP). */
+export interface UploadAvatarResponse {
+  avatarUrl: string | null;
+  avatarLargeUrl: string | null;
+}
+
+/**
+ * The upload's own deadline. The shared 15 s timeout suits short REST calls; a
+ * 2 MiB picture over a slow mobile uplink plus the server's decode and two
+ * object-store writes can legitimately take longer.
+ */
+const AVATAR_UPLOAD_TIMEOUT_MS = 60_000;
+
+/**
+ * Upload (or replace) the caller's avatar as multipart field `avatar`. The file
+ * goes up as picked: the server is the only place that decodes, crops and
+ * resizes. `onProgress` receives the sent fraction, 0 to 1.
+ */
+export function uploadAvatar(
+  userId: number,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<UploadAvatarResponse> {
+  const form = new FormData();
+  form.append("avatar", file);
+  return axiosClient.put(`/users/${userId}/avatar`, form, {
+    // The instance default is application/json, which makes axios serialise
+    // FormData as JSON. Naming multipart here sends the FormData as-is, and the
+    // browser adds the boundary itself.
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: AVATAR_UPLOAD_TIMEOUT_MS,
+    onUploadProgress: (event) => {
+      if (onProgress && event.total) onProgress(Math.min(1, event.loaded / event.total));
+    },
+  });
+}
+
+/** Remove the caller's avatar. 204 whether or not one was set. */
+export function removeAvatar(userId: number): Promise<void> {
+  return axiosClient.delete(`/users/${userId}/avatar`);
 }

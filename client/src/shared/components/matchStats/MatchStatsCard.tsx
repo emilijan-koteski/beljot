@@ -525,13 +525,16 @@ export function MatchStatsCard({
   // values). A soft-deleted participant arrives as {userId > 0, username: "",
   // isBot: false} — the server hydrates usernames from the users table, which
   // excludes deleted rows — and linking their "—" chip would be a sure 404.
-  const seatChipProps = (seat: number): { name: string; bot: boolean; userId?: number } => {
+  const seatChipProps = (
+    seat: number,
+  ): { name: string; bot: boolean; avatarUrl?: string | null; userId?: number } => {
     const p = match.players.find((pl) => pl.seat === seat);
     if (!p) return { name: "—", bot: false };
     if (p.isBot === true) return { name: botDisplayName(t, p.seat), bot: true };
     return {
       name: p.username || "—",
       bot: false,
+      avatarUrl: p.avatarUrl,
       userId: linkPlayers && p.userId > 0 && p.username !== "" ? p.userId : undefined,
     };
   };
@@ -543,7 +546,8 @@ export function MatchStatsCard({
   // a profile link (you are already looking at their page, or at yourself).
   // Same "—" fallback as every other seat (seatChipProps): a soft-deleted or
   // missing subject must not render a blank chip with a "?" avatar.
-  const subjectName = match.players.find((p) => p.seat === match.viewerSeat)?.username || "—";
+  const subject = match.players.find((p) => p.seat === match.viewerSeat);
+  const subjectName = subject?.username || "—";
 
   const viewerTeamIndex: 0 | 1 = match.viewerSeat % 2 === 0 ? 0 : 1;
   const usTeam: "A" | "B" = viewerTeamIndex === 0 ? "A" : "B";
@@ -623,13 +627,19 @@ export function MatchStatsCard({
         {/* Players */}
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <SeatChip name={subjectName} team={usTeam} you={subjectIsSelf} />
+            <SeatChip
+              name={subjectName}
+              avatarUrl={subject?.avatarUrl}
+              team={usTeam}
+              you={subjectIsSelf}
+            />
             <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
               {t("profile.matchHistory.with")}
             </span>
             <SeatChip
               name={teammate.name}
               bot={teammate.bot}
+              avatarUrl={teammate.avatarUrl}
               userId={teammate.userId}
               team={usTeam}
             />
@@ -641,6 +651,7 @@ export function MatchStatsCard({
             <SeatChip
               name={opponent1.name}
               bot={opponent1.bot}
+              avatarUrl={opponent1.avatarUrl}
               userId={opponent1.userId}
               team={themTeam}
             />
@@ -650,6 +661,7 @@ export function MatchStatsCard({
             <SeatChip
               name={opponent2.name}
               bot={opponent2.bot}
+              avatarUrl={opponent2.avatarUrl}
               userId={opponent2.userId}
               team={themTeam}
             />

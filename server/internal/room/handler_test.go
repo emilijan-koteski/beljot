@@ -37,6 +37,12 @@ type mockRoomRepo struct {
 	nextPID        uint
 	nextBID        uint
 	ownerUsernames map[uint]string
+	// ownerAvatarURLs stands in for the owner's users.avatar_key on the same
+	// read; a missing entry is "no avatar".
+	ownerAvatarURLs map[uint]*string
+	// addPlayerHook, when set, decorates each stored row (e.g. with the avatar
+	// the real repository's JOIN would read back).
+	addPlayerHook func(*room.RoomPlayer)
 }
 
 func newMockRoomRepo() *mockRoomRepo {
@@ -111,6 +117,9 @@ func (m *mockRoomRepo) AddPlayer(p *room.RoomPlayer) error {
 	p.ID = m.nextPID
 	p.CreatedAt = time.Now()
 	m.nextPID++
+	if m.addPlayerHook != nil {
+		m.addPlayerHook(p)
+	}
 	m.players = append(m.players, p)
 	return nil
 }
@@ -255,6 +264,7 @@ func (m *mockRoomRepo) LoadOwnerUsernames(rooms []*room.Room) error {
 		}
 		if name, ok := m.ownerUsernames[rm.OwnerID]; ok {
 			rm.OwnerUsername = name
+			rm.OwnerAvatarURL = m.ownerAvatarURLs[rm.OwnerID]
 		}
 	}
 	return nil

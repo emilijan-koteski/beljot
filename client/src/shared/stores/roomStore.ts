@@ -80,11 +80,17 @@ export interface RoomState {
   markReturned: (userId: number) => void;
   addPlayer: (player: RoomPlayer, playerCount: number) => void;
   removePlayer: (userId: number, playerCount: number, newOwnerId?: number) => void;
+  /**
+   * `avatarUrl`, when given (a string or null), also refreshes the mover's
+   * avatar: seat_updated carries it, so a picture changed after joining shows
+   * on the next move. Omitted leaves the stored one alone.
+   */
   updatePlayerSeat: (
     userId: number,
     seat: number | null,
     team: string | null,
     previousSeat: number | null,
+    avatarUrl?: string | null,
   ) => void;
   // Bot seating (Story 10.3). All bots share userId 0, so bot mutations MUST
   // match by seat — never by userId. Human paths above stay userId-keyed.
@@ -152,10 +158,12 @@ export const useRoomStore = create<RoomState>((set) => ({
         : state.room,
     })),
 
-  updatePlayerSeat: (userId, seat, team, _previousSeat) =>
+  updatePlayerSeat: (userId, seat, team, _previousSeat, avatarUrl) =>
     set((state) => ({
       players: state.players.map((p) =>
-        p.userId === userId && p.isBot !== true ? { ...p, seat, team } : p,
+        p.userId === userId && p.isBot !== true
+          ? { ...p, seat, team, ...(avatarUrl !== undefined ? { avatarUrl } : {}) }
+          : p,
       ),
     })),
 
@@ -175,6 +183,7 @@ export const useRoomStore = create<RoomState>((set) => ({
               roomId,
               userId: 0,
               username: "",
+              avatarUrl: null,
               seat,
               team,
               isBot: true,

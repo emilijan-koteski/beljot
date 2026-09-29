@@ -210,6 +210,7 @@ export function LeaderboardPage() {
               position={row.position}
               userId={row.userId}
               username={row.username}
+              avatarUrl={row.avatarUrl}
               sp={row.sp}
               tier={row.tier}
               division={row.division}
@@ -235,6 +236,8 @@ export function LeaderboardPage() {
                 // query, which needs only the token, has already resolved, and a
                 // nameless pinned row is worse than a generic one.
                 username={viewer?.username || t("season.leaderboard.you")}
+                // Same source as the name, for the same reason.
+                avatarUrl={viewer?.avatarUrl ?? null}
                 sp={pinned.sp}
                 tier={pinned.tier}
                 division={pinned.division}

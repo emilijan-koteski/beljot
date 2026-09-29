@@ -71,6 +71,30 @@
         "generic": "Nije moguće ažurirati korisničko ime, pokušaj ponovno"
       }
     },
+    "avatar": {
+      "title": "Profilna slika",
+      "edit": "Promijeni profilnu sliku",
+      "hint": "JPEG, PNG ili WebP, do 2 MB. Slika se obrezuje na kvadrat iz sredine.",
+      "previewAlt": "Pregled nove slike",
+      "pick": "Odaberi sliku",
+      "upload": "Prenesi",
+      "uploading": "Prijenos…",
+      "progressLabel": "Napredak prijenosa",
+      "remove": "Ukloni sliku",
+      "removing": "Uklanjanje…",
+      "cancel": "Odustani",
+      "success": "Profilna slika je ažurirana",
+      "removed": "Profilna slika je uklonjena",
+      "errors": {
+        "tooLarge": "Slika je prevelika. Odaberi datoteku do 2 MB, najviše 4096 piksela po stranici i 16 megapiksela ukupno.",
+        "tooSmall": "Slika je premala. Kraća stranica mora imati najmanje 128 piksela.",
+        "unsupported": "Taj format nije podržan. Odaberi sliku JPEG, PNG ili WebP bez animacije.",
+        "rateLimited": "Previše prijenosa u posljednjih sat vremena. Pokušaj kasnije.",
+        "busy": "Poslužitelj je zauzet. Pokušaj ponovno za trenutak.",
+        "unavailable": "Prijenos slika trenutno nije dostupan.",
+        "generic": "Nije moguće ažurirati sliku, pokušaj ponovno"
+      }
+    },
     "streak": {
       "winTitle": "Niz pobjeda, {{count}} zaredom",
       "lossTitle": "Hladni niz, {{count}} poraza zaredom",

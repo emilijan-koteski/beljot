@@ -9,8 +9,11 @@ import "time"
 type PlayerSeatInfo struct {
 	UserID   uint
 	Username string
-	Seat     int
-	IsBot    bool
+	// AvatarURL is the seat's derived 128 px avatar URL (nil for bots and for
+	// players without one), stamped onto the game's PlayerState at start.
+	AvatarURL *string
+	Seat      int
+	IsBot     bool
 }
 
 // Match represents a completed game match record persisted to the database.

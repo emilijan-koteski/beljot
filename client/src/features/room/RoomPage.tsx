@@ -1110,6 +1110,7 @@ export function RoomPage() {
                           >
                             <Avatar
                               name={rowName}
+                              avatarUrl={isBotRow ? null : p.avatarUrl}
                               size={22}
                               team={rosterTeam(p)}
                               you={isYou}
@@ -1649,10 +1650,12 @@ export function RoomPage() {
         onConfirm={handleTransferConfirm}
         pending={transferOwnershipMutation.isPending}
         fromName={currentUser?.username ?? ownerUsername}
+        fromAvatarUrl={currentUser?.avatarUrl ?? null}
         target={{
           name: transferConfirm?.username ?? "",
           seat: transferTarget?.seat ?? null,
           team: transferTarget ? rosterTeam(transferTarget) : null,
+          avatarUrl: transferTarget?.avatarUrl ?? null,
         }}
       />
 
@@ -1668,6 +1671,7 @@ export function RoomPage() {
           name: kickConfirm?.username ?? "",
           seat: kickTarget?.seat ?? kickConfirm?.seat ?? null,
           team: kickTarget ? rosterTeam(kickTarget) : null,
+          avatarUrl: kickTarget?.avatarUrl ?? null,
         }}
       />
 

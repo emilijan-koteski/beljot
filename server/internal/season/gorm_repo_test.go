@@ -717,6 +717,41 @@ func TestLeaderboardReads_SelectTheStoredRank(t *testing.T) {
 	assert.Equal(t, intPtr(2), viewer.RankDivision)
 }
 
+// Both leaderboard reads carry users.avatar_key beside the username, so the
+// service can derive each row's avatarUrl; a user without one reads back nil.
+func TestLeaderboardReads_SelectTheAvatarKey(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	user.SetPublicAssetsURL("https://assets.test")
+	t.Cleanup(func() { user.SetPublicAssetsURL("") })
+	s := makeSeason(t, db, time.Date(2081, time.January, 1, 0, 0, 0, 0, time.UTC))
+
+	pictured := seedStanding(t, db, repo, s.ID, "lb-av1@s.test", 900)
+	plain := seedStanding(t, db, repo, s.ID, "lb-av2@s.test", 300)
+	prefix := "avatars/77777777-7777-4777-8777-777777777777"
+	require.NoError(t, db.Model(&user.User{}).Where("id = ?", pictured.ID).Update("avatar_key", prefix).Error)
+
+	entries := fullLadder(t, repo, s.ID)
+	require.Len(t, entries, 2)
+	require.Equal(t, pictured.ID, entries[0].UserID)
+	require.NotNil(t, entries[0].AvatarKey)
+	assert.Equal(t, prefix, *entries[0].AvatarKey)
+	assert.Equal(t, "https://assets.test/"+prefix+"/128.webp", *user.SmallAvatarURL(entries[0].AvatarKey))
+	assert.Equal(t, plain.ID, entries[1].UserID)
+	assert.Nil(t, entries[1].AvatarKey)
+
+	viewer, err := repo.FindLeaderboardEntry(s.ID, pictured.ID)
+	require.NoError(t, err)
+	require.NotNil(t, viewer)
+	require.NotNil(t, viewer.AvatarKey)
+	assert.Equal(t, prefix, *viewer.AvatarKey)
+
+	plainViewer, err := repo.FindLeaderboardEntry(s.ID, plain.ID)
+	require.NoError(t, err)
+	require.NotNil(t, plainViewer)
+	assert.Nil(t, plainViewer.AvatarKey)
+}
+
 func TestLeaderboardPage_BreaksTiesByAscendingUserID(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)

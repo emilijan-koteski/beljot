@@ -66,6 +66,7 @@ const mockMatchState: MatchState = {
       seat: 0,
       userId: 10,
       username: "Alice",
+      avatarUrl: null,
       team: "teamA",
       declarations: [],
       connected: true,
@@ -80,6 +81,7 @@ const mockMatchState: MatchState = {
       seat: 1,
       userId: 20,
       username: "Bob",
+      avatarUrl: null,
       team: "teamB",
       declarations: [],
       connected: true,
@@ -94,6 +96,7 @@ const mockMatchState: MatchState = {
       seat: 2,
       userId: 30,
       username: "Carol",
+      avatarUrl: null,
       team: "teamA",
       declarations: [],
       connected: true,
@@ -108,6 +111,7 @@ const mockMatchState: MatchState = {
       seat: 3,
       userId: 40,
       username: "Dave",
+      avatarUrl: null,
       team: "teamB",
       declarations: [],
       connected: true,
@@ -887,6 +891,7 @@ describe("useWsDispatch", () => {
         roomId: 10,
         userId: 42,
         username: "Alice",
+        avatarUrl: null,
         seat: null,
         team: null,
         isBot: false,
@@ -918,6 +923,7 @@ describe("useWsDispatch", () => {
         roomId: 10,
         userId: 42,
         username: "Alice",
+        avatarUrl: null,
         seat: null,
         team: null,
         isBot: false,
@@ -944,6 +950,94 @@ describe("useWsDispatch", () => {
     const player = useRoomStore.getState().players[0]!;
     expect(player.seat).toBe(2);
     expect(player.team).toBe("teamA");
+  });
+
+  it("carries the joiner's avatar from system:player_joined, and null for anything else", () => {
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+    const url = "https://assets.test/avatars/a/128.webp";
+
+    dispatch({
+      type: "system:player_joined",
+      payload: { roomId: 10, userId: 42, username: "Alice", avatarUrl: url, playerCount: 2 },
+    });
+    // An older server sends no key; a garbled one sends a non-string.
+    dispatch({
+      type: "system:player_joined",
+      payload: { roomId: 10, userId: 43, username: "Bob", playerCount: 3 },
+    });
+    dispatch({
+      type: "system:player_joined",
+      payload: { roomId: 10, userId: 44, username: "Cvete", avatarUrl: 7, playerCount: 4 },
+    });
+
+    const byId = new Map(useRoomStore.getState().players.map((p) => [p.userId, p.avatarUrl]));
+    expect(byId.get(42)).toBe(url);
+    expect(byId.get(43)).toBeNull();
+    expect(byId.get(44)).toBeNull();
+  });
+
+  it("refreshes the mover's avatar from system:seat_updated only when the key is sent", () => {
+    const url = "https://assets.test/avatars/new/128.webp";
+    useRoomStore.getState().addPlayer(
+      {
+        id: 42,
+        roomId: 10,
+        userId: 42,
+        username: "Alice",
+        avatarUrl: "https://assets.test/avatars/old/128.webp",
+        seat: null,
+        team: null,
+        isBot: false,
+        createdAt: "",
+      },
+      1,
+    );
+    const { result } = renderHook(() => useWsDispatch());
+    const dispatch = result.current;
+
+    dispatch({
+      type: "system:seat_updated",
+      payload: {
+        roomId: 10,
+        userId: 42,
+        username: "Alice",
+        seat: 1,
+        team: "teamB",
+        previousSeat: null,
+      },
+    });
+    expect(useRoomStore.getState().players[0]!.avatarUrl).toBe(
+      "https://assets.test/avatars/old/128.webp",
+    );
+
+    dispatch({
+      type: "system:seat_updated",
+      payload: {
+        roomId: 10,
+        userId: 42,
+        username: "Alice",
+        avatarUrl: url,
+        seat: 2,
+        team: "teamA",
+        previousSeat: 1,
+      },
+    });
+    expect(useRoomStore.getState().players[0]!.avatarUrl).toBe(url);
+
+    dispatch({
+      type: "system:seat_updated",
+      payload: {
+        roomId: 10,
+        userId: 42,
+        username: "Alice",
+        avatarUrl: null,
+        seat: 0,
+        team: "teamA",
+        previousSeat: 2,
+      },
+    });
+    expect(useRoomStore.getState().players[0]!.avatarUrl).toBeNull();
   });
 
   it("dispatches system:match_started to roomStore", () => {
