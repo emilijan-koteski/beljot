@@ -1,5 +1,5 @@
 # generated: 2026-04-06
-# last_updated: 2026-08-27
+# last_updated: 2026-10-11
 # project: beljot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -43,7 +43,7 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # --- Epic 1: Project Foundation & Player Identity (Phase 1) ---
-  epic-1: in-progress
+  epic-1: done
   1-1-project-scaffold-and-development-environment: done
   1-2-user-registration: done
   1-3-user-login-and-session-persistence: done
@@ -51,7 +51,7 @@ development_status:
   epic-1-retrospective: optional
 
   # --- Epic 2: Lobby & Room Management (Phase 1) ---
-  epic-2: in-progress
+  epic-2: done
   2-1-create-room-and-room-configuration: done
   2-2-browse-and-search-rooms: done
   2-3-join-room-and-room-lobby: done
@@ -61,7 +61,7 @@ development_status:
   epic-2-retrospective: optional
 
   # --- Epic 3: Belot Rules Engine - Bitola Variant (Phase 1) ---
-  epic-3: in-progress
+  epic-3: done
   3-1-game-state-types-card-encoding-and-deck: done
   3-2-trump-bidding-bitola-variant: done
   3-3-card-play-and-trick-resolution: done
@@ -71,7 +71,7 @@ development_status:
   epic-3-retrospective: optional
 
   # --- Epic 4: Real-Time Game Experience (Phase 1) ---
-  epic-4: in-progress
+  epic-4: done
   4-1-websocket-gateway-and-event-contract: done
   4-2-game-session-manager-and-state-sync: done
   4-3-game-table-ui-layout-seats-and-cards: done
@@ -223,3 +223,17 @@ development_status:
   16-3-cosmetic-store: backlog
   16-4-tournament-system: backlog
   epic-16-retrospective: optional
+
+  # --- Epic 17: Toolchain Major Upgrades (maintenance) ---
+  # Added 2026-10-11 via bmad-create-epics-and-stories: major bumps deferred from the minor/patch refresh (32b37bf).
+  # Echo v5 explicitly out of scope (server stays on echo/v4 by project rule).
+  epic-17: backlog
+  17-1-base-ui-upgrade-and-create-room-modal-test-isolation: backlog
+  17-2-vite-8-upgrade: backlog
+  17-3-vitest-5-jsdom-30-jest-dom-7-upgrade: backlog
+  17-4-eslint-10-upgrade: backlog
+  17-5-react-hooks-7-compiler-rules: backlog
+  17-6-simple-import-sort-14-autofix: backlog
+  17-7-typescript-7-upgrade: backlog
+  17-8-react-router-8-upgrade: backlog
+  epic-17-retrospective: optional

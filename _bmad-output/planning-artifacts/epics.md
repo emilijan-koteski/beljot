@@ -393,6 +393,13 @@ Players can spectate live matches, earn achievements and badges, purchase cosmet
 **FRs covered:** FR48, FR49, FR50, FR51
 **Phase:** 5
 
+### Epic 17: Toolchain Major Upgrades
+
+Technical/maintenance epic. Moves the client toolchain across the major-version upgrades deferred from the 2026-10-11 dependency refresh (commit `32b37bf`, minor/patch only): Vite 6 → 8, Vitest 3 → 5 (+ jsdom 30, jest-dom 7), ESLint 9 → 10 and its plugins, TypeScript 5.8 → 7, React Router 7 → 8, and @base-ui/react 1.8 → 1.9+. No player-facing behavior change. Echo stays on v4 by project rule (out of scope).
+
+**FRs covered:** — (technical/maintenance; no FR impact)
+**Phase:** — (maintenance, schedulable alongside any phase)
+
 ---
 
 ## Epic 1: Project Foundation & Player Identity
@@ -2911,3 +2918,184 @@ So that I can compete in organized events with seasonal scheduling.
 **Given** a tournament concludes
 **When** a winner is determined
 **Then** results are posted with final standings, and tournament-specific rewards (badges, cosmetics) are distributed
+
+## Epic 17: Toolchain Major Upgrades
+
+Technical/maintenance epic. The 2026-10-11 dependency refresh (commit `32b37bf`) applied only minor and patch updates on client and server; every major-version bump was deferred here. Goal: bring the client toolchain to current majors with **zero behavior change**, one reviewable story per upgrade, ordered by dependency and risk (test-isolation fix first, then build → test → lint → type-check → runtime routing).
+
+**Baseline (verified 2026-10-11 against `client/package.json`, `client/package-lock.json`, `server/go.mod`):** vite 6.4.4, @vitejs/plugin-react-swc 4.3.3, vitest 3.2.7 (@vitest/mocker 3.2.7, tinypool 1.1.1), jsdom 29.1.1, @testing-library/jest-dom 6.9.1, eslint 9.39.5, @eslint/js 9.39.5, eslint-plugin-react-hooks 5.2.0, eslint-plugin-react-refresh 0.4.26, eslint-plugin-simple-import-sort 13.0.0, typescript 5.8.3 (`~5.8.0`), typescript-eslint 8.71.1, react-router 7.18.4, @base-ui/react 1.8.0 (`~1.8.0`), Go 1.26 with labstack/echo/v4 v4.16.0. CI runs Node 22.
+
+**Scope:**
+
+- In: the client dev/build/test/lint toolchain majors listed above, required config migrations, and code changes forced by new lint/type rules.
+- Out: **Echo v5** — the server stays on `labstack/echo/v4` by project rule; no Echo v5 story. Feature work, refactors not forced by an upgrade, and server Go module majors.
+
+**Common acceptance criteria (apply to every story in this epic):**
+
+- `make lint` and `make test` pass locally.
+- No behavior change: no user-visible or wire-protocol change; existing tests are not deleted or weakened to make the upgrade pass (any test edit is justified in the story's Dev Notes).
+- CI is green on the story's branch.
+- `npm audit` (client) and `govulncheck ./...` (server) report no new or higher-severity findings than before the story.
+- Each story lands as its own commit/PR so it can be reverted independently.
+
+### Story 17.1: @base-ui/react 1.9+ Upgrade & CreateRoomModal Test Isolation
+
+As an engineer,
+I want the CreateRoomModal test failures under @base-ui/react 1.9 diagnosed and fixed,
+So that the `~1.8.0` pin can be lifted and the test suite is order-independent before the test runner itself is upgraded.
+
+**Acceptance Criteria:**
+
+**Given** @base-ui/react is bumped to the latest 1.x (≥ 1.9.0)
+**When** `client/src/features/room/CreateRoomModal.test.tsx` runs as part of the full suite, repeated at least 10 times
+**Then** every test passes on every run (today 1.9.0 fails 4–11 form-submit and error-banner tests per run, while each passes in isolation)
+
+**Given** the failures point to state leaking between tests
+**When** the root cause is identified (e.g. un-awaited portal/dialog teardown, shared store or query-client state, fake timers, or a 1.9 behavior change)
+**Then** the fix addresses that root cause in the test setup or the component, not by retries, skips, or longer timeouts
+**And** the root cause is recorded in the story's Dev Notes
+
+**Given** the upgrade is complete
+**When** `client/package.json` is inspected
+**Then** the `~1.8.0` pin is replaced with a caret range on the upgraded version
+**And** the common acceptance criteria are met
+
+### Story 17.2: Vite 8 Upgrade
+
+As an engineer,
+I want Vite upgraded from 6 to 8,
+So that the build toolchain is current and Vitest 5 can run on a supported Vite major.
+
+**Acceptance Criteria:**
+
+**Given** the Vite 7 and Vite 8 migration guides
+**When** `vite` is upgraded to 8.x (passing through the 7 guide's breaking changes)
+**Then** `client/vite.config.*` is migrated for every applicable breaking change, and `@vitejs/plugin-react-swc` and `@tailwindcss/vite` are moved to majors that declare Vite 8 support
+
+**Given** Vite 7+ raises the Node.js version floor
+**When** the floor is compared with CI (`.github/workflows/ci.yml`, Node 22), any Dockerfile, and local dev docs
+**Then** every environment meets the floor (updated where needed) and an `engines.node` field in `client/package.json` records it
+
+**Given** the upgraded toolchain
+**When** `npm run dev`, `npm run build`, and `npm run preview` are run
+**Then** each succeeds, the production bundle loads the app, and the dev-server API/WebSocket proxy still works
+**And** the common acceptance criteria are met
+
+### Story 17.3: Vitest 5, jsdom 30 & jest-dom 7 Upgrade
+
+As an engineer,
+I want Vitest upgraded from 3 to 5 together with jsdom 30 and @testing-library/jest-dom 7,
+So that the test stack is current and the remaining `npm audit` findings in tinypool and @vitest/mocker are cleared.
+
+**Acceptance Criteria:**
+
+**Given** the Vitest 4 and Vitest 5 migration guides
+**When** `vitest` is upgraded to 5.x
+**Then** the test config is migrated (pool/`poolOptions` changes, workspace → projects, coverage, and any removed options) and the setup file loads correctly
+
+**Given** jsdom is upgraded 29 → 30 and @testing-library/jest-dom 6 → 7
+**When** the suite runs
+**Then** the setup-file import of jest-dom matches the v7 entry point and all custom matchers resolve with correct TypeScript types
+
+**Given** the upgrade is complete
+**When** `npm audit` runs in `client/`
+**Then** no findings remain for `tinypool` or `@vitest/mocker`
+**And** the full suite passes 3 consecutive runs with no new flakiness
+**And** the common acceptance criteria are met
+
+### Story 17.4: ESLint 10 Upgrade (core, @eslint/js, react-refresh 0.5)
+
+As an engineer,
+I want ESLint and @eslint/js upgraded from 9 to 10, with eslint-plugin-react-refresh moved to 0.5,
+So that linting runs on a supported ESLint major.
+
+**Acceptance Criteria:**
+
+**Given** the ESLint 10 migration guide
+**When** `eslint` and `@eslint/js` are upgraded to 10.x
+**Then** `client/eslint.config.*` is migrated for removed/renamed options and every plugin in use (typescript-eslint, eslint-config-prettier, react-hooks 5, simple-import-sort 13) is on a version that supports ESLint 10
+
+**Given** eslint-plugin-react-refresh 0.5 changes its config export shape
+**When** the plugin is upgraded
+**Then** the flat config consumes the new export shape and the `only-export-components` rule still reports on a deliberately non-compliant sample
+
+**Given** the upgrade is complete
+**When** `make lint` runs
+**Then** it passes with no rule disabled or downgraded solely to get green
+**And** the common acceptance criteria are met
+
+### Story 17.5: eslint-plugin-react-hooks 7 & React Compiler Rules
+
+As an engineer,
+I want eslint-plugin-react-hooks upgraded from 5 to 7 and its new React Compiler-based rules satisfied,
+So that hook and purity violations are caught by lint instead of at runtime.
+
+**Acceptance Criteria:**
+
+**Given** eslint-plugin-react-hooks is upgraded to 7.x using its recommended flat config
+**When** `make lint` first runs
+**Then** every new finding (e.g. set-state-in-effect, refs-during-render, purity, immutability) is listed in the story's Dev Notes before remediation
+
+**Given** the listed findings
+**When** each is remediated
+**Then** it is fixed in code where the fix is behavior-preserving and covered by an existing or added test
+**And** any remaining finding is suppressed with an inline disable plus a one-line justification, with no file- or project-wide disables
+
+**Given** the upgrade is complete
+**When** `make lint` and `make test` run
+**Then** both pass and the common acceptance criteria are met
+
+### Story 17.6: eslint-plugin-simple-import-sort 14 Autofix
+
+As an engineer,
+I want eslint-plugin-simple-import-sort upgraded from 13 to 14 with its autofix applied in isolation,
+So that the large mechanical import-order diff is reviewable on its own and does not hide logic changes.
+
+**Acceptance Criteria:**
+
+**Given** eslint-plugin-simple-import-sort is upgraded to 14.x
+**When** `eslint --fix` is run across `client/`
+**Then** the resulting diff contains import-order changes only, in a dedicated commit separate from the dependency/config bump
+
+**Given** the autofix commit
+**When** it is reviewed
+**Then** no non-import lines are changed
+**And** the common acceptance criteria are met
+
+### Story 17.7: TypeScript 7 Upgrade
+
+As an engineer,
+I want TypeScript upgraded from 5.8 to 7 (native compiler),
+So that type-checking is faster and stays on a supported compiler.
+
+**Acceptance Criteria:**
+
+**Given** typescript-eslint's supported TypeScript range
+**When** the upgrade starts
+**Then** typescript-eslint is on a version that officially supports TypeScript 7 (if none exists yet, the story is blocked and stays in backlog rather than shipping with an unsupported-version warning)
+
+**Given** TypeScript 7 removes options deprecated in 5.x/6.x
+**When** `client/tsconfig*.json` are checked
+**Then** deprecated or removed options (e.g. `baseUrl`-only path mapping, old `moduleResolution`/`target` values, `importsNotUsedAsValues`) are migrated and `tsc -b` passes with zero errors
+
+**Given** the upgrade is complete
+**When** `npm run build`, the editor language service, and `make lint` (type-aware rules) are run
+**Then** all work against TypeScript 7 with no new `@ts-expect-error`/`any` added solely for the upgrade
+**And** the common acceptance criteria are met
+
+### Story 17.8: React Router 8 Upgrade
+
+As an engineer,
+I want React Router upgraded from 7 to 8,
+So that routing stays on a supported major.
+
+**Acceptance Criteria:**
+
+**Given** the React Router 8 upgrade guide
+**When** each v8 future flag is enabled on v7 first, one at a time, with tests passing after each
+**Then** the codebase runs clean on v7 with all v8 flags on, before `react-router` is bumped to 8.x
+
+**Given** `react-router` is upgraded to 8.x
+**When** the app is exercised (login, lobby, room, game reconnect redirect, public profile, 404)
+**Then** every route, redirect, protected-route guard, and navigation behaves as before
+**And** the common acceptance criteria are met
