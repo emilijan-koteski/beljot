@@ -22,11 +22,7 @@ function flattenKeys(obj: unknown, prefix = ""): string[] {
 
 describe("i18n", () => {
   afterEach(async () => {
-    // Reset to default so test ordering can't leak language state between
-    // unrelated suites (Vitest shares module state across files in a worker).
     await i18n.changeLanguage("en");
-    // Clear any localStorage writes the languageChanged listener performed,
-    // so other test files importing i18n don't inherit stale state.
     window.localStorage.clear();
   });
 
@@ -38,8 +34,6 @@ describe("i18n", () => {
     await i18n.changeLanguage("sr");
     expect(i18n.t("common.appName")).toBe("Beljot");
     expect(i18n.t("nav.play")).toBe("Igraj");
-    // Discriminator vs HR (where chat.title is "Chat lobija"): proves the
-    // SR bundle is loaded, not HR with the same `nav.play` value.
     expect(i18n.t("chat.title")).toBe("Lobi chat");
   });
 
@@ -53,8 +47,6 @@ describe("i18n", () => {
     await i18n.changeLanguage("hr");
     expect(i18n.t("common.appName")).toBe("Beljot");
     expect(i18n.t("nav.play")).toBe("Igraj");
-    // Discriminator vs SR (where chat.title is "Lobi chat"): catches a bug
-    // where the HR resource bundle is wired to the SR slot in i18n.ts.
     expect(i18n.t("chat.title")).toBe("Chat lobija");
   });
 
@@ -88,8 +80,6 @@ describe("i18n", () => {
     it("does not write unsupported codes to localStorage", async () => {
       window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "hr");
       await i18n.changeLanguage("fr");
-      // Listener silently ignores unsupported codes, leaving the prior
-      // supported value intact.
       expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("hr");
     });
   });

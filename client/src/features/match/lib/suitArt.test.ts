@@ -28,29 +28,18 @@ describe("suitIconUrl", () => {
     expect(suitIconUrl("D", "croatian")).toBe("/suits/croatian/D.webp");
   });
 
-  // The French deck ships no icon files at all — it keeps its Unicode glyphs,
-  // which are already sized and kerned across four surfaces. Returning null
-  // rather than a would-be-404 path is what forces callers to handle the glyph
-  // case instead of silently rendering a broken image.
   it.each(SUITS)("returns null for the french deck (%s)", (suit) => {
     expect(suitIconUrl(suit, "french")).toBeNull();
   });
 });
 
 describe("suit icon assets", () => {
-  // Same reasoning as the deck-face asset test: a missing icon fails silently
-  // everywhere else. The img is decorative, the ancestor's label still reads
-  // correctly, and production's SPA fallback answers 200 with index.html.
   it.each(SUITS)("ships a croatian icon for %s", (suit) => {
     expect(existsSync(join(SUITS_DIR, "croatian", `${suit}.webp`))).toBe(true);
   });
 });
 
 describe("SUIT_ACCENT", () => {
-  // The whole point of Scope Amendment 1: the accent is per suit, not a
-  // red/black split. Leaves and acorns are BOTH green-dominant in the artwork,
-  // so acorns take the brown of their nut — collapsing them to one green would
-  // defeat a per-suit palette, and nothing else would report it.
   it("gives the croatian deck four pairwise-distinct accents", () => {
     const accents = SUITS.map((suit) => SUIT_ACCENT.croatian[suit]);
     expect(new Set(accents).size).toBe(4);
@@ -60,9 +49,6 @@ describe("SUIT_ACCENT", () => {
     expect(SUIT_ACCENT.croatian.S).not.toBe(SUIT_ACCENT.croatian.C);
   });
 
-  // French must be byte-identical to what shipped before this story: these are
-  // the literals the four replaced call sites used, and `--suit-red` /
-  // `--suit-black` resolve to exactly these inside `.game-table`.
   it("preserves the french palette exactly", () => {
     expect(SUIT_ACCENT.french).toEqual({
       S: "#1a1a1a",
@@ -73,8 +59,6 @@ describe("SUIT_ACCENT", () => {
   });
 
   it("never paints a croatian suit in the french red or black", () => {
-    // A red halo round a gold bell, or a black one round a green leaf, is the
-    // exact defect the amendment exists to avoid.
     for (const suit of ["S", "D", "C"] as Suit[]) {
       expect(SUIT_ACCENT.croatian[suit]).not.toBe("#c62828");
       expect(SUIT_ACCENT.croatian[suit]).not.toBe("#1a1a1a");
@@ -109,12 +93,6 @@ describe("palette accessors", () => {
     }
   });
 
-  // `Suit` is a compile-time union but not a runtime guarantee: the WS contract
-  // types a suit as z.string(), so an unrecognised value reaches the UI. A raw
-  // `SUIT_ACCENT[deck][suit]` yielded undefined, the consumers interpolated it,
-  // and `border: "2px solid undefined"` was dropped by the browser — the orb's
-  // whole chrome vanished. The old red/black test degraded to black instead, so
-  // the accessors have to preserve that.
   it.each(DECKS)("degrade to a usable colour for an unknown suit on %s", (deck) => {
     const bogus = "X" as Suit;
 
@@ -136,11 +114,6 @@ describe("palette accessors", () => {
 });
 
 describe("suitNameKey", () => {
-  // The seam that stops a gold bell being captioned "Diamonds". There is
-  // deliberately only ONE suit vocabulary in the locale files — an earlier
-  // word-keyed `match.suits.spades` set duplicated these values verbatim in all
-  // four locales, and the parity test compares key SETS, not values, so nothing
-  // could detect the two drifting apart.
   it("keys the name by deck as well as suit", () => {
     expect(suitNameKey("D", "french")).toBe("match.card.suit.french.D");
     expect(suitNameKey("D", "croatian")).toBe("match.card.suit.croatian.D");
@@ -152,10 +125,7 @@ describe("suitNameKey", () => {
   });
 });
 
-// The reveal panel's gradient runs rgba(32,64,43,.98) -> rgba(13,38,23,.98)
-// (TrumpReveal.tsx). The LIGHTEST end is the worst case for light ink, so that is
-// what the floor is measured against.
-const PANEL_LIGHTEST = "#20402b";
+const REVEAL_PANEL_LIGHTEST_STOP = "#20402b";
 
 /** WCAG relative luminance. */
 function luminance(hex: string): number {
@@ -163,8 +133,6 @@ function luminance(hex: string): number {
     const s = c / 255;
     return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
   };
-  // Read each channel by name rather than destructuring a mapped array: under
-  // noUncheckedIndexedAccess the elements come back `number | undefined`.
   const r = channel(parseInt(hex.slice(1, 3), 16));
   const g = channel(parseInt(hex.slice(3, 5), 16));
   const b = channel(parseInt(hex.slice(5, 7), 16));
@@ -178,10 +146,7 @@ function contrast(a: string, b: string): number {
 }
 
 describe("SUIT_INK_ON_FELT legibility", () => {
-  // The bar is French's own weaker anchor, so "Croatian is as readable as French"
-  // is a measured claim rather than a design opinion. Acorn brown shipped at
-  // 4.73 while these were judgment values; this is what caught it.
-  const FLOOR = contrast(SUIT_INK_ON_FELT.french.H, PANEL_LIGHTEST);
+  const FLOOR = contrast(SUIT_INK_ON_FELT.french.H, REVEAL_PANEL_LIGHTEST_STOP);
 
   it("uses the french red anchor as the floor", () => {
     expect(FLOOR).toBeCloseTo(4.89, 2);
@@ -190,7 +155,9 @@ describe("SUIT_INK_ON_FELT legibility", () => {
   it.each(DECKS.flatMap((deck) => SUITS.map((suit) => [deck, suit] as const)))(
     "%s %s ink clears the floor on the panel's lightest end",
     (deck, suit) => {
-      expect(contrast(SUIT_INK_ON_FELT[deck][suit], PANEL_LIGHTEST)).toBeGreaterThanOrEqual(FLOOR);
+      expect(
+        contrast(SUIT_INK_ON_FELT[deck][suit], REVEAL_PANEL_LIGHTEST_STOP),
+      ).toBeGreaterThanOrEqual(FLOOR);
     },
   );
 
@@ -200,10 +167,6 @@ describe("SUIT_INK_ON_FELT legibility", () => {
 });
 
 describe("SUIT_GLOW_ALPHA derivation", () => {
-  // Alpha rises with the accent's luminance, linear between French's two
-  // anchors and clamped to them. The rule is only trustworthy because it
-  // reproduces French's pre-existing 55/77/77/55 exactly — that is asserted
-  // below, so a change to the rule fails on French before it reaches Croatian.
   const LO = { l: luminance("#1a1a1a"), a: 0x55 };
   const HI = { l: luminance("#c62828"), a: 0x77 };
 

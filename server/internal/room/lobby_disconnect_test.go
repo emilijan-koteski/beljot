@@ -11,17 +11,14 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// mockRepoForLobby is a minimal mock of RoomRepository for lobby disconnect tests.
-//
-// `removed` is written by the disconnect timer's own goroutine (handleTimeout)
-// and read by the test goroutine after a sleep, so it is guarded by `mu` — a
-// time.Sleep gives the race detector no happens-before. Read it via removedIDs().
+// mockRepoForLobby is a minimal RoomRepository mock for lobby disconnect tests. The
+// timer goroutine writes removed, so tests read it through removedIDs().
 type mockRepoForLobby struct {
 	mu          sync.Mutex
 	rooms       map[uint]*room.Room
-	players     map[uint][]room.RoomPlayer // roomID → players
-	playerRooms map[uint]*room.RoomPlayer  // userID → RoomPlayer
-	removed     []uint                     // userIDs that were removed
+	players     map[uint][]room.RoomPlayer
+	playerRooms map[uint]*room.RoomPlayer
+	removed     []uint
 }
 
 // removedIDs returns a copy of the removed-user list under the lock, for tests
@@ -62,7 +59,6 @@ func (r *mockRepoForLobby) RemovePlayer(roomID uint, userID uint) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.removed = append(r.removed, userID)
-	// Remove from playerRooms and players list
 	delete(r.playerRooms, userID)
 	if ps, ok := r.players[roomID]; ok {
 		var remaining []room.RoomPlayer
@@ -127,7 +123,6 @@ func setupLobbyTest() (*mockRepoForLobby, *room.LobbyDisconnectHandler) {
 func TestLobbyDisconnect_FreesAfterTimeout(t *testing.T) {
 	repo, handler := setupLobbyTest()
 
-	// Set up a player in a waiting room
 	repo.rooms[1] = &room.Room{ID: 1, Status: "waiting", OwnerID: 100, PlayerCount: 2}
 	repo.playerRooms[42] = &room.RoomPlayer{RoomID: 1, UserID: 42, Username: "TestPlayer"}
 	repo.players[1] = []room.RoomPlayer{
@@ -137,11 +132,9 @@ func TestLobbyDisconnect_FreesAfterTimeout(t *testing.T) {
 
 	handler.HandleDisconnect(42)
 
-	// Before timeout — player should still be in the room
 	time.Sleep(5 * time.Second)
 	assert.Len(t, repo.removedIDs(), 0, "player should not be removed yet (before 10s timeout)")
 
-	// After timeout — player should be removed
 	time.Sleep(6 * time.Second)
 	assert.Contains(t, repo.removedIDs(), uint(42), "player should be removed after 10s timeout")
 }
@@ -157,11 +150,10 @@ func TestLobbyDisconnect_CancelledByReconnect(t *testing.T) {
 	}
 
 	handler.HandleDisconnect(42)
-	time.Sleep(3 * time.Second) // Reconnect before timeout
+	time.Sleep(3 * time.Second)
 
 	handler.HandleReconnect(42)
 
-	// Wait past the original timeout
 	time.Sleep(8 * time.Second)
 	assert.Len(t, repo.removedIDs(), 0, "player should NOT be removed (reconnected before timeout)")
 }
@@ -169,14 +161,12 @@ func TestLobbyDisconnect_CancelledByReconnect(t *testing.T) {
 func TestLobbyDisconnect_NoOpForPlayingRoom(t *testing.T) {
 	repo, handler := setupLobbyTest()
 
-	// Room is in "playing" status — session manager handles this, not lobby handler
 	repo.rooms[1] = &room.Room{ID: 1, Status: "playing", OwnerID: 100, PlayerCount: 4}
 	repo.playerRooms[42] = &room.RoomPlayer{RoomID: 1, UserID: 42}
 
 	handler.HandleDisconnect(42)
 	time.Sleep(100 * time.Millisecond)
 
-	// No timer should fire — the handler returns immediately for playing rooms
 	time.Sleep(11 * time.Second)
 	assert.Len(t, repo.removedIDs(), 0, "player should NOT be removed from a playing room")
 }
@@ -184,11 +174,8 @@ func TestLobbyDisconnect_NoOpForPlayingRoom(t *testing.T) {
 func TestLobbyDisconnect_NoOpForPlayerNotInRoom(t *testing.T) {
 	_, handler := setupLobbyTest()
 
-	// User 99 is not in any room
 	handler.HandleDisconnect(99)
 	time.Sleep(100 * time.Millisecond)
 
-	// Should not crash, no timer started
 	handler.HandleReconnect(99)
-	// No assertions needed — just verifying no panic
 }

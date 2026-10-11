@@ -6,14 +6,6 @@ import { Field } from "@/shared/components/ui/field";
 import { SuitRule } from "@/shared/components/ui/suit-rule";
 import { cn } from "@/shared/lib/utils";
 
-// ─────────────────────────────────────────────────────────────────────────
-// Auth-page composable primitives — the parchment card chrome.
-//
-// Field + SuitRule were promoted to shared/components/ui/ once Create Room
-// became a third consumer; we re-export them here so existing auth-page
-// imports (`import { Field, SuitRule } from ".../AuthCard"`) stay green.
-// ─────────────────────────────────────────────────────────────────────────
-
 export { Field, SuitRule };
 
 type AuthCardProps = {
@@ -25,9 +17,8 @@ type AuthCardProps = {
 };
 
 /**
- * 440px parchment card with the design's signature top brass hairline,
- * micro-caps eyebrow, Inter display title, ink-dim subtitle and
- * suit-pip divider before the form content.
+ * 440px parchment card with a brass top hairline, eyebrow, title, subtitle,
+ * and suit-pip divider before the form content.
  */
 export function AuthCard({ eyebrow, title, subtitle, children, footer }: AuthCardProps) {
   return (
@@ -35,7 +26,6 @@ export function AuthCard({ eyebrow, title, subtitle, children, footer }: AuthCar
       className="bg-surface relative w-full max-w-125 rounded-[22px] border border-border px-10 pt-10 pb-8 shadow-[0_18px_44px_-28px_rgba(14,58,36,0.32),0_2px_0_rgba(255,255,255,0.6)_inset]"
       data-testid="auth-card"
     >
-      {/* Top brass hairline accent */}
       <div
         aria-hidden="true"
         className="absolute -top-px right-7 left-7 h-0.5 bg-[linear-gradient(90deg,transparent,var(--brass)_50%,transparent)] opacity-70"
@@ -67,10 +57,7 @@ type AltLinkProps = {
   testId?: string;
 };
 
-/**
- * Bottom prompt + accent link to the alternate auth page
- * ("New to Beljot? Create an account" / "Already have an account? Log in").
- */
+/** Bottom prompt and accent link to the alternate auth page. */
 export function AltLink({ prompt, cta, to, testId }: AltLinkProps) {
   return (
     <div className="text-ink-dim text-center text-[13.5px]">
@@ -95,9 +82,8 @@ type CheckboxProps = {
 };
 
 /**
- * Custom check control matching the design's parchment treatment — square
- * surface-2 box with brass border, fills to accent on check, white check
- * glyph inside. Wraps the entire row so clicking the label text also toggles.
+ * Parchment-styled checkbox whose label wraps the whole row, so clicking the text also toggles.
+ * The real input sits transparently over the visual box.
  */
 export function Checkbox({ checked, onChange, invalid, testId, children }: CheckboxProps) {
   return (
@@ -106,8 +92,6 @@ export function Checkbox({ checked, onChange, invalid, testId, children }: Check
         "text-ink-dim flex cursor-pointer items-start gap-2.5 text-[13px] leading-normal",
       )}
     >
-      {/* The real input sits transparently over the visual box so user-event
-          can interact with it, and label-click ↔ input toggle works natively. */}
       <span className="relative mt-px inline-block size-4.5 shrink-0">
         <input
           type="checkbox"

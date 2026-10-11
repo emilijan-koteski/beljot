@@ -12,7 +12,6 @@ func TestHashPassword_ProducesValidBcryptHash(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, hash)
 	assert.NotEqual(t, "testpassword123", hash)
-	// bcrypt hashes start with $2a$ or $2b$
 	assert.Regexp(t, `^\$2[ab]\$`, hash)
 }
 

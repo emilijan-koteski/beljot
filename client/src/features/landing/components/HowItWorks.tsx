@@ -3,8 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Step } from "@/features/landing/components/Step";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 
-// "How it works" — parchment band with three numbered steps.
-
+// "How it works" parchment band with three numbered steps.
 export function HowItWorks() {
   const { t } = useTranslation();
   return (

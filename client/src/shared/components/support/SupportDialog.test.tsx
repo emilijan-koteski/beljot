@@ -7,8 +7,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SupportDialog } from "@/shared/components/support/SupportDialog";
 import { BMC_MARK_SRC, BMC_STICKER_SRC, BMC_URL } from "@/shared/components/support/supportLinks";
 
-// jsdom has no matchMedia, so the real hook would always report "motion is
-// fine" and the reduced-motion branch would never run.
 let mockReducedMotion = false;
 vi.mock("@/shared/hooks/useReducedMotion", () => ({
   useReducedMotion: () => mockReducedMotion,
@@ -35,9 +33,7 @@ describe("SupportDialog", () => {
     expect(screen.getByTestId("support-dialog")).toBeInTheDocument();
     expect(screen.getByText("Hobby project")).toBeInTheDocument();
     expect(screen.getByText("I build Beljot.online in my free time")).toBeInTheDocument();
-    // The reason has to name a real cost, not gesture at one.
     expect(screen.getByText(/come out of my own pocket/)).toBeInTheDocument();
-    // ...and has to say the ask is optional, which is the whole tone of this.
     expect(screen.getByText(/helps just as much/)).toBeInTheDocument();
   });
 
@@ -46,8 +42,6 @@ describe("SupportDialog", () => {
     const cta = screen.getByTestId("support-cta");
     expect(cta).toHaveAttribute("href", BMC_URL);
     expect(cta).toHaveAttribute("target", "_blank");
-    // Both tokens matter: noopener severs window.opener, noreferrer withholds
-    // the referrer. An external link must carry them together.
     expect(cta).toHaveAttribute("rel", "noopener noreferrer");
   });
 
@@ -55,7 +49,6 @@ describe("SupportDialog", () => {
     renderDialog();
     const mark = screen.getByTestId("support-mark");
     expect(mark).toHaveAttribute("src", BMC_STICKER_SRC);
-    // Decorative: the copy beside it already says everything the cup does.
     expect(mark).toHaveAttribute("alt", "");
     expect(mark).toHaveAttribute("aria-hidden", "true");
   });
@@ -77,8 +70,6 @@ describe("SupportDialog", () => {
     await user.click(toggle);
 
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    // A QR is content, not decoration — it needs a real alt, since a viewer who
-    // can't see it still needs to know what the square is.
     expect(screen.getByTestId("support-qr")).toHaveAccessibleName(/QR code/i);
   });
 

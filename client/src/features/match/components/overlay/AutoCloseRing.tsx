@@ -6,17 +6,10 @@ import { ringDrainStyle } from "../../lib/turnCountdown";
 import { IconX } from "./icons";
 
 interface AutoCloseRingProps {
-  /** Total countdown duration in seconds. Default 8 (informational reveals). */
   duration?: number;
-  /** Callback fired when the countdown reaches 0 OR the user clicks the X.
-   *  Guaranteed to fire at most once per mount. */
   onClose: () => void;
-  /** When true, no countdown runs — useful if the parent wants to display the
-   *  ring without auto-firing (e.g. a static preview). */
   paused?: boolean;
-  /** Test id override; defaults to `auto-close-ring`. */
   testId?: string;
-  /** ARIA label for the dismiss button. */
   ariaLabel?: string;
 }
 
@@ -24,13 +17,8 @@ const RING_RADIUS = 9;
 const RING_CIRC = 2 * Math.PI * RING_RADIUS;
 
 /**
- * Small circular X button with an SVG progress ring around it. Used by every
- * informational overlay (trump-taken, belot/declarations reveals, hand-end,
- * match-end) for the unified "auto-closes in 8 s, but you can close it
- * earlier" pattern.
- *
- * The countdown sweeps full → empty over `duration`. When the duration
- * elapses OR the user clicks the X, `onClose()` fires exactly once.
+ * Circular X button whose progress ring drains over `duration` seconds, in step with the close timer.
+ * `onClose` fires exactly once, on timeout or click, and never while `paused`.
  */
 export function AutoCloseRing({
   duration = 8,
@@ -41,8 +29,6 @@ export function AutoCloseRing({
 }: AutoCloseRingProps) {
   const firedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
-  // Wrap `onClose` in a ref so the firing-timer effect doesn't re-run when the
-  // parent re-creates the callback identity mid-reveal.
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -58,18 +44,11 @@ export function AutoCloseRing({
     return () => clearTimeout(fireId);
   }, [duration, paused]);
 
-  // Mount-anchored drain: the sweep and the fire timer above start on the
-  // same commit and share the same duration, so the ring reads empty at the
-  // exact moment the close fires — never one tick behind it. Stable values ⇒
-  // re-renders don't restart the animation.
   const drainStyle = useMemo(
     () => ringDrainStyle(duration * 1000, duration * 1000, RING_CIRC),
     [duration],
   );
 
-  // Reduced-motion fallback: no drain animation, but the ring must still
-  // reflect the countdown — step the static dashoffset once per second,
-  // anchored to the same mount instant as the fire timer.
   const [reducedPct, setReducedPct] = useState(1);
   useEffect(() => {
     if (!prefersReducedMotion || paused) return;
@@ -110,12 +89,7 @@ export function AutoCloseRing({
         touchAction: "manipulation",
       }}
     >
-      {/* Invisible hit-area extender: the visible circle is 32px, below the
-          ~44px touch-target minimum, which made the X frustratingly precise to
-          tap on phones. Clicks on any child of a <button> fire its onClick, so
-          this pad widens the effective target to 48×48 without moving a pixel
-          of the visuals. */}
-      <span aria-hidden style={{ position: "absolute", inset: -8 }} />
+      <TouchTargetPad />
       <IconX size={14} />
       <svg
         viewBox="0 0 24 24"
@@ -153,4 +127,9 @@ export function AutoCloseRing({
       </svg>
     </button>
   );
+}
+
+/** Invisible pad that widens the 32px button's tap target to 48x48 without changing its look. */
+function TouchTargetPad() {
+  return <span aria-hidden style={{ position: "absolute", inset: -8 }} />;
 }

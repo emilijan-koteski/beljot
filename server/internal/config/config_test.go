@@ -108,7 +108,7 @@ func TestLoad_DevelopmentWithoutEndpointDisablesAvatars(t *testing.T) {
 		t.Setenv(k, v)
 	}
 	t.Setenv("BELJOT_S3_ENDPOINT", "")
-	cfg := Load() // must not exit
+	cfg := Load()
 	if cfg.AvatarStorageConfigured() {
 		t.Error("AvatarStorageConfigured() = true with an empty endpoint")
 	}
@@ -127,7 +127,7 @@ func TestLoad_ProductionMissingAvatarVarExits(t *testing.T) {
 		os.Setenv("BELJOT_ENV", "production")
 		os.Setenv("BELJOT_JWT_SECRET", "a-secure-test-secret")
 		Load()
-		os.Exit(0) // not reached when Load exits as it should
+		os.Exit(0)
 	}
 
 	for name := range avatarEnv() {

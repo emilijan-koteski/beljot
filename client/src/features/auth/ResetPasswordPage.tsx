@@ -27,8 +27,6 @@ export function ResetPasswordPage() {
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
-  // Flipped when the server rejects the token (invalid/expired/used), or when
-  // there is no token in the URL at all.
   const [tokenInvalid, setTokenInvalid] = useState(!token);
 
   function validatePassword(value: string): string | undefined {

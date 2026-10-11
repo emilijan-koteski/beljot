@@ -58,7 +58,6 @@ describe("CapotAnimation", () => {
   });
 
   it("reads gold / first-person when the viewer's own team swept", () => {
-    // viewer on seat 0 (team A), capot by team 0 (team A) → viewer's team
     render(<CapotAnimation capotTeam={0} viewerSeat={0} capotBonus={100} onComplete={vi.fn()} />);
 
     expect(screen.getByTestId("capot-text")).toHaveAttribute("data-team", "gold");
@@ -69,7 +68,6 @@ describe("CapotAnimation", () => {
   });
 
   it("reads silver / third-person when the opponents swept", () => {
-    // viewer on seat 1 (team B), capot by team 0 (team A) → opponents
     render(<CapotAnimation capotTeam={0} viewerSeat={1} capotBonus={100} onComplete={vi.fn()} />);
 
     expect(screen.getByTestId("capot-text")).toHaveAttribute("data-team", "silver");
@@ -80,7 +78,6 @@ describe("CapotAnimation", () => {
   });
 
   it("is viewer-relative regardless of the absolute capot team", () => {
-    // viewer on seat 1 (team B), capot by team 1 (team B) → still the viewer's team → gold/first-person
     render(<CapotAnimation capotTeam={1} viewerSeat={1} capotBonus={100} onComplete={vi.fn()} />);
 
     expect(screen.getByTestId("capot-text")).toHaveAttribute("data-team", "gold");

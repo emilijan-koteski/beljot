@@ -3,59 +3,24 @@ package avatar
 import (
 	"encoding/binary"
 	"errors"
+
+	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// Decode-memory prediction. The pixel caps (4096 px a side, 16 MP) bound the
-// SIZE of a source, not what decoding it costs: image/jpeg keeps every DCT
-// coefficient of a progressive scan (256 B per 8x8 block per component), a
-// 4-component JPEG is decoded twice over (planes, then a CMYK copy), a 16-bit
-// PNG is 8 B per pixel, and all of that fits in a file of a few hundred KB. So
-// Inspect reads the encoding from the header and predicts the peak Go memory
-// the one decode will need, and refuses above maxDecodeBytes before the decode
-// slot is taken.
-//
-// The model is the decoder's own allocations (the decoded image and any
-// working copies, sized exactly as the standard decoders size them) plus the
-// resampler's buffer, times a slack factor, plus a fixed allowance. The two
-// constants were calibrated against the measured peak Go runtime memory
-// (resident: total minus released) of a full Inspect + Render on 16 MP
-// fixtures of every encoding, so each prediction is at or above what was
-// measured. Measured 2026-09-29 with Go 1.26 on generated solid-colour images;
-// rerun the calibration if the decoders or x/image change:
-//
-//	source (4096x3906 JPEG, 4000x4000 PNG/WebP)   measured   predicted
-//	baseline 4:2:0 JPEG                             74 MiB      85 MiB
-//	lossy WebP                                      69 MiB      86 MiB
-//	8-bit RGBA PNG                                 110 MiB     127 MiB
-//	lossless WebP, one colour                      114 MiB     135 MiB
-//	progressive greyscale JPEG                     122 MiB     142 MiB
-//	lossy WebP with compressed alpha               149 MiB     176 MiB   rejected
-//	baseline CMYK JPEG                             174 MiB     191 MiB   rejected
-//	16-bit RGBA PNG                                182 MiB     192 MiB   rejected
-//	progressive 4:4:4 JPEG                         286 MiB     306 MiB   rejected
-//	progressive CMYK JPEG                          431 MiB     453 MiB   rejected
 const (
-	// maxDecodeBytes is the most one decode may be predicted to need: with the
-	// single decode slot it keeps the backend well inside its 256 MiB limit.
 	maxDecodeBytes = 150 << 20
 
-	// decodeSlackPercent and decodeFixedBytes turn the decoder's allocations
-	// into a peak: garbage the GC has not yet collected (the read buffers, the
-	// multipart copy, a progressive decoder's scratch), and the encoder.
 	decodeSlackPercent = 107
 	decodeFixedBytes   = 28 << 20
 
-	// resamplerBytesPerSourceRow: x/image/draw's two-pass CatmullRom holds a
-	// [4]float64 (32 B) per destination column per source row, and the first
-	// pass is 256 columns wide over the whole crop height.
-	resamplerBytesPerSourceRow = 256 * 32
+	float64x4Bytes             = 4 * 8
+	resamplerBytesPerSourceRow = user.AvatarSizeLarge * float64x4Bytes
 )
 
 var errNoFrameHeader = errors.New("avatar: no JPEG frame header")
 
-// predictDecodeBytes predicts the peak Go memory of one Render of this
-// source. An encoding the parser cannot read is predicted at the worst case
-// its format allows, never waved through.
+// predictDecodeBytes predicts the peak Go memory of one Render, pricing an unreadable header at its format's worst case.
+// The constants are calibrated by TestPredictDecodeBytes_CoversEveryMeasuredPeak; recalibrate if the decoders change.
 func predictDecodeBytes(data []byte, mime string, width, height int) (int64, error) {
 	var decoded int64
 	var err error
@@ -72,12 +37,8 @@ func predictDecodeBytes(data []byte, mime string, width, height int) (int64, err
 	return raw*decodeSlackPercent/100 + decodeFixedBytes, err
 }
 
-// jpegDecodeBytes sizes image/jpeg's allocations from the frame header: the
-// component planes at their MCU-padded sizes (a Gray or YCbCr image), a
-// 4-component file's black plane plus the CMYK image it is converted into,
-// and, for a progressive scan, one 256 B coefficient block per 8x8 block of
-// every component. A missing frame header is priced as a progressive
-// 4-component 4:4:4 file, the most expensive shape.
+// jpegDecodeBytes sizes image/jpeg's MCU-padded planes, a 4-component file's CMYK copy and progressive coefficient blocks.
+// A missing frame header is priced as a progressive 4-component 4:4:4 file, the most expensive shape.
 func jpegDecodeBytes(data []byte, width, height int) (int64, error) {
 	w, h := int64(width), int64(height)
 	f, err := readJPEGFrame(data)
@@ -87,8 +48,6 @@ func jpegDecodeBytes(data []byte, width, height int) (int64, error) {
 	}
 
 	if len(f.comps) == 1 {
-		// image/jpeg ignores a single component's sampling factors (the data is
-		// non-interleaved by definition), so it is plain 8x8 blocks.
 		blocks := ((w + 7) / 8) * ((h + 7) / 8)
 		total := blocks * 64
 		if f.progressive {
@@ -108,8 +67,6 @@ func jpegDecodeBytes(data []byte, width, height int) (int64, error) {
 	}
 	total := planes
 	if len(f.comps) == 4 {
-		// The black plane is one of `planes`; the conversion adds a full-size
-		// 4 B/px CMYK image on top.
 		total += 4 * w * h
 	}
 	if f.progressive {
@@ -182,15 +139,18 @@ func parseJPEGFrame(seg []byte, progressive bool) (jpegFrame, error) {
 	return f, nil
 }
 
-// pngDecodeBytes sizes image/png's result from IHDR (bit depth, colour type,
-// interlace) and whether a tRNS chunk precedes the image data, which turns a
-// grey or truecolour image into NRGBA / NRGBA64. An Adam7 image is also
-// decoded pass by pass into separate images before the merge, so it is priced
-// at twice its size.
+// pngDecodeBytes sizes image/png's result from IHDR and whether a tRNS chunk widens it to NRGBA / NRGBA64.
+// An Adam7 image is decoded pass by pass before the merge, so it is priced at twice its size.
 func pngDecodeBytes(data []byte, width, height int) int64 {
+	const (
+		signatureLen   = 8
+		chunkHeaderLen = 8
+		ihdrFieldsLen  = 13
+		colourGrey     = 0
+		colourPalette  = 3
+	)
 	px := int64(width) * int64(height)
-	// Signature (8) + IHDR length (4) + type (4) + 13 bytes of fields.
-	if len(data) < 8+8+13 || string(data[12:16]) != "IHDR" {
+	if len(data) < signatureLen+chunkHeaderLen+ihdrFieldsLen || string(data[12:16]) != "IHDR" {
 		return 2 * 8 * px
 	}
 	depth, colour, interlace := data[24], data[25], data[28]
@@ -199,7 +159,7 @@ func pngDecodeBytes(data []byte, width, height int) int64 {
 
 	var bpp int64
 	switch colour {
-	case 0: // greyscale
+	case colourGrey:
 		switch {
 		case wide && trns:
 			bpp = 8
@@ -210,9 +170,9 @@ func pngDecodeBytes(data []byte, width, height int) int64 {
 		default:
 			bpp = 1
 		}
-	case 3: // palette
+	case colourPalette:
 		bpp = 1
-	default: // truecolour, grey + alpha, truecolour + alpha
+	default:
 		bpp = 4
 		if wide {
 			bpp = 8
@@ -245,11 +205,8 @@ func pngHasTRNS(data []byte) bool {
 	return false
 }
 
-// webpDecodeBytes sizes x/image/webp's result. A lossy frame is a 4:2:0 YCbCr
-// image (1.5 B/px); an ALPH chunk adds a full-size alpha plane, and when that
-// alpha is compressed it is itself decoded as a lossless image first. A
-// lossless image is NRGBA (4 B/px), plus the packed buffer a colour-indexing
-// transform expands from (see vp8lTransformExtra8).
+// webpDecodeBytes sizes x/image/webp's result: a 4:2:0 YCbCr lossy frame plus any ALPH plane, or a lossless NRGBA image.
+// Lossless images and compressed alpha add the buffer a colour-indexing transform expands from (see vp8lTransformExtra8).
 func webpDecodeBytes(data []byte, width, height int) int64 {
 	px := int64(width) * int64(height)
 	lossy := px + 2*(int64(width+1)/2)*(int64(height+1)/2)
@@ -274,33 +231,31 @@ func webpDecodeBytes(data []byte, width, height int) int64 {
 	}
 	switch {
 	case vp8l != nil:
-		// Skip the signature byte and the 32-bit size / alpha / version word.
+		const vp8lHeaderLen = 5
 		var stream []byte
-		if len(vp8l) >= 5 {
-			stream = vp8l[5:]
+		if len(vp8l) >= vp8lHeaderLen {
+			stream = vp8l[vp8lHeaderLen:]
 		}
 		return 4*px + px*vp8lTransformExtra8(stream)/8
 	case alph != nil:
-		if len(alph) == 0 || alph[0]&0x03 == 0 {
-			return lossy + px // uncompressed alpha: just the plane
+		uncompressed := len(alph) == 0 || alph[0]&0x03 == 0
+		if uncompressed {
+			return lossy + px
 		}
-		// A compressed alpha stream starts straight at the transforms.
 		return lossy + px + 4*px + px*vp8lTransformExtra8(alph[1:])/8
 	default:
 		return lossy
 	}
 }
 
-// vp8lTransformExtra8 returns, in eighths of a byte per pixel, the extra
-// buffer x/image's lossless decoder allocates while undoing a colour-indexing
-// transform: the packed index image it expands from, 4 B per packed pixel with
-// 2, 4 or 8 pixels per packed pixel (so 2, 1 or 0.5 B/px). A palette of more
-// than 16 colours is expanded in place (0). The transform list is read up to
-// the first transform that carries data it cannot skip (predictor or colour
-// transform); if a colour-indexing transform could still follow, the worst
-// case (2 B/px) is assumed.
+// vp8lTransformExtra8 returns, in eighths of a byte per pixel, the packed index image a colour-indexing transform expands from.
+// Transforms are read until one carries data it cannot skip, after which the worst case (2 B/px) is assumed.
 func vp8lTransformExtra8(stream []byte) int64 {
-	const worst = 16
+	const (
+		worst                   = 16
+		transformSubtractGreen  = 2
+		transformColourIndexing = 3
+	)
 	br := lsbBits{data: stream}
 	for {
 		present, ok := br.read(1)
@@ -308,31 +263,31 @@ func vp8lTransformExtra8(stream []byte) int64 {
 			return worst
 		}
 		if present == 0 {
-			return 0 // no (further) transforms: no colour indexing at all
+			return 0
 		}
 		kind, ok := br.read(2)
 		if !ok {
 			return worst
 		}
 		switch kind {
-		case 2: // subtract green: no data, keep reading
+		case transformSubtractGreen:
 			continue
-		case 3: // colour indexing: the table size decides the packing
+		case transformColourIndexing:
 			size, ok := br.read(8)
 			if !ok {
 				return worst
 			}
 			switch colours := size + 1; {
 			case colours <= 2:
-				return 4 // 8 px per packed pixel: 0.5 B/px
+				return 4
 			case colours <= 4:
-				return 8 // 4 px: 1 B/px
+				return 8
 			case colours <= 16:
-				return 16 // 2 px: 2 B/px
+				return 16
 			default:
-				return 0 // expanded in place
+				return 0
 			}
-		default: // predictor or colour transform: an entropy-coded sub-image follows
+		default:
 			return worst
 		}
 	}

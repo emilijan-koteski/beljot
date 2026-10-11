@@ -26,9 +26,6 @@ describe("SeasonArchiveRow", () => {
     await i18n.changeLanguage("en");
   });
 
-  // The default row is a PRE-DIVISION season (2026 Q2): an old-formula 1800 SP
-  // stored as a bare Silver. The archive shows the stored rank and never
-  // re-derives it from SP (1800 would bucket as Grandmaster on today's floors).
   it("renders the season token verbatim, the stored tier, the SP and the games", () => {
     renderRow();
 
@@ -48,9 +45,6 @@ describe("SeasonArchiveRow", () => {
     expect(badge).toHaveAttribute("aria-hidden", "true");
   });
 
-  // LeaderboardRow's a11y recipe, copied exactly: ONE spoken sentence, every
-  // visible cell hidden — nothing is announced twice and the terse cells never
-  // read as number soup.
   it("carries one sr-only summary and hides every visible cell from AT", () => {
     renderRow();
 
@@ -80,8 +74,6 @@ describe("SeasonArchiveRow", () => {
     );
   });
 
-  // A played season at 0 SP is REAL history — the row must render a real 0,
-  // never blank out on truthiness.
   it("renders a 0-SP season as Iron 1 with a real zero", () => {
     renderRow({ sp: 0, tier: "iron", division: 1, gamesPlayed: 2 });
 
@@ -90,8 +82,6 @@ describe("SeasonArchiveRow", () => {
     expect(screen.getByTestId("season-archive-row")).toHaveAttribute("data-tier", "iron");
   });
 
-  // The version-skew guard: an unknown token from a newer server falls back to
-  // the SP's own bucket instead of a missing colour and a raw i18n key.
   it("falls back to the SP bucket for an unrecognised tier token", () => {
     renderRow({ tier: "mythic", sp: 700 });
 
@@ -106,7 +96,6 @@ describe("SeasonArchiveRow", () => {
     expect(screen.getByTestId("season-archive-tier").textContent).toBe(
       i18n.t("season.tier.silver"),
     );
-    // The machine token is an identifier and never localizes.
     expect(screen.getByTestId("season-archive-name").textContent).toBe("2026 Q2");
   });
 });

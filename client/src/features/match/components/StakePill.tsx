@@ -5,7 +5,6 @@ import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 
 interface StakePillProps {
-  /** The total match pot — sum of every human player's buy-in. */
   amount: number;
 }
 
@@ -13,14 +12,7 @@ const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
 const INK = "var(--ink-light, #f5f2e8)";
 
 /**
- * Compact match-stake (pot) chip for the table HUD — a brass-bordered pill
- * matching the ScorePanel / TrumpIndicator chrome, showing the gold coin glyph
- * and the formatted pot total. Icon-only unit (the coin glyph conveys "coins",
- * mirroring the room-card buy-in label); the localized "Stake" word rides the
- * aria-label for screen readers.
- *
- * Positionless by design: the caller anchors it (top-right beside the mobile
- * hamburger / beneath the desktop trump indicator) and sets its z-tier (Z.HUD).
+ * Positionless brass pill showing the match stake with a coin glyph; the caller anchors it.
  */
 export function StakePill({ amount }: StakePillProps) {
   const { t } = useTranslation();

@@ -33,9 +33,6 @@ func (s *stubStaleRoomRepo) FindByStatus(status string) ([]match.StaleRoom, erro
 	if s.findByStatus != nil {
 		return s.findByStatus(status)
 	}
-	// StaleRoom doesn't carry Status — "playing" is the only query we
-	// exercise. Return everything in the slice as-is (tests only populate
-	// rooms with the status they want FindByStatus("playing") to return).
 	out := make([]match.StaleRoom, 0, len(s.rooms))
 	out = append(out, s.rooms...)
 	return out, nil
@@ -59,12 +56,8 @@ func (s *stubStaleRoomRepo) UpdateStatus(roomID uint, status string) error {
 
 func intp(i int) *int { return &i }
 
-// Server restart leaves rooms in status="playing" with no live session,
-// stranding players because FindPlayerRoom counts "playing" as active and
-// blocks them from quick-play / create-room. ReconcileStaleRooms must close
-// those rows on boot so the lobby unblocks; for fully-seated rooms it must
-// also persist a match row with status="abandoned" so player history matches
-// what actually happened.
+// TestReconcileStaleRooms_FlipsPlayingToCompleted checks that stale playing rooms
+// are completed on boot and fully seated ones get an abandoned match row.
 func TestReconcileStaleRooms_FlipsPlayingToCompleted(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -74,8 +67,6 @@ func TestReconcileStaleRooms_FlipsPlayingToCompleted(t *testing.T) {
 	mgr := match.NewManager(hub, matchRepo)
 
 	stub := newStubRoomRepo()
-	// Only "playing" rooms are passed to FindByStatus("playing") — the stub
-	// returns whatever is in stub.rooms unconditionally.
 	stub.rooms = []match.StaleRoom{
 		{ID: 100, Variant: "bitola", MatchMode: "1001"},
 		{ID: 101, Variant: "bitola", MatchMode: "1001"},
@@ -86,7 +77,6 @@ func TestReconcileStaleRooms_FlipsPlayingToCompleted(t *testing.T) {
 		{UserID: 30, Seat: intp(2)},
 		{UserID: 40, Seat: intp(3)},
 	}
-	// Room 101 is short a player — flip status anyway, just skip the match row.
 	stub.players[101] = []match.StaleRoomPlayer{
 		{UserID: 50, Seat: intp(0)},
 		{UserID: 60, Seat: intp(1)},
@@ -159,7 +149,6 @@ func TestReconcileStaleRooms_NoOpWhenNothingStale(t *testing.T) {
 	mgr := match.NewManager(hub, matchRepo)
 
 	stub := newStubRoomRepo()
-	// Empty rooms slice — FindByStatus("playing") returns nothing.
 	stub.rooms = []match.StaleRoom{}
 
 	err := mgr.ReconcileStaleRooms(stub)

@@ -17,15 +17,7 @@ interface BelotRevealProps {
   cardId: string;
   isKing: boolean;
   onComplete: () => void;
-  /** Optional player roster — when provided the announcer's name appears in
-   *  the eyebrow line. Tests render the reveal without players, in which
-   *  case we just show the team chip. */
   players?: readonly PlayerState[];
-  /**
-   * Dedupe key for the announcement's sound — the declaration sound, since
-   * Belote-Rebelote is scored as one (see `payloadSoundKey`) — played once when
-   * the reveal mounts. Omitted or null: silent.
-   */
   soundKey?: string | null;
 }
 
@@ -33,12 +25,7 @@ function parseCardId(id: string) {
   return { rank: id[0] as Rank, suit: id[1] as Suit };
 }
 
-/**
- * Belot / Re-belot announcement toast — shown to every player once the
- * trump-K-Q holder elects to announce. Mirrors {@link TrumpReveal}: centred
- * over the table, glows in the announcer's viewer-relative team color, auto-
- * closes after 8 s, can be dismissed early via the X-with-countdown-ring.
- */
+/** Belot / Re-belot announcement toast shown to every player, glowing in the announcer's team color. */
 export function BelotReveal({
   playerSeat,
   myPlayerSeat,
@@ -77,9 +64,6 @@ export function BelotReveal({
   const labelKey = isKing ? "match.belot.reveal.rebelot" : "match.belot.reveal.belot";
   const titleKey = isKing ? "match.belot.reveal.titleRebelot" : "match.belot.reveal.titleBelot";
   const announcer = playerDisplayName(t, players?.find((p) => p.seat === playerSeat) ?? null);
-  // Mirror TrumpReveal: full sentence on the title row when we know who
-  // announced ("{{name}} announced re-belot"), graceful fallback to the
-  // team label when the players roster wasn't passed (test renders).
   const titleText = announcer
     ? t(titleKey, { name: announcer })
     : t(team === "gold" ? "team.us" : "team.them");
@@ -94,11 +78,6 @@ export function BelotReveal({
       style={{ zIndex: Z.REVEAL }}
       data-testid="belot-reveal"
     >
-      {/* Vertical, fixed-width centred panel mirroring TrumpReveal so the two
-          announcements read as one set — X in the top-right corner, content
-          stacked and centred. One width serves phone + desktop (the title
-          wraps); no horizontal row that crams the chip + bonus on small
-          screens. */}
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-[18px] text-center max-w-[calc(100vw-1.5rem)]"
         style={{
@@ -112,7 +91,6 @@ export function BelotReveal({
         }}
         data-team={team}
       >
-        {/* close button with countdown ring — top-right (matches TrumpReveal) */}
         <div className="absolute top-3 right-3 z-3">
           <AutoCloseRing
             duration={prefersReducedMotion ? 1.5 : 8}
@@ -122,7 +100,6 @@ export function BelotReveal({
           />
         </div>
 
-        {/* eyebrow label (Belote / Rebelote) — padded clear of the close button */}
         <div
           className="text-[9.5px] uppercase tracking-[0.22em]"
           style={{
@@ -136,7 +113,6 @@ export function BelotReveal({
           {t(labelKey)}
         </div>
 
-        {/* hero K/Q card with a soft team-coloured glow */}
         <div className="relative mb-4 inline-block">
           <div
             aria-hidden
@@ -153,7 +129,6 @@ export function BelotReveal({
           </div>
         </div>
 
-        {/* who announced it */}
         <div
           className="font-semibold leading-snug"
           style={{ fontFamily: "var(--font-body)", fontSize: 18, letterSpacing: 0.2 }}
@@ -163,7 +138,6 @@ export function BelotReveal({
           {titleText}
         </div>
 
-        {/* team chip */}
         <div className="mt-3 flex justify-center">
           <span
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider"
@@ -182,7 +156,6 @@ export function BelotReveal({
           </span>
         </div>
 
-        {/* +20 bonus — its own line so it never crowds the chip */}
         <div className="mt-1.5" style={{ fontSize: 11.5, opacity: 0.7 }}>
           {t("match.belot.reveal.bonus", { defaultValue: "+20 to your team's score" })}
         </div>

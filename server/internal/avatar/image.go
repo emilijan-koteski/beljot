@@ -18,22 +18,13 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// Limits on what an upload may be. The client mirrors the first two before
-// sending; the server is the authority for all of them.
 const (
-	// MaxFileBytes caps the uploaded file itself: 2 MiB = 2,097,152 bytes.
-	MaxFileBytes = 2 << 20
-	// minSourceSide is the smallest shorter side accepted, so the 128 image is
-	// never an upscale of something smaller.
-	minSourceSide = 128
-	// maxSourceSide and maxSourcePixels bound the decode: a 4096×4096 RGBA
-	// decode alone is 64 MiB, so both are checked from the header before any
-	// pixel is decoded. 16 megapixels is decimal (16,000,000).
+	MaxFileBytes    = 2 << 20
+	minSourceSide   = user.AvatarSizeSmall
 	maxSourceSide   = 4096
 	maxSourcePixels = 16_000_000
 )
 
-// Output encoding: lossy WebP, the same parameters for both sizes.
 const (
 	webpQuality = 80
 	webpMethod  = 4
@@ -45,9 +36,8 @@ const (
 	mimeWebP = "image/webp"
 )
 
-// Source is an upload that passed every cheap check (size, sniffed type,
-// header dimensions) and is ready to be decoded. Splitting Inspect from Render
-// lets the handler reject bad uploads before they occupy a decode slot.
+// Source is an upload that passed every cheap check and is ready to be decoded.
+// Splitting Inspect from Render lets the handler reject bad uploads before they occupy a decode slot.
 type Source struct {
 	data   []byte
 	mime   string
@@ -69,8 +59,8 @@ func Process(r io.Reader) (large, small []byte, err error) {
 	return src.Render()
 }
 
-// Inspect runs the checks that cost no pixel decode. The type is decided by
-// sniffing the bytes; any filename or declared content type is irrelevant.
+// Inspect runs the checks that cost no pixel decode, deciding the type by sniffing the bytes.
+// Besides the pixel caps it rejects sources whose predicted decode memory is too high (see decodemem.go).
 func Inspect(data []byte) (*Source, error) {
 	if len(data) > MaxFileBytes {
 		return nil, apperr.ErrAvatarTooLarge
@@ -103,10 +93,6 @@ func Inspect(data []byte) (*Source, error) {
 	if min(cfg.Width, cfg.Height) < minSourceSide {
 		return nil, apperr.ErrAvatarTooSmall
 	}
-	// The pixel caps bound the size, not the decode cost: a progressive,
-	// 4-component or 16-bit source of the same size can need several times the
-	// memory (see decodemem.go). A header the predictor cannot read is priced at
-	// its format's worst case, so the error is only informative here.
 	if need, _ := predictDecodeBytes(data, mime, cfg.Width, cfg.Height); need > maxDecodeBytes {
 		return nil, apperr.ErrAvatarDimensionsTooLarge
 	}
@@ -114,31 +100,20 @@ func Inspect(data []byte) (*Source, error) {
 	return &Source{data: data, mime: mime, width: cfg.Width, height: cfg.Height}, nil
 }
 
-// Render decodes the source once and produces both WebP derivatives. The 128
-// is resampled from the 256, not from the source, so the one expensive
-// resample runs once. Neither output carries any metadata: they are encoded
-// from pixels alone.
+// Render decodes the source once and produces both metadata-free WebP derivatives, resampling the 128 from the 256.
+// EXIF orientation is applied after the centre crop, since that square maps onto itself under every rotation and flip.
 func (s *Source) Render() (large, small []byte, err error) {
 	img, err := s.decode()
 	if err != nil {
-		// The header parsed but the pixels did not: truncated or corrupt data
-		// behind a valid-looking header is as unsupported as the wrong type.
 		return nil, nil, apperr.ErrAvatarUnsupportedType
 	}
 
-	// Centre square. The crop is the same region whichever way the EXIF
-	// orientation turns the picture (the centre square maps onto itself under
-	// every rotation and flip), so orientation is applied to the small result
-	// below rather than to the full-size decode.
 	b := img.Bounds()
 	side := min(b.Dx(), b.Dy())
 	x0 := b.Min.X + (b.Dx()-side)/2
 	y0 := b.Min.Y + (b.Dy()-side)/2
 	crop := image.Rect(x0, y0, x0+side, y0+side)
 
-	// Resample in premultiplied RGBA, which filters edges of transparent
-	// images correctly, then hand the encoder straight (non-premultiplied)
-	// NRGBA, the layout libwebp imports.
 	big := image.NewRGBA(image.Rect(0, 0, user.AvatarSizeLarge, user.AvatarSizeLarge))
 	draw.CatmullRom.Scale(big, big.Bounds(), img, crop, draw.Src, nil)
 	if s.mime == mimeJPEG {
@@ -171,6 +146,7 @@ func (s *Source) decode() (image.Image, error) {
 	}
 }
 
+// encodeWebP converts a premultiplied resample to the straight NRGBA libwebp imports and encodes it.
 func encodeWebP(m *image.RGBA) ([]byte, error) {
 	straight := image.NewNRGBA(m.Bounds())
 	draw.Draw(straight, straight.Bounds(), m, m.Bounds().Min, draw.Src)
@@ -181,18 +157,22 @@ func encodeWebP(m *image.RGBA) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// isAnimatedWebP reports whether the extended (VP8X) header sets the
-// animation flag. An animated WebP has no still image at the top level, so it
-// is rejected by type before anything tries to decode it.
+// isAnimatedWebP reports whether the extended (VP8X) header sets the animation flag.
+// An animated WebP has no top-level still image, so it is rejected by type before decoding.
 func isAnimatedWebP(data []byte) bool {
 	const animationFlag = 1 << 1
 	return len(data) >= 21 && string(data[12:16]) == "VP8X" && data[20]&animationFlag != 0
 }
 
 // jpegOrientation returns the EXIF orientation (1-8) from a JPEG's APP1
-// segment, or 1 when there is none or it cannot be read. A missing or
-// malformed tag never fails an upload; the picture is just kept as stored.
+// segment, or 1 when there is none or it cannot be read.
 func jpegOrientation(data []byte) int {
+	const (
+		markerFill = 0xFF
+		markerSOS  = 0xDA
+		markerEOI  = 0xD9
+		markerAPP1 = 0xE1
+	)
 	if len(data) < 4 || data[0] != 0xFF || data[1] != 0xD8 {
 		return 1
 	}
@@ -203,20 +183,20 @@ func jpegOrientation(data []byte) int {
 		}
 		marker := data[i+1]
 		switch {
-		case marker == 0xFF: // fill byte before a marker
+		case marker == markerFill:
 			i++
 			continue
-		case marker == 0x01 || (marker >= 0xD0 && marker <= 0xD8): // no length field
+		case isStandaloneMarker(marker):
 			i += 2
 			continue
-		case marker == 0xDA || marker == 0xD9: // scan data or end: metadata comes first
+		case marker == markerSOS || marker == markerEOI:
 			return 1
 		}
 		segLen := int(binary.BigEndian.Uint16(data[i+2:]))
 		if segLen < 2 || i+2+segLen > len(data) {
 			return 1
 		}
-		if marker == 0xE1 {
+		if marker == markerAPP1 {
 			if o := exifOrientation(data[i+4 : i+2+segLen]); o != 0 {
 				return o
 			}
@@ -224,6 +204,11 @@ func jpegOrientation(data []byte) int {
 		i += 2 + segLen
 	}
 	return 1
+}
+
+// isStandaloneMarker reports whether a JPEG marker has no length field.
+func isStandaloneMarker(m byte) bool {
+	return m == 0x01 || (m >= 0xD0 && m <= 0xD8)
 }
 
 // exifOrientation reads tag 0x0112 from IFD0 of an APP1 "Exif" payload, or 0
@@ -277,29 +262,37 @@ func orient(m *image.RGBA, orientation int) *image.RGBA {
 	if orientation <= 1 || orientation > 8 {
 		return m
 	}
+	const (
+		mirrorHorizontal = 2
+		rotate180        = 3
+		mirrorVertical   = 4
+		transpose        = 5
+		rotateCW         = 6
+		transverse       = 7
+		rotateCCW        = 8
+	)
 	n := m.Bounds().Dx()
-	// src maps a destination pixel to the stored pixel shown there.
-	var src func(x, y int) (int, int)
+	var storedPixel func(x, y int) (int, int)
 	switch orientation {
-	case 2: // mirror horizontal
-		src = func(x, y int) (int, int) { return n - 1 - x, y }
-	case 3: // rotate 180
-		src = func(x, y int) (int, int) { return n - 1 - x, n - 1 - y }
-	case 4: // mirror vertical
-		src = func(x, y int) (int, int) { return x, n - 1 - y }
-	case 5: // transpose
-		src = func(x, y int) (int, int) { return y, x }
-	case 6: // rotate 90 clockwise
-		src = func(x, y int) (int, int) { return y, n - 1 - x }
-	case 7: // transverse
-		src = func(x, y int) (int, int) { return n - 1 - y, n - 1 - x }
-	case 8: // rotate 90 counter-clockwise
-		src = func(x, y int) (int, int) { return n - 1 - y, x }
+	case mirrorHorizontal:
+		storedPixel = func(x, y int) (int, int) { return n - 1 - x, y }
+	case rotate180:
+		storedPixel = func(x, y int) (int, int) { return n - 1 - x, n - 1 - y }
+	case mirrorVertical:
+		storedPixel = func(x, y int) (int, int) { return x, n - 1 - y }
+	case transpose:
+		storedPixel = func(x, y int) (int, int) { return y, x }
+	case rotateCW:
+		storedPixel = func(x, y int) (int, int) { return y, n - 1 - x }
+	case transverse:
+		storedPixel = func(x, y int) (int, int) { return n - 1 - y, n - 1 - x }
+	case rotateCCW:
+		storedPixel = func(x, y int) (int, int) { return n - 1 - y, x }
 	}
 	out := image.NewRGBA(image.Rect(0, 0, n, n))
 	for y := 0; y < n; y++ {
 		for x := 0; x < n; x++ {
-			sx, sy := src(x, y)
+			sx, sy := storedPixel(x, y)
 			so := m.PixOffset(m.Rect.Min.X+sx, m.Rect.Min.Y+sy)
 			do := out.PixOffset(x, y)
 			copy(out.Pix[do:do+4], m.Pix[so:so+4])

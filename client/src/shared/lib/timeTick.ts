@@ -1,7 +1,3 @@
-// Single shared 30-second tick. RelativeTime components subscribe via
-// `useSyncExternalStore` so the whole tree re-evaluates "5m ago" → "6m ago"
-// from one timer — not one timer per displayed timestamp.
-
 const TICK_INTERVAL_MS = 30_000;
 
 let tick = 0;
@@ -10,13 +6,17 @@ let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
 function ensureRunning() {
   if (intervalHandle !== null) return;
-  if (typeof window === "undefined") return; // server / SSR / tests with no DOM
+  if (typeof window === "undefined") return;
   intervalHandle = setInterval(() => {
-    tick = (tick + 1) | 0; // wrap rather than overflow
+    tick = (tick + 1) | 0;
     for (const cb of subscribers) cb();
   }, TICK_INTERVAL_MS);
 }
 
+/**
+ * Subscribes to one shared 30-second tick, so every relative timestamp
+ * re-renders from a single timer.
+ */
 export function subscribeTimeTick(cb: () => void): () => void {
   subscribers.add(cb);
   ensureRunning();

@@ -20,10 +20,8 @@ import {
   useUploadAvatarMutation,
 } from "@/shared/hooks/mutations/useProfile";
 
-/** The server's file cap, mirrored so an oversized pick never leaves the device. */
-const AVATAR_MAX_BYTES = 2_097_152;
+const SERVER_AVATAR_MAX_BYTES = 2_097_152;
 
-/** The picker's filter and the pre-send type check (the server re-sniffs anyway). */
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const PREVIEW_SIZE = 96;
@@ -33,16 +31,14 @@ type AvatarDialogProps = {
   onClose: () => void;
   userId: number;
   username: string;
-  /** The current 256 px avatar, or null when the player has none. */
   avatarUrl: string | null;
 };
 
 type TFn = ReturnType<typeof useTranslation>["t"];
 
 /**
- * Maps a failed upload or removal to its copy. By status first, because that
- * is the category; the two 503 causes are told apart by code, since "try
- * again in a moment" is wrong advice when storage is simply not configured.
+ * Maps a failed upload or removal to its copy, by status first and then by code.
+ * The code separates unconfigured storage from a busy server, which share a 503.
  */
 function errorMessage(t: TFn, err: unknown): string {
   if (!(err instanceof FetchError)) return t("profile.avatar.errors.generic");
@@ -67,14 +63,8 @@ function errorMessage(t: TFn, err: unknown): string {
 }
 
 /**
- * Upload, replace or remove the signed-in player's avatar. The picked file is
- * previewed locally and sent as-is; the server decodes, crops and resizes it.
- * The two checks the server would reject for certain, size and type, run here
- * first so they never cost a request, and answer inline under the picker. A
- * failure the server reports (including the 503 of a development server
- * without storage) is a toast, and the dialog stays open for another try.
- * Like the other pending-guarded dialogs, it cannot be dismissed while a
- * request is in flight.
+ * Upload, replace or remove the signed-in player's avatar, rejecting oversized or wrong-type
+ * files inline before any request. Server failures show a toast and keep the dialog open.
  */
 export function AvatarDialog({ open, onClose, userId, username, avatarUrl }: AvatarDialogProps) {
   const { t } = useTranslation();
@@ -88,8 +78,6 @@ export function AvatarDialog({ open, onClose, userId, username, avatarUrl }: Ava
 
   const pending = upload.isPending || remove.isPending;
 
-  // Each preview URL pins the picked file in memory until revoked: release it
-  // whenever it is replaced, cleared on close, or the dialog unmounts.
   useEffect(() => {
     if (previewUrl === null) return;
     return () => URL.revokeObjectURL(previewUrl);
@@ -110,19 +98,17 @@ export function AvatarDialog({ open, onClose, userId, username, avatarUrl }: Ava
 
   function onPick(e: ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files?.[0] ?? null;
-    // Clear the input so picking the same file again still fires onChange.
     e.target.value = "";
     if (!picked) return;
     setError(null);
-    if (picked.size > AVATAR_MAX_BYTES) {
+    if (picked.size > SERVER_AVATAR_MAX_BYTES) {
       setFile(null);
       setPreviewUrl(null);
       setError(t("profile.avatar.errors.tooLarge"));
       return;
     }
-    // An empty type means the browser could not tell; the server sniffs the
-    // bytes either way, so only a known-wrong type is stopped here.
-    if (picked.type !== "" && !ACCEPTED_TYPES.includes(picked.type)) {
+    const isKnownWrongType = picked.type !== "" && !ACCEPTED_TYPES.includes(picked.type);
+    if (isKnownWrongType) {
       setFile(null);
       setPreviewUrl(null);
       setError(t("profile.avatar.errors.unsupported"));
@@ -234,8 +220,6 @@ export function AvatarDialog({ open, onClose, userId, username, avatarUrl }: Ava
             </div>
           )}
 
-          {/* The live region stays mounted and only its text changes: a region
-              that appears together with its message is often not announced. */}
           <div aria-live="polite" className="text-center" data-testid="avatar-dialog-live">
             {error && (
               <p className="text-destructive text-xs font-medium" data-testid="avatar-dialog-error">

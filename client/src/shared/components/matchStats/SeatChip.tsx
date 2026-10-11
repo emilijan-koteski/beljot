@@ -7,24 +7,15 @@ import { Avatar } from "@/shared/components/ui/avatar";
 type SeatChipProps = {
   name: string;
   team: "A" | "B";
-  /** Marks this chip as the viewer with a "YOU" badge. */
   you?: boolean;
-  /** Bot seat — the avatar shows the bot glyph instead of a name initial. */
   bot?: boolean;
-  /** The player's 128 px avatar; the initial renders when absent. */
   avatarUrl?: string | null;
-  /** Real user's id — when set, the chip becomes a link to their public
-   *  profile (`/players/:userId`). Leave unset for bot seats, missing seats
-   *  and the profile subject's own chip, which stay non-interactive. */
   userId?: number;
 };
 
 /**
- * Team-tinted player pill used in match-history rows: a small team avatar +
- * username, plus an optional "YOU" badge for the viewer. Tint + edge follow the
- * viewer-relative team palette (Us = gold, Them = silver). With a `userId` it
- * renders as a client-side link to that player's public profile; the click is
- * stopped from bubbling so it never toggles the surrounding match row.
+ * Team-tinted player pill with an optional "YOU" badge.
+ * With a `userId` it links to the player's public profile without toggling the surrounding row.
  */
 export function SeatChip({
   name,

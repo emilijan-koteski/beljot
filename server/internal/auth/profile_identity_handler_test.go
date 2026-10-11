@@ -16,8 +16,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// --- authed self-management setup: real AuthMiddleware + JWT, mocked repos ---
-
 func setupIdentityHandler() (*echo.Echo, *mockUserRepo, *mockIdentityRepo, *fakeProvider) {
 	ur := newMockUserRepo()
 	ir := newMockIdentityRepo()
@@ -68,8 +66,6 @@ func decodeErrorCode(t *testing.T, rec *httptest.ResponseRecorder) string {
 	return resp["error"]["code"]
 }
 
-// --- ListIdentities ---
-
 func TestListIdentities_ReturnsIdentitiesAndHasPassword(t *testing.T) {
 	e, ur, ir, _ := setupIdentityHandler()
 	u := seedUser(ur, "player@example.com", "hashed-pw")
@@ -87,13 +83,12 @@ func TestListIdentities_ReturnsIdentitiesAndHasPassword(t *testing.T) {
 	assert.Equal(t, "fakeprov", resp.Data.Identities[0].Provider)
 	assert.Equal(t, "g@example.com", resp.Data.Identities[0].Email)
 	assert.False(t, resp.Data.Identities[0].CreatedAt.IsZero())
-	// The provider subject (Google `sub`) must never reach the client.
 	assert.NotContains(t, rec.Body.String(), "sub-secret-123")
 }
 
 func TestListIdentities_PasswordlessReportsHasPasswordFalse(t *testing.T) {
 	e, ur, ir, _ := setupIdentityHandler()
-	u := seedUser(ur, "sso@example.com", "") // empty-string sentinel = no password
+	u := seedUser(ur, "sso@example.com", "")
 	seedIdentity(ir, u.ID, "fakeprov", "sub1", "sso@example.com")
 
 	rec := doAuthedReq(e, http.MethodGet, "/api/v1/users/1/identities", u.ID, "")
@@ -112,14 +107,13 @@ func TestListIdentities_EmptyListSerializesAsArray(t *testing.T) {
 
 	rec := doAuthedReq(e, http.MethodGet, "/api/v1/users/1/identities", u.ID, "")
 	require.Equal(t, http.StatusOK, rec.Code)
-	// Never null — the client maps over identities.
 	assert.Contains(t, rec.Body.String(), `"identities":[]`)
 }
 
 func TestListIdentities_ForeignIDForbidden(t *testing.T) {
 	e, ur, _, _ := setupIdentityHandler()
-	seedUser(ur, "one@example.com", "pw")          // id 1
-	other := seedUser(ur, "two@example.com", "pw") // id 2
+	seedUser(ur, "one@example.com", "pw")
+	other := seedUser(ur, "two@example.com", "pw")
 
 	rec := doAuthedReq(e, http.MethodGet, "/api/v1/users/1/identities", other.ID, "")
 	assert.Equal(t, http.StatusForbidden, rec.Code)
@@ -133,8 +127,6 @@ func TestListIdentities_Unauthenticated(t *testing.T) {
 	rec := doAuthedReq(e, http.MethodGet, "/api/v1/users/1/identities", 0, "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
-
-// --- LinkIdentity ---
 
 func TestLinkIdentity_Success(t *testing.T) {
 	e, ur, ir, fp := setupIdentityHandler()
@@ -171,8 +163,8 @@ func TestLinkIdentity_IdempotentWhenAlreadyLinkedToSelf(t *testing.T) {
 
 func TestLinkIdentity_ConflictWhenSubjectLinkedToAnotherUser(t *testing.T) {
 	e, ur, ir, fp := setupIdentityHandler()
-	seedUser(ur, "owner@example.com", "pw")            // id 1 already owns the Google account
-	caller := seedUser(ur, "caller@example.com", "pw") // id 2
+	seedUser(ur, "owner@example.com", "pw")
+	caller := seedUser(ur, "caller@example.com", "pw")
 	seedIdentity(ir, 1, "fakeprov", "sub-shared", "g@example.com")
 	fp.add("cred-shared", identity.ExternalIdentity{Subject: "sub-shared", Email: "g@example.com", EmailVerified: true})
 
@@ -185,7 +177,6 @@ func TestLinkIdentity_ConflictWhenUserAlreadyHasProvider(t *testing.T) {
 	e, ur, ir, fp := setupIdentityHandler()
 	u := seedUser(ur, "player@example.com", "pw")
 	seedIdentity(ir, u.ID, "fakeprov", "sub-old", "old@example.com")
-	// A different Google account for a provider the user already linked.
 	fp.add("cred-other", identity.ExternalIdentity{Subject: "sub-other", Email: "other@example.com", EmailVerified: true})
 
 	rec := doAuthedReq(e, http.MethodPost, "/api/v1/users/1/identities/fakeprov", u.ID, `{"credential":"cred-other"}`)
@@ -223,8 +214,6 @@ func TestLinkIdentity_UnknownProvider(t *testing.T) {
 
 func TestLinkIdentity_UserNotFound(t *testing.T) {
 	e, _, _, fp := setupIdentityHandler()
-	// No user seeded: the self-only guard passes (token subject == :id) but the
-	// account no longer exists, so no orphan identity may be created.
 	fp.add("cred", identity.ExternalIdentity{Subject: "sub", Email: "g@example.com", EmailVerified: true})
 
 	rec := doAuthedReq(e, http.MethodPost, "/api/v1/users/42/identities/fakeprov", 42, `{"credential":"cred"}`)
@@ -241,8 +230,6 @@ func TestLinkIdentity_ForeignIDForbidden(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
-// --- UnlinkIdentity ---
-
 func TestUnlinkIdentity_SuccessWhenAccountHasPassword(t *testing.T) {
 	e, ur, ir, _ := setupIdentityHandler()
 	u := seedUser(ur, "player@example.com", "hashed-pw")
@@ -257,7 +244,7 @@ func TestUnlinkIdentity_SuccessWhenAccountHasPassword(t *testing.T) {
 
 func TestUnlinkIdentity_PasswordlessLastMethodBlocked(t *testing.T) {
 	e, ur, ir, _ := setupIdentityHandler()
-	u := seedUser(ur, "sso@example.com", "") // passwordless
+	u := seedUser(ur, "sso@example.com", "")
 	seedIdentity(ir, u.ID, "fakeprov", "sub-1", "sso@example.com")
 
 	rec := doAuthedReq(e, http.MethodDelete, "/api/v1/users/1/identities/fakeprov", u.ID, "")
@@ -270,7 +257,7 @@ func TestUnlinkIdentity_PasswordlessLastMethodBlocked(t *testing.T) {
 
 func TestUnlinkIdentity_PasswordlessAllowedWhenAnotherRemains(t *testing.T) {
 	e, ur, ir, _ := setupIdentityHandler()
-	u := seedUser(ur, "sso@example.com", "") // passwordless
+	u := seedUser(ur, "sso@example.com", "")
 	seedIdentity(ir, u.ID, "fakeprov", "sub-1", "sso@example.com")
 	seedIdentity(ir, u.ID, "otherprov", "sub-2", "sso@example.com")
 

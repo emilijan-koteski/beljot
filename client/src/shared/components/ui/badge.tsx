@@ -27,7 +27,6 @@ const toneStyles: Record<BadgeTone, { bg: string; color: string; border: string 
     color: "var(--brass-deep)",
     border: "color-mix(in srgb, var(--brass) 40%, transparent)",
   },
-  // Frost-blue bot marker — see the --bot token block in index.css.
   bot: {
     bg: "var(--bot-soft)",
     color: "var(--bot-deep)",

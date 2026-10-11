@@ -15,9 +15,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// Notifier is the narrow slice of *ws.Hub the friend handler needs: is a user
-// connected, and push them a message. Declared here (not taken as *ws.Hub) so
-// the handler stays unit-testable with a spy. *ws.Hub satisfies it already.
+// Notifier is the subset of *ws.Hub the friend handler uses to check presence
+// and push messages, kept narrow so tests can pass a spy.
 type Notifier interface {
 	IsConnected(userID uint) bool
 	SendToUser(userID uint, msg []byte)
@@ -35,8 +34,6 @@ type Handler struct {
 func NewHandler(repo Repository, userRepo user.UserRepository, notifier Notifier) *Handler {
 	return &Handler{repo: repo, userRepo: userRepo, notifier: notifier}
 }
-
-// --- Response DTOs ---
 
 // FriendshipDTO is the created-request response (POST /friends/request).
 type FriendshipDTO struct {
@@ -65,9 +62,8 @@ type PendingRequestDTO struct {
 	CreatedAt    time.Time `json:"createdAt"`
 }
 
-// FriendDTO is one accepted friend (GET /friends). Online is derived
-// server-side from the live hub, never trusted from a client. AvatarURL is the
-// friend's 128 px avatar, null when they have none.
+// FriendDTO is one accepted friend (GET /friends), with Online derived
+// server-side from the live hub and AvatarURL null when they have none.
 type FriendDTO struct {
 	ID        uint    `json:"id"`
 	Username  string  `json:"username"`
@@ -79,10 +75,8 @@ type sendRequestBody struct {
 	UserID uint `json:"userId"`
 }
 
-// SendRequest handles POST /friends/request. The requester is ALWAYS the
-// authenticated caller — never a body-supplied id. Guards run self → target
-// exists → either-direction duplicate, then creates the pending row and (only
-// if the recipient is currently connected) pushes a best-effort notification.
+// SendRequest handles POST /friends/request from the authenticated caller,
+// creating a pending row and notifying the recipient only if they are online.
 func (h *Handler) SendRequest(c echo.Context) error {
 	authUserID, err := getUserID(c)
 	if err != nil {
@@ -109,9 +103,6 @@ func (h *Handler) SendRequest(c echo.Context) error {
 		return apperr.ErrUserNotFound
 	}
 
-	// Direction-agnostic duplicate check — the DB unique index only covers
-	// (user_id, friend_id), so a reverse request (B->A while A->B pending) would
-	// pass it. FindByPair is what blocks it.
 	existing, err := h.repo.FindByPair(authUserID, recipientID)
 	if err != nil {
 		return fmt.Errorf("checking existing friendship: %w", err)
@@ -132,8 +123,6 @@ func (h *Handler) SendRequest(c echo.Context) error {
 		return fmt.Errorf("creating friend request: %w", err)
 	}
 
-	// Best-effort, online-only push. Never fail the request when the recipient
-	// is offline — the durable path is their pending-requests list on next load.
 	if h.notifier != nil && h.notifier.IsConnected(recipientID) {
 		fromUsername := ""
 		if requester, ferr := h.userRepo.FindByID(authUserID); ferr == nil && requester != nil {
@@ -215,7 +204,6 @@ func (h *Handler) ListRequests(c echo.Context) error {
 	for _, f := range rows {
 		sender, ok := identities[f.UserID]
 		if !ok {
-			// The sender was soft-deleted after sending — omit rather than 500.
 			continue
 		}
 		items = append(items, PendingRequestDTO{
@@ -277,12 +265,8 @@ func (h *Handler) Decline(c echo.Context) error {
 	})
 }
 
-// Unfriend handles DELETE /friends/:id — removal of an ACCEPTED friendship by
-// EITHER party (unlike Accept/Decline's recipient-only guard, an accepted
-// friendship belongs to both sides equally). A miss (not a party, not accepted,
-// or missing) is a uniform 404 that never leaks which it was. No WS push to the
-// other party — their surfaces refresh on next load, and whisper/invite already
-// re-check AreFriends server-side per action.
+// Unfriend handles DELETE /friends/:id, letting either party remove an accepted
+// friendship; any miss returns a uniform 404 that does not reveal why.
 func (h *Handler) Unfriend(c echo.Context) error {
 	viewerID, err := getUserID(c)
 	if err != nil {
@@ -305,9 +289,8 @@ func (h *Handler) Unfriend(c echo.Context) error {
 	})
 }
 
-// ListFriends handles GET /friends — the viewer's accepted friends with a
-// live online flag. The list is symmetric (a friend appears whether the viewer
-// was requester or recipient); soft-deleted friends are omitted. Empty → [].
+// ListFriends handles GET /friends, returning the viewer's accepted friends in
+// either direction with a live online flag, omitting soft-deleted users.
 func (h *Handler) ListFriends(c echo.Context) error {
 	viewerID, err := getUserID(c)
 	if err != nil {
@@ -337,7 +320,6 @@ func (h *Handler) ListFriends(c echo.Context) error {
 	for _, id := range otherIDs {
 		friend, ok := identities[id]
 		if !ok {
-			// Friend row outlived its (soft-deleted) user — omit, don't 500.
 			continue
 		}
 		online := false

@@ -27,7 +27,6 @@ describe("StakePill", () => {
 
   it("renders a coin glyph alongside the amount", () => {
     const { container } = render(<StakePill amount={500} />);
-    // lucide-react renders the coin glyph as an <svg>.
     expect(container.querySelector("svg")).not.toBeNull();
     expect(screen.getByTestId("match-stake-amount")).toHaveTextContent(formatCoins(500));
   });

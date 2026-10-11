@@ -2,9 +2,6 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-// A two-column feature row: copy (tag / title / body) beside a media slot.
-// `reverse` swaps sides on md+; on small screens it always stacks copy-first.
-
 type FeatureRowProps = {
   tag: string;
   title: string;
@@ -14,6 +11,7 @@ type FeatureRowProps = {
   children: ReactNode;
 };
 
+// Two-column feature row of copy beside a media slot; `reverse` swaps sides on md+.
 export function FeatureRow({ tag, title, body, reverse = false, id, children }: FeatureRowProps) {
   return (
     <div id={id} className="grid items-center gap-10 md:grid-cols-2 md:gap-14">

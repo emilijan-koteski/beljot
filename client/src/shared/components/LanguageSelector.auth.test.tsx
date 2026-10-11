@@ -9,10 +9,6 @@ import { useAuthStore } from "@/shared/stores/authStore";
 
 import { LanguageSelector } from "./LanguageSelector";
 
-// The pre-auth flow renders the unified <LanguageSelector /> with
-// `persistToServer={false}` and `testIdPrefix="auth-language"` so it keeps
-// the original auth-language-* test ids and does NOT push the picked
-// language to the server.
 const mockUpdatePreferences = vi.fn();
 vi.mock("@/shared/api/profile", () => ({
   updatePreferences: (...args: unknown[]) => mockUpdatePreferences(...args),

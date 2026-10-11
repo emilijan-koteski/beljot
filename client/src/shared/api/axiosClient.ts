@@ -6,22 +6,7 @@ import type { CardDeck } from "@/shared/types/matchTypes";
 
 const BASE_URL = "/api/v1";
 
-// Every request gets a deadline. Without one, axios waits forever on a hung
-// connection (a dropped link, a wedged proxy, a server that accepted the socket
-// and never answered) and the promise never settles — which strands any UI
-// gated on the mutation's `isPending`. The pending-guarded confirm dialogs
-// (remove-friend, unlink-account, remove-bot) disable every dismissal path
-// while pending, so an unsettled request locks them with no way out and
-// `refetchOnWindowFocus` is off, so nothing unsticks them either.
-// 15s is well past the slowest real endpoint here (all are short REST calls —
-// no long-polling; live gameplay runs over the WebSocket, which has its own
-// lifecycle and is unaffected by this). The one upload, the avatar, sets its own
-// longer deadline per request (see uploadAvatar in profile.ts).
 const REQUEST_TIMEOUT_MS = 15_000;
-
-// ---------------------------------------------------------------------------
-// FetchError — kept for backward compatibility with all component error handling
-// ---------------------------------------------------------------------------
 
 interface ApiError {
   code: string;
@@ -44,10 +29,6 @@ export class FetchError extends Error {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Auth redirect — same mechanism as the old fetchClient
-// ---------------------------------------------------------------------------
-
 let authRedirect: (() => void) | null = null;
 let hasRedirected = false;
 
@@ -62,20 +43,10 @@ function redirectToLogin(): void {
   if (authRedirect) {
     authRedirect();
   } else {
-    // Fallback when no SPA redirect is registered — the public landing is the
-    // logged-out home (see useAuthInit's setAuthRedirect).
     window.location.href = "/";
   }
 }
 
-// ---------------------------------------------------------------------------
-// Cross-tab auth coordination
-// ---------------------------------------------------------------------------
-// When one tab refreshes the access token, it broadcasts the new value so
-// sibling tabs adopt it instead of each calling /auth/refresh. With refresh
-// rotation on the server, N tabs each refreshing would rotate the token N times
-// and risk tripping reuse detection; adopting a broadcast token keeps one tab as
-// the de-facto refresh leader. Guarded — BroadcastChannel is absent in jsdom/SSR.
 const authChannel: BroadcastChannel | null =
   typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("beljot-auth") : null;
 
@@ -84,12 +55,12 @@ interface TokenBroadcast {
   token: string;
 }
 
+/** Shares a refreshed token so sibling tabs adopt it instead of each rotating the refresh token. */
 function broadcastToken(token: string): void {
   authChannel?.postMessage({ type: "token", token } satisfies TokenBroadcast);
 }
 
-// subscribeToTokenBroadcast invokes onToken when a sibling tab refreshes. Returns
-// an unsubscribe fn (a no-op where BroadcastChannel is unavailable).
+/** Invokes onToken when a sibling tab refreshes and returns an unsubscribe function. */
 export function subscribeToTokenBroadcast(onToken: (token: string) => void): () => void {
   if (!authChannel) return () => {};
   const handler = (e: MessageEvent<TokenBroadcast>) => {
@@ -101,16 +72,12 @@ export function subscribeToTokenBroadcast(onToken: (token: string) => void): () 
   return () => authChannel.removeEventListener("message", handler);
 }
 
-// ---------------------------------------------------------------------------
-// Singleton refresh — deduplicates concurrent 401 refresh attempts
-// ---------------------------------------------------------------------------
-
 let refreshPromise: Promise<string> | null = null;
 
-// refreshAccessToken is the single coordinated entry point for obtaining a fresh
-// access token: it dedupes concurrent callers (401 interceptor, proactive
-// scheduler, WS re-auth) and broadcasts the result cross-tab. Callers should not
-// call the /auth/refresh endpoint directly.
+/**
+ * Obtains a fresh access token, deduping concurrent callers and broadcasting the result cross-tab.
+ * Use this instead of calling /auth/refresh directly.
+ */
 export function refreshAccessToken(): Promise<string> {
   return doRefresh();
 }
@@ -147,10 +114,6 @@ async function doRefresh(): Promise<string> {
     .then((res) => {
       const r = res.data.data;
       useAuthStore.getState().setToken(r.token);
-      // Re-hydrate the full user incl. wallet / XP / honor / audio / avatar — a
-      // 401-retry refresh that dropped these would blank the header coin pill,
-      // XP bar and honor chip mid-session (and forget a muted table and its
-      // chosen volumes).
       useAuthStore.getState().setUser({
         id: r.id,
         username: r.username,
@@ -171,7 +134,6 @@ async function doRefresh(): Promise<string> {
         avatarUrl: r.avatarUrl ?? null,
         createdAt: r.createdAt,
       });
-      // Tell sibling tabs so they adopt this token rather than each refreshing.
       broadcastToken(r.token);
       return r.token;
     })
@@ -182,10 +144,6 @@ async function doRefresh(): Promise<string> {
   return refreshPromise;
 }
 
-// ---------------------------------------------------------------------------
-// axiosPublic — bare instance for login / refresh / logout (no interceptors)
-// ---------------------------------------------------------------------------
-
 export const axiosPublic = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
@@ -193,13 +151,14 @@ export const axiosPublic = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// ---------------------------------------------------------------------------
-// axiosClient — intercepted instance for all authenticated API calls
-// ---------------------------------------------------------------------------
-
-// Extend config type to carry the retry flag
+/** Request config carrying the one-shot 401 retry flag. */
 interface RetryConfig extends InternalAxiosRequestConfig {
   _isRetry?: boolean;
+}
+
+/** Axios reports an exceeded timeout or an abort as ECONNABORTED, and some platforms as ETIMEDOUT. */
+function isTimeout(error: AxiosError): boolean {
+  return error.code === "ECONNABORTED" || error.code === "ETIMEDOUT";
 }
 
 export const axiosClient = axios.create({
@@ -209,7 +168,6 @@ export const axiosClient = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Request interceptor: attach JWT Bearer token
 axiosClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
   if (token) {
@@ -218,21 +176,16 @@ axiosClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor: unwrap envelope, handle 401, throw FetchError
 axiosClient.interceptors.response.use(
-  // Success path — unwrap { data: T } envelope
   (response) => {
     if (response.status === 204 || response.headers["content-length"] === "0") {
       return undefined as unknown as typeof response;
     }
     return response.data.data;
   },
-
-  // Error path — handle 401 refresh/retry and throw FetchError
   async (error: AxiosError<ApiErrorResponse>) => {
     const config = error.config as RetryConfig | undefined;
 
-    // 401 Unauthorized — attempt token refresh and retry once
     if (error.response?.status === 401 && config) {
       if (config._isRetry) {
         useAuthStore.getState().logout();
@@ -244,8 +197,6 @@ axiosClient.interceptors.response.use(
         const newToken = await doRefresh();
         config._isRetry = true;
         config.headers.Authorization = `Bearer ${newToken}`;
-        // Retry the original request — the response interceptor success
-        // path will unwrap the envelope for us.
         const retryResponse = await axiosClient.request(config);
         return retryResponse;
       } catch {
@@ -255,7 +206,6 @@ axiosClient.interceptors.response.use(
       }
     }
 
-    // Other HTTP errors — parse error envelope and throw FetchError
     if (error.response) {
       const body = error.response.data;
       if (body?.error) {
@@ -268,15 +218,10 @@ axiosClient.interceptors.response.use(
       );
     }
 
-    // Timed out — surfaced separately from a hard network failure so callers can
-    // say "took too long" rather than "you are offline". Axios reports both an
-    // exceeded `timeout` and a caller abort as ECONNABORTED; ETIMEDOUT shows up
-    // on some platforms instead. Status stays 0: no response ever arrived.
-    if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+    if (isTimeout(error)) {
       throw new FetchError(0, "TIMEOUT", error.message || "Request timed out");
     }
 
-    // Network error or no response
     throw new FetchError(0, "NETWORK_ERROR", error.message || "Network error");
   },
 );

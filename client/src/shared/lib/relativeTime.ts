@@ -10,9 +10,6 @@ import updateLocale from "dayjs/plugin/updateLocale";
 dayjs.extend(relativeTime);
 dayjs.extend(updateLocale);
 
-// Threshold table — when "just now" stops, when minutes/hours/days kick in.
-// Tightened so "just now" covers the natural "few seconds" window without the
-// awkward dayjs default "a few seconds ago".
 dayjs.updateLocale("en", {
   relativeTime: {
     future: "in %s",
@@ -85,9 +82,7 @@ dayjs.updateLocale("mk", {
   },
 });
 
-// dayjs ships Serbian-Latin as `sr` and Serbian-Cyrillic as `sr-cyrl`. The
-// project's `sr.json` is Latin-script copy, so the default mapping is a
-// straight pass-through.
+/** Sets the dayjs locale from an i18n language tag; dayjs `sr` is Latin script, matching `sr.json`. */
 export function applyDayjsLocale(lang: string | undefined): void {
   const short = (lang ?? "en").toLowerCase().split("-")[0] ?? "en";
   dayjs.locale(short);
@@ -96,17 +91,15 @@ export function applyDayjsLocale(lang: string | undefined): void {
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Localized relative time. "just now" / "5 minutes ago" / "in 3 hours".
- * Falls back to a localized absolute date (e.g. "May 3, 2026") when the
- * timestamp is more than 7 days away — at that point "X days ago" stops
- * communicating anything useful.
+ * Localized relative time ("just now", "5 minutes ago", "in 3 hours"), or a
+ * localized short date when the timestamp is more than 7 days away.
  */
 export function fromNow(iso: string | number | Date, now: number = Date.now()): string {
   const d = dayjs(iso);
   if (!d.isValid()) return "";
   const diff = Math.abs(now - d.valueOf());
   if (diff > SEVEN_DAYS_MS) {
-    return d.format("ll"); // localized short date — "May 3, 2026" / "3. svi 2026."
+    return d.format("ll");
   }
   return d.from(now);
 }
@@ -115,19 +108,12 @@ const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
-/**
- * Compact age string — "now" / "5m" / "2h" / "3d" / falls through to fromNow
- * for older values. Used for room age chips where a long string would blow
- * out the meta row.
- */
+/** Compact age string ("now", "5m", "2h", "3d"), or a localized short date past 7 days. */
 export function ageCompact(iso: string | number | Date, now: number = Date.now()): string {
   const d = dayjs(iso);
   if (!d.isValid()) return "";
   const diff = now - d.valueOf();
   if (diff < MINUTE_MS) {
-    // Localized "just now" — read the active dayjs locale's `s` token (set in
-    // the updateLocale calls above: en "just now", mk "сега", hr/sr
-    // "upravo sad") so the compact form is localized, not a hardcoded "now".
     const justNow = dayjs.Ls[dayjs.locale()]?.relativeTime?.s;
     return typeof justNow === "string" ? justNow : "now";
   }

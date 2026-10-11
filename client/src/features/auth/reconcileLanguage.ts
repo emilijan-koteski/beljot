@@ -8,16 +8,8 @@ interface AuthResult {
 }
 
 /**
- * Post-auth language reconciliation, shared by the password and SSO success
- * paths on both auth pages: if the visitor picked a different language on the
- * auth page than the one stored on their profile, push the picked language to
- * the server and reconcile the auth store. Mirrors LanguageSelector's
- * optimistic-with-rollback pattern; the UI language stays as picked either
- * way, and a PATCH failure is silent (rolls back only the stored preference).
- *
- * currentLanguage is i18n.language — normalized to the short code here so
- * region-tagged values like "en-US" don't trigger a futile PATCH the server
- * would reject.
+ * Saves the language picked on an auth page to the profile when it differs from the stored one.
+ * A failed PATCH is silent and rolls back only the stored preference in the auth store.
  */
 export async function reconcileLanguagePreference(
   res: AuthResult,

@@ -14,28 +14,8 @@ type Props = {
 };
 
 /**
- * The match-end Season Points line (Story 13.5): the signed change and the rank
- * it lands on ("+24 SP · Gold 2"), shown beside the coin settlement on
- * MatchResult and on the abandoned ReconnectOverlay. ONE renderer for both, so
- * the reason variants and the colour rule cannot drift between them.
- *
- * THE REASON PICKS THE COPY. A teammate of the abandoning seat reads "Partner
- * abandoned: −12 SP (half loss)", the abandoner their own penalty plainly, and
- * everyone else the ordinary line. The half-loss copy needs an actual LOSS: a
- * teammate whose applied change is 0 (the 0 floor) or positive (a Capot bonus
- * over a small half loss) gets the ordinary line instead of "+3 SP (half loss)".
- *
- * `role="status"`: the line usually mounts AFTER its result screen (the SP event
- * trails match_end / match_abandoned), so it is a live region to be announced.
- *
- * THE CHANGE IS SIGNED AND NEVER CLAMPED. `formatSpChange` renders "+24", "−13"
- * (U+2212) or "0" straight from the server's number; it must never pass through
- * `seasonSpOrZero`, `seasonBarFill` or a `finiteOrZero` clamp, which would turn
- * every loss into "0 SP".
- *
- * A GAIN USES THE ACCENT COLOUR, a loss (or no change) a muted ink, never red:
- * dropping SP is the ordinary downside of a loss, not an alarm. Both tokens
- * re-root inside `.game-table`, so the pill reads correctly on dark felt.
+ * Match-end Season Points line showing the signed SP change and resulting rank, with copy picked by the settlement reason.
+ * The change is never clamped, so a loss can never render as "0 SP".
  */
 export function SeasonSpLine({ settlement }: Props) {
   const { t } = useTranslation();
@@ -73,8 +53,6 @@ export function SeasonSpLine({ settlement }: Props) {
       data-reason={settlement.reason}
       data-trend={trend}
     >
-      {/* Decoration beside the rank NAME (TierBadge's own aria-hidden rests on
-          that), so it rides only the line that names the rank. */}
       {namesRank && <TierBadge tier={tier} size="sm" data-testid="season-sp-line-badge" />}
       <span className="text-base font-semibold tabular-nums">{text}</span>
     </div>

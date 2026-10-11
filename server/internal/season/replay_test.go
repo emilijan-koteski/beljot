@@ -153,26 +153,17 @@ func TestOutcomeFor(t *testing.T) {
 func replayWindowByHand() (season.SPFormula, []match.Match) {
 	f := season.SPFormula{BaseWin: 30, BaseLoss: 20, Scale: 430, BotSeatSP: 600, CapotBonus: 5}
 
-	// 1. Bot table, user 1 wins 1100:700 from 0 SP. Own avg 300 vs 600, E = 0.167:
-	//    +45. The bots' team made a Capot, which pays nobody.
 	m1 := replayBotTable(1, 1, 0, 1100, 700)
 	m1.Hands = []match.HandResult{{HandNumber: 1, Capot: true, CapotTeam: intPtr(1)}}
-	// 2. Four humans, users 1 and 3 (avg 22.5) surrender to 2 and 4 (avg 0) at
-	//    300:500. m = 1.2003, E_winner = 0.470: winners +38, losers -25, floored.
 	m2 := replayFourHumans(2, [4]uint{1, 2, 3, 4}, 1, 300, 500)
 	m2.SurrenderedBy = uintPtr(1)
-	// 3. A boot-reconcile placeholder: skipped, and counted in nobody's games.
 	m3 := replayFourHumans(3, [4]uint{1, 2, 3, 4}, 0, 100, 100)
 	m3.Status = "abandoned"
-	// 4. 501, users 2 and 4 (avg 38) against user 1 and a bot (avg 310); user 4
-	//    abandons at 200:400. m = 1.1008, E_winner = 0.811: user 1 +12, user 2
-	//    half of -8.32 = -4, user 4 -120 (floored to 0).
 	m4 := match.Match{
 		ID: 4, Status: "abandoned", MatchMode: "501", AbandonedBy: uintPtr(4),
 		Player1ID: uintPtr(2), Player2ID: uintPtr(1), Player3ID: uintPtr(4), Player4IsBot: true,
 		TeamAScore: 200, TeamBScore: 400, WinnerTeam: 1, CompletedAt: replayT0.Add(4 * time.Minute),
 	}
-	// 5. An unknown mode: skipped.
 	m5 := replayFourHumans(5, [4]uint{1, 2, 3, 4}, 0, 1100, 700)
 	m5.MatchMode = "301"
 	return f, []match.Match{m1, m2, m3, m4, m5}
@@ -201,8 +192,6 @@ func TestReplayMatches(t *testing.T) {
 		},
 	}, got.Summary)
 
-	// The observer sees each scored match once, in order, with every human
-	// seat's total before and after it (after the 0 floor).
 	require.Len(t, seen, 3)
 	assert.Equal(t, []uint{1, 2, 4}, []uint{seen[0].Match.ID, seen[1].Match.ID, seen[2].Match.ID})
 	assert.Equal(t, [4]int{45, 0, 0, 0}, seen[1].Before)
@@ -308,9 +297,9 @@ func TestLoadWindow(t *testing.T) {
 	first := storeMatch(t, db, roomID, at(from, "completed"))
 	tieA := storeMatch(t, db, roomID, at(from.Add(72*time.Hour), "abandoned"))
 	tieB := storeMatch(t, db, roomID, at(from.Add(72*time.Hour), "completed"))
-	storeMatch(t, db, roomID, at(from.Add(-time.Second), "completed")) // before the window
-	storeMatch(t, db, roomID, at(to, "completed"))                     // the end is exclusive
-	storeMatch(t, db, roomID, at(from.Add(time.Hour), "in_progress"))  // not finished
+	storeMatch(t, db, roomID, at(from.Add(-time.Second), "completed"))
+	storeMatch(t, db, roomID, at(to, "completed"))
+	storeMatch(t, db, roomID, at(from.Add(time.Hour), "in_progress"))
 
 	matches, err := season.LoadWindow(db, from, to)
 	require.NoError(t, err)

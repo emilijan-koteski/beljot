@@ -28,10 +28,9 @@ type roomPlayerRow struct {
 	CreatedAt time.Time `gorm:"column:created_at"`
 }
 
+// toRoomPlayer maps a scanned row field by field; room_players rows are always
+// humans, so the column-less IsBot flag stays false.
 func (r roomPlayerRow) toRoomPlayer() RoomPlayer {
-	// Field-by-field (not a struct conversion): RoomPlayer carries the
-	// transient IsBot flag, which has no column. Rows scanned from
-	// room_players are always humans — IsBot stays false.
 	return RoomPlayer{
 		ID:        r.ID,
 		RoomID:    r.RoomID,
@@ -227,19 +226,10 @@ func (r *GormRepository) FindQuickPlayRoom(buyIn int) (*Room, error) {
 	return r.FindQuickPlayRoomExcluding(nil, buyIn)
 }
 
+// FindQuickPlayRoomExcluding locks the oldest open quick-play room in the caller's buy-in bracket.
+// The croatia filter is defence in depth, since quick-play rooms are only ever created with that variant.
 func (r *GormRepository) FindQuickPlayRoomExcluding(excludedRoomIDs map[uint]bool, buyIn int) (*Room, error) {
 	var room Room
-	// Story 9.4: coin_buy_in keys the affordability bracket — a player only ever
-	// matches into a room of their own bracket (0 or 500). The existing partial
-	// index idx_rooms_quick_play(is_quick_play, status, player_count) still
-	// serves this as a prefix; coin_buy_in is a low-cardinality residual filter.
-	//
-	// The variant predicate is DEFENCE IN DEPTH, not the mechanism: Quick Play is
-	// Croatian-only because the only place is_quick_play is ever set true
-	// (QuickPlay's room synthesis) hardcodes Variant "croatia", so no Bitola row
-	// can match this filter in the first place. Stating it here means a future
-	// code path that synthesizes a differently-configured quick-play room cannot
-	// silently drop players into a variant matchmaking was never sized for.
 	q := r.db.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("is_quick_play = ? AND status = ? AND player_count < 4 AND coin_buy_in = ? AND variant = ?",
 			true, "waiting", buyIn, "croatia")
@@ -273,11 +263,8 @@ func (r *GormRepository) FindUserIDsByRoomStatus(status string) ([]uint, error) 
 	return ids, nil
 }
 
-// LoadOwnerUsernames hydrates the transient OwnerUsername and OwnerAvatarURL
-// fields on each room via a single SELECT against the users table. Skips the
-// query for an empty slice and short-circuits when every room already has a
-// username (the WS broadcast path occasionally pre-populates the field); the
-// two are always set together, so the username stands for both.
+// LoadOwnerUsernames fills OwnerUsername and OwnerAvatarURL on each room with one users query.
+// Rooms that already have a username are skipped, since the two fields are always set together.
 func (r *GormRepository) LoadOwnerUsernames(rooms []*Room) error {
 	if len(rooms) == 0 {
 		return nil
@@ -320,9 +307,8 @@ func (r *GormRepository) LoadOwnerUsernames(rooms []*Room) error {
 	return nil
 }
 
-// FindPlayersByRoomIDs returns players for every supplied room id in a single
-// JOIN query. Empty input → empty map. Rooms with no players are simply
-// missing from the returned map (callers should use the zero-value slice).
+// FindPlayersByRoomIDs returns players for the given rooms in one JOIN query.
+// Rooms with no players are missing from the returned map.
 func (r *GormRepository) FindPlayersByRoomIDs(roomIDs []uint) (map[uint][]RoomPlayer, error) {
 	out := make(map[uint][]RoomPlayer)
 	if len(roomIDs) == 0 {
@@ -394,8 +380,8 @@ func (r *GormRepository) FindBotsByRoomID(roomID uint) ([]RoomBot, error) {
 	return bots, nil
 }
 
-// FindBotsByRoomIDs returns bots for every supplied room id in a single query.
-// Empty input → empty map. Rooms with no bots are missing from the map.
+// FindBotsByRoomIDs returns bots for the given rooms in one query.
+// Rooms with no bots are missing from the returned map.
 func (r *GormRepository) FindBotsByRoomIDs(roomIDs []uint) (map[uint][]RoomBot, error) {
 	out := make(map[uint][]RoomBot)
 	if len(roomIDs) == 0 {

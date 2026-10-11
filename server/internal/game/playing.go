@@ -7,8 +7,7 @@ import (
 )
 
 // handlePlaying processes card play actions during the playing phase.
-// Pure function — no side effects. When the 4th card is played, the trick
-// is resolved atomically within the same call.
+// When the 4th card is played, the trick is resolved within the same call.
 func handlePlaying(state *GameState, action Action) (*GameState, error) {
 	if state.Phase != PhasePlaying {
 		return nil, apperr.ErrWrongPhase
@@ -32,26 +31,21 @@ func handlePlaying(state *GameState, action Action) (*GameState, error) {
 
 // handlePlayCard validates and processes a play_card action.
 func handlePlayCard(state *GameState, action Action) (*GameState, error) {
-	// Guard: seat must be valid
 	if action.PlayerSeat < 0 || action.PlayerSeat > 3 {
 		return nil, apperr.ErrNotYourTurn
 	}
 
-	// Guard: must resolve pending declaration first
 	if state.AwaitingDeclaration {
 		return nil, apperr.ErrActionRequired
 	}
-	// Guard: must resolve pending Belot announcement first
 	if state.PendingBelotSeat != nil {
 		return nil, apperr.ErrActionRequired
 	}
 
-	// Validate turn
 	if action.PlayerSeat != state.ActivePlayerSeat {
 		return nil, apperr.ErrNotYourTurn
 	}
 
-	// Validate card is provided and exists in hand
 	if action.Card == nil {
 		return nil, apperr.ErrInvalidCard
 	}
@@ -59,52 +53,41 @@ func handlePlayCard(state *GameState, action Action) (*GameState, error) {
 		return nil, apperr.ErrInvalidCard
 	}
 
-	// Validate legal play
 	if !isCardLegal(state, action.PlayerSeat, *action.Card) {
 		return nil, apperr.ErrIllegalPlay
 	}
 
-	// Clone state before mutation
 	newState := cloneGameState(state)
 	card := *action.Card
 
-	// Save hand before removal for Belot detection (explicit copy to avoid aliasing)
 	handBeforePlay := slices.Clone(newState.Players[action.PlayerSeat].Hand)
 
-	// Remove card from player's hand
 	newState.Players[action.PlayerSeat].Hand = removeCard(
 		newState.Players[action.PlayerSeat].Hand, card,
 	)
 
-	// Add card to current trick
 	newState.CurrentTrick = append(newState.CurrentTrick, TrickCard{
 		Card:       card,
 		PlayerSeat: action.PlayerSeat,
 	})
 
-	// Set lead suit on first card of trick
 	if len(newState.CurrentTrick) == 1 {
 		suit := card.Suit
 		newState.LeadSuit = &suit
 	}
 
-	// Check for Belot prompt before advancing turn
 	if shouldPromptBelot(newState, card, handBeforePlay) {
 		seat := action.PlayerSeat
 		newState.PendingBelotSeat = &seat
-		// Do NOT advance turn or resolve trick — wait for Belot resolution
 		return newState, nil
 	}
 
-	// Advance active player
 	newState.ActivePlayerSeat = (newState.ActivePlayerSeat + 1) % 4
 
-	// Check declaration prompt for next player at trick 1
 	if newState.TrickNumber == 1 && len(newState.CurrentTrick) < 4 {
 		checkDeclarationPrompt(newState)
 	}
 
-	// Resolve trick if 4 cards have been played
 	if len(newState.CurrentTrick) == 4 {
 		resolveTrickWithDeclarations(newState)
 	}
@@ -118,33 +101,28 @@ func handlePlayCard(state *GameState, action Action) (*GameState, error) {
 func resolveTrick(state *GameState) {
 	trumpSuit := *state.TrumpSuit
 
-	// Determine winner and calculate points
 	winnerSeat := determineTrickWinner(state.CurrentTrick, trumpSuit)
 	points := calculateTrickPoints(state.CurrentTrick, trumpSuit)
 
-	// Award points and tricks to winning team
 	winnerTeam := TeamForSeat(winnerSeat)
 	state.HandPoints[winnerTeam] += points
 	state.TricksWon[winnerTeam]++
 	state.TrickWinnerSeat = &winnerSeat
 
-	// Check if this was the last trick
 	if state.TrickNumber == 8 {
 		state.Phase = PhaseHandScoring
 		return
 	}
 
-	// Set up next trick
 	state.TrickNumber++
 	state.CurrentTrick = nil
 	state.LeadSuit = nil
 	state.TrickWinnerSeat = nil
-	state.ActivePlayerSeat = winnerSeat // winner leads next trick
+	state.ActivePlayerSeat = winnerSeat
 }
 
-// determineTrickWinner returns the seat index of the player who wins the trick.
-// If any trump was played, the highest trump wins. Otherwise, the highest card
-// of the led suit wins.
+// determineTrickWinner returns the seat of the trick winner: the highest trump if any was played,
+// otherwise the highest card of the led suit.
 func determineTrickWinner(trick []TrickCard, trumpSuit Suit) int {
 	return currentTrickWinnerSeat(trick, trumpSuit)
 }

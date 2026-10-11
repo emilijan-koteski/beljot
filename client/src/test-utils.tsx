@@ -8,13 +8,8 @@ import type { RoomInvite } from "@/shared/stores/roomStore";
 import type { Room, RoomDetail, RoomPlayer, User } from "@/shared/types/apiTypes";
 
 /**
- * A complete authenticated `User` for tests, with every field defaulted to a
- * plain established-player value. Pass only what the test actually cares about.
- *
- * This exists because `User` grows: Story 9.5 added totalXp/level, 9.6 added
- * room fields, 9.7 added the honor trio, and each time a dozen inline fixtures
- * broke at once. Route new fixtures through here so the NEXT additive field is
- * a one-line change (the profileFixture() precedent from Story 7-2).
+ * Builds a complete authenticated `User` for tests, defaulted to a plain established player.
+ * Pass only the fields the test cares about.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function makeUser(overrides: Partial<User> = {}): User {
@@ -41,12 +36,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
   };
 }
 
-/**
- * A complete `Room` for tests. Same reasoning as `makeUser`, and the same
- * history: Story 9.2 added coinBuyIn, 9.6 added isPrivate, 9.8 added
- * minHonor/allowNewPlayers, and each addition silently broke a pile of inline
- * literals that nothing type-checked (see below). Build rooms through here.
- */
+/** Builds a complete, ungated `Room` for tests with every field defaulted. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function makeRoom(overrides: Partial<Room> = {}): Room {
   return {
@@ -62,7 +52,6 @@ export function makeRoom(overrides: Partial<Room> = {}): Room {
     timerDurationSeconds: null,
     coinBuyIn: 0,
     isPrivate: false,
-    // Ungated by default (Story 9.8).
     minHonor: 0,
     allowNewPlayers: true,
     status: "waiting",
@@ -91,10 +80,8 @@ export function makeRoomPlayer(overrides: Partial<RoomPlayer> = {}): RoomPlayer 
 }
 
 /**
- * The `{room, players, returnedUserIds}` envelope GET /rooms/:id returns.
- * `returnedUserIds` defaults to every seated player's id, which is what a room
- * that was never in a match looks like — the presence layer only diverges from
- * that after a match ends (see D145 / return-to-room v2).
+ * Builds the `{room, players, returnedUserIds}` envelope that GET /rooms/:id returns.
+ * `returnedUserIds` defaults to every seated player's id, as for a room never in a match.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function makeRoomDetail(overrides: Partial<RoomDetail> = {}): RoomDetail {
@@ -151,21 +138,13 @@ export function TestProviders({ children }: { children: ReactNode }) {
 }
 
 /**
- * Asserts the app-wide dialog footer convention: the action-taking control
- * precedes the status-quo control in the DOM, which is what puts it on the left
- * of a `justify-end` row (and on top of a narrow-screen stack).
- *
- * Takes test ids rather than elements so a failure names the pair that broke.
+ * Asserts the action-taking dialog control is immediately followed by the status-quo control in the DOM.
+ * Compares positions strictly, since FOLLOWING is also set when one control contains the other.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function expectActionBeforeStatusQuo(actionTestId: string, statusQuoTestId: string) {
   const action = screen.getByTestId(actionTestId);
   const statusQuo = screen.getByTestId(statusQuoTestId);
-  // Strict equality, not a bitwise AND: FOLLOWING is also set for
-  // CONTAINED_BY (4|16) and for disconnected trees, so the AND form would pass
-  // if the status-quo control ever ended up nested inside the action one. A
-  // plain following sibling — including one wrapped in ButtonTimerRing — is
-  // exactly FOLLOWING.
   expect(
     action.compareDocumentPosition(statusQuo),
     `expected ${actionTestId} to be followed by a sibling ${statusQuoTestId}`,

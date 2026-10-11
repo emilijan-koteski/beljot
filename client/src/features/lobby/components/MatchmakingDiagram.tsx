@@ -13,43 +13,27 @@ import { modeLabel, variantLabel } from "@/shared/lib/roomLabels";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
 type Props = {
-  /** The room being matched — drives the variant / mode / timer / stake chips. */
   room: Room;
-  /** Number of seated players (1..4) — the viewer is always one of them. */
   found: number;
-  /** All players currently in the room (seated and not). */
   players: RoomPlayer[];
-  /** The viewer's seat index (0..3). */
   viewerSeat: number;
-  /** The viewer's username (for the centre avatar). */
   currentUsername: string;
-  /** The viewer's 128 px avatar, from the auth store; the initial without one. */
   currentAvatarUrl?: string | null;
-  /** Elapsed wait time, pre-formatted as mm:ss. */
   elapsed: string;
   onCancel: () => void;
   cancelDisabled?: boolean;
 };
 
-// Ring slot geometry — the four cardinal points around the (now empty) table
-// centre, where the search sweep spins. The viewer ("you") takes the south
-// seat; the other three fill west / north / east in ascending order, becoming
-// real opponents as they join. Offsets are percentages of the (square) orbit
-// box so the whole diagram scales with it; at the 380px design size these
-// resolve to ±130px, matching MatchmakingSearching in room-flow-scenes-1.jsx.
-const ORBIT_OFFSETS = [
-  { x: -34.21, y: 0 }, // west
-  { x: 0, y: -34.21 }, // north
-  { x: 34.21, y: 0 }, // east
-] as const;
-const YOU_OFFSET = { x: 0, y: 34.21 } as const; // south
+const WEST_OFFSET = { x: -34.21, y: 0 } as const;
+const NORTH_OFFSET = { x: 0, y: -34.21 } as const;
+const EAST_OFFSET = { x: 34.21, y: 0 } as const;
+const SOUTH_OFFSET = { x: 0, y: 34.21 } as const;
+const ORBIT_OFFSETS = [WEST_OFFSET, NORTH_OFFSET, EAST_OFFSET] as const;
+const YOU_OFFSET = SOUTH_OFFSET;
 
 /**
- * The Quick Play "finding a table" diagram: the viewer sits at the centre of a
- * brass ring while the three other seats orbit around them, filling in with
- * real opponents as they join. Pure presentational — all room/WS plumbing
- * lives in MatchmakingPage. Team colour is viewer-relative (gold = your side,
- * silver = opponents), matching RoomPage's seat convention.
+ * Presentational Quick Play "finding a table" diagram with the four seats around a brass ring.
+ * Seats fill in as opponents join; team colour is viewer-relative (gold = your side).
  */
 export function MatchmakingDiagram({
   room,
@@ -64,17 +48,11 @@ export function MatchmakingDiagram({
 }: Props) {
   const { t } = useTranslation();
 
-  // Phones (<md) can't fit the full 380px orbit plus the title/badges/progress
-  // chrome without the cancel button slipping below the fold, so shrink the
-  // table, the avatars and the vertical rhythm on compact widths. Returns false
-  // without matchMedia (tests/SSR), so the full desktop geometry renders there.
   const isCompact = useMediaQuery("(max-width: 767px)");
   const youSize = isCompact ? 48 : 64;
   const orbitSize = isCompact ? 40 : 52;
   const orbitBox = isCompact ? "min(240px, calc(100vw - 72px))" : "min(380px, calc(100vw - 72px))";
 
-  // The three seats other than the viewer's, in ascending order, mapped onto
-  // the orbit's west/north/east positions.
   const orbitSeats = [0, 1, 2, 3].filter((s) => s !== viewerSeat);
   const remaining = Math.max(0, 4 - found);
 
@@ -100,9 +78,6 @@ export function MatchmakingDiagram({
         {t("lobby.matchmaking.subtitle")}
       </p>
 
-      {/* Match-rules + elapsed strip — derived from the actual room config
-          (variant, mode, per-move timer, and the coin stake) rather than fixed
-          assumptions, so it matches the room the player is queued into. */}
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 md:mt-4">
         <Badge tone="neutral" icon={<Trophy className="size-3 text-(--accent)" />}>
           {variantLabel(t, room.variant)}
@@ -124,10 +99,6 @@ export function MatchmakingDiagram({
         </span>
       </div>
 
-      {/* Orbit diagram — an explicit square (not aspect-ratio: a flex-column
-          item with only absolute children would collapse its height to 0).
-          Capped at the 380px design size, shrinking to fit narrow screens; the
-          inner geometry is percentage-based so it scales with the box. */}
       <div
         className="relative mt-4 md:mt-7"
         style={{
@@ -135,12 +106,10 @@ export function MatchmakingDiagram({
           height: orbitBox,
         }}
       >
-        {/* Brass ring — the table edge */}
         <div
           className="border-border-2 absolute rounded-full border-2 border-dashed opacity-70"
           style={{ inset: "10.53%" }}
         />
-        {/* Felt halo */}
         <div
           className="absolute rounded-full"
           style={{
@@ -148,7 +117,6 @@ export function MatchmakingDiagram({
             background: "radial-gradient(circle, rgba(25,101,54,0.10) 0%, transparent 70%)",
           }}
         />
-        {/* Rotating sweep */}
         <div
           className="absolute rounded-full animate-[spin_2.4s_linear_infinite]"
           style={{
@@ -160,7 +128,6 @@ export function MatchmakingDiagram({
           }}
         />
 
-        {/* You — south seat on the ring (the centre now holds only the sweep). */}
         <div
           className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5"
           style={{
@@ -180,16 +147,12 @@ export function MatchmakingDiagram({
           </span>
         </div>
 
-        {/* Three orbit seats — one per offset (west, north, east). */}
         {ORBIT_OFFSETS.map((offset, i) => {
           const seatIndex = orbitSeats[i];
           if (seatIndex === undefined) return null;
           const occupant = players.find((p) => p.seat === seatIndex);
           const isUs = seatIndex % 2 === viewerSeat % 2;
           const team = isUs ? "A" : "B";
-          // Bot occupants carry an empty wire username — their identity is
-          // seat-derived and localized ("Bot N"), rendered with the Bot glyph
-          // instead of the blank initial (mirrors SeatTile / RoomCard).
           const occupantIsBot = occupant?.isBot === true;
           const occupantName = occupant
             ? occupantIsBot
@@ -240,7 +203,6 @@ export function MatchmakingDiagram({
         })}
       </div>
 
-      {/* Progress line + cancel */}
       <div className="mt-4 flex w-105 max-w-full flex-col items-center gap-3 md:mt-7 md:gap-4">
         <div
           className="bg-surface-sunken border-border relative h-1.5 w-full overflow-hidden rounded-full border"

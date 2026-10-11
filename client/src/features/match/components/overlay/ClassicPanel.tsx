@@ -2,21 +2,9 @@ import type { CSSProperties, ReactNode } from "react";
 
 interface ClassicPanelProps {
   width?: number | string;
-  /** Optional title displayed in the brass-bordered header. */
   title?: ReactNode;
-  /** Optional subtitle below the title. */
   subtitle?: ReactNode;
-  /**
-   * Optional team-color glow stop (gold or silver). When provided the panel
-   * gains a 2 px outer ring + 24 px halo in that color — used for trump-taken,
-   * declarations, belot reveals, hand-end + match-end overlays.
-   */
   glowColor?: string;
-  /**
-   * Inner padding override for the body (default 16 px on phones, 24 px from
-   * `sm` up). Note: an explicit value applies at ALL breakpoints — it opts the
-   * panel out of the responsive phone reduction.
-   */
   bodyPadding?: number | string;
   className?: string;
   style?: CSSProperties;
@@ -26,12 +14,8 @@ interface ClassicPanelProps {
 const PANEL_BG = "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)";
 
 /**
- * Felt-gradient dialog shell — the unified chrome for every classic-state
- * overlay (bidding, belot, declarations, pause, score, match end, etc.).
- *
- * Optional `glowColor` adds a team-tinted ring around the panel — Gold for
- * "Us" wins/announcements, Silver for "Them" — pinned to the panel's 14 px
- * radius so the halo traces the edge cleanly.
+ * Felt-gradient dialog shell for every classic overlay, with an optional team-tinted `glowColor` ring.
+ * Caps at the viewport in both axes and scrolls its body, so bottom controls always stay reachable.
  */
 export function ClassicPanel({
   width = 480,
@@ -52,15 +36,7 @@ export function ClassicPanel({
       className={`flex flex-col overflow-hidden ${className}`}
       style={{
         width,
-        // Never exceed the viewport on a narrow (phone) screen — the panel
-        // shrinks to fit with a small gutter, then caps at `width` on desktop.
         maxWidth: "calc(100vw - 2rem)",
-        // …and the same in the other axis. Without this the panel grows past a
-        // short viewport (landscape phone, a ~700px laptop) and `overflow-hidden`
-        // CLIPS whatever sits at the bottom — which on the match-result panel is
-        // the "Return to room" / "Return to lobby" pair, leaving the overlay a
-        // dead end with nothing scrollable. The body below scrolls instead, so
-        // the last control is always reachable.
         maxHeight: "calc(100vh - 2rem)",
         borderRadius: 14,
         background: PANEL_BG,
@@ -78,8 +54,6 @@ export function ClassicPanel({
             borderBottom: "1px solid rgba(201,168,118,0.22)",
           }}
         >
-          {/* Type scale steps down one notch below `sm` so phone-width panels
-              don't blow the header out of proportion. */}
           <div
             className="text-[17px] sm:text-[20px]"
             style={{
@@ -98,9 +72,6 @@ export function ClassicPanel({
           )}
         </div>
       )}
-      {/* min-h-0 is what lets a flex child actually shrink below its content
-          height — without it `overflow-y-auto` never engages and the cap above
-          would clip instead of scroll. */}
       <div
         className={`min-h-0 overflow-y-auto ${bodyPadding === undefined ? "p-4 sm:p-6" : ""}`}
         style={bodyPadding === undefined ? undefined : { padding: bodyPadding }}

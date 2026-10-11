@@ -27,10 +27,6 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Order: Latin-script entries sorted ASC by native name (English, Hrvatski,
-// Srpski) then Cyrillic-script entries sorted ASC (Македонски). Mirrors the
-// order used in the lobby nav LanguageSelector so users see the same list
-// regardless of where they switch language.
 const LANGUAGES = [
   { code: "en", labelKey: "language.en" },
   { code: "hr", labelKey: "language.hr" },
@@ -38,8 +34,6 @@ const LANGUAGES = [
   { code: "mk", labelKey: "language.mk" },
 ] as const;
 
-// Order: French first — it is the default, and the deck every account that did
-// not pick otherwise is already looking at.
 const DECKS = [
   { code: "french", labelKey: "cardDeck.french" },
   { code: "croatian", labelKey: "cardDeck.croatian" },
@@ -117,10 +111,7 @@ function SettingRow({
 }
 
 /**
- * One brass on/off row — the switch counterpart of `SettingRow`, same frame, so
- * a section of switches sits flush with the radio sections above it. The row's
- * text is its accessible name; the track/thumb is decoration for
- * `aria-checked`.
+ * Brass on/off switch row, the switch counterpart of `SettingRow`.
  */
 function SettingSwitchRow({
   checked,
@@ -188,10 +179,7 @@ function SettingSwitchRow({
 }
 
 /**
- * One brass volume row, sitting under its channel's switch. The slider moves
- * the level live and persists it on release (see `useAudioVolume`); it is
- * disabled — value kept — while the switch above it is off. The accessible
- * name comes from `label`; the `N%` readout is its visible counterpart.
+ * Brass volume slider row under its channel switch, disabled while that switch is off.
  */
 function SettingVolumeRow({
   field,
@@ -244,10 +232,8 @@ function SettingVolumeRow({
 }
 
 /**
- * Brass eyebrow + a group of rows — one per settings group. A radiogroup by
- * default (language, deck); a section of independent switches passes
- * `role="group"`, since its rows are not mutually exclusive. Either way the
- * heading names the group, via `aria-labelledby`.
+ * Brass eyebrow heading over a group of setting rows, a radiogroup by default.
+ * Sections of independent switches pass `role="group"`.
  */
 function SettingSection({
   icon,
@@ -283,22 +269,8 @@ function SettingSection({
 }
 
 /**
- * In-game settings dialog. Exposes the UI language, the card deck, and the two
- * audio switches each with its volume slider; the layout is sectioned so
- * future settings (table theme, timer preference, etc.) can drop in without
- * rework.
- *
- * Every change persists to the user's profile via `updatePreferences`, mirroring
- * the lobby's [LanguageSelector] behavior — optimistic store write, silent
- * revert on failure, no reload and no interruption to play. The deck is read
- * straight back off the auth store, so every mounted `PlayingCard` re-skins the
- * moment the optimistic write lands, mid-hand included; the audio engine reads
- * the same store, so a switch takes effect on the very next sound.
- *
- * Renders inside the same classic-felt overlay shell (ClassicPanel +
- * OverlayBackdrop) used by the bidding / belot / surrender / rules prompts so
- * the in-game chrome stays visually consistent. Portaled to document.body so
- * the z-50 backdrop floats above the bidder banner and seat panels.
+ * In-game settings dialog for language, card deck and audio, persisted via `updatePreferences`.
+ * Writes are optimistic with a silent revert on failure, so the table re-skins instantly without interrupting play.
  */
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { t, i18n } = useTranslation();
@@ -321,8 +293,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     try {
       await updatePreferences(user.id, { languagePreference: lang });
     } catch {
-      // Revert the optimistic auth-store update so it stays in sync with the
-      // server (mirrors LanguageSelector). UI locale stays put.
       const current = useAuthStore.getState().user;
       if (current?.id === user.id) {
         useAuthStore.getState().setUser({ ...current, languagePreference: previousPreference });
@@ -330,17 +300,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     }
   }
 
-  /**
-   * Persist the deck. Shares one latest-wins helper with the profile panel, so
-   * two fast toggles cannot leave store and server disagreeing — see
-   * `persistCardDeck`. Deliberately NOT merged with the language handler above:
-   * they write different fields, only language has an i18n switch to sequence
-   * first, and the language path's identical race is pre-existing and deferred.
-   */
   async function handleDeckChange(next: CardDeck) {
     if (next === deck) return;
-    // `deck` is the RESOLVED value, so a rollback cannot reinstate an
-    // unrecognised string that would render as a missing asset.
     await persistCardDeck(next, deck);
   }
 
@@ -364,8 +325,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </span>
             }
           >
-            {/* One sectioned group per setting, so the next one (table theme,
-                timer preference) drops in below without shifting these. */}
             <div className="flex flex-col gap-5">
               <SettingSection
                 icon={<Globe size={14} aria-hidden="true" />}
@@ -383,8 +342,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 ))}
               </SettingSection>
 
-              {/* Card deck — purely visual, and applied without leaving the
-                  match: the store write re-renders every card in place. */}
               <SettingSection
                 icon={<Spade size={14} aria-hidden="true" />}
                 heading={t("match.settings.deckHeading")}
@@ -401,10 +358,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 ))}
               </SettingSection>
 
-              {/* Sound — two independent switches, each writing only its own
-                  field through the shared latest-wins helper (the HUD mute and
-                  the profile panel write the same fields), each with its
-                  channel's volume slider underneath. */}
               <SettingSection
                 icon={<Volume2 size={14} aria-hidden="true" />}
                 heading={t("match.settings.soundHeading")}

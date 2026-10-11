@@ -19,11 +19,6 @@ vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
 }));
 
-/**
- * The profile-sidebar entry point. It had no test of its own: an acceptance
- * criterion promises the deck is settable outside a match, and its optimistic
- * write, silent revert and deck-only PATCH were all unexercised.
- */
 describe("CardDeckPanel", () => {
   beforeEach(() => {
     mockUpdatePreferences.mockReset();
@@ -52,8 +47,6 @@ describe("CardDeckPanel", () => {
   it("previews each deck with a suit that actually differs between them", () => {
     render(<CardDeckPanel />);
 
-    // Bells vs diamonds. Hearts looks nearly identical in both decks, so
-    // previewing it hid the very thing the choice changes.
     const previews = Array.from(document.querySelectorAll("img")).map((i) => i.getAttribute("src"));
     expect(previews).toContain("/cards/french/AD.svg");
     expect(previews).toContain("/cards/croatian/AD.webp");
@@ -67,8 +60,6 @@ describe("CardDeckPanel", () => {
 
     expect(useAuthStore.getState().user?.cardDeckPreference).toBe("croatian");
     expect(mockUpdatePreferences).toHaveBeenCalledWith(7, { cardDeckPreference: "croatian" });
-    // A language field here would let a deck change clobber a language picked
-    // in another tab.
     expect(mockUpdatePreferences.mock.calls[0]?.[1]).not.toHaveProperty("languagePreference");
   });
 
@@ -100,8 +91,6 @@ describe("CardDeckPanel", () => {
   it("reverts to the RESOLVED deck, never a stored value it cannot render", async () => {
     const user = userEvent.setup();
     mockUpdatePreferences.mockRejectedValueOnce(new Error("offline"));
-    // A stored value the client does not know — reachable because HTTP responses
-    // are cast, not parsed. A rollback must not reinstate it.
     useAuthStore.setState({
       token: "test-token",
       user: makeUser({ id: 7, cardDeckPreference: "hungarian" as never }),

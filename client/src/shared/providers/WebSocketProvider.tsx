@@ -10,11 +10,7 @@ import { WebSocketContext } from "./WebSocketContext";
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const dispatch = useWsDispatch();
   const { sendMessage, state } = useWebSocket({ onMessage: dispatch });
-  // D145b: always-mounted navigator that routes a seated player into a freshly
-  // started match even when they are not on RoomPage.
   useMatchStartRedirect();
-  // Story 9.3: always-mounted navigator that routes an ejected player
-  // to the lobby (the modal there is the single consumer of the signal).
   useRoomEjectRedirect();
 
   const value = useMemo(() => ({ sendMessage, connectionState: state }), [sendMessage, state]);

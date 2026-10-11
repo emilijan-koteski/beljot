@@ -37,8 +37,6 @@ vi.mock("@/shared/api/profile", () => ({
   updatePreferences: (...args: unknown[]) => mockUpdatePreferences(...args),
 }));
 
-// GIS never loads in tests — the mock captures the onCredential callback so
-// tests can hand the page a fake Google credential.
 const mockRenderGoogleButton = vi.fn();
 let mockClientId = "test-client-id";
 vi.mock("@/shared/lib/googleIdentity", () => ({
@@ -457,8 +455,6 @@ describe("RegisterPage", () => {
 
     it("reconciles the picked language after an SSO registration", async () => {
       await i18n.changeLanguage("mk");
-      // SSO registration always seeds "en" server-side — the page must PATCH
-      // the picked language just like the login page does.
       mockSsoLogin.mockResolvedValueOnce(ssoResponse());
       mockUpdatePreferences.mockResolvedValueOnce({ languagePreference: "mk" });
       renderRegisterPage();

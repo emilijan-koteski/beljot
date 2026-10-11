@@ -12,44 +12,18 @@ import {
 } from "../../lib/turnCountdown";
 
 interface ButtonTimerRingProps {
-  /**
-   * Either a wall-clock expiry (`turnExpiresAt` ISO string) **or** a
-   * client-side countdown duration in seconds. Server-driven prompts use
-   * `turnExpiresAt + totalDuration` so the ring stays in sync across clients;
-   * client-side reveals (e.g. score continue) just pass `duration` instead.
-   */
   turnExpiresAt?: string | null;
-  /** Total ring duration in seconds — drives the dasharray sweep. */
   totalDuration: number;
-  /**
-   * When set without `turnExpiresAt`, the ring counts down purely client-side
-   * from `totalDuration` to 0. Useful for non-server-bound timers.
-   */
   clientCountdown?: boolean;
-  /**
-   * Callback fired the moment the ring reaches 0. Used by reveals that wrap
-   * a Continue button — when the timer expires we auto-fire the action so an
-   * AFK player doesn't get stuck on the reveal screen.
-   */
   onExpire?: () => void;
-  /** Corner radius of the wrapped button (in px). Default 8 (matches
-   *  ClassicButton). */
   radius?: number;
-  /** Reduced-motion hint — when true, skip the SVG rendering entirely. */
   hideRing?: boolean;
   children: ReactNode;
 }
 
 /**
- * Wraps a button with an SVG rounded-rect outline countdown that traces the
- * button's border, sweeping clockwise from the top.
- *
- * Two channels:
- *   • lime  → plenty of time
- *   • red   → ≤1/8 remaining (urgent — same threshold as PlayerSeat ring)
- *
- * The wrapper measures the wrapped button via ResizeObserver so the sweep
- * traces the actual button shape regardless of label width / padding.
+ * Wraps a button with a rounded-rect countdown outline that drains to a server deadline or a client-side timer.
+ * Fires `onExpire` once when the countdown reaches 0.
  */
 export function ButtonTimerRing({
   turnExpiresAt,
@@ -63,9 +37,6 @@ export function ButtonTimerRing({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
-  // Two countdown sources — server expiry (clock-offset corrected,
-  // deadline-aligned ticks via the shared hook) or a client-only seconds
-  // counter anchored at mount.
   const serverSecondsLeft = useTurnCountdown(turnExpiresAt ?? null);
   const [clientSecondsLeft, setClientSecondsLeft] = useState(totalDuration);
 
@@ -90,23 +61,17 @@ export function ButtonTimerRing({
       ? clientSecondsLeft
       : totalDuration;
 
-  // Fire onExpire exactly once when secondsLeft hits 0.
   const expireFiredRef = useRef(false);
   useEffect(() => {
     if (secondsLeft <= 0 && !expireFiredRef.current && (turnExpiresAt || clientCountdown)) {
-      // A deadline that just arrived (null → set, or value swap) renders one
-      // commit with the previous countdown state — re-verify against the
-      // wall clock so a stale 0 can't fire the expiry for a live deadline.
-      if (turnExpiresAt && remainingMsUntil(turnExpiresAt) > 0) return;
+      const staleZeroForLiveDeadline = turnExpiresAt && remainingMsUntil(turnExpiresAt) > 0;
+      if (staleZeroForLiveDeadline) return;
       expireFiredRef.current = true;
       onExpire?.();
     }
     if (secondsLeft > 0) expireFiredRef.current = false;
   }, [secondsLeft, onExpire, turnExpiresAt, clientCountdown]);
 
-  // Re-measure the wrapped button so the SVG rect always matches the button's
-  // actual painted size (the scene is also CSS-scaled, but offsetWidth gives
-  // un-scaled px which is what stroke-dasharray needs).
   useLayoutEffect(() => {
     const measure = () => {
       const el = wrapRef.current;
@@ -121,21 +86,13 @@ export function ButtonTimerRing({
 
   const pct = totalDuration > 0 ? Math.min(1, Math.max(0, secondsLeft) / totalDuration) : 0;
   const isUrgent = totalDuration > 0 && pct <= URGENT_FRACTION;
-  // Cream / red palette to match the AutoCloseRing on info-toast X buttons
-  // (the avatar's lime/red ring stays the primary turn signal — dialogs use
-  // this softer pair so two countdown channels don't compete for attention).
   const stroke = isUrgent ? "var(--turn-urgent, #ef4444)" : "#d4d0c4";
   const pad = 4;
   const strokeW = 1.75;
   const w = size.w + pad * 2;
   const h = size.h + pad * 2;
-  // Approximate rounded-rect perimeter — good enough for a visually consistent
-  // dasharray, no need to be analytically perfect.
   const perim = 2 * (w + h) - 8 * radius + 2 * Math.PI * radius;
 
-  // Deadline-anchored sweep (server mode) or mount-anchored sweep (client
-  // mode): the arc reaches empty exactly when the countdown truly hits 0.
-  // The quantized dashoffset below remains the reduced-motion fallback.
   const prefersReducedMotion = useReducedMotion();
   const serverDrain = useRingDrain(turnExpiresAt ?? null, totalDuration, perim);
   const clientDrain = useMemo(
@@ -146,6 +103,7 @@ export function ButtonTimerRing({
     [turnExpiresAt, clientCountdown, totalDuration, perim],
   );
   const drainStyle = prefersReducedMotion ? undefined : (serverDrain ?? clientDrain);
+  const sweepRestartKey = turnExpiresAt ?? (clientCountdown ? "client" : "static");
 
   return (
     <div
@@ -179,11 +137,8 @@ export function ButtonTimerRing({
             stroke="rgba(255,255,255,0.12)"
             strokeWidth={strokeW}
           />
-          {/* Keyed by the countdown source: a running CSS animation keeps
-              its original start time even when animation-delay changes, so a
-              deadline swap must recreate the element to re-anchor the sweep. */}
           <rect
-            key={turnExpiresAt ?? (clientCountdown ? "client" : "static")}
+            key={sweepRestartKey}
             x={strokeW / 2}
             y={strokeW / 2}
             width={w - strokeW}

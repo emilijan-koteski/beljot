@@ -19,8 +19,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/apperr"
 )
 
-// --- fixtures -------------------------------------------------------------
-
 var (
 	red   = color.RGBA{R: 230, G: 20, B: 20, A: 255}
 	green = color.RGBA{R: 20, G: 200, B: 20, A: 255}
@@ -95,8 +93,8 @@ func pngHeaderOnly(w, h int) []byte {
 	ihdr := make([]byte, 13)
 	binary.BigEndian.PutUint32(ihdr[0:], uint32(w))
 	binary.BigEndian.PutUint32(ihdr[4:], uint32(h))
-	ihdr[8] = 8 // bit depth
-	ihdr[9] = 2 // truecolour
+	ihdr[8] = 8
+	ihdr[9] = 2
 	chunk := append([]byte("IHDR"), ihdr...)
 	out := []byte("\x89PNG\r\n\x1a\n")
 	out = binary.BigEndian.AppendUint32(out, uint32(len(ihdr)))
@@ -115,12 +113,13 @@ func withEXIFOrientation(data []byte, orientation int, bo binary.ByteOrder) []by
 		copy(tiff, "MM")
 	}
 	bo.PutUint16(tiff[2:], 42)
-	bo.PutUint32(tiff[4:], 8) // IFD0 right after the header
-	bo.PutUint16(tiff[8:], 1) // one entry
+	bo.PutUint32(tiff[4:], 8)
+	bo.PutUint16(tiff[8:], 1)
 	entry := tiff[10:22]
-	bo.PutUint16(entry[0:], 0x0112) // Orientation
-	bo.PutUint16(entry[2:], 3)      // SHORT
-	bo.PutUint32(entry[4:], 1)      // count
+	const orientationTag, typeShort = 0x0112, 3
+	bo.PutUint16(entry[0:], orientationTag)
+	bo.PutUint16(entry[2:], typeShort)
+	bo.PutUint32(entry[4:], 1)
 	bo.PutUint16(entry[8:], uint16(orientation))
 
 	payload := append([]byte("Exif\x00\x00"), tiff...)
@@ -130,8 +129,6 @@ func withEXIFOrientation(data []byte, orientation int, bo binary.ByteOrder) []by
 	out = append(out, payload...)
 	return append(out, data[2:]...)
 }
-
-// --- assertions -----------------------------------------------------------
 
 // decodeSquareWebP asserts data is a WebP of exactly size×size and returns it.
 func decodeSquareWebP(t *testing.T, data []byte, size int) image.Image {
@@ -163,8 +160,6 @@ func assertColorNear(t *testing.T, m image.Image, x, y int, want color.RGBA, msg
 	assert.True(t, near(got.R, want.R) && near(got.G, want.G) && near(got.B, want.B),
 		"%s: pixel (%d,%d) = %v, want about %v", msg, x, y, got, want)
 }
-
-// --- Inspect --------------------------------------------------------------
 
 func TestInspect_AcceptsStillJPEGPNGWebP(t *testing.T) {
 	src := gradientImage(300, 200)
@@ -236,8 +231,6 @@ func TestRender_UndecodablePixelsAreUnsupported(t *testing.T) {
 	_, _, err = s.Render()
 	assert.ErrorIs(t, err, apperr.ErrAvatarUnsupportedType)
 }
-
-// --- Process --------------------------------------------------------------
 
 func TestProcess_ProducesTwoSquareWebPsWithoutMetadata(t *testing.T) {
 	src := withEXIFOrientation(jpegBytes(t, gradientImage(1600, 1200)), 1, binary.BigEndian)
@@ -317,15 +310,12 @@ func TestProcess_AppliesEXIFOrientation(t *testing.T) {
 		}
 	}
 
-	// Without the tag the stored layout is kept: red on top.
 	large, _, err := Process(bytes.NewReader(plain))
 	require.NoError(t, err)
 	m := decodeSquareWebP(t, large, 256)
 	assertColorNear(t, m, 128, 32, red, "top without orientation")
 	assertColorNear(t, m, 128, 224, blue, "bottom without orientation")
 }
-
-// --- EXIF and orientation helpers ----------------------------------------
 
 func TestJPEGOrientation(t *testing.T) {
 	plain := jpegBytes(t, gradientImage(16, 16))
@@ -351,13 +341,13 @@ func TestOrient(t *testing.T) {
 
 	cases := map[int][2]image.Point{
 		1: {{0, 0}, {1, 0}},
-		2: {{2, 0}, {1, 0}}, // mirror horizontal
-		3: {{2, 2}, {1, 2}}, // rotate 180
-		4: {{0, 2}, {1, 2}}, // mirror vertical
-		5: {{0, 0}, {0, 1}}, // transpose
-		6: {{2, 0}, {2, 1}}, // rotate 90 CW
-		7: {{2, 2}, {2, 1}}, // transverse
-		8: {{0, 2}, {0, 1}}, // rotate 90 CCW
+		2: {{2, 0}, {1, 0}},
+		3: {{2, 2}, {1, 2}},
+		4: {{0, 2}, {1, 2}},
+		5: {{0, 0}, {0, 1}},
+		6: {{2, 0}, {2, 1}},
+		7: {{2, 2}, {2, 1}},
+		8: {{0, 2}, {0, 1}},
 	}
 	for o, want := range cases {
 		out := orient(stored, o)

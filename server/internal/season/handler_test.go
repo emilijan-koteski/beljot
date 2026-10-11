@@ -19,22 +19,13 @@ import (
 	"github.com/emilijan/beljot/server/internal/season"
 )
 
-// --- Mock Repository (in-memory, mirrors the GORM semantics) ---
-
 type mockRepo struct {
 	current      *season.Season
 	currentErr   error
 	currentCalls int
-	// rows is keyed "userID:seasonID"; a missing key is the zero state.
-	rows    map[string]*season.PlayerSeason
-	findErr error
-	// usernames backs the join the GORM repo does against `users`. A row with no
-	// entry here is treated as INVISIBLE — the mock's stand-in for
-	// `users.deleted_at IS NULL`, applied to the page, the total AND CountAhead
-	// exactly as the real predicate is.
-	usernames map[uint]string
-	// avatarKeys backs users.avatar_key on the same join; a missing entry is
-	// NULL (no avatar).
+	rows         map[string]*season.PlayerSeason
+	findErr      error
+	usernames    map[uint]string
 	avatarKeys   map[uint]*string
 	pageErr      error
 	countErr     error
@@ -44,10 +35,6 @@ type mockRepo struct {
 	entryCalls   int
 	lastPageArgs [3]int
 
-	// Story 13.3 state. `seasons` are the EXTRA windows beside `current` (the
-	// mock's stand-in for the seasons table); FindSeasonByID / ListSeasons /
-	// PlayerSeasonArchive all read them plus `current`, mirroring the one real
-	// table the GORM repo queries.
 	seasons       []season.Season
 	listErr       error
 	findSeasonErr error
@@ -129,15 +116,8 @@ func (m *mockRepo) FindPlayerSeason(userID, seasonID uint) (*season.PlayerSeason
 	return m.rows[key(userID, seasonID)], nil
 }
 
-// visibleRows is the mock's copy of leaderboardScope: every LISTABLE row of the
-// season, in the repository's own total order (sp DESC, user_id ASC). ONE helper
-// feeds LeaderboardPage, CountAhead AND FindLeaderboardEntry here for the same
-// reason the GORM repo has one scope — if the mock let them diverge it would
-// happily pass a test the real repository fails.
-//
-// Two exclusions, mirroring the real predicate: no username entry stands in for
-// `users.deleted_at IS NOT NULL`, and `games_played < 1` is outside the
-// played-this-season membership rule.
+// visibleRows mirrors leaderboardScope: the season's played, non-deleted rows in (sp DESC, user_id ASC) order.
+// One helper feeds every leaderboard read so the mock cannot diverge from the real repository.
 func (m *mockRepo) visibleRows(seasonID uint) []*season.PlayerSeason {
 	out := make([]*season.PlayerSeason, 0, len(m.rows))
 	for _, row := range m.rows {
@@ -147,9 +127,6 @@ func (m *mockRepo) visibleRows(seasonID uint) []*season.PlayerSeason {
 		if _, visible := m.usernames[row.UserID]; !visible {
 			continue
 		}
-		// THE LADDER IS EVERYONE WHO PLAYED (Story 13.4). Mirrors the real
-		// `player_seasons.games_played >= 1` in leaderboardScope: a player at
-		// 0 SP who has played is listed.
 		if row.GamesPlayed < 1 {
 			continue
 		}
@@ -170,9 +147,6 @@ func (m *mockRepo) LeaderboardPage(seasonID uint, limit, offset int) ([]season.L
 	if m.pageErr != nil {
 		return nil, 0, m.pageErr
 	}
-	// The interface documents limit >= 1 and offset >= 0 as a PRECONDITION, so the
-	// mock enforces it too: otherwise a service bug that passed limit=0 would sail
-	// through here and fail only against Postgres.
 	if limit < 1 || offset < 0 {
 		return nil, 0, fmt.Errorf("mock: precondition violated limit=%d offset=%d", limit, offset)
 	}
@@ -332,8 +306,6 @@ func divPtr(division int) *int {
 	return &division
 }
 
-// --- Test harness ---
-
 var testWindow = &season.Season{
 	ID:        7,
 	Name:      "2026 Q3",
@@ -365,17 +337,8 @@ func decode(t *testing.T, rec *httptest.ResponseRecorder) season.CurrentSeasonVi
 	return env.Data
 }
 
-// THE JSON TAGS ARE THE CONTRACT, and `decode` above cannot police them: it
-// unmarshals into season.CurrentSeasonView itself, so it agrees with whatever
-// spelling the struct currently carries. Rename the `spForNextTier` tag and every
-// Go and TS test still passes, while at runtime the client reads `undefined`,
-// seasonBarFill returns 1, `atTop` flips true, and EVERY player's bar renders
-// 100% full captioned "Top of the ladder" — silently.
-//
-// So assert the LITERAL wire keys, exactly and exhaustively. The client's
-// CurrentSeasonResponse interface is hand-maintained against these names (there
-// is no golden for HTTP payloads the way there is for WS events), which makes
-// this the only gate between the two.
+// The client's CurrentSeasonResponse is hand-maintained against these JSON tags, so assert the literal wire keys.
+// A renamed tag would otherwise pass every typed test while the client reads undefined.
 func TestGetCurrentSeason_WirePayloadKeysAreExact(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
@@ -400,8 +363,6 @@ func TestGetCurrentSeason_WirePayloadKeysAreExact(t *testing.T) {
 	}
 	sort.Strings(got)
 
-	// Sorted literals, matching client/src/shared/types/apiTypes.ts's
-	// CurrentSeasonResponse field for field.
 	assert.Equal(t, []string{
 		"endsAt",
 		"gamesCompleted",
@@ -414,8 +375,6 @@ func TestGetCurrentSeason_WirePayloadKeysAreExact(t *testing.T) {
 		"spIntoDivision",
 	}, got, "exact wire key set — a renamed or dropped tag breaks the client silently")
 
-	// Spot-check the types too: a tag that survives but changes shape (an int
-	// serialised as a string, say) is the same class of silent break.
 	assert.IsType(t, "", data["seasonName"])
 	assert.IsType(t, "", data["endsAt"])
 	assert.IsType(t, "", data["rankTier"])
@@ -423,7 +382,6 @@ func TestGetCurrentSeason_WirePayloadKeysAreExact(t *testing.T) {
 		assert.IsType(t, float64(0), data[numeric], "%s must be a JSON number", numeric)
 	}
 	assert.Equal(t, float64(2), data["rankDivision"], "680 SP is Gold 2")
-	// endsAt is an ABSOLUTE RFC 3339 timestamp, never a relative duration.
 	_, parseErr := time.Parse(time.RFC3339, data["endsAt"].(string))
 	assert.NoError(t, parseErr, "endsAt must be an absolute ISO 8601 timestamp")
 }
@@ -470,7 +428,6 @@ func TestGetCurrentSeason_MidTierProgressDecomposition(t *testing.T) {
 	assert.Equal(t, "gold", got.RankTier)
 	require.NotNil(t, got.RankDivision)
 	assert.Equal(t, 2, *got.RankDivision)
-	// 700 sits 33 into Gold 2's 67-SP step (667 -> 734).
 	assert.Equal(t, 33, got.SPIntoDivision)
 	assert.Equal(t, 67, got.SPForNextDivision)
 	assert.Equal(t, 31, got.GamesPlayed)
@@ -483,7 +440,7 @@ func TestGetCurrentSeason_IgnoresAStaleStoredTier(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
 		UserID: 42, SeasonID: testWindow.ID, SP: 700,
-		RankTier: "iron", RankDivision: divPtr(1), // deliberately stale
+		RankTier: "iron", RankDivision: divPtr(1),
 		GamesPlayed: 60, GamesCompleted: 60,
 	}
 
@@ -551,12 +508,9 @@ func TestGetCurrentSeason_ResolverFailureSurfaces(t *testing.T) {
 	assert.NotErrorIs(t, err, apperr.ErrUnauthorized, "a DB failure is not an auth failure")
 }
 
-// A repository that violates its own "never returns (nil, nil)" contract must
-// produce an ERROR, not a nil dereference. Nothing in the type system enforces
-// that contract, and on the write path the panic would land inside a match
-// finalizer that is mid-way through settling four players.
+// A repository that breaks its never-(nil, nil) contract must produce an error, not a nil dereference.
 func TestGetCurrentSeason_NilSeasonIsAnErrorNotAPanic(t *testing.T) {
-	repo := newMockRepo(nil) // no error, no season — the contract violation
+	repo := newMockRepo(nil)
 
 	_, err := call(t, repo, 42)
 	require.Error(t, err)
@@ -617,15 +571,12 @@ func TestApplySeasonPoints_MalformedOutcomeWritesNothing(t *testing.T) {
 	assert.Empty(t, repo.rows)
 }
 
-// The service hands the match manager a FULLY PRECOMPUTED snapshot — season
-// name, the APPLIED change, the rank, the rank change and the reason — so the
-// manager never runs ladder arithmetic it cannot see (Story 13.1 D8). The rank
-// change compares (tier, division), never SP alone.
+// The match manager receives a fully precomputed snapshot, so it never runs ladder arithmetic.
+// The rank change compares (tier, division), never SP alone.
 func TestApplySeasonPoints_PrecomputesTheSnapshot(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	svc := season.NewService(repo)
 
-	// Team A averages 120, team B 85: E_A = 0.552, so A wins +24, B loses -16.
 	repo.rows[key(1, testWindow.ID)] = &season.PlayerSeason{UserID: 1, SeasonID: testWindow.ID, SP: 140}
 	repo.rows[key(2, testWindow.ID)] = &season.PlayerSeason{UserID: 2, SeasonID: testWindow.ID, SP: 160}
 	repo.rows[key(3, testWindow.ID)] = &season.PlayerSeason{UserID: 3, SeasonID: testWindow.ID, SP: 100}
@@ -644,13 +595,11 @@ func TestApplySeasonPoints_PrecomputesTheSnapshot(t *testing.T) {
 		RankChange: "none", Reason: "normal",
 	}, got[3], "100 -> 124 is a gain inside Iron 3: no rank change")
 
-	// The one a "the SP changed" shortcut gets wrong: a DROP is a demotion.
 	assert.Equal(t, match.PlayerSeasonSnapshot{
 		SeasonName: "2026 Q3", SP: 144, SPChange: -16, RankTier: "iron", RankDivision: divPtr(3),
 		RankChange: "demoted", Reason: "normal",
 	}, got[2], "160 (Bronze 1) -> 144 drops to Iron 3")
 
-	// The floor: the formula's -16 applies as -10, and Iron 1 stays Iron 1.
 	assert.Equal(t, match.PlayerSeasonSnapshot{
 		SeasonName: "2026 Q3", SP: 0, SPChange: -10, RankTier: "iron", RankDivision: divPtr(1),
 		RankChange: "none", Reason: "normal",
@@ -689,8 +638,6 @@ func TestApplySeasonPoints_AbandonmentReasons(t *testing.T) {
 	assert.Equal(t, "normal", got[4].Reason)
 	assert.Positive(t, got[2].SPChange)
 }
-
-// --- Story 13.2: GET /api/v1/leaderboard ---
 
 // callLeaderboard issues GET /leaderboard with the given raw query string and
 // userID already on the context, the way the auth middleware leaves it.
@@ -737,14 +684,8 @@ func seedLadder(repo *mockRepo, n int) {
 	}
 }
 
-// The same gate TestGetCurrentSeason_WirePayloadKeysAreExact is: `decode` above
-// unmarshals into the handler's own structs, so it agrees with whatever spelling
-// they currently carry. Rename `gamesPlayed` and every Go and TS test still
-// passes while the client silently renders `undefined`.
-//
-// Assert the LITERAL wire keys for all three shapes -- envelope, row and viewer --
-// since the client's LeaderboardResponse is hand-maintained against them and
-// there is no golden for HTTP payloads.
+// Assert the literal wire keys of the envelope, row and viewer, since the client's LeaderboardResponse
+// is hand-maintained against them.
 func TestGetLeaderboard_WirePayloadKeysAreExact(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	seedLadder(repo, 3)
@@ -773,12 +714,9 @@ func TestGetLeaderboard_WirePayloadKeysAreExact(t *testing.T) {
 
 	viewer, ok := data["viewer"].(map[string]any)
 	require.True(t, ok, "viewer must be an object when the caller has SP")
-	// No `username`: the viewer is the authenticated caller and the client
-	// already holds their name (Story 13.2 D3).
 	assert.Equal(t, []string{"division", "gamesPlayed", "position", "sp", "tier", "userId"},
 		sortedKeys(viewer), "the viewer block deliberately carries no username")
 
-	// A tag that survives but changes shape is the same class of silent break.
 	assert.IsType(t, "", row["username"])
 	assert.IsType(t, "", row["tier"])
 	for _, numeric := range []string{"position", "userId", "sp", "division", "gamesPlayed"} {
@@ -790,10 +728,7 @@ func TestGetLeaderboard_WirePayloadKeysAreExact(t *testing.T) {
 	}
 }
 
-// Each row carries the player's 128 px avatar URL, derived from the stored
-// prefix by the injected resolver: a string for a player with an avatar, null
-// for one without, and null everywhere when no resolver is wired. The viewer
-// block stays avatar-free, like it stays name-free.
+// Each row carries the resolved avatar URL, null without an avatar or a resolver; the viewer block stays avatar-free.
 func TestGetLeaderboard_RowsCarryTheResolvedAvatarURL(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	seedLadder(repo, 2)
@@ -899,19 +834,11 @@ func TestGetLeaderboard_RejectsBadQueryParams(t *testing.T) {
 		{"offset not a number", "offset=x"},
 		{"season is a quarter token", "season=2026Q1"},
 		{"season is a bare word", "season=previous"},
-		// Story 13.3 opened the selector to POSITIVE INTEGERS — everything
-		// below is still malformed, not merely unknown, so it must 400 before
-		// the database is touched (an unknown-but-well-formed id is the 404
-		// tested separately).
 		{"season not a number", "season=abc"},
 		{"season negative", "season=-1"},
 		{"season zero", "season=0"},
 		{"season with a sign", "season=+5"},
 		{"season a decimal", "season=1.5"},
-		// Ids are 32-bit SERIALs. A 64-bit parse followed by uint() would
-		// TRUNCATE these on a 32-bit build and serve a DIFFERENT season's
-		// standings under the requested id; bit size 32 makes them 400s
-		// everywhere. 4294967296 is 2^32 exactly -- the first value that lies.
 		{"season above the 32-bit range", "season=4294967296"},
 		{"season absurdly large", "season=99999999999999999999"},
 	}
@@ -987,10 +914,7 @@ func TestGetLeaderboard_ViewerWhoNeverPlayedIsNull(t *testing.T) {
 	assert.Zero(t, repo.aheadCalls, "no position is counted for a player with no row")
 }
 
-// A player who has played down to 0 SP is ON THE LADDER (Story 13.4): listed at
-// a real position, counted in the total, and given a viewer block that agrees
-// with their row. The list and the viewer block have to agree, so both halves
-// are asserted.
+// A player who has played down to 0 SP stays on the ladder, and the list and viewer block must agree.
 func TestGetLeaderboard_ViewerAtZeroSPHasAStanding(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	seedLadder(repo, 3)
@@ -1084,7 +1008,6 @@ func TestGetLeaderboard_InvisibleUserIsExcludedEverywhere(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.seed(1, "top", 5000, 10)
 	repo.seed(2, "second", 3000, 10)
-	// A row with no username -- the mock's stand-in for users.deleted_at NOT NULL.
 	repo.rows[key(9, testWindow.ID)] = &season.PlayerSeason{
 		UserID: 9, SeasonID: testWindow.ID, SP: 99000, GamesPlayed: 1,
 	}
@@ -1110,7 +1033,6 @@ func TestGetLeaderboard_TierIsDerivedNotTheStoredColumn(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.seed(1, "gm", 1600, 40)
 	repo.seed(2, "viewer", 1100, 30)
-	// Deliberately wrong snapshots, as a stale row would carry.
 	repo.rows[key(1, testWindow.ID)].RankTier = "iron"
 	repo.rows[key(1, testWindow.ID)].RankDivision = divPtr(1)
 	repo.rows[key(2, testWindow.ID)].RankTier = "iron"
@@ -1144,16 +1066,12 @@ func TestGetLeaderboard_RequiresAuth(t *testing.T) {
 	assert.Zero(t, repo.pageCalls)
 }
 
-// A READ MUST NOT WRITE. FindPlayerSeason's contract is explicit that a GET which
-// lazily created a player_seasons row would put everyone who merely opened the
-// lobby onto this very leaderboard -- so the read path is asserted to leave the
-// row set exactly as it found it.
+// A read must not write: opening the leaderboard must not create a player_seasons row for the caller.
 func TestGetLeaderboard_ReadCreatesNoPlayerRecord(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	seedLadder(repo, 3)
 	before := len(repo.rows)
 
-	// A caller with no row of their own is the case that would create one.
 	_, err := callLeaderboard(t, repo, 4242, "season=current")
 	require.NoError(t, err)
 
@@ -1193,13 +1111,7 @@ func TestGetLeaderboard_NilSeasonIsAnErrorNotAPanic(t *testing.T) {
 	assert.Contains(t, err.Error(), "no season")
 }
 
-// --- Review follow-ups (P1, P7, P9, P12) ---
-
-// P12: nothing previously proved that the handler's PARSED parameters, and the
-// resolved season id, arrive at the repository unchanged. A parse that clamped
-// silently, or a service that swapped limit and offset, would still produce a
-// well-formed response — the numbers would just describe a different page than
-// the one asked for.
+// Parsed limit, offset and season id must reach the repository unchanged, not clamped or swapped.
 func TestGetLeaderboard_ParsedParamsReachTheRepositoryUnchanged(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	seedLadder(repo, 60)
@@ -1223,10 +1135,7 @@ func TestGetLeaderboard_DefaultParamsReachTheRepositoryUnchanged(t *testing.T) {
 	assert.Equal(t, [3]int{int(testWindow.ID), 10, 0}, repo.lastPageArgs)
 }
 
-// P10: `?limit=` and `?offset=` are PRESENT BUT EMPTY. They take the defaults
-// rather than 400, matching parseMatchesQuery — so a client that interpolates an
-// undefined value gets the same answer from both endpoints. Pinned because the
-// doc now makes a claim about it.
+// Present-but-empty limit and offset take the defaults rather than 400, matching parseMatchesQuery.
 func TestGetLeaderboard_EmptyParamValuesTakeTheDefaults(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	seedLadder(repo, 30)
@@ -1320,7 +1229,6 @@ func TestGetLeaderboard_PositionsAgreeWithZeroSPPlayersListed(t *testing.T) {
 	repo.seed(5, "floored2", 0, 2)
 	repo.seed(6, "unplayed", 0, 0)
 
-	// Each listed player asks for their own standing in turn.
 	for _, viewerID := range []uint{1, 2, 3, 4, 5} {
 		rec, err := callLeaderboard(t, repo, viewerID, "season=current")
 		require.NoError(t, err)
@@ -1340,14 +1248,10 @@ func TestGetLeaderboard_PositionsAgreeWithZeroSPPlayersListed(t *testing.T) {
 	}
 }
 
-// P7: a SOFT-DELETED account holding an unexpired JWT used to receive a viewer
-// block (FindPlayerSeason has no `users` join) while being absent from the list —
-// a position counted against a population that excluded it, plus a pinned row the
-// caller could never find. The viewer now runs through the list's own predicate.
+// A soft-deleted account with a valid JWT gets no viewer block, since it is absent from the list.
 func TestGetLeaderboard_SoftDeletedViewerHasNoStanding(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.seed(1, "alive", 1000, 10)
-	// A row with SP but no username entry: the mock's soft-deleted account.
 	repo.rows[key(9, testWindow.ID)] = &season.PlayerSeason{
 		UserID: 9, SeasonID: testWindow.ID, SP: 50000, GamesPlayed: 40,
 	}
@@ -1375,10 +1279,6 @@ func TestGetLeaderboard_ViewerLookupFailureSurfaces(t *testing.T) {
 	assert.NotErrorIs(t, err, apperr.ErrUnauthorized)
 }
 
-// --- Story 13.3: prior-season selector, GET /seasons, GET /users/:id/seasons ---
-
-// endedWindow is the quarter BEFORE testWindow — the archive's and the
-// prior-season selector's subject.
 var endedWindow = &season.Season{
 	ID:        5,
 	Name:      "2026 Q2",
@@ -1386,10 +1286,7 @@ var endedWindow = &season.Season{
 	EndsAt:    time.Date(2026, time.July, 1, 0, 0, 0, 0, time.UTC),
 }
 
-// seedEnded drops one player into endedWindow directly (mockRepo.seed only
-// writes into testWindow) with an EXPLICIT stored rank snapshot: an ended
-// season shows what was stored, which for a pre-division season is a bare
-// tier scored on old floors.
+// seedEnded writes one player into endedWindow with an explicit stored rank snapshot.
 func seedEnded(repo *mockRepo, userID uint, username string, sp, gamesPlayed int, tier string, division *int) {
 	repo.rows[key(userID, endedWindow.ID)] = &season.PlayerSeason{
 		UserID: userID, SeasonID: endedWindow.ID, SP: sp,
@@ -1445,9 +1342,7 @@ func TestGetLeaderboard_UnknownSeasonIdIs404(t *testing.T) {
 func TestGetLeaderboard_EndedSeasonByIdRendersItsStandings(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.seasons = []season.Season{*endedWindow}
-	// Current window: a ladder that must NOT leak into the prior season's view.
 	seedLadder(repo, 3)
-	// The ended season: three players, one of them finished on 0 SP.
 	seedEnded(repo, 21, "past-top", 1000, 12, "diamond", nil)
 	seedEnded(repo, 22, "past-second", 400, 8, "silver", nil)
 	seedEnded(repo, 23, "past-zero", 0, 3, "iron", nil)
@@ -1465,22 +1360,17 @@ func TestGetLeaderboard_EndedSeasonByIdRendersItsStandings(t *testing.T) {
 	assert.Equal(t, 2, got.Viewer.Position)
 	assert.Equal(t, 400, got.Viewer.SP)
 
-	// And the resolved id — not the current window's — reached the repository.
 	assert.Equal(t, [3]int{int(endedWindow.ID), 10, 0}, repo.lastPageArgs)
 	assert.Zero(t, repo.currentCalls, "a by-id read never resolves (or creates) the current window")
 }
 
-// AN ENDED SEASON SHOWS ITS STORED RANK, NEVER A RE-DERIVED ONE (Story 13.5). The Q3
-// matrix row: an old-formula total of 3500 SP stored as a bare "gold" reads as
-// Gold with no division, never as Grandmaster, in the rows AND the viewer
-// block. Beside it, a row written after divisions existed keeps its stored
-// division, and the CURRENT season, read in the same test, still derives.
+// An ended season shows its stored rank in rows and viewer, never a re-derived one.
+// The current season, read in the same test, still derives its rank from SP.
 func TestGetLeaderboard_EndedSeasonReadsTheStoredRank(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.seasons = []season.Season{*endedWindow}
 	seedEnded(repo, 31, "q3-veteran", 3500, 90, "gold", nil)
 	seedEnded(repo, 32, "divided", 900, 20, "platinum", divPtr(2))
-	// The same veteran on the running window, with a stale snapshot.
 	repo.seed(31, "q3-veteran", 700, 4)
 	repo.rows[key(31, testWindow.ID)].RankTier = "iron"
 	repo.rows[key(31, testWindow.ID)].RankDivision = divPtr(1)
@@ -1665,7 +1555,9 @@ func TestGetPlayerSeasonArchive_WirePayloadKeysAreExact(t *testing.T) {
 // The archive's membership through the HTTP surface: the ACTIVE season is
 // excluded, a played-but-0-SP ended season is included, newest-first.
 func TestGetPlayerSeasonArchive_ActiveExcludedZeroSPKept(t *testing.T) {
-	repo := newMockRepo(testWindow)
+	active := *testWindow
+	active.EndsAt = time.Now().UTC().AddDate(1, 0, 0)
+	repo := newMockRepo(&active)
 	older := season.Season{
 		ID:        4,
 		Name:      "2026 Q1",
@@ -1673,9 +1565,7 @@ func TestGetPlayerSeasonArchive_ActiveExcludedZeroSPKept(t *testing.T) {
 		EndsAt:    time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC),
 	}
 	repo.seasons = []season.Season{*endedWindow, older}
-	// Active season: must not appear.
 	repo.seed(42, "archiver", 5000, 9)
-	// Ended seasons: one earned, one played at 0 SP — BOTH archive rows.
 	seedEnded(repo, 42, "archiver", 200, 8, "bronze", divPtr(2))
 	repo.rows[key(42, older.ID)] = &season.PlayerSeason{
 		UserID: 42, SeasonID: older.ID, SP: 0, RankTier: "iron", GamesPlayed: 2,
@@ -1740,8 +1630,6 @@ func TestGetPlayerSeasonArchive_UnknownUserIsEmpty200(t *testing.T) {
 
 // Malformed subject ids are 400s, mirroring every other :id route.
 func TestGetPlayerSeasonArchive_RejectsBadSubjectIds(t *testing.T) {
-	// 4294967296 is 2^32: parsed at 64 bits and cast to uint it would truncate
-	// to a DIFFERENT user's id on a 32-bit build and serve their archive.
 	for _, bad := range []string{"abc", "0", "-1", "1.5", "4294967296", "99999999999999999999"} {
 		t.Run(bad, func(t *testing.T) {
 			repo := newMockRepo(testWindow)
@@ -1771,8 +1659,6 @@ func TestGetPlayerSeasonArchive_RepositoryFailureSurfaces(t *testing.T) {
 	assert.NotErrorIs(t, err, apperr.ErrUnauthorized)
 }
 
-// --- Story 13.3: CurrentSeasonRank (the profile's narrow reader) ---
-
 // The service satisfies user.SeasonRankReader structurally; these pin the
 // contract the profile depends on without importing `user` (season_test must
 // not — the edge is one-way).
@@ -1790,7 +1676,6 @@ func TestCurrentSeasonRank_DerivesTierFromSP(t *testing.T) {
 	repo := newMockRepo(testWindow)
 	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
 		UserID: 42, SeasonID: testWindow.ID, SP: 700,
-		// Deliberately stale — the active season derives, so it is ignored.
 		RankTier: "iron", RankDivision: divPtr(1),
 		GamesPlayed: 30, GamesCompleted: 28,
 	}

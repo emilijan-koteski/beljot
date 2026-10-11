@@ -12,9 +12,8 @@ import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { variantLabel } from "@/shared/lib/roomLabels";
 import { normalizeVariant, type Variant, VARIANTS } from "@/shared/types/matchTypes";
 
-// The eyebrow above the tab bar names the tablist through aria-labelledby, so
-// the string is announced once rather than duplicated into an aria-label.
 const VARIANT_LABEL_ID = "rules-variant-label";
+const SCROLL_SPY_OFFSET_PX = 140;
 
 export function RulesPage() {
   const { t, i18n } = useTranslation();
@@ -22,8 +21,6 @@ export function RulesPage() {
   const sections = content.sections;
   const firstId = sections[0]?.id ?? "";
 
-  // Bitola is the default tab: it is the only variant Quick Play offers and the
-  // one an unfamiliar reader is most likely to land in.
   const [variant, setVariant] = useState<Variant>("bitola");
   const [activeId, setActiveId] = useState(firstId);
   const refs = useRef<Record<string, HTMLElement | null>>({});
@@ -36,18 +33,13 @@ export function RulesPage() {
     setActiveId(id);
   };
 
-  // Scroll-spy — highlight the chapter whose header sits closest above the
-  // ~140px mark below the sticky top bar. Keyed on the active variant too:
-  // flipping tabs swaps whole blocks in and out of `basics` and `melds`, so
-  // every chapter below them moves and a stale `activeId` would highlight the
-  // wrong entry until the next scroll event.
   useEffect(() => {
     const onScroll = () => {
       let best = firstId;
       for (const s of sections) {
         const el = refs.current[s.id];
         if (!el) continue;
-        if (el.getBoundingClientRect().top - 140 <= 0) best = s.id;
+        if (el.getBoundingClientRect().top - SCROLL_SPY_OFFSET_PX <= 0) best = s.id;
       }
       setActiveId(best);
     };
@@ -58,8 +50,6 @@ export function RulesPage() {
 
   return (
     <RulesProvider value={{ content, variant }}>
-      {/* One provider for the whole page: every difference marker's tooltip
-          shares its delay grouping instead of each mounting a provider root. */}
       <TooltipProvider delay={0}>
         <div
           className="mx-auto flex max-w-270 items-start gap-10 px-7 py-10"
@@ -88,12 +78,7 @@ export function RulesPage() {
               >
                 {content.ui.variantLabel}
               </span>
-              <Tabs
-                value={variant}
-                // Guarded, not cast: a value outside the union would hide every
-                // scoped block and leave `basics` and `melds` with no steps at all.
-                onValueChange={(value) => setVariant(normalizeVariant(value))}
-              >
+              <Tabs value={variant} onValueChange={(value) => setVariant(normalizeVariant(value))}>
                 <TabsList aria-labelledby={VARIANT_LABEL_ID}>
                   {VARIANTS.map((v) => (
                     <TabsTrigger key={v} value={v} data-testid={`rules-variant-${v}`}>

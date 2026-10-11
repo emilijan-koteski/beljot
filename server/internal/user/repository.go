@@ -2,11 +2,8 @@ package user
 
 import "time"
 
-// PreferencesUpdate is a PARTIAL write to the player's preference columns. A
-// nil pointer leaves that column untouched; a non-nil one writes its value —
-// including false for the audio switches and 0 for the audio volumes, which is
-// why they are *bool / *int rather than bool / int (a plain false or 0 would be
-// indistinguishable from "not sent").
+// PreferencesUpdate is a partial write to the player's preference columns.
+// A nil pointer leaves that column untouched, so false and 0 can still be written explicitly.
 type PreferencesUpdate struct {
 	LanguagePreference *string
 	CardDeckPreference *string
@@ -23,91 +20,22 @@ func (p PreferencesUpdate) IsEmpty() bool {
 		p.SoundVolume == nil && p.MusicVolume == nil
 }
 
+// UserRepository persists users and their per-user counters.
+// Batch mutations lock rows FOR UPDATE in ascending userID order inside one transaction.
 type UserRepository interface {
 	Create(user *User) error
-	// Delete soft-deletes the user (GORM DeletedAt). The users unique indexes
-	// are partial (WHERE deleted_at IS NULL), so a soft-deleted row frees its
-	// email and username again. Used as the compensating action when SSO
-	// registration fails after the user insert. Returns ErrUserNotFound when
-	// no live row matches.
 	Delete(id uint) error
 	FindByEmail(email string) (*User, error)
 	FindByUsername(username string) (*User, error)
-	// SearchByUsername returns up to `limit` users whose username contains
-	// `query` as a case-insensitive substring (ILIKE '%query%'), ordered by
-	// username ascending. The requesting user (excludeUserID) and soft-deleted
-	// users are excluded (the latter via GORM's default scope). LIKE
-	// metacharacters (\, %, _) in `query` are escaped so they match literally —
-	// `_` is a legal username character and must not act as a wildcard. Story
-	// 11.1 (FR5); the first ILIKE query in the Go backend.
 	SearchByUsername(query string, excludeUserID uint, limit int) ([]User, error)
 	FindByID(id uint) (*User, error)
-	// FindManyByIDs returns all users whose ID is in the provided slice, in
-	// arbitrary order. Returns an empty slice (no DB round-trip) when ids is
-	// empty. Soft-deleted users are excluded via GORM's default scope.
 	FindManyByIDs(ids []uint) ([]User, error)
-	// Count returns the total number of registered (non-soft-deleted) users.
 	Count() (int64, error)
-	// UpdatePreferences writes the supplied preference columns in ONE statement.
-	// A nil field means "leave that column alone", so a deck-only PATCH does
-	// not have to resend the language, a music toggle does not resend the
-	// sound switch, a volume change resends nothing else, and so on (Story
-	// 12.4; audio switches, migration 000025; audio volumes, migration 000026).
-	//
-	// One statement, not several, is the point: with sequential per-column
-	// writes a multi-field request whose second write failed answered 500 with
-	// the FIRST change already committed, leaving the client's optimistic state
-	// and the row disagreeing with no way to tell. Either all land or none does.
-	//
-	// Returns ErrUserNotFound when no row matches. An update with every field
-	// nil is a programming error and returns ErrBadRequest rather than a no-op
-	// UPDATE.
 	UpdatePreferences(id uint, prefs PreferencesUpdate) error
-	// UpdatePasswordHash replaces the user's bcrypt password hash (used by the
-	// password-reset flow). Returns ErrUserNotFound when no row matches.
 	UpdatePasswordHash(id uint, hash string) error
-	// UpdateUsername sets the user's username and stamps username_changed_at to
-	// now (UTC), returning that stamp. Cooldown enforcement is atomic: the write
-	// only lands when the row is outside the change cooldown, so concurrent
-	// requests cannot both succeed — a lost cooldown race returns
-	// ErrUsernameChangeTooSoon. A duplicate username maps the pg 23505
-	// unique-violation to ErrUsernameTaken (mirroring Create) so a lost
-	// uniqueness race returns 409, not a raw 500.
 	UpdateUsername(id uint, username string) (time.Time, error)
-	// AddXP atomically adds each (userID -> delta) to that user's total_xp and
-	// returns each user's NEW total (Story 9.5). Mirrors the wallet charge/settle
-	// lock discipline (one transaction, FOR UPDATE, ascending userID order) so
-	// concurrent match-ends — or one user finishing back-to-back matches — are
-	// race-free. Zero-delta entries are skipped (absent from the result). Returns
-	// ErrUserNotFound (rolling the whole batch back) if any target row is missing.
 	AddXP(awards map[uint]int) (map[uint]int, error)
-	// TotalXPForUsers returns the total_xp of each requested user, keyed by ID.
-	// A read-only batch lookup used at match start to stamp each seat's static
-	// level. Returns an empty map (no DB round-trip) when ids is empty; unknown
-	// IDs are simply absent from the result (no error). Soft-deleted users are
-	// excluded via GORM's default scope.
 	TotalXPForUsers(ids []uint) (map[uint]int, error)
-	// ApplyHonorEvents records exactly ONE finished match per listed user and
-	// returns each user's resulting honor state (Story 9.7). For every user it
-	// decays the stored weights forward to `now` FIRST, then adds the new
-	// event's full weight of 1.0 — which is algebraically identical to summing
-	// every match's decayed weight from scratch, so the running totals stay
-	// exact rather than approximate.
-	//
-	// It also stamps honor_decayed_at = now, bumps the matching raw lifetime
-	// total, and refreshes the denormalized honor_score snapshot.
-	//
-	// Same lock discipline as AddXP and the wallet settlement it races with:
-	// one transaction, FOR UPDATE, ascending userID order. User id 0 (the bot
-	// placeholder) is skipped. An empty map is a no-op with no DB round-trip. A
-	// missing row returns ErrUserNotFound and rolls the WHOLE batch back.
 	ApplyHonorEvents(events map[uint]HonorEvent, now time.Time) (map[uint]HonorSnapshot, error)
-	// ResetHonor is the operator forgiveness hook (Story 9.7 AC9): it clears
-	// one user's weights, raw totals and decay stamp, returning them to the
-	// state of a player with no history (honor_score back to the 80 prior), in
-	// one transaction. Deliberately has NO endpoint and NO admin UI — Story 9.7
-	// D7 ships the capability, not an operator surface. The equivalent hand-run
-	// SQL is documented in the 000017 migration header. Returns ErrUserNotFound
-	// when no live row matches.
 	ResetHonor(userID uint) error
 }

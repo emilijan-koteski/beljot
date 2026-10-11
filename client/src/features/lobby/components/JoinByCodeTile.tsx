@@ -15,13 +15,8 @@ import type { Room } from "@/shared/types/apiTypes";
 const CODE_LENGTH = 6;
 
 /**
- * 6-char uppercase code input + Join button inline. Replaces the older
- * <JoinByCode> sidebar tile; mirrors the design's hero action rail. Submits
- * on Enter and on button click.
- *
- * Story 9.6: a code can resolve to a private room. We resolve the code first
- * (getRoomByCode exposes room.isPrivate but never demands the password), then
- * prompt for the password before joining when the room is private.
+ * Room-code input with an inline Join button, submitting on Enter or click.
+ * Resolves the code first and prompts for a password when the room is private.
  */
 export function JoinByCodeTile() {
   const { t } = useTranslation();
@@ -34,13 +29,8 @@ export function JoinByCodeTile() {
   const isValid = code.trim().length === CODE_LENGTH;
   const busy = resolving || joinRoomMutation.isPending;
 
-  // Maps a join/lookup failure to a toast. WRONG_ROOM_PASSWORD is handled inline
-  // by the prompt, never here.
-  //
-  // Story 11.5 D4: one shared mapping across every join entry point. No room is
-  // threaded in — toastError is shared by the lookup and join paths and the
-  // lookup one holds no room — so the coin/honor branches fall back to their
-  // param-less generic copy, exactly as before.
+  // Maps a lookup or join failure to a toast with the generic shared copy.
+  // WRONG_ROOM_PASSWORD is handled inline by the prompt, never here.
   function toastError(err: unknown) {
     const c = err instanceof FetchError ? err.code : null;
     toast.error(joinFailureMessage(c));
@@ -54,7 +44,6 @@ export function JoinByCodeTile() {
     } catch (err) {
       const c = err instanceof FetchError ? err.code : null;
       if (c === "WRONG_ROOM_PASSWORD") {
-        // Keep the prompt open with the inline error for a retry (AC4).
         setPasswordErrorKey("room.errors.wrongPassword");
         return;
       }

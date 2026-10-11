@@ -28,8 +28,6 @@ describe("SuitMark", () => {
     expect(mark.tagName).toBe("IMG");
     expect(mark).toHaveAttribute("src", `/suits/croatian/${suit}.webp`);
     expect(mark).toHaveAttribute("data-deck", "croatian");
-    // Both decks occupy the same box at the same `size`, so a surface does not
-    // reflow when the player switches decks.
     expect(mark.style.width).toBe("30px");
     expect(mark.style.height).toBe("30px");
   });
@@ -39,9 +37,6 @@ describe("SuitMark", () => {
     expect(screen.getByTestId("suit-mark-D").style.color).toBe("");
   });
 
-  // Every call site already names the suit on an ancestor (chip aria-label,
-  // button aria-label, seal aria-label, seat chip title), so the mark itself
-  // must not be announced a second time.
   it.each(DECKS)("is decorative on the %s deck", (deck) => {
     render(<SuitMark suit="H" deck={deck} size={18} />);
     expect(screen.getByTestId("suit-mark-H")).toHaveAttribute("aria-hidden", "true");
@@ -53,9 +48,6 @@ describe("SuitMark", () => {
   });
 
   it("hides a croatian icon that cannot load, leaving the surrounding chrome", () => {
-    // Production answers a bad asset path with index.html at 200, which browsers
-    // paint as a broken-image glyph — inside a 44 px parchment orb that is worse
-    // than an empty orb.
     render(<SuitMark suit="C" deck="croatian" size={30} />);
 
     const mark = screen.getByTestId("suit-mark-C");

@@ -6,7 +6,6 @@ type SectionHeaderProps = {
   eyebrow: string;
   title: string;
   sub?: string;
-  /** Optional trailing slot, right-aligned (e.g. a control). */
   right?: ReactNode;
 };
 

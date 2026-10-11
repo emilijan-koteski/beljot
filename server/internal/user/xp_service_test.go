@@ -9,9 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeLevelRepo is a minimal UserRepository stub exercising only the methods
-// XPService.LevelsForUsers touches. All other methods panic to surface
-// accidental coupling.
+// fakeLevelRepo is a UserRepository stub for LevelsForUsers; every other method panics.
 type fakeLevelRepo struct {
 	totals map[uint]int
 	err    error
@@ -52,9 +50,9 @@ func (f *fakeLevelRepo) ApplyHonorEvents(map[uint]HonorEvent, time.Time) (map[ui
 
 func TestXPService_LevelsForUsers_AppliesCurve(t *testing.T) {
 	repo := &fakeLevelRepo{totals: map[uint]int{
-		10: 0,    // Level 0
-		20: 60,   // Level 1 (>= 50)
-		30: 1250, // Level 5
+		10: 0,
+		20: 60,
+		30: 1250,
 	}}
 	svc := NewXPService(repo)
 
@@ -64,7 +62,6 @@ func TestXPService_LevelsForUsers_AppliesCurve(t *testing.T) {
 	assert.Equal(t, 0, levels[10])
 	assert.Equal(t, 1, levels[20])
 	assert.Equal(t, 5, levels[30])
-	// Unknown user is absent (the repo omitted it), not a zero-keyed entry.
 	_, present := levels[99]
 	assert.False(t, present, "unknown user must be absent from the level map")
 }

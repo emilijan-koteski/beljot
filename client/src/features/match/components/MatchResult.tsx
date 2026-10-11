@@ -25,50 +25,19 @@ interface MatchResultProps {
   data: MatchEndPayload;
   viewerTeam: TeamString;
   onReturnToLobby: () => void;
-  /** Reopens the same room (status completed → waiting) and routes the viewer
-   *  back to the room lobby on their original seat, so the group can play
-   *  another match without recreating a room. */
   onReturnToRoom: () => void;
-  /** Resolved username for `data.surrenderedBySeat`. Optional — falls back to
-   *  `game.surrender.unknownProposer` when undefined and outcomeReason is
-   *  "surrender" (e.g. a race where matchState was cleared before the overlay
-   *  mounted). Has no effect for natural match-ends. */
   surrenderedByUsername?: string;
-  /** Story 9.2: the viewer's net coin change for this match (winner's pot
-   *  share minus stake, or −stake for a loser). Undefined for free (0 buy-in)
-   *  matches and omitted while the settlement event is still in flight; a 0
-   *  delta (e.g. a lone winner who only recovers their stake) renders nothing. */
   coinDelta?: number;
-  /** Honour movement for this match (honour redesign R7). Undefined for a New
-   *  Player, whose score is deliberately not shown, and while the honour event is
-   *  still in flight. The chip itself renders only when the movement CROSSED a
-   *  tier boundary (user decision 2026-07-31) — a few points inside the same
-   *  band is noise, a change of standing is news. */
   honorSettlement?: { before: number; after: number; tier: string } | null;
-  /** The viewer's Season Points outcome (Story 13.5), from the match store.
-   *  Undefined/null while event:season_points_awarded is still in flight (it
-   *  follows match_end in the same burst) and for a player the server scored
-   *  nothing for; the line then simply does not render. */
   seasonSettlement?: SeasonSettlement | null;
-  /** The room this match was played in. Enables the collapsible per-hand
-   *  breakdown — without it there is no room to read the stats from, and the
-   *  section simply never renders. */
   roomId?: number;
-  /** Dedupe key for the win/lose jingle (see `payloadSoundKey`), played once
-   *  when the result mounts, for the viewer's team. Omitted or null: silent. */
   soundKey?: string | null;
 }
 
-// Loss accent — the soft red shared with the surrender overlay, kept local
-// since MatchResult is otherwise gold/silver. Wins use the off-theme COIN_GOLD.
 const COIN_LOSS = "#ff8585";
 
 /**
- * End-of-match overlay — gold/silver-glowing classic panel with the winner
- * banner, viewer-first score columns, match duration, and two actions:
- * a primary "Return to room" (reopen + replay with the same group) and a
- * ghost "Return to lobby". Surrender wins also show a "<player> surrendered
- * the match" footnote.
+ * End-of-match overlay with the winner banner, viewer-first scores, and the return-to-room and lobby actions.
  */
 export function MatchResult({
   data,
@@ -84,24 +53,9 @@ export function MatchResult({
 }: MatchResultProps) {
   const { t } = useTranslation();
 
-  // The just-finished match, read back over REST (there is no match-stats WS
-  // event). Enabled as soon as the overlay mounts rather than on expand, so the
-  // toggle only ever appears when there is something behind it. The row is
-  // already persisted by the time match_end reaches us (live_match.go writes
-  // before it broadcasts), so this is a read, not a poll.
   const statsQuery = useRoomLastMatchQuery(roomId, roomId !== undefined);
-  // Collapsed by default — the score and the two actions are what this dialog
-  // is for; the breakdown is an optional second look.
   const [statsOpen, setStatsOpen] = useState(false);
 
-  // Only ever paint a row that IS the match that just ended. The query key is
-  // per-ROOM, so its cache entry describes match N-1 from the moment match N
-  // starts — the room lobby populated it before anyone sat down. `useWsDispatch`
-  // removes that entry on match_end and the query is `staleTime: 0`, but neither
-  // helps an overlay mounted from a cache this component cannot see (a
-  // reconnect, a second tab, a future caller). Both the persisted row and the
-  // match_end payload are projections of the same final GameState — TeamScores
-  // and WinnerTeam, verbatim — so equality here is exact, never a heuristic.
   const stats = statsQuery.data;
   const statsAreThisMatch =
     stats !== undefined &&
@@ -165,12 +119,6 @@ export function MatchResult({
               </p>
             )}
 
-            {/* A "dosta" room's match ends the moment a team reaches the target,
-                so the player is looking at a finished match with cards still in
-                their hand and a score that jumped. Without this line that reads
-                as a bug rather than as the rule the room was created with. The
-                second sentence pre-empts the follow-up question: the hand
-                breakdown below is one hand short, on purpose. */}
             {data.outcomeReason === "target_reached" && (
               <p
                 className="font-body text-sm"
@@ -181,7 +129,6 @@ export function MatchResult({
               </p>
             )}
 
-            {/* Final-score columns — viewer-first ordering preserved. */}
             <div className="flex items-center justify-center gap-6 mt-2 mb-2">
               {viewerTeam === "teamA" ? (
                 <>
@@ -228,9 +175,6 @@ export function MatchResult({
               )}
             </div>
 
-            {/* Coin outcome (Story 9.2) — the won/lost stake, shown here in the
-                result dialog instead of a transient toast. Gold for a win, red
-                for a loss; hidden for free matches and net-zero deltas. */}
             {showCoins && (
               <div
                 className="font-display inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
@@ -251,19 +195,6 @@ export function MatchResult({
               </div>
             )}
 
-            {/* Honour movement (honour redesign R7), shown ONLY when the match
-                moved the score across a tier boundary (user decision 2026-07-31):
-                a few points inside the same band is noise every finished match
-                produces, but a change of STANDING — Fair to Trusted, Trusted to
-                Fair — is news, and it reads as tier names, not numbers.
-
-                The before-tier is bucketed from the before-score with the same
-                bands the server uses; the after-tier prefers the server's token.
-                No scolding copy on the way down — the demotion is the
-                consequence, and adding a sentence would make it a telling-off.
-
-                Tier colour comes from HONOR_TIER_COLOR, whose values re-root inside
-                .game-table, so this reads correctly on dark felt with no branch. */}
             {honorSettlement &&
               (() => {
                 const tierBefore = honorTierForScore(honorSettlement.before);
@@ -294,9 +225,6 @@ export function MatchResult({
                 );
               })()}
 
-            {/* Season Points (Story 13.5): the signed change and the rank it
-                lands on, beside the coin settlement. Shown on every rated
-                finish, a zero change included ("0 SP · Iron 1"). */}
             {seasonSettlement && <SeasonSpLine settlement={seasonSettlement} />}
 
             <p
@@ -307,19 +235,6 @@ export function MatchResult({
               {t("match.matchResult.duration")}: {formattedDuration}
             </p>
 
-            {/* Per-hand breakdown — the SAME card the profile and the room
-                lobby render, on a parchment inset because it is built for the
-                parchment palette and this panel sits on dark felt.
-
-                Three props are load-bearing here and nowhere else:
-                • `handsLayout="stacked"` — HandsGrid picks its layout from a
-                  VIEWPORT media query, and its desktop table is `min-w-155`
-                  (620px), which overflows this 520px panel on any desktop.
-                • `linkPlayers={false}` — a seat chip link would PUSH-navigate
-                  out of the match, unmounting MatchPage before the player has
-                  returned to the room or left it.
-                • `allowRemoveFriend={false}` — that confirm is a z-50 dialog
-                  and this panel is Z.PROMPT (74); it would open behind us. */}
             {statsAreThisMatch && stats !== undefined && (
               <div className="mt-1 w-full" data-testid="match-result-stats">
                 <button

@@ -57,9 +57,6 @@ describe("buildDealSchedule", () => {
     });
   });
 
-  // The server pushes the next actor's deadline back by these same numbers
-  // (server/internal/match/deal_grace.go). If the schedule changes, both the
-  // MOTION constants and the Go constants have to move with it.
   it.each<[DealKind, number]>([
     ["candidateFirst", 2100],
     ["allBeforeBidding", 2260],
@@ -69,8 +66,6 @@ describe("buildDealSchedule", () => {
     expect(DEAL_DURATION[kind]).toBe(ms);
   });
 
-  // The server's match-start grace adds this splash hold (deal_grace.go
-  // matchStartSplash) on top of the opening deal.
   it("keeps the match-start splash the server's grace counts on (1500 ms)", () => {
     expect(MOTION.GAME_STARTING_SPLASH).toBe(1500);
   });

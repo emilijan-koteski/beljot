@@ -6,8 +6,6 @@ export type ChipOption<T extends string | number> = {
   value: T;
   label: React.ReactNode;
   icon?: React.ReactNode;
-  /** Per-chip accent colour (CSS colour value) — e.g. an honour tier's own
-   *  colour, so picking that chip also shows its band. Defaults to --accent. */
   tone?: string;
 };
 

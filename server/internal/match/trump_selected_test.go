@@ -30,9 +30,6 @@ func TestTrumpSelected_EmittedWithEmptyCardIDWhenNoCandidate(t *testing.T) {
 			wantCardID: "",
 		},
 		{
-			// The FORCED path: three passes recorded, the dealer on the clock
-			// with no legal pass. The forced pick must announce itself on the
-			// wire exactly like a voluntary one — empty cardId, no candidate.
 			name: "forced dealer pick — still emits with empty cardId",
 			state: func() *game.GameState {
 				gs := testfixtures.NewGameCroatianMidBidding(3)
@@ -48,7 +45,7 @@ func TestTrumpSelected_EmittedWithEmptyCardIDWhenNoCandidate(t *testing.T) {
 			name:       "candidate present — the absorbed card rides along",
 			state:      func() *game.GameState { return testfixtures.NewGameJustDealt() },
 			suit:       nil,
-			wantCardID: "AH", // the fixture's face-up candidate
+			wantCardID: "AH",
 		},
 	}
 

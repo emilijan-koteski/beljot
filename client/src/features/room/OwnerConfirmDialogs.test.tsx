@@ -107,9 +107,7 @@ describe("TransferOwnershipDialog", () => {
     expect(await screen.findByTestId("transfer-dialog-title")).toHaveTextContent(
       "Transfer room ownership to another player?",
     );
-    // The current host reads as "You · current host" (name conveyed by the avatar initial).
     expect(screen.getByText(/current host/i)).toBeInTheDocument();
-    // The new host is named in both the lede and the handoff caption.
     expect(screen.getAllByText(/filip/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Kicking & promoting players/)).toBeInTheDocument();
     expect(screen.getByTestId("transfer-confirm")).toHaveTextContent("Make host");
@@ -149,8 +147,6 @@ describe("owner confirm dialog footer order", () => {
     await screen.findByTestId("kick-dialog-title");
     expectActionBeforeStatusQuo("kick-confirm", "kick-cancel");
 
-    // Swapping the footer pair must not disturb the X, which stays pinned to
-    // the top-right corner rather than joining the footer row.
     const close = screen.getByLabelText("Close");
     expect(close.style.position).toBe("absolute");
     expect(

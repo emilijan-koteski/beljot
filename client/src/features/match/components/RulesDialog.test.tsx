@@ -39,10 +39,8 @@ describe("RulesDialog (in-game)", () => {
 
     expect(screen.getByTestId("rules-dialog")).toBeInTheDocument();
     expect(screen.getByText("Belote rules")).toBeInTheDocument();
-    // Chapter index entries for all six chapters.
     expect(screen.getByTestId("rules-toc-goal")).toHaveTextContent("The goal");
     expect(screen.getByTestId("rules-toc-scoring")).toHaveTextContent("Scoring");
-    // Content: a chapter heading, a card value, and a declaration.
     expect(
       screen.getByRole("heading", { name: "Trump plays by its own rules" }),
     ).toBeInTheDocument();
@@ -54,8 +52,6 @@ describe("RulesDialog (in-game)", () => {
   it("does not render a language toggle", () => {
     render(<RulesDialog open onOpenChange={() => {}} />);
     const dialog = screen.getByTestId("rules-dialog");
-    // The design's per-dialog en/mk switch is intentionally gone — language is
-    // set in game settings.
     expect(within(dialog).queryByRole("button", { name: /^mk$/i })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /^en$/i })).not.toBeInTheDocument();
   });
@@ -74,12 +70,6 @@ describe("RulesDialog (in-game)", () => {
     await user.click(screen.getByTestId("rules-toc-melds"));
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
-
-  // ── The variant split ────────────────────────────────────────────────────
-  //
-  // The overlay opens over a live table, so the tab it lands on has to be the
-  // variant actually being played — rules that contradict the cards in front of
-  // the player are worse than no rules at all.
 
   const BITOLA_STEP = "Deal five each, then turn one up";
   const CROATIA_STEP = "Deal all eight up front";
@@ -130,10 +120,6 @@ describe("RulesDialog (in-game)", () => {
   });
 
   it("resets the tab to the match variant when reopened", () => {
-    // The component stays MOUNTED while closed (`if (!open) return null` sits
-    // after the hooks), so `activeVariant` survives a close. Without the reset
-    // effect a player who browsed the other ruleset mid-hand would come back to
-    // it, still showing rules this table is not playing.
     const { rerender } = render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
     fireEvent.click(screen.getByTestId("rules-dialog-variant-croatia"));
     expect(screen.getByText(CROATIA_STEP)).toBeInTheDocument();
@@ -154,7 +140,6 @@ describe("RulesDialog (in-game)", () => {
     render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
     const bitola = screen.getByTestId("rules-dialog-variant-bitola");
     const croatia = screen.getByTestId("rules-dialog-variant-croatia");
-    // Roving tabIndex: only the selected tab is in the tab order.
     expect(bitola).toHaveAttribute("tabindex", "0");
     expect(croatia).toHaveAttribute("tabindex", "-1");
 
@@ -189,8 +174,6 @@ describe("RulesDialog (in-game)", () => {
         .map((el) => el.textContent ?? "")
         .filter((txt) => /^\d\d$/.test(txt))
         .slice(0, 6);
-    // The dark switch filters and numbers independently of the light one, so it
-    // needs its own proof: numbering the unfiltered array reads 01,02,03,05,07,09.
     expect(numbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
     await user.click(screen.getByTestId("rules-dialog-variant-croatia"));
     expect(numbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
@@ -199,7 +182,6 @@ describe("RulesDialog (in-game)", () => {
   it("marks each divergent step individually in the overlay", async () => {
     const user = userEvent.setup();
     render(<RulesDialog open onOpenChange={() => {}} variant="croatia" />);
-    // Shared steps carry no marker; the divergent one carries its own.
     expect(
       within(screen.getByText("Take your seat")).queryByTestId("rules-diff-marker"),
     ).not.toBeInTheDocument();
@@ -230,10 +212,6 @@ describe("RulesDialog (in-game)", () => {
     ).toBeInTheDocument();
   });
 
-  // The scoring chapter says the match runs until a team is on the target "at the
-  // end of a hand", which is the opposite of what a "dosta" table does. The
-  // content module has no room-level split (Story 12.9 owns that), so the caveat
-  // rides on the dialog — and must NOT appear on an ordinary table.
   it("caveats the scoring chapter on a stop-at-target table", () => {
     render(<RulesDialog open onOpenChange={() => {}} stopAtTarget />);
     expect(screen.getByTestId("rules-dialog-stop-at-target-note")).toBeInTheDocument();

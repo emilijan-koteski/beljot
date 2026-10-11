@@ -11,20 +11,8 @@ import {
 import { useFriendRequests } from "@/shared/hooks/queries/useFriendRequests";
 
 /**
- * The viewer's incoming friend-requests surface in the lobby (Story 11.2, AC4 +
- * AC8). Each row shows the sender's username with Accept / Decline actions wired
- * to the friend mutations. This list is the DURABLE delivery path — the WS
- * system:friend_request push only invalidates it (best-effort, online-only).
- *
- * A SECTION inside the Friends card, not a card of its own: requests and friends
- * are one relationship in two states, and giving each a card meant two headings,
- * two borders and two paddings to show what is usually two or three names. It
- * renders NOTHING unless there is at least one pending request — an empty inbox
- * is the normal state and is not worth the row it takes to announce itself. No
- * loading placeholder either, for the same reason: it would resolve to nothing.
- *
- * Requests tile into an auto-filling grid rather than stacking full width, so a
- * handful of names occupies one line on a wide lobby instead of three.
+ * The pending friend-requests section inside the Friends card, with accept and decline actions.
+ * It renders nothing while loading or when there are no pending requests.
  */
 export function FriendRequests() {
   const { t } = useTranslation();
@@ -45,8 +33,6 @@ export function FriendRequests() {
     >
       <div className="mb-1.5 flex items-center gap-1.5">
         <Eyebrow>{t("friends.requests.heading")}</Eyebrow>
-        {/* The count earns its place once the tiles wrap onto a second line and
-            the eye can no longer take them in at a glance. */}
         <span className="text-brass-deep font-mono text-[10.5px] font-semibold tabular-nums">
           {requests.length}
         </span>
@@ -60,9 +46,6 @@ export function FriendRequests() {
             data-testid="friend-request-row"
             data-request-id={request.id}
           >
-            {/* Avatar + name open the sender's public profile, exactly as a friend
-                row does — deciding on a request usually means looking the person
-                up first, and the two surfaces sit in the same card. */}
             <button
               type="button"
               onClick={() => navigate(`/players/${request.fromUserId}`)}
@@ -78,12 +61,6 @@ export function FriendRequests() {
               />
               <span className="text-ink truncate text-sm font-medium">{request.fromUsername}</span>
             </button>
-            {/* Bare glyphs, no chip: a tick and a cross beside a pending name are
-                as legible as the verbs at a third of the width, and boxing each
-                one put two more borders inside a tile that already has one. Solid
-                ink, not a tinted fill — green reads accept, grey reads dismiss,
-                and hover confirms which is which. The verbs stay as the accessible
-                name and the hover title. The size-6 box is the tap target only. */}
             <button
               type="button"
               data-testid="friend-request-accept"

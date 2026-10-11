@@ -20,7 +20,6 @@ describe("SurrenderButton", () => {
     );
     const button = screen.getByTestId("surrender-button");
     expect(button).toBeEnabled();
-    // The HUD button is icon-only; the verbose status reads through aria-label.
     expect(button.getAttribute("aria-label")).toMatch(/Surrender/i);
   });
 

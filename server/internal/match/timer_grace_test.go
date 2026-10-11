@@ -12,10 +12,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// TestMatchMessages_CarryServerNow locks the clock-sync contract: every match
-// message stamps the server wall clock on the envelope so clients can estimate
-// their clock offset and render TurnExpiresAt / ReconnectExpiresAt countdowns
-// against corrected time instead of a possibly-skewed Date.now().
+// Every match message stamps the server wall clock on the envelope so clients can
+// correct their countdowns for clock skew.
 func TestMatchMessages_CarryServerNow(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
@@ -38,21 +36,16 @@ func TestMatchMessages_CarryServerNow(t *testing.T) {
 	}
 }
 
-// TestWSMessage_ServerNowIsOptionalOnTheWire guards the inbound direction:
-// client messages carry no serverNow, and the field must serialize as absent
-// (omitempty), never as null — the client types the envelope field as
-// optional (`serverNow?: string` on WsMessage in wsEvents.ts).
+// serverNow must serialize as absent when unset, never as null, because the client
+// types it as optional.
 func TestWSMessage_ServerNowIsOptionalOnTheWire(t *testing.T) {
 	b, err := json.Marshal(ws.WSMessage{Type: "action:continue", Payload: []byte(`{}`)})
 	require.NoError(t, err)
 	assert.NotContains(t, string(b), "serverNow")
 }
 
-// TestPerMoveTimer_FiresAfterAdvertisedDeadlineNotBefore locks the expiryGrace
-// contract: TurnExpiresAt advertises start+duration exactly (clients count down
-// to it and reach 0 there), while the server's auto-action fires expiryGrace
-// later — never before the advertised deadline. Players must always see "0"
-// before the server acts in their name.
+// TurnExpiresAt advertises start+duration exactly, while the auto-action fires
+// expiryGrace later, so players always see 0 before the server acts.
 func TestPerMoveTimer_FiresAfterAdvertisedDeadlineNotBefore(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
@@ -66,22 +59,16 @@ func TestPerMoveTimer_FiresAfterAdvertisedDeadlineNotBefore(t *testing.T) {
 	require.NotNil(t, state)
 	firstBidder := state.ActivePlayerSeat
 
-	// The advertised deadline reflects the configured duration only — the
-	// grace is the server's private cushion, never added to what clients see.
 	require.NotNil(t, state.TurnExpiresAt)
 	assert.WithinDuration(t, start.Add(1*time.Second), *state.TurnExpiresAt, 200*time.Millisecond,
 		"advertised TurnExpiresAt must be start+duration, without the grace")
 
-	// Before the advertised deadline the seat must be untouched. Checking at
-	// 700ms leaves a wide cushion to the 1.4s fire — load-tolerant because
-	// AfterFunc can fire late under load, but never early.
 	time.Sleep(700 * time.Millisecond)
 	mid := mgr.GetStateSnapshot(100)
 	require.NotNil(t, mid)
 	assert.Equal(t, firstBidder, mid.ActivePlayerSeat,
 		"auto-action must not fire before the advertised deadline")
 
-	// By deadline+grace+settle the auto-pass must have landed.
 	time.Sleep(1500 * time.Millisecond)
 	after := mgr.GetStateSnapshot(100)
 	require.NotNil(t, after)

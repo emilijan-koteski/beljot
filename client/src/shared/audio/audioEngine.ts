@@ -5,33 +5,6 @@ import {
 } from "@/shared/lib/audioPreference";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-/**
- * The in-match audio engine: card sound effects and the background playlist
- * behind ONE Web Audio graph.
- *
- *   sfx buffers ──► sfxGain ───┐
- *                              ├──► destination
- *   <audio> ──► mediaSource ──► musicGain ─┘
- *
- * Why Web Audio for the music too, rather than a bare `<audio>` element: iOS
- * treats `HTMLMediaElement.volume` as read-only (always 1), so the only way to
- * sit the music under the card sounds — and to fade it — on every platform is a
- * gain node. Routing both buses through one `AudioContext` also means a single
- * user gesture unlocks both.
- *
- * Assets are MP3 only: Safari / iOS before 18.4 cannot `decodeAudioData` Ogg.
- * Provenance and the transcode recipe live in `docs/audio.md`.
- *
- * Loudness: each bus's gain is its gain-at-default scaled linearly by the
- * player's 0-100 volume for that channel, so the default volume of 70 plays at
- * exactly the levels the game shipped with before volumes existed, and 0 is
- * silent. The on/off switches are separate and untouched by the volumes.
- *
- * Everything here is a silent no-op where `AudioContext` does not exist (jsdom,
- * very old browsers), and every playback failure is swallowed: sound is
- * feedback, never something a player should see an error for.
- */
-
 export type SfxName =
   | "cardPlay"
   | "trickCollect"
@@ -50,11 +23,6 @@ function sfxSet(stem: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => `${AUDIO_BASE}/sfx/${stem}-${i + 1}.mp3`);
 }
 
-/**
- * Recordings per sound. Where there are several, one is picked at random so
- * repeats don't sound canned; the one-off moments (a jingle, the shuffle, the
- * clock) have a single recording each.
- */
 export const SFX_URLS: Readonly<Record<SfxName, readonly string[]>> = {
   cardPlay: sfxSet("card-slide", 8),
   trickCollect: sfxSet("card-shove", 4),
@@ -68,44 +36,26 @@ export const SFX_URLS: Readonly<Record<SfxName, readonly string[]>> = {
   clockTick: [`${AUDIO_BASE}/sfx/clock-tick.mp3`],
 };
 
-/** The rotating playlist. A random track starts; the rest follow in order. */
 export const MUSIC_TRACKS: readonly string[] = [
   `${AUDIO_BASE}/music/lucky-break.mp3`,
   `${AUDIO_BASE}/music/a-good-bass-for-gambling.mp3`,
   `${AUDIO_BASE}/music/bass-meant-jazz.mp3`,
 ];
 
-/** Bus gains at the default volume of 70 — the pre-volume shipping levels. */
 const SFX_GAIN_AT_DEFAULT = 0.6;
 const MUSIC_GAIN_AT_DEFAULT = 0.18;
 const MUSIC_FADE_IN_S = 1.5;
 const MUSIC_FADE_OUT_S = 0.4;
-/** How fast a live music-volume change glides to its new level. */
 const MUSIC_VOLUME_RAMP_S = 0.1;
-/**
- * How many dedupe keys are remembered. A hand spends about 25–35: a shuffle,
- * 12 deal packets (8 + 4, or 12), 8 collects, a reveal or two — more with a
- * reshuffle or urgent ticks. So this holds the last seven or so hands, far
- * more than any remount can reach back for.
- */
-const DEDUPE_MEMORY = 256;
-/**
- * How long after the last session closes the context is suspended: past the
- * music fade-out, so the fade is heard to the end rather than cut off.
- */
+const DEDUPE_KEYS_REMEMBERED = 256;
 const SUSPEND_DELAY_MS = MUSIC_FADE_OUT_S * 1000 + 100;
 
-/**
- * Activation-triggering inputs. `pointerdown` alone is not enough: for touch
- * the browser grants activation on `pointerup` / `touchend`, not on the down.
- */
 const GESTURE_EVENTS = ["pointerdown", "pointerup", "touchend", "keydown"] as const;
 
 type AudioContextCtor = typeof AudioContext;
 
 /** A bus gain for a 0-100 volume: linear, and exact at the default of 70. */
 function gainFor(gainAtDefault: number, volume: number | null | undefined): number {
-  // Ratio first, so the default volume multiplies by exactly 1.
   return gainAtDefault * (resolveAudioVolume(volume) / DEFAULT_AUDIO_VOLUME);
 }
 
@@ -122,28 +72,17 @@ let musicWanted = false;
 let needsFreshTrack = true;
 let trackIndex = 0;
 let stopTimer: ReturnType<typeof setTimeout> | null = null;
-/** Tracks that failed in a row; at the playlist length the engine gives up. */
 let consecutiveTrackErrors = 0;
-/** The music gain the player's volume asks for; every fade-in targets it. */
 let musicLevel = MUSIC_GAIN_AT_DEFAULT;
-/**
- * Whether the music has been faded up (or is fading up) toward `musicLevel`:
- * set when a fade-in is scheduled, cleared by a stop or a fresh track. Only
- * then does a volume change move the gain live — before it, the pending
- * fade-in picks the new level up; during a fade-out it must not undo the fade.
- */
 let musicFadedIn = false;
-/** Context time the current fade-in lands, so a volume change can keep it. */
 let fadeInEndsAt = 0;
 
-/** Open match-audio sessions; SFX only ever sound while one is open. */
 let sessions = 0;
 let suspendTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * Unprefixed `AudioContext` only. Engines that ship just `webkitAudioContext`
- * support only the callback form of `decodeAudioData`, so no sound effect
- * could ever decode there — they take the silent no-op path instead.
+ * Returns the unprefixed `AudioContext` constructor, or null where it is missing.
+ * Prefixed-only engines decode only via callbacks, so they take the silent no-op path.
  */
 function audioContextCtor(): AudioContextCtor | null {
   if (typeof window === "undefined") return null;
@@ -151,8 +90,8 @@ function audioContextCtor(): AudioContextCtor | null {
 }
 
 /**
- * Create the context on first need. Created before any gesture it starts
- * `suspended`; the gesture listeners resume it.
+ * Creates the context with its sfx and music gain buses on first need; before a gesture it starts suspended.
+ * Music goes through a gain node too because iOS ignores `HTMLMediaElement.volume`.
  */
 function ensureContext(): AudioContext | null {
   if (ctx) return ctx;
@@ -180,10 +119,11 @@ function resumeContext(context: AudioContext): void {
   try {
     void context.resume().catch(() => {});
   } catch {
-    // Some engines throw synchronously outside a gesture; the next one retries.
+    return;
   }
 }
 
+/** Fetches and decodes one asset into the cache, sharing in-flight requests; failures are swallowed for a later retry. */
 function loadBuffer(context: AudioContext, url: string): Promise<void> {
   if (buffers.has(url)) return Promise.resolve();
   const inflight = loading.get(url);
@@ -197,8 +137,6 @@ function loadBuffer(context: AudioContext, url: string): Promise<void> {
     .then((buffer) => {
       buffers.set(url, buffer);
     })
-    // A failed load is retried by the next preload or play; production answers
-    // a missing asset with index.html, which lands here as a decode error.
     .catch(() => {})
     .finally(() => {
       loading.delete(url);
@@ -216,22 +154,15 @@ export function preloadSfx(): Promise<void> {
 }
 
 /**
- * Play one random variant of a sound effect, if the player has sound on, at
- * the player's sound-effects volume (both read at play time; volume 0 plays
- * nothing).
- *
- * `dedupeKey` makes a call idempotent: a second call with the same name and key
- * is dropped, so an effect that re-runs on remount (a reconnect mid-trick keeps
- * the resolved-trick snapshot alive) cannot sound the same moment twice. The key
- * is consumed even when sound is off, so switching sound on afterwards does not
- * replay an old moment either.
+ * Plays a random variant of a sound effect at the player's volume, only inside a session with sound on.
+ * A `dedupeKey` makes the call idempotent per name, and is consumed even while sound is off.
  */
 export function playSfx(name: SfxName, options: { dedupeKey?: string } = {}): void {
   if (options.dedupeKey !== undefined) {
     const key = `${name}:${options.dedupeKey}`;
     if (playedKeys.has(key)) return;
     playedKeys.add(key);
-    if (playedKeys.size > DEDUPE_MEMORY) {
+    if (playedKeys.size > DEDUPE_KEYS_REMEMBERED) {
       const oldest = playedKeys.values().next().value;
       if (oldest !== undefined) playedKeys.delete(oldest);
     }
@@ -244,10 +175,8 @@ export function playSfx(name: SfxName, options: { dedupeKey?: string } = {}): vo
 
   const context = ensureContext();
   if (!context || !sfxGain) return;
-  // A source started on a suspended context is held, then released the moment
-  // the context resumes — every card played before the first click would burst
-  // out at once. Before the unlock, sounds are simply dropped.
-  if (context.state !== "running") return;
+  const queuedSoundsWouldBurstOnResume = context.state !== "running";
+  if (queuedSoundsWouldBurstOnResume) return;
 
   const urls = SFX_URLS[name];
   const ready = urls.filter((url) => buffers.has(url));
@@ -258,8 +187,6 @@ export function playSfx(name: SfxName, options: { dedupeKey?: string } = {}): vo
   const url = ready[Math.floor(Math.random() * ready.length)];
   const buffer = url === undefined ? undefined : buffers.get(url);
   if (!buffer) return;
-  // Effects are a fraction of a second long, so setting the bus level per play
-  // is exact enough: at most a still-ringing tail shifts with it.
   sfxGain.gain.value = gainFor(SFX_GAIN_AT_DEFAULT, volume);
   try {
     const source = context.createBufferSource();
@@ -267,7 +194,7 @@ export function playSfx(name: SfxName, options: { dedupeKey?: string } = {}): vo
     source.connect(sfxGain);
     source.start();
   } catch {
-    // A decoded buffer that cannot start is not worth surfacing.
+    return;
   }
 }
 
@@ -293,11 +220,8 @@ function fadeMusicOut(): void {
 }
 
 /**
- * Set the music volume (0-100; missing means the default). While the music is
- * faded in it glides to the new level in ~0.1 s — or, mid fade-in, keeps the
- * fade's own landing time — so a slider drag is heard live. Otherwise it only
- * records the level: the next fade-in targets it, and a fade-out in progress
- * carries on to silence.
+ * Sets the music volume (0-100), gliding to it live only while the music is faded in.
+ * Otherwise the level is recorded for the next fade-in and a fade-out in progress continues.
  */
 export function setMusicVolume(volume: number | null | undefined): void {
   const level = gainFor(MUSIC_GAIN_AT_DEFAULT, volume);
@@ -328,10 +252,8 @@ function handleTrackPlaying(): void {
 }
 
 /**
- * A track that fails to load or breaks mid-stream fires `error`, never
- * `ended` — without this the playlist would stall on it for the rest of the
- * session. Skip to the next track, but stop once every track has failed in a
- * row, so an unreachable playlist cannot loop forever.
+ * Skips a track that failed to load or broke mid-stream, which fires `error` and never `ended`.
+ * Gives up once every track has failed in a row.
  */
 function handleTrackError(): void {
   consecutiveTrackErrors += 1;
@@ -339,14 +261,13 @@ function handleTrackError(): void {
   advanceTrack();
 }
 
+/** Creates the one music element for the engine's lifetime, since an element can feed a media source only once. */
 function ensureMusicElement(context: AudioContext): HTMLAudioElement | null {
   if (musicEl) return musicEl;
   if (!musicGain) return null;
   try {
     const el = new Audio();
     el.preload = "auto";
-    // One element for the engine's lifetime: an element can be wired into a
-    // media source exactly once.
     const source = context.createMediaElementSource(el);
     source.connect(musicGain);
     el.addEventListener("ended", handleTrackEnded);
@@ -434,8 +355,8 @@ export function stopMusic(): void {
 }
 
 /**
- * Resume a context that exists; never create one. With sound and music both
- * off nothing has created a context, and a click must not start one either.
+ * Resumes an existing context (never creates one) and restarts music autoplay refused.
+ * Touch grants activation on pointerup/touchend, so those are listened to as well as pointerdown.
  */
 function handleGesture(): void {
   const context = ctx;
@@ -445,13 +366,8 @@ function handleGesture(): void {
 }
 
 /**
- * Open a match-audio session: sound effects may play while at least one is
- * open, and the first pointer / key input resumes the context and starts any
- * music that autoplay refused. Returns the release function.
- *
- * Once the last session closes, the context is suspended after the music has
- * had time to fade out, so an idle SPA does not keep the audio device running;
- * the next session cancels a pending suspend and resumes the context.
+ * Opens a match-audio session, allowing sound effects and unlocking audio on the next gesture; returns the release.
+ * After the last session closes, the context is suspended once the music has faded out.
  */
 export function openAudioSession(): () => void {
   sessions += 1;
@@ -485,7 +401,7 @@ export function openAudioSession(): () => void {
       try {
         void ctx.suspend().catch(() => {});
       } catch {
-        // A context that cannot suspend just stays idle.
+        return;
       }
     }, SUSPEND_DELAY_MS);
   };

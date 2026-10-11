@@ -35,8 +35,6 @@ export function ForgotPasswordPage() {
 
     try {
       await forgotMutation.mutateAsync({ email });
-      // Anti-enumeration: the server returns the same generic success whether or
-      // not the account exists, so we always land on the confirmation state.
       setSubmitted(true);
     } catch {
       toast.error(t("auth.forgotPassword.errors.requestFailed"));

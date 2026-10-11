@@ -50,7 +50,6 @@ describe("EditableUsername", () => {
 
     await user.click(screen.getByTestId("profile-edit-username-button"));
     expect(screen.getByTestId("profile-username-input")).toBeInTheDocument();
-    // Save is disabled while the draft still equals the current name.
     expect(screen.getByTestId("profile-username-save")).toBeDisabled();
   });
 
@@ -133,7 +132,6 @@ describe("EditableUsername", () => {
     await user.click(screen.getByTestId("profile-username-save"));
 
     await waitFor(() => expect(screen.getByTestId("profile-username-error")).toBeInTheDocument());
-    // Still editing so the user can correct it.
     expect(screen.getByTestId("profile-username-input")).toBeInTheDocument();
   });
 

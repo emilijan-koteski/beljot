@@ -13,8 +13,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// --- Integration tests (Postgres; skipped when the DB is unavailable) ---
-
 func getTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
@@ -28,7 +26,6 @@ func getTestDB(t *testing.T) *gorm.DB {
 		t.Skip("skipping integration test: database not available")
 	}
 
-	// Per-test transaction rolled back on cleanup — tests create their own data.
 	tx := db.Begin()
 	t.Cleanup(func() { tx.Rollback() })
 	return tx
@@ -54,7 +51,6 @@ func TestGormRepository_CreateAndFindByPair_BothDirections(t *testing.T) {
 
 	require.NoError(t, repo.Create(&Friendship{UserID: a.ID, FriendID: b.ID, Status: FriendStatusPending}))
 
-	// Found from the requester's perspective...
 	got, err := repo.FindByPair(a.ID, b.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
@@ -62,13 +58,11 @@ func TestGormRepository_CreateAndFindByPair_BothDirections(t *testing.T) {
 	assert.Equal(t, b.ID, got.FriendID)
 	assert.Equal(t, FriendStatusPending, got.Status)
 
-	// ...and from the recipient's perspective (reversed args) — the same row.
 	rev, err := repo.FindByPair(b.ID, a.ID)
 	require.NoError(t, err)
 	require.NotNil(t, rev)
 	assert.Equal(t, got.ID, rev.ID)
 
-	// An unrelated pair returns (nil, nil).
 	c := makeUser(t, db, "c@f.test")
 	none, err := repo.FindByPair(a.ID, c.ID)
 	require.NoError(t, err)
@@ -83,18 +77,11 @@ func TestGormRepository_Create_ExactDuplicateConflicts(t *testing.T) {
 
 	require.NoError(t, repo.Create(&Friendship{UserID: a.ID, FriendID: b.ID, Status: FriendStatusPending}))
 
-	// Same direction again → the unique index fires → mapped ErrFriendRequestExists.
 	err := repo.Create(&Friendship{UserID: a.ID, FriendID: b.ID, Status: FriendStatusPending})
 	assert.ErrorIs(t, err, apperr.ErrFriendRequestExists)
 }
 
 func TestGormRepository_ReverseDuplicate_BlockedByNormalizedIndex(t *testing.T) {
-	// PINS the race backstop: the unique index is on the NORMALIZED (unordered)
-	// pair, so B->A while A->B exists is refused at the DB level (23505) and
-	// mapped to ErrFriendRequestExists. This closes the reverse-duplicate race the
-	// handler's non-atomic FindByPair pre-check cannot on its own. If the reverse
-	// insert ever succeeds again, the index regressed to a single direction and
-	// the race is reopened.
 	db := getTestDB(t)
 	repo := NewGormRepository(db)
 	a := makeUser(t, db, "rda@f.test")
@@ -102,16 +89,10 @@ func TestGormRepository_ReverseDuplicate_BlockedByNormalizedIndex(t *testing.T) 
 
 	require.NoError(t, repo.Create(&Friendship{UserID: a.ID, FriendID: b.ID, Status: FriendStatusPending}))
 
-	// FindByPair resolves the single relationship regardless of argument order.
 	got, err := repo.FindByPair(a.ID, b.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
-	// The reverse row (B->A) is refused by the normalized unique index (23505 →
-	// ErrFriendRequestExists), closing the race. Asserted LAST: the failing INSERT
-	// aborts the surrounding per-test transaction, so no query may follow it here
-	// (in production each Create is its own auto-commit statement — the handler
-	// just returns the 409).
 	err = repo.Create(&Friendship{UserID: b.ID, FriendID: a.ID, Status: FriendStatusPending})
 	assert.ErrorIs(t, err, apperr.ErrFriendRequestExists)
 }
@@ -124,12 +105,10 @@ func TestGormRepository_Accept_RecipientOnlyAndPending(t *testing.T) {
 	f := &Friendship{UserID: requester.ID, FriendID: recipient.ID, Status: FriendStatusPending}
 	require.NoError(t, repo.Create(f))
 
-	// The requester cannot accept their own outgoing request → 0 rows.
 	rows, err := repo.Accept(f.ID, requester.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), rows)
 
-	// The recipient flips it to accepted → 1 row.
 	rows, err = repo.Accept(f.ID, recipient.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), rows)
@@ -139,7 +118,6 @@ func TestGormRepository_Accept_RecipientOnlyAndPending(t *testing.T) {
 	require.NotNil(t, got)
 	assert.Equal(t, FriendStatusAccepted, got.Status)
 
-	// Accepting an already-accepted row is a no-op (no longer pending) → 0 rows.
 	rows, err = repo.Accept(f.ID, recipient.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), rows)
@@ -153,12 +131,10 @@ func TestGormRepository_Delete_RecipientOnly(t *testing.T) {
 	f := &Friendship{UserID: requester.ID, FriendID: recipient.ID, Status: FriendStatusPending}
 	require.NoError(t, repo.Create(f))
 
-	// The requester cannot decline their own outgoing request → 0 rows.
 	rows, err := repo.Delete(f.ID, requester.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), rows)
 
-	// The recipient declines → 1 row, and the row is gone.
 	rows, err = repo.Delete(f.ID, recipient.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), rows)
@@ -183,7 +159,6 @@ func TestGormRepository_Unfriend_EitherParty(t *testing.T) {
 		return f
 	}
 
-	// The requester unfriends → 1 row, and the row is gone.
 	f := accepted()
 	rows, err := repo.Unfriend(f.ID, requester.ID)
 	require.NoError(t, err)
@@ -192,21 +167,15 @@ func TestGormRepository_Unfriend_EitherParty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, got)
 
-	// The recipient unfriends a fresh row just the same — the guard is
-	// party-agnostic, unlike Accept/Delete.
 	f = accepted()
 	rows, err = repo.Unfriend(f.ID, recipient.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), rows)
 
-	// A second delete of the same id (the both-unfriend race) → 0 rows.
 	rows, err = repo.Unfriend(f.ID, requester.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), rows)
 
-	// After the unfriend, a fresh request for the same pair — in the REVERSE
-	// direction, no less — succeeds: the hard delete leaves no residue in the
-	// normalized unique index, so the "send a new request later" promise holds.
 	require.NoError(t, repo.Create(&Friendship{UserID: recipient.ID, FriendID: requester.ID, Status: FriendStatusPending}))
 }
 
@@ -217,7 +186,6 @@ func TestGormRepository_Unfriend_GuardMisses(t *testing.T) {
 	recipient := makeUser(t, db, "ufgb@f.test")
 	third := makeUser(t, db, "ufgc@f.test")
 
-	// A pending row is decline's job, not unfriend's → 0 rows, row survives.
 	f := &Friendship{UserID: requester.ID, FriendID: recipient.ID, Status: FriendStatusPending}
 	require.NoError(t, repo.Create(f))
 	rows, err := repo.Unfriend(f.ID, recipient.ID)
@@ -228,7 +196,6 @@ func TestGormRepository_Unfriend_GuardMisses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), acceptRows)
 
-	// A third party cannot unfriend an accepted row → 0 rows, row survives.
 	rows, err = repo.Unfriend(f.ID, third.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), rows)
@@ -236,7 +203,6 @@ func TestGormRepository_Unfriend_GuardMisses(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
-	// A missing id → 0 rows.
 	rows, err = repo.Unfriend(f.ID+9999, requester.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), rows)
@@ -250,7 +216,6 @@ func TestGormRepository_ListAccepted_Symmetric(t *testing.T) {
 	c := makeUser(t, db, "lsc@f.test")
 	d := makeUser(t, db, "lsd@f.test")
 
-	// a->b accepted (a is requester); c->a accepted (a is recipient).
 	f1 := &Friendship{UserID: a.ID, FriendID: b.ID, Status: FriendStatusPending}
 	require.NoError(t, repo.Create(f1))
 	_, err := repo.Accept(f1.ID, b.ID)
@@ -261,7 +226,6 @@ func TestGormRepository_ListAccepted_Symmetric(t *testing.T) {
 	_, err = repo.Accept(f2.ID, a.ID)
 	require.NoError(t, err)
 
-	// A pending row for a must NOT appear in the accepted list.
 	require.NoError(t, repo.Create(&Friendship{UserID: a.ID, FriendID: d.ID, Status: FriendStatusPending}))
 
 	friends, err := repo.ListAccepted(a.ID)
@@ -288,7 +252,6 @@ func TestGormRepository_ListIncomingPending(t *testing.T) {
 	x := makeUser(t, db, "lipx@f.test")
 	y := makeUser(t, db, "lipy@f.test")
 
-	// x->me pending (incoming); me->y pending (outgoing, must NOT appear).
 	require.NoError(t, repo.Create(&Friendship{UserID: x.ID, FriendID: me.ID, Status: FriendStatusPending}))
 	require.NoError(t, repo.Create(&Friendship{UserID: me.ID, FriendID: y.ID, Status: FriendStatusPending}))
 
@@ -297,8 +260,6 @@ func TestGormRepository_ListIncomingPending(t *testing.T) {
 	require.Len(t, incoming, 1)
 	assert.Equal(t, x.ID, incoming[0].UserID)
 
-	// x is only ever a requester here (x->me), so it has no incoming requests —
-	// and gets a non-nil empty slice, not nil.
 	empty, err := repo.ListIncomingPending(x.ID)
 	require.NoError(t, err)
 	require.NotNil(t, empty)
@@ -314,7 +275,6 @@ func TestGormRepository_AreFriends(t *testing.T) {
 	f := &Friendship{UserID: a.ID, FriendID: b.ID, Status: FriendStatusPending}
 	require.NoError(t, repo.Create(f))
 
-	// A pending relationship is not friendship.
 	ok, err := repo.AreFriends(a.ID, b.ID)
 	require.NoError(t, err)
 	assert.False(t, ok)
@@ -322,7 +282,6 @@ func TestGormRepository_AreFriends(t *testing.T) {
 	_, err = repo.Accept(f.ID, b.ID)
 	require.NoError(t, err)
 
-	// Accepted → friends, in either argument order.
 	ok, err = repo.AreFriends(a.ID, b.ID)
 	require.NoError(t, err)
 	assert.True(t, ok)
@@ -336,10 +295,6 @@ func TestGormRepository_SelfRowRejectedByCheck(t *testing.T) {
 	repo := NewGormRepository(db)
 	a := makeUser(t, db, "selfrow@f.test")
 
-	// user_id == friend_id violates chk_friendships_not_self. The repo only maps
-	// 23505 to a friendly error, so a CHECK violation (23514) surfaces as a raw
-	// error — the point is that the DB refuses the row (defense-in-depth behind
-	// the handler's self guard).
 	err := repo.Create(&Friendship{UserID: a.ID, FriendID: a.ID, Status: FriendStatusPending})
 	assert.Error(t, err)
 }

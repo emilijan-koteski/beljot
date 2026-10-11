@@ -6,9 +6,6 @@ import { useVersionCheck } from "./useVersionCheck";
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
-// APP_VERSION is swapped per-test through the getter; reloadForNewVersion is
-// the seam the hook uses instead of window.location.reload (non-configurable
-// in jsdom).
 const mocks = vi.hoisted(() => ({
   appVersion: "old-sha",
   reload: vi.fn(),

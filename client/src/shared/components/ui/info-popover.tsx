@@ -13,17 +13,8 @@ type InfoPopoverProps = {
 };
 
 /**
- * The "(?)" affordance that replaced permanent field hints in the Create Room
- * redesign (and is available to any field that wants the same treatment).
- * Hover opens it on desktop; touch has no hover, so a tap opens/pins it —
- * both paths land on the same popup.
- *
- * Built on Base UI's Popover (Portal + Positioner), not a hand-rolled
- * absolutely-positioned span: the popup used to be clipped by the dialog's
- * `overflow-hidden`/`overflow-y-auto` ancestors and by the viewport edge for
- * any field near the right column or the bottom of the form — the Positioner
- * portals into `document.body` and auto-flips/shifts to stay on screen,
- * exactly like the existing `Tooltip` component already does.
+ * "(?)" button that opens an explanation popup on hover, or on tap for touch devices.
+ * Portalled via Base UI's Positioner so overflow-clipping ancestors and viewport edges never cut it off.
  */
 export function InfoPopover({ text, ariaLabel, testId, className }: InfoPopoverProps) {
   return (

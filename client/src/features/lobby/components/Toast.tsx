@@ -3,7 +3,6 @@ import { useEffect } from "react";
 type Props = {
   message: string | null;
   onClear: () => void;
-  /** Auto-dismiss after this many ms. Defaults to 2200, matching the design. */
   ttlMs?: number;
 };
 

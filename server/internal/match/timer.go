@@ -1,12 +1,7 @@
 package match
 
-// cancelTurnTimer stops the current turn timer if active. Safe to call when nil.
-// Must be called under session.mu.Lock().
-//
-// Bumps timerGeneration unconditionally so any goroutine already past
-// time.AfterFunc but blocked on session.mu fails the staleness check in
-// handleTimerExpiry. This makes "cancel == invalidate stale callbacks" a
-// property of this function rather than a discipline imposed on every caller.
+// cancelTurnTimer stops the turn timer and bumps timerGeneration so blocked callbacks
+// fail their staleness check. Must be called under session.mu.Lock().
 func (s *LiveMatch) cancelTurnTimer() {
 	s.timerGeneration++
 	if s.turnTimer != nil {
@@ -15,11 +10,8 @@ func (s *LiveMatch) cancelTurnTimer() {
 	}
 }
 
-// cancelSeatReconnectTimer stops the reconnect countdown timer for a single
-// seat if active and bumps that seat's generation counter so any in-flight
-// callback that already passed `time.AfterFunc` but is blocked on session.mu
-// fails its staleness check. Safe to call when nil. Must be called under
-// session.mu.Lock().
+// cancelSeatReconnectTimer stops one seat's reconnect timer and bumps its generation
+// so blocked callbacks fail their staleness check. Must be called under session.mu.Lock().
 func (s *LiveMatch) cancelSeatReconnectTimer(seat int) {
 	if seat < 0 || seat >= 4 {
 		return
@@ -31,19 +23,16 @@ func (s *LiveMatch) cancelSeatReconnectTimer(seat int) {
 	}
 }
 
-// cancelAllReconnectTimers stops every per-seat reconnect timer. Used by
-// session teardown + match-end paths so no stale callback can fire after the
-// session is unreachable. Must be called under session.mu.Lock().
+// cancelAllReconnectTimers stops every per-seat reconnect timer.
+// Must be called under session.mu.Lock().
 func (s *LiveMatch) cancelAllReconnectTimers() {
 	for seat := 0; seat < 4; seat++ {
 		s.cancelSeatReconnectTimer(seat)
 	}
 }
 
-// cancelAllBotActionTimers stops every pending bot think-delay timer and
-// bumps each seat's generation so in-flight callbacks blocked on session.mu
-// fail their staleness check. Used by session teardown. Must be called under
-// session.mu.Lock().
+// cancelAllBotActionTimers stops every bot think-delay timer and bumps each seat's
+// generation. Must be called under session.mu.Lock().
 func (s *LiveMatch) cancelAllBotActionTimers() {
 	for seat := 0; seat < 4; seat++ {
 		s.botActionGenerations[seat]++

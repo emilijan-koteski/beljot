@@ -59,11 +59,6 @@ beforeEach(() => {
     matchMessages: [],
     matchMessagesReceivedTotal: 0,
     hasSentMatch: false,
-    // In-file ordering only — Vitest gives each test file its own module
-    // registry, so the store cannot carry over from another file. Within this
-    // file the FAB's pink chip reads `whisperUnread`, so a thread seeded by an
-    // earlier test would sit beside the brass chip and break the primary-only
-    // assertions below.
     whisperThreads: {},
     whisperUnread: {},
     activeChannel: "primary",
@@ -162,17 +157,12 @@ describe("MatchChatDock", () => {
     render(<ControlledDock />);
 
     act(() => {
-      // Authored by bob(2), not the local user: `appendWhisper(..., 1)` below
-      // declares 1 to be me, and a message from me would not raise the brass
-      // chip at all in a dock that knows who I am.
       useChatStore
         .getState()
         .appendMatch(makeMatchMessage({ userId: 2, username: "bob", message: "public" }));
       useChatStore.getState().appendWhisper(makeWhisper(), 1);
     });
 
-    // Two independent chips on the felt skin: brass counts the match channel,
-    // pink the whisper. The pre-split badge summed them into one "2".
     expect(screen.getByTestId("match-chat-unread")).toHaveTextContent("1");
     expect(screen.getByTestId("match-chat-whisper-unread")).toHaveTextContent("1");
   });
@@ -186,8 +176,6 @@ describe("MatchChatDock", () => {
     });
     expect(screen.getByTestId("match-chat-unread")).toHaveTextContent("2");
 
-    // Match teardown: clearMatch while the dock is still closed. The badge must
-    // drop to 0 — no phantom unread over an emptied history.
     act(() => {
       useChatStore.getState().clearMatch();
     });

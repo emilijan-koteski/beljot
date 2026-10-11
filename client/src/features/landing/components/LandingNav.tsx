@@ -5,10 +5,8 @@ import { BrandLockup } from "@/features/landing/components/BrandLockup";
 import { LandingCta } from "@/features/landing/components/LandingCta";
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
 
-// Marketing top bar — sits absolutely over the felt hero. Just the brand,
-// the (reused) language picker, a log-in link and the sign-up CTA. Rendered
-// inside the hero's `.felt-surface`, so everything auto-themes to light/brass.
-
+// Marketing top bar that sits absolutely over the felt hero.
+// It renders inside the hero's `.felt-surface`, so everything auto-themes to light/brass.
 export function LandingNav() {
   const { t } = useTranslation();
   return (
@@ -24,9 +22,6 @@ export function LandingNav() {
           >
             {t("landing.nav.login")}
           </Link>
-          {/* Sign-up CTA — hidden on phones; the page body already carries the
-              primary "create account" call to action, so the narrow header just
-              needs the language picker and a way back in (log in). */}
           <span className="hidden sm:inline-flex">
             <LandingCta to="/register" testId="landing-signup" className="px-4.5 py-2.5 text-sm">
               {t("landing.nav.signup")}

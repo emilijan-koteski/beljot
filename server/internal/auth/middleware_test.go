@@ -109,8 +109,6 @@ func TestMiddleware_RejectsNonBearerScheme(t *testing.T) {
 func TestMiddleware_RejectsNonAccessAudience(t *testing.T) {
 	e := setupMiddlewareTest()
 
-	// A validly-signed, unexpired JWT whose audience is NOT "access" must be
-	// rejected — the middleware gates on the access audience, not just signature.
 	claims := jwt.RegisteredClaims{
 		Subject:   "1",
 		Audience:  jwt.ClaimStrings{"refresh"},

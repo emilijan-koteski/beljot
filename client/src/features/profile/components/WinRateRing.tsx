@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 
 type WinRateRingProps = {
-  /** 0–100, or null when the player has no games yet (renders "—"). */
   rate: number | null;
 };
 

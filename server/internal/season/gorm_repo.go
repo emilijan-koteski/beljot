@@ -17,20 +17,10 @@ func NewGormRepository(db *gorm.DB) *GormRepository {
 	return &GormRepository{db: db}
 }
 
-// Compile-time proof that the concrete repo still satisfies the boundary the
-// service and handler depend on.
 var _ Repository = (*GormRepository)(nil)
 
-// CurrentSeason implements the lazy self-healing resolver (Story 13.1 D1).
-//
-// Read first: the overwhelmingly common case is a hit, and the read costs one
-// indexed lookup. Only on a miss do we compute the calendar quarter and insert
-// it, and that insert is idempotent (ON CONFLICT (started_at) DO NOTHING) so two
-// match ends racing at a quarter boundary both proceed with the same row rather
-// than one failing on a unique violation.
-//
-// Then re-read rather than trusting the insert: DO NOTHING means "maybe someone
-// else won", and the row we want is whichever one is actually in the table.
+// CurrentSeason returns the season covering now, inserting the calendar quarter on a miss.
+// The insert is ON CONFLICT DO NOTHING and followed by a re-read, so racing callers get the same row.
 func (r *GormRepository) CurrentSeason(now time.Time) (*Season, error) {
 	existing, err := r.findCovering(now)
 	if err != nil {
@@ -55,18 +45,13 @@ func (r *GormRepository) CurrentSeason(now time.Time) (*Season, error) {
 		return nil, fmt.Errorf("re-reading current season: %w", err)
 	}
 	if created == nil {
-		// Unreachable unless a concurrent writer inserted a window that does not
-		// actually cover `now` under the same started_at. Surfaced rather than
-		// returning (nil, nil), which every caller would have to special-case.
 		return nil, fmt.Errorf("season: no window covers %s after upsert", now.UTC().Format(time.RFC3339))
 	}
 	return created, nil
 }
 
-// findCovering returns the row whose [started_at, ends_at) window contains now,
-// or (nil, nil) on a miss. Ordered started_at DESC so that if overlapping rows
-// were ever hand-inserted, the most recently started one wins deterministically
-// instead of the result depending on physical row order.
+// findCovering returns the row whose [started_at, ends_at) window contains now, or (nil, nil).
+// Overlapping rows resolve to the most recently started one.
 func (r *GormRepository) findCovering(now time.Time) (*Season, error) {
 	var s Season
 	err := r.db.
@@ -96,34 +81,8 @@ func (r *GormRepository) FindPlayerSeason(userID, seasonID uint) (*PlayerSeason,
 	return &ps, nil
 }
 
-// ApplySeasonPoints scores one match inside ONE transaction, in three steps.
-//
-//  1. LOCK. In ASCENDING user-ID order -- the AddXP / ApplySettlement discipline
-//     (user/gorm_repo.go, wallet/gorm_repo.go), so a concurrent wallet
-//     settlement, XP award or second match cannot deadlock against this -- each
-//     player gets `INSERT ... ON CONFLICT DO NOTHING` of a ZERO row and then
-//     `SELECT sp ... FOR UPDATE`. The insert is what makes the lock possible: a
-//     missing row cannot be locked, a just-inserted zero row can. Two first-ever
-//     writes for the same player serialise on the unique index, and the second
-//     then reads the first's committed total.
-//  2. COMPUTE. Every locked total goes to `changes` at once, because the formula
-//     needs the whole table (both teams' averages), not one player at a time.
-//  3. WRITE. Each new total is floored at 0 (ApplySPChange) and written with its
-//     rank snapshot (rank_tier, rank_division) and counters, again in
-//     ascending order.
-//
-// Reading the totals and writing the results under the same lock is what the
-// old in-SQL increment (sp = sp + EXCLUDED.sp) could not do once a change
-// depends on the current total: two matches sharing a player now apply one
-// after the other instead of both computing from the same stale total. It also
-// retires the old first-row INSERT, which wrote the award straight in as the
-// total and would have written a negative first total after a loss.
-//
-// The rank snapshot is Go arithmetic (RankForSP) written alongside sp, so the
-// ladder stays single-sourced -- restating it as a SQL CASE would be a second
-// copy that could drift. It is written on EVERY award, so when a season ends
-// each row already holds the rank it finished on, which is what ended-season
-// reads return (Story 13.5).
+// ApplySeasonPoints scores one match in a single transaction: it upserts and locks each player's row
+// in ascending user-ID order, computes all changes at once, then writes the floored totals and ranks.
 func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]bool, changes SPChanges) (map[uint]PlayerSeasonSnapshot, error) {
 	snapshots := make(map[uint]PlayerSeasonSnapshot, len(completed))
 	if len(completed) == 0 {
@@ -216,38 +175,9 @@ func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]boo
 	return snapshots, nil
 }
 
-// leaderboardScope is THE ONE PLACE the leaderboard's visibility predicate is
-// written. Every leaderboard read starts here -- the page, its total, and the
-// viewer's CountAhead -- so the three cannot drift apart. Divergence would not
-// fail loudly: it would just make the viewer's reported position disagree with
-// the slot they are standing in.
-//
-// A FRESH BUILDER PER CALL, on purpose. The alternative (one *gorm.DB handed to
-// Count and then to Scan) reuses a statement across two executions; a helper
-// returning a new scope gives the same single-source guarantee with none of that
-// coupling, and reads the same at every call site.
-//
-// `users.deleted_at IS NULL` IS THE LINE TO CHECK FIRST IN REVIEW. Table()/Joins()
-// takes GORM out of model-land, so the soft-delete scope that PlayerSeason reads
-// get for free does NOT apply here -- exactly the hole left open at
-// internal/room/gorm_repo.go:298. Without it a deleted account keeps its slot at
-// the top of the ladder forever.
-//
-// `games_played >= 1` IS THE SECOND HALF OF THE PREDICATE, and it is a
-// MEMBERSHIP RULE (Story 13.4): the ladder is EVERYONE WHO PLAYED THE SEASON,
-// including players at 0 SP. SP now falls as well as rises, so a player who
-// loses back down to 0 is still a ranked player -- Iron 1, at a real position,
-// with a viewer block -- not someone who vanished from the list. The earlier
-// `sp > 0` rule (owner decision 2026-08-27) belonged to the climb-only ladder.
-//
-// ApplySeasonPoints never commits a row with games_played = 0 (the zero row it
-// inserts is updated in the same transaction), so in practice the rule excludes
-// only rows that did not come from a match end.
-//
-// Because this lives in the shared scope, the rule applies identically to
-// `items`, to `total` and to CountAhead -- a non-member row cannot be listed,
-// cannot inflate the count, and cannot push anyone down a slot. Do not move it
-// into the page query alone.
+// leaderboardScope is the single source of the leaderboard's visibility predicate, shared by
+// the page, its total and CountAhead. It hand-writes `users.deleted_at IS NULL` because
+// Table()/Joins() skips the soft-delete scope.
 func (r *GormRepository) leaderboardScope(seasonID uint) *gorm.DB {
 	return r.db.
 		Table("player_seasons").
@@ -257,40 +187,10 @@ func (r *GormRepository) leaderboardScope(seasonID uint) *gorm.DB {
 		Where("player_seasons.games_played >= 1")
 }
 
-// allocHintCap bounds the pre-allocation hint taken from `limit`.
-//
-// make([]LeaderboardEntry, 0, limit) trusts its argument with the process memory
-// budget: a limit of 1e9 reserves tens of gigabytes before a single row is read.
-// The handler caps requests far below this, so the ceiling never binds in
-// practice -- it exists so a future in-process caller (Story 13.3) cannot turn a
-// typo into an OOM. It is deliberately NOT a page-size policy: an over-large
-// limit still runs, it just grows the slice incrementally instead.
 const allocHintCap = 1000
 
-// LeaderboardPage implements Repository.LeaderboardPage.
-//
-// THE BOUNDS CHECK IS NOT PARANOIA. `limit` reaches both make(..., 0, limit),
-// which PANICS on a negative, and GORM Limit(), where a negative means "no
-// limit" and quietly returns the entire season. Neither failure mode is one a
-// caller would attribute to its own bad argument. The handler validates user
-// input and answers 400; this guards the GO boundary against a caller that never
-// saw a query string, and returns an ordinary error (a 500) because reaching it
-// is a programming bug rather than a bad request.
-//
-// Count first, then the page: the total drives load-more, and an offset past the
-// end must still report the real total rather than 0 (see the story edge-case
-// matrix). Both statements run through leaderboardScope, so they apply the SAME
-// PREDICATE -- but they are two statements, not one snapshot: under READ
-// COMMITTED a write landing between them can leave `total` disagreeing with the
-// rows by a row or two. That is accepted (the client re-reads on its next poll).
-// What the shared scope guarantees is that the two never describe different
-// POPULATIONS -- the failure that would be permanent rather than transient.
-//
-// Columns are aliased explicitly rather than selected as `*`: the join puts two
-// `id` and two `created_at` columns on the result set, and an unaliased scan
-// would silently take whichever the driver returned last.
-//
-// ORDER BY sp DESC, user_id ASC -- the same order CountAhead counts under.
+// LeaderboardPage returns one page ordered by sp DESC, user_id ASC plus the total row count.
+// It rejects out-of-range arguments, since a negative limit would panic make or disable SQL LIMIT.
 func (r *GormRepository) LeaderboardPage(seasonID uint, limit, offset int) ([]LeaderboardEntry, int64, error) {
 	if limit < 1 {
 		return nil, 0, fmt.Errorf("season: leaderboard limit must be >= 1, got %d", limit)
@@ -324,19 +224,8 @@ func (r *GormRepository) LeaderboardPage(seasonID uint, limit, offset int) ([]Le
 	return entries, total, nil
 }
 
-// FindLeaderboardEntry implements Repository.FindLeaderboardEntry.
-//
-// WHY THIS EXISTS INSTEAD OF REUSING FindPlayerSeason. FindPlayerSeason is a
-// MODEL query over player_seasons alone: it carries no `users` join, so it
-// happily returns the row of a SOFT-DELETED account. A deleted player holding an
-// unexpired JWT would then get a viewer block and a pinned row while being
-// absent from the very list they are looking at -- a position counted against a
-// population that excludes them. Routing the viewer through leaderboardScope
-// closes that by construction: a player who is not listable has no standing.
-//
-// (nil, nil) on a miss, which covers three cases the caller treats
-// identically: no row at all, a row with no games played, and a soft-deleted
-// account.
+// FindLeaderboardEntry returns the viewer's row through leaderboardScope, so soft-deleted or unplayed
+// rows have no standing; it returns (nil, nil) on a miss.
 func (r *GormRepository) FindLeaderboardEntry(seasonID, userID uint) (*LeaderboardEntry, error) {
 	var entries []LeaderboardEntry
 	err := r.leaderboardScope(seasonID).
@@ -359,8 +248,7 @@ func (r *GormRepository) FindLeaderboardEntry(seasonID, userID uint) (*Leaderboa
 	return &entries[0], nil
 }
 
-// FindSeasonByID implements Repository.FindSeasonByID. A model query — no join,
-// no scope subtleties — with the usual (nil, nil) miss convention.
+// FindSeasonByID returns the season with the given id, or (nil, nil) on a miss.
 func (r *GormRepository) FindSeasonByID(id uint) (*Season, error) {
 	var s Season
 	if err := r.db.First(&s, id).Error; err != nil {
@@ -372,8 +260,7 @@ func (r *GormRepository) FindSeasonByID(id uint) (*Season, error) {
 	return &s, nil
 }
 
-// ListSeasons implements Repository.ListSeasons: every window, newest-first.
-// The table grows by four rows a year, so there is no pagination to design.
+// ListSeasons returns every season, newest first.
 func (r *GormRepository) ListSeasons() ([]Season, error) {
 	seasons := make([]Season, 0, 8)
 	if err := r.db.Order("started_at DESC").Find(&seasons).Error; err != nil {
@@ -382,31 +269,8 @@ func (r *GormRepository) ListSeasons() ([]Season, error) {
 	return seasons, nil
 }
 
-// PlayerSeasonArchive implements Repository.PlayerSeasonArchive.
-//
-// The joins are written BY TABLE NAME, copying leaderboardScope's style — but
-// not sharing its scope. The predicate here is the archive's own
-// (games_played >= 1 AND seasons.ends_at <= now): a played season with 0 SP
-// belongs in a player's history, and the ACTIVE window is excluded because its
-// record is still accumulating.
-//
-// `users.deleted_at IS NULL` IS SPELLED OUT, same as leaderboardScope and for
-// the same reason: Table()/Joins() takes GORM out of model-land, so the
-// soft-delete scope does not apply on its own — and without the join, any
-// authenticated caller could read a DELETED account's full season history
-// through this endpoint while the leaderboard scrubs the same user. A
-// soft-deleted subject therefore answers an EMPTY archive — indistinguishable
-// from an unknown id, and still a 200 `{items: []}`, never a 404 (the profile
-// query owns user existence).
-//
-// Columns are aliased explicitly, like LeaderboardPage's: the joins carry
-// multiple `id`/`created_at` columns, and seasons.name must land in
-// ArchiveEntry's season_name without guessing. The stored rank snapshot is
-// selected because every archived season has ENDED, so it is the rank the
-// row finished on (Story 13.5).
-//
-// The read is served by idx_player_seasons_user_season (user_id leads it), so
-// no new index is needed — see migration 000024.
+// PlayerSeasonArchive returns a user's ended seasons with games_played >= 1, newest first.
+// A soft-deleted user gets an empty archive rather than an error.
 func (r *GormRepository) PlayerSeasonArchive(userID uint, now time.Time) ([]ArchiveEntry, error) {
 	entries := make([]ArchiveEntry, 0, 4)
 	err := r.db.
@@ -433,11 +297,7 @@ func (r *GormRepository) PlayerSeasonArchive(userID uint, now time.Time) ([]Arch
 	return entries, nil
 }
 
-// CountAhead implements Repository.CountAhead.
-//
-// One order, two consumers: the predicate below is the strict-ahead form of
-// LeaderboardPage's ORDER BY, and if the two ever diverge the viewer's position
-// silently drifts away from their own row in the list.
+// CountAhead counts rows strictly ahead of (sp, userID) under LeaderboardPage's ordering.
 func (r *GormRepository) CountAhead(seasonID uint, sp int, userID uint) (int64, error) {
 	var ahead int64
 	err := r.leaderboardScope(seasonID).

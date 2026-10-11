@@ -23,10 +23,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// PasswordResetHandler owns the public forgot-password / reset-password
-// endpoints. It is intentionally separate from AuthHandler so wiring the
-// mailer + reset-token repo doesn't disturb the existing auth constructor or
-// its tests.
+// PasswordResetHandler serves the public forgot-password and reset-password endpoints.
 type PasswordResetHandler struct {
 	userRepo   user.UserRepository
 	resetRepo  passwordreset.Repository
@@ -81,12 +78,8 @@ func (h *PasswordResetHandler) ForgotPassword(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("finding user for password reset: %w", err)
 	}
-	// Anti-enumeration: identical response whether or not the user exists. Only
-	// do the token+email work when a user is actually found.
 	if u != nil {
 		if err := h.issueAndSend(u); err != nil {
-			// Token/DB errors are logged but never surfaced — the caller still
-			// gets the generic success so existence cannot be probed.
 			slog.Error("failed to issue password reset", "error", err, "userId", u.ID)
 		}
 	}
@@ -94,14 +87,8 @@ func (h *PasswordResetHandler) ForgotPassword(c echo.Context) error {
 	return genericForgotResponse(c)
 }
 
-// issueAndSend invalidates any prior tokens, mints a fresh single-use token,
-// persists its hash, and emails the reset link in the user's language. The raw
-// token is only ever placed in the email link.
-//
-// The email is sent on a background goroutine so the HTTP response returns
-// without waiting on SMTP — this keeps the forgot-password latency independent
-// of whether the account exists (no timing-based enumeration) and never blocks
-// the user on a slow mail server.
+// issueAndSend replaces any prior tokens with a fresh single-use one and emails the reset link.
+// The email goes out in the background so response latency never reveals whether the account exists.
 func (h *PasswordResetHandler) issueAndSend(u *user.User) error {
 	if err := h.resetRepo.DeleteByUserID(u.ID); err != nil {
 		return fmt.Errorf("clearing prior reset tokens: %w", err)
@@ -144,8 +131,6 @@ func (h *PasswordResetHandler) ResetPassword(c echo.Context) error {
 		return apperr.ErrBadRequest
 	}
 
-	// Token validity wins over password shape: an invalid / expired / used link
-	// always reports INVALID_RESET_TOKEN regardless of the submitted password.
 	if strings.TrimSpace(req.Token) == "" {
 		return apperr.ErrInvalidResetToken
 	}
@@ -164,9 +149,6 @@ func (h *PasswordResetHandler) ResetPassword(c echo.Context) error {
 		return apperr.ErrPasswordTooLong
 	}
 
-	// Consume the token atomically BEFORE changing the password — the single-use
-	// guard against two concurrent requests that both passed FindValidByHash.
-	// The loser of the race gets consumed == false.
 	consumed, err := h.resetRepo.MarkUsed(token.ID)
 	if err != nil {
 		return fmt.Errorf("consuming reset token: %w", err)
@@ -181,9 +163,6 @@ func (h *PasswordResetHandler) ResetPassword(c echo.Context) error {
 	}
 
 	if err := h.userRepo.UpdatePasswordHash(token.UserID, hash); err != nil {
-		// The token's user no longer exists (e.g. soft-deleted after the link
-		// was issued) — treat the link as invalid rather than leaking a 404
-		// USER_NOT_FOUND the client can't map.
 		if errors.Is(err, apperr.ErrUserNotFound) {
 			return apperr.ErrInvalidResetToken
 		}

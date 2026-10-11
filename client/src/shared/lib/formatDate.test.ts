@@ -19,13 +19,11 @@ describe("formatLocalizedDate", () => {
 
   it("uses the locale template and month name when language is sr", async () => {
     await i18n.changeLanguage("sr");
-    // SR template: "{{day}}. {{month}} {{year}}." with nominative month names.
     expect(formatLocalizedDate("2026-05-09T12:00:00Z", i18n.t)).toBe("9. maj 2026.");
   });
 
   it("uses the locale template and month name when language is mk", async () => {
     await i18n.changeLanguage("mk");
-    // MK template is "{{day}} {{month}} {{year}}" (no periods, MK convention).
     expect(formatLocalizedDate("2026-05-09T12:00:00Z", i18n.t)).toBe("9 мај 2026");
   });
 
@@ -44,8 +42,6 @@ describe("formatLocalizedDate", () => {
 
   it("falls back to short variant explicitly when requested", async () => {
     await i18n.changeLanguage("hr");
-    // HR short month for May is "svi." (Croatian convention adds a trailing
-    // period to month abbreviations).
     expect(formatLocalizedDate("2026-05-09T12:00:00Z", i18n.t, "short")).toBe("9. svi. 2026.");
   });
 });

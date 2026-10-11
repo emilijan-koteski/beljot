@@ -12,10 +12,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// --- Fakes ---
-
 type fakeGame struct {
-	// matchID-less lookup: userID → (participants, seat).
 	byUser map[uint]userMembership
 }
 
@@ -78,8 +75,6 @@ func (h *hubSpy) lastCall(t *testing.T) hubCall {
 	return h.calls[len(h.calls)-1]
 }
 
-// --- Helpers ---
-
 func emoteAction(t *testing.T, emoteID string) ws.WSMessage {
 	t.Helper()
 	payload, err := json.Marshal(ws.EmoteRequest{Emote: emoteID})
@@ -93,8 +88,6 @@ func newHandlerWithMatch(participants [4]uint) (*Handler, *hubSpy, *fakeGame) {
 	game.addMatch(participants)
 	return NewHandler(hub, game), hub, game
 }
-
-// --- Tests ---
 
 func TestHandler_IgnoresWrongActionType(t *testing.T) {
 	h, hub, _ := newHandlerWithMatch([4]uint{10, 20, 30, 40})
@@ -118,7 +111,7 @@ func TestHandler_InvalidPayload_NoBroadcast(t *testing.T) {
 func TestHandler_UnknownEmote_SilentlyDropped(t *testing.T) {
 	h, hub, _ := newHandlerWithMatch([4]uint{10, 20, 30, 40})
 
-	cases := []string{"", "shrug", "THUMBS_UP" /* wrong case */, "rocket"}
+	cases := []string{"", "shrug", "THUMBS_UP", "rocket"}
 	for _, emote := range cases {
 		h.HandleAction(&ws.Client{UserID: 10}, emoteAction(t, emote))
 	}
@@ -129,7 +122,7 @@ func TestHandler_UnknownEmote_SilentlyDropped(t *testing.T) {
 
 func TestHandler_SenderNotInGame_SilentlyDropped(t *testing.T) {
 	hub := &hubSpy{}
-	h := NewHandler(hub, newFakeGame()) // no matches registered
+	h := NewHandler(hub, newFakeGame())
 
 	h.HandleAction(&ws.Client{UserID: 10}, emoteAction(t, "thumbs_up"))
 
@@ -160,8 +153,6 @@ func TestHandler_ValidEmote_BroadcastsToFourParticipants(t *testing.T) {
 func TestHandler_RateLimit_DropsSecondEmoteWithinWindow(t *testing.T) {
 	h, hub, _ := newHandlerWithMatch([4]uint{10, 20, 30, 40})
 
-	// Two consecutive emotes from the same user — second one within the
-	// rate-limit window must be silently dropped.
 	h.HandleAction(&ws.Client{UserID: 10}, emoteAction(t, "thumbs_up"))
 	h.HandleAction(&ws.Client{UserID: 10}, emoteAction(t, "laugh"))
 
@@ -172,9 +163,6 @@ func TestHandler_RateLimit_DropsSecondEmoteWithinWindow(t *testing.T) {
 func TestHandler_RateLimit_AllowsAfterWindow(t *testing.T) {
 	h, hub, _ := newHandlerWithMatch([4]uint{10, 20, 30, 40})
 
-	// First emote stamps "now" into lastEmoteAt; rewind it past the window
-	// to simulate a 3.5 s gap without sleeping (white-box test on package
-	// internals).
 	h.HandleAction(&ws.Client{UserID: 10}, emoteAction(t, "thumbs_up"))
 	require.Equal(t, 1, hub.callCount())
 
@@ -190,8 +178,6 @@ func TestHandler_RateLimit_AllowsAfterWindow(t *testing.T) {
 func TestHandler_RateLimit_PerUserNotGlobal(t *testing.T) {
 	h, hub, _ := newHandlerWithMatch([4]uint{10, 20, 30, 40})
 
-	// Two different users emoting back-to-back — both should broadcast.
-	// The rate limit is per-user, never global.
 	h.HandleAction(&ws.Client{UserID: 10}, emoteAction(t, "thumbs_up"))
 	h.HandleAction(&ws.Client{UserID: 20}, emoteAction(t, "laugh"))
 
@@ -213,7 +199,6 @@ func TestHandler_PayloadSeatIndexMatchesSender(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		// Reset rate limit between cases so each broadcast lands.
 		h.mu.Lock()
 		delete(h.lastEmoteAt, tc.userID)
 		h.mu.Unlock()
@@ -238,18 +223,14 @@ func TestHandler_RemoveUser_ClearsRateLimit(t *testing.T) {
 	userID := uint(1)
 	client := &ws.Client{UserID: userID}
 
-	// First emote stamps lastEmoteAt.
 	h.HandleAction(client, emoteAction(t, "heart"))
 	assert.Equal(t, 1, hub.callCount(), "first emote should broadcast")
 
-	// Second immediate emote is rate-limited.
 	h.HandleAction(client, emoteAction(t, "heart"))
 	assert.Equal(t, 1, hub.callCount(), "second immediate emote should be rate-limited")
 
-	// RemoveUser clears the rate-limit entry.
 	h.RemoveUser(userID)
 
-	// Third emote immediately after removal should broadcast (fresh window).
 	h.HandleAction(client, emoteAction(t, "heart"))
 	assert.Equal(t, 2, hub.callCount(), "emote after RemoveUser should broadcast (rate limit cleared)")
 }

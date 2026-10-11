@@ -6,23 +6,10 @@ import type { CareerStreak } from "@/shared/api/career";
 
 type StreakCalloutProps = {
   streak: CareerStreak;
-  /**
-   * False on ANOTHER player's profile (Story 11.3). Both subtitles are written
-   * AT the reader ("Keep it going…", "Shake it off — Quick Play…"), which is
-   * right on the self page and wrong on a public one, where the streak belongs
-   * to the subject and the reader is a visitor. Selects the third-person
-   * `*Public` copy and drops the Play link, the same way MatchHistory drops its
-   * lobby CTA from a public empty state — the callout there is a fact about that
-   * player, not a nudge to the person reading it.
-   */
   subjectIsSelf?: boolean;
 };
 
-// Frost-blue accent reserved exclusively for the cold (loss) streak callout — a
-// deliberately off-palette icy tone with no shared token, so it never leaks into
-// the rest of the (warm felt-green / parchment) UI. The win streak keeps the
-// regular accent tokens.
-const ICE = {
+const COLD_STREAK_ICE = {
   fill: "#EAF4FA",
   border: "rgba(46,131,176,0.32)",
   disc: "#D6ECF6",
@@ -33,9 +20,8 @@ const ICE = {
 } as const;
 
 /**
- * Win/loss streak banner between the hero and the stats grid. A win streak
- * reads as a warm felt-green callout; a cold streak as a neutral nudge back to
- * the lobby. Renders nothing when there is no active streak.
+ * Win/loss streak banner between the hero and stats grid: felt green for wins, ice for losses.
+ * Renders nothing when there is no active streak.
  */
 export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutProps) {
   const { t } = useTranslation();
@@ -47,8 +33,8 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
     <div
       className="border-border mb-5 flex items-center gap-3.5 rounded-lg border p-3.5"
       style={{
-        background: isWin ? "var(--accent-soft)" : ICE.fill,
-        borderColor: isWin ? "rgba(25,101,54,0.33)" : ICE.border,
+        background: isWin ? "var(--accent-soft)" : COLD_STREAK_ICE.fill,
+        borderColor: isWin ? "rgba(25,101,54,0.33)" : COLD_STREAK_ICE.border,
       }}
       data-testid="profile-streak"
       data-streak-kind={streak.kind}
@@ -57,8 +43,8 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
       <span
         className="inline-flex size-9 shrink-0 items-center justify-center rounded-[10px]"
         style={{
-          background: isWin ? "var(--accent)" : ICE.disc,
-          color: isWin ? "var(--accent-ink)" : ICE.icon,
+          background: isWin ? "var(--accent)" : COLD_STREAK_ICE.disc,
+          color: isWin ? "var(--accent-ink)" : COLD_STREAK_ICE.icon,
         }}
       >
         {isWin ? <Sparkles className="size-4.5" /> : <Snowflake className="size-4.5" />}
@@ -66,7 +52,7 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
       <div className="flex min-w-0 flex-col gap-0.5">
         <span
           className="font-display text-base font-semibold"
-          style={{ color: isWin ? "var(--accent)" : ICE.title }}
+          style={{ color: isWin ? "var(--accent)" : COLD_STREAK_ICE.title }}
         >
           {isWin
             ? t("profile.streak.winTitle", { count: streak.length })
@@ -87,8 +73,8 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
           to="/lobby"
           className="ml-auto inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-2 text-[13px] font-semibold"
           style={{
-            background: isWin ? "var(--accent)" : ICE.buttonBg,
-            color: isWin ? "var(--accent-ink)" : ICE.buttonText,
+            background: isWin ? "var(--accent)" : COLD_STREAK_ICE.buttonBg,
+            color: isWin ? "var(--accent-ink)" : COLD_STREAK_ICE.buttonText,
           }}
           data-testid="profile-streak-play"
         >

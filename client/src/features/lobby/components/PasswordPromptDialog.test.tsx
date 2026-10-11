@@ -61,7 +61,6 @@ describe("PasswordPromptDialog", () => {
 
     await user.type(screen.getByTestId("password-prompt-input"), "x");
 
-    // The stale "wrong password" message clears on edit — no need to resubmit.
     expect(screen.queryByTestId("password-prompt-error")).not.toBeInTheDocument();
   });
 
@@ -82,8 +81,6 @@ describe("PasswordPromptDialog footer order", () => {
   it("stacks the shared footer in DOM order on narrow screens", () => {
     renderDialog();
     const footer = document.querySelector('[data-slot="dialog-footer"]');
-    // flex-col-reverse would invert the pair below the sm breakpoint, putting
-    // the status quo on top — the opposite of the desktop reading order.
     expect(footer?.className).toContain("flex-col");
     expect(footer?.className).not.toContain("flex-col-reverse");
   });

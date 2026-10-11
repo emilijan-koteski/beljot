@@ -13,8 +13,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// --- Integration tests (Postgres; skipped when the DB is unavailable) ---
-
 func getTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
@@ -28,7 +26,6 @@ func getTestDB(t *testing.T) *gorm.DB {
 		t.Skip("skipping integration test: database not available")
 	}
 
-	// Per-test transaction rolled back on cleanup — tests create their own data.
 	tx := db.Begin()
 	t.Cleanup(func() { tx.Rollback() })
 	return tx
@@ -69,7 +66,6 @@ func TestGormRepo_CreateAndFindByProviderSubject(t *testing.T) {
 	assert.Equal(t, "find@id.test", got.Email)
 	assert.False(t, got.CreatedAt.IsZero())
 
-	// Same subject under a different provider is a different identity.
 	other, err := repo.FindByProviderSubject("facebook", "sub-find")
 	require.NoError(t, err)
 	assert.Nil(t, other)
@@ -87,7 +83,6 @@ func TestGormRepo_DuplicateProviderSubjectConflicts(t *testing.T) {
 
 	require.NoError(t, repo.Create(makeIdentity(u1.ID, "google", "sub-dup", "dup1@id.test")))
 
-	// The same external identity cannot be linked to a second account.
 	err := repo.Create(makeIdentity(u2.ID, "google", "sub-dup", "dup2@id.test"))
 	assert.ErrorIs(t, err, apperr.ErrSSOIdentityInUse)
 }
@@ -99,7 +94,6 @@ func TestGormRepo_DuplicateUserProviderConflicts(t *testing.T) {
 
 	require.NoError(t, repo.Create(makeIdentity(u.ID, "google", "sub-a", "twice@id.test")))
 
-	// One identity per provider per account.
 	err := repo.Create(makeIdentity(u.ID, "google", "sub-b", "twice@id.test"))
 	assert.ErrorIs(t, err, apperr.ErrSSOIdentityInUse)
 }
@@ -121,7 +115,6 @@ func TestGormRepo_FindByUserID(t *testing.T) {
 		assert.Equal(t, u.ID, id.UserID)
 	}
 
-	// A user with no identities gets an empty slice, not an error.
 	none, err := repo.FindByUserID(999999)
 	require.NoError(t, err)
 	assert.Empty(t, none)
@@ -135,7 +128,6 @@ func TestGormRepo_DeleteByUserProvider(t *testing.T) {
 	require.NoError(t, repo.Create(makeIdentity(u1.ID, "google", "sub-1", "del1@id.test")))
 	require.NoError(t, repo.Create(makeIdentity(u2.ID, "google", "sub-2", "del2@id.test")))
 
-	// Deletes exactly the target user's provider row.
 	n, err := repo.DeleteByUserProvider(u1.ID, "google")
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), n)
@@ -144,12 +136,10 @@ func TestGormRepo_DeleteByUserProvider(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, gone)
 
-	// The other user's identity for the same provider is untouched.
 	remaining, err := repo.FindByUserID(u2.ID)
 	require.NoError(t, err)
 	assert.Len(t, remaining, 1)
 
-	// Deleting a provider the user has no identity for removes nothing.
 	n, err = repo.DeleteByUserProvider(u1.ID, "google")
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), n)
@@ -162,7 +152,6 @@ func TestGormRepo_CascadeDeletesWithUser(t *testing.T) {
 
 	require.NoError(t, repo.Create(makeIdentity(u.ID, "google", "sub-cascade", "cascade@id.test")))
 
-	// Hard delete (Unscoped bypasses GORM soft delete) triggers ON DELETE CASCADE.
 	require.NoError(t, db.Unscoped().Delete(&user.User{}, u.ID).Error)
 
 	gone, err := repo.FindByProviderSubject("google", "sub-cascade")

@@ -132,9 +132,6 @@ describe("HandCards", () => {
       />,
     );
 
-    // The wrapper around the flying card carries visibility:hidden + pointer-
-    // events:none so the CardFlight overlay is the sole painter for the
-    // moving card; the other cards stay visible at their normal layout.
     const flyingWrapper = screen.getByTestId("playing-card-KS").parentElement;
     const otherWrapper = screen.getByTestId("playing-card-TH").parentElement;
     expect(flyingWrapper?.style.visibility).toBe("hidden");
@@ -155,8 +152,6 @@ describe("HandCards", () => {
     );
 
     const flying = screen.getByTestId("playing-card-KS");
-    // Without the playable lift class, the card is in default state — no
-    // cursor-pointer hint, no extra click handler that would re-fire onPlay.
     expect(flying.className).not.toContain("cursor-pointer");
   });
 });
@@ -184,8 +179,6 @@ describe("Croatian face-down pair at the viewer's own seat", () => {
   }
 
   it("renders the pair as backs so the seat shows all eight cards it holds", () => {
-    // Before this, the viewer's own seat showed six while every opponent's
-    // stack showed eight — the asymmetry Story 12.8 made conspicuous.
     renderHand(six, 2);
     expect(screen.getAllByTestId("hand-card-face-down")).toHaveLength(2);
     expect(screen.getAllByTestId(/^hand-card-[A-Z0-9]{2}$/)).toHaveLength(6);
@@ -197,7 +190,6 @@ describe("Croatian face-down pair at the viewer's own seat", () => {
   });
 
   it("keeps the backs unclickable", () => {
-    // They carry no card id, so they can never be a legal move.
     renderHand(six, 2);
     for (const back of screen.getAllByTestId("hand-card-face-down")) {
       expect(back).toHaveStyle({ pointerEvents: "none" });
@@ -205,8 +197,6 @@ describe("Croatian face-down pair at the viewer's own seat", () => {
   });
 
   it("lays the fan out for eight slots, not six", () => {
-    // The backs occupy real slots: if the geometry counted only the face-up
-    // cards, the container would be sized for six and the backs would spill.
     const { container: withBacks } = renderHand(six, 2);
     const wide = (withBacks.querySelector("[data-testid='hand-cards']") as HTMLElement).style.width;
     cleanup();

@@ -21,10 +21,8 @@ import (
 
 const whisperTestSecret = "test-jwt-secret-for-whisper-tests"
 
-// setupWhisperServer wires a REAL hub + WSHandler and routes action:whisper to a
-// real chat.WhisperHandler (fakes only for the friend/presence/user deps, which
-// have their own DB-backed tests). This exercises the full websocket path:
-// dial → auth handshake → hub registration → per-user SendToUser delivery.
+// setupWhisperServer starts a real hub and WSHandler that route action:whisper to
+// a real chat.WhisperHandler, faking only the friend, presence and user deps.
 func setupWhisperServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	hub := ws.NewHub()
@@ -35,8 +33,8 @@ func setupWhisperServer(t *testing.T) *httptest.Server {
 	repo.add(1, "alice")
 	repo.add(2, "bob")
 	repo.add(3, "carol")
-	friends := newFakeFriends([2]uint{1, 2}) // alice & bob are friends; carol is not
-	presence := newFakePresence()            // nobody in a room → anti-collusion never fires
+	friends := newFakeFriends([2]uint{1, 2})
+	presence := newFakePresence()
 
 	whisperHandler := chat.NewWhisperHandler(hub, repo, friends, presence)
 	hub.SetActionHandler(func(client *ws.Client, msg ws.WSMessage) {
@@ -77,7 +75,6 @@ func dialWhisperClient(t *testing.T, server *httptest.Server, userID uint) *webs
 	require.NoError(t, err)
 	writeWhisper(t, conn, ws.WSMessage{Type: ws.ActionAuthenticate, Payload: tokenPayload})
 
-	// Consume the system:authenticated ack.
 	ack := readWhisper(t, conn, 5*time.Second)
 	require.Equal(t, ws.SystemAuthenticated, ack.Type)
 	return conn
@@ -109,13 +106,10 @@ func TestWhisperIntegration_DeliveredToBothAndNotToOthers(t *testing.T) {
 	carol := dialWhisperClient(t, server, 3)
 	defer func() { _ = carol.CloseNow() }()
 
-	// Wait for all three hub registrations to settle.
 	time.Sleep(80 * time.Millisecond)
 
-	// alice whispers bob.
 	writeWhisper(t, alice, whisperMessage(t, "bob", "just between us"))
 
-	// bob (the recipient) receives exactly one system:whisper with the payload.
 	got := readWhisper(t, bob, 3*time.Second)
 	assert.Equal(t, ws.SystemWhisper, got.Type)
 	var payload ws.WhisperPayload
@@ -126,11 +120,9 @@ func TestWhisperIntegration_DeliveredToBothAndNotToOthers(t *testing.T) {
 	assert.Equal(t, "bob", payload.ToUsername)
 	assert.Equal(t, "just between us", payload.Message)
 
-	// alice receives her own-echo.
 	selfEcho := readWhisper(t, alice, 3*time.Second)
 	assert.Equal(t, ws.SystemWhisper, selfEcho.Type)
 
-	// carol (uninvolved) receives NOTHING — a short read must time out.
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	var stray ws.WSMessage

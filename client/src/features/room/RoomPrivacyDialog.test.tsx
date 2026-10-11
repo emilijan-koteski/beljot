@@ -72,7 +72,6 @@ describe("RoomPrivacyDialog", () => {
     mockUpdateRoomPrivacy.mockResolvedValueOnce({ ...baseRoom, isPrivate: false });
     renderDialog({ ...baseRoom, isPrivate: true });
 
-    // Starts in "private" mode; switch to public and save.
     await user.click(screen.getByTestId("room-privacy-mode-public"));
     await user.click(screen.getByTestId("room-privacy-submit"));
 

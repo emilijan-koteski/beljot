@@ -15,25 +15,14 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// updateGoldens regenerates the JSON goldens under
-// server/internal/ws/testdata/events/. Run with `UPDATE_GOLDENS=1 go test
-// ./internal/ws/... -run Contract` to refresh after a payload field/tag change.
 var updateGoldens = flag.Bool("update-goldens", os.Getenv("UPDATE_GOLDENS") == "1",
 	"regenerate JSON goldens under testdata/events/")
 
-// goldensDir is the on-disk location of the WS event goldens. Mirrored on the
-// TS side via a relative import in client/src/shared/types/wsEvents.contract.test.ts.
 const goldensDir = "testdata/events"
 
-// TestEventsJSONContract is the drift gate between server/internal/ws/events.go
-// and client/src/shared/types/wsEvents.ts. Each entry in the table marshals a
-// representative payload struct and compares it byte-for-byte against the
-// stored golden. The TS side parses these same goldens through Zod schemas;
-// any rename or tag change here updates the goldens (with UPDATE_GOLDENS=1)
-// and forces a paired update on the TS side or the parse fails.
+// TestEventsJSONContract is the drift gate between events.go and the client's wsEvents.ts.
+// Each payload is compared byte-for-byte against a golden that the client also parses through Zod.
 func TestEventsJSONContract(t *testing.T) {
-	// Helper: build a 4-player GameState with realistic non-zero fields.
-	// The struct is large but the golden captures only the JSON-tagged fields.
 	gameStateSample := func() *game.GameState {
 		return &game.GameState{
 			ID:                    42,
@@ -82,9 +71,6 @@ func TestEventsJSONContract(t *testing.T) {
 		}
 	}
 
-	// handScoredSample mirrors session/manager.go's broadcast — a map[string]any,
-	// not a typed struct. Capturing the wire shape verbatim is what the contract
-	// test cares about; the TS schema parses against the same keys.
 	handScoredSample := map[string]any{
 		"teamACardPoints": 82,
 		"teamBCardPoints": 80,
@@ -103,20 +89,9 @@ func TestEventsJSONContract(t *testing.T) {
 		"teamBMatchScore": 280,
 	}
 
-	// declarationsResolvedSample is now the REAL ws.DeclarationsResolvedPayload
-	// struct that the match layer emits, not a hand-written map that merely
-	// resembled it. Previously the producer built a map[string]interface{} and
-	// this test marshalled a separate literal, so nothing connected the keys
-	// actually put on the wire to either the type or the golden.
-	//
-	// Two entries for the SAME seat, sharing JS: that is what a
-	// declaration-overlap config produces, and the flat "one entry per meld,
-	// each carrying its own playerSeat" shape already carries it — no payload
-	// change was needed for overlap.
 	declarationsResolvedSample := ws.DeclarationsResolvedPayload{
 		WinnerTeam: ptrInt(0),
-		// Both teams declared, so the reveal may name the deciding meld.
-		Contested: true,
+		Contested:  true,
 		Declarations: []ws.DeclarationPayload{
 			{
 				PlayerSeat: 0,
@@ -139,10 +114,6 @@ func TestEventsJSONContract(t *testing.T) {
 		goldenFile string
 	}{
 		{
-			// Marshalled through the seat-0 projection, exactly as the match
-			// layer serializes every state frame (Story 12.10) — so the golden
-			// itself is the standing proof of card privacy: one real hand
-			// (seat 0's), three empty ones, four handCounts, and no deck key.
 			name:       "EventMatchState",
 			sample:     game.ProjectForSeat(gameStateSample(), 0),
 			goldenFile: "event_match_state.json",
@@ -158,7 +129,6 @@ func TestEventsJSONContract(t *testing.T) {
 		},
 		{
 			name: "TrickResolvedPayload",
-			// Mirrors session/manager.go's broadcast — also a map literal.
 			sample: map[string]any{
 				"winnerSeat": 2,
 				"winnerTeam": 0,
@@ -202,14 +172,6 @@ func TestEventsJSONContract(t *testing.T) {
 			goldenFile: "trump_selected.json",
 		},
 		{
-			// Not a payload — the phase VOCABULARY itself. Story 12.6 left the
-			// `phase` string as the only field carrying the declaring state,
-			// while the client typed it as a bare z.string(), so a server
-			// constant and its client union member could drift with nothing
-			// failing. This golden is the pin: the client builds its Phase
-			// union from this file, so adding a phase on either side without
-			// the other breaks a test. game.AllPhases() is itself guarded
-			// against the constants by TestAllPhasesCoversEveryConstant.
 			name:       "Phases",
 			sample:     game.AllPhases(),
 			goldenFile: "phases.json",
@@ -260,9 +222,6 @@ func TestEventsJSONContract(t *testing.T) {
 			goldenFile: "auto_action.json",
 		},
 		{
-			// Story 12.8's added AutoActionType gets its own golden: the payload
-			// SHAPE is already pinned above, so what this fixes across the wire is
-			// the literal "pick_trump", which the TS union must accept verbatim.
 			name: "AutoActionPayload_PickTrump",
 			sample: ws.AutoActionPayload{
 				PlayerSeat: 3,
@@ -302,8 +261,6 @@ func TestEventsJSONContract(t *testing.T) {
 		},
 		{
 			name: "SeasonPointsAwardedPayload",
-			// The matrix's tier-down row (Story 13.5): 610 -> 590 drops Gold 1
-			// to Silver 3. The change is signed and the division is a number.
 			sample: ws.SeasonPointsAwardedPayload{
 				SPChange:     -20,
 				NewSeasonSP:  590,
@@ -316,9 +273,6 @@ func TestEventsJSONContract(t *testing.T) {
 			goldenFile: "season_points_awarded.json",
 		},
 		{
-			// Master has no division, so rankDivision is a literal null (never
-			// omitted), and a teammate of the abandoning seat carries its own
-			// reason token. Separate golden so the TS side parses both shapes.
 			name: "SeasonPointsAwardedPayload (master, partner abandoned)",
 			sample: ws.SeasonPointsAwardedPayload{
 				SPChange:     -12,
@@ -371,8 +325,6 @@ func TestEventsJSONContract(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Indent for human-readable goldens; trailing newline so editors
-			// don't muck with the file (POSIX text-file convention).
 			actual, err := json.MarshalIndent(tc.sample, "", "  ")
 			require.NoError(t, err)
 			actual = append(actual, '\n')
@@ -388,12 +340,6 @@ func TestEventsJSONContract(t *testing.T) {
 			expected, err := os.ReadFile(goldenPath)
 			if err != nil {
 				if os.IsNotExist(err) {
-					// AC10 / D118: a missing golden hard-fails. The original
-					// bootstrap-on-missing path silently treated a deleted
-					// golden as the new truth, defeating the drift gate.
-					// Regeneration is the *updateGoldens branch above, which
-					// has already returned by this point — so there is no
-					// "write it if the caller asked" case to handle here.
 					t.Fatalf("missing golden %s — rerun with UPDATE_GOLDENS=1 to regenerate", goldenPath)
 				}
 				t.Fatalf("failed to read golden %s: %v", goldenPath, err)
@@ -403,7 +349,7 @@ func TestEventsJSONContract(t *testing.T) {
 				t.Errorf("golden drift in %s\n--- expected ---\n%s\n--- actual ---\n%s\nrerun with UPDATE_GOLDENS=1 if intentional",
 					goldenPath, string(expected), string(actual))
 			} else {
-				assert.True(t, true) // record the assertion for -v output
+				assert.True(t, true)
 			}
 		})
 	}
@@ -413,9 +359,7 @@ func ptrInt(v int) *int              { return &v }
 func ptrSuit(v game.Suit) *game.Suit { return &v }
 func ptrString(v string) *string     { return &v }
 
-// sampleFourPlayers builds a deterministic 4-player roster with hands of
-// varying length so the JSON shape covers populated arrays. Values are
-// stable and chosen to be team-shape-correct (seats 0/2 = teamA, 1/3 = teamB).
+// sampleFourPlayers builds a deterministic, team-correct 4-player roster with populated hands.
 func sampleFourPlayers() [4]game.PlayerState {
 	return [4]game.PlayerState{
 		{
@@ -427,9 +371,7 @@ func sampleFourPlayers() [4]game.PlayerState {
 			Declarations: []game.Declaration{},
 			Connected:    true,
 			Level:        3,
-			// One seat with an avatar, three without: the golden pins both the
-			// string and the null shape of avatarUrl.
-			AvatarURL: ptrString("https://assets.example.com/avatars/0f8b6c1e-2a4d-4e6f-9a1b-3c5d7e9f1a2b/128.webp"),
+			AvatarURL:    ptrString("https://assets.example.com/avatars/0f8b6c1e-2a4d-4e6f-9a1b-3c5d7e9f1a2b/128.webp"),
 		},
 		{
 			Seat:         1,

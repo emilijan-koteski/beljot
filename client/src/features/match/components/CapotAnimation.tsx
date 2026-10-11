@@ -9,27 +9,14 @@ import { Z } from "@/shared/lib/zLayers";
 import { seatTeam, teamColors } from "../lib/tableTheme";
 
 interface CapotAnimationProps {
-  /** Absolute capot team (0 = team A, 1 = team B). */
   capotTeam: number;
-  /** Viewer's seat — used to render the moment from their perspective. */
   viewerSeat: number;
-  /** Capot bonus actually awarded this hand (from the `hand_scored` payload). */
   capotBonus: number;
   onComplete: () => void;
-  /**
-   * Dedupe key for the capot jingle (see `payloadSoundKey`), played once when
-   * the banner mounts. Null for a banner rebuilt on reconnect from the saved
-   * hand result, which describes a moment that has already sounded.
-   */
   soundKey?: string | null;
 }
 
-/**
- * Full-screen capot celebration. Reads viewer-relative: the viewer's own team
- * always shows as Gold ("Us"), the opponents as Silver ("Them") — matching the
- * rest of the in-game table. Auto-advances to the score reveal after a short
- * dwell; tapping anywhere skips early.
- */
+/** Full-screen capot celebration from the viewer's perspective; tapping skips early. */
 export function CapotAnimation({
   capotTeam,
   viewerSeat,
@@ -60,10 +47,6 @@ export function CapotAnimation({
 
   const team = seatTeam(capotTeam, viewerSeat);
   const [bright] = teamColors(team);
-  // Grammar is viewer-relative: when the viewer's own team swept ("gold") the
-  // copy reads first-person ("we swept" / "to us"); the opponents read
-  // third-person. A single {{team}} label can't carry verb agreement or noun
-  // case across languages, so each perspective gets its own string.
   const isUs = team === "gold";
 
   return (

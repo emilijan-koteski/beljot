@@ -81,7 +81,6 @@ describe("MatchStatsCard", () => {
     const row = screen.getByTestId("match-history-row");
     expect(row).toHaveAttribute("data-match-id", "7");
     expect(screen.getByTestId("match-history-outcome")).toHaveAttribute("data-outcome", "win");
-    // Viewer sits on team A, so their score leads.
     const scores = within(row).getAllByText(/^(1010|640)$/);
     expect(scores[0]).toHaveTextContent("1010");
   });
@@ -89,7 +88,6 @@ describe("MatchStatsCard", () => {
   it("derives the subject's seat chip from viewerSeat", () => {
     renderCard({ match: makeMatch({ viewerSeat: 1 }) });
     const chips = screen.getAllByTestId("match-seat-chip");
-    // First chip is the subject's own — seat 1 here, not the seat-0 default.
     expect(chips[0]).toHaveTextContent("opp1");
   });
 
@@ -113,8 +111,6 @@ describe("MatchStatsCard", () => {
   });
 
   it("forces the stacked hand layout with handsLayout='stacked'", () => {
-    // jsdom reports the desktop viewport, so "auto" picks the wide table; the
-    // stacked override is what keeps the card inside a narrow overlay panel.
     renderCard({ isOpen: true, handsLayout: "auto" });
     expect(screen.getByTestId("match-history-hands-grid").className).toContain("overflow-x-auto");
 
@@ -152,23 +148,18 @@ describe("MatchStatsCard", () => {
     });
     expect(screen.getByTestId("match-history-bots-marker")).toBeInTheDocument();
     const links = screen.getAllByRole("link");
-    // Only the human teammate is linkable; both bot seats and the subject are not.
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveTextContent("mate");
   });
-  // P2: inside the match overlay a seat-chip <Link> would PUSH-navigate away,
-  // unmounting MatchPage and skipping return-to-room / leave-room entirely.
   it("renders seat chips as plain text when linkPlayers is false", () => {
     renderCard({ linkPlayers: false });
     expect(screen.queryAllByRole("link")).toHaveLength(0);
-    // The names are still there — only the navigation is gone.
     expect(screen.getAllByTestId("match-seat-chip")).toHaveLength(4);
     expect(screen.getByText("mate")).toBeInTheDocument();
   });
 
   it("links seat chips to player profiles by default", () => {
     renderCard();
-    // Three co-players; the subject's own chip is never a link.
     expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 
@@ -187,11 +178,6 @@ describe("MatchStatsCard", () => {
     expect(chips[0]).toHaveTextContent("—");
   });
 
-  // A room playing "dosta" ends the match the instant a team reaches the target,
-  // and that cut-short hand deliberately gets no hand_results row. Its points are
-  // still inside the final score, so the breakdown would otherwise fall short of
-  // the total with nothing naming the difference. Observed live before this row
-  // existed: hands summing to 407 under a displayed 516.
   describe("unfinished hand (stop at target)", () => {
     it("accounts for points the scored hands do not cover", () => {
       const match = makeMatch({
@@ -209,9 +195,7 @@ describe("MatchStatsCard", () => {
       renderCard({ match, isOpen: true });
 
       const row = screen.getByTestId("match-history-unscored-hand");
-      // Viewer is on team A: 119 - (0+14+105) = 0 for us, 516 - 407 = 109 for them.
       expect(row).toHaveTextContent("109");
-      // Numbered as the hand it actually was — the fourth.
       expect(row).toHaveTextContent("04");
     });
 
@@ -228,9 +212,6 @@ describe("MatchStatsCard", () => {
     });
   });
 
-  // A match records the rules it was played under (migration 000023), because a
-  // room is reusable and its settings can change between matches. Chipped only
-  // when they differ from the default, so a chip always carries information.
   describe("rule chips", () => {
     it("names the rules when they are not the defaults", () => {
       renderCard({
@@ -248,7 +229,6 @@ describe("MatchStatsCard", () => {
       expect(screen.queryByTestId("match-history-no-declarations")).not.toBeInTheDocument();
       expect(screen.queryByTestId("match-history-stop-at-target")).not.toBeInTheDocument();
 
-      // Absent must never assert a rule — hence `=== false` / `=== true`.
       const legacy = makeMatch();
       delete (legacy as { declarationsEnabled?: boolean }).declarationsEnabled;
       delete (legacy as { stopAtTarget?: boolean }).stopAtTarget;

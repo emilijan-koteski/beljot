@@ -30,13 +30,6 @@ func TestAutoActionTypeFor(t *testing.T) {
 		{"play_card uses autoPlayed flag, not auto-action", game.ActionPlayCard, "", false},
 		{"announce_belot is not a timeout action", game.ActionAnnounceBelot, "", false},
 		{"declare is not a timeout action", game.ActionDeclare, "", false},
-		// Story 12.8 flipped this row. It used to read "pick_trump is not a
-		// timeout action", which was true only while no config could force a
-		// pick. Under AllPassOutcome == AllPassDealerMustPick the dealer bidding
-		// last (fourth) has no legal pass, so the timer names a suit for an
-		// absent one — and that is the one auto-action that FIXES trump for the
-		// whole hand, so it must be announced rather than silently inferred from
-		// the next snapshot.
 		{"pick_trump emits auto-action (forced dealer pick)", game.ActionPickTrump, ws.AutoActionPickTrump, true},
 		{"empty action", "", "", false},
 	}
@@ -50,11 +43,8 @@ func TestAutoActionTypeFor(t *testing.T) {
 	}
 }
 
-// TestPerMoveTimer_BiddingPhaseAutoPasses confirms the auto-pass path runs
-// end-to-end: a bidding-phase timer expiry advances the active seat without
-// panicking and without leaving the session stuck. The wire-format payload
-// itself is locked by TestAutoActionTypeFor; this test guards against silent
-// regression where the new EventAutoAction broadcast path corrupts state.
+// TestPerMoveTimer_BiddingPhaseAutoPasses checks a bidding-phase timer expiry
+// advances the active seat without panicking or leaving the session stuck.
 func TestPerMoveTimer_BiddingPhaseAutoPasses(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -64,7 +54,6 @@ func TestPerMoveTimer_BiddingPhaseAutoPasses(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetDealGraceForTest(false)
 
-	// 1-second timer so it expires quickly
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false))
 
 	state := mgr.GetStateSnapshot(100)
@@ -72,9 +61,6 @@ func TestPerMoveTimer_BiddingPhaseAutoPasses(t *testing.T) {
 	require.Equal(t, game.PhaseBidding, state.Phase)
 	firstBidder := state.ActivePlayerSeat
 
-	// Wait through one bidding timeout — server auto-passes for the active bidder.
-	// The timer fires expiryGrace (400ms) past the 1s advertised deadline, so
-	// sleep comfortably past deadline+grace for the broadcast to settle.
 	time.Sleep(2200 * time.Millisecond)
 
 	after := mgr.GetStateSnapshot(100)
@@ -92,12 +78,8 @@ func TestPerMoveTimer_PickTrumpJSONShapeUnchanged(t *testing.T) {
 	assert.JSONEq(t, `{"playerSeat":2,"type":"pass_trump"}`, string(b))
 }
 
-// TestAutoAction_SkipDeclare_ChainsToAutoPlayWithoutExtension is the regression
-// for the bug: when the per-move timer fires while a declaration prompt is
-// open, the auto-action used to be skip_declare followed by setTurnExpiry
-// granting the same player a fresh full-duration window. Fix: chain AutoPlay
-// inside handleTimerExpiry so the seat advances and the next seat (not the
-// timed-out player) gets the fresh timer.
+// TestAutoAction_SkipDeclare_ChainsToAutoPlayWithoutExtension checks a timer expiry
+// during a declaration prompt chains into auto-play, so the next seat gets the fresh timer.
 func TestAutoAction_SkipDeclare_ChainsToAutoPlayWithoutExtension(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -105,19 +87,13 @@ func TestAutoAction_SkipDeclare_ChainsToAutoPlayWithoutExtension(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	// 60-second timerDurationSec — if the bug regressed (fresh expiry on
-	// timed-out seat), that fresh expiry would land ~60s in the future, far
-	// past the chained next-seat expiry (which sits ~60s after the chain
-	// runs but starts on the seat that just received the play, not seat 1).
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false))
 
-	// Inject a declaration-prompt state on seat 1 with an already-elapsed
-	// expiry. The next TriggerTimerExpiryForTest fires the auto-action.
 	gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
 	gs.RoomID = 100
 	gs.ActivePlayerSeat = 1
 	gs.AwaitingDeclaration = true
-	originalExpiry := time.Now().Add(-1 * time.Second) // already past
+	originalExpiry := time.Now().Add(-1 * time.Second)
 	gs.TurnExpiresAt = &originalExpiry
 	gs.TimerDurationSec = 60
 	mgr.SetGameStateForTest(100, gs)
@@ -127,27 +103,17 @@ func TestAutoAction_SkipDeclare_ChainsToAutoPlayWithoutExtension(t *testing.T) {
 
 	after := mgr.GetStateSnapshot(100)
 	require.NotNil(t, after)
-	// Chain proof: seat advanced past 1 (skip_declare alone leaves seat=1).
 	assert.NotEqual(t, 1, after.ActivePlayerSeat,
 		"chained AutoPlay must advance the seat past the doomed player")
-	// Trick has exactly the chained card (no other plays could happen).
 	assert.Equal(t, 1, len(after.CurrentTrick),
 		"chained auto-play should land exactly one card in the trick")
-	// Fresh timer belongs to the new seat. Crucially, oldState (seat 1) had
-	// expiry in the past; a regression of the bug would arm a fresh timer for
-	// seat 1 (the doomed player). Assert the seat changed AND the expiry is
-	// in the future.
 	require.NotNil(t, after.TurnExpiresAt)
 	assert.True(t, after.TurnExpiresAt.After(time.Now()),
 		"fresh timer for next seat must be in the future")
 }
 
-// TestAutoAction_ChainedBelotPrompt_AdvancesPastDoomedSeat is a regression for
-// a stall edge case: when the chain auto-plays K of trump while the player
-// also holds Q, handlePlayCard opens a belot prompt and does NOT advance the
-// seat. Without a multi-step chain, no timer would arm and the game would
-// stall. The structural loop must keep auto-resolving (here: skip_belot)
-// until the seat actually advances.
+// TestAutoAction_ChainedBelotPrompt_AdvancesPastDoomedSeat checks the auto-action chain
+// keeps resolving a belot prompt opened by its own K/Q play until the seat advances.
 func TestAutoAction_ChainedBelotPrompt_AdvancesPastDoomedSeat(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -157,19 +123,10 @@ func TestAutoAction_ChainedBelotPrompt_AdvancesPastDoomedSeat(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false))
 
-	// Seat 0 with hearts trump holds KH+QH. Force AutoPlay to land on KH by
-	// stripping all of seat 0's other cards down to just K and Q. Set
-	// AwaitingDeclaration=true on seat 0 so the chain runs:
-	//   skip_declare → auto_play(KH) → belot prompt → skip_belot.
 	gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
 	gs.RoomID = 100
 	gs.ActivePlayerSeat = 0
 	gs.AwaitingDeclaration = true
-	// Seat 0 fixture hand starts with KH QH 7S 8S 9S 7C 8C 9C — keep all,
-	// AutoPlay sorts S→H→D→C then 7→8→9→T→J→Q→K→A and lead-suit-first; with
-	// no LeadSuit (seat 0 leads), the smallest of the smallest suit wins, so
-	// 7S leads. That doesn't trigger belot — hearts trump K isn't played.
-	// Restrict seat 0's hand to hearts only so AutoPlay must pick QH or KH.
 	gs.Players[0].Hand = []game.Card{
 		{Rank: game.RankKing, Suit: game.SuitHearts},
 		{Rank: game.RankQueen, Suit: game.SuitHearts},
@@ -184,29 +141,20 @@ func TestAutoAction_ChainedBelotPrompt_AdvancesPastDoomedSeat(t *testing.T) {
 
 	after := mgr.GetStateSnapshot(100)
 	require.NotNil(t, after)
-	// Seat must advance past 0 — the chain must not stall on the belot prompt.
-	// (The new active seat may have its own AwaitingDeclaration if their hand
-	// contains declarations — that's a fresh prompt for the new seat, not the
-	// stale one for seat 0.)
 	assert.NotEqual(t, 0, after.ActivePlayerSeat,
 		"chain must walk skip_declare → auto_play → skip_belot until seat advances")
 	assert.Nil(t, after.PendingBelotSeat, "belot prompt for seat 0 must be resolved by the chain")
 	require.NotNil(t, after.TurnExpiresAt)
 	assert.True(t, after.TurnExpiresAt.After(time.Now()),
 		"fresh timer must arm for the next seat once the chain settles")
-	// One trump card was auto-played (which one depends on AutoPlay's sort —
-	// either K or Q triggers the belot prompt since seat 0 holds both).
 	assert.Equal(t, 1, len(after.CurrentTrick), "exactly one card landed in the trick")
 	played := after.CurrentTrick[0].Card.String()
 	assert.Contains(t, []string{"KH", "QH"}, played,
 		"the chained auto-play must commit a hearts trump K or Q (both held → belot trigger)")
 }
 
-// TestAutoAction_SkipBelot_AdvancesSeatAndArmsFreshTimer covers the simpler
-// case: skip_belot flows through finishCardPlay which advances the seat, so a
-// fresh timer for the next seat is correct. This locks the contract that the
-// auto-action path in handleTimerExpiry still arms a timer when the seat
-// genuinely transitions.
+// TestAutoAction_SkipBelot_AdvancesSeatAndArmsFreshTimer checks a timer-driven
+// skip_belot advances the seat and arms a fresh timer for the next one.
 func TestAutoAction_SkipBelot_AdvancesSeatAndArmsFreshTimer(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -216,15 +164,11 @@ func TestAutoAction_SkipBelot_AdvancesSeatAndArmsFreshTimer(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false))
 
-	// Set up a belot-prompt state on seat 1, using diamonds trump so seat 1's
-	// fixture hand (KD, QD) qualifies. Seat 1 just played KD; PendingBelotSeat
-	// == 1; KD already moved from hand into the trick.
 	gs := testfixtures.NewGameFirstTrick(game.SuitDiamonds)
 	gs.RoomID = 100
 	gs.ActivePlayerSeat = 1
 	pendingSeat := 1
 	gs.PendingBelotSeat = &pendingSeat
-	// Move KD from seat 1's hand into the trick to mirror the post-play state.
 	kdIdx := -1
 	for i, c := range gs.Players[1].Hand {
 		if c.Rank == game.RankKing && c.Suit == game.SuitDiamonds {
@@ -238,7 +182,7 @@ func TestAutoAction_SkipBelot_AdvancesSeatAndArmsFreshTimer(t *testing.T) {
 	gs.CurrentTrick = []game.TrickCard{{PlayerSeat: 1, Card: playedCard}}
 	leadSuit := game.SuitDiamonds
 	gs.LeadSuit = &leadSuit
-	originalExpiry := time.Now().Add(-1 * time.Second) // already past
+	originalExpiry := time.Now().Add(-1 * time.Second)
 	gs.TurnExpiresAt = &originalExpiry
 	gs.TimerDurationSec = 60
 	mgr.SetGameStateForTest(100, gs)
@@ -256,10 +200,8 @@ func TestAutoAction_SkipBelot_AdvancesSeatAndArmsFreshTimer(t *testing.T) {
 		"fresh timer for next seat must be in the future")
 }
 
-// TestPerMoveTimer_BitolaRoundOnePassoutOpensRoundTwo restores the match-layer
-// proof (previously carried by the deleted face-down reveal suite) that
-// timer-driven auto-passes walk a Bitola round 1 out into round 2 — and only
-// into round 2: no reshuffle fires until round 2 itself passes out.
+// TestPerMoveTimer_BitolaRoundOnePassoutOpensRoundTwo checks timer-driven auto-passes
+// walk Bitola round 1 into round 2, with no reshuffle until round 2 passes out.
 func TestPerMoveTimer_BitolaRoundOnePassoutOpensRoundTwo(t *testing.T) {
 	hub := &hubSpy{}
 	mgr := match.NewManager(hub, newMockMatchRepo())
@@ -272,9 +214,6 @@ func TestPerMoveTimer_BitolaRoundOnePassoutOpensRoundTwo(t *testing.T) {
 	gs.RoomID = roomID
 	mgr.SetGameStateForTest(roomID, gs)
 
-	// Four timer expiries, each auto-passing the seat on the clock. Waiting on
-	// the observable state between them keeps the sequence honest — expiry N+1
-	// is aimed at the seat expiry N actually advanced to.
 	for pass := 1; pass <= 4; pass++ {
 		before := mgr.GetStateSnapshot(roomID)
 		require.NotNil(t, before)

@@ -20,47 +20,22 @@ interface PlayerSeatProps {
   player: PlayerState | null;
   isSelf: boolean;
   isActive: boolean;
-  /**
-   * Viewer-relative team identity. The viewer's own team always reads as
-   * `gold` regardless of teamA/teamB. See [tableTheme.seatTeam].
-   */
   seatTeam: SeatTeam;
   cardCount?: number;
   turnExpiresAt?: string | null;
   timerDuration?: number;
-  /** This seat is the dealer for the current hand. */
   isDealer?: boolean;
-  /**
-   * When this seat is the trump caller, the trump suit. When `null` /
-   * `undefined`, no caller chip is rendered. (The chip carries the suit
-   * glyph, so the suit must be known.)
-   */
   trumpCallerSuit?: Suit | null;
-  /**
-   * Layout for the seat's children. `bottom`/`top` stack vertically; `left`/
-   * `right` flow horizontally so the avatar sits on the screen edge while
-   * name + card-back stack flow inward.
-   */
   orientation?: SeatOrientation;
-  /**
-   * Phone layout: every seat stacks vertically (avatar → name → card-backs),
-   * the avatar shrinks, and the name pill drops the team-label / seconds row
-   * (the timer ring around the avatar carries that). Dealer/trump chips keep
-   * their size. Defaults to the desktop layout.
-   */
   compact?: boolean;
 }
 
 const AVATAR_DISC_PX = 64;
 const AVATAR_DISC_PX_COMPACT = 44;
-const FRAME_PAD_PX = 16; // 3 px conic frame + 5 px ring lane (both sides)
+const FRAME_PAD_PX = 16;
 
 const TURN_LIME = "var(--turn-lime, #00e5a0)";
 const COLOR_URGENT = "var(--turn-urgent, #ef4444)";
-// Hard-coded RGBA so the active glow keeps its alpha — `var()` cannot be
-// concatenated with extra hex digits (the CSS parser drops the whole
-// declaration on `var(--x, #fff)99`, which had been silently disabling
-// the active-seat outer ring).
 const TURN_LIME_GLOW = "rgba(0, 229, 160, 0.6)";
 
 /**
@@ -107,15 +82,10 @@ function StatusChip({
   );
 }
 
-/** Fanned face-down card-back pile shown next to non-self avatars, with a
- *  trailing `×N` count so a glance reveals exactly how many cards the seat
- *  still holds (5 in trump-bidding, 8 once dealing finishes, then drops as
- *  cards are played).
- *
- *  Doubles as the geometric anchor for the CardFlight overlay — opponent
- *  throws launch from this rect and trick-collect flights converge here when
- *  this seat wins. The outer `data-testid="player-seat-deck-{seat}"` exposes
- *  it for `getBoundingClientRect()` lookups. */
+/**
+ * Fanned card-back pile with a `×N` count, shown next to opponent avatars.
+ * It is also the CardFlight anchor, so it keeps its box even when empty.
+ */
 function CardBackStack({
   count,
   isHorizontal,
@@ -128,27 +98,17 @@ function CardBackStack({
   compact?: boolean;
 }) {
   const visible = Math.min(count, 5);
-  // Extra-small card backs on phones so the seat stays tight.
   const cw = compact ? SEAT_STACK_CARD_WIDTH.compact : SEAT_STACK_CARD_WIDTH.desktop;
   const ch = compact ? 22 : 38;
   const overlap = compact ? 12 : 22;
-  // Render the wrapper div even when count === 0 so the CardFlight overlay
-  // can always measure this seat's deck rect (used as the destination on a
-  // collect flight that converges on this seat as winner). Without this,
-  // the last trick of a hand — where every player has zero cards left —
-  // would have no anchor and the collect animation would silently bail.
   return (
     <div
       className="flex items-center"
       style={{
         marginLeft: isHorizontal ? 8 : 0,
         marginTop: isHorizontal ? 0 : compact ? 2 : 4,
-        // Reserve enough box for the card-back fan + count badge so the rect
-        // measurement returns a non-zero size even with no cards visible.
         minWidth: compact ? 34 : 56,
         minHeight: compact ? 22 : 38,
-        // When there are no cards to show, hide the children visually but
-        // keep the box (and its rect) addressable.
         visibility: visible > 0 ? "visible" : "hidden",
       }}
       data-testid="player-seat-card-stack"
@@ -188,15 +148,7 @@ function CardBackStack({
 }
 
 /**
- * Player seat — the avatar + name pill + status chips + (for opponents) a
- * card-back stack representing the cards they still hold.
- *
- * Three visual channels stack here:
- *  • Team identity — the conic-gradient frame around the avatar disc (Gold
- *    for the viewer's team, Silver for the opposition; viewer-relative).
- *  • Turn signal — the lime ring + countdown number that appear when this
- *    seat is the active player (urgent-red flip handled by [TimerRing]).
- *  • Hand state — dealer (D) + trump-caller (suit) chips, stacked.
+ * Player seat: avatar with team frame and turn ring, name pill, dealer and trump chips, and opponent card backs.
  */
 export function PlayerSeat({
   player,
@@ -219,11 +171,7 @@ export function PlayerSeat({
   const discPx = compact ? AVATAR_DISC_PX_COMPACT : AVATAR_DISC_PX;
   const framePx = discPx + FRAME_PAD_PX;
 
-  // Hook must run before the empty-seat early return — the seconds drive the
-  // external label rendered inside the name pill (next to the team label).
-  // Returns 0 when there's no expiry, so an empty/inactive seat costs nothing.
   const secondsLeft = useTurnCountdown(turnExpiresAt ?? null);
-  // Same reason this sits above the early return: hooks cannot run conditionally.
   const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
 
   if (!player) {
@@ -250,11 +198,7 @@ export function PlayerSeat({
     );
   }
 
-  // Bots keep Connected=true server-side forever, so they can never render
-  // the connection-lost treatment; the explicit guard documents the contract.
   const isDisconnected = player.connected === false && player.isBot !== true;
-  // On phones every seat stacks vertically (avatar on top); only desktop keeps
-  // the horizontal left/right edge layout.
   const isHorizontal = !compact && (orientation === "left" || orientation === "right");
 
   const flexDirection: React.CSSProperties["flexDirection"] = isHorizontal
@@ -269,8 +213,6 @@ export function PlayerSeat({
     : player.isBot === true
       ? botDisplayName(t, player.seat)
       : player.username || `P${player.seat + 1}`;
-  // Humans only — bot discs render the Bot glyph below, never an initial (or a
-  // picture). The initial is also the fallback while a picture fails to load.
   const initial = (player.username || "?").charAt(0).toUpperCase();
 
   const showRing =
@@ -287,9 +229,6 @@ export function PlayerSeat({
       borderColor={suitAccent(trumpCallerSuit, deck)}
       textColor={suitAccent(trumpCallerSuit, deck)}
       glowColor={`${suitAccent(trumpCallerSuit, deck)}99`}
-      // Localized AND deck-aware. This was `Called ${SUIT_NAME[suit]}` —
-      // hardcoded English on a French-only name map, so a Croatian-deck player
-      // reading Macedonian got an English "Called Diamonds" over a gold bell.
       title={t("match.seat.calledSuit", { suit: t(suitNameKey(trumpCallerSuit, deck)) })}
       testId="player-seat-caller-chip"
     >
@@ -308,17 +247,10 @@ export function PlayerSeat({
     </StatusChip>
   ) : null;
 
-  // Chip anchoring. Both chips share the same `top`, so the pair reads as one
-  // chip layered over the other (caller wins z-order). The front/back `right`
-  // values differ by 10 px → the two 30 px chips overlap by 20 px, the same
-  // staggered "stack" the desktop layout uses. On phones the whole pair tucks
-  // inward (front at the avatar's right edge, back 10 px behind-left) so the
-  // rightmost chip can't clip off-screen on an edge-hugging seat — instead of
-  // fanning the dealer far inward, which left them sitting side-by-side.
   const chipTop = compact ? -4 : -6;
   const chipRightLone = compact ? -2 : -6;
-  const chipRightFront = compact ? -2 : -16; // caller (top of z-stack)
-  const chipRightBack = compact ? 8 : -6; // dealer (behind, 10px left of caller)
+  const chipRightFront = compact ? -2 : -16;
+  const chipRightBack = compact ? 8 : -6;
 
   return (
     <div
@@ -335,7 +267,6 @@ export function PlayerSeat({
       data-active={isActive ? "true" : "false"}
       data-self={isSelf ? "true" : undefined}
     >
-      {/* Avatar w/ team-color conic frame + (when active) lime/red countdown ring */}
       <div className="relative shrink-0" style={{ width: framePx, height: framePx }}>
         <div
           className="rounded-full"
@@ -362,11 +293,6 @@ export function PlayerSeat({
             }}
             data-testid="player-seat-avatar"
           >
-            {/* Bot seats show the bot glyph instead of a name initial,
-                mirroring the room-lobby avatars. The 5% upward shift is
-                optical — the glyph's visual mass sits low in its viewBox.
-                Humans show their picture inside the team frame, or the
-                initial without one. */}
             {player.isBot === true ? (
               <Bot
                 size={discPx * 0.5}
@@ -379,9 +305,6 @@ export function PlayerSeat({
             )}
           </div>
         </div>
-        {/* Countdown ring overlay (lime → urgent red ≤1/8). The numeric label
-            is suppressed here so the avatar initial stays legible — the
-            seconds are rendered in the name pill team-label row instead. */}
         {showRing && (
           <TimerRing
             turnExpiresAt={turnExpiresAt ?? null}
@@ -391,11 +314,6 @@ export function PlayerSeat({
             hideLabel
           />
         )}
-        {/* Stackable status chips: caller occupies the left slot, dealer the
-            right (positions kept as before). The caller chip wins the z-order
-            so its suit glyph hovers above the dealer chip in the overlap
-            region — the suit is the more important piece of information once
-            trump has been taken. */}
         {callerChipNode && dealerChipNode && (
           <>
             <div className="absolute" style={{ top: chipTop, right: chipRightFront, zIndex: 2 }}>
@@ -418,8 +336,6 @@ export function PlayerSeat({
         )}
       </div>
 
-      {/* Name pill. On phones it's name-only and tight — the team label and
-          seconds counter are dropped (the avatar's timer ring covers timing). */}
       <div
         className={`rounded-lg flex flex-col items-center ${compact ? "px-2 py-0.5" : "gap-0.5 px-3 py-1.5"}`}
         style={{
@@ -440,10 +356,6 @@ export function PlayerSeat({
         >
           {displayName}
         </span>
-        {/* Humans only: the lifetime level (replacing the old team label) plus
-            the live seconds counter. Bots get a name-only pill on desktop — no
-            level, no seconds — and phones drop this row for everyone (compact).
-            Team identity is still announced to screen readers via aria-label. */}
         {!compact && player.isBot !== true && (
           <span
             className="font-body text-[10px] tabular-nums flex items-center gap-1.5"
@@ -470,9 +382,6 @@ export function PlayerSeat({
         )}
       </div>
 
-      {/* Card-back stack — opponents only. Rendered even when `cardCount === 0`
-          (last trick of a hand) so the CardFlight overlay can always measure
-          this seat's deck rect; the inner stack hides itself when empty. */}
       {!isSelf && cardCount !== undefined && (
         <CardBackStack
           count={cardCount}
@@ -482,8 +391,6 @@ export function PlayerSeat({
         />
       )}
 
-      {/* sr-live region for assistive tech — same wording as before so existing
-          screen-reader expectations don't drift. */}
       <div aria-live="polite" className="sr-only">
         {isActive ? "It's this player's turn" : ""}
       </div>

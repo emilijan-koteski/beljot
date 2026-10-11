@@ -11,14 +11,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/game/testfixtures"
 )
 
-// GameState.WonByInstantWin (Story 13.1 D3) is the engine's record of WHY a match
-// ended, so the match layer can state the outcome instead of inferring it — the
-// Season-Points bonus has no other signal, because checkInstantWin fires right
-// after a deal and leaves TeamScores and the hand results untouched.
-//
-// Every case drives the engine through ApplyAction only and builds its state from
-// a testfixtures factory, never a raw GameState literal.
-
 // instantWinOnPick returns the stage-1 state from TestInstantWin_TriggeredOnPick:
 // seat 1 holds 5 hearts, the candidate is 7H, and the deck's stage-2 slice for
 // seat 1 is KH AH — so picking trump leaves seat 1 holding all eight hearts.
@@ -60,7 +52,6 @@ func TestWonByInstantWin_SetOnPickTrump(t *testing.T) {
 	require.NotNil(t, result.WinnerTeam)
 	assert.True(t, result.WonByInstantWin,
 		"the pick that dealt one seat all 8 trumps must record the instant win")
-	// The two flags are independent records of two different end reasons.
 	assert.False(t, result.StoppedAtTarget, "this match did not end on the stop rule")
 }
 
@@ -82,7 +73,6 @@ func TestWonByInstantWin_NotSetOnAnOrdinaryPick(t *testing.T) {
 // set by the near miss either.
 func TestWonByInstantWin_NotSetOnPartialTrump(t *testing.T) {
 	gs := instantWinOnPick(t)
-	// Swap the second stage-2 card for a non-heart: seat 1 ends on 7 hearts.
 	gs.Deck[1] = game.Card{Rank: game.Rank7, Suit: game.SuitSpades}
 
 	result, err := game.ApplyAction(gs, game.Action{Type: game.ActionPickTrump, PlayerSeat: 1})
@@ -93,15 +83,8 @@ func TestWonByInstantWin_NotSetOnPartialTrump(t *testing.T) {
 	assert.False(t, result.WonByInstantWin, "7 trump cards is not an instant win")
 }
 
-// THE MID-MATCH INSTANT WIN — the case GameState.WonByInstantWin exists for, and
-// the one with real money on it: an instant win on hand 5 of a match sitting at
-// 500:300 has TeamScores and hand results that look exactly like an ordinary
-// finish, so the flag is the ONLY thing that tells the match layer to pay the
-// +50 Season Points bonus (Story 13.1 D2/D3).
-//
-// Every other set-case in this file is hand 1 at 0:0, where an instant win is
-// also inferable from "no hand results, zero scores". This one is not inferable
-// at all, which is the whole point.
+// TestWonByInstantWin_SetMidMatchWithPointsOnTheBoard checks the flag is set for a mid-match
+// instant win, where scores alone cannot reveal it.
 func TestWonByInstantWin_SetMidMatchWithPointsOnTheBoard(t *testing.T) {
 	gs := instantWinOnPick(t)
 	gs.HandNumber = 5
@@ -115,34 +98,12 @@ func TestWonByInstantWin_SetMidMatchWithPointsOnTheBoard(t *testing.T) {
 	require.NotNil(t, result.WinnerTeam)
 	assert.True(t, result.WonByInstantWin,
 		"an instant win on hand 5 must be recorded — nothing else at the match layer can tell")
-	// The scores are untouched, which is precisely why the inference available on
-	// a hand-1 instant win ("TeamScores are [0,0]") does not exist here.
 	assert.Equal(t, [2]int{500, 300}, result.TeamScores)
 	assert.Equal(t, 5, result.HandNumber)
 }
 
-// THE OTHER CALL SITE IS STRUCTURALLY UNREACHABLE, and this test is what keeps
-// that true — or fails loudly the day it stops being.
-//
-// scoring.go's startNewHand also calls checkInstantWin, right after dealing. That
-// branch cannot fire under either shipped deal shape, for two different reasons:
-//
-//   - DealShapeCandidate (Bitola): the stage-1 deal leaves each seat holding 5
-//     cards, so trumpCount == 8 is arithmetically impossible.
-//   - DealShapeAllBeforeBidding (Croatia): the deal sets TrumpCandidate to nil and
-//     leaves TrumpSuit nil, so checkInstantWin returns at its `default` arm with no
-//     suit to count. (Each seat also holds only 6 cards in Hand, the other 2 being
-//     face-down until bidding resolves.)
-//
-// So the flag can only ever be set from handlePickTrump, which is what every
-// other set-case here drives. THIS TEST DOES NOT PROVE THE ASSIGNMENT IN
-// startNewHand WORKS — it cannot, because that line cannot execute. It pins the
-// two structural invariants that make it dead, so a future variant that deals
-// eight open cards alongside a trump reference fails here and tells its author
-// the branch just came alive and now needs its own coverage.
-//
-// startNewHand builds and shuffles its OWN deck (math/rand/v2, no seeding), so
-// there is no seam to stack it through and no fixture that can force the case.
+// TestWonByInstantWin_StartNewHandSiteCannotFireUnderEitherDealShape pins the deal invariants that
+// keep startNewHand's instant-win check unreachable under both deal shapes.
 func TestWonByInstantWin_StartNewHandSiteCannotFireUnderEitherDealShape(t *testing.T) {
 	deal := func(t *testing.T, start *game.GameState) *game.GameState {
 		t.Helper()
@@ -159,8 +120,6 @@ func TestWonByInstantWin_StartNewHandSiteCannotFireUnderEitherDealShape(t *testi
 	}
 
 	t.Run("candidate shape cannot reach eight trumps in a hand", func(t *testing.T) {
-		// Repeated because the deal is genuinely random; the assertions below are
-		// structural, so a single pass would already be conclusive.
 		for i := 0; i < 50; i++ {
 			dealt := deal(t, testfixtures.NewGameJustDealt())
 			require.NotNil(t, dealt.TrumpCandidate, "this shape flips a candidate")
@@ -177,7 +136,6 @@ func TestWonByInstantWin_StartNewHandSiteCannotFireUnderEitherDealShape(t *testi
 	t.Run("all-before-bidding shape has no trump reference to count", func(t *testing.T) {
 		for i := 0; i < 50; i++ {
 			dealt := deal(t, testfixtures.NewGameCroatianJustDealt())
-			// Both nil is what sends checkInstantWin to its `default: return nil`.
 			assert.Nil(t, dealt.TrumpCandidate)
 			assert.Nil(t, dealt.TrumpSuit)
 			assert.NotEqual(t, game.PhaseMatchEnd, dealt.Phase)
@@ -194,7 +152,6 @@ func TestWonByInstantWin_SurvivesApplyActionsDerivedFlagRefresh(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result.WonByInstantWin, "set by the handler...")
 
-	// Called directly, the way ApplyAction calls it.
 	game.RefreshDerivedFlags(result)
 	assert.True(t, result.WonByInstantWin, "...and not recomputed away at the exit")
 }
@@ -203,9 +160,6 @@ func TestWonByInstantWin_SurvivesApplyActionsDerivedFlagRefresh(t *testing.T) {
 // the four continue acknowledgements that deal the next hand.
 func TestWonByInstantWin_ClearedByStartNewHand(t *testing.T) {
 	state := reachHandComplete(t)
-	// Simulate a flag left over from an earlier hand's state (unreachable in
-	// practice, since an instant win ends the match — reset defensively for
-	// exactly the reason StoppedAtTarget is).
 	state.WonByInstantWin = true
 
 	for seat := 0; seat < 4; seat++ {

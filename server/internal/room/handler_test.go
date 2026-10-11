@@ -20,29 +20,19 @@ import (
 	"github.com/emilijan/beljot/server/internal/room"
 )
 
-// --- Mock Repository ---
-
+// mockRoomRepo is an in-memory room repository. Only bot access is locked, because
+// Quick Play auto-fill seats bots from a background goroutine.
 type mockRoomRepo struct {
-	rooms   []*room.Room
-	players []*room.RoomPlayer
-	// botMu guards the bot slice + counter ONLY. The Quick Play auto-fill
-	// scheduler seats bots from a background AfterFunc goroutine, so bot access
-	// can race a test goroutine's read (e.g. the real-timer smoke test polling
-	// countBots). The rest of the mock is touched only from a single goroutine
-	// per test, so it stays lock-free — a blanket mutex would deadlock on the
-	// re-entrant RunInTransaction (fn(m)) and FindQuickPlayRoom self-call.
-	botMu          sync.Mutex
-	bots           []*room.RoomBot
-	nextID         uint
-	nextPID        uint
-	nextBID        uint
-	ownerUsernames map[uint]string
-	// ownerAvatarURLs stands in for the owner's users.avatar_key on the same
-	// read; a missing entry is "no avatar".
+	rooms           []*room.Room
+	players         []*room.RoomPlayer
+	botMu           sync.Mutex
+	bots            []*room.RoomBot
+	nextID          uint
+	nextPID         uint
+	nextBID         uint
+	ownerUsernames  map[uint]string
 	ownerAvatarURLs map[uint]*string
-	// addPlayerHook, when set, decorates each stored row (e.g. with the avatar
-	// the real repository's JOIN would read back).
-	addPlayerHook func(*room.RoomPlayer)
+	addPlayerHook   func(*room.RoomPlayer)
 }
 
 func newMockRoomRepo() *mockRoomRepo {
@@ -218,11 +208,6 @@ func (m *mockRoomRepo) FindQuickPlayRoomExcluding(excluded map[uint]bool, buyIn 
 		if excluded[r.ID] {
 			continue
 		}
-		// Story 9.4: only return a room in the caller's affordability bracket.
-		// The variant predicate mirrors GormRepository.FindQuickPlayRoomExcluding
-		// — Quick Play is Croatian-only (croatia/501 default), and the mock must
-		// not be a looser filter than production or a quick-play test could pass
-		// against behaviour the real query rejects.
 		if r.IsQuickPlay && r.Status == "waiting" && r.PlayerCount < 4 &&
 			r.CoinBuyIn == buyIn && r.Variant == "croatia" {
 			return r, nil
@@ -354,8 +339,6 @@ func (m *mockRoomRepo) RunInTransaction(fn func(room.RoomRepository) error) erro
 	return fn(m)
 }
 
-// --- Mock Broadcaster ---
-
 type broadcastCall struct {
 	userIDs []uint
 	msg     []byte
@@ -377,8 +360,6 @@ func (m *mockBroadcaster) BroadcastToUsers(userIDs []uint, msg []byte) {
 func (m *mockBroadcaster) BroadcastAll(msg []byte) {
 	m.allCalls = append(m.allCalls, allBroadcastCall{msg: msg})
 }
-
-// --- Test Infrastructure ---
 
 func testErrorHandler(err error, c echo.Context) {
 	if c.Response().Committed {
@@ -407,10 +388,6 @@ func testErrorHandler(err error, c echo.Context) {
 func setupTest() (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
 	handler := room.NewRoomHandler(repo, nil, nil, nil, nil, nil, nil)
-	// Neutralize the auto-fill cadence so a QuickPlay handler unit test never
-	// arms a real 3s AfterFunc that would fire against the abandoned mock after
-	// the test returns. The scheduler stays ARMED (observable via QuickFillState),
-	// it just never fires on its own within a unit test's lifetime.
 	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 
 	e := echo.New()
@@ -442,7 +419,7 @@ func setupTestWithBroadcast() (*echo.Echo, *mockRoomRepo, *mockBroadcaster) {
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
 	handler := room.NewRoomHandler(repo, nil, broadcaster, nil, nil, nil, nil)
-	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -492,15 +469,14 @@ func registerRoomRoutes(api *echo.Group, handler *room.RoomHandler) {
 	api.DELETE("/rooms/:id/bots/:seat", handler.RemoveBot)
 }
 
-// setupTestWithPresence mirrors setupTest but injects a caller-controlled
-// presence registry so tests can mark seated members "present". Required since
-// Story 9.3 gates owner-transfer on present-AND-solvent and direct repo seeding
-// bypasses the join/return paths that populate presence in production.
+// setupTestWithPresence mirrors setupTest but injects a caller-controlled presence
+// registry. Tests use it to mark seated members present, since direct repo seeding
+// bypasses presence.
 func setupTestWithPresence() (*echo.Echo, *mockRoomRepo, *room.PresenceRegistry) {
 	repo := newMockRoomRepo()
 	reg := room.NewPresenceRegistry()
 	handler := room.NewRoomHandler(repo, nil, &mockBroadcaster{}, reg, nil, nil, nil)
-	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -517,7 +493,7 @@ func setupTestWithBroadcastAndPresence() (*echo.Echo, *mockRoomRepo, *mockBroadc
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
 	handler := room.NewRoomHandler(repo, nil, broadcaster, reg, nil, nil, nil)
-	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -542,8 +518,6 @@ func validToken(userID uint) string {
 	token, _ := auth.GenerateAccessToken(userID, "test-jwt-secret")
 	return token
 }
-
-// --- Tests ---
 
 func TestCreateRoom_Success(t *testing.T) {
 	e, _ := setupTest()
@@ -595,10 +569,6 @@ func TestCreateRoom_501MatchMode(t *testing.T) {
 }
 
 func TestCreateRoom_AutoSeatsCreator(t *testing.T) {
-	// The creator is auto-seated at seat 0 / teamA so the room is startable
-	// from creation: with the 4-player cap an unseated owner could otherwise
-	// get locked out by 3 invitees taking the open seats. Mirrors the QuickPlay
-	// auto-seat path.
 	e, repo := setupTest()
 	token := validToken(7)
 
@@ -673,8 +643,6 @@ func TestCreateRoom_DuplicateName(t *testing.T) {
 	rec := doCreateRoom(e, body, token)
 	assert.Equal(t, http.StatusCreated, rec.Code)
 
-	// A DIFFERENT user attempts the same name — user 1 is now in their room and
-	// would (correctly) hit the already-in-room guard first.
 	rec2 := doCreateRoom(e, body, validToken(2))
 	assert.Equal(t, http.StatusConflict, rec2.Code)
 
@@ -813,17 +781,11 @@ func TestCreateRoom_CroatianVariant(t *testing.T) {
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
 	assert.Equal(t, "croatia", data.Variant)
 
-	// Persisted, not just echoed — the column is a plain varchar with no CHECK,
-	// so the allowlist in the handler is the only thing standing between a
-	// request body and the row.
 	persisted, err := repo.FindByID(data.ID)
 	require.NoError(t, err)
 	require.NotNil(t, persisted)
 	assert.Equal(t, "croatia", persisted.Variant)
 
-	// A quick-play room is never creatable through this endpoint: the DTO has no
-	// IsQuickPlay field, so a Croatian room can never carry the flag that makes
-	// it matchmaking-eligible.
 	assert.False(t, persisted.IsQuickPlay)
 }
 
@@ -896,8 +858,6 @@ func TestCreateRoom_TimerDurationTooHigh(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "TIMER_DURATION_OUT_OF_RANGE", errResp["error"]["code"])
 }
-
-// --- ListRooms Tests ---
 
 func doListRooms(e *echo.Echo, query string, token string) *httptest.ResponseRecorder {
 	url := "/api/v1/rooms"
@@ -975,7 +935,6 @@ func TestListRooms_EmptyArrayNotNull(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	// Verify the raw JSON contains [] not null
 	body := rec.Body.String()
 	assert.Contains(t, body, `"data":[]`)
 }
@@ -1000,8 +959,6 @@ func TestListRooms_InvalidStatus(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "INVALID_ROOM_STATUS", errResp["error"]["code"])
 }
-
-// --- GetRoom Tests ---
 
 func doGetRoom(e *echo.Echo, id string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/rooms/"+id, nil)
@@ -1068,8 +1025,6 @@ func TestGetRoom_Unauthorized(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
-
-// --- GetRoomByCode Tests ---
 
 func doGetRoomByCode(e *echo.Echo, code string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/rooms/code/"+code, nil)
@@ -1174,8 +1129,6 @@ func TestGetRoomByCode_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
-// --- JoinRoom Tests ---
-
 func doJoinRoom(e *echo.Echo, id string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/join", nil)
 	if token != "" {
@@ -1200,7 +1153,6 @@ func TestJoinRoom_Success(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	assert.Equal(t, 2, resp["data"].PlayerCount)
 
-	// Verify player was added
 	require.Len(t, repo.players, 1)
 	assert.Equal(t, uint(10), repo.players[0].UserID)
 }
@@ -1273,8 +1225,6 @@ func TestJoinRoom_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
-// --- LeaveRoom Tests ---
-
 func doLeaveRoom(e *echo.Echo, id string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/leave", nil)
 	if token != "" {
@@ -1320,20 +1270,14 @@ func TestLeaveRoom_NotInRoom(t *testing.T) {
 
 func TestLeaveRoom_OwnerTransfersOwnership(t *testing.T) {
 	e, repo, reg := setupTestWithPresence()
-	token := validToken(1) // user 1 is the owner (seedRoom sets OwnerID=1)
+	token := validToken(1)
 
 	seedRoom(repo, "Owner Leave", "waiting")
 	repo.rooms[0].PlayerCount = 2
-	// The inheritor must be SEATED — an unseated member never inherits ownership
-	// (see TestLeaveRoom_Owner_NoSeatedHuman_ClosesRoom).
 	repo.players = append(repo.players,
 		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
 		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, Seat: intPtr(1), CreatedAt: time.Now().Add(time.Second)},
 	)
-	// Story 9.3: ownership transfers only to a PRESENT seated human. In
-	// production join/return populate presence; here the direct seeding does not,
-	// so mark the inheritor present explicitly. The room is free (CoinBuyIn 0) so
-	// solvency is trivially satisfied.
 	reg.Add(1, 20)
 
 	rec := doLeaveRoom(e, "1", token)
@@ -1367,7 +1311,7 @@ func TestLeaveRoom_Owner_NoSeatedHuman_ClosesRoom(t *testing.T) {
 	repo.rooms[0].PlayerCount = 2
 	repo.players = append(repo.players,
 		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
-		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)}, // unseated
+		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)},
 	)
 	repo.bots = append(repo.bots, &room.RoomBot{ID: 1, RoomID: 1, Seat: 2, CreatedAt: time.Now()})
 
@@ -1391,10 +1335,9 @@ func TestLeaveRoom_OwnerTransfersToSeated_NotUnseated(t *testing.T) {
 	repo.rooms[0].PlayerCount = 3
 	repo.players = append(repo.players,
 		&room.RoomPlayer{ID: 1, RoomID: 1, UserID: 1, Seat: intPtr(0), CreatedAt: time.Now()},
-		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)},                      // unseated, first
-		&room.RoomPlayer{ID: 3, RoomID: 1, UserID: 30, Seat: intPtr(2), CreatedAt: time.Now().Add(2 * time.Second)}, // seated
+		&room.RoomPlayer{ID: 2, RoomID: 1, UserID: 20, CreatedAt: time.Now().Add(time.Second)},
+		&room.RoomPlayer{ID: 3, RoomID: 1, UserID: 30, Seat: intPtr(2), CreatedAt: time.Now().Add(2 * time.Second)},
 	)
-	// Both candidates present (Story 9.3); only the seated one (30) is eligible.
 	reg.Add(1, 20)
 	reg.Add(1, 30)
 
@@ -1430,8 +1373,6 @@ func TestCreateRoom_AlreadyInRoom_Rejected(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "ALREADY_IN_ROOM", errResp["error"]["code"])
 }
-
-// --- SelectSeat Tests ---
 
 func doSelectSeat(e *echo.Echo, id string, body string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/seat", strings.NewReader(body))
@@ -1490,7 +1431,6 @@ func TestSelectSeat_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	// Find the player and verify seat assignment
 	for _, p := range repo.players {
 		if p.UserID == 10 {
 			require.NotNil(t, p.Seat)
@@ -1538,7 +1478,6 @@ func TestSelectSeat_Switching(t *testing.T) {
 	token := validToken(10)
 
 	seedRoomWithPlayers(repo, "Switch Test", 1, 1, 10)
-	// Pre-assign player 10 to seat 0
 	for _, p := range repo.players {
 		if p.UserID == 10 {
 			p.Seat = intPtr(0)
@@ -1565,7 +1504,6 @@ func TestSelectSeat_Taken(t *testing.T) {
 	token := validToken(10)
 
 	seedRoomWithPlayers(repo, "Taken Test", 1, 1, 10)
-	// Player 1 already in seat 0
 	for _, p := range repo.players {
 		if p.UserID == 1 {
 			p.Seat = intPtr(0)
@@ -1629,7 +1567,7 @@ func TestSelectSeat_MissingSeat(t *testing.T) {
 
 func TestSelectSeat_NotInRoom(t *testing.T) {
 	e, repo := setupTest()
-	token := validToken(99) // user 99 not in room
+	token := validToken(99)
 
 	seedRoomWithPlayers(repo, "Not In Room", 1, 1, 10)
 
@@ -1663,7 +1601,6 @@ func TestSelectSeat_OwnCurrentSeat(t *testing.T) {
 	token := validToken(10)
 
 	seedRoomWithPlayers(repo, "No-op Test", 1, 1, 10)
-	// Player 10 already in seat 2
 	for _, p := range repo.players {
 		if p.UserID == 10 {
 			p.Seat = intPtr(2)
@@ -1675,7 +1612,6 @@ func TestSelectSeat_OwnCurrentSeat(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	// Seat should remain unchanged
 	for _, p := range repo.players {
 		if p.UserID == 10 {
 			require.NotNil(t, p.Seat)
@@ -1692,8 +1628,6 @@ func TestSelectSeat_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
-// --- StartGame Tests ---
-
 func doStartGame(e *echo.Echo, id string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/start", nil)
 	if token != "" {
@@ -1706,10 +1640,9 @@ func doStartGame(e *echo.Echo, id string, token string) *httptest.ResponseRecord
 
 func TestStartGame_Success(t *testing.T) {
 	e, repo := setupTest()
-	token := validToken(1) // owner
+	token := validToken(1)
 
 	seedRoomWithPlayers(repo, "Start Test", 1, 1, 2, 3, 4)
-	// Seat all 4 players
 	seats := []int{0, 1, 2, 3}
 	teams := []string{"teamA", "teamB", "teamA", "teamB"}
 	for i, p := range repo.players {
@@ -1729,7 +1662,7 @@ func TestStartGame_Success(t *testing.T) {
 
 func TestStartGame_NotOwner(t *testing.T) {
 	e, repo := setupTest()
-	token := validToken(10) // not the owner
+	token := validToken(10)
 
 	seedRoomWithPlayers(repo, "Not Owner", 1, 1, 10, 3, 4)
 	for i, p := range repo.players {
@@ -1752,7 +1685,6 @@ func TestStartGame_NotAllSeated(t *testing.T) {
 	token := validToken(1)
 
 	seedRoomWithPlayers(repo, "Not All Seated", 1, 1, 2, 3, 4)
-	// Only seat 2 out of 4
 	repo.players[0].Seat = intPtr(0)
 	repo.players[0].Team = strPtr("teamA")
 	repo.players[1].Seat = intPtr(1)
@@ -1816,8 +1748,6 @@ func TestStartGame_RejectsQuickPlayRoom(t *testing.T) {
 	assert.Equal(t, "MATCH_NOT_STARTABLE", errResp["error"]["code"])
 }
 
-// --- Quick Play Tests ---
-
 func doQuickPlay(e *echo.Echo, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/quick-play", nil)
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -1840,9 +1770,9 @@ func doQuickJoin(e *echo.Echo, id string, token string) *httptest.ResponseRecord
 	return rec
 }
 
-// seedQuickPlayRoom creates a waiting quick-play room owned by ownerID, who is
-// auto-seated at the lowest seats together with any extra occupants. Mirrors
-// the state QuickPlay leaves a partially-filled room in. Returns the room.
+// seedQuickPlayRoom creates a waiting quick-play room owned by ownerID, auto-seated at
+// the lowest seats with any extra occupants. It mirrors a partially filled QuickPlay
+// room.
 func seedQuickPlayRoom(repo *mockRoomRepo, code string, seatedUserIDs ...uint) *room.Room {
 	r := &room.Room{
 		Name:        "Quick Play " + code,
@@ -1895,7 +1825,6 @@ func TestQuickJoin_SeatsPlayerInTargetRoom(t *testing.T) {
 
 	assert.Equal(t, qpRoom.ID, data.Room.ID)
 	assert.Equal(t, 2, data.Room.PlayerCount)
-	// Joiner gets the next empty seat (1 → team B) since seat 0 is taken.
 	assert.Equal(t, 1, data.Seat)
 	assert.False(t, data.MatchStarted)
 
@@ -1939,7 +1868,6 @@ func TestQuickJoin_FourthPlayerAutoStarts(t *testing.T) {
 func TestQuickJoin_AlreadyInRoom(t *testing.T) {
 	e, repo := setupTest()
 	seedQuickPlayRoom(repo, "ABC123", 20)
-	// User 30 is already in another room.
 	other := seedQuickPlayRoom(repo, "OTHER1", 30)
 	_ = other
 
@@ -1953,7 +1881,6 @@ func TestQuickJoin_AlreadyInRoom(t *testing.T) {
 
 func TestQuickJoin_RoomNotQuickPlay(t *testing.T) {
 	e, repo := setupTest()
-	// A manual (custom) room — quick-join must be rejected.
 	manual := &room.Room{
 		Name: "Manual", Code: "MAN001", OwnerID: 50,
 		Variant: "bitola", MatchMode: "1001", TimerStyle: "relaxed",
@@ -2000,7 +1927,6 @@ func TestQuickJoin_NotWaitingStatus(t *testing.T) {
 
 	rec := doQuickJoin(e, "1", validToken(95))
 
-	// Matches JoinRoom's convention: a non-waiting room reads as not found.
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 	var resp map[string]map[string]string
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
@@ -2036,7 +1962,6 @@ func TestQuickPlay_CreatesNewRoom(t *testing.T) {
 	assert.True(t, data.Room.IsQuickPlay)
 	assert.Equal(t, "croatia", data.Room.Variant)
 	assert.Equal(t, "501", data.Room.MatchMode)
-	// Story 9.4 (AC5): synthesized quick-play rooms default to per-move 30s.
 	assert.Equal(t, "per-move", data.Room.TimerStyle)
 	require.NotNil(t, data.Room.TimerDurationSeconds)
 	assert.Equal(t, 30, *data.Room.TimerDurationSeconds)
@@ -2046,7 +1971,6 @@ func TestQuickPlay_CreatesNewRoom(t *testing.T) {
 	assert.Contains(t, data.Room.Name, "Quick Play ")
 	assert.Len(t, data.Room.Code, 6)
 
-	// Auto-seat: first joiner lands at seat 0 (team A).
 	assert.Equal(t, 0, data.Seat)
 	assert.False(t, data.MatchStarted)
 
@@ -2060,8 +1984,6 @@ func TestQuickPlay_CreatesNewRoom(t *testing.T) {
 func TestQuickPlay_JoinsExistingRoom(t *testing.T) {
 	e, repo := setupTest()
 
-	// Create an existing Quick Play room owned by user 20, who is already
-	// auto-seated at seat 0 (the state Quick Play leaves a single-player room in).
 	existingRoom := &room.Room{
 		Name:        "Quick Play ABC123",
 		Code:        "ABC123",
@@ -2095,11 +2017,9 @@ func TestQuickPlay_JoinsExistingRoom(t *testing.T) {
 
 	assert.Equal(t, existingRoom.ID, data.Room.ID)
 	assert.Equal(t, 2, data.Room.PlayerCount)
-	// Joiner gets the next empty seat (1 → team B) since seat 0 is taken.
 	assert.Equal(t, 1, data.Seat)
 	assert.False(t, data.MatchStarted)
 
-	// Verify the joining player record has seat 1 / team B.
 	var joinerSeat *int
 	var joinerTeam *string
 	for _, p := range repo.players {
@@ -2117,7 +2037,6 @@ func TestQuickPlay_JoinsExistingRoom(t *testing.T) {
 func TestQuickPlay_AlreadyInRoom(t *testing.T) {
 	e, repo := setupTest()
 
-	// User 40 is already in a room
 	existingRoom := &room.Room{
 		Name:        "Some Room",
 		Code:        "XYZ789",
@@ -2155,7 +2074,6 @@ func TestQuickPlay_Unauthorized(t *testing.T) {
 func TestQuickPlay_SkipsNonQuickPlayRooms(t *testing.T) {
 	e, repo := setupTest()
 
-	// A manual room with matching settings should NOT be matched
 	manualRoom := &room.Room{
 		Name:        "Manual Room",
 		Code:        "MAN001",
@@ -2185,21 +2103,14 @@ func TestQuickPlay_SkipsNonQuickPlayRooms(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
 
-	// Should create a new room, not join the manual one.
 	assert.NotEqual(t, manualRoom.ID, data.Room.ID)
 	assert.True(t, data.Room.IsQuickPlay)
 	assert.Equal(t, 0, data.Seat)
 	assert.False(t, data.MatchStarted)
 }
 
-// TestQuickPlay_NeverMatchesBitolaRooms pins the "Quick Play is Croatian-only"
-// limit. It is true by construction — QuickPlay's room synthesis hardcodes
-// Variant "croatia", the only place is_quick_play is ever set true — but nothing
-// STATED it, so a future change to that synthesis would silently drop queued
-// players into a variant matchmaking was never sized for.
-//
-// The Bitola room here is deliberately given every other matchable attribute
-// (quick-play flag, waiting, seats free, matching buy-in) so the variant is the
+// TestQuickPlay_NeverMatchesBitolaRooms pins that Quick Play only matches Croatian
+// rooms. The Bitola room has every other matchable attribute, so the variant is the
 // only reason it is skipped.
 func TestQuickPlay_NeverMatchesBitolaRooms(t *testing.T) {
 	e, repo := setupTest()
@@ -2218,7 +2129,6 @@ func TestQuickPlay_NeverMatchesBitolaRooms(t *testing.T) {
 	_ = repo.Create(bitolaRoom)
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: bitolaRoom.ID, UserID: 50})
 
-	// Queue repeatedly: matchmaking must never land in it, not merely usually.
 	for attempt, uid := range []uint{60, 61, 62} {
 		rec := doQuickPlay(e, validToken(uid))
 		require.Equal(t, http.StatusOK, rec.Code, "attempt %d", attempt)
@@ -2240,8 +2150,6 @@ func TestQuickPlay_NeverMatchesBitolaRooms(t *testing.T) {
 func TestQuickPlay_FillsFirstEmptySeat(t *testing.T) {
 	e, repo := setupTest()
 
-	// Seats 0 and 2 are already occupied. The new joiner should land at seat 1
-	// (the first empty seat in 0..3 order), NOT seat 3.
 	qpRoom := &room.Room{
 		Name:        "Quick Play GAPS",
 		Code:        "GAPSEA",
@@ -2296,8 +2204,6 @@ func TestQuickPlay_FillsFirstEmptySeat(t *testing.T) {
 func TestQuickPlay_AutoStartsOnFourthJoiner(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
 
-	// Three players are already auto-seated (0, 1, 2). The 4th QuickPlay call
-	// should land at seat 3, fill the room, and trigger auto-start.
 	qpRoom := &room.Room{
 		Name:        "Quick Play FILL",
 		Code:        "FILLED",
@@ -2338,7 +2244,6 @@ func TestQuickPlay_AutoStartsOnFourthJoiner(t *testing.T) {
 	updatedRoom, _ := repo.FindByID(qpRoom.ID)
 	assert.Equal(t, "playing", updatedRoom.Status)
 
-	// system:match_started must reach the room participants.
 	gotMatchStarted := false
 	for _, call := range broadcaster.calls {
 		if strings.Contains(string(call.msg), "system:match_started") {
@@ -2349,18 +2254,12 @@ func TestQuickPlay_AutoStartsOnFourthJoiner(t *testing.T) {
 	assert.True(t, gotMatchStarted, "expected system:match_started broadcast")
 }
 
-// TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying locks in Story
-// 8.5-1 AC3: the LeaveRoom transaction must re-fetch the room inside the tx
-// and reject with ErrMatchAlreadyStarted (HTTP 409) when status != "waiting".
-// This prevents the race where a leave observes status="waiting" pre-tx and
-// a concurrent auto-start tx flips status to "playing" between the read and
-// the RemovePlayer write — the rules-engine would then receive a seatInfo
-// snapshot containing a player who has already left.
+// TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying checks that LeaveRoom re-
+// fetches the room in the transaction and returns 409 once it is no longer waiting.
+// This closes the race with a concurrent auto-start.
 func TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying(t *testing.T) {
 	e, repo := setupTest()
 
-	// Room is already in "playing" status — simulates a concurrent auto-start
-	// having flipped status before this leave's tx body runs.
 	playingRoom := &room.Room{
 		Name:        "Started Room",
 		Code:        "STARTD",
@@ -2398,8 +2297,6 @@ func TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying(t *testing.T) {
 	require.NoError(t, json.Unmarshal(resp["error"], &errBody))
 	assert.Equal(t, "MATCH_ALREADY_STARTED", errBody.Code)
 
-	// No player removed — the player count must remain 4 and the seat row
-	// for user 803 must still exist.
 	postRoom, _ := repo.FindByID(playingRoom.ID)
 	require.NotNil(t, postRoom)
 	assert.Equal(t, 4, postRoom.PlayerCount, "PlayerCount must NOT be decremented when leave is rejected")
@@ -2414,34 +2311,18 @@ func TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying(t *testing.T) {
 	assert.True(t, stillSeated, "user 803 must still be in the room — RemovePlayer must not have run")
 }
 
-// --- Test fakes for Story 8.5-1 AC2 (gameStarter) ---
-
 type fakeMatchStarter struct {
-	called               int
-	lastRoom             uint
-	lastPlayers          [4]match.PlayerSeatInfo
-	lastCoinBuyIn        int
-	lastTimerStyle       string
-	lastTimerDurationSec int
-	// lastVariant is captured because it is the ONE argument whose value the
-	// engine cannot validate: game.RulesFor resolves any unrecognised string to
-	// the Bitola preset rather than erroring, so a room that persisted "croatia"
-	// but handed the session manager anything else would deal 5 cards plus a
-	// candidate and look entirely healthy. Nothing else in this suite would
-	// notice (Story 12.8).
-	lastVariant   string
-	lastMatchMode string
-	// lastDeclarationsEnabled is captured for the same reason as lastVariant: the
-	// engine cannot validate it either. False is a legal value, so a room that
-	// persisted declarations-on but handed the session manager false would play a
-	// silently meldless match and look entirely healthy from here.
+	called                  int
+	lastRoom                uint
+	lastPlayers             [4]match.PlayerSeatInfo
+	lastCoinBuyIn           int
+	lastTimerStyle          string
+	lastTimerDurationSec    int
+	lastVariant             string
+	lastMatchMode           string
 	lastDeclarationsEnabled bool
-	// lastStopAtTarget is captured for the same reason again: the engine cannot
-	// validate "dosta" either. True is a legal value, so a room that persisted
-	// finish-the-hand but handed the session manager true would cut every match
-	// short mid-hand and look entirely healthy from here.
-	lastStopAtTarget bool
-	err              error
+	lastStopAtTarget        bool
+	err                     error
 }
 
 func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool) error {
@@ -2461,7 +2342,7 @@ func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode str
 func setupTestWithStarter(starter room.MatchStarter, broadcaster room.Broadcaster) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
 	handler := room.NewRoomHandler(repo, starter, broadcaster, nil, nil, nil, nil)
-	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -2502,11 +2383,9 @@ func containsString(haystack []string, needle string) bool {
 	return false
 }
 
-// TestStartGame_PassesTheRoomsVariantToTheSessionManager is the story's headline
-// behaviour, and it had no test: a room persisted as Croatian must start a
-// CROATIAN match. The link is a bare string argument and game.RulesFor falls
-// back to Bitola for anything it does not recognise, so a normalisation or
-// rename refactor between the two would silently deal the wrong shape.
+// TestStartGame_PassesTheRoomsVariantToTheSessionManager checks that a Croatian room
+// starts a Croatian match. game.RulesFor falls back to Bitola for unknown variants, so
+// a broken link would deal the wrong shape.
 func TestStartGame_PassesTheRoomsVariantToTheSessionManager(t *testing.T) {
 	for _, variant := range []string{"croatia", "bitola"} {
 		t.Run(variant, func(t *testing.T) {
@@ -2516,7 +2395,6 @@ func TestStartGame_PassesTheRoomsVariantToTheSessionManager(t *testing.T) {
 			r := seedRoomWithPlayers(repo, "Start "+variant, 1, 1, 2, 3, 4)
 			r.Variant = variant
 			r.MatchMode = "501"
-			// StartGame requires four SEATED players.
 			seats := []int{0, 1, 2, 3}
 			teams := []string{"teamA", "teamB", "teamA", "teamB"}
 			for i, p := range repo.players {
@@ -2576,13 +2454,9 @@ func decodeQuickPlayRoomID(t *testing.T, rec *httptest.ResponseRecorder) uint {
 	return data.Room.ID
 }
 
-// TestQuickPlay_WiresQuickFillScheduler pins the handler→scheduler wiring — the
-// feature's activation trigger, which is otherwise unverified (a regression that
-// dropped the start/reset calls would ship green). It asserts a brand-new
-// QuickPlay room ARMS the auto-fill scheduler, and that a later human arriving
-// via QuickPlay (join-existing branch) or QuickJoin RESETS it — a fresh
-// generation, still armed. Huge intervals keep the scheduler observable without
-// a real timer firing mid-assertion.
+// TestQuickPlay_WiresQuickFillScheduler checks that a new QuickPlay room arms the auto-
+// fill scheduler and a later human arrival resets it. Huge intervals keep it observable
+// without a timer firing.
 func TestQuickPlay_WiresQuickFillScheduler(t *testing.T) {
 	repo := newMockRoomRepo()
 	handler := room.NewRoomHandler(repo, nil, nil, nil, nil, nil, nil)
@@ -2594,7 +2468,6 @@ func TestQuickPlay_WiresQuickFillScheduler(t *testing.T) {
 	api.POST("/rooms/quick-play", handler.QuickPlay)
 	api.POST("/rooms/:id/quick-join", handler.QuickJoin)
 
-	// (a) Creating a NEW quick-play room arms the scheduler.
 	rec := doQuickPlay(e, validToken(1))
 	require.Equal(t, http.StatusOK, rec.Code)
 	roomID := decodeQuickPlayRoomID(t, rec)
@@ -2602,7 +2475,6 @@ func TestQuickPlay_WiresQuickFillScheduler(t *testing.T) {
 	gen1, _, armed := handler.QuickFillState(roomID)
 	require.True(t, armed, "creating a new QP room must arm the auto-fill scheduler")
 
-	// (b) A second human QuickPlay-ing into that same room resets the scheduler.
 	rec = doQuickPlay(e, validToken(2))
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, roomID, decodeQuickPlayRoomID(t, rec), "the second QuickPlay must join the existing room")
@@ -2610,7 +2482,6 @@ func TestQuickPlay_WiresQuickFillScheduler(t *testing.T) {
 	require.True(t, armed2, "still armed after a join")
 	assert.Greater(t, gen2, gen1, "join-existing must reset the scheduler (fresh generation)")
 
-	// (c) A QuickJoin into the waiting room also resets the scheduler.
 	rec = doQuickJoin(e, "1", validToken(3))
 	require.Equal(t, http.StatusOK, rec.Code)
 	gen3, _, armed3 := handler.QuickFillState(roomID)
@@ -2660,11 +2531,9 @@ func TestSelectSeat_AutoStart_BroadcastsWhenStartGameSucceeds(t *testing.T) {
 	assert.False(t, containsString(types, "error:match_start_failed"), "no error event on success")
 }
 
-// TestSelectSeat_AutoStart_RevertsWhenStartGameFails locks in Story 8.5-1 AC2
-// failure path: when StartGame returns an error, the status flip is reverted
-// to "waiting", system:match_started is NOT broadcast, and
-// error:match_start_failed reaches the four would-be participants.
-// playerCount and seat assignments survive (no partial writes lost).
+// TestSelectSeat_AutoStart_RevertsWhenStartGameFails checks that a failed StartGame
+// reverts the room to waiting and notifies the four players with match_start_failed.
+// Seats and playerCount survive.
 func TestSelectSeat_AutoStart_RevertsWhenStartGameFails(t *testing.T) {
 	starter := &fakeMatchStarter{err: errors.New("session manager unavailable")}
 	broadcaster := &mockBroadcaster{}
@@ -2692,8 +2561,6 @@ func TestSelectSeat_AutoStart_RevertsWhenStartGameFails(t *testing.T) {
 	token := validToken(603)
 	rec := doSelectSeat(e, "1", `{"seat": 3}`, token)
 
-	// HTTP success — the seat selection itself succeeded; the auto-start
-	// failure is communicated via the error WS event, not an HTTP error.
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, 1, starter.called, "StartGame must be called once")
 
@@ -2705,7 +2572,6 @@ func TestSelectSeat_AutoStart_RevertsWhenStartGameFails(t *testing.T) {
 	assert.False(t, containsString(types, "system:match_started"), "system:match_started MUST NOT be broadcast on StartGame failure")
 	assert.True(t, containsString(types, "error:match_start_failed"), "error:match_start_failed MUST be broadcast to participants")
 
-	// Verify the error reached all four would-be participants.
 	gotErrUserIDs := map[uint]bool{}
 	for _, c := range broadcaster.calls {
 		if msgTypeOf(t, c.msg) == "error:match_start_failed" {
@@ -2718,8 +2584,6 @@ func TestSelectSeat_AutoStart_RevertsWhenStartGameFails(t *testing.T) {
 		assert.True(t, gotErrUserIDs[expectedUID], "user %d must receive error:match_start_failed", expectedUID)
 	}
 
-	// Seat assignments + player count survive the rollback: only the room
-	// status flipped back. Players are still seated; PlayerCount is still 4.
 	players, err := repo.FindPlayersByRoomID(qpRoom.ID)
 	require.NoError(t, err)
 	assert.Len(t, players, 4, "all four players still seated")
@@ -2766,24 +2630,12 @@ func TestQuickPlay_AutoStart_RevertsWhenStartGameFails(t *testing.T) {
 	assert.True(t, containsString(types, "error:match_start_failed"), "error:match_start_failed MUST be broadcast to participants")
 }
 
-// TestQuickPlay_RetriesOnErrRoomFull locks in Story 8.5-1 AC5 / D29 symptom fix.
-//
-// The QuickPlay retry loop must continue when pickFirstEmptySeat raises
-// apperr.ErrRoomFull (caused by the player_count denormalized counter saying a
-// room has free seats but every seat row is occupied — i.e. counter drift).
-// Counter drift must surface as a successful join into a different/new room,
-// never as an opaque 5xx.
-//
-// Setup: a "drifted" QuickPlay room reports PlayerCount=3 but already has all
-// four seats occupied. First iteration: FindQuickPlayRoom returns the drifted
-// room → pickFirstEmptySeat fails with ErrRoomFull. With the fix, the loop
-// continues; on the second iteration FindQuickPlayRoom returns nil (the
-// drifted room's PlayerCount has reached 4 from the failed iteration's
-// IncrementPlayerCount) and a fresh room is created instead.
+// TestQuickPlay_RetriesOnErrRoomFull checks that QuickPlay retries into a new room when
+// player-count drift makes a full room look open. Drift must surface as a successful
+// join, never a 5xx.
 func TestQuickPlay_RetriesOnErrRoomFull(t *testing.T) {
 	e, repo := setupTest()
 
-	// Drifted room: counter says 3, but all 4 seats are filled.
 	driftedRoom := &room.Room{
 		Name:        "Quick Play DRIFT",
 		Code:        "DRIFT1",
@@ -2807,9 +2659,6 @@ func TestQuickPlay_RetriesOnErrRoomFull(t *testing.T) {
 	token := validToken(904)
 	rec := doQuickPlay(e, token)
 
-	// Without the AC5 fix this would surface ErrRoomFull as 500 (or the
-	// apperr-mapped 4xx). With the fix the loop retries; second iteration
-	// creates a new room and the user lands cleanly.
 	require.Equal(t, http.StatusOK, rec.Code, "ErrRoomFull from counter drift must be retried, not surfaced as an error")
 
 	var resp map[string]json.RawMessage
@@ -2827,8 +2676,6 @@ func TestQuickPlay_RetriesOnErrRoomFull(t *testing.T) {
 	assert.Equal(t, 0, data.Seat, "first joiner of the new room sits at seat 0")
 	assert.False(t, data.MatchStarted)
 }
-
-// --- SelectSeat Auto-Start Tests ---
 
 func TestSelectSeat_QuickPlayAutoStart(t *testing.T) {
 	e, repo := setupTest()
@@ -2857,7 +2704,6 @@ func TestSelectSeat_QuickPlayAutoStart(t *testing.T) {
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: qpRoom.ID, UserID: 102, Seat: &seat2, Team: &teamA, Username: "P3"})
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: qpRoom.ID, UserID: 103, Username: "P4"})
 
-	// Player 103 selects seat 3 — this is the 4th seat, should trigger auto-start
 	token := validToken(103)
 	rec := doSelectSeat(e, "1", `{"seat": 3}`, token)
 
@@ -2873,7 +2719,6 @@ func TestSelectSeat_QuickPlayAutoStart(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data["matchStarted"], &matchStarted))
 	assert.True(t, matchStarted)
 
-	// Room status should be "playing"
 	updatedRoom, _ := repo.FindByID(qpRoom.ID)
 	assert.Equal(t, "playing", updatedRoom.Status)
 }
@@ -2904,7 +2749,6 @@ func TestSelectSeat_QuickPlayNoAutoStartWith3Seats(t *testing.T) {
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: qpRoom.ID, UserID: 202, Username: "P3"})
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: qpRoom.ID, UserID: 203, Username: "P4"})
 
-	// Player 202 selects seat 2 — only 3 seated now
 	token := validToken(202)
 	rec := doSelectSeat(e, "1", `{"seat": 2}`, token)
 
@@ -2920,7 +2764,6 @@ func TestSelectSeat_QuickPlayNoAutoStartWith3Seats(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data["matchStarted"], &matchStarted))
 	assert.False(t, matchStarted)
 
-	// Room status should still be "waiting"
 	updatedRoom, _ := repo.FindByID(qpRoom.ID)
 	assert.Equal(t, "waiting", updatedRoom.Status)
 }
@@ -2952,7 +2795,6 @@ func TestSelectSeat_ManualRoomNoAutoStart(t *testing.T) {
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: manualRoom.ID, UserID: 302, Seat: &seat2, Team: &teamA, Username: "P3"})
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: manualRoom.ID, UserID: 303, Username: "P4"})
 
-	// Player 303 selects seat 3 — all 4 seated but NOT a Quick Play room
 	token := validToken(303)
 	rec := doSelectSeat(e, "1", `{"seat": 3}`, token)
 
@@ -2968,12 +2810,9 @@ func TestSelectSeat_ManualRoomNoAutoStart(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data["matchStarted"], &matchStarted))
 	assert.False(t, matchStarted)
 
-	// Room status should still be "waiting"
 	updatedRoom, _ := repo.FindByID(manualRoom.ID)
 	assert.Equal(t, "waiting", updatedRoom.Status)
 }
-
-// --- Broadcast Tests ---
 
 func TestJoinRoom_BroadcastsPlayerJoined(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
@@ -2982,7 +2821,6 @@ func TestJoinRoom_BroadcastsPlayerJoined(t *testing.T) {
 	_ = repo.Create(ownerRoom)
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 100, Username: "Owner"})
 
-	// Player 200 joins
 	token := validToken(200)
 	rec := doJoinRoom(e, "1", token)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -2990,17 +2828,14 @@ func TestJoinRoom_BroadcastsPlayerJoined(t *testing.T) {
 	require.Len(t, broadcaster.calls, 1, "expected one BroadcastToUsers call")
 	call := broadcaster.calls[0]
 
-	// Broadcast should include both existing (100) and joining (200) player
 	assert.ElementsMatch(t, []uint{100, 200}, call.userIDs)
 
-	// Verify the message type is system:player_joined
 	var msg map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(call.msg, &msg))
 	var msgType string
 	require.NoError(t, json.Unmarshal(msg["type"], &msgType))
 	assert.Equal(t, "system:player_joined", msgType)
 
-	// Verify payload
 	var payload map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(msg["payload"], &payload))
 	var userId float64
@@ -3019,7 +2854,6 @@ func TestLeaveRoom_BroadcastsPlayerLeft(t *testing.T) {
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 100, Username: "Owner"})
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 200, Username: "Player2"})
 
-	// Player 200 leaves
 	token := validToken(200)
 	rec := doLeaveRoom(e, "1", token)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -3027,17 +2861,14 @@ func TestLeaveRoom_BroadcastsPlayerLeft(t *testing.T) {
 	require.Len(t, broadcaster.calls, 1, "expected one BroadcastToUsers call")
 	call := broadcaster.calls[0]
 
-	// Broadcast should only go to remaining player (100)
 	assert.ElementsMatch(t, []uint{100}, call.userIDs)
 
-	// Verify the message type is system:player_left
 	var msg map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(call.msg, &msg))
 	var msgType string
 	require.NoError(t, json.Unmarshal(msg["type"], &msgType))
 	assert.Equal(t, "system:player_left", msgType)
 
-	// Verify payload contains leaving player's info
 	var payload map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(msg["payload"], &payload))
 	var userId float64
@@ -3052,9 +2883,8 @@ func TestLeaveRoom_OwnerTransfer_BroadcastsNewOwner(t *testing.T) {
 	_ = repo.Create(ownerRoom)
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 100, Username: "Owner", Seat: intPtr(0)})
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: ownerRoom.ID, UserID: 200, Username: "Player2", Seat: intPtr(1)})
-	reg.Add(ownerRoom.ID, 200) // Story 9.3: heir must be present
+	reg.Add(ownerRoom.ID, 200)
 
-	// Owner (100) leaves — ownership should transfer to seated player 200
 	token := validToken(100)
 	rec := doLeaveRoom(e, "1", token)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -3065,7 +2895,6 @@ func TestLeaveRoom_OwnerTransfer_BroadcastsNewOwner(t *testing.T) {
 	var payload map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(msg["payload"], &payload))
 
-	// newOwnerId should be present
 	var newOwnerId float64
 	require.NoError(t, json.Unmarshal(payload["newOwnerId"], &newOwnerId))
 	assert.Equal(t, float64(200), newOwnerId)
@@ -3121,10 +2950,8 @@ func TestStartGame_BroadcastsGameStarted(t *testing.T) {
 	rec := doStartGame(e, "1", token)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	// Should have at least one broadcast for match_started
 	require.GreaterOrEqual(t, len(broadcaster.calls), 1, "expected BroadcastToUsers call for match_started")
 
-	// Find the match_started message
 	found := false
 	for _, call := range broadcaster.calls {
 		var msg map[string]json.RawMessage
@@ -3137,7 +2964,6 @@ func TestStartGame_BroadcastsGameStarted(t *testing.T) {
 		}
 		if msgType == "system:match_started" {
 			found = true
-			// All 4 players should receive the broadcast
 			assert.ElementsMatch(t, []uint{100, 200, 300, 400}, call.userIDs)
 			break
 		}
@@ -3161,15 +2987,12 @@ func TestQuickPlayAutoStart_BroadcastsGameStarted(t *testing.T) {
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: qpRoom.ID, UserID: 300, Seat: &seat2, Team: &teamA, Username: "P3"})
 	_ = repo.AddPlayer(&room.RoomPlayer{RoomID: qpRoom.ID, UserID: 400, Username: "P4"})
 
-	// Player 400 selects seat 3 — all 4 seated, Quick Play auto-start should trigger
 	token := validToken(400)
 	rec := doSelectSeat(e, "1", `{"seat": 3}`, token)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	// Should have broadcasts for seat_updated AND match_started
 	require.GreaterOrEqual(t, len(broadcaster.calls), 2, "expected seat_updated + match_started broadcasts")
 
-	// Find the match_started message
 	found := false
 	for _, call := range broadcaster.calls {
 		var msg map[string]json.RawMessage
@@ -3209,8 +3032,6 @@ func TestCreateRoom_BroadcastsRoomCreated(t *testing.T) {
 	require.NoError(t, json.Unmarshal(payload["name"], &roomName))
 	assert.Equal(t, "Broadcast Room", roomName)
 }
-
-// --- KickPlayer Tests ---
 
 func doKickPlayer(e *echo.Echo, id string, body string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/kick", strings.NewReader(body))
@@ -3253,39 +3074,31 @@ func TestKickPlayer_Success(t *testing.T) {
 	rec := doKickPlayer(e, "1", `{"userId": 200}`, token)
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// Player count decremented
 	updated, _ := repo.FindByID(r.ID)
 	require.NotNil(t, updated)
 	assert.Equal(t, 2, updated.PlayerCount)
 
-	// 200 removed from room_players
 	prooms, _ := repo.FindPlayersByRoomID(r.ID)
 	require.Len(t, prooms, 2)
 	for _, p := range prooms {
 		assert.NotEqual(t, uint(200), p.UserID)
 	}
 
-	// Response shape
 	var resp map[string]map[string]interface{}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	assert.Equal(t, float64(2), resp["data"]["playerCount"])
 
-	// Three broadcasts: kicked user, remaining members, lobby-wide
 	require.Len(t, broadcaster.calls, 2, "expected 2 BroadcastToUsers calls")
 	require.Len(t, broadcaster.allCalls, 1, "expected 1 BroadcastAll call (room_updated)")
 
-	// First call goes to the kicked user with system:room_kicked
 	assert.ElementsMatch(t, []uint{200}, broadcaster.calls[0].userIDs)
 	assert.Equal(t, "system:room_kicked", msgTypeOf(t, broadcaster.calls[0].msg))
 
-	// Second call goes to the remaining members with system:player_left
 	assert.ElementsMatch(t, []uint{100, 300}, broadcaster.calls[1].userIDs)
 	assert.Equal(t, "system:player_left", msgTypeOf(t, broadcaster.calls[1].msg))
 
-	// Lobby-wide broadcast is system:room_updated
 	assert.Equal(t, "system:room_updated", msgTypeOf(t, broadcaster.allCalls[0].msg))
 
-	// Verify kick payload contents
 	var kickMsg map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(broadcaster.calls[0].msg, &kickMsg))
 	var kickPayload map[string]json.RawMessage
@@ -3294,7 +3107,6 @@ func TestKickPlayer_Success(t *testing.T) {
 	require.NoError(t, json.Unmarshal(kickPayload["reason"], &reason))
 	assert.Equal(t, "kicked_by_owner", reason)
 
-	// Verify player_left payload includes the kicked user's username
 	var leftMsg map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(broadcaster.calls[1].msg, &leftMsg))
 	var leftPayload map[string]json.RawMessage
@@ -3318,7 +3130,7 @@ func TestKickPlayer_NotOwner(t *testing.T) {
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 100, Username: "Owner"}))
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "P2"}))
 
-	token := validToken(200) // not the owner
+	token := validToken(200)
 	rec := doKickPlayer(e, "1", `{"userId": 100}`, token)
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 
@@ -3326,7 +3138,6 @@ func TestKickPlayer_NotOwner(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "NOT_ROOM_OWNER", errResp["error"]["code"])
 
-	// State unchanged
 	updated, _ := repo.FindByID(r.ID)
 	assert.Equal(t, 2, updated.PlayerCount)
 }
@@ -3347,7 +3158,6 @@ func TestKickPlayer_RoomNotWaiting(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "ROOM_NOT_WAITING", errResp["error"]["code"])
 
-	// State unchanged
 	updated, _ := repo.FindByID(r.ID)
 	assert.Equal(t, 4, updated.PlayerCount)
 }
@@ -3361,14 +3171,12 @@ func TestKickPlayer_MissingUserID(t *testing.T) {
 
 	token := validToken(100)
 
-	// missing userId
 	rec := doKickPlayer(e, "1", `{}`, token)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	var errResp map[string]map[string]string
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "BAD_REQUEST", errResp["error"]["code"])
 
-	// userId == 0
 	rec2 := doKickPlayer(e, "1", `{"userId": 0}`, token)
 	assert.Equal(t, http.StatusBadRequest, rec2.Code)
 	var errResp2 map[string]map[string]string
@@ -3402,7 +3210,6 @@ func TestKickPlayer_NotInRoom(t *testing.T) {
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "P2"}))
 
 	token := validToken(100)
-	// userID 999 is not a member of this room
 	rec := doKickPlayer(e, "1", `{"userId": 999}`, token)
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 
@@ -3422,19 +3229,14 @@ func TestKickPlayer_PreviousOwnerLosesPermission(t *testing.T) {
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 100, Username: "A", Seat: intPtr(0)}))
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "B", Seat: intPtr(1)}))
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 300, Username: "C", Seat: intPtr(2)}))
-	// Story 9.3: heir must be present for the transfer on owner-leave.
 	reg.Add(r.ID, 200)
 	reg.Add(r.ID, 300)
 
-	// A leaves first — ownership transfers to seated player B (200)
 	leaveRec := doLeaveRoom(e, "1", validToken(100))
 	require.Equal(t, http.StatusOK, leaveRec.Code)
 	updated, _ := repo.FindByID(r.ID)
 	require.Equal(t, uint(200), updated.OwnerID)
 
-	// A (no longer owner) attempts to kick C — must return 403.
-	// In the mock, A is no longer a member, but the owner-check inside the tx
-	// is what matters: A's userID != current OwnerID == 200.
 	rec := doKickPlayer(e, "1", `{"userId": 300}`, validToken(100))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 	var errResp map[string]map[string]string
@@ -3447,8 +3249,6 @@ func TestKickPlayer_Unauthorized(t *testing.T) {
 	rec := doKickPlayer(e, "1", `{"userId": 200}`, "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
-
-// --- SwapSeats Tests ---
 
 func doSwapSeats(e *echo.Echo, id string, body string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/swap-seats", strings.NewReader(body))
@@ -3489,11 +3289,10 @@ func TestSwapSeats_Success(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
 	r := seedSeatedRoom(t, repo)
 
-	token := validToken(100) // owner
+	token := validToken(100)
 	rec := doSwapSeats(e, "1", `{"seatA": 0, "seatB": 1}`, token)
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// User 100 should now be at seat 1 (team B), user 200 at seat 0 (team A)
 	players, _ := repo.FindPlayersByRoomID(r.ID)
 	for _, p := range players {
 		switch p.UserID {
@@ -3510,20 +3309,15 @@ func TestSwapSeats_Success(t *testing.T) {
 		}
 	}
 
-	// Two ordered seat_updated broadcasts to room members, plus a single
-	// lobby-wide room_updated snapshot so non-participant lobby viewers
-	// see the seat changes on the grid.
 	require.Len(t, broadcaster.calls, 2, "expected exactly two BroadcastToUsers calls")
 	require.Len(t, broadcaster.allCalls, 1, "swap should emit one lobby-wide room_updated snapshot")
 	assert.Equal(t, "system:room_updated", msgTypeOf(t, broadcaster.allCalls[0].msg))
 
 	for _, call := range broadcaster.calls {
 		assert.Equal(t, "system:seat_updated", msgTypeOf(t, call.msg))
-		// Each broadcast goes to all 4 room members
 		assert.ElementsMatch(t, []uint{100, 200, 300, 400}, call.userIDs)
 	}
 
-	// First broadcast describes user-100's move (seat 0 → seat 1, prev 0)
 	var msgA map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(broadcaster.calls[0].msg, &msgA))
 	var pA map[string]json.RawMessage
@@ -3538,7 +3332,6 @@ func TestSwapSeats_Success(t *testing.T) {
 	require.NoError(t, json.Unmarshal(pA["previousSeat"], &prevSeatA))
 	assert.Equal(t, float64(0), prevSeatA)
 
-	// Second broadcast describes user-200's move (seat 1 → seat 0, prev 1)
 	var msgB map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(broadcaster.calls[1].msg, &msgB))
 	var pB map[string]json.RawMessage
@@ -3559,7 +3352,6 @@ func TestSwapSeats_CrossTeamRecomputesTeam(t *testing.T) {
 	seedSeatedRoom(t, repo)
 
 	token := validToken(100)
-	// seat 0 (team A) ↔ seat 3 (team B)
 	rec := doSwapSeats(e, "1", `{"seatA": 0, "seatB": 3}`, token)
 	require.Equal(t, http.StatusOK, rec.Code)
 
@@ -3582,7 +3374,7 @@ func TestSwapSeats_NotOwner(t *testing.T) {
 	e, repo := setupTest()
 	seedSeatedRoom(t, repo)
 
-	token := validToken(200) // not the owner
+	token := validToken(200)
 	rec := doSwapSeats(e, "1", `{"seatA": 0, "seatB": 1}`, token)
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 
@@ -3647,7 +3439,6 @@ func TestSwapSeats_MoveToEmptySeat(t *testing.T) {
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "P2", Seat: &seat1, Team: &teamB}))
 
 	token := validToken(100)
-	// seatA=2 is empty, seatB=1 is P2 → P2 moves to seat 2 (team A)
 	rec := doSwapSeats(e, "1", `{"seatA": 2, "seatB": 1}`, token)
 	require.Equal(t, http.StatusOK, rec.Code)
 
@@ -3666,9 +3457,6 @@ func TestSwapSeats_MoveToEmptySeat(t *testing.T) {
 		}
 	}
 
-	// A move-to-empty emits exactly ONE seat_updated broadcast to room
-	// members, plus one lobby-wide room_updated snapshot so non-participant
-	// viewers see the seat change on the grid.
 	require.Len(t, broadcaster.calls, 1, "expected exactly one BroadcastToUsers call for move-to-empty")
 	require.Len(t, broadcaster.allCalls, 1, "move-to-empty should emit one lobby-wide room_updated snapshot")
 	assert.Equal(t, "system:room_updated", msgTypeOf(t, broadcaster.allCalls[0].msg))
@@ -3696,11 +3484,9 @@ func TestSwapSeats_BothSeatsEmpty(t *testing.T) {
 	seat0 := 0
 	teamA := "teamA"
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 100, Username: "Owner", Seat: &seat0, Team: &teamA}))
-	// Second player not yet seated
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "P2"}))
 
 	token := validToken(100)
-	// Both seat 1 and seat 2 are empty → SEAT_NOT_OCCUPIED.
 	rec := doSwapSeats(e, "1", `{"seatA": 1, "seatB": 2}`, token)
 	assert.Equal(t, http.StatusConflict, rec.Code)
 
@@ -3714,8 +3500,6 @@ func TestSwapSeats_Unauthorized(t *testing.T) {
 	rec := doSwapSeats(e, "1", `{"seatA": 0, "seatB": 1}`, "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
-
-// --- LeaveSeat Tests ---
 
 func doLeaveSeat(e *echo.Echo, id string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/leave-seat", nil)
@@ -3750,7 +3534,6 @@ func TestLeaveSeat_Success(t *testing.T) {
 	rec := doLeaveSeat(e, "1", token)
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// Player 200 should now be unseated; owner unchanged.
 	players, _ := repo.FindPlayersByRoomID(r.ID)
 	for _, p := range players {
 		switch p.UserID {
@@ -3763,7 +3546,6 @@ func TestLeaveSeat_Success(t *testing.T) {
 		}
 	}
 
-	// Exactly one seat_updated broadcast with seat=null/team=null/previousSeat=1.
 	require.Len(t, broadcaster.calls, 1)
 	assert.Equal(t, "system:seat_updated", msgTypeOf(t, broadcaster.calls[0].msg))
 	assert.ElementsMatch(t, []uint{100, 200}, broadcaster.calls[0].userIDs)
@@ -3786,7 +3568,7 @@ func TestLeaveSeat_OwnerForbidden(t *testing.T) {
 	e, repo := setupTest()
 	seedRoomWithSeatedNonOwner(t, repo)
 
-	token := validToken(100) // owner
+	token := validToken(100)
 	rec := doLeaveSeat(e, "1", token)
 	assert.Equal(t, http.StatusConflict, rec.Code)
 
@@ -3827,7 +3609,6 @@ func TestLeaveSeat_NotInRoom(t *testing.T) {
 	e, repo := setupTest()
 	seedRoomWithSeatedNonOwner(t, repo)
 
-	// User 999 is not a member of room 1.
 	token := validToken(999)
 	rec := doLeaveSeat(e, "1", token)
 	assert.Equal(t, http.StatusNotFound, rec.Code)
@@ -3844,7 +3625,6 @@ func TestLeaveSeat_NotSeated(t *testing.T) {
 	seat0 := 0
 	teamA := "teamA"
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 100, Username: "Owner", Seat: &seat0, Team: &teamA}))
-	// Player 200 is in the room but has no seat.
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "P2"}))
 
 	token := validToken(200)
@@ -3862,8 +3642,6 @@ func TestLeaveSeat_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
-// --- TransferOwnership Tests ---
-
 func doTransferOwnership(e *echo.Echo, id string, body string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/transfer-ownership", strings.NewReader(body))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -3877,18 +3655,16 @@ func doTransferOwnership(e *echo.Echo, id string, body string, token string) *ht
 
 func TestTransferOwnership_Success(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
-	r := seedSeatedRoom(t, repo) // owner=100 seat 0, P2=200 seat 1, P3=300 seat 2, P4=400 seat 3
+	r := seedSeatedRoom(t, repo)
 
 	token := validToken(100)
 	rec := doTransferOwnership(e, "1", `{"userId": 200}`, token)
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// Owner has flipped to user 200.
 	updated, _ := repo.FindByID(r.ID)
 	require.NotNil(t, updated)
 	assert.Equal(t, uint(200), updated.OwnerID)
 
-	// system:room_owner_changed broadcast to all 4 members.
 	require.Len(t, broadcaster.calls, 1, "expected one room broadcast")
 	assert.Equal(t, "system:room_owner_changed", msgTypeOf(t, broadcaster.calls[0].msg))
 	assert.ElementsMatch(t, []uint{100, 200, 300, 400}, broadcaster.calls[0].userIDs)
@@ -3903,7 +3679,6 @@ func TestTransferOwnership_Success(t *testing.T) {
 	assert.Equal(t, float64(200), newOwnerID)
 	assert.Equal(t, float64(100), prevOwnerID)
 
-	// And one lobby-wide system:room_updated broadcast.
 	require.Len(t, broadcaster.allCalls, 1)
 }
 
@@ -3911,7 +3686,7 @@ func TestTransferOwnership_NotOwner(t *testing.T) {
 	e, repo := setupTest()
 	seedSeatedRoom(t, repo)
 
-	token := validToken(200) // not the current owner
+	token := validToken(200)
 	rec := doTransferOwnership(e, "1", `{"userId": 300}`, token)
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 
@@ -3955,7 +3730,6 @@ func TestTransferOwnership_CannotPromoteUnseated(t *testing.T) {
 	seat0 := 0
 	teamA := "teamA"
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 100, Username: "Owner", Seat: &seat0, Team: &teamA}))
-	// Player 200 in room but unseated — cannot be promoted.
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "P2"}))
 
 	token := validToken(100)
@@ -3966,7 +3740,6 @@ func TestTransferOwnership_CannotPromoteUnseated(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "CANNOT_PROMOTE_UNSEATED", errResp["error"]["code"])
 
-	// Owner unchanged.
 	updated, _ := repo.FindByID(r.ID)
 	assert.Equal(t, uint(100), updated.OwnerID)
 }

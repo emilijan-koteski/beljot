@@ -10,17 +10,6 @@ import {
 } from "@/shared/api/friends";
 import { queryKeys } from "@/shared/api/queryKeys";
 
-/**
- * Friend request mutations (Story 11.2, FR6). Each invalidates exactly the
- * caches its action changes so the profile button and the friends/requests
- * surfaces stay live without a manual refetch.
- *
- * Accept/decline take the row id AND the counterpart `userId` (optional) so the
- * public-profile button — which lives on a subject's page — can also refresh
- * that subject's friends.status() entry. The lobby requests list passes the
- * sender's fromUserId for the same reason.
- */
-
 /** Send a friend request; flips the subject's status to pending_outgoing. */
 export function useSendFriendRequestMutation() {
   const queryClient = useQueryClient();
@@ -30,8 +19,6 @@ export function useSendFriendRequestMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.friends.status(userId) });
     },
     onError: () => {
-      // A stale button (e.g. a racing/mutual request) yields a 409, or the target
-      // vanished — surface it instead of silently re-enabling the button.
       toast.error(i18n.t("friends.errors.sendFailed"));
     },
   });
@@ -51,13 +38,12 @@ export function useAcceptFriendRequestMutation() {
       }
     },
     onError: () => {
-      // The request may have been accepted/declined elsewhere first → 404.
       toast.error(i18n.t("friends.errors.acceptFailed"));
     },
   });
 }
 
-/** Decline an incoming request; refreshes requests and (if known) the subject's status. */
+/** Decline an incoming request and refresh requests and the subject's status; on error resync both, since a 404 means the row is already gone. */
 export function useDeclineFriendRequestMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -70,9 +56,6 @@ export function useDeclineFriendRequestMutation() {
       }
     },
     onError: (_error, vars) => {
-      // The request may have been accepted/declined elsewhere first → 404. The
-      // row is already gone then, so resync the stale caches too — otherwise
-      // every retry just re-404s against the same phantom request.
       toast.error(i18n.t("friends.errors.declineFailed"));
       queryClient.invalidateQueries({ queryKey: queryKeys.friends.requests() });
       if (vars.userId !== undefined) {
@@ -82,7 +65,7 @@ export function useDeclineFriendRequestMutation() {
   });
 }
 
-/** Remove an accepted friend; refreshes the friend list and the subject's status. */
+/** Remove an accepted friend and refresh the friend list and the subject's status, also on error, since a 404 means the friendship is already gone. */
 export function useRemoveFriendMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -92,9 +75,6 @@ export function useRemoveFriendMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.friends.status(vars.userId) });
     },
     onError: (_error, vars) => {
-      // A 404 means the friendship is already gone (the other party removed it
-      // first) — so the stale "Friends" state must be resynced too, otherwise
-      // every retry just re-404s against the same phantom row.
       toast.error(i18n.t("friends.errors.removeFailed"));
       queryClient.invalidateQueries({ queryKey: queryKeys.friends.list() });
       queryClient.invalidateQueries({ queryKey: queryKeys.friends.status(vars.userId) });

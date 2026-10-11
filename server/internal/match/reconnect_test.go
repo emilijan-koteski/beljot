@@ -26,14 +26,12 @@ func setupDisconnectedGame(t *testing.T, hub *ws.Hub, disconnectSeat int) (*matc
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// Start game with per-move timer (1s short for tests) and 120s reconnect window
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
 
-	// Pick trump to reach playing phase
 	activeSeat := state.ActivePlayerSeat
 	activeUserID := state.Players[activeSeat].UserID
 	client := &ws.Client{UserID: activeUserID}
@@ -48,7 +46,6 @@ func setupDisconnectedGame(t *testing.T, hub *ws.Hub, disconnectSeat int) (*matc
 	require.NotNil(t, state)
 	require.Equal(t, game.PhasePlaying, state.Phase)
 
-	// Disconnect the specified player
 	disconnectedUserID := state.Players[disconnectSeat].UserID
 	mgr.HandleDisconnect(disconnectedUserID)
 	time.Sleep(100 * time.Millisecond)
@@ -69,20 +66,16 @@ func TestHandleReconnect_RestoresPlayerState(t *testing.T) {
 
 	mgr, disconnectedUserID := setupDisconnectedGame(t, hub, 0)
 
-	// Reconnect the player
 	mgr.HandleReconnect(disconnectedUserID)
 	time.Sleep(100 * time.Millisecond)
 
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
 
-	// Phase restored from disconnected to playing
 	assert.Equal(t, game.PhasePlaying, state.Phase)
 	assert.Equal(t, "", string(state.PreviousPhase))
-	// Disconnect fields cleared
 	assert.Equal(t, -1, state.DisconnectedSeat)
 	assert.Nil(t, state.ReconnectExpiresAt)
-	// Player marked connected
 	assert.True(t, state.Players[0].Connected)
 }
 
@@ -93,31 +86,23 @@ func TestHandleReconnect_RestoresTurnTimer(t *testing.T) {
 
 	mgr, disconnectedUserID := setupDisconnectedGame(t, hub, 0)
 
-	// Check TurnTimeRemaining was captured during disconnect
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
 	assert.Nil(t, state.TurnExpiresAt, "timer should be paused during disconnect")
 
-	// Reconnect
 	mgr.HandleReconnect(disconnectedUserID)
 	time.Sleep(100 * time.Millisecond)
 
 	state = mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
 
-	// Turn timer should be restored
 	assert.NotNil(t, state.TurnExpiresAt, "per-move timer should be restored on reconnect")
 	assert.True(t, state.TurnExpiresAt.After(time.Now()), "timer should be in the future")
 	assert.Equal(t, int64(0), state.TurnTimeRemaining, "TurnTimeRemaining should be reset to 0")
 }
 
-// TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores guards the
-// production jam fix: a socket drop during the score-reveal (hand-complete)
-// pause must pause the table (PhaseDisconnected), not be silently skipped.
-// Otherwise the dropped seat stays Connected=true and allConnectedReady keeps
-// waiting for an acknowledgement that can never arrive — jamming the table for
-// the full auto-continue window (the reported mobile-client symptom). Reconnect
-// restores the pause so the score dialog reappears and play resumes.
+// TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores checks that a
+// drop during the score reveal pauses the table and reconnect restores the pause.
 func TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -127,8 +112,6 @@ func TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores(t *testi
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
 
-	// Inject the score-reveal pause: hand scored, holding for continue, with the
-	// other three players already acknowledged.
 	gs := mgr.GetStateSnapshot(100)
 	require.NotNil(t, gs)
 	gs.Phase = game.PhaseHandComplete
@@ -138,7 +121,6 @@ func TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores(t *testi
 	gs.HandCompleteReady = [4]bool{false, true, true, true}
 	mgr.SetGameStateForTest(100, gs)
 
-	// Seat 0 (the only un-acked player) drops mid-pause.
 	mgr.HandleDisconnect(uint(10))
 	time.Sleep(100 * time.Millisecond)
 
@@ -149,7 +131,6 @@ func TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores(t *testi
 	assert.False(t, state.Players[0].Connected, "dropped seat must be marked disconnected")
 	assert.Equal(t, 0, state.DisconnectedSeat)
 
-	// Reconnect restores the pause so the dialog reappears and play can resume.
 	mgr.HandleReconnect(uint(10))
 	time.Sleep(100 * time.Millisecond)
 
@@ -161,12 +142,8 @@ func TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores(t *testi
 	assert.Equal(t, -1, state.DisconnectedSeat)
 }
 
-// TestHandComplete_AckDoesNotExtendAutoContinueDeadline locks in the fix that a
-// player's continue acknowledgement must NOT push back the auto-continue
-// deadline. The deadline is fixed when the score-reveal pause starts; if each
-// ack reset it, the present players' clicks would keep extending the wait for a
-// missing/idle seat — the production jam. Deterministic: asserts the stored
-// deadline directly, with no timer wait.
+// TestHandComplete_AckDoesNotExtendAutoContinueDeadline checks that a continue
+// acknowledgement leaves the auto-continue deadline unchanged.
 func TestHandComplete_AckDoesNotExtendAutoContinueDeadline(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -176,7 +153,6 @@ func TestHandComplete_AckDoesNotExtendAutoContinueDeadline(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
 
-	// Put the table in the score-reveal pause with nobody acknowledged yet.
 	gs := mgr.GetStateSnapshot(100)
 	require.NotNil(t, gs)
 	gs.Phase = game.PhaseHandComplete
@@ -184,14 +160,9 @@ func TestHandComplete_AckDoesNotExtendAutoContinueDeadline(t *testing.T) {
 	gs.TurnExpiresAt = nil
 	mgr.SetGameStateForTest(100, gs)
 
-	// Seed the fixed deadline far in the future (as entry into the pause does),
-	// so the auto-continue timer can't fire during the test.
 	deadline := time.Now().Add(time.Hour)
 	mgr.SetHandCompleteExpiresAtForTest(100, deadline)
 
-	// Three of four players acknowledge in turn. None completes readiness (seat 3
-	// never acks), so the phase stays hand_complete and each ack re-enters the
-	// auto-continue arming branch — which must leave the deadline untouched.
 	for _, uid := range []uint{10, 20, 30} {
 		mgr.HandleAction(&ws.Client{UserID: uid}, ws.WSMessage{Type: "action:continue", Payload: []byte(`{}`)})
 		time.Sleep(20 * time.Millisecond)
@@ -212,11 +183,9 @@ func TestHandleReconnect_RejectsExpiredWindow(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// Start game with very short reconnect window (1 second)
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0, true, false)
 	require.NoError(t, err)
 
-	// Pick trump to reach playing phase
 	state := mgr.GetStateSnapshot(100)
 	activeSeat := state.ActivePlayerSeat
 	activeUserID := state.Players[activeSeat].UserID
@@ -228,29 +197,21 @@ func TestHandleReconnect_RejectsExpiredWindow(t *testing.T) {
 	mgr.HandleAction(client, msg)
 	time.Sleep(100 * time.Millisecond)
 
-	// Disconnect seat 0
 	mgr.HandleDisconnect(uint(10))
 	time.Sleep(100 * time.Millisecond)
 
 	state = mgr.GetStateSnapshot(100)
 	require.Equal(t, game.PhaseDisconnected, state.Phase)
 
-	// Wait for reconnect window to expire — handleReconnectTimeout fires
-	// expiryGrace (400ms) past the 1s window and removes the session
-	// (Story 5.5 match abandonment)
 	time.Sleep(2200 * time.Millisecond)
 
-	// Session is removed after timeout-triggered abandonment
 	assert.False(t, mgr.HasSession(100), "session should be removed after timeout")
 
-	// Attempt reconnect — HandleReconnect should be a no-op (user no longer in userToRoom)
 	mgr.HandleReconnect(uint(10))
 	time.Sleep(100 * time.Millisecond)
 
-	// Session still doesn't exist
 	assert.Nil(t, mgr.GetStateSnapshot(100))
 
-	// Match was persisted as abandoned
 	matches := repo.getMatches()
 	require.Len(t, matches, 1)
 	assert.Equal(t, "abandoned", matches[0].Status)
@@ -263,22 +224,18 @@ func TestHandleReconnect_RejectsWrongUser(t *testing.T) {
 
 	mgr, _ := setupDisconnectedGame(t, hub, 0)
 
-	// Try to reconnect as a different user (seat 1, userID 20)
 	mgr.HandleReconnect(uint(20))
 	time.Sleep(100 * time.Millisecond)
 
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
-	// Still disconnected — wrong user tried to reconnect
 	assert.Equal(t, game.PhaseDisconnected, state.Phase)
 	assert.Equal(t, 0, state.DisconnectedSeat)
 	assert.False(t, state.Players[0].Connected)
 }
 
-// Per-seat windows: each disconnect gets its own `reconnectWindowSec` from
-// its drop time. PlayerReconnectExpiresAt[seat] holds that seat's expiry; the
-// legacy single-pointer ReconnectExpiresAt + DisconnectedSeat are recomputed
-// to point at whichever seat closes soonest.
+// TestHandleConcurrentDisconnect_AssignsIndependentPerSeatWindows checks that each
+// dropped seat gets its own window and the legacy fields track the earliest.
 func TestHandleConcurrentDisconnect_AssignsIndependentPerSeatWindows(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -293,7 +250,6 @@ func TestHandleConcurrentDisconnect_AssignsIndependentPerSeatWindows(t *testing.
 		assert.Nil(t, state.PlayerReconnectExpiresAt[i], "online seats have nil expiry")
 	}
 
-	// Delay so the second drop's window is meaningfully later than the first.
 	time.Sleep(50 * time.Millisecond)
 	secondaryUserID := state.Players[1].UserID
 	mgr.HandleDisconnect(secondaryUserID)
@@ -304,27 +260,17 @@ func TestHandleConcurrentDisconnect_AssignsIndependentPerSeatWindows(t *testing.
 	require.NotNil(t, state.PlayerReconnectExpiresAt[1], "secondary gets its own expiry")
 	secondaryExpiry := *state.PlayerReconnectExpiresAt[1]
 
-	// Secondary's window must be later than primary's — they got their own
-	// `reconnectWindowSec` from their own drop, not the leftover of primary's.
 	assert.True(t, secondaryExpiry.After(primaryExpiry),
 		"secondary expiry %v should be after primary expiry %v", secondaryExpiry, primaryExpiry)
 
-	// The earliest-expiry derivation (ReconnectExpiresAt + DisconnectedSeat)
-	// points at the *primary* seat — the one whose clock fires first.
 	assert.Equal(t, 0, state.DisconnectedSeat, "earliest-expiry pointer = primary seat")
 	require.NotNil(t, state.ReconnectExpiresAt)
 	assert.True(t, state.ReconnectExpiresAt.Equal(primaryExpiry),
 		"ReconnectExpiresAt mirrors primary expiry")
 }
 
-// Concurrent-disconnect path: when a second player drops while the first
-// player's reconnect window is already running, both seats are flagged
-// Connected=false. Each must be able to rejoin in any order — earlier the
-// `playerIDs[seat] != userID` guard silently swallowed the secondary's
-// reconnect, leaving their client stuck on the splash until the no-active-
-// session fallback bounced them to /lobby. With per-seat timers, secondary
-// rejoin flips their Connected back to true while primary's window keeps
-// running.
+// TestHandleReconnect_SecondaryReconnectsBeforePrimary checks that the second seat
+// to drop can rejoin while the first seat's window keeps running.
 func TestHandleReconnect_SecondaryReconnectsBeforePrimary(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -332,8 +278,6 @@ func TestHandleReconnect_SecondaryReconnectsBeforePrimary(t *testing.T) {
 
 	mgr, primaryUserID := setupDisconnectedGame(t, hub, 0)
 
-	// Drop a second player (seat 1). Concurrent disconnect path: marks them
-	// Connected=false and reuses the primary's reconnect expiry.
 	state := mgr.GetStateSnapshot(100)
 	require.Equal(t, game.PhaseDisconnected, state.Phase)
 	require.Equal(t, 0, state.DisconnectedSeat)
@@ -347,21 +291,16 @@ func TestHandleReconnect_SecondaryReconnectsBeforePrimary(t *testing.T) {
 	require.False(t, state.Players[0].Connected, "primary still offline")
 	require.False(t, state.Players[1].Connected, "secondary marked offline")
 
-	// Reconnect the SECONDARY first — earlier this was a silent no-op.
 	mgr.HandleReconnect(secondaryUserID)
 	time.Sleep(100 * time.Millisecond)
 
 	state = mgr.GetStateSnapshot(100)
-	// Phase stays disconnected — primary hasn't returned yet.
 	assert.Equal(t, game.PhaseDisconnected, state.Phase, "phase remains disconnected")
 	assert.Equal(t, 0, state.DisconnectedSeat, "primary seat unchanged")
 	assert.NotNil(t, state.ReconnectExpiresAt, "primary reconnect window still running")
-	// Secondary is now back online; primary still offline.
 	assert.True(t, state.Players[1].Connected, "secondary restored")
 	assert.False(t, state.Players[0].Connected, "primary still offline")
 
-	// Now reconnect the primary — chained logic should NOT promote anyone
-	// (no remaining offline seats), so the game returns to playing.
 	mgr.HandleReconnect(primaryUserID)
 	time.Sleep(100 * time.Millisecond)
 
@@ -381,9 +320,7 @@ func TestHandleReconnect_NoOpForNonGameUser(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// No session exists — calling HandleReconnect should not panic
 	mgr.HandleReconnect(uint(999))
-	// No assertion needed — just verify no panic
 }
 
 func TestHandleReconnect_NoOpWhenNotDisconnectedPhase(t *testing.T) {
@@ -397,11 +334,9 @@ func TestHandleReconnect_NoOpWhenNotDisconnectedPhase(t *testing.T) {
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
 	require.NoError(t, err)
 
-	// Game is in bidding phase, not disconnected
 	state := mgr.GetStateSnapshot(100)
 	require.Equal(t, game.PhaseBidding, state.Phase)
 
-	// HandleReconnect should be a no-op
 	mgr.HandleReconnect(uint(10))
 	time.Sleep(50 * time.Millisecond)
 
@@ -416,14 +351,12 @@ func TestHandleReconnect_IdempotentOnSecondCall(t *testing.T) {
 
 	mgr, disconnectedUserID := setupDisconnectedGame(t, hub, 0)
 
-	// First reconnect
 	mgr.HandleReconnect(disconnectedUserID)
 	time.Sleep(100 * time.Millisecond)
 
 	state := mgr.GetStateSnapshot(100)
 	require.Equal(t, game.PhasePlaying, state.Phase)
 
-	// Second reconnect (idempotent — phase is no longer disconnected)
 	mgr.HandleReconnect(disconnectedUserID)
 	time.Sleep(50 * time.Millisecond)
 
@@ -440,11 +373,9 @@ func TestHandleReconnect_RelaxedTimer_NoTimerRestore(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// Start with relaxed timer (no per-move timer)
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
 	require.NoError(t, err)
 
-	// Pick trump to reach playing phase
 	state := mgr.GetStateSnapshot(100)
 	activeSeat := state.ActivePlayerSeat
 	activeUserID := state.Players[activeSeat].UserID
@@ -456,11 +387,9 @@ func TestHandleReconnect_RelaxedTimer_NoTimerRestore(t *testing.T) {
 	mgr.HandleAction(client, msg)
 	time.Sleep(100 * time.Millisecond)
 
-	// Disconnect seat 0
 	mgr.HandleDisconnect(uint(10))
 	time.Sleep(100 * time.Millisecond)
 
-	// Reconnect
 	mgr.HandleReconnect(uint(10))
 	time.Sleep(100 * time.Millisecond)
 
@@ -482,13 +411,10 @@ func TestNewGameReconnectingFixture(t *testing.T) {
 	assert.Equal(t, int64(15000), gs.TurnTimeRemaining)
 	assert.Nil(t, gs.TurnExpiresAt)
 
-	// Other players remain connected
 	assert.True(t, gs.Players[0].Connected)
 	assert.True(t, gs.Players[1].Connected)
 	assert.True(t, gs.Players[3].Connected)
 }
-
-// --- handleReconnectTimeout tests (Story 5.5) ---
 
 // setupDisconnectedGameShortWindow creates a game with a 1-second reconnect window
 // and disconnects the specified seat. The reconnect timer fires after ~1s.
@@ -498,14 +424,12 @@ func setupDisconnectedGameShortWindow(t *testing.T, hub *ws.Hub, disconnectSeat 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// Start game with 1-second reconnect window for fast timeout
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0, true, false)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
 
-	// Pick trump to reach playing phase
 	activeSeat := state.ActivePlayerSeat
 	activeUserID := state.Players[activeSeat].UserID
 	client := &ws.Client{UserID: activeUserID}
@@ -519,7 +443,6 @@ func setupDisconnectedGameShortWindow(t *testing.T, hub *ws.Hub, disconnectSeat 
 	state = mgr.GetStateSnapshot(100)
 	require.Equal(t, game.PhasePlaying, state.Phase)
 
-	// Disconnect the specified player
 	disconnectedUserID := state.Players[disconnectSeat].UserID
 	mgr.HandleDisconnect(disconnectedUserID)
 	time.Sleep(100 * time.Millisecond)
@@ -537,10 +460,8 @@ func TestReconnectTimeout_TransitionsToMatchEnd(t *testing.T) {
 
 	mgr, _, _ := setupDisconnectedGameShortWindow(t, hub, 0)
 
-	// Wait for the 1-second reconnect window to expire
 	time.Sleep(2200 * time.Millisecond)
 
-	// Session should be removed after abandonment
 	assert.False(t, mgr.HasSession(100), "session should be removed after timeout")
 	assert.Nil(t, mgr.GetStateSnapshot(100), "state snapshot should be nil after session removed")
 }
@@ -552,18 +473,14 @@ func TestReconnectTimeout_PersistsAbandonedMatch(t *testing.T) {
 
 	_, repo, _ := setupDisconnectedGameShortWindow(t, hub, 2)
 
-	// Wait for the 1-second reconnect window to expire
 	time.Sleep(2200 * time.Millisecond)
 
-	// Match should be persisted with abandoned status
 	matches := repo.getMatches()
 	require.Len(t, matches, 1, "one match should be persisted")
 	m := matches[0]
 	assert.Equal(t, "abandoned", m.Status)
 	assert.NotNil(t, m.AbandonedBy)
-	assert.Equal(t, uint(30), *m.AbandonedBy) // seat 2 = userID 30
-	// The record carries the real non-abandoning team, not a filler 0:
-	// seat 2 = team 0 abandoned, so team 1 is the winner.
+	assert.Equal(t, uint(30), *m.AbandonedBy)
 	assert.Equal(t, 1, m.WinnerTeam, "winner is the non-abandoning team")
 	assert.Equal(t, uint(100), m.RoomID)
 	assert.Equal(t, "bitola", m.Variant)
@@ -579,7 +496,6 @@ func TestReconnectTimeout_PersistsWinnerTeamOppositeParity(t *testing.T) {
 
 	_, repo, _ := setupDisconnectedGameShortWindow(t, hub, 3)
 
-	// Wait for the 1-second reconnect window to expire
 	time.Sleep(2200 * time.Millisecond)
 
 	matches := repo.getMatches()
@@ -587,8 +503,7 @@ func TestReconnectTimeout_PersistsWinnerTeamOppositeParity(t *testing.T) {
 	m := matches[0]
 	assert.Equal(t, "abandoned", m.Status)
 	assert.NotNil(t, m.AbandonedBy)
-	assert.Equal(t, uint(40), *m.AbandonedBy) // seat 3 = userID 40
-	// Seat 3 = team 1 abandoned, so team 0 is the winner.
+	assert.Equal(t, uint(40), *m.AbandonedBy)
 	assert.Equal(t, 0, m.WinnerTeam, "winner is the non-abandoning team")
 }
 
@@ -599,7 +514,6 @@ func TestReconnectTimeout_NoOpWhenReconnected(t *testing.T) {
 
 	mgr, repo, disconnectedUserID := setupDisconnectedGameShortWindow(t, hub, 0)
 
-	// Reconnect before timeout
 	mgr.HandleReconnect(disconnectedUserID)
 	time.Sleep(100 * time.Millisecond)
 
@@ -607,10 +521,8 @@ func TestReconnectTimeout_NoOpWhenReconnected(t *testing.T) {
 	require.NotNil(t, state)
 	assert.Equal(t, game.PhasePlaying, state.Phase)
 
-	// Wait past the original timeout window
 	time.Sleep(2200 * time.Millisecond)
 
-	// Session should still exist (timeout was cancelled by reconnection)
 	assert.True(t, mgr.HasSession(100), "session should still exist after reconnection")
 	matches := repo.getMatches()
 	assert.Len(t, matches, 0, "no match should be persisted when reconnected")
@@ -623,30 +535,14 @@ func TestReconnectTimeout_RemovesSession(t *testing.T) {
 
 	mgr, _, _ := setupDisconnectedGameShortWindow(t, hub, 1)
 
-	// Wait for timeout
 	time.Sleep(2200 * time.Millisecond)
 
 	assert.False(t, mgr.HasSession(100))
 	assert.Nil(t, mgr.GetStateSnapshot(100))
 }
 
-// TestReconnect_RefreshesDerivedMustPickTrump pins the derived-flag half of the
-// forced-pick fix (Story 12.8) against the session manager's out-of-engine phase
-// writes.
-//
-// GameState.MustPickTrump is DERIVED: ApplyAction recomputes it at its single
-// exit, so no rules-engine handler can leave it stale. The reconnect module does
-// not go through ApplyAction — it assigns gs.Phase directly, twice — and the
-// engine's own tests cannot see that.
-//
-// The reachable sequence is: pause on a forced-pick bidding turn (ApplyAction
-// recomputes the flag to false, correctly, because PhasePaused is not a bidding
-// turn) → the paused player drops, and HandleDisconnect auto-clears their pause
-// by restoring the pre-pause phase directly → they reconnect, and HandleReconnect
-// restores PhaseBidding directly. Without a refresh at those writes the snapshot
-// says "you may pass" while the engine refuses the pass — the client renders the
-// Pass control and the player gets a rejection toast, which is precisely the
-// defect this story removed.
+// TestReconnect_RefreshesDerivedMustPickTrump checks that the reconnect paths'
+// direct phase writes refresh the derived MustPickTrump flag.
 func TestReconnect_RefreshesDerivedMustPickTrump(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(1288)
@@ -654,7 +550,6 @@ func TestReconnect_RefreshesDerivedMustPickTrump(t *testing.T) {
 	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-	// Three passes behind it: the dealer is on the clock with no legal pass.
 	gs := testfixtures.NewGameCroatianMidBidding(3)
 	gs.RoomID = roomID
 	seat := gs.ActivePlayerSeat
@@ -686,8 +581,6 @@ func TestReconnect_RefreshesDerivedMustPickTrump(t *testing.T) {
 		"the wire flag must agree with the engine predicate after an out-of-engine phase restore")
 	assert.True(t, back.MustPickTrump, "the dealer still has no legal pass")
 
-	// The consequence, stated rather than implied: the engine refuses exactly the
-	// action a false flag would have let the client offer.
 	_, err := game.ApplyAction(back, game.Action{Type: game.ActionPassTrump, PlayerSeat: back.ActivePlayerSeat})
 	assert.Error(t, err, "a pass here is rejected, so the client must never render the control")
 }

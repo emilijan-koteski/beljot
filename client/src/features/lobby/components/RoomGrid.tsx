@@ -7,15 +7,13 @@ import type { Room } from "@/shared/types/apiTypes";
 type Props = {
   rooms: Room[];
   onJoin: (room: Room) => void;
-  /** When true, render the empty-state with a "Clear search" CTA. */
   hasSearch?: boolean;
   onClearSearch?: () => void;
 };
 
 /**
- * List-layout grid of room cards. Locked to "list" / "comfortable" density
- * per the design's `lobby-app.jsx` constants. Stagger animation is provided
- * per-card via the index prop.
+ * List-layout grid of room cards, each staggered in by its index.
+ * Shows an empty state, with a "Clear search" action when a search is active.
  */
 export function RoomGrid({ rooms, onJoin, hasSearch, onClearSearch }: Props) {
   const { t } = useTranslation();

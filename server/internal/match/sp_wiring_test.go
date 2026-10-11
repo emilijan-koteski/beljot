@@ -16,20 +16,15 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// stubSPAwarder records the outcome ApplySeasonPoints received and scores it with
-// the REAL formula (season.ComputeSPChanges, the 0 floor, the real ladder and
-// rank change), so the emitted events reflect production arithmetic rather than
-// canned values. The reason is resolved from the outcome's abandoned seat the
-// way the season service resolves it (pinned there by
-// TestApplySeasonPoints_AbandonmentReasons). Satisfies match.SPAwarder.
+// stubSPAwarder records the outcome it receives and scores it with the real
+// season formula and ladder, resolving the reason the way the season service does.
 type stubSPAwarder struct {
 	mu          sync.Mutex
 	applyCalls  int
 	lastOutcome match.MatchOutcome
 	lastNow     time.Time
 	err         error
-	// priorSP seeds each user's pre-existing season total (missing = 0).
-	priorSP map[uint]int
+	priorSP     map[uint]int
 }
 
 func (s *stubSPAwarder) ApplySeasonPoints(outcome match.MatchOutcome, now time.Time) (map[uint]match.PlayerSeasonSnapshot, error) {
@@ -99,11 +94,8 @@ func evenPrior(sp int) map[uint]int {
 	return map[uint]int{10: sp, 20: sp, 30: sp, 40: sp}
 }
 
-// assertFinalizerStamp checks the `now` the finalizer threaded down. It is the
-// value that decides WHICH SEASON WINDOW the match lands in, so an unset or
-// non-UTC stamp would silently file a match under the wrong quarter at a
-// boundary — and a zero time.Time resolves to year 1, which the lazy resolver
-// would happily create a season for.
+// assertFinalizerStamp checks the finalizer's `now` is set and in UTC, since it
+// decides which season window the match lands in.
 func assertFinalizerStamp(t *testing.T, awarder *stubSPAwarder) {
 	t.Helper()
 	now := awarder.snapshotNow()
@@ -139,9 +131,7 @@ func seasonPointsByUser(t *testing.T, hub *hubSpy) map[uint]ws.SeasonPointsAward
 	return out
 }
 
-// bufferCapot drives a real scored Capot hand for `team` into the session's
-// buffer the way play does: an old->new state pair in which the hand advanced
-// and the new state carries the scored Capot result.
+// bufferCapot drives a real scored Capot hand for `team` into the session's buffer.
 func bufferCapot(t *testing.T, mgr *match.Manager, roomID uint, team int) {
 	t.Helper()
 	before := mgr.GetStateSnapshot(roomID)
@@ -183,10 +173,8 @@ func allPresentSeats() [4]match.OutcomeSeat {
 	}
 }
 
-// NATURAL END. The finalizer hands over the whole outcome, every human gets
-// their own event carrying the APPLIED change, and the events land after
-// honor_updated and before the trailing match_state. From 0 SP the losers'
-// -16 floors to an applied 0.
+// Every human gets their own event with the applied change, between honor_updated
+// and the trailing match_state. From 0 SP the losers' -16 floors to an applied 0.
 func TestHandleMatchEnd_AwardsSeasonPoints(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -218,7 +206,6 @@ func TestHandleMatchEnd_AwardsSeasonPoints(t *testing.T) {
 	assert.Equal(t, 4, countTypeBetween(hubCalls, "event:season_points_awarded", matchEndIdx, trailingStateIdx),
 		"all four humans receive a season_points_awarded between match_end and match_state")
 
-	// m = 0.5 + 310/1001 = 0.81, E = 0.5: winners +24, losers -16 floored to 0.
 	got := seasonPointsByUser(t, hub)
 	for _, id := range []uint{10, 30} {
 		assert.Equal(t, 24, got[id].SPChange, "user %d", id)
@@ -238,9 +225,8 @@ func TestHandleMatchEnd_AwardsSeasonPoints(t *testing.T) {
 	}
 }
 
-// ORDERING — season_points_awarded lands strictly AFTER honor_updated and
-// strictly BEFORE the trailing match_state, on the natural-end finalizer. Adding
-// it must also leave honor's own assertion (LAST(honor) < match_state) true.
+// season_points_awarded lands strictly after honor_updated and strictly before the
+// trailing match_state on the natural-end finalizer.
 func TestHandleMatchEnd_SeasonPointsFollowHonorAndPrecedeMatchState(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -269,17 +255,14 @@ func TestHandleMatchEnd_SeasonPointsFollowHonorAndPrecedeMatchState(t *testing.T
 
 	assert.Greater(t, firstSPIdx, lastHonorIdx, "season_points_awarded must follow every honor_updated")
 	assert.Less(t, lastSPIdx, trailingStateIdx, "every season_points_awarded must precede the trailing match_state")
-	// The pre-existing honor invariant still holds with SP slotted in between.
 	assert.Less(t, lastHonorIdx, trailingStateIdx)
 }
 
-// RANK CHANGES ARE PER PLAYER, AND COMPARE RANKS. User 10 climbs from Iron 3
-// into Bronze 1 (promoted); user 20 drops from Bronze 1 into Iron 3 (demoted,
-// never a promotion); users 30 and 40 stay in Iron 1 (none).
+// User 10 is promoted into Bronze 1, user 20 demoted into Iron 3, and users 30
+// and 40 stay in Iron 1.
 func TestHandleMatchEnd_RankChangeIsPerPlayer(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
-	// Team A averages 70, team B 80, so E_A = 0.485: A wins +25, B loses -17.
 	awarder := &stubSPAwarder{priorSP: map[uint]int{10: 140, 20: 160}}
 	mgr := match.NewManager(hub, repo)
 	mgr.SetSPAwarder(awarder)
@@ -345,9 +328,7 @@ func TestHandleMatchEnd_SingleTiersCarryANullDivision(t *testing.T) {
 	require.True(t, found, "user 10's season_points_awarded frame must be sent")
 }
 
-// A Capot reaches the outcome from the BUFFERED hand results, for the team that
-// made it. This also exercises the hoist: the hand-results copy happens before
-// the SP award, so a Capot recorded during play actually reaches the formula.
+// A Capot reaches the outcome from the buffered hand results, for the team that made it.
 func TestHandleMatchEnd_CapotBonusGoesToTheCapotTeam(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -393,9 +374,8 @@ func TestHandleMatchEnd_The501TargetScalesTheMargin(t *testing.T) {
 	assert.Equal(t, -22, got[20].SPChange)
 }
 
-// An instant win on a fresh deal: TeamScores [0,0] and no hand results, yet the
-// maximum margin still applies, because the engine records the outcome on the
-// state instead of leaving the match layer to infer it.
+// An instant win on a fresh deal still gets the maximum margin, with TeamScores
+// [0,0] and no hand results.
 func TestHandleMatchEnd_InstantWinIsTheMaximumMargin(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -418,9 +398,8 @@ func TestHandleMatchEnd_InstantWinIsTheMaximumMargin(t *testing.T) {
 	assert.Equal(t, -30, got[20].SPChange)
 }
 
-// An accepted surrender routes through handleMatchEnd with the engine's winner
-// already resolved: the outcome is a surrender, the winners' points count as the
-// target, and the win follows WinnerTeam rather than the higher score.
+// An accepted surrender counts the winners' points as the target, and the win
+// follows WinnerTeam rather than the higher score.
 func TestHandleMatchEnd_SurrenderScoresAsIfTheWinnersReachedTheTarget(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -432,7 +411,6 @@ func TestHandleMatchEnd_SurrenderScoresAsIfTheWinnersReachedTheTarget(t *testing
 	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-	// Team A is AHEAD on points but surrendered, so team B is the winner.
 	surrenderedBy := uint(10)
 	proposer := 0
 	endMatch(t, mgr, roomID, game.TeamB, 900, 200, &surrenderedBy,
@@ -442,7 +420,6 @@ func TestHandleMatchEnd_SurrenderScoresAsIfTheWinnersReachedTheTarget(t *testing
 	assert.True(t, outcome.Surrender)
 	assert.Equal(t, game.TeamB, outcome.WinnerTeam)
 
-	// m = 0.5 + (1001 - 900)/1001 = 0.60, E = 0.5: B +18, A -12.
 	got := seasonPointsByUser(t, hub)
 	assert.Equal(t, 18, got[20].SPChange, "the win follows the resolved winner, not the score")
 	assert.Equal(t, 18, got[40].SPChange)
@@ -450,9 +427,7 @@ func TestHandleMatchEnd_SurrenderScoresAsIfTheWinnersReachedTheTarget(t *testing
 	assert.Equal(t, -12, got[30].SPChange)
 }
 
-// The same, end to end: a real surrender request and accept through the action
-// path, so the outcome's Surrender flag comes from the match-end payload the
-// engine's result actually produced rather than from a hand-built one.
+// A real surrender request and accept through the action path is scored as a surrender.
 func TestSurrender_ThroughTheActionPathIsScoredAsASurrender(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -464,7 +439,6 @@ func TestSurrender_ThroughTheActionPathIsScoredAsASurrender(t *testing.T) {
 	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-	// Seat 0 (team A) proposes, seat 2 (its partner) accepts.
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{Type: "action:surrender_request", Payload: json.RawMessage(`{}`)})
 	mgr.HandleAction(&ws.Client{UserID: 30}, ws.WSMessage{Type: "action:surrender_accept", Payload: json.RawMessage(`{}`)})
 	require.True(t, waitFor(2*time.Second, func() bool {
@@ -476,16 +450,13 @@ func TestSurrender_ThroughTheActionPathIsScoredAsASurrender(t *testing.T) {
 	assert.True(t, outcome.Surrender)
 	assert.Equal(t, game.TeamB, outcome.WinnerTeam)
 	assert.Equal(t, -1, outcome.AbandonedSeat)
-	// 0:0 before any hand, scored as a surrender: m = 0.5 + 1001/1001 = 1.5.
 	got := seasonPointsByUser(t, hub)
 	assert.Equal(t, 45, got[20].SPChange)
 	assert.Equal(t, -30, got[10].SPChange)
 }
 
-// A surrender accepted with a team already over the target in a "dosta" room
-// runs the stop and finalizes as target_reached, surrenderedBy still set. The
-// winners really reached the target, so it is scored on the real margin, not as
-// a surrender.
+// A surrender accepted with a team already over the target in a dosta room
+// finalizes as target_reached and is scored on the real margin.
 func TestHandleMatchEnd_SurrenderThatFinalizesAtTargetIsANaturalMargin(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -505,17 +476,13 @@ func TestHandleMatchEnd_SurrenderThatFinalizesAtTargetIsANaturalMargin(t *testin
 	_, outcome := awarder.snapshotCalls()
 	assert.False(t, outcome.Surrender, "a target_reached finish is not scored as a surrender")
 
-	// Natural m = 0.5 + 500/1001 = 1.00: +30 / -20. Scored as a surrender the
-	// winners' 1100 would have been cut to the 1001 target, m = 0.90: +27 / -18.
 	got := seasonPointsByUser(t, hub)
 	assert.Equal(t, 30, got[10].SPChange)
 	assert.Equal(t, -20, got[20].SPChange)
 }
 
-// ABANDONMENT. The abandoner takes the fixed penalty, the teammate half of the
-// surrender loss, the opponents a surrender-scored win. Every human seat still
-// counts a games_played, so every one of them is in the outcome, the abandoner
-// with Completed false.
+// The abandoner takes the fixed penalty, the teammate half the surrender loss and
+// the opponents a surrender-scored win; the abandoner has Completed false.
 func TestAbandonment_ScoresEverySeatByItsRole(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -535,7 +502,6 @@ func TestAbandonment_ScoresEverySeatByItsRole(t *testing.T) {
 	gs.TeamScores[game.TeamB] = 300
 	mgr.SetGameStateForTest(roomID, gs)
 
-	// Seat 2 (userID 30, team A) abandons. Seat 0 (userID 10) is its teammate.
 	mgr.AbandonSeatForTest(roomID, 2)
 
 	calls, outcome := awarder.snapshotCalls()
@@ -556,14 +522,11 @@ func TestAbandonment_ScoresEverySeatByItsRole(t *testing.T) {
 	assert.Equal(t, 4, countTypeBetween(hubCalls, "event:season_points_awarded", abandonedIdx, trailingStateIdx),
 		"all four humans receive a season_points_awarded — including the abandoner")
 
-	// The ordering slot holds on this finalizer too (it broadcasts BEFORE it
-	// persists).
 	lastHonorIdx := lastIndexOfType(hubCalls, "event:honor_updated")
 	require.GreaterOrEqual(t, lastHonorIdx, 0)
 	assert.Greater(t, firstIndexOfType(hubCalls, "event:season_points_awarded"), lastHonorIdx)
 	assert.Less(t, lastIndexOfType(hubCalls, "event:season_points_awarded"), trailingStateIdx)
 
-	// Surrender margin m = 0.5 + (1001 - 900)/1001 = 0.60, E = 0.5.
 	got := seasonPointsByUser(t, hub)
 	assert.Equal(t, -120, got[30].SPChange, "the abandoner: -2 × (20 × 1.5 × 2)")
 	assert.Equal(t, 380, got[30].NewSeasonSP)
@@ -577,9 +540,8 @@ func TestAbandonment_ScoresEverySeatByItsRole(t *testing.T) {
 	assert.Equal(t, ws.SPReasonNormal, got[40].Reason)
 }
 
-// The abandonment finalizer reads the 501 target too: its surrender margin is
-// m = 0.5 + (501 - 200)/501 = 1.10, so the opponents get +33 and the teammate
-// half of -22.
+// The abandonment margin uses the 501 target: m = 0.5 + (501 - 200)/501 = 1.10,
+// so the opponents get +33 and the teammate half of -22.
 func TestAbandonment_The501TargetScalesTheMargin(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -607,10 +569,8 @@ func TestAbandonment_The501TargetScalesTheMargin(t *testing.T) {
 	assert.Equal(t, -120, got[30].SPChange)
 }
 
-// The Capot teams are captured on the ABANDONMENT finalizer too, from its own
-// under-lock copy of the hand results — covering them only on the natural end
-// would leave this path free to drop them without any test noticing. The
-// teammate keeps the Capot bonus; the abandoner never gets it.
+// The abandonment finalizer captures Capot teams too: the teammate keeps the bonus
+// and the abandoner never gets it.
 func TestAbandonment_CapotBonusSkipsOnlyTheAbandoner(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -640,9 +600,8 @@ func TestAbandonment_CapotBonusSkipsOnlyTheAbandoner(t *testing.T) {
 	assert.Equal(t, 18, got[20].SPChange)
 }
 
-// PRESENCE DOES NOT GATE SP. Seat 3 drops first and is still inside its own
-// window when seat 2's expires: it is absent at the end (Completed false, so no
-// games_completed) but is still scored by its team's result — a win.
+// Seat 3 is still inside its own reconnect window when seat 2's expires: it gets
+// Completed false but is still scored by its team's win.
 func TestAbandonment_AnAbsentOpponentIsStillScoredByTheResult(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -675,10 +634,8 @@ func TestAbandonment_AnAbsentOpponentIsStillScoredByTheResult(t *testing.T) {
 	assert.Equal(t, -6, got[10].SPChange)
 }
 
-// BOT AVERAGING. A bot seat is never an SP subject and never receives the event,
-// but it counts as the Gold 1 floor (600) in its team's average. Team B here is
-// user 20 (100 SP) and a bot, an average of 350 against team A's 0, so team A's
-// win is worth far more than against an even table.
+// A bot seat never gets SP or the event but counts as the Gold 1 floor (600) in
+// its team's average, so beating user 20 plus a bot is worth more than an even table.
 func TestHandleMatchEnd_BotSeatCountsAsTheGoldFloor(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -696,8 +653,6 @@ func TestHandleMatchEnd_BotSeatCountsAsTheGoldFloor(t *testing.T) {
 	_, outcome := awarder.snapshotCalls()
 	assert.Equal(t, match.OutcomeSeat{IsBot: true, Team: 1}, outcome.Seats[3], "a bot seat carries no user")
 
-	// m = 0.5 + 200/1001 = 0.70; E_A = 1/(1+10^(350/385)) = 0.11: A +37, B -25.
-	// (With the bot counted as 0 SP, team B would average 50 and A get +24.)
 	got := seasonPointsByUser(t, hub)
 	require.Len(t, got, 3, "only the three humans receive season_points_awarded")
 	assert.Equal(t, 37, got[10].SPChange)
@@ -714,7 +669,6 @@ func TestHandleMatchEnd_NoAwarderNoSeasonPoints(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
 	mgr := match.NewManager(hub, repo)
-	// No SetSPAwarder call.
 
 	roomID := uint(408)
 	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
@@ -754,10 +708,7 @@ func TestHandleMatchEnd_SeasonPointsFailureDoesNotBlockBroadcasts(t *testing.T) 
 	}
 }
 
-// A boot reconcile of a stale room is a SERVER fault, not a player signal, so
-// nobody's SP moves — the same rule honor holds. reconcile.go has no live session
-// and never touches the awarder; asserted explicitly so a future refactor cannot
-// quietly wire it in.
+// A boot reconcile of a stale room is a server fault, so nobody's SP moves.
 func TestReconcileStaleRooms_AwardsNoSeasonPoints(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}

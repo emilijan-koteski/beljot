@@ -1,9 +1,6 @@
 import { Lock } from "lucide-react";
 import type { CSSProperties } from "react";
 
-// Live-lobby room card (parchment). Static marketing data — mirrors the real
-// lobby RoomCard layout (live dot, code chip, A/B seat grid, host + join).
-
 export type Seat = [initial: string | null, name: string, team: "a" | "b"];
 
 type RoomCardProps = {
@@ -67,6 +64,7 @@ function SeatChip({ seat, emptyLabel }: { seat?: Seat; emptyLabel: string }) {
   );
 }
 
+// Static marketing room card that mirrors the real lobby RoomCard layout.
 export function RoomCard({
   title,
   code = "B4LJ7T",

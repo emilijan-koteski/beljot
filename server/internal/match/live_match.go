@@ -16,53 +16,27 @@ import (
 
 // LiveMatch holds the live game state and player mapping for one active game.
 type LiveMatch struct {
-	gameState *game.GameState
-	playerIDs [4]uint // index = seat
-	roomID    uint
-	startedAt time.Time
-	// coinBuyIn is the per-human stake captured at StartMatch (Story 9.2). It is
-	// the settlement authority for this match — immune to later edits of
-	// rooms.coin_buy_in. 0 means no economy (quick-play / unstaked). Written once
-	// at StartMatch, read-only thereafter (safe to read without the lock).
-	coinBuyIn        int
-	timerStyle       string      // "relaxed" or "per-move"
-	timerDurationSec int         // seconds per move (only used when timerStyle == "per-move")
-	turnTimer        *time.Timer // current per-move timer (nil when inactive)
-	timerGeneration  uint64      // incremented on each turn; timer callback checks staleness
-	// handCompleteExpiresAt is the fixed deadline for the score-reveal pause's
-	// auto-continue. Set once when the pause STARTS; the timer is re-created
-	// against this same deadline (remaining time) on every action so a player's
-	// acknowledgement never pushes it back. Reset on reconnect into the pause.
-	handCompleteExpiresAt time.Time
-	// declarationExpiresAt is the fixed ceiling on the dedicated declaration
-	// phase. Set once when the phase is ENTERED and, like
-	// handCompleteExpiresAt, never pushed back by an answer — otherwise three
-	// prompt players' clicks would keep extending the wait on the fourth.
-	// Reset on reconnect into the phase.
+	gameState                *game.GameState
+	playerIDs                [4]uint
+	roomID                   uint
+	startedAt                time.Time
+	coinBuyIn                int
+	timerStyle               string
+	timerDurationSec         int
+	turnTimer                *time.Timer
+	timerGeneration          uint64
+	handCompleteExpiresAt    time.Time
 	declarationExpiresAt     time.Time
-	reconnectWindowSec       int            // seconds to wait for disconnected player (default 120)
-	seatReconnectTimers      [4]*time.Timer // per-seat reconnect countdown timers; nil when seat is online
-	seatReconnectGenerations [4]uint64      // per-seat staleness counters — bumped on cancel + start
-	closed                   bool           // set when session is being removed
-	// handResults buffers per-hand scoring rows during the match. Flushed via
-	// matchRepo.CreateWithHands when the match completes (normal end) or is
-	// abandoned. Mutated only under session.mu.Lock.
-	handResults []HandResult
-	// Bot-driver state (Story 10.3). Each bot seat owns its own think-delay
-	// timer + staleness generation, independent of timerGeneration — another
-	// seat's action (e.g. a human's continue ack during the score reveal)
-	// must not invalidate a bot's pending acknowledgement. botMemory is the
-	// shared per-match public-information memory, allocated only when the
-	// match has bots; all three are guarded by session.mu.
-	botActionTimers      [4]*time.Timer
-	botActionGenerations [4]uint64
-	botMemory            *bot.Memory
-	// dealGraceUntil is when the client's animation of the deal that opened
-	// the current turn finishes (see deal_grace.go). Zero when the current turn
-	// was not opened by a deal. Read by setTurnExpiry / startTimerLocked and
-	// the bot scheduler; guarded by mu.
-	dealGraceUntil time.Time
-	mu             sync.RWMutex
+	reconnectWindowSec       int
+	seatReconnectTimers      [4]*time.Timer
+	seatReconnectGenerations [4]uint64
+	closed                   bool
+	handResults              []HandResult
+	botActionTimers          [4]*time.Timer
+	botActionGenerations     [4]uint64
+	botMemory                *bot.Memory
+	dealGraceUntil           time.Time
+	mu                       sync.RWMutex
 }
 
 // RoomStatusUpdater updates a room's status in the database.
@@ -70,49 +44,28 @@ type RoomStatusUpdater interface {
 	UpdateRoomStatus(roomID uint, status string) error
 }
 
-// WalletSettler is the subset of *wallet.Service the match manager needs to
-// settle a match at end (Story 9.2): credit the winning human seats atomically
-// and read every human's resulting balance for event:coin_settlement. Injected
-// via SetWalletSettler so the match package stays decoupled from wallet
-// internals and tests can swap a stub. Nil → settlement is skipped (the manager
-// still computes/persists deltas; only the wallet write + event are no-ops).
+// WalletSettler credits winning human seats and reads balances at match end.
+// Nil skips settlement.
 type WalletSettler interface {
 	ApplySettlement(credits map[uint]int) error
 	GetBalances(userIDs []uint) (map[uint]int, error)
 }
 
-// XPAwarder is the subset of the user-side XP service the match manager needs to
-// award lifetime XP at match end (Story 9.5). ApplyXPAwards atomically adds each
-// (userID -> delta) to total_xp and returns the new totals; LevelForXP derives a
-// level from a total. LevelForXP is on the interface (not imported directly) so
-// the manager can compute NewLevel/LeveledUp for event:xp_awarded WITHOUT
-// importing the user package — user imports match, so match must never import
-// user (Story 9.5 Design Decision D1). Injected via SetXPAwarder; nil → XP is
-// skipped (no mutation, no event), mirroring walletSettler's nil-tolerance.
+// XPAwarder awards lifetime XP at match end and derives levels from totals.
+// It is an interface because user imports match, so match must never import user.
 type XPAwarder interface {
 	ApplyXPAwards(awards map[uint]int) (map[uint]int, error)
 	LevelForXP(totalXP int) int
-	// LevelsForUsers returns each given userID's current lifetime level
-	// (total_xp run through LevelForXP). Captured at match start to stamp each
-	// human seat's static level on the game state. Unknown IDs and the bot
-	// placeholder (0) are skipped/omitted from the result.
 	LevelsForUsers(ids []uint) (map[uint]int, error)
 }
 
-// HonorEvent is one finished match's honor contribution for one player
-// (Story 9.7). Abandoned is true only for the seat whose reconnect window
-// expired; every other human seat that reached a terminal state gets false
-// (a completion), including the three innocents in an abandoned match.
+// HonorEvent is one player's honor contribution from a finished match.
+// Abandoned is true only for the seat whose reconnect window expired.
 type HonorEvent struct {
 	Abandoned bool
 }
 
-// HonorSnapshot is one player's honor state immediately after the match-end
-// write, as returned by HonorRecorder. Score is the AUTHORITATIVE recomputed
-// value (never the lagging honor_score column), Tier is a stable machine token
-// the client maps to an i18n label, and IsNewPlayer drives client-side
-// suppression of the score for players under the matches-played floor
-// (completed + abandoned < 5 — it counts experience, not successes).
+// HonorSnapshot is one player's precomputed honor state after the match-end write.
 type HonorSnapshot struct {
 	Score          int
 	Tier           string
@@ -121,122 +74,51 @@ type HonorSnapshot struct {
 	IsNewPlayer    bool
 }
 
-// HonorRecorder is the subset of the user-side honor service the match manager
-// needs at match end (Story 9.7). It mirrors XPAwarder's shape and exists for
-// exactly the same reason: user imports match, so MATCH MUST NEVER IMPORT USER
-// (Story 9.7 D4 / Story 9.5 D1). Both HonorEvent and HonorSnapshot are declared
-// HERE, in match, so the interface is satisfiable by a user.HonorService
-// without match taking a dependency on the user package — the score and tier
-// arrive precomputed rather than the manager calling honor math it cannot see.
-//
-// Injected via SetHonorRecorder; nil → honor is skipped entirely (no mutation,
-// no event), mirroring walletSettler's and xpAwarder's nil-tolerance.
+// HonorRecorder records honor at match end without match importing the user package.
+// Nil skips honor entirely.
 type HonorRecorder interface {
 	ApplyHonorEvents(events map[uint]HonorEvent, now time.Time) (map[uint]HonorSnapshot, error)
 }
 
-// PlayerSeasonSnapshot is one player's season standing immediately after the
-// match-end write, as returned by SPAwarder.
-//
-// Everything here is PRECOMPUTED by the season service: SeasonName, the applied
-// SPChange, the derived rank, the rank change and the reason all arrive
-// resolved, so the manager never runs ladder arithmetic it cannot see (the same
-// shape HonorSnapshot uses, and for the same reason). awardSeasonPoints copies
-// it onto ws.SeasonPointsAwardedPayload field for field.
+// PlayerSeasonSnapshot is one player's precomputed season standing after the match-end write.
 type PlayerSeasonSnapshot struct {
-	SeasonName string
-	SP         int
-	// SPChange is the APPLIED change, new total minus previous total, never the
-	// formula's raw output. The two differ at the 0 floor: a player on 10 SP
-	// whose loss computes to -18 reports -10.
-	SPChange int
-	// RankTier and RankDivision are the rank of the NEW total (season/tier.go).
-	// RankDivision is 1-3, or nil for Master and Grandmaster.
+	SeasonName   string
+	SP           int
+	SPChange     int
 	RankTier     string
 	RankDivision *int
-	// RankChange is ws.RankChangePromoted, ws.RankChangeDemoted or
-	// ws.RankChangeNone, comparing the rank before and after, never SP alone.
-	RankChange string
-	// Reason is ws.SPReasonAbandoned for the abandoning seat,
-	// ws.SPReasonPartnerAbandoned for its teammate and ws.SPReasonNormal for
-	// every other seat.
-	Reason string
+	RankChange   string
+	Reason       string
 }
 
-// OutcomeSeat is one seat of a finished match as the Season Points formula reads
-// it (Story 13.4).
+// OutcomeSeat is one seat of a finished match as the Season Points formula reads it.
 type OutcomeSeat struct {
-	// UserID is 0 for a bot seat.
-	UserID uint
-	IsBot  bool
-	// Team is game.TeamForSeat(seat), carried so the formula never re-derives it.
-	Team int
-	// Completed is the spSeatPresent answer. It drives games_completed and
-	// nothing else: every human seat is scored by its team's result whatever its
-	// presence.
+	UserID    uint
+	IsBot     bool
+	Team      int
 	Completed bool
 }
 
-// MatchOutcome is everything the season service needs to score one finished
-// match (Story 13.4). It is built by the two finalizers, under the facts they
-// already resolved, and handed over whole so the SP change can be computed
-// inside the season service's award transaction from every seat's current SP.
-//
-// Declared HERE, in match, for the same reason as PlayerSeasonSnapshot: season
-// imports match, never the reverse.
+// MatchOutcome is everything the season service needs to score one finished match.
 type MatchOutcome struct {
-	Seats [4]OutcomeSeat
-	// WinnerTeam is the finalizer's resolved winner, never re-derived from the
-	// scores. On an abandonment it is the non-abandoning team.
-	WinnerTeam int
-	// TeamScores are the final (or, on an abandonment, current) totals, [A, B].
-	TeamScores [2]int
-	// Target is the match target, 501 or 1001.
-	Target int
-	// Surrender is true when the match ended by an accepted surrender. The
-	// winners' points then count as the target.
-	Surrender bool
-	// InstantWin is true when the engine ended the match by an instant win.
-	InstantWin bool
-	// CapotTeams marks each team that made at least one Capot in the match.
-	CapotTeams [2]bool
-	// AbandonedSeat is the seat whose reconnect window expired, or -1.
+	Seats         [4]OutcomeSeat
+	WinnerTeam    int
+	TeamScores    [2]int
+	Target        int
+	Surrender     bool
+	InstantWin    bool
+	CapotTeams    [2]bool
 	AbandonedSeat int
 }
 
-// SPAwarder is the subset of the season service the match manager needs at match
-// end (Story 13.1, reshaped by 13.4). It mirrors XPAwarder's and HonorRecorder's
-// shape and exists for exactly the same reason: `season` imports `match`, so
-// MATCH MUST NEVER IMPORT SEASON (Story 13.1 D8 / 9.7 D4 / 9.5 D1). Both
-// MatchOutcome and PlayerSeasonSnapshot are declared HERE, in match, so the
-// interface is satisfiable by a *season.Service without match taking a
-// dependency on the season package.
-//
-// It takes the whole OUTCOME, not per-player deltas: a change depends on every
-// seated human's current SP, which only the season service can read, under the
-// same lock it writes with.
-//
-// `now` is passed in rather than read inside: the season a match lands in must
-// be decided by the finalizer's own stamp, not by a clock read somewhere further
-// down. The implementation resolves (and, at a quarter boundary, creates) the
-// covering window from it.
-//
-// Injected via SetSPAwarder; nil → SP is skipped entirely (no mutation, no
-// event), mirroring walletSettler's, xpAwarder's and honorRecorder's
-// nil-tolerance. Match end must never break because SP is unwired.
+// SPAwarder applies Season Points for a whole match outcome without match importing season.
+// now decides which season the match lands in; nil skips SP entirely.
 type SPAwarder interface {
 	ApplySeasonPoints(outcome MatchOutcome, now time.Time) (map[uint]PlayerSeasonSnapshot, error)
 }
 
-// Broadcaster is the subset of *ws.Hub the manager depends on. Mirrors the
-// chat / emote pattern (chat/handler.go, emote/handler.go) so tests can swap
-// in a hubSpy without spinning up a real hub. *ws.Hub satisfies this directly.
-//
-// SendFrames is the per-recipient primitive every match_state send rides
-// (Story 12.10): each human seat gets its own ProjectForSeat frame, but the
-// event stays ONE logical call — so wiring tests that count/order broadcasts
-// keep one entry per state event, and a single-recipient SendToUser still
-// reliably means a targeted send (an error, a settlement, a face-down reveal).
+// Broadcaster is the subset of *ws.Hub the manager depends on.
+// SendFrames delivers per-seat match_state frames as one logical send.
 type Broadcaster interface {
 	BroadcastToUsers(userIDs []uint, msg []byte)
 	SendToUser(userID uint, msg []byte)
@@ -246,8 +128,8 @@ type Broadcaster interface {
 // Manager orchestrates game sessions: receives actions via WebSocket,
 // calls the rules engine, broadcasts results, and persists completed matches.
 type Manager struct {
-	sessions         map[uint]*LiveMatch // keyed by roomID
-	userToRoom       map[uint]uint       // userID → roomID for quick lookup
+	sessions         map[uint]*LiveMatch
+	userToRoom       map[uint]uint
 	hub              Broadcaster
 	matchRepo        MatchRepository
 	roomUpdater      RoomStatusUpdater
@@ -256,16 +138,8 @@ type Manager struct {
 	honorRecorder    HonorRecorder
 	spAwarder        SPAwarder
 	userRemovedHooks []func(userID uint)
-	// Bot think-delay bounds (Story 10.3). Uniform random in [min, max] per
-	// decision; injectable so manager tests don't sleep for real. The 2.5 s
-	// ceiling always resolves inside the 10 s per-move timer minimum, so a
-	// bot never trips timeout auto-play.
-	botDelayMin time.Duration
-	botDelayMax time.Duration
-	// dealGraceEnabled adds each deal's client animation length to the next
-	// actor's deadline and to a bot actor's think delay (deal_grace.go).
-	// Always on in production; tests that are not about the deal switch it
-	// off so their timings stay exact.
+	botDelayMin      time.Duration
+	botDelayMax      time.Duration
 	dealGraceEnabled bool
 	mu               sync.RWMutex
 }
@@ -302,26 +176,26 @@ func (m *Manager) SetRoomUpdater(updater RoomStatusUpdater) {
 }
 
 // SetWalletSettler injects the wallet service used to settle coins at match end
-// (Story 9.2). Optional — when unset, settlement is skipped.
+// Optional — when unset, settlement is skipped.
 func (m *Manager) SetWalletSettler(settler WalletSettler) {
 	m.walletSettler = settler
 }
 
 // SetXPAwarder injects the user-side XP service used to award lifetime XP at
-// match end (Story 9.5). Optional — when unset, XP awards are skipped.
+// match end. Optional — when unset, XP awards are skipped.
 func (m *Manager) SetXPAwarder(awarder XPAwarder) {
 	m.xpAwarder = awarder
 }
 
 // SetHonorRecorder injects the user-side honor service used to record match
-// completions and abandonments at match end (Story 9.7). Optional — when unset,
+// completions and abandonments at match end. Optional — when unset,
 // honor is skipped entirely (no mutation, no event).
 func (m *Manager) SetHonorRecorder(recorder HonorRecorder) {
 	m.honorRecorder = recorder
 }
 
 // SetSPAwarder injects the season service used to apply Season Points and
-// refresh the rank tier at match end (Story 13.1). Optional — when unset, SP is
+// refresh the rank tier at match end. Optional — when unset, SP is
 // skipped entirely (no mutation, no event).
 func (m *Manager) SetSPAwarder(awarder SPAwarder) {
 	m.spAwarder = awarder
@@ -329,23 +203,14 @@ func (m *Manager) SetSPAwarder(awarder SPAwarder) {
 
 // AddUserRemovedHook registers fn to be called (outside the manager lock)
 // for each playerID when RemoveSession tears down a session.
-// Reusable for Epic 9 per-user state (wallet rate-limit, daily-claim cooldown).
 func (m *Manager) AddUserRemovedHook(fn func(userID uint)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.userRemovedHooks = append(m.userRemovedHooks, fn)
 }
 
-// StartMatch creates a new game session from room data and broadcasts the
-// initial state. coinBuyIn is the per-human stake to capture on the session for
-// match-end settlement (Story 9.2); 0 for no-economy / quick-play matches.
-//
-// declarationsEnabled is the room's melds-and-Belote setting and stopAtTarget is
-// its "dosta" setting, both passed straight through to NewGame. Positional and
-// non-optional on purpose: for declarationsEnabled false is the destructive
-// value, so a forgotten argument must be a compile error rather than a silently
-// declarations-less match, and stopAtTarget follows the same shape for
-// consistency with that shipped precedent.
+// StartMatch creates a new game session from room data and broadcasts the initial state.
+// coinBuyIn is the per-human stake for settlement, 0 for no-economy matches.
 func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool) error {
 	m.mu.Lock()
 	if _, exists := m.sessions[roomID]; exists {
@@ -364,20 +229,12 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 
 	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID, declarationsEnabled, stopAtTarget)
 
-	// Stamp each human seat's avatar URL, captured once like the level below.
-	// The room handler already resolved it from the roster JOIN, so this is a
-	// copy, not a lookup. Bot seats stay nil.
 	for _, p := range players {
 		if !p.IsBot {
 			gs.Players[p.Seat].AvatarURL = p.AvatarURL
 		}
 	}
 
-	// Stamp each human seat's static lifetime level (Story: level-in-match).
-	// Levels derive from total_xp via the XP service and are captured ONCE here
-	// — XP only changes at match end, so they never drift mid-match. Best-effort,
-	// mirroring awardXP's degradation: a lookup failure logs and leaves every
-	// level at 0 rather than blocking match start. Bot seats (UserID 0) stay 0.
 	if m.xpAwarder != nil {
 		humanLevelIDs := humanUserIDs(playerIDs)
 		if len(humanLevelIDs) > 0 {
@@ -395,8 +252,6 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		}
 	}
 
-	// Map room owner to seat index for pause override validation.
-	// Default to -1 (no owner override available) if ownerID not found among players.
 	gs.OwnerSeat = -1
 	for i, uid := range playerIDs {
 		if uid == ownerID {
@@ -421,8 +276,6 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 
 	m.sessions[roomID] = session
 	for _, uid := range playerIDs {
-		// Bot seats (UserID 0) must NEVER enter userToRoom — HandleDisconnect
-		// and action routing key on it.
 		if uid == 0 {
 			continue
 		}
@@ -432,12 +285,8 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 
 	slog.Info("session: game started", "roomID", roomID, "players", playerIDs)
 
-	// Broadcast dealing-phase state (client shows deal animation)
 	m.broadcastState(playerIDs, gs)
 
-	// Auto-transition to bidding phase. The client shows its "match is
-	// starting" splash and then animates the opening deal, so the first bidder
-	// (and a first-bidder bot) gets both on top of the normal window.
 	if gs.Phase == game.PhaseDealing {
 		session.mu.Lock()
 		gs.Phase = game.PhaseBidding
@@ -449,7 +298,6 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		m.broadcastState(playerIDs, gs)
 	}
 
-	// The first bidder may be a bot.
 	m.maybeScheduleBotAction(session)
 
 	return nil
@@ -472,7 +320,6 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 		return
 	}
 
-	// Parse the action from the WS message
 	action, err := m.parseAction(client.UserID, session, msg)
 	if err != nil {
 		m.sendError(client.UserID, ws.ErrorInvalidAction, err.Error())
@@ -484,27 +331,17 @@ func (m *Manager) HandleAction(client *ws.Client, msg ws.WSMessage) {
 	}
 }
 
-// applyAndBroadcastAction is the single apply-and-broadcast path for every
-// in-band action: human actions (HandleAction) and bot decisions
-// (handleBotActionTimer) run through it identically — same timer semantics,
-// same event ordering, no autoPlayed marker. Returns the rules-engine
-// rejection (timers already restored) so the caller decides how to surface
-// it; nil on success and on benign drops.
+// applyAndBroadcastAction applies and broadcasts a human or bot action through one path.
+// It returns the rules-engine rejection, or nil on success and benign drops.
 func (m *Manager) applyAndBroadcastAction(session *LiveMatch, action game.Action) error {
 	return m.applyAndBroadcastActionWith(session, func(*game.GameState) (game.Action, bool) {
 		return action, true
 	})
 }
 
-// applyAndBroadcastActionWith builds the action under the session lock via
-// the build callback, then applies and broadcasts it. The bot path uses build
-// to re-verify its decision point and run bot.Decide inside the SAME critical
-// section that applies the result — no verify→act gap for a racing state
-// change to slip through. build returning ok=false is a benign drop: state
-// and timers are left untouched. build runs under session.mu and may read
-// session fields guarded by it.
+// applyAndBroadcastActionWith builds the action under the session lock and applies it in the same
+// critical section. build returning ok=false is a benign drop that leaves state and timers untouched.
 func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs *game.GameState) (game.Action, bool)) error {
-	// Lock the session for state mutation — cancel timer first to prevent race
 	session.mu.Lock()
 	if session.closed {
 		session.mu.Unlock()
@@ -517,13 +354,6 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 		return nil
 	}
 
-	// A continue that arrives after the score-reveal pause already advanced is
-	// a benign race, not a player error: the client's 8s auto-ack countdown
-	// starts when its dialog MOUNTS — gated behind the trick-collect sweep and
-	// the capot banner — so it can trail the server's force-advance. Drop it
-	// silently BEFORE cancelTurnTimer so the new turn's timer is untouched,
-	// and send no error (the "cannot perform this action" toast was pure noise
-	// the player could do nothing about).
 	if action.Type == game.ActionContinue && session.gameState.Phase != game.PhaseHandComplete {
 		session.mu.Unlock()
 		return nil
@@ -534,29 +364,6 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 	oldState := session.gameState
 	newState, err := game.ApplyAction(oldState, action)
 	if err != nil {
-		// The pre-mutation cancelTurnTimer above also stops the score-reveal
-		// auto-continue fallback when the table is paused in hand_complete —
-		// and the per-move restore branch below can never re-arm it, because
-		// TurnExpiresAt is always nil during the pause. Re-create it here
-		// against the SAME fixed deadline, or one rejected action (a stray tap
-		// that sends play_card while the collect animation still covers the
-		// table, a pause click, …) would permanently disarm the fallback and a
-		// connected-but-unresponsive seat could strand the table forever.
-		// Applies regardless of timer style, mirroring the success branch.
-		//
-		// Otherwise restart the timer we cancelled preemptively above,
-		// restoring the ORIGINAL deadline rather than minting a fresh full
-		// window. Two reasons:
-		//   1. We don't broadcast state on error, so all four clients still
-		//      hold the original TurnExpiresAt. A fresh full window would
-		//      silently desync server↔clients: the UI ticks to 0 while the
-		//      server quietly waits another full duration before auto-acting.
-		//      Players see "0s" sit on the screen for several seconds before
-		//      the card finally auto-throws.
-		//   2. Fairness: any player (not just the active one) can hit this
-		//      branch by clicking an illegal card / sending a stale action.
-		//      Resetting to a fresh window would let any client extend the
-		//      active player's turn indefinitely via spam.
 		if oldState.Phase == game.PhaseHandComplete {
 			remaining := max(time.Until(session.handCompleteExpiresAt), 0)
 			gen := session.timerGeneration
@@ -564,12 +371,6 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 				m.handleHandCompleteTimeout(session, gen)
 			})
 		} else if oldState.Phase == game.PhaseDeclaring {
-			// Same reasoning as the score-reveal pause above: the declaration
-			// phase's only clock is this fixed-deadline fallback, and the
-			// per-move restore branch below can never re-arm it (TurnExpiresAt
-			// is nil for the whole phase). A rejected action — a repeat answer
-			// from a seat that already spoke is the common one — would
-			// otherwise permanently disarm it and strand the table.
 			remaining := max(time.Until(session.declarationExpiresAt), 0)
 			gen := session.timerGeneration
 			session.turnTimer = time.AfterFunc(remaining, func() {
@@ -582,21 +383,14 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 		return err
 	}
 
-	// Handle dealing→bidding auto-transition inside the lock (prevents data race).
-	// Every direct Phase write bypasses ApplyAction, so the derived wire flags
-	// have to be recomputed by hand — see game.RefreshDerivedFlags.
 	if newState.Phase == game.PhaseDealing {
 		newState.Phase = game.PhaseBidding
 		game.RefreshDerivedFlags(newState)
 	}
 
-	// A transition that dealt (next hand, reshuffle, second deal) buys the next
-	// actor the deal's animation length; any other clears the previous one.
 	m.setDealGraceLocked(session, dealGraceFor(oldState, newState))
 
-	// Timer management for pause/unpause
 	if action.Type == game.ActionPause && newState.Phase == game.PhasePaused {
-		// Capture remaining timer time before discarding it
 		if oldState.TurnExpiresAt != nil {
 			remaining := time.Until(*oldState.TurnExpiresAt)
 			if remaining > 0 {
@@ -604,50 +398,25 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 			}
 		}
 		newState.TurnExpiresAt = nil
-		// Do NOT start timer — game is paused
 	} else if (action.Type == game.ActionUnpause || action.Type == game.ActionOwnerUnpause) &&
 		newState.Phase != game.PhasePaused && newState.Phase != game.PhaseDeclaring {
-		// Game resumed — restore timer from preserved remaining time.
-		//
-		// PhaseDeclaring is excluded so a resume INTO the declaration phase falls
-		// through to its own arm below and gets a fresh fixed window. Handling it
-		// here would arm a per-move timer for a phase that has no active turn,
-		// against a declarationExpiresAt left over from before the pause — and
-		// since session.turnTimer is one shared field, that would also be the
-		// phase's only clock. Unreachable today (handlePause refuses the phase,
-		// so PreviousPhase can never be `declaring`), but the branch order is
-		// what makes it unreachable, and branch order is easy to disturb.
 		if session.timerStyle == "per-move" {
-			// Enforce a minimum floor of 3 seconds to give the player reaction time after unpause
 			const minResumeMs int64 = 3000
 			remaining := time.Duration(newState.TurnTimeRemaining) * time.Millisecond
 			if newState.TurnTimeRemaining > 0 && newState.TurnTimeRemaining < minResumeMs {
 				remaining = time.Duration(minResumeMs) * time.Millisecond
 			} else if newState.TurnTimeRemaining <= 0 {
-				// Timer had expired or was not active — give minimum floor, not a full reset
 				remaining = time.Duration(minResumeMs) * time.Millisecond
 			}
 			expiry := time.Now().Add(remaining)
 			newState.TurnExpiresAt = &expiry
 			newState.TurnTimeRemaining = 0
-			// Start timer with remaining duration. cancelTurnTimer bumps
-			// timerGeneration so the captured gen is the post-cancel value.
 			session.cancelTurnTimer()
 			m.armTurnTimerLocked(session, remaining, newState.ActivePlayerSeat)
 		} else {
 			newState.TurnTimeRemaining = 0
 		}
 	} else if newState.Phase == game.PhaseDeclaring {
-		// Dedicated declaration phase: no active turn, so no per-move timer —
-		// every seat is answering at once. Arm the fixed-window fallback so an
-		// absent or idle seat cannot stall the table; the phase closes early the
-		// moment every connected seat has answered.
-		//
-		// The deadline is fixed when the phase is ENTERED and is NOT pushed back
-		// by each answer, or three prompt players would keep extending the wait
-		// on the fourth. cancelTurnTimer() at the top of HandleAction already
-		// stopped the prior tick, so we always re-create the timer here, but
-		// against the SAME deadline (remaining time) rather than a fresh window.
 		newState.TurnExpiresAt = nil
 		if oldState.Phase != game.PhaseDeclaring {
 			session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
@@ -658,12 +427,6 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 			m.handleDeclarationTimeout(session, gen)
 		})
 	} else if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding {
-		// Within-turn predicate: when seat and phase are unchanged, the action
-		// resolved a prompt (declare/skip_declare, play_card-into-belot,
-		// surrender request/decline) without advancing the turn. The original
-		// turn deadline must persist so prompts cost the active player the same
-		// budget as a normal play. Otherwise (seat advanced or phase changed)
-		// the turn truly transitioned — issue a fresh expiry for the next seat.
 		preserveTimer := session.timerStyle == "per-move" &&
 			oldState.TurnExpiresAt != nil &&
 			newState.ActivePlayerSeat == oldState.ActivePlayerSeat &&
@@ -671,32 +434,12 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 		if preserveTimer {
 			newState.TurnExpiresAt = oldState.TurnExpiresAt
 			newState.TimerDurationSec = oldState.TimerDurationSec
-			// HandleAction's pre-mutation cancelTurnTimer (above) already
-			// bumped timerGeneration; armTurnTimerLocked captures the
-			// post-cancel value. An already-past deadline still re-arms (the
-			// helper clamps), so a prompt action racing the expiry callback
-			// can't leave the seat with no timer at all.
 			m.armTurnTimerLocked(session, time.Until(*oldState.TurnExpiresAt), newState.ActivePlayerSeat)
 		} else {
-			// Turn advanced or phase changed — fresh window for the next seat.
-			// Pass newState.ActivePlayerSeat explicitly: session.gameState is
-			// reassigned to newState only after this block (see below), so a
-			// state-less startTimerLocked would capture the OLD active seat
-			// and the timer would auto-act for the wrong player.
 			m.setTurnExpiry(session, newState)
 			m.startTimerLocked(session, newState.ActivePlayerSeat)
 		}
 	} else if newState.Phase == game.PhaseHandComplete {
-		// Hand-complete pause: no active turn. Arm the auto-continue safety net so
-		// a connected-but-idle player can't stall the table; players advance early
-		// via action:continue. Applies regardless of timer style.
-		//
-		// The deadline is fixed when the pause STARTS and is NOT pushed back by
-		// each acknowledgement — otherwise the present players' continue clicks
-		// would keep extending the wait for a missing/idle seat. cancelTurnTimer()
-		// at the top of HandleAction already stopped the prior tick, so we always
-		// re-create the timer here, but against the SAME deadline (remaining time)
-		// rather than a fresh full window.
 		newState.TurnExpiresAt = nil
 		if oldState.Phase != game.PhaseHandComplete {
 			session.handCompleteExpiresAt = time.Now().Add(handCompleteAutoContinue)
@@ -709,24 +452,17 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 	}
 
 	session.gameState = newState
-	// Capture immutable values for use after unlock
 	playerIDs := session.playerIDs
 	startedAt := session.startedAt
 	session.mu.Unlock()
 
-	// Broadcast the result using captured local variables (not session.gameState)
 	m.broadcastActionResult(playerIDs, oldState, newState, action, false)
 
-	// Buffer per-hand scoring for persistence at match end
 	m.bufferHandResultIfScored(session, oldState, newState)
 
-	// Keep the bot memory current (no-op for human-only matches).
 	m.observeBotMemory(session, oldState, newState, action)
 
-	// Check for match completion
 	if newState.Phase == game.PhaseMatchEnd {
-		// Story 8.2: when accepting surrender, the proposer seat lives on
-		// oldState (newState clears it). Resolve to userID for persistence.
 		var surrenderedBy *uint
 		if action.Type == game.ActionSurrenderAccept && oldState.SurrenderProposerSeat != nil {
 			proposerSeat := *oldState.SurrenderProposerSeat
@@ -740,8 +476,6 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 		return nil
 	}
 
-	// The new state may put a bot on the clock (next turn, prompt, score
-	// reveal acknowledgement, surrender response).
 	m.maybeScheduleBotAction(session)
 	return nil
 }
@@ -775,7 +509,7 @@ func (m *Manager) RemoveSession(roomID uint) {
 		session.mu.Unlock()
 		for _, uid := range session.playerIDs {
 			if uid == 0 {
-				continue // bot seat — never in userToRoom, never hooked
+				continue
 			}
 			delete(m.userToRoom, uid)
 			removedIDs = append(removedIDs, uid)
@@ -783,10 +517,9 @@ func (m *Manager) RemoveSession(roomID uint) {
 		delete(m.sessions, roomID)
 		slog.Info("session: removed", "roomID", roomID)
 	}
-	hooks := append([]func(userID uint){}, m.userRemovedHooks...) // snapshot under lock
+	hooks := append([]func(userID uint){}, m.userRemovedHooks...)
 	m.mu.Unlock()
 
-	// Call hooks after releasing the manager lock to prevent deadlocks.
 	for _, uid := range removedIDs {
 		for _, fn := range hooks {
 			fn(uid)
@@ -811,9 +544,7 @@ func (m *Manager) IsUserInMatch(userID uint) bool {
 	return ok
 }
 
-// InMatchUserIDs returns a snapshot of every userID currently mapped to an
-// active game session. Used by the lobby stats endpoint to bucket connected
-// users into "in game" vs other states. Order is unspecified.
+// InMatchUserIDs returns a snapshot of every userID mapped to an active session, in no order.
 func (m *Manager) InMatchUserIDs() []uint {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -824,10 +555,8 @@ func (m *Manager) InMatchUserIDs() []uint {
 	return ids
 }
 
-// MatchParticipants returns the four player userIDs for an active session
-// keyed by roomID (the matchID in the chat wire format). Returns
-// (zero-value, false) when no session exists for that roomID.
-// Used by the chat handler to authorise match-scoped messages.
+// MatchParticipants returns the four player userIDs for the active session keyed by roomID.
+// It returns false when no session exists for that roomID.
 func (m *Manager) MatchParticipants(roomID uint) ([4]uint, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -838,12 +567,8 @@ func (m *Manager) MatchParticipants(roomID uint) ([4]uint, bool) {
 	return s.playerIDs, true
 }
 
-// MatchParticipantsByUser resolves an active session via the sender's userID
-// and returns the four participants alongside the sender's seat index. Used
-// by the emote handler, which receives no matchID in its request payload —
-// looking up the session through userToRoom keeps the caller decoupled from
-// the manager's internal indexing.
-// Returns ([4]uint{}, -1, false) when the user is not in any active session.
+// MatchParticipantsByUser returns the participants and the user's seat index for the user's active session.
+// It returns ([4]uint{}, -1, false) when the user is not in any active session.
 func (m *Manager) MatchParticipantsByUser(userID uint) ([4]uint, int, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -865,7 +590,6 @@ func (m *Manager) MatchParticipantsByUser(userID uint) ([4]uint, int, bool) {
 
 // parseAction converts a WS message into a game.Action for the rules engine.
 func (m *Manager) parseAction(userID uint, session *LiveMatch, msg ws.WSMessage) (game.Action, error) {
-	// Find seat for this user (playerIDs is immutable after StartMatch)
 	seat := -1
 	for i, uid := range session.playerIDs {
 		if uid == userID {
@@ -877,7 +601,6 @@ func (m *Manager) parseAction(userID uint, session *LiveMatch, msg ws.WSMessage)
 		return game.Action{}, fmt.Errorf("user %d not found in session", userID)
 	}
 
-	// Extract action type from the WS event type (strip "action:" prefix)
 	actionType := ""
 	if len(msg.Type) > 7 && msg.Type[:7] == "action:" {
 		actionType = msg.Type[7:]
@@ -886,7 +609,6 @@ func (m *Manager) parseAction(userID uint, session *LiveMatch, msg ws.WSMessage)
 		return game.Action{}, fmt.Errorf("invalid action type: %s", msg.Type)
 	}
 
-	// Map WS event names to rules engine action types where they differ
 	if actionType == "decline_belot" {
 		actionType = game.ActionSkipBelot
 	}
@@ -896,7 +618,6 @@ func (m *Manager) parseAction(userID uint, session *LiveMatch, msg ws.WSMessage)
 		PlayerSeat: seat,
 	}
 
-	// Parse card from payload for play_card action
 	if actionType == game.ActionPlayCard {
 		var payload struct {
 			CardID string `json:"cardId"`
@@ -911,8 +632,6 @@ func (m *Manager) parseAction(userID uint, session *LiveMatch, msg ws.WSMessage)
 		action.Card = &card
 	}
 
-	// Parse suit from payload for pick_trump action (every free-suit pick
-	// requires suit selection)
 	if actionType == game.ActionPickTrump {
 		var payload struct {
 			Suit string `json:"suit"`
@@ -921,37 +640,13 @@ func (m *Manager) parseAction(userID uint, session *LiveMatch, msg ws.WSMessage)
 			suit := game.Suit(payload.Suit)
 			action.Suit = &suit
 		}
-		// If no suit provided, it's a candidate take (Bitola round 1) —
-		// action.Suit stays nil
 	}
 
 	return action, nil
 }
 
-// broadcastActionResult sends the appropriate event(s) after a successful action.
-// All parameters are local values — no session.gameState reads (avoids data races).
-// autoPlayed indicates whether the card was played by the timer auto-play system.
-//
-// Story 8.5-1 AC4: match-end broadcasts (event:match_end and the trailing
-// event:match_state) are emitted by handleMatchEnd AFTER persistence; this
-// function returns early in those branches.
-// trickResolvedWinnerSeat resolves the seat that won the trick that just
-// completed, for the event:trick_resolved payload. The winner lives in a
-// different field depending on what else the same ApplyAction did:
-//
-//   - Tricks 1-7: resolveTrick cleared TrickWinnerSeat but set
-//     ActivePlayerSeat = winner ("winner leads next trick", playing.go).
-//   - Last trick of a NON-final hand: the same ApplyAction chained
-//     scoreHand -> startNewHand, which cleared TrickWinnerSeat AND advanced
-//     ActivePlayerSeat to the NEXT hand's first bidder. The real winner is
-//     preserved in LastHandResult.LastTrickSeat (HandNumber incremented).
-//   - Last trick of the FINAL hand (match end): scoreHand returns before
-//     startNewHand, so TrickWinnerSeat is still set.
-//
-// The previous code fell back to ActivePlayerSeat whenever TrickWinnerSeat was
-// nil, so on every hand's last trick it sent the next hand's bidder as the
-// winner — the collect animation swept to the wrong seat even though scoring
-// (which uses the true winner internally) was correct.
+// trickResolvedWinnerSeat returns the winner of the trick that just completed.
+// On a non-final hand's last trick the winner is only kept in LastHandResult.LastTrickSeat.
 func trickResolvedWinnerSeat(oldState, newState *game.GameState) int {
 	switch {
 	case newState.TrickWinnerSeat != nil:
@@ -963,12 +658,13 @@ func trickResolvedWinnerSeat(oldState, newState *game.GameState) int {
 	}
 }
 
+// broadcastActionResult sends the events for a successful action from local values only.
+// Match-end broadcasts are left to handleMatchEnd, which sends them after persistence.
 func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *game.GameState, action game.Action, autoPlayed bool) {
 	userIDs := humanUserIDs(playerIDs)
 
 	switch action.Type {
 	case game.ActionPlayCard:
-		// Broadcast card played
 		cardPlayed := map[string]interface{}{
 			"playerSeat": action.PlayerSeat,
 			"cardId":     action.Card.String(),
@@ -976,9 +672,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		}
 		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventCardPlayed, cardPlayed))
 
-		// Check if trick completed: oldState had cards in the trick, newState cleared them
-		// or hand/match transitioned (trick number wrapped or phase changed)
-		trickCompleted := len(oldState.CurrentTrick) == 3 && // 4th card was just played (3 in old + this one)
+		trickCompleted := len(oldState.CurrentTrick) == 3 &&
 			(len(newState.CurrentTrick) == 0 || newState.Phase != game.PhasePlaying)
 
 		if trickCompleted {
@@ -1000,30 +694,8 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrickResolved, trickResolved))
 		}
 
-		// In Bitola, declarations resolve at end of trick 1 inside
-		// resolveTrickWithDeclarations, which runs under ActionPlayCard — not
-		// under ActionDeclare. Broadcast the reveal event here so the client's
-		// DeclarationReveal fires at start of trick 2. Must precede the
-		// authoritative event:match_state below so the reveal handler sets
-		// declarationReveal before any follow-up state logic runs.
 		m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
 
-		// Check if the hand was just scored. scoreHand now holds in
-		// PhaseHandComplete (next hand deals on action:continue) instead of dealing
-		// immediately, so detect the phase transition into PhaseHandComplete (or
-		// PhaseMatchEnd) rather than a HandNumber increment.
-		//
-		// The two extra terms both exist because a HandScore outlives its hand
-		// (startNewHand never clears LastHandResult), so "non-nil" alone is not
-		// "a hand just finished":
-		//
-		//   - HandNumber == oldState.HandNumber: the result describes THIS hand.
-		//     Without it, accepting a surrender in hand 3 re-announced hand 2's
-		//     numbers, because a surrender also transitions into match_end.
-		//   - oldState.Phase != PhaseHandComplete: a hand cannot FINISH from
-		//     hand_complete — it already finished. Without it, an instant win on a
-		//     freshly dealt hand (continue -> deal -> all 8 trumps -> match_end)
-		//     re-announced the hand that had just been scored before the deal.
 		handJustScored := newState.LastHandResult != nil &&
 			newState.LastHandResult.HandNumber == oldState.HandNumber &&
 			oldState.Phase != game.PhaseHandComplete &&
@@ -1051,38 +723,14 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventHandScored, handScored))
 		}
 
-		// Story 8.5-1 AC4: when phase is match_end, the event:match_end and the
-		// trailing event:match_state are emitted by handleMatchEnd AFTER the
-		// match is persisted. The persist-before-broadcast invariant guarantees
-		// a client that receives match_end and immediately reads the match row
-		// will find it. handleMatchEnd preserves the (match_end → match_state)
-		// client-facing order so MatchPage's stale-state redirect does not race
-		// the matchEndData arrival.
 		if newState.Phase == game.PhaseMatchEnd {
 			return
 		}
 
-		// Follow with authoritative state so clients advance activePlayerSeat,
-		// remove the played card from hand, refresh turn timer, and pick up
-		// awaitingDeclaration / pendingBelotSeat flags. event:card_played only
-		// mutates the trick on the client — without this the next player never
-		// learns it's their turn.
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionPickTrump:
 		if newState.TrumpSuit != nil {
-			// oldState.TrumpCandidate is the face-up card the picker took;
-			// ApplyAction clears it on newState, so source from oldState.
-			//
-			// An EMPTY CardID is legitimate for exactly one reason: the variant
-			// has no candidate, so there is no card to show. The client renders a
-			// candidate-less reveal for it — suppressing the event instead would
-			// mean a take under that variant fires no reveal at all.
-			//
-			// Under a candidate config a nil candidate is still a SERVER BUG
-			// (handlePickTrump rejects that state with ErrWrongPhase), so it
-			// stays loud and suppressed rather than quietly riding an empty
-			// CardID that the client would render as a candidate-less take.
 			switch {
 			case oldState.TrumpCandidate != nil:
 				m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrumpSelected, ws.TrumpSelectedPayload{
@@ -1101,67 +749,25 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 					"roomID", newState.RoomID, "playerSeat", action.PlayerSeat)
 			}
 		}
-		// Under DeclarationTimingDedicatedPhase a pick can RESOLVE the contest on
-		// the spot: when no seat holds a meld the phase opens and closes inside
-		// this one transition, so DeclarationsResolved flips false→true here and
-		// nowhere else. Without this call the fire-once latch is consumed by a
-		// broadcast arm that never emits, and the hand silently loses its
-		// event:declarations_resolved — while the equivalent Bitola hand fires a
-		// winnerTeam:null event at trick 2. Emitted BEFORE the authoritative
-		// state, like every other typed-event-then-state pair here.
 		m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
-		// Always follow with full state so clients leave the bidding UI and
-		// sync activePlayerSeat/phase/trumpCallerSeat. Without this, a
-		// successful pick leaves the client stuck on TrumpPrompt and every
-		// subsequent click returns error:wrong_phase.
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionPassTrump:
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionDeclare, game.ActionSkipDeclare:
-		// Announce WHO declared the moment the declare commits, so the table
-		// learns a declaration exists (seat only — the melds themselves stay
-		// secret until event:declarations_resolved). Timer expiry only ever
-		// auto-SKIPS, so this fires for manual declares only.
-		//
-		// Suppressed inside the dedicated phase (oldState is the pre-action
-		// state, so this reads the phase the answer was GIVEN in, not the
-		// playing phase a closing answer lands in). There the four seats answer
-		// simultaneously and in secret; a live banner would out whoever clicked
-		// first, before the contest has decided whose melds are public at all —
-		// and the losing team's are never revealed. The reveal that follows
-		// milliseconds later is the whole announcement. Bitola, whose
-		// declarations happen inside a visibly progressing trick, is unchanged.
 		if action.Type == game.ActionDeclare && oldState.Phase != game.PhaseDeclaring {
 			declared := ws.PlayerDeclaredPayload{PlayerSeat: action.PlayerSeat}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventPlayerDeclared, declared))
 		}
-		// Under DeclarationTimingDuringFirstTrick DeclarationsResolved cannot
-		// flip here — declarations resolve only at end of trick 1 (see the
-		// ActionPlayCard branch). Under DeclarationTimingDedicatedPhase it flips
-		// on the FOURTH seat's answer, the same action that opens trick 1, so the
-		// reveal rides ahead of the playing-phase match_state below.
 		m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
-		// A "dosta" room can end the match INSIDE the declaration contest: the
-		// award crossed the target, so closeDeclarationPhase's stop fired and the
-		// phase never became playing. The reveal above still goes out (the contest
-		// really did resolve), but match_state must not — handleMatchEnd emits
-		// event:match_end and the trailing match_state itself, after persistence,
-		// and shipping a match_state ahead of match_end races MatchPage's
-		// stale-state redirect (Story 8.5-1 AC4).
 		if newState.Phase == game.PhaseMatchEnd {
 			return
 		}
-		// Always follow with full state so the client clears awaitingDeclaration,
-		// advances activePlayerSeat, and picks up declarationsResolved. The
-		// event:declarations_resolved handler is reveal-only and does not sync state.
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionAnnounceBelot, game.ActionSkipBelot:
 		if newState.BelotAnnounced && !oldState.BelotAnnounced {
-			// The triggering card is the K/Q last appended to the trick before the
-			// Belot prompt paused post-play flow. It remains in oldState.CurrentTrick.
 			var cardID string
 			if n := len(oldState.CurrentTrick); n > 0 {
 				cardID = oldState.CurrentTrick[n-1].Card.String()
@@ -1173,46 +779,6 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventBelotAnnounced, belot))
 		}
-		// If this Belot action completed a deferred trick — the triggering K/Q was
-		// the 4th card, so handlePlayCard set PendingBelotSeat and returned before
-		// resolving (playing.go) — emit the event:trick_resolved the deferred
-		// play_card could not. Without it the client never receives the trick
-		// winner, so pendingResolvedTrick is never set and the just-completed trick
-		// gets no collect animation. A Belot prompt can only fire on tricks 1-7 (a
-		// player cannot hold both trump K and Q at trick 8), so no hand_scored
-		// follows here; trick 1 resolving this way still reveals declarations.
-		//
-		// The TrickNumber comparison is what makes this arm safe in a "dosta" room,
-		// and it is not the same test as "four cards were on the table". This arm
-		// is SHARED by announce_belot and skip_belot, and three different things
-		// can arrive here with oldState.CurrentTrick full:
-		//
-		//  1. announce_belot whose +20 itself crosses the target. The engine returns
-		//     before finishCardPlay, so the trick is NOT resolved — TrickNumber is
-		//     unchanged — and emitting trick_resolved would broadcast a winner for a
-		//     trick abandoned mid-air.
-		//  2. skip_belot, which awards nothing but still runs finishCardPlay. The
-		//     trick resolves, so checkpoint 1 may cross on its CARD points — and
-		//     that trick really happened, so its trick_resolved (and, at Bitola
-		//     trick 1, its declarations_resolved reveal) must still go out.
-		//  3. announce_belot whose +20 falls short: identical to (2).
-		//
-		// Testing the phase instead of the trick would suppress the events in (2)
-		// and (3) — a real trick with no collect animation and, at trick 1, a lost
-		// meld reveal.
-		// TrickNumber is the discriminator and a phase comparison is NOT a usable
-		// substitute or supplement: an announce-crossing stop also changes the phase
-		// (playing -> match_end) while leaving the trick UNRESOLVED, so a phase term
-		// would fire this block and broadcast a winner for a trick abandoned
-		// mid-air — the exact defect this gate exists to prevent.
-		//
-		// The one shape TrickNumber alone would misread is trick 8, where
-		// resolveTrick sets PhaseHandScoring and returns before incrementing. That
-		// is unreachable here: at trick 8 a seat holds a single card, so it cannot
-		// hold the other trump royal and no Belote can be prompted (the comment
-		// above says tricks 1-7 for this reason). If that ever changes, discriminate
-		// on newState.TrickWinnerSeat != nil, which resolveTrick leaves SET on trick
-		// 8 and nils on tricks 1-7 — never on a phase comparison.
 		if len(oldState.CurrentTrick) == 4 && newState.TrickNumber != oldState.TrickNumber {
 			winnerSeat := trickResolvedWinnerSeat(oldState, newState)
 			trickCards := make([]string, 0, 4)
@@ -1227,27 +793,12 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrickResolved, trickResolved))
 			m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
 		}
-		// A "dosta" room can end the match on any of the three crossings above. The
-		// guard sits AFTER every typed event this arm owes — the announcement and,
-		// where the trick really resolved, its winner and reveal all describe things
-		// that happened — and BEFORE broadcastState, because handleMatchEnd emits
-		// event:match_end and the trailing match_state itself, after persistence.
-		// Shipping a match_state first races MatchPage's stale-state redirect
-		// (Story 8.5-1 AC4). Same placement as the ActionPlayCard and declare arms.
 		if newState.Phase == game.PhaseMatchEnd {
 			return
 		}
-		// Always follow with full state so the client clears pendingBelotSeat,
-		// advances activePlayerSeat, and resolves the trick if the belot action
-		// came after the 4th card. event:belot_announced is informational only.
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionContinue:
-		// Acknowledging the hand-complete pause. If this continue dealt the next
-		// hand (all connected players ready) the state is now bidding/dealing; if
-		// it merely recorded one player's readiness it is still PhaseHandComplete.
-		// Either way the authoritative state syncs clients. An instant-win on the
-		// freshly dealt hand is handled by handleMatchEnd (called from HandleAction).
 		if newState.Phase == game.PhaseMatchEnd {
 			return
 		}
@@ -1262,9 +813,6 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionSurrenderRequest:
-		// Story 8.2 — broadcast typed proposed payload, then authoritative
-		// state so opponents/proposer pick up surrenderProposerSeat. Per
-		// project-context: separate ordered messages, never batched.
 		proposerSeat := action.PlayerSeat
 		var proposerUsername string
 		if proposerSeat >= 0 && proposerSeat < 4 {
@@ -1280,12 +828,6 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionSurrenderDecline:
-		// Proposer is no longer in newState (cleared on decline) — read it
-		// from oldState. Per FR28a the proposer's attempt remains consumed.
-		// Defensive: rules engine rejects decline when no proposal is pending,
-		// so a nil proposer here is unreachable; suppress the broadcast and
-		// rely on the authoritative state event rather than ship a malformed
-		// payload (proposerSeat=-1) over the wire.
 		if oldState.SurrenderProposerSeat != nil {
 			declined := ws.SurrenderDeclinedPayload{
 				ProposerSeat:  *oldState.SurrenderProposerSeat,
@@ -1299,15 +841,9 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionSurrenderAccept:
-		// Story 8.5-1 AC4: match-end transition emits event:match_end AND the
-		// trailing event:match_state from handleMatchEnd, AFTER persistence.
-		// The (match_end → match_state) client-facing order is preserved.
 		if newState.Phase == game.PhaseMatchEnd {
 			return
 		}
-		// Defensive fallback for the (currently unreachable) case where surrender
-		// accept does not reach match_end — emit authoritative state so clients
-		// pick up the cleared SurrenderProposerSeat.
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionUnpause, game.ActionOwnerUnpause:
@@ -1315,22 +851,18 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			ResumedBy:     action.PlayerSeat,
 			OwnerOverride: action.Type == game.ActionOwnerUnpause,
 		}
-		// Only send resumed event if game actually left paused phase
 		if newState.Phase != game.PhasePaused {
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchResumed, resumed))
 		}
 		m.broadcastState(playerIDs, newState)
 
 	default:
-		// For any other action, broadcast full state
 		m.broadcastState(playerIDs, newState)
 	}
 }
 
-// broadcastDeclarationsResolvedIfTransition fires event:declarations_resolved
-// exactly once, when DeclarationsResolved flips from false to true. Losing-team
-// declarations have already been cleared by resolveDeclarationsForHand at the
-// game layer, so iterating every player yields only the winning team's.
+// broadcastDeclarationsResolvedIfTransition fires event:declarations_resolved once,
+// when DeclarationsResolved flips from false to true.
 func (m *Manager) broadcastDeclarationsResolvedIfTransition(oldState, newState *game.GameState, userIDs []uint) {
 	if !newState.DeclarationsResolved || oldState.DeclarationsResolved {
 		return
@@ -1358,26 +890,15 @@ func (m *Manager) broadcastDeclarationsResolvedIfTransition(oldState, newState *
 	}
 
 	payload := ws.DeclarationsResolvedPayload{
-		WinnerTeam: declWinnerTeam,
-		// Read from the engine, never re-derived here. The session manager only
-		// ever sees a before/after pair, and neither member carries the fact:
-		// resolution clears the losing team's melds, and under
-		// DeclarationTimingDedicatedPhase the seat whose answer triggered the
-		// resolution had its melds stored — and, if its team lost, cleared —
-		// inside that same ApplyAction, so they appear in NEITHER state.
+		WinnerTeam:   declWinnerTeam,
 		Contested:    newState.DeclarationsContested,
 		Declarations: decls,
 	}
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventDeclarationsResolved, payload))
 }
 
-// bufferHandResultIfScored appends a HandResult to session.handResults
-// when the provided state transition represents a scored hand (hand number
-// advanced OR match ended) AND LastHandResult is populated. The completed
-// hand's number is oldState.HandNumber — on normal hand completion newState
-// has already been advanced by startNewHand, and on match-end startNewHand
-// does not run so oldState.HandNumber still identifies the final hand. Safe
-// to call on every state transition; no-op when the condition is not met.
+// bufferHandResultIfScored appends the completed hand's result to session.handResults
+// when the transition scored a hand; otherwise it does nothing.
 func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newState *game.GameState) {
 	if oldState == nil || newState == nil || newState.LastHandResult == nil {
 		return
@@ -1394,12 +915,6 @@ func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newStat
 		capotTeam = &v
 	}
 	row := HandResult{
-		// The result's OWN hand number, not oldState's. They agree on the normal
-		// paths (buffering rides the continue that deals the next hand, or the
-		// match-end transition), but a stale result reaching a match end — an
-		// accepted surrender, or an instant win on a freshly dealt hand — used to
-		// stamp the previous hand's figures with the current hand's number,
-		// producing a row for a hand that had already been recorded.
 		HandNumber:      hr.HandNumber,
 		TeamACardPoints: hr.TeamACardPoints,
 		TeamBCardPoints: hr.TeamBCardPoints,
@@ -1417,12 +932,6 @@ func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newStat
 	}
 	session.mu.Lock()
 	defer session.mu.Unlock()
-	// Idempotent by hand number. The gate above can fire twice for one hand — the
-	// continue that deals hand N+1 buffers hand N, and a match end reached later
-	// in that same hand carries the same result forward — and `hand_results` has a
-	// UNIQUE (match_id, hand_number) constraint, so a duplicate would fail the
-	// whole CreateWithHands transaction and lose the entire match record rather
-	// than just one row.
 	for _, existing := range session.handResults {
 		if existing.HandNumber == row.HandNumber {
 			return
@@ -1431,26 +940,8 @@ func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newStat
 	session.handResults = append(session.handResults, row)
 }
 
-// handleMatchEnd persists the match record, updates room status, broadcasts
-// event:match_end and the trailing event:match_state, and removes the session.
-// Uses the passed finalState (not session.gameState) to avoid data races.
-// surrenderedBy is the userID of the player who initiated the accepted surrender,
-// or nil for natural match-end. The match Status stays "completed" in both cases —
-// the column is the load-bearing signal the honor system consumes (Story 9.7:
-// both a natural end and an accepted surrender credit every seat a completion).
-//
-// Story 8.5-1 AC4 ordering contract:
-//
-//  1. Persist matchRecord (CreateWithHands) and update room status FIRST so a
-//     client that receives event:match_end and immediately reads the match row
-//     will find it.
-//  2. event:match_end ALWAYS fires — even if persistence failed — so the four
-//     participants are not stranded on the table forever. Persist failures
-//     are logged via slog.Error but do not block the broadcast.
-//  3. event:match_state follows event:match_end so the (match_end → match_state)
-//     client-facing order is preserved (MatchPage redirects to /lobby when it
-//     observes phase=="match_end" with matchEndData==null; sending match_state
-//     first would race that redirect against matchEndData arrival).
+// handleMatchEnd persists the match and room status, then always broadcasts event:match_end
+// followed by event:match_state, and removes the session.
 func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState, surrenderedBy *uint, matchEndPayload ws.MatchEndPayload) {
 	winnerTeam := 0
 	if finalState.WinnerTeam != nil {
@@ -1463,74 +954,21 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	}
 	ids, botFlags, hasBots := matchSeatColumns(session.playerIDs, botSeats)
 
-	// Copy buffered hand results under RLock to avoid holding the lock during I/O.
-	//
-	// HOISTED HERE FROM JUST ABOVE CreateWithHands (Story 13.1 D4). The Season
-	// Points award below needs to know which teams made a Capot, and reading
-	// session.handResults unlocked at that point would be a data race that `make
-	// test` cannot catch for us (the suite does not pass -race). ONE copy, used by
-	// both the SP award and the persist call — do not add a second acquisition.
 	session.mu.RLock()
 	handsCopy := make([]HandResult, len(session.handResults))
 	copy(handsCopy, session.handResults)
 	session.mu.RUnlock()
 
-	// Story 9.2: settle coins (no-op when coinBuyIn == 0). The winner is the
-	// normally-resolved WinnerTeam — surrender routes through here with the
-	// engine's non-surrendering team already set, so it needs no special case
-	// (AC #7). Deltas ride the match row; settlement events are sent below,
-	// after event:match_end (8.5-1 ordering contract).
 	deltas, settlementMsgs := m.settleMatch(session.roomID, session.playerIDs, botSeats, winnerTeam, session.coinBuyIn)
 
-	// Story 9.5: award lifetime XP (no-op when no awarder wired). Normal end →
-	// abandonedSeat -1; every human seat earns floor(teamScores[team]/10), losers
-	// included. Best-effort like settlement — a failure logs and skips the events
-	// but never blocks the broadcasts below. The xp_awarded messages are slotted
-	// after coin_settlement and before match_state (8.5-1 ordering contract).
 	xpMsgs := m.awardXP(session.roomID, session.playerIDs, botSeats, finalState.TeamScores, -1)
 
-	// Story 9.7: record honor (no-op when no recorder wired). Natural end AND
-	// accepted surrender both route through here, and both count as COMPLETED
-	// for every human seat — abandonedSeat -1. Best-effort like settlement and
-	// XP: a failure logs and skips the events but never blocks the broadcasts
-	// below. The honor_updated messages are slotted after xp_awarded and before
-	// match_state (8.5-1 ordering contract).
-	//
-	// The presence snapshot is passed for symmetry with the abandonment
-	// finalizer, but computeHonorEvents only consults it when abandonedSeat >= 0:
-	// this path reached a real terminal state, so every human seat is credited.
 	var connected [4]bool
 	for i := range finalState.Players {
 		connected[i] = finalState.Players[i].Connected
 	}
 	honorMsgs := m.recordHonor(session.roomID, session.playerIDs, botSeats, connected, -1)
 
-	// Story 13.4: apply Season Points and refresh the rank tier (no-op when no
-	// awarder wired). This path builds the match OUTCOME; the season service
-	// computes every change from the current totals it locks.
-	//
-	// Natural end → abandonedSeat -1, so every human seat counts as present; the
-	// `connected` snapshot above is passed for symmetry with the abandonment
-	// finalizer and is not consulted. winnerTeam is the value already resolved at
-	// the top of this function — never re-derived from scores, because the taker
-	// can win a both-cross hand with fewer points.
-	//
-	// SURRENDER is read off the outcome reason, not off surrenderedBy: an
-	// accepted surrender that finds a team already over the target in a "dosta"
-	// room runs the stop instead (game/surrender.go) and finalizes as
-	// target_reached with surrenderedBy still set. Those winners really did reach
-	// the target, so it is scored on the real margin. finalState.WonByInstantWin
-	// is the engine's own record of an instant win, which has no other trace at
-	// this layer. Capot teams come from the hoisted handsCopy.
-	//
-	// Best-effort like settlement, XP and honor: a failure logs and skips the
-	// events but never blocks the broadcasts below. The season_points_awarded
-	// messages are slotted after honor_updated and before match_state.
-	//
-	// finalizedAt is stamped HERE, in the finalizer, and threaded down: it is what
-	// decides which season window this match lands in, so at a quarter boundary
-	// the answer must come from the moment the match ended, not from a later clock
-	// read inside the awarder.
 	finalizedAt := time.Now().UTC()
 	spMsgs := m.awardSeasonPoints(session.roomID, buildSPOutcome(spMatchFacts{
 		playerIDs:     session.playerIDs,
@@ -1546,23 +984,21 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	}), finalizedAt)
 
 	matchRecord := &Match{
-		RoomID:       session.roomID,
-		Player1ID:    ids[0],
-		Player2ID:    ids[1],
-		Player3ID:    ids[2],
-		Player4ID:    ids[3],
-		Player1IsBot: botFlags[0],
-		Player2IsBot: botFlags[1],
-		Player3IsBot: botFlags[2],
-		Player4IsBot: botFlags[3],
-		HasBots:      hasBots,
-		TeamAScore:   finalState.TeamScores[game.TeamA],
-		TeamBScore:   finalState.TeamScores[game.TeamB],
-		WinnerTeam:   winnerTeam,
-		Variant:      string(finalState.Variant),
-		MatchMode:    finalState.MatchMode,
-		// From the RESOLVED rule config, which is what the engine actually played
-		// by — not from the room, whose settings may since have changed.
+		RoomID:              session.roomID,
+		Player1ID:           ids[0],
+		Player2ID:           ids[1],
+		Player3ID:           ids[2],
+		Player4ID:           ids[3],
+		Player1IsBot:        botFlags[0],
+		Player2IsBot:        botFlags[1],
+		Player3IsBot:        botFlags[2],
+		Player4IsBot:        botFlags[3],
+		HasBots:             hasBots,
+		TeamAScore:          finalState.TeamScores[game.TeamA],
+		TeamBScore:          finalState.TeamScores[game.TeamB],
+		WinnerTeam:          winnerTeam,
+		Variant:             string(finalState.Variant),
+		MatchMode:           finalState.MatchMode,
 		DeclarationsEnabled: finalState.Rules.DeclarationsEnabled,
 		StopAtTarget:        finalState.Rules.StopAtTarget,
 		StartedAt:           session.startedAt,
@@ -1582,18 +1018,12 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 		slog.Info("session: match persisted", "roomID", session.roomID, "matchID", matchRecord.ID, "hands", len(handsCopy))
 	}
 
-	// Update room status to completed
 	if m.roomUpdater != nil {
 		if err := m.roomUpdater.UpdateRoomStatus(session.roomID, "completed"); err != nil {
 			slog.Error("session: failed to update room status", "roomID", session.roomID, "error", err)
 		}
 	}
 
-	// Broadcast match_end → coin_settlement(s) → match_state AFTER persistence
-	// completes. All fire regardless of persist outcome (clients must not be
-	// stranded on the table). event:coin_settlement is slotted after match_end
-	// and before match_state, preserving the 8.5-1 (match_end → match_state)
-	// client-facing order while delivering each human their own delta/balance.
 	userIDs := humanUserIDs(session.playerIDs)
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchEnd, matchEndPayload))
 	for _, sm := range settlementMsgs {
@@ -1645,23 +1075,8 @@ func (m *Manager) sendGameError(userID uint, err error) {
 	m.sendError(userID, eventType, err.Error())
 }
 
-// buildStateFrames builds one event:match_state frame PER HUMAN SEAT, each
-// carrying game.ProjectForSeat's mask for that recipient, in deterministic
-// seat order 0→3. Every match_state frame is built through ProjectForSeat and
-// sent through hub.SendFrames — this helper covers every fan-out send, and
-// SyncStateOnConnect builds its one-recipient frame the same way as a
-// single-frame batch. An unprojected state frame would ship every hand, the
-// undealt deck, unresolved melds, and the pending-Belote secret to all four
-// seats (Story 12.10); the test spies hard-fail any match_state payload that
-// arrives via BroadcastToUsers or SendToUser, so no send site can drift back.
-//
-// excludeSeat omits that one seat's frame (-1 for none): the disconnect
-// broadcasts address the remaining seats only. Bot seats (UserID 0) never get
-// a frame — they read the unprojected struct in-process via buildBotView and
-// have no socket.
-//
-// Callers that build under the session lock and send after releasing it pass
-// the returned frames to hub.SendFrames, same as the old pre-built stateMsg.
+// buildStateFrames builds one ProjectForSeat-masked match_state frame per human seat, in seat order.
+// excludeSeat omits one seat (-1 for none); bot seats never get a frame.
 func buildStateFrames(playerIDs [4]uint, state *game.GameState, excludeSeat int) []ws.UserFrame {
 	frames := make([]ws.UserFrame, 0, 4)
 	for seat, uid := range playerIDs {
@@ -1676,10 +1091,7 @@ func buildStateFrames(playerIDs [4]uint, state *game.GameState, excludeSeat int)
 	return frames
 }
 
-// broadcastState sends the authoritative state to every human seat, projected
-// per recipient. The projection-aware replacement for the old
-// BroadcastToUsers(humanUserIDs(...), buildMessage(EventMatchState, state)) —
-// one logical send, four distinct frames.
+// broadcastState sends the state to every human seat, projected per recipient.
 func (m *Manager) broadcastState(playerIDs [4]uint, state *game.GameState) {
 	m.hub.SendFrames(buildStateFrames(playerIDs, state, -1))
 }
@@ -1691,9 +1103,6 @@ func buildMessage(eventType string, payload interface{}) []byte {
 		slog.Error("session: failed to marshal payload", "eventType", eventType, "error", err)
 		payloadBytes = []byte(`{}`)
 	}
-	// Stamp the server wall clock on every match message so clients can
-	// estimate their clock offset and render TurnExpiresAt /
-	// ReconnectExpiresAt countdowns against corrected time (see WSMessage).
 	now := time.Now()
 	msg, err := json.Marshal(ws.WSMessage{
 		Type:      eventType,
@@ -1707,11 +1116,8 @@ func buildMessage(eventType string, payload interface{}) []byte {
 	return msg
 }
 
-// setTurnExpiry sets TurnExpiresAt on the game state based on timer config.
-// For "per-move" style, sets an absolute expiry timestamp. For "relaxed", sets nil.
-// A turn opened by a deal starts its window once the deal animation has played
-// out (session.dealGraceRemaining, deal_grace.go), so the ring is full when the
-// prompt appears. Must be called under session.mu.Lock().
+// setTurnExpiry sets TurnExpiresAt from the timer config, after any deal-animation grace.
+// Must be called under session.mu.Lock().
 func (m *Manager) setTurnExpiry(session *LiveMatch, gs *game.GameState) {
 	if session.timerStyle == "per-move" && session.timerDurationSec > 0 {
 		window := time.Duration(session.timerDurationSec)*time.Second + session.dealGraceRemaining()
@@ -1724,26 +1130,10 @@ func (m *Manager) setTurnExpiry(session *LiveMatch, gs *game.GameState) {
 	}
 }
 
-// expiryGrace is how long the server waits PAST the advertised deadline
-// (TurnExpiresAt / ReconnectExpiresAt) before firing the auto-action. Clients
-// render the advertised deadline — their countdown reaches 0 exactly at the
-// deadline — so the grace absorbs network latency, frame scheduling, and
-// residual clock-offset error, guaranteeing players see "0" before the server
-// acts in their name. The advertised deadline itself never moves; pacing is
-// unchanged beyond this fixed sub-second cushion.
 const expiryGrace = 400 * time.Millisecond
 
-// armTurnTimerLocked arms the per-move turn timer to fire expiryGrace after
-// `remaining` elapses (clamped ≥ 0, so an already-past deadline still fires —
-// one grace later — rather than tripping AfterFunc's negative-duration path).
-//
-// It does not bump the generation itself: every caller sits downstream of a
-// cancelTurnTimer (HandleAction's pre-mutation cancel, or its own explicit
-// cancel), so the generation captured here is the post-cancel value,
-// invalidated by any subsequent cancel/restart. The defensive Stop below
-// keeps a future caller that forgets its cancel from leaking a second live
-// timer on the same generation (double auto-action). Must be called under
-// session.mu.Lock().
+// armTurnTimerLocked arms the turn timer to fire expiryGrace after remaining (clamped at 0)
+// for the current generation. Callers must cancel first and hold session.mu.
 func (m *Manager) armTurnTimerLocked(session *LiveMatch, remaining time.Duration, expectedSeat int) {
 	if session.turnTimer != nil {
 		session.turnTimer.Stop()
@@ -1754,61 +1144,23 @@ func (m *Manager) armTurnTimerLocked(session *LiveMatch, remaining time.Duration
 	})
 }
 
-// startTimerLocked starts the per-move turn timer for the current session.
-// Must be called under session.mu.Lock(). The timer callback will acquire
-// session.mu.Lock() when it fires (safe — fires in a separate goroutine later).
-//
-// expectedSeat is passed explicitly because callers commonly invoke this BEFORE
-// session.gameState has been reassigned to the post-action state. Reading
-// session.gameState here would capture the pre-action seat and the timer would
-// fire for the wrong player.
+// startTimerLocked starts the per-move turn timer for expectedSeat, the post-action seat.
+// Must be called under session.mu.Lock().
 func (m *Manager) startTimerLocked(session *LiveMatch, expectedSeat int) {
 	if session.timerStyle != "per-move" || session.timerDurationSec <= 0 {
 		return
 	}
 	session.cancelTurnTimer()
-	// Same window setTurnExpiry advertises, deal grace included.
 	window := time.Duration(session.timerDurationSec)*time.Second + session.dealGraceRemaining()
 	m.armTurnTimerLocked(session, window, expectedSeat)
 }
 
-// handCompleteAutoContinue is the server's fallback ceiling on the score-reveal
-// pause before auto-dealing the next hand when not every connected player has
-// acknowledged. Each client auto-acknowledges 8s after its dialog MOUNTS
-// (SCORE_REVEAL_AUTO_CONTINUE on the client) — and the mount trails this
-// deadline's start by the trick-collect sweep (~2s) plus, on capot hands, the
-// capot banner (~2.5s). The ceiling must therefore cover 8s + ~4.5s of reveal
-// pacing + network grace, or the auto-acks land after the force-advance and
-// every slow hand ends in a wrong-phase race (observed as "cannot perform this
-// action" toasts at 10s). 14s keeps the normal ack-driven path comfortably
-// ahead while still capping how long one stuck seat can hold the table — and
-// is measured from when the pause STARTS, never extended by later
-// acknowledgements (see handCompleteExpiresAt).
 const handCompleteAutoContinue = 14 * time.Second
 
-// declarationAutoClose is the server's fallback ceiling on the dedicated
-// declaration phase before force-closing it when not every connected player has
-// answered.
-//
-// Sized exactly the way handCompleteAutoContinue is, and for the same reason.
-// Each client auto-skips 8s after its dialog MOUNTS
-// (DECLARATION_PHASE_AUTO_SKIP on the client), and that mount trails this
-// deadline's start by the trump-take reveal, itself an 8s auto-dismissing
-// dialog that suppresses the declaration prompt. A ceiling that did not cover
-// 8s of reveal + the 8s window + network grace would force-close underneath the
-// clients and turn every hand's auto-skips into wrong-phase races. 20s keeps
-// the answer-driven path comfortably ahead while still capping how long one
-// stuck seat can hold the table — and is measured from when the phase STARTS,
-// never extended by later answers (see declarationExpiresAt).
 const declarationAutoClose = 20 * time.Second
 
-// handleDeclarationTimeout force-closes the dedicated declaration phase when its
-// window elapses without every connected player answering. Unanswered seats are
-// treated as having skipped.
-//
-// Mirrors handleHandCompleteTimeout: it reproduces the answer-action advance
-// path (resolve, open trick 1, arm the per-move timer, broadcast) but bypasses
-// ApplyAction since it is a server-initiated advance, not a player action.
+// handleDeclarationTimeout force-closes the declaration phase when its window elapses,
+// treating unanswered seats as having skipped.
 func (m *Manager) handleDeclarationTimeout(session *LiveMatch, generation uint64) {
 	session.mu.Lock()
 	if session.closed || session.timerGeneration != generation {
@@ -1826,13 +1178,8 @@ func (m *Manager) handleDeclarationTimeout(session *LiveMatch, generation uint64
 		session.mu.Unlock()
 		return
 	}
-	// In a "dosta" room the forced close can CROSS the target — the contest's
-	// award is one of the three mid-hand point moments — and then trick 1 never
-	// opens. Skip the per-move timer in that case: there is no turn to clock.
 	matchEnded := newState.Phase == game.PhaseMatchEnd
 	if !matchEnded {
-		// Trick 1 is open — this is a real turn again, so the per-move timer comes
-		// back exactly as it does on the answer-driven close.
 		m.setDealGraceLocked(session, 0)
 		m.setTurnExpiry(session, newState)
 		m.startTimerLocked(session, newState.ActivePlayerSeat)
@@ -1843,23 +1190,9 @@ func (m *Manager) handleDeclarationTimeout(session *LiveMatch, generation uint64
 	session.mu.Unlock()
 	userIDs := humanUserIDs(playerIDs)
 
-	// Same ordered pair the answer path sends: the reveal rides ahead of the
-	// playing-phase snapshot so the panel is on screen before trick 1 renders.
 	m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
 
-	// A timeout-driven close that crossed the target ends the match HERE, and it
-	// has to go through handleMatchEnd exactly as the action-driven paths do —
-	// mirroring handleHandCompleteTimeout's instant-win branch. This path had no
-	// PhaseMatchEnd check at all before "dosta" existed because nothing could end
-	// a match inside it; without the branch the match would end with no
-	// persistence, no coin settlement, no XP or honor, no event:match_end and a
-	// session that is never removed, leaving the table hung permanently.
 	if matchEnded {
-		// No bufferHandResultIfScored and no observeBotMemory before this call,
-		// unlike handleHandCompleteTimeout's instant-win branch, and that is
-		// deliberate rather than a gap: the stop nils LastHandResult, so the buffer
-		// is a guaranteed no-op, and no hand boundary was crossed (no hand was
-		// dealt or scored), so the bot memory has nothing to observe.
 		matchEndPayload := buildMatchEndPayload(oldState, newState, game.Action{}, startedAt)
 		m.handleMatchEnd(session, newState, nil, matchEndPayload)
 		return
@@ -1867,15 +1200,11 @@ func (m *Manager) handleDeclarationTimeout(session *LiveMatch, generation uint64
 
 	m.broadcastState(playerIDs, newState)
 
-	// Trick 1's leader may be a bot.
 	m.maybeScheduleBotAction(session)
 }
 
 // handleHandCompleteTimeout force-advances the hand-complete pause when the
 // auto-continue window elapses without every connected player acknowledging.
-// Mirrors the continue-action advance path (deal next hand, arm the per-move
-// timer, persist the finished hand, broadcast) but bypasses ApplyAction since
-// it is a server-initiated advance, not a player action.
 func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint64) {
 	session.mu.Lock()
 	if session.closed || session.timerGeneration != generation {
@@ -1897,8 +1226,6 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 		newState.Phase = game.PhaseBidding
 		game.RefreshDerivedFlags(newState)
 	}
-	// A freshly dealt hand can only be bidding — reaching the declaration phase
-	// takes a resolved bid — so PhaseDeclaring is deliberately absent here.
 	m.setDealGraceLocked(session, dealGraceFor(oldState, newState))
 	if newState.Phase == game.PhasePlaying || newState.Phase == game.PhaseBidding {
 		m.setTurnExpiry(session, newState)
@@ -1910,10 +1237,8 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 	session.mu.Unlock()
 
 	m.bufferHandResultIfScored(session, oldState, newState)
-	// New hand dealt — sync the bot memory's hand boundary.
 	m.observeBotMemory(session, oldState, newState, game.Action{})
 
-	// An instant-win on the freshly dealt hand ends the match here.
 	if newState.Phase == game.PhaseMatchEnd {
 		matchEndPayload := buildMatchEndPayload(oldState, newState, game.Action{Type: game.ActionContinue}, startedAt)
 		m.handleMatchEnd(session, newState, nil, matchEndPayload)
@@ -1921,17 +1246,14 @@ func (m *Manager) handleHandCompleteTimeout(session *LiveMatch, generation uint6
 	}
 	m.broadcastState(playerIDs, newState)
 
-	// The freshly dealt hand's first bidder may be a bot.
 	m.maybeScheduleBotAction(session)
 }
 
-// handleTimerExpiry is called when a per-move timer fires. It auto-plays for the
-// active player and broadcasts the result. The generation counter prevents stale
-// timer callbacks from acting on the wrong turn.
+// handleTimerExpiry auto-plays for the active player when a per-move timer fires.
+// The generation counter drops stale callbacks.
 func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expectedSeat int) {
 	session.mu.Lock()
 
-	// Guard: session closed or timer is stale (turn already advanced)
 	if session.closed || session.timerGeneration != generation {
 		session.mu.Unlock()
 		return
@@ -1939,42 +1261,15 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 
 	gs := session.gameState
 
-	// Determine what action to auto-take based on game phase and state
 	var action game.Action
 	switch {
 	case gs.Phase == game.PhaseBidding && game.MustPickTrump(gs, expectedSeat):
-		// The dealer bidding last (fourth) under AllPassOutcome ==
-		// AllPassDealerMustPick has no legal pass, so an absent one must be given
-		// a suit instead. Auto-passing here would be REJECTED by the rules engine
-		// and the error path below re-arms the same seat through
-		// startTimerLocked — a full fresh window every time, so the hand never
-		// advances and one slog.Error lands per timer period, forever. (It is a
-		// bounded loop, not a hot spin: handleTimerExpiry contains no
-		// time.Until re-arm. The clamped `max(remaining,0)` re-arm on an
-		// already-elapsed deadline lives in HandleAction's error path, which this
-		// path does not go through.)
-		//
-		// The picker is game.AutoPickTrumpSuit — pure and deterministic, mirroring
-		// AutoPlay, and reading the seat's HAND only: the face-down pair is
-		// still hidden from everyone (its owner included) until trump resolves,
-		// so the forced call comes from the six visible cards, exactly as it
-		// would for a present player. The rule config decides this, never the
-		// variant name (D-VAR-1). The guard above already proved expectedSeat is
-		// the seat on the clock, so the same value picks the suit and stamps the
-		// action.
 		suit, err := game.AutoPickTrumpSuit(gs, expectedSeat)
 		if err != nil {
-			// Defensive: a bidding seat holding no pickable card is a state the
-			// deal cannot produce. Recover the way the sibling PhaseDeclaring
-			// branch below does rather than with a bare re-arm — refresh the
-			// ADVERTISED deadline and rebroadcast it, or all four clients keep
-			// rendering an elapsed clock while the server quietly holds a fresh
-			// window, which is the same "silently stuck" shape this story removed.
 			slog.Error("session: auto-pick trump failed; re-arming",
 				"roomID", session.roomID, "seat", expectedSeat, "error", err)
 			m.setTurnExpiry(session, gs)
 			m.startTimerLocked(session, expectedSeat)
-			// Build under the lock, send after releasing it.
 			staleFrames := buildStateFrames(session.playerIDs, gs, -1)
 			session.mu.Unlock()
 			m.hub.SendFrames(staleFrames)
@@ -1986,35 +1281,16 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 			Suit:       &suit,
 		}
 	case gs.Phase == game.PhaseBidding:
-		// Auto-pass trump on bidding timeout — the ordinary case, in both
-		// bidding rounds of every config that still allows a pass.
 		action = game.Action{
 			Type:       game.ActionPassTrump,
 			PlayerSeat: expectedSeat,
 		}
 	case gs.Phase == game.PhasePlaying && gs.AwaitingDeclaration:
-		// Auto-skip declaration on timer expiry, inside trick 1 under
-		// DeclarationTimingDuringFirstTrick. The dedicated phase is deliberately
-		// absent: it runs no per-move timer at all, so it never reaches this
-		// function — its whole clock is declarationExpiresAt /
-		// handleDeclarationTimeout, which force-closes for every unanswered seat
-		// at once rather than auto-skipping one.
-		//
-		// This auto-action can never be rejected: the prompted seat IS the active
-		// seat and AwaitingDeclaration is set, so skip_declare always applies.
-		// There is therefore no reject → re-arm cycle to stall on.
 		action = game.Action{
 			Type:       game.ActionSkipDeclare,
 			PlayerSeat: expectedSeat,
 		}
 	case gs.Phase == game.PhaseDeclaring:
-		// Defensive: the phase arms no per-move timer, so this is unreachable —
-		// but session.turnTimer is ONE field shared by the turn timer, the
-		// score-reveal fallback and the declaration window, so anything that did
-		// arm a turn timer here would have clobbered the window on its way in.
-		// Falling into the default's silent return would then leave the phase
-		// with no clock at all and the table stuck until someone answers. Log it
-		// as loudly as the sibling re-arms below and restore the window.
 		slog.Error("session: declaring phase reached the per-move timer expiry; re-arming its window",
 			"roomID", session.roomID, "activeSeat", gs.ActivePlayerSeat, "expectedSeat", expectedSeat)
 		session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
@@ -2026,18 +1302,14 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		session.mu.Unlock()
 		return
 	case gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == expectedSeat:
-		// Auto-skip belot announcement on timer expiry
 		action = game.Action{
 			Type:       game.ActionSkipBelot,
 			PlayerSeat: expectedSeat,
 		}
 	case gs.Phase == game.PhasePlaying:
-		// Auto-play a card
 		cardID, err := game.AutoPlay(gs)
 		if err != nil {
 			slog.Error("session: auto-play failed", "roomID", session.roomID, "error", err)
-			// Restart timer so the game doesn't stall. The seat that timed out
-			// is still active — re-arm for the same seat.
 			m.startTimerLocked(session, expectedSeat)
 			session.mu.Unlock()
 			return
@@ -2055,7 +1327,6 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 			Card:       &card,
 		}
 	default:
-		// Phase doesn't support auto-play (e.g., match_end, paused)
 		session.mu.Unlock()
 		return
 	}
@@ -2064,32 +1335,16 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	newState, err := game.ApplyAction(oldState, action)
 	if err != nil {
 		slog.Error("session: auto-play ApplyAction failed", "roomID", session.roomID, "error", err)
-		// Restart timer so the game doesn't stall permanently. The seat that
-		// timed out is still active — re-arm for the same seat.
 		m.startTimerLocked(session, expectedSeat)
 		session.mu.Unlock()
 		return
 	}
 
-	// Handle dealing→bidding auto-transition inside the lock
 	if newState.Phase == game.PhaseDealing {
 		newState.Phase = game.PhaseBidding
 		game.RefreshDerivedFlags(newState)
 	}
 
-	// Within-turn auto-action chain. The first ApplyAction may leave the same
-	// seat owing a continuation: skip_declare clears the prompt but the player
-	// still owes a card; an auto-played card may itself open a belot prompt
-	// (K/Q of trump while holding both) which keeps the same seat. Without
-	// chaining, setTurnExpiry below would either extend the doomed player's
-	// window (the bug we're fixing) or leave the timer unarmed and stall.
-	//
-	// Loop instead: while seat and phase are still equal to oldState's, pick
-	// the next auto-action structurally based on what's blocking newState
-	// (PendingBelotSeat → skip_belot, AwaitingDeclaration → skip_declare,
-	// otherwise auto-play). Bounded depth as a safety net against pathological
-	// state — in practice the chain resolves in at most three steps
-	// (skip_declare → auto-play → skip_belot if K/Q of trump came out).
 	const maxChainSteps = 3
 	type chainStep struct {
 		action game.Action
@@ -2100,19 +1355,12 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 
 	for i := 0; i < maxChainSteps; i++ {
 		cur := steps[len(steps)-1].post
-		// Done if the seat or phase already transitioned vs the timer-firing
-		// state. PhaseMatchEnd / PhasePaused also fall out here.
 		if cur.ActivePlayerSeat != oldState.ActivePlayerSeat || cur.Phase != oldState.Phase {
 			break
 		}
-		// PhasePlaying only: the dedicated declaration phase runs no per-move
-		// timer, so no chain can start or continue inside it.
 		if cur.Phase != game.PhasePlaying {
 			break
 		}
-		// Pick the next auto-action structurally — no action-type enumeration.
-		// PendingBelotSeat takes precedence over AwaitingDeclaration in the same
-		// way handleTimerExpiry's initial switch orders them.
 		var next game.Action
 		switch {
 		case cur.PendingBelotSeat != nil && *cur.PendingBelotSeat == cur.ActivePlayerSeat:
@@ -2132,7 +1380,6 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 			}
 			next = game.Action{Type: game.ActionPlayCard, PlayerSeat: cur.ActivePlayerSeat, Card: &card}
 		}
-		// Empty action.Type means the inner switch hit an error path — break.
 		if next.Type == "" {
 			break
 		}
@@ -2150,47 +1397,20 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 
 	finalState := steps[len(steps)-1].post
 
-	// An auto-pass can reshuffle, and an auto-pick can open the second deal.
 	m.setDealGraceLocked(session, dealGraceFor(oldState, finalState))
 
-	// Set expiry and start timer for the next player. Three cases:
-	//  • Seat or phase advanced past oldState — fresh timer for the new turn.
-	//  • Seat unchanged AND phase unchanged AND we exhausted maxChainSteps or
-	//    a chain step errored — defensive fresh timer to prevent the game from
-	//    stalling. The slog.Error in the chain logs the underlying invariant
-	//    violation; arming a fresh timer keeps the game moving while operator
-	//    debugs.
-	//  • Phase is match_end / paused — outer guard skips both.
 	if finalState.Phase == game.PhaseDeclaring {
-		// Reachable, and only one way: a bidding timeout on a seat forbidden to
-		// pass auto-picks a suit (AllPassDealerMustPick), and that pick opens
-		// the dedicated declaration phase in the same step. The phase has no
-		// active turn, so it gets its fixed window rather than a per-move timer
-		// — the same arm HandleAction gives it on the human-driven path.
 		finalState.TurnExpiresAt = nil
 		session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
-		// cancelTurnTimer bumps the generation so the captured gen is current
-		// and the just-fired callback cannot act again — same as the
-		// PhaseHandComplete branch below.
 		session.cancelTurnTimer()
 		gen := session.timerGeneration
 		session.turnTimer = time.AfterFunc(declarationAutoClose, func() {
 			m.handleDeclarationTimeout(session, gen)
 		})
 	} else if finalState.Phase == game.PhasePlaying || finalState.Phase == game.PhaseBidding {
-		// Pass finalState.ActivePlayerSeat explicitly: session.gameState is
-		// reassigned to finalState only after this block, so a state-less
-		// startTimerLocked would capture the OLD (timed-out) seat and the next
-		// timer would auto-act for the wrong player.
 		m.setTurnExpiry(session, finalState)
 		m.startTimerLocked(session, finalState.ActivePlayerSeat)
 	} else if finalState.Phase == game.PhaseHandComplete {
-		// An auto-play ended the hand (the timed-out card was the last of the
-		// hand). Arm the score-reveal auto-continue safety net, exactly as the
-		// normal-action path does in HandleAction — otherwise this pause would
-		// have NO server-side timer and could stall until every player manually
-		// continues. cancelTurnTimer bumps the generation so the captured gen is
-		// current.
 		finalState.TurnExpiresAt = nil
 		session.handCompleteExpiresAt = time.Now().Add(handCompleteAutoContinue)
 		session.cancelTurnTimer()
@@ -2205,11 +1425,6 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	startedAt := session.startedAt
 	session.mu.Unlock()
 
-	// Inform clients that a non-card auto-action just fired so they can surface
-	// a toast naming the timed-out player. Only the *first* step emits this —
-	// chained card-play uses the AutoPlayed flag on event:card_played, and
-	// further chained skip_belot is implementation detail (a single timer
-	// expiry should produce a single user-facing notification).
 	if autoType, ok := autoActionTypeFor(action.Type); ok {
 		m.hub.BroadcastToUsers(humanUserIDs(playerIDs), buildMessage(ws.EventAutoAction, ws.AutoActionPayload{
 			PlayerSeat: expectedSeat,
@@ -2217,10 +1432,6 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		}))
 	}
 
-	// Broadcast each step's result in order. Multi-event sequences ride as
-	// separate ordered messages per project-context — never batched. Each
-	// step within a chain represents an auto-action (the player was AFK), so
-	// any step that was an ActionPlayCard rides with autoPlayed=true.
 	for _, step := range steps {
 		isAutoPlayedCard := step.action.Type == game.ActionPlayCard
 		m.broadcastActionResult(playerIDs, step.pre, step.post, step.action, isAutoPlayedCard)
@@ -2228,13 +1439,7 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		m.observeBotMemory(session, step.pre, step.post, step.action)
 	}
 
-	// Check for match completion. Auto-play never produces a surrender (the
-	// per-move timer doesn't auto-resolve a pending proposal — see AC #13),
-	// so surrenderedBy is always nil here.
 	if finalState.Phase == game.PhaseMatchEnd {
-		// The match-ending action is whichever step landed in PhaseMatchEnd —
-		// almost always the last one (steps run sequentially and only the
-		// terminal step transitions the phase).
 		last := steps[len(steps)-1]
 		matchEndAction := last.action
 		matchEndOld := last.pre
@@ -2243,14 +1448,11 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		return
 	}
 
-	// The post-auto-action state may put a bot on the clock.
 	m.maybeScheduleBotAction(session)
 }
 
-// autoActionTypeFor maps a rules-engine action type to the wire-format
-// AutoActionType emitted on timer expiry. Returns (_, false) for actions that
-// should not produce an EventAutoAction (notably ActionPlayCard, which uses the
-// AutoPlayed flag on EventCardPlayed).
+// autoActionTypeFor maps an action type to the AutoActionType emitted on timer expiry.
+// It returns false for actions without an EventAutoAction, such as ActionPlayCard.
 func autoActionTypeFor(actionType string) (ws.AutoActionType, bool) {
 	switch actionType {
 	case game.ActionPassTrump:
@@ -2260,9 +1462,6 @@ func autoActionTypeFor(actionType string) (ws.AutoActionType, bool) {
 	case game.ActionSkipBelot:
 		return ws.AutoActionSkipBelot, true
 	case game.ActionPickTrump:
-		// Only ever reachable as an auto-action through the forced-pick arm of
-		// handleTimerExpiry: a seat with no legal pass. A voluntary pick is a
-		// player action and never passes through here.
 		return ws.AutoActionPickTrump, true
 	}
 	return "", false
@@ -2279,11 +1478,6 @@ func safeDerefInt(p *int) int {
 // OutcomeReason is always set explicitly so the wire format is fully symmetric:
 // natural-end matches emit "natural", surrender emits "surrender".
 func buildMatchEndPayload(oldState, newState *game.GameState, action game.Action, startedAt time.Time) ws.MatchEndPayload {
-	// A zero startedAt would report the seconds since year 1 — about 6.4e10, which
-	// the client renders as a match duration. Four separate call sites capture
-	// this value from the session, so the failure is one forgotten assignment
-	// away, and nothing downstream would flag a number that absurd. Report an
-	// unknown duration as 0 and say so in the log rather than shipping fiction.
 	durationSec := 0
 	if startedAt.IsZero() {
 		slog.Error("match: match-end payload built with a zero startedAt; duration reported as 0",
@@ -2304,20 +1498,6 @@ func buildMatchEndPayload(oldState, newState *game.GameState, action game.Action
 		payload.OutcomeReason = ws.OutcomeReasonSurrender
 		payload.SurrenderedBySeat = &proposerSeat
 	}
-	// A "dosta" stop. Read from the flag the engine set rather than inferred:
-	// "StopAtTarget on and LastHandResult nil" also describes a surrender and an
-	// instant win. Checked AFTER the surrender branch, and deliberately allowed to
-	// override it: an accepted surrender CAN run the stop. In a "dosta" room a
-	// team may already be over the target while a deferred Belote checkpoint
-	// waits, and handleSurrenderAccept settles that crossing before the
-	// concession (game/surrender.go). The winners then genuinely reached the
-	// target, so the match ends as target_reached with SurrenderedBySeat still
-	// set, and Season Points score it on the real margin, not as a surrender.
-	//
-	// The cut-short hand's POINTS are deliberately not carried here. They are
-	// already inside the final scores, and the client recovers them by
-	// subtracting the persisted hand rows from the final score — which works on
-	// the profile's match history too, where no match_end payload exists.
 	if newState.StoppedAtTarget {
 		payload.OutcomeReason = ws.OutcomeReasonTargetReached
 	}

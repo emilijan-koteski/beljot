@@ -71,29 +71,13 @@ function OutcomeChip({ outcome }: { outcome: MatchOutcome }) {
   );
 }
 
-/**
- * Which hand layout to render. "auto" picks the dense desktop table or the
- * stacked cards from a viewport media query (the profile page's behaviour);
- * "stacked" forces the cards regardless of viewport — needed inside the
- * end-of-match overlay, whose panel is far narrower than the viewport that
- * media query is measuring.
- */
+/** Hand layout: "auto" picks table or cards from the viewport, "stacked" always uses cards. */
 export type HandsLayout = "auto" | "stacked";
 
 interface HandsGridProps {
   hands: MatchHandView[];
   viewerTeamIndex: 0 | 1;
   layout: HandsLayout;
-  // Final match scores, viewer-relative. Used ONLY to detect a hand that was
-  // played but never scored: a room playing "dosta" ends the match the instant a
-  // team reaches the target, and that cut-short hand deliberately gets no
-  // hand_results row. Its points are still inside the final score, so without
-  // this the breakdown silently falls short of the total (observed: hands
-  // summing to 407 under a displayed 516) and reads as broken arithmetic.
-  //
-  // Derived from the persisted match rather than from event:match_end, so the
-  // profile's match history gets the same accounting — there is no payload
-  // there.
   usFinal: number;
   themFinal: number;
 }
@@ -112,10 +96,7 @@ interface HandNotesProps {
   themColor: string;
 }
 
-/** The capot / last-trick / failed-contract badges for a hand. Shared by the
- *  desktop table cell and the mobile hand card so the wording + testids stay
- *  identical across layouts. Returns a fragment; the caller supplies the
- *  wrapping flex container. */
+/** Renders the capot, last-trick and failed-contract badges for a hand as a fragment. */
 function HandNotes({
   hand: h,
   capotIsUs,
@@ -178,16 +159,6 @@ function HandNotes({
 
 function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: HandsGridProps) {
   const { t } = useTranslation();
-  // Phones get a stacked per-hand card layout instead of the dense 7-column
-  // table — the table needs ~620px and would otherwise force a horizontal
-  // scroll inside the (much narrower) expanded row. Rendering exactly one
-  // layout (not both behind `hidden`/`md:block`) keeps the per-hand testids
-  // unique. `useMediaQuery` returns false without `matchMedia` (tests/SSR), so
-  // those environments get the desktop table.
-  //
-  // The hook runs unconditionally — layout === "stacked" only overrides its
-  // ANSWER, because a caller inside a fixed-width overlay knows the viewport
-  // query is measuring the wrong box.
   const viewportIsCompact = useMediaQuery("(max-width: 767px)");
   const isCompact = layout === "stacked" || viewportIsCompact;
 
@@ -202,13 +173,6 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
   const usColor = viewerTeamIndex === 0 ? "var(--team-a)" : "var(--team-b)";
   const themColor = viewerTeamIndex === 0 ? "var(--team-b)" : "var(--team-a)";
 
-  // The hand a "dosta" stop cut short: whatever the final score holds that the
-  // scored hands do not account for. Both sides are shown even when only one
-  // crossed, because the other team's partial points were banked too.
-  //
-  // Guarded on > 0 so a normal match — where the rows sum exactly — renders
-  // nothing at all, and so a mid-hand surrender (which banks nothing) does not
-  // grow a phantom row.
   const scoredUs = hands.reduce(
     (n, h) => n + (viewerTeamIndex === 0 ? h.teamAHandTotal : h.teamBHandTotal),
     0,
@@ -249,7 +213,6 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
     };
   };
 
-  // ── Mobile: stacked, self-labelled hand cards (no horizontal scroll). ──
   if (isCompact) {
     return (
       <div className="flex flex-col gap-2" data-testid="match-history-hands-grid">
@@ -373,7 +336,6 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
     );
   }
 
-  // ── Desktop: dense 7-column table. ──
   const cols = "44px minmax(120px,1fr) 56px 56px 90px 110px minmax(120px,1fr)";
 
   return (
@@ -470,38 +432,17 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
 
 interface MatchStatsCardProps {
   match: MatchListItem;
-  /** Marks the subject's seat as "YOU" — false on a public profile, where the
-   *  subject is someone other than the viewer. */
   subjectIsSelf?: boolean;
   isOpen: boolean;
   onToggle: () => void;
-  /** See `HandsLayout`. Defaults to the viewport-driven "auto". */
   handsLayout?: HandsLayout;
-  /**
-   * Whether seat chips link to player profiles. FALSE inside the in-match
-   * overlay: those links are react-router <Link>s, and a click PUSH-navigates
-   * away, unmounting MatchPage and skipping the return-to-room / leave-room
-   * settlement entirely — the player's membership row is left dangling. On the
-   * profile and in the room lobby, navigating away is harmless and wanted.
-   */
   linkPlayers?: boolean;
-  /** Rendered inside the expanded detail, below the hand breakdown — the
-   *  per-player Add-friend / Reinvite row on the room surfaces. */
   footer?: ReactNode;
 }
 
 /**
- * One match rendered as a collapsible card: header (date, variant, seats,
- * viewer-first score, outcome) plus an expandable per-hand breakdown.
- *
- * Lives in `shared/` because three surfaces mount it — the profile's match
- * history list, the room lobby's last-match dialog, and the end-of-match
- * overlay — and the hand breakdown must not fork between them. Everything it
- * renders is viewer-relative through `match.viewerSeat`, which the server
- * derives per request, so the card itself needs no notion of who is looking.
- *
- * Open state is LIFTED: the profile keeps a set of open row ids, the dialogs
- * keep a single boolean.
+ * One match as a collapsible card: a viewer-relative header plus an expandable per-hand breakdown.
+ * Open state is controlled by the caller.
  */
 export function MatchStatsCard({
   match,
@@ -517,14 +458,6 @@ export function MatchStatsCard({
   const teammateSeat = (match.viewerSeat + 2) % 4;
   const opp1Seat = (match.viewerSeat + 1) % 4;
   const opp2Seat = (match.viewerSeat + 3) % 4;
-  // Bot seats carry an empty username with isBot:true — render the localized
-  // seat-derived bot name (and the bot glyph in the chip avatar) instead of
-  // a blank chip. Only real, still-existing users get a `userId`, which turns
-  // the chip into a link to their public profile: isBot !== true, userId > 0
-  // AND username !== "" (explicit comparisons, never truthiness on Go zero
-  // values). A soft-deleted participant arrives as {userId > 0, username: "",
-  // isBot: false} — the server hydrates usernames from the users table, which
-  // excludes deleted rows — and linking their "—" chip would be a sure 404.
   const seatChipProps = (
     seat: number,
   ): { name: string; bot: boolean; avatarUrl?: string | null; userId?: number } => {
@@ -541,11 +474,6 @@ export function MatchStatsCard({
   const teammate = seatChipProps(teammateSeat);
   const opponent1 = seatChipProps(opp1Seat);
   const opponent2 = seatChipProps(opp2Seat);
-  // The subject IS the viewer seat — the server derives it per request, so the
-  // card never needs the viewer's identity passed in. Their own chip is never
-  // a profile link (you are already looking at their page, or at yourself).
-  // Same "—" fallback as every other seat (seatChipProps): a soft-deleted or
-  // missing subject must not render a blank chip with a "?" avatar.
   const subject = match.players.find((p) => p.seat === match.viewerSeat);
   const subjectName = subject?.username || "—";
 
@@ -565,22 +493,11 @@ export function MatchStatsCard({
       data-testid="match-history-row"
       data-match-id={match.id}
     >
-      {/* The header is a clickable <div>, NOT a <button>: seat chips inside it
-          are links to player profiles, and interactive elements must not nest.
-          The real toggle (with the aria state) is the chevron <button> at the
-          far end; this div is a convenience click target that mirrors it, so
-          keyboard users lose nothing. */}
       <div
         onClick={onToggle}
         className="flex cursor-pointer flex-col gap-3 p-4 md:grid md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center md:gap-5"
         data-testid="match-history-row-header"
       >
-        {/* Date + variant. The variant rides the date block rather than the
-            outcome group so it reads as "when and what", and so a Croatian row
-            is identifiable at a glance (Epic 12: Croatian rooms must be
-            identifiable in the lobby, room preview, and match history).
-            Localized through the same lobby.card.* keys the lobby and room-page
-            badges use, so the three surfaces cannot drift. */}
         <div className="flex min-w-22 flex-col gap-0.5">
           <span className="text-ink font-display text-[15px] font-semibold tracking-[-0.1px]">
             {formatLocalizedDate(match.completedAt, t, "short")}
@@ -596,12 +513,6 @@ export function MatchStatsCard({
           >
             {variantLabel(t, match.variant)}
           </span>
-          {/* The rules this match was played under, shown only when they differ
-              from the default — same "chip only when it carries information"
-              rule the lobby card follows, and the same role="img" reasoning for
-              why the explanation is reliable here. Without these a dosta match
-              in history is indistinguishable from an ordinary one apart from the
-              unfinished-hand row in its breakdown. */}
           {match.declarationsEnabled === false && (
             <span
               className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
@@ -624,7 +535,6 @@ export function MatchStatsCard({
           )}
         </div>
 
-        {/* Players */}
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <SeatChip
@@ -668,7 +578,6 @@ export function MatchStatsCard({
           </div>
         </div>
 
-        {/* Score */}
         <div className="bg-surface-elevated border-border flex items-center gap-2.5 self-start rounded-xl border px-3.5 py-2 md:self-center">
           <span
             className="font-display text-[22px] leading-none font-bold tracking-[-0.4px] tabular-nums"
@@ -687,15 +596,7 @@ export function MatchStatsCard({
           </span>
         </div>
 
-        {/* Outcome + chevron */}
         <div className="flex items-center gap-2.5 self-start md:self-center">
-          {/* Muted early-end marker for the players who did NOT abandon —
-              the abandoner's own row (outcome "abandoned") and legacy rows
-              without an attributable abandoner already say it via the chip.
-              Wording is distinct per reason: abandonment vs surrender.
-              Positive matching on the two known reasons only: an older server
-              (or cached response) sends no endReason, and unknown future
-              values must render nothing. */}
           {(match.endReason === "abandonment" || match.endReason === "surrender") &&
             match.outcome !== "abandoned" && (
               <span
@@ -726,8 +627,6 @@ export function MatchStatsCard({
           <button
             type="button"
             onClick={(e) => {
-              // The header div above also toggles on click — stop the bubble so
-              // one press means one toggle.
               e.stopPropagation();
               onToggle();
             }}

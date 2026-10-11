@@ -32,17 +32,8 @@ type StaleRoomRepository interface {
 	UpdateStatus(roomID uint, status string) error
 }
 
-// ReconcileStaleRooms cleans up rooms left in status="playing" by a previous
-// process. Sessions live only in process memory, so any "playing" row at boot
-// has no live session — its players are stranded by FindPlayerRoom (which
-// counts "playing" as active) and cannot quick-play or create a new room
-// until that row is closed out.
-//
-// For each stranded room we (a) best-effort persist a match row with
-// status="abandoned" so the player history reflects what happened, then
-// (b) flip room.status to "completed" so the lobby treats those players as
-// free again. Idempotent: a no-op when nothing is stale, safe to call on
-// every boot.
+// ReconcileStaleRooms closes out rooms left "playing" by a previous process,
+// recording an abandoned match where possible and marking the room completed.
 func (m *Manager) ReconcileStaleRooms(roomRepo StaleRoomRepository) error {
 	rooms, err := roomRepo.FindByStatus("playing")
 	if err != nil {
@@ -71,10 +62,6 @@ func (m *Manager) reconcileStaleRoom(roomRepo StaleRoomRepository, r StaleRoom) 
 		return fmt.Errorf("loading bot seats: %w", err)
 	}
 
-	// Persist history when all four seats were held by occupants the
-	// repository can still see — humans (room_players) or bots (room_bots).
-	// Bot seats persist exactly like a live match end: nil player IDs +
-	// per-seat IsBot flags + HasBots.
 	var seated [4]uint
 	var botSeats [4]bool
 	seatedCount := 0
@@ -91,24 +78,6 @@ func (m *Manager) reconcileStaleRoom(roomRepo StaleRoomRepository, r StaleRoom) 
 		}
 	}
 	if m.matchRepo != nil && seatedCount == 4 {
-		// Story 9.2: NO coin settlement here, by design. This boot-time path has
-		// no surviving in-memory session, so the per-match coinBuyIn captured at
-		// StartMatch is gone and there is no determinable winner. Any stakes
-		// debited before the crash simply stay out of circulation (a sink, the
-		// same fail-safe spirit as the no-human-winner case). The record persists
-		// 0 deltas / 0 buy-in (the actually-charged amount is unrecoverable).
-		//
-		// Story 9.7: NO honor change here either, and for a stronger reason
-		// than the coin case — a crashed server is a SERVER fault, not a player
-		// signal, so nobody is charged an abandonment and nobody is credited a
-		// completion. The record below deliberately leaves AbandonedBy nil,
-		// which is also the marker the migration 000017 backfill uses to
-		// exclude these rows. This path has no live session and no
-		// honorRecorder call at all, so it is safe by construction.
-		//
-		// No precise game-start timestamp survives the restart — the room's
-		// UpdatedAt is the best proxy (StartMatch is the last writer for a
-		// "playing" row that hasn't moved on).
 		ids, botFlags, hasBots := matchSeatColumns(seated, botSeats)
 		record := &Match{
 			RoomID:       r.ID,

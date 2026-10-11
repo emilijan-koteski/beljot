@@ -25,33 +25,20 @@ import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 interface RulesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /**
-   * The running match's variant, which pre-selects the tab. Without it the
-   * overlay could sit in a Croatian match describing the Bitola deal — rules
-   * contradicting the table in front of the player.
-   */
   variant?: Variant;
-  /**
-   * True when the running match's room plays "dosta" — the match ends the moment
-   * a team reaches the target, mid-hand. The scoring chapter states the opposite
-   * ("at the end of a hand"), so the dialog shows a caveat above the chapters.
-   * Compared with `=== true` so an absent value never claims the rule is on.
-   */
   stopAtTarget?: boolean;
 }
 
-// The scrolling body is the single region both tabs control, so both name it.
 const PANEL_ID = "rules-dialog-panel";
 const tabId = (v: Variant) => `rules-dialog-tab-${v}`;
 
-// Felt-dark palette — matches the bidding / belot / score overlays.
 const PANEL_BG = "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)";
 const BRASS = "#c9a876";
 const INK = "#f5f2e8";
 const TEXT = "rgba(245,242,232,0.88)";
 const TEXT_DIM = "rgba(245,242,232,0.66)";
 const TEXT_FAINT = "rgba(245,242,232,0.5)";
-const GREEN = "#00e5a0"; // --turn-lime — the in-game accent
+const GREEN = "#00e5a0";
 
 type DarkRulesValue = { content: RulesContent; variant: Variant };
 const DarkRulesCtx = createContext<DarkRulesValue | null>(null);
@@ -59,27 +46,17 @@ const useDarkRules = () => (useContext(DarkRulesCtx) as DarkRulesValue).content;
 const useDarkVariant = () => (useContext(DarkRulesCtx) as DarkRulesValue).variant;
 
 /**
- * In-game rules reference. Same content module as the standalone /rules page
- * (so the two never drift) but rendered in the dark felt chrome the other
- * in-game overlays use. A sticky chapter index scroll-spies a single scrolling
- * body. No language switch — the locale is the one chosen in game settings.
+ * In-game rules reference in the dark felt chrome, sharing its content with the standalone /rules page.
+ * A sticky chapter index scroll-spies a single scrolling body.
  */
 export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: RulesDialogProps) {
   const { t, i18n } = useTranslation();
   const content = getRulesContent(i18n.language);
   const { sections, ui } = content;
 
-  // An unknown or absent variant falls back to Bitola, mirroring the engine's
-  // own `RulesFor` fallback rather than rendering an empty tab bar.
   const matchVariant = normalizeVariant(variant);
   const [activeVariant, setActiveVariant] = useState<Variant>(matchVariant);
 
-  // LOAD-BEARING, not redundant. The early return below sits AFTER the hooks, so
-  // this component stays mounted while closed and `activeVariant` survives —
-  // without this effect a player who browsed the other ruleset mid-hand would
-  // come back to it, still showing rules the table is not playing, next time
-  // they tapped the icon. Covered by "resets the tab to the match variant when
-  // reopened".
   useEffect(() => {
     if (open) setActiveVariant(matchVariant);
   }, [open, matchVariant]);
@@ -89,10 +66,6 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
   const chapterRefs = useRef<Record<string, HTMLElement | null>>({});
   const [activeId, setActiveId] = useState(sections[0]?.id ?? "");
 
-  // Scroll-spy within the dialog's own scroll container. Keyed on the active
-  // variant too: flipping tabs swaps blocks in and out of `basics` and `melds`,
-  // so every chapter below them moves and a stale `activeId` would highlight the
-  // wrong index entry until the next scroll event.
   useEffect(() => {
     if (!open) return;
     const el = scrollRef.current;
@@ -120,8 +93,6 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
   };
 
   const dialog = (
-    // One provider for the whole overlay: every difference marker's tooltip
-    // shares Base UI's delay grouping instead of each mounting a provider root.
     <TooltipProvider delay={0}>
       <div className="fixed inset-0" style={{ zIndex: Z.UTIL }} data-testid="rules-dialog">
         <OverlayBackdrop dim={0.55}>
@@ -144,7 +115,6 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
               color: INK,
             }}
           >
-            {/* Header */}
             <div
               className="flex shrink-0 items-center gap-3"
               style={{
@@ -182,9 +152,6 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
               </div>
             </div>
 
-            {/* Body: TOC rail + scrolling content. On phones the rail is hidden
-              and the content fills the full width (everything scrolls in one
-              column). */}
             <div className="flex min-h-0 flex-1">
               <nav
                 className="hidden shrink-0 flex-col gap-0.5 md:flex"
@@ -275,13 +242,6 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
                         id={tabId(v)}
                         aria-selected={on}
                         aria-controls={PANEL_ID}
-                        // Roving tabIndex + arrow traversal, matching what the Tabs
-                        // primitive gives the standalone page. This bar is
-                        // hand-rolled because the shared primitive is painted from
-                        // light-theme tokens, so its keyboard contract has to be
-                        // hand-rolled too — otherwise the same choice behaves
-                        // differently on the two surfaces for anyone not using a
-                        // pointer.
                         tabIndex={on ? 0 : -1}
                         onKeyDown={(e) => {
                           const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -316,14 +276,6 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
                     );
                   })}
                 </div>
-                {/* This table plays "dosta", and the scoring chapter below says
-                    the match runs until a team is on the target "at the end of a
-                    hand" — true everywhere else, wrong here. The rules content
-                    itself has no variant- or room-level split yet (Story 12.9
-                    owns reconciling it), so the caveat lives on the dialog rather
-                    than in the chapter text. Without it the in-match reference
-                    teaches the opposite of the rule the player is playing under,
-                    which this project treats as worse than any UI defect. */}
                 {stopAtTarget === true && (
                   <div
                     className="mt-3 rounded-lg px-3 py-2.5"
@@ -357,7 +309,6 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
               </div>
             </div>
 
-            {/* Footer */}
             <div
               className="flex shrink-0 items-center justify-end"
               style={{
@@ -382,8 +333,6 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
 
   return createPortal(dialog, document.body);
 }
-
-// ── Dark-themed renderers ──────────────────────────────────────────────────
 
 function DarkChapter({
   idx,
@@ -529,8 +478,6 @@ function DarkBlock({ block }: { block: RuleBlock }) {
         </div>
       );
 
-    // Filtered FIRST, numbered from the survivors — see the light renderer's
-    // note: numbering the unfiltered array shows 01, 02, 03, 05.
     case "steps": {
       const items = visibleFor(block.items, activeVariant);
       return (

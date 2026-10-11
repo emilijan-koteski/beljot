@@ -22,8 +22,6 @@ const (
 	testAbsoluteTTL = 180 * 24 * time.Hour
 )
 
-// --- in-memory refresh-token repository mimicking the GORM impl's semantics ---
-
 type mockRefreshRepo struct {
 	mu     sync.Mutex
 	rows   []*refreshtoken.RefreshToken
@@ -39,7 +37,7 @@ func (m *mockRefreshRepo) Create(t *refreshtoken.RefreshToken) error {
 	defer m.mu.Unlock()
 	for _, r := range m.rows {
 		if r.TokenHash == t.TokenHash {
-			return assertUniqueViolation
+			return errDuplicateTokenHash
 		}
 	}
 	stored := *t
@@ -97,14 +95,11 @@ func (m *mockRefreshRepo) RevokeFamily(familyID string) error {
 	return nil
 }
 
-// assertUniqueViolation stands in for the DB's unique-index error on token_hash.
-var assertUniqueViolation = &uniqueErr{}
+var errDuplicateTokenHash = &uniqueErr{}
 
 type uniqueErr struct{}
 
 func (*uniqueErr) Error() string { return "unique constraint: token_hash" }
-
-// --- test-only mutators (in-package) for deterministic expiry/reuse tests ---
 
 func (m *mockRefreshRepo) backdateRotations(d time.Duration) {
 	m.mu.Lock()
@@ -165,8 +160,6 @@ func (m *mockRefreshRepo) firstFamilyID() string {
 	return m.rows[0].FamilyID
 }
 
-// --- server + cookie helpers ---
-
 func setupAuthServer() (*echo.Echo, *mockUserRepo, *mockRefreshRepo) {
 	ur := newMockUserRepo()
 	rr := newMockRefreshRepo()
@@ -197,8 +190,6 @@ func doLoginOn(e *echo.Echo, body string) *httptest.ResponseRecorder {
 	return doLogin(e, body)
 }
 
-// --- rotation / longevity ---
-
 func TestRefresh_RotatesTokenEachUse(t *testing.T) {
 	e, _, _ := setupAuthServer()
 	reg := registerUser(e)
@@ -227,13 +218,9 @@ func TestRefresh_SlidesIdleKeepsAbsoluteCap(t *testing.T) {
 	require.Len(t, after, 2, "rotation should mint a successor in the same family")
 	successor := after[1]
 
-	// Absolute cap is fixed at login and copied unchanged onto the successor.
 	assert.WithinDuration(t, before[0].FamilyExpiresAt, successor.FamilyExpiresAt, time.Second)
-	// Idle window is re-slid to ~now+idleTTL.
 	assert.WithinDuration(t, time.Now().Add(testIdleTTL), successor.ExpiresAt, time.Minute)
 }
-
-// --- reuse detection ---
 
 func TestRefresh_ReuseAfterGraceRevokesFamily(t *testing.T) {
 	e, _, rr := setupAuthServer()
@@ -244,8 +231,6 @@ func TestRefresh_ReuseAfterGraceRevokesFamily(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	second := refreshCookieValue(rec)
 
-	// Push the first token's rotation beyond the grace window so re-presenting
-	// it reads as a replay, not a race.
 	rr.backdateRotations(reuseGracePeriod + time.Minute)
 
 	replay := doRefresh(e, []*http.Cookie{cookieFor(first)})
@@ -254,7 +239,6 @@ func TestRefresh_ReuseAfterGraceRevokesFamily(t *testing.T) {
 	fam := rr.firstFamilyID()
 	assert.True(t, rr.familyRevoked(fam), "reuse must revoke the whole family")
 
-	// The legitimate live token is now dead too — the session is compromised.
 	afterRevoke := doRefresh(e, []*http.Cookie{cookieFor(second)})
 	assert.Equal(t, http.StatusUnauthorized, afterRevoke.Code)
 }
@@ -270,11 +254,6 @@ func TestRefresh_ReuseWithinGraceServesAccessOnly(t *testing.T) {
 	require.NotEmpty(t, successor)
 	familyRowsBefore := len(rr.byFamily(rr.firstFamilyID()))
 
-	// Re-present the just-rotated token immediately (within grace) — a benign
-	// multi-tab / retried-request race. It should serve an access token WITHOUT
-	// re-rotating and WITHOUT touching the cookie, so the winner's live successor
-	// stays the browser's cookie (this is what prevents the next-cycle reuse
-	// false-positive).
 	healed := doRefresh(e, []*http.Cookie{cookieFor(first)})
 	assert.Equal(t, http.StatusOK, healed.Code, "in-grace replay should be tolerated")
 	assert.Empty(t, refreshCookieValue(healed), "heal must NOT rotate / set a new refresh cookie")
@@ -289,12 +268,9 @@ func TestRefresh_ReuseWithinGraceServesAccessOnly(t *testing.T) {
 	assert.False(t, rr.familyRevoked(fam), "in-grace race must not revoke the family")
 	assert.Equal(t, familyRowsBefore, len(rr.byFamily(fam)), "heal must not mint a new refresh token row")
 
-	// The winner's successor is still live and usable.
 	after := doRefresh(e, []*http.Cookie{cookieFor(successor)})
 	assert.Equal(t, http.StatusOK, after.Code, "the live successor keeps working")
 }
-
-// --- expiry ---
 
 func TestRefresh_IdleExpiryRevokes(t *testing.T) {
 	e, _, rr := setupAuthServer()
@@ -316,12 +292,10 @@ func TestRefresh_AbsoluteCapRevokes(t *testing.T) {
 	assert.True(t, rr.familyRevoked(rr.firstFamilyID()))
 }
 
-// --- multi-device isolation + logout revoke ---
-
 func TestRefresh_MultiDeviceIsolation(t *testing.T) {
 	e, _, rr := setupAuthServer()
 
-	regA := registerUser(e) // device A: family created at registration
+	regA := registerUser(e)
 	deviceA := refreshCookieValue(regA)
 
 	loginB := doLoginOn(e, `{"email":"test@example.com","password":"password123"}`)
@@ -329,10 +303,8 @@ func TestRefresh_MultiDeviceIsolation(t *testing.T) {
 	deviceB := refreshCookieValue(loginB)
 	require.NotEqual(t, deviceA, deviceB)
 
-	// Two independent families exist.
 	require.GreaterOrEqual(t, len(rr.rows), 2)
 
-	// Logging out device A revokes only A's family.
 	out := doLogoutWith(e, deviceA)
 	require.Equal(t, http.StatusOK, out.Code)
 
@@ -366,13 +338,9 @@ func doLogoutWith(e *echo.Echo, refreshToken string) *httptest.ResponseRecorder 
 	return rec
 }
 
-// --- deleted-user edge ---
-
 func TestRefresh_DeletedUser(t *testing.T) {
 	e, _, rr := setupAuthServer()
 
-	// A live token whose user was never created (simulates a user removed after
-	// the token was issued).
 	raw, hash, err := mintRefreshToken()
 	require.NoError(t, err)
 	fam, err := newFamilyID()

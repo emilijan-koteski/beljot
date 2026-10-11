@@ -19,11 +19,6 @@ vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
 }));
 
-/**
- * The profile-sidebar entry point for the two audio switches, so they are
- * settable outside a match. Same optimistic write + silent revert as the
- * in-match Settings dialog, sharing its latest-wins helper.
- */
 describe("AudioPanel", () => {
   beforeEach(() => {
     mockUpdatePreferences.mockReset();
@@ -204,7 +199,6 @@ describe("AudioPanel volume sliders", () => {
   it("keeps the slider outside the switch's label, so using it never toggles the switch", () => {
     render(<AudioPanel />);
 
-    // Inside the <label>, a press on the track would reach the switch too.
     expect(screen.getByTestId("profile-sound-volume").closest("label")).toBeNull();
     expect(screen.getByTestId("profile-music-volume").closest("label")).toBeNull();
 

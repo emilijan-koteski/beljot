@@ -54,46 +54,19 @@ interface CreateRoomModalProps {
 
 const MIN_NAME = 3;
 const MAX_NAME = 32;
-const DEFAULT_BUY_IN = 500; // mirrors the server default (Story 9.2)
+const DEFAULT_BUY_IN = 500;
 const BUY_IN_PRESETS = [0, 100, 500, 1000];
-// Private-room password bounds (Story 9.6). Cosmetic client guards; the server
-// is authoritative (apperr ROOM_PASSWORD_TOO_SHORT / ROOM_PASSWORD_TOO_LONG).
 const MIN_ROOM_PASSWORD = 4;
 const MAX_ROOM_PASSWORD = 72;
-// Honor-gate bounds (Story 9.8). The same [0,100] interval, in the same unit (a
-// plain integer), that the server validates and the rooms.min_honor CHECK
-// enforces — 9.6 shipped a min in runes and a max in bytes and needed a review
-// patch to align them, so keep this symmetric and boring.
 const MIN_HONOR_FLOOR = 0;
 const MIN_HONOR_CEILING = 100;
-// The default is UNGATED: min 0, newcomers welcome. Creating a gated room is an
-// opt-in, so the modal must never nudge an owner into one by default.
 const DEFAULT_MIN_HONOR = 0;
 
-/**
- * The honour gate is a discrete choice between tier BOUNDARIES, not a free
- * number — so it renders as preset chips rather than a slider (Create Room
- * redesign). Derived from the bands themselves, same as the old slider's
- * ticks: retuning a floor server-side moves this with it.
- */
 const MIN_HONOR_PRESETS = HONOR_TIER_BANDS.map((b) => b.from);
 
 /**
- * Split-panel create-room modal. Left = form (name, variant, match mode,
- * timer, buy-in, then an "Advanced settings" accordion for declarations,
- * match end, privacy, the honour gate and new-player policy). Right =
- * darker live-preview pane that mirrors the lobby card the room will
- * become so the host sees exactly what the lobby grid will display.
- *
- * Redesign rationale: five fields (name, variant, match mode, timer, buy-in)
- * cover what most hosts touch; the other five default to "how it's always
- * played" and move into the accordion, which reports how many of them the
- * host changed so nothing is silently different from the norm.
- *
- * Backend contract unchanged — only `name | variant | matchMode | timerStyle
- * | timerDurationSeconds` are submitted. Both variants are selectable as of
- * Story 12.8; the server's own allowlist is the authority on that, so the
- * segmented control carries no locked option any more.
+ * Split-panel create-room modal: the form on the left, with rarely changed settings in an
+ * "Advanced settings" accordion, and a live preview of the resulting lobby card on the right.
  */
 export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const { t } = useTranslation();
@@ -101,22 +74,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const createRoomMutation = useCreateRoomMutation();
   const meUsername = useAuthStore((s) => s.user?.username ?? "");
   const meBalance = useAuthStore((s) => s.user?.walletBalance ?? 0);
-  // The creator's own honor, read through the shared guards (Story 9.8 D7's
-  // self-gate). honorScoreOrPrior, never `?? 80` or `|| 80` — a real score of 0
-  // must survive; honorIsNewPlayer defaults to SUPPRESSED when the flag is absent.
-  // Both were added in 9.7 precisely because the unguarded versions rendered a
-  // confident "80 / Fair" for accounts the server had said nothing about.
   const meHonor = useAuthStore((s) => honorScoreOrPrior(s.user?.honorScore));
   const meIsNewPlayer = useAuthStore((s) => honorIsNewPlayer(s.user?.isNewPlayer));
-  // ...but those guards' defaults are calibrated for DISPLAY, not for a capability
-  // gate. honorIsNewPlayer(undefined) is `true` (suppress the score) and
-  // honorScoreOrPrior(undefined) is 80 — both correct when rendering an unknown,
-  // both wrong when deciding what the owner may configure, because they turn
-  // "unknown" into "denied": with the flag absent, a 200-match veteran could not
-  // create a veterans-only room at all, and the submit button offered no override
-  // for a request the SERVER would have accepted. So when the envelope carries no
-  // honor (an old server, or user === null) skip the cosmetic mirror entirely and
-  // let the authority decide.
   const honorKnown = useAuthStore(
     (s) => typeof s.user?.isNewPlayer === "boolean" && typeof s.user?.honorScore === "number",
   );
@@ -125,14 +84,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [nameShuffleSpin, setNameShuffleSpin] = useState(0);
   const [variant, setVariant] = useState<"bitola" | "croatia">("bitola");
   const [matchMode, setMatchMode] = useState<"1001" | "501">("1001");
-  // Declarations default ON: it is how both variants have always been played
-  // here, so creating a "bez zvanja" room is an opt-in the modal must never
-  // nudge an owner into, exactly like the honor gate below.
   const [declarationsEnabled, setDeclarationsEnabled] = useState(true);
-  // "Dosta" defaults OFF: finishing the hand before the target is checked is how
-  // every match here has always ended, so stopping mid-hand is an opt-in the
-  // modal must never nudge an owner into — the same rule as declarations above,
-  // with the polarity flipped.
   const [stopAtTarget, setStopAtTarget] = useState(false);
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
   const [timerDuration, setTimerDuration] = useState(30);
@@ -143,45 +95,21 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [minHonor, setMinHonor] = useState(DEFAULT_MIN_HONOR);
   const [allowNewPlayers, setAllowNewPlayers] = useState(true);
-  // Collapsed by default — the five fields above cover the common case. See
-  // the auto-open effect below for the one case this is overridden.
   const [advOpen, setAdvOpen] = useState(false);
-  // Field-level error shown under the room-name input (name validation only).
   const [error, setError] = useState<string | null>(null);
-  // General submit error (already-in-room, insolvency race, unexpected) shown
-  // in a pinned banner above the footer — NOT under the name field.
   const [formError, setFormError] = useState<string | null>(null);
 
   const trimmed = name.trim();
   const nameValid = trimmed.length >= MIN_NAME && trimmed.length <= MAX_NAME;
-  // A private room needs a password within bounds; a public room ignores it.
-  // MIN is per-character (matches the server's rune count); MAX is the bcrypt
-  // byte limit, so measure UTF-8 bytes — not UTF-16 .length — to agree with the
-  // server and never accept a multibyte password it would reject as too long.
   const passwordValid =
     !isPrivate ||
     (roomPassword.length >= MIN_ROOM_PASSWORD &&
       new TextEncoder().encode(roomPassword).length <= MAX_ROOM_PASSWORD);
   const submitting = createRoomMutation.isPending;
 
-  // The creator is auto-seated and charged the buy-in at match start, so a room
-  // they can't afford is un-startable — block it here too (server re-validates).
   const effectiveBuyIn = Math.max(0, Math.floor(coinBuyIn || 0));
   const buyInExceedsBalance = effectiveBuyIn > meBalance;
 
-  // Honor self-gate (Story 9.8 D7), same shape and same reason as
-  // buyInExceedsBalance above: the creator is auto-seated, so a gate they cannot
-  // pass would eject them from their own room at the first Start. Cosmetic: the
-  // server is the authority and re-validates.
-  //
-  // The score check applies to a New Player TOO, and this is the one place it
-  // deliberately diverges from the join gate (review 2026-07-30, PO decision).
-  // At the join gate D1 is right: a newcomer is never score-checked, because the
-  // toggle is the owner's "I'll take an unknown" switch. Mirrored onto the CREATOR
-  // it made D7 a no-op for exactly the accounts whose score is about to move — a
-  // newcomer at 0 completed / 4 abandoned holds 19, could set a bar of 80, and one
-  // finished match would put them at 23 and eject them from their own room. So a
-  // creator may only set a bar they satisfy RIGHT NOW, newcomer or not.
   const effectiveMinHonor = Math.min(
     MIN_HONOR_CEILING,
     Math.max(MIN_HONOR_FLOOR, Math.floor(minHonor || 0)),
@@ -190,18 +118,10 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const failsOwnHonorGate = honorKnown && meHonor < effectiveMinHonor;
   const failsOwnGate = failsOwnNewPlayerGate || failsOwnHonorGate;
 
-  // Both live inside the advanced accordion, so a host who set one, then
-  // collapsed the section, would otherwise be stuck on a disabled submit
-  // button with no visible reason. One-way reveal only — it never fights a
-  // host who deliberately re-collapses an already-valid section.
   useEffect(() => {
     if (!advOpen && (failsOwnGate || (isPrivate && !passwordValid))) setAdvOpen(true);
   }, [advOpen, failsOwnGate, isPrivate, passwordValid]);
 
-  // How many of the five advanced settings differ from "how it's always
-  // played" — shown on the collapsed accordion so a host glancing at a
-  // shared room knows something back there isn't the default without
-  // having to open it and re-read all five.
   const advancedChangedCount = [
     declarationsEnabled !== true,
     stopAtTarget !== false,
@@ -234,30 +154,16 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         timerDurationSeconds: timerStyle === "per-move" ? timerDuration : null,
         coinBuyIn: Math.max(0, Math.floor(coinBuyIn || 0)),
         isPrivate,
-        // Only send the password for a private room (Story 9.6).
         password: isPrivate ? roomPassword : undefined,
-        // Honor gate (Story 9.8). Always sent, including the ungated 0 / true
-        // defaults — the server treats them as pointers so an explicit false is
-        // distinguishable from omitted, and sending both keeps the wire honest
-        // about what the modal chose.
         minHonor: effectiveMinHonor,
         allowNewPlayers,
-        // Always sent, for the same reason as the honor gate above: the server
-        // reads it as a pointer, so sending the value explicitly is what makes
-        // an off room distinguishable from an old client that never mentions it.
         declarationsEnabled,
-        // Always sent, same reasoning: the server reads it as a pointer, so
-        // sending the value explicitly is what makes a "dosta" room
-        // distinguishable from an old client that never mentions it.
         stopAtTarget,
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
     } catch (err) {
       if (err instanceof FetchError) {
-        // Name-specific failures belong under the name field; everything else
-        // is a general failure shown in the form banner (never the raw server
-        // message — e.g. "player is already in a room" under the name input).
         if (err.code === "ROOM_NAME_TAKEN") {
           setError(t("lobby.createRoomModal.errors.nameTaken"));
         } else if (err.code === "ROOM_NAME_REQUIRED") {
@@ -286,9 +192,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
             }),
           );
         } else if (err.code === "HONOR_TOO_LOW") {
-          // The creator's own gate rejected them (Story 9.8 D7). Compose the copy
-          // locally from the requested minimum and the viewer's own score — the
-          // server error deliberately carries only the code, no numbers.
           setFormError(
             t("lobby.createRoomModal.errors.ownHonorTooLow", {
               minHonor: effectiveMinHonor,
@@ -330,10 +233,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     onOpenChange(nextOpen);
   }
 
-  // Both option lists resolve through shared/lib/roomLabels — the one place a
-  // variant or mode is turned into text. The form spells modes out ("1001
-  // points") where chips abbreviate ("1001 pts"), which is why the mode helper
-  // has two forms; variants read identically everywhere and have only one.
   const variantOptions = (["bitola", "croatia"] as const).map((value) => ({
     value,
     label: variantLabel(t, value),
@@ -344,11 +243,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     label: modeOptionLabel(t, value),
   }));
 
-  // On first, so the default sits where the eye lands and the control reads
-  // "Declarations: On" left to right.
-  // Built the same way as variantOptions and matchModeOptions above, so `value`
-  // narrows to "on" | "off" instead of widening to string: a typo in either
-  // literal is then a compile error rather than a segment that never matches.
   const declarationsOptions = (["on", "off"] as const).map((value) => ({
     value,
     label: t(
@@ -358,8 +252,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     ),
   }));
 
-  // Finish-the-hand first, so the default sits where the eye lands. Built the
-  // same way as the lists above so `value` narrows to "finish" | "stop".
   const matchEndOptions = (["finish", "stop"] as const).map((value) => ({
     value,
     label: t(
@@ -382,8 +274,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     },
   ];
 
-  // "Free" reuses the same lobby-card copy the chip's own preview will show;
-  // "Custom" opens the number input below instead of picking a value directly.
   const buyInOptions = [
     ...BUY_IN_PRESETS.map((value) => ({
       value: String(value),
@@ -393,9 +283,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   ];
   const buyInChipValue = customBuyIn ? "custom" : String(coinBuyIn);
 
-  // Anyone (0) reuses tierPlural, same as the honour-gate copy everywhere else
-  // in the app; each preset's floor label ("50+"…"95+") is the same helper the
-  // lobby card and the preview chip use, so the three never disagree.
   const minHonorOptions = MIN_HONOR_PRESETS.map((value) => ({
     value,
     tone: value === 0 ? undefined : HONOR_TIER_COLOR[honorTierForScore(value)],
@@ -438,7 +325,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         showCloseButton={false}
         data-testid="create-room-modal"
       >
-        {/* Top brass hairline accent — same gradient as AuthCard */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -top-px right-7 left-7 h-0.5 bg-[linear-gradient(90deg,transparent,var(--brass)_50%,transparent)] opacity-70"
@@ -449,7 +335,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
           className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] md:grid-cols-[1.05fr_0.95fr]"
           noValidate
         >
-          {/* ── Left: form ────────────────────────────────────────────── */}
           <div className="bg-surface flex min-h-0 flex-col">
             <header className="flex shrink-0 flex-col gap-2 px-8 pt-7 pb-1.5">
               <Eyebrow tone="accent">
@@ -632,8 +517,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 onToggle={() => setAdvOpen((v) => !v)}
                 changedCount={advancedChangedCount}
               >
-                {/* Sits directly under the variant/match-mode pair because it is
-                    the same kind of setting: what the rules ARE. */}
                 <Field
                   label={t("lobby.createRoomModal.declarations")}
                   info={t("lobby.createRoomModal.declarationsHint")}
@@ -648,7 +531,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   />
                 </Field>
 
-                {/* Its sibling in kind, same reasoning as declarations above. */}
                 <Field
                   label={t("lobby.createRoomModal.matchEnd")}
                   info={t("lobby.createRoomModal.matchEndHint")}
@@ -691,12 +573,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                       ariaLabel={t("lobby.createRoomModal.privateRoom")}
                     />
 
-                    {/* Directly under the toggle that reveals it. It used to
-                          render last, after the honour gate, so choosing
-                          Приватна grew a required field two fields further
-                          down — off screen on a phone — and the host met it as
-                          a validation error instead of as the consequence of
-                          the tap they just made. */}
                     {isPrivate && (
                       <Field
                         label={t("lobby.createRoomModal.roomPassword")}
@@ -791,8 +667,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               </AdvancedSettings>
             </div>
 
-            {/* General submit error — pinned above the footer so it's always
-                visible (the form body scrolls independently). */}
             {formError && (
               <div
                 role="alert"
@@ -827,7 +701,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
             </footer>
           </div>
 
-          {/* ── Right: live preview pane ──────────────────────────────── */}
           <aside
             className="border-border hidden flex-col gap-4 border-t px-9 py-7 md:flex md:min-h-0 md:overflow-y-auto md:border-t-0 md:border-l"
             style={{
@@ -949,8 +822,6 @@ function PreviewCard({
   hostUsername: string;
 }) {
   const { t } = useTranslation();
-  // Mirrors the lobby card the room will become, so it reads the same
-  // lobby.card.* keys the real card does rather than the modal's option labels.
   const variantText = variantLabel(t, variant);
   const matchLabel = modeLabel(t, matchMode);
   const timerLabel =
@@ -987,8 +858,6 @@ function PreviewCard({
           <span>
             {variantText} · {matchLabel}
           </span>
-          {/* OFF-only, exactly like the real lobby card: a declarations-on room
-              is the norm and gets no chip, so the chip always means something. */}
           {!declarationsEnabled && (
             <>
               <Dot />
@@ -1003,8 +872,6 @@ function PreviewCard({
               </span>
             </>
           )}
-          {/* ON-only, the mirror of the chip above: finishing the hand is the
-              norm and gets no chip, so this chip always means something. */}
           {stopAtTarget && (
             <>
               <Dot />
@@ -1027,8 +894,6 @@ function PreviewCard({
           <Dot />
           <span className="inline-flex items-center gap-1" data-testid="preview-buy-in">
             <Coins className="size-3" style={{ color: COIN_GOLD }} />
-            {/* Icon-only unit — the coin glyph conveys "coins", so the preview
-                shows just the grouped number (or "Free" at 0). */}
             {coinBuyIn > 0 ? formatCoins(coinBuyIn) : t("lobby.card.buyInFree")}
           </span>
           <Dot />
@@ -1051,9 +916,6 @@ function PreviewCard({
               {t("lobby.card.public")}
             </span>
           )}
-          {/* Honor-gate chips, mirroring RoomCard exactly so the preview keeps its
-              "this is what the lobby will show" promise honest — including the
-              conditionality: an ungated room's preview shows neither chip. */}
           {minHonor > 0 && (
             <>
               <Dot />
@@ -1063,9 +925,6 @@ function PreviewCard({
                 data-min-honor={minHonor}
                 aria-label={t("lobby.card.minHonorAriaLabel", { minHonor })}
               >
-                {/* Same tier-tinted shield as RoomCard — tinted by the tier the
-                    REQUIREMENT falls in, so the preview's promise of "this is
-                    what the lobby will show" covers the colour too. */}
                 <HonorShield tier={honorTierForScore(minHonor)} size={12} />
                 {t("lobby.card.minHonor", { minHonor: honorFloorLabel(minHonor) })}
               </span>
@@ -1087,7 +946,6 @@ function PreviewCard({
         </div>
       </div>
 
-      {/* Seat preview — host (you) occupies seat 1 of Team A, others empty */}
       <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-1.5 px-4.5 pb-3.5">
         <TeamLabel team="A" />
         <SeatChip username={hostUsername} team="A" testId="preview-seat-0" />

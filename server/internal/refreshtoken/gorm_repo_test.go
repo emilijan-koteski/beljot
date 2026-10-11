@@ -13,8 +13,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// --- Integration tests (Postgres; skipped when the DB is unavailable) ---
-
 func getTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
@@ -28,7 +26,6 @@ func getTestDB(t *testing.T) *gorm.DB {
 		t.Skip("skipping integration test: database not available")
 	}
 
-	// Per-test transaction rolled back on cleanup — tests create their own data.
 	tx := db.Begin()
 	t.Cleanup(func() { tx.Rollback() })
 	return tx
@@ -85,8 +82,6 @@ func TestGormRepo_RotateAndReplace(t *testing.T) {
 	got, err := repo.FindByHash("hash-rot-1")
 	require.NoError(t, err)
 
-	// First rotate wins: the old token is consumed and the successor is created
-	// atomically.
 	won, err := repo.RotateAndReplace(got.ID, makeToken(u.ID, "fam2", "hash-rot-2"))
 	require.NoError(t, err)
 	assert.True(t, won, "first rotate consumes the token and mints the successor")
@@ -102,8 +97,6 @@ func TestGormRepo_RotateAndReplace(t *testing.T) {
 	assert.Nil(t, next.RotatedAt)
 	assert.Nil(t, next.RevokedAt)
 
-	// Second rotate of the same (now consumed) token loses and must NOT create
-	// a successor row.
 	won2, err := repo.RotateAndReplace(got.ID, makeToken(u.ID, "fam2", "hash-rot-3"))
 	require.NoError(t, err)
 	assert.False(t, won2, "second rotate of an already-consumed token must lose")
@@ -130,7 +123,6 @@ func TestGormRepo_RevokeFamily(t *testing.T) {
 		assert.NotNil(t, revoked.RevokedAt, "%s should be revoked", h)
 	}
 
-	// A different family is untouched.
 	other, err := repo.FindByHash("hash-other")
 	require.NoError(t, err)
 	require.NotNil(t, other)

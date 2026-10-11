@@ -12,25 +12,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// A HandScore OUTLIVES its hand: startNewHand deliberately never clears
-// LastHandResult, because it has to survive for the broadcast that follows
-// scoring. So from hand 2 onward every state carries the PREVIOUS hand's result,
-// and anything reacting to "LastHandResult is non-nil" must ask which hand it
-// describes.
-//
-// Two match ends used to get that wrong, both re-announcing and re-persisting a
-// hand that had already finished:
-//
-//   - an accepted surrender in hand 2 or later;
-//   - an instant win on a freshly dealt hand (continue -> deal -> all 8 trumps).
-//
-// The duplicate row is the worse half: hand_results has a UNIQUE
-// (match_id, hand_number) constraint, so it fails the whole CreateWithHands
-// transaction and the match record is lost entirely rather than one row.
-//
-// Found while establishing why the "dosta" stop must nil LastHandResult — the
-// stop trips the same two gates.
-
 func staleResult(handNumber int) *game.HandScore {
 	return &game.HandScore{
 		HandNumber:      handNumber,
@@ -55,14 +36,11 @@ func TestBufferHandResult_StaleResultIsNotRePersisted(t *testing.T) {
 	))
 	t.Cleanup(func() { mgr.RemoveSession(910) })
 
-	// Hand 2 finishes and is buffered by the continue that deals hand 3.
 	mgr.BufferHandResultIfScored(910,
 		&game.GameState{HandNumber: 2},
 		&game.GameState{HandNumber: 3, LastHandResult: staleResult(2)})
 	require.Len(t, mgr.HandResults(910), 1)
 
-	// Now a surrender is accepted during hand 3. The state still carries hand 2's
-	// result, and a surrender transitions into match_end, so the old gate fired.
 	mgr.BufferHandResultIfScored(910,
 		&game.GameState{HandNumber: 3},
 		&game.GameState{HandNumber: 3, Phase: game.PhaseMatchEnd, LastHandResult: staleResult(2)})
@@ -85,8 +63,6 @@ func TestBufferHandResult_StampsTheResultsOwnHand(t *testing.T) {
 	))
 	t.Cleanup(func() { mgr.RemoveSession(911) })
 
-	// A stale hand-1 result reaching a match end in hand 4 must be stamped 1, not
-	// 4. Stamping it 4 is what produced a row for a hand nobody played.
 	mgr.BufferHandResultIfScored(911,
 		&game.GameState{HandNumber: 4},
 		&game.GameState{HandNumber: 4, Phase: game.PhaseMatchEnd, LastHandResult: staleResult(1)})
@@ -96,11 +72,8 @@ func TestBufferHandResult_StampsTheResultsOwnHand(t *testing.T) {
 	assert.Equal(t, 1, hands[0].HandNumber)
 }
 
-// MatchDurationSec is computed from a session timestamp captured separately at
-// each of four match-end call sites, and a zero time.Time yields the seconds
-// since year 1 — about 6.4e10, which the client renders as a match duration.
-// Nothing downstream sanity-checks it, and no test ever asserted it on a payload
-// the manager actually built, so the whole class was invisible.
+// A zero match-start timestamp would report about 6.4e10 seconds as the match
+// duration, so the built payload must carry a sane value.
 func TestMatchEndPayload_ReportsASaneDuration(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
@@ -128,8 +101,6 @@ func TestMatchEndPayload_ReportsASaneDuration(t *testing.T) {
 		}
 		require.NoError(t, json.Unmarshal(e.payload, &p))
 		found = true
-		// The session started microseconds ago. An hour is a generous ceiling that
-		// still catches the year-1 arithmetic by nine orders of magnitude.
 		assert.GreaterOrEqual(t, p.MatchDurationSec, 0)
 		assert.Less(t, p.MatchDurationSec, 3600,
 			"a duration this large means startedAt was never set")
@@ -137,11 +108,8 @@ func TestMatchEndPayload_ReportsASaneDuration(t *testing.T) {
 	require.True(t, found, "no event:match_end was broadcast")
 }
 
-// The persisted match must record the RULES it was played under. `rooms` already
-// stores them, but a room is reusable and mutable: it hosts match after match and
-// its settings can change between them, so the room cannot answer what a finished
-// match was played under. Without this, a dosta match in history was
-// indistinguishable from an ordinary one.
+// The persisted match records the rules it was played under, because a room is
+// reused and its settings can change between matches.
 func TestMatchRecord_CarriesTheRulesItWasPlayedUnder(t *testing.T) {
 	tests := []struct {
 		name                string
@@ -166,7 +134,6 @@ func TestMatchRecord_CarriesTheRulesItWasPlayedUnder(t *testing.T) {
 			))
 			t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-			// Any match end will do; a surrender is the cheapest to drive.
 			gs := mgr.GetStateSnapshot(roomID)
 			gs.Phase = game.PhasePlaying
 			seat := 0

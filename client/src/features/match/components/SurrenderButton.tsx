@@ -29,15 +29,10 @@ export function SurrenderButton({
   const { t } = useTranslation();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // If a partner's proposal arrives or the player's attempt becomes exhausted
-  // while the confirm dialog is open, close it — the action would be doomed.
   useEffect(() => {
     if (isPending || isExhausted) setConfirmOpen(false);
   }, [isPending, isExhausted]);
 
-  // Exhausted state takes priority — once consumed, that's the durable
-  // condition; pending only describes a transient partner-side proposal.
-  // The aria-label carries the verbose status; the button itself is icon-only.
   const ariaLabel = isExhausted
     ? t("match.surrender.exhausted")
     : isPending
@@ -76,20 +71,12 @@ interface SurrenderConfirmDialogProps {
 }
 
 /**
- * The surrender confirmation modal. Exported so surfaces that can't keep the
- * SurrenderButton mounted (e.g. the mobile HUD menu, which closes on tap) can
- * drive the confirm dialog directly from their own state.
+ * Surrender confirmation modal, exported for surfaces that cannot keep SurrenderButton mounted.
  */
 export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirmDialogProps) {
   const { t } = useTranslation();
-  // Escape cancels the proposal — matches BelotPrompt's onEscape→decline
-  // convention so destructive overlays bail out safely on a stray keystroke.
   const dialogRef = useFocusTrap<HTMLDivElement>({ onEscape: onCancel });
 
-  // Portal to document.body — the SurrenderButton sits inside the bottom-left
-  // HUD cluster, which would otherwise cap the overlay's stacking context and
-  // hide the dialog behind table elements. Rendering at the body level lets the
-  // dialog sit at the Z.SURRENDER tier above the entire game-table.
   const dialog = (
     <div
       className="fixed inset-0"
@@ -121,9 +108,6 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
               {t("match.surrender.confirm.body")}
             </p>
 
-            {/* Danger accent strip — red counterpart to the brass strip used
-                for celebratory announcements (BelotPrompt). Reinforces that
-                this is a one-shot, destructive action. */}
             <div
               className="mb-4 px-3 py-2 rounded-lg flex items-center gap-2 font-body"
               style={{

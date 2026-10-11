@@ -20,8 +20,8 @@ type recordedRequest struct {
 	body   []byte
 }
 
-// fakeS3 records every request and answers with the status `respond` picks
-// (default: 200 for PUT, 204 for DELETE).
+// fakeS3 records every request and answers with the status `respond` picks (default 200 PUT, 204 DELETE).
+// Error statuses carry a non-retryable AccessDenied body, so the SDK makes exactly one attempt.
 type fakeS3 struct {
 	mu       sync.Mutex
 	requests []recordedRequest
@@ -42,7 +42,6 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		status = f.respond(r)
 	}
 	if status >= 400 {
-		// A non-retryable S3 error, so the SDK makes exactly one attempt.
 		w.Header().Set("Content-Type", "application/xml")
 		w.WriteHeader(status)
 		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>AccessDenied</Code><Message>denied</Message></Error>`)

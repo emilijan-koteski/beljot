@@ -12,12 +12,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/season"
 )
 
-// countingRepo is a MUTEX-GUARDED CurrentSeason counter for the ticker tests:
-// the job's goroutine and the test's assertions read the counter concurrently,
-// so the shared handler-test mockRepo (single-threaded by design) would be a
-// data race under -race here. Embedding the nil season.Repository satisfies the
-// interface while making any OTHER method call an immediate panic — the job's
-// whole contract is that it touches nothing but CurrentSeason.
+// countingRepo is a mutex-guarded CurrentSeason counter safe for concurrent ticker tests.
+// Any other Repository method panics through the embedded nil interface.
 type countingRepo struct {
 	season.Repository
 	mu    sync.Mutex
@@ -147,13 +143,10 @@ func TestRollover_ShutdownIsIdempotentAndSafeWithoutStart(t *testing.T) {
 	started.Shutdown()
 }
 
-// A SECOND Start must not spawn a second ticker loop. Without the guard both
-// loops tick forever against the same repo, Shutdown's single close stops both
-// but the pass rate silently doubled — and on a longer-lived process every
-// accidental re-Start compounds it.
+// A second Start must not spawn a second ticker loop.
 func TestRollover_StartIsIdempotent(t *testing.T) {
 	repo := &countingRepo{ret: testWindow}
-	job := season.NewRollover(repo, time.Hour, nil) // long interval: only the immediate passes can land
+	job := season.NewRollover(repo, time.Hour, nil)
 
 	job.Start()
 	job.Start()

@@ -22,10 +22,6 @@ vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
 }));
 
-// --- Web Audio / media fakes -------------------------------------------------
-// jsdom ships neither AudioContext nor a working HTMLMediaElement.play, so the
-// engine is exercised against minimal recorders of what it asks for.
-
 class FakeParam {
   value = 0;
   lastRampTarget: number | null = null;
@@ -483,7 +479,6 @@ describe("music", () => {
           resolvePlay = resolve;
         }),
     );
-    // First play already resolved; force a fresh start path.
     await flush();
     music().paused = true;
     startMusic();
@@ -518,7 +513,6 @@ describe("music errors", () => {
     expect(music().src).toBe(MUSIC_TRACKS[2]);
     const plays = music().play.mock.calls.length;
 
-    // Third consecutive failure: the whole playlist is unreachable — stop.
     music().emit("error");
     music().emit("error");
     expect(music().src).toBe(MUSIC_TRACKS[2]);
@@ -648,7 +642,6 @@ describe("gesture unlock", () => {
 });
 
 describe("volumes", () => {
-  /** Gains the engine shipped with before volumes, i.e. at the default 70. */
   const SFX_AT_DEFAULT = 0.6;
   const MUSIC_AT_DEFAULT = 0.18;
 
@@ -793,9 +786,6 @@ describe("volumes", () => {
 });
 
 describe("audio assets", () => {
-  // A missing file fails silently at every other layer — the engine swallows
-  // load errors and production answers with index.html — so this is the only
-  // thing standing between a renamed asset and a silent table.
   const PUBLIC_DIR = join(process.cwd(), "public");
   const BASE = import.meta.env.BASE_URL;
 

@@ -71,7 +71,6 @@ func TestNewGameMidBidding(t *testing.T) {
 			assert.Equal(t, tc.expectedActive, gs.ActivePlayerSeat, "ActivePlayerSeat")
 			assert.Equal(t, 0, gs.DealerSeat, "DealerSeat should always be 0")
 
-			// Mid-bidding: 5 cards per seat, 11 in Deck, candidate aside.
 			for i, p := range gs.Players {
 				assert.Len(t, p.Hand, 5, "player at seat %d should have 5 cards", i)
 			}
@@ -154,7 +153,6 @@ func TestNewGameMidPlay(t *testing.T) {
 
 	t.Run("mixed suits for rule testing", func(t *testing.T) {
 		gs := testfixtures.NewGameMidPlay(1)
-		// Seat 0 should have spades AND hearts AND others
 		hasSuit := func(hand []game.Card, suit game.Suit) bool {
 			for _, c := range hand {
 				if c.Suit == suit {
@@ -165,7 +163,6 @@ func TestNewGameMidPlay(t *testing.T) {
 		}
 		assert.True(t, hasSuit(gs.Players[0].Hand, game.SuitSpades), "seat 0 should have spades")
 		assert.True(t, hasSuit(gs.Players[0].Hand, game.SuitHearts), "seat 0 should have hearts (trump)")
-		// Seat 3 should have NO trump hearts
 		assert.False(t, hasSuit(gs.Players[3].Hand, game.SuitHearts), "seat 3 should have no trump")
 	})
 }
@@ -249,12 +246,6 @@ func TestNewGameJustDealt(t *testing.T) {
 	})
 }
 
-// TestNewGameJustDealt_NoInstantWinOnAnyPick is a fixture-property test that
-// verifies the "engineered to never trigger instant-win" claim documented in
-// NewGameJustDealt's docstring. It exhausts every (round, picker, suit)
-// combination supported by NewGameMidBidding and asserts none of them lead to
-// PhaseMatchEnd. This locks the docstring promise so any future tweak to the
-// fixture's deck order that breaks the property fails this test loudly.
 func TestNewGameJustDealt_NoInstantWinOnAnyPick(t *testing.T) {
 	allSuits := []game.Suit{game.SuitSpades, game.SuitHearts, game.SuitDiamonds, game.SuitClubs}
 
@@ -263,7 +254,6 @@ func TestNewGameJustDealt_NoInstantWinOnAnyPick(t *testing.T) {
 		picker := gs.ActivePlayerSeat
 
 		if gs.BiddingRound == 1 {
-			// Round 1: trump = candidate suit; action.Suit is ignored.
 			result, err := game.ApplyAction(gs, game.Action{Type: game.ActionPickTrump, PlayerSeat: picker})
 			require.NoError(t, err, "round 1 pick by seat %d (passCount=%d) should succeed", picker, passCount)
 			assert.NotEqual(t, game.PhaseMatchEnd, result.Phase,
@@ -272,9 +262,6 @@ func TestNewGameJustDealt_NoInstantWinOnAnyPick(t *testing.T) {
 			continue
 		}
 
-		// Round 2: try every suit EXCEPT the candidate's suit, which is locked
-		// out by the Bitola "spent suit" rule and would be rejected with
-		// ErrInvalidBid before any state mutation.
 		require.NotNil(t, gs.TrumpCandidate, "round-2 fixture must have a face-up candidate")
 		lockedSuit := gs.TrumpCandidate.Suit
 		for _, suit := range allSuits {
@@ -369,7 +356,6 @@ func TestNewGameCapotInProgress(t *testing.T) {
 	})
 
 	t.Run("team A has strongest cards to complete capot", func(t *testing.T) {
-		// Seat 0 has JH (strongest trump), seat 2 has AH (strong trump)
 		assert.Equal(t, game.RankJack, gs.Players[0].Hand[0].Rank)
 		assert.Equal(t, game.SuitHearts, gs.Players[0].Hand[0].Suit)
 	})
@@ -390,12 +376,10 @@ func TestNewGameNearEnd(t *testing.T) {
 
 	t.Run("inherits NewGameLastTrick structure", func(t *testing.T) {
 		lastTrick := testfixtures.NewGameLastTrick()
-		// Same cards
 		for i := range gs.Players {
 			assert.Equal(t, lastTrick.Players[i].Hand, gs.Players[i].Hand,
 				"player %d hand should match NewGameLastTrick", i)
 		}
-		// Same hand points and tricks won
 		assert.Equal(t, lastTrick.HandPoints, gs.HandPoints)
 		assert.Equal(t, lastTrick.TricksWon, gs.TricksWon)
 	})

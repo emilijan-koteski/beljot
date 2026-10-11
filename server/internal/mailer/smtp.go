@@ -8,8 +8,7 @@ import (
 	mail "github.com/wneessen/go-mail"
 )
 
-// SMTPMailer sends real email over SMTP via go-mail. Configured for STARTTLS
-// (e.g. Gmail on smtp.gmail.com:587 with an app password).
+// SMTPMailer sends real email over SMTP via go-mail with mandatory STARTTLS.
 type SMTPMailer struct {
 	host     string
 	port     int

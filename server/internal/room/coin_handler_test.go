@@ -16,16 +16,14 @@ import (
 )
 
 // stubWallet implements room.WalletService for the coin-economy handler tests.
+// When balances is nil every user resolves to the uniform balance.
 type stubWallet struct {
 	balance         int
 	balanceErr      error
 	chargeErr       error
 	chargeInsolvent uint
-	// balances overrides per-user balances for GetBalances; when nil every
-	// requested userID resolves to `balance` (uniform-wallet shorthand). Used
-	// by Story 9.3 ejection tests to make some seats insolvent and others not.
-	balances    map[uint]int
-	balancesErr error
+	balances        map[uint]int
+	balancesErr     error
 
 	chargeCalls   int
 	chargedIDs    []uint
@@ -35,11 +33,9 @@ type stubWallet struct {
 	settledCredits map[uint]int
 }
 
+// GetBalance prefers the per-user balance and falls back to the uniform one,
+// so it agrees with GetBalances.
 func (s *stubWallet) GetBalance(userID uint) (int, error) {
-	// Mirror the real wallet: a per-user balance (when the `balances` map is set)
-	// is authoritative for that user; otherwise fall back to the uniform scalar.
-	// Keeps GetBalance and GetBalances consistent so the join-time bracket read
-	// and the charge-time prefilter agree on a user's balance.
 	if s.balances != nil {
 		if b, ok := s.balances[userID]; ok {
 			return b, s.balanceErr
@@ -77,14 +73,11 @@ func (s *stubWallet) ApplySettlement(credits map[uint]int) error {
 }
 
 // setupCoinTest wires the room handler with an injected wallet stub and starter.
-// honorService is nil: these are the Story 9.2/9.3 coin tests, and a nil honor
-// service means no honor enforcement, so every room here behaves exactly as it did
-// before Story 9.8. The honor-gate tests use setupHonorTest in
-// honor_handler_test.go.
+// The honor service is nil, so no honor gate applies.
 func setupCoinTest(starter room.MatchStarter, wallet room.WalletService) (*echo.Echo, *mockRoomRepo) {
 	repo := newMockRoomRepo()
 	handler := room.NewRoomHandler(repo, starter, &mockBroadcaster{}, nil, wallet, nil, nil)
-	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -97,16 +90,14 @@ func setupCoinTest(starter room.MatchStarter, wallet room.WalletService) (*echo.
 	return e, repo
 }
 
-// setupCoinTestBC is setupCoinTest with the full route set plus an observable
-// broadcaster and a caller-controlled presence registry — for Story 9.3 tests
-// that assert WS fan-out (insolvent_ejected, room_closed_insolvent,
-// match_start_failed) and exercise the return / leave paths.
+// setupCoinTestBC is setupCoinTest with the full route set, an observable
+// broadcaster, and a caller-controlled presence registry.
 func setupCoinTestBC(starter room.MatchStarter, wallet room.WalletService) (*echo.Echo, *mockRoomRepo, *mockBroadcaster, *room.PresenceRegistry) {
 	repo := newMockRoomRepo()
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
 	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet, nil, nil)
-	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -128,8 +119,6 @@ func broadcastsOfType(t *testing.T, b *mockBroadcaster, msgType string) []broadc
 	}
 	return out
 }
-
-// --- Create-room buy-in (AC #1) ---
 
 func TestCreateRoom_DefaultsBuyInTo500(t *testing.T) {
 	e, repo := setupTest()
@@ -180,9 +169,9 @@ func TestCreateRoom_NegativeBuyInRejected(t *testing.T) {
 	assert.Equal(t, "BAD_REQUEST", errCodeOf(t, rec))
 }
 
+// The creator is auto-seated and charged at start, so an unaffordable buy-in is
+// rejected at create time.
 func TestCreateRoom_InsufficientCoinsRejected(t *testing.T) {
-	// Creator is auto-seated and charged at start, so a buy-in above their
-	// balance is rejected at create time (mirrors the join check).
 	e, repo := setupCoinTest(nil, &stubWallet{balance: 100})
 	body := `{"name":"High Roller","variant":"bitola","matchMode":"1001","timerStyle":"relaxed","coinBuyIn":500}`
 	rec := doCreateRoom(e, body, validToken(5))
@@ -204,11 +193,8 @@ func TestCreateRoom_SufficientCoinsAllowed(t *testing.T) {
 	assert.Equal(t, 500, persisted.CoinBuyIn)
 }
 
-// Story 9.4 (AC1, AC5): a synthesized quick-play room carries the caller's
-// affordability bracket as its stake — 500 for a player who can afford it, 0
-// for a player who cannot (including exactly 0) — and always defaults to the
-// per-move 30s timer regardless of bracket. (Supersedes 9.2's "quick-play is
-// always free" TestQuickPlay_RoomIsFree.)
+// A synthesized quick-play room takes the caller's bracket as its stake and
+// always uses the per-move 30s timer.
 func TestQuickPlay_SynthesizedRoomCarriesBracketAndTimer(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -226,7 +212,6 @@ func TestQuickPlay_SynthesizedRoomCarriesBracketAndTimer(t *testing.T) {
 			rec := doQuickPlay(e, validToken(7))
 			require.Equal(t, http.StatusOK, rec.Code)
 
-			// Quick-play synthesizes a brand-new room when none is available.
 			persisted, _ := repo.FindByID(1)
 			require.NotNil(t, persisted)
 			assert.True(t, persisted.IsQuickPlay)
@@ -238,7 +223,7 @@ func TestQuickPlay_SynthesizedRoomCarriesBracketAndTimer(t *testing.T) {
 	}
 }
 
-// Story 9.4 (AC4): tapping a quick-play room in the wrong coin bracket is
+// Tapping a quick-play room in the wrong coin bracket is
 // rejected with QUICK_PLAY_BRACKET_MISMATCH and the player is never seated; a
 // matching bracket seats normally.
 func TestQuickJoin_CrossBracketRejected(t *testing.T) {
@@ -281,10 +266,8 @@ func TestQuickJoin_CrossBracketRejected(t *testing.T) {
 	}
 }
 
-// seedQuickPlayRoomWithStake creates a waiting quick-play room with the given
-// coin bracket + per-move/30s timer and seats the listed humans at the lowest
-// seats — mirroring the state a partially-filled Story 9.4 quick-play room is
-// left in. The first ID is the owner. Returns the room.
+// seedQuickPlayRoomWithStake creates a waiting per-move quick-play room with the given stake
+// and seats the listed humans from seat 0; the first ID is the owner.
 func seedQuickPlayRoomWithStake(t *testing.T, repo *mockRoomRepo, code string, buyIn int, seatedUserIDs ...uint) *room.Room {
 	t.Helper()
 	dur := 30
@@ -310,7 +293,7 @@ func seedQuickPlayRoomWithStake(t *testing.T, repo *mockRoomRepo, code string, b
 	return r
 }
 
-// Story 9.4 (AC1): matchmaking keeps the two affordability pools strictly
+// Matchmaking keeps the two affordability pools strictly
 // separate — QuickPlay never seats a player into a room of the other bracket;
 // it synthesizes a fresh same-bracket room instead.
 func TestQuickPlay_BracketsKeepPoolsSeparate(t *testing.T) {
@@ -329,7 +312,6 @@ func TestQuickPlay_BracketsKeepPoolsSeparate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e, repo := setupCoinTest(&fakeMatchStarter{}, &stubWallet{balance: tt.callerBalance})
-			// A waiting, not-full quick-play room (1 seated) in the existing bracket.
 			existing := seedQuickPlayRoomWithStake(t, repo, "EXQP01", tt.existingBuyIn, 20)
 
 			rec := doQuickPlay(e, validToken(30))
@@ -350,13 +332,11 @@ func TestQuickPlay_BracketsKeepPoolsSeparate(t *testing.T) {
 	}
 }
 
-// Story 9.4 (AC2, AC5): when the 4th joiner fills a default-bracket (500) quick-
-// play room, the auto-start path charges all four humans the stake atomically,
-// threads the stake into StartMatch (so 9.2 settlement applies), and forwards
-// the per-move 30s timer.
+// When the 4th joiner fills a 500-bracket quick-play room, auto-start charges all
+// four humans and threads the stake and per-move timer into StartMatch.
 func TestQuickJoin_AutoStartChargesDefaultBracket(t *testing.T) {
 	starter := &fakeMatchStarter{}
-	wallet := &stubWallet{balance: 5000} // all four afford 500
+	wallet := &stubWallet{balance: 5000}
 	e, repo, broadcaster, _ := setupCoinTestBC(starter, wallet)
 	seedQuickPlayRoomWithStake(t, repo, "QP500A", 500, 100, 200, 300)
 
@@ -377,12 +357,12 @@ func TestQuickJoin_AutoStartChargesDefaultBracket(t *testing.T) {
 	assert.Empty(t, broadcastsOfType(t, broadcaster, "error:match_start_failed"))
 }
 
-// Story 9.4 (AC3): a free-bracket (0) quick-play match auto-starts with no
+// A free-bracket (0) quick-play match auto-starts with no
 // charge and no settlement — exactly as before the economy work, since the
 // charge block is skipped when CoinBuyIn == 0.
 func TestQuickJoin_AutoStartFreeBracketNoCharge(t *testing.T) {
 	starter := &fakeMatchStarter{}
-	wallet := &stubWallet{balance: 0} // free bracket
+	wallet := &stubWallet{balance: 0}
 	e, repo, _, _ := setupCoinTestBC(starter, wallet)
 	seedQuickPlayRoomWithStake(t, repo, "QPFREE", 0, 100, 200, 300)
 
@@ -398,11 +378,8 @@ func TestQuickJoin_AutoStartFreeBracketNoCharge(t *testing.T) {
 	assert.Equal(t, "playing", persisted.Status)
 }
 
-// Story 9.4 (Task 5 safety net): if a seat is insolvent at charge time on the
-// auto-start path (a near-impossible edge), the eject path frees that seat,
-// reverts the room to waiting, pushes system:insolvent_ejected to the ejected
-// player only, and the match does not start. Critically, the generic
-// error:match_start_failed broadcast must NOT fire — the insolvency was handled.
+// An insolvent seat on the auto-start path is ejected and the room reverts to
+// waiting, without the generic match_start_failed broadcast.
 func TestQuickJoin_AutoStartInsolventSeatEjected(t *testing.T) {
 	starter := &fakeMatchStarter{}
 	wallet := &stubWallet{balances: map[uint]int{100: 5000, 200: 0, 300: 5000, 400: 5000}}
@@ -431,17 +408,10 @@ func TestQuickJoin_AutoStartInsolventSeatEjected(t *testing.T) {
 		"insolvency is handled by the eject path; the generic failure broadcast must not fire")
 }
 
-// Story 9.4 (Task 5, review patch): the TOCTOU branch — every seat clears the
-// prefilter (all >= 500), but the authoritative atomic ChargeStakes still
-// surfaces ONE insolvent user (a balance drop racing the charge). That seat
-// must be ejected and the room reverted, exactly like the prefilter path, but
-// here the charge IS attempted first. Distinct from
-// TestQuickJoin_AutoStartInsolventSeatEjected, where the prefilter ejects
-// before any charge (chargeCalls == 0).
+// Every seat clears the prefilter but the atomic charge reports one insolvent
+// user; that seat is ejected after the charge attempt, unlike the prefilter path.
 func TestQuickJoin_AutoStartChargeTOCTOUEjectsInsolventSeat(t *testing.T) {
 	starter := &fakeMatchStarter{}
-	// Prefilter sees all four solvent; the atomic charge then races and reports
-	// user 200 insolvent (chargeInsolvent + ErrInsufficientCoins).
 	wallet := &stubWallet{
 		balances:        map[uint]int{100: 5000, 200: 5000, 300: 5000, 400: 5000},
 		chargeErr:       apperr.ErrInsufficientCoins,
@@ -473,7 +443,7 @@ func TestQuickJoin_AutoStartChargeTOCTOUEjectsInsolventSeat(t *testing.T) {
 		"insolvency is handled by the eject path; the generic failure broadcast must not fire")
 }
 
-// Story 9.4 (Task 5): when the charge succeeds on the auto-start path but the
+// When the charge succeeds on the auto-start path but the
 // session fails to start, the charged stakes are refunded (no coins destroyed),
 // the room reverts to waiting, and error:match_start_failed is broadcast.
 func TestQuickJoin_AutoStartRefundOnStartFailure(t *testing.T) {
@@ -497,12 +467,9 @@ func TestQuickJoin_AutoStartRefundOnStartFailure(t *testing.T) {
 	assert.Empty(t, broadcastsOfType(t, broadcaster, "system:match_started"))
 }
 
-// --- Join affordability check (AC #2) ---
-
 func TestJoinRoom_InsufficientCoinsRejected(t *testing.T) {
 	wallet := &stubWallet{balance: 300}
 	e, repo := setupCoinTest(&fakeMatchStarter{}, wallet)
-	// Owner 100 created a 500-stake room (one seat taken).
 	r := &room.Room{Name: "Stake Room", OwnerID: 100, Status: "waiting", PlayerCount: 1, CoinBuyIn: 500}
 	require.NoError(t, repo.Create(r))
 	seat := 0
@@ -513,7 +480,6 @@ func TestJoinRoom_InsufficientCoinsRejected(t *testing.T) {
 	require.Equal(t, http.StatusConflict, rec.Code)
 	assert.Equal(t, "INSUFFICIENT_COINS", errCodeOf(t, rec))
 
-	// Not seated — player count unchanged, joiner absent.
 	persisted, _ := repo.FindByID(1)
 	assert.Equal(t, 1, persisted.PlayerCount)
 	players, _ := repo.FindPlayersByRoomID(1)
@@ -534,19 +500,15 @@ func TestJoinRoom_SufficientCoinsSeatsWithoutDeduction(t *testing.T) {
 
 	persisted, _ := repo.FindByID(1)
 	assert.Equal(t, 2, persisted.PlayerCount)
-	// Join is a check only — no charge happens at join.
 	assert.Equal(t, 0, wallet.chargeCalls)
 }
-
-// --- Match-start charge (AC #4, #5) ---
 
 func TestStartMatch_ChargesHumanSeatsNotBots(t *testing.T) {
 	starter := &fakeMatchStarter{}
 	wallet := &stubWallet{balance: 5000}
 	e, repo := setupCoinTest(starter, wallet)
-	// 3 humans (seats 0,1,2: users 100,200,300) + 1 bot (seat 3).
 	r := seedMixedRoom(t, e, repo, 3, 1)
-	r.CoinBuyIn = 500 // set the stake on the seeded room
+	r.CoinBuyIn = 500
 
 	rec := doStartMatch(e, "1", validToken(100))
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -559,13 +521,10 @@ func TestStartMatch_ChargesHumanSeatsNotBots(t *testing.T) {
 	assert.Equal(t, 500, starter.lastCoinBuyIn, "the buy-in is threaded into the session")
 }
 
-// Story 9.3 AC5: a single insolvent NON-owner seat is ejected (per-player, not
-// a whole-table rollback); the seat is freed, system:insolvent_ejected is pushed
-// to that player, the match does not start, the room reverts to waiting, and the
-// owner gets a 409. ChargeStakes is never reached — the prefilter caught it.
+// A single insolvent non-owner seat is ejected by the prefilter before any
+// charge, and the room reverts to waiting with a 409 for the owner.
 func TestStartMatch_InsolventSeatEjected(t *testing.T) {
 	starter := &fakeMatchStarter{}
-	// 200 is insolvent; owner 100 + 300/400 are fine.
 	wallet := &stubWallet{balances: map[uint]int{100: 5000, 200: 0, 300: 5000, 400: 5000}}
 	e, repo, broadcaster, _ := setupCoinTestBC(starter, wallet)
 	r := seedMixedRoom(t, e, repo, 4, 0)
@@ -581,14 +540,12 @@ func TestStartMatch_InsolventSeatEjected(t *testing.T) {
 	persisted, _ := repo.FindByID(1)
 	assert.Equal(t, "waiting", persisted.Status, "room reverts to waiting on insolvency")
 
-	// The insolvent seat is freed; the three solvent humans remain.
 	players, _ := repo.FindPlayersByRoomID(1)
 	assert.Len(t, players, 3)
 	for _, p := range players {
 		assert.NotEqual(t, uint(200), p.UserID, "insolvent seat must be freed")
 	}
 
-	// system:insolvent_ejected pushed only to the ejected player.
 	ejects := broadcastsOfType(t, broadcaster, "system:insolvent_ejected")
 	require.Len(t, ejects, 1)
 	assert.Equal(t, []uint{200}, ejects[0].userIDs)
@@ -603,7 +560,7 @@ func TestStartMatch_InsolventSeatEjected(t *testing.T) {
 	assert.Equal(t, 0, payload.Balance)
 }
 
-// Story 9.3 AC5: when the OWNER is the insolvent seat and a solvent seated human
+// When the OWNER is the insolvent seat and a solvent seated human
 // remains, ownership transfers to the first such seat and the room reverts to
 // waiting. Presence is cleared at start, so eligibility is solvent-only.
 func TestStartMatch_InsolventOwnerTransfersOwnership(t *testing.T) {
@@ -622,13 +579,13 @@ func TestStartMatch_InsolventOwnerTransfersOwnership(t *testing.T) {
 	assert.Equal(t, uint(200), persisted.OwnerID, "ownership transfers to first solvent seated human")
 }
 
-// Story 9.3 AC5: insolvent owner with no solvent human heir (only bots remain)
+// An insolvent owner with no solvent human heir (only bots remain)
 // closes the room.
 func TestStartMatch_InsolventOwnerNoHeirClosesRoom(t *testing.T) {
 	starter := &fakeMatchStarter{}
 	wallet := &stubWallet{balances: map[uint]int{100: 0}}
 	e, repo, _, _ := setupCoinTestBC(starter, wallet)
-	r := seedMixedRoom(t, e, repo, 1, 3) // lone human owner + 3 bots
+	r := seedMixedRoom(t, e, repo, 1, 3)
 	r.CoinBuyIn = 500
 
 	rec := doStartMatch(e, "1", validToken(100))
@@ -639,11 +596,8 @@ func TestStartMatch_InsolventOwnerNoHeirClosesRoom(t *testing.T) {
 	assert.Equal(t, "completed", persisted.Status, "room closes when no solvent human can host")
 }
 
-// Story 9.3 (deferred item 1): when ChargeStakes SUCCEEDS but the session fails
-// to start, the charged stakes are refunded (no coins destroyed), the room is
-// reverted to waiting (not stranded in playing), error:match_start_failed is
-// broadcast, and the owner's request resolves with an error (so the client does
-// not auto-navigate into a dead match) — never a success.
+// When the charge succeeds but the session fails to start, stakes are refunded,
+// the room reverts to waiting, and the owner gets an error rather than success.
 func TestStartMatch_RefundOnStartFailure(t *testing.T) {
 	starter := &fakeMatchStarter{err: errors.New("session manager unavailable")}
 	wallet := &stubWallet{balance: 5000}
@@ -663,16 +617,14 @@ func TestStartMatch_RefundOnStartFailure(t *testing.T) {
 	assert.Equal(t, "waiting", persisted.Status, "room reverted to waiting, never stranded in playing")
 
 	require.Len(t, broadcastsOfType(t, broadcaster, "error:match_start_failed"), 1)
-	// The success event must NOT have fired.
 	assert.Empty(t, broadcastsOfType(t, broadcaster, "system:match_started"))
 }
 
-// Story 9.3 AC5: a TOCTOU race — the prefilter passed but the authoritative
+// A TOCTOU race — the prefilter passed but the authoritative
 // ChargeStakes still reports an insolvent user — ejects that user and aborts;
 // the match never starts with an unpaid stake.
 func TestStartMatch_ChargeTimeInsolventEjects(t *testing.T) {
 	starter := &fakeMatchStarter{}
-	// Prefilter sees everyone solvent, but the atomic charge reports 200 insolvent.
 	wallet := &stubWallet{balance: 5000, chargeErr: apperr.ErrInsufficientCoins, chargeInsolvent: 200}
 	e, repo, broadcaster, _ := setupCoinTestBC(starter, wallet)
 	r := seedMixedRoom(t, e, repo, 4, 0)
@@ -694,15 +646,10 @@ func TestStartMatch_ChargeTimeInsolventEjects(t *testing.T) {
 	assert.Equal(t, []uint{200}, ejects[0].userIDs)
 }
 
-// Story 9.3 (review P1, HIGH): a TOCTOU race where the OWNER is the user
-// ChargeStakes reports insolvent — with solvent seated heirs present — must
-// TRANSFER ownership, not close the room. Regression guard: the charge-time
-// eject path must pass the FULL prefilter balances map (not a single-entry map),
-// or transferOwnershipOrClose sees every heir as broke and wrongly closes.
+// A charge-time insolvent owner with solvent heirs transfers ownership instead of
+// closing, which requires the full prefilter balances map on that path.
 func TestStartMatch_ChargeTimeInsolventOwnerTransfersOwnership(t *testing.T) {
 	starter := &fakeMatchStarter{}
-	// Prefilter sees everyone solvent; the atomic charge reports the OWNER (100)
-	// insolvent via the TOCTOU race.
 	wallet := &stubWallet{
 		balances:        map[uint]int{100: 5000, 200: 5000, 300: 5000, 400: 5000},
 		chargeErr:       apperr.ErrInsufficientCoins,
@@ -722,10 +669,8 @@ func TestStartMatch_ChargeTimeInsolventOwnerTransfersOwnership(t *testing.T) {
 	assert.Equal(t, uint(200), persisted.OwnerID, "ownership transfers to the first solvent seated heir")
 }
 
-// Story 9.3 (review P2): when a NON-owner seat is ejected at start, the remaining
-// in-room players must receive system:player_left for the freed seat — RoomPage
-// ignores system:room_updated for the in-room roster, so without player_left the
-// ejected seat stays visibly occupied.
+// Remaining players get system:player_left for an ejected seat, since RoomPage
+// ignores room_updated for the in-room roster.
 func TestStartMatch_InsolventSeatEjected_NotifiesRemainingPlayers(t *testing.T) {
 	starter := &fakeMatchStarter{}
 	wallet := &stubWallet{balances: map[uint]int{100: 5000, 200: 0, 300: 5000, 400: 5000}}
@@ -751,7 +696,7 @@ func TestStartMatch_ZeroBuyInSkipsCharge(t *testing.T) {
 	starter := &fakeMatchStarter{}
 	wallet := &stubWallet{balance: 5000}
 	e, repo := setupCoinTest(starter, wallet)
-	seedMixedRoom(t, e, repo, 4, 0) // CoinBuyIn defaults to 0
+	seedMixedRoom(t, e, repo, 4, 0)
 
 	rec := doStartMatch(e, "1", validToken(100))
 	require.Equal(t, http.StatusOK, rec.Code)

@@ -12,12 +12,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/season"
 )
 
-// The replay core (loading the window, rebuilding each outcome, the scoring
-// loop) is season's, shared with the server's season recalculation
-// (season/replay.go), so the tuning report and the recalculated rows can never
-// disagree. What lives here is the report: usernames, win rates, bot-table
-// statistics, the Silver match and the trace.
-
 // loadWindow reads the window's matches (season.LoadWindow) plus a display label
 // for every user who sat in one. It only reads; main runs it inside a READ ONLY
 // transaction.
@@ -44,9 +38,6 @@ func loadWindow(db *gorm.DB, from, to time.Time) ([]match.Match, map[uint]string
 		list = append(list, id)
 	}
 
-	// Soft-deleted accounts are deliberately INCLUDED: their matches are in the
-	// replay (their SP moved their opponents' expected results), so they need a
-	// label; they are marked rather than hidden.
 	var rows []struct {
 		ID       uint
 		Username string
@@ -71,7 +62,8 @@ func seatIDs(m match.Match) [4]*uint {
 	return [4]*uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID}
 }
 
-// playerResult is one player's line in the replay report.
+// playerResult is one player's line in the replay report. SilverAt is the match count
+// at which the player first reached Silver, or 0 if they never did.
 type playerResult struct {
 	UserID     uint
 	Name       string
@@ -82,9 +74,7 @@ type playerResult struct {
 	FinalSP    int
 	Tier       string
 	Division   int
-	// SilverAt is the player's own match count at which they first reached the
-	// Silver floor, or 0 if they never did.
-	SilverAt int
+	SilverAt   int
 }
 
 // replaySummary counts what the replay did with the window.
@@ -97,12 +87,11 @@ type replaySummary struct {
 	Abandonments int
 	CapotMatches int
 	BotOnly      int
-	// Trace is the traced player's match-by-match record, empty unless a
-	// player was traced.
-	Trace []traceRow
+	Trace        []traceRow
 }
 
-// traceRow is one match of the traced player's replay.
+// traceRow is one match of the traced player's replay. Change is the applied
+// change, which the 0 floor can make smaller than the formula's.
 type traceRow struct {
 	N         int
 	MatchID   uint
@@ -112,10 +101,8 @@ type traceRow struct {
 	Surrender bool
 	Abandoned bool
 	Before    int
-	// Change is the APPLIED change, After - Before; at the 0 floor it is smaller
-	// than the formula's own number.
-	Change int
-	After  int
+	Change    int
+	After     int
 }
 
 // replay runs the window through season.ReplayMatches and builds the report
@@ -188,8 +175,6 @@ func replay(matches []match.Match, names map[uint]string, f season.SPFormula, la
 	for _, p := range result.Players {
 		r := stats[p.UserID]
 		if r == nil {
-			// The core scored a player the observer's seat check did not count:
-			// report them with the core's own game count rather than panic.
 			r = &playerResult{UserID: p.UserID, Name: names[p.UserID], Matches: p.GamesPlayed}
 		}
 		r.FinalSP, r.Tier, r.Division = p.SP, p.Tier, p.Division

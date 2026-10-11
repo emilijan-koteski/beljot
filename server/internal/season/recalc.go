@@ -8,46 +8,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// One-time SEASON RECALCULATIONS (migration 000029).
-//
-// A recalculation re-scores a whole season from its stored matches with the
-// LIVE formula and ladder, and writes each player's result over their
-// player_seasons row. It exists for 2026 Q3, whose standings were scored by the
-// retired climb-only formula: 000029 queues one job for the season starting
-// 2026-07-01, and the server runs pending jobs once at startup, after the
-// migrations and before it accepts connections (cmd/api/main.go). Later Q3
-// matches then score live from the recalculated totals.
-//
-// A job is a season_recalculations row keyed by the season's started_at. It is
-// PENDING while completed_at is NULL and DONE once it is set; a done job never
-// runs again. A failed job rolls back whole and stays pending, so the next
-// start retries it.
-
 // RecalculationResult reports one job that ran to completion.
 type RecalculationResult struct {
 	SeasonStartedAt time.Time
-	// SeasonFound is false when no season row starts at SeasonStartedAt (a
-	// fresh database that never had that quarter): the job is marked done and
-	// nothing is written. SeasonID and SeasonName are then zero.
-	SeasonFound bool
-	SeasonID    uint
-	SeasonName  string
-	// Rewritten is how many player_seasons rows were written (inserted or
-	// overwritten): one per player of the replay.
-	Rewritten int
-	Summary   ReplaySummary
-	// Untouched lists, ascending, the users whose row in the season the replay
-	// did not cover (they sat in no scored match of its window). Their rows are
-	// left as they are; the caller logs them.
-	Untouched []uint
+	SeasonFound     bool
+	SeasonID        uint
+	SeasonName      string
+	Rewritten       int
+	Summary         ReplaySummary
+	Untouched       []uint
 }
 
-// RunPendingRecalculations runs every pending job, oldest season first, each in
-// its own transaction, and stamps completed_at = now on the ones it finishes.
-//
-// It returns the jobs that ran. A failing job does not stop the others: its
-// error is joined into the returned error and it stays pending. A job another
-// process finished while this one waited on its lock is skipped, not re-run.
+// RunPendingRecalculations runs every pending job, oldest season first, each in its own transaction.
+// A failing job stays pending and its error is joined into the result, without stopping the others.
 func RunPendingRecalculations(db *gorm.DB, now time.Time) ([]RecalculationResult, error) {
 	var pending []recalculationJob
 	if err := db.Raw(`
@@ -76,8 +49,6 @@ func RunPendingRecalculations(db *gorm.DB, now time.Time) ([]RecalculationResult
 	return results, errors.Join(errs...)
 }
 
-// The recalculation transaction's bounds on waiting for a row lock and on any
-// one statement (Postgres interval syntax, SET LOCAL so they end with it).
 const (
 	recalcLockTimeout      = "10s"
 	recalcStatementTimeout = "120s"
@@ -88,26 +59,8 @@ type recalculationJob struct {
 	SeasonStartedAt time.Time `gorm:"column:season_started_at"`
 }
 
-// runRecalculation runs one job in ONE transaction:
-//
-//  1. LOCK the job row, re-checking that it is still pending (a second process
-//     that waited on the lock finds it done and returns ran = false).
-//  2. FIND the season by started_at. None: mark the job done, write nothing.
-//  3. REPLAY the season's window [started_at, ends_at) with the live formula
-//     and ladder (ReplayWindow). It reads the matches, never the rows it is
-//     about to overwrite, so an old-formula award that landed before this run
-//     is replaced like every other total.
-//  4. WRITE each replayed player's row in ASCENDING user-ID order, the
-//     ApplySeasonPoints discipline: INSERT a zero row ON CONFLICT DO NOTHING
-//     (a player who never had a row gets one), lock it with SELECT ... FOR
-//     UPDATE, then set sp, the rank snapshot and both counters outright.
-//  5. MARK the job done in the same transaction, so the rows and the stamp
-//     commit together or not at all.
-//
-// It runs at startup before the server accepts connections, so it must never
-// wait forever: the transaction first sets a lock timeout and a statement
-// timeout, and a lock another session holds past them fails the job (logged,
-// still pending, retried on the next start) instead of hanging boot.
+// runRecalculation replays one season from its stored matches and rewrites its rows in ascending user-ID order,
+// marking the job done in the same transaction. Lock and statement waits are bounded so a held lock fails the job instead of hanging boot.
 func runRecalculation(db *gorm.DB, start, now time.Time) (RecalculationResult, bool, error) {
 	res := RecalculationResult{SeasonStartedAt: start}
 	ran := false
@@ -171,7 +124,6 @@ func rewriteSeason(tx *gorm.DB, s Season, res *RecalculationResult) error {
 
 	zeroTier, zeroDivision := RankForSP(0)
 	written := make([]uint, 0, len(replay.Players))
-	// replay.Players is in ascending user-ID order: the lock order.
 	for _, p := range replay.Players {
 		if err := tx.Exec(`
 			INSERT INTO player_seasons

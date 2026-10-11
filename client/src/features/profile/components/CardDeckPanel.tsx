@@ -9,35 +9,16 @@ import { useAuthStore } from "@/shared/stores/authStore";
 
 import { SidePanel } from "./SidePanel";
 
-// Order matches the in-match SettingsDialog: French first, since it is the
-// default and the deck an account that never chose is already looking at.
 const DECKS = [
   { code: "french", labelKey: "cardDeck.french" },
   { code: "croatian", labelKey: "cardDeck.croatian" },
 ] as const satisfies ReadonlyArray<{ code: CardDeck; labelKey: string }>;
 
-/**
- * The card ID each option previews.
- *
- * Deliberately the ace of DIAMONDS/BELLS. Hearts is the one suit that looks
- * nearly identical in both decks, so previewing it hid the very thing the
- * choice changes; `D` swaps a red diamond for a gold bell, which is the most
- * legible difference in the set at 45 px.
- */
-const PREVIEW_CARD = "AD" as const;
+const ACE_OF_DIAMONDS_SHOWS_MOST_DECK_DIFFERENCE = "AD" as const;
 
 /**
- * Profile-sidebar card-deck picker (Story 12.4), so the deck is settable outside
- * a match as well as from the in-game Settings dialog.
- *
- * Persistence is the same optimistic-write-with-silent-revert the language
- * selector uses: the auth store is the single source every `PlayingCard` reads,
- * so the choice applies immediately with no reload, and a failed PATCH rolls the
- * store back rather than surfacing an error the player cannot act on.
- *
- * SELF-ONLY. This is a private preference, absent from `PublicProfileResponse`,
- * so the panel mounts on `ProfilePage` and must never appear on
- * `PublicPlayerProfilePage`.
+ * Self-only profile picker for the card deck, saved optimistically with a silent revert on failure.
+ * It is a private preference, so it must never appear on the public profile page.
  */
 export function CardDeckPanel() {
   const { t } = useTranslation();
@@ -45,9 +26,6 @@ export function CardDeckPanel() {
 
   async function handleSelect(next: CardDeck) {
     if (next === active) return;
-    // Same latest-wins helper the in-match Settings dialog uses, so a toggle
-    // here and a toggle there are ordered against each other rather than each
-    // racing on its own captured "previous". `active` is already resolved.
     await persistCardDeck(next, active);
   }
 
@@ -61,7 +39,7 @@ export function CardDeckPanel() {
       <div className="flex gap-2.5" role="radiogroup" aria-label={t("profile.cardDeck.title")}>
         {DECKS.map((deck) => {
           const selected = active === deck.code;
-          const previewUrl = cardFaceUrl(PREVIEW_CARD, deck.code);
+          const previewUrl = cardFaceUrl(ACE_OF_DIAMONDS_SHOWS_MOST_DECK_DIFFERENCE, deck.code);
           return (
             <button
               key={deck.code}
@@ -77,14 +55,7 @@ export function CardDeckPanel() {
                   : "border-border bg-surface-elevated hover:bg-surface-sunken",
               )}
             >
-              {/* Decorative: the option's own label is the announcement, and the
-                  radio's aria-checked carries the state. Same `onError` fallback
-                  as PlayingCard — production answers a missing asset with 200
-                  index.html, which browsers paint as a broken-image glyph. */}
               <img
-                // Keyed by src for the same reason as PlayingCard's face: React
-                // would otherwise reuse this node across deck changes and the
-                // imperative hide below would outlive the failure that set it.
                 key={previewUrl}
                 src={previewUrl}
                 alt=""

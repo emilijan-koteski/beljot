@@ -6,10 +6,7 @@ import { BrandLockup } from "@/features/landing/components/BrandLockup";
 import { ContactDialog } from "@/features/landing/components/ContactDialog";
 import { SupportDialog } from "@/shared/components/support/SupportDialog";
 
-// Felt footer — brand, a row of links, and the copyright. Rules reaches the
-// public reference page; Privacy + Terms the public legal pages;
-// Contact and Support each open a dialog.
-
+// Felt footer with the brand, links to rules, legal, contact and support, and the copyright.
 export function LandingFooter() {
   const { t } = useTranslation();
   const [supportOpen, setSupportOpen] = useState(false);
@@ -31,8 +28,6 @@ export function LandingFooter() {
             </Link>
           ))}
           <ContactDialog />
-          {/* Labelled "Support Beljot.online" rather than a bare "Support":
-              next to Contact, the short form would read as a help desk. */}
           <button
             type="button"
             onClick={() => setSupportOpen(true)}

@@ -5,11 +5,6 @@ import { useAuthStore } from "@/shared/stores/authStore";
 import { axiosClient, axiosPublic, FetchError, refreshAccessToken } from "./axiosClient";
 
 describe("axiosClient request deadline", () => {
-  // A missing timeout means a hung connection never settles the promise, which
-  // strands every pending-guarded confirm dialog (remove-friend,
-  // unlink-account, remove-bot) with all dismissal paths disabled. Both
-  // instances must carry one — axiosPublic handles login/refresh/logout, which
-  // are exactly the calls a user cannot navigate away from.
   it.each([
     ["axiosClient", axiosClient],
     ["axiosPublic", axiosPublic],
@@ -19,9 +14,6 @@ describe("axiosClient request deadline", () => {
   });
 
   it("reports a timed-out request as TIMEOUT, distinct from a network failure", async () => {
-    // Axios surfaces an exceeded `timeout` as ECONNABORTED with no response.
-    // The interceptor must map that to its own code so callers can say "took
-    // too long" rather than "you are offline".
     const timeoutError = Object.assign(new Error("timeout of 15000ms exceeded"), {
       isAxiosError: true,
       code: "ECONNABORTED",

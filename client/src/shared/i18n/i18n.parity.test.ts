@@ -1,14 +1,3 @@
-// i18n parity test. The existing `i18n.test.ts` already runs an equivalent
-// assertion bundled with other i18n smoke checks; this file isolates the
-// parity gate per the spec (AC-007) so a single dedicated failure points
-// directly at translation drift without unrelated i18n behaviour mixed in.
-//
-// Approach: deep-flatten en.json (the canonical source) and every supported
-// locale into dotted key paths (e.g. "lobby.roomLobby.startMatch", "team.us")
-// and assert every locale's set is identical to en.json's. Sorted arrays
-// make the failure diff readable in CI logs. Also asserts every leaf is a
-// non-empty string so a stray `"key": ""` cannot pass parity (AC-005).
-
 import { describe, expect, it } from "vitest";
 
 import en from "./en.json";
@@ -16,10 +5,7 @@ import hr from "./hr.json";
 import mk from "./mk.json";
 import sr from "./sr.json";
 
-// flattenKeys walks an arbitrary JSON object and returns the dotted path of
-// every leaf. Arrays inside translation files would be flattened too, but
-// the project's i18n files contain only nested string maps; the recursion
-// handles either shape defensively.
+/** Returns the dotted path of every leaf in a JSON object. */
 function flattenKeys(obj: unknown, prefix = ""): string[] {
   if (obj === null || typeof obj !== "object") {
     return prefix === "" ? [] : [prefix];
@@ -36,8 +22,7 @@ function flattenKeys(obj: unknown, prefix = ""): string[] {
   return out;
 }
 
-// flattenEntries returns [path, leafValue] tuples — used to assert every
-// translated leaf is a non-empty string, not just present in the key tree.
+/** Returns a [path, value] pair for every leaf in a JSON object. */
 function flattenEntries(obj: unknown, prefix = ""): Array<[string, unknown]> {
   if (obj === null || typeof obj !== "object") {
     return prefix === "" ? [] : [[prefix, obj]];
@@ -78,8 +63,6 @@ describe("i18n parity", () => {
         extraInLocale,
         `Keys present in ${name}.json but missing in en.json: ${extraInLocale.join(", ")}`,
       ).toEqual([]);
-      // Belt-and-suspenders: explicit set equality so a failure shows the
-      // sorted full key list in the CI log, not just the first diff.
       expect(localeKeys, `${name}.json key parity vs en.json`).toEqual(enKeys);
     }
   });
@@ -88,9 +71,6 @@ describe("i18n parity", () => {
     const allFiles = [["en", en], ...locales] as const;
 
     for (const [name, locale] of allFiles) {
-      // Use trim() so whitespace-only leaves (" ", "\t", "\n") also fail —
-      // a bare " " is functionally an empty translation but slips through a
-      // length === 0 check.
       const empties = flattenEntries(locale)
         .filter(([, v]) => typeof v !== "string" || v.trim().length === 0)
         .map(([path]) => path);
@@ -102,17 +82,6 @@ describe("i18n parity", () => {
   });
 });
 
-// The Croatian deck's suits are ordinary common nouns (zelje / srce / bundeva /
-// žir, лист / срце / ѕвонче / жир), unlike the French row's borrowed, capitalised
-// card words (Pik / Herc / Karo / Tref). Most templates put the suit
-// mid-sentence — "zvao bundeva za aduta", "го зеде ѕвонче за адут" — and none of
-// these languages capitalise common nouns there, so a capital in the stored
-// string is an orthography bug at every one of those call sites.
-//
-// Nothing else would catch it: the parity test above checks key sets and
-// non-empty leaves, never wording. The one surface that needs a leading capital,
-// TrumpIndicator's suit caption, takes it from CSS `capitalize` rather than from
-// the stored value, so lowercase here is safe as well as correct.
 describe("card-deck suit name casing", () => {
   const LATIN_AND_CYRILLIC = { hr, sr, mk } as const;
 
@@ -136,11 +105,6 @@ describe("card-deck suit name casing", () => {
   });
 });
 
-// The declaration-phase copy replaced a per-seat "waiting for {name}" banner
-// whose own test carried the only cross-locale assertion for these strings.
-// Parity above proves the keys EXIST; this proves they were actually translated
-// — an untranslated locale most often shows up as an English word left in place
-// or a Latin string in the Cyrillic bundle.
 describe("declaration phase copy", () => {
   const KEYS = ["noneTitle", "noneBody", "waitingOthers"] as const;
 
@@ -165,7 +129,6 @@ describe("declaration phase copy", () => {
   it("keeps the Macedonian declaration-phase copy all-Cyrillic", () => {
     const localised = decl(mk as unknown as Record<string, unknown>);
     for (const key of KEYS) {
-      // Strip the interpolation placeholder — {{answered}} is Latin by design.
       const prose = (localised[key] ?? "").replace(/\{\{.*?\}\}/g, "");
       expect(prose, `mk.${key}`).not.toMatch(/[A-Za-z]/);
     }
@@ -185,13 +148,6 @@ describe("declaration phase copy", () => {
   });
 });
 
-// The support surfaces are the one place the app asks players for money, so
-// their copy gets its own gate. Parity above proves the keys EXIST; this proves
-// they were translated, that the Macedonian stayed Cyrillic, and that the
-// clickable slot survived translation — a locale that drops <action> renders a
-// sentence with nothing to click, and naming that slot <link> breaks silently
-// (`link` is a real HTML void element, so Trans's parser closes it immediately
-// and spills the label into the surrounding sentence).
 describe("support copy", () => {
   const PROSE_KEYS = ["label", "note"] as const;
   const DIALOG_KEYS = ["eyebrow", "title", "body", "cta", "qrToggle"] as const;
@@ -234,9 +190,6 @@ describe("support copy", () => {
       ...DIALOG_KEYS.map((k): [string, string] => [`dialog.${k}`, localised.dialog[k] ?? ""]),
     ];
     for (const [key, value] of entries) {
-      // Allowed Latin: the <action> markup slot and the brand name itself.
-      // `qrAlt` is deliberately excluded from this list — it carries both the
-      // "QR" abbreviation and the full "Buy Me a Coffee" brand name.
       const prose = value.replace(/<\/?action>/g, "").replace(/Beljot(\.online)?/g, "");
       expect(prose, `mk.support.${key}`).not.toMatch(/[A-Za-z]/);
     }

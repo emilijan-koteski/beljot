@@ -3,11 +3,6 @@ import { Link } from "react-router";
 
 import { cn } from "@/shared/lib/utils";
 
-// The landing's single primary action — a felt-green/lime CTA rendered as a
-// router <Link> (so it can sit inside anchors without nesting a <button>).
-// Colour + glow come from tokens (`--accent`, `--accent-glow`), so inside a
-// `.felt-surface` it auto-themes to lime with a lime glow.
-
 type LandingCtaProps = {
   to: string;
   children: ReactNode;
@@ -16,6 +11,7 @@ type LandingCtaProps = {
   className?: string;
 };
 
+// The landing's primary CTA, rendered as a router Link so it never nests a button in an anchor.
 export function LandingCta({ to, children, size = "md", testId, className }: LandingCtaProps) {
   return (
     <Link

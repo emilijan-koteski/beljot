@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 
 /**
- * Subscribes to the `prefers-reduced-motion: reduce` media query and returns
- * the live value. Reactive — toggling the OS-level setting mid-session
- * updates consumers on the next render. SSR-safe (returns false when window
- * or matchMedia is undefined).
+ * Subscribes to the `prefers-reduced-motion: reduce` media query and returns the live value.
+ * Returns false when `window.matchMedia` is unavailable.
  */
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState<boolean>(() => {

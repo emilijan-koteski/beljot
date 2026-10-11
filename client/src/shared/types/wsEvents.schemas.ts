@@ -1,30 +1,3 @@
-// WebSocket event payload schemas — runtime parsers (Zod) for the event
-// payloads enumerated in `wsEvents.ts`. Two roles:
-//
-// 1. Drift gate against the Go server. The contract test in
-//    `wsEvents.contract.test.ts` runs every JSON golden produced by
-//    `server/internal/ws/events_contract_test.go` through the matching
-//    schema; any rename or shape change on either side triggers a parse
-//    failure (or, locally, a Go test diff) so the WS contract files stay
-//    paired.
-//
-// 2. Compile-time conformance check against the hand-maintained interface
-//    types in `wsEvents.ts`. The bottom of this file declares
-//    `_*Conformance` helper types: each asserts that the schema's inferred
-//    type and the interface are mutually-extending. This catches
-//    schema-vs-interface drift the moment `tsc --noEmit` runs — no need to
-//    wait for a runtime parse to fire.
-//
-// Schemas use `z.strictObject({...})` so unknown fields cause parse
-// errors. That is the whole point — without strictness, the Go side could
-// add a field and the TS side would silently swallow it.
-//
-// Coverage scope: team-shaped payloads (HandScored, MatchEnd,
-// MatchAbandoned) plus the small set the spec lists as required for the
-// contract goldens. Non-team-shaped payloads not in this file are covered
-// by interfaces in `wsEvents.ts` only — adding their schemas is a future
-// refactor, not in this commit's scope.
-
 import { z } from "zod";
 
 import type { MatchState, PlayerState } from "./matchTypes";
@@ -53,8 +26,6 @@ import type {
 } from "./wsEvents";
 import { SEASON_RANK_CHANGES, SEASON_SP_REASONS } from "./wsEvents";
 
-// --- Card / declaration sub-schemas (used by MatchState + DeclarationsResolved) ---
-
 const CardSchema = z.strictObject({
   rank: z.string(),
   suit: z.string(),
@@ -75,34 +46,11 @@ const PlayerStateSchema = z.strictObject({
   team: z.string(),
   declarations: z.array(DeclarationSchema),
   connected: z.boolean(),
-  // Story 10.3: bot seats. Strict schema — this entry must land in the same
-  // commit as the Go PlayerState.IsBot field or every snapshot hard-fails.
   isBot: z.boolean(),
-  // Server-authoritative lifetime level (from total_xp), captured at match
-  // start and static for the match. Must match the Go PlayerState.Level field.
   level: z.number().int(),
-  // The seat's 128 px avatar URL, null for bots and players without one.
-  // Captured at match start like level. Must match the Go PlayerState.AvatarURL
-  // field (same build-time gate as the fields below).
   avatarUrl: z.string().nullable(),
-  // Story 12.8: how many cards the seat holds face-down, outside `hand`. Must
-  // land in the same commit as the Go PlayerState.FaceDownCount field or the
-  // contract test fails. Note the gate is BUILD-time, not runtime: these schemas
-  // are exercised by wsEvents.contract.test.ts against the Go goldens, while the
-  // live dispatch path casts the payload instead of parsing it — so consumers
-  // still guard against a field an older server did not send.
   faceDownCount: z.number().int(),
-  // Story 12.10: the open-hand counterpart of faceDownCount. match_state is
-  // projected per recipient — only the viewer's own `hand` carries cards, so
-  // opponents render from this count. Real hand length on all four seats.
-  // Same build-time gate as faceDownCount above.
   handCount: z.number().int(),
-  // Whether this seat has answered the dedicated declaration phase (declared or
-  // skipped). Public on all four seats because the phase asks every seat
-  // regardless of what it holds, so it reports who has clicked and never who
-  // holds a meld. Must land in the same commit as the Go
-  // PlayerState.DeclarationAnswered field. Same build-time gate as the two
-  // counts above.
   declarationAnswered: z.boolean(),
 });
 
@@ -111,20 +59,11 @@ const TrickCardSchema = z.strictObject({
   playerSeat: z.number(),
 });
 
-// EventMatchStateSchema mirrors `game.MatchState` in server/internal/game/state.go.
-// The server emits this on every match-state-affecting event so the client can sync.
-// Strict-object: any new field on the Go side fails this parse until the
-// schema lands too.
 export const EventMatchStateSchema = z.strictObject({
   id: z.number(),
   roomId: z.number(),
   variant: z.string(),
   matchMode: z.string(),
-  // Enum, not z.string(): the phase string is the ONLY field carrying the
-  // dedicated-declaration state, so it is load-bearing. SERVER_PHASES is pinned
-  // against the Go-owned golden by wsEvents.contract.test.ts, which makes this
-  // the far end of a chain that fails on drift instead of silently accepting an
-  // unknown phase and rendering a blank table.
   phase: z.enum(SERVER_PHASES),
   ownerSeat: z.number(),
   handNumber: z.number(),
@@ -134,27 +73,9 @@ export const EventMatchStateSchema = z.strictObject({
   trumpCandidate: CardSchema.nullable(),
   biddingRound: z.number(),
   biddingPassCount: z.number(),
-  // Story 12.8: the active seat has no legal pass. Must land in the same commit
-  // as the Go GameState.MustPickTrump field — enforced by the contract test, not
-  // at runtime (see faceDownCount above).
   mustPickTrump: z.boolean(),
-  // The room's melds-and-Belote setting — the ONE rule-config field the server
-  // puts on the wire, because it is a setting the owner chose and the UI labels
-  // the table with it. Must land in the same commit as the Go
-  // GameState.DeclarationsEnabled field; the contract test is what enforces
-  // that, not runtime.
   declarationsEnabled: z.boolean(),
-  // "Dosta": whether the match ends the instant a team's running total reaches
-  // the target, hand unfinished. The SECOND rule-config field the server puts on
-  // the wire, and for the same reason as declarationsEnabled above — the owner
-  // chose it and the UI labels the table with it. Must land in the same commit as
-  // the Go GameState.StopAtTarget field; the contract test is what enforces that,
-  // not runtime.
   stopAtTarget: z.boolean(),
-  // No `deck` field: the 11 held-back Bitola cards are hidden information and
-  // Story 12.10 removed them from the wire outright (GameState.Deck is
-  // json:"-" on the Go side). strictObject means the field cannot quietly
-  // return without failing the contract test.
   trickNumber: z.number(),
   currentTrick: z.array(TrickCardSchema),
   leadSuit: z.string().nullable(),
@@ -170,10 +91,6 @@ export const EventMatchStateSchema = z.strictObject({
   pendingBelotSeat: z.number().nullable(),
   belotAnnounced: z.boolean(),
   winnerTeam: z.number().nullable(),
-  // LastHandResult uses the same shape as the typed payload, but on MatchState
-  // it can be nil between hands. Inline-declared rather than reusing
-  // HandScoredPayloadSchema because MatchState's lastHandResult does NOT
-  // include match-score keys (those live on TeamScores).
   lastHandResult: z
     .strictObject({
       teamACardPoints: z.number(),
@@ -210,8 +127,6 @@ export const EventMatchStateSchema = z.strictObject({
   ]),
 });
 
-// --- Action / state event payloads ---
-
 export const CardPlayedPayloadSchema = z.strictObject({
   playerSeat: z.number(),
   cardId: z.string(),
@@ -220,16 +135,10 @@ export const CardPlayedPayloadSchema = z.strictObject({
 
 export const TrickResolvedPayloadSchema = z.strictObject({
   winnerSeat: z.number(),
-  // Schema mirrors the interface (`number`) for type-conformance; runtime
-  // values from Go are still 0|1 so consumers can treat it as such.
   winnerTeam: z.number(),
   cards: z.array(z.string()),
 });
 
-// HandScoredPayloadSchema is the team-shaped payload that drove the
-// teamA/teamB rename. Field-name drift here breaks ScorePanel's
-// per-hand reveal — the contract test catches it before the dispatcher
-// silently drops the event.
 export const HandScoredPayloadSchema = z.strictObject({
   teamACardPoints: z.number(),
   teamBCardPoints: z.number(),
@@ -248,11 +157,7 @@ export const HandScoredPayloadSchema = z.strictObject({
   teamBMatchScore: z.number(),
 });
 
-// MatchEndPayloadSchema — outcomeReason / surrenderedBySeat are optional
-// (Go uses omitempty). Strict-object still rejects unknown keys.
 export const MatchEndPayloadSchema = z.strictObject({
-  // See note on TrickResolvedPayloadSchema — schema kept as `number` to match
-  // the hand-maintained interface; values from Go are still 0|1 in practice.
   winnerTeam: z.number(),
   teamAFinalScore: z.number(),
   teamBFinalScore: z.number(),
@@ -276,8 +181,6 @@ export const MatchAbandonedPayloadSchema = z.strictObject({
   matchDurationSec: z.number(),
 });
 
-// cardId is the absorbed candidate, or EMPTY when the variant has no candidate.
-// Nothing in between: a 1- or 3-character id is malformed and must not parse.
 export const TrumpSelectedPayloadSchema = z.strictObject({
   playerSeat: z.number(),
   trumpSuit: z.string(),
@@ -285,8 +188,6 @@ export const TrumpSelectedPayloadSchema = z.strictObject({
 });
 
 export const DeclarationsResolvedPayloadSchema = z.strictObject({
-  // See note on TrickResolvedPayloadSchema — schema kept as `number | null`
-  // to match the hand-maintained interface; values from Go are 0|1|null.
   winnerTeam: z.number().nullable(),
   contested: z.boolean(),
   declarations: z.array(
@@ -325,20 +226,16 @@ export const AutoActionPayloadSchema = z.strictObject({
     z.literal("pass_trump"),
     z.literal("skip_declare"),
     z.literal("skip_belot"),
-    // Story 12.8: the forced dealer pick. Must stay in step with the Go
-    // ws.AutoActionType constants.
     z.literal("pick_trump"),
   ]),
 });
 
-// Story 9.2: per-human match-end coin settlement.
 export const CoinSettlementPayloadSchema = z.strictObject({
   coinDelta: z.number().int(),
   newBalance: z.number().int(),
   pot: z.number().int(),
 });
 
-// Story 9.5: per-human match-end XP award.
 export const XpAwardedPayloadSchema = z.strictObject({
   xpEarned: z.number().int(),
   newTotalXp: z.number().int(),
@@ -346,10 +243,6 @@ export const XpAwardedPayloadSchema = z.strictObject({
   leveledUp: z.boolean(),
 });
 
-// Story 9.7: per-human match-end honor update. honorTier is left as a plain
-// string rather than a union of the five tokens on purpose — a server-side
-// retune that adds a tier must not hard-fail a stale client bundle (deferred
-// item D142); the display layer falls back for an unknown token instead.
 export const HonorUpdatedPayloadSchema = z.strictObject({
   honorScore: z.number().int(),
   honorTier: z.string(),
@@ -358,14 +251,6 @@ export const HonorUpdatedPayloadSchema = z.strictObject({
   isNewPlayer: z.boolean(),
 });
 
-// Story 13.1, reshaped by 13.5: per-human match-end Season Points award. rankTier
-// is left as a plain string rather than a union of the eight tokens for the same
-// reason honorTier is — a server-side retune that adds a tier must not hard-fail
-// a stale client bundle; normalizeSeasonTier in shared/lib/seasonTier.ts falls
-// back to the SP's own bucket instead. seasonName is likewise a free string: it
-// is a machine-stable "YYYY QN" identifier the client renders verbatim.
-// rankDivision is null (never absent) for Master and Grandmaster. rankChange and
-// reason are closed token sets mirroring the Go constants, so they are enums.
 export const SeasonPointsAwardedPayloadSchema = z.strictObject({
   spChange: z.number().int(),
   newSeasonSp: z.number().int(),
@@ -398,40 +283,10 @@ export const SurrenderDeclinedPayloadSchema = z.strictObject({
   decliningSeat: z.number(),
 });
 
-// --- Compile-time conformance ---
-//
-// Each `_*Conformance` type asserts the schema's inferred type is mutually
-// assignable to the hand-maintained interface. If a field drifts on either
-// side the type evaluates to `false` and the `const _*Conforms: true =
-// _*Conformance` line fails to compile. `tsc --noEmit` becomes the gate
-// — no need for a runtime parse to surface a schema-vs-interface mismatch.
-//
-// Pattern: bidirectional `extends` so adding-only changes on either side
-// also fail (a Zod-side new field that isn't on the interface is just as
-// much drift as the reverse).
-
+/** True when A and B are mutually assignable, so each witness below fails tsc on schema-vs-interface drift. */
 type MutualExtends<A, B> = A extends B ? (B extends A ? true : false) : false;
 
-// --- MatchState / PlayerState witnesses (Story 12.10) ---
-//
-// The live dispatch path CASTS event:match_state to `MatchState` instead of
-// parsing it (useWsDispatch), so nothing at runtime connects the interface to
-// the schema the goldens gate — a field added or removed on only one side
-// (exactly this story's change: `deck` out, `handCount` in) would drift
-// silently. `MutualExtends` cannot witness these two directly because the
-// interface deliberately narrows value types (Variant, Suit, Rank, TeamString
-// are unions where the wire schema keeps plain strings), so the witness is
-// split in two, each half compiling only while its guarantee holds:
-//
-//  1. Key parity, both directions and at both nesting levels that this story
-//     touched (MatchState itself and the PlayerState tuple element) — the
-//     drift class the cast leaves open is a missing/extra field, and keys
-//     catch it symmetrically.
-//  2. Assignability of the interface INTO the schema output (minus `phase`,
-//     whose union adds the client-local "" member the server never sends) —
-//     this checks every field's VALUE type in the direction the narrowing
-//     allows, so e.g. `handCount: string` on either side still fails tsc.
-
+/** True when A and B have exactly the same keys, for interfaces that narrow the wire's plain strings. */
 type MutualKeys<A, B> = [keyof A] extends [keyof B]
   ? [keyof B] extends [keyof A]
     ? true
@@ -447,6 +302,7 @@ type _PlayerStateConformance = MutualKeys<
 >;
 const _playerStateConforms: _PlayerStateConformance = true;
 
+/** Checks every MatchState value type against the schema, minus `phase`, whose union adds the client-local "". */
 type _MatchStateAssignability =
   Omit<MatchState, "phase"> extends Omit<z.infer<typeof EventMatchStateSchema>, "phase">
     ? true
@@ -570,9 +426,6 @@ type _SurrenderDeclinedConformance = MutualExtends<
 >;
 const _surrenderDeclinedConforms: _SurrenderDeclinedConformance = true;
 
-// Suppress unused-locals — these constants exist purely for the type-level
-// assertion above. Re-exporting under a private namespace gives them a
-// reachable use without polluting the public module surface.
 export const _conformanceWitnesses = {
   _matchStateConforms,
   _playerStateConforms,

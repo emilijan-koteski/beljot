@@ -15,8 +15,7 @@ function renderRules() {
   );
 }
 
-// `getAllByTestId` already throws when nothing matches, so the guard is here
-// only to narrow away `undefined` under `noUncheckedIndexedAccess`.
+/** Returns the first difference marker rendered on the page. */
 function firstDiffMarker(): HTMLElement {
   const [marker] = screen.getAllByTestId("rules-diff-marker");
   if (!marker) throw new Error("no difference marker rendered");
@@ -24,7 +23,6 @@ function firstDiffMarker(): HTMLElement {
 }
 
 beforeEach(async () => {
-  // jsdom has no scrollIntoView — the TOC jump calls it.
   Element.prototype.scrollIntoView = vi.fn();
   await act(async () => {
     await i18n.changeLanguage("en");
@@ -65,7 +63,6 @@ describe("RulesPage", () => {
   it("renders both card ladders with trump Jack worth 20", () => {
     renderRules();
     const trump = screen.getByTestId("ladder-trump");
-    // Jack row: rank chip + name + 20 points.
     expect(within(trump).getByText("Jack")).toBeInTheDocument();
     expect(within(trump).getByText("20")).toBeInTheDocument();
     expect(screen.getByTestId("ladder-plain")).toBeInTheDocument();
@@ -84,12 +81,6 @@ describe("RulesPage", () => {
     await user.click(screen.getByTestId("toc-melds"));
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
-
-  // ── The variant split ────────────────────────────────────────────────────
-  //
-  // The four shared chapters must not move between tabs; `basics` and `melds`
-  // must. These assertions are the only thing standing between that promise and
-  // a page that quietly describes the wrong ruleset.
 
   const BITOLA_STEP = "Deal five each, then turn one up";
   const CROATIA_STEP = "Deal all eight up front";
@@ -121,7 +112,6 @@ describe("RulesPage", () => {
     expect(screen.getByText(CROATIA_RULE)).toBeInTheDocument();
     expect(screen.queryByText(BITOLA_STEP)).not.toBeInTheDocument();
     expect(screen.queryByText(BITOLA_RULE)).not.toBeInTheDocument();
-    // Shared chapters are untouched — that is the whole point of block scoping.
     expect(screen.getByRole("heading", { level: 2, name: SHARED_HEADING })).toBeInTheDocument();
     expect(screen.getByText(SHARED_RULE)).toBeInTheDocument();
   });
@@ -133,7 +123,6 @@ describe("RulesPage", () => {
     expect(screen.getByText("One round: name a suit, or say “dalje”")).toBeInTheDocument();
     expect(screen.getByText("The dealer speaks last — “pod mus”")).toBeInTheDocument();
     expect(screen.getByText("Your last two turn up")).toBeInTheDocument();
-    // The reveal happens only AFTER trump is named — never mid-bidding.
     expect(
       screen.getByText(/Only once trump is named do the two face-down cards/),
     ).toBeInTheDocument();
@@ -180,8 +169,6 @@ describe("RulesPage", () => {
   it("numbers the visible steps gaplessly on both tabs", async () => {
     const user = userEvent.setup();
     renderRules();
-    // Items are scoped INSIDE one shared block, so numbering the unfiltered
-    // array would render 01, 02, 03, 05, 07, 09 here. Both tabs must read 01-06.
     expect(basicsStepNumbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
     await user.click(screen.getByTestId("rules-variant-croatia"));
     expect(basicsStepNumbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
@@ -191,7 +178,6 @@ describe("RulesPage", () => {
     const user = userEvent.setup();
     renderRules();
     for (const shared of ["Take your seat", "Build the deck"]) {
-      // One node, not two: the shared steps are no longer duplicated per variant.
       expect(screen.getByText(shared)).toBeInTheDocument();
       expect(within(step(shared)).queryByTestId("rules-diff-marker")).not.toBeInTheDocument();
     }
@@ -206,7 +192,6 @@ describe("RulesPage", () => {
     const user = userEvent.setup();
     renderRules();
 
-    // Bitola tab: the deal step's own marker describes the Croatian deal.
     const bitolaDeal = within(step(BITOLA_STEP)).getByTestId("rules-diff-marker");
     await user.hover(bitolaDeal);
     expect(
@@ -214,8 +199,6 @@ describe("RulesPage", () => {
     ).toBeInTheDocument();
     await user.unhover(bitolaDeal);
 
-    // And the round-one step carries a DIFFERENT note — one marker per diff
-    // spot, not one for the whole sequence.
     const bitolaRound1 = within(step("Round one: take that card, or pass")).getByTestId(
       "rules-diff-marker",
     );
@@ -225,7 +208,6 @@ describe("RulesPage", () => {
     ).toBeInTheDocument();
     await user.unhover(bitolaRound1);
 
-    // Croatian tab: the mirror image.
     await user.click(screen.getByTestId("rules-variant-croatia"));
     const croatiaDeal = within(step(CROATIA_STEP)).getByTestId("rules-diff-marker");
     await user.hover(croatiaDeal);
@@ -248,9 +230,6 @@ describe("RulesPage", () => {
     const user = userEvent.setup();
     renderRules();
     const marker = firstDiffMarker();
-    // A real touch, not a mouse click: Base UI's hover is `mouseOnly`, so this
-    // is the one path that proves the marker is reachable on a phone. Hover-only
-    // would pass every other test here and still be dead on a handset.
     await user.pointer({ keys: "[TouchA]", target: marker });
     expect(
       await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),

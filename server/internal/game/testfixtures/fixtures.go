@@ -6,28 +6,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/game"
 )
 
-// NewGameJustDealt returns a valid GameState in the BIDDING phase after a
-// Bitola stage-1 deal: each player holds 5 cards, the trump candidate is
-// public (AH on the table), and 11 cards remain in Deck for stage-2
-// distribution after a player picks trump.
-//
-// Layout is deterministic — each seat holds 5 cards of its assigned suit;
-// the candidate is the Ace of Hearts; the Deck holds the remaining 11 cards
-// in deal order. The layout is engineered so that picking trump (in either
-// round, by any seat) never accidentally triggers instant-win, while still
-// allowing tests to mutate hand[0] for partial-trump scenarios.
-//
-//	Initial hands (5 cards each):
-//	  Seat 0 (team A):  7S 8S 9S TS JS   (5 Spades, low ranks)
-//	  Seat 1 (team B): 7H 8H 9H TH JH   (5 Hearts, low ranks)
-//	  Seat 2 (team A):  7D 8D 9D TD JD   (5 Diamonds, low ranks)
-//	  Seat 3 (team B): 7C 8C 9C TC JC   (5 Clubs, low ranks)
-//
-//	TrumpCandidate (public, on table): AH
-//
-//	Deck (11 cards, deal order): QS KS QH KH AS QD KD AD QC KC AC
-//
-// Dealer: seat 0, Active bidder: seat 1.
 func NewGameJustDealt() *game.GameState {
 	trumpCandidate := game.Card{Rank: game.RankAce, Suit: game.SuitHearts}
 
@@ -96,8 +74,7 @@ func lowRanksOfSuit(suit game.Suit) []game.Card {
 }
 
 // biddingDeck returns the 11-card stage-2 reserve for NewGameJustDealt.
-// Order is chosen so that no pick (round 1 or round 2, by any seat) ends
-// with all 8 cards of trump suit in one hand.
+// Its order ensures no pick by any seat leaves all 8 trump cards in one hand.
 func biddingDeck() []game.Card {
 	return []game.Card{
 		{Rank: game.RankQueen, Suit: game.SuitSpades},
@@ -114,22 +91,6 @@ func biddingDeck() []game.Card {
 	}
 }
 
-// NewGameMidPlay returns a GameState in the playing phase at the specified
-// trick number. Trump is Hearts, trump caller is seat 1. Hands contain mixed
-// suits for testing suit-following, trump obligation, and partner exemption.
-//
-// trickNum 1: 8 cards per player (fresh playing state)
-// trickNum 2-7: reduced hand sizes (8 - (trickNum-1) cards each)
-// trickNum 8: 1 card per player (final trick)
-//
-// Hand distribution for trickNum=1 (trump=Hearts):
-//
-//	Seat 0 (team A):  AS TS KS QS AH TH KD 7C  (4S, 2H-trump, 1D, 1C)
-//	Seat 1 (team B): JS 9S 8S 7S JH 9H QD 8C  (4S, 2H-trump, 1D, 1C)
-//	Seat 2 (team A):  AD TD KH QH 8H 7H AC TC  (2D, 4H-trump, 2C)
-//	Seat 3 (team B): JD 9D 8D 7D KC QC JC 9C  (4D, 0H-trump, 4C)
-//
-// Active player: seat 0, dealer: seat 0.
 func NewGameMidPlay(trickNum int) *game.GameState {
 	if trickNum < 1 {
 		trickNum = 1
@@ -154,8 +115,8 @@ func NewGameMidPlay(trickNum int) *game.GameState {
 		BiddingRound:         1,
 		TrickNumber:          trickNum,
 		CurrentTrick:         []game.TrickCard{},
-		DeclarationsResolved: true, // declarations already handled (for card play testing)
-		BelotAnnounced:       true, // Belot already handled (for card play testing)
+		DeclarationsResolved: true,
+		BelotAnnounced:       true,
 		Players: [4]game.PlayerState{
 			{Seat: 0, UserID: 10, Team: "teamA", Declarations: []game.Declaration{}, Connected: true},
 			{Seat: 1, UserID: 20, Team: "teamB", Declarations: []game.Declaration{}, Connected: true},
@@ -165,9 +126,8 @@ func NewGameMidPlay(trickNum int) *game.GameState {
 		ActivePlayerSeat: 0,
 	}
 
-	// Full hands for trick 1 — mixed suits for rule testing
 	fullHands := [4][]game.Card{
-		{ // Seat 0: 4 Spades, 2 trump Hearts, 1 Diamond, 1 Club
+		{
 			{Rank: game.RankAce, Suit: game.SuitSpades},
 			{Rank: game.RankTen, Suit: game.SuitSpades},
 			{Rank: game.RankKing, Suit: game.SuitSpades},
@@ -177,7 +137,7 @@ func NewGameMidPlay(trickNum int) *game.GameState {
 			{Rank: game.RankKing, Suit: game.SuitDiamonds},
 			{Rank: game.Rank7, Suit: game.SuitClubs},
 		},
-		{ // Seat 1: 4 Spades, 2 trump Hearts, 1 Diamond, 1 Club
+		{
 			{Rank: game.RankJack, Suit: game.SuitSpades},
 			{Rank: game.Rank9, Suit: game.SuitSpades},
 			{Rank: game.Rank8, Suit: game.SuitSpades},
@@ -187,7 +147,7 @@ func NewGameMidPlay(trickNum int) *game.GameState {
 			{Rank: game.RankQueen, Suit: game.SuitDiamonds},
 			{Rank: game.Rank8, Suit: game.SuitClubs},
 		},
-		{ // Seat 2: 2 Diamonds, 4 trump Hearts, 2 Clubs
+		{
 			{Rank: game.RankAce, Suit: game.SuitDiamonds},
 			{Rank: game.RankTen, Suit: game.SuitDiamonds},
 			{Rank: game.RankKing, Suit: game.SuitHearts},
@@ -197,7 +157,7 @@ func NewGameMidPlay(trickNum int) *game.GameState {
 			{Rank: game.RankAce, Suit: game.SuitClubs},
 			{Rank: game.RankTen, Suit: game.SuitClubs},
 		},
-		{ // Seat 3: 4 Diamonds, 0 trump Hearts, 4 Clubs
+		{
 			{Rank: game.RankJack, Suit: game.SuitDiamonds},
 			{Rank: game.Rank9, Suit: game.SuitDiamonds},
 			{Rank: game.Rank8, Suit: game.SuitDiamonds},
@@ -209,7 +169,6 @@ func NewGameMidPlay(trickNum int) *game.GameState {
 		},
 	}
 
-	// For trickNum > 1, trim hands from the end to simulate previous tricks
 	cardsPerPlayer := 8 - (trickNum - 1)
 	for i := range gs.Players {
 		if cardsPerPlayer < len(fullHands[i]) {
@@ -221,7 +180,6 @@ func NewGameMidPlay(trickNum int) *game.GameState {
 		}
 	}
 
-	// Simulate accumulated scores from previous tricks
 	if trickNum > 1 {
 		gs.HandPoints = [2]int{10 * (trickNum - 1), 5 * (trickNum - 1)}
 		gs.TricksWon = [2]int{(trickNum - 1 + 1) / 2, (trickNum - 1) / 2}
@@ -230,31 +188,6 @@ func NewGameMidPlay(trickNum int) *game.GameState {
 	return gs
 }
 
-// NewGameFirstTrick returns a GameState at trick 1 designed for testing
-// declarations and Belot bonus. DeclarationsResolved and BelotAnnounced
-// are false. AwaitingDeclaration is NOT pre-set (caller controls flow).
-//
-// Hand distribution (trump = Hearts always, parameter reserved for future use):
-//
-//	Seat 0 (team A):  KH QH 7S 8S 9S 7C 8C 9C   → Belot (KH+QH), tierce 7S-8S-9S (20pts), tierce 7C-8C-9C (20pts)
-//	Seat 1 (team B): JD QD KD AD QS 8D 9D TC    → quarte JD-QD-KD-AD (50pts)
-//	Seat 2 (team A):  JH 9H AH TH KS AS QC JC   → tierce 9H-TH-JH in trump (20pts)
-//	Seat 3 (team B): 7H 8H TD 7D TS AC KC       → no declarations (max 2 consecutive per suit, no four-of-a-kind)
-//
-// Wait - seat 3 has 7 cards above. Let me add JS... no that's at seat 2.
-// Corrected seat 3: 7H 8H TD 7D TS JS AC KC = 8 cards. JS(4),TS(3) = 2 consecutive spades.
-//
-// All 32 cards verified: H(KH QH JH 9H AH TH 7H 8H) S(7S 8S 9S QS JS KS AS TS)
-// D(JD QD KD AD 8D 9D TD 7D) C(7C 8C 9C TC AC KC QC JC)... wait, QC and JC are missing.
-//
-// FINAL verified distribution (all 32 unique cards, 8 per player):
-//
-//	Seat 0 (team A):  KH QH 7S 8S 9S 7C 8C 9C   → Belot, tierce 7S-8S-9S, tierce 7C-8C-9C
-//	Seat 1 (team B): JD QD KD AD QS 8D 9D TC    → quarte JD-QD-KD-AD
-//	Seat 2 (team A):  JH 9H AH TH KS AS JC QC   → tierce 9H-TH-JH (trump, 20pts)
-//	Seat 3 (team B): 7H 8H TD 7D TS JS AC KC   → no declarations
-//
-// Active player: seat 1 (player after dealer). Dealer: seat 0.
 func NewGameFirstTrick(trump game.Suit) *game.GameState {
 	trumpSuit := trump
 	callerSeat := 1
@@ -272,9 +205,9 @@ func NewGameFirstTrick(trump game.Suit) *game.GameState {
 		BiddingRound:     1,
 		TrickNumber:      1,
 		CurrentTrick:     []game.TrickCard{},
-		ActivePlayerSeat: 1, // player after dealer
+		ActivePlayerSeat: 1,
 		Players: [4]game.PlayerState{
-			{ // Seat 0 (team A): KH QH 7S 8S 9S 7C 8C 9C → Belot + 2 tierces
+			{
 				Hand: []game.Card{
 					{Rank: game.RankKing, Suit: game.SuitHearts},
 					{Rank: game.RankQueen, Suit: game.SuitHearts},
@@ -287,7 +220,7 @@ func NewGameFirstTrick(trump game.Suit) *game.GameState {
 				},
 				Seat: 0, UserID: 10, Team: "teamA", Declarations: []game.Declaration{}, Connected: true,
 			},
-			{ // Seat 1 (team B): JD QD KD AD QS 8D 9D TC → quarte JD-QD-KD-AD
+			{
 				Hand: []game.Card{
 					{Rank: game.RankJack, Suit: game.SuitDiamonds},
 					{Rank: game.RankQueen, Suit: game.SuitDiamonds},
@@ -300,7 +233,7 @@ func NewGameFirstTrick(trump game.Suit) *game.GameState {
 				},
 				Seat: 1, UserID: 20, Team: "teamB", Declarations: []game.Declaration{}, Connected: true,
 			},
-			{ // Seat 2 (team A): JH 9H AH TH KS AS QC JC → tierce 9H-TH-JH (trump)
+			{
 				Hand: []game.Card{
 					{Rank: game.RankJack, Suit: game.SuitHearts},
 					{Rank: game.Rank9, Suit: game.SuitHearts},
@@ -313,7 +246,7 @@ func NewGameFirstTrick(trump game.Suit) *game.GameState {
 				},
 				Seat: 2, UserID: 30, Team: "teamA", Declarations: []game.Declaration{}, Connected: true,
 			},
-			{ // Seat 3 (team B): 7H 8H TD 7D TS JS AC KC → no declarations
+			{
 				Hand: []game.Card{
 					{Rank: game.Rank7, Suit: game.SuitHearts},
 					{Rank: game.Rank8, Suit: game.SuitHearts},
@@ -333,12 +266,10 @@ func NewGameFirstTrick(trump game.Suit) *game.GameState {
 }
 
 // NewGameWithDeclarations returns a GameState at trick 1 with pre-populated
-// declarations on the given player seats. Used for testing resolveDeclarations
-// without going through the full declare flow.
+// declarations on the given player seats.
 func NewGameWithDeclarations(decls []game.Declaration) *game.GameState {
 	gs := NewGameFirstTrick(game.SuitHearts)
 
-	// Store declarations on respective player seats
 	for _, d := range decls {
 		gs.Players[d.PlayerSeat].Declarations = append(
 			gs.Players[d.PlayerSeat].Declarations, d,
@@ -348,30 +279,10 @@ func NewGameWithDeclarations(decls []game.Declaration) *game.GameState {
 	return gs
 }
 
-// NewGameLastTrick returns a GameState at trick 8 (the final trick) for testing
-// hand-end scoring: last-trick bonus, Capot detection, failed contracts, and
-// match score updates.
-//
-// Trump = Hearts, TrumpCallerSeat = seat 1 (team B).
-// TricksWon = [4, 3] — team A won 4 tricks, team B won 3 (7 total, 8th pending).
-// HandPoints = [70, 61] — realistic card point distribution from 7 tricks.
-// DeclarationPoints = [0, 0] — no declarations (simplifies scoring tests).
-//
-// Remaining cards (1 per player):
-//
-//	Seat 0 (team A):  AS — Ace of Spades (11 pts non-trump)
-//	Seat 1 (team B): 8D — 8 of Diamonds (0 pts)
-//	Seat 2 (team A):  TD — Ten of Diamonds (10 pts non-trump)
-//	Seat 3 (team B): 7H — 7 of Hearts (0 pts trump — can win if Hearts led)
-//
-// Remaining card points: 11 + 0 + 10 + 0 = 21. Total from 7 tricks: 152 - 21 = 131.
-// HandPoints 70 + 61 = 131 ✓
-//
-// ActivePlayerSeat = 0 (team A, winner of trick 7 — leads trick 8).
 func NewGameLastTrick() *game.GameState {
 	trumpSuit := game.SuitHearts
-	callerSeat := 1  // Team B called trump
-	trickWinner := 0 // Seat 0 won trick 7
+	callerSeat := 1
+	trickWinner := 0
 
 	return &game.GameState{
 		RoomID:               1,
@@ -390,7 +301,7 @@ func NewGameLastTrick() *game.GameState {
 		BelotAnnounced:       true,
 		ActivePlayerSeat:     0,
 		Players: [4]game.PlayerState{
-			{ // Seat 0 (team A): AS — strong non-trump
+			{
 				Hand:         []game.Card{{Rank: game.RankAce, Suit: game.SuitSpades}},
 				Seat:         0,
 				UserID:       10,
@@ -398,7 +309,7 @@ func NewGameLastTrick() *game.GameState {
 				Declarations: nil,
 				Connected:    true,
 			},
-			{ // Seat 1 (team B): 8D — weak non-trump
+			{
 				Hand:         []game.Card{{Rank: game.Rank8, Suit: game.SuitDiamonds}},
 				Seat:         1,
 				UserID:       20,
@@ -406,7 +317,7 @@ func NewGameLastTrick() *game.GameState {
 				Declarations: nil,
 				Connected:    true,
 			},
-			{ // Seat 2 (team A): TD — medium non-trump (10 pts)
+			{
 				Hand:         []game.Card{{Rank: game.RankTen, Suit: game.SuitDiamonds}},
 				Seat:         2,
 				UserID:       30,
@@ -414,7 +325,7 @@ func NewGameLastTrick() *game.GameState {
 				Declarations: nil,
 				Connected:    true,
 			},
-			{ // Seat 3 (team B): 7H — low trump (can win if led suit is hearts)
+			{
 				Hand:         []game.Card{{Rank: game.Rank7, Suit: game.SuitHearts}},
 				Seat:         3,
 				UserID:       40,
@@ -430,28 +341,10 @@ func NewGameLastTrick() *game.GameState {
 	}
 }
 
-// NewGameCapotInProgress returns a GameState at trick 8 where one team (team A)
-// has won all 7 previous tricks. Used for testing Capot detection and scoring.
-//
-// Trump = Hearts, TrumpCallerSeat = seat 0 (team A — the Capot team).
-// TricksWon = [7, 0] — team A has won every trick so far.
-// HandPoints = [121, 0] — all card points from 7 tricks go to team A.
-//
-// Remaining cards (1 per player):
-//
-//	Seat 0 (team A):  JH — Jack of Hearts (20 pts trump, strongest card)
-//	Seat 1 (team B): 7D — 7 of Diamonds (0 pts)
-//	Seat 2 (team A):  AH — Ace of Hearts (11 pts trump)
-//	Seat 3 (team B): 7C — 7 of Clubs (0 pts)
-//
-// Remaining card points: 20 + 0 + 11 + 0 = 31. Total from 7 tricks: 152 - 31 = 121 ✓
-//
-// ActivePlayerSeat = 0 (team A, winner of trick 7).
-// Team A is guaranteed to win trick 8 (JH is strongest possible trump).
 func NewGameCapotInProgress() *game.GameState {
 	trumpSuit := game.SuitHearts
-	callerSeat := 0  // Team A called trump
-	trickWinner := 0 // Seat 0 won trick 7
+	callerSeat := 0
+	trickWinner := 0
 
 	return &game.GameState{
 		RoomID:               1,
@@ -470,7 +363,7 @@ func NewGameCapotInProgress() *game.GameState {
 		BelotAnnounced:       true,
 		ActivePlayerSeat:     0,
 		Players: [4]game.PlayerState{
-			{ // Seat 0 (team A): JH — Jack of Hearts (trump, strongest)
+			{
 				Hand:         []game.Card{{Rank: game.RankJack, Suit: game.SuitHearts}},
 				Seat:         0,
 				UserID:       10,
@@ -478,7 +371,7 @@ func NewGameCapotInProgress() *game.GameState {
 				Declarations: nil,
 				Connected:    true,
 			},
-			{ // Seat 1 (team B): 7D — weakest
+			{
 				Hand:         []game.Card{{Rank: game.Rank7, Suit: game.SuitDiamonds}},
 				Seat:         1,
 				UserID:       20,
@@ -486,7 +379,7 @@ func NewGameCapotInProgress() *game.GameState {
 				Declarations: nil,
 				Connected:    true,
 			},
-			{ // Seat 2 (team A): AH — Ace of Hearts (trump)
+			{
 				Hand:         []game.Card{{Rank: game.RankAce, Suit: game.SuitHearts}},
 				Seat:         2,
 				UserID:       30,
@@ -494,7 +387,7 @@ func NewGameCapotInProgress() *game.GameState {
 				Declarations: nil,
 				Connected:    true,
 			},
-			{ // Seat 3 (team B): 7C — weakest
+			{
 				Hand:         []game.Card{{Rank: game.Rank7, Suit: game.SuitClubs}},
 				Seat:         3,
 				UserID:       40,
@@ -510,37 +403,12 @@ func NewGameCapotInProgress() *game.GameState {
 	}
 }
 
-// NewGameNearEnd returns a GameState at trick 8 (like NewGameLastTrick) but with
-// configurable team scores, for testing match completion thresholds and tiebreakers.
-//
-// Trump = Hearts, TrumpCallerSeat = seat 1 (team B).
-// TricksWon = [4, 3] — team A won 4 tricks, team B won 3 (7 total, 8th pending).
-// HandPoints = [70, 61] — realistic card point distribution from 7 tricks.
-//
-// Remaining cards are identical to NewGameLastTrick:
-//
-//	Seat 0 (team A):  AS — Ace of Spades (11 pts non-trump)
-//	Seat 1 (team B): 8D — 8 of Diamonds (0 pts)
-//	Seat 2 (team A):  TD — Ten of Diamonds (10 pts non-trump)
-//	Seat 3 (team B): 7H — 7 of Hearts (0 pts trump)
-//
-// After trick 8 resolves (Seat 0 leads AS; seat 3 is void in spades and must
-// trump with 7H, winning the trick for team B):
-//   - Team A gets: 70 hand points
-//   - Team B gets: 61 + 21(trick) + 10(last-trick) = 92 hand points
-//   - Team B called trump and 92 > 70 → hand succeeds → normal scoring:
-//     team A += 70, team B += 92 (see TestHandScoring_LastTrickBonus)
-//
-// Use teamAScore/teamBScore to position teams near the 1001/501 threshold.
 func NewGameNearEnd(teamAScore, teamBScore int) *game.GameState {
 	gs := NewGameLastTrick()
 	gs.TeamScores = [2]int{teamAScore, teamBScore}
 	return gs
 }
 
-// NewGamePaused returns a GameState in PhasePaused, transitioned from PhasePlaying.
-// The specified seat has an active pause (PausedPlayers and PauseUsed set).
-// PreviousPhase is set to PhasePlaying so unpause restores to playing.
 func NewGamePaused(pausedBySeat int) *game.GameState {
 	gs := NewGameMidPlay(1)
 	gs.Phase = game.PhasePaused
@@ -552,16 +420,12 @@ func NewGamePaused(pausedBySeat int) *game.GameState {
 
 // NewGamePausedWithOwner returns a GameState in PhasePaused with the specified
 // seat having an active pause and the specified seat as room owner.
-// Used for testing owner unpause scenarios.
 func NewGamePausedWithOwner(pausedBySeat int, ownerSeat int) *game.GameState {
 	gs := NewGamePaused(pausedBySeat)
 	gs.OwnerSeat = ownerSeat
 	return gs
 }
 
-// NewGameDisconnected returns a GameState in PhaseDisconnected with the
-// specified seat disconnected. PreviousPhase is PhasePlaying. Used for
-// testing that all actions are rejected during the disconnected phase.
 func NewGameDisconnected(disconnectedSeat int) *game.GameState {
 	gs := NewGameMidPlay(1)
 	gs.Phase = game.PhaseDisconnected
@@ -571,10 +435,6 @@ func NewGameDisconnected(disconnectedSeat int) *game.GameState {
 	return gs
 }
 
-// NewGameReconnecting returns a GameState in PhaseDisconnected suitable for
-// testing reconnection scenarios. The disconnected seat has Connected=false,
-// DisconnectedSeat set, ReconnectExpiresAt 2 minutes in the future,
-// PreviousPhase=PhasePlaying, and TurnTimeRemaining=15000ms.
 func NewGameReconnecting(disconnectedSeat int) *game.GameState {
 	gs := NewGameMidPlay(1)
 	gs.Phase = game.PhaseDisconnected
@@ -583,20 +443,11 @@ func NewGameReconnecting(disconnectedSeat int) *game.GameState {
 	gs.Players[disconnectedSeat].Connected = false
 	reconnectExpiry := time.Now().Add(2 * time.Minute)
 	gs.ReconnectExpiresAt = &reconnectExpiry
-	gs.TurnTimeRemaining = 15000 // 15 seconds preserved from disconnect
-	gs.TurnExpiresAt = nil       // Timer paused during disconnect
+	gs.TurnTimeRemaining = 15000
+	gs.TurnExpiresAt = nil
 	return gs
 }
 
-// NewGameMidBidding returns a GameState with the specified number of passes
-// already recorded. Correctly tracks BiddingRound and ActivePlayerSeat.
-//
-// passCount 0: same as NewGameJustDealt (round 1, seat 1 active)
-// passCount 1-3: round 1 with passes applied
-// passCount 4: round 2 just started (0 passes in round 2, seat 1 active)
-// passCount 5-7: round 2 with passes applied
-//
-// Dealer is always seat 0. First bidder is seat 1.
 func NewGameMidBidding(passCount int) *game.GameState {
 	gs := NewGameJustDealt()
 
@@ -604,56 +455,32 @@ func NewGameMidBidding(passCount int) *game.GameState {
 		return gs
 	}
 
-	// Clamp to valid range: max 7 (round 2 with 3 passes).
-	// passCount 8 would trigger a reshuffle, not a mid-bidding state.
 	if passCount > 7 {
 		passCount = 7
 	}
 
 	if passCount <= 4 {
-		// Round 1 passes
 		passesInRound := passCount
 		if passesInRound == 4 {
-			// All 4 passed in round 1 — transition to round 2
 			gs.BiddingRound = 2
 			gs.BiddingPassCount = 0
-			gs.ActivePlayerSeat = (gs.DealerSeat + 1) % 4 // reset to first bidder
+			gs.ActivePlayerSeat = (gs.DealerSeat + 1) % 4
 		} else {
 			gs.BiddingPassCount = passesInRound
-			gs.ActivePlayerSeat = (1 + passesInRound) % 4 // seat 1 is first bidder
+			gs.ActivePlayerSeat = (1 + passesInRound) % 4
 		}
 	} else {
-		// Round 2 passes (passCount 5-7)
 		passesInRound2 := passCount - 4
 		gs.BiddingRound = 2
 		gs.BiddingPassCount = passesInRound2
-		gs.ActivePlayerSeat = (1 + passesInRound2) % 4 // seat 1 is first bidder in round 2
+		gs.ActivePlayerSeat = (1 + passesInRound2) % 4
 	}
 
-	// Bidding counters were set directly rather than by applying passes, so the
-	// derived wire flag ApplyAction normally maintains has to be refreshed here.
-	// Always false for this variant (its config reshuffles instead of forcing a
-	// pick), but derived rather than hardcoded so the fixture cannot drift.
 	gs.MustPickTrump = game.MustPickTrump(gs, gs.ActivePlayerSeat)
 
 	return gs
 }
 
-// NewGameCroatianJustDealt returns a valid GameState in the BIDDING phase after
-// a Croatian all-before-bidding deal: every card is already dealt, so each seat
-// physically holds 8 — 6 open in Hand and 2 in the server-only FaceDownCards
-// slot. There is no trump candidate and Deck is empty.
-//
-// Layout is deterministic and engineered so that no pick (by any seat, at any
-// pass count) triggers instant-win — seat 3 holds exactly two cards of every
-// suit, and no seat holds more than six of one suit:
-//
-//	Seat 0 (team A): 7S 8S 9S TS 7H 8H   face-down: JS QS
-//	Seat 1 (team B): 7D 8D 9D TD 9H TH   face-down: JD QD
-//	Seat 2 (team A): 7C 8C 9C TC JH QH   face-down: JC QC
-//	Seat 3 (team B): KS AS KD AD KH AH   face-down: KC AC
-//
-// Dealer: seat 0, Active bidder: seat 1.
 func NewGameCroatianJustDealt() *game.GameState {
 	c := func(r game.Rank, s game.Suit) game.Card { return game.Card{Rank: r, Suit: s} }
 
@@ -736,29 +563,12 @@ func NewGameCroatianJustDealt() *game.GameState {
 		},
 	}
 
-	// FaceDownCount is the PUBLIC half of FaceDownCards (see game.PlayerState),
-	// so it is derived here rather than authored beside each literal: a fixture
-	// edit that changes the hidden pair cannot leave the wire count disagreeing
-	// with it. Every other Croatian factory builds on this one, so they inherit
-	// the derivation.
 	for i := range gs.Players {
 		gs.Players[i].FaceDownCount = len(gs.Players[i].FaceDownCards)
 	}
 	return gs
 }
 
-// NewGameCroatianMidBidding returns a Croatian GameState with the specified
-// number of passes already recorded. Croatian bidding is a SINGLE round —
-// three passes put the dealer on the clock with no right to pass — so:
-//
-// passCount 0: same as NewGameCroatianJustDealt (seat 1 active)
-// passCount 1-2: passes applied, next seat active
-// passCount 3: the dealer (seat 0) is on the clock and must pick
-//
-// Clamped to 3: the dealer's own pass is refused under this variant's config,
-// so a fourth pass — and with it a second round — is not a reachable state.
-//
-// Dealer is always seat 0. First bidder is seat 1.
 func NewGameCroatianMidBidding(passCount int) *game.GameState {
 	gs := NewGameCroatianJustDealt()
 
@@ -770,38 +580,11 @@ func NewGameCroatianMidBidding(passCount int) *game.GameState {
 	}
 
 	gs.BiddingPassCount = passCount
-	gs.ActivePlayerSeat = (1 + passCount) % 4 // seat 1 is first bidder
-	// Counters set directly, so refresh the derived flag ApplyAction maintains.
-	// True at passCount 3 — the state where the dealer has no legal pass.
+	gs.ActivePlayerSeat = (1 + passCount) % 4
 	gs.MustPickTrump = game.MustPickTrump(gs, gs.ActivePlayerSeat)
 	return gs
 }
 
-// NewGameCroatianDeclaring returns a Croatian GameState parked in the dedicated
-// DECLARING phase, the state between a resolved bid and trick 1 that no other
-// factory can produce.
-//
-// It is built by driving the real engine — NewGameCroatianJustDealt plus a
-// round-1 free-suit pick by seat 1 — rather than by hand, so the fixture also
-// exercises mergeFaceDownCards and can never drift from what handlePickTrump
-// actually produces. Panics if the engine rejects the pick: that means the
-// bidding fixture and the engine have diverged, which no test should paper over.
-//
-// With the standard NewGameCroatianJustDealt layout every seat holds a meld
-// once its two face-down cards merge in — seats 0/1/2 each a six-card run,
-// seat 3 four Kings and four Aces — so the cursor stops at all four in turn.
-//
-//	Seat 0: 7S 8S 9S TS JS QS + 7H 8H     -> spade run of six
-//	Seat 1: 7D 8D 9D TD JD QD + 9H TH     -> diamond run of six
-//	Seat 2: 7C 8C 9C TC JC QC + JH QH     -> club run of six
-//	Seat 3: KS AS KD AD KH AH KC AC       -> four Kings + four Aces
-//
-// Dealer is seat 0, so the declaration cursor opens on seat 1 — the seat that
-// will lead trick 1 — and walks counter-clockwise 1 → 2 → 3 → 0.
-//
-// A test that needs a different meld layout (meld-less seats, no melds at all)
-// should overwrite the hands on NewGameCroatianJustDealt and apply pick_trump
-// itself, so the engine still decides where the cursor stops.
 func NewGameCroatianDeclaring(trump game.Suit) *game.GameState {
 	gs := NewGameCroatianJustDealt()
 
@@ -816,29 +599,6 @@ func NewGameCroatianDeclaring(trump game.Suit) *game.GameState {
 	return picked
 }
 
-// NewGameCroatianFirstTrick returns the Croatian counterpart of
-// NewGameFirstTrick: the identical trick-1 playing-phase layout, but carrying
-// the Croatian variant string AND the Croatian rule preset, so
-// Rules.DeclarationOverlap is true.
-//
-// Both fields must be set together — game.RulesFor is the only thing that
-// populates the config, and the zero-value VariantRules is not Bitola (see
-// state_test.go's note), so a fixture that set Variant alone would silently
-// run on an invalid config.
-//
-// By trick 1 a Croatian hand holds all eight cards openly: bidding merged each
-// seat's two face-down cards into Hand and cleared FaceDownCards, which is
-// exactly the shape NewGameFirstTrick already has.
-//
-// Scope: this is the fixture for MELD DETECTION and RESOLUTION under the
-// Croatian overlap rule — the parts of the contest that are timing-agnostic. A
-// real Croatian hand no longer reaches trick 1 with declarations outstanding;
-// they are collected in the dedicated phase before the first card is played.
-// Use NewGameCroatianDeclaring for anything that depends on WHEN they are
-// collected.
-//
-// Tests that need a specific meld shape overwrite Players[n].Hand, the same
-// way the Bitola dedup tests do.
 func NewGameCroatianFirstTrick(trump game.Suit) *game.GameState {
 	gs := NewGameFirstTrick(trump)
 	gs.Variant = game.VariantCroatia
@@ -846,23 +606,6 @@ func NewGameCroatianFirstTrick(trump game.Suit) *game.GameState {
 	return gs
 }
 
-// WithoutDeclarations returns gs configured as a room that plays "bez zvanja":
-// no melds, no Belote/Rebelote. It is the factory for every declarations-off
-// test, in either variant, and it exists so the two-part setup lives in ONE
-// place.
-//
-// Two parts, because one alone is a silently broken fixture:
-//
-//   - Rules.DeclarationsEnabled = false is what handlePickTrump and
-//     shouldPromptBelot read.
-//   - DeclarationsResolved = true is what suppresses the trick-1 meld prompt and
-//     the trick-2 resolve, exactly as NewGame and the per-hand reset seed it.
-//
-// Setting only the config field would leave a fixture whose Bitola seats still
-// get prompted; setting only the flag would leave Belote live. Mutates and
-// returns gs so it composes with any base fixture:
-//
-//	gs := testfixtures.WithoutDeclarations(testfixtures.NewGameFirstTrick(game.SuitHearts))
 func WithoutDeclarations(gs *game.GameState) *game.GameState {
 	gs.Rules.DeclarationsEnabled = false
 	gs.DeclarationsEnabled = false
@@ -870,46 +613,12 @@ func WithoutDeclarations(gs *game.GameState) *game.GameState {
 	return gs
 }
 
-// WithStopAtTarget returns gs configured as a room that plays "dosta" (enough):
-// the match ends the instant a team's running total reaches the 1001/501 target,
-// hand unfinished. It is the factory for every stop-at-target test, in either
-// variant, and it exists so the two-part setup lives in ONE place — the same
-// reason WithoutDeclarations above does.
-//
-// Two parts, mirroring the mutator above:
-//
-//   - Rules.StopAtTarget is what the three engine checkpoints read.
-//   - StopAtTarget is the wire mirror, which RefreshDerivedFlags recomputes at
-//     ApplyAction's exit — set here so a fixture inspected BEFORE any action
-//     already carries the right snapshot.
-//
-// Mutates and returns gs so it composes with any base fixture:
-//
-//	gs := testfixtures.WithStopAtTarget(testfixtures.NewGameMidPlayWithScores(5, 940, 0))
 func WithStopAtTarget(gs *game.GameState) *game.GameState {
 	gs.Rules.StopAtTarget = true
 	gs.StopAtTarget = true
 	return gs
 }
 
-// WithScoredPreviousHand puts gs on hand handNumber (which must be 2 or more)
-// carrying the LastHandResult of the hand BEFORE it — the exact shape a real
-// match has from hand 2 onwards.
-//
-// This exists because startNewHand deliberately never clears LastHandResult: the
-// result of hand N-1 has to survive into the state handed to the session manager
-// so it can be broadcast, and it is only overwritten by the next scoreHand. Every
-// mid-hand fixture in this package starts on hand 1 with a nil result, which
-// makes any "the code nils LastHandResult" assertion pass on the fixture's zero
-// value rather than on the code. Compose this in and the assertion has something
-// to prove:
-//
-//	gs := testfixtures.WithScoredPreviousHand(testfixtures.NewGameMidPlay(5), 3)
-//
-// The numbers are deliberately distinctive (81/81 card points, a +10 last trick
-// to team A, hand totals 111/81) so a leaked result is recognisable in a failure
-// message or a persisted hand_results row rather than looking like plausible
-// output of the hand under test.
 func WithScoredPreviousHand(gs *game.GameState, handNumber int) *game.GameState {
 	if handNumber < 2 {
 		panic("testfixtures: WithScoredPreviousHand needs handNumber >= 2 — hand 1 has no previous hand")
@@ -934,26 +643,6 @@ func WithScoredPreviousHand(gs *game.GameState, handNumber int) *game.GameState 
 	return gs
 }
 
-// NewGameMidPlayWithScores is NewGameMidPlay with the MATCH scores set — the one
-// thing it adds, and all its name claims. It exists because NewGameNearEnd, the
-// only other score-configurable factory, forces trick 8: the single trick that is
-// deliberately NOT a "dosta" checkpoint, since a completed hand always goes
-// through scoreHand. So it cannot set up a mid-hand stop at all.
-//
-// Everything else is NewGameMidPlay's table, untouched: Bitola, 1001, trump
-// Hearts, TrumpCallerSeat = seat 1 (team B), declarations and Belote already
-// handled, hands trimmed to 8-(trickNum-1) cards, and HandPoints/TricksWon
-// carrying its simulated history for trickNum > 1.
-//
-// HOW CALLERS USE IT: leave HandPoints as the factory built it and back-compute
-// the match score from the total you want to hit — seed
-// `target - gs.HandPoints[team] - <what the next award is worth>` so the crossing
-// lands on the boundary exactly. That is what every current call site does, and
-// it keeps the fixture's own arithmetic out of the assertion. Overwriting
-// HandPoints instead works too, but then the seed and the fixture disagree about
-// the hand's history.
-//
-// trickNum is clamped to [1,8] by NewGameMidPlay; pass 1-7 for a mid-hand stop.
 func NewGameMidPlayWithScores(trickNum, teamAScore, teamBScore int) *game.GameState {
 	gs := NewGameMidPlay(trickNum)
 	gs.TeamScores = [2]int{teamAScore, teamBScore}

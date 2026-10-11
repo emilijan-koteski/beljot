@@ -28,8 +28,6 @@ func TestQuarterBounds(t *testing.T) {
 		{"Jul 1 opens Q3", utc(2026, time.July, 1), utc(2026, time.July, 1), utc(2026, time.October, 1)},
 		{"Sep 30 still Q3", utc(2026, time.September, 30), utc(2026, time.July, 1), utc(2026, time.October, 1)},
 		{"Oct 1 opens Q4", utc(2026, time.October, 1), utc(2026, time.October, 1), utc(2027, time.January, 1)},
-		// Q4 is the one window that crosses a year, which is where naive
-		// month-arithmetic breaks.
 		{"Dec 31 still Q4, ending next year", utc(2026, time.December, 31), utc(2026, time.October, 1), utc(2027, time.January, 1)},
 		{"leap-year Feb 29", utc(2028, time.February, 29), utc(2028, time.January, 1), utc(2028, time.April, 1)},
 	}
@@ -61,7 +59,6 @@ func TestQuarterBounds_WindowsAbutWithNoGapOrOverlap(t *testing.T) {
 		start, end := season.QuarterBounds(cursor)
 		assert.True(t, start.Equal(cursor), "window %d must start where the previous one ended", i)
 		assert.True(t, end.After(start), "window %d must be non-empty", i)
-		// The instant before the end still belongs to this window.
 		s2, _ := season.QuarterBounds(end.Add(-time.Nanosecond))
 		assert.True(t, s2.Equal(start), "the instant before ends_at is still inside the window")
 		cursor = end

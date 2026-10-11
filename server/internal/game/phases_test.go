@@ -9,18 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// phaseConstRe matches a `PhaseX Phase = "value"` declaration in types.go.
 var phaseConstRe = regexp.MustCompile(`(?m)^\s*Phase[A-Za-z]+\s+Phase\s*=\s*"([a-z_]+)"`)
 
-// TestAllPhasesCoversEveryConstant is the guard that keeps AllPhases honest.
-//
-// AllPhases is hand-maintained (Go cannot enumerate the constants of a string
-// type at runtime), and everything downstream trusts it: the ws contract test
-// writes it to a golden, and the client derives its Phase union from that
-// golden. A phase constant added to types.go but forgotten in AllPhases would
-// travel the wire with no client union member and no test failing anywhere —
-// exactly the drift this chain exists to prevent. So instead of trusting the
-// list, scan the source for the declarations and compare.
+// TestAllPhasesCoversEveryConstant scans types.go for Phase constants and checks the hand-maintained
+// AllPhases list contains every one.
 func TestAllPhasesCoversEveryConstant(t *testing.T) {
 	src, err := os.ReadFile("types.go")
 	require.NoError(t, err, "types.go must be readable — this test scans it for Phase constants")

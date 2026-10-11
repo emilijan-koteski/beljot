@@ -26,8 +26,6 @@ function renderHero(overrides: Partial<HeroProps> = {}) {
     winRate: 60,
     ...overrides,
   };
-  // IdentityHero now hosts EditableUsername, whose mutation hook needs a
-  // QueryClient in context.
   return render(
     <QueryWrapper>
       <IdentityHero {...props} />
@@ -41,7 +39,6 @@ describe("IdentityHero XP (Story 9.5)", () => {
 
     expect(screen.getByTestId("profile-level")).toHaveTextContent("Level 3");
     expect(screen.getByTestId("profile-xp")).toHaveTextContent("150 / 350 XP");
-    // 150 / 350 → round(42.857) = 43%.
     expect(screen.getByTestId("profile-xp-bar")).toHaveAttribute("aria-valuenow", "43");
   });
 

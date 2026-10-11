@@ -19,18 +19,9 @@ interface DailyRewardDialogProps {
   onClose: () => void;
 }
 
-// The reward grows each day and caps on day 14 (server: wallet.DailyCap). At and
-// past the cap the dialog swaps the brass strike for the gold "streak maxed"
-// treatment; the streak counter itself keeps climbing for the "Day N" line.
 const STREAK_MAX = 14;
 
-/**
- * Struck-brass coin token with the embossed Beljot monogram — the coin-wallet
- * currency motif (same "B" as the face-down card). A single circle built from
- * radial gradients + layered inset shadows; `tone` swaps the standard brass
- * strike for the gold milestone strike. Size-parameterised so the 92px hero and
- * the 22px balance-row chip share one source.
- */
+/** Struck-brass coin token with the embossed Beljot monogram, in brass or gold `tone`. */
 function CoinMedallion({
   size = 96,
   tone = "brass",
@@ -58,7 +49,6 @@ function CoinMedallion({
         flexShrink: 0,
       }}
     >
-      {/* soft outer glow */}
       <span
         style={{
           position: "absolute",
@@ -67,7 +57,6 @@ function CoinMedallion({
           background: `radial-gradient(circle, ${halo} 0%, transparent 68%)`,
         }}
       />
-      {/* coin body */}
       <span
         style={{
           position: "relative",
@@ -82,7 +71,6 @@ function CoinMedallion({
           justifyContent: "center",
         }}
       >
-        {/* engraved inner rim */}
         <span
           style={{
             position: "absolute",
@@ -162,18 +150,8 @@ function StreakTrack({ day, total = STREAK_MAX }: { day: number; total?: number 
 }
 
 /**
- * DailyRewardDialog is the persistent daily-login reward modal (AC #2). It is
- * fully controlled and opened programmatically by the gate — never via a
- * trigger. It stays open until the player clicks Continue: `disablePointerDismissal`
- * blocks outside-click dismissal and the no-op `onOpenChange` swallows every
- * library-initiated close (outside press / Escape / focus-out), so the only
- * close path is the explicit Continue button. There is no auto-dismiss timer.
- * The button only dismisses — the coins are already credited server-side by
- * the time the dialog opens (hence "Continue", not "Collect").
- *
- * Visual: the "Medallion" direction from the Daily Reward redesign — a struck
- * coin hero, the 14-day streak track, a wallet-balance ledger row, and the
- * felt-green Continue CTA, on the lobby's parchment + brass system.
+ * Persistent, fully controlled daily-login reward modal opened by the gate.
+ * Every library-initiated close is swallowed, so only the Continue button dismisses it.
  */
 export function DailyRewardDialog({
   open,
@@ -199,9 +177,7 @@ export function DailyRewardDialog({
             : "shadow-[0_0_0_1px_rgba(201,168,118,0.16)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]",
         )}
       >
-        {/* top brass hairline accent */}
         <div className="h-[3px] bg-[linear-gradient(90deg,transparent,var(--brass)_28%,var(--team-a-fill)_50%,var(--brass)_72%,transparent)]" />
-        {/* faint top halo */}
         <div
           aria-hidden="true"
           className={cn(

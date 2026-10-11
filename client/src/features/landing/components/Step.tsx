@@ -1,11 +1,10 @@
-// A numbered "how it works" step — brass-ringed numeral + title + body.
-
 type StepProps = {
   n: string;
   title: string;
   body: string;
 };
 
+// A numbered "how it works" step with a brass-ringed numeral, title and body.
 export function Step({ n, title, body }: StepProps) {
   return (
     <div className="flex items-start gap-4.5">

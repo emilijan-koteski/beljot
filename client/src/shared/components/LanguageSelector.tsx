@@ -11,10 +11,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-// Order: Latin-script entries sorted ASC by native name (English, Hrvatski,
-// Srpski) then Cyrillic-script entries sorted ASC (Македонски). The native
-// names in `language.<code>` are immutable, so this ordering is stable.
-const languages = [
+const languagesLatinThenCyrillic = [
   { code: "en", labelKey: "language.en" },
   { code: "hr", labelKey: "language.hr" },
   { code: "sr", labelKey: "language.sr" },
@@ -22,19 +19,7 @@ const languages = [
 ] as const;
 
 type LanguageSelectorProps = {
-  /**
-   * When true, the picked language is also pushed to the server via
-   * `updatePreferences` so it persists across devices. The authenticated
-   * `AppLayout` enables this; the pre-auth `AuthLayout` leaves it off
-   * (localStorage persistence is handled centrally by the
-   * `languageChanged` listener in i18n.ts).
-   */
   persistToServer?: boolean;
-  /**
-   * Override the data-testid of the trigger + items. Preserves the
-   * pre-existing test ids for `auth-language-selector` and
-   * `language-selector` flows without forking the component.
-   */
   testIdPrefix?: string;
 };
 
@@ -59,9 +44,6 @@ export function LanguageSelector({
     try {
       await updatePreferences(user.id, { languagePreference: lang });
     } catch {
-      // Revert the optimistic auth-store update so it stays in sync with the
-      // server. The visible UI language stays put (i18n already changed) — a
-      // refresh would re-pull the persisted preference and reconcile.
       const current = useAuthStore.getState().user;
       if (current?.id === user.id) {
         useAuthStore.getState().setUser({ ...current, languagePreference: previousPreference });
@@ -80,8 +62,6 @@ export function LanguageSelector({
         aria-label={t("auth.languageSelector.label")}
         data-testid={triggerTestId}
       >
-        {/* Phones (<md): icon-only globe button, matching the hamburger menu —
-            the language code + chevron only appear from md up. */}
         <Globe className="size-4.5 md:size-3.5" />
         <span className="text-ink hidden tracking-wider md:inline">{currentLang}</span>
         <ChevronDown className="hidden size-3 opacity-70 md:block" />
@@ -90,7 +70,7 @@ export function LanguageSelector({
         align="end"
         className="bg-surface-elevated min-w-40 border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
       >
-        {languages.map((lang) => {
+        {languagesLatinThenCyrillic.map((lang) => {
           const active = lang.code === i18n.language;
           return (
             <DropdownMenuItem

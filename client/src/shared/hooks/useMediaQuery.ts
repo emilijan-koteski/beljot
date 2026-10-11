@@ -1,13 +1,8 @@
 import { useEffect, useState } from "react";
 
 /**
- * Subscribes to a CSS media query and returns its live match state. Reactive —
- * resizing across the breakpoint updates consumers on the next render. SSR/test
- * safe (returns false when `window`/`matchMedia` is unavailable).
- *
- * Used for layout that can't be expressed with Tailwind breakpoints alone —
- * e.g. the in-match seats, whose pixel geometry is driven from JS rather than
- * class names.
+ * Subscribes to a CSS media query and returns its live match state.
+ * Returns false when `window.matchMedia` is unavailable.
  */
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState<boolean>(() => {

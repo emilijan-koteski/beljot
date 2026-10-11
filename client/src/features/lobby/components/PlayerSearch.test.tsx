@@ -56,9 +56,6 @@ describe("PlayerSearch", () => {
     renderSearch();
 
     await user.type(screen.getByTestId("player-search"), "a");
-    // Wait past the debounce window: the request is gated by `enabled`, so even
-    // after the debounce settles no call must be made for a 1-char query. The
-    // wait is wrapped in act() because the debounce commits a state update.
     await act(async () => {
       await new Promise((r) => setTimeout(r, 300));
     });
@@ -89,8 +86,6 @@ describe("PlayerSearch", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/players/7");
   });
 
-  // The panel is opened from the Friends card header and dismissed from there or
-  // with Escape — there is no in-field clear button to duplicate that control.
   it("drops the term and asks the host to close on Escape", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -123,8 +118,6 @@ describe("PlayerSearch", () => {
     await user.type(input, "al");
     expect(await screen.findByTestId("player-search-result")).toHaveTextContent("alice");
 
-    // keepPreviousData keeps the resolved rows in the query cache, but the list
-    // is gated on the active (>=2 char) term, so it must disappear on clear.
     await user.clear(input);
     await waitFor(() => expect(screen.queryByTestId("player-search-result")).toBeNull());
   });
@@ -138,8 +131,6 @@ describe("PlayerSearch", () => {
     await user.type(input, "al");
     expect(await screen.findByTestId("player-search-result")).toHaveTextContent("alice");
 
-    // Backspacing to a single character drops below the 2-char gate; the stale
-    // rows retained by keepPreviousData must not stay on screen.
     await user.type(input, "{backspace}");
     await waitFor(() => expect(screen.queryByTestId("player-search-result")).toBeNull());
   });

@@ -18,20 +18,9 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// Story 9.8 (FR57) — honor-gated rooms. Sibling of coin_handler_test.go /
-// privacy_handler_test.go, reusing the same mockRoomRepo / mockBroadcaster /
-// PresenceRegistry harness.
-
-// --- stubHonor -------------------------------------------------------------
-
-// stubHonor implements room.HonorService for the honor-gate tests. Mirrors
-// stubWallet's shape, plus a CALL COUNTER: AC4's "an ungated room performs no
-// honor read at all" is only provable with one — asserted by inspection it would
-// silently rot the first time a call site forgot to short-circuit.
+// stubHonor implements room.HonorService for the honor-gate tests. It counts calls so
+// tests can prove an ungated room performs no honor read.
 type stubHonor struct {
-	// snaps is the authoritative per-user snapshot the service would recompute.
-	// A user absent from the map is absent from the result, which the handler
-	// treats as a failure rather than an admit.
 	snaps map[uint]user.HonorSnapshot
 	err   error
 
@@ -54,19 +43,8 @@ func (s *stubHonor) HonorForUsers(userIDs []uint) (map[uint]user.HonorSnapshot, 
 	return out, nil
 }
 
-// honorOf is shorthand for an EXPERIENCED player's snapshot at a given score.
-// The raw totals are what make IsNewPlayer false, so they are set past the
-// 5-match floor rather than left at zero.
-// CAVEAT on both helpers: the totals below are DECORATIVE. They exist only to make
-// IsNewPlayer coherent (>= 5 finished here, < 5 in newPlayerHonorOf) and are NOT
-// the counts that would actually produce the given score — honorOf(5) carries 20/2,
-// which really computes to ~96. Nothing reads them: honorGateError consults only
-// Score and IsNewPlayer, so no assertion depends on the totals.
-//
-// What DOES matter, and is honoured at every call site, is that each
-// (IsNewPlayer, Score) PAIR is reachable in production — a fixture pinning an
-// impossible state proves nothing. Hence newPlayerHonorOf(19) for the newcomer
-// worst case and honorOf(5) for the experienced pure-abandoner.
+// honorOf is an experienced player's snapshot at the given score. The match totals only
+// make IsNewPlayer false, since honorGateError reads just Score and IsNewPlayer.
 func honorOf(score int) user.HonorSnapshot {
 	return user.HonorSnapshot{
 		Score:          score,
@@ -77,13 +55,8 @@ func honorOf(score int) user.HonorSnapshot {
 	}
 }
 
-// newPlayerHonorOf is a NEW player's snapshot: fewer than 5 finished matches.
-//
-// A New Player's score can never be below 19 — the floor caps a newcomer at 4
-// finished matches, so their worst reachable case is 0 completed / 4 abandoned:
-// 100 x 4 / (4 + 4*4 + 1) = 400/21 = 19. Fixtures below use 80 (the untouched
-// Beta(4,1) prior) and 19 (the worst case) for that reason; a newcomer paired
-// with a score of, say, 5 is a state the system cannot produce.
+// newPlayerHonorOf is a new player's snapshot, with fewer than 5 finished matches. A
+// newcomer's score can never drop below 19, so fixtures use 80 or 19.
 func newPlayerHonorOf(score int) user.HonorSnapshot {
 	return user.HonorSnapshot{
 		Score:          score,
@@ -106,7 +79,7 @@ func setupHonorTest(
 	broadcaster := &mockBroadcaster{}
 	reg := room.NewPresenceRegistry()
 	handler := room.NewRoomHandler(repo, starter, broadcaster, reg, wallet, honor, nil)
-	handler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
+	handler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
@@ -140,12 +113,9 @@ func seedGatedRoom(t *testing.T, repo *mockRoomRepo, minHonor int, allowNewPlaye
 	return r
 }
 
-// --- The D1 truth table (AC4) ---------------------------------------------
-
-// Every row of the Story 9.8 D1 truth table, evaluated through the real join
-// endpoint. The two gates are INDEPENDENT: isNewPlayer is checked first and a
-// New Player is never score-checked, which is what makes allowNewPlayers
-// meaningful (and is the half of the gate the epic got wrong).
+// TestJoinRoom_HonorGateTruthTable covers every row of the honor-gate truth table
+// through the real join endpoint. The new-player check runs first and a new player is
+// never score-checked.
 func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 	const joiner = uint(200)
 
@@ -159,18 +129,12 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 		wantHonorReads  int
 	}{
 		{
-			// Row 1: ungated room. The GATE performs no honor read at all (D5);
-			// the single read below is the lenient roster decoration the join
-			// broadcast carries (level + shield for the joiner's seat), which can
-			// never reject anyone.
 			name:     "row 1: ungated room admits anyone with no gate read",
 			minHonor: 0, allowNewPlayers: true,
 			snap:       newPlayerHonorOf(19),
 			wantStatus: http.StatusOK, wantHonorReads: 1,
 		},
 		{
-			// Row 2: the newcomer bar bites even at minHonor 0 — the epic's
-			// scoping would have made this toggle dead in a 0-gate room.
 			name:     "row 2: new player rejected in a minHonor 0 veterans-only room",
 			minHonor: 0, allowNewPlayers: false,
 			snap:       newPlayerHonorOf(80),
@@ -183,8 +147,6 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 			wantStatus: http.StatusOK, wantHonorReads: 2,
 		},
 		{
-			// Rows 4-5: a New Player is NEVER score-checked. This is the whole
-			// point of the toggle — the owner's explicit "I'll take an unknown".
 			name:     "row 4: new player admitted in a minHonor 80 room on the prior",
 			minHonor: 80, allowNewPlayers: true,
 			snap:       newPlayerHonorOf(80),
@@ -197,8 +159,6 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 			wantStatus: http.StatusOK, wantHonorReads: 2,
 		},
 		{
-			// Row 6: precedence — isNewPlayer is evaluated FIRST, so this is
-			// NEW_PLAYER_NOT_ALLOWED and never HONOR_TOO_LOW.
 			name:     "row 6: new player barred by the toggle even when the score would pass",
 			minHonor: 80, allowNewPlayers: false,
 			snap:       newPlayerHonorOf(80),
@@ -217,9 +177,6 @@ func TestJoinRoom_HonorGateTruthTable(t *testing.T) {
 			wantStatus: http.StatusOK, wantHonorReads: 2,
 		},
 		{
-			// Row 9: a minHonor of 100 is very nearly a closed room — reaching a
-			// rounded 100 needs ~195 decayed completions inside one 90-day
-			// half-life. This rejection is correct, not a bug to "fix".
 			name:     "row 9: a minHonor 100 room rejects a 99",
 			minHonor: 100, allowNewPlayers: true,
 			snap:       honorOf(99),
@@ -316,8 +273,6 @@ func TestJoinRoom_CoinCheckPrecedesHonorGate(t *testing.T) {
 	assert.Equal(t, 0, honor.calls, "the coin check short-circuits before the honor read")
 }
 
-// --- CreateRoom (AC3, D7) -------------------------------------------------
-
 func TestCreateRoom_DefaultsToUngated(t *testing.T) {
 	e, repo, _, _ := setupHonorTest(nil, nil, &stubHonor{})
 	body := `{"name":"Open Table","variant":"bitola","matchMode":"1001","timerStyle":"relaxed"}`
@@ -371,10 +326,9 @@ func TestCreateRoom_RejectsOutOfRangeMinHonor(t *testing.T) {
 	}
 }
 
-// D7: the creator is auto-seated, so an owner who cannot pass their own gate
-// would be ejected from their own room at the first Start. Rejected up front
-// with the same code the join gate would have returned — mirroring the existing
-// buy-in affordability check, which exists for the identical reason.
+// TestCreateRoom_CreatorMustSatisfyOwnGate checks that a creator who cannot pass their
+// own honor gate is rejected up front. Otherwise the auto-seated owner would be ejected
+// at the first start.
 func TestCreateRoom_CreatorMustSatisfyOwnGate(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -410,19 +364,9 @@ func TestCreateRoom_CreatorMustSatisfyOwnGate(t *testing.T) {
 	}
 }
 
-// D7 + review 2026-07-30 (PO decision): a NEW PLAYER creator IS score-checked
-// against their own score at create time — the one place the self-gate diverges
-// from the join gate, where D1 deliberately never score-checks a newcomer.
-//
-// This pins the D1 x D7 hole the review closed, and it replaces an earlier test
-// (TestCreateRoom_NewPlayerCreatorMaySetHighThreshold) that asserted the opposite.
-// Before the fix a newcomer could set ANY bar: an account at 0 completed /
-// 4 abandoned holds 19, could create a min_honor = 80 room, and ONE finished match
-// made them experienced at 100x5/22 = 23 — at which point the AC6 re-check ejected
-// them from the room they had just made, transferring ownership or closing it.
-//
-// Note the last two rows: capping at the fixed 80 prior would NOT have closed this.
-// The bar has to be the creator's own current score.
+// TestCreateRoom_NewPlayerCreatorCannotSetBarAboveOwnScore checks that a new-player
+// creator cannot set min honor above their own score. Otherwise one finished match
+// could eject them from their own room.
 func TestCreateRoom_NewPlayerCreatorCannotSetBarAboveOwnScore(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -482,16 +426,13 @@ func TestCreateRoom_UngatedPerformsNoHonorRead(t *testing.T) {
 	assert.Equal(t, 0, honor.calls)
 }
 
-// --- ReturnToRoom (AC6, AC7) ---------------------------------------------
-
-// AC6: the return-time re-check ejects a seated player whose honor has dropped
-// below the room's threshold (in practice: they abandoned the previous match),
-// through the same flow insolvency uses — 409 to the caller, seat freed,
-// player_left + room_updated fan-out, and a per-user system:honor_ejected.
+// TestReturnToRoom_HonorEjectsReturner checks that the return-time re-check ejects a
+// seated player whose honor fell below the threshold. It follows the insolvency flow,
+// plus a per-user honor_ejected.
 func TestReturnToRoom_HonorEjectsReturner(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{
-		100: honorOf(90), // the owner, who stays
-		200: honorOf(55), // the returner, now below the bar
+		100: honorOf(90),
+		200: honorOf(55),
 	}}
 	e, repo, broadcaster, _ := setupHonorTest(nil, nil, honor)
 	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
@@ -526,7 +467,6 @@ func TestReturnToRoom_HonorEjectsReturner(t *testing.T) {
 	assert.Equal(t, 80, payload.MinHonor)
 	assert.Equal(t, 55, payload.Honor, "the payload carries the recomputed score, not the snapshot column")
 
-	// Not an insolvency ejection — the reason-specific event must be the only one.
 	assert.Empty(t, broadcastsOfType(t, broadcaster, "system:insolvent_ejected"))
 }
 
@@ -547,18 +487,13 @@ func TestReturnToRoom_NewPlayerEjectedWithItsOwnCode(t *testing.T) {
 	assert.Equal(t, "NEW_PLAYER_NOT_ALLOWED", errorCodeOf(t, rec.Body.Bytes()))
 }
 
-// AC6: an ungated room skips the re-check entirely — a returner at score 5 is
-// admitted, which no gated recheck would allow. The one read that DOES happen is
-// the response's lenient roster decoration (level + shield per seat), which can
-// never 409.
+// TestReturnToRoom_UngatedRoomSkipsHonorRecheck checks that an ungated room admits a
+// returner at score 5. The only honor read is the lenient roster decoration, which
+// never returns 409.
 func TestReturnToRoom_UngatedRoomSkipsHonorRecheck(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{200: honorOf(5)}}
 	e, repo, _, _ := setupHonorTest(nil, nil, honor)
 	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
-	// Spelled out because a hand-built &Room{} leaves AllowNewPlayers at Go's
-	// zero false, i.e. veterans-only — the inverse of the GORM default trap, and
-	// the reason both production &Room{} sites set this field explicitly. The
-	// seed helpers predate Story 9.8, so an "ungated" fixture must say so.
 	r.MinHonor = 0
 	r.AllowNewPlayers = true
 
@@ -574,14 +509,14 @@ func TestReturnToRoom_UngatedRoomSkipsHonorRecheck(t *testing.T) {
 // AND passes the honor gate.
 func TestReturnToRoom_HonorEjectedOwnerTransfersToEligibleHeir(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{
-		100: honorOf(40), // owner has fallen below
-		200: honorOf(90), // heir passes
+		100: honorOf(40),
+		200: honorOf(90),
 	}}
 	e, repo, _, reg := setupHonorTest(nil, nil, honor)
 	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
 	r.MinHonor = 80
 	r.AllowNewPlayers = true
-	reg.Add(1, 200) // 200 has returned (present)
+	reg.Add(1, 200)
 
 	rec := doReturnToRoom(e, "1", validToken(100))
 	require.Equal(t, http.StatusConflict, rec.Code)
@@ -600,7 +535,7 @@ func TestReturnToRoom_HonorEjectedOwnerTransfersToEligibleHeir(t *testing.T) {
 func TestReturnToRoom_HonorEjectedOwnerNoEligibleHeirClosesRoom(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{
 		100: honorOf(40),
-		200: honorOf(50), // present, but also below the bar
+		200: honorOf(50),
 	}}
 	e, repo, broadcaster, reg := setupHonorTest(nil, nil, honor)
 	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
@@ -620,14 +555,12 @@ func TestReturnToRoom_HonorEjectedOwnerNoEligibleHeirClosesRoom(t *testing.T) {
 		"the room-close event is REUSED for honor closes, wire string unchanged")
 }
 
-// AC7: a candidate whose honor row is MISSING is treated as ineligible, not as a
-// reason to fail the whole ejection. The subject has already failed the gate and
-// their seat must be freed either way — 500ing out would leave a barred player
-// seated. This is why heir enumeration is lenient where the gate subject is strict.
+// TestReturnToRoom_MissingCandidateHonorTreatsHeirAsIneligible checks that a candidate
+// with no honor row is an ineligible heir rather than a failed ejection. The barred
+// seat must be freed either way.
 func TestReturnToRoom_MissingCandidateHonorTreatsHeirAsIneligible(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{
-		100: honorOf(40), // the ejected owner
-		// 200's row is absent entirely.
+		100: honorOf(40),
 	}}
 	e, repo, broadcaster, reg := setupHonorTest(nil, nil, honor)
 	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
@@ -645,8 +578,6 @@ func TestReturnToRoom_MissingCandidateHonorTreatsHeirAsIneligible(t *testing.T) 
 	require.Len(t, broadcastsOfType(t, broadcaster, "system:honor_ejected"), 1)
 }
 
-// --- StartMatch (AC6, AC7) ----------------------------------------------
-
 // AC6: the start-path honor gate runs BEFORE the coin block, so no stake is ever
 // charged and refunded for a player who was about to be ejected.
 func TestStartMatch_HonorGateRunsBeforeCharging(t *testing.T) {
@@ -654,7 +585,7 @@ func TestStartMatch_HonorGateRunsBeforeCharging(t *testing.T) {
 	wallet := &stubWallet{balance: 5000}
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{
 		100: honorOf(90),
-		200: honorOf(40), // abandoned the previous match
+		200: honorOf(40),
 		300: honorOf(90),
 		400: honorOf(90),
 	}}
@@ -685,21 +616,19 @@ func TestStartMatch_HonorGateRunsBeforeCharging(t *testing.T) {
 	require.Len(t, ejects, 1)
 	assert.Equal(t, []uint{200}, ejects[0].userIDs)
 
-	// The remaining players are told the seat is gone (AC6 fan-out).
 	assert.NotEmpty(t, broadcastsOfType(t, broadcaster, "system:player_left"))
 }
 
-// AC7: an abandonment charges EVERY absent human seat (9.7 AC3, review pass 2),
-// so one match end can push several seats below the threshold at once. The owner
-// plus one other seat failing together must transfer to the single eligible heir
-// rather than closing a room that has one.
+// TestStartMatch_HonorEjectsOwnerAndPeerTransfersToLoneHeir checks that when the owner
+// and another seat both fall below the threshold, ownership passes to the one eligible
+// heir.
 func TestStartMatch_HonorEjectsOwnerAndPeerTransfersToLoneHeir(t *testing.T) {
 	starter := &fakeMatchStarter{}
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{
-		100: honorOf(30), // owner, ejected
-		200: honorOf(35), // ejected too
-		300: honorOf(88), // the only eligible heir
-		400: honorOf(30), // ejected
+		100: honorOf(30),
+		200: honorOf(35),
+		300: honorOf(88),
+		400: honorOf(30),
 	}}
 	e, repo, broadcaster, _ := setupHonorTest(starter, nil, honor)
 	r := seedMixedRoom(t, e, repo, 4, 0)
@@ -719,7 +648,6 @@ func TestStartMatch_HonorEjectsOwnerAndPeerTransfersToLoneHeir(t *testing.T) {
 	require.Len(t, players, 1)
 	assert.Equal(t, uint(300), players[0].UserID)
 
-	// Every ejected seat gets its own per-user push.
 	ejects := broadcastsOfType(t, broadcaster, "system:honor_ejected")
 	require.Len(t, ejects, 3)
 	got := make([]uint, 0, 3)
@@ -756,8 +684,6 @@ func TestStartMatch_UngatedRoomSkipsHonorRecheck(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{100: honorOf(5)}}
 	e, repo, _, _ := setupHonorTest(starter, nil, honor)
 	r := seedMixedRoom(t, e, repo, 4, 0)
-	// Spelled out for the same reason as in the return-path test above: a
-	// hand-built &Room{} leaves AllowNewPlayers false, which reads as gated.
 	r.MinHonor = 0
 	r.AllowNewPlayers = true
 
@@ -777,7 +703,7 @@ func TestStartMatch_AllSeatsPassGateStartsMatch(t *testing.T) {
 	e, repo, _, _ := setupHonorTest(starter, nil, honor)
 	r := seedMixedRoom(t, e, repo, 4, 0)
 	r.MinHonor = 80
-	r.AllowNewPlayers = true // the newcomer at 19 is admitted: never score-checked
+	r.AllowNewPlayers = true
 
 	rec := doStartMatch(e, "1", validToken(100))
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -804,21 +730,10 @@ func TestStartMatch_HonorReadErrorDoesNotEject(t *testing.T) {
 	assert.Len(t, players, 4, "nobody is ejected on a read failure")
 	assert.Empty(t, broadcastsOfType(t, broadcaster, "system:honor_ejected"))
 
-	// The room must NOT be left in "playing". The outer StartMatch tx has already
-	// committed that status, and on a read failure no seat is ejected — so
-	// ejectSeatsAtStart, which normally owns the revert, never runs. Without an
-	// explicit un-brick here the room is stranded "playing" with no live session:
-	// it drops out of the lobby, and JoinRoom / StartMatch / ReturnToRoom /
-	// LeaveRoom all refuse, trapping every seated player until the next boot
-	// reconcile. This assertion is the whole point of the test and was missing —
-	// the three sibling failure paths (balance-read, charge, session-start) all
-	// revert, and this one silently did not.
 	persisted, _ := repo.FindByID(1)
 	require.NotNil(t, persisted)
 	assert.Equal(t, "waiting", persisted.Status, "a honor-read failure must un-brick the room")
 }
-
-// --- Quick Play (AC12) ---------------------------------------------------
 
 // AC12: a synthesized Quick Play room is ungated BY CONSTRUCTION. This is the
 // test that catches the AC2 GORM trap in the wild — a missing explicit
@@ -838,12 +753,9 @@ func TestQuickPlay_SynthesizedRoomIsUngated(t *testing.T) {
 	assert.Equal(t, 0, honor.calls, "QuickPlay gains no honor gate")
 }
 
-// --- Wire surface (AC5) --------------------------------------------------
-
-// AC5: minHonor / allowNewPlayers ride the hand-built roomLifecyclePayload, not
-// just the Room struct. system:room_created and system:room_updated flow through
-// that map, so a missing key would render a gated room as ungated on a live lobby
-// card until the next full refetch — invisible to every HTTP test.
+// TestRoomLifecyclePayload_CarriesHonorGate checks that minHonor and allowNewPlayers
+// ride the hand-built roomLifecyclePayload. Without them a gated room shows as ungated
+// on live lobby cards.
 func TestRoomLifecyclePayload_CarriesHonorGate(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{5: honorOf(96)}}
 	e, _, broadcaster, _ := setupHonorTest(nil, nil, honor)
@@ -882,20 +794,9 @@ func TestListRooms_GatedRoomsStayListedWithTheirGate(t *testing.T) {
 	assert.False(t, rooms[0].AllowNewPlayers)
 }
 
-// --- DB-backed: the GORM default-tag trap (AC2) --------------------------
-
-// AC2: allow_new_players = false MUST survive a create-and-read roundtrip.
-//
-// This test is DB-BACKED on purpose, and it is the one that fails the moment
-// someone "tidies up" room.Room by adding `gorm:"default:true"` to the field.
-// GORM omits a zero-valued field (false) from the INSERT when it declares a
-// default, letting the database apply TRUE instead — which would make a
-// veterans-only room literally uninsertable.
-//
-// A mockRoomRepo test cannot catch this at all: the trap lives in GORM's SQL
-// generation, and an in-memory mock stores whatever Go value it is handed. A
-// green mock-level test here would be worse than none, because it would certify
-// the exact thing it cannot observe.
+// TestRoom_AllowNewPlayersFalseSurvivesRoundtrip checks against a real DB that
+// allow_new_players = false survives a roundtrip. A GORM default:true tag on the field
+// would make GORM drop the false.
 func TestRoom_AllowNewPlayersFalseSurvivesRoundtrip(t *testing.T) {
 	db := getRoomTestDB(t)
 	repo := room.NewGormRepository(db)
@@ -918,8 +819,6 @@ func TestRoom_AllowNewPlayersFalseSurvivesRoundtrip(t *testing.T) {
 		"allow_new_players=false must round-trip; a GORM `default` tag on this field would silently flip it to true")
 	assert.Equal(t, 90, got.MinHonor)
 
-	// Read the column directly too, so the assertion does not depend on how the
-	// struct scans back.
 	var raw bool
 	require.NoError(t, db.Raw("SELECT allow_new_players FROM rooms WHERE id = ?", r.ID).Scan(&raw).Error)
 	assert.False(t, raw, "the DB column itself must hold false")
@@ -953,8 +852,6 @@ func TestRoom_OmittedAllowNewPlayersDefaultsToTrueInDB(t *testing.T) {
 // binding and the &Room{} literal as well as GORM.
 func TestCreateRoom_VeteransOnlyPersistsToDB(t *testing.T) {
 	if os.Getenv("BELJOT_DB_URL") == "" {
-		// getRoomTestDB defaults to the dev DSN; this guard only documents that
-		// the test is DB-backed like its siblings above.
 		t.Log("using the default dev DSN (port 5433)")
 	}
 	db := getRoomTestDB(t)
@@ -998,10 +895,6 @@ func TestRoom_MinHonorCheckConstraintRejectsOutOfRange(t *testing.T) {
 	require.Error(t, err, "min_honor 101 must violate the CHECK (min_honor BETWEEN 0 AND 100)")
 }
 
-// --- Per-seat honour on the room roster (honour redesign R6) -----------------
-
-// doGetRoom lives in handler_test.go — reused here rather than redeclared.
-
 // rosterOf pulls the players array out of a room-detail response.
 func rosterOf(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
 	t.Helper()
@@ -1018,8 +911,6 @@ func rosterOf(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
 // both chips, then the gate vanished the moment you were inside. Per-seat honour
 // is what makes the roster answer "who am I about to partner with".
 func TestGetRoom_AttachesHonorToHumanSeats(t *testing.T) {
-	// Level rides the same hydration as honour (rendered before the shield on
-	// the seat tile), so this fixture carries one to prove it reaches the wire.
 	withLevel := honorOf(96)
 	withLevel.Level = 7
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{
@@ -1048,8 +939,6 @@ func TestGetRoom_AttachesHonorToHumanSeats(t *testing.T) {
 	assert.Equal(t, float64(7), byUser[100]["level"])
 	assert.Equal(t, float64(71), byUser[7]["honorScore"])
 	assert.Equal(t, "fair", byUser[7]["honorTier"])
-	// A real level 0 stays on the wire — the pointer field serializes &0, and
-	// only a nil ("not read") is omitted. Same rule as honorScore.
 	assert.Equal(t, float64(0), byUser[7]["level"])
 }
 
@@ -1127,7 +1016,6 @@ func TestGetRoom_BotSeatsAreNeverGivenHonor(t *testing.T) {
 		if p["isBot"] == true {
 			_, present := p["honorScore"]
 			assert.False(t, present, "a bot seat carries no honour")
-			// And the read never asked for user 0.
 			for _, batch := range honor.requestedBy {
 				assert.NotContains(t, batch, uint(0))
 			}

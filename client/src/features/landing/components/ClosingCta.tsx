@@ -3,8 +3,7 @@ import { useTranslation } from "react-i18next";
 import { LandingCta } from "@/features/landing/components/LandingCta";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 
-// Closing felt CTA band — bottom-anchored spotlight, big headline, sign-up CTA.
-
+// Closing felt CTA band with a spotlight, big headline and sign-up CTA.
 export function ClosingCta() {
   const { t } = useTranslation();
   return (

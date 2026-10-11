@@ -16,49 +16,14 @@ import type { SeasonRank } from "@/shared/types/apiTypes";
 import { SectionHeader } from "./SectionHeader";
 
 type Props = {
-  /** The SUBJECT's id — the route param on the public page, the viewer's own
-   *  id on the self page. `undefined` while unresolved (the archive waits). */
   userId: number | undefined;
-  /** The profile response's seasonRank block. `null` = has not played this
-   *  season (the chip hides); `undefined` = the profile has not resolved. */
   seasonRank: SeasonRank | null | undefined;
-  /**
-   * False on the SELF profile, where the full RankBanner sits above the streak
-   * callout and already states the viewer's current tier, SP and progress. The
-   * chip would be a second, smaller readout of the same standing on the same
-   * page — so the self page keeps only the archive, and the section's subtitle
-   * drops its "Current rank and…" clause to match.
-   *
-   * The public page has no banner (another player's `seasonRank` carries no
-   * band decomposition and no countdown, so there is nothing to draw a progress
-   * bar from), which is why the chip stays the default.
-   */
   showCurrentRank?: boolean;
 };
 
 /**
- * The profile's season surface (Story 13.3): the current-rank chip plus the
- * prior-season archive, filling the slot both profile pages reserved when
- * Epic 11 shipped.
- *
- * HIDDEN-WHEN-EMPTY, BOTH HALVES INDEPENDENTLY — and that is a product rule,
- * not a styling choice (epic AC: the archive section is omitted from the DOM
- * entirely for players with no played seasons, never shown as an empty state):
- *
- *   - the chip (`profile-season`) renders only when `seasonRank` is non-null
- *     AND the caller asked for it; a played season at 0 SP IS a rank (Iron), so
- *     the gate is null, never SP truthiness. The SELF page passes
- *     `showCurrentRank={false}` — its RankBanner above the streak callout is
- *     the richer readout of the same standing — so there the section is the
- *     archive and nothing else.
- *   - the archive (`prior-season-archive`) renders only when the archive query
- *     resolved with rows. Loading and error states render NOTHING rather than
- *     a skeleton or an error line: the section is supplementary history, and a
- *     placeholder here would shift the whole profile for a section most
- *     players do not have yet.
- *
- * When neither half has anything, the component contributes NOTHING to the
- * DOM — the pre-13.3 pages' graceful absence, preserved.
+ * Profile season section: current-rank chip and prior-season archive, each hidden when empty.
+ * The archive gates on its rows, not on isError, so a failed background refetch never hides it.
  */
 export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Props) {
   const { t } = useTranslation();
@@ -66,11 +31,6 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
 
   const items = archive.data?.items ?? [];
   const hasRank = showCurrentRank && seasonRank !== null && seasonRank !== undefined;
-  // CACHED ROWS SURVIVE A FAILED REFETCH. React Query keeps `data` when a
-  // background or focus refetch fails, so gating on `isError` made a network
-  // blip delete an already-rendered archive and jump the profile's layout. The
-  // row count is the only gate that matters: a first load that fails has no
-  // rows anyway, which is the same hidden section either way.
   const hasArchive = items.length > 0;
 
   if (!hasRank && !hasArchive) return null;
@@ -78,8 +38,6 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
   let chip = null;
   if (hasRank) {
     const sp = seasonSpOrZero(seasonRank.sp);
-    // Guarded, not trusted: an unrecognised token from a newer server falls
-    // back to the SP's own bucket rather than a missing i18n key.
     const tier = normalizeSeasonTier(seasonRank.tier, sp);
     const rankName = seasonRankLabel(t, tier, normalizeSeasonDivision(tier, seasonRank.division));
     chip = (
@@ -107,8 +65,6 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
           </span>
           <span className="text-ink-dim text-[11px] leading-tight tabular-nums">
             {t("season.banner.sp", { sp: sp.toLocaleString() })}
-            {/* The machine-stable window token, VERBATIM — an identifier, not
-                translated copy. */}
             <span className="text-ink-mute"> · {seasonRank.seasonName}</span>
           </span>
         </div>
@@ -118,10 +74,6 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
 
   return (
     <section className="mb-5" data-testid="profile-season-section">
-      {/* The subtitle follows the CHIP, not the caller's flag: a public profile
-          whose subject has not played this season renders no chip either, and
-          promising a "current rank" above a list of past ones only would be
-          wrong there for exactly the same reason. */}
       <SectionHeader
         eyebrow={t("season.archive.eyebrow")}
         title={t("season.archive.title")}

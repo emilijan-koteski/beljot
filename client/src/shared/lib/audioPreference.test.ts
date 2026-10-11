@@ -145,8 +145,6 @@ describe("persistAudioPreferences", () => {
   });
 
   it("leaves a field alone when a later write of it superseded the failure", async () => {
-    // off (fails late) → on → off. The first write's rollback target is ON,
-    // which would silently un-mute the player's actual last choice.
     const first = deferred();
     mockUpdatePreferences.mockReturnValueOnce(first.promise);
 
@@ -162,9 +160,6 @@ describe("persistAudioPreferences", () => {
   });
 
   it("still reverts a field that no later write touched", async () => {
-    // Mute both (fails late), then flip sound on (succeeds): sound is owned by
-    // the second write, but music was only ever written by the first, so its
-    // failure must still roll music back.
     const mute = deferred();
     mockUpdatePreferences.mockReturnValueOnce(mute.promise).mockResolvedValueOnce({});
 
@@ -270,8 +265,6 @@ describe("persistAudioPreferences", () => {
     });
 
     it("keeps switches and volumes independent under latest-wins", async () => {
-      // A mute that fails late must roll back the switches only; the volume
-      // change made after it has its own field and its own outcome.
       const mute = deferred();
       mockUpdatePreferences.mockReturnValueOnce(mute.promise).mockResolvedValueOnce({});
 

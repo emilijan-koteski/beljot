@@ -14,9 +14,6 @@ const CARD_IDS = RANKS.flatMap((rank) => SUITS.map((suit) => `${rank}${suit}`));
 
 const CARDS_DIR = join(process.cwd(), "public", "cards");
 
-// One row per shipped deck: the folder under `public/cards/` and the file
-// extension its faces carry. Both assertions below iterate this, so adding a
-// third deck is one row rather than a copied describe block.
 const DECKS: Array<{ deck: CardDeck; ext: string }> = [
   { deck: "french", ext: "svg" },
   { deck: "croatian", ext: "webp" },
@@ -41,11 +38,6 @@ describe("cardFaceUrl", () => {
 });
 
 describe("resolveCardDeck", () => {
-  // The store's `user` is null before hydration and on unauthenticated paths,
-  // and HTTP responses are cast rather than parsed — so an unknown value is
-  // reachable at runtime even though the type says otherwise. Falling back to
-  // French is what stops it resolving to a missing asset (a blank card, which
-  // nothing else would report).
   it("passes through every shipped deck", () => {
     for (const { deck } of DECKS) {
       expect(resolveCardDeck(deck)).toBe(deck);
@@ -57,14 +49,8 @@ describe("resolveCardDeck", () => {
     null,
     "",
     "german",
-    // The game VARIANT value, which is the enum most likely to be cross-wired.
     "croatia",
     "FRENCH",
-    // Prototype-chain keys. `value in DECK_EXT` accepted these — `"toString" in
-    // DECK_EXT` is true — so a garbled preference resolved to a "deck" named
-    // toString and the face URL became
-    // `cards/toString/KS.function toString() { [native code] }`. Object.hasOwn
-    // is the fix; these two rows are the regression guard.
     "toString",
     "constructor",
     "hasOwnProperty",
@@ -79,10 +65,6 @@ describe("resolveCardDeck", () => {
 });
 
 describe("deck assets", () => {
-  // A face resolved from a card ID fails silently at every other layer: the img
-  // is decorative so there is no broken-image affordance, the aria-label still
-  // reads correctly, and in production the SPA fallback answers with a 200. This
-  // is the only thing standing between a renamed asset and a blank card in play.
   describe.each(DECKS)("$deck", ({ deck, ext }) => {
     it.each(CARD_IDS)("ships artwork for %s", (cardId) => {
       expect(existsSync(join(CARDS_DIR, deck, `${cardId}.${ext}`))).toBe(true);
@@ -91,10 +73,6 @@ describe("deck assets", () => {
 });
 
 describe("CARD_SIZES", () => {
-  // The faces are authored `preserveAspectRatio="none"` (French) or encoded to
-  // 5:7 at import time (Croatian), so they stretch to fill whatever box they are
-  // given. A box at any other ratio distorts the artwork without failing
-  // anything else — hence pinning the ratios here.
   it.each(Object.entries(CARD_SIZES))("%s matches the artwork's 5:7 ratio", (_size, dims) => {
     expect(dims.height / dims.width).toBeCloseTo(336 / 240, 10);
   });

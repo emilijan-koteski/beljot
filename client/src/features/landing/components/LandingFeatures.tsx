@@ -5,10 +5,7 @@ import { FeltVignette } from "@/features/landing/components/FeltVignette";
 import { ProfileCard } from "@/features/landing/components/ProfileCard";
 import { RoomCard } from "@/features/landing/components/RoomCard";
 
-// Three alternating feature rows on a surface band: the live lobby, the felt
-// table (teams), and the player profile. Media slots reuse the marketing
-// graphics; all copy is translated.
-
+// Three alternating feature rows: the live lobby, the felt table, and the player profile.
 export function LandingFeatures() {
   const { t } = useTranslation();
 

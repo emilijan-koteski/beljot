@@ -57,8 +57,6 @@ describe("AutoCloseRing", () => {
     render(<AutoCloseRing duration={8} onClose={vi.fn()} />);
 
     const arc = screen.getByTestId("auto-close-ring-arc") as unknown as SVGCircleElement;
-    // The sweep and the setTimeout fire share duration and start commit, so
-    // the ring reads empty at the exact moment the close fires.
     expect(arc.style.animationName).toBe("ring-drain");
     expect(arc.style.animationDuration).toBe("8000ms");
     expect(arc.style.animationDelay).toBe("0ms");
@@ -73,10 +71,9 @@ describe("AutoCloseRing", () => {
 
     const arc = screen.getByTestId("auto-close-ring-arc") as unknown as SVGCircleElement;
     expect(arc.style.animationName).toBe("");
-    expect(parseFloat(arc.style.strokeDashoffset)).toBe(0); // full at mount
+    expect(parseFloat(arc.style.strokeDashoffset)).toBe(0);
 
     act(() => vi.advanceTimersByTime(4_000));
-    // Half the window elapsed — the static fallback has stepped to ~half drained.
     expect(parseFloat(arc.style.strokeDashoffset)).toBeCloseTo(RING_CIRC / 2, 1);
 
     act(() => vi.advanceTimersByTime(4_000));

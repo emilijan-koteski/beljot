@@ -26,10 +26,6 @@ vi.mock("@/shared/api/season", () => ({
 const mockGet = vi.mocked(getSeasonLeaderboard);
 const mockGetSeasons = vi.mocked(getSeasons);
 
-// Two windows for the picker tests, newest-first as the server sends them.
-// Built RELATIVE to the real clock (the page identifies "current" by comparing
-// the windows' timestamps to Date.now()) so the suite never rots with the
-// calendar.
 const DAY = 86_400_000;
 function seasonsFixture(): SeasonsListResponse {
   const now = Date.now();
@@ -83,7 +79,6 @@ describe("LeaderboardPage", () => {
   beforeEach(() => {
     mockGet.mockReset();
     mockGetSeasons.mockReset();
-    // Default: no seasons list → no picker → every pre-13.3 test is unchanged.
     mockGetSeasons.mockResolvedValue({ items: [] });
     useAuthStore.setState({
       token: "t",
@@ -153,9 +148,7 @@ describe("LeaderboardPage", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(40);
     });
-    // Offset comes from the rows already held, not pageSize * pages.
     expect(mockGet).toHaveBeenLastCalledWith(25, 25, "current");
-    // Fully loaded — the button retires.
     expect(screen.queryByTestId("leaderboard-load-more")).not.toBeInTheDocument();
   });
 
@@ -167,8 +160,6 @@ describe("LeaderboardPage", () => {
     expect(screen.queryByTestId("leaderboard-load-more")).not.toBeInTheDocument();
   });
 
-  // AC3: the viewer's own row is marked in place when it is on screen, and
-  // NOT duplicated into a pinned row.
   it("marks the viewer's row in place without pinning it", async () => {
     mockGet.mockResolvedValue(
       response({
@@ -186,8 +177,6 @@ describe("LeaderboardPage", () => {
     expect(screen.queryByTestId("leaderboard-pinned")).not.toBeInTheDocument();
   });
 
-  // AC3: off-page, the standing is PINNED below the list — otherwise a player
-  // ranked 340th would have to page thirteen times to find themselves.
   it("pins the viewer's row when it falls outside the loaded pages", async () => {
     mockGet.mockResolvedValue(
       response({
@@ -200,8 +189,6 @@ describe("LeaderboardPage", () => {
 
     const pinned = await screen.findByTestId("leaderboard-pinned");
     expect(pinned).toHaveTextContent("340");
-    // The username comes from the auth store: the server's viewer block
-    // deliberately carries no name.
     expect(pinned).toHaveTextContent("kiro");
     expect(pinned.querySelector('[data-testid="leaderboard-row"]')).toHaveAttribute(
       "data-self",
@@ -209,8 +196,6 @@ describe("LeaderboardPage", () => {
     );
   });
 
-  // The pinned row takes the avatar from the auth store, like the name: the
-  // viewer block carries neither.
   it("draws the viewer's own avatar on the pinned row", async () => {
     const url = "https://assets.test/avatars/kiro/128.webp";
     useAuthStore.setState({ user: makeUser({ id: 7, username: "kiro", avatarUrl: url }) });
@@ -227,7 +212,6 @@ describe("LeaderboardPage", () => {
     expect(pinned.querySelector("img")).toHaveAttribute("src", url);
   });
 
-  // AC4: no standing at all -> no marker anywhere and nothing pinned.
   it("renders no own-row marker and no pinned row when the viewer has no standing", async () => {
     mockGet.mockResolvedValue(response({ viewer: null }));
     renderPage();
@@ -266,11 +250,6 @@ describe("LeaderboardPage", () => {
     );
   });
 
-  // --- Review follow-ups (P3, P4, P5, P6, P14) ---
-
-  // P3: the destructive error branch. `isError` was checked BEFORE `data`, so a
-  // failed load-more — the click at the bottom of 75 rows the reader had already
-  // scrolled through — replaced all of them with one line of error text.
   it("keeps the loaded rows when fetchNextPage fails, and offers a retry", async () => {
     const user = userEvent.setup();
     mockGet
@@ -284,11 +263,8 @@ describe("LeaderboardPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("leaderboard-page-error")).toBeInTheDocument();
     });
-    // The 25 rows survive the failure...
     expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(25);
-    // ...the whole-body error branch never fires...
     expect(screen.queryByTestId("leaderboard-error")).not.toBeInTheDocument();
-    // ...and the failure is recoverable in place.
     expect(screen.getByTestId("leaderboard-retry")).toBeInTheDocument();
   });
 
@@ -312,8 +288,6 @@ describe("LeaderboardPage", () => {
     expect(screen.queryByTestId("leaderboard-page-error")).not.toBeInTheDocument();
   });
 
-  // The FIRST load failing is still the full-body error — there is nothing to
-  // preserve, so the reader must see why the page is blank.
   it("shows the whole-body error when there is nothing loaded to keep", async () => {
     mockGet.mockRejectedValue(new Error("boom"));
     renderPage();
@@ -322,10 +296,6 @@ describe("LeaderboardPage", () => {
     expect(screen.queryByTestId("leaderboard-list")).not.toBeInTheDocument();
   });
 
-  // P4: the button used to be driven by `items.length < pages[0].total` while the
-  // FETCH decided from the last page's total. When the total shrank between pages
-  // (an account deleted, a row leaving the ladder) the two disagreed and the
-  // button survived with nothing to fetch — every click a silent no-op.
   it("retires load more when the total shrinks below the rows already loaded", async () => {
     const user = userEvent.setup();
     mockGet
@@ -339,16 +309,9 @@ describe("LeaderboardPage", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(30);
     });
-    // 30 loaded, latest total 28: there is no next page, so no button.
     expect(screen.queryByTestId("leaderboard-load-more")).not.toBeInTheDocument();
   });
 
-  // P4, THE CASE WHERE THE TWO CONDITIONS ACTUALLY DIVERGE. An empty last page
-  // while `total` still exceeds the loaded rows: `getNextPageParam` stops (its
-  // `items.length === 0` guard), so there is no next page param and
-  // `fetchNextPage()` is a silent no-op — but `items.length (25) < total (60)`
-  // is still true, so the old condition left a button that did nothing at all,
-  // forever. Only `hasNextPage` agrees with the fetch.
   it("retires load more when the last page came back empty but total says more", async () => {
     const user = userEvent.setup();
     mockGet
@@ -362,16 +325,10 @@ describe("LeaderboardPage", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("leaderboard-load-more")).not.toBeInTheDocument();
     });
-    // The rows are untouched and the caption still reports the real total, so the
-    // reader is not told the list is complete — only that there is nothing more
-    // to fetch.
     expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(25);
     expect(screen.getByTestId("leaderboard-count")).toHaveTextContent("60");
   });
 
-  // P4, second half: `standing` and `total` are read from the LAST page, so a
-  // reader who has paged deeper sees their current position, not the one from the
-  // first response they happened to receive.
   it("reads the viewer standing and the total from the newest page", async () => {
     const user = userEvent.setup();
     mockGet
@@ -394,7 +351,6 @@ describe("LeaderboardPage", () => {
           items: rows(26, 25),
           total: 55,
           offset: 25,
-          // Their position improved while they were reading.
           viewer: {
             position: 310,
             userId: 999,
@@ -415,20 +371,13 @@ describe("LeaderboardPage", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(51);
     });
-    // The fresher standing, not the stale one from page 0.
     expect(screen.getByTestId("leaderboard-pinned")).toHaveTextContent("310");
-    // And the fresher total in the caption.
     expect(screen.getByTestId("leaderboard-count")).toHaveTextContent("55");
   });
 
-  // P5: offset paging over live data can return the same player twice — if
-  // someone above the fold gains SP between requests, every row below shifts down
-  // and the last row of page 1 reappears first on page 2. Duplicate React keys
-  // make React reconcile the wrong nodes.
   it("dedupes a player who appears on two pages", async () => {
     const user = userEvent.setup();
     const first = rows(1, 25);
-    // Page 2 repeats the last row of page 1 (userId 25) before continuing.
     const second = [first[24]!, ...rows(26, 4)];
     mockGet
       .mockResolvedValueOnce(response({ items: first, total: 40 }))
@@ -439,7 +388,6 @@ describe("LeaderboardPage", () => {
     await user.click(screen.getByTestId("leaderboard-load-more"));
 
     await waitFor(() => {
-      // 25 + 5 items came back, but one was a repeat -> 29 rendered rows.
       expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(29);
     });
     const ids = screen.getAllByTestId("leaderboard-row").map((r) => r.getAttribute("data-user-id"));
@@ -447,10 +395,6 @@ describe("LeaderboardPage", () => {
     expect(ids.filter((id) => id === "25")).toHaveLength(1);
   });
 
-  // P6: the auth store can be unhydrated (a hard refresh straight onto this URL)
-  // while the query — which needs only the token — has already resolved. The
-  // pinned row was then rendered with an empty name, in the visible cell AND in
-  // its spoken summary.
   it("falls back to the you label when the auth store has no username yet", async () => {
     useAuthStore.setState({ token: "t", user: null, isLoading: false });
     mockGet.mockResolvedValue(
@@ -466,14 +410,11 @@ describe("LeaderboardPage", () => {
     const name = pinned.querySelector('[data-testid="leaderboard-username"]');
     expect(name).toHaveTextContent(i18n.t("season.leaderboard.you"));
     expect(name?.textContent?.trim()).not.toBe("");
-    // The spoken summary is not left nameless either.
     expect(pinned.querySelector('[data-testid="leaderboard-row-summary"]')).toHaveTextContent(
       i18n.t("season.leaderboard.you"),
     );
   });
 
-  // P14: clicking Load more inserts 25 rows with no event a screen reader can
-  // observe, so the caption is a live region and its text is the announcement.
   it("announces the loaded count through a live region", async () => {
     mockGet.mockResolvedValue(response({ items: rows(1, 25), total: 60 }));
     renderPage();
@@ -492,8 +433,6 @@ describe("LeaderboardPage", () => {
     expect(skeleton).toHaveAttribute("aria-busy", "true");
   });
 
-  // --- Story 13.3: the season picker ---
-
   it("renders the picker newest-first with season tokens verbatim and the current chip marked", async () => {
     mockGetSeasons.mockResolvedValue(seasonsFixture());
     mockGet.mockResolvedValue(response());
@@ -502,10 +441,8 @@ describe("LeaderboardPage", () => {
     const picker = await screen.findByTestId("leaderboard-season-picker");
     const chips = picker.querySelectorAll('[role="radio"]');
     expect(chips).toHaveLength(2);
-    // Newest-first, straight off the server's order; tokens rendered verbatim.
     expect(chips[0]).toHaveTextContent("2026 Q3");
     expect(chips[1]).toHaveTextContent("2026 Q2");
-    // The current window's chip is selected by default and carries the marker.
     expect(chips[0]).toHaveAttribute("aria-checked", "true");
     expect(chips[0]).toHaveTextContent(i18n.t("season.picker.current"));
     expect(chips[1]).toHaveAttribute("aria-checked", "false");
@@ -516,16 +453,11 @@ describe("LeaderboardPage", () => {
     mockGet.mockResolvedValue(response());
     renderPage();
 
-    // The ladder still renders — the picker failing must not take it down.
     await screen.findAllByTestId("leaderboard-row");
     expect(screen.queryByTestId("leaderboard-season-picker")).not.toBeInTheDocument();
     expect(mockGet).toHaveBeenCalledWith(25, 0, "current");
   });
 
-  // THE ACCEPTANCE CRITERION on the page: the current season shows tier plus
-  // division, and an earlier ended pre-division season (2026 Q2 here) shows the
-  // stored tier with none — the page renders the server's rank and never
-  // re-derives one from SP (3500 old-formula SP would bucket as Grandmaster).
   it("renders the current season's divisions and an ended season's stored bare tier", async () => {
     const user = userEvent.setup();
     mockGetSeasons.mockResolvedValue(seasonsFixture());
@@ -581,7 +513,6 @@ describe("LeaderboardPage", () => {
     await waitFor(() => {
       expect(mockGet).toHaveBeenLastCalledWith(25, 0, 5);
     });
-    // The picked chip takes the selection.
     expect(screen.getByTestId("leaderboard-season-picker-5")).toHaveAttribute(
       "aria-checked",
       "true",
@@ -598,14 +529,10 @@ describe("LeaderboardPage", () => {
     await user.click(screen.getByTestId("leaderboard-season-picker-5"));
     await waitFor(() => expect(mockGet).toHaveBeenLastCalledWith(25, 0, 5));
 
-    // Back to the current window: the request must say `current`, not id 7 —
-    // that reuses the default cache entry and keeps the URL quarter-agnostic.
     await user.click(screen.getByTestId("leaderboard-season-picker-7"));
     await waitFor(() => expect(mockGet).toHaveBeenLastCalledWith(25, 0, "current"));
   });
 
-  // A picker offering one already-selected chip is a control that cannot do
-  // anything — and that is the state of the product's whole first quarter.
   it("hides the picker when only one window exists", async () => {
     const now = Date.now();
     mockGetSeasons.mockResolvedValue({
@@ -625,7 +552,6 @@ describe("LeaderboardPage", () => {
     expect(screen.queryByTestId("leaderboard-season-picker")).not.toBeInTheDocument();
   });
 
-  // A frozen quarter must not be described in the present tense.
   it("switches the header copy to the past-season variant for an ended season", async () => {
     const user = userEvent.setup();
     mockGetSeasons.mockResolvedValue(seasonsFixture());
@@ -645,8 +571,6 @@ describe("LeaderboardPage", () => {
     expect(screen.queryByText(i18n.t("season.leaderboard.sub"))).not.toBeInTheDocument();
   });
 
-  // "Nobody has earned Season Points YET this season" is simply false about a
-  // season that is over.
   it("uses the past-season empty copy for an ended season with no scorers", async () => {
     const user = userEvent.setup();
     mockGetSeasons.mockResolvedValue(seasonsFixture());
@@ -663,17 +587,8 @@ describe("LeaderboardPage", () => {
     );
   });
 
-  // THE PAGE OBSERVES THE BOUNDARY ITSELF, rather than leaning on the header's
-  // `useSeasonWindowWatch`: this page's own list of windows is the thing that
-  // has to gain a row, and it watches the newest endsAt it holds — which the
-  // header's watch, keyed on the ACTIVE window, does not. Without it a page
-  // left open across the quarter boundary keeps the "Current" marker on the
-  // dead window and serves its frozen standings under the present-tense
-  // heading forever.
   it("invalidates the ladder and the seasons list when the newest window ends", async () => {
     const now = Date.now();
-    // Every known window is already over: the next one exists only server-side,
-    // which is exactly the state right after a rollover.
     mockGetSeasons.mockResolvedValue({
       items: [
         {

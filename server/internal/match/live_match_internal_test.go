@@ -17,10 +17,8 @@ import (
 // which events broadcastActionResult emits, without a real WS hub/clients.
 type recordingBroadcaster struct{ msgs [][]byte }
 
-// rejectUnprojectedState hard-fails the run when an event:match_state payload
-// arrives through an identical-bytes primitive — same adoption sweep as
-// hubSpy's failIfUnprojectedState (matchend_test.go): every state frame must
-// ride SendFrames with a per-seat game.ProjectForSeat mask (Story 12.10).
+// rejectUnprojectedState panics when an event:match_state payload is sent
+// through an identical-bytes primitive instead of per-seat projected SendFrames.
 func rejectUnprojectedState(primitive string, msg []byte) {
 	if json.Valid(msg) {
 		var env struct {
@@ -88,11 +86,8 @@ func (r *recordingBroadcaster) payloadOf(t *testing.T, eventType string) map[str
 
 func intPtr(n int) *int { return &n }
 
-// TestTrickResolvedWinnerSeat covers the three states the winner can live in by
-// the time event:trick_resolved is broadcast. The middle case is the
-// regression: on a non-final hand's last trick, startNewHand has cleared
-// TrickWinnerSeat and advanced ActivePlayerSeat to the next bidder, so the
-// winner must be read from LastHandResult.LastTrickSeat — not ActivePlayerSeat.
+// TestTrickResolvedWinnerSeat checks the trick_resolved winner seat, which on a
+// non-final hand's last trick must come from LastHandResult.LastTrickSeat.
 func TestTrickResolvedWinnerSeat(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -110,9 +105,9 @@ func TestTrickResolvedWinnerSeat(t *testing.T) {
 			name:     "last trick of a continuing hand: read preserved seat, not the next bidder",
 			oldState: &game.GameState{HandNumber: 1},
 			newState: &game.GameState{
-				HandNumber:       2,   // startNewHand incremented it
-				ActivePlayerSeat: 0,   // next hand's first bidder (the buggy fallback)
-				TrickWinnerSeat:  nil, // cleared by startNewHand
+				HandNumber:       2,
+				ActivePlayerSeat: 0,
+				TrickWinnerSeat:  nil,
 				LastHandResult:   &game.HandScore{LastTrickSeat: 3},
 			},
 			want: 3,
@@ -141,13 +136,8 @@ func indexOf(xs []string, s string) int {
 	return len(xs)
 }
 
-// TestBroadcastActionResult_BelotCompletingTrickEmitsTrickResolved is the
-// regression for the missing-collect bug: when a trump K/Q is the 4th card of a
-// trick it triggers a Belot prompt and handlePlayCard defers resolution, so the
-// play_card broadcast carries no trick_resolved. The resolution happens under
-// the Belot action, which previously emitted only belot_announced + match_state
-// — leaving the client without pendingResolvedTrick, so the trick never swept to
-// the winner. The Belot branch must now emit trick_resolved (before match_state).
+// TestBroadcastActionResult_BelotCompletingTrickEmitsTrickResolved checks that a
+// Belot action resolving a deferred trick emits trick_resolved before match_state.
 func TestBroadcastActionResult_BelotCompletingTrickEmitsTrickResolved(t *testing.T) {
 	rec := &recordingBroadcaster{}
 	m := &Manager{hub: rec}
@@ -156,8 +146,6 @@ func TestBroadcastActionResult_BelotCompletingTrickEmitsTrickResolved(t *testing
 	leadSpades := game.SuitSpades
 	pending := 2
 
-	// oldState: trump KH was just played as the 4th card of trick 2; the Belot
-	// prompt deferred resolution (PendingBelotSeat set, trick still has 4 cards).
 	oldState := &game.GameState{
 		Phase:                game.PhasePlaying,
 		HandNumber:           1,
@@ -174,9 +162,6 @@ func TestBroadcastActionResult_BelotCompletingTrickEmitsTrickResolved(t *testing
 			{Card: game.Card{Rank: game.RankKing, Suit: game.SuitHearts}, PlayerSeat: 2},
 		},
 	}
-	// newState: announce_belot ran finishCardPlay -> resolveTrick. Seat 2's trump
-	// KH beats the three spades, so seat 2 wins and leads next (tricks 1-7 path:
-	// ActivePlayerSeat = winner, TrickWinnerSeat cleared).
 	newState := &game.GameState{
 		Phase:                game.PhasePlaying,
 		HandNumber:           1,
@@ -199,8 +184,6 @@ func TestBroadcastActionResult_BelotCompletingTrickEmitsTrickResolved(t *testing
 	require.NotNil(t, payload)
 	assert.Equal(t, float64(2), payload["winnerSeat"], "seat 2 wins the trick with trump KH")
 
-	// Ordering: trick_resolved must precede the authoritative match_state so the
-	// client arms pendingResolvedTrick before the trick is cleared from state.
 	assert.Less(t, indexOf(types, ws.EventTrickResolved), indexOf(types, ws.EventMatchState),
 		"trick_resolved must come before match_state (got %v)", types)
 }
@@ -216,8 +199,6 @@ func TestBroadcastActionResult_BelotMidTrickEmitsNoTrickResolved(t *testing.T) {
 	leadHearts := game.SuitHearts
 	pending := 1
 
-	// Two cards played; seat 1 announced Belot on its trump K. Turn advances, no
-	// resolution (only 2 cards in the trick).
 	oldState := &game.GameState{
 		Phase:                game.PhasePlaying,
 		HandNumber:           1,
@@ -240,7 +221,7 @@ func TestBroadcastActionResult_BelotMidTrickEmitsNoTrickResolved(t *testing.T) {
 		LeadSuit:             &leadHearts,
 		DeclarationsResolved: true,
 		BelotAnnounced:       true,
-		ActivePlayerSeat:     2, // advanced to the next player; trick continues
+		ActivePlayerSeat:     2,
 		CurrentTrick: []game.TrickCard{
 			{Card: game.Card{Rank: game.Rank7, Suit: game.SuitHearts}, PlayerSeat: 0},
 			{Card: game.Card{Rank: game.RankKing, Suit: game.SuitHearts}, PlayerSeat: 1},
@@ -254,11 +235,8 @@ func TestBroadcastActionResult_BelotMidTrickEmitsNoTrickResolved(t *testing.T) {
 		"a mid-trick Belot must not emit trick_resolved")
 }
 
-// TestBroadcastActionResult_HandCompleteEmitsHandScored guards the hand-scored
-// detection: scoreHand now holds in PhaseHandComplete (no HandNumber increment),
-// so the broadcast must fire event:hand_scored on the PhasePlaying ->
-// PhaseHandComplete transition and follow with the PhaseHandComplete state — NOT
-// a next-hand state, and NOT match_end.
+// TestBroadcastActionResult_HandCompleteEmitsHandScored checks that the last trick
+// emits hand_scored followed by the PhaseHandComplete state, not match_end.
 func TestBroadcastActionResult_HandCompleteEmitsHandScored(t *testing.T) {
 	rec := &recordingBroadcaster{}
 	m := &Manager{hub: rec}
@@ -277,16 +255,14 @@ func TestBroadcastActionResult_HandCompleteEmitsHandScored(t *testing.T) {
 		},
 	}
 	newState := &game.GameState{
-		Phase:           game.PhaseHandComplete, // scored, holding for continue
-		HandNumber:      1,                      // NOT incremented (next hand not dealt)
+		Phase:           game.PhaseHandComplete,
+		HandNumber:      1,
 		TrumpSuit:       &trump,
 		TrickNumber:     8,
 		TrickWinnerSeat: &winner,
 		CurrentTrick:    []game.TrickCard{},
 		TeamScores:      [2]int{70, 92},
 		LastHandResult: &game.HandScore{
-			// The hand this result describes. Required: the broadcast gate now checks
-			// it against oldState.HandNumber, because a HandScore outlives its hand.
 			HandNumber:    1,
 			LastTrickTeam: 1, LastTrickSeat: 3, LastTrickBonus: 10,
 		},
@@ -322,10 +298,8 @@ func TestBroadcastActionResult_ContinueAdvanceBroadcastsState(t *testing.T) {
 		"a continue advance just syncs authoritative state")
 }
 
-// TestBroadcastActionResult_DeclareEmitsPlayerDeclared guards the trick-1
-// "who declared" announcement: a manual declare must broadcast
-// event:player_declared (seat only — no meld details) before the
-// authoritative match_state, and a skip must stay silent.
+// TestBroadcastActionResult_DeclareEmitsPlayerDeclared checks that a declare
+// broadcasts player_declared before match_state and a skip stays silent.
 func TestBroadcastActionResult_DeclareEmitsPlayerDeclared(t *testing.T) {
 	trump := game.SuitHearts
 
@@ -383,19 +357,10 @@ func TestBroadcastActionResult_DeclareEmitsPlayerDeclared(t *testing.T) {
 	})
 }
 
-// TestHandleTimerExpiry_ForcedDealerPickResolvesBidding is the timeout half of
-// the Story 12.8 deadlock fix, independent of bots.
-//
-// Under AllPassOutcome == AllPassDealerMustPick the dealer bidding last
-// (fourth) has no legal pass. The old auto-action passed anyway, the engine
-// rejected it, and the error path re-armed the SAME seat for a full fresh
-// window — so the hand never advanced and the session logged one rejection per
-// timer period for as long as it lived. Bidding resolving here is the proof
-// that loop is gone.
+// TestHandleTimerExpiry_ForcedDealerPickResolvesBidding checks that a timeout on
+// a dealer who cannot pass picks trump instead of re-arming the same seat forever.
 func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 	rec := &recordingBroadcaster{}
-	// nil repo: this test never reaches a persisted match end — bidding
-	// resolves into the declaration phase and stops there.
 	m := NewManager(rec, nil)
 
 	const roomID = uint(100)
@@ -408,8 +373,6 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0, true, false))
 	t.Cleanup(func() { m.RemoveSession(roomID) })
 
-	// passCount 3: the other three seats have passed and the dealer is on the
-	// clock with no legal pass.
 	gs := testfixtures.NewGameCroatianMidBidding(3)
 	gs.RoomID = roomID
 	require.True(t, game.MustPickTrump(gs, gs.ActivePlayerSeat), "the fixture must be the forced-pick state")
@@ -418,12 +381,6 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 
 	m.TriggerTimerExpiryForTest(roomID, gs.ActivePlayerSeat, 10*time.Millisecond)
 
-	// Captured AT the moment bidding resolves, not re-read later. The phase this
-	// opens runs on a wall-clock window (declarationAutoClose), so a later
-	// snapshot can legitimately have moved on to trick 1 if this goroutine was
-	// starved long enough — which happens under a loaded `go test ./...`.
-	// Asserting on the captured pair keeps the test about the transition rather
-	// than about how fast the machine is.
 	var resolvedSnap *game.GameState
 	var declExpiry time.Time
 	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); {
@@ -436,9 +393,6 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 	}
 	require.NotNil(t, resolvedSnap, "the expired forced-dealer turn must resolve bidding, not loop on a rejected pass")
 
-	// The table must be TOLD. This is the only auto-action that fixes trump for a
-	// whole hand, so leaving it to be inferred from the next snapshot would mean
-	// three players watch a suit appear from nowhere.
 	assert.Contains(t, rec.eventTypes(), ws.EventAutoAction,
 		"the forced auto-pick must announce itself (got %v)", rec.eventTypes())
 	autoPayload := rec.payloadOf(t, ws.EventAutoAction)
@@ -451,39 +405,19 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 	require.NotNil(t, after.TrumpCallerSeat)
 	assert.Equal(t, gs.DealerSeat, *after.TrumpCallerSeat, "the dealer is the taker — nobody else can be")
 	assert.NotEqual(t, game.PhaseBidding, after.Phase, "bidding must be over")
-	// The pick merged every seat's face-down pair, so no seat is still holding
-	// two cards back and the public count is zero across the table.
 	for seat, p := range after.Players {
 		assert.Len(t, p.Hand, 8, "seat %d must hold all eight cards once bidding resolves", seat)
 		assert.Zero(t, p.FaceDownCount, "seat %d", seat)
 	}
 
-	// This is the SECOND of only two doors into the declaration phase, and the
-	// only one a player never opens: a forced dealer pick that arrives by
-	// timeout. handleTimerExpiry has to arm the phase's fixed window itself,
-	// because the phase runs no per-move timer for the ordinary re-arm to reach.
-	//
-	// Without the deadline the failure is silent and delayed: declarationExpiresAt
-	// stays the zero time, HandleAction's declaring arm does NOT re-seed it (the
-	// phase is already open), so `max(time.Until(zero), 0)` is 0 and the timer
-	// fires the instant the first seat answers — force-closing the contest and
-	// forfeiting the other three seats' melds.
 	require.Equal(t, game.PhaseDeclaring, resolvedSnap.Phase, "the pick opens the declaration phase")
 	assert.Nil(t, resolvedSnap.TurnExpiresAt, "the phase has no active turn and no per-move clock")
-	// Non-zero, not "in the future": that the deadline was SET is the invariant.
-	// Whether it has since elapsed is a wall-clock race with the test runner, and
-	// the zero value is exactly the bug this guards — a zero deadline makes
-	// `max(time.Until(zero), 0)` evaluate to 0, so the window fires the instant
-	// the first seat answers and force-closes the contest.
 	assert.False(t, declExpiry.IsZero(),
 		"the phase's fixed window must be armed by the timer-expiry door too")
 }
 
-// TestBuildBotView_FaceDownNeverVisible pins the no-peeking boundary for bot
-// seats: the face-down pair is hidden from EVERYONE — its owner included —
-// for the whole of bidding, so no card from any seat's hidden slot may reach a
-// bot's View at any pass count, and the bot bids on its six visible cards
-// exactly like a human.
+// TestBuildBotView_FaceDownNeverVisible checks that no seat's face-down cards
+// ever reach a bot's View during bidding, its own included.
 func TestBuildBotView_FaceDownNeverVisible(t *testing.T) {
 	for passCount := 0; passCount <= 3; passCount++ {
 		gs := testfixtures.NewGameCroatianMidBidding(passCount)
@@ -501,10 +435,8 @@ func TestBuildBotView_FaceDownNeverVisible(t *testing.T) {
 	}
 }
 
-// TestBuildBotView_MustPickTrumpIsSeatScoped pins the other half of what the
-// view hands the bot: the "a pass will be refused" flag belongs to the seat on
-// the clock and nobody else, and it is derived from the rule config — the bot
-// never learns a variant name.
+// TestBuildBotView_MustPickTrumpIsSeatScoped checks that the must-pick-trump flag
+// is set only for the seat on the clock and derives from the rule config.
 func TestBuildBotView_MustPickTrumpIsSeatScoped(t *testing.T) {
 	forced := testfixtures.NewGameCroatianMidBidding(3)
 	require.True(t, game.MustPickTrump(forced, forced.ActivePlayerSeat))
@@ -513,14 +445,12 @@ func TestBuildBotView_MustPickTrumpIsSeatScoped(t *testing.T) {
 		assert.Equal(t, seat == forced.ActivePlayerSeat, v.MustPickTrump, "seat %d", seat)
 	}
 
-	// One pass earlier the dealer is not yet on the clock, so no seat is forced.
 	open := testfixtures.NewGameCroatianMidBidding(2)
 	require.False(t, game.MustPickTrump(open, open.ActivePlayerSeat))
 	for seat := 0; seat < 4; seat++ {
 		assert.False(t, buildBotView(open, seat, nil).MustPickTrump, "seat %d", seat)
 	}
 
-	// Bitola never forces a pick — its config reshuffles instead.
 	bitola := testfixtures.NewGameMidBidding(7)
 	require.False(t, game.MustPickTrump(bitola, bitola.ActivePlayerSeat))
 	for seat := 0; seat < 4; seat++ {

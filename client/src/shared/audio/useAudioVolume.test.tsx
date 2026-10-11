@@ -145,8 +145,6 @@ describe("useAudioVolume", () => {
       expect(mockUpdatePreferences).toHaveBeenCalledWith(7, { soundVolume: 40 });
       expect(engine.playSfx).toHaveBeenCalledTimes(1);
       expect(engine.playSfx).toHaveBeenCalledWith("cardPlay");
-      // The engine reads the volume at play time, so the store must already
-      // hold the new level when the preview fires.
       expect(levelAtPreview).toBe(40);
       expect(engine.setMusicVolume).not.toHaveBeenCalled();
     });
@@ -156,8 +154,6 @@ describe("useAudioVolume", () => {
     it("ignores a commit that no value change preceded", () => {
       const { result } = renderHook(() => useAudioVolume("soundVolume"));
 
-      // Base UI commits its last changed value when nothing moved — a thumb
-      // click without dragging, or End at the maximum.
       act(() => result.current.onValueCommitted(30));
 
       expect(mockUpdatePreferences).not.toHaveBeenCalled();
@@ -172,13 +168,10 @@ describe("useAudioVolume", () => {
 
       act(() => result.current.onValueChange(40));
       act(() => result.current.onValueCommitted(40));
-      // The failed save reverts the store to 70 ...
       await act(async () => {});
       expect(storedVolumes().sound).toBe(70);
       act(() => vi.advanceTimersByTime(COMMIT_COALESCE_MS));
 
-      // ... and a later no-move commit reporting the stale 40 must not re-save
-      // it (or replay the preview) — neither at once nor after the quiet period.
       act(() => result.current.onValueCommitted(40));
       act(() => vi.advanceTimersByTime(COMMIT_COALESCE_MS));
 
@@ -208,7 +201,6 @@ describe("useAudioVolume", () => {
         act(() => vi.advanceTimersByTime(30));
         step(result, value);
       }
-      // Held back: the slider shows the latest step, nothing more is sent.
       expect(result.current.value).toBe(75);
       expect(mockUpdatePreferences).toHaveBeenCalledTimes(1);
       expect(engine.playSfx).toHaveBeenCalledTimes(1);

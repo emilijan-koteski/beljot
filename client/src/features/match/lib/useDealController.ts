@@ -8,12 +8,10 @@ import { CARD_SIZES, cardBox, SEAT_STACK_CARD_WIDTH } from "./cardFace";
 import { buildDealSchedule, type DealKind, type DealSchedule } from "./dealSchedule";
 
 /**
- * What the deal controller remembers about one table state. Only the fields a
- * deal can change are kept, so an ordinary card play never looks like a deal.
+ * What the deal controller remembers about one table state, keyed by `handNumber:dealerSeat`.
+ * Only the fields a deal can change are kept, so an ordinary card play never looks like a deal.
  */
 export interface DealObservation {
-  /** `handNumber:dealerSeat` — the identity of one deal. A reshuffle keeps the
-   *  hand number and rotates the dealer, so it is a new deal too. */
   dealId: string;
   phase: Phase;
   handNumber: number;
@@ -23,9 +21,7 @@ export interface DealObservation {
   candidate: Card | null;
   trumpSuitSet: boolean;
   trumpCallerSeat: number | null;
-  /** Cards each seat physically holds: open plus face-down. */
   seatCounts: [number, number, number, number];
-  /** The viewer's own open cards, in the server's (deal) order. */
   myHandIds: string[];
 }
 
@@ -35,21 +31,15 @@ export interface DetectedDeal {
   dealerSeat: number;
   takerSeat: number | null;
   isReshuffle: boolean;
-  /** Cards each seat held before this deal (all zero for an opening deal). */
   baseCounts: [number, number, number, number];
-  /** The viewer's cards before this deal; null for an opening deal. */
   baseHandIds: string[] | null;
-  /** The face-up candidate that flies to the taker in the second deal. */
   candidate: Card | null;
 }
 
 export interface ActiveDeal extends DetectedDeal {
   schedule: DealSchedule;
-  /** Date.now() when the deal started. */
   startedAt: number;
-  /** Packets landed so far. */
   landed: number;
-  /** The candidate has turned face-up (opening candidate deal). */
   flipped: boolean;
   done: boolean;
 }
@@ -93,12 +83,10 @@ function isFreshDeal(o: DealObservation): boolean {
   );
 }
 
+/** An opening deal shaped by what the server dealt: a face-up candidate means two stages. */
 function openingDeal(o: DealObservation, isReshuffle: boolean): DetectedDeal {
   return {
     id: o.dealId,
-    // The shape comes from what the server dealt, never from the variant: a
-    // face-up candidate means the two-stage deal, none means everything was
-    // dealt before bidding.
     kind: o.candidate !== null ? "candidateFirst" : "allBeforeBidding",
     dealerSeat: o.dealerSeat,
     takerSeat: null,
@@ -110,12 +98,8 @@ function openingDeal(o: DealObservation, isReshuffle: boolean): DetectedDeal {
 }
 
 /**
- * Decide whether the table just went through a deal worth animating.
- *
- * `prev` is null for the first state the table shows. That one animates only
- * when `animateOpening` says the viewer arrived for a fresh match (straight
- * from the room): a reload or reconnect mounts into whatever is on the table
- * and never replays a deal.
+ * Returns the deal the table just went through, or null if none is worth animating.
+ * A null `prev` animates only when `animateOpening` is set, so a reload never replays a deal.
  */
 export function detectDeal(
   prev: DealObservation | null,
@@ -131,8 +115,6 @@ export function detectDeal(
     if (!isFreshDeal(cur)) return null;
     return openingDeal(cur, prev.handNumber === cur.handNumber);
   }
-  // Second deal: the candidate was on the table during bidding and has now
-  // gone to the taker, together with the reserve.
   const tookCandidate =
     prev.phase === "bidding" &&
     prev.candidate !== null &&
@@ -186,14 +168,10 @@ function cardRectAt(around: FlightRect, width: number, dx = 0, dy = 0): FlightRe
   };
 }
 
-/** Every deal flight's id starts with this. */
-const DEAL_FLIGHT = "deal-";
-/** How many backs a flying packet shows — enough to read as a small stack. */
+const DEAL_FLIGHT_ID_PREFIX = "deal-";
 const PACKET_CARDS_SHOWN = 3;
-/** Offset between the backs of one packet. */
 const PACKET_FAN_PX = 3;
-/** Width of the deck resting at the dealer's seat. */
-const DEALER_DECK_W = 36;
+const DEALER_DECK_WIDTH = 36;
 
 function dealFlights(deal: ActiveDeal, mySeat: number, compact: boolean): CardFlightDescriptor[] {
   const avatar = (seat: number) =>
@@ -224,9 +202,9 @@ function dealFlights(deal: ActiveDeal, mySeat: number, compact: boolean): CardFl
     for (let c = 0; c < shown; c++) {
       const fan = c * PACKET_FAN_PX;
       flights.push({
-        id: `${DEAL_FLIGHT}${dealRunId(deal)}-${index}-${c}`,
+        id: `${DEAL_FLIGHT_ID_PREFIX}${dealRunId(deal)}-${index}-${c}`,
         card: null,
-        fromRect: cardRectAt(origin, DEALER_DECK_W, fan, -fan),
+        fromRect: cardRectAt(origin, DEALER_DECK_WIDTH, fan, -fan),
         toRect: cardRectAt(target, toWidth, fan, -fan),
         durationMs: packet.landMs - packet.startMs,
         delayMs,
@@ -235,7 +213,7 @@ function dealFlights(deal: ActiveDeal, mySeat: number, compact: boolean): CardFl
     }
     if (packet.withCandidate && deal.candidate && table) {
       flights.push({
-        id: `${DEAL_FLIGHT}${dealRunId(deal)}-${index}-candidate`,
+        id: `${DEAL_FLIGHT_ID_PREFIX}${dealRunId(deal)}-${index}-candidate`,
         card: deal.candidate,
         fromRect: cardRectAt(table, CARD_SIZES.md.width),
         toRect: cardRectAt(target, toWidth),
@@ -251,39 +229,23 @@ function dealFlights(deal: ActiveDeal, mySeat: number, compact: boolean): CardFl
 interface DealControllerInput {
   matchState: MatchState | null;
   myPlayerSeat: number | null;
-  /** The table is on screen (splash over, state and seat known). Nothing is
-   *  observed before, so the first observation is the first thing seen. */
   tableVisible: boolean;
-  /** The viewer arrived straight from the room: the first state they see is a
-   *  fresh match whose opening deal they have not watched yet. */
   animateOpening: boolean;
   prefersReducedMotion: boolean;
   compact: boolean;
-  /** Updates the page's CardFlight overlay: the deal adds its packets when it
-   *  starts and takes back any still there when it ends. */
   updateFlights: (update: (flights: CardFlightDescriptor[]) => CardFlightDescriptor[]) => void;
 }
 
 export interface DealView {
-  /** A deal is animating; the table asks nobody for a decision until it ends. */
   dealing: boolean;
   deal: ActiveDeal | null;
-  /** Backs to show at a seat mid-deal, or null to show its real count. */
   seatCardCount: (seat: number) => number | null;
-  /** The part of the viewer's own hand that has landed so far. */
   visibleHand: (hand: Card[], faceDownCount: number) => { hand: Card[]; faceDownCount: number };
 }
 
 /**
- * Deal controller: watches the table for a deal (opening deal, reshuffle,
- * candidate second deal), runs its schedule, and reports what the table should
- * show at each moment of it.
- *
- * Detection happens during render (the "adjust state when props change"
- * pattern), so the very first frame of a new hand already shows empty seats and
- * no bidding prompt — no flash of the finished deal before the animation.
- * Landings, sounds and the end are driven by timers against the deal's start
- * time, so a re-run effect resumes rather than restarts.
+ * Watches the table for a deal, runs its schedule, and reports what the table shows meanwhile.
+ * Detection happens during render, so a new hand's first frame never flashes the finished deal.
  */
 export function useDealController({
   matchState,
@@ -321,13 +283,8 @@ export function useDealController({
   }
 
   const deal = current.deal;
-  // One run of a deal. The deal id alone can recur — four all-pass reshuffles
-  // bring the dealer back round, and a new match starts at hand 1 again — so
-  // the start time is part of what keys its effects, flights and sounds.
   const runId = deal !== null && !deal.done ? dealRunId(deal) : null;
 
-  // Timers: the shuffle, each packet's landing (with its sound), the candidate
-  // flip, and the end. Scheduled against the deal's start, so a re-run resumes.
   useEffect(() => {
     if (runId === null) return;
     const active = tracker.deal;
@@ -357,13 +314,9 @@ export function useDealController({
       update((d) => ({ ...d, landed: d.schedule.packets.length, flipped: true, done: true })),
     );
     return () => timers.forEach((id) => clearTimeout(id));
-    // Keyed on the run alone: its schedule and start time never change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId]);
 
-  // Flights: measured once the new hand's table has committed, once per deal.
-  // Whatever of them is still in the overlay when the deal ends (a hidden tab
-  // never fires animationend) is taken back then.
   const flownRef = useRef<string | null>(null);
   const updateFlightsRef = useRef(updateFlights);
   updateFlightsRef.current = updateFlights;
@@ -380,7 +333,7 @@ export function useDealController({
   useEffect(() => {
     if (runId !== null) return;
     updateFlightsRef.current((prev) => {
-      const next = prev.filter((f) => !f.id.startsWith(DEAL_FLIGHT));
+      const next = prev.filter((f) => !f.id.startsWith(DEAL_FLIGHT_ID_PREFIX));
       return next.length === prev.length ? prev : next;
     });
   }, [runId]);
@@ -413,9 +366,8 @@ export function useDealController({
     visibleHand: (hand, faceDownCount) => {
       if (!dealing || deal === null || myPlayerSeat === null) return { hand, faceDownCount };
       const landed = landedFor(myPlayerSeat);
-      if (deal.baseHandIds !== null) {
-        // Second deal: the viewer's earlier cards stay; the new ones appear
-        // with their packet.
+      const isSecondDeal = deal.baseHandIds !== null;
+      if (isSecondDeal) {
         if (landed.packets > 0) return { hand, faceDownCount };
         const base = new Set(deal.baseHandIds);
         return { hand: hand.filter((c) => base.has(cardIdOf(c))), faceDownCount };

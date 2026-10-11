@@ -19,7 +19,7 @@ describe("TimerRing", () => {
 
   it("renders countdown from turnExpiresAt", () => {
     const now = new Date();
-    const expiry = new Date(now.getTime() + 25000); // 25 seconds from now
+    const expiry = new Date(now.getTime() + 25000);
 
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
@@ -31,7 +31,7 @@ describe("TimerRing", () => {
 
   it("renders lime color while above the 1/8 urgency threshold", () => {
     const now = new Date();
-    const expiry = new Date(now.getTime() + 20000); // 20s of 30s = 66.6%
+    const expiry = new Date(now.getTime() + 20000);
 
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
@@ -43,7 +43,7 @@ describe("TimerRing", () => {
 
   it("stays lime when above 1/8 even though the old 25% rule would flip", () => {
     const now = new Date();
-    const expiry = new Date(now.getTime() + 6000); // 6s of 30s = 20% — above 1/8
+    const expiry = new Date(now.getTime() + 6000);
 
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
@@ -55,7 +55,7 @@ describe("TimerRing", () => {
 
   it("flips to urgent red when ≤1/8 of the turn timer remains", () => {
     const now = new Date();
-    const expiry = new Date(now.getTime() + 3000); // 3s of 30s = 10% — urgent
+    const expiry = new Date(now.getTime() + 3000);
 
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
@@ -68,7 +68,7 @@ describe("TimerRing", () => {
 
   it("stays red when expired (0 seconds), but stops pulsing", () => {
     const now = new Date();
-    const expiry = new Date(now.getTime() - 1000); // already expired
+    const expiry = new Date(now.getTime() - 1000);
 
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
@@ -81,7 +81,7 @@ describe("TimerRing", () => {
 
   it("decrements countdown over time", () => {
     const now = new Date();
-    const expiry = new Date(now.getTime() + 15000); // 15 seconds
+    const expiry = new Date(now.getTime() + 15000);
 
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
@@ -109,7 +109,7 @@ describe("TimerRing", () => {
 
   it("does not pulse while plenty of time remains", () => {
     const now = new Date();
-    const expiry = new Date(now.getTime() + 20000); // 20s of 30s = 66.6%
+    const expiry = new Date(now.getTime() + 20000);
 
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
@@ -142,14 +142,11 @@ describe("TimerRing", () => {
 
   it("drives the arc with the deadline-anchored ring-drain animation", () => {
     vi.setSystemTime(0);
-    const expiry = new Date(10_000).toISOString(); // 10s left of a 30s window
+    const expiry = new Date(10_000).toISOString();
 
     render(<TimerRing turnExpiresAt={expiry} totalDuration={30} />);
 
     const arc = screen.getByTestId("timer-ring-arc") as unknown as SVGCircleElement;
-    // One wall-clock-anchored animation owns the sweep — never a per-tick
-    // stroke-dashoffset transition, which rendered the arc one tick behind
-    // the truth (the bug where timers visibly fired with ~1-2s remaining).
     expect(arc.style.animationName).toBe("ring-drain");
     expect(arc.style.animationDuration).toBe("30000ms");
     expect(arc.style.animationDelay).toBe("-20000ms");
@@ -159,7 +156,7 @@ describe("TimerRing", () => {
 
   it("uses motion-safe prefix for transitions (reduced-motion safe)", () => {
     const now = new Date();
-    const expiry = new Date(now.getTime() + 5000); // urgent state
+    const expiry = new Date(now.getTime() + 5000);
 
     const { container } = render(
       <TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />,

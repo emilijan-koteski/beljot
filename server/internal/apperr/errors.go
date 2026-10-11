@@ -27,7 +27,6 @@ func Wrap(err error, appErr *AppError) error {
 	return fmt.Errorf("%s: %w", appErr.Message, appErr)
 }
 
-// Centralized application errors
 var (
 	ErrInternal     = NewAppError("INTERNAL_ERROR", "An internal error occurred", http.StatusInternalServerError)
 	ErrNotFound     = NewAppError("NOT_FOUND", "Resource not found", http.StatusNotFound)
@@ -36,7 +35,6 @@ var (
 	ErrBadRequest   = NewAppError("BAD_REQUEST", "Invalid request", http.StatusBadRequest)
 	ErrConflict     = NewAppError("CONFLICT", "Resource conflict", http.StatusConflict)
 
-	// Auth domain errors
 	ErrInvalidCredentials   = NewAppError("INVALID_CREDENTIALS", "invalid email or password", http.StatusUnauthorized)
 	ErrEmailTaken           = NewAppError("EMAIL_TAKEN", "email is already registered", http.StatusConflict)
 	ErrUsernameTaken        = NewAppError("USERNAME_TAKEN", "username is already taken", http.StatusConflict)
@@ -46,48 +44,22 @@ var (
 	ErrUsernameTooShort     = NewAppError("USERNAME_TOO_SHORT", "username must be at least 3 characters", http.StatusBadRequest)
 	ErrUsernameTooLong      = NewAppError("USERNAME_TOO_LONG", "username must be at most 20 characters", http.StatusBadRequest)
 	ErrUsernameInvalidChars = NewAppError("USERNAME_INVALID_CHARS", "username can only contain letters, numbers, and underscores", http.StatusBadRequest)
-	// ErrInvalidResetToken is deliberately generic — it covers unknown, expired,
-	// and already-used reset tokens alike so the response never reveals which.
-	ErrInvalidResetToken = NewAppError("INVALID_RESET_TOKEN", "reset link is invalid or has expired", http.StatusBadRequest)
+	ErrInvalidResetToken    = NewAppError("INVALID_RESET_TOKEN", "reset link is invalid or has expired", http.StatusBadRequest)
 
-	// SSO domain errors. ErrSSOInvalidCredential is deliberately generic —
-	// expired, forged, and wrong-audience tokens are indistinguishable to the
-	// client (details are logged server-side). ErrSSOLinkRequired discloses
-	// account existence, which is acceptable because it is only ever returned
-	// to a provider-verified owner of that email.
 	ErrSSOInvalidCredential = NewAppError("SSO_INVALID_CREDENTIAL", "sign-in credential is invalid or expired", http.StatusUnauthorized)
 	ErrSSOLinkRequired      = NewAppError("SSO_LINK_REQUIRED", "an account with this email already exists — confirm its password to link", http.StatusConflict)
 	ErrSSOEmailUnverified   = NewAppError("SSO_EMAIL_UNVERIFIED", "the email on this sign-in account is not verified", http.StatusForbidden)
 	ErrSSOIdentityInUse     = NewAppError("SSO_IDENTITY_IN_USE", "this sign-in identity is already linked to an account", http.StatusConflict)
 	ErrSSOUnknownProvider   = NewAppError("SSO_UNKNOWN_PROVIDER", "unknown sign-in provider", http.StatusBadRequest)
-	// ErrSSOIdentityNotFound is returned when unlinking a provider the account
-	// has no identity for. ErrSSOCannotUnlinkLast guards the invariant that an
-	// account must always keep at least one way to sign in: a passwordless
-	// (SSO-only) account cannot unlink its sole remaining identity. 409 matches
-	// the project's Conflict convention for state guards.
-	ErrSSOIdentityNotFound = NewAppError("SSO_IDENTITY_NOT_FOUND", "no linked account for this provider", http.StatusNotFound)
-	ErrSSOCannotUnlinkLast = NewAppError("SSO_CANNOT_UNLINK_LAST", "cannot unlink your only sign-in method — set a password first", http.StatusConflict)
+	ErrSSOIdentityNotFound  = NewAppError("SSO_IDENTITY_NOT_FOUND", "no linked account for this provider", http.StatusNotFound)
+	ErrSSOCannotUnlinkLast  = NewAppError("SSO_CANNOT_UNLINK_LAST", "cannot unlink your only sign-in method — set a password first", http.StatusConflict)
 
-	// User domain errors
-	ErrUserNotFound    = NewAppError("USER_NOT_FOUND", "user not found", http.StatusNotFound)
-	ErrInvalidLanguage = NewAppError("INVALID_LANGUAGE", "language must be one of: en, sr, mk, hr", http.StatusBadRequest)
-	// ErrInvalidCardDeck rejects an unknown card-deck style on
-	// PATCH /users/:id/preferences (Story 12.4). These are DECK values, not game
-	// variants: "croatian" is a deck, "croatia" is a variant.
-	ErrInvalidCardDeck = NewAppError("INVALID_CARD_DECK", "card deck must be one of: french, croatian", http.StatusBadRequest)
-	// Change-username errors. ErrUsernameUnchanged guards the no-op case (new
-	// name equals current) so a redundant submit never consumes the cooldown.
-	// ErrUsernameChangeTooSoon is 429 Too Many Requests — a rate limit, not a
-	// conflict; the client computes the next-allowed date from usernameChangedAt.
+	ErrUserNotFound          = NewAppError("USER_NOT_FOUND", "user not found", http.StatusNotFound)
+	ErrInvalidLanguage       = NewAppError("INVALID_LANGUAGE", "language must be one of: en, sr, mk, hr", http.StatusBadRequest)
+	ErrInvalidCardDeck       = NewAppError("INVALID_CARD_DECK", "card deck must be one of: french, croatian", http.StatusBadRequest)
 	ErrUsernameUnchanged     = NewAppError("USERNAME_UNCHANGED", "new username is the same as the current one", http.StatusBadRequest)
 	ErrUsernameChangeTooSoon = NewAppError("USERNAME_CHANGE_TOO_SOON", "username was changed too recently", http.StatusTooManyRequests)
 
-	// Avatar upload errors (PUT/DELETE /users/:id/avatar). The status carries
-	// the category the client maps to copy: 400 for an image the rules reject,
-	// 413 for bytes or pixels over the caps, 415 for anything that is not a
-	// still JPEG, PNG or WebP (decided by sniffing, never by filename), 429 for
-	// the per-user hourly upload budget, and 503 when the server cannot take the
-	// upload right now (decode slots full, or no object store in development).
 	ErrAvatarMissing            = NewAppError("AVATAR_MISSING", "the request has no avatar file", http.StatusBadRequest)
 	ErrAvatarTooSmall           = NewAppError("AVATAR_TOO_SMALL", "the image must be at least 128 pixels on its shorter side", http.StatusBadRequest)
 	ErrAvatarTooLarge           = NewAppError("AVATAR_TOO_LARGE", "the image file must be at most 2 MiB", http.StatusRequestEntityTooLarge)
@@ -97,7 +69,6 @@ var (
 	ErrAvatarBusy               = NewAppError("AVATAR_BUSY", "the server is busy processing images, try again shortly", http.StatusServiceUnavailable)
 	ErrAvatarStorageUnavailable = NewAppError("AVATAR_STORAGE_UNAVAILABLE", "avatar storage is not available", http.StatusServiceUnavailable)
 
-	// Room domain errors
 	ErrRoomNameRequired          = NewAppError("ROOM_NAME_REQUIRED", "room name is required", http.StatusBadRequest)
 	ErrRoomNameTooLong           = NewAppError("ROOM_NAME_TOO_LONG", "room name must be at most 100 characters", http.StatusBadRequest)
 	ErrRoomNameTaken             = NewAppError("ROOM_NAME_TAKEN", "a room with this name already exists", http.StatusConflict)
@@ -124,105 +95,46 @@ var (
 	ErrNotSeated                 = NewAppError("NOT_SEATED", "player has no seat to leave", http.StatusConflict)
 	ErrQuickPlayLeaveSeatBlocked = NewAppError("QUICK_PLAY_LEAVE_SEAT_BLOCKED", "leaving a seat is not allowed in quick play rooms", http.StatusConflict)
 	ErrRoomNotQuickPlay          = NewAppError("ROOM_NOT_QUICK_PLAY", "this room is not a quick play room", http.StatusConflict)
-	// ErrQuickPlayBracketMismatch (Story 9.4) — a player tapped a quick-play room
-	// whose coin bracket (its buy-in) doesn't match their own affordability
-	// bracket. 409 Conflict, consistent with the sibling quick-play guards.
-	ErrQuickPlayBracketMismatch = NewAppError("QUICK_PLAY_BRACKET_MISMATCH", "this quick play table is for a different coin bracket", http.StatusConflict)
-	ErrOwnerCannotLeaveSeat     = NewAppError("OWNER_CANNOT_LEAVE_SEAT", "the room owner cannot leave their seat — leave the room instead", http.StatusConflict)
-	ErrCannotTransferToSelf     = NewAppError("CANNOT_TRANSFER_TO_SELF", "ownership cannot be transferred to yourself", http.StatusBadRequest)
-	ErrCannotPromoteUnseated    = NewAppError("CANNOT_PROMOTE_UNSEATED", "the new owner must be seated", http.StatusConflict)
-	ErrMatchAlreadyStarted      = NewAppError("MATCH_ALREADY_STARTED", "the match has already started", http.StatusConflict)
-	ErrBotsNotAllowed           = NewAppError("BOTS_NOT_ALLOWED", "bots cannot be added to this room", http.StatusConflict)
-	ErrNoBotOnSeat              = NewAppError("NO_BOT_ON_SEAT", "no bot occupies this seat", http.StatusNotFound)
+	ErrQuickPlayBracketMismatch  = NewAppError("QUICK_PLAY_BRACKET_MISMATCH", "this quick play table is for a different coin bracket", http.StatusConflict)
+	ErrOwnerCannotLeaveSeat      = NewAppError("OWNER_CANNOT_LEAVE_SEAT", "the room owner cannot leave their seat — leave the room instead", http.StatusConflict)
+	ErrCannotTransferToSelf      = NewAppError("CANNOT_TRANSFER_TO_SELF", "ownership cannot be transferred to yourself", http.StatusBadRequest)
+	ErrCannotPromoteUnseated     = NewAppError("CANNOT_PROMOTE_UNSEATED", "the new owner must be seated", http.StatusConflict)
+	ErrMatchAlreadyStarted       = NewAppError("MATCH_ALREADY_STARTED", "the match has already started", http.StatusConflict)
+	ErrBotsNotAllowed            = NewAppError("BOTS_NOT_ALLOWED", "bots cannot be added to this room", http.StatusConflict)
+	ErrNoBotOnSeat               = NewAppError("NO_BOT_ON_SEAT", "no bot occupies this seat", http.StatusNotFound)
 
-	// Private-room errors (Story 9.6, FR60). The privacy gate is HTTP-only —
-	// mirroring ErrInsufficientCoins below, NOT a WS error event. ErrWrongRoomPassword
-	// is 409 (matching the INSUFFICIENT_COINS precedent) and is returned for BOTH a
-	// wrong and a missing password on a private room — the two are deliberately
-	// indistinguishable to the client (no oracle beyond the public isPrivate flag).
 	ErrWrongRoomPassword    = NewAppError("WRONG_ROOM_PASSWORD", "incorrect room password", http.StatusConflict)
 	ErrRoomPasswordRequired = NewAppError("ROOM_PASSWORD_REQUIRED", "a password is required for a private room", http.StatusBadRequest)
 	ErrRoomPasswordTooShort = NewAppError("ROOM_PASSWORD_TOO_SHORT", "room password must be at least 4 characters", http.StatusBadRequest)
 	ErrRoomPasswordTooLong  = NewAppError("ROOM_PASSWORD_TOO_LONG", "room password must be at most 72 characters", http.StatusBadRequest)
-	// ErrQuickPlayRoomPrivacy guards the AC7 invariant server-side: quick-play
-	// rooms are structurally public and can never be privatized. The UI hides the
-	// owner privacy control for quick-play rooms, so this is reached only by a
-	// direct API call; 409 matches the sibling quick-play guards.
 	ErrQuickPlayRoomPrivacy = NewAppError("QUICK_PLAY_ROOM_PRIVACY", "quick play rooms cannot be made private", http.StatusConflict)
 
-	// Honor-gate errors (Story 9.8, FR57). Same shape as the private-room block
-	// above: an HTTP-only join gate with NO WS error event. 409 (not 402/403)
-	// matches the INSUFFICIENT_COINS and WRONG_ROOM_PASSWORD precedents.
-	//
-	// The payload carries ONLY the code — never the numbers (9.2 Decision B, 9.6's
-	// precedent). The client composes "requires honor >= X, yours is Y" locally from
-	// the room object and its own auth envelope, so these messages stay generic.
-	//
-	// ErrHonorTooLow is returned by the join gate, the return-time gate, CreateRoom's
-	// creator self-gate, and StartMatch (to the owner, when a seat is honor-ejected).
-	// ErrNewPlayerNotAllowed is returned from the same four sites. Because the gate
-	// evaluates isNewPlayer FIRST, a New Player in a min_honor > 0 /
-	// allow_new_players = false room gets NEW_PLAYER_NOT_ALLOWED, never HONOR_TOO_LOW.
 	ErrHonorTooLow         = NewAppError("HONOR_TOO_LOW", "honor score below this room's minimum", http.StatusConflict)
 	ErrNewPlayerNotAllowed = NewAppError("NEW_PLAYER_NOT_ALLOWED", "this room does not allow new players", http.StatusConflict)
-	// ErrInvalidMinHonor is CreateRoom validation only — the requested minimum fell
-	// outside [0,100], the same interval the rooms.min_honor CHECK enforces.
-	ErrInvalidMinHonor = NewAppError("INVALID_MIN_HONOR", "minimum honor must be between 0 and 100", http.StatusBadRequest)
+	ErrInvalidMinHonor     = NewAppError("INVALID_MIN_HONOR", "minimum honor must be between 0 and 100", http.StatusBadRequest)
 
-	// Economy domain errors (Epic 9). 409 Conflict (not 402) — the project's
-	// status set is 200/201/400/401/403/404/409/500. Surfaces from the join
-	// affordability check and the atomic match-start stake charge.
 	ErrInsufficientCoins = NewAppError("INSUFFICIENT_COINS", "insufficient coins", http.StatusConflict)
 
-	// Friend domain errors (Story 11.2, FR6). A self-request is 400. The two
-	// conflict states are 409 (the project's conflict convention, matching the
-	// INSUFFICIENT_COINS / WRONG_ROOM_PASSWORD precedents): FRIEND_REQUEST_EXISTS
-	// for a pending relationship in either direction, ALREADY_FRIENDS for an
-	// accepted one. A failed accept/decline (not the recipient, not pending, or a
-	// missing row) is a UNIFORM 404 FRIEND_REQUEST_NOT_FOUND that never leaks
-	// which of those it was. An unknown request target reuses ErrUserNotFound.
 	ErrSelfFriendRequest     = NewAppError("SELF_FRIEND_REQUEST", "cannot send a friend request to yourself", http.StatusBadRequest)
 	ErrFriendRequestExists   = NewAppError("FRIEND_REQUEST_EXISTS", "a friend request already exists between these users", http.StatusConflict)
 	ErrAlreadyFriends        = NewAppError("ALREADY_FRIENDS", "you are already friends with this user", http.StatusConflict)
 	ErrFriendRequestNotFound = NewAppError("FRIEND_REQUEST_NOT_FOUND", "friend request not found", http.StatusNotFound)
-	// ErrFriendshipNotFound is the unfriend counterpart of that uniform 404: a
-	// failed DELETE /friends/:id (caller not a party, the row not accepted, or no
-	// row at all) never leaks which it was. A distinct code because the
-	// request-oriented FRIEND_REQUEST_NOT_FOUND is semantically wrong for an
-	// accepted friendship.
-	ErrFriendshipNotFound = NewAppError("FRIENDSHIP_NOT_FOUND", "friendship not found", http.StatusNotFound)
+	ErrFriendshipNotFound    = NewAppError("FRIENDSHIP_NOT_FOUND", "friendship not found", http.StatusNotFound)
 
-	// Room-invite errors (Story 11.5, FR62). Both are 409, matching the sibling
-	// friend errors and the project's conflict convention for state guards.
-	// ErrNotFriends rejects inviting a non-friend (the HTTP counterpart of the
-	// error:not_friends WS event the whisper path uses). ErrFriendNotAvailable
-	// rejects inviting a friend who is offline, already in a room, or in a match —
-	// availability is recomputed server-side at invite time and never trusted from
-	// the client.
-	// ErrInviteAlreadyPending rejects a second invite to a friend who already has
-	// a live one for this room. It is the throttle: without it any seated member
-	// could replace a friend's popup and restart its clock as fast as they can
-	// POST, and a member's invite could silently overwrite the owner's stronger
-	// host grant.
 	ErrNotFriends           = NewAppError("NOT_FRIENDS", "you are not friends with this player", http.StatusConflict)
 	ErrFriendNotAvailable   = NewAppError("FRIEND_NOT_AVAILABLE", "this friend is not available to invite right now", http.StatusConflict)
 	ErrInviteAlreadyPending = NewAppError("INVITE_ALREADY_PENDING", "this friend already has a pending invite to this room", http.StatusConflict)
 
-	// Game domain errors
-	ErrWrongPhase         = NewAppError("WRONG_PHASE", "action not valid in current game phase", http.StatusBadRequest)
-	ErrNotYourTurn        = NewAppError("NOT_YOUR_TURN", "it is not your turn", http.StatusForbidden)
-	ErrInvalidCard        = NewAppError("INVALID_CARD", "card is not in your hand", http.StatusBadRequest)
-	ErrIllegalPlay        = NewAppError("ILLEGAL_PLAY", "card play violates game rules", http.StatusBadRequest)
-	ErrGamePaused         = NewAppError("GAME_PAUSED", "game is currently paused", http.StatusConflict)
-	ErrPauseExhausted     = NewAppError("PAUSE_EXHAUSTED", "player has already used their pause", http.StatusConflict)
-	ErrNotPaused          = NewAppError("NOT_PAUSED", "game is not paused", http.StatusConflict)
-	ErrNoActivePause      = NewAppError("NO_ACTIVE_PAUSE", "player does not have an active pause to clear", http.StatusConflict)
-	ErrPlayerDisconnected = NewAppError("PLAYER_DISCONNECTED", "player is disconnected", http.StatusConflict)
-	ErrInvalidBid         = NewAppError("INVALID_BID", "invalid bid action", http.StatusBadRequest)
-	// Distinct from ErrInvalidBid so the client can tell "you must name a suit"
-	// (the dealer bidding last under AllPassDealerMustPick, whose only legal
-	// action is pick_trump) from "that suit is not allowed". Both were
-	// INVALID_BID before, which left the two indistinguishable on the wire.
+	ErrWrongPhase              = NewAppError("WRONG_PHASE", "action not valid in current game phase", http.StatusBadRequest)
+	ErrNotYourTurn             = NewAppError("NOT_YOUR_TURN", "it is not your turn", http.StatusForbidden)
+	ErrInvalidCard             = NewAppError("INVALID_CARD", "card is not in your hand", http.StatusBadRequest)
+	ErrIllegalPlay             = NewAppError("ILLEGAL_PLAY", "card play violates game rules", http.StatusBadRequest)
+	ErrGamePaused              = NewAppError("GAME_PAUSED", "game is currently paused", http.StatusConflict)
+	ErrPauseExhausted          = NewAppError("PAUSE_EXHAUSTED", "player has already used their pause", http.StatusConflict)
+	ErrNotPaused               = NewAppError("NOT_PAUSED", "game is not paused", http.StatusConflict)
+	ErrNoActivePause           = NewAppError("NO_ACTIVE_PAUSE", "player does not have an active pause to clear", http.StatusConflict)
+	ErrPlayerDisconnected      = NewAppError("PLAYER_DISCONNECTED", "player is disconnected", http.StatusConflict)
+	ErrInvalidBid              = NewAppError("INVALID_BID", "invalid bid action", http.StatusBadRequest)
 	ErrMustPickTrump           = NewAppError("MUST_PICK_TRUMP", "you must name a trump suit", http.StatusBadRequest)
 	ErrDeclarationNotAvailable = NewAppError("DECLARATION_NOT_AVAILABLE", "no declarable combinations in hand", http.StatusBadRequest)
 	ErrBelotNotAvailable       = NewAppError("BELOT_NOT_AVAILABLE", "belot announcement not available", http.StatusBadRequest)
@@ -230,14 +142,8 @@ var (
 	ErrInvalidAction           = NewAppError("INVALID_ACTION", "action is not valid in this context", http.StatusBadRequest)
 	ErrSurrenderExhausted      = NewAppError("SURRENDER_EXHAUSTED", "player has already used their surrender for this match", http.StatusConflict)
 
-	// Season domain errors (Story 13.3). ErrSeasonNotFound is returned by the
-	// leaderboard's ?season=<id> selector when no season row carries that id —
-	// a MISS, not a validation failure (a malformed selector is ErrBadRequest
-	// before the database is ever touched). 404 matches ErrUserNotFound /
-	// ErrRoomNotFound: the resource named by the identifier does not exist.
 	ErrSeasonNotFound = NewAppError("SEASON_NOT_FOUND", "season not found", http.StatusNotFound)
 
-	// WebSocket domain errors
 	ErrWSAuthTimeout    = NewAppError("WS_AUTH_TIMEOUT", "WebSocket authentication timed out", http.StatusUnauthorized)
 	ErrWSAuthFailed     = NewAppError("WS_AUTH_FAILED", "WebSocket authentication failed", http.StatusUnauthorized)
 	ErrWSInvalidMessage = NewAppError("WS_INVALID_MESSAGE", "invalid WebSocket message format", http.StatusBadRequest)

@@ -113,7 +113,6 @@ describe("MatchPlayerActions", () => {
         players: [
           { seat: 0, userId: 10, username: "viewer", avatarUrl: null, isBot: false },
           { seat: 1, userId: 0, username: "", avatarUrl: null, isBot: true },
-          // Soft-deleted: a real id with no username left to render or befriend.
           { seat: 2, userId: 12, username: "", avatarUrl: null, isBot: false },
           { seat: 3, userId: 13, username: "opp2", avatarUrl: null, isBot: false },
         ],
@@ -181,9 +180,6 @@ describe("MatchPlayerActions", () => {
     );
   });
 
-  // The confirmation must NOT latch the row: an invite can be declined or lapse
-  // on its TTL, and this row cannot observe either — a second press has to be
-  // able to send a real second invite.
   it("stays pressable after a successful invite so a lapsed one can be re-sent", async () => {
     mockGetFriendshipStatus.mockResolvedValue(statusFor("friends"));
     renderActions({ roomId: 5, showReinvite: true });
@@ -197,9 +193,6 @@ describe("MatchPlayerActions", () => {
     await waitFor(() => expect(mockInviteToRoom).toHaveBeenCalledTimes(2));
   });
 
-  // The mapping itself lives in shared/lib/inviteFailure — asserted here against
-  // the SAME roomInvite.errors.* keys the invite panel renders, so the two
-  // surfaces cannot drift apart again.
   it.each([
     ["ROOM_FULL", "roomInvite.errors.roomFull"],
     ["INVITE_ALREADY_PENDING", "roomInvite.errors.alreadyPending"],
@@ -218,13 +211,9 @@ describe("MatchPlayerActions", () => {
 
       await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
       expect(toast.error).toHaveBeenCalledWith(i18n.t(messageKey));
-      // The row stays interactive: room-full / not-available are transient.
       expect(screen.getByTestId("match-player-reinvite-11")).toBeEnabled();
     },
   );
-  // P3: the confirm RemoveFriendDialog opens is a shadcn Dialog at z-50, while
-  // the match-result overlay is Z.PROMPT (74) — it would open behind the panel,
-  // invisible and unclickable. The overlay suppresses the affordance instead.
   it("offers Remove friend by default for an existing friend", async () => {
     mockGetFriendshipStatus.mockResolvedValue(statusFor("friends"));
     renderActions();

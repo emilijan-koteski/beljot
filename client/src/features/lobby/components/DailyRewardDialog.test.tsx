@@ -33,7 +33,6 @@ describe("DailyRewardDialog", () => {
   it("stays open without an auto-dismiss timer", async () => {
     render(<Harness initialOpen={true} />);
 
-    // No timer drives a close; the dialog must remain mounted on its own.
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.getByTestId("daily-reward-dialog")).toBeInTheDocument();
   });

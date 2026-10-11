@@ -1,13 +1,8 @@
 import type { TFunction } from "i18next";
 
 /**
- * Adjective + noun combo, drawn from the host's own language pack
- * (`lobby.createRoomModal.randomName.*` in each locale file) rather than one
- * fixed list — so a Serbian host never sees a Macedonian-flavoured suggestion.
- *
- * Pre-fills the Create Room dialog's name field so "Create room" is enabled
- * the moment it opens; the shuffle button calls this again to reroll,
- * excluding whatever name is already showing.
+ * Random adjective + noun room name from the active locale's word lists,
+ * differing from `prev` when possible.
  */
 export function randomRoomName(t: TFunction, prev?: string): string {
   const adjectives = t("lobby.createRoomModal.randomName.adjectives", {

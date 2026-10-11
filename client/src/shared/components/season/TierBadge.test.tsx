@@ -16,9 +16,6 @@ describe("TierBadge", () => {
   });
 
   it("paints from the rank ramp variables rather than a hardcoded colour", () => {
-    // The ramp is a runtime CSS value, so it must arrive through inline style —
-    // a Tailwind class could not carry it, and a literal hex would not re-root
-    // on the .game-table felt scope.
     render(<TierBadge tier="diamond" />);
     const style = screen.getByTestId("tier-badge").getAttribute("style") ?? "";
     expect(style).toContain(SEASON_TIER_COLOR.diamond);

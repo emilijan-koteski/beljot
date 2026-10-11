@@ -10,10 +10,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/season"
 )
 
-// placeholderFormula is the constant set the spec's I/O matrix is written in
-// (W=30, L=20, with the approved S and bot value), restated here so the matrix
-// rows keep their meaning if the live constants are retuned. S and the bot value
-// only matter where E != 0.5.
 var placeholderFormula = season.SPFormula{
 	BaseWin:    30,
 	BaseLoss:   20,
@@ -22,7 +18,6 @@ var placeholderFormula = season.SPFormula{
 	CapotBonus: 5,
 }
 
-// Seat user IDs for the all-human table. Team A is seats 0 and 2, team B 1 and 3.
 const (
 	uSeat0 uint = 10
 	uSeat1 uint = 11
@@ -105,7 +100,6 @@ func TestSPFormula_Matrix(t *testing.T) {
 		assert.Equal(t, 0, total)
 		assert.Equal(t, -10, total-10, "the applied change is new minus previous")
 
-		// A first-ever row (missing = 0 SP) after a loss writes 0, never a negative.
 		assert.Equal(t, 0, season.ApplySPChange(0, got[uSeat1]))
 	})
 
@@ -122,7 +116,6 @@ func TestSPFormula_Matrix(t *testing.T) {
 			Target:        1001,
 			AbandonedSeat: -1,
 		}
-		// x = 0: own avg 300 vs 600, E = 1/(1+10^(300/385)) = 0.143.
 		got, err := placeholderFormula.Changes(o, map[uint]int{})
 		require.NoError(t, err)
 		assert.Equal(t, map[uint]int{uSeat0: 46}, got, "30·0.8996·2·0.857 = 46.28")
@@ -133,7 +126,6 @@ func TestSPFormula_Matrix(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, map[uint]int{uSeat0: -5}, got, "-20·0.8996·2·0.143 = -5.13")
 
-		// x = 1000: own avg 800 vs 600, E = 0.768; a win pays far less.
 		o.WinnerTeam = 0
 		o.TeamScores = [2]int{1100, 700}
 		got, err = placeholderFormula.Changes(o, map[uint]int{uSeat0: 1000})
@@ -188,14 +180,10 @@ func TestSPFormula_Margin(t *testing.T) {
 		wantWin  int
 		wantLoss int
 	}{
-		// 0.5 + 0/1001 = 0.5 is the floor of the clamp: +15 / -10.
 		{"a dead-level finish is the minimum margin", [2]int{1001, 1001}, 1001, 15, -10},
-		// The taker can win a both-cross hand with FEWER points; the clamp holds at 0.5.
 		{"a winner below the loser clamps to 0.5", [2]int{1010, 1050}, 1001, 15, -10},
-		// 0.5 + 1001/1001 = 1.5.
 		{"a whitewash is the maximum margin", [2]int{1001, 0}, 1001, 45, -30},
 		{"above the maximum clamps to 1.5", [2]int{1200, 0}, 1001, 45, -30},
-		// 0.5 + 300/501 = 1.099: +33 / -22.
 		{"the 501 target scales the margin", [2]int{520, 220}, 501, 33, -22},
 	}
 	for _, tc := range cases {
@@ -212,7 +200,6 @@ func TestSPFormula_TeammatesShareTheChangeAtUnevenSP(t *testing.T) {
 	got, err := placeholderFormula.Changes(humanTable(0, [2]int{1100, 700}, 1001), sp)
 	require.NoError(t, err)
 
-	// Both averages are 500, so E = 0.5 even though no two players match.
 	assertTeamChanges(t, got, 27, -18)
 }
 
@@ -224,20 +211,13 @@ func TestSPFormula_ExpectedResultScalesTheChange(t *testing.T) {
 	underdog, err := placeholderFormula.Changes(o, map[uint]int{uSeat0: 0, uSeat2: 0, uSeat1: 1400, uSeat3: 1400})
 	require.NoError(t, err)
 
-	// Gap 1400 at S=385: E = 0.9998. The favourite's win is worth almost nothing
-	// and the beaten underdog barely loses.
 	assert.Equal(t, 0, favourite[uSeat0])
 	assert.Equal(t, 0, favourite[uSeat1])
-	// The underdog's win is worth nearly the full 2·W·m, the beaten favourite
-	// loses nearly the full 2·L·m.
 	assert.Equal(t, 54, underdog[uSeat0])
 	assert.Equal(t, -36, underdog[uSeat1])
 }
 
-// The forge constraint: the reward for beating weaker teams must fall well below
-// 0.5×, or a player who beats bots more than two thirds of the time climbs
-// forever. On the Grandmaster floor (1400) at a bot table the own average is 1000
-// against 600, and at S = 385 the multiplier 2·(1 − E) is about 0.17×.
+// Beating weaker tables must pay well below 0.5x, or a player who usually beats bots climbs forever.
 func TestSPFormula_WinsOverWeakerTablesShrinkWellBelowHalf(t *testing.T) {
 	o := match.MatchOutcome{
 		Seats: [4]match.OutcomeSeat{
@@ -300,8 +280,6 @@ func TestApplySPChange(t *testing.T) {
 	assert.Equal(t, 0, season.ApplySPChange(18, -18))
 	assert.Equal(t, 0, season.ApplySPChange(5, -120))
 	assert.Equal(t, 5, season.ApplySPChange(0, 5), "a positive change from 0 applies in full")
-	// The Capot bonus is part of the change BEFORE the floor: a loser on 0 SP
-	// whose -18 becomes -13 with the bonus still ends on 0.
 	assert.Equal(t, 0, season.ApplySPChange(0, -18+5))
 }
 

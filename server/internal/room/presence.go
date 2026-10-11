@@ -5,20 +5,11 @@ import (
 	"sync"
 )
 
-// PresenceRegistry tracks which users are actually "present" in a reopened
-// (waiting) room after a match — i.e. who has clicked "Return to room" or
-// freshly joined, as opposed to lingering on the match result dialog.
-//
-// A room_players row survives a match (so returners reclaim their original
-// seats), so DB membership cannot distinguish "returned" from "still away".
-// Presence is therefore tracked separately, in process memory.
-//
-// The registry is best-effort and NOT durable across restarts: after a restart
-// it is empty and rebuilds as players return/join. It is application-level
-// (return/join), not tied to WS connect/disconnect.
+// PresenceRegistry tracks, in memory and per room, which users have returned to or joined a
+// reopened room after a match, since room_players rows survive the match.
 type PresenceRegistry struct {
 	mu      sync.Mutex
-	present map[uint]map[uint]struct{} // roomID → set of userID
+	present map[uint]map[uint]struct{}
 }
 
 // NewPresenceRegistry creates an empty presence registry.

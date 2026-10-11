@@ -23,7 +23,6 @@ const EMOTE_GLYPHS: Record<EmoteID, string> = {
   heart: "❤️",
 };
 
-// snake_case wire ID → camelCase i18n leaf for `match.emote.names.*`.
 const EMOTE_I18N_KEYS: Record<EmoteID, string> = {
   thumbs_up: "thumbsUp",
   clap: "clap",
@@ -38,14 +37,9 @@ const COOLDOWN_MS = MOTION.EMOTE_COOLDOWN;
 interface EmotePickerButtonProps {
   onSend: (emote: EmoteID) => void;
   disabled?: boolean;
-  /** When set, the trigger renders as a labeled row (mobile HUD menu). */
   label?: ReactNode;
-  /** Picker opens upward by default (bottom HUD); "down" opens below the
-   *  trigger (top-right menu). */
   openDirection?: "up" | "down";
-  /** Extra classes for the trigger button (e.g. full-width row). */
   className?: string;
-  /** Fired after an emote is sent — lets the host (mobile menu) close itself. */
   onSent?: () => void;
 }
 
@@ -59,13 +53,8 @@ export function EmotePickerButton({
 }: EmotePickerButtonProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  // lastSentAt lives on matchStore so the cooldown survives the picker's
-  // unmount/remount across phase transitions (D107). performance.now() is
-  // monotonic so an OS clock backstep cannot lock the picker (D108).
   const lastSentAt = useMatchStore((s) => s.lastEmoteSentAt);
   const setLastSentAt = useMatchStore((s) => s.setLastEmoteSentAt);
-  // `now` re-renders the picker exactly when the cooldown expires so disabled
-  // tiles re-enable instantly without forcing parents to re-render every tick.
   const [now, setNow] = useState<number>(() => performance.now());
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -73,8 +62,6 @@ export function EmotePickerButton({
 
   const cooldownRemaining = lastSentAt === 0 ? 0 : Math.max(0, COOLDOWN_MS - (now - lastSentAt));
 
-  // Single timer keyed on lastSentAt — fires once at the cooldown end so the
-  // disabled tiles flip back to enabled. No per-tile timer storms.
   useEffect(() => {
     if (cooldownRemaining <= 0) return;
     const handle = window.setTimeout(() => {
@@ -83,9 +70,6 @@ export function EmotePickerButton({
     return () => window.clearTimeout(handle);
   }, [lastSentAt, cooldownRemaining]);
 
-  // Close on outside click + Escape. Mirrors the lightweight popover pattern;
-  // useFocusTrap is intentionally NOT used — outside click dismissal would be
-  // swallowed by a focus trap (see Dev Notes anti-patterns).
   useEffect(() => {
     if (!isOpen) return;
 
@@ -99,7 +83,6 @@ export function EmotePickerButton({
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsOpen(false);
-        // Restore focus to the toggle so keyboard users land back on it.
         buttonRef.current?.focus();
       }
     };
@@ -118,19 +101,12 @@ export function EmotePickerButton({
     setIsOpen((open) => !open);
   }, []);
 
-  // When the picker opens, focus the first tile so keyboard users can navigate
-  // the grid with arrow keys immediately (AC #1). Mouse users are unaffected
-  // because the focus-visible ring only renders for keyboard activation.
   useEffect(() => {
     if (isOpen) {
       tileRefs.current[0]?.focus();
     }
   }, [isOpen]);
 
-  // Roving-tabindex-style arrow navigation across the 3x2 tile grid.
-  // Layout (zero-indexed):  0 1 2
-  //                         3 4 5
-  // Right/Left wrap horizontally; Up/Down move between rows (and wrap).
   const handleGridKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
     const focused = document.activeElement;
     const currentIdx = tileRefs.current.findIndex((ref) => ref === focused);
@@ -158,7 +134,7 @@ export function EmotePickerButton({
     (emote: EmoteID) => {
       const stamp = performance.now();
       const remaining = lastSentAt === 0 ? 0 : COOLDOWN_MS - (stamp - lastSentAt);
-      if (remaining > 0) return; // defence in depth — tiles already disabled
+      if (remaining > 0) return;
       setLastSentAt(stamp);
       setNow(stamp);
       onSend(emote);

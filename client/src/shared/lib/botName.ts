@@ -3,12 +3,8 @@ import type { TFunction } from "i18next";
 import type { PlayerState } from "@/shared/types/matchTypes";
 
 /**
- * Single source of the bot display rule (Story 10.3): bot identity is
- * seat-derived ("Bot 1"–"Bot 4") and localized at render time — the server
- * sends only `isBot` + the seat, never a name. Apply wherever a `username`
- * renders from a players array so an empty bot username never leaks through
- * as a blank. A swapped/moved bot changes name with its seat — accepted
- * consequence, not a bug.
+ * Localized, seat-derived bot name ("Bot 1"–"Bot 4"); the server never sends a
+ * bot username, so use this wherever a bot's name renders.
  */
 export function botDisplayName(t: TFunction, seat: number | null | undefined): string {
   return t("bots.seatName", { n: (seat ?? 0) + 1 });

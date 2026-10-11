@@ -27,33 +27,17 @@ export interface RankStepProgress {
 interface RankChangeDialogProps {
   open: boolean;
   direction: "promoted" | "demoted";
-  /** An ALREADY-NORMALIZED tier token. */
   tier: SeasonTier;
-  /** An already-normalized division: 1–3, or null for a single tier. */
   division: number | null;
-  /** The match's signed, applied SP change. */
   spChange: number;
-  /** The season total after the match (names the top-of-ladder bar). */
   sp: number;
-  /**
-   * The bar toward the next rank step, or null to leave it out (the
-   * current-season read has not caught up with this match yet).
-   */
   progress: RankStepProgress | null;
   onClose: () => void;
 }
 
 /**
- * RankChangeDialog — the post-match season rank-change announcement (owner
- * request 2026-09-26, replacing Story 13.5's toasts). The same forced-modal shell
- * as LevelUpDialog: no outside or Escape dismiss (`disablePointerDismissal` + the
- * no-op `onOpenChange`), no close button, closed only through Continue. Shown by
- * RankChangeGate once the player is back in the lobby or room.
- *
- * ONLY CLIMBING IS THEATRICAL (Story 13.5). A PROMOTION gets level-up's
- * celebration: the brass hairline, the gold halo and the glowing tier medallion.
- * A DEMOTION gets the same layout with none of that — a neutral hairline, no
- * halo, an unlit badge and a plain title. Never alarm styling.
+ * Post-match season rank-change announcement: a forced modal closed only through Continue.
+ * Promotions get the celebratory brass and glow styling; demotions get the same layout kept neutral.
  */
 export function RankChangeDialog({
   open,
@@ -71,8 +55,6 @@ export function RankChangeDialog({
   const title = promoted ? t("season.rankUpDialog.title") : t("season.rankDownDialog.title");
   const color = SEASON_TIER_COLOR[tier];
 
-  // Step POSITION and SIZE are non-negative, so the total clamps apply (the
-  // signed change above never goes through them), the same as RankBanner.
   const intoStep = progress ? seasonSpOrZero(progress.spIntoStep) : 0;
   const forNextStep = progress ? seasonSpOrZero(progress.spForNextStep) : 0;
   const atTop = progress !== null && forNextStep <= 0;
@@ -93,9 +75,7 @@ export function RankChangeDialog({
       >
         {promoted ? (
           <>
-            {/* top brass hairline accent, as on the level-up dialog */}
             <div className="h-[3px] bg-[linear-gradient(90deg,transparent,var(--brass)_28%,var(--team-a-fill)_50%,var(--brass)_72%,transparent)]" />
-            {/* faint top halo */}
             <div
               aria-hidden="true"
               data-testid="rank-change-halo"
@@ -107,10 +87,6 @@ export function RankChangeDialog({
         )}
 
         <div className="relative flex flex-col items-center gap-4 px-[26px] pt-[26px] pb-6 text-center">
-          {/* The new rank is the dialog's main fact, but its visible line is a
-              plain div and the badge is aria-hidden, so the title's accessible
-              name carries it ("Rank Up! Gold 2"). An aria-label, not a hidden
-              span: name-from-content drops the space between the two. */}
           <DialogTitle
             aria-label={`${title} ${rank}`}
             className={cn(
@@ -176,9 +152,6 @@ export function RankChangeDialog({
               </div>
             </div>
           ) : (
-            // The row's height, RESERVED while the season read catches up: the
-            // popup is centred, so a bar that popped in later would shift the
-            // whole card. An empty track in the same box, announced as nothing.
             <div
               aria-hidden="true"
               data-testid="rank-change-progress-placeholder"

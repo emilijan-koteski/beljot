@@ -27,10 +27,7 @@ type GameMembership interface {
 }
 
 // RoomMembership resolves the member userIDs of a room for room-scoped chat.
-// Returns (userIDs, true) only when the room exists AND its status is
-// "waiting" (pre-match). Returns (nil, false) for unknown rooms or rooms
-// whose match has started/ended — room chat is a pre-match feature.
-// Wired in main.go to an adapter over room.RoomRepository.
+// It reports waiting=false for unknown rooms and rooms whose match has started.
 type RoomMembership interface {
 	RoomMembers(roomID uint) (userIDs []uint, waiting bool)
 }
@@ -52,10 +49,8 @@ type Handler struct {
 	room     RoomMembership
 }
 
-// NewHandler creates a chat handler wired to the WebSocket broadcaster,
-// the user repository (for sender username lookup), the match manager
-// (for in-game membership + match participant checks), and the room
-// membership resolver (for room-scoped chat recipient lists).
+// NewHandler creates a chat handler from its broadcaster, user repository,
+// match membership and room membership dependencies.
 func NewHandler(
 	hub Broadcaster,
 	userRepo user.UserRepository,
@@ -65,10 +60,8 @@ func NewHandler(
 	return &Handler{hub: hub, userRepo: userRepo, game: game, room: room}
 }
 
-// HandleAction is the action handler entry point. Composed with
-// match.Manager.HandleAction in main.go via a dispatch closure.
-// Returns silently for any msg.Type other than ws.ActionChatMessage so the
-// composite caller can safely route every action through it.
+// HandleAction handles action:chat_message and ignores every other message type,
+// so a composite router can pass it every action.
 func (h *Handler) HandleAction(client *ws.Client, msg ws.WSMessage) {
 	if msg.Type != ws.ActionChatMessage {
 		return
@@ -81,9 +74,6 @@ func (h *Handler) HandleAction(client *ws.Client, msg ws.WSMessage) {
 	}
 
 	text := strings.TrimSpace(req.Text)
-	// Use rune count (not byte count) so the server cap matches the client's
-	// `string.length` (UTF-16 code units approximate runes). A 500-rune
-	// Cyrillic or emoji message stays within the limit.
 	runeCount := utf8.RuneCountInString(text)
 	if text == "" || runeCount > maxMessageLength {
 		slog.Info("chat: message rejected (empty or too long)",
@@ -103,8 +93,9 @@ func (h *Handler) HandleAction(client *ws.Client, msg ws.WSMessage) {
 	}
 }
 
+// handleGlobal sends to every connected user not in a game and drops sends from
+// in-game senders. The sender always gets their own echo, even after joining a game.
 func (h *Handler) handleGlobal(senderID uint, text string) {
-	// Enforce "no global chat while in a game" — silently drop (AC #7).
 	if h.game.IsUserInMatch(senderID) {
 		slog.Info("chat: global send dropped (sender in game)", "userID", senderID)
 		return
@@ -117,12 +108,9 @@ func (h *Handler) handleGlobal(senderID uint, text string) {
 	}
 
 	payload := ws.ChatMessagePayload{
-		UserID:   sender.ID,
-		Username: sender.Username,
-		Message:  text,
-		// RFC3339Nano gives nanosecond precision so (userId, timestamp) is
-		// effectively unique across the message stream — used as a stable
-		// React key on the client.
+		UserID:    sender.ID,
+		Username:  sender.Username,
+		Message:   text,
 		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
 		Scope:     ChannelLobby,
 	}
@@ -131,10 +119,6 @@ func (h *Handler) handleGlobal(senderID uint, text string) {
 		return
 	}
 
-	// Recipients: all connected users NOT currently in a game.
-	// The sender is unconditionally included (their initial check already
-	// passed at the top of this function) so they always see their own
-	// message echo even if they joined a game in the microseconds since.
 	recipients := h.hub.ConnectedUserIDs()
 	eligible := make([]uint, 0, len(recipients))
 	for _, uid := range recipients {
@@ -159,7 +143,6 @@ func (h *Handler) handleMatch(senderID uint, roomID *uint, text string) {
 		return
 	}
 
-	// Authorise: sender must be one of the 4 session participants.
 	authorized := false
 	for _, uid := range participants {
 		if uid == senderID {
@@ -191,9 +174,6 @@ func (h *Handler) handleMatch(senderID uint, roomID *uint, text string) {
 		return
 	}
 
-	// Broadcast to ALL 4 participants (sender included so they see their own
-	// echo). Hub.BroadcastToUsers silently skips disconnected IDs, which is the
-	// intended behaviour for players inside the reconnect window.
 	h.hub.BroadcastToUsers(participants[:], msgBytes)
 }
 
@@ -210,7 +190,6 @@ func (h *Handler) handleRoom(senderID uint, roomID *uint, text string) {
 		return
 	}
 
-	// Authorise: sender must be one of the room members.
 	authorized := false
 	for _, uid := range members {
 		if uid == senderID {
@@ -242,9 +221,6 @@ func (h *Handler) handleRoom(senderID uint, roomID *uint, text string) {
 		return
 	}
 
-	// Broadcast to all room members (sender included for own-echo).
-	// Hub.BroadcastToUsers silently skips disconnected IDs, which is the
-	// intended behaviour during transient disconnects.
 	h.hub.BroadcastToUsers(members, msgBytes)
 }
 

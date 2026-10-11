@@ -2,11 +2,8 @@ package game
 
 import "github.com/emilijan/beljot/server/internal/apperr"
 
-// handleContinue processes a player's acknowledgement of the PhaseHandComplete
-// pause (action:continue). The next hand is dealt once every connected player
-// has continued. Disconnected seats are excluded so a dropped player does not
-// stall the table; the session manager's auto-continue timeout covers the
-// connected-but-idle case.
+// handleContinue records a player's continue during PhaseHandComplete.
+// The next hand is dealt once every connected player has continued.
 func handleContinue(state *GameState, action Action) (*GameState, error) {
 	if state.Phase != PhaseHandComplete {
 		return nil, apperr.ErrWrongPhase

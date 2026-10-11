@@ -7,9 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Internal tests for unexported checkInstantWin function.
-// These tests use deterministic card distributions to verify instant-win detection.
-
 func TestCheckInstantWin_AllTrumpCards(t *testing.T) {
 	trumpCandidate := Card{Rank: Rank7, Suit: SuitHearts}
 	gs := &GameState{
@@ -54,14 +51,14 @@ func TestCheckInstantWin_NoInstantWin(t *testing.T) {
 		TrumpCandidate: &trumpCandidate,
 		Players: [4]PlayerState{
 			{Seat: 0, Hand: []Card{
-				{Rank: Rank7, Suit: SuitHearts}, // 1 heart on seat 0
+				{Rank: Rank7, Suit: SuitHearts},
 				{Rank: Rank8, Suit: SuitSpades}, {Rank: Rank9, Suit: SuitSpades},
 				{Rank: RankTen, Suit: SuitSpades}, {Rank: RankJack, Suit: SuitSpades},
 				{Rank: RankQueen, Suit: SuitSpades}, {Rank: RankKing, Suit: SuitSpades},
 				{Rank: RankAce, Suit: SuitSpades},
 			}},
 			{Seat: 1, Hand: []Card{
-				{Rank: Rank7, Suit: SuitSpades}, // 1 spade mixed in
+				{Rank: Rank7, Suit: SuitSpades},
 				{Rank: Rank8, Suit: SuitHearts}, {Rank: Rank9, Suit: SuitHearts},
 				{Rank: RankTen, Suit: SuitHearts}, {Rank: RankJack, Suit: SuitHearts},
 				{Rank: RankQueen, Suit: SuitHearts}, {Rank: RankKing, Suit: SuitHearts},
@@ -96,7 +93,6 @@ func TestCheckInstantWin_NilTrumpCandidate(t *testing.T) {
 }
 
 func TestCheckInstantWin_Seat0TeamA(t *testing.T) {
-	// Verify correct team is returned when seat 0 (team A) has all trump
 	trumpCandidate := Card{Rank: Rank7, Suit: SuitSpades}
 	gs := &GameState{
 		TrumpCandidate: &trumpCandidate,
@@ -119,10 +115,7 @@ func TestCheckInstantWin_Seat0TeamA(t *testing.T) {
 	assert.Equal(t, TeamA, *result, "seat 0 (team A) has all 8 Spades (trump)")
 }
 
-// TestStartNewHandDealsPerConfig locks that hand 2 onwards is dealt the same way
-// hand 1 was. dealCards has three callers and only one is NewGame, so a
-// config-driven deal that is only wired into NewGame would silently deal hand 2
-// of a Croatian match Bitola-style.
+// TestStartNewHandDealsPerConfig checks that hand 2 onwards is dealt per the variant's config, like hand 1.
 func TestStartNewHandDealsPerConfig(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -192,18 +185,9 @@ func allCardsInPlay(state *GameState) []Card {
 	return out
 }
 
-// TestReshuffleAndRedealRecoversFaceDownCards covers the face-down recovery in
-// reshuffleAndRedeal's pooling loop. The guard exists because a short pool makes
-// dealCards fall back to a fresh deck, and its own comment names the failure it
-// prevents — so it needs a test rather than a reachability argument.
-//
-// A state carrying face-down cards while resolving to a reshuffle outcome is
-// malformed (the config that deals them refuses the dealer's fourth pass, so
-// its bidding can never pass out), which is exactly the situation the guard is
-// defending.
+// TestReshuffleAndRedealRecoversFaceDownCards checks that reshuffleAndRedeal pools face-down cards
+// instead of letting a short pool fall back to a fresh deck.
 func TestReshuffleAndRedealRecoversFaceDownCards(t *testing.T) {
-	// buildPooled lays a given 32-card slice out as 6 open + 2 face-down per
-	// seat under a reshuffle-and-rotate config.
 	buildPooled := func(cards []Card) *GameState {
 		require.Len(t, cards, 32)
 		gs := &GameState{
@@ -226,10 +210,6 @@ func TestReshuffleAndRedealRecoversFaceDownCards(t *testing.T) {
 	}
 
 	t.Run("the re-dealt state holds 32 cards with no duplicates", func(t *testing.T) {
-		// Without the recovery, the 8 face-down cards are neither pooled nor
-		// cleared: the short pool triggers a fresh deck AND the stale hidden
-		// cards survive on the seats, so the state ends up holding 40 entries
-		// with duplicates.
 		gs := buildPooled(NewDeck())
 
 		result := reshuffleAndRedeal(gs)
@@ -259,17 +239,10 @@ func TestReshuffleAndRedealRecoversFaceDownCards(t *testing.T) {
 	})
 
 	t.Run("the pool is the state's own cards, not a fresh deck", func(t *testing.T) {
-		// Mark the pool so the two sources are distinguishable: drop the Ace of
-		// Spades and duplicate a face-down card in its place. The pool still has
-		// 32 cards, so the recovery path deals THESE cards — and the Ace of
-		// Spades stays absent. If the face-down cards were not pooled, the pool
-		// would be 24, dealCards would fall back to NewDeck, and the Ace of
-		// Spades would reappear.
 		cards := NewDeck()
 		var marker Card
 		for i, c := range cards {
 			if c.Rank == RankAce && c.Suit == SuitSpades {
-				// cards[24:32] become the face-down slots in buildPooled.
 				marker = cards[24]
 				cards[i] = marker
 				break
@@ -298,17 +271,8 @@ func TestReshuffleAndRedealRecoversFaceDownCards(t *testing.T) {
 	})
 }
 
-// TestFaceDownCountTracksCardsAcrossHands pins the invariant syncFaceDownCounts
-// documents but nothing enforced: the public FaceDownCount never diverges from
-// the server-only FaceDownCards it counts.
-//
-// It matters at the HAND BOUNDARY specifically. startNewHand and
-// reshuffleAndRedeal both clear FaceDownCards themselves and are covered only
-// transitively, by falling through to dealCards — so an early return added to
-// either one before its dealCards call would ship the previous hand's count with
-// no cards behind it, rendering a wrong stack size on every opponent's seat with
-// no test to catch it. This is an internal test because startNewHand is the
-// unexported entry point that boundary runs through.
+// TestFaceDownCountTracksCardsAcrossHands checks that FaceDownCount always equals len(FaceDownCards),
+// including across the hand boundary in startNewHand and reshuffleAndRedeal.
 func TestFaceDownCountTracksCardsAcrossHands(t *testing.T) {
 	assertInSync := func(t *testing.T, state *GameState, want int, when string) {
 		t.Helper()
@@ -325,7 +289,6 @@ func TestFaceDownCountTracksCardsAcrossHands(t *testing.T) {
 			[4]bool{}, VariantCroatia, "1001", 1, true, false)
 		assertInSync(t, state, 2, "on the opening deal")
 
-		// Bidding resolves: the pair merges into Hand and the count must follow.
 		state.Phase = PhaseBidding
 		suit := SuitHearts
 		picked, err := ApplyAction(state, Action{
@@ -337,7 +300,6 @@ func TestFaceDownCountTracksCardsAcrossHands(t *testing.T) {
 			require.Len(t, picked.Players[seat].Hand, 8, "seat %d holds all eight after the merge", seat)
 		}
 
-		// Hand 2 is dealt by the same path a scored hand takes.
 		startNewHand(picked)
 		assertInSync(t, picked, 2, "after startNewHand dealt hand 2")
 	})
@@ -347,8 +309,6 @@ func TestFaceDownCountTracksCardsAcrossHands(t *testing.T) {
 			[4]bool{}, VariantBitola, "1001", 1, true, false)
 		assertInSync(t, state, 0, "on the opening deal")
 
-		// Four round-2 passes reshuffle and re-deal — the other transitively
-		// covered path.
 		state.Phase = PhaseBidding
 		state.BiddingRound = 2
 		state.BiddingPassCount = 3

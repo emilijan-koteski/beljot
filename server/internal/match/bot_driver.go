@@ -9,17 +9,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/game"
 )
 
-// Bot driver (Story 10.3). Bots are server-side actors driven by the session
-// manager — no WebSocket, no client, no auth. Decision logic is the pure
-// bot.Decide over a redacted View; this file owns the side effects:
-// scheduling, humanized think delays, memory upkeep, and applying decisions
-// through the exact apply-and-broadcast path human actions use.
-
-// maybeScheduleBotAction arms think-delay timers for every bot seat that
-// currently owes a decision. It must be invoked after EVERY point the game
-// state is replaced and broadcast (StartMatch, action success, timer-expiry
-// auto-actions, hand-complete force-advance, reconnect resume) — a missed
-// call site is a silently stalled match. Cheap no-op for human-only matches.
+// maybeScheduleBotAction arms think-delay timers for every bot seat that owes a
+// decision. Call it after every game-state replacement; a missed call site stalls the match.
 func (m *Manager) maybeScheduleBotAction(session *LiveMatch) {
 	session.mu.Lock()
 	defer session.mu.Unlock()
@@ -30,10 +21,8 @@ func (m *Manager) maybeScheduleBotAction(session *LiveMatch) {
 	gs := session.gameState
 	for _, seat := range botDecisionSeats(gs) {
 		if session.botActionTimers[seat] != nil {
-			continue // a think delay is already pending for this seat
+			continue
 		}
-		// A deal still animating on the clients delays the bot by what is left
-		// of it, exactly as it delays a human's deadline (deal_grace.go).
 		delay := m.botThinkDelay(gs, seat) + session.dealGraceRemaining()
 		gen := session.botActionGenerations[seat]
 		ctx := botDecisionContextFor(gs, seat)
@@ -44,17 +33,8 @@ func (m *Manager) maybeScheduleBotAction(session *LiveMatch) {
 	}
 }
 
-// botDecisionContext captures WHICH decision point a think delay was armed
-// for. If the state has moved to a DIFFERENT decision point by the time the
-// timer fires (e.g. a hand-complete ack delay elapsing just after the next
-// hand's bidding opened for the same seat), acting immediately would undercut
-// the ≥1 s humanization floor — the fire path compares contexts and re-arms a
-// fresh delay instead of acting.
-//
-// The dedicated declaration phase needs no field of its own: `phase` separates
-// it from bidding and playing, and a seat that has already answered drops out
-// of botDecisionSeats, so the fire path's "does this seat still owe a decision"
-// check short-circuits before the context is ever compared.
+// botDecisionContext identifies the decision point a think delay was armed for.
+// If it changed by the time the timer fires, the delay is re-armed instead of acting.
 type botDecisionContext struct {
 	phase            game.Phase
 	handNumber       int
@@ -73,16 +53,8 @@ func botDecisionContextFor(gs *game.GameState, seat int) botDecisionContext {
 	}
 }
 
-// botDecisionSeats resolves which BOT seats owe a decision in the given
-// state. Phase table per the story: bidding → active bidder; declaring → every
-// seat that has not yet answered (the phase asks all four at once and closes
-// only when every connected seat has answered); playing → pending belote seat,
-// else active player (covers the
-// trick-1 declaration prompt — it always belongs to the active player);
-// hand_complete → every bot that has not acknowledged the score reveal; a
-// pending surrender adds the proposer's partner (surrender is team-internal —
-// bots never initiate and never respond to opponents' proposals). Paused /
-// disconnected / match_end never schedule.
+// botDecisionSeats resolves which bot seats owe a decision in the given state,
+// including every unanswered seat while declaring and a surrender proposer's partner.
 func botDecisionSeats(gs *game.GameState) []int {
 	seats := make([]int, 0, 4)
 	add := func(seat int) {
@@ -101,16 +73,6 @@ func botDecisionSeats(gs *game.GameState) []int {
 	case game.PhaseBidding:
 		add(gs.ActivePlayerSeat)
 	case game.PhaseDeclaring:
-		// Every bot seat that has not answered, not just one: the dedicated
-		// phase asks all four at once and closes only when every connected seat
-		// has answered, so scheduling a single seat would leave the rest silent
-		// until the window elapsed — turning every hand with bots into a full
-		// declarationAutoClose stall.
-		//
-		// Gating on DeclarationAnswered (not AwaitingDeclaration, which the
-		// phase never sets) also makes the reject → reschedule loop
-		// unreachable: the engine accepts an answer from any unanswered seat,
-		// and a seat drops out of this list the moment it answers.
 		for seat := range gs.Players {
 			if !gs.Players[seat].DeclarationAnswered {
 				add(seat)
@@ -139,25 +101,11 @@ func botDecisionSeats(gs *game.GameState) []int {
 	return seats
 }
 
-// botBelotBeat is how long a bot takes to answer its own Belote/Rebelote
-// prompt. The decision was made when it chose to play the K/Q — a human answers
-// the same prompt BEFORE the card leaves their hand — so a second full think
-// delay here only froze the turn on the announcer, with the card already on
-// the table and the reveal not yet shown. A short beat keeps the announcement
-// in step with the card landing.
 const botBelotBeat = 150 * time.Millisecond
 
-// botThinkDelay returns the humanized delay before the bot at `seat` acts on
-// gs: uniform random in [botDelayMin, botDelayMax] for game decisions —
-// bidding and play — and a single short beat (botDelayMin) for the two
-// fixed-window phases, score-reveal acknowledgements and the dedicated
-// declaration phase, where the human players plus the window itself already
-// pace things. Its own pending Belote answer takes botBelotBeat.
-//
-// The declaration phase is not merely a preference: the window is short, all
-// four seats must answer to close it early, and a bot drawing near botDelayMax
-// on every seat would routinely push a table of bots to the full ceiling. The
-// humans are the ones the pacing exists for, and they are answering in parallel.
+// botThinkDelay returns the humanized delay before the bot at seat acts: random in
+// [botDelayMin, botDelayMax] for bids and plays, botDelayMin for fixed-window phases,
+// and botBelotBeat for its own Belote answer, already decided when it played the card.
 func (m *Manager) botThinkDelay(gs *game.GameState, seat int) time.Duration {
 	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat {
 		return min(botBelotBeat, m.botDelayMax)
@@ -173,15 +121,8 @@ func (m *Manager) botThinkDelay(gs *game.GameState, seat int) time.Duration {
 	return m.botDelayMin + time.Duration(rand.Int64N(int64(spread)+1))
 }
 
-// handleBotActionTimer fires when a bot's think delay elapses. Verification
-// (generation, the seat STILL owing a decision, the decision point being the
-// one the delay was sized for) and the bot.Decide call all run inside the
-// build callback — i.e. inside the SAME critical section that applies the
-// action — so no state change can slip between verify and act. Bot actions
-// carry no autoPlayed marker — event:card_played looks identical to a human
-// play. The per-move turn timer stays armed throughout the think delay as the
-// safety net; relaxed rooms have none, so an engine rejection re-schedules
-// the seat instead of silently stalling.
+// handleBotActionTimer verifies and decides inside the same critical section that
+// applies the action. A rejected or stale decision re-arms the seat so the match never stalls.
 func (m *Manager) handleBotActionTimer(session *LiveMatch, seat int, generation uint64, armedCtx botDecisionContext) {
 	var (
 		rearm      bool
@@ -191,9 +132,6 @@ func (m *Manager) handleBotActionTimer(session *LiveMatch, seat int, generation 
 		if session.botActionGenerations[seat] != generation {
 			return game.Action{}, false
 		}
-		// Consume this firing: bump the generation so a stale duplicate can
-		// never double-fire, and clear the slot so the next schedule pass can
-		// re-arm.
 		session.botActionGenerations[seat]++
 		session.botActionTimers[seat] = nil
 
@@ -208,17 +146,12 @@ func (m *Manager) handleBotActionTimer(session *LiveMatch, seat int, generation 
 			return game.Action{}, false
 		}
 		if botDecisionContextFor(gs, seat) != armedCtx {
-			// The seat owes a decision, but a DIFFERENT one than this delay
-			// was armed for (e.g. a hand-complete ack delay firing right after
-			// the next hand's bidding opened). Acting now would undercut the
-			// ≥1 s humanization floor — re-arm a fresh delay instead.
 			rearm = true
 			return game.Action{}, false
 		}
 
 		var action game.Action
 		if gs.Phase == game.PhaseHandComplete {
-			// Nothing to decide — the bot acknowledges the score reveal.
 			action = game.Action{Type: game.ActionContinue, PlayerSeat: seat}
 		} else {
 			action = bot.Decide(buildBotView(gs, seat, session.botMemory))
@@ -227,10 +160,6 @@ func (m *Manager) handleBotActionTimer(session *LiveMatch, seat int, generation 
 		return action, true
 	})
 	if err != nil {
-		// The seat still owes its decision and nothing else will re-schedule
-		// it (rejections outside a racing state change have no other wake-up;
-		// relaxed rooms have no auto-play backstop) — re-arm so the match
-		// never stalls on a dropped bot action.
 		slog.Warn("bot: action rejected by engine; rescheduling seat",
 			"roomID", session.roomID, "seat", seat, "type", actionType, "error", err)
 		rearm = true
@@ -240,11 +169,8 @@ func (m *Manager) handleBotActionTimer(session *LiveMatch, seat int, generation 
 	}
 }
 
-// buildBotView projects the seat-local, redacted View handed to bot.Decide.
-// The redaction is structural no-peeking: only this seat's hand and public
-// state cross the boundary — Decide never receives other players' hands even
-// though gs has them. Must be called under session.mu (reads gameState +
-// botMemory).
+// buildBotView projects the seat-local, redacted View handed to bot.Decide, so it
+// never sees other players' hands. Call under session.mu.
 func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	v := bot.View{
 		Seat:                seat,
@@ -259,14 +185,11 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		LeadSuit:            gs.LeadSuit,
 		ActivePlayerSeat:    gs.ActivePlayerSeat,
 		AwaitingDeclaration: gs.AwaitingDeclaration && gs.ActivePlayerSeat == seat,
-		// Only meaningful in the dedicated declaration phase, and meld detection
-		// walks the whole hand — so it is not paid on every bid and every card
-		// play as well.
-		HasDeclarations: gs.Phase == game.PhaseDeclaring && game.HasDeclarableCombinations(gs, seat),
-		PendingBelot:    gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,
-		TeamScores:      gs.TeamScores,
-		HandPoints:      gs.HandPoints,
-		TricksWon:       gs.TricksWon,
+		HasDeclarations:     gs.Phase == game.PhaseDeclaring && game.HasDeclarableCombinations(gs, seat),
+		PendingBelot:        gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,
+		TeamScores:          gs.TeamScores,
+		HandPoints:          gs.HandPoints,
+		TricksWon:           gs.TricksWon,
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -274,11 +197,6 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	if gs.Phase == game.PhasePlaying {
 		v.LegalCards = game.LegalCards(gs, seat)
 	}
-	// Whether a pass would be refused at THIS seat's turn: the rule config and
-	// the bidding counters decide, read through the engine's own predicate so the
-	// bot and the engine can never disagree. The predicate takes the seat, so the
-	// scoping cannot be forgotten here — offering the flag to a seat that is not
-	// on the clock would make it pick out of turn.
 	v.MustPickTrump = game.MustPickTrump(gs, seat)
 	if mem != nil {
 		v.PlayedCards = mem.PlayedCards()
@@ -288,11 +206,8 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	return v
 }
 
-// observeBotMemory keeps the per-match bot memory current after a successful
-// state transition: resolved card plays feed the seen-cards + void inference
-// (the OLD state's LeadSuit tells the void story), a hand-number advance resets
-// the per-hand sets, and a resolved declaration contest records the publicly
-// revealed cards as known holdings. No-op for human-only matches.
+// observeBotMemory updates the per-match bot memory after a successful transition:
+// card plays, hand resets and revealed declarations. No-op for human-only matches.
 func (m *Manager) observeBotMemory(session *LiveMatch, oldState, newState *game.GameState, action game.Action) {
 	session.mu.Lock()
 	defer session.mu.Unlock()
@@ -304,16 +219,6 @@ func (m *Manager) observeBotMemory(session *LiveMatch, oldState, newState *game.
 		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit)
 	}
 	mem.SyncHand(newState.HandNumber)
-	// Once the contest resolves, the engine has nil'd the losing team's
-	// declarations, so this records only the publicly revealed winning cards.
-	//
-	// Also gated on the room HAVING declarations. DeclarationsResolved is seeded
-	// true from the deal in a declarations-off room — it means "no contest is
-	// outstanding", not "a contest resolved" — so without this the observation
-	// would run on every action of every hand instead of once, and the sentence
-	// above would not be true of it. Harmless either way (there are no melds to
-	// record), but a bot memory that says it observed a reveal should only say so
-	// when there was one.
 	if newState.DeclarationsResolved && newState.Rules.DeclarationsEnabled {
 		mem.ObserveDeclarations(newState.Players)
 	}

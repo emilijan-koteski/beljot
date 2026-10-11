@@ -51,7 +51,6 @@ const baseInvite = makeRoomInvite({
   coinBuyIn: 500,
   isPrivate: false,
   isHostInvite: false,
-  // Far enough out that the auto-dismiss timer never fires during a test.
   expiresAt: new Date(Date.now() + 60_000).toISOString(),
 });
 
@@ -87,7 +86,6 @@ describe("RoomInviteModal", () => {
     expect(screen.queryByTestId("room-invite-buyin")).not.toBeInTheDocument();
   });
 
-  // AC3: a host invite joins with NO password — the server grant does the work.
   it("joins with no password on a host invite into a private room", async () => {
     const user = userEvent.setup();
     joinRoomSpy.mockResolvedValue({ id: 7 });
@@ -102,7 +100,6 @@ describe("RoomInviteModal", () => {
     expect(useRoomStore.getState().roomInvite).toBeNull();
   });
 
-  // AC4: a non-host invite into a private room still has to clear the password.
   it("opens the password prompt on a non-host invite into a private room", async () => {
     const user = userEvent.setup();
     useRoomStore.getState().setRoomInvite({ ...baseInvite, isPrivate: true, isHostInvite: false });
@@ -137,7 +134,6 @@ describe("RoomInviteModal", () => {
     expect(useRoomStore.getState().roomInvite).not.toBeNull();
   });
 
-  // AC5: no password step at all for a non-host invite into a public room.
   it("joins directly on a non-host invite into a public room", async () => {
     const user = userEvent.setup();
     joinRoomSpy.mockResolvedValue({ id: 7 });
@@ -150,8 +146,6 @@ describe("RoomInviteModal", () => {
     expect(screen.queryByTestId("password-prompt-dialog")).not.toBeInTheDocument();
   });
 
-  // AC6/AC7: the honor gate still applies under an invite, and the failure is
-  // routed through the ONE shared join-failure mapping (D4).
   it.each([
     ["ROOM_FULL", "lobby.errors.roomFull"],
     ["NEW_PLAYER_NOT_ALLOWED", "room.errors.newPlayerNotAllowed"],
@@ -168,17 +162,11 @@ describe("RoomInviteModal", () => {
 
       const i18n = (await import("i18next")).default;
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith(i18n.t(key)));
-      // No dead end: the popup is gone and no navigation happened.
       expect(useRoomStore.getState().roomInvite).toBeNull();
       expect(navigateSpy).not.toHaveBeenCalled();
     },
   );
 
-  // HONOR_TOO_LOW takes the SPECIFIC arm of the same mapping, not the generic
-  // fallback: an invite payload always carries the room's `minHonor` (Story
-  // 11.5 added the field for exactly this), so `joinFailure` has the floor in
-  // hand and can name it. The generic arm is for callers with no room object,
-  // which is why JoinByCodeTile asserts that one instead.
   it("names the room's honor floor when an invited join is rejected for honor", async () => {
     const user = userEvent.setup();
     joinRoomSpy.mockRejectedValue(new FetchError(409, "HONOR_TOO_LOW", "join rejected"));
@@ -208,7 +196,6 @@ describe("RoomInviteModal", () => {
     expect(useRoomStore.getState().roomInvite).toBeNull();
   });
 
-  // AC2: the popup must not outlive the grant behind it.
   it("auto-dismisses an already-expired invite", async () => {
     useRoomStore.getState().setRoomInvite({
       ...baseInvite,

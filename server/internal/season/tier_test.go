@@ -9,14 +9,10 @@ import (
 	"github.com/emilijan/beljot/server/internal/season"
 )
 
-// The ladder, restated as LITERALS. Deliberately not derived from
-// season.TierFloor: re-deriving the expectation from the same table the
-// implementation reads would make these tests pass for any table, including an
-// inverted one (the trap the Story 9.7 review pass 2 caught in the honor tests).
 var ladder = []struct {
 	tier  string
 	floor int
-	band  int // size of this tier's band; 0 at the top
+	band  int
 }{
 	{"iron", 0, 150},
 	{"bronze", 150, 150},
@@ -34,7 +30,6 @@ func TestSeasonTiers_OrderAndIsolation(t *testing.T) {
 		season.SeasonTiers(),
 		"eight tiers, lowest first")
 
-	// A caller that mutates the returned slice must not corrupt the ladder.
 	got := season.SeasonTiers()
 	got[0] = "tampered"
 	assert.Equal(t, "iron", season.SeasonTiers()[0], "SeasonTiers must hand out a fresh slice")
@@ -95,18 +90,15 @@ func TestRankForSP(t *testing.T) {
 	}{
 		{"zero SP is Iron 1", 0, "iron", 1},
 		{"negative clamps to Iron 1", -40, "iron", 1},
-		// Iron's 150-SP band: 1 + into·3/150 steps at 50 and 100.
 		{"last SP of Iron 1", 49, "iron", 1},
 		{"first SP of Iron 2", 50, "iron", 2},
 		{"last SP of Iron 2", 99, "iron", 2},
 		{"first SP of Iron 3", 100, "iron", 3},
 		{"top of Iron is still Iron 3", 149, "iron", 3},
 		{"Bronze floor resets to division 1", 150, "bronze", 1},
-		// Silver's 300-SP band steps at 100 and 200 in.
 		{"Silver 1", 300, "silver", 1},
 		{"Silver 2", 400, "silver", 2},
 		{"Silver 3", 500, "silver", 3},
-		// A 200-SP band steps at 67 and 134 in.
 		{"Gold 1 floor", 600, "gold", 1},
 		{"last SP of Gold 1", 666, "gold", 1},
 		{"first SP of Gold 2", 667, "gold", 2},
@@ -170,7 +162,6 @@ func TestNewLadder(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 1750, floor)
 
-	// The live ladder is untouched by building a candidate.
 	liveTier, _ := season.RankForSP(460)
 	assert.Equal(t, "silver", liveTier)
 
@@ -217,7 +208,6 @@ func TestRankProgress(t *testing.T) {
 		{"Silver 2 is a 100-SP step", 450, "silver", 2, 50, 100},
 		{"Gold 1 floor", 600, "gold", 1, 0, 67},
 		{"Gold 1, 50 in", 650, "gold", 1, 50, 67},
-		// The spec's worked example: Gold 2 (667-733) fills 0 -> 67 toward Gold 3.
 		{"Gold 2 floor", 667, "gold", 2, 0, 67},
 		{"mid Gold 2", 700, "gold", 2, 33, 67},
 		{"last SP of Gold 2", 733, "gold", 2, 66, 67},
@@ -257,7 +247,6 @@ func TestRankProgress_StepsResetExactlyWhereTheRankChanges(t *testing.T) {
 		if sp > 0 {
 			assert.Equal(t, rankChanged, into == 0, "sp=%d: the bar is empty exactly on a new rank", sp)
 		}
-		// The step ends where the next rank begins.
 		if into == forNext-1 {
 			nextTier, nextDiv := season.RankForSP(sp + 1)
 			assert.True(t, nextTier != tier || nextDiv != div, "sp=%d: the last SP of a step", sp)

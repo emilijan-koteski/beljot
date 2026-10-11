@@ -252,18 +252,11 @@ describe("MatchmakingPage", () => {
 
     await waitFor(() => expect(mockLeaveRoom).toHaveBeenCalledWith(1));
     expect(toast.error).toHaveBeenCalled();
-    // "Stays on the page" means no navigation of any kind — a targeted
-    // not.toHaveBeenCalledWith would let a differently-shaped call slip by.
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  // Regression: re-entering a recently-visited room serves a STALE cached
-  // detail snapshot that omits the just-joined viewer. The page must judge
-  // membership on the fresh post-mount refetch — not the stale cache — or it
-  // bounces the player to /lobby while the server keeps them in the room.
   it("does not bounce to lobby when the cached snapshot is stale (member added by refetch)", async () => {
     const client = createTestQueryClient();
-    // Seed the cache as if the viewer left earlier: only the owner is present.
     client.setQueryData(queryKeys.rooms.detail(1), {
       room: qpRoom,
       players: [
@@ -279,7 +272,6 @@ describe("MatchmakingPage", () => {
         },
       ],
     });
-    // The fresh fetch (after the just-completed quick-join) includes the viewer.
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
         room: qpRoom,

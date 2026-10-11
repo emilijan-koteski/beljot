@@ -9,11 +9,13 @@ import { WinLoseBar } from "./WinLoseBar";
 
 type RivalriesProps = {
   rivals: RivalStat[];
-  /** False on ANOTHER player's profile (Story 11.3): the empty state tells the
-   *  reader to go play a few matches, which only makes sense when the reader is
-   *  the subject. Selects the third-person `emptyPublic` copy. */
   subjectIsSelf?: boolean;
 };
+
+/** Soft-deleted rivals arrive with a valid id but an empty username; linking them would 404. */
+function isSoftDeleted(rival: RivalStat): boolean {
+  return rival.username === "";
+}
 
 /**
  * Sidebar panel of most-faced opponents with the viewer's head-to-head record
@@ -43,11 +45,7 @@ export function Rivalries({ rivals, subjectIsSelf = true }: RivalriesProps) {
                 className="bg-surface-elevated border-border flex flex-col gap-1.5 rounded-[10px] border p-2.5"
               >
                 <div className="flex items-center gap-2.5">
-                  {/* Bots ARE excluded server-side (NULL seat ids never reach
-                      this list), but soft-deleted users are not: they arrive
-                      with a valid userId and an empty username. Linking them
-                      would 404, so the link is gated on a non-empty username. */}
-                  {r.username !== "" ? (
+                  {!isSoftDeleted(r) ? (
                     <Link
                       to={`/players/${r.userId}`}
                       aria-label={t("friends.viewProfileAria", { username: r.username })}

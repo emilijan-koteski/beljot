@@ -32,7 +32,6 @@ describe("PublicContentLayout (guest)", () => {
     expect(screen.getByTestId("public-signup")).toHaveAttribute("href", "/register");
     expect(screen.getByTestId("public-logo")).toHaveAttribute("href", "/");
     expect(screen.getByTestId("content")).toBeInTheDocument();
-    // The authed app nav must NOT appear for a logged-out visitor.
     expect(screen.queryByTestId("app-nav")).not.toBeInTheDocument();
   });
 });

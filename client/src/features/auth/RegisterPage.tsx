@@ -96,12 +96,8 @@ export function RegisterPage() {
         email,
         username,
         password,
-        // Normalize so a region-tagged i18n.language ("en-US") doesn't get
-        // silently downgraded by the server to "en" — send the short code we
-        // already display.
         languagePreference: normalizeLanguage(i18n.language) ?? "en",
       });
-      // Replace: /lobby is the app root — back must not return to the form.
       navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError) {
@@ -291,7 +287,6 @@ export function RegisterPage() {
 
       <GoogleSignInButton onCredential={handleGoogleCredential} />
 
-      {/* Google sign-up has no checkbox — this small-print carries the ToS/privacy consent. */}
       <p
         className="text-ink-mute mt-3 text-center text-xs leading-normal"
         data-testid="sso-consent-note"

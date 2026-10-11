@@ -52,10 +52,8 @@ func waitFor(timeout time.Duration, cond func() bool) bool {
 	return cond()
 }
 
-// driveHumanSeat0 performs the scripted human response for seat 0 when the
-// state requires one: pass round-1 bidding, pick a suit in round 2 (so an
-// all-pass reshuffle loop cannot spin forever), skip prompts, play the first
-// legal card, acknowledge score reveals.
+// driveHumanSeat0 plays the scripted human response for seat 0 when the state
+// requires one, picking a suit in round 2 so an all-pass reshuffle cannot loop.
 func driveHumanSeat0(mgr *match.Manager, st *game.GameState) {
 	client := &ws.Client{UserID: 10}
 	send := func(msgType string, payload any) {
@@ -101,7 +99,7 @@ func driveHumanSeat0(mgr *match.Manager, st *game.GameState) {
 	}
 }
 
-// TestBotMatch_ProgressesToNextHandWithoutClientActions is the AC2/AC3 core:
+// TestBotMatch_ProgressesToNextHandWithoutClientActions checks
 // a match with three bots progresses Dealing → Bidding → Playing →
 // HandComplete → next hand with no client input except the single human's.
 func TestBotMatch_ProgressesToNextHandWithoutClientActions(t *testing.T) {
@@ -127,33 +125,15 @@ func TestBotMatch_ProgressesToNextHandWithoutClientActions(t *testing.T) {
 	require.True(t, reachedNextHand, "bot match must reach hand 2 without stalling")
 }
 
-// TestBot_ActsAfterMinDelayAndBeforeTimerExpiry pins AC3's boundaries with
-// the PRODUCTION delay bounds: the bot's first bidding action lands no
-// earlier than 1s after its turn opened (never instantaneous) and far inside
-// the 10s per-move window, and it is never surfaced as a timeout auto-action.
+// TestBot_ActsAfterMinDelayAndBeforeTimerExpiry checks, with production delay bounds,
+// that the bot's first bid lands after 1s, well inside the 10s window, and not as an auto-action.
 func TestBot_ActsAfterMinDelayAndBeforeTimerExpiry(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
-	mgr := match.NewManager(hub, repo) // production delays: 1–2.5s
+	mgr := match.NewManager(hub, repo)
 	mgr.SetDealGraceForTest(false)
 
 	start := time.Now()
-	// Per-move timer at the 10s minimum. The first-hand dealer is randomized, so
-	// the bot seat is put on the opening bid explicitly rather than assumed:
-	// NewGameJustDealt deals from dealer 0, leaving seat 1 owing the bid.
-	//
-	// Two arming paths are reachable and both hold. When the random dealer is 0,
-	// StartMatch already armed seat 1 and the BotSchedule below no-ops
-	// (maybeScheduleBotAction skips a seat that already has a live timer); the
-	// injected fixture shares that decision context (bidding, hand 1, no
-	// prompts), so the pending delay still applies to the state asserted below.
-	// Otherwise BotSchedule arms it here.
-	//
-	// `start` predates StartMatch, so elapsed carries a few ms of setup on top of
-	// the think delay. That direction loosens the >=1s floor rather than
-	// tightening it, by about the setup cost -- a regression bigger than that
-	// (e.g. a sub-second botDelayMin) is still caught. The 10s ceiling only gets
-	// stricter.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "per-move", 10, 10, 120, 0, true, false))
 	mgr.SetGameStateForTest(100, markBots(testfixtures.NewGameJustDealt(), 1))
 	mgr.BotSchedule(100)
@@ -169,7 +149,6 @@ func TestBot_ActsAfterMinDelayAndBeforeTimerExpiry(t *testing.T) {
 		if st == nil {
 			return false
 		}
-		// Seat 1 acted: it passed (count>0 or turn advanced) or picked trump.
 		return st.Phase != game.PhaseBidding || st.BiddingPassCount > 0 || st.ActivePlayerSeat != 1
 	})
 	elapsed := time.Since(start)
@@ -178,7 +157,6 @@ func TestBot_ActsAfterMinDelayAndBeforeTimerExpiry(t *testing.T) {
 	assert.GreaterOrEqual(t, elapsed, time.Second, "bot must never act instantaneously (≥1s think delay)")
 	assert.Less(t, elapsed, 10*time.Second, "bot must act before the per-move timer expires")
 
-	// No timeout auto-action was emitted for the bot's decision.
 	for _, call := range hub.snapshot() {
 		var msg ws.WSMessage
 		require.NoError(t, json.Unmarshal(call.msg, &msg))
@@ -234,20 +212,10 @@ func TestBot_StaleTimerNeverFiresAfterStateChange(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	mgr.SetDealGraceForTest(false)
-	// 300ms rather than 50ms: the delay must outlast the setup below. When the
-	// random dealer is 0 the clock starts back at StartMatch, so with a 50ms
-	// delay a loaded machine could let the bot act BEFORE the pause is injected
-	// — the assertions would then still pass, without the stale path ever being
-	// exercised.
 	mgr.SetBotDelayForTest(300*time.Millisecond, 300*time.Millisecond)
 
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true, false))
 
-	// The first-hand dealer is randomized, so the bot seat is put on the bidding
-	// decision explicitly: NewGameJustDealt deals from dealer 0, leaving seat 1
-	// (the bot) on the bid. When the dealer is already 0 the delay was armed by
-	// StartMatch and BotSchedule no-ops, but the decision context is identical,
-	// so a delay is pending for seat 1 either way.
 	mgr.SetGameStateForTest(100, markBots(testfixtures.NewGameJustDealt(), 1))
 	mgr.BotSchedule(100)
 
@@ -257,31 +225,22 @@ func TestBot_StaleTimerNeverFiresAfterStateChange(t *testing.T) {
 	require.Equal(t, 1, pre.ActivePlayerSeat, "a bot seat must really owe the bidding decision")
 	require.True(t, pre.Players[1].IsBot)
 
-	// Before the delay fires, the table pauses.
 	paused := markBots(testfixtures.NewGamePaused(0), 1)
 	pauseAt := time.Now()
 	mgr.SetGameStateForTest(100, paused)
 
-	time.Sleep(700 * time.Millisecond) // well past the 300ms think delay
+	time.Sleep(700 * time.Millisecond)
 
 	st := mgr.GetStateSnapshot(100)
 	require.NotNil(t, st)
 	assert.Equal(t, game.PhasePaused, st.Phase, "stale bot timer must not act on a paused table")
 	assert.Equal(t, 0, st.BiddingPassCount, "no bidding action may have been applied")
 
-	// Both assertions above are also true of the paused fixture exactly as
-	// injected, so on their own they cannot tell "the phase guard rejected the
-	// decision" from "the fixture was inert". A stale timer that DID act would
-	// have gone through applyAndBroadcastActionWith and broadcast, so require
-	// that nothing broadcast after the pause.
 	for _, call := range hub.snapshot() {
 		assert.False(t, call.at.After(pauseAt),
 			"a stale think delay must not broadcast after the table paused")
 	}
 
-	// Control: the identical arrangement WITHOUT the pause does produce a bot
-	// action. Without it the assertions above could pass simply because no
-	// think delay was ever armed.
 	mgr.SetGameStateForTest(100, markBots(testfixtures.NewGameJustDealt(), 1))
 	mgr.BotSchedule(100)
 
@@ -304,12 +263,6 @@ func TestBot_RemoveSessionCancelsPendingBotTimers(t *testing.T) {
 	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(50*time.Millisecond, 50*time.Millisecond)
 
-	// The first-hand dealer is randomized, so the bot's decision point is set
-	// explicitly rather than assumed: NewGameJustDealt deals from dealer 0, which
-	// leaves seat 1 (the bot) on the opening bid. When the random dealer is
-	// already 0, StartMatch armed that seat and BotSchedule no-ops against the
-	// identical decision context; otherwise BotSchedule arms it here. Either way
-	// a 50ms delay is pending for seat 1.
 	armBotThinkDelay := func() {
 		mgr.SetGameStateForTest(100, markBots(testfixtures.NewGameJustDealt(), 1))
 		mgr.BotSchedule(100)
@@ -321,9 +274,6 @@ func TestBot_RemoveSessionCancelsPendingBotTimers(t *testing.T) {
 		require.True(t, st.Players[1].IsBot)
 	}
 
-	// Control: left alone, that armed delay really does fire and act. Without
-	// it the teardown assertions below would also hold if no bot timer had
-	// ever been pending.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true, false))
 	armBotThinkDelay()
 	require.True(t, waitFor(2*time.Second, func() bool {
@@ -335,26 +285,17 @@ func TestBot_RemoveSessionCancelsPendingBotTimers(t *testing.T) {
 	}), "an armed think delay must fire while the session is alive")
 	mgr.RemoveSession(100)
 
-	// Drain: applyAndBroadcastActionWith releases session.mu before it
-	// broadcasts, so the control action's broadcast can still be in flight after
-	// waitFor observed the applied state. Let it land before the cutoff below.
 	time.Sleep(50 * time.Millisecond)
 
-	// Now tear the session down while the SAME delay is still pending.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true, false))
 	armBotThinkDelay()
 
 	teardownAt := time.Now()
 	mgr.RemoveSession(100)
 
-	time.Sleep(150 * time.Millisecond) // well past the 50ms think delay
+	time.Sleep(150 * time.Millisecond)
 	assert.False(t, mgr.HasSession(100))
 
-	// This pins the OUTCOME, not the cancellation mechanism specifically:
-	// applyAndBroadcastActionWith also drops everything once session.closed is
-	// set, and RemoveSession sets that flag before it cancels timers, so a leaked
-	// (uncancelled) timer would still look silent here. Proving cancellation
-	// itself needs timer introspection — see deferred-work.
 	for _, call := range hub.snapshot() {
 		assert.False(t, call.at.After(teardownAt),
 			"nothing may broadcast after the session was torn down")
@@ -372,7 +313,6 @@ func TestBot_RespondsToBelotPrompt(t *testing.T) {
 
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1), "relaxed", 0, 10, 120, 0, true, false))
 
-	// Bot at seat 1 just played KH (trump) while holding QH — prompt pending.
 	gs := markBots(testfixtures.NewGameMidPlay(1), 1)
 	pending := 1
 	gs.BelotAnnounced = false
@@ -407,7 +347,6 @@ func TestBot_PartnerAcceptsHumanSurrender(t *testing.T) {
 
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(2), "relaxed", 0, 10, 120, 0, true, false))
 
-	// Human seat 0 proposed; its partner (seat 2) is the bot.
 	gs := markBots(testfixtures.NewGameMidPlay(3), 2)
 	proposer := 0
 	gs.SurrenderProposerSeat = &proposer
@@ -426,7 +365,7 @@ func TestBot_PartnerAcceptsHumanSurrender(t *testing.T) {
 	assert.Equal(t, game.TeamB, matches[0].WinnerTeam, "surrendering team's opponents win")
 }
 
-// TestBot_MatchEndPersistsBotColumns pins AC5's persistence shape: bot seats
+// TestBot_MatchEndPersistsBotColumns checks the persisted shape: bot seats
 // store NULL player IDs + per-seat flags, the match is marked bot-inclusive,
 // and human seats keep their real IDs.
 func TestBot_MatchEndPersistsBotColumns(t *testing.T) {
@@ -436,8 +375,6 @@ func TestBot_MatchEndPersistsBotColumns(t *testing.T) {
 	mgr.SetDealGraceForTest(false)
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
 
-	// Bots at seats 1 and 2; human seat 0 proposes surrender, partner seat 2
-	// (bot) accepts — the fast path to a completed bot-inclusive record.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2), "relaxed", 0, 10, 120, 0, true, false))
 
 	gs := markBots(testfixtures.NewGameMidPlay(2), 1, 2)
@@ -471,13 +408,11 @@ func TestBot_AbandonedMatchPersistsBotColumns(t *testing.T) {
 	hub := &hubSpy{}
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	// Long delays so no bot acts while the abandonment plays out.
 	mgr.SetBotDelayForTest(time.Minute, time.Minute)
 
-	// 1-second reconnect window so the abandonment fires fast.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(2, 3), "relaxed", 0, 10, 1, 0, true, false))
 
-	mgr.HandleDisconnect(10) // human seat 0 drops and never returns
+	mgr.HandleDisconnect(10)
 
 	abandoned := waitFor(5*time.Second, func() bool {
 		return !mgr.HasSession(100)
@@ -528,7 +463,6 @@ func TestBot_AcksScoreReveal(t *testing.T) {
 	st := mgr.GetStateSnapshot(100)
 	assert.Equal(t, game.PhaseHandComplete, st.Phase, "the reveal waits for the human")
 
-	// Human continues — the next hand deals immediately (no 14s fallback).
 	raw, _ := json.Marshal(map[string]string{})
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{Type: "action:continue", Payload: raw})
 
@@ -539,7 +473,7 @@ func TestBot_AcksScoreReveal(t *testing.T) {
 	assert.True(t, advanced, "hand must advance once every connected seat acked")
 }
 
-// TestBot_ResilienceIsolation pins AC6: a human disconnect pauses the table
+// TestBot_ResilienceIsolation checks a human disconnect pauses the table
 // (bots do not act during it), bot seats never receive reconnect windows,
 // and bots resume acting after the human returns.
 func TestBot_ResilienceIsolation(t *testing.T) {
@@ -551,12 +485,10 @@ func TestBot_ResilienceIsolation(t *testing.T) {
 
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false))
 
-	// Park the table mid-play with the bot at seat 1 on turn.
 	gs := markBots(testfixtures.NewGameMidPlay(1), 1, 2, 3)
 	gs.ActivePlayerSeat = 1
 	mgr.SetGameStateForTest(100, gs)
 
-	// Human (seat 0) drops before the bot's think delay is scheduled.
 	mgr.HandleDisconnect(10)
 
 	st := mgr.GetStateSnapshot(100)
@@ -568,14 +500,12 @@ func TestBot_ResilienceIsolation(t *testing.T) {
 		assert.True(t, st.Players[seat].Connected, "bots never read as disconnected")
 	}
 
-	// While disconnected, bots must not act.
 	mgr.BotSchedule(100)
 	time.Sleep(100 * time.Millisecond)
 	st = mgr.GetStateSnapshot(100)
 	assert.Equal(t, game.PhaseDisconnected, st.Phase)
 	assert.Empty(t, st.CurrentTrick, "no bot card may land while the table is disconnected")
 
-	// Human returns: phase restores and the bot on turn resumes acting.
 	mgr.HandleReconnect(10)
 
 	resumed := waitFor(2*time.Second, func() bool {
@@ -603,21 +533,12 @@ func TestBot_HumanOnlyMatchSchedulesNothing(t *testing.T) {
 	require.NotNil(t, st)
 	assert.Equal(t, game.PhaseBidding, st.Phase)
 	assert.Equal(t, 0, st.BiddingPassCount, "nothing may act for a human seat")
-	// The first-hand dealer is randomized, so the opening bid is asserted
-	// against the seat after the dealer rather than a fixed seat 1.
 	assert.Equal(t, (st.DealerSeat+1)%4, st.ActivePlayerSeat,
 		"the opening bid still sits with the seat after the dealer")
 }
 
-// logCapture redirects slog to an in-memory buffer so a test can assert an
-// error path did NOT fire. Concurrency-safe: the bot driver logs from timer
-// goroutines. Tests in this package never run in parallel, so swapping the
-// process-wide default logger is safe here.
-//
-// Process-wide is exactly why `matched` below takes a roomID: a session left
-// running by an earlier test can log into this buffer, and a bare substring
-// match on the message would turn another room's rejection into this test's
-// failure. Every session log line carries roomID=N, so the assertion pins both.
+// logCapture redirects slog to a concurrency-safe in-memory buffer so a test can
+// assert an error path did NOT fire.
 type logCapture struct {
 	mu  sync.Mutex
 	buf bytes.Buffer
@@ -653,16 +574,8 @@ func (c *logCapture) matched(roomID uint, sub string) []string {
 	return out
 }
 
-// TestBot_ForcedDealerPickAdvancesHandWithoutRejection is the driver-level half
-// of the Story 12.8 deadlock fix. The engine refuses the dealer's fourth
-// pass under AllPassOutcome == AllPassDealerMustPick; a bot that
-// offered one had its action rejected and re-armed by handleBotActionTimer, so
-// the same rejected pass cycled at the 1 s think-delay floor forever. An
-// engine-level test cannot see that loop — it lives in the driver.
-//
-// Relaxed timers on purpose: with no per-move auto-play backstop the bot driver
-// is the ONLY thing that can move this hand, so the assertion below is about the
-// bot's own decision and nothing else.
+// TestBot_ForcedDealerPickAdvancesHandWithoutRejection checks a bot dealer forced
+// to pick never offers the refused fourth pass, which used to loop in the driver.
 func TestBot_ForcedDealerPickAdvancesHandWithoutRejection(t *testing.T) {
 	logs := captureLogs(t)
 	hub := &hubSpy{}
@@ -675,20 +588,11 @@ func TestBot_ForcedDealerPickAdvancesHandWithoutRejection(t *testing.T) {
 		mixedPlayers(0), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-	// passCount 3: the other three seats have passed, so the dealer (seat 0,
-	// the bot) is on the clock with no legal pass.
 	gs := markBots(testfixtures.NewGameCroatianMidBidding(3), 0)
 	gs.RoomID = roomID
 	require.True(t, game.MustPickTrump(gs, gs.ActivePlayerSeat), "the fixture must be the forced-pick state")
 	require.Equal(t, 0, gs.ActivePlayerSeat, "the bot dealer must be the seat on the clock")
 
-	// Swap seats 0 and 3's holdings — a permutation, so the deck stays valid and
-	// the fixture's no-instant-win guarantee survives. It matters because the
-	// default seat-0 layout is a six-card spade run: the bot would call spades
-	// VOLUNTARILY and the run would prove nothing about the forced path. Seat 3's
-	// holding is K+A in all four suits, which clears no threshold in any suit, so
-	// a bot that only knew the threshold has nothing to offer but the pass the
-	// engine refuses.
 	gs.Players[0].Hand, gs.Players[3].Hand = gs.Players[3].Hand, gs.Players[0].Hand
 	gs.Players[0].FaceDownCards, gs.Players[3].FaceDownCards =
 		gs.Players[3].FaceDownCards, gs.Players[0].FaceDownCards
@@ -708,8 +612,6 @@ func TestBot_ForcedDealerPickAdvancesHandWithoutRejection(t *testing.T) {
 	assert.Equal(t, 0, *after.TrumpCallerSeat, "the forced dealer is the taker")
 	assert.NotEqual(t, game.PhaseBidding, after.Phase, "bidding must be over")
 
-	// The livelock's signature. One rejection is already the bug: nothing else
-	// would ever wake this seat with a different decision.
 	assert.Empty(t, logs.matched(roomID, "action rejected by engine"),
 		"the bot must never offer the engine a bid it will refuse")
 }

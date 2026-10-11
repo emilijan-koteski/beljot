@@ -13,21 +13,13 @@ import {
 
 interface RemoveFriendDialogProps {
   open: boolean;
-  /** The subject's username, shown so the viewer knows exactly who is removed. */
   username: string;
-  /** True while the remove request is in flight (locks dismissal + confirm). */
   pending: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
 
-/**
- * Confirmation shown before removing a friend from the public profile. Purely a
- * confirm step — the destructive part is that the friendship row is
- * hard-deleted, though either side can send a fresh request later. Modeled on
- * UnlinkAccountDialog: not dismissable while the request is in flight, so an
- * in-flight remove can't be silently abandoned.
- */
+/** Confirmation shown before removing a friend; it cannot be dismissed while the request is in flight. */
 export function RemoveFriendDialog({
   open,
   username,

@@ -37,8 +37,6 @@ vi.mock("@/shared/api/profile", () => ({
   updatePreferences: (...args: unknown[]) => mockUpdatePreferences(...args),
 }));
 
-// GIS never loads in tests — the mock captures the onCredential callback so
-// tests can hand the page a fake Google credential.
 const mockRenderGoogleButton = vi.fn();
 let mockClientId = "test-client-id";
 vi.mock("@/shared/lib/googleIdentity", () => ({
@@ -95,18 +93,12 @@ describe("LoginPage", () => {
     expect(screen.getByTestId("login-title")).toHaveTextContent("Log in");
   });
 
-  // Signing in is this page's job, so the credentials and the button own the front
-  // of the tab sequence. The forgot link used to render in the password field's
-  // label row, which put it BETWEEN the two credentials.
   it("tabs email → password → sign in, with the forgot link after them", async () => {
     const user = userEvent.setup();
     renderLoginPage();
 
-    // autoFocus puts the caret in the email field on arrival.
     expect(screen.getByTestId("email-input")).toHaveFocus();
 
-    // Fill both credentials first: an empty form disables the submit button, and
-    // a disabled button is not in the tab sequence at all.
     await user.type(screen.getByTestId("email-input"), "test@example.com");
     await user.type(screen.getByTestId("password-input"), "hunter2");
     await user.click(screen.getByTestId("email-input"));
@@ -115,13 +107,8 @@ describe("LoginPage", () => {
     expect(screen.getByTestId("password-input")).toHaveFocus();
 
     await user.tab();
-    // The eye toggle is tabIndex={-1} on purpose, so the button comes next.
     expect(screen.getByTestId("submit-button")).toHaveFocus();
 
-    // "Forgot?" stays beside the Password label, which in document order is above
-    // the input — it is kept out of the way by having NO positive tabIndex, so it
-    // follows the promoted three rather than interrupting them. It is still a
-    // plain tabbable link, never removed from the sequence with tabIndex={-1}.
     const forgot = screen.getByTestId("forgot-password-link");
     expect(forgot).not.toHaveFocus();
     expect(forgot).not.toHaveAttribute("tabindex");
@@ -352,7 +339,6 @@ describe("LoginPage", () => {
       });
       expect(useAuthStore.getState().user?.languagePreference).toBe("en");
       expect(i18n.language).toBe("mk");
-      // Failure is silent — no toast.
       expect(toast.error).not.toHaveBeenCalled();
     });
   });
@@ -444,7 +430,6 @@ describe("LoginPage", () => {
         expect(screen.getByTestId("link-account-dialog")).toBeInTheDocument();
       });
 
-      // Footer convention: submit leads, cancel trails.
       expectActionBeforeStatusQuo("link-account-submit", "link-account-cancel");
 
       await user.type(screen.getByTestId("link-account-password-input"), "password123");
@@ -504,8 +489,6 @@ describe("LoginPage", () => {
     });
 
     it("renders the ToS/privacy small-print under the Google button", () => {
-      // The /login Google button can register a brand-new account, so the
-      // consent small-print must appear here exactly like on /register.
       renderLoginPage();
 
       expect(screen.getByTestId("sso-consent-note")).toBeInTheDocument();
@@ -541,8 +524,6 @@ describe("LoginPage", () => {
       mockSsoLogin.mockRejectedValueOnce(
         new FetchError(409, "SSO_LINK_REQUIRED", "account exists"),
       );
-      // Both are 401s — the dialog must discriminate by code, or an expired
-      // credential loops "Incorrect password" forever on the right password.
       mockSsoLink.mockRejectedValueOnce(
         new FetchError(401, "SSO_INVALID_CREDENTIAL", "sign-in credential is invalid or expired"),
       );
@@ -613,7 +594,6 @@ describe("LoginPage", () => {
       await waitFor(() => {
         expect(screen.getByTestId("link-account-cancel")).toBeDisabled();
       });
-      // Neither Escape nor the (disabled) cancel button may dismiss it.
       await user.keyboard("{Escape}");
       expect(screen.getByTestId("link-account-dialog")).toBeInTheDocument();
 
@@ -627,9 +607,6 @@ describe("LoginPage", () => {
   });
 });
 
-// The support reminder lives on AuthLayout, not on any one page, so login /
-// register / forgot-password / reset-password all inherit it. Asserted here
-// because this file already renders the real layout around its page.
 describe("AuthLayout support note", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
@@ -640,7 +617,6 @@ describe("AuthLayout support note", () => {
 
     const note = screen.getByTestId("support-note");
     expect(note.textContent).toContain("hobby project");
-    // Under the existing credit line, inside the same footer.
     const footer = screen.getByTestId("auth-footer");
     expect(footer).toContainElement(note);
     expect(screen.getByTestId("auth-footer-link").compareDocumentPosition(note)).toBe(

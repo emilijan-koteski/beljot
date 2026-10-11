@@ -127,8 +127,6 @@ func TestGameStateJSONCamelCaseKeys(t *testing.T) {
 	expectedKeys := []string{
 		"id", "roomId", "variant", "matchMode", "phase",
 		"handNumber", "dealerSeat", "trumpSuit", "trumpCallerSeat",
-		// "deck" left this list with Story 12.10: GameState.Deck is json:"-" —
-		// the 11 held-back cards are hidden information and never serialize.
 		"trumpCandidate", "biddingRound", "biddingPassCount", "activePlayerSeat",
 		"trickNumber", "currentTrick", "leadSuit", "trickWinnerSeat",
 		"players", "teamScores", "handPoints", "declarationPoints", "tricksWon",
@@ -161,14 +159,6 @@ func TestNewGame(t *testing.T) {
 	})
 
 	t.Run("first dealer is drawn roughly uniformly across all four seats", func(t *testing.T) {
-		// A "seat appears at least once" check is too weak: a badly skewed draw
-		// (say 70/10/10/10) would satisfy it while quietly handing one seat most
-		// of the deals, which matters because coin buy-in matches settle real
-		// stakes. So assert every seat's SHARE too.
-		//
-		// 4000 draws, expected 1000 per seat, sd = sqrt(4000*0.25*0.75) ~= 27.
-		// The +/-20% band below sits about 7 sd out, so a uniform source
-		// effectively never trips it, while any material skew does.
 		const draws = 4000
 		var counts [4]int
 		for range draws {
@@ -337,13 +327,8 @@ func TestTeamStringForIndex_SafeOnOutOfRange(t *testing.T) {
 	}
 }
 
-// TestRulesForPresets locks D-VAR-1's foundation: both presets return a fully
-// populated config, an unknown variant string falls back to Bitola, and the two
-// presets actually differ on the six divergences.
-//
-// DeclarationsEnabled is the one field exempt from that last assertion, and the
-// exemption has its own subtest: it is a per-room setting layered over the
-// preset by NewGame, not a variant divergence, so both presets return true.
+// TestRulesForPresets checks both presets are fully populated, differ on every variant divergence, and that unknown variants fall back to Bitola.
+// DeclarationsEnabled is a per-room setting rather than a divergence, so both presets return true.
 func TestRulesForPresets(t *testing.T) {
 	bitola := game.VariantRules{
 		DealShape:           game.DealShapeCandidate,
@@ -380,9 +365,6 @@ func TestRulesForPresets(t *testing.T) {
 			rules := game.RulesFor(tc.variant)
 			assert.Equal(t, tc.expected, rules)
 
-			// Fully populated: no named-string field may be left at its zero
-			// value. The two booleans are legitimately false in one preset each,
-			// so they are covered by the exact-equality assertion above.
 			assert.NotEmpty(t, rules.DealShape, "DealShape must be populated")
 			assert.NotEmpty(t, rules.AllPassOutcome, "AllPassOutcome must be populated")
 			assert.NotEmpty(t, rules.DeclarationTiming, "DeclarationTiming must be populated")
@@ -400,18 +382,11 @@ func TestRulesForPresets(t *testing.T) {
 	})
 
 	t.Run("declarations-enabled is a room setting, so both presets AGREE on it", func(t *testing.T) {
-		// The deliberate exception to the divergence assertion above, asserted
-		// rather than left as an absence. It is not a variant property: both
-		// variants play with declarations by default, and only NewGame overrides
-		// it from the room. A preset that returned false here would give one
-		// variant a rule the owner never chose.
 		assert.True(t, bitola.DeclarationsEnabled)
 		assert.True(t, croatia.DeclarationsEnabled)
 	})
 
 	t.Run("the zero-value config is NOT the bitola preset", func(t *testing.T) {
-		// This is why every GameState literal must set Rules explicitly — an
-		// unset config would deal no candidate and reject every round-1 take.
 		assert.NotEqual(t, bitola, game.VariantRules{})
 	})
 }
@@ -457,10 +432,6 @@ func TestNewGameCroatianDeal(t *testing.T) {
 		assert.Empty(t, gs.Deck, "every card is dealt before bidding")
 	})
 
-	// FaceDownCount is the only public trace of the hidden pair, and it is what
-	// makes an opponent's stack render as 8 instead of 6. Asserted here on a real
-	// NewGame rather than on a fixture, because the fixtures author the count and
-	// would still pass with the derivation deleted from the deal itself.
 	t.Run("the public face-down count is 2 per seat", func(t *testing.T) {
 		for i, p := range gs.Players {
 			assert.Equal(t, 2, p.FaceDownCount, "seat %d", i)
@@ -483,10 +454,6 @@ func TestNewGameCroatianDeal(t *testing.T) {
 			assert.Equal(t, float64(2), seat["faceDownCount"], "seat %d on the wire", i)
 		}
 
-		// Resolving the bid merges every pair into its owner's hand, so the count
-		// must go back to 0 — a stale 2 would render every stack as 10. Built on
-		// its own deal: `gs` is a pointer shared with the sibling subtests, and
-		// flipping its phase here would leak into them.
 		bidding := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
 			[4]bool{}, game.VariantCroatia, "1001", 7, true, false)
 		bidding.Phase = game.PhaseBidding
@@ -575,9 +542,6 @@ func TestGameStateJSONOmitsServerOnlyRuleFields(t *testing.T) {
 					_, exists := seat[key]
 					assert.False(t, exists, "seat %d's %q must not reach the wire", i, key)
 				}
-				// The COUNT does ride the wire — it is the public half. Zero for
-				// a deal shape that holds nothing back, so a Bitola client can
-				// add it unconditionally.
 				want := float64(0)
 				if tc.variant == game.VariantCroatia {
 					want = 2

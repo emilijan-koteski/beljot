@@ -13,20 +13,13 @@ import { xpBarFill } from "@/shared/lib/xpLevel";
 
 interface LevelUpDialogProps {
   open: boolean;
-  /** The level the player just reached (server-authoritative). */
   level: number;
-  /** Lifetime XP after the match — anchors the progress-bar band. */
   newTotalXp: number;
-  /** XP earned in the match that triggered the level-up. */
   xpEarned: number;
   onClose: () => void;
 }
 
-/**
- * Gold level-badge medallion — the level number struck into a gold coin face,
- * reusing the daily-reward coin construction (radial-gradient face + layered
- * inset shadows) but glyphed with the level instead of the Beljot monogram.
- */
+/** Gold coin medallion with the level number struck into its face. */
 function LevelMedallion({ level, size = 92 }: { level: number; size?: number }) {
   return (
     <span
@@ -39,7 +32,6 @@ function LevelMedallion({ level, size = 92 }: { level: number; size?: number }) 
         flexShrink: 0,
       }}
     >
-      {/* soft outer glow */}
       <span
         style={{
           position: "absolute",
@@ -48,7 +40,6 @@ function LevelMedallion({ level, size = 92 }: { level: number; size?: number }) 
           background: "radial-gradient(circle, rgba(232,194,90,0.45) 0%, transparent 68%)",
         }}
       />
-      {/* coin body */}
       <span
         style={{
           position: "relative",
@@ -63,7 +54,6 @@ function LevelMedallion({ level, size = 92 }: { level: number; size?: number }) 
           justifyContent: "center",
         }}
       >
-        {/* engraved inner rim */}
         <span
           style={{
             position: "absolute",
@@ -90,14 +80,7 @@ function LevelMedallion({ level, size = 92 }: { level: number; size?: number }) 
   );
 }
 
-/**
- * LevelUpDialog — the post-match level-up celebration (Story 9.5 follow-up).
- * Styled to match DailyRewardDialog: a forced modal (no outside/Escape dismiss
- * via `disablePointerDismissal` + the no-op `onOpenChange`, no close button)
- * that closes only through the Continue CTA. Shown by LevelUpGate once the
- * player lands back in the lobby/room after a match that leveled them up —
- * never on the match-end screen itself.
- */
+/** Post-match level-up celebration: a forced modal that closes only through the Continue button. */
 export function LevelUpDialog({ open, level, newTotalXp, xpEarned, onClose }: LevelUpDialogProps) {
   const { t } = useTranslation();
   const { xpIntoLevel, xpForNextLevel, fraction } = xpBarFill(newTotalXp, level);
@@ -112,9 +95,7 @@ export function LevelUpDialog({ open, level, newTotalXp, xpEarned, onClose }: Le
           "shadow-[0_0_0_1px_rgba(232,194,90,0.18)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]",
         )}
       >
-        {/* top brass hairline accent */}
         <div className="h-[3px] bg-[linear-gradient(90deg,transparent,var(--brass)_28%,var(--team-a-fill)_50%,var(--brass)_72%,transparent)]" />
-        {/* faint top halo */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-[180px] bg-[radial-gradient(ellipse_70%_100%_at_50%_0%,rgba(232,194,90,0.18),transparent_70%)]"

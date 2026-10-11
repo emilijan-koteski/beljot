@@ -17,6 +17,20 @@ interface AuthState {
   logout: () => void;
 }
 
+/**
+ * Wipes every session-scoped store, including notices meant for the outgoing account.
+ * Runs before auth state clears so token subscribers never see stale data.
+ */
+function clearSessionStores() {
+  useMatchStore.getState().clearGame();
+  useRoomStore.getState().clearSessionNotices();
+  useChatStore.getState().clearLobby();
+  useChatStore.getState().clearMatch();
+  useChatStore.getState().clearRoom();
+  useChatStore.getState().clearWhispers();
+  useRankChangeStore.getState().clear();
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   user: null,
@@ -28,22 +42,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (get().token) {
       logoutApi();
     }
-    // Wipe session-scoped stores BEFORE clearing auth state so synchronous
-    // subscribers to authStore.token transitions don't observe stale game
-    // data. Single canonical logout point — both manual logout and the
-    // axiosClient 401 interceptor inherit this ordering.
-    useMatchStore.getState().clearGame();
-    // clearSessionNotices, not reset: reset() preserves roomEjection/roomInvite
-    // on purpose so they survive a mid-navigation unmount, but they belong to the
-    // session that just ended and must not greet the next account in this tab.
-    useRoomStore.getState().clearSessionNotices();
-    useChatStore.getState().clearLobby();
-    useChatStore.getState().clearMatch();
-    useChatStore.getState().clearRoom();
-    useChatStore.getState().clearWhispers();
-    // A pending rank-change dialog belongs to the account that earned it; it
-    // must not greet the next account to log in on this tab.
-    useRankChangeStore.getState().clear();
+    clearSessionStores();
     set({ token: null, user: null, isLoading: false });
   },
 }));

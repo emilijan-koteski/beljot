@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- Declaration Detection Tests (Task 7) ---
-
 func TestDeclareAtFirstTrick(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -25,12 +23,12 @@ func TestDeclareAtFirstTrick(t *testing.T) {
 		{
 			name:          "seat 1 declares quarte JD-QD-KD-AD (50pts)",
 			seat:          1,
-			wantDeclCount: 1, // quarte diamonds
+			wantDeclCount: 1,
 		},
 		{
 			name:          "seat 0 declares two tierces (20pts each)",
 			seat:          0,
-			wantDeclCount: 2, // tierce spades + tierce clubs
+			wantDeclCount: 2,
 		},
 		{
 			name:          "seat 2 declares tierce 9H-TH-JH in trump (20pts)",
@@ -65,7 +63,6 @@ func TestDeclareAtFirstTrick(t *testing.T) {
 			assert.Equal(t, tt.wantDeclCount, len(result.Players[tt.seat].Declarations))
 			assert.False(t, result.AwaitingDeclaration, "AwaitingDeclaration should be false after declare")
 
-			// Verify declaration values
 			for _, d := range result.Players[tt.seat].Declarations {
 				assert.Greater(t, d.Value, 0, "declaration value should be positive")
 				assert.Equal(t, tt.seat, d.PlayerSeat, "declaration should have correct player seat")
@@ -108,7 +105,6 @@ func TestDeclarationValues(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Find declaration matching expected type and value
 			found := false
 			for _, d := range result.Players[tt.seat].Declarations {
 				if d.Type == tt.wantType && d.Value == tt.wantValue {
@@ -167,7 +163,7 @@ func TestDeclareErrorCases(t *testing.T) {
 
 		_, err := game.ApplyAction(gs, game.Action{
 			Type:       game.ActionDeclare,
-			PlayerSeat: 2, // not active
+			PlayerSeat: 2,
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, apperr.ErrNotYourTurn)
@@ -189,8 +185,6 @@ func TestDeclareErrorCases(t *testing.T) {
 	})
 }
 
-// --- Declaration Resolution Tests ---
-
 func TestDeclarationResolution(t *testing.T) {
 	t.Run("higher value declaration wins", func(t *testing.T) {
 		decls := []game.Declaration{
@@ -198,7 +192,6 @@ func TestDeclarationResolution(t *testing.T) {
 			{Type: game.DeclarationSequence, Cards: makeCards("JD", "QD", "KD", "AD"), PlayerSeat: 1, Value: 50},
 		}
 		gs := testfixtures.NewGameWithDeclarations(decls)
-		// Simulate that trick 1 has been played (4 cards in trick)
 		gs.CurrentTrick = []game.TrickCard{
 			{Card: game.Card{Rank: game.RankTen, Suit: game.SuitSpades}, PlayerSeat: 1},
 			{Card: game.Card{Rank: game.Rank7, Suit: game.SuitSpades}, PlayerSeat: 2},
@@ -208,26 +201,17 @@ func TestDeclarationResolution(t *testing.T) {
 		leadSuit := game.SuitSpades
 		gs.LeadSuit = &leadSuit
 		gs.DeclarationsResolved = false
-		gs.BelotAnnounced = true // skip Belot for this test
+		gs.BelotAnnounced = true
 
-		// Play a card to trigger trick resolution (use trick 1 → resolves declarations)
-		// Actually, we need to test declaration resolution after trick 1 completes.
-		// The simplest way: manually check the resolution through the fixture.
-		// Since resolveDeclarations is unexported, we test through the full flow instead.
-
-		// Team B (seat 1) has 50pts vs team A (seat 0) has 20pts → team B wins
 		assert.Equal(t, 50, decls[1].Value)
 		assert.Equal(t, 20, decls[0].Value)
-		// Team B declaration should win because 50 > 20
 	})
 
 	t.Run("only winning team declarations scored", func(t *testing.T) {
-		// Team A total would be 40 (two tierces), team B total is 50 (quarte).
-		// Team B's best (50) beats team A's best (20), so team B wins all 50 and team A gets 0.
 		decls := []game.Declaration{
-			{Type: game.DeclarationSequence, Cards: makeCards("7S", "8S", "9S"), PlayerSeat: 0, Value: 20},       // Team A
-			{Type: game.DeclarationSequence, Cards: makeCards("7C", "8C", "9C"), PlayerSeat: 2, Value: 20},       // Team A (teammate)
-			{Type: game.DeclarationSequence, Cards: makeCards("JD", "QD", "KD", "AD"), PlayerSeat: 1, Value: 50}, // Team B
+			{Type: game.DeclarationSequence, Cards: makeCards("7S", "8S", "9S"), PlayerSeat: 0, Value: 20},
+			{Type: game.DeclarationSequence, Cards: makeCards("7C", "8C", "9C"), PlayerSeat: 2, Value: 20},
+			{Type: game.DeclarationSequence, Cards: makeCards("JD", "QD", "KD", "AD"), PlayerSeat: 1, Value: 50},
 		}
 		state := completeTrick1(t, decls)
 
@@ -240,8 +224,8 @@ func TestDeclarationResolution(t *testing.T) {
 
 	t.Run("only one team declared — wins with full sum", func(t *testing.T) {
 		decls := []game.Declaration{
-			{Type: game.DeclarationSequence, Cards: makeCards("7S", "8S", "9S"), PlayerSeat: 0, Value: 20},           // Team A
-			{Type: game.DeclarationFourOfAKind, Cards: makeCards("TS", "TH", "TD", "TC"), PlayerSeat: 2, Value: 100}, // Team A (teammate)
+			{Type: game.DeclarationSequence, Cards: makeCards("7S", "8S", "9S"), PlayerSeat: 0, Value: 20},
+			{Type: game.DeclarationFourOfAKind, Cards: makeCards("TS", "TH", "TD", "TC"), PlayerSeat: 2, Value: 100},
 		}
 		state := completeTrick1(t, decls)
 
@@ -251,14 +235,11 @@ func TestDeclarationResolution(t *testing.T) {
 		assert.NotEmpty(t, state.Players[2].Declarations, "Team A seat 2 declarations preserved")
 	})
 
-	// Regression: per Beljot rules, declaration comparison uses each team's
-	// SINGLE strongest meld, never the team sum. Team A's two 100-pt Kares
-	// (sum=200) lose to Team B's lone 150-pt Kare-of-9.
 	t.Run("strongest single meld wins over higher team sum (Q+K vs 9)", func(t *testing.T) {
 		decls := []game.Declaration{
-			{Type: game.DeclarationFourOfAKind, Cards: makeCards("QS", "QH", "QD", "QC"), PlayerSeat: 0, Value: 100}, // Team A
-			{Type: game.DeclarationFourOfAKind, Cards: makeCards("9S", "9H", "9D", "9C"), PlayerSeat: 1, Value: 150}, // Team B
-			{Type: game.DeclarationFourOfAKind, Cards: makeCards("KS", "KH", "KD", "KC"), PlayerSeat: 2, Value: 100}, // Team A (teammate)
+			{Type: game.DeclarationFourOfAKind, Cards: makeCards("QS", "QH", "QD", "QC"), PlayerSeat: 0, Value: 100},
+			{Type: game.DeclarationFourOfAKind, Cards: makeCards("9S", "9H", "9D", "9C"), PlayerSeat: 1, Value: 150},
+			{Type: game.DeclarationFourOfAKind, Cards: makeCards("KS", "KH", "KD", "KC"), PlayerSeat: 2, Value: 100},
 		}
 		state := completeTrick1(t, decls)
 
@@ -270,11 +251,8 @@ func TestDeclarationResolution(t *testing.T) {
 	})
 }
 
-// completeTrick1 seats the given declarations on the standard NewGameFirstTrick
-// fixture and drives trick 1 to completion through legal plays so that
-// declaration resolution fires. Returns the post-resolution state. Belot is
-// pre-marked announced so the trick-end flow doesn't stall on the K/Q-trump
-// pair held by seat 0 in the fixture hands.
+// completeTrick1 seats the given declarations on the NewGameFirstTrick fixture and plays trick 1
+// to completion, returning the post-resolution state with Belot pre-marked announced.
 func completeTrick1(t *testing.T, decls []game.Declaration) *game.GameState {
 	t.Helper()
 	state := testfixtures.NewGameWithDeclarations(decls)
@@ -284,10 +262,10 @@ func completeTrick1(t *testing.T, decls []game.Declaration) *game.GameState {
 		seat int
 		card game.Card
 	}{
-		{1, game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}},   // seat 1 leads diamonds
-		{2, game.Card{Rank: game.Rank9, Suit: game.SuitHearts}},     // seat 2 void in diamonds, opponent winning → trumps
-		{3, game.Card{Rank: game.RankTen, Suit: game.SuitDiamonds}}, // seat 3 follows diamonds (trick already cut by 9H — any diamond legal)
-		{0, game.Card{Rank: game.RankQueen, Suit: game.SuitHearts}}, // seat 0 void in diamonds with trump K+Q — must cut; QH < 9H so falls through to any-trump
+		{1, game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}},
+		{2, game.Card{Rank: game.Rank9, Suit: game.SuitHearts}},
+		{3, game.Card{Rank: game.RankTen, Suit: game.SuitDiamonds}},
+		{0, game.Card{Rank: game.RankQueen, Suit: game.SuitHearts}},
 	}
 	for _, p := range plays {
 		card := p.card
@@ -301,14 +279,12 @@ func completeTrick1(t *testing.T, decls []game.Declaration) *game.GameState {
 	return state
 }
 
-// --- Belot Bonus Tests (Task 8) ---
-
 func TestBelotDetection(t *testing.T) {
 	t.Run("play trump K while holding trump Q triggers Belot prompt", func(t *testing.T) {
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
-		gs.ActivePlayerSeat = 0 // seat 0 has KH + QH
+		gs.ActivePlayerSeat = 0
 		gs.AwaitingDeclaration = false
-		gs.DeclarationsResolved = true // skip declaration flow for this test
+		gs.DeclarationsResolved = true
 
 		card := game.Card{Rank: game.RankKing, Suit: game.SuitHearts}
 		result, err := game.ApplyAction(gs, game.Action{
@@ -340,11 +316,10 @@ func TestBelotDetection(t *testing.T) {
 
 	t.Run("no Belot when playing trump K without Q in hand", func(t *testing.T) {
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
-		gs.ActivePlayerSeat = 2 // seat 2 has JH 9H AH TH but NOT QH or KH together
+		gs.ActivePlayerSeat = 2
 		gs.AwaitingDeclaration = false
 		gs.DeclarationsResolved = true
 
-		// Seat 2 has JH — not K or Q, so no Belot
 		card := game.Card{Rank: game.RankJack, Suit: game.SuitHearts}
 		result, err := game.ApplyAction(gs, game.Action{
 			Type:       game.ActionPlayCard,
@@ -357,11 +332,11 @@ func TestBelotDetection(t *testing.T) {
 
 	t.Run("no Belot when playing non-trump K", func(t *testing.T) {
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
-		gs.ActivePlayerSeat = 2 // seat 2 has KS
+		gs.ActivePlayerSeat = 2
 		gs.AwaitingDeclaration = false
 		gs.DeclarationsResolved = true
 
-		card := game.Card{Rank: game.RankKing, Suit: game.SuitSpades} // non-trump
+		card := game.Card{Rank: game.RankKing, Suit: game.SuitSpades}
 		result, err := game.ApplyAction(gs, game.Action{
 			Type:       game.ActionPlayCard,
 			PlayerSeat: 2,
@@ -379,7 +354,6 @@ func TestAnnounceBelot(t *testing.T) {
 		gs.AwaitingDeclaration = false
 		gs.DeclarationsResolved = true
 
-		// Play trump K to trigger Belot
 		card := game.Card{Rank: game.RankKing, Suit: game.SuitHearts}
 		state1, err := game.ApplyAction(gs, game.Action{
 			Type: game.ActionPlayCard, PlayerSeat: 0, Card: &card,
@@ -387,7 +361,6 @@ func TestAnnounceBelot(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, state1.PendingBelotSeat)
 
-		// Announce Belot
 		state2, err := game.ApplyAction(state1, game.Action{
 			Type: game.ActionAnnounceBelot, PlayerSeat: 0,
 		})
@@ -433,7 +406,6 @@ func TestAnnounceBelot(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, state1.PendingBelotSeat)
 
-		// Try to play another card without resolving Belot
 		card2 := game.Card{Rank: game.RankQueen, Suit: game.SuitHearts}
 		_, err = game.ApplyAction(state1, game.Action{
 			Type: game.ActionPlayCard, PlayerSeat: 0, Card: &card2,
@@ -456,20 +428,11 @@ func TestAnnounceBelot(t *testing.T) {
 	})
 }
 
-// --- Integration Tests (Task 9): Full Trick 1 Flow ---
-
 func TestFullTrick1WithDeclarations(t *testing.T) {
 	t.Run("full trick 1 flow with declarations and Belot", func(t *testing.T) {
-		// Fixture hands (trump=Hearts):
-		// Seat 0: KH QH 7S 8S 9S 7C 8C 9C → Belot + 2 tierces (40 total)
-		// Seat 1: JD QD KD AD TS QS 8D TC → quarte JD-QD-KD-AD (50)
-		// Seat 2: JH 9H AH TH KS AS JC QC → tierce 9H-TH-JH (20)
-		// Seat 3: 7H 8H JS 9D TD 7D AC KC → no declarations
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
-		// Active player is seat 1 (after dealer seat 0)
-		gs.AwaitingDeclaration = true // simulate the prompt set by handlePickTrump
+		gs.AwaitingDeclaration = true
 
-		// Step 1: Seat 1 declares (quarte diamonds = 50pts)
 		state, err := game.ApplyAction(gs, game.Action{
 			Type: game.ActionDeclare, PlayerSeat: 1,
 		})
@@ -478,83 +441,67 @@ func TestFullTrick1WithDeclarations(t *testing.T) {
 		assert.Equal(t, 1, len(state.Players[1].Declarations))
 		assert.Equal(t, 50, state.Players[1].Declarations[0].Value)
 
-		// Step 2: Seat 1 plays 8D (leads diamonds — seat 0 is void in diamonds)
 		card1 := game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}
 		state, err = game.ApplyAction(state, game.Action{
 			Type: game.ActionPlayCard, PlayerSeat: 1, Card: &card1,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, 1, len(state.CurrentTrick))
-		// Seat 2 has tierce → declaration prompt
 		assert.True(t, state.AwaitingDeclaration)
 		assert.Equal(t, 2, state.ActivePlayerSeat)
 
-		// Step 3: Seat 2 declares (tierce 9H-TH-JH = 20pts)
 		state, err = game.ApplyAction(state, game.Action{
 			Type: game.ActionDeclare, PlayerSeat: 2,
 		})
 		require.NoError(t, err)
 		assert.False(t, state.AwaitingDeclaration)
 
-		// Step 4: Seat 2 plays 9H (trump — void in diamonds, must trump since opponent winning)
 		card2 := game.Card{Rank: game.Rank9, Suit: game.SuitHearts}
 		state, err = game.ApplyAction(state, game.Action{
 			Type: game.ActionPlayCard, PlayerSeat: 2, Card: &card2,
 		})
 		require.NoError(t, err)
-		// Seat 3 has diamonds → must follow suit, no declaration prompt
 		assert.False(t, state.AwaitingDeclaration)
 		assert.Equal(t, 3, state.ActivePlayerSeat)
 
-		// Step 5: Seat 3 plays TD (follows diamonds — seat 3 has TD 7D)
 		card3 := game.Card{Rank: game.RankTen, Suit: game.SuitDiamonds}
 		state, err = game.ApplyAction(state, game.Action{
 			Type: game.ActionPlayCard, PlayerSeat: 3, Card: &card3,
 		})
 		require.NoError(t, err)
-		// Seat 0 has declarations → prompt
 		assert.True(t, state.AwaitingDeclaration)
 		assert.Equal(t, 0, state.ActivePlayerSeat)
 
-		// Step 6: Seat 0 declares (2 tierces = 20 + 20)
 		state, err = game.ApplyAction(state, game.Action{
 			Type: game.ActionDeclare, PlayerSeat: 0,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, 2, len(state.Players[0].Declarations))
 
-		// Step 7: Seat 0 plays trump K (void in diamonds, partner winning → any card legal → Belot!)
 		card0 := game.Card{Rank: game.RankKing, Suit: game.SuitHearts}
 		state, err = game.ApplyAction(state, game.Action{
 			Type: game.ActionPlayCard, PlayerSeat: 0, Card: &card0,
 		})
 		require.NoError(t, err)
-		// Belot prompt fires
 		require.NotNil(t, state.PendingBelotSeat)
 		assert.Equal(t, 0, *state.PendingBelotSeat)
-		// Trick not resolved yet (4 cards but Belot pending)
 		assert.Equal(t, 4, len(state.CurrentTrick))
 		assert.Equal(t, 1, state.TrickNumber)
 
-		// Step 8: Announce Belot (+20 to team A)
 		state, err = game.ApplyAction(state, game.Action{
 			Type: game.ActionAnnounceBelot, PlayerSeat: 0,
 		})
 		require.NoError(t, err)
 		assert.Nil(t, state.PendingBelotSeat)
 		assert.True(t, state.BelotAnnounced)
-		// Trick resolved, declarations compared
 		assert.Equal(t, 2, state.TrickNumber)
 		assert.True(t, state.DeclarationsResolved)
 
-		// Verify Belot: the 20 lives in BelotPoints (a declaration), NOT HandPoints.
 		assert.Equal(t, 20, state.BelotPoints[game.TeamA], "Team A belote tracked as a declaration")
 
-		// Verify declarations: team B's quarte (50) beats team A's tierces (20 each)
 		assert.Equal(t, 50, state.DeclarationPoints[game.TeamB])
 		assert.Equal(t, 0, state.DeclarationPoints[game.TeamA])
 
-		// Team A declarations cleared, team B preserved
 		assert.Empty(t, state.Players[0].Declarations)
 		assert.Empty(t, state.Players[2].Declarations)
 		assert.NotEmpty(t, state.Players[1].Declarations)
@@ -565,26 +512,19 @@ func TestFullTrick1WithDeclarations(t *testing.T) {
 		gs.AwaitingDeclaration = true
 		original := *gs
 
-		// Perform declare action
 		_, err := game.ApplyAction(gs, game.Action{
 			Type: game.ActionDeclare, PlayerSeat: 1,
 		})
 		require.NoError(t, err)
 
-		// Original state should be unchanged
 		assert.Equal(t, original.AwaitingDeclaration, gs.AwaitingDeclaration)
 		assert.Empty(t, gs.Players[1].Declarations)
 	})
 }
 
-// --- Missing coverage tests (Review Patch 8) ---
-
 func TestDeclarationTiebreakers(t *testing.T) {
 	t.Run("four-of-a-kind beats sequence at equal 100pts", func(t *testing.T) {
-		// Seat 0 has 4xAce (100pts, four-of-a-kind), seat 1 has quinte (100pts, sequence)
-		// Four-of-a-kind should win
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
-		// Give seat 0 four Aces: AS, AH, AD, AC + 4 fillers
 		gs.Players[0].Hand = []game.Card{
 			{Rank: game.RankAce, Suit: game.SuitSpades},
 			{Rank: game.RankAce, Suit: game.SuitHearts},
@@ -595,7 +535,6 @@ func TestDeclarationTiebreakers(t *testing.T) {
 			{Rank: game.Rank7, Suit: game.SuitClubs},
 			{Rank: game.Rank8, Suit: game.SuitClubs},
 		}
-		// Give seat 1 a quinte (5-card sequence = 100pts): 7D 8D 9D TD JD + 3 fillers
 		gs.Players[1].Hand = []game.Card{
 			{Rank: game.Rank7, Suit: game.SuitDiamonds},
 			{Rank: game.Rank8, Suit: game.SuitDiamonds},
@@ -607,19 +546,16 @@ func TestDeclarationTiebreakers(t *testing.T) {
 			{Rank: game.RankTen, Suit: game.SuitClubs},
 		}
 
-		// Seat 0 declares
 		gs.ActivePlayerSeat = 0
 		gs.AwaitingDeclaration = true
 		state, err := game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
 		require.NoError(t, err)
 
-		// Play trick 1 with seat 0 leading, skip declarations for others
 		state.ActivePlayerSeat = 1
 		state.AwaitingDeclaration = true
 		state, err = game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: 1})
 		require.NoError(t, err)
 
-		// Verify seat 0 has four-of-a-kind (100pts) and seat 1 has quinte (100pts)
 		assert.Equal(t, 100, state.Players[0].Declarations[0].Value)
 		assert.Equal(t, 100, state.Players[1].Declarations[0].Value)
 		assert.Equal(t, game.DeclarationFourOfAKind, state.Players[0].Declarations[0].Type)
@@ -628,7 +564,6 @@ func TestDeclarationTiebreakers(t *testing.T) {
 
 	t.Run("equal-value sequences resolved by top card", func(t *testing.T) {
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
-		// Seat 0 (team A): tierce Q-K-A spades (top=A)
 		gs.Players[0].Hand = []game.Card{
 			{Rank: game.RankQueen, Suit: game.SuitSpades},
 			{Rank: game.RankKing, Suit: game.SuitSpades},
@@ -639,7 +574,6 @@ func TestDeclarationTiebreakers(t *testing.T) {
 			{Rank: game.Rank7, Suit: game.SuitDiamonds},
 			{Rank: game.Rank8, Suit: game.SuitDiamonds},
 		}
-		// Seat 1 (team B): tierce 7-8-9 diamonds (top=9)
 		gs.Players[1].Hand = []game.Card{
 			{Rank: game.Rank7, Suit: game.SuitSpades},
 			{Rank: game.Rank8, Suit: game.SuitSpades},
@@ -651,7 +585,6 @@ func TestDeclarationTiebreakers(t *testing.T) {
 			{Rank: game.RankAce, Suit: game.SuitDiamonds},
 		}
 
-		// Both declare
 		gs.ActivePlayerSeat = 0
 		gs.AwaitingDeclaration = true
 		state, err := game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
@@ -662,34 +595,17 @@ func TestDeclarationTiebreakers(t *testing.T) {
 		state, err = game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: 1})
 		require.NoError(t, err)
 
-		// Both have tierces (20pts each) but seat 1 actually has a quinte (100pts)
-		// which beats seat 0's tierce (20pts) by value
-		// Note: seat 1 has 9D-TD-JD-QD-KD-AD = 6 consecutive = 100pts!
-		// Seat 0 has QS-KS-AS = tierce 20pts
-		// Team B (seat 1) wins by value 100 > 20
 		assert.True(t, len(state.Players[1].Declarations) > 0)
 	})
 
-	// Regression: the top-card tiebreak for equal-length sequences must use the
-	// NATURAL declaration rank order (7<8<9<10<J<Q<K<A), where Jack outranks
-	// Ten — NOT the trick-taking non-trump order (7<8<9<J<Q<K<10<A) where Ten
-	// outranks Jack. Bug report: opponent's 9-10-J tierce lost to a player's
-	// 8-9-10 tierce because the comparison used NonTrumpRankOrder.
 	t.Run("Jack-topped tierce beats Ten-topped tierce (natural order)", func(t *testing.T) {
 		decls := []game.Declaration{
-			// Team A (seat 0): tierce 8D-9D-TD — top card Ten (team A's strongest)
 			{Type: game.DeclarationSequence, Cards: makeCards("8D", "9D", "TD"), PlayerSeat: 0, Value: 20},
-			// Team A (seat 2): weaker tierce, placed only so seat 2's natural
-			// declarable hand doesn't trigger a prompt that blocks the scripted
-			// plays in completeTrick1. Does not affect the tiebreak under test.
 			{Type: game.DeclarationSequence, Cards: makeCards("7S", "8S", "9S"), PlayerSeat: 2, Value: 20},
-			// Team B (seat 1): tierce 9C-TC-JC — top card Jack
 			{Type: game.DeclarationSequence, Cards: makeCards("9C", "TC", "JC"), PlayerSeat: 1, Value: 20},
 		}
 		state := completeTrick1(t, decls)
 
-		// Neither tierce is trump (trump=Hearts), so the trump tiebreak never
-		// applies — the winner is decided purely by top card: J > T.
 		assert.Equal(t, 0, state.DeclarationPoints[game.TeamA], "Ten-topped tierce must lose")
 		assert.Equal(t, 20, state.DeclarationPoints[game.TeamB], "Jack-topped tierce wins (J > T)")
 		assert.Empty(t, state.Players[0].Declarations, "Team A declarations cleared")
@@ -815,7 +731,6 @@ func TestQuinteDeclaration(t *testing.T) {
 		state, err := game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
 		require.NoError(t, err)
 
-		// Should have quinte (100pts) and tierce 7C-8C-9C (20pts)
 		foundQuinte := false
 		for _, d := range state.Players[0].Declarations {
 			if d.Type == game.DeclarationSequence && d.Value == 100 && len(d.Cards) == 5 {
@@ -829,8 +744,7 @@ func TestQuinteDeclaration(t *testing.T) {
 func TestBelotAtLaterTricks(t *testing.T) {
 	t.Run("Belot detection at trick 2", func(t *testing.T) {
 		gs := testfixtures.NewGameMidPlay(2)
-		gs.BelotAnnounced = false // override fixture default
-		// Give seat 2 both KH and QH (trump)
+		gs.BelotAnnounced = false
 		gs.Players[2].Hand = []game.Card{
 			{Rank: game.RankKing, Suit: game.SuitHearts},
 			{Rank: game.RankQueen, Suit: game.SuitHearts},
@@ -862,8 +776,6 @@ func TestSkipDeclareAtTrick2(t *testing.T) {
 		assert.ErrorIs(t, err, apperr.ErrWrongPhase)
 	})
 }
-
-// --- Bitola dedup tests ---
 
 func TestDedupBitola(t *testing.T) {
 	t.Run("tierce spades + FoaK 9s sharing 9S — FoaK kept", func(t *testing.T) {
@@ -931,7 +843,6 @@ func TestDedupBitola(t *testing.T) {
 	})
 
 	t.Run("non-overlapping tierce + FoaK — both kept", func(t *testing.T) {
-		// Tierce 7S-8S-9S (top=9S) + FoaK jacks. No overlap — 9 is not J.
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
 		gs.Players[0].Hand = []game.Card{
 			{Rank: game.Rank7, Suit: game.SuitSpades},
@@ -948,16 +859,10 @@ func TestDedupBitola(t *testing.T) {
 
 		state, err := game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
 		require.NoError(t, err)
-		// Spade run 9→J is not consecutive (9 idx 2, J idx 4). So runs are
-		// 7-8-9 (tierce) and JS alone. Tierce + FoaK kept — no shared cards.
 		require.Len(t, state.Players[0].Declarations, 2)
 	})
 
 	t.Run("equal-value clash: quinte + FoaK tens sharing TS — FoaK kept", func(t *testing.T) {
-		// The only tie dedup can reach: a 5+ sequence (100) against a
-		// 100-point four-of-a-kind. declarationBeats rule 2 awards an
-		// equal-value clash to the four-of-a-kind, so dedup keeps the same
-		// meld the clash comparison would have preferred.
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
 		gs.Players[0].Hand = makeCards("TS", "JS", "QS", "KS", "AS", "TH", "TD", "TC")
 		gs.ActivePlayerSeat = 0
@@ -971,7 +876,6 @@ func TestDedupBitola(t *testing.T) {
 	})
 
 	t.Run("quarte subsumes tierce in detection — single declaration emitted", func(t *testing.T) {
-		// Pre-dedup sanity: JD-QD-KD-AD produces only the maximal quarte.
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
 		gs.Players[0].Hand = []game.Card{
 			{Rank: game.RankJack, Suit: game.SuitDiamonds},
@@ -994,13 +898,8 @@ func TestDedupBitola(t *testing.T) {
 	})
 }
 
-// --- Declaration overlap by variant config (Story 12.5) ---
-
-// meldSummary is an order-independent fingerprint of a detected declaration.
-// detectDeclarations walks Go maps (by suit, then by rank), so both the order
-// of the returned melds and the order of cards inside a meld vary between
-// runs; every assertion below compares summaries as an unordered set instead
-// of indexing into Declarations.
+// meldSummary is an order-independent fingerprint of a detected declaration, compared as an
+// unordered set because detection order varies between runs.
 type meldSummary struct {
 	Type  game.DeclarationType
 	Value int
@@ -1052,13 +951,8 @@ func declareSeat0(t *testing.T, gs *game.GameState, hand []game.Card) *game.Game
 }
 
 func TestDeclarationOverlapByVariant(t *testing.T) {
-	// quarte 9S-TS-JS-QS (50) + carré of Jacks (200), sharing JS.
 	jackOverlap := makeCards("9S", "TS", "JS", "QS", "JH", "JD", "JC", "7C")
-	// quinte TS-JS-QS-KS-AS (100) + carré of Tens (100), sharing TS. The only
-	// reachable equal-value clash: a 5+ sequence against a 100-point carré.
 	equalValueOverlap := makeCards("TS", "JS", "QS", "KS", "AS", "TH", "TD", "TC")
-	// tierce 7S-8S-9S (20) + carré of Jacks (200) with no shared card — the
-	// spade run stops at 9S because 9 and J are not consecutive.
 	overlapFree := makeCards("7S", "8S", "9S", "JS", "JH", "JD", "JC", "7C")
 
 	quarteSpades := meld(game.DeclarationSequence, 50, "9S", "TS", "JS", "QS")
@@ -1122,15 +1016,8 @@ func TestDeclarationOverlapByVariant(t *testing.T) {
 	}
 }
 
-// TestDeclarationPromptTriggerIsOverlapInvariant pins the story's I/O-matrix
-// row for the prompt trigger: dedup can only ever drop melds from a set that
-// still has a survivor, so hasDeclarableCombinations answers identically under
-// both configs and the prompt fires on exactly the same hands.
-//
-// AwaitingDeclaration is never force-set here — seat 1 leads trick 1, which
-// hands the turn to seat 2 and makes the engine run checkDeclarationPrompt
-// against seat 2's hand. That is the call site whose signature this story
-// changed, so the flag on the returned state is the thing under test.
+// TestDeclarationPromptTriggerIsOverlapInvariant checks the declaration prompt fires on the same
+// hands whether or not overlapping melds are deduplicated.
 func TestDeclarationPromptTriggerIsOverlapInvariant(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -1193,20 +1080,9 @@ func TestDeclarationPromptTriggerIsOverlapInvariant(t *testing.T) {
 	}
 }
 
-// TestDetectedMeldsOverlapOnlyAcrossTypes pins the premise the equal-value tie
-// fix rests on, which is otherwise asserted only in comments: two sequences
-// never share a card (they are maximal per-suit runs) and two four-of-a-kinds
-// never share a card (they are rank-disjoint). That makes every dedup
-// comparison a sequence-vs-four-of-a-kind one, so declarationBeats rule 2
-// settles it alone and the chain steps needing trump and seat stay unreachable.
-//
-// The Croatian config is used on purpose: with dedup skipped, detection returns
-// EVERY meld it found, which is the only way to observe the raw overlap
-// structure. A counterexample here is an Ask-First escalation for the story —
-// not something to adapt the code to.
+// TestDetectedMeldsOverlapOnlyAcrossTypes checks that detected melds only ever share cards between
+// a sequence and a four-of-a-kind, never within one type.
 func TestDetectedMeldsOverlapOnlyAcrossTypes(t *testing.T) {
-	// samePairs counts the same-type meld pairs inspected, so the sweep cannot
-	// pass by never reaching a multi-meld hand.
 	samePairs := map[game.DeclarationType]int{}
 
 	check := func(t *testing.T, decls []game.Declaration) {
@@ -1237,32 +1113,26 @@ func TestDetectedMeldsOverlapOnlyAcrossTypes(t *testing.T) {
 		gs.AwaitingDeclaration = true
 		state, err := game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
 		if err != nil {
-			return nil // no meld in this hand
+			return nil
 		}
 		return state.Players[0].Declarations
 	}
 
-	// Hand-built meld-dense hands. Random deals essentially never produce two
-	// four-of-a-kinds in eight cards, so that half of the premise is covered
-	// here rather than by the sweep.
 	t.Run("constructed meld-dense hands", func(t *testing.T) {
 		for _, hand := range [][]game.Card{
-			makeCards("9S", "9H", "9D", "9C", "AS", "AH", "AD", "AC"), // two carrés
-			makeCards("JS", "JH", "JD", "JC", "TS", "TH", "TD", "TC"), // two carrés, adjacent ranks
-			makeCards("7S", "8S", "9S", "7C", "8C", "9C", "TD", "JH"), // two tierces
-			makeCards("7S", "8S", "9S", "JS", "QS", "KS", "7C", "8C"), // two runs in ONE suit
-			makeCards("TS", "JS", "QS", "KS", "AS", "TH", "TD", "TC"), // quinte + carré, shared
-			makeCards("9S", "TS", "JS", "QS", "JH", "JD", "JC", "7C"), // quarte + carré, shared
-			makeCards("QS", "KS", "AS", "QH", "QD", "QC", "7D", "8C"), // tierce + carré, shared
-			makeCards("7H", "8H", "9H", "TH", "JH", "QH", "KH", "AH"), // one maximal eight-card run
+			makeCards("9S", "9H", "9D", "9C", "AS", "AH", "AD", "AC"),
+			makeCards("JS", "JH", "JD", "JC", "TS", "TH", "TD", "TC"),
+			makeCards("7S", "8S", "9S", "7C", "8C", "9C", "TD", "JH"),
+			makeCards("7S", "8S", "9S", "JS", "QS", "KS", "7C", "8C"),
+			makeCards("TS", "JS", "QS", "KS", "AS", "TH", "TD", "TC"),
+			makeCards("9S", "TS", "JS", "QS", "JH", "JD", "JC", "7C"),
+			makeCards("QS", "KS", "AS", "QH", "QD", "QC", "7D", "8C"),
+			makeCards("7H", "8H", "9H", "TH", "JH", "QH", "KH", "AH"),
 		} {
 			check(t, detect(t, hand))
 		}
 	})
 
-	// Bounded, deterministically seeded sweep: a fixed seed and a fixed deal
-	// count, four hands per deal, so a failure is reproducible and the runtime
-	// stays in the tens of milliseconds.
 	t.Run("seeded sweep over dealt hands", func(t *testing.T) {
 		deck := make([]game.Card, 0, 32)
 		for _, r := range game.NaturalRankSequence {
@@ -1295,20 +1165,8 @@ type seatPlay struct {
 	card string
 }
 
-// resolveTrick1 seats the four given hands on the supplied fixture, drives
-// trick 1 to completion through the scripted plays and returns the
-// post-resolution state.
-//
-// Seats listed in declaringSeats answer their prompt with `declare`; any other
-// prompted seat skips. Every prompt but the leader's is raised by the engine
-// itself — the helper asserts as much — so a declaring seat that the engine
-// failed to prompt fails the test. The trick leader is the one exception: its
-// prompt was raised back when bidding resolved (checkDeclarationPrompt in
-// bidding.go), which is before a playing-phase fixture picks the state up, so
-// the helper reproduces that single flag.
-//
-// Belote is pre-marked announced so a K+Q-of-trump holder cannot stall the
-// trick; no test using this helper is about Belote.
+// resolveTrick1 seats the given hands on the fixture, plays trick 1 through the scripted plays and
+// returns the post-resolution state, declaring for declaringSeats and skipping for everyone else.
 func resolveTrick1(
 	t *testing.T,
 	gs *game.GameState,
@@ -1335,7 +1193,7 @@ func resolveTrick1(
 		switch {
 		case declares[p.seat]:
 			if i == 0 {
-				state.AwaitingDeclaration = true // leader's prompt, see doc
+				state.AwaitingDeclaration = true
 			}
 			require.True(t, state.AwaitingDeclaration, "engine must prompt seat %d to declare", p.seat)
 			require.Equal(t, p.seat, state.ActivePlayerSeat)
@@ -1361,15 +1219,6 @@ func resolveTrick1(
 	return state
 }
 
-// overlapOnlyLayout is the 32-card deal used for the single-team overlap tests.
-// Team A's seat 0 holds the only melds at the table, which keeps resolution
-// unambiguous, and no seat holds both K and Q of hearts so trump-hearts Belote
-// can never prompt.
-//
-//	Seat 0 (team A): quarte 9S-TS-JS-QS (50) + carré of Jacks (200), sharing JS
-//	Seat 1 (team B): no meld (its four 8s carry no value)
-//	Seat 2 (team A): no meld
-//	Seat 3 (team B): no meld
 var overlapOnlyLayout = [4][]game.Card{
 	makeCards("9S", "TS", "JS", "QS", "JH", "JD", "JC", "7C"),
 	makeCards("7S", "8S", "7H", "8H", "7D", "8D", "8C", "9C"),
@@ -1377,9 +1226,6 @@ var overlapOnlyLayout = [4][]game.Card{
 	makeCards("TH", "QH", "AH", "9D", "TD", "AD", "KC", "AC"),
 }
 
-// overlapOnlyPlays: seat 1 leads spades, seat 2 must follow and overplay, seat 3
-// is void and must cut, seat 0 follows into the already-cut trick. Seat 3 takes
-// it on the trump.
 var overlapOnlyPlays = []seatPlay{
 	{1, "7S"}, {2, "KS"}, {3, "TH"}, {0, "9S"},
 }
@@ -1392,8 +1238,6 @@ func TestDeclarationOverlapScoresBothMelds(t *testing.T) {
 		assert.Len(t, state.Players[0].Declarations, 2)
 		assert.Equal(t, 250, state.DeclarationPoints[game.TeamA])
 		assert.Equal(t, 0, state.DeclarationPoints[game.TeamB])
-		// Card points run in their own lane — the shared JS is not double-counted.
-		// Trick 1 (7S=0, KS=4, TH=10 trump, 9S=0) goes to seat 3 on the cut.
 		assert.Equal(t, 0, state.HandPoints[game.TeamA])
 		assert.Equal(t, 14, state.HandPoints[game.TeamB])
 	})
@@ -1410,23 +1254,10 @@ func TestDeclarationOverlapScoresBothMelds(t *testing.T) {
 	})
 }
 
-// TestCroatianOverlapClashAcrossTeams pins the existing tie-break semantics now
-// that overlap makes them consequential: resolveDeclarations picks the winner
-// from each team's SINGLE strongest meld and only then awards that team's whole
-// sum. Overlap inflates a team's sum without touching its best meld, so a team
-// holding two shared melds can out-total its opponents and still lose outright.
-//
-// It also pins the premise bot.ObserveDeclarations depends on for the
-// no-peeking rule: the losing team's declarations are cleared, and under
-// overlap that means BOTH of seat 0's melds are nilled, not just one.
+// TestCroatianOverlapClashAcrossTeams checks the winner is picked by each team's single best meld,
+// so a team with a higher overlapping sum can still lose and have all its melds cleared.
 func TestCroatianOverlapClashAcrossTeams(t *testing.T) {
 	t.Run("opposing carré of Jacks (200) beats the overlap team's best (100)", func(t *testing.T) {
-		// Seat 0 (team A): tierce QS-KS-AS (20) + carré of Queens (100), sharing
-		// QS — sum 120, best 100. Seat 1 (team B): carré of Jacks (200).
-		//
-		// A quinte cannot be paired against an opposing carré of Jacks: every
-		// 5-card run contains its suit's Jack, so the four Jacks can never all
-		// sit in another hand. Hence a tierce + carré overlap here.
 		hands := [4][]game.Card{
 			makeCards("QS", "KS", "AS", "QH", "QD", "QC", "7D", "8C"),
 			makeCards("JS", "JH", "JD", "JC", "7S", "8S", "9D", "TC"),
@@ -1435,8 +1266,6 @@ func TestCroatianOverlapClashAcrossTeams(t *testing.T) {
 		}
 		plays := []seatPlay{{1, "7S"}, {2, "9S"}, {3, "9H"}, {0, "QS"}}
 
-		// Precondition: overlap really is live for seat 0, so the clash below is
-		// the overlap case and not a deduped single meld.
 		before := declareSeat0(t, testfixtures.NewGameCroatianFirstTrick(game.SuitHearts), hands[0])
 		require.Len(t, before.Players[0].Declarations, 2)
 		assert.Equal(t, 120, totalDeclarationValue(before.Players[0].Declarations))
@@ -1452,9 +1281,6 @@ func TestCroatianOverlapClashAcrossTeams(t *testing.T) {
 	})
 
 	t.Run("the overlap team's larger sum still loses the clash", func(t *testing.T) {
-		// Seat 0 (team A): quinte TS-JS-QS-KS-AS (100) + carré of Tens (100),
-		// sharing TS — sum 200, best 100. Seat 1 (team B): carré of Nines (150).
-		// Team A out-totals team B 200 to 150 and is still awarded 0.
 		hands := [4][]game.Card{
 			makeCards("TS", "JS", "QS", "KS", "AS", "TH", "TD", "TC"),
 			makeCards("9S", "9H", "9D", "9C", "JH", "QD", "KC", "7S"),
@@ -1463,8 +1289,6 @@ func TestCroatianOverlapClashAcrossTeams(t *testing.T) {
 		}
 		plays := []seatPlay{{1, "7S"}, {2, "7H"}, {3, "8S"}, {0, "AS"}}
 
-		// Precondition: seat 0's two overlapping melds really do sum to 200,
-		// more than the 150 that is about to beat them.
 		before := declareSeat0(t, testfixtures.NewGameCroatianFirstTrick(game.SuitHearts), hands[0])
 		require.Len(t, before.Players[0].Declarations, 2)
 		require.Equal(t, 200, totalDeclarationValue(before.Players[0].Declarations))
@@ -1505,14 +1329,8 @@ func makeCards(ids ...string) []game.Card {
 	return cards
 }
 
-// --- Croatian dedicated declaration phase (Story 12.6) ---
-
-// croatianDeclaringWith opens the dedicated declaration phase over an explicit
-// 32-card layout: each seat's eight cards are split across the six open and two
-// face-down slots the Croatian deal produces, then the real engine resolves the
-// bid. Going through ApplyAction rather than building the state by hand means
-// mergeFaceDownCards and the phase entry are both under test, and the cursor
-// lands wherever handlePickTrump genuinely puts it.
+// croatianDeclaringWith deals the given hands through the Croatian open and face-down slots and
+// resolves the bid via ApplyAction, opening the dedicated declaration phase.
 func croatianDeclaringWith(t *testing.T, trump game.Suit, hands [4][]game.Card) *game.GameState {
 	t.Helper()
 
@@ -1532,15 +1350,7 @@ func croatianDeclaringWith(t *testing.T, trump game.Suit, hands [4][]game.Card) 
 	return state
 }
 
-// Layouts for the phase tests. Every one is a full 32-card partition, so the
-// deal is legal and no seat can trigger instant-win.
 var (
-	// Seats 1 and 0 hold a meld; seats 2 and 3 hold none, so the cursor must
-	// step straight past them.
-	//
-	//	seat 0: hearts 7-8-9-T quarte (50)
-	//	seat 1: spades 7-8-9 tierce (20)
-	//	seats 2, 3: no run of three, no scoring four-of-a-kind
 	meldGapLayout = [4][]game.Card{
 		makeCards("7H", "8H", "9H", "TH", "QD", "8C", "KS", "AS"),
 		makeCards("7S", "8S", "9S", "JH", "KD", "7C", "TC", "AC"),
@@ -1548,10 +1358,6 @@ var (
 		makeCards("JS", "KH", "8D", "TD", "AD", "9C", "JC", "KC"),
 	}
 
-	// Every seat holds a meld, so the cursor stops at all four in turn. This is
-	// the NewGameCroatianJustDealt partition written out as whole hands.
-	//
-	//	seats 0-2: a six-card run each; seat 3: four Kings + four Aces
 	allMeldLayout = [4][]game.Card{
 		makeCards("7S", "8S", "9S", "TS", "7H", "8H", "JS", "QS"),
 		makeCards("7D", "8D", "9D", "TD", "9H", "TH", "JD", "QD"),
@@ -1559,8 +1365,6 @@ var (
 		makeCards("KS", "AS", "KD", "AD", "KH", "AH", "KC", "AC"),
 	}
 
-	// Nobody holds a meld: every suit contributes two non-adjacent ranks per
-	// seat, and no rank lands four times in one hand.
 	noMeldLayout = [4][]game.Card{
 		makeCards("7S", "9S", "8H", "TH", "JD", "KD", "QC", "AC"),
 		makeCards("8S", "TS", "JH", "KH", "QD", "AD", "7C", "9C"),
@@ -1569,10 +1373,8 @@ var (
 	}
 )
 
-// TestCroatianBidOpensDeclarationPhase covers both Croatian bidding paths into
-// the phase: an early free-suit pick, and the forced pick by the dealer who
-// cannot pass. Both converge on handlePickTrump, which is the single insertion
-// point.
+// TestCroatianBidOpensDeclarationPhase covers both Croatian bidding paths into the declaration
+// phase: an early free-suit pick and the dealer's forced pick.
 func TestCroatianBidOpensDeclarationPhase(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1632,10 +1434,8 @@ func TestBitolaBidStillOpensTrick1(t *testing.T) {
 	}
 }
 
-// TestCroatianDeclarationPhaseAcceptsAnyOrder is the heart of the simultaneous
-// model: all four seats are asked at once, so any of them may answer at any
-// time. The order below is deliberately NOT the play order — if the engine
-// still walked a cursor this would fail on the first action.
+// TestCroatianDeclarationPhaseAcceptsAnyOrder checks all four seats may answer the declaration
+// phase in any order, not just play order.
 func TestCroatianDeclarationPhaseAcceptsAnyOrder(t *testing.T) {
 	state := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
 
@@ -1648,9 +1448,6 @@ func TestCroatianDeclarationPhaseAcceptsAnyOrder(t *testing.T) {
 		state, err = game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
 		require.NoError(t, err, "seat %d may answer out of play order", seat)
 		if state.Phase == game.PhaseDeclaring {
-			// Before resolution every answer is simply banked. On the last the
-			// contest settles and the losing team's melds are cleared, so this
-			// only holds while the phase is still open.
 			assert.True(t, state.Players[seat].DeclarationAnswered)
 			assert.NotEmpty(t, state.Players[seat].Declarations, "seat %d's melds are stored", seat)
 		}
@@ -1660,16 +1457,11 @@ func TestCroatianDeclarationPhaseAcceptsAnyOrder(t *testing.T) {
 	assert.Equal(t, 1, state.TrickNumber)
 	assert.True(t, state.DeclarationsResolved)
 	assert.False(t, state.AwaitingDeclaration)
-	// All four declared, so the contest produced a winner and the loser's melds
-	// were cleared — exactly what resolveDeclarationsForHand does at Bitola's
-	// trick 2.
 	assert.NotEqual(t, [2]int{0, 0}, state.DeclarationPoints)
 }
 
-// TestCroatianDeclarationOutcomeIsOrderIndependent is the guarantee that makes
-// simultaneous answering safe to ship: whoever speaks first, the same team wins
-// the same points. resolveDeclarations breaks ties on trickLeaderSeat, a
-// positional fact, so answer order must be invisible in the result.
+// TestCroatianDeclarationOutcomeIsOrderIndependent checks the same team wins the same points
+// whatever order the seats answer in.
 func TestCroatianDeclarationOutcomeIsOrderIndependent(t *testing.T) {
 	orders := [][]int{
 		{1, 2, 3, 0},
@@ -1695,16 +1487,12 @@ func TestCroatianDeclarationOutcomeIsOrderIndependent(t *testing.T) {
 	}
 }
 
-// TestCroatianDeclarationPhaseAsksMeldlessSeatsToo is the information-hiding
-// rule in test form. A seat holding nothing is NOT stepped past — it is asked
-// like everyone else and must answer, which is precisely why no observer can
-// tell the two apart. The old cursor skipped these seats, and that skip was the
-// leak.
+// TestCroatianDeclarationPhaseAsksMeldlessSeatsToo checks seats without melds are asked like
+// everyone else, so observers cannot tell who holds one.
 func TestCroatianDeclarationPhaseAsksMeldlessSeatsToo(t *testing.T) {
 	state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
 	require.Equal(t, game.PhaseDeclaring, state.Phase)
 
-	// Seats 2 and 3 hold nothing under this layout.
 	for _, seat := range []int{2, 3} {
 		require.False(t, game.HasDeclarableCombinations(state, seat), "fixture: seat %d holds no meld", seat)
 
@@ -1714,8 +1502,6 @@ func TestCroatianDeclarationPhaseAsksMeldlessSeatsToo(t *testing.T) {
 		assert.Equal(t, game.PhaseDeclaring, answered.Phase, "two other seats still owe an answer")
 	}
 
-	// And declaring with nothing is still refused — the button is disabled
-	// client-side, but the engine is the authority.
 	for _, seat := range []int{2, 3} {
 		rejected, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: seat})
 		assert.Nil(t, rejected)
@@ -1723,10 +1509,8 @@ func TestCroatianDeclarationPhaseAsksMeldlessSeatsToo(t *testing.T) {
 	}
 }
 
-// TestCroatianDeclarationPhaseRejectsSecondAnswer pins the double-answer row.
-// The first answer stands: a stale click, a double-tap, or a client that
-// reconnected mid-phase and re-rendered its dialog must not be able to turn a
-// skip into a declare after the fact.
+// TestCroatianDeclarationPhaseRejectsSecondAnswer checks a seat's first answer stands and a
+// second answer is rejected.
 func TestCroatianDeclarationPhaseRejectsSecondAnswer(t *testing.T) {
 	base := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
 
@@ -1744,15 +1528,11 @@ func TestCroatianDeclarationPhaseRejectsSecondAnswer(t *testing.T) {
 		assert.ErrorIs(t, err, apperr.ErrWrongPhase, "%s after answering", action.Type)
 	}
 
-	// The skip is untouched by the rejected attempts.
 	assert.Empty(t, skipped.Players[1].Declarations)
 }
 
-// TestCroatianDeclarationPhaseWithNoMeldsStillOpens is the other half of the
-// hiding rule, and a deliberate reversal of the old behaviour. When NOBODY
-// holds a meld the phase still opens and still asks all four seats — because a
-// phase that were skipped in that case would announce, by its very absence,
-// that somebody holds one.
+// TestCroatianDeclarationPhaseWithNoMeldsStillOpens checks the phase opens and asks all four
+// seats even when nobody holds a meld.
 func TestCroatianDeclarationPhaseWithNoMeldsStillOpens(t *testing.T) {
 	state := croatianDeclaringWith(t, game.SuitSpades, noMeldLayout)
 
@@ -1780,10 +1560,8 @@ func TestCroatianDeclarationPhaseWithNoMeldsStillOpens(t *testing.T) {
 	}
 }
 
-// TestCroatianDeclarationPhaseResolvesIntoTrick1 covers the "last seat answers"
-// row end to end: the contest resolves through the same helper Bitola uses at
-// trick 2, the losing team's melds are cleared, and play opens at trick 1 with
-// the leader on the clock.
+// TestCroatianDeclarationPhaseResolvesIntoTrick1 checks the last answer resolves the contest,
+// clears the losing team's melds and opens trick 1 with the leader on the clock.
 func TestCroatianDeclarationPhaseResolvesIntoTrick1(t *testing.T) {
 	state := croatianDeclaringWith(t, game.SuitClubs, meldGapLayout)
 
@@ -1814,7 +1592,6 @@ func TestCroatianDeclarationPhaseResolvesIntoTrick1(t *testing.T) {
 	assert.Empty(t, state.Players[1].Declarations, "the losing team's melds are cleared")
 	assert.NotEmpty(t, state.Players[0].Declarations)
 
-	// The hand is genuinely playable from here.
 	lead := state.Players[state.ActivePlayerSeat].Hand[0]
 	played, err := game.ApplyAction(state, game.Action{
 		Type:       game.ActionPlayCard,
@@ -1924,10 +1701,6 @@ func TestCroatianDeclarationPhaseRejectsOtherActions(t *testing.T) {
 	card := base.Players[1].Hand[0]
 	suit := game.SuitSpades
 
-	// Every action that belongs to a NEIGHBOURING phase — the bidding it just
-	// left, the play it has not started, and the hand-complete pause far ahead —
-	// must bounce off. handleDeclaring's default arm is the only thing standing
-	// between them and a half-applied transition.
 	rejected := []struct {
 		name   string
 		action game.Action
@@ -1950,10 +1723,8 @@ func TestCroatianDeclarationPhaseRejectsOtherActions(t *testing.T) {
 	}
 }
 
-// TestCroatianDeclarationPhaseIsNotPausable pins the phase OUT of the pause
-// allowlist. It is a fixed-length window with no active turn and no
-// TurnExpiresAt, so pause/unpause — which exists to preserve and restore
-// TurnTimeRemaining — has nothing to carry. Surrender stays allowed.
+// TestCroatianDeclarationPhaseIsNotPausable checks pause is rejected during the declaration phase,
+// which has no turn timer to preserve, while surrender stays allowed.
 func TestCroatianDeclarationPhaseIsNotPausable(t *testing.T) {
 	base := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
 
@@ -1971,10 +1742,8 @@ func TestCroatianDeclarationPhaseIsNotPausable(t *testing.T) {
 	})
 }
 
-// TestCroatianDeclarationFlagsDoNotLeakIntoHand2 guards the reset in
-// startNewHand: the answered flags are per-hand, and stale ones would make
-// hand 2's phase close the instant it opened — silently denying every seat its
-// answer. ForceAdvanceHandComplete is the exported door onto startNewHand.
+// TestCroatianDeclarationFlagsDoNotLeakIntoHand2 checks startNewHand resets the per-hand answered
+// flags so hand 2's declaration phase does not close immediately.
 func TestCroatianDeclarationFlagsDoNotLeakIntoHand2(t *testing.T) {
 	gs := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
 	gs.Phase = game.PhaseHandComplete
@@ -1995,18 +1764,11 @@ func TestCroatianDeclarationFlagsDoNotLeakIntoHand2(t *testing.T) {
 	require.Equal(t, 1, next.DealerSeat, "startNewHand rotates the dealer counter-clockwise")
 	require.NotEqual(t, game.PhaseMatchEnd, next.Phase, "hand 2 must have dealt normally")
 
-	// Drive hand 2 to its own declaration phase. Stale flags would close it on
-	// entry, so this proves the reset by watching the phase actually stay open
-	// and wait for all four seats.
-	//
-	// Hand 2's deal is random, so the hands are replaced with a layout where
-	// every seat holds a meld: that makes the phase's behaviour observable
-	// instead of dependent on who happened to be dealt a run.
 	for seat, hand := range allMeldLayout {
 		next.Players[seat].Hand = append([]game.Card(nil), hand[:6]...)
 		next.Players[seat].FaceDownCards = append([]game.Card(nil), hand[6:]...)
 	}
-	next.Phase = game.PhaseBidding // the session manager's dealing -> bidding step
+	next.Phase = game.PhaseBidding
 
 	suit := game.SuitClubs
 	opened, err := game.ApplyAction(next, game.Action{

@@ -179,8 +179,6 @@ describe("matchStore", () => {
     expect(state.matchEndData).toBeNull();
   });
 
-  // Story 13.5: the SP line's slot starts empty and leaves with the match, so a
-  // later match can never inherit this one's change.
   it("stores the season settlement and clears it with the game", () => {
     expect(useMatchStore.getState().seasonSettlement).toBeNull();
 
@@ -220,7 +218,6 @@ describe("matchStore", () => {
     expect(slot).not.toBeNull();
     expect(slot?.emote).toBe("thumbs_up");
     expect(typeof slot?.receivedAt).toBe("number");
-    // Other seats untouched
     expect(useMatchStore.getState().activeEmotes[0]).toBeNull();
     expect(useMatchStore.getState().activeEmotes[1]).toBeNull();
     expect(useMatchStore.getState().activeEmotes[3]).toBeNull();
@@ -234,8 +231,6 @@ describe("matchStore", () => {
     const second = useMatchStore.getState().activeEmotes[1];
 
     expect(second?.emote).toBe("laugh");
-    // The slot must be a fresh object — mutating the previous one would
-    // break React's reference-equality re-render guard.
     expect(second).not.toBe(first);
   });
 
@@ -274,7 +269,6 @@ describe("matchStore", () => {
     const slot = useMatchStore.getState().activeDeclares[2];
     expect(slot).not.toBeNull();
     expect(typeof slot?.receivedAt).toBe("number");
-    // Other seats untouched
     expect(useMatchStore.getState().activeDeclares[0]).toBeNull();
     expect(useMatchStore.getState().activeDeclares[1]).toBeNull();
     expect(useMatchStore.getState().activeDeclares[3]).toBeNull();

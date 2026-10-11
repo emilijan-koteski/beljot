@@ -5,20 +5,12 @@ import (
 	"sync/atomic"
 )
 
-// Avatar derivative sizes, in pixels. Every upload writes both under one
-// prefix: the large one for the profile hero, the small one for every other
-// disc (lists and seats are at most 64 CSS px, so 128 covers them at 2x).
 const (
 	AvatarSizeLarge = 256
 	AvatarSizeSmall = 128
 )
 
-// publicAssetsBase is the public origin the avatar bucket is served from, with
-// no trailing slash. Package-level and set ONCE from main.go, so the many
-// handlers that serialize a user's identity need no extra constructor
-// argument. Empty (the zero value) makes every AvatarURL nil, which is what
-// tests and development-without-storage rely on to serialize null.
-var publicAssetsBase atomic.Value // string
+var publicAssetsBase atomic.Value
 
 // SetPublicAssetsURL sets the base every avatar URL is derived from. Called
 // once at startup, before the server accepts requests.

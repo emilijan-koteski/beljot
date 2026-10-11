@@ -2,13 +2,8 @@ package game
 
 import "github.com/emilijan/beljot/server/internal/apperr"
 
-// handleSurrenderRequest processes a player's request to surrender the match.
-// Valid only from PhasePlaying, PhaseBidding or PhaseDeclaring. Each player may
-// initiate at most one surrender request per match — the SurrenderUsed flag flips on
-// request, regardless of whether the partner later accepts or declines.
-// A proposal already pending is rejected with ErrActionRequired (must be
-// resolved first). PhasePaused is rejected with ErrGamePaused (AC#1: pause
-// rejection mirrors the existing rule — pause must be cleared first).
+// handleSurrenderRequest opens a surrender proposal during bidding, declaring or play.
+// Each seat gets one request per match, spent on request whether or not the partner accepts.
 func handleSurrenderRequest(state *GameState, action Action) (*GameState, error) {
 	if state.Phase == PhasePaused {
 		return nil, apperr.ErrGamePaused
@@ -38,13 +33,8 @@ func handleSurrenderRequest(state *GameState, action Action) (*GameState, error)
 	return newState, nil
 }
 
-// handleSurrenderAccept processes the partner accepting a pending surrender.
-// Only the proposer's partner (seat = (proposer + 2) % 4) may accept.
-// Transitions the match into PhaseMatchEnd with the opposing team as winner
-// and clears the per-move TurnExpiresAt / TurnTimeRemaining fields on the
-// returned state (rules engine is pure — the actual *time.Timer goroutine is
-// stopped by the session manager's preemptive cancelTurnTimer in HandleAction).
-// SurrenderUsed[proposer] stays true — the attempt has been spent.
+// handleSurrenderAccept lets the proposer's partner accept, ending the match with the opposing team as winner.
+// It clears the turn deadline fields; the session manager stops the actual timer.
 func handleSurrenderAccept(state *GameState, action Action) (*GameState, error) {
 	if state.Phase == PhasePaused {
 		return nil, apperr.ErrGamePaused
@@ -66,19 +56,6 @@ func handleSurrenderAccept(state *GameState, action Action) (*GameState, error) 
 
 	newState := cloneGameState(state)
 
-	// In a "dosta" room a team may ALREADY have reached the target: the Belote
-	// checkpoint defers while a Bitola trick-1 meld contest is still open, so for
-	// two or three cards the match is in a state the rule says should not exist —
-	// it should already be over. A surrender resolving the match inside that
-	// window would hand it to the other team, which the rule does not allow.
-	// Settle the crossing first; only if nobody has crossed does the concession
-	// decide the match.
-	//
-	// The running total here still omits the unresolved melds the deferral was
-	// waiting for, and it always will — this hand is being abandoned, so the
-	// contest can never resolve. An understated total that is already past the
-	// target is the best available answer, and strictly better than awarding the
-	// match to the side that did not reach it.
 	if stopAtTargetIfReached(newState) {
 		return newState, nil
 	}
@@ -93,11 +70,8 @@ func handleSurrenderAccept(state *GameState, action Action) (*GameState, error) 
 	return newState, nil
 }
 
-// handleSurrenderDecline processes the partner declining a pending surrender.
-// Only the proposer's partner may decline. Clears SurrenderProposerSeat;
-// SurrenderUsed[proposer] is preserved (declined attempts still count) so the
-// proposer cannot retry. All other game state is untouched — phase, scores,
-// hands, trick state continue exactly as before the proposal opened.
+// handleSurrenderDecline lets the proposer's partner decline, closing the proposal and leaving all other state untouched.
+// The proposer's attempt stays spent, so they cannot retry.
 func handleSurrenderDecline(state *GameState, action Action) (*GameState, error) {
 	if state.Phase == PhasePaused {
 		return nil, apperr.ErrGamePaused
@@ -119,6 +93,5 @@ func handleSurrenderDecline(state *GameState, action Action) (*GameState, error)
 
 	newState := cloneGameState(state)
 	newState.SurrenderProposerSeat = nil
-	// SurrenderUsed[proposer] stays true — attempt is consumed even on decline.
 	return newState, nil
 }

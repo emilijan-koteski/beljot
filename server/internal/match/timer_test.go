@@ -5,15 +5,8 @@ import (
 	"time"
 )
 
-// TestCancelTurnTimer_BumpsGeneration locks in Story 8.5-1 AC1 / D-2026-05-02
-// "cancelTurnTimer() does not increment timerGeneration".
-//
-// cancelTurnTimer must bump timerGeneration on EVERY call — not only the
-// callsites that immediately re-arm a timer afterwards. This guarantees that
-// any in-flight time.AfterFunc goroutine already past its trigger but blocked
-// on session.mu fails the staleness check in handleTimerExpiry. Without this
-// invariant a future patch that adds work above handleTimerExpiry's switch
-// could fire spuriously after a cancel.
+// cancelTurnTimer must bump timerGeneration on every call so blocked AfterFunc
+// callbacks fail the staleness check in handleTimerExpiry.
 func TestCancelTurnTimer_BumpsGeneration(t *testing.T) {
 	s := &LiveMatch{timerGeneration: 7}
 
@@ -28,12 +21,9 @@ func TestCancelTurnTimer_BumpsGeneration(t *testing.T) {
 	}
 }
 
-// TestCancelTurnTimer_BumpsGeneration_WithActiveTimer confirms the bump
-// happens even when an active *time.Timer is being stopped (the original case
-// the staleness guard was designed for).
+// The bump also happens when an active timer is being stopped.
 func TestCancelTurnTimer_BumpsGeneration_WithActiveTimer(t *testing.T) {
 	s := &LiveMatch{timerGeneration: 0}
-	// Schedule far enough out that Stop() succeeds before it fires.
 	s.turnTimer = time.AfterFunc(time.Hour, func() {})
 
 	s.mu.Lock()

@@ -1,9 +1,6 @@
 import type { Declaration } from "@/features/rules/content/types";
 import { useRules } from "@/features/rules/RulesContext";
 
-// Visual differentiation by point tier — small / mid / jackpot / match-winner.
-// `pts` colors the "+N" figure and `text` the meld title + summary, so each
-// tier's text matches its chrome.
 const TIER_STYLES: Record<
   0 | 1 | 2 | 3,
   { eyebrow: string; border: string; tint: string; pts: string; text: string }
@@ -29,8 +26,6 @@ const TIER_STYLES: Record<
     pts: "var(--accent)",
     text: "var(--ink)",
   },
-  // The instant-win bela (+1001) — dark-red treatment so the card that ends
-  // the whole match on the spot reads apart from the green jackpot melds.
   3: {
     eyebrow: "var(--danger)",
     border: "var(--danger)",

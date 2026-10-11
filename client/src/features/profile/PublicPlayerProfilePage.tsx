@@ -17,40 +17,29 @@ import { StreakCallout } from "./components/StreakCallout";
 import { MatchHistory } from "./MatchHistory";
 
 /**
- * Public read-only view of ANOTHER player's profile (Story 11.3, FR47), reached
- * at /players/:id by any authenticated viewer.
- *
- * It is a SEPARATE page from the self ProfilePage rather than a dual-mode of it
- * (Design Decision D5): that structurally excludes the self-only side effects
- * instead of gating them. Three things the self page does are simply NOT mounted
- * here — the honor auth-store hydration effect (it would overwrite the VIEWER's
- * TopBar honor with the subject's), <LinkedAccounts> (SSO management), and the
- * username edit pencil (userId is never passed) — plus the private wallet/streak
- * pills are suppressed via hidePrivatePills. No viewer data is ever read for the
- * subject's surfaces.
+ * Parses a canonical positive safe-integer id, rejecting spellings like "1e2" or "0x10"
+ * that `Number()` alone would alias to a different player.
+ */
+function parseCanonicalUserId(id: string | undefined): number | undefined {
+  return id !== undefined && /^[1-9][0-9]*$/.test(id) && Number.isSafeInteger(Number(id))
+    ? Number(id)
+    : undefined;
+}
+
+/**
+ * Read-only profile of another player at /players/:id, kept separate from ProfilePage so
+ * self-only side effects are never mounted. The page is keyed by subject id so navigating
+ * between cached profiles remounts its local state.
  */
 export function PublicPlayerProfilePage() {
   const { t } = useTranslation();
   const { id } = useParams();
 
-  // Guard the route param against a strict canonical positive-integer form
-  // BEFORE coercing. `Number()` alone would accept non-canonical spellings
-  // ("1e2" → 100, "0x10" → 16, " 3 " → 3, "+5", "5.0") and alias them to a
-  // real-but-different subject, and would turn an over-range id into a server
-  // 400 that misses the not-found surface. A `/^[1-9][0-9]*$/` match plus a
-  // safe-integer bound rejects all of those to the same not-found state as an
-  // unknown id (Story 11.3 review).
-  const validId =
-    id !== undefined && /^[1-9][0-9]*$/.test(id) && Number.isSafeInteger(Number(id))
-      ? Number(id)
-      : undefined;
+  const validId = parseCanonicalUserId(id);
 
   const { data: profile, isPending, isError, error } = usePublicProfileQuery(validId);
   const career = useCareerQuery(validId);
 
-  // Not-found: an invalid id, or a 404 USER_NOT_FOUND from the server (unknown /
-  // soft-deleted subject). Distinct from a transient error so the copy can say
-  // "no such player" rather than "try again".
   const isNotFound =
     validId === undefined || (isError && error instanceof FetchError && error.status === 404);
 
@@ -90,8 +79,6 @@ export function PublicPlayerProfilePage() {
     );
   }
 
-  // Any non-404 failure (500, network) after the pending skeleton: there is no
-  // subject data to show, so render a generic error rather than a half profile.
   if (isError || !profile) {
     return (
       <div className="mx-auto max-w-330 px-4 py-8 md:px-7">
@@ -119,12 +106,6 @@ export function PublicPlayerProfilePage() {
   };
 
   return (
-    // key={validId}: profile→profile navigation (a partner/rival/seat-chip link
-    // on THIS page) can land on a subject that is already in the query cache,
-    // so no pending skeleton renders and nothing would otherwise remount —
-    // MatchHistory's local filter/sort/open-rows state (and any other page-local
-    // state) would carry over to the new subject. Keying on the subject forces
-    // a clean remount per player.
     <div
       key={validId}
       className="mx-auto max-w-330 px-4 py-8 pb-32 md:px-7"
@@ -133,7 +114,6 @@ export function PublicPlayerProfilePage() {
       <IdentityHero
         username={profile.username}
         avatarUrl={profile.avatarLargeUrl ?? null}
-        // No userId → the username edit pencil stays hidden (read-only switch).
         userId={undefined}
         createdAt={profile.createdAt}
         lastPlayedAt={career.data?.lastPlayedAt}
@@ -141,9 +121,6 @@ export function PublicPlayerProfilePage() {
         wins={wins}
         losses={losses}
         capots={career.data?.capots ?? 0}
-        // The wallet + login-streak pills are private and are suppressed; the 0s
-        // below are never rendered. Crucially we never read the viewer's authStore
-        // for the subject's pills.
         hidePrivatePills
         walletBalance={0}
         loginStreakDays={0}
@@ -151,12 +128,7 @@ export function PublicPlayerProfilePage() {
         xpIntoLevel={profile.xpIntoLevel}
         xpForNextLevel={profile.xpForNextLevel}
         winRate={winRate}
-        // Honour rides the hero as its bottom band (same as the self page). The
-        // client decides New Player suppression; the server-recomputed score/tier
-        // are authoritative for any viewer.
         honor={{
-          // Every honour string that speaks to the reader as the subject (the
-          // newcomer hint, the trend tooltip) switches to third person here.
           subjectIsSelf: false,
           score: profile.honorScore,
           tier: profile.honorTier,
@@ -168,27 +140,15 @@ export function PublicPlayerProfilePage() {
         }}
       />
 
-      {/* Story 11.2 AC7: the friendship action. Drives its label/action entirely
-          from GET /friends/status/:id — every state maps to a real affordance,
-          never a placeholder — and is never shown on the viewer's own profile. */}
       {validId !== undefined && <FriendButton userId={validId} username={profile.username} />}
 
-      {/* subjectIsSelf=false: the streak reads as a fact about this player, not
-          as a nudge at whoever is reading, and it drops the Play link with the
-          second-person copy. */}
       {career.data && <StreakCallout streak={career.data.streak} subjectIsSelf={false} />}
 
       <StatsGrid games={games} wins={wins} losses={losses} abandoned={abandoned} />
 
-      {/* Story 13.3: the SUBJECT's current seasonal rank + prior-season
-          archive, in the slot reserved since Epic 11. Renders nothing at all
-          when the subject has neither, which preserves the original graceful
-          absence for players without season history. */}
       <SeasonSection userId={validId} seasonRank={profile.seasonRank} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        {/* subjectIsSelf=false → the subject's seat shows their username, never a
-            "YOU" badge (the subject is not the viewer). */}
         <MatchHistory userId={validId} counts={counts} subjectIsSelf={false} />
 
         <aside

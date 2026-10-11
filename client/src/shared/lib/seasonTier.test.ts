@@ -23,8 +23,6 @@ import {
 
 describe("SEASON_TIERS", () => {
   it("lists the eight tokens the server emits, ascending", () => {
-    // Literals, not derived from SEASON_TIER_FLOORS: re-deriving the expectation
-    // from the same table the implementation reads would pass for any table.
     expect([...SEASON_TIERS]).toEqual([
       "iron",
       "bronze",
@@ -100,8 +98,6 @@ describe("normalizeSeasonTier", () => {
   });
 
   it("falls back to the SP bucket for an unknown token", () => {
-    // The version-skew case: a server that grows a ninth tier must not make a
-    // stale bundle render a missing i18n key.
     expect(normalizeSeasonTier("mythic", 1100)).toBe("diamond");
   });
 
@@ -120,8 +116,6 @@ describe("seasonBarFill", () => {
   });
 
   it("is FULL at Grandmaster, where there is no next tier", () => {
-    // spForNextTier 0 is the terminal case. An empty bar at the top of the
-    // ladder would be the exact opposite of the truth.
     expect(seasonBarFill(2000, 0)).toBe(1);
   });
 
@@ -220,7 +214,6 @@ describe("seasonRankLabel", () => {
 
   it("reads the bare tier name without a division", () => {
     expect(seasonRankLabel(i18n.t, "master", null)).toBe("Master");
-    // An ended pre-division season: stored tier, no division.
     expect(seasonRankLabel(i18n.t, "gold", null)).toBe("Gold");
   });
 

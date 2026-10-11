@@ -20,8 +20,6 @@ func datePtr(y int, m time.Month, d int) *time.Time {
 	return &t
 }
 
-// --- Pure streak/bonus rule tests (DB-free, table-driven) ---
-
 func TestEvaluateDailyLogin(t *testing.T) {
 	today := time.Date(2026, time.June, 18, 9, 30, 0, 0, time.UTC)
 
@@ -95,7 +93,7 @@ func TestBonusForStreak_Curve(t *testing.T) {
 		{1, 1000},
 		{2, 1162},
 		{13, 2944},
-		{14, 3100}, // 3106 capped to 3100 — cap first reached on day 14
+		{14, 3100},
 		{15, 3100},
 		{50, 3100},
 	}
@@ -103,8 +101,6 @@ func TestBonusForStreak_Curve(t *testing.T) {
 		assert.Equalf(t, tc.want, bonusForStreak(tc.streak), "streak day %d", tc.streak)
 	}
 }
-
-// --- Integration tests (Postgres; skipped when the DB is unavailable) ---
 
 func getTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -119,8 +115,6 @@ func getTestDB(t *testing.T) *gorm.DB {
 		t.Skip("skipping integration test: database not available")
 	}
 
-	// Per-test transaction rolled back on cleanup — tests create their own data
-	// and never depend on seed data.
 	tx := db.Begin()
 	t.Cleanup(func() { tx.Rollback() })
 	return tx
@@ -165,7 +159,6 @@ func TestGormRepository_ProcessDailyLogin_SameDayNoGrant(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, first.Granted)
 
-	// Second call, same UTC day — no further grant.
 	later := time.Date(2026, time.June, 18, 23, 59, 0, 0, time.UTC)
 	second, err := repo.ProcessDailyLogin(u.ID, later)
 	require.NoError(t, err)
@@ -193,8 +186,6 @@ func TestGormRepository_ProcessDailyLogin_ConsecutiveDayIncrements(t *testing.T)
 	assert.Equal(t, 5000+1000+1162, res.NewBalance)
 }
 
-// --- Story 9.2 wallet primitives: ChargeStakes / ApplySettlement / balances ---
-
 func TestGormRepository_ChargeStakes_HappyPathDebitsAll(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormRepository(db)
@@ -214,8 +205,6 @@ func TestGormRepository_ChargeStakes_HappyPathDebitsAll(t *testing.T) {
 func TestGormRepository_ChargeStakes_InsolventRollsBackWholeTx(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormRepository(db)
-	// rich is created first → lower ID → locked/debited first; poor then fails,
-	// which must roll back rich's debit too (all-or-nothing).
 	rich := createTestUser(t, db, "csrich@w.t", 1000, 0, nil)
 	poor := createTestUser(t, db, "cspoor@w.t", 100, 0, nil)
 
@@ -234,11 +223,11 @@ func TestGormRepository_ChargeStakes_NoOp(t *testing.T) {
 	repo := NewGormRepository(db)
 	u := createTestUser(t, db, "csnoop@w.t", 1000, 0, nil)
 
-	insolvent, err := repo.ChargeStakes([]uint{u.ID}, 0) // amount 0
+	insolvent, err := repo.ChargeStakes([]uint{u.ID}, 0)
 	require.NoError(t, err)
 	assert.Equal(t, uint(0), insolvent)
 
-	insolvent, err = repo.ChargeStakes(nil, 500) // empty list
+	insolvent, err = repo.ChargeStakes(nil, 500)
 	require.NoError(t, err)
 	assert.Equal(t, uint(0), insolvent)
 
@@ -259,7 +248,6 @@ func TestGormRepository_ApplySettlement_CreditsWinners(t *testing.T) {
 	assert.Equal(t, 1500, ba)
 	assert.Equal(t, 500, bb, "zero-amount credit is a no-op")
 
-	// Empty credits map is a no-op success (no-human-winner sink).
 	require.NoError(t, repo.ApplySettlement(map[uint]int{}))
 }
 
@@ -279,11 +267,8 @@ func TestGormRepository_GetBalances(t *testing.T) {
 	assert.Empty(t, empty)
 }
 
-// TestGormRepository_ChargeStakes_ConcurrentNoDeadlock verifies the ascending
-// userID lock order makes concurrent charges over the same two users
-// deadlock-free even when the caller passes the IDs in opposite orders. It needs
-// committed rows two SEPARATE transactions can contend on, so it uses a raw
-// connection and hard-deletes its rows on cleanup.
+// TestGormRepository_ChargeStakes_ConcurrentNoDeadlock verifies opposite-order concurrent charges do not deadlock.
+// It uses committed rows on a raw connection so two separate transactions can contend.
 func TestGormRepository_ChargeStakes_ConcurrentNoDeadlock(t *testing.T) {
 	dsn := os.Getenv("BELJOT_DB_URL")
 	if dsn == "" {
@@ -307,7 +292,6 @@ func TestGormRepository_ChargeStakes_ConcurrentNoDeadlock(t *testing.T) {
 
 	var wg sync.WaitGroup
 	errs := make([]error, 2)
-	// Opposite input orders; ChargeStakes sorts internally so both lock u1→u2.
 	inputs := [][]uint{{u1.ID, u2.ID}, {u2.ID, u1.ID}}
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
@@ -327,11 +311,8 @@ func TestGormRepository_ChargeStakes_ConcurrentNoDeadlock(t *testing.T) {
 	assert.Equal(t, 800, b2)
 }
 
-// TestGormRepository_ProcessDailyLogin_ConcurrentGrantsOnce verifies the row
-// lock makes the once-per-day guard race-free (AC #3). It needs a committed row
-// that two SEPARATE transactions can contend on, so it uses a raw (non-tx)
-// connection and hard-deletes its own row on cleanup — a rolled-back outer
-// transaction cannot host two concurrent FOR UPDATE waiters.
+// TestGormRepository_ProcessDailyLogin_ConcurrentGrantsOnce verifies concurrent daily logins grant exactly once.
+// It uses a committed row on a raw connection so two FOR UPDATE waiters can contend.
 func TestGormRepository_ProcessDailyLogin_ConcurrentGrantsOnce(t *testing.T) {
 	dsn := os.Getenv("BELJOT_DB_URL")
 	if dsn == "" {
@@ -377,7 +358,6 @@ func TestGormRepository_ProcessDailyLogin_ConcurrentGrantsOnce(t *testing.T) {
 	}
 	assert.Equal(t, 1, grantCount, "exactly one concurrent call must grant the daily bonus")
 
-	// Balance must reflect exactly one grant of 1000.
 	var reloaded user.User
 	require.NoError(t, db.First(&reloaded, u.ID).Error)
 	assert.Equal(t, 6000, reloaded.WalletBalance)

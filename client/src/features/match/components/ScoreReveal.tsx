@@ -20,19 +20,10 @@ interface ScoreRevealProps {
   data: HandScoredPayload;
   viewerTeam: TeamString;
   onContinue: () => void;
-  /** Hand number (1-based) used in the title — "Hand N — results". */
   handNumber?: number;
-  /** Trump suit for the just-finished hand (used in the subtitle). */
   trumpSuit?: Suit | null;
-  /** Seat that called the trump (used for "you took trump on X" wording). */
   trumpCallerSeat?: number | null;
-  /**
-   * True once the local player has clicked Continue and the server is waiting
-   * for the other players (server-gated hand-complete pause). Swaps the button
-   * to a disabled "waiting" label until the next hand is dealt.
-   */
   acknowledged?: boolean;
-  /** Match target shown in the brass strip — defaults to the full 1001 race. */
   matchTarget?: number;
 }
 
@@ -42,30 +33,11 @@ function callerTeamString(seat: number): TeamString {
 
 const AUTO_CONTINUE_MS = MOTION.SCORE_REVEAL_AUTO_CONTINUE;
 
-// Continue button corner radius — must equal ClassicButton's borderRadius (8)
-// so the traced border curves exactly like the gold button edge. The rect is
-// inset from the edge, so its corner radius is BUTTON_RADIUS - inset to stay
-// concentric (a rounded rect inset by d has corner radius R - d).
 const BUTTON_RADIUS = 8;
 
 /**
- * Countdown border that traces the Continue button's perimeter, sweeping full →
- * empty over the auto-continue window — the "loader around the button" the
- * informational reveals use (an AutoCloseRing's ring around its X), adapted to a
- * wide button. Two strokes mirror AutoCloseRing: a faint full-perimeter track
- * (the path the loader has already swept past) and the silver progress on top
- * that retracts. Colours match AutoCloseRing so it reads identically against the
- * green (ghost) button. Purely decorative; the timer in ScoreReveal owns the
- * actual fire.
- *
- * Measures the button via the SVG's own rect (it fills the relatively-positioned
- * wrapper) so the viewBox maps 1 user-unit → 1 px and the rounded corners stay
- * true. `pathLength={1}` normalises the dash math regardless of the perimeter.
- *
- * `sweep` carries the ring-drain animation style (mount-anchored, same
- * duration as the auto-continue fire timer) so the border reads empty exactly
- * when the auto-ack fires; undefined renders a static full border
- * (reduced motion).
+ * Decorative countdown border that drains around the Continue button over the auto-continue window.
+ * `sweep` carries the drain animation style; undefined renders a static full border for reduced motion.
  */
 function ButtonProgressBorder({ sweep }: { sweep?: CSSProperties }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -105,7 +77,6 @@ function ButtonProgressBorder({ sweep }: { sweep?: CSSProperties }) {
     >
       {w > 0 && h > 0 && (
         <>
-          {/* Faint full-perimeter track — the swept-past path. */}
           <rect
             x={inset}
             y={inset}
@@ -117,7 +88,6 @@ function ButtonProgressBorder({ sweep }: { sweep?: CSSProperties }) {
             stroke="rgba(255,255,255,0.1)"
             strokeWidth={2}
           />
-          {/* Silver progress that retracts over the track (matches AutoCloseRing). */}
           <rect
             x={inset}
             y={inset}
@@ -140,14 +110,8 @@ function ButtonProgressBorder({ sweep }: { sweep?: CSSProperties }) {
 }
 
 /**
- * End-of-hand score reveal — felt-panel breakdown of card points + decls
- * + bonuses, ending in a brass-tinted match-score strip.
- *
- * Continue is enabled from the start. A countdown border around the button runs
- * the auto-continue window: if the player never clicks, the dialog acknowledges
- * itself (so one AFK player can't strand the table on the score screen). Once
- * acknowledged the button swaps to a disabled "waiting" label until the server
- * deals the next hand.
+ * End-of-hand score reveal breaking down card points, declarations and bonuses above the match score.
+ * A countdown border on Continue auto-acknowledges the dialog so an AFK player cannot stall the table.
  */
 export function ScoreReveal({
   data,
@@ -162,13 +126,6 @@ export function ScoreReveal({
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
 
-  // Auto-continue: if the player never clicks, the dialog acknowledges itself
-  // after AUTO_CONTINUE_MS so an AFK player can't strand the whole table on the
-  // score screen (each client auto-acks → the server deals the next hand once
-  // everyone is ready). Mirrors the 8 s auto-close on the informational
-  // reveals; the border around the button visualises the countdown. Once
-  // acknowledged (this click, or the parent already advanced) the timer is
-  // cancelled — see the `acknowledged` dependency.
   const firedRef = useRef(false);
   const onContinueRef = useRef(onContinue);
   onContinueRef.current = onContinue;
@@ -183,14 +140,8 @@ export function ScoreReveal({
     return () => clearTimeout(fire);
   }, [acknowledged]);
 
-  // Mount-anchored drain sweep for the button border: starts on the same
-  // commit as the fire timer above and shares its duration, so the border
-  // reads empty exactly when the auto-ack fires.
   const borderSweep = useMemo(() => ringDrainStyle(AUTO_CONTINUE_MS, AUTO_CONTINUE_MS, 1), []);
 
-  // Reduced-motion fallback: no drain animation, but the border must still
-  // reflect the countdown — step the dashoffset once per second, anchored to
-  // the same mount instant as the fire timer.
   const [reducedPct, setReducedPct] = useState(1);
   useEffect(() => {
     if (!prefersReducedMotion || acknowledged) return;
@@ -207,9 +158,6 @@ export function ScoreReveal({
 
   const hasDeclarations = data.teamADeclPoints > 0 || data.teamBDeclPoints > 0;
 
-  // Title + outcome subtitle per design ("Hand N — results / Pulled it off ·
-  // you took trump on Spades"). When handNumber / trumpSuit aren't passed
-  // (legacy callers, test renders) we fall back to a plain "Hand Score".
   const title =
     handNumber !== undefined
       ? t("match.scoreReveal.titleWithHand", {
@@ -221,19 +169,9 @@ export function ScoreReveal({
   const callerTeam: TeamString | null =
     typeof trumpCallerSeat === "number" ? callerTeamString(trumpCallerSeat) : null;
   const callerWasViewer = callerTeam !== null && callerTeam === viewerTeam;
-  // Names the suit as the player's own deck depicts it. This panel draws no suit
-  // artwork at all — the name is the only representation — so there is nothing
-  // here to contradict: a Croatian player reads "Bells", not "Diamonds".
   const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
   const trumpSuitName = trumpSuit ? t(suitNameKey(trumpSuit, deck)) : null;
 
-  // Subtitle carries the hand-outcome callout per design. When the taker's
-  // team went down, it names who collects the points — split into Us/Them
-  // keys (mirroring capot.bonusUs/bonusThem) rather than interpolating the
-  // team LABEL, because "all points to {{team}}" reads ungrammatically after
-  // the preposition in mk/hr/sr: the nominative label ("за Тие" / "za Oni")
-  // must be the oblique pronoun ("за нив" / "za njih"). Held = "Pulled it off
-  // · you took trump on Spades"; went down = "Went down · all points to us/them".
   let subtitle: string | null = null;
   if (data.failedContract) {
     const beneficiary: TeamString = data.contractingTeam === 0 ? "teamB" : "teamA";
@@ -266,7 +204,6 @@ export function ScoreReveal({
             title={<span data-testid="score-reveal-title">{title}</span>}
             subtitle={subtitle ?? undefined}
           >
-            {/* Header eyebrow row — Us / Them column labels */}
             <div
               className="grid items-end mb-2"
               style={{ gridTemplateColumns: "1fr 80px 80px", gap: 8 }}
@@ -329,10 +266,6 @@ export function ScoreReveal({
               />
             </div>
 
-            {/* Match-score brass strip — per design, the strip hosts the
-                "Match score" eyebrow + the {Us · Them / 1001} totals on the
-                left and the Continue button on the right. Combining them
-                keeps the dialog footprint tight. */}
             <div
               className="rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 mt-4 flex flex-wrap items-center justify-between gap-3 sm:gap-4"
               style={{
@@ -348,8 +281,6 @@ export function ScoreReveal({
                 >
                   {t("match.scoreReveal.matchTotal")}
                 </span>
-                {/* nowrap: the "/ 1001" target must never split off onto its own
-                    line when the Continue button squeezes the strip on phones. */}
                 <div className="flex items-baseline gap-1.5 sm:gap-2 font-display text-[16px] sm:text-[18px] font-bold tabular-nums whitespace-nowrap">
                   <span style={{ color: teamAGradient[0] }} data-team="teamA">
                     {data.teamAMatchScore}
@@ -366,9 +297,6 @@ export function ScoreReveal({
                   </span>
                 </div>
               </div>
-              {/* ml-auto keeps the CTA pinned right if the strip ever wraps on
-                  ultra-narrow screens (justify-between alone would drop a lone
-                  wrapped item to the left edge). */}
               <span className="relative inline-flex ml-auto">
                 <ClassicButton
                   variant="ghost"
@@ -378,9 +306,6 @@ export function ScoreReveal({
                 >
                   {acknowledged ? t("match.scoreReveal.waiting") : t("match.scoreReveal.continue")}
                 </ClassicButton>
-                {/* Loader traces the button's border (not an inline icon) —
-                    matches the ring-around-the-control pattern of the other
-                    reveals. Hidden once acknowledged (then we're just waiting). */}
                 {!acknowledged && (
                   <ButtonProgressBorder sweep={prefersReducedMotion ? reducedSweep : borderSweep} />
                 )}
@@ -457,8 +382,6 @@ interface BonusRowProps {
 
 function BonusRow({ label, amount, team, teamGradient, testId }: BonusRowProps) {
   const teamString = teamStringForIndex(team);
-  // Same grid as ScoreRow so the bonus lands under the earning team's column
-  // (team A = left, team B = right) instead of always hugging the right edge.
   const value = (
     <span
       className="font-display text-right tabular-nums text-sm sm:text-[15px]"

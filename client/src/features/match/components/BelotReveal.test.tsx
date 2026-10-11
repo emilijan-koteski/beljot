@@ -132,7 +132,6 @@ describe("BelotReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    // Stand-alone test render — no players roster, viewer-relative team only.
     expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent("Us");
   });
 

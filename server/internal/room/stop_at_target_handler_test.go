@@ -12,14 +12,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// The room-level "dosta" (stop at target) toggle: request shape, defaulting,
-// persistence, what reaches the session manager, and what the lobby is told.
-//
-// Direct sibling of declarations_handler_test.go, and deliberately shaped after
-// it — same feature class, same traps. The POLARITY is the one thing that
-// differs: here the safe default is FALSE, so the interesting failure is an
-// explicit TRUE being lost rather than an absent field being read as off.
-
 // The default must be OFF: finishing the hand before the target is checked is
 // how every match here has ever ended. The request field is a *bool for symmetry
 // with declarationsEnabled, and this pins the resolution of both "absent" forms.
@@ -56,10 +48,8 @@ func TestCreateRoom_StopAtTargetDefaultsToOff(t *testing.T) {
 	}
 }
 
-// An explicit true must survive all the way to the persisted row, in either
-// variant. This is the assertion the missing GORM `default` tag protects: with
-// one, GORM would drop the field from the INSERT and the toggle could never be
-// turned on.
+// TestCreateRoom_StopAtTargetEnabledSurvives checks an explicit true reaches the persisted
+// row in either variant, which a GORM `default` tag would break.
 func TestCreateRoom_StopAtTargetEnabledSurvives(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -89,13 +79,9 @@ func TestCreateRoom_StopAtTargetEnabledSurvives(t *testing.T) {
 	}
 }
 
-// The two room-level rule fields are independent switches, and nothing else in
-// either suite proves it: both are resolved in the same handler block and
-// layered onto the same config struct, so a copy-paste that read one pointer
-// twice would pass every single-field test above.
+// TestCreateRoom_RuleTogglesAreIndependent checks the two room-level rule fields are
+// resolved from their own pointers rather than one read twice.
 func TestCreateRoom_RuleTogglesAreIndependent(t *testing.T) {
-	// Marshalled from a struct rather than spliced together from JSON fragments:
-	// the request shape is the thing under test, so it should be readable as one.
 	type createBody struct {
 		Name                string `json:"name"`
 		Variant             string `json:"variant"`
@@ -177,11 +163,8 @@ func TestQuickPlay_SynthesizedRoomFinishesTheHand(t *testing.T) {
 		"Quick Play is Croatian, 501, declarations on, finish the hand")
 }
 
-// QuickPlay's system:room_created is the SECOND hand-built room payload in the
-// package — a separate key list from roomLifecyclePayload, which is exactly why
-// it has hidden a missing field before. The lobby card treats an absent key as
-// off, so an omission here is harmless TODAY and becomes a bug the day the
-// default stops matching; assert the key is really sent.
+// TestQuickPlayRoomCreatedPayload_CarriesStopAtTarget asserts QuickPlay's hand-built
+// system:room_created payload really sends the stop-at-target key.
 func TestQuickPlayRoomCreatedPayload_CarriesStopAtTarget(t *testing.T) {
 	e, _, broadcaster := setupTestWithBroadcast()
 
@@ -204,11 +187,8 @@ func TestQuickPlayRoomCreatedPayload_CarriesStopAtTarget(t *testing.T) {
 	assert.Equal(t, false, got)
 }
 
-// The value the session manager receives is the one the engine will play by, and
-// nothing downstream can validate it: true is legal, so a room that persisted
-// finish-the-hand but handed the manager true would cut every match short
-// mid-hand and look entirely healthy. Same reasoning as the variant string and
-// the declarations flag before it.
+// TestStartGame_PassesTheRoomsStopAtTargetToTheSessionManager checks the session manager
+// receives the room's persisted stop-at-target value.
 func TestStartGame_PassesTheRoomsStopAtTargetToTheSessionManager(t *testing.T) {
 	for _, want := range []bool{true, false} {
 		name := "stop at target"
@@ -222,7 +202,6 @@ func TestStartGame_PassesTheRoomsStopAtTargetToTheSessionManager(t *testing.T) {
 			r := seedRoomWithPlayers(repo, "Dosta Start", 1, 1, 2, 3, 4)
 			r.StopAtTarget = want
 			r.DeclarationsEnabled = true
-			// StartGame requires four SEATED players.
 			seats := []int{0, 1, 2, 3}
 			teams := []string{"teamA", "teamB", "teamA", "teamB"}
 			for i, p := range repo.players {
@@ -297,11 +276,8 @@ func TestRoom_StopAtTargetDefaultsFalseOnRawInsert(t *testing.T) {
 		"a row inserted without the column must land on FALSE, or the migration silently changed every existing room")
 }
 
-// The lobby's LIVE path. roomLifecyclePayload is a hand-built key list, so the
-// room struct's json tag does not protect it: dropping the key compiles, every
-// HTTP and DB test above still passes, and a freshly created dosta room arrives
-// at every connected lobby looking like an ordinary table until the next full
-// refetch. This one map feeds BOTH system:room_created and system:room_updated.
+// TestRoomLifecyclePayload_CarriesStopAtTarget asserts the hand-built lifecycle payload
+// behind system:room_created and system:room_updated includes the stop-at-target key.
 func TestRoomLifecyclePayload_CarriesStopAtTarget(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{5: honorOf(96)}}
 	e, _, broadcaster, _ := setupHonorTest(nil, nil, honor)

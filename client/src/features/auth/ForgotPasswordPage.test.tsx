@@ -80,7 +80,6 @@ describe("ForgotPasswordPage", () => {
       expect(screen.getByTestId("forgot-success")).toBeInTheDocument();
     });
     expect(mockForgotPassword).toHaveBeenCalledWith({ email: "test@example.com" });
-    // The form is gone — replaced by the confirmation state.
     expect(screen.queryByTestId("forgot-form")).not.toBeInTheDocument();
   });
 

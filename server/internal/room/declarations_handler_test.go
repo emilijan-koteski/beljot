@@ -12,13 +12,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// The room-level declarations toggle: request shape, defaulting, persistence,
-// what reaches the session manager, and what the lobby is told.
-
-// The default must be ON. This is the single most important assertion in the
-// file: the request field is a *bool precisely so an omitted key cannot be read
-// as "off", and a plain bool here would silently strip melds and Belote from
-// every room created by a client that has not shipped the toggle yet.
+// An omitted or null declarationsEnabled must mean ON, so older clients keep
+// melds and Belote; that is why the request field is a *bool.
 func TestCreateRoom_DeclarationsDefaultToEnabled(t *testing.T) {
 	tests := []struct {
 		name string
@@ -119,12 +114,8 @@ func TestQuickPlay_SynthesizedRoomKeepsDeclarations(t *testing.T) {
 		"a hand-built &Room{} that forgets the field inserts false — quick play must be explicit")
 }
 
-// The value the session manager receives is the one the engine will play by, and
-// nothing downstream can validate it: false is legal, so a room that persisted
-// ON but handed the manager OFF would play a silently meldless match and look
-// entirely healthy. Deliberately shaped after
-// TestStartGame_PassesTheRoomsVariantToTheSessionManager, which exists for the
-// same reason about the variant string.
+// The session manager must receive the room's own setting, since nothing
+// downstream can tell a wrong false from a deliberate one.
 func TestStartGame_PassesTheRoomsDeclarationSettingToTheSessionManager(t *testing.T) {
 	for _, want := range []bool{true, false} {
 		name := "declarations on"
@@ -137,7 +128,6 @@ func TestStartGame_PassesTheRoomsDeclarationSettingToTheSessionManager(t *testin
 
 			r := seedRoomWithPlayers(repo, "Decl Start", 1, 1, 2, 3, 4)
 			r.DeclarationsEnabled = want
-			// StartGame requires four SEATED players.
 			seats := []int{0, 1, 2, 3}
 			teams := []string{"teamA", "teamB", "teamA", "teamB"}
 			for i, p := range repo.players {
@@ -155,10 +145,8 @@ func TestStartGame_PassesTheRoomsDeclarationSettingToTheSessionManager(t *testin
 	}
 }
 
-// DB-backed: the column round-trips a false, and the migration's DEFAULT TRUE
-// backfills a row that never mentions it. Mirrors
-// TestRoom_AllowNewPlayersFalseSurvivesRoundtrip, which exists because this
-// exact class of bug (GORM dropping a zero-valued field) shipped once already.
+// DB-backed: an explicit false round-trips through GORM instead of being
+// dropped as a zero value.
 func TestRoom_DeclarationsEnabledFalseSurvivesRoundtrip(t *testing.T) {
 	db := getRoomTestDB(t)
 	repo := room.NewGormRepository(db)
@@ -213,12 +201,8 @@ func TestRoom_DeclarationsEnabledDefaultsTrueOnRawInsert(t *testing.T) {
 		"a row inserted without the column must land on TRUE, or the migration silently changed every existing room")
 }
 
-// The lobby's LIVE path. roomLifecyclePayload is a hand-built key list, so the
-// room struct's json tag does not protect it: dropping the key compiles, every
-// HTTP and DB test above still passes, and a freshly created bez-zvanja room
-// arrives at every connected lobby looking like an ordinary table until the next
-// full refetch. Direct sibling of TestRoomLifecyclePayload_CarriesHonorGate,
-// which exists for exactly this failure mode on the honor gate.
+// roomLifecyclePayload is a hand-built key list that the struct's json tag does
+// not protect, so the live lobby broadcast must carry the setting explicitly.
 func TestRoomLifecyclePayload_CarriesDeclarationsSetting(t *testing.T) {
 	honor := &stubHonor{snaps: map[uint]user.HonorSnapshot{5: honorOf(96)}}
 	e, _, broadcaster, _ := setupHonorTest(nil, nil, honor)

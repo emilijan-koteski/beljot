@@ -14,13 +14,9 @@ interface DialogTarget {
   name: string;
   seat: number | null;
   team: "A" | "B" | null;
-  /** The target's 128 px avatar, as the roster shows it; the initial without one. */
   avatarUrl?: string | null;
 }
 
-// ── Filled brass / danger / ghost footer buttons ────────────────────────────
-// The shared <Button> has no solid brass or solid danger fill, so the dialog
-// footer builds its own to keep the rhythm identical across both confirmations.
 const BUTTON_TONES: Record<ButtonTone, CSSProperties> = {
   ghost: {
     background: "transparent",
@@ -87,7 +83,6 @@ function DialogButton({
   );
 }
 
-// ── Shared parchment confirm-dialog shell ───────────────────────────────────
 function OwnerConfirmDialog({
   open,
   onOpenChange,
@@ -148,7 +143,6 @@ function OwnerConfirmDialog({
           boxShadow: "0 40px 90px -30px rgba(14,58,36,0.55), 0 0 0 1px rgba(201,168,118,0.18)",
         }}
       >
-        {/* Brass/danger hairline — owner-action signature */}
         <div
           style={{
             height: 3,
@@ -160,7 +154,6 @@ function OwnerConfirmDialog({
           }}
         />
 
-        {/* Close */}
         <DialogClose
           aria-label={t("room.ownerConfirm.close", { defaultValue: "Close" })}
           style={{
@@ -182,7 +175,6 @@ function OwnerConfirmDialog({
           <X size={16} />
         </DialogClose>
 
-        {/* Header */}
         <div style={{ display: "flex", gap: 16, padding: "26px clamp(18px, 5vw, 28px) 6px" }}>
           <div
             style={{
@@ -230,7 +222,6 @@ function OwnerConfirmDialog({
           </div>
         </div>
 
-        {/* Lede */}
         <p
           style={{
             margin: 0,
@@ -243,10 +234,8 @@ function OwnerConfirmDialog({
           {lede}
         </p>
 
-        {/* Body */}
         <div style={{ padding: "18px clamp(18px, 5vw, 28px) 4px" }}>{children}</div>
 
-        {/* Footer */}
         <div
           style={{
             marginTop: 12,
@@ -277,7 +266,6 @@ function OwnerConfirmDialog({
   );
 }
 
-// ── Compact player row — the subject of the kick dialog ─────────────────────
 function PlayerRow({ name, seat, team, avatarUrl, icon }: DialogTarget & { icon?: ReactNode }) {
   const { t } = useTranslation();
   const seated = seat !== null && seat !== undefined;
@@ -332,7 +320,6 @@ interface ActionDialogProps {
   target: DialogTarget;
 }
 
-// ── Kick player (destructive → danger) ──────────────────────────────────────
 export function KickPlayerDialog({
   open,
   onOpenChange,
@@ -381,7 +368,6 @@ export function KickPlayerDialog({
   );
 }
 
-// ── Remove bot (destructive → danger; kick pattern, Story 10.3) ─────────────
 export function RemoveBotDialog({
   open,
   onOpenChange,
@@ -430,7 +416,6 @@ export function RemoveBotDialog({
   );
 }
 
-// ── Transfer ownership / Make host (constructive but irreversible → brass) ──
 export function TransferOwnershipDialog({
   open,
   onOpenChange,
@@ -454,9 +439,6 @@ export function TransferOwnershipDialog({
       icon: <UserX size={14} color="var(--brass-deep)" />,
       label: t("room.ownerConfirm.capabilities.players"),
     },
-    // Add/remove bots + room privacy are the owner powers actually available in
-    // a waiting room; the old "room name, pace & settings" item was misleading
-    // (name/timer aren't editable after creation).
     {
       icon: <Bot size={14} color="var(--brass-deep)" />,
       label: t("room.ownerConfirm.capabilities.bots"),
@@ -498,7 +480,6 @@ export function TransferOwnershipDialog({
       cancelLabel={t("room.transferConfirm.cancel")}
       cancelTestId="transfer-cancel"
     >
-      {/* Crown handoff — leaves you, lands on them */}
       <div
         style={{
           display: "flex",
@@ -593,7 +574,6 @@ export function TransferOwnershipDialog({
         </div>
       </div>
 
-      {/* What you hand over */}
       <span
         style={{
           fontFamily: "var(--font-mono)",
@@ -606,9 +586,6 @@ export function TransferOwnershipDialog({
       >
         {t("room.ownerConfirm.handOver")}
       </span>
-      {/* Simple icon-bulleted list (was a 2-col card grid that couldn't align
-          on narrow screens): the capability icon replaces the bullet dot, then
-          the label. One column at every width. */}
       <ul
         style={{
           margin: "10px 0 0",

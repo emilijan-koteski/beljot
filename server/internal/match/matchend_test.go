@@ -14,42 +14,22 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// --- Test doubles ---
-//
-// Story 8.5-1 AC7: new tests added by Tasks 1, 4 use synchronous assertions
-// (handleMatchEnd is synchronous, so no polling is needed) instead of
-// time.Sleep. If a future async test path is added, prefer channels or a
-// waitFor(cond, timeout) polling helper — never a fixed sleep.
-
 type hubCall struct {
 	userIDs []uint
 	msg     []byte
 	at      time.Time
-	// frames holds the per-recipient bytes when the call came through
-	// SendFrames (per-seat projected match_state, Story 12.10); nil for
-	// BroadcastToUsers / SendToUser calls. msg is then the FIRST frame, kept
-	// as the representative for type/ordering assertions — every frame in one
-	// call carries the same event type.
-	frames map[uint][]byte
+	frames  map[uint][]byte
 }
 
-// hubSpy records every BroadcastToUsers / SendToUser call so tests can assert
-// the order and timing of broadcasts. Mirrors the chat / emote handler test
-// pattern (chat/handler_test.go, emote/handler_test.go) — same shape, no new
-// mocking style introduced. Satisfies session.Broadcaster.
+// hubSpy records every broadcast call so tests can assert their order and
+// timing. It satisfies session.Broadcaster.
 type hubSpy struct {
 	mu    sync.Mutex
 	calls []hubCall
 }
 
-// failIfUnprojectedState hard-fails the run when an event:match_state payload
-// arrives through an identical-bytes primitive. Story 12.10 routes EVERY state
-// frame through SendFrames carrying a per-seat game.ProjectForSeat mask; a
-// state payload on BroadcastToUsers or SendToUser is an unprojected send that
-// would ship hidden cards to all four seats. It panics (rather than t.Errorf)
-// so the failure fires AT the offending send with a stack trace naming the
-// call site, without threading *testing.T through every spy constructor —
-// this turns the whole wiring suite into an adoption sweep.
+// failIfUnprojectedState panics when an event:match_state payload is sent through
+// BroadcastToUsers or SendToUser, which would leak hidden cards to every seat.
 func failIfUnprojectedState(spy, primitive string, msg []byte) {
 	if containsType(msg, ws.EventMatchState) {
 		panic(spy + ": " + ws.EventMatchState + " must ride SendFrames with a per-seat projection (Story 12.10); got it via " + primitive)
@@ -76,11 +56,8 @@ func (h *hubSpy) SendToUser(userID uint, msg []byte) {
 	h.calls = append(h.calls, hubCall{userIDs: []uint{userID}, msg: msgCopy, at: time.Now()})
 }
 
-// SendFrames records ONE call per frames batch — the wire log keeps one entry
-// per logical state event, so every count/order assertion over calls still
-// holds, and a single-recipient entry still means a targeted SendToUser.
-// An empty batch (every recipient seat is a bot) records nothing, mirroring
-// recordingBroadcaster — a phantom nil-msg call would poison type decoding.
+// SendFrames records one call per non-empty frames batch, keeping the first
+// frame as the representative message.
 func (h *hubSpy) SendFrames(frames []ws.UserFrame) {
 	if len(frames) == 0 {
 		return
@@ -185,12 +162,8 @@ func (r *timestampedRepo) at() time.Time {
 	return r.persistAt
 }
 
-// --- Tests (Story 8.5-1 AC4 — resolves D101) ---
-
-// TestHandleMatchEnd_PersistsBeforeBroadcast locks in the AC4 invariant:
-// matchRepo.CreateWithHands MUST complete BEFORE event:match_end is broadcast,
-// so a client that receives match_end and immediately reads the match row
-// (Story 9.1+) finds it.
+// TestHandleMatchEnd_PersistsBeforeBroadcast checks that the match row is
+// persisted before event:match_end is broadcast.
 func TestHandleMatchEnd_PersistsBeforeBroadcast(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -200,7 +173,6 @@ func TestHandleMatchEnd_PersistsBeforeBroadcast(t *testing.T) {
 	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-	// Build a final state and a payload that look like a real match end.
 	finalState := mgr.GetStateSnapshot(roomID)
 	require.NotNil(t, finalState)
 	winner := game.TeamA
@@ -219,12 +191,9 @@ func TestHandleMatchEnd_PersistsBeforeBroadcast(t *testing.T) {
 
 	require.True(t, repo.wasCalled(), "matchRepo.CreateWithHands must be invoked")
 
-	// The first hubSpy call after handleMatchEnd must be event:match_end and
-	// must occur AFTER the persist timestamp.
 	calls := hub.snapshot()
 	require.NotEmpty(t, calls, "handleMatchEnd must broadcast at least one message")
 
-	// Find the event:match_end broadcast.
 	matchEndIdx := -1
 	for i, c := range calls {
 		if containsType(c.msg, "event:match_end") {
@@ -243,8 +212,6 @@ func TestHandleMatchEnd_PersistsBeforeBroadcast(t *testing.T) {
 		broadcastAt, persistAt,
 	)
 
-	// match_state must follow match_end (preserves client-facing order so
-	// MatchPage's stale-state redirect does not race matchEndData arrival).
 	require.Greater(t, len(calls), matchEndIdx+1, "event:match_state must follow event:match_end")
 	assert.True(t,
 		containsType(calls[matchEndIdx+1].msg, "event:match_state"),

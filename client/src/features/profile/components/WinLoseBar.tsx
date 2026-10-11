@@ -1,13 +1,8 @@
 type WinLoseBarProps = {
-  /** Win share 0–100; the remainder renders as the loss segment. */
   winPct: number;
 };
 
-/**
- * Two-segment ratio bar: solid felt-green for the win share reads as "filled",
- * while the loss share is a soft translucent red — it indicates the remainder
- * without clashing with the green. Together they fill the track.
- */
+/** Two-segment ratio bar: the win share in felt-green, the remaining loss share in translucent red. */
 export function WinLoseBar({ winPct }: WinLoseBarProps) {
   const win = Math.max(0, Math.min(100, winPct));
   return (

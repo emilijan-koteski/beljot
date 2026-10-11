@@ -25,37 +25,27 @@ export function getRoomByCode(code: string): Promise<RoomDetail> {
   return axiosClient.get(`/rooms/code/${encodeURIComponent(code)}`);
 }
 
-// joinRoom posts an optional private-room password (Story 9.6). Public-room
-// joins pass no password and send no body, preserving the pre-9.6 request shape.
+/** Join a room, sending a body only when a private-room password is given. */
 export function joinRoom(id: number, password?: string): Promise<Room> {
   return axiosClient.post(`/rooms/${id}/join`, password !== undefined ? { password } : undefined);
 }
 
-// listInvitableFriends returns the caller's friends annotated with whether they
-// can be invited into this room right now (Story 11.5, AC1). Caller must be a
-// member of the (waiting) room; availability is computed server-side.
+/** The caller's friends, each flagged with whether they can be invited into this room now. */
 export function listInvitableFriends(roomId: number): Promise<InvitableFriend[]> {
   return axiosClient.get(`/rooms/${roomId}/invitable-friends`);
 }
 
-// inviteToRoom issues a friend invite into this room (Story 11.5, AC2). Whether
-// the invite carries a password bypass is decided SERVER-side from the room's
-// owner — deliberately no flag is sent here (D3).
+/** Invite a friend into this room; the server decides any password bypass from the room owner. */
 export function inviteToRoom(roomId: number, friendUserId: number): Promise<void> {
   return axiosClient.post(`/rooms/${roomId}/invite`, { friendUserId });
 }
 
-// declineRoomInvite voids the caller's own outstanding invite to this room
-// (Story 11.5). Called by the INVITEE, who is not in the room. Without it a
-// declined invite stays consumable until its TTL lapses, so a "no thanks" would
-// still leave the door open for a minute. Always succeeds server-side — a
-// missing or already-expired invite is a no-op, not an error.
+/** Void the caller's own outstanding invite to this room; a missing invite is a no-op. */
 export function declineRoomInvite(roomId: number): Promise<void> {
   return axiosClient.post(`/rooms/${roomId}/invite/decline`);
 }
 
-// updateRoomPrivacy sets/changes the room password or reverts the room to public
-// (Story 9.6). Owner-only + waiting-only server-side. Does not eject seated players.
+/** Set or change the room password, or revert the room to public. */
 export function updateRoomPrivacy(
   roomId: number,
   body: { isPrivate: boolean; password?: string },
@@ -67,10 +57,7 @@ export function leaveRoom(id: number): Promise<void> {
   return axiosClient.post(`/rooms/${id}/leave`);
 }
 
-// Reopens a finished room (status completed -> waiting) so the same group can
-// play another match without recreating it. The caller's original seat is
-// preserved server-side; rejects with 404 NOT_IN_ROOM if the caller was kicked
-// or left, in which case the UI routes them back to the lobby.
+/** Reopen a finished room for another match, keeping the caller's seat; 404 NOT_IN_ROOM if they left. */
 export function returnToRoom(roomId: number): Promise<RoomDetail> {
   return axiosClient.post(`/rooms/${roomId}/return`);
 }
@@ -95,10 +82,7 @@ export function quickPlay(signal?: AbortSignal): Promise<QuickPlayResponse> {
   return axiosClient.post("/rooms/quick-play", undefined, { signal });
 }
 
-// Joins a SPECIFIC quick-play room (the one tapped in the lobby grid),
-// auto-seating the player and running the auto-start check. Returns the same
-// shape as quickPlay so the caller can route to the matchmaking screen (or the
-// game when this join filled the last seat).
+/** Join a specific quick-play room with auto-seating, returning the same shape as quickPlay. */
 export function quickJoin(id: number): Promise<QuickPlayResponse> {
   return axiosClient.post(`/rooms/${id}/quick-join`);
 }

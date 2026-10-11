@@ -20,8 +20,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// --- test doubles ---------------------------------------------------------
-
 type fakeResetRepo struct {
 	tokens    []*passwordreset.PasswordResetToken
 	nextID    uint
@@ -102,8 +100,6 @@ func (m *fakeMailer) sent() []sentEmail {
 	return append([]sentEmail(nil), m.calls...)
 }
 
-// --- harness --------------------------------------------------------------
-
 func setupResetHandler() (*mockUserRepo, *fakeResetRepo, *fakeMailer, *echo.Echo) {
 	userRepo := newMockUserRepo()
 	resetRepo := &fakeResetRepo{}
@@ -148,8 +144,6 @@ func tokenFromLink(t *testing.T, link string) string {
 	return u.Query().Get("token")
 }
 
-// --- ForgotPassword -------------------------------------------------------
-
 func TestForgotPassword_KnownEmail_SendsLinkInUserLanguage(t *testing.T) {
 	userRepo, resetRepo, fm, e := setupResetHandler()
 	seedResetUser(t, userRepo, "test@example.com", "mk")
@@ -157,7 +151,6 @@ func TestForgotPassword_KnownEmail_SendsLinkInUserLanguage(t *testing.T) {
 	rec := postJSON(e, "/api/v1/auth/forgot-password", `{"email":"test@example.com"}`)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	// The email is dispatched on a background goroutine — wait for it.
 	require.Eventually(t, func() bool { return len(fm.sent()) == 1 }, time.Second, 5*time.Millisecond,
 		"expected one email for a known address")
 	sent := fm.sent()[0]
@@ -219,8 +212,6 @@ func TestForgotPassword_MailerError_StillGenericSuccess(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code, "mailer failures must not leak via the response")
 }
 
-// --- ResetPassword --------------------------------------------------------
-
 func TestResetPassword_ValidToken_UpdatesHashAndIsSingleUse(t *testing.T) {
 	userRepo, _, fm, e := setupResetHandler()
 	u := seedResetUser(t, userRepo, "test@example.com", "en")
@@ -238,7 +229,6 @@ func TestResetPassword_ValidToken_UpdatesHashAndIsSingleUse(t *testing.T) {
 	assert.NoError(t, CheckPassword(stored.PasswordHash, "brandnewpass1"), "new password must verify")
 	assert.Error(t, CheckPassword(stored.PasswordHash, "oldpassword123"), "old password must no longer verify")
 
-	// Re-using the same link must fail — single use.
 	reuse := postJSON(e, "/api/v1/auth/reset-password", `{"token":"`+token+`","password":"anotherpass99"}`)
 	assert.Equal(t, http.StatusBadRequest, reuse.Code)
 	assert.Equal(t, "INVALID_RESET_TOKEN", errCode(t, reuse))

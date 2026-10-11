@@ -2,14 +2,8 @@ package identity
 
 import "time"
 
-// Identity links a local user account to one external SSO provider account
-// (e.g. a Google account). Provider is the registry name ("google"), and
-// ProviderUserID is the provider's stable subject for that account (Google's
-// `sub` claim) — never the email, which can change or be recycled.
-//
-// Email is a point-in-time snapshot of the provider email at link time, kept
-// for support/debugging only; login matches exclusively on
-// (provider, provider_user_id).
+// Identity links a local user to one external SSO account, keyed by the provider's stable subject.
+// Email is a link-time snapshot for support only; login matches on (provider, provider_user_id).
 type Identity struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	UserID         uint      `gorm:"column:user_id;not null" json:"userId"`
@@ -20,8 +14,7 @@ type Identity struct {
 	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
-// TableName overrides GORM's default pluralization ("identities") — the table
-// is user_identities (migration 000014).
+// TableName maps Identity to the user_identities table.
 func (Identity) TableName() string {
 	return "user_identities"
 }

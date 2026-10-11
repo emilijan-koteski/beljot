@@ -19,8 +19,6 @@ vi.mock("@/shared/api/profile", () => ({
   updatePreferences: vi.fn().mockResolvedValue({ languagePreference: "en" }),
 }));
 
-// The mounted DailyRewardGate fires claimDailyLogin on bootstrap — stub it so
-// these layout tests don't reach the network. granted:false → no dialog opens.
 vi.mock("@/shared/api/wallet", () => ({
   claimDailyLogin: vi.fn().mockResolvedValue({
     granted: false,
@@ -76,8 +74,6 @@ describe("AppLayout", () => {
     expect(screen.getByTestId("app-nav")).toBeInTheDocument();
     expect(screen.getByTestId("app-name")).toHaveTextContent("Beljot");
     expect(screen.getByTestId("nav-play")).toHaveTextContent("Play");
-    // Story 13.2 added a FOURTH tab. Its test-id derives from the labelKey
-    // (`nav.leaderboard` -> `nav-leaderboard`), like every other one.
     expect(screen.getByTestId("nav-leaderboard")).toHaveTextContent("Leaderboard");
     expect(screen.getByTestId("nav-profile")).toHaveTextContent("Profile");
     expect(screen.getByTestId("nav-rules")).toHaveTextContent("Rules");
@@ -105,8 +101,6 @@ describe("AppLayout", () => {
     expect(profileTab).toHaveAttribute("aria-current", "page");
   });
 
-  // AC2: the new tab gets the SAME active styling as the others — it is one more
-  // entry in the same data-driven navItems list, not a special case.
   it("highlights active tab for /leaderboard", () => {
     renderWithRouter("/leaderboard");
 

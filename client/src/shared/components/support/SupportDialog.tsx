@@ -15,41 +15,22 @@ import { SuitRule } from "@/shared/components/ui/suit-rule";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { cn } from "@/shared/lib/utils";
 
-/**
- * The one place that explains WHY support is being asked for. Every support
- * surface in the app is a link or a menu row that opens this — nothing else
- * carries the pitch, so nothing else has to be dismissible.
- *
- * Shaped as a parchment card rather than a donation modal: mono eyebrow, then
- * the claim, then the reason, then the app's own ♥♠♦♣ rule dividing the
- * situation from the action — the same divider AuthCard and Create Room use, so
- * this reads as a Beljot surface instead of a bolted-on payment widget. The
- * yellow stays inside the cup artwork and never touches the UI.
- *
- * Controlled only (no DialogTrigger): one of its callers is a
- * DropdownMenuItem, and the dropdown unmounts its own subtree on select, which
- * would close the dialog in the same tick it opened.
- */
-
 type SupportDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
+/** Controlled dialog explaining why to support the app, with the Buy Me a Coffee link and an optional QR. */
 export function SupportDialog({ open, onOpenChange }: SupportDialogProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
   const [showQr, setShowQr] = useState(false);
 
-  // The animated sticker is only used when motion is welcome; the still frame
-  // is the fallback (see supportLinks).
   const markSrc = supportMarkSrc(prefersReducedMotion);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-0 p-5 sm:max-w-md" data-testid="support-dialog">
-        {/* Cup, eyebrow and claim read as one block, so they sit closer to each
-            other than to the paragraph that follows. */}
         <div className="flex flex-col items-center gap-3 text-center">
           <img
             src={markSrc}
@@ -68,17 +49,10 @@ export function SupportDialog({ open, onOpenChange }: SupportDialogProps) {
           {t("support.dialog.body")}
         </DialogDescription>
 
-        {/* Divides the situation above from the action below. SuitRule carries
-            its own my-* for the auth card, so zero it and let this wrapper own
-            both gaps — flex, because a plain div lets those margins collapse
-            straight through it (they did, and ate the gap under the rule). */}
         <div className="mt-5 mb-4 flex flex-col [&>div]:my-0">
           <SuitRule />
         </div>
 
-        {/* Styled as a Button but rendered as a plain anchor: it leaves the app
-            for an external domain, so it must be a real link (middle-click,
-            open-in-new-tab, "copy link address" all keep working). */}
         <a
           href={BMC_URL}
           target="_blank"
@@ -90,9 +64,6 @@ export function SupportDialog({ open, onOpenChange }: SupportDialogProps) {
           {t("support.dialog.cta")}
         </a>
 
-        {/* Collapsed by default: the QR only helps someone reading this on a
-            desktop with a phone in hand, and expanded it would make the dialog
-            taller for everyone else. */}
         <div className="mt-3 flex flex-col items-center">
           <button
             type="button"
@@ -109,8 +80,6 @@ export function SupportDialog({ open, onOpenChange }: SupportDialogProps) {
           </button>
 
           {showQr && (
-            /* White plate under the code: the QR's own quiet zone is white, and
-               parchment behind it would eat the contrast scanners need. */
             <img
               src={BMC_QR_SRC}
               alt={t("support.dialog.qrAlt")}

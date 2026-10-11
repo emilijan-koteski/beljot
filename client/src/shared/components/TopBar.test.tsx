@@ -18,8 +18,6 @@ vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
 }));
 
-// The header's rank chip reads GET /seasons/current, so the bar is a fetching
-// component now and every render below needs a query client.
 const mockGetCurrentSeason = vi.fn();
 vi.mock("@/shared/api/season", () => ({
   getCurrentSeason: (...args: unknown[]) => mockGetCurrentSeason(...args),
@@ -39,10 +37,6 @@ const seasonFixture: CurrentSeasonResponse = {
 
 beforeEach(() => {
   mockGetCurrentSeason.mockReset();
-  // DEFAULT: never settles, so the chip renders nothing and the bar looks
-  // exactly as it did before the rank joined it. That keeps every pre-existing
-  // assertion in this file about its own subject, and it is also the honest
-  // first frame — the chip has no skeleton by design.
   mockGetCurrentSeason.mockReturnValue(new Promise(() => {}));
 });
 
@@ -67,9 +61,6 @@ function renderWithRouter() {
 function setAuthUser(overrides: Partial<User> = {}) {
   useAuthStore.setState({
     token: "test-token",
-    // Routed through the shared makeUser fixture so the next additive User field
-    // is a one-line change here too (code review 2026-07-29 — this file was the
-    // last one still hand-building the literal).
     user: makeUser({
       username: "kiro",
       email: "kiro@example.com",
@@ -126,8 +117,6 @@ describe("TopBar coin balance", () => {
   });
 
   it("does not render the login streak in the header, even at a high streak", () => {
-    // The streak is surfaced in the daily-reward dialog and the profile only —
-    // never alongside the header coin balance.
     setAuthUser({ loginStreakDays: 7 });
     renderWithRouter();
 
@@ -142,8 +131,6 @@ describe("TopBar XP level (Story 9.5)", () => {
   });
 
   it("renders the level and XP bar from the store", () => {
-    // Level 3, 600 XP: band threshold(3)=450 .. threshold(4)=800 (span 350),
-    // 150 into the band → round(150/350*100) = 43%.
     setAuthUser({ level: 3, totalXp: 600 });
     renderWithRouter();
 
@@ -168,8 +155,6 @@ describe("TopBar honor (Story 9.7)", () => {
   });
 
   it("does not render an honor chip in the header", () => {
-    // Honor is surfaced on the profile page (HonorHeroBand), not in the header —
-    // the chip that used to sit beside the coin pill was removed.
     setAuthUser({ honorScore: 96, honorTier: "exemplary" });
     renderWithRouter();
 
@@ -190,8 +175,6 @@ describe("TopBar history-stack shaping", () => {
     window.history.replaceState(null, "");
   });
 
-  // TopBar on every route; distinct landing pads so pathname assertions are
-  // unambiguous. Stack starts as [/lobby, <initialPath>].
   function renderAtWithRouter(initialPath: string) {
     const router = createMemoryRouter([{ path: "*", element: <TopBar showNav showUserMenu /> }], {
       initialEntries: ["/lobby", initialPath],
@@ -209,7 +192,6 @@ describe("TopBar history-stack shaping", () => {
     });
     expect(router.state.location.pathname).toBe("/rules");
 
-    // /profile was replaced — back skips it and lands on the lobby root.
     await act(async () => {
       await router.navigate(-1);
     });
@@ -219,8 +201,6 @@ describe("TopBar history-stack shaping", () => {
   it("pops back to the recorded lobby root when the Play link is clicked", async () => {
     const router = renderAtWithRouter("/profile");
 
-    // Simulate the react-router history idx bookkeeping jsdom lacks: the
-    // lobby root was recorded at idx 0 and the current entry sits at idx 1.
     window.history.replaceState({ idx: 1 }, "");
     sessionStorage.setItem("beljot:lobby-idx", "0");
 
@@ -229,7 +209,6 @@ describe("TopBar history-stack shaping", () => {
     });
     expect(router.state.location.pathname).toBe("/lobby");
 
-    // A pop keeps /profile in FORWARD history; a push or replace would not.
     await act(async () => {
       await router.navigate(1);
     });
@@ -244,7 +223,6 @@ describe("TopBar history-stack shaping", () => {
     });
     expect(router.state.location.pathname).toBe("/lobby");
 
-    // The /profile entry was replaced — back lands on the original root.
     await act(async () => {
       await router.navigate(-1);
     });
@@ -254,16 +232,11 @@ describe("TopBar history-stack shaping", () => {
   it("keeps native behavior for modified clicks on the Play link", () => {
     renderAtWithRouter("/profile");
 
-    // fireEvent returns false when preventDefault was called — a ctrl+click
-    // must pass through untouched for open-in-new-tab.
     const passedThrough = fireEvent.click(screen.getByTestId("nav-play"), { ctrlKey: true });
     expect(passedThrough).toBe(true);
   });
 });
 
-// Story 13.2 added a fourth tab. navItems feeds BOTH renderers — the >=md link
-// row and the mobile dropdown — so a tab that appears in one and not the other
-// means someone stopped mapping over the shared list.
 describe("TopBar leaderboard tab", () => {
   beforeEach(() => {
     setAuthUser();
@@ -285,8 +258,6 @@ describe("TopBar leaderboard tab", () => {
     const user = userEvent.setup();
     renderWithRouter();
 
-    // The mobile menu is its own dropdown (`nav-menu`), separate from the
-    // desktop user pill (`nav-user`).
     await user.click(screen.getByTestId("nav-menu"));
     await waitFor(() => {
       expect(screen.getByTestId("nav-menu-leaderboard")).toBeInTheDocument();
@@ -345,10 +316,6 @@ describe("TopBar seasonal rank chip", () => {
     expect(screen.getByTestId("header-rank-tier").textContent).toBe("Master");
   });
 
-  // THE POINT OF THE CHIP: identity, not arithmetic. The SP total, the band
-  // decomposition and the countdown all live on the profile's RankBanner — a
-  // number here would compete with the two the header already carries (level
-  // and coin balance).
   it("shows no SP figure at all", async () => {
     renderWithRouter();
 
@@ -364,12 +331,9 @@ describe("TopBar seasonal rank chip", () => {
     const name = screen.getByTestId("header-rank-tier");
     expect(name.className).toContain("hidden");
     expect(name.className).toContain("sm:inline");
-    // The badge itself carries no responsive gate — it is the phone treatment.
     expect(screen.getByTestId("header-rank-badge").className).not.toContain("hidden");
   });
 
-  // The badge is decorative and the name is hidden on phones, so without the
-  // sr-only line the rank would be announced as nothing at all below sm.
   it("names the rank for assistive tech at every width", async () => {
     renderWithRouter();
 
@@ -379,11 +343,9 @@ describe("TopBar seasonal rank chip", () => {
   });
 
   it("falls back to the SP bucket for an unrecognised tier token", async () => {
-    // Version skew: a newer server sends a tier this bundle has never heard of.
     mockGetCurrentSeason.mockResolvedValue({ ...seasonFixture, rankTier: "mythic", sp: 700 });
     renderWithRouter();
 
-    // 700 SP is Gold.
     expect(await screen.findByTestId("header-rank")).toHaveAttribute("data-tier", "gold");
   });
 
@@ -395,8 +357,6 @@ describe("TopBar seasonal rank chip", () => {
     expect(screen.getByTestId("header-rank-tier").textContent).toBe("Злато 2");
   });
 
-  // AuthLayout mounts this same bar with nobody signed in, and the endpoint
-  // behind the chip is auth-only — so the chip must not even be mounted there.
   it("renders no chip and makes no request when signed out", async () => {
     useAuthStore.setState({ token: null, user: null, isLoading: false });
 
@@ -434,8 +394,6 @@ describe("TopBar support entry", () => {
 
     const item = screen.getByTestId("nav-support");
     expect(item).toHaveTextContent("Support Beljot.online");
-    // Support sits above logout: logout is the menu's terminal action and stays
-    // last, the way it did before this entry joined.
     expect(item.compareDocumentPosition(screen.getByTestId("nav-logout"))).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -451,8 +409,6 @@ describe("TopBar support entry", () => {
     });
     await user.click(screen.getByTestId("nav-support"));
 
-    // The dialog is mounted outside the dropdown, so it must survive the
-    // dropdown unmounting itself on select.
     expect(await screen.findByTestId("support-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("support-cta")).toHaveAttribute(
       "href",
@@ -475,9 +431,6 @@ describe("TopBar support entry", () => {
   });
 
   it("adds no support entry to a bar that renders no menus", () => {
-    // AuthLayout's configuration: no nav, no user menu. The auth pages get
-    // their reminder from the footer note instead, so a second one here would
-    // be the duplicate this feature is specifically trying to avoid.
     render(
       withQuery(
         <MemoryRouter initialEntries={["/login"]}>

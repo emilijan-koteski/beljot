@@ -15,11 +15,6 @@ import { TEAM_GOLD, TEAM_SILVER } from "../lib/tableTheme";
 import { AutoCloseRing } from "./overlay/AutoCloseRing";
 import { PlayingCard } from "./PlayingCard";
 
-// Fanned meld cards overlap by a fraction of their width rather than a fixed
-// pixel amount, so the visible sliver of each card scales with the card. A
-// five-card sequence has to share a 520px panel (and `100vw - 2rem` on a phone)
-// with its label, so this is the balance point between a readable rank index and
-// a row that squeezes the label out.
 const CARD_OVERLAP = Math.round(CARD_SIZES.sm.width * 0.4);
 
 interface DeclarationRevealProps {
@@ -27,10 +22,6 @@ interface DeclarationRevealProps {
   players: readonly PlayerState[];
   viewerTeam: TeamString;
   onComplete: () => void;
-  /**
-   * Dedupe key for this reveal's sound (see `payloadSoundKey`), played once when
-   * it mounts. Omitted or null: silent.
-   */
   soundKey?: string | null;
 }
 
@@ -38,17 +29,9 @@ function parseCardId(id: string) {
   return { rank: id[0] as Rank, suit: id[1] as Suit };
 }
 
-// Same silver-parchment tone the AutoCloseRing uses for the X button — keeps
-// the per-meld + total numbers in a team-neutral channel so the team-color
-// glow on the panel edge isn't competed with by the digits.
 const VALUE_COLOR = "#d4d0c4";
 
-/**
- * Team declarations resolution — full classic-panel reveal showing the
- * winning team's melds. Glow ring follows the winning team's viewer-relative
- * color (Gold = your team won, Silver = opponents). Auto-closes after 8 s
- * or via the X-with-countdown-ring.
- */
+/** Reveal panel showing the winning team's melds, glowing in that team's viewer-relative color. */
 export function DeclarationReveal({
   payload,
   players,
@@ -83,22 +66,8 @@ export function DeclarationReveal({
   const teamGradient = isUs ? TEAM_GOLD : TEAM_SILVER;
   const glowColor = teamGradient[0];
 
-  // Total awarded — server has already zeroed the losing team's melds, so
-  // every entry in the payload counts toward the winner's tally.
   const totalAwarded = payload.declarations.reduce((acc, d) => acc + d.value, 0);
 
-  // Tiebreaker line: only render when a comparison actually happened, i.e. the
-  // opposing team also declared. The highest-value meld is what tipped the
-  // team-result decision per Beljot rules ("the team holding the single
-  // strongest meld wins, and that team's other melds stack on top"); naming it
-  // and its declarer makes the win-reason explicit.
-  //
-  // Gated on the server's `contested` flag, NOT on declarations.length > 1.
-  // Only the winning team's melds reach the client, so meld count cannot tell a
-  // real clash from an uncontested win — and under the Croatian overlap rule a
-  // single seat holding two melds is the ordinary case, not evidence of a
-  // contest. The old count-based gate announced a "highest declaration at the
-  // table" on hands where nothing was ever compared.
   const showTiebreaker = payload.contested && payload.declarations.length > 0;
   const highestMeld = showTiebreaker
     ? payload.declarations.reduce((best, d) => (d.value > best.value ? d : best))
@@ -126,14 +95,6 @@ export function DeclarationReveal({
       <div
         className="relative rounded-2xl px-4 py-4 md:px-5.5 md:pt-5 md:pb-4.5 max-h-[calc(100vh-7rem)] md:max-h-[calc(100vh-2rem)]"
         style={{
-          // Desktop keeps the 520 design width; on a phone it caps to the
-          // viewport (−2rem) so the centered panel no longer clips its cards
-          // and +value column off both edges. max-h guards a tall melds list
-          // on short screens — the rows scroll, the brass total stays. Below
-          // md the cap reserves 3.5rem per edge (not 1rem): the mobile HUD
-          // hamburger (viewport top-3 right-3, 36px, CHROME_TOP) paints above
-          // Z.REVEAL, and a full-height panel would slide this dialog's own
-          // top-right X under it, making the X swallow taps into the menu.
           width: "min(520px, calc(100vw - 2rem))",
           overflowY: "auto",
           background: "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)",
@@ -144,9 +105,6 @@ export function DeclarationReveal({
         }}
         data-team={winnerTeamString}
       >
-        {/* z-3 (matches TrumpReveal/BelotReveal): the header's opacity-bearing
-            lines create stacking contexts that otherwise paint OVER this
-            earlier-DOM wrapper and swallow clicks on the X's center. */}
         <div className="absolute top-3 right-3 z-3">
           <AutoCloseRing
             duration={prefersReducedMotion ? 1.5 : 8}
@@ -156,7 +114,6 @@ export function DeclarationReveal({
           />
         </div>
 
-        {/* Header: brass eyebrow + big serif title with team-color dot. */}
         <div className="text-center mb-5">
           <div
             className="text-[11px] uppercase mb-2"
@@ -207,8 +164,6 @@ export function DeclarationReveal({
           )}
         </div>
 
-        {/* Meld rows — cards on the left, label + "by Name" in the middle,
-            +value on the right. */}
         <div className="flex flex-col gap-3 mb-4">
           {payload.declarations.map((decl, i) => {
             const declarer = players.find((p) => p.seat === decl.playerSeat);
@@ -277,8 +232,6 @@ export function DeclarationReveal({
           })}
         </div>
 
-        {/* Brass-tinted total strip — same family as the ScoreReveal match
-            strip so end-of-hand panels read as one set. */}
         <div
           className="rounded-lg px-4 py-3 flex items-center justify-between"
           style={{

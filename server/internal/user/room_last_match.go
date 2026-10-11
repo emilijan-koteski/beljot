@@ -11,23 +11,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/match"
 )
 
-// GetRoomLastMatch returns the room's most recent match in the same
-// viewer-relative DTO the profile's match history uses, so both surfaces render
-// from one shape.
-//
-// It lives on UserHandler rather than RoomHandler even though the path is
-// /rooms/:id/last-match: the response is a MatchListItem, which needs the
-// batched identity hydration (loadIdentitiesForMatches) plus buildMatchListItem,
-// and RoomHandler holds no user repository. Moving the DTO would fork it.
-//
-// AUTHORIZATION IS MATCH PARTICIPATION, not room membership: the repository
-// query only returns a row when the authenticated caller occupied one of its
-// four seats. That is both the gate and the correctness guarantee for the
-// viewer-relative projection (see GetLastMatchForRoomAndUser). Room membership
-// would be the wrong test twice over — room.requireRoomMember 404s any room
-// whose status is not "waiting" (this endpoint is also read from the
-// end-of-match dialog, while the room is still "completed"), and a player who
-// joined the room AFTER the match has no business reading it.
+// GetRoomLastMatch returns the room's most recent match as a viewer-relative MatchListItem.
+// Only a participant of that match can read it; anyone else gets 404.
 func (h *UserHandler) GetRoomLastMatch(c echo.Context) error {
 	viewerID, err := getUserID(c)
 	if err != nil {
@@ -44,8 +29,6 @@ func (h *UserHandler) GetRoomLastMatch(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("fetching room last match: %w", err)
 	}
-	// Absent row and non-participant are the SAME response on purpose: a
-	// stranger must not be able to tell whether the room ever hosted a match.
 	if m == nil {
 		return apperr.ErrNotFound
 	}

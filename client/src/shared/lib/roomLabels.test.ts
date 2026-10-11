@@ -19,8 +19,6 @@ describe("roomLabels — the single variant/mode label resolver", () => {
   it.each(["bitola", "croatia"] as const)("resolves the %s variant to real copy", (v) => {
     const label = variantLabel(t, v);
     expect(label).not.toBe("");
-    // A missing key makes i18next echo the key back — the failure mode this
-    // helper exists to prevent when a new variant is added.
     expect(label).not.toContain("lobby.card");
   });
 
@@ -30,8 +28,6 @@ describe("roomLabels — the single variant/mode label resolver", () => {
   });
 
   it("keeps the compact and spelled-out mode forms distinct", () => {
-    // The two i18n families survive consolidation precisely because they say
-    // different things; if they ever converge, collapse them.
     expect(modeLabel(t, "1001")).not.toBe(modeOptionLabel(t, "1001"));
   });
 
@@ -41,9 +37,6 @@ describe("roomLabels — the single variant/mode label resolver", () => {
     });
 
     it("renders an unknown numeric mode through i18n, not hardcoded English (D138)", async () => {
-      // The old fallback was a literal `${m} pts`, the one string on this path
-      // that ignored the active locale. Assert it actually changes with the
-      // locale rather than merely containing the number.
       const rendered: string[] = [];
       for (const loc of LOCALES) {
         await i18n.changeLanguage(loc);
@@ -53,7 +46,6 @@ describe("roomLabels — the single variant/mode label resolver", () => {
         rendered.push(out);
       }
       await i18n.changeLanguage("en");
-      // en/mk/hr/sr do not all share one word for points.
       expect(new Set(rendered).size).toBeGreaterThan(1);
     });
 

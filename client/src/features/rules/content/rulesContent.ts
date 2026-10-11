@@ -1,9 +1,3 @@
-// Beljot · Rules content — assembler.
-//
-// Merges the shared numeric base (point values, strength, declaration tiers)
-// with each locale's strings into render-ready `RulesContent`. The numbers come
-// from a single source so they can never drift between translations.
-
 import { en } from "./en";
 import { hr } from "./hr";
 import { mk } from "./mk";

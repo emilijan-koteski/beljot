@@ -20,11 +20,8 @@ func NewGormRepository(db *gorm.DB) *GormRepository {
 	return &GormRepository{db: db}
 }
 
-// ProcessDailyLogin wraps the read-modify-write in a single transaction and
-// locks the user row FOR UPDATE before reading it. The lock makes the
-// once-per-day guard race-free: two concurrent bootstraps serialize on the
-// row, so the second sees the just-written last_login_at and grants nothing
-// (AC #3, #6). Precedent: passwordreset.MarkUsed's atomic single-use guard.
+// ProcessDailyLogin grants the daily bonus inside one transaction with the user row locked FOR UPDATE,
+// so concurrent calls on a new day grant exactly once.
 func (r *GormRepository) ProcessDailyLogin(userID uint, today time.Time) (DailyLoginResult, error) {
 	var result DailyLoginResult
 
@@ -39,7 +36,6 @@ func (r *GormRepository) ProcessDailyLogin(userID uint, today time.Time) (DailyL
 
 		grant, newStreak, amount := evaluateDailyLogin(u.LastLoginAt, u.LoginStreakDays, today)
 		if !grant {
-			// Already claimed today — touch nothing, echo current state.
 			result = DailyLoginResult{
 				Granted:         false,
 				Amount:          0,
@@ -74,12 +70,8 @@ func (r *GormRepository) ProcessDailyLogin(userID uint, today time.Time) (DailyL
 	return result, nil
 }
 
-// ChargeStakes debits `amount` from every userID atomically. Reuses the
-// ProcessDailyLogin FOR UPDATE pattern: each row is locked, balance-guarded,
-// then written, all inside one db.Transaction. Locking in ascending userID
-// order makes concurrent charges deadlock-free. On the first insolvent row the
-// transaction returns (and rolls back) with ErrInsufficientCoins, so the
-// caller observes all-or-nothing — no partial debits.
+// ChargeStakes debits amount from every userID in one transaction, locking rows in ascending ID order.
+// An insolvent row rolls the whole charge back and returns that userID with ErrInsufficientCoins.
 func (r *GormRepository) ChargeStakes(userIDs []uint, amount int) (uint, error) {
 	if amount <= 0 || len(userIDs) == 0 {
 		return 0, nil
@@ -113,10 +105,8 @@ func (r *GormRepository) ChargeStakes(userIDs []uint, amount int) (uint, error) 
 	return 0, nil
 }
 
-// ApplySettlement credits each (userID → amount) atomically, mirroring the
-// ChargeStakes lock discipline (FOR UPDATE, ascending userID order) so a credit
-// running concurrently with a charge cannot deadlock. Zero-amount entries are
-// skipped. Rolls back on any failure.
+// ApplySettlement credits each (userID → amount) in one transaction, using the ChargeStakes lock order.
+// Zero-amount entries are skipped.
 func (r *GormRepository) ApplySettlement(credits map[uint]int) error {
 	if len(credits) == 0 {
 		return nil

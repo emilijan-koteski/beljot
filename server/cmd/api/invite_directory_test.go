@@ -48,8 +48,8 @@ func TestInviteFriendDirectory_ListFriendsCarriesAvatarURL(t *testing.T) {
 	prefix := "avatars/99999999-9999-4999-8999-999999999999"
 	dir := &inviteFriendDirectory{
 		friends: &fakeFriendRows{rows: []friend.Friendship{
-			{UserID: 1, FriendID: 2, Status: friend.FriendStatusAccepted}, // viewer requested
-			{UserID: 3, FriendID: 1, Status: friend.FriendStatusAccepted}, // viewer accepted
+			{UserID: 1, FriendID: 2, Status: friend.FriendStatusAccepted},
+			{UserID: 3, FriendID: 1, Status: friend.FriendStatusAccepted},
 		}},
 		users: &fakeUserRows{users: []user.User{
 			{ID: 2, Username: "pictured", AvatarKey: &prefix},

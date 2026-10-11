@@ -10,13 +10,10 @@ import {
   DialogTrigger,
 } from "@/shared/components/ui/dialog";
 
-// Footer "Contact" — opens a small dialog with the maker's email + LinkedIn
-// (same profile the auth pages credit) and a beta disclaimer. The trigger
-// renders as a plain link styled to sit inside the footer link row.
-
 const EMAIL = "emilijankoteski@pm.me";
 const LINKEDIN_URL = "https://www.linkedin.com/in/emilijan-koteski/";
 
+// Footer "Contact" link that opens a dialog with the maker's email, LinkedIn and a beta disclaimer.
 export function ContactDialog() {
   const { t } = useTranslation();
   return (

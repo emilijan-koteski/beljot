@@ -3,9 +3,7 @@ import { useMemo } from "react";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 
 interface TableAmbienceProps {
-  /** Multiplier on the base 0..1 layer opacity. Default 0.9. */
   intensity?: number;
-  /** CSS color (with alpha or hex) for the soft top beam + particles. */
   tint?: string;
 }
 
@@ -20,12 +18,8 @@ interface Particle {
 const PARTICLE_COUNT = 30;
 
 /**
- * Decorative ambience layer for the felt: a soft top beam + ~30 floating
- * particles that drift on slightly different periods so the table feels alive.
- *
- * Particles are deterministic per mount (computed once with `useMemo`) so the
- * layout doesn't reshuffle on every render. Honors `prefers-reduced-motion`:
- * particles still render but the float keyframes drop, leaving a static field.
+ * Decorative felt ambience: a soft top beam plus floating particles, computed once per mount.
+ * Under reduced motion the particles render as a static field.
  */
 export function TableAmbience({ intensity = 0.9, tint = "#ffe9b0" }: TableAmbienceProps) {
   const reducedMotion = useReducedMotion();
@@ -48,7 +42,6 @@ export function TableAmbience({ intensity = 0.9, tint = "#ffe9b0" }: TableAmbien
       data-testid="table-ambience"
       aria-hidden
     >
-      {/* Soft light beam from the top */}
       <div
         className="absolute"
         style={{

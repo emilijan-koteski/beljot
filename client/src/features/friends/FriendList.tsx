@@ -10,28 +10,8 @@ import { useFriends } from "@/shared/hooks/queries/useFriends";
 import { useChatStore } from "@/shared/stores/chatStore";
 
 /**
- * The viewer's friend-list surface in the lobby (Story 11.2, AC6 + AC8). Each
- * accepted friend shows an online/offline indicator and links to their public
- * profile; each ONLINE friend also gets a whisper button.
- *
- * That slot used to hold "Invite to Room", which could not do its job from here:
- * an invite goes INTO a specific waiting room (POST /rooms/:id/invite) and a
- * player reading this list is in the lobby, in no room at all, so the button only
- * ever raised a toast pointing at the room's own invite panel. Whisper is the
- * action this surface CAN complete — the friend is right there, the dock is on
- * this page — so the slot now opens a private thread with them (Story 11.4's
- * channel, entered from the friend instead of from a /w command).
- *
- * This card is the lobby's WHOLE friends surface: the pending-requests section
- * (FriendRequests, which draws nothing when the inbox is empty) and player search
- * both live inside it. Three cards for one relationship spent most of their area
- * on chrome — heading, border and padding each — to show a handful of names.
- * Search hides behind one header icon because the field is empty almost always;
- * this component holds its open/closed state, and mounting PlayerSearch only when
- * open is also what puts the caret in the field on the way in.
- *
- * Names TILE into an auto-filling grid instead of one row each: a lobby is wide,
- * a name is narrow, and a stack of full-width rows is mostly empty parchment.
+ * The lobby's friends card: the friend roster with presence, profile links and whisper buttons.
+ * It also hosts the pending-requests section and a toggleable player search.
  */
 export function FriendList() {
   const { t } = useTranslation();
@@ -47,8 +27,6 @@ export function FriendList() {
     >
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-ink-dim text-xs font-semibold">{t("friends.list.heading")}</h2>
-        {/* One control, two states — open the search, or close it (which also
-            drops the term). Escape inside the field does the same thing. */}
         <button
           type="button"
           onClick={() => setSearchOpen((open) => !open)}
@@ -68,8 +46,6 @@ export function FriendList() {
 
       {searchOpen && <PlayerSearch onClose={() => setSearchOpen(false)} />}
 
-      {/* Pending requests sit above the roster, under their own eyebrow: they are
-          the part of this card that wants an answer. Draws nothing when empty. */}
       <FriendRequests />
 
       {isPending ? (
@@ -102,15 +78,10 @@ export function FriendList() {
                 <span className="text-ink truncate text-sm font-medium">{friend.username}</span>
               </button>
 
-              {/* The dot alone carries presence in a tile this narrow — green for
-                  here, grey for away is the one convention nobody has to learn.
-                  The word survives as the hover title and for screen readers, so
-                  nothing is lost but the width it was costing. */}
               <span
                 className="flex shrink-0 items-center"
                 title={friend.online === true ? t("friends.online") : t("friends.offline")}
               >
-                {/* Go bool — compare with === true, never truthiness. */}
                 <span
                   className={
                     friend.online === true
@@ -124,13 +95,6 @@ export function FriendList() {
                 </span>
               </span>
 
-              {/* Whisper, as a bare glyph in the pink the whisper thread itself
-                  wears (Story 11.4's --whisper-* tokens) — the icon is the colour
-                  of the thing it opens, and it takes the solid ink tone rather
-                  than the translucent bubble fill, which at this size read as a
-                  smudge. Online-only, like the invite button it replaces: the
-                  server rejects a whisper to an offline friend (whispers are
-                  real-time), so an always-on button would fail by design. */}
               {friend.online === true && (
                 <button
                   type="button"

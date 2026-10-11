@@ -26,15 +26,12 @@ describe("clockSync", () => {
   });
 
   it("estimates the offset from a serverNow stamp", () => {
-    // Server clock 2s ahead of the client.
     recordServerNow(new Date(102_000).toISOString());
     expect(serverClockOffsetMs()).toBe(2_000);
     expect(serverNowMs()).toBe(102_000);
   });
 
   it("keeps the max sample — the one with the least latency error", () => {
-    // Three messages with 300ms / 50ms / 150ms one-way latency: each sample
-    // underestimates the true +2s offset by its latency.
     recordServerNow(new Date(101_700).toISOString());
     recordServerNow(new Date(101_950).toISOString());
     recordServerNow(new Date(101_850).toISOString());
@@ -42,8 +39,7 @@ describe("clockSync", () => {
   });
 
   it("forgets samples older than the rolling window", () => {
-    recordServerNow(new Date(105_000).toISOString()); // pre-NTP-step outlier: +5s
-    // Clock step corrected: ten fresh samples around +1s push the outlier out.
+    recordServerNow(new Date(105_000).toISOString());
     for (let i = 0; i < 10; i++) {
       recordServerNow(new Date(101_000 + i).toISOString());
     }
@@ -51,11 +47,9 @@ describe("clockSync", () => {
   });
 
   it("expires stale samples by age, not only by count", () => {
-    recordServerNow(new Date(105_000).toISOString()); // +5s before a clock step
-    // Idle turn: the next message arrives 3 minutes later, after the client
-    // clock caught up. One fresh sample must beat the aged-out outlier.
+    recordServerNow(new Date(105_000).toISOString());
     vi.setSystemTime(280_000);
-    recordServerNow(new Date(281_000).toISOString()); // +1s
+    recordServerNow(new Date(281_000).toISOString());
     expect(serverClockOffsetMs()).toBe(1_000);
   });
 
@@ -66,8 +60,7 @@ describe("clockSync", () => {
   });
 
   it("computes remaining time against the corrected clock", () => {
-    recordServerNow(new Date(102_000).toISOString()); // server 2s ahead
-    // Deadline 5s away on the client clock is only 3s away on the server's.
+    recordServerNow(new Date(102_000).toISOString());
     expect(remainingMsUntil(new Date(105_000).toISOString())).toBe(3_000);
     expect(remainingMsUntil(new Date(90_000).toISOString())).toBe(0);
     expect(remainingMsUntil("garbage")).toBe(0);

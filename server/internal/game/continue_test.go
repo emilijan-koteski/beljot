@@ -29,10 +29,6 @@ func TestHandComplete_HoldsBeforeDealingNextHand(t *testing.T) {
 		assert.Empty(t, hc.Players[seat].Hand, "no next-hand cards dealt during the pause")
 	}
 	assert.Equal(t, [4]bool{}, hc.HandCompleteReady)
-	// The just-resolved last trick must be cleared from the hand-complete state.
-	// resolveTrick skips its next-trick reset on the 8th trick, so scoreHand owns
-	// this — without it the authoritative match_state re-feeds the client the four
-	// last-trick cards, flashing them back at table center after the collect sweep.
 	assert.Empty(t, hc.CurrentTrick, "resolved last trick cleared from the hand-complete state")
 	assert.Nil(t, hc.LeadSuit, "lead suit cleared with the resolved trick")
 }
@@ -48,8 +44,6 @@ func TestContinue_AllReadyDealsNextHand(t *testing.T) {
 			assert.True(t, state.HandCompleteReady[seat], "seat %d marked ready", seat)
 		}
 	}
-	// All four acknowledged → next hand dealt. The engine sets PhaseDealing; the
-	// session manager promotes dealing→bidding.
 	assert.Equal(t, game.PhaseDealing, state.Phase)
 	assert.Equal(t, 2, state.HandNumber)
 	assert.Equal(t, 0, state.TrickNumber)
@@ -57,7 +51,7 @@ func TestContinue_AllReadyDealsNextHand(t *testing.T) {
 
 func TestContinue_DisconnectedSeatDoesNotBlock(t *testing.T) {
 	state := reachHandComplete(t)
-	state.Players[2].Connected = false // seat 2 dropped
+	state.Players[2].Connected = false
 	for _, seat := range []int{0, 1, 3} {
 		ns, err := game.ApplyAction(state, game.Action{Type: game.ActionContinue, PlayerSeat: seat})
 		require.NoError(t, err)
@@ -69,7 +63,6 @@ func TestContinue_DisconnectedSeatDoesNotBlock(t *testing.T) {
 
 func TestContinue_IsIdempotentPerSeat(t *testing.T) {
 	state := reachHandComplete(t)
-	// Seat 0 continues twice; still waiting on the others.
 	for i := 0; i < 2; i++ {
 		ns, err := game.ApplyAction(state, game.Action{Type: game.ActionContinue, PlayerSeat: 0})
 		require.NoError(t, err)

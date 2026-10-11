@@ -18,22 +18,10 @@ interface ScorePanelProps {
   teamBHandPotential?: number;
   lastTrickBonus?: number;
   lastTrickTeam?: number;
-  /** Match target — defaults to 1001 for Bitola. */
   matchTarget?: number;
-  /** Current hand number (1-based). When omitted, the header right-side
-   *  pill (Hand N · Variant) is hidden — keeps stand-alone test renders
-   *  free of game-state coupling. */
   handNumber?: number;
-  /** Variant label rendered next to the hand number ("Bitola"). */
   variantLabel?: string;
-  /** Whether this room plays with melds and Belote. Rendered as a third meta
-   *  segment ONLY when false, so a normal table's header is unchanged. Optional
-   *  and defaulted to true so stand-alone test renders stay uncoupled. */
   declarationsEnabled?: boolean;
-  /** Whether this room ends the match the instant a team reaches the target
-   *  ("dosta"). Rendered as a further meta segment ONLY when true, so a normal
-   *  table's header is unchanged. Optional and defaulted to false so stand-alone
-   *  test renders stay uncoupled. */
   stopAtTarget?: boolean;
 }
 
@@ -70,8 +58,6 @@ function ScoreRow({
   const { t } = useTranslation();
   const showPotential = potential > 0;
   const dot = teamGradient[0];
-  // Cap the bar at 100% in the rare case `potential` overshoots the felt-style
-  // 162 trick-points cap (declarations + bonuses can push it higher).
   const barPct = Math.max(0, Math.min(100, (potential / 162) * 100));
 
   return (
@@ -144,13 +130,8 @@ function ScoreRow({
 }
 
 /**
- * Top-left scoreboard panel — felt-tinted classic chip.
- *
- * Two team rows, each ordered viewer-first: the viewer's row always reads
- * Gold ("Us"); the opposition reads Silver ("Them"). Wire-level data is still
- * keyed by teamA/teamB so existing test selectors and downstream consumers
- * don't drift. A small per-team mini-bar shows hand potential ('this hand'
- * total) so players can read momentum at a glance.
+ * Top-left scoreboard panel with one row per team, the viewer's team first as Gold ("Us").
+ * Each row carries a mini-bar showing this hand's potential points.
  */
 export function ScorePanel({
   viewerTeam,
@@ -195,8 +176,6 @@ export function ScorePanel({
   const teamALabel = viewerTeam === "teamA" ? t("team.us") : t("team.them");
   const teamBLabel = viewerTeam === "teamB" ? t("team.us") : t("team.them");
 
-  // Viewer-relative gradients: viewer's own team is always gold; the other
-  // team is always silver, regardless of teamA/teamB identity.
   const teamAGradient: TeamGradient = viewerTeam === "teamA" ? TEAM_GOLD : TEAM_SILVER;
   const teamBGradient: TeamGradient = viewerTeam === "teamB" ? TEAM_GOLD : TEAM_SILVER;
 
@@ -208,8 +187,6 @@ export function ScorePanel({
         ? teamBGradient
         : null;
 
-  // Viewer-first compact rows for the mobile scoreboard. Us is always gold,
-  // Them always silver — matching the desktop panel's viewer-relative colours.
   const usIsA = viewerTeam === "teamA";
   const mobileRows = [
     {
@@ -230,9 +207,6 @@ export function ScorePanel({
 
   return (
     <>
-      {/* Mobile (<md): ultra-compact scoreboard — one line per team, showing
-          this-hand points (+N) and total / target. No heading, momentum bars,
-          trick counts or hand/variant metadata; the desktop panel keeps those. */}
       <div
         className="fixed top-3 left-3 flex flex-col gap-0.5 rounded-lg px-2.5 py-1.5 md:hidden"
         style={{
@@ -282,7 +256,6 @@ export function ScorePanel({
         ))}
       </div>
 
-      {/* Desktop (md+): full felt scoreboard panel. */}
       <div
         className="fixed top-4 left-4 hidden overflow-hidden rounded-xl md:block"
         style={{
@@ -297,9 +270,6 @@ export function ScorePanel({
         data-testid="score-panel"
         aria-live="polite"
       >
-        {/* Header eyebrow — brass "SCOREBOARD" on the left, "Hand N · Variant"
-          metadata on the right (per design). Both lines share the same brass
-          uppercase tracking so they read as one band. */}
         <div
           className="flex items-center justify-between px-4 py-2 font-body text-[10.5px] uppercase tracking-wider"
           style={{
@@ -322,19 +292,6 @@ export function ScorePanel({
                       defaultValue: `Hand ${handNumber}`,
                     })
                   : variantLabel}
-              {/* Third segment, OFF only. Reuses the lobby card's key so the
-                  room, the lobby and the table all name the rule identically —
-                  one word per concept per locale.
-
-                  The " · " separator sits OUTSIDE the aria-labelled span on
-                  purpose: an aria-label replaces the element's entire accessible
-                  name, so a separator inside it is swallowed by the label and the
-                  segment loses its visual join in the accessibility tree.
-
-                  No hardcoded aria defaultValue either. en.json owns the string,
-                  i18n.parity.test.ts guarantees all four locales have it, and a
-                  copy here only drifts — the previous one already said "table"
-                  where en.json says "room". */}
               {!declarationsEnabled && (
                 <>
                   {(handNumber !== undefined || variantLabel) && " · "}
@@ -347,9 +304,6 @@ export function ScorePanel({
                   </span>
                 </>
               )}
-              {/* Further segment, ON only. Same two rules as above: separator
-                  outside the labelled span, and the aria string comes from
-                  en.json rather than a local copy. */}
               {stopAtTarget && (
                 <>
                   {(handNumber !== undefined || variantLabel || !declarationsEnabled) && " · "}
@@ -366,11 +320,6 @@ export function ScorePanel({
           )}
         </div>
 
-        {/* Rows are laid out viewer-first: the viewer's row ("Us") always
-          renders above the opposition ("Them"), regardless of which seats
-          map to teamA / teamB. The wire-level data-testid contract still
-          tags rows by absolute team identity (score-row-a / score-row-b),
-          so existing assertions on team-A vs team-B numbers stay valid. */}
         {viewerTeam === "teamA" ? (
           <>
             <ScoreRow
@@ -429,7 +378,6 @@ export function ScorePanel({
           </>
         )}
 
-        {/* Float-up bonus animation */}
         {showBonus !== null && bonusTeamString !== null && bonusGradient !== null && (
           <div
             className={`absolute -top-2 right-3 font-display text-sm font-bold ${

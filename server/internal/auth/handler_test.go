@@ -20,14 +20,9 @@ import (
 )
 
 type mockUserRepo struct {
-	users  []*user.User
-	nextID uint
-	// createErrs, when non-empty, are consumed (front first) by Create before
-	// any insert happens — lets tests inject insert-time unique violations the
-	// in-memory pre-checks can't produce naturally (concurrency races).
-	createErrs []error
-	// failUpdatePreferences mirrors the user package's mock; unused here, but the
-	// shared UpdatePreferences body reads it.
+	users                 []*user.User
+	nextID                uint
+	createErrs            []error
 	failUpdatePreferences error
 }
 
@@ -45,11 +40,6 @@ func (m *mockUserRepo) Create(u *user.User) error {
 	}
 	u.ID = m.nextID
 	u.CreatedAt = time.Now()
-	// Mirror GORM's Create for the two `default:true` bool columns and the two
-	// `default:70` volume columns: a zero value is treated as unset and replaced
-	// by the tag default, in the row AND in the struct the handler then echoes.
-	// Nothing creates a user with audio off or silent, so this is the only
-	// behaviour the real repo can produce here.
 	if !u.SoundEnabled {
 		u.SoundEnabled = true
 	}
@@ -104,16 +94,13 @@ func (m *mockUserRepo) FindByID(id uint) (*user.User, error) {
 	return nil, nil
 }
 
-// SearchByUsername is unused by the auth tests; a nil result satisfies the
-// interface for the player-search method added in Story 11.1.
+// SearchByUsername is unused by the auth tests and returns nil.
 func (m *mockUserRepo) SearchByUsername(string, uint, int) ([]user.User, error) {
 	return nil, nil
 }
 
-// UpdatePreferences mirrors the real repo's ALL-OR-NOTHING contract: both
-// columns are applied to the in-memory row together, so a test asserting the
-// half-applied case has to force the failure rather than rely on ordering.
-// failUpdatePreferences, when set, fails BEFORE writing anything.
+// UpdatePreferences applies all preference columns together, like the real repo.
+// When failUpdatePreferences is set it fails before writing anything.
 func (m *mockUserRepo) UpdatePreferences(id uint, prefs user.PreferencesUpdate) error {
 	if m.failUpdatePreferences != nil {
 		return m.failUpdatePreferences
@@ -207,9 +194,8 @@ func (m *mockUserRepo) AddXP(awards map[uint]int) (map[uint]int, error) {
 	return newTotals, nil
 }
 
-// ApplyHonorEvents mirrors the real repository's decay-forward-then-add
-// arithmetic in memory so auth-envelope tests can assert honor fields
-// (Story 9.7). A missing user aborts the whole batch, like the real one.
+// ApplyHonorEvents mirrors the real repository's decay-forward-then-add arithmetic in memory.
+// A missing user aborts the whole batch, like the real one.
 func (m *mockUserRepo) ApplyHonorEvents(events map[uint]user.HonorEvent, now time.Time) (map[uint]user.HonorSnapshot, error) {
 	snapshots := make(map[uint]user.HonorSnapshot, len(events))
 	for id, ev := range events {
@@ -340,13 +326,8 @@ func TestRegister_Success(t *testing.T) {
 	assert.False(t, data.CreatedAt.IsZero(), "createdAt should be set")
 }
 
-// TestAuthEnvelope_CarriesHonor pins Story 9.7 AC7/AC8: honor rides the shared
-// auth envelope so the TopBar chip renders on first paint without a second
-// fetch. A fresh registration sits at the Beta(4,1) prior (80 / "fair") and is
-// flagged New Player; a returning login echoes that user's real stored state.
-//
-// The TREND is deliberately absent from this envelope — it needs a windowed
-// query over `matches` and the auth path stays a single-row read.
+// TestAuthEnvelope_CarriesHonor checks that a fresh registration sits at the Beta(4,1) prior
+// (80 / "fair", New Player) and a login echoes the user's stored honor state.
 func TestAuthEnvelope_CarriesHonor(t *testing.T) {
 	t.Run("a fresh registration sits at the prior", func(t *testing.T) {
 		_, e := setupHandler()
@@ -371,7 +352,6 @@ func TestAuthEnvelope_CarriesHonor(t *testing.T) {
 		repo, ok := handler.userRepo.(*mockUserRepo)
 		require.True(t, ok)
 
-		// 20 completed / 1 abandoned as of now -> 100*24/29 = 82.8 -> 83.
 		now := time.Now().UTC()
 		require.Len(t, repo.users, 1)
 		repo.users[0].HonorCompletedWeight = 20
@@ -448,11 +428,8 @@ func TestRegister_LanguagePreference(t *testing.T) {
 	}
 }
 
-// TestRegister_CardDeckPreference pins the one derivation point (Story 12.4):
-// the deck is seeded from the RESOLVED language, so "hr" gets the Croatian deck
-// and everything else — including a language that fell back to "en" — gets
-// French. This is a first-impression default, not a lock: the player can switch
-// decks from Settings or the profile panel at any time.
+// TestRegister_CardDeckPreference checks the deck is seeded from the resolved language:
+// "hr" gets the Croatian deck and everything else, including a fallback to "en", gets French.
 func TestRegister_CardDeckPreference(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -479,8 +456,6 @@ func TestRegister_CardDeckPreference(t *testing.T) {
 			expectedDeck: "french",
 		},
 		{
-			// An unsupported code falls back to "en", and the deck must follow
-			// the RESOLVED language rather than the requested one.
 			name:         "unsupported language seeds french",
 			body:         `{"email":"fr@example.com","username":"frdeck","password":"password123","languagePreference":"fr"}`,
 			expectedLang: "en",
@@ -518,12 +493,9 @@ func TestRegister_CardDeckPreference(t *testing.T) {
 			var data RegisterResponseData
 			require.NoError(t, json.Unmarshal(resp["data"], &data))
 
-			// Echoed on the envelope so the first card of the session already
-			// draws in the right deck, with no separate profile fetch.
 			assert.Equal(t, tc.expectedLang, data.LanguagePreference)
 			assert.Equal(t, tc.expectedDeck, data.CardDeckPreference)
 
-			// And persisted on the row, not only echoed.
 			repo, ok := handler.userRepo.(*mockUserRepo)
 			require.True(t, ok)
 			require.Len(t, repo.users, 1)
@@ -570,9 +542,6 @@ func TestRegister_SetsRefreshCookie(t *testing.T) {
 	assert.False(t, refreshCookie.Secure, "Secure should be false in development environment")
 	assert.Equal(t, http.SameSiteStrictMode, refreshCookie.SameSite)
 	assert.Equal(t, "/api/v1/auth", refreshCookie.Path)
-	// MaxAge is derived from time.Until(exp), which floors to just under the
-	// nominal idle TTL because the clock advances between setting exp and
-	// computing the cookie lifetime; allow a small tolerance for elapsed time.
 	assert.InDelta(t, testIdleTTL.Seconds(), refreshCookie.MaxAge, 60)
 }
 
@@ -706,8 +675,6 @@ func TestRegister_NormalizesEmail(t *testing.T) {
 	assert.Equal(t, "test@example.com", data.Email)
 }
 
-// --- Helper functions for login/refresh/logout tests ---
-
 func doLogin(e *echo.Echo, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -738,8 +705,6 @@ func registerUser(e *echo.Echo) *httptest.ResponseRecorder {
 	return doRegister(e, body)
 }
 
-// --- Login tests ---
-
 func TestLogin_Success(t *testing.T) {
 	_, e := setupHandler()
 
@@ -759,7 +724,6 @@ func TestLogin_Success(t *testing.T) {
 	assert.Equal(t, "test@example.com", data.Email)
 	assert.NotEmpty(t, data.Token)
 
-	// Check refresh cookie is set
 	cookies := rec.Result().Cookies()
 	var refreshCookie *http.Cookie
 	for _, c := range cookies {
@@ -803,8 +767,6 @@ func TestLogin_NormalizesEmail(t *testing.T) {
 	rec := doLogin(e, `{"email":"  Test@Example.COM  ","password":"password123"}`)
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
-
-// --- Refresh tests ---
 
 func TestRefresh_Success(t *testing.T) {
 	_, e := setupHandler()
@@ -852,7 +814,6 @@ func TestRefresh_ClearsCookieOnFailure(t *testing.T) {
 	rec := doRefresh(e, cookies)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 
-	// Check that cookie is cleared (MaxAge = -1)
 	respCookies := rec.Result().Cookies()
 	var refreshCookie *http.Cookie
 	for _, c := range respCookies {
@@ -865,15 +826,12 @@ func TestRefresh_ClearsCookieOnFailure(t *testing.T) {
 	assert.Equal(t, -1, refreshCookie.MaxAge)
 }
 
-// --- Logout tests ---
-
 func TestLogout_Success(t *testing.T) {
 	_, e := setupHandler()
 
 	rec := doLogout(e)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	// Check cookie is cleared
 	cookies := rec.Result().Cookies()
 	var refreshCookie *http.Cookie
 	for _, c := range cookies {
@@ -890,8 +848,6 @@ func TestLogout_Success(t *testing.T) {
 	assert.Equal(t, "logged out", resp["data"]["message"])
 }
 
-// --- Wallet seeding / echo (Story 9.1) ---
-
 func TestRegister_SeedsWalletAndStampsLastLogin(t *testing.T) {
 	repo := newMockUserRepo()
 	handler := NewAuthHandler(repo, newMockRefreshRepo(), newMockIdentityRepo(), identity.Registry{}, "test-jwt-secret", "development", testAccessTTL, testIdleTTL, testAbsoluteTTL)
@@ -907,12 +863,9 @@ func TestRegister_SeedsWalletAndStampsLastLogin(t *testing.T) {
 	var data RegisterResponseData
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
 
-	// Response seeds balance 5000 / streak 0 — no daily bonus at registration.
 	assert.Equal(t, 5000, data.WalletBalance)
 	assert.Equal(t, 0, data.LoginStreakDays)
 
-	// Stored user is stamped with today's UTC date so the day-1 bonus first
-	// becomes claimable on the next calendar day (no same-day grant).
 	require.Len(t, repo.users, 1)
 	u := repo.users[0]
 	require.NotNil(t, u.LastLoginAt, "registration must stamp last_login_at")
@@ -937,7 +890,6 @@ func TestLogin_EchoesWalletFields(t *testing.T) {
 	var data RegisterResponseData
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
 
-	// Echoes the seeded values from the loaded user — login never grants.
 	assert.Equal(t, 5000, data.WalletBalance)
 	assert.Equal(t, 0, data.LoginStreakDays)
 }
@@ -958,8 +910,6 @@ func TestRefresh_EchoesWalletFields(t *testing.T) {
 	assert.Equal(t, 5000, data.WalletBalance)
 	assert.Equal(t, 0, data.LoginStreakDays)
 }
-
-// --- Audio preferences echo (migration 000025) ---
 
 // decodeAuthEnvelope returns both the typed payload and its raw key set, so a
 // test can tell an echoed false apart from a key that is missing altogether
@@ -1025,12 +975,8 @@ func TestRefresh_EchoesStoredAudioPreferences(t *testing.T) {
 	assert.JSONEq(t, "false", string(raw["musicEnabled"]))
 }
 
-// --- Audio volumes echo (migration 000026) ---
-
-// A fresh account starts at the default level of 70 on both channels — the
-// loudness the client played at before volumes existed. Register never names
-// the two fields, so this pins that the default reaches both the row and the
-// envelope.
+// TestRegister_EchoesAudioVolumesAtDefault checks a fresh account gets volume 70 on both
+// channels, in the stored row and the envelope.
 func TestRegister_EchoesAudioVolumesAtDefault(t *testing.T) {
 	handler, e := setupHandler()
 	rec := registerUser(e)
@@ -1080,8 +1026,6 @@ func TestRefresh_EchoesStoredAudioVolumes(t *testing.T) {
 	assert.Equal(t, 100, data.SoundVolume)
 	assert.Equal(t, 45, data.MusicVolume)
 }
-
-// --- Avatar echo (migration 000030) ---
 
 // The auth envelope carries the 128 avatar URL derived from the stored prefix,
 // so the nav pill shows the picture on first paint: null for a fresh account,

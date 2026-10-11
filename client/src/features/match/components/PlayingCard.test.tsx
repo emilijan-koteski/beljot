@@ -27,16 +27,10 @@ function signInWithDeck(deck: "french" | "croatian") {
 
 describe("PlayingCard", () => {
   beforeEach(() => {
-    // Default: no session at all, which is the state most of these assertions
-    // care nothing about — and which must still resolve to the French deck.
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
   afterEach(async () => {
-    // Unmount FIRST. RTL's own auto-cleanup is registered at the file's root
-    // scope, so it runs AFTER this inner hook — which would leave a mounted card
-    // subscribed to the store and the i18n instance while both are reset here,
-    // and every reset would log an act() warning.
     cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
     await i18n.changeLanguage("en");
@@ -100,10 +94,6 @@ describe("PlayingCard", () => {
       "/cards/french/KS.svg",
     );
 
-    // The store write alone must be enough — this is what makes the in-match
-    // Settings toggle change the table without interrupting play. No rerender()
-    // here on purpose: the subscription is what has to do the work. `act` only
-    // flushes React's queue; it is not a second render pass.
     act(() => signInWithDeck("croatian"));
 
     expect(faceImage(screen.getByTestId("playing-card-KS"))).toHaveAttribute(
@@ -124,12 +114,6 @@ describe("PlayingCard", () => {
     ["french", undefined],
     ["croatian", "croatian" as const],
   ])("degrades to a blank card when the %s face cannot load", (_deck, signIn) => {
-    // A face that fails to resolve does NOT 404 in production — Caddy's SPA
-    // fallback answers with index.html at 200, which browsers paint as a
-    // broken-image glyph. Hiding the img is the only thing between a bad deck
-    // path and a torn-looking hand, and the wrapper's parchment is what the
-    // player sees instead. Asserted per deck because the two carry different
-    // extensions, so a path bug can exist in one and not the other.
     if (signIn) signInWithDeck(signIn);
     render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
 
@@ -139,16 +123,10 @@ describe("PlayingCard", () => {
     fireEvent.error(image);
 
     expect(image.style.visibility).toBe("hidden");
-    // The card itself survives — blank, not absent.
     expect(screen.getByTestId("playing-card-KS")).toBeInTheDocument();
   });
 
   it("recovers a hidden face when the deck changes to one that loads", () => {
-    // The regression: `onError` set style.visibility imperatively and React
-    // reuses the same <img> when only `src` changes, so one transient miss on the
-    // French face blanked the card for the page's lifetime — and survived
-    // switching to the Croatian deck, whose asset was perfectly fine. The img is
-    // keyed by its resolved URL now, so a new source gets a new node.
     render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
     const before = faceImage(screen.getByTestId("playing-card-KS"))!;
     fireEvent.error(before);
@@ -168,8 +146,6 @@ describe("PlayingCard", () => {
     fireEvent.error(image);
     expect(image.style.visibility).toBe("hidden");
 
-    // The onLoad twin of onError — the only thing that un-hides a node whose src
-    // never changed.
     fireEvent.load(image);
     expect(image.style.visibility).toBe("");
   });
@@ -188,7 +164,6 @@ describe("PlayingCard", () => {
 
     const card = screen.getByTestId("playing-card-KS");
     expect(card.className).toContain("cursor-pointer");
-    // Lime turn-signal halo is applied inline (channel is independent of theme)
     expect(card.style.boxShadow).toContain("var(--turn-lime");
   });
 
@@ -238,8 +213,6 @@ describe("PlayingCard", () => {
     signInWithDeck("croatian");
     render(<PlayingCard card={queenOfDiamonds} state="default" size="md" />);
 
-    // Bells on the Croatian deck, not diamonds — the same card ID, a different
-    // announcement, because the artwork the player is looking at is different.
     expect(screen.getByTestId("playing-card-QD")).toHaveAttribute("aria-label", "Queen of Bells");
   });
 
@@ -247,8 +220,6 @@ describe("PlayingCard", () => {
     await i18n.changeLanguage("hr");
     render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
 
-    // hr puts the suit first ("Pik kralj"), which is why the label is a locale
-    // template rather than a hardcoded "{rank} of {suit}" in the component.
     expect(screen.getByTestId("playing-card-KS")).toHaveAttribute("aria-label", "Pik kralj");
   });
 
@@ -257,12 +228,6 @@ describe("PlayingCard", () => {
     await i18n.changeLanguage("hr");
     render(<PlayingCard card={queenOfDiamonds} state="default" size="md" />);
 
-    // Lower case, unlike the French row's "Pik": the Croatian deck's suits are
-    // ordinary common nouns (bundeva, žir, zelje) rather than the borrowed,
-    // capitalised card words, and hr does not capitalise common nouns
-    // mid-sentence — which is where most templates put them ("zvao bundeva za
-    // aduta"). The one surface that needs a leading capital, TrumpIndicator's
-    // caption, gets it from CSS `capitalize`, not from the stored string.
     expect(screen.getByTestId("playing-card-QD")).toHaveAttribute("aria-label", "bundeva dama");
   });
 

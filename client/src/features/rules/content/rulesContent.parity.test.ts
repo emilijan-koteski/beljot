@@ -1,7 +1,3 @@
-// Cross-locale drift gate for the Rules content module. The four locales live
-// outside the parity-tested i18n JSON, so this test guarantees they never drift
-// in structure and that no translated string is empty.
-
 import { describe, expect, it } from "vitest";
 
 import { type Variant, VARIANTS } from "@/shared/types/matchTypes";
@@ -13,48 +9,32 @@ import { visibleFor } from "./visibility";
 const LANGS: RulesLang[] = ["en", "mk", "hr", "sr"];
 const reference = RULES_CONTENT.en;
 
-// The block kinds whose renderers actually paint a difference marker, in BOTH
-// the light `RuleBlock` switch and the dark `DarkBlock` one. `cards` and `melds`
-// take no marker in either (they render a grid, with no text to hang it on), and
-// `tiers` renders in the light theme only — `DarkBlock` has no `tiers` case at
-// all, a pre-existing gap filed as deferred work. `VariantScope` sits on every
-// member of the union, so nothing in the type system stops a scoped `melds`
-// block; this list is what makes it a test failure instead of a note that
-// silently disappears in one theme.
 const MARKER_CAPABLE: RuleBlock["kind"][] = ["p", "rule", "steps", "note"];
 
-// The variant scope and the presence of a difference marker are structure, not
-// translation: a block scoped in one locale only, or one that lost its marker
-// in translation, renders a different page per language. Folding both into the
-// shape string is what makes that a test failure instead of silent drift.
+/** A block or item's variant scope and marker presence, which must match across locales. */
 function scopeShape(s: VariantScope): string {
   return `${s.variant ?? "all"}/${s.otherVariantNote ? "marked" : "plain"}`;
 }
 
+/** The structural shape of a block, including per-item step scopes and tier order. */
 function blockShape(b: RuleBlock): string {
-  // Step items carry their own scope, so the per-item scopes are part of the
-  // block's shape: a locale that scoped the same six steps differently would
-  // render a different page under the same tab.
   if (b.kind === "steps")
     return `steps:${b.items.length}:${scopeShape(b)}:[${b.items.map(scopeShape).join("|")}]`;
-  // Tier tokens are structure, not translation — the shape pins their order.
   if (b.kind === "tiers") return `tiers:${b.items.map((i) => i.tier).join(",")}:${scopeShape(b)}`;
   return `${b.kind}:${scopeShape(b)}`;
 }
 
-/** Every scoped block in a section, grouped by the variant it is scoped to. */
 function scopedVariants(blocks: RuleBlock[]): Set<Variant> {
   return new Set(blocks.flatMap((b) => (b.variant ? [b.variant] : [])));
 }
 
-/** Every scoped step item across a section's `steps` blocks. */
 function stepItems(blocks: RuleBlock[]): { blockIndex: number; index: number; item: StepItem }[] {
   return blocks.flatMap((b, blockIndex) =>
     b.kind === "steps" ? b.items.map((item, index) => ({ blockIndex, index, item })) : [],
   );
 }
 
-// Walk every leaf string in a content object and collect empties.
+/** Paths of every empty leaf string, skipping the optional card `note`. */
 function emptyStringPaths(value: unknown, prefix = ""): string[] {
   if (typeof value === "string") {
     return value.trim().length === 0 ? [prefix] : [];
@@ -64,7 +44,6 @@ function emptyStringPaths(value: unknown, prefix = ""): string[] {
   }
   if (value && typeof value === "object") {
     return Object.entries(value).flatMap(([k, v]) =>
-      // `note` is an optional card annotation — empty for most ranks by design.
       k === "note" ? [] : emptyStringPaths(v, prefix ? `${prefix}.${k}` : k),
     );
   }
@@ -150,8 +129,6 @@ describe("rules content parity", () => {
   });
 
   it("never carries a difference note on an unscoped block", () => {
-    // An unscoped block renders under BOTH tabs, so a note saying "the other
-    // variant does X" would be wrong on one of them.
     for (const lang of LANGS) {
       for (const section of RULES_CONTENT[lang].sections) {
         section.blocks.forEach((b, i) => {
@@ -166,8 +143,6 @@ describe("rules content parity", () => {
   });
 
   it("covers both variants wherever a section scopes anything", () => {
-    // A section that scopes a block for one variant and gives the other no
-    // counterpart is a content hole: that tab is simply missing the rule.
     for (const lang of LANGS) {
       for (const section of RULES_CONTENT[lang].sections) {
         const scoped = scopedVariants(section.blocks);
@@ -181,12 +156,6 @@ describe("rules content parity", () => {
       }
     }
   });
-
-  // ── Item-level scoping ───────────────────────────────────────────────────
-  //
-  // `basics` holds ONE steps block whose individual items are scoped, so the
-  // block-level gates above see nothing there. These are the equivalents one
-  // level down.
 
   it("gives every variant-scoped step item a difference marker", () => {
     for (const lang of LANGS) {
@@ -213,8 +182,6 @@ describe("rules content parity", () => {
   });
 
   it("never carries a difference note on an unscoped step item", () => {
-    // A shared item renders under BOTH tabs, so "the other variant does X" is
-    // wrong on one of them.
     for (const lang of LANGS) {
       for (const section of RULES_CONTENT[lang].sections) {
         for (const { blockIndex, index, item } of stepItems(section.blocks)) {
@@ -247,9 +214,6 @@ describe("rules content parity", () => {
   });
 
   it("shows both variants the same number of steps in every steps block", () => {
-    // "Almost identical" is the product requirement, not a nice-to-have: one tab
-    // silently short a step is the failure this catches. It also pins the
-    // gapless 01..06 the renderers derive from the filtered list.
     for (const lang of LANGS) {
       for (const section of RULES_CONTENT[lang].sections) {
         section.blocks.forEach((block, blockIndex) => {

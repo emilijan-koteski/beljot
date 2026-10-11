@@ -3,23 +3,14 @@ import { Link } from "react-router";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-// Logo tile (the shared /beljot-logo.svg, same asset the app TopBar uses) +
-// "Beljot" wordmark. The wordmark uses `text-ink`, so it auto-flips to light
-// inside a `.felt-surface` and stays dark on parchment. Clicking it goes home —
-// "/lobby" when signed in, the marketing landing ("/") otherwise.
-
 type BrandLockupProps = {
   size?: number;
   wordmarkSize?: number;
   className?: string;
-  /**
-   * Append a ".online" suffix after the wordmark, rendered in the muted
-   * silver (`text-ink-dim`) that matches the nav's Login link on felt. Used
-   * by the landing header for the complete "Beljot.online" brand lockup.
-   */
   showSuffix?: boolean;
 };
 
+// Logo tile and "Beljot" wordmark linking home: /lobby when signed in, / otherwise.
 export function BrandLockup({
   size = 34,
   wordmarkSize = 22,

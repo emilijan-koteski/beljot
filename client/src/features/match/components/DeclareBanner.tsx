@@ -6,26 +6,12 @@ import { MOTION, motionDuration } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 
 interface DeclareBannerProps {
-  /** Player who committed the declare action. */
   declarerUsername: string;
-  /**
-   * Compass position of the declarer relative to the local viewer (0=south,
-   * 1=east, 2=north, 3=west). Same per-seat anchoring as {@link EmoteBubble} /
-   * {@link SurrenderOpponentBanner}.
-   */
   compassPosition: 0 | 1 | 2 | 3;
-  /** Fired by the auto-dismiss timer so the parent clears the store slot. */
   onDismiss: () => void;
-  /**
-   * Phone layout: anchor the banner to the declarer's avatar (table-facing
-   * side, one seat-gap away) — the parent must render this inside the
-   * positioned seat wrapper. Desktop uses the viewport-anchored offsets.
-   */
   compact?: boolean;
 }
 
-// Desktop: viewport-anchored seat-relative positions — identical to
-// EmoteBubble / SurrenderOpponentBanner so all seat banners share one anchor.
 const SEAT_POSITIONS: Record<0 | 1 | 2 | 3, string> = {
   0: "bottom-[22rem] left-1/2 -translate-x-1/2",
   1: "right-[22rem] top-1/2 -translate-y-1/2",
@@ -33,22 +19,16 @@ const SEAT_POSITIONS: Record<0 | 1 | 2 | 3, string> = {
   3: "left-[22rem] top-1/2 -translate-y-1/2",
 };
 
-// Phone: anchored to the declarer's avatar on the table-facing side, one
-// seat-gap away — same geometry as the other compact seat banners.
-const AVATAR_FRAME_COMPACT = 60; // compact avatar: 44px disc + 16px frame padding
-const GAP = 4; // matches the seat's `gap-1` between avatar and name pill
+const AVATAR_FRAME_COMPACT = 60;
+const GAP = 4;
 const COMPACT_POSITIONS: Record<0 | 1 | 2 | 3, CSSProperties> = {
-  // South / self — above the avatar.
   0: { left: "50%", bottom: "100%", transform: "translateX(-50%)", marginBottom: GAP },
-  // East / right opponent — left of the avatar, extending inward.
   1: {
     left: "50%",
     top: AVATAR_FRAME_COMPACT / 2,
     transform: `translate(calc(-100% - ${AVATAR_FRAME_COMPACT / 2 + GAP}px), -50%)`,
   },
-  // North / partner — below the avatar.
   2: { left: "50%", top: "100%", transform: "translateX(-50%)", marginTop: GAP },
-  // West / left opponent — right of the avatar, extending inward.
   3: {
     left: "50%",
     top: AVATAR_FRAME_COMPACT / 2,
@@ -57,13 +37,8 @@ const COMPACT_POSITIONS: Record<0 | 1 | 2 | 3, CSSProperties> = {
 };
 
 /**
- * "Has a declaration" seat banner. Shown the moment a player commits a declare
- * action so the whole table knows a declaration exists — WITHOUT revealing
- * which melds or how much; that stays secret until the DeclarationReveal. It is
- * phase-agnostic: declarations may be collected inside trick 1 or in a
- * dedicated phase before it, and the banner reads the same either way. Styling
- * and anchoring mirror EmoteBubble / SurrenderOpponentBanner; auto-dismisses
- * like the emote bubble.
+ * Seat banner announcing that a player has a declaration, without revealing which melds or how much.
+ * It auto-dismisses like the emote bubble.
  */
 export function DeclareBanner({
   declarerUsername,
@@ -73,9 +48,6 @@ export function DeclareBanner({
 }: DeclareBannerProps) {
   const { t } = useTranslation();
 
-  // Capture latest onDismiss in a ref so the dismiss-timer effect runs once
-  // on mount instead of restarting whenever the parent re-creates the inline
-  // callback (same pattern as EmoteBubble).
   const onDismissRef = useRef(onDismiss);
   useEffect(() => {
     onDismissRef.current = onDismiss;

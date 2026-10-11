@@ -1,17 +1,3 @@
-// Locale overflow test (AC-009).
-//
-// AC-009 overflow check is JSDOM-impossible: both `scrollWidth` and
-// `clientWidth` are 0 in jsdom, so any `scrollWidth > clientWidth` comparison
-// is trivially false and would never fail. The real overflow regression gate
-// lives in Playwright (TODO — convert to Playwright). This test only asserts
-// i18n key parity at the seat-label render path: that the localized "Team A"
-// / "Tim A" labels mount without a missing-key fallback that would itself
-// break layout.
-//
-// AC10 / D117: removed the dead-letter scrollWidth/clientWidth assertion;
-// keeping it would mislead future readers into thinking this test catches
-// overflow regressions in unit-test runs.
-
 import "@/shared/i18n/i18n";
 
 import { render, screen, waitFor } from "@testing-library/react";
@@ -46,9 +32,6 @@ vi.mock("@/shared/api/rooms", () => ({
   swapSeats: vi.fn(),
 }));
 
-// The room's last-match panel reads GET /rooms/:id/last-match. Rejected here so
-// these suites never touch the network; the action-bar button stays unrendered,
-// which is what a room with no viewer-played match looks like.
 vi.mock("@/shared/api/matches", () => ({
   getRoomLastMatch: vi.fn(() => Promise.reject(new Error("no last match"))),
 }));
@@ -145,7 +128,6 @@ function renderRoomPage() {
 }
 
 beforeAll(async () => {
-  // Make sure we start in `en` regardless of any cross-test residue.
   await i18n.changeLanguage("en");
 });
 
@@ -193,23 +175,17 @@ describe("RoomPage locale overflow", () => {
         expect(screen.getByTestId("seats-grid")).toBeInTheDocument();
       });
 
-      // Viewer alice is seated, so the legend renders the perspective-based
-      // "Us" / "Them" labels in the active locale.
       const expectedUs = locale === "en" ? "Us" : "Mi";
       const expectedThem = locale === "en" ? "Them" : "Oni";
       expect(screen.getByText(expectedUs)).toBeInTheDocument();
       expect(screen.getByText(expectedThem)).toBeInTheDocument();
 
-      // Sanity-check the diamond layout has all four seat tiles.
       const seatGrid = screen.getByTestId("seats-grid");
       const tiles = seatGrid.querySelectorAll<HTMLElement>("[data-testid^='seat-position-']");
       expect(tiles.length).toBe(4);
     },
   );
 
-  // Story 12.8: RoomPage's variantKeys map held only bitola, so a Croatian room
-  // fell through `t(variantKeys[v] ?? v)` and rendered the raw server string
-  // "croatia" in every locale — a missing-key passthrough, not a translation.
   it.each([
     ["mk", "Хрватска"],
     ["hr", "Hrvatska"],
@@ -231,8 +207,6 @@ describe("RoomPage locale overflow", () => {
   });
 
   it("renders the localized 501 match-mode badge in mk locale", async () => {
-    // mk distinguishes the i18n label ("501 поен") from the raw "501"
-    // fallback that an unmapped matchMode key would render.
     const detail = fourSeatedRoom();
     detail.room.matchMode = "501";
     mockGetRoom.mockResolvedValue(detail);

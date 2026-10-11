@@ -1,7 +1,3 @@
-// Profile snapshot card (parchment). Static marketing data — shows the shape
-// of the real profile page: identity, a streak badge, three career stats and a
-// short match history. Labels are translated; numbers are illustrative.
-
 export type ProfileLabels = {
   member: string;
   games: string;
@@ -21,6 +17,8 @@ const MATCHES: Match[] = [
   { won: false, a: "812", b: "1018", withWho: "ana", when: "4d" },
 ];
 
+// Static marketing profile card showing the shape of the real profile page.
+// Labels are translated; numbers are illustrative.
 export function ProfileCard({ labels }: { labels: ProfileLabels }) {
   const stats: [string, string][] = [
     ["142", labels.games],
@@ -30,7 +28,6 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
 
   return (
     <div className="bg-surface-elevated border-border w-full max-w-95 overflow-hidden rounded-[18px] border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.45)]">
-      {/* identity */}
       <div className="flex items-center gap-3 px-4.5 pt-4.5 pb-4">
         <span
           className="font-display flex size-11 items-center justify-center rounded-full text-lg font-bold"
@@ -48,7 +45,6 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
         </div>
       </div>
 
-      {/* career stats */}
       <div className="border-border grid grid-cols-3 border-t border-b">
         {stats.map(([value, label], i) => (
           <div
@@ -64,7 +60,6 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
         ))}
       </div>
 
-      {/* recent matches */}
       <div className="text-brass-deep font-mono px-4.5 pt-3 pb-1.5 text-[10.5px] font-semibold tracking-[1.5px] uppercase">
         {labels.recent}
       </div>

@@ -12,24 +12,9 @@ import (
 	"github.com/emilijan/beljot/server/internal/apperr"
 )
 
-// CurrentSeasonView is the GET /api/v1/seasons/current response body (the value
-// inside the { "data": ... } envelope). It carries the active window plus the
-// caller's own record, decomposed so the RankBanner renders without doing ladder
-// arithmetic.
-//
-// EndsAt is an ABSOLUTE ISO 8601 timestamp, never a relative "days remaining":
-// the wire rule across this project is absolute timestamps, and the countdown is
-// display state the client recomputes on its own tick.
-//
-// RankTier is a stable machine token ("iron" ... "grandmaster") that the client maps
-// to an i18n label and a colour. A display string never crosses the wire.
-// RankDivision is 1-3, or null for Master and Grandmaster (never omitted).
-//
-// SPIntoDivision / SPForNextDivision decompose the current RANK STEP, the unit
-// the banner's bar fills (Story 13.5): toward the next division, toward the
-// next tier from Diamond 3 and Master, and SPForNextDivision 0 at Grandmaster,
-// which has no next step and renders a full bar. They replace 13.1's tier-band
-// pair (spIntoTier / spForNextTier).
+// CurrentSeasonView is the GET /api/v1/seasons/current body: the active window plus the caller's
+// own rank, decomposed so the client does no ladder arithmetic. EndsAt is an absolute timestamp
+// and RankDivision is null for Master and Grandmaster.
 type CurrentSeasonView struct {
 	SeasonName        string    `json:"seasonName"`
 	EndsAt            time.Time `json:"endsAt"`
@@ -66,16 +51,8 @@ func getUserID(c echo.Context) (uint, error) {
 	return userID, nil
 }
 
-// GetCurrentSeason handles GET /api/v1/seasons/current.
-//
-// It returns THE CALLER'S OWN record, keyed off the JWT subject the auth
-// middleware resolved -- never a path or query id, so there is no way to read
-// another player's season standing through it. (Story 13.2's leaderboard is the
-// endpoint that exposes other players, and it exposes them as a ranked list.)
-//
-// A caller who has not played this season gets the zero state, not a 404: at 0
-// SP a player is Iron 1, which is a real rank that renders normally, and there
-// is no "unranked" state in this ladder.
+// GetCurrentSeason handles GET /api/v1/seasons/current for the JWT caller only, never a path id.
+// A caller who has not played this season gets the Iron 1 zero state, not a 404.
 func (h *Handler) GetCurrentSeason(c echo.Context) error {
 	userID, err := getUserID(c)
 	if err != nil {
@@ -92,22 +69,12 @@ func (h *Handler) GetCurrentSeason(c echo.Context) error {
 	})
 }
 
-// --- Story 13.2: GET /api/v1/leaderboard ---
-
-// LeaderboardRowView is one row of the seasonal leaderboard.
-//
-// Tier is a stable machine token the client maps to a label and a colour --
-// same contract as CurrentSeasonView.RankTier -- and Division is 1-3 or null.
-// For a RUNNING season both are derived from `sp`; for an ENDED one they are
-// the row's stored snapshot, so an old season shows the rank it finished on
-// (Story 13.5). Position is the row's 1-based slot in the FULL season order,
-// not its index in this page.
+// LeaderboardRowView is one leaderboard row, with Position as its 1-based slot in the full season order.
+// Tier and Division derive from SP for a running season and come from the stored snapshot for an ended one.
 type LeaderboardRowView struct {
-	Position int    `json:"position"`
-	UserID   uint   `json:"userId"`
-	Username string `json:"username"`
-	// AvatarURL is the player's 128 px avatar, null when they have none (or
-	// when no avatar resolver is wired).
+	Position    int     `json:"position"`
+	UserID      uint    `json:"userId"`
+	Username    string  `json:"username"`
 	AvatarURL   *string `json:"avatarUrl"`
 	SP          int     `json:"sp"`
 	Tier        string  `json:"tier"`
@@ -115,20 +82,8 @@ type LeaderboardRowView struct {
 	GamesPlayed int     `json:"gamesPlayed"`
 }
 
-// LeaderboardViewerView is the CALLER'S OWN standing, so the client can mark
-// their row in the list and pin it into view when it falls outside the loaded
-// pages.
-//
-// NO USERNAME, on purpose: the viewer is the authenticated caller and the client
-// already holds their name in authStore, so the pinned row renders through the
-// same component with the name supplied locally (Story 13.2 D3).
-//
-// Position is counted under the LIST'S OWN total order (sp DESC, user_id ASC),
-// so a tied viewer's number matches the slot they occupy rather than the shared
-// number a COUNT(sp > x) would give every tied player.
-//
-// Tier and Division follow the list's own running / ended rule, so the pinned
-// row and the listed row always show the same rank.
+// LeaderboardViewerView is the caller's own standing, positioned under the list's total order
+// (sp DESC, user_id ASC). It deliberately omits the username, which the client already holds.
 type LeaderboardViewerView struct {
 	Position    int    `json:"position"`
 	UserID      uint   `json:"userId"`
@@ -138,19 +93,8 @@ type LeaderboardViewerView struct {
 	GamesPlayed int    `json:"gamesPlayed"`
 }
 
-// LeaderboardView is the GET /api/v1/leaderboard response body (the value inside
-// the { "data": ... } envelope).
-//
-// { items, total, limit, offset } is this project's ONE paginated shape, taken
-// verbatim from MatchesListResponse (user/handler.go). Total is the whole
-// season's visible row count, not the page length, so the client's load-more can
-// tell when it has reached the end.
-//
-// Viewer is NULL when the caller has not played the season (no listable row);
-// a player who has played is on the ladder even at 0 SP (Story 13.4), and gets
-// a viewer block. `omitempty` is deliberately NOT set: the key must always be
-// present so the client can distinguish "no standing" from "an older server
-// that does not send this".
+// LeaderboardView is the GET /api/v1/leaderboard body in the shared { items, total, limit, offset } shape.
+// Viewer is null, never omitted, when the caller has not played the season.
 type LeaderboardView struct {
 	Items  []LeaderboardRowView   `json:"items"`
 	Total  int64                  `json:"total"`
@@ -159,42 +103,8 @@ type LeaderboardView struct {
 	Viewer *LeaderboardViewerView `json:"viewer"`
 }
 
-// parseLeaderboardQuery reads limit/offset/season and applies the documented
-// bounds and allowlist. Returns apperr.ErrBadRequest on any violation, mirroring
-// parseMatchesQuery (user/handler.go) -- including its strictness: a MALFORMED or
-// out-of-range value is rejected rather than coerced, so a client bug surfaces as
-// a 400 instead of a quietly wrong page.
-//
-// AN EMPTY VALUE IS NOT A MALFORMED ONE. `?limit=` and `?offset=` (present, no
-// value) are treated as ABSENT and take the defaults, because the `raw != ""`
-// guard cannot distinguish them from an omitted parameter -- and neither can the
-// precedent this mirrors: parseMatchesQuery behaves identically, so a client that
-// builds `limit=${x}` with an undefined x gets the same answer from both
-// endpoints. Only a non-empty value that fails to parse, or parses outside the
-// bounds, is a 400.
-//
-// defaultLimit is 10 because the lobby widget is a TOP TEN and sends no limit at
-// all; the full page passes its own.
-//
-// maxOffset EXISTS BECAUSE `offset` HAD NO CEILING AT ALL while `limit` had two
-// bounds. Without it `offset=9223372036854775807` parses cleanly and reaches
-// Postgres, and every deep offset makes the database sort and discard that many
-// rows before returning a page -- so the cost of a request grew with a number the
-// caller chose freely. 10,000 is 400 load-more pages deep, far past any real
-// reader, and is a bound rather than a target: if the product ever needs to page
-// past it, the fix is a keyset cursor (WHERE (sp, user_id) < (?, ?)), not a
-// larger number here.
-//
-// `season` accepts "current", absence, or a POSITIVE INTEGER season id (Story
-// 13.3's prior-season selector -- the value GET /api/v1/seasons hands the
-// picker). The returned seasonID is 0 for the current-window selector. The
-// integer form is parsed with ParseUint, base 10, BIT SIZE 32 -- ids are
-// 32-bit SERIALs, and a 64-bit parse followed by a uint cast would silently
-// TRUNCATE an over-range value to a different id on a 32-bit build. So "+5",
-// "-1", "5.0", "abc" and anything above 2^32-1 are all 400s -- MALFORMED input
-// never reaches the database, while a well-formed id that matches no row is
-// the service's 404 (apperr.ErrSeasonNotFound), never a silent fallback to the
-// active window, which would show the wrong standings under the right heading.
+// parseLeaderboardQuery validates limit, offset and season, returning apperr.ErrBadRequest instead of
+// coercing bad values; empty values take the defaults. Season ids parse as 32-bit so an over-range id never truncates to another season.
 func parseLeaderboardQuery(c echo.Context) (limit, offset int, seasonID uint, err error) {
 	const defaultLimit = 10
 	const maxLimit = 50
@@ -220,7 +130,6 @@ func parseLeaderboardQuery(c echo.Context) (limit, offset int, seasonID uint, er
 
 	switch raw := c.QueryParam("season"); raw {
 	case "", "current":
-		// seasonID 0: the active window, resolved by the service.
 	default:
 		v, convErr := strconv.ParseUint(raw, 10, 32)
 		if convErr != nil || v < 1 {
@@ -232,14 +141,8 @@ func parseLeaderboardQuery(c echo.Context) (limit, offset int, seasonID uint, er
 	return limit, offset, seasonID, nil
 }
 
-// GetLeaderboard handles GET /api/v1/leaderboard?season=current|<id>.
-//
-// AUTHENTICATED, like every other route on the api group. The viewer block is
-// keyed off the JWT subject -- there is no id parameter -- so this endpoint
-// exposes other players only as an SP-ordered list, never as a lookup.
-//
-// PULL-ONLY: page load plus poll. Standings deliberately have no WebSocket push
-// (epic decision), so nothing here has a counterpart in ws/events.go.
+// GetLeaderboard handles GET /api/v1/leaderboard?season=current|<id> for an authenticated caller.
+// The viewer block is keyed off the JWT subject, so other players appear only in the ranked list.
 func (h *Handler) GetLeaderboard(c echo.Context) error {
 	userID, err := getUserID(c)
 	if err != nil {
@@ -253,11 +156,6 @@ func (h *Handler) GetLeaderboard(c echo.Context) error {
 
 	view, err := h.service.LeaderboardView(userID, seasonID, limit, offset, time.Now().UTC())
 	if err != nil {
-		// apperr.ErrSeasonNotFound (a well-formed but unknown ?season=<id>) must
-		// reach appErrorHandler UNWRAPPED-COMPATIBLY -- errors.As unwraps %w
-		// chains, so plain wrapping is fine -- but wrapping it in prose here
-		// would bury the one error that is the caller's, not ours. Return it
-		// as-is; wrap only genuine internal failures.
 		if errors.Is(err, apperr.ErrSeasonNotFound) {
 			return err
 		}
@@ -269,8 +167,6 @@ func (h *Handler) GetLeaderboard(c echo.Context) error {
 	})
 }
 
-// --- Story 13.3: GET /api/v1/seasons + GET /api/v1/users/:id/seasons ---
-
 // SeasonListItemView is one row of GET /api/v1/seasons -- the picker's feed.
 // Name is the machine-stable "YYYY QN" token, rendered verbatim and never
 // translated; the timestamps are absolute ISO 8601, like every wire timestamp.
@@ -281,22 +177,14 @@ type SeasonListItemView struct {
 	EndsAt    time.Time `json:"endsAt"`
 }
 
-// SeasonsListView is the GET /api/v1/seasons response body (inside the
-// { "data": ... } envelope). Items is newest-first and never null -- an empty
-// table serializes as [].
+// SeasonsListView is the GET /api/v1/seasons response body.
+// Items is newest-first and never null, so an empty table serializes as [].
 type SeasonsListView struct {
 	Items []SeasonListItemView `json:"items"`
 }
 
-// ArchiveRowView is one ended, played season in a player's archive
-// (GET /api/v1/users/:id/seasons).
-//
-// Tier and Division are the row's STORED rank snapshot, the rank the season
-// finished on (Story 13.5): every archived season has ended, and re-deriving an
-// old SP total on today's floors would misrank it. Division is null for Master,
-// Grandmaster and any row scored before divisions existed and never
-// recalculated (2026 Q3 was recalculated with divisions, migration 000029).
-// SeasonName is the verbatim machine token.
+// ArchiveRowView is one ended, played season in a player's archive, with the rank the season finished on.
+// Division is null for Master, Grandmaster and rows scored before divisions existed.
 type ArchiveRowView struct {
 	SeasonID    uint      `json:"seasonId"`
 	SeasonName  string    `json:"seasonName"`
@@ -308,22 +196,13 @@ type ArchiveRowView struct {
 	EndsAt      time.Time `json:"endsAt"`
 }
 
-// ArchiveView is the GET /api/v1/users/:id/seasons response body (inside the
-// { "data": ... } envelope). Items is newest-first and never null: a player
-// with no ended played seasons -- and an UNKNOWN user id alike -- gets
-// { "items": [] } with a 200, never a 404. The profile query owns user
-// existence; this endpoint only answers "which ended seasons did this id play",
-// and the client hides the whole archive section on an empty answer.
+// ArchiveView is the GET /api/v1/users/:id/seasons body. An unknown user id gets an empty list, not a 404.
 type ArchiveView struct {
 	Items []ArchiveRowView `json:"items"`
 }
 
-// SeasonRankView is the `seasonRank` block on BOTH profile DTOs (Story 13.3):
-// the subject's standing in the ACTIVE season. Nil -- serialized as null --
-// when the subject has not played this season. Public-safe by construction:
-// tier, division and SP are exactly what the leaderboard already exposes for
-// every player, and SeasonName is the machine token. The season is running, so
-// the rank is derived from SP; Division is 1-3 or null.
+// SeasonRankView is the subject's active-season standing on both profile DTOs, null when they have not played.
+// It exposes only what the leaderboard already shows, with the rank derived from SP.
 type SeasonRankView struct {
 	SeasonName string `json:"seasonName"`
 	Tier       string `json:"tier"`
@@ -349,20 +228,13 @@ func (h *Handler) GetSeasons(c echo.Context) error {
 	})
 }
 
-// GetPlayerSeasonArchive handles GET /api/v1/users/:id/seasons: the SUBJECT's
-// ended, played seasons, newest-first. Public to any authenticated viewer,
-// mirroring the profile endpoints (Story 11.3): the id names the subject, the
-// data is exactly what the leaderboard already exposes, and DELIBERATELY NO
-// user-existence 404 -- an unknown id is an empty archive (the profile query,
-// which the client always issues first, owns the not-found surface).
+// GetPlayerSeasonArchive handles GET /api/v1/users/:id/seasons, listing ended played seasons newest-first.
+// An unknown id is an empty archive rather than a 404, since the profile query owns not-found.
 func (h *Handler) GetPlayerSeasonArchive(c echo.Context) error {
 	if _, err := getUserID(c); err != nil {
 		return apperr.ErrUnauthorized
 	}
 
-	// BIT SIZE 32, like the ?season= selector above: ids are 32-bit SERIALs,
-	// and a 64-bit parse cast to uint would truncate to a DIFFERENT user's id
-	// on a 32-bit build -- serving someone else's archive instead of a 400.
 	paramID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil || paramID == 0 {
 		return apperr.ErrBadRequest

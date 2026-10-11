@@ -23,8 +23,7 @@ vi.mock("react-router", async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-// TestProviders (not QueryWrapper): rows link to the sender's public profile, so
-// the section needs a router around it.
+// Renders the section inside TestProviders, since request rows link to a profile route.
 function renderRequests() {
   render(
     <TestProviders>
@@ -36,9 +35,6 @@ function renderRequests() {
 afterEach(() => vi.clearAllMocks());
 
 describe("FriendRequests", () => {
-  // An empty inbox is the normal state, and it is not worth a card that says so:
-  // the card renders only when it has requests, and the friend list beside it
-  // takes the freed width.
   it("renders nothing at all when there are no requests", async () => {
     mockList.mockResolvedValue([]);
     renderRequests();
@@ -82,7 +78,6 @@ describe("FriendRequests", () => {
     expect(mockDecline).toHaveBeenCalledWith(8);
   });
 
-  // Same affordance as a friend row: you look the sender up before deciding.
   it("opens the sender's public profile from their name", async () => {
     const user = userEvent.setup();
     mockList.mockResolvedValue([
@@ -94,7 +89,6 @@ describe("FriendRequests", () => {
     await user.click(screen.getByTestId("friend-request-profile"));
 
     expect(mockNavigate).toHaveBeenCalledWith("/players/42");
-    // Opening the profile must not answer the request.
     expect(mockAccept).not.toHaveBeenCalled();
     expect(mockDecline).not.toHaveBeenCalled();
   });

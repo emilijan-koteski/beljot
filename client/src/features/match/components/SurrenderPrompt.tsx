@@ -18,8 +18,6 @@ const DANGER = "#ff8585";
 
 export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: SurrenderPromptProps) {
   const { t } = useTranslation();
-  // Escape declines the partner-accept (D102 / D103). fixed inset-0 prevents
-  // the prompt from leaking through scrolled/zoomed parent stacking contexts.
   const promptRef = useFocusTrap<HTMLDivElement>({ onEscape: onDecline });
 
   return (
@@ -49,8 +47,6 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
               {t("match.surrender.prompt.body", { username: proposerUsername })}
             </p>
 
-            {/* Danger accent strip — mirrors the proposer's confirm dialog so
-                both sides of the surrender flow share visual language. */}
             <div
               className="mb-4 px-3 py-2 rounded-lg flex items-center gap-2 font-body"
               style={{

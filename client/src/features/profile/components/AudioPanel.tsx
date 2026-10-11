@@ -42,9 +42,8 @@ const ROWS = [
 }>;
 
 /**
- * One channel's volume slider, under its switch. Outside the switch's
- * `<label>` on purpose: inside it, every press on the track would also toggle
- * the switch. Disabled — value kept — while the switch is off.
+ * One channel's volume slider, kept outside the switch's `<label>` so pressing the track
+ * never toggles the switch. Disabled, with its value kept, while the switch is off.
  */
 function VolumeRow({
   field,
@@ -87,18 +86,8 @@ function VolumeRow({
 }
 
 /**
- * Profile-sidebar audio switches and volumes, so sound effects and music are
- * settable outside a match as well as from the in-game Settings dialog and HUD
- * mute.
- *
- * Same optimistic write with silent, latest-wins revert as those two — all
- * three share `persistAudioPreferences`, so a change here and one in a match
- * are ordered against each other — and each switch or slider PATCHes only its
- * own field (a slider once, on release).
- *
- * SELF-ONLY. Every one of these is a private account preference, absent from
- * `PublicProfileResponse`, so the panel mounts on `ProfilePage` and must never
- * appear on `PublicPlayerProfilePage`.
+ * Self-only profile sidebar panel for the sound and music switches and volumes.
+ * Writes go through `persistAudioPreferences`, so they stay ordered with in-match changes.
  */
 export function AudioPanel() {
   const { t } = useTranslation();

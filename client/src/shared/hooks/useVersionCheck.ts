@@ -3,19 +3,10 @@ import { useLocation } from "react-router";
 
 import { APP_VERSION, reloadForNewVersion } from "@/shared/lib/appVersion";
 
-// How often a live tab compares itself against the deployed version. Checks
-// also fire when a hidden tab becomes visible again and when the device comes
-// back online — the two moments a long-slept tab is most likely stale.
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
-// Remembers which version this tab already reloaded for. If an intermediary
-// cache keeps serving the old index.html even after a reload, we'd otherwise
-// reload forever; sessionStorage survives reloads but stays per-tab.
 const RELOADED_FOR_KEY = "beljot:version-reloaded-for";
 
-// An active match is the one place a surprise reload hurts (table state only
-// partially resyncs), so the reload is deferred until the player leaves the
-// match screen. "/match/" (not "/match") so /matchmaking/:id isn't caught.
 function isMatchRoute(pathname: string): boolean {
   return pathname.startsWith("/match/");
 }
@@ -26,19 +17,16 @@ function reloadOncePerVersion(version: string): void {
   reloadForNewVersion();
 }
 
-// useVersionCheck reloads the tab when a newer build has been deployed: it
-// polls /version.json (emitted at build time with the commit SHA) and compares
-// against the SHA baked into this bundle. Combined with the Caddy cache rules
-// (index.html no-cache, /assets immutable) a plain reload is equivalent to a
-// hard refresh. No-ops in dev, where there is no version.json and hot reload
-// handles freshness. Mount once, near the app root.
+/**
+ * Reloads the tab when /version.json reports a build newer than this bundle, deferring the
+ * reload while on a match route. No-ops in dev; mount once near the app root.
+ */
 export function useVersionCheck(): void {
   const { pathname } = useLocation();
   const inMatchRef = useRef(isMatchRoute(pathname));
   inMatchRef.current = isMatchRoute(pathname);
   const pendingVersionRef = useRef<string | null>(null);
 
-  // A reload deferred during a match fires as soon as the route leaves it.
   useEffect(() => {
     if (pendingVersionRef.current && !isMatchRoute(pathname)) {
       reloadOncePerVersion(pendingVersionRef.current);
@@ -62,7 +50,7 @@ export function useVersionCheck(): void {
         }
         reloadOncePerVersion(version);
       } catch {
-        // Offline or a mid-deploy blip — the next scheduled check retries.
+        return;
       }
     };
 

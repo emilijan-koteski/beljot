@@ -5,21 +5,11 @@ import type { CardDeck } from "@/shared/types/matchTypes";
 export interface ProfileResponse {
   id: number;
   username: string;
-  // Avatar derivatives, null when the player has none: the 128 px image every
-  // disc uses and the 256 px one only the profile hero draws. The two profile
-  // shapes are the only responses that carry the large one.
   avatarUrl: string | null;
   avatarLargeUrl: string | null;
-  // When the username was last changed; absent/null if never. Drives the
-  // client-side change-cooldown UX (see shared/lib/usernameChange).
   usernameChangedAt?: string | null;
   languagePreference: string;
-  // Card deck (Story 12.4) — PRIVATE, self-only, deliberately absent from
-  // PublicProfileResponse below. Mirrors the server DTO; the auth envelope is
-  // what the renderer actually reads.
   cardDeckPreference: CardDeck;
-  // Audio switches (migration 000025) and their 0-100 volumes (migration
-  // 000026) — PRIVATE and self-only, like the deck.
   soundEnabled: boolean;
   musicEnabled: boolean;
   soundVolume: number;
@@ -29,22 +19,10 @@ export interface ProfileResponse {
   wins: number;
   losses: number;
   abandoned: number;
-  // XP & level (Story 9.5). level is derived server-side from totalXp;
-  // xpIntoLevel / xpForNextLevel drive the profile XP-bar fill
-  // (fill = xpIntoLevel / xpForNextLevel). Server-authoritative, never recomputed.
   totalXp: number;
   level: number;
   xpIntoLevel: number;
   xpForNextLevel: number;
-  // Honor (Story 9.7). Unlike walletBalance / totalXp these are PUBLIC-SAFE by
-  // design — honor exists so other players can judge reliability, and Epic 11's
-  // public profile can carry them verbatim.
-  //
-  // honorScore is server-recomputed on every response (never the lagging
-  // honor_score column). honorTier / honorTrendDirection are stable machine
-  // tokens, mapped to i18n labels client-side. The Completed/Abandoned totals
-  // are raw undecayed lifetime counts. isNewPlayer hides the score and tier
-  // behind a "New Player" chip while the counts still render.
   honorScore: number;
   honorTier: string;
   honorCompletedTotal: number;
@@ -52,26 +30,16 @@ export interface ProfileResponse {
   isNewPlayer: boolean;
   honorTrendDelta: number;
   honorTrendDirection: string;
-  // Seasonal rank (Story 13.3): the subject's standing in the ACTIVE season,
-  // or null when they have not played in it — the chip hides on null. The key
-  // is ALWAYS present on the wire (no omitempty server-side), so null means
-  // "no standing", never "an older server". Public-safe: the public shape
-  // below carries it verbatim.
   seasonRank: SeasonRank | null;
 }
 
 /**
- * The PUBLIC projection of a player's profile (Story 11.3). The server returns
- * this shape from GET /users/:id/profile when :id is NOT the authenticated
- * viewer. It is a strict subset of {@link ProfileResponse}: identity,
- * member-since, progression (level + XP) and the full honor section, but NONE of
- * the private figures — no walletBalance, loginStreakDays, languagePreference or
- * usernameChangedAt. Same URL as getProfile; the narrower type is the point.
+ * The public projection of a player's profile, returned when :id is not the viewer.
+ * A strict subset of {@link ProfileResponse} with none of the private figures.
  */
 export interface PublicProfileResponse {
   id: number;
   username: string;
-  // Avatar derivatives — same semantics as the self shape.
   avatarUrl: string | null;
   avatarLargeUrl: string | null;
   createdAt: string;
@@ -90,19 +58,10 @@ export interface PublicProfileResponse {
   isNewPlayer: boolean;
   honorTrendDelta: number;
   honorTrendDirection: string;
-  // Seasonal rank (Story 13.3) — public per the epic AC. Same null semantics
-  // as the self shape.
   seasonRank: SeasonRank | null;
 }
 
-/**
- * A PARTIAL preferences update — every field is optional, and the server
- * validates and writes each independently (Story 12.4; audio switches,
- * migration 000025; audio volumes, migration 000026). Sending only the deck
- * leaves the language untouched and vice versa, a music toggle never resends
- * the sound switch, and a volume never resends anything else; a body naming no
- * field is a 400, and so is a volume that is not an integer in 0-100.
- */
+/** A partial preferences update; the server validates and writes each field independently. */
 export interface UpdatePreferencesRequest {
   languagePreference?: string;
   cardDeckPreference?: CardDeck;
@@ -112,12 +71,7 @@ export interface UpdatePreferencesRequest {
   musicVolume?: number;
 }
 
-/**
- * The server echoes back ONLY the fields it wrote, so every key is optional
- * here too. Merging a `cardDeckPreference: undefined` into the cached user is a
- * no-op; merging an echoed `""` (or a `false` for an untouched switch, or a
- * `0` for an untouched volume) would have clobbered the untouched preference.
- */
+/** Only the fields the server wrote, so untouched preferences are never clobbered on merge. */
 export interface UpdatePreferencesResponse {
   languagePreference?: string;
   cardDeckPreference?: CardDeck;
@@ -131,12 +85,7 @@ export function getProfile(userId: number): Promise<ProfileResponse> {
   return axiosClient.get(`/users/${userId}/profile`);
 }
 
-/**
- * Fetch another player's public profile. Hits the same URL as getProfile — the
- * server decides the shape from whether :id is the authenticated viewer — and
- * only attaches the narrower {@link PublicProfileResponse} type. The public page
- * never requests its own viewer's id here.
- */
+/** Fetch another player's public profile from the same URL as getProfile, typed to the narrower shape. */
 export function getPublicProfile(userId: number): Promise<PublicProfileResponse> {
   return axiosClient.get(`/users/${userId}/profile`);
 }
@@ -170,17 +119,11 @@ export interface UploadAvatarResponse {
   avatarLargeUrl: string | null;
 }
 
-/**
- * The upload's own deadline. The shared 15 s timeout suits short REST calls; a
- * 2 MiB picture over a slow mobile uplink plus the server's decode and two
- * object-store writes can legitimately take longer.
- */
 const AVATAR_UPLOAD_TIMEOUT_MS = 60_000;
 
 /**
- * Upload (or replace) the caller's avatar as multipart field `avatar`. The file
- * goes up as picked: the server is the only place that decodes, crops and
- * resizes. `onProgress` receives the sent fraction, 0 to 1.
+ * Upload (or replace) the caller's avatar as multipart field `avatar`, unprocessed.
+ * `onProgress` receives the sent fraction, 0 to 1.
  */
 export function uploadAvatar(
   userId: number,
@@ -190,9 +133,6 @@ export function uploadAvatar(
   const form = new FormData();
   form.append("avatar", file);
   return axiosClient.put(`/users/${userId}/avatar`, form, {
-    // The instance default is application/json, which makes axios serialise
-    // FormData as JSON. Naming multipart here sends the FormData as-is, and the
-    // browser adds the boundary itself.
     headers: { "Content-Type": "multipart/form-data" },
     timeout: AVATAR_UPLOAD_TIMEOUT_MS,
     onUploadProgress: (event) => {

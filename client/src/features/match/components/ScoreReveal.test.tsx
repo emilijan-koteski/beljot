@@ -59,7 +59,6 @@ const normalData: HandScoredPayload = {
 describe("ScoreReveal", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    // Mock matchMedia for reduced motion
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -77,8 +76,6 @@ describe("ScoreReveal", () => {
 
   afterEach(() => {
     vi.useRealTimers();
-    // The deck cases below write a signed-in player into the store; without this
-    // the Croatian one leaks into every later test in the file.
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
@@ -152,18 +149,15 @@ describe("ScoreReveal", () => {
 
   it("shows the failed-contract subtitle — points go to the viewer when contracting team is Them", () => {
     const failedData = { ...normalData, failedContract: true, contractingTeam: 1 };
-    // contracting team = teamB; viewer on teamA → beneficiary (teamA) is "Us"
     const { container } = render(
       <ScoreReveal data={failedData} viewerTeam="teamA" onContinue={vi.fn()} />,
     );
     expect(container.textContent).toContain("Went down · all points to us");
-    // The legacy middle paragraph is gone — the message lives in the subtitle.
     expect(screen.queryByTestId("row-failed-contract")).not.toBeInTheDocument();
   });
 
   it("shows the failed-contract subtitle — points go to opponents when viewer's team failed", () => {
     const failedData = { ...normalData, failedContract: true, contractingTeam: 1 };
-    // contracting team = teamB (viewer); beneficiary (teamA) is "Them"
     const { container } = render(
       <ScoreReveal data={failedData} viewerTeam="teamB" onContinue={vi.fn()} />,
     );
@@ -183,11 +177,6 @@ describe("ScoreReveal", () => {
     expect(container.textContent).toContain("Pulled it off · you took trump on");
   });
 
-  // The suit NAME is this panel's only representation of the suit — it draws no
-  // glyph and no icon — so naming it from the French vocabulary while the player
-  // holds the Croatian deck was a visible contradiction with nothing to justify
-  // it. The mocked `t` echoes unknown keys, so asserting the key proves which
-  // vocabulary row was chosen without needing real translations.
   it.each([
     ["french", undefined, "match.card.suit.french.H"],
     ["croatian", "croatian" as const, "match.card.suit.croatian.H"],
@@ -227,14 +216,11 @@ describe("ScoreReveal", () => {
     const onContinue = vi.fn();
     render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={onContinue} />);
 
-    // Still up well within the 8s window.
     act(() => {
       vi.advanceTimersByTime(2000);
     });
     expect(onContinue).not.toHaveBeenCalled();
 
-    // Crossing the auto-continue window acknowledges for the player exactly once
-    // (so one AFK player can't strand the table on the score screen).
     act(() => {
       vi.advanceTimersByTime(6000);
     });

@@ -20,12 +20,7 @@ function wrapper(client: QueryClient) {
   };
 }
 
-/**
- * Mirrors the app-wide client (the 30s staleTime the hook must override, and a
- * `retry` default the hook must override too), minus the backoff — these tests
- * assert the retry PREDICATE, and real exponential delays would add seconds to
- * the suite for nothing.
- */
+/** Builds a client with the app-wide defaults the hook overrides, minus retry backoff. */
 function makeAppLikeClient() {
   return new QueryClient({
     defaultOptions: { queries: { staleTime: 30_000, retry: 1, gcTime: 0, retryDelay: 0 } },
@@ -49,8 +44,6 @@ describe("useRoomLastMatchQuery", () => {
     expect(mockGetRoomLastMatch).not.toHaveBeenCalled();
   });
 
-  // The client-wide staleTime is 30s and the key is per-ROOM, so without the
-  // override a cached previous match would be served without a refetch.
   it("refetches on mount despite a warm cache (staleTime 0)", async () => {
     const client = makeAppLikeClient();
     client.setQueryData(queryKeys.matches.lastByRoom(5), { id: 1 });
@@ -88,8 +81,6 @@ describe("useRoomLastMatchQuery", () => {
     expect(mockGetRoomLastMatch).toHaveBeenCalledTimes(3);
   });
 
-  // FetchError.status is 0 for a dropped connection / timeout — the one case
-  // the retry actually exists for.
   it("retries a network failure", async () => {
     const client = makeAppLikeClient();
     mockGetRoomLastMatch.mockRejectedValue(new FetchError(0, "NETWORK_ERROR", "offline"));

@@ -17,10 +17,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// reuseGracePeriod is how long after a token is rotated an already-rotated
-// token may still be presented without being treated as a stolen-token replay.
-// It absorbs benign races (a second browser tab, or a retried request that
-// never saw the rotated cookie); a replay after this window revokes the family.
 const reuseGracePeriod = 20 * time.Second
 
 type RegisterRequest struct {
@@ -30,58 +26,28 @@ type RegisterRequest struct {
 	LanguagePreference string `json:"languagePreference"`
 }
 
-// RegisterResponseData is shared by Register, Login, and Refresh. The wallet
-// fields are read-only echoes for immediate header display — NO auth handler
-// grants the daily bonus (that is the wallet endpoint's job). Register sets
-// balance 5000 / streak 0; Login and Refresh echo the loaded user's values.
+// RegisterResponseData is the auth envelope shared by Register, Login, and Refresh.
+// Wallet and honor fields are read-only echoes; no auth handler grants the daily bonus.
 type RegisterResponseData struct {
-	ID                 uint   `json:"id"`
-	Username           string `json:"username"`
-	Email              string `json:"email"`
-	LanguagePreference string `json:"languagePreference"`
-	// CardDeckPreference is the card-face artwork the client renders with
-	// (Story 12.4). Echoed on the auth envelope for the same reason as
-	// level/honor above: the FIRST card the player sees must already be in
-	// their chosen deck, without waiting on a separate profile fetch.
-	CardDeckPreference string `json:"cardDeckPreference"`
-	// SoundEnabled / MusicEnabled are the in-match audio switches (migration
-	// 000025), echoed for the same first-paint reason as the deck: the first
-	// card played in a session must already honour a switch the player turned
-	// off on another device.
-	SoundEnabled bool `json:"soundEnabled"`
-	MusicEnabled bool `json:"musicEnabled"`
-	// SoundVolume / MusicVolume are the 0-100 levels for the same two channels
-	// (migration 000026), echoed for the same reason: the first sound of a
-	// session must already play at the level set on another device.
-	SoundVolume     int `json:"soundVolume"`
-	MusicVolume     int `json:"musicVolume"`
-	WalletBalance   int `json:"walletBalance"`
-	LoginStreakDays int `json:"loginStreakDays"`
-	// XP & level (Story 9.5) — read-only echoes so the top-nav banner has the
-	// level + XP immediately on auth, without a separate profile fetch. TotalXP
-	// is the loaded lifetime total (0 for a fresh registration); Level is derived
-	// from it via user.LevelForXP (never stored).
-	TotalXP int `json:"totalXp"`
-	Level   int `json:"level"`
-	// Honor (Story 9.7) — read-only echoes so the top-nav honor chip renders on
-	// FIRST PAINT, without a separate profile fetch, exactly like level/totalXp
-	// above. HonorScore is recomputed from the loaded user's stored weights at
-	// response time (the recompute is the authority; the users.honor_score
-	// column is a lagging filter-only snapshot). HonorTier is a stable machine
-	// token the client maps to a label and colour.
-	//
-	// The TREND is deliberately absent: it needs a windowed query over
-	// `matches`, and the auth path must stay a single-row read. The profile
-	// endpoint carries it.
-	HonorScore  int    `json:"honorScore"`
-	HonorTier   string `json:"honorTier"`
-	IsNewPlayer bool   `json:"isNewPlayer"`
-	// AvatarURL is the player's 128 px avatar (null when none), echoed so the
-	// nav pill shows the picture on first paint. Derived from the stored
-	// prefix, never stored as a URL.
-	AvatarURL *string   `json:"avatarUrl"`
-	CreatedAt time.Time `json:"createdAt"`
-	Token     string    `json:"token"`
+	ID                 uint      `json:"id"`
+	Username           string    `json:"username"`
+	Email              string    `json:"email"`
+	LanguagePreference string    `json:"languagePreference"`
+	CardDeckPreference string    `json:"cardDeckPreference"`
+	SoundEnabled       bool      `json:"soundEnabled"`
+	MusicEnabled       bool      `json:"musicEnabled"`
+	SoundVolume        int       `json:"soundVolume"`
+	MusicVolume        int       `json:"musicVolume"`
+	WalletBalance      int       `json:"walletBalance"`
+	LoginStreakDays    int       `json:"loginStreakDays"`
+	TotalXP            int       `json:"totalXp"`
+	Level              int       `json:"level"`
+	HonorScore         int       `json:"honorScore"`
+	HonorTier          string    `json:"honorTier"`
+	IsNewPlayer        bool      `json:"isNewPlayer"`
+	AvatarURL          *string   `json:"avatarUrl"`
+	CreatedAt          time.Time `json:"createdAt"`
+	Token              string    `json:"token"`
 }
 
 type AuthHandler struct {
@@ -158,8 +124,6 @@ func (h *AuthHandler) startSession(c echo.Context, userID uint) error {
 	}
 	now := time.Now()
 	familyExpiresAt := now.Add(h.absoluteTTL)
-	// Idle deadline never exceeds the absolute cap (matches newSuccessor; only
-	// differs under a misconfigured idleTTL > absoluteTTL, which config warns on).
 	exp := now.Add(h.idleTTL)
 	if exp.After(familyExpiresAt) {
 		exp = familyExpiresAt
@@ -187,10 +151,6 @@ func (h *AuthHandler) revokeFamily(familyID, reason string) {
 }
 
 func authResponseData(u *user.User, accessToken string) RegisterResponseData {
-	// Story 9.7: recompute honor from the loaded row's stored weights. This is
-	// pure arithmetic over three columns we already have — no extra query — and
-	// it is the authoritative value, so the TopBar can never render a stale
-	// score even for a user who has not played in months.
 	honor := user.NewHonorSnapshot(
 		u.HonorCompletedWeight, u.HonorAbandonedWeight, u.HonorDecayedAt,
 		u.HonorCompletedTotal, u.HonorAbandonedTotal, time.Now().UTC(),
@@ -218,6 +178,8 @@ func authResponseData(u *user.User, accessToken string) RegisterResponseData {
 	}
 }
 
+// Register creates the account and starts a session. The wallet is seeded at 5000 with
+// last login stamped to today (UTC), so the first daily bonus lands on the next day.
 func (h *AuthHandler) Register(c echo.Context) error {
 	var req RegisterRequest
 	if err := c.Bind(&req); err != nil {
@@ -249,37 +211,16 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return fmt.Errorf("hashing password: %w", err)
 	}
 
-	// languagePreference is a UX-tolerant field — bad/absent values fall
-	// back to "en" rather than failing the registration. The /preferences
-	// endpoint is the strict validator and exists for later correction.
 	lang := "en"
 	if user.IsSupportedLanguage(req.LanguagePreference) {
 		lang = req.LanguagePreference
 	}
 
-	// Seed the card deck from the RESOLVED language (Story 12.4): somebody
-	// registering in Croatian grew up on the German-suited deck, so that is the
-	// better first impression than the French one. Every other language — and
-	// every fallback to "en" above — gets French. Derived from `lang`, not from
-	// req.LanguagePreference, so an unsupported code cannot pick a deck the
-	// account's actual language does not match. Purely visual and changeable at
-	// any time from Settings or the profile panel; the deck is NOT the variant.
 	deck := user.CardDeckFrench
 	if lang == "hr" {
 		deck = user.CardDeckCroatian
 	}
 
-	// Seed the wallet at registration (Story 9.1): balance 5000, streak 0, and
-	// last_login stamped to today (UTC). Stamping today is what makes the
-	// same-day bootstrap a no-grant and the FIRST grant land on the next
-	// calendar day (day-1). No bonus is granted here — the grant is the wallet
-	// endpoint's job. 5000 mirrors wallet.StartingBalance and migration 000009;
-	// set explicitly so the response and the inserted row agree.
-	//
-	// Stamp the UTC calendar date (midnight), not the current instant: the
-	// last_login_at column is a DATE and the wallet daily-login path writes a
-	// date-truncated value too, so both write paths agree in intent (rather than
-	// relying on the DATE column to silently truncate a full timestamp).
 	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	u := &user.User{
@@ -357,13 +298,8 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	})
 }
 
-// Refresh rotates the refresh token and detects replay. The cookie value is an
-// opaque token looked up by hash. See the spec's Design Notes for the full
-// state table; in short: a live token rotates (atomically) to a successor; a
-// consumed token within the grace window is a benign race and gets an
-// access-token only (no re-rotation, no cookie write) so the winner's live
-// token stays the cookie; a consumed token past grace is a replay → revoke the
-// family.
+// Refresh rotates a live refresh token atomically to a successor and detects replay.
+// A consumed token within the grace window gets an access token only; past it, the family is revoked.
 func (h *AuthHandler) Refresh(c echo.Context) error {
 	cookie, err := c.Cookie("refresh_token")
 	if err != nil || cookie.Value == "" {
@@ -376,24 +312,18 @@ func (h *AuthHandler) Refresh(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("looking up refresh token: %w", err)
 	}
-	// Unknown token (never issued, or a stale pre-rotation JWT cookie from before
-	// this feature) or an already-revoked family → reject and clear.
 	if rt == nil || rt.RevokedAt != nil {
 		h.clearRefreshCookie(c)
 		return apperr.ErrUnauthorized
 	}
 
 	now := time.Now()
-	// Absolute cap applies to every token in the family (copied unchanged onto
-	// each successor), so it is safe to check on whatever token was presented.
 	if now.After(rt.FamilyExpiresAt) {
 		h.revokeFamily(rt.FamilyID, "absolute-cap")
 		h.clearRefreshCookie(c)
 		return apperr.ErrUnauthorized
 	}
 
-	// Load the user before any rotation: if the account was deleted after the
-	// token was issued, revoke the family and stop — never mint for a gone user.
 	u, err := h.userRepo.FindByID(rt.UserID)
 	if err != nil {
 		return fmt.Errorf("finding user: %w", err)
@@ -404,13 +334,10 @@ func (h *AuthHandler) Refresh(c echo.Context) error {
 		return apperr.ErrUnauthorized
 	}
 
-	// A consumed token was presented — benign race or replay.
 	if rt.RotatedAt != nil {
 		return h.handleConsumed(c, rt, u, now)
 	}
 
-	// Live token. Idle expiry is a property of the LIVE token (the family's last
-	// activity), not of a spent sibling.
 	if now.After(rt.ExpiresAt) {
 		h.revokeFamily(rt.FamilyID, "idle-expired")
 		h.clearRefreshCookie(c)
@@ -430,10 +357,6 @@ func (h *AuthHandler) Refresh(c echo.Context) error {
 		return h.respondAccess(c, u)
 	}
 
-	// Lost the rotation race: another request consumed this exact token (or the
-	// family was revoked) between our read and the update. Re-read for fresh
-	// state and reject a revoked family; otherwise treat as the now-consumed
-	// benign race.
 	fresh, err := h.refreshRepo.FindByHash(hash)
 	if err != nil {
 		return fmt.Errorf("re-checking refresh token: %w", err)
@@ -445,12 +368,8 @@ func (h *AuthHandler) Refresh(c echo.Context) error {
 	return h.handleConsumed(c, fresh, u, time.Now())
 }
 
-// handleConsumed serves an already-rotated token. Within the grace window it is
-// a benign race (a second tab, a retried request, or bootstrap): issue a fresh
-// access token WITHOUT rotating and WITHOUT touching the cookie — the request
-// that won the rotation already set the live successor as this browser's cookie,
-// and re-rotating here would consume it. Past the window it is a replay of a
-// consumed token — the compromise signal — so revoke the whole family.
+// handleConsumed issues an access token without rotating or touching the cookie when
+// an already-rotated token arrives within the grace window, and revokes the family past it.
 func (h *AuthHandler) handleConsumed(c echo.Context, rt *refreshtoken.RefreshToken, u *user.User, now time.Time) error {
 	if rt.RotatedAt != nil && now.Sub(*rt.RotatedAt) > reuseGracePeriod {
 		h.revokeFamily(rt.FamilyID, "reuse-detected")
@@ -493,10 +412,8 @@ func (h *AuthHandler) respondAccess(c echo.Context, u *user.User) error {
 	})
 }
 
-// refreshCookieMaxAge is the cookie Max-Age (seconds) for a token expiring at
-// exp. Clamped to >= 1 so it is always a positive lifetime (never Go's MaxAge==0
-// "session cookie" or <0 "delete" semantics); callers only reach here with a
-// future exp.
+// refreshCookieMaxAge is the cookie Max-Age in seconds for a token expiring at exp.
+// It is clamped to at least 1 so it never means a session cookie (0) or a delete (<0).
 func refreshCookieMaxAge(exp time.Time) int {
 	secs := int(time.Until(exp).Seconds())
 	if secs < 1 {
@@ -506,8 +423,6 @@ func refreshCookieMaxAge(exp time.Time) int {
 }
 
 func (h *AuthHandler) Logout(c echo.Context) error {
-	// Revoke the presented session's family so the refresh token can't be
-	// reused after logout. Best-effort: logout always succeeds for the client.
 	if cookie, err := c.Cookie("refresh_token"); err == nil && cookie.Value != "" {
 		rt, err := h.refreshRepo.FindByHash(hashRefreshToken(cookie.Value))
 		if err != nil {

@@ -28,10 +28,7 @@ func seasonAt(t *testing.T, db *gorm.DB, start time.Time) *season.Season {
 	return &s
 }
 
-// Migration 000027 clears 2026 Q4's player_seasons rows (the old formula's
-// points, written between the quarter boundary and the release) and leaves 2026
-// Q3 and every other season untouched. Run against the real SQL file, inside the
-// per-test transaction, so the database's own Q4 rows are never really deleted.
+// Migration 000027 clears 2026 Q4's player_seasons rows and leaves every other season untouched.
 func TestResetMigration_ClearsOnly2026Q4(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
@@ -68,7 +65,6 @@ func TestResetMigration_ClearsOnly2026Q4(t *testing.T) {
 	require.NoError(t, db.Model(&season.Season{}).Where("id = ?", q4.ID).Count(&q4Seasons).Error)
 	assert.Equal(t, int64(1), q4Seasons, "the season row itself is kept")
 
-	// The down migration is a documented no-op: it runs and changes nothing.
 	require.NoError(t, db.Exec(string(down)).Error)
 	row, err := repo.FindPlayerSeason(u.ID, q3.ID)
 	require.NoError(t, err)

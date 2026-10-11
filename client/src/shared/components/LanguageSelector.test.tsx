@@ -36,7 +36,6 @@ describe("LanguageSelector", () => {
   });
 
   afterEach(async () => {
-    // Reset i18n so test order can't leak language state into other suites.
     await i18n.changeLanguage("en");
   });
 

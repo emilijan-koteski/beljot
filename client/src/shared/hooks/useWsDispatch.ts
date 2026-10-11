@@ -123,7 +123,6 @@ export function useWsDispatch() {
   const dispatch = useCallback((message: WsMessage) => {
     const { type } = message;
 
-    // Auth events are handled by useWebSocket directly
     if (type === SYSTEM_AUTHENTICATED || type === ERROR_AUTH_FAILED) {
       return;
     }
@@ -148,10 +147,7 @@ export function useWsDispatch() {
   return dispatch;
 }
 
-// Test-only hook retained for API stability. The dispatcher no longer keeps
-// module-level reveal state (the reveal lifecycle is owned by the reveal
-// components' own countdown + the MatchPage overlay-clear effect), so this is
-// a no-op. Kept exported so existing test setup that calls it doesn't break.
+/** No-op kept so existing test setup that calls it still works; the dispatcher holds no module state. */
 export function __resetWsDispatchStateForTests(): void {}
 
 function dispatchGameEvent(message: WsMessage): void {
@@ -160,47 +156,15 @@ function dispatchGameEvent(message: WsMessage): void {
 
   if (type === EVENT_MATCH_STATE) {
     const matchState = message.payload as MatchState;
-    // NOTE: declarationReveal / belotReveal are intentionally NOT cleared here.
-    // A reveal must live for its full on-screen countdown (8 s) or until the
-    // viewer dismisses it — NOT be wiped by an unrelated trailing match_state,
-    // e.g. the snapshot another player's card-play broadcasts mid-reveal (that
-    // was the bug: the reveal closed the instant anyone played). The reveal
-    // components own their own dismissal; MatchPage clears a stale/orphaned
-    // reveal when an overlay covers the table (disconnect / pause / hand-end),
-    // which is the only situation a reveal can be left up after the moment it
-    // describes has passed (D69 / D71 reconnect case included — the disconnect
-    // overlay clears it before the resync snapshot arrives).
-    //
-    // NOTE: pendingResolvedTrick is intentionally NOT cleared here. The
-    // server emits a trailing event:match_state ~immediately after every
-    // event:trick_resolved (see live_match.go); clearing the snapshot here
-    // would tear it down before the collect animation can run. MatchPage's
-    // pendingResolvedTrick effect installs a fallback clear timer scoped
-    // to the animation duration, which also handles the reconnect-mid-
-    // collect case (snapshot survives reconnect, the remounted effect
-    // re-arms the timer and the snapshot clears within ~1.6s of remount).
     store.setMatchState(matchState);
     return;
   }
 
   if (type === EVENT_CARD_PLAYED) {
-    // Card played is an incremental event — update trick only.
-    // activePlayerSeat is NOT computed client-side (no local game logic).
-    // The server will send the authoritative state via event:match_state or
-    // the next action's broadcast will carry the correct active player.
     const payload = message.payload as CardPlayedPayload;
     const current = store.matchState;
     if (current) {
       if (!payload.cardId || payload.cardId.length < 2) return;
-      // One card sound per card_played message — keyed to the WS event, not to
-      // the throw flight, because reduced-motion players get no flights and the
-      // 4th card of a trick can land in the same batch as trick_resolved (its
-      // flight never runs, but it was still played). The one exception is the
-      // local player's own manual play: MatchPage sounds that at the click, in
-      // step with the optimistic throw, so its non-auto server echo stays
-      // silent here. A server auto-play for the local seat has no click, so it
-      // sounds here like everyone else's card. event:match_state (resync)
-      // never reaches this branch, so a reconnect is silent.
       if (payload.playerSeat !== store.myPlayerSeat || payload.autoPlayed) {
         playSfx("cardPlay");
       }
@@ -219,22 +183,14 @@ function dispatchGameEvent(message: WsMessage): void {
             playerSeat: payload.playerSeat,
           },
         ],
-        // Optimistically clear pendingBelotSeat when the server auto-plays for
-        // the local player while a Belot prompt is open. Without this, a stale
-        // click on Announce/Decline races against the trailing event:match_state
-        // and lands on the server with a wrong-phase error toast.
         pendingBelotSeat: isLocalAutoPlay ? null : current.pendingBelotSeat,
       });
     }
 
-    // Auto-play toast notification
     if (payload.autoPlayed) {
       toast.info(i18n.t("match.timer.autoPlayed", { card: payload.cardId }), {
         duration: MOTION.TOAST_INFO,
       });
-      // Signal MatchPage to drive the same hand-throw animation that
-      // handlePlayCard runs for a manual click — otherwise the auto-played
-      // card disappears from the local hand without an exit animation.
       if (payload.playerSeat === store.myPlayerSeat) {
         store.setPendingAutoPlayedCard(payload.cardId);
       }
@@ -246,25 +202,12 @@ function dispatchGameEvent(message: WsMessage): void {
     const payload = message.payload as TrickResolvedPayload;
     const current = store.matchState;
     if (current) {
-      // Snapshot the full 4-card trick BEFORE clearing currentTrick. By the
-      // time this dispatcher runs, the preceding event:card_played for the
-      // 4th card has already pushed it into current.currentTrick — but
-      // React batches both store updates into one render, so without a
-      // snapshot the UI sees currentTrick jump 3 → 0 and the collect
-      // animation never has a chance to run. The snapshot decouples the
-      // collect animation from currentTrick's authoritative-but-transient
-      // state. MatchPage clears it after the take flight completes.
       if (current.currentTrick && current.currentTrick.length > 0) {
         store.setPendingResolvedTrick({
           trick: current.currentTrick,
           winnerSeat: payload.winnerSeat,
         });
       }
-      // Clear turnExpiresAt here so the previous active seat's TimerRing stops
-      // ticking the moment the trick resolves. The trailing event:match_state
-      // will set the next turn's deadline; until then, no seat counts down.
-      // Without this, the just-played seat keeps decrementing under the
-      // trick-resolve animation and can flip urgent-red on a slow snapshot.
       store.setMatchState({
         ...current,
         currentTrick: [],
@@ -280,9 +223,6 @@ function dispatchGameEvent(message: WsMessage): void {
     const payload = message.payload as HandScoredPayload;
     const current = store.matchState;
     if (current) {
-      // Clear per-hand fields here so the ScorePanel's "this hand" line disappears
-      // immediately. The follow-up event:match_state will replace them with the
-      // new-hand defaults, but zeroing now avoids a flicker of stale potentials.
       store.setMatchState({
         ...current,
         teamScores: [payload.teamAMatchScore, payload.teamBMatchScore],
@@ -306,40 +246,15 @@ function dispatchGameEvent(message: WsMessage): void {
       });
     }
     store.setMatchEndData(payload);
-    // Reset any prior settlement so the result dialog never shows a stale coin
-    // amount — the matching event:coin_settlement (if buy-in) arrives
-    // immediately after per the ordering contract.
     store.setCoinSettlement(null);
-    // Same for honour: event:honor_updated follows in the same burst, so clearing
-    // here means the overlay shows this match's movement or none at all.
     store.setHonorSettlement(null);
-    // And for Season Points (Story 13.5): event:season_points_awarded follows in
-    // the same burst, so the SP line shows this match's change or nothing.
     store.setSeasonSettlement(null);
-    // Drop the room last-match cache. The key is per-ROOM, so whatever sits
-    // there right now describes the PREVIOUS match — the room lobby populated
-    // it before this one started, and the client-wide 30s staleTime means a
-    // short match ends while that entry is still considered fresh. Removing it
-    // (not invalidating: invalidate keeps serving the stale row during the
-    // refetch) is what guarantees the end-of-match overlay can only ever paint
-    // the match that just finished. The row itself is already persisted at this
-    // point — match/live_match.go writes it BEFORE broadcasting match_end.
-    // A prefix removal because the payload carries no roomId, and any other
-    // room's entry is equally worth re-reading after a match.
     queryClient.removeQueries({ queryKey: queryKeys.matches.lastByRoomAll() });
     return;
   }
 
   if (type === EVENT_COIN_SETTLEMENT) {
-    // Story 9.2: per-human coin settlement, arriving right after match_end while
-    // still on the match page. Update the persisted wallet balance on authStore
-    // (balance lives on authStore.user, NOT gameStore — it must survive the
-    // later navigation away that wipes gameStore) and stash the settlement on
-    // the match store so the end-of-match score dialog reports the won/lost
-    // amount. No toast — the result dialog is the single place that shows it.
     const payload = message.payload as CoinSettlementPayload;
-    // Defensive validation — Go zero values are real values, so guard on type,
-    // not truthiness (a 0 delta/balance is legitimate).
     if (
       !Number.isInteger(payload.coinDelta) ||
       !Number.isInteger(payload.newBalance) ||
@@ -356,17 +271,7 @@ function dispatchGameEvent(message: WsMessage): void {
   }
 
   if (type === EVENT_XP_AWARDED) {
-    // Story 9.5: per-human XP award, arriving right after event:coin_settlement.
-    // Always update the persisted level + totalXp on authStore.user (lives on
-    // authStore, NOT gameStore, so the top-nav level/XP bar survives the
-    // navigation away that wipes gameStore). When the award crossed a level
-    // boundary, stash a pending level-up on the navigation-surviving
-    // levelUpStore so the dedicated dialog can celebrate it once the player
-    // lands back in the lobby/room (AppLayout). No toast; non-level-up matches
-    // surface nothing.
     const payload = message.payload as XpAwardedPayload;
-    // Defensive validation — Go zero values are real values, so guard on type,
-    // not truthiness (a 0 xpEarned is legitimate).
     if (
       !Number.isInteger(payload.xpEarned) ||
       !Number.isInteger(payload.newTotalXp) ||
@@ -390,28 +295,7 @@ function dispatchGameEvent(message: WsMessage): void {
   }
 
   if (type === EVENT_HONOR_UPDATED) {
-    // Story 9.7: per-human honor update, arriving right after
-    // event:xp_awarded and before the trailing event:match_state.
-    //
-    // It writes to authStore.user, which survives the navigation away that wipes
-    // the match store — so the top-nav honor chip is correct the moment the player
-    // lands back in the lobby.
-    //
-    // It ALSO stashes the movement on the match store for the result overlay
-    // (honour redesign R7). This is the "future story adds an honor flourish"
-    // case the previous version of this comment anticipated, and its instruction
-    // is honoured: honorSettlement is reset in BOTH the match_end and
-    // match_abandoned handlers, because the abandoning player is precisely the
-    // one who gets no follow-up event and would otherwise be shown a stale
-    // movement from an earlier match.
-    //
-    // `before` is read off authStore BEFORE the write below: the payload carries
-    // only the new score, so this is what makes "95 -> 96" possible without
-    // widening the WS contract and its six drift-gate touchpoints.
     const payload = message.payload as HonorUpdatedPayload;
-    // Defensive validation — Go zero values are real values, so guard on type,
-    // not truthiness. A score of 0 ("Problematic") and isNewPlayer false are
-    // both legitimate, and both are falsy.
     if (
       !Number.isInteger(payload.honorScore) ||
       typeof payload.honorTier !== "string" ||
@@ -425,9 +309,6 @@ function dispatchGameEvent(message: WsMessage): void {
     }
     const authState = useAuthStore.getState();
     if (authState.user) {
-      // Captured before the overwrite. A New Player has no meaningful "before",
-      // so no movement is stashed for them — the overlay then shows nothing
-      // rather than a jump from a score they never had.
       if (!honorIsNewPlayer(authState.user.isNewPlayer) && !payload.isNewPlayer) {
         useMatchStore.getState().setHonorSettlement({
           before: honorScoreOrPrior(authState.user.honorScore),
@@ -446,29 +327,7 @@ function dispatchGameEvent(message: WsMessage): void {
   }
 
   if (type === EVENT_SEASON_POINTS_AWARDED) {
-    // Story 13.1, reshaped by 13.5: per-human Season Points award, arriving right
-    // after event:honor_updated and before the trailing event:match_state.
-    //
-    // Unlike XP and honor this does NOT write to authStore.user: the season
-    // record is not on the auth envelope (extending it would force a season
-    // dependency into AuthHandler and every one of its call sites, for data a
-    // couple of surfaces read). Instead `season.current` is invalidated — the
-    // same WS-to-query bridge the friend-request push uses — so the header's
-    // rank chip and the profile's RankBanner both hold whatever value the
-    // server actually has, the moment the player is back out of the match.
-    //
-    // It ALSO stashes the outcome on the match store for the SP line on the
-    // result screens (MatchResult, ReconnectOverlay). The store read there is
-    // live, so the line appears even when this lands after the overlay mounted.
     const payload = message.payload as SeasonPointsAwardedPayload;
-    // Defensive validation — Go zero values are real values, so guard on type,
-    // not truthiness. `spChange: 0` (a loss at the 0 floor), `rankDivision: null`
-    // (Master, Grandmaster) and `rankChange: "none"` are all legitimate.
-    //
-    // The object check comes FIRST: a null or absent payload would otherwise
-    // throw a TypeError on the field read below, which is the opposite of what
-    // this block is for — a malformed frame must warn and return, not blow up the
-    // dispatcher mid-burst and strand the rest of the match-end sequence.
     if (
       !payload ||
       typeof payload !== "object" ||
@@ -492,13 +351,6 @@ function dispatchGameEvent(message: WsMessage): void {
       rankDivision: payload.rankDivision,
       reason: payload.reason,
     });
-    // A DIALOG, not a toast (owner request 2026-09-26, superseding 13.1 AC2 and
-    // 13.5's toasts): a promotion or a demotion is stashed on rankChangeStore,
-    // the same pattern as levelUpStore, because the dialog must survive the
-    // navigation away that wipes the match stores. RankChangeGate (AppLayout)
-    // shows it once the player is back in the lobby/room — celebratory for a
-    // promotion, subdued for a demotion. "none" shows nothing and leaves any
-    // unseen change pending.
     const rankChange = rankChangeFromPayload(payload);
     if (rankChange) {
       useRankChangeStore.getState().setPending(rankChange);
@@ -507,16 +359,7 @@ function dispatchGameEvent(message: WsMessage): void {
   }
 
   if (type === EVENT_TRUMP_SELECTED) {
-    // Drives the table-wide TrumpReveal dialog. The full event:match_state that
-    // follows carries the persistent fields (trumpSuit, trumpCallerSeat, phase,
-    // activePlayerSeat); the cardId here is the originally face-up
-    // trumpCandidate the picker absorbed and lives only on this event.
     const payload = message.payload as TrumpSelectedPayload;
-    // cardId is either EMPTY — a variant with no trump candidate has no card to
-    // show, and the reveal renders candidate-less — or exactly a 2-character
-    // card ID. Nothing in between: a 1- or 3-character id is malformed, and a
-    // 3-character one would otherwise be sliced into a plausible-but-wrong card
-    // (`"10S"` reading as rank "1", suit "0").
     if (
       typeof payload.cardId !== "string" ||
       (payload.cardId !== "" && !isCardId(payload.cardId))
@@ -531,16 +374,10 @@ function dispatchGameEvent(message: WsMessage): void {
   if (type === EVENT_DECLARATIONS_RESOLVED) {
     const payload = message.payload as DeclarationsResolvedPayload;
     store.setDeclarationReveal(payload);
-    // Full game state update follows via event:match_state. That trailing
-    // snapshot (and any later one) leaves this reveal untouched — see the
-    // EVENT_MATCH_STATE branch.
     return;
   }
 
   if (type === EVENT_PLAYER_DECLARED) {
-    // "Who declared" announcement — ephemeral per-seat banner, not part of
-    // MatchState. Mirrors the system:emote defensive validation; the banner
-    // component clears its own slot via its auto-dismiss timer.
     const payload = message.payload as PlayerDeclaredPayload;
     if (
       typeof payload?.playerSeat !== "number" ||
@@ -552,24 +389,18 @@ function dispatchGameEvent(message: WsMessage): void {
     }
     if (useMatchStore.getState().matchState === null) return;
     useMatchStore.getState().setActiveDeclare(payload.playerSeat, true);
-    // The seat banner pops up now; it has its own avatar popup sound.
     playSfx("popup");
     return;
   }
 
   if (type === EVENT_BELOT_ANNOUNCED) {
     const payload = message.payload as BelotAnnouncedPayload;
-    // Mirror the card_played guard: drop malformed payloads rather than propagate
-    // an empty cardId to BelotReveal where rendering/rank detection would silently break.
     if (!payload.cardId || payload.cardId.length < 2) return;
     store.setBelotReveal(payload);
-    // Full state update follows via event:match_state; it leaves this reveal
-    // untouched (same as declarations_resolved above).
     return;
   }
 
   if (type === EVENT_MATCH_PAUSED) {
-    // Informational — the full event:match_state that follows carries pause state
     return;
   }
 
@@ -598,10 +429,7 @@ function dispatchGameEvent(message: WsMessage): void {
           ? "match.timer.autoSkippedDeclare"
           : payload.type === "skip_belot"
             ? "match.timer.autoSkippedBelot"
-            : // pick_trump: the seat had no legal pass, so the server named a
-              // suit for it. Worth its own copy — the other three decline
-              // something, this one commits the hand to a trump suit.
-              "match.timer.autoPickedTrump";
+            : "match.timer.autoPickedTrump";
     toast.info(i18n.t(i18nKey, { player: playerName }), { duration: 3000 });
     return;
   }
@@ -611,7 +439,6 @@ function dispatchGameEvent(message: WsMessage): void {
     if (payload.ownerOverride) {
       toast.info(i18n.t("match.pause.ownerResumedToast"), { duration: 3000 });
     }
-    // Full state update follows via event:match_state
     return;
   }
 
@@ -625,7 +452,6 @@ function dispatchGameEvent(message: WsMessage): void {
     toast.warning(i18n.t("match.disconnect.playerDisconnected", { player: playerName }), {
       duration: MOTION.TOAST_LONG,
     });
-    // Full state update follows via event:match_state
     return;
   }
 
@@ -637,35 +463,22 @@ function dispatchGameEvent(message: WsMessage): void {
     toast.success(i18n.t("match.disconnect.playerReconnected", { player: playerName }), {
       duration: MOTION.TOAST_INFO,
     });
-    // Full state update follows via event:match_state
     return;
   }
 
   if (type === EVENT_MATCH_ABANDONED) {
     const payload = message.payload as MatchAbandonedPayload;
     store.setMatchAbandonedData(payload);
-    // Mirror the match_end reset: clear any prior settlement so the result
-    // surface never shows a stale coin amount.
     store.setCoinSettlement(null);
-    // Honour matters MORE here than on the clean-end path: the abandoning player
-    // is the one who never receives event:honor_updated (Hub.SendToUser is an
-    // unqueued no-op for an absent user), so without this reset they would be
-    // shown the movement from a PREVIOUS match as if it were this one's.
     store.setHonorSettlement(null);
-    // The same reasoning for the SP line (Story 13.5): the abandoner never
-    // receives event:season_points_awarded either.
     store.setSeasonSettlement(null);
     return;
   }
 
   if (type === EVENT_SURRENDER_PROPOSED) {
-    // Defence in depth: only surface a proposal if the user is in an active
-    // match (Story 8.1 dispatcher hardening pattern).
     if (store.matchState === null) return;
     const payload = message.payload as SurrenderProposedPayload;
     store.setSurrenderProposed(payload);
-    // The partner's prompt and the opponents' banner pop up with it. The
-    // proposer sees neither — they just asked — so they hear nothing.
     if (
       payload.proposerSeat !== store.myPlayerSeat &&
       store.matchEndData === null &&
@@ -673,8 +486,6 @@ function dispatchGameEvent(message: WsMessage): void {
     ) {
       playSfx("popup");
     }
-    // Full game state update follows via event:match_state — clears the
-    // pending flag on resolve.
     return;
   }
 
@@ -683,8 +494,6 @@ function dispatchGameEvent(message: WsMessage): void {
     const payload = message.payload as SurrenderDeclinedPayload;
     store.setSurrenderDeclined(payload);
     toast.info(i18n.t("match.surrender.declinedToast"), { duration: 3000 });
-    // Full game state update follows via event:match_state — clears
-    // surrenderProposerSeat so the prompt/banner unmount.
     return;
   }
 }
@@ -692,21 +501,12 @@ function dispatchGameEvent(message: WsMessage): void {
 function dispatchSystemEvent(message: WsMessage): void {
   const { type } = message;
 
-  // Friend request received (Story 11.2). Best-effort/online-only push — the
-  // durable path is GET /friends/requests, so all we do is invalidate that
-  // query (the lobby requests surface refetches) plus surface a toast.
   if (type === SYSTEM_FRIEND_REQUEST) {
     const payload = message.payload as FriendRequestPayload;
-    // Validate the Go-origin numerics explicitly — never JS truthiness on a
-    // value that could legitimately be 0, and reject a malformed frame. Optional
-    // chaining so a null/missing payload returns early instead of throwing.
     if (typeof payload?.requestId !== "number" || typeof payload?.fromUserId !== "number") {
       return;
     }
     void queryClient.invalidateQueries({ queryKey: queryKeys.friends.requests() });
-    // Also refresh the sender's profile-button state: a viewer sitting on the
-    // sender's public profile would otherwise keep a stale "Add friend" button
-    // and hit a 409 on click.
     void queryClient.invalidateQueries({ queryKey: queryKeys.friends.status(payload.fromUserId) });
     const fromUsername =
       typeof payload.fromUsername === "string" && payload.fromUsername.length > 0
@@ -718,14 +518,6 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
-  // Room invite received (Story 11.5, AC2). Per-user push, gated on NOTHING —
-  // an invite is deliberately deliverable wherever the player is standing in the
-  // lobby. It feeds the single roomInvite signal the always-mounted
-  // RoomInviteModal consumes, mirroring the roomEjection pipeline.
-  //
-  // Every Go-origin scalar is validated with typeof, never JS truthiness: a
-  // coinBuyIn of 0 and isPrivate/isHostInvite of false are all legitimate real
-  // values that truthiness would silently reject.
   if (type === SYSTEM_ROOM_INVITE) {
     const payload = message.payload as RoomInvitePayload;
     if (
@@ -737,10 +529,6 @@ function dispatchSystemEvent(message: WsMessage): void {
       typeof payload?.isPrivate !== "boolean" ||
       typeof payload?.isHostInvite !== "boolean" ||
       typeof payload?.minHonor !== "number" ||
-      // expiresAt is validated like every other field rather than coerced to "".
-      // The popup's only auto-dismiss is driven by this timestamp, so accepting a
-      // frame without it produces an invite that never expires on screen while
-      // its server grant quietly dies — the worst of both.
       typeof payload?.expiresAt !== "string" ||
       payload.expiresAt === "" ||
       Number.isNaN(new Date(payload.expiresAt).getTime())
@@ -763,14 +551,8 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
-  // Room list updates — delegate to existing useRoomUpdates handler
   if (type === SYSTEM_ROOM_CREATED || type === SYSTEM_ROOM_UPDATED) {
     handleRoomListMessage(new MessageEvent("message", { data: JSON.stringify(message) }));
-    // The handler above only touches the lobby grid cache. A room_updated for
-    // the room the viewer is currently sitting in (e.g. the owner flipping
-    // privacy) must also refresh the in-room view, which renders from the
-    // roomStore — otherwise a seated player keeps seeing the stale privacy
-    // badge. Merge the changed fields into the store's room.
     if (type === SYSTEM_ROOM_UPDATED) {
       const payload = message.payload as RoomUpdatedPayload;
       const store = useRoomStore.getState();
@@ -781,39 +563,28 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
-  // Lobby grid cache updates — keep the ["rooms","waiting"] cache live for
-  // playerCount + per-seat names without touching the roomStore path
-  // below (which only fires for the user's currently viewed room). Falls
-  // through so the roomStore branch still runs.
   if (
     type === SYSTEM_PLAYER_JOINED ||
     type === SYSTEM_PLAYER_LEFT ||
     type === SYSTEM_SEAT_UPDATED
   ) {
     handleRoomListMessage(new MessageEvent("message", { data: JSON.stringify(message) }));
-    // intentional fall-through to the per-room store dispatch below
   }
 
-  // Room lobby updates — dispatch to roomStore (only if event matches the currently viewed room)
   if (type === SYSTEM_PLAYER_JOINED) {
     const payload = message.payload as PlayerJoinedPayload;
     const store = useRoomStore.getState();
     if (store.currentRoomId !== null && store.currentRoomId !== payload.roomId) return;
     store.addPlayer(
       {
-        id: payload.userId, // Use userId as a client-side ID (fixes D24: no longer hardcodes 0)
+        id: payload.userId,
         roomId: payload.roomId,
         userId: payload.userId,
         username: payload.username,
-        // Not zod-validated (see below): anything but a string means no avatar.
         avatarUrl: typeof payload.avatarUrl === "string" ? payload.avatarUrl : null,
         seat: null,
         team: null,
         isBot: false,
-        // typeof guards, never truthiness: level 0 and honour 0 are real values.
-        // Room-lobby events are not zod-validated (see the coverage note below),
-        // so a payload from a server without these fields degrades to "no chips"
-        // rather than bogus zeros.
         honorScore: typeof payload.honorScore === "number" ? payload.honorScore : undefined,
         honorTier: typeof payload.honorTier === "string" ? payload.honorTier : undefined,
         level: typeof payload.level === "number" ? payload.level : undefined,
@@ -821,9 +592,6 @@ function dispatchSystemEvent(message: WsMessage): void {
       },
       payload.playerCount,
     );
-    // A joiner is "present" by definition — without this, the owner's Start gate
-    // (all seated humans present) would never satisfy for normally-joined rooms,
-    // since joins arrive as player_joined, not player_returned.
     store.markReturned(payload.userId);
     return;
   }
@@ -845,8 +613,6 @@ function dispatchSystemEvent(message: WsMessage): void {
       payload.seat,
       payload.team,
       payload.previousSeat,
-      // Refresh only from a payload that carries the key; an older server's
-      // seat_updated leaves the stored avatar as it is.
       payload.avatarUrl === undefined
         ? undefined
         : typeof payload.avatarUrl === "string"
@@ -856,12 +622,6 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
-  // Bot seating (Story 10.3). Room-lobby events are not zod-validated (see
-  // wsEvents.schemas.ts coverage note) — guard the fields defensively so
-  // protocol drift can't inject bogus seats into the store. `typeof x ===
-  // "number"` alone admits NaN, fractions, and out-of-range values; a seat
-  // that isn't an integer 0–3 could insert a phantom player no tile renders
-  // and no removal ever matches.
   if (type === SYSTEM_BOT_ADDED) {
     const payload = message.payload as BotAddedPayload;
     if (
@@ -897,8 +657,6 @@ function dispatchSystemEvent(message: WsMessage): void {
 
   if (type === SYSTEM_PLAYER_RETURNED) {
     const payload = message.payload as PlayerReturnedPayload;
-    // Defensive guards mirror the bot handlers: reject NaN/fractional ids so
-    // protocol drift can't pollute the presence set.
     if (!Number.isInteger(payload?.roomId) || !Number.isInteger(payload?.userId)) {
       return;
     }
@@ -913,11 +671,6 @@ function dispatchSystemEvent(message: WsMessage): void {
     const store = useRoomStore.getState();
     if (store.currentRoomId !== null && store.currentRoomId !== payload.roomId) return;
     store.setMatchStarted(true);
-    // D145b: record the room whose match started so the always-mounted
-    // navigator can route a seated player into it even if they are not on
-    // RoomPage (currentRoomId === null after leaving it for the prior match).
-    // match_started is sent only to room members, so receiving it implies
-    // membership — navigating is always correct.
     store.setMatchStartedRoomId(payload.roomId);
     return;
   }
@@ -933,19 +686,11 @@ function dispatchSystemEvent(message: WsMessage): void {
   if (type === SYSTEM_ROOM_KICKED) {
     const payload = message.payload as RoomKickedPayload;
     const store = useRoomStore.getState();
-    // Require a positive room match. A null currentRoomId means the user is
-    // not currently viewing any room — processing the event would set a sticky
-    // kickedFromRoomId that traps them on a later re-entry to the same room.
     if (store.currentRoomId !== payload.roomId) return;
     store.setKickedFromRoom(payload.roomId);
     return;
   }
 
-  // Story 9.3 AC5: per-user push to a player ejected at match start (or barred
-  // at return time) for insolvency. Gated on NOTHING — it is a direct per-user
-  // event (the player may be on the room page, the match result overlay, or
-  // elsewhere). Sets the single ejection signal that the always-mounted redirect
-  // routes to the lobby and the lobby modal consumes. Validate the shape first.
   if (type === SYSTEM_INSOLVENT_EJECTED) {
     const payload = message.payload as InsolventEjectedPayload;
     if (
@@ -965,14 +710,6 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
-  // Story 9.8 AC6: per-user push to a player ejected because their honor score no
-  // longer clears the room's gate (in practice: they abandoned the previous match
-  // in this room). Sibling of the insolvency handler above — same ungated per-user
-  // delivery, same single ejection signal, same redirect + modal pipeline.
-  //
-  // All three numbers are validated with typeof === "number" and never with JS
-  // truthiness: a real honor score of 0 is a legitimate Go value, and `!payload.honor`
-  // would silently reject it.
   if (type === SYSTEM_HONOR_EJECTED) {
     const payload = message.payload as HonorEjectedPayload;
     if (
@@ -985,7 +722,6 @@ function dispatchSystemEvent(message: WsMessage): void {
     }
     useRoomStore.getState().setRoomEjection({
       roomId: payload.roomId,
-      // Not meaningful for an honor ejection; the modal reads minHonor/honor.
       buyIn: 0,
       balance: 0,
       minHonor: payload.minHonor,
@@ -995,11 +731,6 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
-  // Story 9.3 AC4: the room closed because no present-and-solvent player could
-  // own it — or (Story 9.8) because an honor-ejected owner left no eligible heir.
-  // The event and its copy are deliberately reason-agnostic. Route every
-  // still-seated recipient to the lobby with the room-closed notice (balance/buy-in
-  // are not meaningful here, so they are zeroed).
   if (type === SYSTEM_ROOM_CLOSED_INSOLVENT) {
     const payload = message.payload as RoomClosedInsolventPayload;
     if (typeof payload?.roomId !== "number") {
@@ -1015,11 +746,8 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
-  // Chat events
   if (type === SYSTEM_CHAT_MESSAGE) {
     const payload = message.payload as ChatMessagePayload;
-    // Defensive: reject malformed payloads so a server bug or protocol drift
-    // cannot inject "Invalid Date" / null username into the chat UI.
     if (
       typeof payload?.userId !== "number" ||
       typeof payload?.username !== "string" ||
@@ -1033,24 +761,15 @@ function dispatchSystemEvent(message: WsMessage): void {
     if (payload.scope === "lobby") {
       useChatStore.getState().appendLobby(payload);
     } else if (payload.scope === "match") {
-      // Defence in depth: server only broadcasts match chat to session
-      // participants, but if a stale frame arrives after clearGame (or during
-      // the race window before a fresh match state lands), drop it so the
-      // next match doesn't see leaked history from the previous one.
       if (useMatchStore.getState().roomId === null) return;
       useChatStore.getState().appendMatch(payload);
     } else if (payload.scope === "room") {
-      // Defence in depth: drop stale room chat frames that arrive after the
-      // user has left the room page, so they don't bleed into the next
-      // room's history.
       if (useRoomStore.getState().currentRoomId === null) return;
       useChatStore.getState().appendRoom(payload);
     }
     return;
   }
 
-  // Emote events (Story 8.3) — ephemeral per-seat broadcast, not part of
-  // MatchState. Mirrors the chat-message defensive-validation pattern.
   if (type === SYSTEM_EMOTE) {
     const payload = message.payload as EmotePayload;
     if (
@@ -1063,15 +782,9 @@ function dispatchSystemEvent(message: WsMessage): void {
       console.warn("WS: ignoring malformed system:emote payload", payload);
       return;
     }
-    // Defence in depth (Story 8.1 dispatcher hardening): only commit when the
-    // user is in an active match. A stray emote frame after clearGame() must
-    // not seed the next match's bubble state.
     const matchStore = useMatchStore.getState();
     if (matchStore.matchState === null) return;
     matchStore.setActiveEmote(payload.playerSeat, payload.emote);
-    // The bubble pops up with a sound — only when it is actually shown: the
-    // same gate MatchPage's `emotesVisible` applies (no bubbles over the
-    // match-end / abandon overlays, a pause or a disconnect).
     const phase = matchStore.matchState.phase;
     if (
       matchStore.matchEndData === null &&
@@ -1084,13 +797,8 @@ function dispatchSystemEvent(message: WsMessage): void {
     return;
   }
 
-  // Whisper received (Story 11.4). The SAME payload arrives at both participants
-  // (own-echo + recipient); the store keys the thread by whichever participant
-  // is not the local user. Ephemeral — no persistence, mirroring chat.
   if (type === SYSTEM_WHISPER) {
     const payload = message.payload as WhisperPayload;
-    // Validate the Go-origin fields explicitly — never JS truthiness on numerics
-    // (a real userId of any value is legitimate). Reject a malformed frame.
     if (
       typeof payload?.fromUserId !== "number" ||
       typeof payload?.fromUsername !== "string" ||
@@ -1103,15 +811,12 @@ function dispatchSystemEvent(message: WsMessage): void {
       return;
     }
     const myId = useAuthStore.getState().user?.id;
-    // Without a resolved local user we cannot decide which participant keys the
-    // thread — drop rather than mis-key. Whispers only arrive while authed.
     if (typeof myId !== "number") return;
     useChatStore.getState().appendWhisper(payload, myId);
     return;
   }
 }
 
-// Game error types that should trigger a user-visible toast
 const GAME_ERROR_TYPES: Set<string> = new Set([
   ERROR_WRONG_PHASE,
   ERROR_NOT_YOUR_TURN,
@@ -1127,20 +832,12 @@ const GAME_ERROR_TYPES: Set<string> = new Set([
 function dispatchErrorEvent(message: WsMessage): void {
   const payload = message.payload as { code?: string; message?: string; roomId?: number };
 
-  // Surrender-exhausted has its own dedicated toast (the UI gates already
-  // prevent reaching this branch in the happy path; defence in depth).
-  // Mirror the GAME_ERROR_TYPES lastError write so debug/store consumers see
-  // the event before the early return.
   if (message.type === ERROR_SURRENDER_EXHAUSTED) {
     useMatchStore.getState().setLastError(message.type);
     toast.error(i18n.t("match.surrender.errors.exhausted"));
     return;
   }
 
-  // Story 8.5-1 AC2: auto-start failed server-side. Surface a toast so the
-  // four would-be participants know the room reverted to "waiting" rather
-  // than navigating them to a non-existent /game/{roomId}. Defence in depth:
-  // validate payload shape before showing the toast.
   if (message.type === ERROR_MATCH_START_FAILED) {
     if (typeof payload?.message !== "string" || typeof payload?.roomId !== "number") {
       console.warn("WS: ignoring malformed error:match_start_failed payload", payload);
@@ -1151,9 +848,6 @@ function dispatchErrorEvent(message: WsMessage): void {
     return;
   }
 
-  // Whisper errors (Story 11.4) — sent to the sender only, surfaced as an inline
-  // toast hint. These are not GAME_ERROR_TYPES (no match store involvement); a
-  // whisper can be attempted from the lobby with no match in scope.
   if (message.type === ERROR_NOT_FRIENDS) {
     toast.error(i18n.t("whisper.errors.notFriends"));
     return;

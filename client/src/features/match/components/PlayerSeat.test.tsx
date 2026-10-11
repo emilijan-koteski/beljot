@@ -33,7 +33,6 @@ describe("PlayerSeat", () => {
     const bot = makePlayer({ seat: 2, userId: 0, username: "", isBot: true });
     render(<PlayerSeat player={bot} isSelf={false} isActive={false} seatTeam="gold" />);
     expect(screen.getByText("Bot 3")).toBeInTheDocument();
-    // The avatar disc shows the bot glyph, not a name initial.
     expect(screen.getByTestId("avatar-icon")).toBeInTheDocument();
     expect(screen.getByTestId("player-seat-avatar")).not.toHaveTextContent("B");
   });
@@ -72,9 +71,7 @@ describe("PlayerSeat", () => {
     );
 
     expect(screen.getByTestId("player-seat-level")).toHaveTextContent("Lvl 7");
-    // The visible pill no longer shows the team label "Us".
     expect(screen.queryByTestId("player-seat-name-pill")).not.toHaveTextContent("Us");
-    // Team is still announced to screen readers via the seat aria-label.
     expect(screen.getByTestId("player-seat-0")).toHaveAttribute("aria-label", "Alice, Us, waiting");
   });
 
@@ -199,7 +196,6 @@ describe("PlayerSeat", () => {
     expect(screen.getByTestId("player-seat-caller-chip")).toHaveTextContent("♥");
   });
 
-  // --- Scope Amendment 1: the seat trump chip follows the active deck ---
   describe("trump chip card deck", () => {
     afterEach(() => {
       useAuthStore.setState({ token: null, user: null, isLoading: false });
@@ -223,8 +219,6 @@ describe("PlayerSeat", () => {
       const mark = screen.getByTestId("suit-mark-C");
       expect(mark.tagName).toBe("IMG");
       expect(mark).toHaveAttribute("src", "/suits/croatian/C.webp");
-      // Acorns are brown, so the chip's border and glow must not be the French
-      // black they would have been before the amendment.
       const chip = screen.getByTestId("player-seat-caller-chip");
       expect(chip.style.borderColor).toBe("rgb(150, 80, 30)");
       expect(chip.style.boxShadow).toContain("#96501e99");
@@ -246,9 +240,6 @@ describe("PlayerSeat", () => {
         />,
       );
 
-      // Was a hardcoded English `Called ${SUIT_NAME[suit]}` on a French-only
-      // map: a Croatian-deck player got "Called Diamonds" over a gold bell,
-      // untranslated in every locale.
       expect(screen.getByTestId("player-seat-caller-chip")).toHaveAttribute(
         "title",
         "Called Bells",

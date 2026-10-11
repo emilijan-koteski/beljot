@@ -18,15 +18,11 @@ interface LinkedAccountsProps {
   userId: number | undefined;
 }
 
-// The only provider surfaced today. Adding a provider is a new row here plus an
-// i18n label — the backend flow is already provider-agnostic.
 const GOOGLE = "google";
 
 /**
- * Profile sidebar panel for managing linked SSO accounts. Shows Google as
- * linked (with its email + an Unlink action) or not linked (with the Google
- * sign-in button that links it). Unlink is disabled — with a hint — when it
- * would remove a passwordless account's only way to sign in.
+ * Profile sidebar panel that links or unlinks the Google SSO account.
+ * Unlink is disabled with a hint when it would remove a passwordless account's only sign-in.
  */
 export function LinkedAccounts({ userId }: LinkedAccountsProps) {
   const { t } = useTranslation();
@@ -34,25 +30,19 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
   const linkMutation = useLinkIdentityMutation(userId ?? 0);
   const unlinkMutation = useUnlinkIdentityMutation(userId ?? 0);
   const [unlinkOpen, setUnlinkOpen] = useState(false);
-  // GIS can fire its global callback again (double-tap / stale button) before
-  // React re-renders with isPending — a ref guards synchronously.
-  const linkInFlight = useRef(false);
+  const linkInFlightSyncGuard = useRef(false);
 
   const google = data?.identities.find((i) => i.provider === GOOGLE);
-  // A passwordless account must keep at least one identity, so its sole
-  // identity cannot be unlinked (mirrors the server guard).
   const canUnlink = data ? data.hasPassword || data.identities.length > 1 : false;
 
   function handleGoogleCredential(credential: string) {
-    if (userId === undefined || linkInFlight.current || linkMutation.isPending) return;
-    linkInFlight.current = true;
+    if (userId === undefined || linkInFlightSyncGuard.current || linkMutation.isPending) return;
+    linkInFlightSyncGuard.current = true;
     linkMutation.mutate(
       { provider: GOOGLE, credential },
       {
         onSuccess: () => toast.success(t("profile.linkedAccounts.linkedToast")),
         onError: (err) => {
-          // Discriminate by code, never status — an expired Google credential
-          // is a different fix than an already-claimed account.
           if (err instanceof FetchError && err.code === "SSO_IDENTITY_IN_USE") {
             toast.error(t("profile.linkedAccounts.errors.alreadyLinked"));
           } else if (err instanceof FetchError && err.code === "SSO_EMAIL_UNVERIFIED") {
@@ -64,7 +54,7 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
           }
         },
         onSettled: () => {
-          linkInFlight.current = false;
+          linkInFlightSyncGuard.current = false;
         },
       },
     );
@@ -79,8 +69,6 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
       },
       onError: (err) => {
         setUnlinkOpen(false);
-        // The button is already disabled in this case; handle it defensively
-        // in case the guard is reached via a stale render.
         if (err instanceof FetchError && err.code === "SSO_CANNOT_UNLINK_LAST") {
           toast.error(t("profile.linkedAccounts.errors.cannotUnlinkLast"));
         } else {
@@ -115,8 +103,6 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
             data-testid="linked-account-google"
           >
             {google ? (
-              // Linked: compact row — provider + email on the left, small Unlink
-              // action on the right.
               <div className="flex items-center justify-between gap-2.5">
                 <div className="min-w-0">
                   <div className="text-ink flex items-center gap-2 text-[13px] font-medium">
@@ -152,9 +138,6 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
                 </div>
               </div>
             ) : (
-              // Not linked: stack the label above the full-width Google button —
-              // the GIS button renders a fixed-width iframe that would clip the
-              // provider label if squeezed into a horizontal row.
               <div className="flex flex-col gap-2.5">
                 <div>
                   <div className="text-ink flex items-center gap-2 text-[13px] font-medium">

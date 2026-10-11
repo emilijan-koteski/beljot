@@ -10,22 +10,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/season"
 )
 
-// The synthetic sweep: one human plus a bot partner against two bots, winning
-// each match with probability p, from 0 SP. It answers the two tuning targets
-// the replay cannot (few real players sustain one win rate for long): where a
-// p-player SETTLES, and where they are after the first N matches.
-//
-// Each match is scored by the real formula. Its margin comes from a template
-// drawn from the replay window's own bot-table matches, split by whether the
-// human won, so the sweep inherits real scorelines, surrenders and Capots. With
-// no window, or with a fixed margin requested, it uses a natural 1001 finish at
-// that margin instead.
-
-// sweepSeatUser is the synthetic human's user ID.
 const sweepSeatUser uint = 1
 
-// defaultSweepMargin is the fixed margin used when there is no window to sample.
-// It is Q3 2026's mean margin over natural 1001 finishes.
 const defaultSweepMargin = 0.84
 
 // outcomeTemplate is a bot-table outcome relabelled so the human's team is team
@@ -104,33 +90,28 @@ func botTableOutcome(t outcomeTemplate, humanWon bool) match.MatchOutcome {
 	}
 }
 
+// sweepConfig drives the synthetic sweep: a human and a bot partner against two bots, winning
+// with probability p from 0 SP. FixedMargin > 0 forces a 1001 finish at that margin instead of sampling Won/Lost.
 type sweepConfig struct {
-	WinRates []float64
-	Runs     int
-	Horizon  int
-	AfterN   int
-	Seed     uint64
-	// FixedMargin > 0 forces a natural 1001 finish at that margin; otherwise the
-	// pools are sampled, falling back to defaultSweepMargin when a pool is empty.
+	WinRates    []float64
+	Runs        int
+	Horizon     int
+	AfterN      int
+	Seed        uint64
 	FixedMargin float64
 	Won, Lost   []outcomeTemplate
 }
 
+// sweepRow is one win rate's sweep result: analytic and simulated settle points,
+// SP percentiles after AfterN matches, and how runs reached the Silver floor.
 type sweepRow struct {
-	P float64
-	// AnalyticSettle is gold + 2·S·log10(p·W/((1−p)·L)): where the expected
-	// change is zero if wins and losses had the same margin.
-	AnalyticSettle float64
-	// SimSettle is the mean SP over the second half of the horizon, across runs.
-	SimSettle float64
-	// AfterN* are the 10th, 50th and 90th percentile SP after AfterN matches.
+	P                                  float64
+	AnalyticSettle                     float64
+	SimSettle                          float64
 	AfterNP10, AfterNMedian, AfterNP90 int
-	// SilverMedian is the median match count at which a run first reached the
-	// Silver floor, over runs that did; SilverWithinN is the share of runs that
-	// got there within AfterN matches.
-	SilverMedian  int
-	SilverReached float64
-	SilverWithinN float64
+	SilverMedian                       int
+	SilverReached                      float64
+	SilverWithinN                      float64
 }
 
 func sweep(cfg sweepConfig, f season.SPFormula, ladder season.Ladder) ([]sweepRow, error) {

@@ -9,10 +9,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// TestTrumpSelectedPayload_JSONContract locks the wire-format field names so
-// the frontend's TrumpSelectedPayload type stays in sync. Renaming any field
-// here without updating client/src/shared/types/wsEvents.ts breaks the
-// reveal-dialog dispatch silently — this test surfaces the drift.
+// TestTrumpSelectedPayload_JSONContract locks the wire field names shared with the client's TrumpSelectedPayload.
 func TestTrumpSelectedPayload_JSONContract(t *testing.T) {
 	p := ws.TrumpSelectedPayload{
 		PlayerSeat: 2,

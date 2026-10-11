@@ -12,11 +12,6 @@ interface TrumpIndicatorProps {
   trumpSuit: Suit;
   trumpCallerSeat?: number | null;
   trumpCallerName?: string | null;
-  /**
-   * When provided, the visible team label flips to viewer-relative Us/Them.
-   * `null` / `undefined` preserves the legacy neutral team.a / team.b label
-   * (used in tests rendering the indicator stand-alone).
-   */
   viewerTeam?: TeamString | null;
 }
 
@@ -29,13 +24,6 @@ function callerTeam(seat: number): TeamString {
   return seat % 2 === 0 ? "teamA" : "teamB";
 }
 
-/**
- * Tailwind ink class for the glyph, kept only because four pre-existing tests
- * assert on it. It has NEVER carried colour — the inline `color` from
- * SUIT_ACCENT wins over a class — and it is a per-suit lookup rather than the
- * red/black conditional it replaced, so no `H/D` test survives in this file.
- * Glyph-only: the Croatian marks are images and ignore it.
- */
 const LEGACY_INK_CLASS: Record<Suit, string> = {
   S: "text-text-primary",
   H: "text-red-500",
@@ -48,14 +36,8 @@ const INK = "var(--ink-light, #f5f2e8)";
 const BRASS = "var(--brass, #c9a876)";
 
 /**
- * Top-right trump indicator — brass-bordered chip with a parchment suit orb,
- * the suit name, and (when known) the caller's name + Us/Them pill.
- *
- * The orb's halo + the team chip both follow viewer-relative coloring: if the
- * caller is on the viewer's team the chip glows gold; otherwise silver. When
- * `viewerTeam` is omitted the chip falls back to the absolute Team A/B label
- * + colors so non-game contexts (Storybook-style test renders, future history
- * views) still work.
+ * Top-right trump chip with the suit orb, suit name, and caller with an Us/Them pill.
+ * Without `viewerTeam` it falls back to absolute Team A/B labels and colors.
  */
 export function TrumpIndicator({
   trumpSuit,
@@ -65,10 +47,6 @@ export function TrumpIndicator({
 }: TrumpIndicatorProps) {
   const { t } = useTranslation();
   const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
-  // Every channel of the orb's chrome — border, radial tint, glow — plus the
-  // glyph ink comes from this one accent. Before Scope Amendment 1 all four were
-  // keyed off `suit === "H" || suit === "D"`, which would have painted a red
-  // halo around the Croatian gold bell and a black one around the green leaf.
   const accent = suitAccent(trumpSuit, deck);
   const glowAlpha = suitGlowAlpha(trumpSuit, deck);
 
@@ -76,23 +54,14 @@ export function TrumpIndicator({
     typeof trumpCallerSeat === "number" ? callerTeam(trumpCallerSeat) : null;
 
   const callerName = trumpCallerName?.trim() || null;
-  // Deck-aware: the caption beside a gold bell must read "Bells", not
-  // "Diamonds". Same lookup feeds the visible text and the aria-label below.
   const suitName = t(suitNameKey(trumpSuit, deck));
 
-  // Viewer-relative Us/Them when both caller team + viewerTeam are known,
-  // otherwise the legacy neutral Team A / Team B label.
   const teamName = team
     ? viewerTeam
       ? t(team === viewerTeam ? "team.us" : "team.them")
       : t(TEAM_NAME_KEY[team])
     : null;
 
-  // Color channel for the team chip:
-  //  • viewerTeam set → gold/silver gradient (table-theme)
-  //  • viewerTeam null → fall back to the absolute team-A / team-B colors so
-  //    tests rendering the indicator stand-alone can still assert on the
-  //    legacy text-team-a / text-team-b classes.
   const teamGradient: TeamGradient | null = team
     ? viewerTeam
       ? team === viewerTeam
@@ -114,9 +83,6 @@ export function TrumpIndicator({
         ? t("match.trumpIndicator.labelWithTeam", { suit: suitName, team: teamName })
         : t("match.trumpIndicator.label", { suit: suitName });
 
-  // Container border:
-  //  • legacy mode → border-team-a / border-team-b (drives existing tests).
-  //  • viewer-relative → brass border (the team chip carries the team color).
   const containerBorderClass = legacyTeamClass !== null ? `border-2 border-${legacyTeamClass}` : "";
 
   return (
@@ -127,10 +93,6 @@ export function TrumpIndicator({
           ? undefined
           : {
               background: PANEL_BG,
-              // Match the ScorePanel chrome: literal rgba so the alpha is
-              // applied (the previous `${BRASS}66` concatenated `var(...)`
-              // with hex alpha, producing an invalid color the browser
-              // dropped — leaving the chip with no visible border).
               border: "1px solid rgba(201,168,118,0.4)",
               backdropFilter: "blur(8px)",
               WebkitBackdropFilter: "blur(8px)",
@@ -142,7 +104,6 @@ export function TrumpIndicator({
       data-testid="trump-indicator"
       data-team={team ?? undefined}
     >
-      {/* Suit orb — parchment circle with radial halo around the glyph */}
       <div
         className="rounded-full flex items-center justify-center shrink-0"
         style={{

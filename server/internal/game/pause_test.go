@@ -78,7 +78,7 @@ func TestPause(t *testing.T) {
 		{
 			name: "pause stacking - second player pauses when first already paused",
 			setup: func() *game.GameState {
-				return testfixtures.NewGamePaused(0) // seat 0 already paused
+				return testfixtures.NewGamePaused(0)
 			},
 			action: game.Action{Type: game.ActionPause, PlayerSeat: 1},
 			assertState: func(t *testing.T, gs *game.GameState) {
@@ -154,7 +154,6 @@ func TestUnpause(t *testing.T) {
 				gs := testfixtures.NewGamePaused(0)
 				gs.PausedPlayers[1] = true
 				gs.PauseUsed[1] = true
-				// Seat 0 already unpaused
 				gs.PausedPlayers[0] = false
 				return gs
 			},
@@ -168,7 +167,7 @@ func TestUnpause(t *testing.T) {
 		{
 			name: "unpause wrong player returns ErrNoActivePause",
 			setup: func() *game.GameState {
-				return testfixtures.NewGamePaused(0) // only seat 0 paused
+				return testfixtures.NewGamePaused(0)
 			},
 			action:  game.Action{Type: game.ActionUnpause, PlayerSeat: 2},
 			wantErr: apperr.ErrNoActivePause,
@@ -176,7 +175,7 @@ func TestUnpause(t *testing.T) {
 		{
 			name: "unpause when not paused returns ErrNotPaused",
 			setup: func() *game.GameState {
-				return testfixtures.NewGameMidPlay(1) // playing phase
+				return testfixtures.NewGameMidPlay(1)
 			},
 			action:  game.Action{Type: game.ActionUnpause, PlayerSeat: 0},
 			wantErr: apperr.ErrNotPaused,
@@ -184,7 +183,7 @@ func TestUnpause(t *testing.T) {
 		{
 			name: "owner_unpause by non-owner returns ErrNotRoomOwner",
 			setup: func() *game.GameState {
-				return testfixtures.NewGamePausedWithOwner(0, 2) // seat 0 paused, owner is seat 2
+				return testfixtures.NewGamePausedWithOwner(0, 2)
 			},
 			action:  game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 0},
 			wantErr: apperr.ErrNotRoomOwner,
@@ -233,7 +232,7 @@ func TestOwnerUnpause(t *testing.T) {
 		{
 			name: "owner clears single pause",
 			setup: func() *game.GameState {
-				return testfixtures.NewGamePausedWithOwner(1, 0) // seat 1 paused, owner is seat 0
+				return testfixtures.NewGamePausedWithOwner(1, 0)
 			},
 			action: game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 0},
 			assertState: func(t *testing.T, gs *game.GameState) {
@@ -246,7 +245,7 @@ func TestOwnerUnpause(t *testing.T) {
 		{
 			name: "owner clears stacked pauses from multiple players",
 			setup: func() *game.GameState {
-				gs := testfixtures.NewGamePausedWithOwner(0, 2) // seat 0 paused, owner is seat 2
+				gs := testfixtures.NewGamePausedWithOwner(0, 2)
 				gs.PausedPlayers[1] = true
 				gs.PauseUsed[1] = true
 				gs.PausedPlayers[3] = true
@@ -264,7 +263,7 @@ func TestOwnerUnpause(t *testing.T) {
 		{
 			name: "non-owner rejected",
 			setup: func() *game.GameState {
-				return testfixtures.NewGamePausedWithOwner(0, 2) // seat 0 paused, owner is seat 2
+				return testfixtures.NewGamePausedWithOwner(0, 2)
 			},
 			action:  game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 1},
 			wantErr: apperr.ErrNotRoomOwner,
@@ -272,8 +271,7 @@ func TestOwnerUnpause(t *testing.T) {
 		{
 			name: "owner who did not pause can still override",
 			setup: func() *game.GameState {
-				gs := testfixtures.NewGamePausedWithOwner(1, 0) // seat 1 paused, owner is seat 0
-				// Owner (seat 0) has NOT used their pause
+				gs := testfixtures.NewGamePausedWithOwner(1, 0)
 				assert.False(t, gs.PausedPlayers[0])
 				assert.False(t, gs.PauseUsed[0])
 				return gs
@@ -287,7 +285,7 @@ func TestOwnerUnpause(t *testing.T) {
 		{
 			name: "owner with active pause can use regular unpause for own pause only",
 			setup: func() *game.GameState {
-				gs := testfixtures.NewGamePausedWithOwner(0, 0) // seat 0 paused and is owner
+				gs := testfixtures.NewGamePausedWithOwner(0, 0)
 				gs.PausedPlayers[1] = true
 				gs.PauseUsed[1] = true
 				return gs

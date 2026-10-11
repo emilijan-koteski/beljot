@@ -83,9 +83,6 @@ describe("JoinByCodeTile", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/rooms/9");
   });
 
-  // Honor gate (Story 9.8 AC9). Join-by-code is the entry point with NO room
-  // object in scope on the public path, so HONOR_TOO_LOW must use the param-less
-  // generic variant — the precedent room.errors.insufficientCoinsGeneric set.
   it("toasts the generic honor message when the gate rejects a by-code join", async () => {
     const user = userEvent.setup();
     mockGetRoomByCode.mockResolvedValueOnce(room(false));

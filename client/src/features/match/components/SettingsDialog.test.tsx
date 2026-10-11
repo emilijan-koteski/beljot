@@ -57,10 +57,7 @@ describe("SettingsDialog card deck section", () => {
 
     await user.click(screen.getByTestId("settings-deck-option-croatian"));
 
-    // The store write is what re-skins the table — it must not wait on the PATCH.
     expect(useAuthStore.getState().user?.cardDeckPreference).toBe("croatian");
-    // Deck-only body: resending the language would make a deck change able to
-    // clobber a language chosen in another tab.
     expect(mockUpdatePreferences).toHaveBeenCalledWith(7, { cardDeckPreference: "croatian" });
   });
 
@@ -71,8 +68,6 @@ describe("SettingsDialog card deck section", () => {
 
     await user.click(screen.getByTestId("settings-deck-option-croatian"));
 
-    // Silent revert, matching LanguageSelector: the rendered deck follows the
-    // store, so the cards revert with it and nothing interrupts play.
     await waitFor(() => {
       expect(useAuthStore.getState().user?.cardDeckPreference).toBe("french");
     });
@@ -101,8 +96,6 @@ describe("SettingsDialog card deck section", () => {
   it("keeps the language and deck rows in radiogroups named by their headings", () => {
     render(<SettingsDialog open onOpenChange={() => {}} />);
 
-    // `radiogroup` is now SettingSection's default rather than hardcoded, so
-    // pin that the two exclusive pickers still get it.
     const language = screen.getByTestId("settings-language-option-en").parentElement;
     const deck = screen.getByTestId("settings-deck-option-french").parentElement;
     expect(language).toHaveAttribute("role", "radiogroup");
@@ -122,9 +115,6 @@ describe("SettingsDialog card deck section", () => {
 
     await user.click(screen.getByTestId("settings-language-option-hr"));
 
-    // Language-only body: the shared SettingRow must not have quietly rewired
-    // the language path onto the deck field, and a language change must not
-    // resend (and therefore be able to clobber) the deck.
     await waitFor(() => {
       expect(mockUpdatePreferences).toHaveBeenCalledWith(7, { languagePreference: "hr" });
     });
@@ -157,8 +147,6 @@ describe("SettingsDialog card deck section", () => {
 
   it("ignores a superseded deck failure — the last toggle wins", async () => {
     const user = userEvent.setup();
-    // First request fails LATE, second succeeds. Without the sequence guard the
-    // stale rollback would reinstate "french" over the player's real choice.
     let releaseFirst: () => void = () => {};
     mockUpdatePreferences
       .mockImplementationOnce(
@@ -180,7 +168,6 @@ describe("SettingsDialog card deck section", () => {
       expect(mockUpdatePreferences).toHaveBeenCalledTimes(2);
     });
 
-    // Still the second toggle's value, not the first request's rollback target.
     expect(useAuthStore.getState().user?.cardDeckPreference).toBe("french");
   });
 });
@@ -212,7 +199,6 @@ describe("SettingsDialog sound section", () => {
     expect(music).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("switch", { name: "Sound effects" })).toBe(sound);
     expect(screen.getByRole("switch", { name: "Music" })).toBe(music);
-    // Independent switches: their group must not claim radio semantics.
     expect(sound.parentElement).toHaveAttribute("role", "group");
     expect(screen.getByRole("group", { name: "Sound" })).toBe(sound.parentElement);
   });
@@ -321,7 +307,6 @@ describe("SettingsDialog volume sliders", () => {
     expect(screen.getByTestId("settings-sound-volume")).toHaveTextContent("70%");
     expect(screen.getByTestId("settings-music-volume")).toHaveTextContent("30%");
 
-    // Each slider follows its own switch in the Sound group.
     const group = screen.getByRole("group", { name: "Sound" });
     const order = Array.from(group.children).map((el) => el.getAttribute("data-testid"));
     expect(order).toEqual([
@@ -399,7 +384,6 @@ describe("SettingsDialog volume sliders", () => {
 
     expect(slider("settings-music-volume")).not.toBeDisabled();
     expect(slider("settings-music-volume")).toHaveAttribute("aria-valuenow", "30");
-    // The switch PATCHes carried the switch alone, never the volume.
     for (const [, body] of mockUpdatePreferences.mock.calls) {
       expect(body).not.toHaveProperty("musicVolume");
     }

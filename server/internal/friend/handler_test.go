@@ -21,8 +21,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// --- Mock friend Repository (in-memory, mirrors the GORM semantics) ---
-
 type mockFriendRepo struct {
 	rows      []*friend.Friendship
 	nextID    uint
@@ -50,8 +48,6 @@ func (m *mockFriendRepo) Create(f *friend.Friendship) error {
 	if m.createErr != nil {
 		return m.createErr
 	}
-	// Mirror the exact-direction unique index only (the reverse dup is the
-	// handler's job to catch via FindByPair, so Create must NOT block it).
 	for _, r := range m.rows {
 		if r.UserID == f.UserID && r.FriendID == f.FriendID {
 			return apperr.ErrFriendRequestExists
@@ -147,8 +143,6 @@ func (m *mockFriendRepo) AreFriends(a, b uint) (bool, error) {
 	return false, nil
 }
 
-// --- Notifier spy ---
-
 type sentMsg struct {
 	userID uint
 	msg    []byte
@@ -166,8 +160,6 @@ func (s *notifierSpy) IsConnected(userID uint) bool { return s.connected[userID]
 func (s *notifierSpy) SendToUser(userID uint, msg []byte) {
 	s.sent = append(s.sent, sentMsg{userID: userID, msg: msg})
 }
-
-// --- Stub user.UserRepository (only FindByID / FindManyByIDs matter here) ---
 
 type stubUserRepo struct {
 	users map[uint]*user.User
@@ -220,8 +212,6 @@ func (s *stubUserRepo) ApplyHonorEvents(map[uint]user.HonorEvent, time.Time) (ma
 	return nil, nil
 }
 func (s *stubUserRepo) ResetHonor(uint) error { return nil }
-
-// --- Test harness ---
 
 func testErrorHandler(err error, c echo.Context) {
 	if c.Response().Committed {
@@ -320,8 +310,6 @@ func statusResp(t *testing.T, rec *httptest.ResponseRecorder) friend.FriendStatu
 	return resp.Data
 }
 
-// --- SendRequest ---
-
 func TestSendRequest_Self(t *testing.T) {
 	_, users, _, e := setup()
 	users.add(1, "alice")
@@ -352,7 +340,6 @@ func TestSendRequest_HappyPath_OnlineRecipientGetsPush(t *testing.T) {
 	assert.Equal(t, uint(2), repo.rows[0].FriendID)
 	assert.Equal(t, friend.FriendStatusPending, repo.rows[0].Status)
 
-	// The online recipient receives the best-effort system:friend_request push.
 	require.Len(t, spy.sent, 1)
 	assert.Equal(t, uint(2), spy.sent[0].userID)
 
@@ -370,7 +357,7 @@ func TestSendRequest_HappyPath_OnlineRecipientGetsPush(t *testing.T) {
 func TestSendRequest_OfflineRecipient_NoPushStill201(t *testing.T) {
 	repo, users, spy, e := setup()
 	users.add(1, "alice")
-	users.add(2, "bob") // deliberately NOT connected
+	users.add(2, "bob")
 
 	rec := doPost(e, "/api/v1/friends/request", `{"userId":2}`, tokenFor(t, 1))
 	require.Equal(t, http.StatusCreated, rec.Code)
@@ -384,12 +371,10 @@ func TestSendRequest_PendingDuplicate_EitherDirection(t *testing.T) {
 	users.add(2, "bob")
 	repo.seed(1, 2, friend.FriendStatusPending)
 
-	// Same direction again → exists.
 	rec := doPost(e, "/api/v1/friends/request", `{"userId":2}`, tokenFor(t, 1))
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	assert.Equal(t, "FRIEND_REQUEST_EXISTS", errorCode(t, rec))
 
-	// Reverse direction (2 requests 1) → also exists, caught by FindByPair.
 	rec = doPost(e, "/api/v1/friends/request", `{"userId":1}`, tokenFor(t, 2))
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	assert.Equal(t, "FRIEND_REQUEST_EXISTS", errorCode(t, rec))
@@ -405,12 +390,9 @@ func TestSendRequest_AcceptedDuplicate(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	assert.Equal(t, "ALREADY_FRIENDS", errorCode(t, rec))
 
-	// Reverse direction also reports already-friends.
 	rec = doPost(e, "/api/v1/friends/request", `{"userId":1}`, tokenFor(t, 2))
 	assert.Equal(t, "ALREADY_FRIENDS", errorCode(t, rec))
 }
-
-// --- GetStatus ---
 
 func TestGetStatus_AllStates(t *testing.T) {
 	repo, users, _, e := setup()
@@ -418,29 +400,22 @@ func TestGetStatus_AllStates(t *testing.T) {
 		users.add(id, name)
 	}
 
-	// none — no relationship.
 	assert.Equal(t, "none", statusResp(t, doGet(e, "/api/v1/friends/status/2", tokenFor(t, 1))).Status)
 
-	// self → none (button never shown on your own page).
 	assert.Equal(t, "none", statusResp(t, doGet(e, "/api/v1/friends/status/1", tokenFor(t, 1))).Status)
 
-	// pending_outgoing — viewer 1 sent it.
 	f := repo.seed(1, 3, friend.FriendStatusPending)
 	out := statusResp(t, doGet(e, "/api/v1/friends/status/3", tokenFor(t, 1)))
 	assert.Equal(t, "pending_outgoing", out.Status)
 	require.NotNil(t, out.RequestID)
 	assert.Equal(t, f.ID, *out.RequestID)
 
-	// pending_incoming — subject 4 sent it to viewer 1.
 	repo.seed(4, 1, friend.FriendStatusPending)
 	assert.Equal(t, "pending_incoming", statusResp(t, doGet(e, "/api/v1/friends/status/4", tokenFor(t, 1))).Status)
 
-	// friends — accepted.
 	repo.seed(1, 5, friend.FriendStatusAccepted)
 	assert.Equal(t, "friends", statusResp(t, doGet(e, "/api/v1/friends/status/5", tokenFor(t, 1))).Status)
 }
-
-// --- Accept / Decline ---
 
 func TestAccept_RecipientOnly(t *testing.T) {
 	repo, users, _, e := setup()
@@ -448,12 +423,10 @@ func TestAccept_RecipientOnly(t *testing.T) {
 	users.add(2, "bob")
 	f := repo.seed(1, 2, friend.FriendStatusPending)
 
-	// The requester (1) cannot accept → uniform 404.
 	rec := doPost(e, "/api/v1/friends/"+uid(f.ID)+"/accept", "", tokenFor(t, 1))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 	assert.Equal(t, "FRIEND_REQUEST_NOT_FOUND", errorCode(t, rec))
 
-	// The recipient (2) accepts → 200 and the row is accepted.
 	rec = doPost(e, "/api/v1/friends/"+uid(f.ID)+"/accept", "", tokenFor(t, 2))
 	assert.Equal(t, http.StatusOK, rec.Code)
 	got, _ := repo.FindByID(f.ID)
@@ -467,33 +440,26 @@ func TestDecline_RecipientOnly(t *testing.T) {
 	users.add(2, "bob")
 	f := repo.seed(1, 2, friend.FriendStatusPending)
 
-	// The requester (1) cannot decline → uniform 404.
 	rec := doPost(e, "/api/v1/friends/"+uid(f.ID)+"/decline", "", tokenFor(t, 1))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 
-	// The recipient (2) declines → 200 and the row is gone.
 	rec = doPost(e, "/api/v1/friends/"+uid(f.ID)+"/decline", "", tokenFor(t, 2))
 	assert.Equal(t, http.StatusOK, rec.Code)
 	got, _ := repo.FindByID(f.ID)
 	assert.Nil(t, got)
 }
 
-// --- Unfriend ---
-
 func TestUnfriend_EitherParty(t *testing.T) {
 	repo, users, _, e := setup()
 	users.add(1, "alice")
 	users.add(2, "bob")
 
-	// The requester (1) unfriends → 200 and the row is gone.
 	f := repo.seed(1, 2, friend.FriendStatusAccepted)
 	rec := doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 1))
 	assert.Equal(t, http.StatusOK, rec.Code)
 	got, _ := repo.FindByID(f.ID)
 	assert.Nil(t, got)
 
-	// The recipient (2) unfriends a fresh row just the same — the guard is
-	// party-agnostic, unlike Accept/Decline.
 	f = repo.seed(1, 2, friend.FriendStatusAccepted)
 	rec = doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 2))
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -510,7 +476,6 @@ func TestUnfriend_RepeatCall404(t *testing.T) {
 	rec := doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 1))
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// The second delete (the both-unfriend race, or a stale button) → uniform 404.
 	rec = doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 2))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 	assert.Equal(t, "FRIENDSHIP_NOT_FOUND", errorCode(t, rec))
@@ -522,7 +487,6 @@ func TestUnfriend_PendingRow404(t *testing.T) {
 	users.add(2, "bob")
 	f := repo.seed(1, 2, friend.FriendStatusPending)
 
-	// A pending row is decline's job, not unfriend's → uniform 404, row survives.
 	rec := doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 2))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 	assert.Equal(t, "FRIENDSHIP_NOT_FOUND", errorCode(t, rec))
@@ -537,8 +501,6 @@ func TestUnfriend_ThirdParty404(t *testing.T) {
 	users.add(3, "carol")
 	f := repo.seed(1, 2, friend.FriendStatusAccepted)
 
-	// A third party (3) gets the same uniform 404 as a missing row — never a 403
-	// that would leak the row's existence — and the row survives.
 	rec := doDelete(e, "/api/v1/friends/"+uid(f.ID), tokenFor(t, 3))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 	assert.Equal(t, "FRIENDSHIP_NOT_FOUND", errorCode(t, rec))
@@ -550,7 +512,6 @@ func TestUnfriend_BadID(t *testing.T) {
 	_, users, _, e := setup()
 	users.add(1, "alice")
 
-	// Non-numeric and zero ids are both a 400 BAD_REQUEST from parseIDParam.
 	rec := doDelete(e, "/api/v1/friends/abc", tokenFor(t, 1))
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.Equal(t, "BAD_REQUEST", errorCode(t, rec))
@@ -559,8 +520,6 @@ func TestUnfriend_BadID(t *testing.T) {
 	assert.Equal(t, "BAD_REQUEST", errorCode(t, rec))
 }
 
-// --- Lists ---
-
 func TestListRequests_IncomingWithUsernames(t *testing.T) {
 	repo, users, _, e := setup()
 	users.add(1, "alice")
@@ -568,9 +527,9 @@ func TestListRequests_IncomingWithUsernames(t *testing.T) {
 	users.add(3, "carol")
 	users.add(4, "dave")
 
-	repo.seed(2, 1, friend.FriendStatusPending) // incoming
-	repo.seed(3, 1, friend.FriendStatusPending) // incoming
-	repo.seed(1, 4, friend.FriendStatusPending) // outgoing — excluded
+	repo.seed(2, 1, friend.FriendStatusPending)
+	repo.seed(3, 1, friend.FriendStatusPending)
+	repo.seed(1, 4, friend.FriendStatusPending)
 
 	rec := doGet(e, "/api/v1/friends/requests", tokenFor(t, 1))
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -603,9 +562,9 @@ func TestListFriends_OnlineFlagAndSymmetry(t *testing.T) {
 	users.add(2, "bob")
 	users.add(3, "carol")
 
-	repo.seed(1, 2, friend.FriendStatusAccepted) // alice requester
-	repo.seed(3, 1, friend.FriendStatusAccepted) // alice recipient
-	spy.connected[2] = true                      // bob online, carol offline
+	repo.seed(1, 2, friend.FriendStatusAccepted)
+	repo.seed(3, 1, friend.FriendStatusAccepted)
+	spy.connected[2] = true
 
 	rec := doGet(e, "/api/v1/friends", tokenFor(t, 1))
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -627,8 +586,6 @@ func TestListFriends_OnlineFlagAndSymmetry(t *testing.T) {
 func TestListFriends_SoftDeletedOmitted(t *testing.T) {
 	repo, users, _, e := setup()
 	users.add(1, "alice")
-	// A friendship to user 2 exists, but user 2 has no live row (soft-deleted →
-	// absent from FindManyByIDs). It must be omitted, not 500.
 	repo.seed(1, 2, friend.FriendStatusAccepted)
 
 	rec := doGet(e, "/api/v1/friends", tokenFor(t, 1))
@@ -644,8 +601,6 @@ func TestListFriends_EmptySerializesArray(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), `"data":[]`)
 }
 
-// --- Unauthenticated ---
-
 func TestFriendEndpoints_RequireAuth(t *testing.T) {
 	_, _, _, e := setup()
 	rec := doGet(e, "/api/v1/friends", "")
@@ -653,8 +608,6 @@ func TestFriendEndpoints_RequireAuth(t *testing.T) {
 	rec = doDelete(e, "/api/v1/friends/1", "")
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
-
-// --- Avatars ---
 
 // Both lists carry each other party's 128 avatar URL (the sender's, on a
 // request), null when they have none.
@@ -687,7 +640,7 @@ func TestLists_CarryAvatarURL(t *testing.T) {
 	assert.Nil(t, byID[3])
 	assert.Contains(t, rec.Body.String(), `"avatarUrl":null`, "the key is present when null")
 
-	repo.seed(2, 3, friend.FriendStatusPending) // bob -> carol
+	repo.seed(2, 3, friend.FriendStatusPending)
 	rec = doGet(e, "/api/v1/friends/requests", tokenFor(t, 3))
 	require.Equal(t, http.StatusOK, rec.Code)
 	var requests struct {

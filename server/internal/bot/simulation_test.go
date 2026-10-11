@@ -12,16 +12,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/game/testfixtures"
 )
 
-// TestSimulation_HeuristicBeatsRandomBaseline is the AC4 evidence: seats 0+2
-// (team A) play bot.Decide, seats 1+3 (team B) play a random-legal baseline,
-// across ≥200 full hands driven purely through game.NewGame/ApplyAction (no
-// session manager, no WS). The heuristic team must accumulate ≥60% of all
-// points awarded — deliberately far below the expected true rate so CI never
-// flakes. Zero ApplyAction errors across the whole simulation doubles as the
-// AC3 "always legal" proof.
-//
-// The baseline uses a seeded source (math/rand/v2 has no global Seed); deck
-// shuffles stay nondeterministic, which is fine at this sample size.
+// TestSimulation_HeuristicBeatsRandomBaseline checks that bot.Decide on team A wins at least 60% of points
+// against a random-legal team B over 200 hands, with no ApplyAction errors.
 func TestSimulation_HeuristicBeatsRandomBaseline(t *testing.T) {
 	const handsTarget = 200
 	rng := rand.New(rand.NewPCG(42, 1))
@@ -37,26 +29,13 @@ func TestSimulation_HeuristicBeatsRandomBaseline(t *testing.T) {
 			[4]bool{true, true, true, true},
 			game.VariantBitola, "1001", 1, true, false,
 		)
-		// NewGame draws the first-hand dealer at random. This experiment measures
-		// heuristic quality, not seat luck, so the dealer is pinned to seat 0 and
-		// the opening bidder derived from it -- the same bidding rotation the
-		// >=60% threshold below was calibrated against, when NewGame hardcoded
-		// dealer 0.
-		//
-		// Note this pins the rotation, not the deal: stage-1 hands were already
-		// dealt from the RANDOM dealer inside NewGame above, and only stage-2
-		// distribution follows the value set here. That costs nothing
-		// statistically -- the deck is uniformly shuffled, so each seat still
-		// holds a uniformly random hand either way -- but the state is not what a
-		// coherent dealer-0 deal would produce, so do not add assertions here that
-		// depend on which seat received which card.
 		gs.DealerSeat = 0
 		gs.ActivePlayerSeat = (gs.DealerSeat + 1) % 4
 		mem := bot.NewMemory()
 
 		result, ok := playOneHand(t, gs, mem, rng)
 		if !ok {
-			continue // instant-win deal — no hand was scored
+			continue
 		}
 		heuristicPoints += result.TeamAHandTotal
 		totalPoints += result.TeamAHandTotal + result.TeamBHandTotal
@@ -72,9 +51,6 @@ func TestSimulation_HeuristicBeatsRandomBaseline(t *testing.T) {
 }
 
 // simDriver supplies the acting seat and its action for one simulation step.
-// Swapping it is how a run changes WHO is playing without forking the loop —
-// and therefore without forking the bot-memory bookkeeping, which is the part
-// that silently drifts when a second driver is copy-pasted.
 type simDriver func(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action)
 
 // simObserver is called with the PRE-action state on every step, so a run can
@@ -82,20 +58,14 @@ type simDriver func(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, g
 // made. nil for runs that only care about the outcome.
 type simObserver func(t *testing.T, gs *game.GameState, seat int, action game.Action)
 
-// playOneHand drives a fresh deal to its scored end and returns the hand
-// result. Returns ok=false when the deal ended the match without scoring a
-// hand (instant-win). Every ApplyAction error fails the test immediately —
-// that is the AC3 always-legal contract.
+// playOneHand drives a fresh deal to its scored end with the default driver.
+// It returns ok=false when the deal ended the match without scoring a hand.
 func playOneHand(t *testing.T, gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (game.HandScore, bool) {
 	t.Helper()
 	return playOneHandWith(t, gs, mem, rng, nextSimAction, nil)
 }
 
-// playOneHandWith is playOneHand with the decision source and an optional
-// per-step observer injected. Every run shares this one loop so they all feed
-// bot memory identically — a driver that learned nothing would exercise
-// chooseCard on empty PlayedCards / KnownVoids / KnownCards, i.e. a different
-// code path from production.
+// playOneHandWith is playOneHand with an injected driver and optional per-step observer.
 func playOneHandWith(
 	t *testing.T,
 	gs *game.GameState,
@@ -106,18 +76,12 @@ func playOneHandWith(
 ) (game.HandScore, bool) {
 	t.Helper()
 
-	// Safety bound: a hand resolves in well under 100 actions; repeated
-	// all-pass reshuffles add a few more rounds.
 	for steps := 0; steps < 500; steps++ {
 		switch gs.Phase {
 		case game.PhaseDealing:
-			// Mirror the session manager's dealing → bidding auto-transition.
 			gs.Phase = game.PhaseBidding
 
 		case game.PhaseBidding, game.PhaseDeclaring, game.PhasePlaying:
-			// PhaseDeclaring is unreachable under DeclarationTimingDuringFirstTrick
-			// (declarations are collected inside trick 1); it is live for the
-			// dedicated-phase run — see TestSimulation_CroatianHandWithBotSeats.
 			seat, action := drive(gs, mem, rng)
 			if observe != nil {
 				observe(t, gs, seat, action)
@@ -130,9 +94,6 @@ func playOneHandWith(
 				mem.ObservePlay(seat, *action.Card, oldLead)
 			}
 			gs = next
-			// Mirror the match layer: once the contest resolves, fold the
-			// publicly revealed declarations into memory so the heuristic team
-			// actually exercises declaration awareness in this guard.
 			if gs.DeclarationsResolved {
 				mem.ObserveDeclarations(gs.Players)
 			}
@@ -143,7 +104,7 @@ func playOneHandWith(
 
 		case game.PhaseMatchEnd:
 			if gs.LastHandResult == nil {
-				return game.HandScore{}, false // instant-win, nothing scored
+				return game.HandScore{}, false
 			}
 			return *gs.LastHandResult, true
 
@@ -178,7 +139,6 @@ func randomLegalAction(gs *game.GameState, seat int, rng *rand.Rand) game.Action
 			}
 			return game.Action{Type: game.ActionPassTrump, PlayerSeat: seat}
 		}
-		// Round 2: pass or any non-candidate suit, uniformly.
 		options := make([]game.Suit, 0, 3)
 		for _, s := range game.AllSuits {
 			if gs.TrumpCandidate != nil && s == gs.TrumpCandidate.Suit {
@@ -213,43 +173,9 @@ func randomLegalAction(gs *game.GameState, seat int, rng *rand.Rand) game.Action
 	return game.Action{Type: game.ActionPlayCard, PlayerSeat: seat, Card: &c}
 }
 
-// TestSimulation_CroatianHandWithBotSeats is the deadlock proof for the
-// dedicated declaration phase (Story 12.6): full Croatian hands, all four seats
-// driven by bot.Decide, from the deal to a scored hand. It is the engine-level
-// counterpart of the session-manager tests — no timers, no WS — so anything it
-// catches is a rules-engine or bot-ladder defect, not a scheduling one.
-//
-// It runs through the SAME playOneHandWith loop as the Bitola experiment, only
-// with a different driver, so the bots learn from played cards and resolved
-// declarations exactly as they do in production. A hand-rolled loop here would
-// quietly feed chooseCard an empty memory and test a path no real match takes.
-//
-// What it pins:
-//   - bidding always finds a taker and hands off to the declaration phase (or
-//     straight to trick 1 when no seat holds a meld);
-//   - the phase terminates: every seat is visited once and nobody is asked twice;
-//   - bot.Decide never reaches for a card there — View.LegalCards is nil in the
-//     phase and chooseCard would panic on legal[0];
-//   - trick 1 opens with the contest already resolved, so no declaration is ever
-//     outstanding during play;
-//   - the FORCED DEALER PICK: when round 1 is passed out and three seats pass
-//     again, the dealer has no legal pass, and bot.Decide must name a suit. A
-//     pass here is rejected by the engine, which playOneHandWith's
-//     require.NoError turns into an immediate failure — so this run is also the
-//     deadlock proof for Story 12.8;
-//   - the hand scores.
+// TestSimulation_CroatianHandWithBotSeats plays full Croatian hands with bots in every seat
+// and checks the declaration phase and forced dealer pick never deadlock.
 func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
-	// 200 hands: 60 already clears the phase-was-entered assertions (only hands
-	// where some seat is dealt a meld open the phase), and the wider sample is
-	// nearly free at this speed, so it buys extra deal coverage for the
-	// forced-pick path — which needs BOTH bidding rounds to reach the dealer and
-	// so shows up in roughly 5% of deals.
-	//
-	// Deck shuffles are NOT seeded, so that 5% is a rate, not a guarantee: over
-	// 200 hands a zero is around 1 in 3,500, which is a flake rather than a
-	// proof. The forced pick is therefore observed and logged here but asserted
-	// on the deterministic tail hand below, and pinned exhaustively by
-	// TestDecide_ForcedDealerNeverPasses.
 	const handsTarget = 200
 	rng := rand.New(rand.NewPCG(12, 6))
 
@@ -257,9 +183,6 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 	sawAnsweredSeat := 0
 	sawForcedPick := 0
 
-	// tailObserver holds the forced-pick invariant on its own, so the per-hand
-	// observer below and the deterministic tail hand at the end share exactly one
-	// definition of it.
 	tailObserver := func(t *testing.T, cur *game.GameState, seat int, action game.Action) {
 		if !game.MustPickTrump(cur, seat) {
 			return
@@ -282,7 +205,6 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 		require.Equal(t, game.DeclarationTimingDedicatedPhase, gs.Rules.DeclarationTiming)
 		mem := bot.NewMemory()
 
-		// Seats already answered this hand — the phase must visit each exactly once.
 		answered := map[int]bool{}
 		enteredPhase := false
 
@@ -300,9 +222,6 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 				require.NotNil(t, cur.TrumpSuit, "the phase is only reachable after a resolved bid")
 				require.Equal(t, (cur.DealerSeat+1)%4, cur.ActivePlayerSeat,
 					"pinned to the trick-1 leader for the phase's whole duration")
-				// Two distinct invariants, so two distinct messages: the engine
-				// must still consider the seat unanswered, and this observer
-				// must not have seen it answer before.
 				require.False(t, cur.Players[seat].DeclarationAnswered,
 					"seat %d is already marked answered in the engine state", seat)
 				require.False(t, answered[seat], "the driver drove seat %d twice", seat)
@@ -327,17 +246,11 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 		}
 	}
 
-	// The phase is not vacuously "safe" because it was never entered.
 	assert.Positive(t, sawDeclarationPhase, "no hand ever opened the declaration phase")
 	assert.Positive(t, sawAnsweredSeat, "no seat ever answered inside the phase")
 	t.Logf("declaration phase opened in %d/%d random hands, %d seats answered, %d forced dealer picks",
 		sawDeclarationPhase, handsTarget, sawAnsweredSeat, sawForcedPick)
 
-	// Deterministic tail: one hand started FROM the forced-pick state, so this
-	// run always exercises it regardless of how the 200 random deals fell. Same
-	// driver, same observer, so the observer's "the dealer must not pass"
-	// assertions apply — and ApplyAction's require.NoError inside
-	// playOneHandWith makes a pass an immediate failure.
 	forcedBefore := sawForcedPick
 	forced := testfixtures.NewGameCroatianMidBidding(3)
 	require.True(t, game.MustPickTrump(forced, forced.ActivePlayerSeat),
@@ -347,24 +260,15 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 		"the deterministic tail hand must have gone through the forced dealer pick")
 }
 
-// croatianBotDriver plays every seat with bot.Decide — no substitutions, no
-// retries. It used to swap in a free-suit pick for the one bid the bot could not
-// make (the dealer bidding last under AllPassDealerMustPick has no
-// legal pass); that crutch is gone, so playOneHandWith's require.NoError is now
-// a strict always-legal proof over the bot's OWN decisions, including the forced
-// dealer pick.
+// croatianBotDriver plays every seat with bot.Decide, with no substitutions.
 func croatianBotDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action) {
-	_ = rng // every seat is deterministic here; randomness lives in the deal
+	_ = rng
 
 	seat := gs.ActivePlayerSeat
 	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil {
 		seat = *gs.PendingBelotSeat
 	}
 	if gs.Phase == game.PhaseDeclaring {
-		// The dedicated phase asks all four seats at once and ActivePlayerSeat
-		// is pinned to the trick-1 leader, so it names nobody in particular.
-		// Drive the first seat that still owes an answer — the same rule
-		// botDecisionSeats applies in the match layer.
 		for s := range gs.Players {
 			if !gs.Players[s].DeclarationAnswered {
 				seat = s

@@ -2,9 +2,6 @@ import type { CSSProperties } from "react";
 
 import { type CardSpec, PlayingCard } from "@/features/landing/components/PlayingCard";
 
-// Overlapping spread of cards. `overlap` (0–1) pulls each card over its
-// neighbour, `arc` tilts each from centre, `lift` raises the middle cards.
-
 type CardFanProps = {
   cards: CardSpec[];
   w?: number;
@@ -15,6 +12,7 @@ type CardFanProps = {
   style?: CSSProperties;
 };
 
+// Overlapping spread of cards; `overlap` pulls cards together, `arc` tilts them, `lift` raises the middle.
 export function CardFan({
   cards,
   w = 96,

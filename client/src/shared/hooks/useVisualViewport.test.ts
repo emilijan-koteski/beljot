@@ -83,7 +83,5 @@ describe("useVisualViewport", () => {
       vv.height = 320;
       vv.dispatchEvent(new Event("resize"));
     });
-    // No crash / no state update on an unmounted hook — nothing to assert
-    // beyond the absence of act() warnings, which vitest surfaces as errors.
   });
 });

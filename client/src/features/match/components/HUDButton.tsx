@@ -3,31 +3,17 @@ import { type ButtonHTMLAttributes, forwardRef, type ReactNode } from "react";
 export type HUDButtonVariant = "default" | "danger";
 
 interface HUDButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Optional icon rendered to the left of the label. */
   icon?: ReactNode;
-  /** When provided, the button widens to fit `icon + label`. Without it the
-   * button stays a 36 px square (icon-only). */
   label?: ReactNode;
-  /** `default` is the brass-bordered felt panel; `danger` swaps the border +
-   * text to a soft red for destructive actions (Surrender). */
   variant?: HUDButtonVariant;
 }
 
-/**
- * Shared button style used across the in-game HUD: Pause, Surrender, Rules,
- * Settings. Glass-frosted `--panel-hud` background with a brass border so the
- * cluster reads as a single instrument tray rather than four loose chrome
- * pieces.
- */
 export const HUDButton = forwardRef<HTMLButtonElement, HUDButtonProps>(function HUDButton(
   { icon, label, variant = "default", className = "", style, type = "button", ...rest },
   ref,
 ) {
   const isLabeled = label !== undefined && label !== null;
 
-  // Inline styles drive the felt + brass chrome so the button reads correctly
-  // regardless of where the consumer mounts it (inside or outside the
-  // `.game-table` scope, e.g. inside Radix portals for confirm dialogs).
   const baseStyle: React.CSSProperties = {
     background: "var(--panel-hud, rgba(18,32,22,0.85))",
     border:

@@ -37,8 +37,6 @@ describe("SeasonSpLine", () => {
     expect(screen.getByTestId("season-sp-line-badge")).toHaveAttribute("data-tier", "gold");
   });
 
-  // The matrix's tier-down row. The change is NEVER clamped to 0, and a loss is
-  // muted, never red.
   it("shows a loss as a real negative with U+2212, muted", () => {
     renderLine({ spChange: -20, newSeasonSp: 590, rankTier: "silver", rankDivision: 3 });
 
@@ -52,7 +50,6 @@ describe("SeasonSpLine", () => {
     expect(style).not.toMatch(/#ff|red|destructive|danger/i);
   });
 
-  // The matrix's loss-at-0 row: a real zero, a real rank.
   it("shows a loss at 0 SP as 0 SP at Iron 1", () => {
     renderLine({ spChange: 0, newSeasonSp: 0, rankTier: "iron", rankDivision: 1 });
 
@@ -67,18 +64,15 @@ describe("SeasonSpLine", () => {
     expect(screen.getByTestId("season-sp-line")).toHaveTextContent("+10 SP · Master");
   });
 
-  // The matrix's partner-abandoned row.
   it("tells the abandoner's teammate it was half a loss", () => {
     renderLine({ spChange: -12, reason: "partner_abandoned" });
 
     const line = screen.getByTestId("season-sp-line");
     expect(line).toHaveTextContent(`Partner abandoned: ${MINUS}12 SP (half loss)`);
     expect(line).toHaveAttribute("data-reason", "partner_abandoned");
-    // The copy names no rank, so the decorative badge stays out.
     expect(screen.queryByTestId("season-sp-line-badge")).not.toBeInTheDocument();
   });
 
-  // The half-loss copy needs a real loss. A teammate on the 0 floor applies 0.
   it("gives a partner whose applied change is 0 the ordinary line", () => {
     renderLine({
       spChange: 0,
@@ -94,7 +88,6 @@ describe("SeasonSpLine", () => {
     expect(line).toHaveAttribute("data-trend", "none");
   });
 
-  // A Capot bonus (+5) over a small half loss can leave the partner positive.
   it("gives a partner with a positive change the ordinary line, never 'half loss'", () => {
     renderLine({ spChange: 3, newSeasonSp: 703, reason: "partner_abandoned" });
 

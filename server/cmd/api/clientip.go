@@ -6,11 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// Cloudflare's edge ranges (https://www.cloudflare.com/ips/). Traefik sits in
-// front of the app on the overlay network and forwards the client address in
-// X-Forwarded-For; the chain is trusted only while every hop is a private
-// address or a Cloudflare edge, so a client cannot claim an IP of its choosing.
-var cloudflareRanges = []string{
+var cloudflareEdgeRanges = []string{
 	"173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22",
 	"141.101.64.0/18", "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20",
 	"197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13",
@@ -19,13 +15,15 @@ var cloudflareRanges = []string{
 	"2405:8100::/32", "2a06:98c0::/29", "2c0f:f248::/32",
 }
 
+// clientIPExtractor reads the client IP from X-Forwarded-For, trusting a hop only if it is
+// private or a Cloudflare edge (https://www.cloudflare.com/ips/), so clients cannot spoof it.
 func clientIPExtractor() echo.IPExtractor {
 	opts := []echo.TrustOption{
 		echo.TrustLoopback(true),
 		echo.TrustLinkLocal(true),
 		echo.TrustPrivateNet(true),
 	}
-	for _, cidr := range cloudflareRanges {
+	for _, cidr := range cloudflareEdgeRanges {
 		_, ipNet, err := net.ParseCIDR(cidr)
 		if err != nil {
 			panic("invalid Cloudflare range " + cidr + ": " + err.Error())

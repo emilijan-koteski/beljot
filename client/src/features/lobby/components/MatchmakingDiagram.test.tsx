@@ -76,14 +76,10 @@ describe("MatchmakingDiagram", () => {
       />,
     );
 
-    // Centre is labelled "You".
     expect(screen.getByText("You")).toBeInTheDocument();
-    // The three other seats are still searching.
     expect(screen.getAllByText("searching")).toHaveLength(3);
-    // Progress reflects 1 of 4 seated and 3 still to go.
     expect(screen.getByText("1 / 4 seated")).toBeInTheDocument();
     expect(screen.getByText("3 more to go")).toBeInTheDocument();
-    // Elapsed time is surfaced.
     expect(screen.getByText("00:07")).toBeInTheDocument();
   });
 
@@ -151,10 +147,8 @@ describe("MatchmakingDiagram", () => {
 
     expect(screen.getByText("Bitola")).toBeInTheDocument();
     expect(screen.getByText("1001 pts")).toBeInTheDocument();
-    // The per-move timer shows its real duration, NOT the old hardcoded "Relaxed".
     expect(screen.getByText("30s timer")).toBeInTheDocument();
     expect(screen.queryByText("Relaxed")).not.toBeInTheDocument();
-    // The coin stake (per-human buy-in) is shown.
     expect(screen.getByText("500")).toBeInTheDocument();
   });
 
@@ -188,15 +182,11 @@ describe("MatchmakingDiagram", () => {
       />,
     );
 
-    // Each bot seat shows its seat-derived name (Bot n = seat + 1), not the
-    // empty wire username and not a "searching" placeholder.
     expect(screen.getByTestId("matchmaking-bot-name-1")).toHaveTextContent("Bot 2");
     expect(screen.getByTestId("matchmaking-bot-name-2")).toHaveTextContent("Bot 3");
     expect(screen.getByTestId("matchmaking-bot-name-3")).toHaveTextContent("Bot 4");
     expect(screen.queryByText("searching")).not.toBeInTheDocument();
-    // The three bot avatars render the Bot glyph in place of an initial.
     expect(screen.getAllByTestId("avatar-icon")).toHaveLength(3);
-    // A full room reads 4 / 4 seated.
     expect(screen.getByText("4 / 4 seated")).toBeInTheDocument();
   });
 

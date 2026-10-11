@@ -12,9 +12,7 @@ vi.mock("@/shared/api/axiosClient", () => ({
   subscribeToTokenBroadcast: () => () => {},
 }));
 
-// makeJwt builds a header.payload.signature string whose payload carries iat/exp
-// (epoch seconds). The signature is irrelevant — the hook only decodes the
-// payload, never verifies it (the server does that).
+/** Builds an unsigned JWT-shaped string whose payload carries iat/exp in epoch seconds. */
 function makeJwt(iatSec: number, expSec: number): string {
   const payload = btoa(JSON.stringify({ iat: iatSec, exp: expSec }));
   return `header.${payload}.sig`;
@@ -41,13 +39,12 @@ describe("decodeJwtTiming", () => {
 
 describe("computeRefreshDelayMs", () => {
   it("schedules at 75% of the token lifetime", () => {
-    const nowMs = 1000 * 1000; // iat, in ms
-    // 900s lifetime → refresh at +675s.
+    const nowMs = 1000 * 1000;
     expect(computeRefreshDelayMs(makeJwt(1000, 1900), nowMs)).toBe(675_000);
   });
 
   it("floors to the minimum delay when already past the threshold", () => {
-    const nowMs = 1900 * 1000; // at expiry
+    const nowMs = 1900 * 1000;
     expect(computeRefreshDelayMs(makeJwt(1000, 1900), nowMs)).toBe(5_000);
   });
 
@@ -65,8 +62,6 @@ describe("useTokenRefresh", () => {
   });
 
   afterEach(() => {
-    // Reset inside act(): the hook is still mounted here (auto-cleanup order is
-    // not guaranteed), so a bare setState would re-render it outside act().
     act(() => {
       useAuthStore.setState({ token: null, user: null, isLoading: false });
     });
@@ -82,7 +77,6 @@ describe("useTokenRefresh", () => {
     renderHook(() => useTokenRefresh());
     expect(refreshAccessToken).not.toHaveBeenCalled();
 
-    // Advance just past the 75% (675s) mark.
     act(() => {
       vi.advanceTimersByTime(676_000);
     });
@@ -119,14 +113,11 @@ describe("useTokenRefresh", () => {
 
     renderHook(() => useTokenRefresh());
 
-    // First proactive fire (~675s in) rejects.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(676_000);
     });
     expect(refreshAccessToken).toHaveBeenCalledTimes(1);
 
-    // The re-armed retry fires ~30s later — a single blip must not disable
-    // proactive renewal for the rest of the token's life.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(31_000);
     });

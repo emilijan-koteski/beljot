@@ -15,12 +15,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// --- Fakes ---
-
 type userRepoStub struct {
-	users map[uint]*user.User
-	// Optional error injection for fail-closed tests. Default nil = no error,
-	// so existing chat tests are unaffected.
+	users             map[uint]*user.User
 	findByUsernameErr error
 	findByIDErr       error
 }
@@ -40,8 +36,6 @@ func (s *userRepoStub) FindByUsername(username string) (*user.User, error) {
 	if s.findByUsernameErr != nil {
 		return nil, s.findByUsernameErr
 	}
-	// Exact-match resolution over the seeded users — the whisper handler resolves
-	// a typed /w <username> to a user via this. Case-sensitive, mirroring the DB.
 	for _, u := range s.users {
 		if u.Username == username {
 			return u, nil
@@ -97,7 +91,7 @@ func (g *fakeGame) MatchParticipants(roomID uint) ([4]uint, bool) {
 }
 
 type fakeRoom struct {
-	members map[uint][]uint // roomID → userIDs; absent means room unknown / not waiting
+	members map[uint][]uint
 }
 
 func newFakeRoom() *fakeRoom {
@@ -157,8 +151,6 @@ func (h *hubSpy) callCount() int {
 	return len(h.calls)
 }
 
-// --- Helpers ---
-
 func chatActionMessage(t *testing.T, channel, text string) ws.WSMessage {
 	t.Helper()
 	return chatActionMessageRaw(t, ws.ChatMessageRequest{Channel: channel, Text: text})
@@ -170,8 +162,6 @@ func chatActionMessageRaw(t *testing.T, req interface{}) ws.WSMessage {
 	require.NoError(t, err)
 	return ws.WSMessage{Type: ws.ActionChatMessage, Payload: payload}
 }
-
-// --- Tests ---
 
 func TestHandler_GlobalMessage_BroadcastsToEligibleClients(t *testing.T) {
 	repo := newUserRepoStub()
@@ -237,10 +227,6 @@ func TestHandler_GlobalMessage_DroppedWhenSenderInGame(t *testing.T) {
 }
 
 func TestHandler_GlobalMessage_SenderAlwaysReceivesOwnEcho(t *testing.T) {
-	// Race repro: sender passes the initial in-game check, but then joins
-	// a game before the per-recipient filter loop runs. The sender must
-	// still receive their own message — the per-recipient filter exempts
-	// the sender unconditionally once handleGlobal started executing.
 	repo := newUserRepoStub()
 	repo.add(10, "alice")
 
@@ -249,16 +235,7 @@ func TestHandler_GlobalMessage_SenderAlwaysReceivesOwnEcho(t *testing.T) {
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
 
-	// Capture the initial check, then flip the sender to in-game before
-	// the broadcast filter runs. Simulate by mutating the fake between
-	// HandleAction calls — but since HandleAction is synchronous, we
-	// instead assert that even when the sender IS marked in-game on the
-	// per-recipient pass, they still appear in the recipient list as long
-	// as the initial check (before mutation) passed. Approximate by
-	// pre-marking the sender as in-game and verifying the dedicated
-	// "dropped" test catches that path; for THIS test we verify the
-	// happy path includes the sender:
-	game.inGame[20] = true // unrelated player in a game
+	game.inGame[20] = true
 	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", "hi"))
 
 	require.Equal(t, 1, hub.callCount())
@@ -304,17 +281,12 @@ func TestHandler_RejectsTooLong(t *testing.T) {
 
 	assert.Equal(t, 0, hub.callCount(), "501-rune message rejected")
 
-	// 500 runes exactly should be allowed
 	exactly500 := strings.Repeat("y", 500)
 	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", exactly500))
 	assert.Equal(t, 1, hub.callCount(), "500-rune message accepted (boundary)")
 }
 
 func TestHandler_LengthCapIsRunesNotBytes(t *testing.T) {
-	// Cyrillic/emoji messages at the 500-rune boundary must be accepted.
-	// Server uses utf8.RuneCountInString, not len(), so multi-byte runes
-	// don't inflate against the cap. This matches the client's
-	// `string.length` (UTF-16 code units approximate runes for the BMP).
 	repo := newUserRepoStub()
 	repo.add(10, "alice")
 	game := newFakeGame()
@@ -322,12 +294,10 @@ func TestHandler_LengthCapIsRunesNotBytes(t *testing.T) {
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
 
-	// 500 Cyrillic "ч" runes = 1000 bytes — would be rejected by len() check
 	cyrillic500 := strings.Repeat("ч", 500)
 	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", cyrillic500))
 	assert.Equal(t, 1, hub.callCount(), "500-rune Cyrillic message accepted")
 
-	// 501 Cyrillic runes — over the cap, must be rejected
 	cyrillic501 := strings.Repeat("ч", 501)
 	h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "lobby", cyrillic501))
 	assert.Equal(t, 1, hub.callCount(), "501-rune Cyrillic message rejected (no new broadcast)")
@@ -341,14 +311,11 @@ func TestHandler_IgnoresUnknownChannel(t *testing.T) {
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
 
-	// Should not panic, should not broadcast
 	assert.NotPanics(t, func() {
 		h.HandleAction(&ws.Client{UserID: 10}, chatActionMessage(t, "private", "hello"))
 	})
 	assert.Equal(t, 0, hub.callCount())
 }
-
-// --- Match-scope chat tests ---
 
 func matchActionMessage(t *testing.T, roomID uint, text string) ws.WSMessage {
 	t.Helper()
@@ -366,8 +333,6 @@ func TestHandler_MatchMessage_BroadcastsToFourParticipants(t *testing.T) {
 	game := newFakeGame()
 	game.participants[7] = [4]uint{10, 20, 30, 40}
 
-	// Connected set is intentionally broader than participants — match chat
-	// must fan out to participants only, ignoring the hub snapshot.
 	hub := &hubSpy{connected: []uint{10, 20, 30, 40, 50, 60}}
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
@@ -410,8 +375,6 @@ func TestHandler_MatchMessage_ExcludesNonParticipants(t *testing.T) {
 	repo.add(10, "alice")
 	game := newFakeGame()
 	game.participants[7] = [4]uint{10, 20, 30, 40}
-	// User 50 is connected but NOT a participant — must not appear in the
-	// recipient list even though the hub reports them connected.
 	hub := &hubSpy{connected: []uint{10, 20, 30, 40, 50}}
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
@@ -428,7 +391,6 @@ func TestHandler_MatchMessage_DroppedWhenRoomIDMissing(t *testing.T) {
 	hub := &hubSpy{connected: []uint{10, 20, 30, 40}}
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
-	// Build a match-channel request with no roomId at all.
 	msg := chatActionMessageRaw(t, ws.ChatMessageRequest{Channel: "match", Text: "hi"})
 	h.HandleAction(&ws.Client{UserID: 10}, msg)
 
@@ -438,7 +400,7 @@ func TestHandler_MatchMessage_DroppedWhenRoomIDMissing(t *testing.T) {
 func TestHandler_MatchMessage_DroppedWhenMatchUnknown(t *testing.T) {
 	repo := newUserRepoStub()
 	repo.add(10, "alice")
-	game := newFakeGame() // no participants registered for any matchID
+	game := newFakeGame()
 	hub := &hubSpy{connected: []uint{10, 20, 30, 40}}
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
@@ -470,17 +432,14 @@ func TestHandler_MatchMessage_RejectsEmptyAndTooLong(t *testing.T) {
 
 	h := chat.NewHandler(hub, repo, game, newFakeRoom())
 
-	// Empty / whitespace-only rejected via the shared prologue.
 	for _, text := range []string{"", "   ", "\n\n"} {
 		h.HandleAction(&ws.Client{UserID: 10}, matchActionMessage(t, 7, text))
 	}
 	assert.Equal(t, 0, hub.callCount(), "empty/whitespace match messages rejected")
 
-	// 501 runes rejected.
 	h.HandleAction(&ws.Client{UserID: 10}, matchActionMessage(t, 7, strings.Repeat("x", 501)))
 	assert.Equal(t, 0, hub.callCount(), "501-rune match message rejected")
 
-	// 500 runes accepted (boundary).
 	h.HandleAction(&ws.Client{UserID: 10}, matchActionMessage(t, 7, strings.Repeat("y", 500)))
 	assert.Equal(t, 1, hub.callCount(), "500-rune match message accepted")
 }
@@ -504,8 +463,6 @@ func TestHandler_MatchMessage_ScopeStampedAsMatch(t *testing.T) {
 		"match broadcast payload must carry scope=match for client dispatch")
 }
 
-// --- Room-scope chat tests ---
-
 func roomActionMessage(t *testing.T, roomID uint, text string) ws.WSMessage {
 	t.Helper()
 	return chatActionMessageRaw(t, ws.ChatMessageRequest{
@@ -521,8 +478,6 @@ func TestHandler_RoomMessage_BroadcastsToAllMembers(t *testing.T) {
 
 	game := newFakeGame()
 	fakeRooms := newFakeRoom()
-	// Room 5 has seated (10, 20) + unseated (30) members. Unseated (no seat)
-	// still receives and can send — room_players membership is the only gate.
 	fakeRooms.members[5] = []uint{10, 20, 30}
 
 	hub := &hubSpy{connected: []uint{10, 20, 30, 40}}
@@ -569,7 +524,6 @@ func TestHandler_RoomMessage_ExcludesNonMembers(t *testing.T) {
 	game := newFakeGame()
 	fakeRooms := newFakeRoom()
 	fakeRooms.members[5] = []uint{10, 20, 30}
-	// User 99 is connected but NOT in the room — must not receive.
 	hub := &hubSpy{connected: []uint{10, 20, 30, 99}}
 
 	h := chat.NewHandler(hub, repo, game, fakeRooms)
@@ -588,7 +542,6 @@ func TestHandler_RoomMessage_DroppedWhenRoomIDMissing(t *testing.T) {
 	hub := &hubSpy{connected: []uint{10, 20}}
 
 	h := chat.NewHandler(hub, repo, game, fakeRooms)
-	// channel:room with no roomId field at all
 	msg := chatActionMessageRaw(t, ws.ChatMessageRequest{Channel: "room", Text: "hi"})
 	h.HandleAction(&ws.Client{UserID: 10}, msg)
 
@@ -599,8 +552,6 @@ func TestHandler_RoomMessage_DroppedWhenRoomUnknownOrNotWaiting(t *testing.T) {
 	repo := newUserRepoStub()
 	repo.add(10, "alice")
 	game := newFakeGame()
-	// Room 999 is not registered → RoomMembers returns (nil, false).
-	// fakeRoom semantics: absent from the map == unknown OR not waiting.
 	fakeRooms := newFakeRoom()
 	hub := &hubSpy{connected: []uint{10, 20}}
 
@@ -649,12 +600,10 @@ func TestHandler_RoomMessage_RejectsEmptyAndTooLong(t *testing.T) {
 }
 
 func TestHandler_RoomMessage_RecipientInMatchStillReceives(t *testing.T) {
-	// The in-game exclusion applies ONLY to global chat. A room member
-	// who happens to be in an active game still gets their room chat.
 	repo := newUserRepoStub()
 	repo.add(10, "alice")
 	game := newFakeGame()
-	game.inGame[20] = true // recipient 20 is in a match
+	game.inGame[20] = true
 	fakeRooms := newFakeRoom()
 	fakeRooms.members[5] = []uint{10, 20}
 	hub := &hubSpy{connected: []uint{10, 20}}
@@ -695,7 +644,7 @@ func TestHandler_InvalidPayload_NoBroadcast(t *testing.T) {
 }
 
 func TestHandler_SenderNotFound_NoBroadcast(t *testing.T) {
-	repo := newUserRepoStub() // user 10 not added
+	repo := newUserRepoStub()
 	game := newFakeGame()
 	hub := &hubSpy{connected: []uint{10, 20}}
 

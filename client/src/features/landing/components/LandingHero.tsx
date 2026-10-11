@@ -6,16 +6,13 @@ import { LandingNav } from "@/features/landing/components/LandingNav";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { usePublicStatsQuery } from "@/shared/hooks/queries/usePublicStats";
 
-// Cinematic felt hero — dark spotlight, wood rail, headline + CTA on the left,
-// a live felt-table vignette on the right. The section owns the `.felt-surface`
-// scope, so the nav, eyebrow, CTA and vignette all read as light-on-felt.
-
+// Cinematic felt hero with the headline and CTA beside a live felt-table vignette.
+// The section owns the `.felt-surface` scope, so everything inside reads as light-on-felt.
 export function LandingHero() {
   const { t } = useTranslation();
   const { data: stats } = usePublicStatsQuery();
   return (
     <section className="felt-surface felt-hero-bg relative overflow-hidden">
-      {/* hand-carved wood rail along the very top edge */}
       <div className="felt-rail absolute inset-x-0 top-0 h-2" aria-hidden="true" />
 
       <LandingNav />

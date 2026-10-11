@@ -1,9 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// AC10 / D120: mock react-i18next so visible-text assertions can verify the
-// viewer-relative "Us declared" / "Them declared" copy. Mirrors the pattern
-// used by MatchResult.test.tsx.
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, string | number>) => {
@@ -97,7 +94,6 @@ describe("DeclarationReveal", () => {
   });
 
   it("renders 'We won the declarations' when viewer's partner declares", () => {
-    // viewer is teamB (seat 1 or 3); declarer is seat 1 (teamB) → both partners see Us
     render(
       <DeclarationReveal
         payload={mockPayload}
@@ -112,7 +108,6 @@ describe("DeclarationReveal", () => {
   });
 
   it("renders 'They won the declarations' when viewer is teamA and opponents declare", () => {
-    // viewer is teamA; declarer is on teamB → they see Them
     render(
       <DeclarationReveal
         payload={mockPayload}
@@ -122,8 +117,6 @@ describe("DeclarationReveal", () => {
       />,
     );
     const label = screen.getByTestId("declaration-reveal-team");
-    // The winner team is still teamB — data-team reflects the winner team
-    // (used for styling), not the viewer-relative label.
     expect(label).toHaveAttribute("data-team", "teamB");
     expect(label).toHaveTextContent("They won the declarations");
   });
@@ -211,15 +204,6 @@ describe("DeclarationReveal", () => {
     expect(screen.queryByTestId("declaration-reveal")).not.toBeInTheDocument();
   });
 
-  // Story 12.5 / D67: a declaration-overlap config lets ONE seat hold two
-  // surviving melds that share a card. Both rows must render, the shared card
-  // must appear in each of them, both declarer rows must carry that seat, and
-  // the total must be the plain sum — the reveal is deliberately centred, so
-  // there is nothing to anchor to a single declarer.
-  //
-  // This subsumes the older "stacks multiple declarations" case, whose
-  // `toBeGreaterThanOrEqual(1)` on the shared card would not have noticed a
-  // collapse to a single rendered copy. Every count here is exact.
   it("stacks both melds when one seat holds two that share a card", () => {
     const payload: DeclarationsResolvedPayload = {
       winnerTeam: 0,
@@ -243,7 +227,6 @@ describe("DeclarationReveal", () => {
     expect(values[0]).toHaveTextContent("+50");
     expect(values[1]).toHaveTextContent("+200");
 
-    // The shared JS is rendered once per row; every unshared card exactly once.
     expect(screen.getAllByTestId("playing-card-JS")).toHaveLength(2);
     for (const id of ["9S", "TS", "QS", "JH", "JD", "JC"]) {
       expect(screen.getAllByTestId(`playing-card-${id}`)).toHaveLength(1);
@@ -284,13 +267,7 @@ describe("DeclarationReveal", () => {
     expect(declarers[1]).toHaveTextContent("by carol");
   });
 
-  // The gate is the server's `contested` flag, not the meld count. Only the
-  // WINNING team's melds are on the wire, so counting them cannot distinguish
-  // "we out-declared them" from "we were the only team to declare".
   it("hides the tiebreaker line when the opposing team declared nothing", () => {
-    // Two melds from ONE seat sharing a card — the ordinary Croatian overlap
-    // case. Nothing was compared, so naming a "highest meld at the table"
-    // would report a contest that never happened.
     const uncontestedOverlap: DeclarationsResolvedPayload = {
       winnerTeam: 1,
       contested: false,
@@ -308,7 +285,6 @@ describe("DeclarationReveal", () => {
       />,
     );
     expect(screen.queryByTestId("declaration-reveal-tiebreaker")).not.toBeInTheDocument();
-    // The melds themselves still render — only the win-reason line is withheld.
     expect(screen.getAllByTestId("declaration-reveal-meld-label")).toHaveLength(2);
   });
 
@@ -329,15 +305,12 @@ describe("DeclarationReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    // Highest meld is dave's four_of_a_kind (200) — that's what tipped the team.
     expect(screen.getByTestId("declaration-reveal-tiebreaker")).toHaveTextContent(
       "dave's Carré — highest meld at the table",
     );
   });
 
   it("names the deciding meld even when the winning team has only one", () => {
-    // A single meld can still have beaten the other team's — the count never
-    // decided this, the comparison did.
     const contestedSingle: DeclarationsResolvedPayload = {
       winnerTeam: 1,
       contested: true,

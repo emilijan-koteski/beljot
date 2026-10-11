@@ -154,8 +154,6 @@ describe("useReconnectionRedirect", () => {
 
     renderHook(() => useReconnectionRedirect(), { wrapper });
 
-    // From the lobby the redirect PUSHES so the stack becomes [lobby, match]
-    // and a later return to the lobby can pop back to the live entry.
     expect(mockNavigate).toHaveBeenCalledWith("/match/42", { replace: false });
   });
 
@@ -168,8 +166,6 @@ describe("useReconnectionRedirect", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/match/42", { replace: true });
   });
 
-  // The first match_state can beat the room / quick-play page's own redirect;
-  // arriving that way is still the match starting, so the flag rides along.
   it.each(["/matchmaking/42", "/rooms/42"])(
     "carries the arrival flag when the match starts under %s",
     (path) => {
@@ -209,12 +205,6 @@ describe("useReconnectionRedirect", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  // Story 8.5-1 AC6 (D66): regression coverage. Before the fix, a 401 on a
-  // finished match → refresh-fail → authStore.logout left matchStore.matchState
-  // populated, and on the next login this hook would redirect the freshly
-  // re-logged-in user to the (no-longer-existing) /game/{roomId}. The fix is
-  // store-level: authStore.logout() now wipes matchStore. After logout, this
-  // hook MUST observe a clean store and NOT navigate.
   it("does not redirect after logout (D66 regression)", () => {
     useMatchStore.setState({ matchState: minimalMatchState, roomId: 42 });
     useAuthStore.setState({ token: "expired", user: null, isLoading: false });

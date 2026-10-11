@@ -13,21 +13,16 @@ import {
 
 interface UnlinkAccountDialogProps {
   open: boolean;
-  /** Human-readable provider label (e.g. "Google") shown in the prompt. */
   providerLabel: string;
-  /** Linked account email, shown so the user knows exactly what is removed. */
   email: string;
-  /** True while the unlink request is in flight (locks dismissal + confirm). */
   pending: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
 
 /**
- * Confirmation shown before unlinking an SSO provider from the profile. Purely
- * a confirm step — no password, since the JWT already authenticates the
- * request. Modeled on LinkAccountDialog: not dismissable while the request is
- * in flight, so an in-flight unlink can't be silently abandoned.
+ * Confirmation shown before unlinking an SSO provider from the profile.
+ * Not dismissable while the request is in flight.
  */
 export function UnlinkAccountDialog({
   open,

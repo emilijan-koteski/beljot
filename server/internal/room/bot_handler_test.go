@@ -14,8 +14,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/room"
 )
 
-// --- Request helpers ---
-
 func doAddBot(e *echo.Echo, id string, body string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/bots", strings.NewReader(body))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -81,8 +79,6 @@ func seedOwnerRoom(t *testing.T, repo *mockRoomRepo) *room.Room {
 	return r
 }
 
-// --- AddBot ---
-
 func TestAddBot_OwnerSeatsBot(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
 	r := seedOwnerRoom(t, repo)
@@ -104,7 +100,6 @@ func TestAddBot_OwnerSeatsBot(t *testing.T) {
 	require.Len(t, bots, 1)
 	assert.Equal(t, 2, bots[0].Seat)
 
-	// system:bot_added to room members, then a lobby-wide room_updated snapshot.
 	require.NotEmpty(t, broadcaster.calls)
 	assert.Equal(t, "system:bot_added", msgTypeOf(t, broadcaster.calls[0].msg))
 	require.Len(t, broadcaster.allCalls, 1)
@@ -187,8 +182,6 @@ func TestAddBot_InvalidSeat(t *testing.T) {
 	}
 }
 
-// --- RemoveBot ---
-
 func TestRemoveBot_FreesSeat(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
 	r := seedOwnerRoom(t, repo)
@@ -207,7 +200,6 @@ func TestRemoveBot_FreesSeat(t *testing.T) {
 	require.NotEmpty(t, broadcaster.calls)
 	assert.Equal(t, "system:bot_removed", msgTypeOf(t, broadcaster.calls[0].msg))
 
-	// The freed seat is takeable again.
 	require.Equal(t, http.StatusCreated, doAddBot(e, "1", `{"seat": 2}`, validToken(100)).Code)
 }
 
@@ -231,8 +223,6 @@ func TestRemoveBot_NonOwnerRejected(t *testing.T) {
 	assert.Equal(t, "NOT_ROOM_OWNER", errCodeOf(t, rec))
 }
 
-// --- SelectSeat onto a bot seat ---
-
 func TestSelectSeat_BotSeatReadsAsTaken(t *testing.T) {
 	e, repo, _ := setupTestWithBroadcast()
 	r := seedOwnerRoom(t, repo)
@@ -244,8 +234,6 @@ func TestSelectSeat_BotSeatReadsAsTaken(t *testing.T) {
 	assert.Equal(t, "SEAT_TAKEN", errCodeOf(t, rec))
 }
 
-// --- SwapSeats with bots ---
-
 func TestSwapSeats_HumanWithBot(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
 	r := seedOwnerRoom(t, repo)
@@ -253,11 +241,9 @@ func TestSwapSeats_HumanWithBot(t *testing.T) {
 	broadcaster.calls = nil
 	broadcaster.allCalls = nil
 
-	// Owner (human, seat 0) swaps with the bot on seat 1.
 	rec := doSwapSeats(e, "1", `{"seatA": 0, "seatB": 1}`, validToken(100))
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// Human moved 0 → 1 (team B), bot moved 1 → 0 (team A).
 	humans, _ := repo.FindPlayersByRoomID(r.ID)
 	require.Len(t, humans, 1)
 	require.NotNil(t, humans[0].Seat)
@@ -268,7 +254,6 @@ func TestSwapSeats_HumanWithBot(t *testing.T) {
 	require.Len(t, bots, 1)
 	assert.Equal(t, 0, bots[0].Seat)
 
-	// Event sequence: seat_updated (human), bot_removed{1}, bot_added{0}.
 	require.Len(t, broadcaster.calls, 3)
 	assert.Equal(t, "system:seat_updated", msgTypeOf(t, broadcaster.calls[0].msg))
 	assert.Equal(t, "system:bot_removed", msgTypeOf(t, broadcaster.calls[1].msg))
@@ -308,12 +293,10 @@ func TestSwapSeats_BotToEmptySeat(t *testing.T) {
 	require.Len(t, bots, 1)
 	assert.Equal(t, 3, bots[0].Seat)
 
-	// No human moved: bot_removed{1} + bot_added{3} only, then snapshot.
 	require.Len(t, broadcaster.calls, 2)
 	assert.Equal(t, "system:bot_removed", msgTypeOf(t, broadcaster.calls[0].msg))
 	assert.Equal(t, "system:bot_added", msgTypeOf(t, broadcaster.calls[1].msg))
 
-	// Bot name follows the seat: the response carries the bot at seat 3.
 	assert.NotNil(t, botAtSeat(playersOf(t, rec), 3))
 }
 
@@ -328,7 +311,6 @@ func TestSwapSeats_BotWithBot_NoOp(t *testing.T) {
 	rec := doSwapSeats(e, "1", `{"seatA": 1, "seatB": 2}`, validToken(100))
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// No state change, no broadcasts.
 	bots, _ := repo.FindBotsByRoomID(r.ID)
 	require.Len(t, bots, 2)
 	assert.Equal(t, 1, bots[0].Seat)
@@ -349,8 +331,6 @@ func TestSwapSeats_NonOwnerWithBot(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, rec.Code)
 	assert.Equal(t, "NOT_ROOM_OWNER", errCodeOf(t, rec))
 }
-
-// --- StartMatch with bots ---
 
 func doStartMatch(e *echo.Echo, id string, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rooms/"+id+"/start", nil)
@@ -436,8 +416,6 @@ func TestStartMatch_ThreeHumansOneEmptyStillFails(t *testing.T) {
 	assert.Equal(t, 0, starter.called)
 }
 
-// --- Room lifecycle invariants with bots ---
-
 func TestLeaveRoom_SoleHumanWithBotsClosesRoom(t *testing.T) {
 	e, repo, _ := setupTestWithBroadcast()
 	r := seedOwnerRoom(t, repo)
@@ -454,8 +432,6 @@ func TestLeaveRoom_SoleHumanWithBotsClosesRoom(t *testing.T) {
 	assert.Equal(t, "completed", updated.Status, "bots never keep a room alive")
 	assert.Equal(t, uint(100), updated.OwnerID, "ownership never transfers to a bot")
 }
-
-// --- Payload merging ---
 
 func TestGetRoom_PlayersIncludeBots(t *testing.T) {
 	e, repo, _ := setupTestWithBroadcast()
@@ -480,7 +456,6 @@ func TestGetRoom_PlayersIncludeBots(t *testing.T) {
 	require.NotNil(t, bot.Team)
 	assert.Equal(t, "teamB", *bot.Team)
 
-	// Humans always serialize isBot:false.
 	for _, p := range detail.Players {
 		if p.UserID == 100 {
 			assert.False(t, p.IsBot)
@@ -507,11 +482,9 @@ func TestListRooms_PreviewsIncludeBots(t *testing.T) {
 	require.NotNil(t, botAtSeat(rooms[0].Players, 1))
 }
 
-// --- Capacity invariant: humans + bots never exceed the four seats ---
-
+// Owner + 3 bots: PlayerCount is 1 but every seat is covered, so the room
+// reads full for joiners.
 func TestJoinRoom_BotCoveredSeatsCountTowardCapacity(t *testing.T) {
-	// Owner + 3 bots: PlayerCount is 1 but every seat is covered — a joiner
-	// could never sit, so the room reads full for joiners.
 	e, repo, _ := setupTestWithBroadcast()
 	seedOwnerRoom(t, repo)
 	for _, seat := range []string{`{"seat": 1}`, `{"seat": 2}`, `{"seat": 3}`} {
@@ -523,9 +496,9 @@ func TestJoinRoom_BotCoveredSeatsCountTowardCapacity(t *testing.T) {
 	assert.Equal(t, "ROOM_FULL", errCodeOf(t, rec))
 }
 
+// With the owner seated and one unseated member, a third bot would leave the
+// member permanently unseatable.
 func TestAddBot_RejectedWhenMembersNeedTheSeats(t *testing.T) {
-	// Owner seated + one unseated member: at most two bots fit — a third
-	// would leave the member permanently unseatable in a waiting room.
 	e, repo, _ := setupTestWithBroadcast()
 	r := seedOwnerRoom(t, repo)
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "Guest"}))
@@ -539,10 +512,9 @@ func TestAddBot_RejectedWhenMembersNeedTheSeats(t *testing.T) {
 	assert.Equal(t, "ROOM_FULL", errCodeOf(t, rec))
 }
 
+// Bots cover every seat but an unseated member remains, and starting would
+// strand that member in a match they hold no seat in.
 func TestStartMatch_UnseatedMemberBlocksStart(t *testing.T) {
-	// Owner + 3 bots cover the seats, but an unseated member is still in the
-	// room — starting would strand them in a match they hold no seat in
-	// (no userToRoom entry, no state, no reconnect window).
 	starter := &fakeMatchStarter{}
 	e, repo := setupTestWithStarter(starter, &mockBroadcaster{})
 	r := seedMixedRoom(t, e, repo, 1, 3)
@@ -554,9 +526,9 @@ func TestStartMatch_UnseatedMemberBlocksStart(t *testing.T) {
 	assert.Equal(t, 0, starter.called)
 }
 
+// Ownership is checked before seat range, as in KickPlayer, so a probing
+// non-owner learns nothing about seat shapes.
 func TestAddBot_NonOwnerWithJunkSeatGetsNotRoomOwner(t *testing.T) {
-	// Validation order mirrors KickPlayer: ownership gates before seat-range
-	// validation, so a probing non-owner learns nothing about seat shapes.
 	e, repo, _ := setupTestWithBroadcast()
 	r := seedOwnerRoom(t, repo)
 	require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 200, Username: "Guest"}))

@@ -18,12 +18,6 @@ type Props = {
   counts: FilterCounts;
 };
 
-/**
- * "qualify" sits second, right after the default: for a player under a common
- * bar the honour gate turns from a wall into a shorter list, and filtering the
- * grid is where that explaining belongs — rather than annotating every card with
- * a viewer-specific sentence. It is also where the ejection modal sends people.
- */
 const FILTERS: LobbyFilter[] = ["all", "qualify", "open", "relaxed", "timed"];
 
 export function FilterRail({ search, setSearch, filter, setFilter, sort, setSort, counts }: Props) {
@@ -37,9 +31,6 @@ export function FilterRail({ search, setSearch, filter, setFilter, sort, setSort
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("lobby.search.placeholder")}
           data-testid="room-list-search"
-          // `truncate` (overflow-hidden + nowrap + text-ellipsis) makes the
-          // placeholder ellipsize instead of hard-clipping when the field is
-          // too narrow for it — width-driven, so it adapts to any viewport.
           className="text-ink min-w-0 flex-1 truncate bg-transparent text-sm outline-none placeholder:text-ink-off"
         />
         {search && (

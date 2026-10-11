@@ -7,21 +7,12 @@ import type { Card } from "@/shared/types/matchTypes";
 import { PlayingCard } from "./PlayingCard";
 
 interface DealAnimationProps {
-  /** The face-up candidate, once the deal has turned it over; null before. */
   flippedCandidate: Card | null;
-  /** The deal follows an all-pass: say so, or it reads as a random re-deal. */
   isReshuffle: boolean;
   prefersReducedMotion: boolean;
 }
 
-/**
- * Table-centre layer of a deal in progress. The packets themselves fly in the
- * page's CardFlight overlay and the seats fill as they land (see
- * `useDealController`); this only carries what belongs to the middle of the
- * table: the trump candidate turning face-up at the end of a candidate deal,
- * and the "reshuffling" caption after everyone passed. It is mounted only
- * while a deal runs, and announces it to assistive tech.
- */
+/** Table-centre layer of a running deal: the flipped trump candidate and the reshuffle caption. */
 export function DealAnimation({
   flippedCandidate,
   isReshuffle,

@@ -106,7 +106,6 @@ describe("LastMatchDialog", () => {
     renderDialog();
     await waitFor(() => expect(mockGetRoomLastMatch).toHaveBeenCalledWith(5));
     expect(await screen.findByTestId("match-history-row")).toBeInTheDocument();
-    // Expanded by default — the breakdown is the reason this dialog exists.
     expect(screen.getByTestId("match-history-detail")).toBeInTheDocument();
     expect(screen.getByTestId("match-history-hand-row")).toBeInTheDocument();
   });

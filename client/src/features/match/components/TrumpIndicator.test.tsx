@@ -12,8 +12,6 @@ vi.mock("react-i18next", () => ({
         "team.them": "Them",
         "team.a": "Team A",
         "team.b": "Team B",
-        // Both decks' suit vocabularies, so a name that follows the wrong deck
-        // shows up as the wrong WORD here rather than as a passing test.
         "match.card.suit.french.S": "Spades",
         "match.card.suit.french.H": "Hearts",
         "match.card.suit.french.D": "Diamonds",
@@ -152,7 +150,6 @@ describe("TrumpIndicator", () => {
     expect(screen.getByTestId("trump-caller-team")).toHaveTextContent("Team B");
   });
 
-  // --- Scope Amendment 1: the mark follows the active deck ---
   describe("card deck", () => {
     afterEach(() => {
       useAuthStore.setState({ token: null, user: null, isLoading: false });
@@ -162,7 +159,6 @@ describe("TrumpIndicator", () => {
       useAuthStore.setState({ user: makeUser({ cardDeckPreference: deck }), isLoading: false });
     }
 
-    /** The 44 px parchment suit orb — the indicator's first child div. */
     function orbOf(): HTMLElement {
       const orb = screen.getByTestId("trump-indicator").querySelector("div");
       if (orb === null) throw new Error("suit orb not rendered");
@@ -176,10 +172,6 @@ describe("TrumpIndicator", () => {
       const mark = screen.getByTestId("suit-mark-D");
       expect(mark.tagName).toBe("IMG");
       expect(mark).toHaveAttribute("src", "/suits/croatian/D.webp");
-      // Bells are gold. The orb's border, halo and glow all come off the same
-      // accent, so a red ring here is the exact defect the amendment prevents.
-      // `border` is read off the typed property because jsdom re-serialises hex
-      // as rgb() there; `box-shadow` it leaves alone, so the halo keeps its hex.
       const orb = orbOf();
       expect(orb.style.borderColor).toBe("rgb(201, 162, 60)");
       expect(orb.style.boxShadow).toContain("#c9a23c");
@@ -191,8 +183,6 @@ describe("TrumpIndicator", () => {
       render(<TrumpIndicator trumpSuit="D" />);
 
       const indicator = screen.getByTestId("trump-indicator");
-      // Visible text beside the orb, not just the label — a gold bell captioned
-      // "Diamonds" was the most serious finding of the review round.
       expect(indicator).toHaveTextContent("Bells");
       expect(indicator).not.toHaveTextContent("Diamonds");
       expect(indicator).toHaveAttribute("aria-label", "Trump: Bells");
@@ -222,7 +212,6 @@ describe("TrumpIndicator", () => {
       render(<TrumpIndicator trumpSuit="H" />);
 
       const orb = orbOf();
-      // The #c62828 border plus the red glow's pre-existing 0x77 strength.
       expect(orb.style.borderColor).toBe("rgb(198, 40, 40)");
       expect(orb.style.boxShadow).toContain("#c6282877");
       expect(screen.getByTestId("suit-mark-H")).toHaveTextContent("\u2665");

@@ -15,32 +15,23 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// FriendSummary is one accepted friend of the viewer, already resolved to a
-// username. It is a room-owned DTO on purpose: the adapter that satisfies
-// FriendDirectory does the friend-rows → usernames join, so `room` never imports
-// `friend` and the two packages stay decoupled (same discipline as WalletService
-// / HonorService).
+// FriendSummary is one accepted friend of the viewer, resolved to a username and
+// avatar URL. It is owned by room so that `room` never imports `friend`.
 type FriendSummary struct {
-	UserID   uint
-	Username string
-	// AvatarURL is the friend's derived 128 px avatar URL (nil when none),
-	// resolved by the same adapter that resolves the username.
+	UserID    uint
+	Username  string
 	AvatarURL *string
 }
 
-// FriendDirectory is the subset of the friend domain the invite handler needs
-// (Story 11.5, D5): who are my friends, and is this specific player one of them.
-// Satisfied by an adapter in main.go over friend.Repository + user.UserRepository.
-//
-// Import direction: room → (adapter) → friend. `friend` must never import `room`.
+// FriendDirectory is the subset of the friend domain the invite handler needs.
+// It is satisfied by an adapter in main.go, so `friend` never imports `room`.
 type FriendDirectory interface {
 	AreFriends(a, b uint) (bool, error)
 	ListFriends(userID uint) ([]FriendSummary, error)
 }
 
 // ConnectionTracker reports whether a user holds a live WebSocket connection.
-// Implemented by *ws.Hub. Mirrors lobby.ConnectionTracker — declared here so the
-// invite handler takes a one-method dependency instead of the whole hub.
+// Implemented by *ws.Hub.
 type ConnectionTracker interface {
 	IsConnected(userID uint) bool
 }
@@ -57,30 +48,17 @@ type InviteNotifier interface {
 	SendToUser(userID uint, msg []byte)
 }
 
-// Availability reasons returned by GET /rooms/:id/invitable-friends. An
-// available friend carries the empty string; the client maps the rest to a
-// localized "why not" line under a disabled Invite button.
 const (
-	inviteReasonOffline = "offline"
-	inviteReasonInMatch = "in_match"
-	inviteReasonInRoom  = "in_room"
-	// A friend who is ALREADY SEATED in the room being invited into. Distinct from
-	// inviteReasonInRoom, which means "busy in some other room": both leave the
-	// Invite button disabled, but only one of them is a reason to go looking for
-	// them elsewhere. Reporting "in another room" for someone sitting at this very
-	// table is simply false.
+	inviteReasonOffline     = "offline"
+	inviteReasonInMatch     = "in_match"
+	inviteReasonInRoom      = "in_room"
 	inviteReasonAlreadyHere = "in_this_room"
 	inviteReasonRoomFull    = "room_full"
 )
 
-// InviteHandler serves the two friend-invite endpoints (Story 11.5). It is a
-// separate handler from RoomHandler on purpose: the invite feature needs four
-// dependencies (friends, connections, sessions, notifier) that nothing else in
-// RoomHandler uses, and threading them through its already six-argument
-// constructor would touch every room handler test for no benefit.
-//
-// The InviteRegistry, however, IS shared with RoomHandler — that is the whole
-// point: this handler issues grants, JoinRoom consumes them.
+// InviteHandler serves the friend-invite endpoints, kept apart from RoomHandler to
+// avoid widening its constructor. It shares the InviteRegistry with RoomHandler:
+// this handler issues grants and JoinRoom consumes them.
 type InviteHandler struct {
 	repo        RoomRepository
 	invites     *InviteRegistry
@@ -113,11 +91,8 @@ func NewInviteHandler(
 	}
 }
 
-// InviteToRoomRequest is the body of POST /rooms/:id/invite.
-//
-// It carries the target and NOTHING else. In particular there is no bypass flag
-// of any kind (Story 11.5 D3) — whether the invite grants a password bypass is
-// decided server-side from room.OwnerID == callerID, never from the wire.
+// InviteToRoomRequest is the body of POST /rooms/:id/invite. It deliberately has no
+// bypass flag; the server derives that from the room owner.
 type InviteToRoomRequest struct {
 	FriendUserID uint `json:"friendUserId"`
 }
@@ -132,14 +107,9 @@ type InvitableFriendDTO struct {
 	Reason    string  `json:"reason"`
 }
 
-// ListInvitableFriends handles GET /rooms/:id/invitable-friends (AC1). It returns
-// the caller's accepted friends, each annotated with whether they can be invited
-// right now. Unavailable friends are RETURNED, not filtered out — the panel shows
-// them disabled with a reason, which is far less confusing than a friend silently
-// missing from the list.
-//
-// Availability is server-computed and re-checked at invite time; this endpoint is
-// advisory rendering data, never an authorization.
+// ListInvitableFriends handles GET /rooms/:id/invitable-friends, returning every friend
+// annotated with whether they can be invited now. The result is advisory rendering
+// data; availability is re-checked at invite time.
 func (h *InviteHandler) ListInvitableFriends(c echo.Context) error {
 	callerID, roomID, _, err := h.requireRoomMember(c)
 	if err != nil {
@@ -166,8 +136,6 @@ func (h *InviteHandler) ListInvitableFriends(c echo.Context) error {
 		})
 	}
 
-	// The room itself may already be full; the panel disables every button in
-	// that case rather than letting an invite be sent into a dead end.
 	full, err := h.roomIsFull(roomID)
 	if err != nil {
 		return err
@@ -184,11 +152,9 @@ func (h *InviteHandler) ListInvitableFriends(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": items})
 }
 
-// InviteToRoom handles POST /rooms/:id/invite (AC2). It issues a one-time invite
-// grant and pushes the popup. The gate order is: caller is in a waiting room →
-// target is the caller's friend → target is available. isHostInvite is derived
-// from room.OwnerID, and ONLY a host invite produces a consumable password
-// bypass (AC3/AC4/D2).
+// InviteToRoom handles POST /rooms/:id/invite, issuing a one-time grant and pushing
+// the popup. Only one invite per room and friend may be live, and only the owner's
+// invite carries a password bypass.
 func (h *InviteHandler) InviteToRoom(c echo.Context) error {
 	callerID, roomID, room, err := h.requireRoomMember(c)
 	if err != nil {
@@ -211,8 +177,6 @@ func (h *InviteHandler) InviteToRoom(c echo.Context) error {
 		return apperr.ErrNotFriends
 	}
 
-	// Availability is ALWAYS recomputed here — a client claim that "this friend is
-	// available" is never trusted.
 	reason, err := h.availabilityReason(req.FriendUserID, roomID)
 	if err != nil {
 		return err
@@ -229,11 +193,6 @@ func (h *InviteHandler) InviteToRoom(c echo.Context) error {
 		return apperr.ErrRoomFull
 	}
 
-	// One live invite per (room, friend). This is the throttle: re-issuing on
-	// every POST would let any seated member replace the friend's popup and reset
-	// its clock as fast as they can send requests, and would let a member's
-	// non-host invite silently overwrite the owner's stronger host grant. The
-	// friend answers or the TTL lapses before anyone can invite them again.
 	if h.invites.Pending(roomID, req.FriendUserID) {
 		return apperr.ErrInviteAlreadyPending
 	}
@@ -265,17 +224,9 @@ func (h *InviteHandler) InviteToRoom(c echo.Context) error {
 	})
 }
 
-// DeclineInvite handles POST /rooms/:id/invite/decline. The authenticated caller
-// declines an invite addressed to THEM, which voids the grant immediately rather
-// than leaving it consumable for the rest of its TTL.
-//
-// Note the asymmetry with the other two endpoints: this one is called by the
-// INVITEE, who by definition is not in the room, so it deliberately does not use
-// requireRoomMember. The grant is keyed by (roomID, authenticated userID), so a
-// caller can only ever void their own invite — there is nothing to authorize
-// beyond being logged in, and voiding a grant that does not exist is a harmless
-// no-op. Always 200: an already-expired or already-voided invite is not an error
-// from the declining player's point of view.
+// DeclineInvite handles POST /rooms/:id/invite/decline, voiding the caller's own
+// invite to that room. It skips requireRoomMember because the invitee is not in the
+// room, and it always returns 200.
 func (h *InviteHandler) DeclineInvite(c echo.Context) error {
 	userID, err := auth.GetUserID(c)
 	if err != nil {
@@ -294,14 +245,9 @@ func (h *InviteHandler) DeclineInvite(c echo.Context) error {
 	})
 }
 
-// requireRoomMember resolves the authenticated caller, the :id room, and asserts
-// the room is still `waiting` and the caller is one of its members (owner or
-// seated player alike). Both invite endpoints share it so their guards cannot
-// drift apart.
-//
-// Membership is read from FindPlayersByRoomID rather than FindPlayerRoom because
-// it answers the stronger question directly — "is the caller in THIS room" — and
-// the same rows carry the inviter's username for the push.
+// requireRoomMember resolves the caller and the :id room, requiring a waiting,
+// non-quick-play room the caller belongs to. Quick-play rooms are refused because
+// JoinRoom has no bracket check, so an invite would bypass the bracket.
 func (h *InviteHandler) requireRoomMember(c echo.Context) (uint, uint, *Room, error) {
 	callerID, err := auth.GetUserID(c)
 	if err != nil {
@@ -318,16 +264,9 @@ func (h *InviteHandler) requireRoomMember(c echo.Context) (uint, uint, *Room, er
 	if err != nil {
 		return 0, 0, nil, fmt.Errorf("finding room for invite: %w", err)
 	}
-	// A closed or in-progress room is indistinguishable from a missing one here,
-	// matching JoinRoom's treatment of a non-waiting room.
 	if room == nil || room.Status != "waiting" {
 		return 0, 0, nil, apperr.ErrRoomNotFound
 	}
-	// Quick-play rooms are matchmaking brackets, not social tables: seats are
-	// allocated by the bracket, and JoinRoom has no bracket check (that lives in
-	// QuickJoin), so an invite would seat a friend in a bracket they never
-	// qualified for. AddBot, LeaveSeat and StartMatch all refuse quick-play rooms
-	// the same way.
 	if room.IsQuickPlay {
 		return 0, 0, nil, apperr.ErrRoomNotFound
 	}
@@ -344,15 +283,9 @@ func (h *InviteHandler) requireRoomMember(c echo.Context) (uint, uint, *Room, er
 	return 0, 0, nil, apperr.ErrNotInRoom
 }
 
-// availabilityReason applies the presence trio to one friend and returns the
-// reason they cannot be invited, or "" when they are available.
-//
-// "Available" means online AND not in a match AND not in a room — the same
-// bucketing lobby.GetStats uses, evaluated per user. The in-room probe is
-// FindPlayerRoom (waiting OR playing), which is exactly the predicate JoinRoom's
-// already-in-room gate uses, so the panel can never advertise a friend the join
-// would then reject. A missing tracker is treated as "no signal" rather than
-// "unavailable", mirroring the nil-service affordances elsewhere in this package.
+// availabilityReason returns why a friend cannot be invited, or "" when available.
+// The in-room probe uses JoinRoom's FindPlayerRoom predicate, and a nil tracker
+// counts as no signal.
 func (h *InviteHandler) availabilityReason(friendID, roomID uint) (string, error) {
 	if h.connections != nil && !h.connections.IsConnected(friendID) {
 		return inviteReasonOffline, nil
@@ -365,8 +298,6 @@ func (h *InviteHandler) availabilityReason(friendID, roomID uint) (string, error
 		return "", fmt.Errorf("checking friend room presence: %w", err)
 	}
 	if existing != nil {
-		// Same table → say so. Either way they cannot be invited, but the panel
-		// must not send the host hunting for a friend who is sitting right there.
 		if existing.RoomID == roomID {
 			return inviteReasonAlreadyHere, nil
 		}
@@ -411,10 +342,8 @@ func (h *InviteHandler) usernameInRoom(roomID, userID uint) string {
 	return ""
 }
 
-// pushInvite marshals and delivers the best-effort system:room_invite push.
-// Offline recipients are a silent no-op (SendToUser drops unknown users) — there
-// is no offline inbox, and marshal failures are logged, never returned: a failed
-// notification must not fail the request that issued the grant.
+// pushInvite delivers the best-effort system:room_invite push. Offline recipients
+// and marshal failures are dropped, so a failed notification never fails the request.
 func (h *InviteHandler) pushInvite(recipientID uint, payload ws.RoomInvitePayload) {
 	if h.notifier == nil {
 		return

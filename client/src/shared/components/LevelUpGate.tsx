@@ -3,11 +3,8 @@ import { useLevelUpStore } from "@/shared/stores/levelUpStore";
 import { LevelUpDialog } from "./LevelUpDialog";
 
 /**
- * LevelUpGate renders the post-match level-up dialog whenever a level-up is
- * pending on the levelUpStore. Mount it once in the authenticated shell
- * (AppLayout) alongside DailyRewardGate — because AppLayout does NOT wrap the
- * match route, the celebration only ever appears after the player lands back in
- * the lobby/room. Renders nothing until a level-up is pending.
+ * Renders the level-up dialog whenever a level-up is pending on the levelUpStore.
+ * Mounted in AppLayout, which does not wrap the match route, so it only appears back in the lobby/room.
  */
 export function LevelUpGate() {
   const pending = useLevelUpStore((s) => s.pending);

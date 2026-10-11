@@ -5,10 +5,7 @@ import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { buttonVariants } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 
-// Parchment sticky header for public content pages (Rules) when
-// viewed by a logged-out visitor. Mirrors the app TopBar's chrome but offers
-// sign-in CTAs instead of the authed nav/user menu. The logo links home.
-
+/** Sticky header for public content pages seen by logged-out visitors, with sign-in CTAs instead of the app nav. */
 export function PublicTopBar() {
   const { t } = useTranslation();
   return (
@@ -33,11 +30,6 @@ export function PublicTopBar() {
         >
           {t("landing.nav.login")}
         </Link>
-        {/* Sign-up CTA — hidden on phones, where it overflowed the narrow bar.
-            The Rules body still routes visitors to register; the mobile header
-            just needs the brand, language picker and a way back in (log in).
-            Wrapped in a span (rather than toggling the button's own display)
-            so `hidden` isn't fighting buttonVariants' `inline-flex`. */}
         <span className="hidden sm:inline-flex">
           <Link
             to="/register"

@@ -28,10 +28,8 @@ type IdentityView struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-// LinkedAccountsResponse is the body of GET /users/:id/identities. HasPassword
-// tells the client whether the account can still be signed into without any
-// linked identity — it drives the "cannot unlink your last sign-in method" UX
-// and mirrors the guard the server enforces on unlink.
+// LinkedAccountsResponse is the body of GET /users/:id/identities.
+// HasPassword tells the client whether the account can sign in without any linked identity.
 type LinkedAccountsResponse struct {
 	HasPassword bool           `json:"hasPassword"`
 	Identities  []IdentityView `json:"identities"`
@@ -89,21 +87,13 @@ func (h *AuthHandler) ListIdentities(c echo.Context) error {
 	})
 }
 
-// LinkIdentity handles POST /users/:id/identities/:provider — links a verified
-// SSO identity to the already-authenticated account. No password gate (unlike
-// SSOLink): the JWT proves account ownership and the verified credential proves
-// provider ownership. The provider email is deliberately NOT required to match
-// the account email — this is the "connected accounts" flow, not the
-// login-collision merge.
+// LinkIdentity links a verified SSO identity to the authenticated account, with no password gate.
+// The provider email need not match the account email, unlike the login-collision merge.
 func (h *AuthHandler) LinkIdentity(c echo.Context) error {
 	authUserID, err := authorizeSelf(c)
 	if err != nil {
 		return err
 	}
-	// Match the sibling endpoints' existence check: never create an identity
-	// row for a soft-deleted (or otherwise absent) user — it would orphan the
-	// row and squat the (provider, subject) unique slot for an unreachable
-	// account.
 	u, err := h.userRepo.FindByID(authUserID)
 	if err != nil {
 		return fmt.Errorf("finding user: %w", err)
@@ -145,12 +135,6 @@ func (h *AuthHandler) LinkIdentity(c echo.Context) error {
 	}
 	if err := h.identityRepo.Create(newIdentity); err != nil {
 		if errors.Is(err, apperr.ErrSSOIdentityInUse) {
-			// Idempotency: a retried/double-tapped link conflicts on a row that
-			// already says what we were about to write. If the (provider,
-			// subject) identity already belongs to THIS user, the link exists —
-			// succeed. Any other conflict (subject linked to another account, or
-			// this user already linked a different account for this provider) is
-			// a real 409.
 			existing, findErr := h.identityRepo.FindByProviderSubject(provider.Name(), ext.Subject)
 			if findErr != nil {
 				return fmt.Errorf("re-checking identity: %w", findErr)
@@ -176,12 +160,8 @@ func (h *AuthHandler) LinkIdentity(c echo.Context) error {
 	})
 }
 
-// UnlinkIdentity handles DELETE /users/:id/identities/:provider — removes the
-// authenticated user's linked identity for the given provider. It refuses to
-// remove the account's only remaining sign-in method: a passwordless (SSO-only)
-// account with a single identity would otherwise become unreachable. The
-// :provider is matched directly (not resolved against the registry) so a
-// de-registered provider's stale link can still be removed.
+// UnlinkIdentity removes the user's identity for :provider, refusing to remove the last sign-in method.
+// The provider is not checked against the registry, so stale links of removed providers can be unlinked.
 func (h *AuthHandler) UnlinkIdentity(c echo.Context) error {
 	authUserID, err := authorizeSelf(c)
 	if err != nil {
@@ -211,10 +191,6 @@ func (h *AuthHandler) UnlinkIdentity(c echo.Context) error {
 	if !linked {
 		return apperr.ErrSSOIdentityNotFound
 	}
-	// An account must retain at least one way to sign in. With a unique
-	// (user_id, provider) index there is at most one identity per provider, so
-	// a passwordless account holding a single identity would be locked out by
-	// removing it.
 	if u.PasswordHash == "" && len(idents) <= 1 {
 		return apperr.ErrSSOCannotUnlinkLast
 	}
@@ -224,8 +200,6 @@ func (h *AuthHandler) UnlinkIdentity(c echo.Context) error {
 		return fmt.Errorf("unlinking identity: %w", err)
 	}
 	if deleted == 0 {
-		// Lost a race with a concurrent unlink of the same provider — the end
-		// state (no such link) matches the request, so report it as not-found.
 		return apperr.ErrSSOIdentityNotFound
 	}
 	return c.NoContent(http.StatusNoContent)

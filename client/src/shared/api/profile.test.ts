@@ -4,16 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { axiosClient } from "@/shared/api/axiosClient";
 import { removeAvatar, uploadAvatar } from "@/shared/api/profile";
 
-/**
- * THE REQUEST HALF OF THE AVATAR CONTRACT.
- *
- * Every component test mocks `@/shared/api/profile` outright, so nothing else
- * would notice if the upload lost its multipart override: axios would serialise
- * the FormData as JSON, the server would find no `avatar` part and answer
- * AVATAR_MISSING on every upload, and every suite would stay green. These spy
- * on the one axios seam and pin what goes on the wire against the Go route
- * (PUT/DELETE /users/:id/avatar, multipart field "avatar").
- */
 describe("avatar API request contract", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -43,9 +33,7 @@ describe("avatar API request contract", () => {
     const config = put.mock.calls[0]![2] as AxiosRequestConfig;
     const report = config.onUploadProgress!;
     report({ loaded: 50, total: 200 } as AxiosProgressEvent);
-    // Multipart framing can push `loaded` past the file's own size.
     report({ loaded: 260, total: 200 } as AxiosProgressEvent);
-    // No total (a chunked body) is no progress to report, not a division by zero.
     report({ loaded: 10, total: undefined } as AxiosProgressEvent);
 
     expect(onProgress.mock.calls).toEqual([[0.25], [1]]);

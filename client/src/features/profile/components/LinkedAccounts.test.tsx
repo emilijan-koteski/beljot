@@ -18,8 +18,6 @@ vi.mock("@/shared/api/identities", () => ({
   unlinkIdentity: (...args: unknown[]) => mockUnlinkIdentity(...args),
 }));
 
-// Stub the third-party GIS button with a plain button that emits a credential
-// on click, so the link flow is testable without loading Google's script.
 vi.mock("@/features/auth/components/GoogleSignInButton", () => ({
   GoogleSignInButton: ({ onCredential }: { onCredential: (c: string) => void }) => (
     <button data-testid="mock-google-button" onClick={() => onCredential("test-credential")}>
@@ -122,7 +120,6 @@ describe("LinkedAccounts", () => {
     fireEvent.click(screen.getByTestId("unlink-google-button"));
 
     await waitFor(() => expect(screen.getByTestId("unlink-account-dialog")).toBeInTheDocument());
-    // Footer convention: the destructive action leads, cancel trails.
     expectActionBeforeStatusQuo("unlink-account-confirm", "unlink-account-cancel");
     fireEvent.click(screen.getByTestId("unlink-account-confirm"));
 

@@ -1,15 +1,12 @@
 import { useEffect, useRef } from "react";
 
 interface UseFocusTrapOptions {
-  // When provided, pressing Escape inside the trapped container invokes the
-  // callback. Opt-in — legacy callers that omit it keep their previous
-  // behaviour (no Escape handling).
   onEscape?: () => void;
 }
 
 /**
- * Traps focus within a container element and restores focus to the
- * previously focused element when the container unmounts.
+ * Traps focus within a container and restores the previous focus on unmount.
+ * Escape calls `onEscape` when provided and is otherwise left alone.
  */
 export function useFocusTrap<T extends HTMLElement>(opts?: UseFocusTrapOptions) {
   const containerRef = useRef<T>(null);
@@ -53,7 +50,6 @@ export function useFocusTrap<T extends HTMLElement>(opts?: UseFocusTrapOptions) 
       }
     }
 
-    // Focus first focusable element
     const firstFocusable = container.querySelector<HTMLElement>(focusableSelector);
     firstFocusable?.focus();
 
@@ -61,7 +57,6 @@ export function useFocusTrap<T extends HTMLElement>(opts?: UseFocusTrapOptions) 
 
     return () => {
       container.removeEventListener("keydown", handleKeyDown);
-      // Restore previous focus
       if (previousActiveElement.current instanceof HTMLElement) {
         previousActiveElement.current.focus();
       }

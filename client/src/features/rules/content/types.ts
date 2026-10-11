@@ -1,10 +1,3 @@
-// Beljot · Rules content — shared types.
-//
-// The standalone Rules page (and, later, the in-game Rules overlay) render
-// from this typed content. Numeric facts (point values, strength, declaration
-// tiers) live in `shared.ts` ONCE; only the human-readable strings vary by
-// locale. A parity test asserts the four locales never drift in structure.
-
 import type { HonorTier } from "@/shared/lib/honor";
 import type { Variant } from "@/shared/types/matchTypes";
 
@@ -12,13 +5,13 @@ export type Rank = "7" | "8" | "9" | "10" | "J" | "Q" | "K" | "A";
 
 export type RulesLang = "en" | "mk" | "hr" | "sr";
 
-// One row of a card-value ladder, in strength order (1 = strongest).
+/** One row of a card-value ladder, in strength order (1 = strongest). */
 export type CardRow = {
   rank: Rank;
-  name: string; // localized
+  name: string;
   pts: number;
   strength: number;
-  note: string; // localized; "" when none
+  note: string;
 };
 
 export type DeclarationKind = "belot" | "run" | "set";
@@ -26,49 +19,29 @@ export type DeclarationKind = "belot" | "run" | "set";
 export type Declaration = {
   id: string;
   pts: number;
-  tier: 0 | 1 | 2 | 3; // visual grouping: small / mid / jackpot / match-winner
+  tier: 0 | 1 | 2 | 3;
   kind: DeclarationKind;
-  name: string; // localized
-  summary: string; // localized
-  detail: string; // localized
+  name: string;
+  summary: string;
+  detail: string;
 };
 
-// Variant scoping, carried by every block kind AND by individual step items.
-//
-// Most of the rules are identical in both variants, so the default — no
-// `variant` — means "renders under both tabs". Only a genuinely divergent piece
-// names one, and it renders only while that variant's tab is active. Whole
-// chapters are never duplicated: the visible diff between the two tabs IS the
-// divergence list.
-//
-// `otherVariantNote` is authored prose, not a derived badge — a marker that
-// says "this differs" tells a player nothing; the useful sentence is what the
-// OTHER variant does. It lives beside the thing it annotates so it is
-// translated with it.
+/**
+ * Variant scoping for a block or step item; no `variant` means it renders under both tabs.
+ * `otherVariantNote` is authored prose describing what the other variant does.
+ */
 export type VariantScope = {
   variant?: Variant;
   otherVariantNote?: string;
 };
 
-// One numbered step. Scoping lives at the ITEM level here, not just the block
-// level, because a deal-and-bid sequence diverges step by step: "take your seat"
-// and "build the deck" are word-for-word identical in both variants, while the
-// four steps after them differ. Scoping the whole block instead would author the
-// shared two twice per locale (eight duplicate strings the epic's audit forbids)
-// and give the reader ONE marker for the entire sequence, hiding exactly where
-// the rules part company.
-//
-// Renderers filter items by the active variant and number what SURVIVES, so both
-// tabs show a gapless 01..06.
+/** One numbered step, scoped per item because deal-and-bid sequences diverge step by step. */
 export type StepItem = VariantScope & { t: string; d: string };
 
-// One honour tier line: the token picks the name (from the shared i18n tier
-// keys) and colour (HONOR_TIER_COLOR) at render time; only the sentence tail
-// is authored per locale. The score range is derived from HONOR_TIER_BANDS,
-// so a tier retune never leaves stale numbers in four content files.
+/** One honour tier line; name, colour and score range derive from the tier token at render time. */
 export type TierItem = { tier: HonorTier; d: string };
 
-// A content block inside a chapter. The prototype's unused `split` is omitted.
+/** A content block inside a chapter. */
 export type RuleBlock =
   | (VariantScope & { kind: "p"; text: string })
   | (VariantScope & { kind: "rule"; title: string; text: string })
@@ -88,7 +61,7 @@ export type RuleSection = {
 
 export type Fact = { label: string; value: string; caption: string };
 
-// Chrome / label strings. `ov*` are reserved for the future in-game overlay.
+/** Chrome and label strings; `ov*` are reserved for the future in-game overlay. */
 export type RulesUi = {
   heroEyebrow: string;
   heroTitle: string;
@@ -99,9 +72,6 @@ export type RulesUi = {
   footerBody: string;
   footerCta: string;
   noteLabel: string;
-  // Chrome for the variant split: the eyebrow above the tab bar (tab labels
-  // themselves come from `variantLabel`, not from here) and the accessible
-  // name of the per-block difference marker.
   variantLabel: string;
   diffLabel: string;
   pts: string;
@@ -120,7 +90,7 @@ export type RulesUi = {
   ovClose: string;
 };
 
-// Per-locale source: strings only. Numbers are merged in from `shared.ts`.
+/** Per-locale source strings; numbers are merged in from `shared.ts`. */
 export type RulesLangData = {
   cardNames: Record<Rank, string>;
   trumpNotes: Partial<Record<Rank, string>>;
@@ -130,7 +100,7 @@ export type RulesLangData = {
   ui: RulesUi;
 };
 
-// Assembled, render-ready content for one locale.
+/** Assembled, render-ready content for one locale. */
 export type RulesContent = {
   cardsTrump: CardRow[];
   cardsPlain: CardRow[];

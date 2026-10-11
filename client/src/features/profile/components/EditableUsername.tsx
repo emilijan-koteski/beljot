@@ -18,27 +18,16 @@ import {
 
 type EditableUsernameProps = {
   username: string;
-  /** Undefined when there is no authenticated self context — editing is hidden. */
   userId: number | undefined;
-  /** When the username was last changed; drives the cooldown gate. */
   usernameChangedAt?: string | null;
 };
 
-// Matches the static hero title previously rendered inline by IdentityHero, so
-// swapping in the editable version leaves the visual identity unchanged.
-// min-w-0 + overflow-wrap let a long unbroken username (up to 20 chars) wrap
-// onto a second line instead of overflowing the hero and pushing the edit
-// pencil out of view on phones.
 const TITLE_CLASS =
   "text-ink font-display m-0 min-w-0 [overflow-wrap:anywhere] text-[clamp(32px,6vw,48px)] leading-[1.05] font-bold tracking-[-1.2px]";
 
 /**
- * The profile identity title with edit-in-place. Display mode shows the
- * username with a pencil; clicking swaps to an input with confirm/cancel
- * (Enter saves, Escape cancels). Client-side validation mirrors the server for
- * instant feedback, but the server stays authoritative — a rejected change
- * surfaces its error inline. On success the mutation updates both the profile
- * cache and the auth store, so the header refreshes without a reload.
+ * Profile username title with edit-in-place: Enter saves, Escape cancels.
+ * Client validation gives instant feedback; the server stays authoritative and errors show inline.
  */
 export function EditableUsername({ username, userId, usernameChangedAt }: EditableUsernameProps) {
   const { t } = useTranslation();
@@ -68,8 +57,6 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
       case "USERNAME_UNCHANGED":
         return t("profile.editUsername.errors.unchanged");
       case "USERNAME_CHANGE_TOO_SOON":
-        // Only show a concrete date when we actually know the last-change time;
-        // otherwise a generic message beats fabricating "try again on <today>".
         return availableAt
           ? t("profile.editUsername.errors.tooSoon", {
               date: formatLocalizedDate(availableAt.toISOString(), t, "long"),
@@ -93,8 +80,6 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
 
   function submit() {
     const trimmed = draft.trim();
-    // Submitting the unchanged name is a no-op — just close, never call the API
-    // (which would reject it and, worse, could be read as consuming a change).
     if (trimmed === username) {
       cancelEdit();
       return;

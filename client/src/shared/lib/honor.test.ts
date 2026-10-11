@@ -42,9 +42,6 @@ describe("honorTierForScore", () => {
   });
 
   it("falls back to the prior's band for an absent score, not the worst band", () => {
-    // Regression: an unguarded undefined produced NaN, every floor comparison
-    // went false, and the loop fell through to "problematic" — a blank number in
-    // danger red. A missing score must read as the neutral prior instead.
     expect(honorTierForScore(undefined as unknown as number)).toBe("fair");
     expect(honorTierForScore(NaN)).toBe("fair");
   });
@@ -52,8 +49,6 @@ describe("honorTierForScore", () => {
 
 describe("honorScoreOrPrior", () => {
   it("passes real scores through, including a genuine zero", () => {
-    // 0 is a REAL score from Go ("problematic"), not a missing value. A
-    // truthiness check here would silently rewrite it to 80.
     expect(honorScoreOrPrior(0)).toBe(0);
     expect(honorScoreOrPrior(1)).toBe(1);
     expect(honorScoreOrPrior(96)).toBe(96);
@@ -71,7 +66,6 @@ describe("honorCountOrZero", () => {
   it("passes real counts through, including zero and negatives", () => {
     expect(honorCountOrZero(0)).toBe(0);
     expect(honorCountOrZero(41)).toBe(41);
-    // A trend delta is legitimately signed.
     expect(honorCountOrZero(-3)).toBe(-3);
   });
 
@@ -89,10 +83,6 @@ describe("honorIsNewPlayer", () => {
   });
 
   it("defaults to SUPPRESSED when absent", () => {
-    // Unguarded, `undefined` was falsy and took the numeric branch, so a server
-    // without the honor fields showed a confident 80/"Fair" for every account —
-    // including the newcomers the flag exists to suppress. Hiding is the
-    // conservative default when we cannot tell.
     expect(honorIsNewPlayer(undefined)).toBe(true);
     expect(honorIsNewPlayer(null)).toBe(true);
   });
@@ -106,8 +96,6 @@ describe("normalizeHonorTier", () => {
   });
 
   it("falls back to the score's own band for an unknown token", () => {
-    // Version skew: a newer server ships a tier this bundle has never heard of.
-    // It must colour by score rather than render a missing i18n key.
     expect(normalizeHonorTier("legendary", 97)).toBe("exemplary");
     expect(normalizeHonorTier("", 30)).toBe("problematic");
   });

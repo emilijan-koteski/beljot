@@ -25,19 +25,15 @@ export function useUpdatePreferencesMutation(userId: number) {
   });
 }
 
+/** Rename the user, patching both the profile cache and the auth store so the page and the TopBar update without a refetch. */
 export function useUpdateUsernameMutation(userId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (req: UpdateUsernameRequest) => updateUsername(userId, req),
     onSuccess: (data) => {
-      // Patch the profile cache so the page reflects the new name + cooldown
-      // stamp without a refetch.
       queryClient.setQueryData<ProfileResponse>(queryKeys.profile.detail(userId), (old) =>
         old ? { ...old, username: data.username, usernameChangedAt: data.usernameChangedAt } : old,
       );
-      // The username also lives on the auth store, which drives the TopBar
-      // (avatar initial, nav pill, "signed in as"). Update it there too or the
-      // header goes stale until the next refresh-token cycle.
       const user = useAuthStore.getState().user;
       if (user && user.id === userId) {
         useAuthStore.getState().setUser({ ...user, username: data.username });
@@ -47,11 +43,8 @@ export function useUpdateUsernameMutation(userId: number) {
 }
 
 /**
- * Adopt a new avatar (or its removal) everywhere the viewer's own picture is
- * already on screen, without a refetch: the profile cache (both sizes, so the
- * hero swaps at once) and the auth store (the 128 image, which drives the nav
- * pill). The viewer's public-profile entry, if one was ever cached, is simply
- * invalidated.
+ * Apply a new or removed avatar to the profile cache and the auth store without a refetch.
+ * The viewer's cached public-profile entry is invalidated instead.
  */
 function adoptAvatar(
   queryClient: QueryClient,
@@ -69,9 +62,9 @@ function adoptAvatar(
   queryClient.invalidateQueries({ queryKey: queryKeys.publicProfile.detail(userId) });
 }
 
+/** Avatar upload input; onProgress receives the sent fraction from 0 to 1. */
 export interface UploadAvatarVariables {
   file: File;
-  /** Sent fraction of the upload, 0 to 1, for the progress bar. */
   onProgress?: (fraction: number) => void;
 }
 

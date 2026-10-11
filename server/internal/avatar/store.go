@@ -1,6 +1,3 @@
-// Package avatar serves user avatar uploads: it validates and re-encodes the
-// image once, writes two immutable WebP derivatives to the public bucket, and
-// records their shared prefix on the user row.
 package avatar
 
 import (
@@ -19,21 +16,13 @@ import (
 // Store is the object-store slice the avatar handler needs. The S3
 // implementation below talks to Garage; tests inject an in-memory fake.
 type Store interface {
-	// Put writes one object. The object is public by virtue of the bucket's
-	// website mode, so no ACL is sent.
 	Put(ctx context.Context, key, contentType, cacheControl string, body []byte) error
-	// Delete removes every listed key. Deleting a key that does not exist is
-	// not an error (S3 semantics).
 	Delete(ctx context.Context, keys ...string) error
 }
 
-// storeCallTimeout bounds every single S3 call, so a hung object store can
-// hold a request for at most this long per call.
 const storeCallTimeout = 15 * time.Second
 
-// S3Config is the connection data for NewS3Store, taken from the six
-// BELJOT_S3_* / BELJOT_PUBLIC_ASSETS_URL variables (the public URL is not
-// needed to write, only to derive read URLs).
+// S3Config is the connection data for NewS3Store, taken from the BELJOT_S3_* variables.
 type S3Config struct {
 	Endpoint  string
 	Region    string
@@ -49,18 +38,14 @@ type S3Store struct {
 	bucket string
 }
 
-// NewS3Store builds the client from static credentials only. Shared AWS
-// config and credential files are ignored on purpose, so nothing on the host
-// can redirect or re-authenticate the writes.
+// NewS3Store builds the client from static credentials only, ignoring shared AWS config files.
+// Checksums are sent only where S3 requires them, since not every S3-compatible store accepts a CRC32 trailer.
 func NewS3Store(ctx context.Context, cfg S3Config) (*S3Store, error) {
 	awsCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(cfg.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, "")),
 		config.WithSharedConfigFiles([]string{}),
 		config.WithSharedCredentialsFiles([]string{}),
-		// Checksums only where the S3 API requires them: the SDK's default
-		// (a CRC32 trailer on every upload) is not something every
-		// S3-compatible store accepts, and the payload is already signed.
 		config.WithRequestChecksumCalculation(aws.RequestChecksumCalculationWhenRequired),
 		config.WithResponseChecksumValidation(aws.ResponseChecksumValidationWhenRequired),
 	)
@@ -92,10 +77,8 @@ func (s *S3Store) Put(ctx context.Context, key, contentType, cacheControl string
 	return nil
 }
 
-// Delete implements Store. One DeleteObject per key, each under its own
-// timeout: there are only ever two keys, and a per-key call avoids the
-// Content-MD5 requirement of the batch API. Every key is attempted even when
-// an earlier one fails; the failures are joined.
+// Delete implements Store with one DeleteObject per key, avoiding the batch API's Content-MD5 requirement.
+// Every key is attempted and the failures are joined.
 func (s *S3Store) Delete(ctx context.Context, keys ...string) error {
 	var errs []error
 	for _, key := range keys {

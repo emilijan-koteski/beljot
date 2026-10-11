@@ -6,7 +6,6 @@ type Props = {
   icon: ReactNode;
   label: string;
   value: string | number;
-  /** "accent" highlights the pill (used for the "playing" stat). */
   tone?: "neutral" | "accent";
   testId?: string;
 };

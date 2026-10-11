@@ -16,14 +16,8 @@ const MONTH_KEYS = [
 ] as const;
 
 /**
- * Format an ISO date string using i18n month names + a locale-specific format
- * template. Independent of the runtime's Intl/CLDR coverage so MK and HR
- * display correctly even in environments whose Intl data silently falls back
- * to en-US for those locales (observed on some Windows browser builds).
- *
- * Returns "" if `iso` cannot be parsed; callers gate display with a truthy
- * check ({formattedDate && <p>…</p>}), matching the behaviour of the
- * try/catch'd Intl.DateTimeFormat path this helper replaced.
+ * Formats an ISO date with i18n month names and a locale template, avoiding Intl
+ * gaps for MK and HR. Returns "" if `iso` cannot be parsed.
  */
 export function formatLocalizedDate(
   iso: string,
@@ -41,13 +35,7 @@ export function formatLocalizedDate(
   });
 }
 
-/**
- * 24-hour HH:MM for an ISO timestamp, locale-neutral (matches the match-row
- * clock in the design). Returns "" for an unparseable input.
- *
- * Shared rather than profile-local because the match-stats card that renders it
- * is mounted from the profile, the room lobby, and the end-of-match dialog.
- */
+/** Locale-neutral 24-hour HH:MM for an ISO timestamp. Returns "" for an unparseable input. */
 export function formatClockTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";

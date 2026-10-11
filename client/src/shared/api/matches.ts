@@ -7,15 +7,11 @@ export type MatchOutcome = "win" | "loss" | "abandoned";
  *  "ended early" marker in history, with distinct wording per reason. */
 export type MatchEndReason = "natural" | "surrender" | "abandonment";
 
+/** A seat in a match; bot seats have userId 0, so detect them with `isBot === true`. */
 export interface MatchPlayer {
   seat: number;
-  // Bot seats arrive as {userId: 0, username: "", isBot: true} — check with
-  // `isBot === true` (explicit comparison, never truthiness on userId) and
-  // render the localized seat-derived bot name.
   userId: number;
   username: string;
-  // The participant's 128 px avatar as it is NOW (not at match time); null for
-  // bots and players without one.
   avatarUrl: string | null;
   isBot: boolean;
 }
@@ -37,6 +33,10 @@ export interface MatchHandView {
   teamBHandTotal: number;
 }
 
+/**
+ * A viewer-relative match history row. Optional fields may be absent from older servers,
+ * so compare them explicitly rather than by truthiness.
+ */
 export interface MatchListItem {
   id: number;
   variant: Variant;
@@ -47,19 +47,11 @@ export interface MatchListItem {
   winnerTeam: number;
   teamAScore: number;
   teamBScore: number;
-  /** True when at least one seat was a bot (Story 10.3) — history rows show a marker. */
   hasBots: boolean;
   abandonedBy?: number;
   viewerSeat: number;
   outcome: MatchOutcome;
-  /** Optional: an older server (or a cached response) may not send it —
-   *  consumers must treat a missing value as "no early-end marker". */
   endReason?: MatchEndReason;
-  /** The two per-room RULE flags this match was played under (migration 000023).
-   *  Recorded on the match, not read back from the room: a room is reusable and
-   *  its settings can change between matches. Optional because a response from a
-   *  server predating the columns omits them — compare `=== false` /
-   *  `=== true`, never truthiness, so an absent value never asserts a rule. */
   declarationsEnabled?: boolean;
   stopAtTarget?: boolean;
   players: MatchPlayer[];
@@ -91,20 +83,11 @@ export function getUserMatches(
   { outcome = "all", sort = "new" }: MatchListParams = {},
 ): Promise<MatchesListResponse> {
   return axiosClient.get(`/users/${userId}/matches`, {
-    // "all" is the server default, so it is omitted to keep the URL clean.
     params: { limit, offset, outcome: outcome === "all" ? undefined : outcome, sort },
   });
 }
 
-/**
- * The most recent match played in a room, in the same viewer-relative shape as
- * the profile's history rows (the response is a bare MatchListItem, not the
- * paginated envelope — there is deliberately no room match HISTORY).
- *
- * 404s when the room never hosted a match OR when the caller did not play the
- * one it hosted: participation is the server's authorization gate, and the two
- * cases are indistinguishable on purpose.
- */
+/** The most recent match in a room that the caller played; 404s otherwise. */
 export function getRoomLastMatch(roomId: number): Promise<MatchListItem> {
   return axiosClient.get(`/rooms/${roomId}/last-match`);
 }

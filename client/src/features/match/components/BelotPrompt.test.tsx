@@ -67,7 +67,6 @@ describe("BelotPrompt", () => {
     );
     const ring = screen.getByTestId("button-timer-ring");
     expect(ring).toBeInTheDocument();
-    // Auto-action target on expiry is Decline, so the ring must wrap it.
     expect(ring.querySelector('[data-testid="belot-prompt-decline"]')).toBeInTheDocument();
   });
 
@@ -139,9 +138,6 @@ describe("BelotPrompt", () => {
       act(() => {
         vi.advanceTimersByTime(6000);
       });
-      // Client never fires the action — the server runs its own per-move
-      // timer and pushes auto-skip state, dismissing this prompt. A client
-      // onExpire would race the server and surface a wrong-phase error toast.
       expect(onDecline).not.toHaveBeenCalled();
     });
   });

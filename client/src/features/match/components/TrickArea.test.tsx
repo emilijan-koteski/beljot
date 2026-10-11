@@ -19,7 +19,6 @@ describe("TrickArea", () => {
     render(<TrickArea trick={[]} winnerSeat={null} myPlayerSeat={0} />);
 
     expect(screen.getByTestId("trick-area")).toBeInTheDocument();
-    // All four compass placeholders present, no cards.
     expect(screen.getByTestId("trick-slot-0")).toBeInTheDocument();
     expect(screen.getByTestId("trick-slot-1")).toBeInTheDocument();
     expect(screen.getByTestId("trick-slot-2")).toBeInTheDocument();
@@ -47,9 +46,6 @@ describe("TrickArea", () => {
   });
 
   it("shows snapshot cards with winner glow when pendingResolvedTrick is set", () => {
-    // Simulates the post-resolve frame: server has cleared currentTrick to []
-    // but the dispatcher captured the four cards into pendingResolvedTrick so
-    // the collect animation can run.
     render(
       <TrickArea
         trick={[]}
@@ -59,13 +55,11 @@ describe("TrickArea", () => {
       />,
     );
 
-    // All four cards rendered from the snapshot.
     expect(screen.getByTestId("playing-card-KS")).toBeInTheDocument();
     expect(screen.getByTestId("playing-card-7H")).toBeInTheDocument();
     expect(screen.getByTestId("playing-card-AD")).toBeInTheDocument();
     expect(screen.getByTestId("playing-card-9C")).toBeInTheDocument();
 
-    // Winner glow on the partner's compass (seat 2 from viewer seat 0 → north).
     const trickArea = screen.getByTestId("trick-area");
     const glowEl = trickArea.querySelector('[class*="shadow-[0_0_20px_var(--color-accent)]"]');
     expect(glowEl).toBeInTheDocument();
@@ -81,21 +75,13 @@ describe("TrickArea", () => {
       />,
     );
 
-    // Suppressed cards: hidden so the overlay can paint the flight.
     expect(screen.queryByTestId("playing-card-KS")).not.toBeInTheDocument();
     expect(screen.queryByTestId("playing-card-AD")).not.toBeInTheDocument();
-    // Non-suppressed cards still render at their slots.
     expect(screen.getByTestId("playing-card-7H")).toBeInTheDocument();
     expect(screen.getByTestId("playing-card-9C")).toBeInTheDocument();
   });
 
   it("renders the union of snapshot and live trick while the collect window is open", () => {
-    // Reproduces the vanish-and-pop bug seen in live play: the next trick's
-    // lead arrives while pendingResolvedTrick still owns the display. When the
-    // lead's throw flight completes (cardId leaves suppressedCardIds), the
-    // card must paint statically — with snapshot-exclusive rendering it had no
-    // painter and vanished until the snapshot cleared, then popped back in
-    // with no animation.
     render(
       <TrickArea
         trick={[{ card: { rank: "T", suit: "S" }, playerSeat: 1 }]}
@@ -105,15 +91,11 @@ describe("TrickArea", () => {
       />,
     );
 
-    // Snapshot cards still shown (they own the glow + collect sweep)...
     expect(screen.getByTestId("playing-card-KS")).toBeInTheDocument();
-    // ...AND the next trick's landed lead is painted, not masked.
     expect(screen.getByTestId("playing-card-TS")).toBeInTheDocument();
   });
 
   it("scopes the winner glow to the snapshot card, not a next-trick card at the same compass", () => {
-    // The next trick's leader IS the previous trick's winner, so the new lead
-    // lands at the winner's compass. The glow must stay on the resolved card.
     render(
       <TrickArea
         trick={[{ card: { rank: "T", suit: "S" }, playerSeat: 1 }]}
@@ -130,9 +112,6 @@ describe("TrickArea", () => {
   });
 
   it("suppresses a live card mid-flight without hiding the snapshot card at its compass", () => {
-    // While the new lead is still flying (overlay paints it), its static copy
-    // stays hidden — but the resolving trick's card at the same compass keeps
-    // rendering beneath the flight.
     render(
       <TrickArea
         trick={[{ card: { rank: "T", suit: "S" }, playerSeat: 1 }]}

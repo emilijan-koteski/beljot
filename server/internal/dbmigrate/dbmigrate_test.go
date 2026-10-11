@@ -7,12 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Runs only where a disposable Postgres is available (CI sets the variable;
-// see .github/workflows/ci.yml). CI migrates that database with the
-// golang-migrate CLI before the tests run, so the first Up already finds a
-// schema_migrations table written by the old tool and must accept it as a
-// no-op: exactly the restored-production case. Against an empty database the
-// first Up applies everything and the second is the no-op.
+// TestUpIsIdempotent checks a second Up is a no-op, including on a database the
+// golang-migrate CLI already migrated (as CI does). Needs BELJOT_TEST_DB_URL.
 func TestUpIsIdempotent(t *testing.T) {
 	url := os.Getenv("BELJOT_TEST_DB_URL")
 	if url == "" {

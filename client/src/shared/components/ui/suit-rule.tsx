@@ -1,13 +1,8 @@
 import * as React from "react";
 
 /**
- * ♥ ♠ ♦ ♣ row divider — the in-game DNA dropped onto parchment. Suit glyphs
- * are forced to a serif font with the U+FE0E variation selector so they
- * render as text not emoji (which renders ~1.3× larger and breaks the row).
- *
- * Promoted from features/auth/components/AuthCard.tsx so non-auth callers
- * (Create Room, future surfaces) can use the same divider without an auth
- * import.
+ * Horizontal divider with the four suit glyphs in the middle.
+ * Glyphs carry the U+FE0E text variation selector so they never render as larger emoji.
  */
 export function SuitRule() {
   const glyphStyle: React.CSSProperties = {

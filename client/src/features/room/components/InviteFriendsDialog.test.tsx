@@ -51,7 +51,6 @@ describe("InviteFriendsDialog", () => {
     inviteToRoomSpy.mockReset();
   });
 
-  // AC1: unavailable friends are LISTED, disabled, with a reason — never hidden.
   it("lists every friend and disables the unavailable ones with a reason", async () => {
     listInvitableFriendsSpy.mockResolvedValue(roster);
     renderDialog();
@@ -66,7 +65,6 @@ describe("InviteFriendsDialog", () => {
     expect(screen.getByTestId("invite-friend-reason-201")).toHaveTextContent(/offline/i);
     expect(screen.getByTestId("invite-friend-reason-202")).toBeInTheDocument();
     expect(screen.getByTestId("invite-friend-reason-203")).toBeInTheDocument();
-    // The available friend needs no explanation.
     expect(screen.queryByTestId("invite-friend-reason-200")).not.toBeInTheDocument();
   });
 
@@ -83,9 +81,6 @@ describe("InviteFriendsDialog", () => {
     await waitFor(() => expect(screen.getByTestId("invite-friend-200")).toBeDisabled());
   });
 
-  // Availability is recomputed server-side, so a row can go stale between render
-  // and click. The failure belongs on the row that failed, not in a toast that
-  // loses track of which friend it was about.
   it("reports a stale FRIEND_NOT_AVAILABLE inline on that row", async () => {
     const user = userEvent.setup();
     listInvitableFriendsSpy.mockResolvedValue(roster);
@@ -98,7 +93,6 @@ describe("InviteFriendsDialog", () => {
     await user.click(screen.getByTestId("invite-friend-200"));
 
     expect(await screen.findByTestId("invite-friend-reason-200")).toBeInTheDocument();
-    // Still invitable — the player can retry once their friend frees up.
     expect(screen.getByTestId("invite-friend-200")).toBeEnabled();
   });
 

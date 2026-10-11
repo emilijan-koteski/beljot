@@ -18,18 +18,9 @@ import { PlayingCard } from "./PlayingCard";
 import { SuitMark } from "./SuitMark";
 
 interface TrumpRevealProps {
-  /** Seat index of the player who took the trump. */
   playerSeat: number;
-  /** Local viewer's seat, used to derive viewer-relative team color. When
-   *  null (race during initial mount), the panel renders with a brass glow
-   *  fallback. */
   myPlayerSeat: number | null;
-  /** The originally face-up trump candidate the taker absorbed, or an EMPTY
-   *  string when the variant has no candidate — trump was a bare named suit and
-   *  the taker drew no card. */
   cardId: string;
-  /** The actually-chosen trump suit. Differs from `cardId`'s suit only in
-   *  round-2 free-suit picks; round 1 always has them equal. */
   trumpSuit: Suit;
   players: readonly PlayerState[];
   onComplete: () => void;
@@ -40,16 +31,8 @@ function parseCardId(id: string) {
 }
 
 /**
- * "Trump taken" announcement — the "Wax Seal" panel. The turned-up candidate
- * card is the hero; the *chosen* trump suit is stamped over its corner as an
- * embossed wax seal. One layout serves both rounds: round 1 takes the
- * candidate's suit ("{Suit} is trump this hand"); a round-2 free pick names a
- * different suit ("chose {Suit}" + the candidate that was on the table). A
- * variant with no candidate sends an empty cardId — then the seal stands alone
- * and the copy reads "named {Suit} as trump", because there is no card to show
- * and no suit was turned down. The
- * panel glows in the taker's viewer-relative team color (Gold = Us, Silver =
- * Them) and auto-closes after 8 s — early dismissal via the X-with-countdown.
+ * "Trump taken" wax-seal panel showing the candidate card with the chosen suit stamped on it, or the seal alone when there is no candidate.
+ * Glows in the taker's viewer-relative team color and auto-closes after 8 s.
  */
 export function TrumpReveal({
   playerSeat,
@@ -64,9 +47,6 @@ export function TrumpReveal({
 
   const prefersReducedMotion = useReducedMotion();
 
-  // Hold onComplete in a ref so the AutoCloseRing's callback identity stays
-  // stable — preventing the inner countdown from resetting if the parent
-  // re-renders mid-reveal (e.g. on a stale matchState push).
   const onCompleteRef = useRef(onComplete);
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -78,13 +58,6 @@ export function TrumpReveal({
     onCompleteRef.current();
   };
 
-  // An EMPTY cardId is a legitimate candidate-less take, rendered without a hero
-  // card. Anything else must be exactly a rank character plus a suit character,
-  // checked with the same `isCardId` the WS dispatch uses — a bare length test
-  // would let `"10S"` through and parseCardId would slice it into rank "1",
-  // suit "0" rather than rejecting it. This is defence in depth at the boundary;
-  // dispatch already drops both shapes.
-  // Must sit above the early return below — hooks cannot run conditionally.
   const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
 
   if (!visible || (cardId !== "" && !isCardId(cardId))) {
@@ -95,35 +68,19 @@ export function TrumpReveal({
   const pickerName = playerDisplayName(t, picker ?? null);
   const card = cardId === "" ? null : parseCardId(cardId);
 
-  // Free-pick is detected purely from the wire fields: with a candidate, a
-  // chosen suit that differs from the candidate's means the player named a free
-  // suit. With no candidate at all, every take is a free naming — but there is
-  // no turned-down suit to contrast it against, so it gets its own copy below
-  // rather than the "free pick" eyebrow.
   const isFreePick = card !== null && card.suit !== trumpSuit;
 
-  // Deck-aware, like the seal's mark: a gold bell is announced and captioned
-  // "Bells", never "Diamonds". No English defaultValue — the key set is gated by
-  // the i18n parity test, so a missing leaf is a test failure, not a fallback.
   const suitName = t(suitNameKey(trumpSuit, deck));
   const candidateRankName = card ? t(rankNameKey(card.rank)) : "";
   const candidateSuitName = card ? t(suitNameKey(card.suit, deck)) : "";
 
-  // Viewer-relative team color for the glow, avatar fill, and Us/Them chip.
-  // Falls back to brass when the viewer's seat hasn't resolved yet.
   const team = myPlayerSeat !== null ? seatTeam(playerSeat, myPlayerSeat) : null;
   const teamGradient = team ? teamColors(team) : null;
   const glowColor = teamGradient ? teamGradient[0] : "var(--brass, #c9a876)";
   const teamLabel = team ? t(team === "gold" ? "team.us" : "team.them") : null;
   const avatarTeam = team === "gold" ? "A" : team === "silver" ? "B" : null;
 
-  // Wax-seal ring: the active deck's accent for the chosen suit, so the ring
-  // round a Croatian bell is its gold and not the French red.
   const sealRing = suitAccent(trumpSuit, deck);
-  // The suit word inside the body copy sits on dark felt, not parchment, so it
-  // keeps its own lifted pair rather than reusing the seal accent: `--suit-red`
-  // is unreadable there, which is what `--suit-red-up` exists for. Still not an
-  // H/D test — a per-suit lookup, one entry per deck.
   const chosenColor = suitInkOnFelt(trumpSuit, deck);
 
   const eyebrow = isFreePick
@@ -153,7 +110,6 @@ export function TrumpReveal({
         }}
         data-team={team ?? undefined}
       >
-        {/* close button with countdown ring — top-right */}
         <div className="absolute top-3 right-3 z-3">
           <AutoCloseRing
             duration={prefersReducedMotion ? 1.5 : 8}
@@ -163,7 +119,6 @@ export function TrumpReveal({
           />
         </div>
 
-        {/* eyebrow — padded clear of the close button */}
         <div
           className="text-[9.5px] uppercase tracking-[0.22em]"
           style={{
@@ -177,9 +132,6 @@ export function TrumpReveal({
           {eyebrow}
         </div>
 
-        {/* hero candidate card + chosen-trump wax seal. With no candidate the
-            seal is the hero on its own — centred in the flow instead of pinned
-            to a card's corner. */}
         <div className="relative mb-4.5 inline-block">
           {card && (
             <>
@@ -206,10 +158,6 @@ export function TrumpReveal({
               borderRadius: "50%",
               background: "radial-gradient(circle at 38% 30%, #fffdf6, #efe4c8 68%, #ddcca2)",
               border: `2.5px solid ${sealRing}`,
-              // With a card, the team-coloured halo sits behind the card and the
-              // seal is pinned to its corner. Without one the seal IS the hero,
-              // so it carries the halo itself — otherwise it reads as an
-              // unglowing stamp inside a panel that still glows.
               boxShadow: card
                 ? "0 6px 14px rgba(0,0,0,0.5), inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)"
                 : `0 6px 14px rgba(0,0,0,0.5), 0 0 32px ${glowColor}66, 0 0 0 6px ${glowColor}22, inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)`,
@@ -222,15 +170,12 @@ export function TrumpReveal({
               suit={trumpSuit}
               deck={deck}
               size={30}
-              // `shadow`, not style.textShadow: the icon branch needs
-              // `drop-shadow` for the same effect, and SuitMark owns that split.
               shadow="0 1px 1px rgba(0,0,0,0.25)"
               style={{ fontFamily: "var(--font-suit)" }}
             />
           </div>
         </div>
 
-        {/* taker */}
         <div
           className="flex items-center justify-center gap-2"
           style={{ fontFamily: "var(--font-body)", fontSize: 20, fontWeight: 600 }}
@@ -253,7 +198,6 @@ export function TrumpReveal({
           )}
         </div>
 
-        {/* what they did — round 1 vs round-2 free pick */}
         <div
           className="mt-1 leading-snug"
           style={{ fontSize: 13, color: "#e8dfc8" }}
@@ -272,7 +216,6 @@ export function TrumpReveal({
           />
         </div>
 
-        {/* candidate that was on the table (round 2 only) */}
         {isFreePick && (
           <div
             className="mt-1"
@@ -286,7 +229,6 @@ export function TrumpReveal({
           </div>
         )}
 
-        {/* team chip */}
         {team && teamLabel && (
           <div className="mt-3.5 flex justify-center">
             <span

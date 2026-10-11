@@ -10,12 +10,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/room"
 )
 
-// --- Capability-providing stubs -------------------------------------------------
-//
-// The idle-lobby cadence read type-asserts the hub for ConnectedUserIDs() and
-// the match starter for InMatchUserIDs(). These embed the existing fakes and add
-// exactly those methods so a scheduler test can force the fast/patient decision.
-
 type capabilityStarter struct {
 	*fakeMatchStarter
 	inMatch []uint
@@ -30,8 +24,6 @@ type capabilityHub struct {
 
 func (c *capabilityHub) ConnectedUserIDs() []uint { return c.connected }
 
-// hugeInterval keeps auto-re-armed real timers from ever firing mid-test; ticks
-// are driven manually via TriggerQuickFillTick / InvokeQuickFillTick.
 const hugeInterval = time.Hour
 
 // seedCroatiaQuickPlayRoom creates a waiting croatia/501 quick-play room with the
@@ -66,15 +58,12 @@ func countBots(repo *mockRoomRepo, roomID uint) int {
 	return len(bots)
 }
 
-// TestQuickFill_FastFill_ReachesFourAndStarts covers the fast (nobody idle)
-// cadence: each tick seats a bot in the lowest empty seat, and the tick that
-// fills the fourth seat auto-starts the match with 1 human + 3 bots — the human
-// seat carries the real identity, the three bot seats are flagged IsBot, and
-// only the human is charged.
+// TestQuickFill_FastFill_ReachesFourAndStarts covers the fast cadence: each tick seats
+// a bot in the lowest empty seat and the fourth seat auto-starts with only the human charged.
 func TestQuickFill_FastFill_ReachesFourAndStarts(t *testing.T) {
 	repo := newMockRoomRepo()
 	starter := &capabilityStarter{fakeMatchStarter: &fakeMatchStarter{}}
-	hub := &capabilityHub{mockBroadcaster: &mockBroadcaster{}, connected: []uint{10}} // only the initiator online
+	hub := &capabilityHub{mockBroadcaster: &mockBroadcaster{}, connected: []uint{10}}
 	wallet := &stubWallet{balance: 1000}
 	h := room.NewRoomHandler(repo, starter, hub, nil, wallet, nil, nil)
 	h.SetQuickFillIntervals(hugeInterval, 2*hugeInterval)
@@ -88,23 +77,22 @@ func TestQuickFill_FastFill_ReachesFourAndStarts(t *testing.T) {
 	require.True(t, armed, "scheduler must be armed after StartQuickFill")
 	assert.Equal(t, hugeInterval, interval, "0 idle players selects the fast cadence")
 
-	h.TriggerQuickFillTick(r.ID) // seat 1
+	h.TriggerQuickFillTick(r.ID)
 	assert.Equal(t, 1, countBots(repo, r.ID))
-	h.TriggerQuickFillTick(r.ID) // seat 2
+	h.TriggerQuickFillTick(r.ID)
 	assert.Equal(t, 2, countBots(repo, r.ID))
 
 	updated, _ := repo.FindByID(r.ID)
 	assert.Equal(t, "waiting", updated.Status, "not yet full — still waiting")
 	assert.Equal(t, 0, starter.called)
 
-	h.TriggerQuickFillTick(r.ID) // seat 3 → full → auto-start
+	h.TriggerQuickFillTick(r.ID)
 
 	assert.Equal(t, 3, countBots(repo, r.ID))
 	updated, _ = repo.FindByID(r.ID)
 	assert.Equal(t, "playing", updated.Status, "the fourth occupant auto-starts the match")
 	require.Equal(t, 1, starter.called, "StartMatch runs exactly once")
 
-	// Seat info: seat 0 human, seats 1..3 bots.
 	assert.Equal(t, uint(10), starter.lastPlayers[0].UserID)
 	assert.False(t, starter.lastPlayers[0].IsBot, "seat 0 is the human")
 	for seat := 1; seat <= 3; seat++ {
@@ -112,20 +100,16 @@ func TestQuickFill_FastFill_ReachesFourAndStarts(t *testing.T) {
 		assert.Equal(t, uint(0), starter.lastPlayers[seat].UserID, "bot seat %d has no user id", seat)
 	}
 
-	// Only the human is charged.
 	assert.Equal(t, 1, wallet.chargeCalls)
 	assert.Equal(t, []uint{10}, wallet.chargedIDs, "only the human seat pays the stake")
 	assert.Equal(t, 500, wallet.chargedAmount)
 
-	// Scheduler cancelled on start.
 	_, _, armed = h.QuickFillState(r.ID)
 	assert.False(t, armed, "the scheduler is cancelled once the match starts")
 }
 
-// TestQuickFill_MixedHumansAndBotsAutoStarts covers a partially-human room: two
-// humans already seated, the scheduler fills the remaining two seats with bots
-// and auto-starts. Both humans are charged (only the humans), the two bot seats
-// are flagged, and the scheduler cancels on start.
+// TestQuickFill_MixedHumansAndBotsAutoStarts covers a room with two humans seated:
+// bots fill the rest, only the humans are charged, and the scheduler cancels on start.
 func TestQuickFill_MixedHumansAndBotsAutoStarts(t *testing.T) {
 	repo := newMockRoomRepo()
 	starter := &capabilityStarter{fakeMatchStarter: &fakeMatchStarter{}}
@@ -134,26 +118,24 @@ func TestQuickFill_MixedHumansAndBotsAutoStarts(t *testing.T) {
 	h := room.NewRoomHandler(repo, starter, hub, nil, wallet, nil, nil)
 	h.SetQuickFillIntervals(hugeInterval, 2*hugeInterval)
 
-	// Two humans seated at seats 0 and 1.
 	r := seedCroatiaQuickPlayRoom(repo, "MIXEDQ", 500, 10, 11)
 
 	h.StartQuickFill(r.ID, 10)
 	defer h.CancelQuickFill(r.ID)
 
-	h.TriggerQuickFillTick(r.ID) // seat 2 (bot)
+	h.TriggerQuickFillTick(r.ID)
 	assert.Equal(t, 1, countBots(repo, r.ID))
 	updated, _ := repo.FindByID(r.ID)
 	assert.Equal(t, "waiting", updated.Status, "3 occupants — still waiting")
 	assert.Equal(t, 0, starter.called)
 
-	h.TriggerQuickFillTick(r.ID) // seat 3 (bot) → full → auto-start
+	h.TriggerQuickFillTick(r.ID)
 
 	assert.Equal(t, 2, countBots(repo, r.ID))
 	updated, _ = repo.FindByID(r.ID)
 	assert.Equal(t, "playing", updated.Status, "the fourth occupant auto-starts the match")
 	require.Equal(t, 1, starter.called, "StartMatch runs exactly once")
 
-	// Seats 0 and 1 are the two humans; seats 2 and 3 are bots.
 	assert.False(t, starter.lastPlayers[0].IsBot)
 	assert.Equal(t, uint(10), starter.lastPlayers[0].UserID)
 	assert.False(t, starter.lastPlayers[1].IsBot)
@@ -163,7 +145,6 @@ func TestQuickFill_MixedHumansAndBotsAutoStarts(t *testing.T) {
 		assert.Equal(t, uint(0), starter.lastPlayers[seat].UserID, "bot seat %d has no user id", seat)
 	}
 
-	// Both humans are charged exactly once, at the room stake; bots never pay.
 	assert.Equal(t, 1, wallet.chargeCalls)
 	assert.ElementsMatch(t, []uint{10, 11}, wallet.chargedIDs, "both human seats pay, and only them")
 	assert.Equal(t, 500, wallet.chargedAmount)
@@ -192,7 +173,7 @@ func TestQuickFill_AutoStartCarriesSeatAvatars(t *testing.T) {
 	h.StartQuickFill(r.ID, 10)
 	defer h.CancelQuickFill(r.ID)
 	h.TriggerQuickFillTick(r.ID)
-	h.TriggerQuickFillTick(r.ID) // full → auto-start
+	h.TriggerQuickFillTick(r.ID)
 	require.Equal(t, 1, starter.called)
 
 	require.NotNil(t, starter.lastPlayers[0].AvatarURL)
@@ -209,8 +190,6 @@ func TestQuickFill_AutoStartCarriesSeatAvatars(t *testing.T) {
 func TestQuickFill_PatientCadenceSelected(t *testing.T) {
 	repo := newMockRoomRepo()
 	starter := &capabilityStarter{fakeMatchStarter: &fakeMatchStarter{}}
-	// User 10 is the initiator (seated); user 99 is connected and idle (in no
-	// room, no match) → one idle player online.
 	hub := &capabilityHub{mockBroadcaster: &mockBroadcaster{}, connected: []uint{10, 99}}
 	h := room.NewRoomHandler(repo, starter, hub, nil, nil, nil, nil)
 	fast := hugeInterval
@@ -257,18 +236,15 @@ func TestQuickFill_HumanJoinResetsTimer(t *testing.T) {
 	require.True(t, armed)
 	assert.Equal(t, patient, intervalBefore)
 
-	// A human joins → reset.
 	h.ResetQuickFill(r.ID)
 	genAfter, intervalAfter, armed := h.QuickFillState(r.ID)
 	require.True(t, armed, "still armed after a reset")
 	assert.Greater(t, genAfter, genBefore, "reset restarts the countdown (bumps the generation)")
 	assert.Equal(t, patient, intervalAfter, "reset keeps the cadence chosen at arm time")
 
-	// The OLD timer (pre-reset generation) firing now must seat NOTHING.
 	h.InvokeQuickFillTick(r.ID, genBefore)
 	assert.Equal(t, 0, countBots(repo, r.ID), "a stale (pre-reset) tick is a no-op")
 
-	// The fresh timer still works.
 	h.TriggerQuickFillTick(r.ID)
 	assert.Equal(t, 1, countBots(repo, r.ID), "the reset timer still seats a bot when it fires")
 }
@@ -289,8 +265,6 @@ func TestQuickFill_CancelledTickIsNoOp(t *testing.T) {
 	_, _, armed := h.QuickFillState(r.ID)
 	assert.False(t, armed, "cancel forgets the timer")
 
-	// Both a current-generation trigger (no entry) and the old-generation
-	// callback are no-ops.
 	h.TriggerQuickFillTick(r.ID)
 	h.InvokeQuickFillTick(r.ID, genBefore)
 	assert.Equal(t, 0, countBots(repo, r.ID))
@@ -308,8 +282,6 @@ func TestQuickFill_NonWaitingRoomSelfTerminates(t *testing.T) {
 	r := seedCroatiaQuickPlayRoom(repo, "PLAYQP", 0, 10)
 	h.StartQuickFill(r.ID, 10)
 
-	// Simulate the room leaving "waiting" (started elsewhere, or closed after
-	// the sole human left).
 	r.Status = "playing"
 
 	h.TriggerQuickFillTick(r.ID)
@@ -330,7 +302,6 @@ func TestQuickFill_ClosedRoomSelfTerminates(t *testing.T) {
 	r := seedCroatiaQuickPlayRoom(repo, "CLOSEQ", 0, 10)
 	h.StartQuickFill(r.ID, 10)
 
-	// The sole human left; LeaveRoom closed the room.
 	r.Status = "completed"
 
 	h.TriggerQuickFillTick(r.ID)
@@ -349,7 +320,6 @@ func TestQuickFill_AlreadyFullSelfTerminates(t *testing.T) {
 	h := room.NewRoomHandler(repo, starter, hub, nil, nil, nil, nil)
 	h.SetQuickFillIntervals(hugeInterval, 2*hugeInterval)
 
-	// Three humans seated (0,1,2) + one bot at seat 3 = full.
 	r := seedCroatiaQuickPlayRoom(repo, "FULLQP", 0, 10, 11, 12)
 	require.NoError(t, repo.AddBot(r.ID, 3))
 
@@ -361,15 +331,8 @@ func TestQuickFill_AlreadyFullSelfTerminates(t *testing.T) {
 	assert.False(t, armed, "a full room self-terminates the scheduler")
 }
 
-// TestQuickFill_RealTimerFires is the smoke test that the AfterFunc plumbing
-// actually fires end-to-end on a real (short) interval: it fills the room, the
-// match auto-starts, and the scheduler self-cancels. It waits for that TERMINAL
-// state so no scheduler goroutine outlives the test.
-//
-// Race safety: the poll condition touches ONLY QuickFillState (mutex-guarded,
-// no repo access), so it never races the tick goroutine's repo writes. Once the
-// scheduler reports not-armed it has been cancelled on the auto-start path — no
-// further repo writes happen — so the post-loop repo reads are race-clean.
+// TestQuickFill_RealTimerFires checks the AfterFunc plumbing end-to-end on a short interval.
+// It polls only QuickFillState until the scheduler self-cancels, so no goroutine races the repo reads.
 func TestQuickFill_RealTimerFires(t *testing.T) {
 	repo := newMockRoomRepo()
 	starter := &capabilityStarter{fakeMatchStarter: &fakeMatchStarter{}}
@@ -380,7 +343,7 @@ func TestQuickFill_RealTimerFires(t *testing.T) {
 
 	r := seedCroatiaQuickPlayRoom(repo, "REALTQ", 500, 10)
 	h.StartQuickFill(r.ID, 10)
-	defer h.CancelQuickFill(r.ID) // safety net if the terminal state is never reached
+	defer h.CancelQuickFill(r.ID)
 
 	require.Eventually(t, func() bool {
 		_, _, armed := h.QuickFillState(r.ID)
@@ -388,8 +351,6 @@ func TestQuickFill_RealTimerFires(t *testing.T) {
 	}, 2*time.Second, 2*time.Millisecond,
 		"the real timer must fill the room, auto-start the match, and self-cancel")
 
-	// The scheduler has self-cancelled after auto-start; the tick goroutine has
-	// finished its writes, so these reads are safe.
 	updated, _ := repo.FindByID(r.ID)
 	require.NotNil(t, updated)
 	assert.Equal(t, "playing", updated.Status, "the match must have auto-started")

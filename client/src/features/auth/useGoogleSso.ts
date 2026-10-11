@@ -17,20 +17,15 @@ export interface LinkDialogProps {
   onClose: () => void;
 }
 
+/** Wire handleGoogleCredential to GoogleSignInButton and spread linkDialogProps onto LinkAccountDialog. */
 export interface UseGoogleSsoResult {
-  /** Wire to GoogleSignInButton's onCredential. */
   handleGoogleCredential: (credential: string) => Promise<void>;
-  /** Spread onto LinkAccountDialog. */
   linkDialogProps: LinkDialogProps;
 }
 
 /**
- * The complete Google SSO flow shared by LoginPage and RegisterPage (the
- * endpoint is one and the same — it logs in, registers, or asks to link based
- * on server state): takes the GIS credential, runs the SSO login mutation,
- * and on SSO_LINK_REQUIRED owns the link-dialog state and the follow-up link
- * mutation. Success paths reconcile the picked UI language (SSO registration
- * seeds "en" server-side) and navigate to /lobby.
+ * Runs the Google SSO login, register, or link flow shared by LoginPage and RegisterPage.
+ * Success paths reconcile the picked UI language and navigate to /lobby.
  */
 export function useGoogleSso(): UseGoogleSsoResult {
   const { t, i18n } = useTranslation();
@@ -38,13 +33,9 @@ export function useGoogleSso(): UseGoogleSsoResult {
   const ssoLoginMutation = useSSOLoginMutation();
   const ssoLinkMutation = useSSOLinkMutation();
 
-  // The credential that hit the email collision is held until the password
-  // dialog confirms or is dismissed.
   const [linkCredential, setLinkCredential] = useState<string | null>(null);
   const [linkEmail, setLinkEmail] = useState("");
   const [linkErrorKey, setLinkErrorKey] = useState<string | null>(null);
-  // GIS can fire the global callback again (double-tap, or a stale button)
-  // before React re-renders with isPending — a ref guards synchronously.
   const inFlightRef = useRef(false);
 
   async function handleGoogleCredential(credential: string): Promise<void> {
@@ -53,12 +44,9 @@ export function useGoogleSso(): UseGoogleSsoResult {
     try {
       const res = await ssoLoginMutation.mutateAsync({ provider: "google", credential });
       await reconcileLanguagePreference(res, i18n.language);
-      // Replace: /lobby is the app root — back must not return to the auth page.
       navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError && err.code === "SSO_LINK_REQUIRED") {
-        // An account with this email already exists — confirm its password
-        // before linking. Nothing was linked server-side yet.
         setLinkEmail(decodeCredentialEmail(credential) ?? "");
         setLinkErrorKey(null);
         setLinkCredential(credential);
@@ -87,16 +75,10 @@ export function useGoogleSso(): UseGoogleSsoResult {
       await reconcileLanguagePreference(res, i18n.language);
       navigate("/lobby", { replace: true });
     } catch (err) {
-      // Discriminate by code, never by status: INVALID_CREDENTIALS and
-      // SSO_INVALID_CREDENTIAL are both 401s, but only the first one is
-      // fixable by retyping the password.
       if (err instanceof FetchError && err.code === "INVALID_CREDENTIALS") {
         setLinkErrorKey("auth.sso.linkDialog.errors.wrongPassword");
         return;
       }
-      // The held Google credential itself is dead (typically expired while
-      // the dialog sat open) — no password can fix that, so close the dialog
-      // and send the player back to the Google button.
       setLinkCredential(null);
       setLinkErrorKey(null);
       if (err instanceof FetchError && err.code === "SSO_INVALID_CREDENTIAL") {

@@ -15,25 +15,17 @@ import type {
   TrumpSelectedPayload,
 } from "@/shared/types/wsEvents";
 
-// Snapshot of the just-resolved trick. Captured by the EVENT_TRICK_RESOLVED
-// dispatcher BEFORE clearing currentTrick — without this, a same-tick batch
-// of event:card_played (#4) + event:trick_resolved would render the trick
-// going from 3 → 0 cards directly, leaving no chance to animate the four
-// cards flowing toward the winner. The TrickArea + CardFlight overlay read
-// this to drive the resolve-glow + collect flight; MatchPage clears it after
-// the take animation completes (or on receiving the next event:match_state).
+/**
+ * Snapshot of the just-resolved trick, captured before currentTrick clears so
+ * the collect animation can still play.
+ */
 export interface PendingResolvedTrick {
   trick: TrickCard[];
   winnerSeat: number;
-  /** Stamped on capture, strictly increasing across captures, so it names ONE
-   *  resolved trick: the collect effect, its flights and its sound are all
-   *  keyed by it, and two tricks resolved in the same millisecond (a timeout
-   *  chain) still get distinct stamps. */
   receivedAt: number;
 }
 
-// Per-seat ephemeral emote slot. The receivedAt stamp doubles as a remount
-// key so a second emote on the same seat replaces the first cleanly.
+/** Per-seat emote slot; receivedAt doubles as a remount key. */
 export interface ActiveEmote {
   emote: EmoteID;
   receivedAt: number;
@@ -41,30 +33,20 @@ export interface ActiveEmote {
 
 export type ActiveEmotesMap = Record<0 | 1 | 2 | 3, ActiveEmote | null>;
 
-// Per-seat ephemeral "has a declaration" banner slot (trick 1). Mirrors the
-// emote pattern: the receivedAt stamp doubles as a remount key, and the
-// banner component clears its own slot via its auto-dismiss timer.
+/** Per-seat trick-one declaration banner slot; receivedAt doubles as a remount key. */
 export interface ActiveDeclare {
   receivedAt: number;
 }
 
 export type ActiveDeclaresMap = Record<0 | 1 | 2 | 3, ActiveDeclare | null>;
 
-// Transient signal that the server auto-played a card for the local player.
-// Dispatcher writes this on EVENT_CARD_PLAYED with autoPlayed=true and
-// payload.playerSeat === myPlayerSeat; MatchPage observes it to drive the
-// hand-throw animation that handlePlayCard would have triggered for a manual
-// click. The receivedAt stamp doubles as a remount key so two consecutive
-// auto-plays of the same card (rare but possible across hands) replay the
-// animation cleanly.
+/** Signals that the server auto-played the local player's card, so the hand-throw animation runs. */
 export interface PendingAutoPlayedCard {
   cardId: string;
   receivedAt: number;
 }
 
-// The viewer's Season Points outcome for the match that just ended (Story 13.5),
-// taken from event:season_points_awarded for the SP line on the result screens.
-// A subset of the payload: exactly what the line renders.
+/** The viewer's Season Points outcome for the match that just ended. */
 export type SeasonSettlement = Pick<
   SeasonPointsAwardedPayload,
   "spChange" | "newSeasonSp" | "rankTier" | "rankDivision" | "reason"
@@ -81,29 +63,8 @@ export interface MatchStoreState {
   trumpReveal: TrumpSelectedPayload | null;
   scoreRevealData: HandScoredPayload | null;
   matchEndData: MatchEndPayload | null;
-  // Story 9.2: the per-human coin settlement that arrives right after
-  // event:match_end. Stored (rather than toasted) so the won/lost amount can
-  // be shown inside the end-of-match score dialog. Null for free (0 buy-in)
-  // matches, which emit no settlement event.
   coinSettlement: CoinSettlementPayload | null;
-  // Honour movement for the result overlay (honour redesign R7). event:honor_updated
-  // lands at exactly the moment the match ends and was previously discarded
-  // visually — the score changed and nothing on screen said so.
-  //
-  // `before` is captured from authStore at the instant the event arrives, because
-  // the payload carries only the NEW score. That is enough for "95 -> 96" without
-  // widening the WS contract (and its six drift-gate touchpoints).
-  //
-  // Reset in BOTH the match_end and match_abandoned handlers, exactly as the
-  // comment on the honor_updated handler in useWsDispatch demands: the abandoning
-  // player is the one who gets no follow-up event, so a stale flourish would
-  // otherwise show them someone else's last movement.
   honorSettlement: { before: number; after: number; tier: string } | null;
-  // The SP line on MatchResult (natural end) and ReconnectOverlay (abandonment),
-  // Story 13.5. Reset in BOTH the match_end and match_abandoned handlers, the
-  // same discipline as coinSettlement and honorSettlement: the abandoning player
-  // never receives event:season_points_awarded, so without the reset they would
-  // be shown a previous match's change as this one's.
   seasonSettlement: SeasonSettlement | null;
   matchAbandonedData: MatchAbandonedPayload | null;
   surrenderProposed: SurrenderProposedPayload | null;
@@ -112,11 +73,6 @@ export interface MatchStoreState {
   pendingResolvedTrick: PendingResolvedTrick | null;
   activeEmotes: ActiveEmotesMap;
   activeDeclares: ActiveDeclaresMap;
-  // Monotonic timestamp (performance.now()) of the most recent emote sent
-  // from this client. Lifted out of EmotePickerButton's local useState so
-  // the picker's cooldown survives mount/unmount across phase transitions
-  // (D107). performance.now() is monotonic so OS clock backsteps cannot
-  // lock the picker for arbitrary time (D108). 0 means "no emote sent".
   lastEmoteSentAt: number;
 
   setMatchState: (state: MatchState) => void;
@@ -136,10 +92,6 @@ export interface MatchStoreState {
   setSurrenderDeclined: (payload: SurrenderDeclinedPayload | null) => void;
   setPendingAutoPlayedCard: (cardId: string | null) => void;
   setPendingResolvedTrick: (snapshot: { trick: TrickCard[]; winnerSeat: number } | null) => void;
-  /** Clear the resolved-trick snapshot only if it is still the one stamped
-   *  `receivedAt`. Every end-of-collect path (last flight landed, fallback
-   *  timer, reduced-motion hold) clears through this, so a late finish of
-   *  trick N-1 can never tear down trick N's snapshot mid-glow. */
   clearPendingResolvedTrick: (receivedAt: number) => void;
   setActiveEmote: (seat: number, emote: EmoteID | null) => void;
   setActiveDeclare: (seat: number, active: boolean) => void;
@@ -148,8 +100,7 @@ export interface MatchStoreState {
   reset: () => void;
 }
 
-// Go JSON serializes nil slices as `null`. Coerce the nullable array fields to
-// empty arrays so every consumer can iterate without a null guard.
+/** Coerces Go's null slices to empty arrays and backfills handCount for servers that omit it. */
 function normalizeMatchState(gs: MatchState): MatchState {
   return {
     ...gs,
@@ -158,18 +109,11 @@ function normalizeMatchState(gs: MatchState): MatchState {
       ...p,
       hand: p.hand ?? [],
       declarations: p.declarations ?? [],
-      // Backfill for the rolling-deploy window: a server that predates
-      // Story 12.10 sends full hands and no handCount, and the live path CASTS
-      // the payload (never parses), so the required field would be undefined
-      // for every consumer. Against such a server hand.length IS the count;
-      // against a current one this is a no-op.
       handCount: p.handCount ?? (p.hand ?? []).length,
     })) as MatchState["players"],
   };
 }
 
-// Last stamp handed out by setPendingResolvedTrick — module-level so it stays
-// monotonic across clearGame/reset too.
 let lastResolvedTrickStamp = 0;
 
 const initialState = {
@@ -242,11 +186,6 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
         snapshot === null
           ? null
           : {
-              // Shallow-clone the trick array so the snapshot doesn't share
-              // its backing storage with `matchState.currentTrick` — the
-              // dispatcher zeroes that array immediately after this setter,
-              // and we want the snapshot to remain a stable, isolated
-              // snapshot of the just-resolved trick.
               trick: [...snapshot.trick],
               winnerSeat: snapshot.winnerSeat,
               receivedAt: (lastResolvedTrickStamp = Math.max(
@@ -265,9 +204,6 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
 
   setActiveEmote: (seat, emote) =>
     set((state) => {
-      // Defensive: out-of-range seat is a noop. The dispatcher already
-      // validates this server payload, but the setter must not corrupt the
-      // map shape if a test or stray caller passes a bad index.
       if (seat !== 0 && seat !== 1 && seat !== 2 && seat !== 3) return state;
       const slot = seat as 0 | 1 | 2 | 3;
       const next: ActiveEmote | null = emote === null ? null : { emote, receivedAt: Date.now() };
@@ -278,7 +214,6 @@ export const useMatchStore = create<MatchStoreState>((set) => ({
 
   setActiveDeclare: (seat, active) =>
     set((state) => {
-      // Defensive: out-of-range seat is a noop, same as setActiveEmote.
       if (seat !== 0 && seat !== 1 && seat !== 2 && seat !== 3) return state;
       const slot = seat as 0 | 1 | 2 | 3;
       const next: ActiveDeclare | null = active ? { receivedAt: Date.now() } : null;

@@ -81,15 +81,8 @@ function ComparisonRow({
 }
 
 /**
- * Story 9.3: lobby arrival modal for a room ejection. It is the single consumer
- * of roomStore.roomEjection — set by the return-time 409 (MatchPage), the
- * per-user system:insolvent_ejected and system:honor_ejected pushes, and
- * system:room_closed_insolvent. Calm, non-panic copy with one clear action so
- * the player is never left at a dead end (per the UX "no dead ends" rule).
- *
- * Three copy branches, selected by `reason`: insolvency (balance vs buy-in),
- * honor (Story 9.8 — the player's score vs the room's minimum), and the
- * reason-agnostic room-closed notice.
+ * Lobby modal explaining why the player was removed from a room, read from roomStore.roomEjection.
+ * Copy branches on `reason`: insolvency, honor below the room's minimum, or room closed.
  */
 export function RoomEjectionModal() {
   const { t } = useTranslation();
@@ -130,7 +123,6 @@ export function RoomEjectionModal() {
           }}
         />
 
-        {/* Header */}
         <div style={{ display: "flex", gap: 16, padding: "26px 28px 6px" }}>
           <div
             style={{
@@ -151,9 +143,6 @@ export function RoomEjectionModal() {
             ) : honor ? (
               <ShieldAlert size={24} color="var(--brass-deep)" />
             ) : (
-              // Coins are always the off-theme gold (COIN_GOLD), even in a brass
-              // icon well where its neighbours take --brass-deep: the door and the
-              // shield are theme glyphs, a coin is a coin.
               <Coins size={24} color={COIN_GOLD} />
             )}
           </div>
@@ -191,11 +180,8 @@ export function RoomEjectionModal() {
           </div>
         </div>
 
-        {/* Body */}
         <p
           data-testid="room-ejection-body"
-          // Expose the honor numbers as data-* so tests assert the computed values
-          // without depending on i18n wording. Absent on the other two branches.
           data-min-honor={honor ? ejection?.minHonor : undefined}
           data-honor={honor ? ejection?.honor : undefined}
           style={{
@@ -209,10 +195,7 @@ export function RoomEjectionModal() {
           {roomClosed
             ? t("lobby.roomEjection.roomClosedBody")
             : honor
-              ? // ?? 0 is a fallback for a malformed notice only. The dispatch
-                // handler rejects any payload whose numbers are not typeof
-                // "number", so a real 0 arrives as 0 and renders as 0.
-                t("lobby.roomEjection.honorBody", {
+              ? t("lobby.roomEjection.honorBody", {
                   minHonor: ejection?.minHonor ?? 0,
                   honor: ejection?.honor ?? 0,
                 })
@@ -222,11 +205,6 @@ export function RoomEjectionModal() {
                 })}
         </p>
 
-        {/* The comparison, DRAWN TO SCALE. A sentence with two numbers in it makes
-            the player do the arithmetic; two bars on a shared 0-100 axis show at a
-            glance how far off they are — which is the difference between "I'm
-            locked out" and "I'm four matches away". Numbers stay alongside, so this
-            never depends on the bars alone. */}
         {honor && typeof ejection?.honor === "number" && typeof ejection?.minHonor === "number" && (
           <div style={{ padding: "16px 28px 0", display: "flex", flexDirection: "column", gap: 8 }}>
             <ComparisonRow
@@ -244,8 +222,6 @@ export function RoomEjectionModal() {
           </div>
         )}
 
-        {/* Footer. Stacks below sm — in DOM order, so the phone layout keeps
-            the same action-then-dismiss reading as the desktop row. */}
         <div
           className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-end"
           style={{
@@ -255,11 +231,6 @@ export function RoomEjectionModal() {
             background: "color-mix(in srgb, var(--surface-3) 45%, transparent)",
           }}
         >
-          {/* A DOOR OUT, not just an acknowledgement. The honour branch is the one
-              that removed something from the player, so it is the one that has to
-              offer somewhere to go — the lobby, pre-filtered to rooms they can
-              actually join. Without this the modal is a dead end, which is exactly
-              what turns a nudge into a churn moment. */}
           {honor && (
             <button
               type="button"

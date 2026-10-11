@@ -17,13 +17,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// Story 11.5 (FR62) — friend room invites. Sibling of privacy_handler_test.go /
-// honor_handler_test.go, reusing the same mockRoomRepo harness. The load-bearing
-// assertions here are the NEGATIVE ones: a host grant must bypass the password
-// and NOTHING else (D2/AC6).
-
-// --- stubs -----------------------------------------------------------------
-
 // stubFriendDirectory implements room.FriendDirectory. friends is keyed by the
 // viewer; the relation is made symmetric on read so a test only declares it once.
 type stubFriendDirectory struct {
@@ -54,10 +47,8 @@ func (s *stubFriendDirectory) ListFriends(userID uint) ([]room.FriendSummary, er
 	return out, nil
 }
 
-// stubPresence implements both room.ConnectionTracker and room.SessionTracker.
-// The third leg of the presence trio (in-room) is not stubbed — it is read from
-// the real mockRoomRepo, so the tests exercise the same FindPlayerRoom predicate
-// JoinRoom's already-in-room gate uses.
+// stubPresence implements both room.ConnectionTracker and room.SessionTracker. In-room
+// presence comes from the real mockRoomRepo instead.
 type stubPresence struct {
 	online  map[uint]bool
 	inMatch map[uint]bool
@@ -97,8 +88,6 @@ func (s *spyNotifier) pushesOfType(t *testing.T, msgType string) []ws.RoomInvite
 	return out
 }
 
-// --- harness ---------------------------------------------------------------
-
 type inviteHarness struct {
 	e        *echo.Echo
 	repo     *mockRoomRepo
@@ -108,10 +97,8 @@ type inviteHarness struct {
 	notifier *spyNotifier
 }
 
-// setupInviteTest wires the room handler AND the invite handler over ONE shared
-// invite registry — the whole point of the feature is that grants issued by the
-// second are consumed by the first, so a test harness that split them would
-// prove nothing.
+// setupInviteTest wires the room and invite handlers over one shared invite registry.
+// Grants issued by the invite handler must be consumable by JoinRoom.
 func setupInviteTest(honor room.HonorService) *inviteHarness {
 	repo := newMockRoomRepo()
 	invites := room.NewInviteRegistry()
@@ -120,7 +107,7 @@ func setupInviteTest(honor room.HonorService) *inviteHarness {
 	notifier := &spyNotifier{}
 
 	roomHandler := room.NewRoomHandler(repo, nil, &mockBroadcaster{}, room.NewPresenceRegistry(), nil, honor, invites)
-	roomHandler.SetQuickFillIntervals(hugeInterval, hugeInterval) // no stray auto-fill timer in unit tests
+	roomHandler.SetQuickFillIntervals(hugeInterval, hugeInterval)
 	inviteHandler := room.NewInviteHandler(repo, invites, friends, presence, presence, notifier)
 
 	e := echo.New()
@@ -210,8 +197,6 @@ func errorCode(t *testing.T, raw []byte) string {
 	require.NoError(t, json.Unmarshal(raw, &resp))
 	return resp.Error.Code
 }
-
-// --- InviteToRoom (AC1, AC2) ------------------------------------------------
 
 func TestInviteToRoom_OwnerInviteIssuesHostGrantAndPushes(t *testing.T) {
 	h := setupInviteTest(nil)
@@ -368,8 +353,6 @@ func TestInviteToRoom_FullRoomIsRejected(t *testing.T) {
 	assert.False(t, h.invites.Pending(1, 200))
 }
 
-// --- ListInvitableFriends (AC1) --------------------------------------------
-
 func TestListInvitableFriends_AnnotatesAvailability(t *testing.T) {
 	h := setupInviteTest(nil)
 	seedInviteRoom(t, h.repo, 100, "", 0, true)
@@ -420,7 +403,6 @@ func TestListInvitableFriends_FriendSeatedHereReadsAsAlreadyHere(t *testing.T) {
 	h.befriend(100, "owner", 201, "elsewhere")
 	h.available(200, 201)
 
-	// 200 sits in room 1 — the room this panel is for. 201 sits in another room.
 	require.NoError(t, h.repo.AddPlayer(&room.RoomPlayer{RoomID: 1, UserID: 200, Username: "here"}))
 	other := seedInviteRoom(t, h.repo, 300, "", 0, true)
 	require.NoError(t, h.repo.AddPlayer(&room.RoomPlayer{
@@ -455,15 +437,12 @@ func TestListInvitableFriends_CallerNotInRoomIsRejected(t *testing.T) {
 	assert.Equal(t, "NOT_IN_ROOM", errorCode(t, rec.Body.Bytes()))
 }
 
-// --- JoinRoom under a grant (AC3-AC7) ---------------------------------------
-
 // AC3: a host grant stands in for the password — and is spent doing so.
 func TestJoinRoom_HostGrantBypassesPassword(t *testing.T) {
 	h := setupInviteTest(nil)
 	seedInviteRoom(t, h.repo, 100, "hunter2", 0, true)
 	h.invites.Issue(1, 200, 100, true)
 
-	// No password sent at all.
 	rec := doPostJSON(h.e, "/api/v1/rooms/1/join", validToken(200), "")
 
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -485,7 +464,6 @@ func TestJoinRoom_NonHostGrantStillRequiresPassword(t *testing.T) {
 	players, _ := h.repo.FindPlayersByRoomID(1)
 	assert.Len(t, players, 1, "no bypass, no seat")
 
-	// The correct password still works for the same invitee.
 	rec = doPostJSON(h.e, "/api/v1/rooms/1/join", validToken(200), `{"password":"hunter2"}`)
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
@@ -583,8 +561,8 @@ func TestJoinRoom_FillingTheRoomVoidsOutstandingInvites(t *testing.T) {
 	h := setupInviteTest(nil)
 	r := seedInviteRoom(t, h.repo, 100, "hunter2", 0, true)
 	r.PlayerCount = 3
-	h.invites.Issue(1, 200, 100, true) // the joiner
-	h.invites.Issue(1, 201, 100, true) // a second invitee who never acted
+	h.invites.Issue(1, 200, 100, true)
+	h.invites.Issue(1, 201, 100, true)
 
 	rec := doPostJSON(h.e, "/api/v1/rooms/1/join", validToken(200), "")
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -593,27 +571,20 @@ func TestJoinRoom_FillingTheRoomVoidsOutstandingInvites(t *testing.T) {
 	assert.False(t, h.invites.ConsumeHostGrant(1, 201))
 }
 
-// --- Code review 2026-08-16: patched behaviours ----------------------------
-
-// The password gate PEEKS at the grant instead of consuming it, so a rejection
-// from any LATER gate leaves the bypass intact for a retry. Before this, a
-// transient ROOM_FULL burned the grant and the retry hit bcrypt with a password
-// the invitee was never given — an unrecoverable lockout.
+// TestJoinRoom_RejectedJoinDoesNotBurnTheHostGrant checks that the password gate only
+// peeks at the grant, so a later gate's rejection leaves the bypass for a retry.
 func TestJoinRoom_RejectedJoinDoesNotBurnTheHostGrant(t *testing.T) {
 	h := setupInviteTest(nil)
 	r := seedInviteRoom(t, h.repo, 100, "hunter2", 0, true)
 	r.PlayerCount = 4
 	h.invites.Issue(1, 200, 100, true)
 
-	// First attempt bounces off capacity, which sits AFTER the password block.
 	rec := doPostJSON(h.e, "/api/v1/rooms/1/join", validToken(200), "")
 	require.Equal(t, http.StatusConflict, rec.Code)
 	require.Equal(t, "ROOM_FULL", errorCode(t, rec.Body.Bytes()))
 
-	// The grant must have survived: it was never the reason the join failed.
 	assert.True(t, h.invites.HasHostGrant(1, 200), "a capacity rejection must not spend the grant")
 
-	// A seat frees up and the same invite still works — no password supplied.
 	r.PlayerCount = 3
 	rec = doPostJSON(h.e, "/api/v1/rooms/1/join", validToken(200), "")
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -634,8 +605,8 @@ func TestJoinRoom_SuccessfulJoinSpendsTheHostGrant(t *testing.T) {
 // A member's later invite must not strip the owner's password bypass.
 func TestInviteRegistry_NonHostIssueNeverDowngradesALiveHostGrant(t *testing.T) {
 	reg := room.NewInviteRegistry()
-	reg.Issue(1, 200, 100, true)  // owner invites
-	reg.Issue(1, 200, 300, false) // ordinary member invites the same friend
+	reg.Issue(1, 200, 100, true)
+	reg.Issue(1, 200, 300, false)
 
 	assert.True(t, reg.HasHostGrant(1, 200), "the stronger host grant must survive a non-host re-issue")
 }
@@ -715,7 +686,6 @@ func TestDeclineInvite_VoidsTheGrant(t *testing.T) {
 
 	assert.False(t, h.invites.HasHostGrant(1, 200))
 
-	// And the declined invitee is now back on the normal password gate.
 	rec = doPostJSON(h.e, "/api/v1/rooms/1/join", validToken(200), "")
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	assert.Equal(t, "WRONG_ROOM_PASSWORD", errorCode(t, rec.Body.Bytes()))

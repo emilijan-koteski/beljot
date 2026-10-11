@@ -15,162 +15,74 @@ import (
 	"github.com/emilijan/beljot/server/internal/season"
 )
 
-// SeasonRankReader is the ONE read the profile needs from the season domain:
-// the subject's standing in the active season, or (nil, nil) when they have
-// not played in it (Story 13.3).
-//
-// THE INTERFACE LIVES HERE, in `user`, exactly the way match.SPAwarder /
-// HonorRecorder live in `match`: the CONSUMER declares its narrow need,
-// season.Service satisfies it structurally, and cmd/api/main.go wires the two.
-// The import direction is user -> season (a NEW edge, permitted by Story 13.3);
-// `season` must never import `user`, which is why the view type this returns is
-// season's own rather than one declared here that season would have to name.
-//
-// The profile is ONE response assembled server-side -- a second client
-// round-trip for the rank would leak the composition to every consumer of
-// either profile shape.
+// SeasonRankReader returns a user's standing in the active season, or (nil, nil) when they have not played in it.
+// It is declared here so that season never has to import user.
 type SeasonRankReader interface {
 	CurrentSeasonRank(userID uint, now time.Time) (*season.SeasonRankView, error)
 }
 
-// ProfileResponse is the SELF profile DTO returned by GetProfile when the
-// path id equals the authenticated viewer (Story 11.3 made the endpoint
-// public — a foreign id now gets the narrower PublicProfileResponse instead of
-// a 403). WalletBalance, LoginStreakDays, LanguagePreference,
-// CardDeckPreference, SoundEnabled, MusicEnabled, SoundVolume, MusicVolume and
-// UsernameChangedAt are PRIVATE self-only figures: they are absent from
-// PublicProfileResponse and must never be added to any shared/public shape.
+// ProfileResponse is the self profile returned by GetProfile when the path id is the viewer.
+// Its wallet, streak, preference and username-change fields are private and must never reach a public shape.
 type ProfileResponse struct {
-	ID       uint   `json:"id"`
-	Username string `json:"username"`
-	// AvatarURL / AvatarLargeURL are the 128 and 256 px derivatives of the
-	// player's avatar, null when there is none. PUBLIC-SAFE (the picture is on
-	// every roster and seat anyway), so PublicProfileResponse carries both. The
-	// two profile shapes are the ONLY DTOs with the large one: the hero is the
-	// one disc drawn big enough to need it.
-	AvatarURL      *string `json:"avatarUrl"`
-	AvatarLargeURL *string `json:"avatarLargeUrl"`
-	// UsernameChangedAt is when the username was last changed (null if never).
-	// The client derives the change-cooldown state / next-allowed date from it.
-	UsernameChangedAt  *time.Time `json:"usernameChangedAt,omitempty"`
-	LanguagePreference string     `json:"languagePreference"`
-	// CardDeckPreference is the player's card-face artwork choice (Story
-	// 12.4): "french" or "croatian". PRIVATE, like LanguagePreference above —
-	// absent from PublicProfileResponse and never to be added to it.
-	CardDeckPreference string `json:"cardDeckPreference"`
-	// SoundEnabled / MusicEnabled are the in-match audio switches (migration
-	// 000025), SoundVolume / MusicVolume their 0-100 levels (migration
-	// 000026). PRIVATE, like the two preferences above.
-	SoundEnabled    bool `json:"soundEnabled"`
-	MusicEnabled    bool `json:"musicEnabled"`
-	SoundVolume     int  `json:"soundVolume"`
-	MusicVolume     int  `json:"musicVolume"`
-	WalletBalance   int  `json:"walletBalance"`
-	LoginStreakDays int  `json:"loginStreakDays"`
-	// XP & level (Story 9.5). TotalXP is the lifetime total; Level is derived
-	// from it (never stored); XPIntoLevel/XPForNextLevel drive the profile XP
-	// bar (fill = XPIntoLevel / XPForNextLevel). Story 11.3 (D2) made these
-	// PUBLIC: level is already public on room seat tiles and XP is non-sensitive
-	// progression data, so the epic AC lifts level + total XP onto the public
-	// profile. PublicProfileResponse carries all four verbatim.
-	TotalXP        int `json:"totalXp"`
-	Level          int `json:"level"`
-	XPIntoLevel    int `json:"xpIntoLevel"`
-	XPForNextLevel int `json:"xpForNextLevel"`
-	// Honor (Story 9.7). Unlike every private field above, these are
-	// PUBLIC-SAFE: honor exists precisely so other players can judge whether to
-	// play with you, and Story 9.8 gates room access on it. When Epic 11 builds
-	// the public player-profile DTO it can lift these seven fields verbatim
-	// without re-litigating the privacy question.
-	//
-	// HonorScore is the AUTHORITATIVE recomputed value, never the lagging
-	// users.honor_score snapshot column. HonorTier is a stable machine token
-	// the client maps to an i18n label. The Completed/Abandoned totals are RAW
-	// undecayed lifetime counts. IsNewPlayer is presentation-only suppression:
-	// the score and tier are still populated and still authoritative when it is
-	// true. HonorTrendDelta/Direction compare the last honorTrendWindow matches
-	// against the honorTrendWindow matches BEFORE those (never against the
-	// lifetime score — different sample sizes carry different Bayesian prior drag,
-	// which made flawless players read "Slipping"). The one honor figure that
-	// costs a query.
-	HonorScore          int    `json:"honorScore"`
-	HonorTier           string `json:"honorTier"`
-	HonorCompletedTotal int64  `json:"honorCompletedTotal"`
-	HonorAbandonedTotal int64  `json:"honorAbandonedTotal"`
-	IsNewPlayer         bool   `json:"isNewPlayer"`
-	HonorTrendDelta     int    `json:"honorTrendDelta"`
-	HonorTrendDirection string `json:"honorTrendDirection"`
-	// SeasonRank is the subject's standing in the ACTIVE season (Story 13.3):
-	// {seasonName, tier, division, sp}, or null when they have not played in
-	// it -- the client hides the rank chip on null. PUBLIC-SAFE, like the honor block
-	// above: the leaderboard already exposes tier + SP for every player, so
-	// PublicProfileResponse carries it verbatim. NO omitempty -- the key must
-	// always be present so the client can tell "no standing" from "an older
-	// server that does not send this".
-	SeasonRank       *season.SeasonRankView `json:"seasonRank"`
-	CreatedAt        time.Time              `json:"createdAt"`
-	TotalGamesPlayed int                    `json:"totalGamesPlayed"`
-	Wins             int                    `json:"wins"`
-	Losses           int                    `json:"losses"`
-	Abandoned        int                    `json:"abandoned"`
+	ID                  uint                   `json:"id"`
+	Username            string                 `json:"username"`
+	AvatarURL           *string                `json:"avatarUrl"`
+	AvatarLargeURL      *string                `json:"avatarLargeUrl"`
+	UsernameChangedAt   *time.Time             `json:"usernameChangedAt,omitempty"`
+	LanguagePreference  string                 `json:"languagePreference"`
+	CardDeckPreference  string                 `json:"cardDeckPreference"`
+	SoundEnabled        bool                   `json:"soundEnabled"`
+	MusicEnabled        bool                   `json:"musicEnabled"`
+	SoundVolume         int                    `json:"soundVolume"`
+	MusicVolume         int                    `json:"musicVolume"`
+	WalletBalance       int                    `json:"walletBalance"`
+	LoginStreakDays     int                    `json:"loginStreakDays"`
+	TotalXP             int                    `json:"totalXp"`
+	Level               int                    `json:"level"`
+	XPIntoLevel         int                    `json:"xpIntoLevel"`
+	XPForNextLevel      int                    `json:"xpForNextLevel"`
+	HonorScore          int                    `json:"honorScore"`
+	HonorTier           string                 `json:"honorTier"`
+	HonorCompletedTotal int64                  `json:"honorCompletedTotal"`
+	HonorAbandonedTotal int64                  `json:"honorAbandonedTotal"`
+	IsNewPlayer         bool                   `json:"isNewPlayer"`
+	HonorTrendDelta     int                    `json:"honorTrendDelta"`
+	HonorTrendDirection string                 `json:"honorTrendDirection"`
+	SeasonRank          *season.SeasonRankView `json:"seasonRank"`
+	CreatedAt           time.Time              `json:"createdAt"`
+	TotalGamesPlayed    int                    `json:"totalGamesPlayed"`
+	Wins                int                    `json:"wins"`
+	Losses              int                    `json:"losses"`
+	Abandoned           int                    `json:"abandoned"`
 }
 
-// PublicProfileResponse is the PUBLIC projection returned by GET
-// /users/:id/profile when :id is NOT the authenticated viewer (Story 11.3
-// FR47). It carries only public-safe fields — identity, member-since,
-// progression (level + XP, per D2), the full honor section, and the
-// win/loss/abandoned record — and deliberately OMITS every private figure the
-// self ProfileResponse holds: Email, PasswordHash, WalletBalance,
-// LoginStreakDays, LanguagePreference, CardDeckPreference, SoundEnabled,
-// MusicEnabled, SoundVolume, MusicVolume, UsernameChangedAt.
-// Every value is computed for the PATH id (the subject), never the viewer — see
-// GetProfile.
+// PublicProfileResponse is the public profile returned when the path id is not the viewer.
+// It carries only public-safe fields, all computed for the subject rather than the viewer.
 type PublicProfileResponse struct {
-	ID       uint   `json:"id"`
-	Username string `json:"username"`
-	// Avatar derivatives, same semantics as the self shape.
-	AvatarURL      *string   `json:"avatarUrl"`
-	AvatarLargeURL *string   `json:"avatarLargeUrl"`
-	CreatedAt      time.Time `json:"createdAt"`
-	// Progression (Story 9.5) — public per Story 11.3 D2.
-	TotalXP        int `json:"totalXp"`
-	Level          int `json:"level"`
-	XPIntoLevel    int `json:"xpIntoLevel"`
-	XPForNextLevel int `json:"xpForNextLevel"`
-	// Honor (Story 9.7) — public by construction; the client decides New Player
-	// suppression while the score/tier stay authoritative (mirrors the self DTO).
-	HonorScore          int    `json:"honorScore"`
-	HonorTier           string `json:"honorTier"`
-	HonorCompletedTotal int64  `json:"honorCompletedTotal"`
-	HonorAbandonedTotal int64  `json:"honorAbandonedTotal"`
-	IsNewPlayer         bool   `json:"isNewPlayer"`
-	HonorTrendDelta     int    `json:"honorTrendDelta"`
-	HonorTrendDirection string `json:"honorTrendDirection"`
-	// Seasonal rank (Story 13.3) -- public-safe per the epic AC (the current
-	// rank becomes part of the public profile response). Same null-when-unplayed
-	// semantics as the self shape; no omitempty for the same reason.
-	SeasonRank       *season.SeasonRankView `json:"seasonRank"`
-	TotalGamesPlayed int                    `json:"totalGamesPlayed"`
-	Wins             int                    `json:"wins"`
-	Losses           int                    `json:"losses"`
-	Abandoned        int                    `json:"abandoned"`
+	ID                  uint                   `json:"id"`
+	Username            string                 `json:"username"`
+	AvatarURL           *string                `json:"avatarUrl"`
+	AvatarLargeURL      *string                `json:"avatarLargeUrl"`
+	CreatedAt           time.Time              `json:"createdAt"`
+	TotalXP             int                    `json:"totalXp"`
+	Level               int                    `json:"level"`
+	XPIntoLevel         int                    `json:"xpIntoLevel"`
+	XPForNextLevel      int                    `json:"xpForNextLevel"`
+	HonorScore          int                    `json:"honorScore"`
+	HonorTier           string                 `json:"honorTier"`
+	HonorCompletedTotal int64                  `json:"honorCompletedTotal"`
+	HonorAbandonedTotal int64                  `json:"honorAbandonedTotal"`
+	IsNewPlayer         bool                   `json:"isNewPlayer"`
+	HonorTrendDelta     int                    `json:"honorTrendDelta"`
+	HonorTrendDirection string                 `json:"honorTrendDirection"`
+	SeasonRank          *season.SeasonRankView `json:"seasonRank"`
+	TotalGamesPlayed    int                    `json:"totalGamesPlayed"`
+	Wins                int                    `json:"wins"`
+	Losses              int                    `json:"losses"`
+	Abandoned           int                    `json:"abandoned"`
 }
 
-// UpdatePreferencesRequest is a PARTIAL update: every field is a pointer so
-// "absent" is distinguishable from "empty string" / false. Story 12.4 made this
-// necessary — with plain strings a deck-only PATCH sent `languagePreference: ""`
-// implicitly and was rejected with INVALID_LANGUAGE, so changing your deck would
-// have meant resending your language (and vice versa). The audio switches
-// (migration 000025) need it even more: a plain bool would turn "not sent" into
-// "switched off" — and a plain int would turn it into volume 0 for the audio
-// levels (migration 000026).
-//
-// Every supplied field is validated before anything is written, and the write
-// itself is a single multi-column UPDATE, so a request either applies whole or
-// not at all. A body naming no field is ErrBadRequest, and so is a non-boolean
-// soundEnabled / musicEnabled or a non-integer soundVolume / musicVolume (50.5,
-// "50") — the JSON decode fails before validation runs. An integer volume
-// outside 0-100 fails validation, also with ErrBadRequest.
+// UpdatePreferencesRequest is a partial update whose pointer fields tell "absent" apart from empty, false or 0.
 type UpdatePreferencesRequest struct {
 	LanguagePreference *string `json:"languagePreference"`
 	CardDeckPreference *string `json:"cardDeckPreference"`
@@ -187,49 +99,29 @@ var supportedLanguages = map[string]struct{}{
 	"hr": {},
 }
 
-// supportedCardDecks is the card-face artwork allowlist (Story 12.4). These are
-// DECKS, not game variants: the deck is "croatian", the variant is "croatia"
-// (game.VariantCroatia). Unrelated enums — never cross-wire them.
-//
-// Validation lives here rather than in a DB CHECK, mirroring
-// language_preference: users.card_deck_preference is a bare VARCHAR(20), so
-// adding a deck is a Go change plus artwork, not a migration.
 var supportedCardDecks = map[string]struct{}{
 	CardDeckFrench:   {},
 	CardDeckCroatian: {},
 }
 
 const (
-	// CardDeckFrench is the default deck for every account that did not choose
-	// otherwise, and the value migration 000020 backfills every existing row
-	// with.
-	CardDeckFrench = "french"
-	// CardDeckCroatian is the German/Hungarian-suited deck (leaves / hearts /
-	// bells / acorns). Seeded at registration only when the chosen language is
-	// "hr".
+	CardDeckFrench   = "french"
 	CardDeckCroatian = "croatian"
 )
 
-// IsSupportedLanguage reports whether code is one of the registered UI
-// languages. Exported so the auth package can validate register-time language
-// preferences without duplicating the allowlist.
+// IsSupportedLanguage reports whether code is one of the registered UI languages.
 func IsSupportedLanguage(code string) bool {
 	_, ok := supportedLanguages[code]
 	return ok
 }
 
-// IsSupportedCardDeck reports whether deck is one of the shipped card-face
-// decks. Exported for the same reason as IsSupportedLanguage: the auth package
-// seeds this preference at registration and must not restate the allowlist.
+// IsSupportedCardDeck reports whether deck is one of the shipped card-face decks.
 func IsSupportedCardDeck(deck string) bool {
 	_, ok := supportedCardDecks[deck]
 	return ok
 }
 
 const (
-	// MinAudioVolume / MaxAudioVolume bound the two audio levels (migration
-	// 000026): a whole percentage. The users columns carry the same range as a
-	// CHECK; validating here first answers 400 instead of a constraint error.
 	MinAudioVolume = 0
 	MaxAudioVolume = 100
 )
@@ -239,15 +131,11 @@ func isValidAudioVolume(v int) bool {
 	return v >= MinAudioVolume && v <= MaxAudioVolume
 }
 
-// MatchPlayer is the per-seat participant embedded in a match list item.
-// Bot seats carry userId 0 and an empty username with isBot true — the
-// client renders the localized seat-derived bot name.
+// MatchPlayer is the per-seat participant in a match list item; bot seats have userId 0 and isBot true.
 type MatchPlayer struct {
-	Seat     int    `json:"seat"`
-	UserID   uint   `json:"userId"`
-	Username string `json:"username"`
-	// AvatarURL is the participant's 128 px avatar as it is NOW, not as it was
-	// when the match was played; null for bots and players without one.
+	Seat      int     `json:"seat"`
+	UserID    uint    `json:"userId"`
+	Username  string  `json:"username"`
 	AvatarURL *string `json:"avatarUrl"`
 	IsBot     bool    `json:"isBot"`
 }
@@ -272,27 +160,20 @@ type MatchHandView struct {
 
 // MatchListItem is the per-match DTO returned by GET /users/:id/matches.
 type MatchListItem struct {
-	ID          uint      `json:"id"`
-	Variant     string    `json:"variant"`
-	MatchMode   string    `json:"matchMode"`
-	StartedAt   time.Time `json:"startedAt"`
-	CompletedAt time.Time `json:"completedAt"`
-	Status      string    `json:"status"`
-	WinnerTeam  int       `json:"winnerTeam"`
-	TeamAScore  int       `json:"teamAScore"`
-	TeamBScore  int       `json:"teamBScore"`
-	HasBots     bool      `json:"hasBots"`
-	AbandonedBy *uint     `json:"abandonedBy,omitempty"`
-	ViewerSeat  int       `json:"viewerSeat"`
-	Outcome     string    `json:"outcome"`
-	// EndReason says why the match ended: "abandonment" (abandoned rows),
-	// "surrender" (completed via an accepted surrender), or "natural". The
-	// client renders the muted "ended early" history marker from it.
-	EndReason string `json:"endReason"`
-	// The two per-room RULE flags the match was played under. Chipped in history
-	// only when they differ from the default, so a chip always carries
-	// information. Read from the MATCH, not the room: a room is reusable and its
-	// settings can change between the matches it hosts.
+	ID                  uint            `json:"id"`
+	Variant             string          `json:"variant"`
+	MatchMode           string          `json:"matchMode"`
+	StartedAt           time.Time       `json:"startedAt"`
+	CompletedAt         time.Time       `json:"completedAt"`
+	Status              string          `json:"status"`
+	WinnerTeam          int             `json:"winnerTeam"`
+	TeamAScore          int             `json:"teamAScore"`
+	TeamBScore          int             `json:"teamBScore"`
+	HasBots             bool            `json:"hasBots"`
+	AbandonedBy         *uint           `json:"abandonedBy,omitempty"`
+	ViewerSeat          int             `json:"viewerSeat"`
+	Outcome             string          `json:"outcome"`
+	EndReason           string          `json:"endReason"`
 	DeclarationsEnabled bool            `json:"declarationsEnabled"`
 	StopAtTarget        bool            `json:"stopAtTarget"`
 	Players             []MatchPlayer   `json:"players"`
@@ -339,35 +220,23 @@ type RivalStat struct {
 	Losses    int     `json:"losses"`
 }
 
-// CareerResponse is the envelope returned by GET /users/:id/career — the
-// derived stats that power the profile hero (capots), streak callout,
-// milestones, partner spotlight, and rivalries.
+// CareerResponse is the envelope returned by GET /users/:id/career.
 type CareerResponse struct {
-	Capots          int `json:"capots"`
-	AvgMatchSeconds int `json:"avgMatchSeconds"`
-	// CareerPoints is the lifetime sum of the subject's own team score across
-	// their COMPLETED matches (Story 11.3 net-new aggregate — see
-	// MatchRepository.GetCareerPointsForUser). Surfaced on both the public and
-	// self career views.
-	CareerPoints int64         `json:"careerPoints"`
-	Streak       CareerStreak  `json:"streak"`
-	BestHand     *BestHand     `json:"bestHand,omitempty"`
-	LastPlayedAt *time.Time    `json:"lastPlayedAt,omitempty"`
-	TopPartners  []PartnerStat `json:"topPartners"`
-	TopRivals    []RivalStat   `json:"topRivals"`
+	Capots          int           `json:"capots"`
+	AvgMatchSeconds int           `json:"avgMatchSeconds"`
+	CareerPoints    int64         `json:"careerPoints"`
+	Streak          CareerStreak  `json:"streak"`
+	BestHand        *BestHand     `json:"bestHand,omitempty"`
+	LastPlayedAt    *time.Time    `json:"lastPlayedAt,omitempty"`
+	TopPartners     []PartnerStat `json:"topPartners"`
+	TopRivals       []RivalStat   `json:"topRivals"`
 }
 
-// careerListLimit caps how many partner / rival rows the career endpoint
-// returns (one featured + a short list, matching the profile sidebar design).
 const careerListLimit = 4
 
 type UserHandler struct {
-	userRepo  UserRepository
-	matchRepo match.MatchRepository
-	// seasonRank is the narrow season-domain reader behind the profile's
-	// seasonRank block (Story 13.3). Nil-tolerant: a handler built without one
-	// serves seasonRank: null rather than panicking, so tests (and any future
-	// season-less deployment) need not wire it.
+	userRepo   UserRepository
+	matchRepo  match.MatchRepository
 	seasonRank SeasonRankReader
 }
 
@@ -398,12 +267,6 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		return apperr.ErrBadRequest
 	}
 
-	// Story 11.3: this endpoint is PUBLIC. The subject is ALWAYS the path id —
-	// every repo call and honor query below keys on subjectID, not authUserID.
-	// (Removing the old self-gate WITHOUT this swap would silently serve the
-	// viewer's own data under another player's URL.) A non-existent subject 404s
-	// exactly as a self-lookup did; a huge/wrapped id resolves to no user and
-	// 404s too, so there is no self-serve via truncation.
 	subjectID := uint(paramID)
 
 	u, err := h.userRepo.FindByID(subjectID)
@@ -421,30 +284,12 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 
 	level, xpIntoLevel, xpForNextLevel := LevelProgress(u.TotalXP)
 
-	// Honor (Story 9.7). The lifetime score is recomputed from the stored
-	// weights at request time — that recompute IS the authority, so it can
-	// never be stale no matter how long ago the row was last written.
 	now := time.Now().UTC()
 	honor := NewHonorSnapshot(
 		u.HonorCompletedWeight, u.HonorAbandonedWeight, u.HonorDecayedAt,
 		u.HonorCompletedTotal, u.HonorAbandonedTotal, now,
 	)
 
-	// The trend is the ONE honor figure that must query `matches`: the stored
-	// weights are running aggregates and cannot be windowed. It runs here, on
-	// the profile read path only — never on the auth envelope and never in
-	// Story 9.8's join gate. Both windows are undecayed; the windows themselves
-	// are the recency mechanism.
-	//
-	// It compares the newest window against the one before it, NOT against the
-	// lifetime score — comparing a 20-match window to a lifetime aggregate mixed
-	// two different Bayesian prior drags and made flawless active players read
-	// "Slipping" forever (code review 2026-07-29). HonorTrendWindowed enforces
-	// the equal-sample-size precondition and returns flat when it does not hold.
-	//
-	// Best-effort: a failed trend query degrades to a flat trend rather than
-	// failing the whole profile, which would take the far more important
-	// score/tier/counters down with it.
 	trendDelta, trendDirection := 0, HonorTrendFlat
 	windows, err := h.matchRepo.GetHonorTrendWindowsForUser(subjectID, HonorTrendWindow())
 	if err != nil {
@@ -457,15 +302,6 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		)
 	}
 
-	// Seasonal rank (Story 13.3): the SUBJECT's standing in the active season,
-	// keyed on subjectID like every other figure here. BEST-EFFORT, mirroring
-	// the honor trend above: a failed season read degrades to seasonRank: null
-	// rather than failing the whole profile -- the identity/honor/stats sections
-	// matter more than the chip, and nil is already the documented "not played"
-	// shape the client handles.
-	// The error is scoped to this block rather than reusing the function's `err`:
-	// a swallowed failure must not leave `err` non-nil for whatever is written
-	// below it next.
 	var seasonRank *season.SeasonRankView
 	if h.seasonRank != nil {
 		rank, rankErr := h.seasonRank.CurrentSeasonRank(subjectID, now)
@@ -476,10 +312,6 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		}
 	}
 
-	// Self → the full private profile (wallet / streak / language / username
-	// cooldown); any other viewer → the narrower public projection. The branch
-	// compares paramID as uint64 to stay wraparound-safe, mirroring the old
-	// self-gate (D86). subjectID above has already resolved the actual subject.
 	if paramID == uint64(authUserID) {
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"data": ProfileResponse{
@@ -544,15 +376,8 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 	})
 }
 
-// GetCareer returns the derived career stats for the SUBJECT (path id):
-// capots won, average match length, lifetime career points, current streak,
-// best hand, and the most-played partners / most-faced rivals. Story 11.3 made
-// it public — any authenticated viewer may read any player's career (an unknown
-// subject 404s). Like the other user endpoints, only participant usernames +
-// ids are exposed — never email, password hash, or language preference.
+// GetCareer returns the derived career stats for the subject in the path; any authenticated viewer may read them.
 func (h *UserHandler) GetCareer(c echo.Context) error {
-	// Auth is still required (the route sits under the authenticated group), but
-	// the viewer's own id is no longer the subject — the path id is (Story 11.3).
 	if _, err := getUserID(c); err != nil {
 		return apperr.ErrUnauthorized
 	}
@@ -562,10 +387,6 @@ func (h *UserHandler) GetCareer(c echo.Context) error {
 		return apperr.ErrBadRequest
 	}
 
-	// Story 11.3: career is public — the subject is the path id, and every
-	// aggregate below keys on subjectID, never authUserID (D1). An unknown
-	// subject 404s (unlike the old self-only path, which relied on the token to
-	// prove the user existed).
 	subjectID := uint(paramID)
 
 	subject, err := h.userRepo.FindByID(subjectID)
@@ -670,8 +491,7 @@ func identitiesByID(users []User) map[uint]participantIdentity {
 	return result
 }
 
-// loadIdentitiesForAggregates batches the identity lookup for all partner +
-// rival IDs into a single FindManyByIDs call, returning a map keyed by userID.
+// loadIdentitiesForAggregates loads all partner and rival identities in one query, keyed by user ID.
 func (h *UserHandler) loadIdentitiesForAggregates(partners []match.PartnerAggregate, rivals []match.RivalAggregate) (map[uint]participantIdentity, error) {
 	seen := make(map[uint]struct{}, len(partners)+len(rivals))
 	ids := make([]uint, 0, len(partners)+len(rivals))
@@ -720,19 +540,12 @@ func (h *UserHandler) UpdatePreferences(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return apperr.ErrBadRequest
 	}
-	// A plain conversion: the request and the repo update carry the same six
-	// fields, so a preference added to one but not the other fails to compile
-	// here rather than being silently dropped.
 	prefs := PreferencesUpdate(req)
 
-	// Nothing to update is a client error, not a silent 200: an empty body means
-	// the caller believes it is changing something.
 	if prefs.IsEmpty() {
 		return apperr.ErrBadRequest
 	}
 
-	// Validate EVERY supplied field before writing ANY of them, so a both-fields
-	// request with one bad value cannot half-apply.
 	if req.LanguagePreference != nil && !IsSupportedLanguage(*req.LanguagePreference) {
 		return apperr.ErrInvalidLanguage
 	}
@@ -746,19 +559,10 @@ func (h *UserHandler) UpdatePreferences(c echo.Context) error {
 		return apperr.ErrBadRequest
 	}
 
-	// ONE statement for however many fields were supplied. Sequential writes
-	// meant a multi-field request could commit the language and then fail on the
-	// deck, answering 500 with half the change persisted — the client reverts its
-	// optimistic deck and never learns its language moved. The HUD mute button
-	// sends both audio switches together for the same reason.
 	if err := h.userRepo.UpdatePreferences(authUserID, prefs); err != nil {
 		return fmt.Errorf("updating preferences: %w", err)
 	}
 
-	// Echo only what was written. A field the caller did not send is absent from
-	// the response rather than reported as "" or false — the client merges the
-	// echo into its cached user, and a zero-value echo would clobber the
-	// untouched preference (a music toggle must not report sound as off).
 	data := map[string]any{}
 	if req.LanguagePreference != nil {
 		data["languagePreference"] = *req.LanguagePreference
@@ -785,12 +589,8 @@ type UpdateUsernameRequest struct {
 	Username string `json:"username"`
 }
 
-// UpdateUsername changes the authenticated user's username. Authorisation
-// mirrors GetProfile (self-only: :id must equal the authenticated user).
-// Checks run in a deliberate order so a redundant or premature request never
-// touches the cooldown clock or leaks a uniqueness oracle beyond what register
-// already exposes: validate → load → unchanged → cooldown → taken → write.
-// The repo write independently maps a lost uniqueness race to ErrUsernameTaken.
+// UpdateUsername changes the authenticated user's own username.
+// Checks run validate, load, unchanged, cooldown, taken, then write, so a redundant request never touches the cooldown.
 func (h *UserHandler) UpdateUsername(c echo.Context) error {
 	authUserID, err := getUserID(c)
 	if err != nil {
@@ -823,19 +623,14 @@ func (h *UserHandler) UpdateUsername(c echo.Context) error {
 		return apperr.ErrUserNotFound
 	}
 
-	// No-op: changing to the exact current name never consumes the cooldown.
 	if username == u.Username {
 		return apperr.ErrUsernameUnchanged
 	}
 
-	// Cooldown: enforced against the LAST change only. A never-changed user
-	// (NULL username_changed_at) may always change.
 	if u.UsernameChangedAt != nil && time.Since(*u.UsernameChangedAt) < UsernameChangeCooldown {
 		return apperr.ErrUsernameChangeTooSoon
 	}
 
-	// Uniqueness pre-check (case-sensitive, matching registration). A row owned
-	// by a different live user means the name is taken.
 	existing, err := h.userRepo.FindByUsername(username)
 	if err != nil {
 		return fmt.Errorf("checking username: %w", err)
@@ -857,29 +652,17 @@ func (h *UserHandler) UpdateUsername(c echo.Context) error {
 	})
 }
 
-// PlayerSearchResult is the minimal per-user DTO returned by SearchUsers
-// (Story 11.1). It deliberately carries ONLY the public id + username + avatar — never
-// email, wallet, honor, or any other field — because search results are shown
-// to any authenticated player. Enriching it with honor/level chips is a
-// possible future enhancement, out of scope here (see the story Scope note).
+// PlayerSearchResult is the minimal public user DTO returned by SearchUsers: id, username and avatar only.
 type PlayerSearchResult struct {
-	ID       uint   `json:"id"`
-	Username string `json:"username"`
-	// AvatarURL is the 128 px avatar (null when none). It is on every roster
-	// already, so it widens nothing the search reveals.
+	ID        uint    `json:"id"`
+	Username  string  `json:"username"`
 	AvatarURL *string `json:"avatarUrl"`
 }
 
-// searchResultLimit caps how many rows SearchUsers returns for a single query.
 const searchResultLimit = 10
 
-// SearchUsers returns players whose username matches the `search` query as a
-// case-insensitive substring (Story 11.1, FR5). The requesting user and
-// soft-deleted users are excluded; results are ordered by username ascending
-// and capped at searchResultLimit. A missing / empty / whitespace-only `search`
-// param is a 400 (reusing the generic ErrBadRequest — no AC needs a distinct
-// code). The items slice is always non-nil so a no-match serializes as [], not
-// null, matching the client's `.length === 0` empty-state check.
+// SearchUsers returns live players other than the caller whose username contains the `search` query, case-insensitively.
+// The items slice is never nil, so no match serializes as [].
 func (h *UserHandler) SearchUsers(c echo.Context) error {
 	callerID, err := getUserID(c)
 	if err != nil {
@@ -904,18 +687,7 @@ func (h *UserHandler) SearchUsers(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": items})
 }
 
-// ListMatches returns a paginated list of matches in which the authenticated
-// user participated. Query params:
-//
-//	limit   — 1..50 (default 20)
-//	offset  — >= 0  (default 0)
-//	outcome — win | loss | abandoned | all (default all), viewer-relative
-//	sort    — new | old (default new)
-//
-// Story 11.3 made it public: the :id path param is the SUBJECT — outcome and
-// viewerSeat are computed from the subject's perspective, and an unknown
-// subject 404s. Responses never leak email, password hash, or language
-// preference — only the 4 participant usernames + ids are included.
+// ListMatches returns a paginated list of the subject's matches, with outcome and viewerSeat from the subject's side.
 func (h *UserHandler) ListMatches(c echo.Context) error {
 	_, err := getUserID(c)
 	if err != nil {
@@ -966,10 +738,7 @@ func (h *UserHandler) ListMatches(c echo.Context) error {
 	})
 }
 
-// parseMatchesQuery reads the limit/offset/outcome/sort query params and applies
-// the documented bounds + allowlists. Returns apperr.ErrBadRequest on any
-// violation. outcome normalises "" / "all" to "" (no filter); sort normalises
-// "" to "new".
+// parseMatchesQuery reads and validates the limit, offset, outcome and sort query params.
 func parseMatchesQuery(c echo.Context) (limit, offset int, outcome, sort string, err error) {
 	const defaultLimit = 20
 	const maxLimit = 50
@@ -1013,11 +782,7 @@ func parseMatchesQuery(c echo.Context) (limit, offset int, outcome, sort string,
 	return limit, offset, outcome, sort, nil
 }
 
-// loadIdentitiesForMatches gathers all participant IDs across the page and
-// issues a single batched query via userRepo.FindManyByIDs. Returns a map
-// keyed by userID so callers can project the 4 seats per match in O(1).
-// Bot seats (NULL player IDs) never reach the users lookup — the client
-// renders the localized bot name from the isBot flag.
+// loadIdentitiesForMatches loads every human participant on the page in one query, keyed by user ID.
 func (h *UserHandler) loadIdentitiesForMatches(matches []match.Match) (map[uint]participantIdentity, error) {
 	if len(matches) == 0 {
 		return map[uint]participantIdentity{}, nil
@@ -1046,18 +811,14 @@ func (h *UserHandler) loadIdentitiesForMatches(matches []match.Match) (map[uint]
 	return identitiesByID(users), nil
 }
 
-// teamForSeat returns 0 for team A, 1 for team B — seats 0/2 are team A, 1/3 are team B.
-// Duplicated locally instead of importing the game package to keep the user
-// package free of game-engine coupling.
+// teamForSeat returns 0 for seats 0 and 2 and 1 for seats 1 and 3.
 func teamForSeat(seat int) int { return seat % 2 }
 
-// buildMatchListItem projects a DB Match + preloaded Hands into the viewer-
-// specific response DTO (derives viewerSeat and outcome server-side).
+// buildMatchListItem projects a match and its hands into the viewer-specific list item.
 func buildMatchListItem(m match.Match, viewerID uint, identities map[uint]participantIdentity) MatchListItem {
 	seats := [4]*uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID}
 	botFlags := [4]bool{m.Player1IsBot, m.Player2IsBot, m.Player3IsBot, m.Player4IsBot}
 
-	// The viewer is always human — bot seats (NULL IDs) are skipped.
 	viewerSeat := 0
 	for i, id := range seats {
 		if id != nil && *id == viewerID {
@@ -1078,15 +839,6 @@ func buildMatchListItem(m match.Match, viewerID uint, identities map[uint]partic
 		players = append(players, p)
 	}
 
-	// Outcome is per-player on abandoned rows: the abandoner keeps "abandoned";
-	// partner/opponents get loss/win from winner_team (the non-abandoning team,
-	// persisted live and backfilled by migration 000015). winner_team is only
-	// meaningful when AbandonedBy is set — NULL-abandoner rows (boot-reconcile)
-	// stay "abandoned" for all four seats.
-	// Invariant: win/loss is derived from winner_team ONLY for "completed" rows
-	// and attributable "abandoned" rows — the repository returns no other
-	// status, and any unexpected value must never invent a win (it keeps the
-	// safe "loss" default rather than reading a meaningless winner_team).
 	outcome := "loss"
 	switch {
 	case m.Status == "abandoned" && (m.AbandonedBy == nil || *m.AbandonedBy == viewerID):
@@ -1096,8 +848,6 @@ func buildMatchListItem(m match.Match, viewerID uint, identities map[uint]partic
 		outcome = "win"
 	}
 
-	// Why the match ended — drives the client's "ended early" marker with
-	// distinct abandonment/surrender wording.
 	endReason := "natural"
 	if m.Status == "abandoned" {
 		endReason = "abandonment"

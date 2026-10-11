@@ -20,28 +20,14 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// ssoUsernameStripRegex removes everything a username may not contain; the
-// complement of the usernameRegex alphabet used by Register.
 var ssoUsernameStripRegex = regexp.MustCompile(`[^a-zA-Z0-9_]`)
 
 const (
-	// ssoUsernameMaxSequentialAttempts caps the base, base1, base2, …
-	// uniquification probes — each one is a FindByUsername round-trip, so the
-	// sequential walk must stay short.
 	ssoUsernameMaxSequentialAttempts = 20
-	// ssoUsernameMaxRandomAttempts bounds the random-suffix fallback used once
-	// the sequential space is crowded; collisions there are astronomically
-	// unlikely, the bound just guarantees termination.
-	ssoUsernameMaxRandomAttempts = 20
-	// ssoRegisterMaxAttempts bounds create retries when the generated username
-	// loses an insert race (unique violation despite the FindByUsername probe).
-	ssoRegisterMaxAttempts = 3
-	// ssoCredentialMaxLen is a cheap upper bound on the raw credential — real
-	// Google ID tokens are well under this; anything larger is garbage we must
-	// not ship to the verifier.
-	ssoCredentialMaxLen = 4096
-	// ssoEmailMaxLen matches the users.email column width.
-	ssoEmailMaxLen = 255
+	ssoUsernameMaxRandomAttempts     = 20
+	ssoRegisterMaxAttempts           = 3
+	ssoCredentialMaxLen              = 4096
+	ssoEmailMaxLen                   = 255
 )
 
 type SSOLoginRequest struct {
@@ -53,11 +39,8 @@ type SSOLinkRequest struct {
 	Password   string `json:"password"`
 }
 
-// SSOLogin handles POST /auth/sso/:provider — one endpoint for both SSO login
-// and SSO registration, decided by whether the verified (provider, subject)
-// identity already exists. An email collision with a local account is never
-// auto-linked: it returns SSO_LINK_REQUIRED and the client confirms with the
-// account password via SSOLink.
+// SSOLogin handles POST /auth/sso/:provider, logging in a known identity or registering a new one.
+// An email collision with a local account is never auto-linked; it returns SSO_LINK_REQUIRED for SSOLink.
 func (h *AuthHandler) SSOLogin(c echo.Context) error {
 	var req SSOLoginRequest
 	if err := c.Bind(&req); err != nil {
@@ -74,15 +57,10 @@ func (h *AuthHandler) SSOLogin(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	// A verifier bug aside, a subject-less identity is nothing we can match or
-	// register — refuse it before it touches any lookup.
 	if ext.Subject == "" {
 		return apperr.ErrSSOInvalidCredential
 	}
 
-	// Known identity → plain login, before any email gating: the email was
-	// verified when the link was made, and Google-side flag churn must not
-	// lock an already-linked player out.
 	ident, err := h.identityRepo.FindByProviderSubject(provider.Name(), ext.Subject)
 	if err != nil {
 		return fmt.Errorf("finding identity: %w", err)
@@ -93,16 +71,11 @@ func (h *AuthHandler) SSOLogin(c echo.Context) error {
 			return fmt.Errorf("finding user: %w", err)
 		}
 		if u == nil {
-			// Identity outlived its (soft-deleted) user — treat as a dead login,
-			// not as a fresh registration slot for a taken email.
 			return apperr.ErrInvalidCredentials
 		}
 		return h.issueSession(c, u, http.StatusOK)
 	}
 
-	// From here on we act on the provider-reported email, so it must be one
-	// the provider itself has verified — and shaped like something the users
-	// table can actually hold.
 	if !ext.EmailVerified {
 		return apperr.ErrSSOEmailUnverified
 	}
@@ -116,8 +89,6 @@ func (h *AuthHandler) SSOLogin(c echo.Context) error {
 		return fmt.Errorf("checking email: %w", err)
 	}
 	if existing != nil {
-		// Never auto-link on email match alone — the owner must confirm with
-		// the account's password (SSOLink). No identity row is created here.
 		return apperr.ErrSSOLinkRequired
 	}
 
@@ -131,10 +102,6 @@ func (h *AuthHandler) SSOLogin(c echo.Context) error {
 		ProviderUserID: ext.Subject,
 		Email:          email,
 	}); err != nil {
-		// Compensate: without its identity row the passwordless user is
-		// unreachable and its email is bricked (SSOLink rejects the empty
-		// password-hash sentinel), so soft-delete the just-created user — the
-		// partial unique indexes free the email/username again.
 		if delErr := h.userRepo.Delete(u.ID); delErr != nil {
 			slog.Error("failed to compensate orphaned sso user", "error", delErr, "userId", u.ID)
 		}
@@ -143,14 +110,8 @@ func (h *AuthHandler) SSOLogin(c echo.Context) error {
 	return h.issueSession(c, u, http.StatusCreated)
 }
 
-// createSSOUser inserts the passwordless user row for an SSO registration,
-// mirroring Register's seeding exactly (wallet 5000, streak 0, last_login
-// stamped today UTC — see Register for the rationale) with a generated
-// username and the empty-string password-hash sentinel meaning "no password
-// set". Insert-time unique violations — which the pre-checks cannot rule out
-// under concurrency — are handled here: a lost email race answers exactly like
-// the pre-check (ErrSSOLinkRequired), and a lost username race regenerates and
-// retries a bounded number of times.
+// createSSOUser inserts a passwordless user seeded like Register, with a generated username.
+// A lost email race returns ErrSSOLinkRequired; a lost username race regenerates and retries.
 func (h *AuthHandler) createSSOUser(email, displayName string) (*user.User, error) {
 	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
@@ -165,9 +126,6 @@ func (h *AuthHandler) createSSOUser(email, displayName string) (*user.User, erro
 			Username:           username,
 			PasswordHash:       "",
 			LanguagePreference: "en",
-			// SSO carries no language input, so there is nothing to derive a deck
-			// from — French, matching the "en" above. The player switches decks
-			// from Settings or the profile panel like anyone else (Story 12.4).
 			CardDeckPreference: user.CardDeckFrench,
 			WalletBalance:      5000,
 			LoginStreakDays:    0,
@@ -178,26 +136,18 @@ func (h *AuthHandler) createSSOUser(email, displayName string) (*user.User, erro
 		case err == nil:
 			return u, nil
 		case errors.Is(err, apperr.ErrEmailTaken):
-			// A concurrent password registration (or a duplicate SSO first
-			// login) won the email — same answer as the pre-check: link.
 			return nil, apperr.ErrSSOLinkRequired
 		case errors.Is(err, apperr.ErrUsernameTaken):
-			lastErr = err // regenerate and retry
+			lastErr = err
 		default:
 			return nil, fmt.Errorf("creating user: %w", err)
 		}
 	}
-	// Deliberately %v, not %w: exhausting the retries is an internal failure
-	// (500), and preserving ErrUsernameTaken in the chain would misreport it
-	// as a 409 for a username the player never chose.
 	return nil, fmt.Errorf("creating sso user: username collided %d times: %v", ssoRegisterMaxAttempts, lastErr)
 }
 
-// SSOLink handles POST /auth/sso/:provider/link — links a verified SSO
-// identity to the existing local account with the same email, gated on that
-// account's password. A missing account, a passwordless (SSO-only) account,
-// and a wrong password are deliberately indistinguishable (all 401
-// INVALID_CREDENTIALS) so the endpoint is no better an oracle than login.
+// SSOLink handles POST /auth/sso/:provider/link, linking a verified identity to the same-email account after a password check.
+// Missing accounts, passwordless accounts, and wrong passwords all answer 401 so it is no better an oracle than login.
 func (h *AuthHandler) SSOLink(c echo.Context) error {
 	var req SSOLinkRequest
 	if err := c.Bind(&req); err != nil {
@@ -233,9 +183,6 @@ func (h *AuthHandler) SSOLink(c echo.Context) error {
 		return apperr.ErrInvalidCredentials
 	}
 
-	// A concurrent link/registration race surfaces here as the repo's mapped
-	// unique-violation (ErrSSOIdentityInUse) — nothing to unwind, the identity
-	// row is the only write.
 	if err := h.identityRepo.Create(&identity.Identity{
 		UserID:         u.ID,
 		Provider:       provider.Name(),
@@ -243,10 +190,6 @@ func (h *AuthHandler) SSOLink(c echo.Context) error {
 		Email:          email,
 	}); err != nil {
 		if errors.Is(err, apperr.ErrSSOIdentityInUse) {
-			// Idempotency: a retry after a lost response (or a concurrent
-			// duplicate of the same link) conflicts on a row that already says
-			// exactly what we were about to write. If the (provider, subject)
-			// identity belongs to THIS user, the link exists — succeed.
 			existing, findErr := h.identityRepo.FindByProviderSubject(provider.Name(), ext.Subject)
 			if findErr != nil {
 				return fmt.Errorf("re-checking identity: %w", findErr)
@@ -260,10 +203,7 @@ func (h *AuthHandler) SSOLink(c echo.Context) error {
 	return h.issueSession(c, u, http.StatusOK)
 }
 
-// validateSSOCredential rejects obviously unusable credentials before any
-// verifier round-trip: an empty/whitespace body is a client bug (and would
-// otherwise slog.Warn per request), an oversized one is garbage no real ID
-// token ever reaches.
+// validateSSOCredential rejects blank or oversized credentials before any verifier round-trip.
 func validateSSOCredential(credential string) error {
 	if strings.TrimSpace(credential) == "" || len(credential) > ssoCredentialMaxLen {
 		return apperr.ErrSSOInvalidCredential
@@ -307,10 +247,8 @@ func normalizeSSOEmail(raw string) string {
 	return email
 }
 
-// generateSSOUsername derives a unique username for an SSO registration:
-// sanitize the display name to the username alphabet, fall back to the email
-// local-part, then to "player"; clamp to the 3-20 length window and uniquify
-// with a numeric suffix.
+// generateSSOUsername derives a unique 3-20 char username from the display name, email local-part, or "player".
+// It tries sequential numeric suffixes first, then random ones once the sequential space is crowded.
 func (h *AuthHandler) generateSSOUsername(displayName, email string) (string, error) {
 	base := ssoUsernameStripRegex.ReplaceAllString(displayName, "")
 	if len(base) < 3 {
@@ -339,8 +277,6 @@ func (h *AuthHandler) generateSSOUsername(displayName, email string) (string, er
 		candidate = suffixUsername(base, strconv.Itoa(i))
 	}
 
-	// The sequential space is crowded — switch to random numeric suffixes so a
-	// popular base costs O(1) probes instead of a linear scan.
 	for i := 0; i < ssoUsernameMaxRandomAttempts; i++ {
 		candidate = suffixUsername(base, strconv.Itoa(rand.IntN(100_000_000)))
 		existing, err := h.userRepo.FindByUsername(candidate)

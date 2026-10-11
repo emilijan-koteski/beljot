@@ -2,11 +2,7 @@ import { useDailyRewardGate } from "@/features/lobby/hooks/useDailyRewardGate";
 
 import { DailyRewardDialog } from "./DailyRewardDialog";
 
-/**
- * DailyRewardGate runs the once-per-session daily-login claim (via the gate
- * hook) and renders the reward dialog when a bonus was granted. Mount it once
- * in the authenticated shell (AppLayout). Renders nothing until a reward opens.
- */
+/** Runs the once-per-session daily-login claim and shows the reward dialog when a bonus was granted. */
 export function DailyRewardGate() {
   const { reward, open, close } = useDailyRewardGate();
 

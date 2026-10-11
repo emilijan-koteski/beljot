@@ -1,7 +1,3 @@
-// package season_test, NOT season, and the distinction is MANDATORY: this file
-// imports `user` for its fixtures, and Story 13.3 opened the `user` -> `season`
-// edge (the profile's SeasonRankReader). An in-package test importing `user`
-// would close the cycle season(test) -> user -> season and stop compiling.
 package season_test
 
 import (
@@ -21,8 +17,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// --- Integration tests (Postgres; skipped when the DB is unavailable) ---
-
 func getTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
@@ -36,8 +30,6 @@ func getTestDB(t *testing.T) *gorm.DB {
 		t.Skip("skipping integration test: database not available")
 	}
 
-	// Per-test transaction rolled back on cleanup — tests create their own data
-	// and never touch seed rows or another test's rows.
 	tx := db.Begin()
 	t.Cleanup(func() { tx.Rollback() })
 	return tx
@@ -190,7 +182,6 @@ func TestApplySeasonPoints_FirstMatchInsertsTheRow(t *testing.T) {
 	assert.Equal(t, 0, snaps[loser.ID].PreviousSP)
 	assert.Equal(t, "iron", snaps[loser.ID].Tier)
 
-	// Presence no longer gates the change; it only drives games_completed.
 	assert.Equal(t, 36, snaps[absent.ID].SP)
 	assert.Equal(t, 1, snaps[absent.ID].GamesPlayed)
 	assert.Equal(t, 0, snaps[absent.ID].GamesCompleted)
@@ -286,7 +277,6 @@ func TestApplySeasonPoints_WritesTheDivision(t *testing.T) {
 		})
 	}
 
-	// A drop out of Master writes the division back.
 	snaps, err = applyAwards(repo, s.ID, map[uint]fixedAward{master.ID: {change: -100, completed: true}})
 	require.NoError(t, err)
 	row, err := repo.FindPlayerSeason(master.ID, s.ID)
@@ -319,10 +309,7 @@ func TestService_EndedSeasonsReadTheStoredRank(t *testing.T) {
 	now := time.Date(2082, time.November, 15, 0, 0, 0, 0, time.UTC)
 
 	u := makeUser(t, db, "mx-u1@s.test")
-	// Q3: the old climb-only formula's 3500 SP, stored as a bare "gold". On the
-	// live floors 3500 would derive Grandmaster.
 	insertPreDivisionRow(t, db, u.ID, q3.ID, 3500, "gold", 90)
-	// Q4: written by the new award path, so it carries its division.
 	_, err := applyAwards(repo, q4.ID, map[uint]fixedAward{u.ID: {change: 700, completed: true}})
 	require.NoError(t, err)
 
@@ -349,8 +336,6 @@ func TestService_EndedSeasonsReadTheStoredRank(t *testing.T) {
 	require.NotNil(t, current.Viewer)
 	assert.Equal(t, intPtr(2), current.Viewer.Division)
 
-	// The same Q4 row once Q4 has ENDED: the archive now lists it, from its
-	// stored snapshot, division included.
 	later := q4.EndsAt.Add(time.Hour)
 	archive, err = svc.ArchiveView(u.ID, later)
 	require.NoError(t, err)
@@ -488,8 +473,6 @@ func TestApplySeasonPoints_UnknownUserRollsBackTheBatch(t *testing.T) {
 	s := makeSeason(t, db, time.Date(2095, time.October, 1, 0, 0, 0, 0, time.UTC))
 	good := makeUser(t, db, "sp-good@s.test")
 
-	// A deliberately unassigned id, ordered AFTER the real one so the good row
-	// has already been inserted inside the transaction when the bad one fails.
 	_, err := applyAwards(repo, s.ID, map[uint]fixedAward{
 		good.ID:              {change: 200, completed: true},
 		good.ID + 10_000_000: {change: 200, completed: true},
@@ -501,13 +484,8 @@ func TestApplySeasonPoints_UnknownUserRollsBackTheBatch(t *testing.T) {
 	assert.Nil(t, row, "the successful seat's write must have rolled back with the batch")
 }
 
-// THE LOST-UPDATE GUARD, against real Postgres with two real transactions. Two
-// matches finish at once and share a player. The first to lock the shared row
-// holds it through a slow computation; the second must WAIT, then compute from
-// the first's committed total, so both changes land. It needs committed rows two
-// separate transactions can contend on, so it commits and hard-deletes its own
-// rows on cleanup (the wallet concurrency tests' pattern), and it runs only
-// against the database BELJOT_DB_URL names.
+// TestApplySeasonPoints_ConcurrentMatchesSharingAPlayerLoseNoChange runs two real
+// transactions on a shared player and checks the second waits so both changes land.
 func TestApplySeasonPoints_ConcurrentMatchesSharingAPlayerLoseNoChange(t *testing.T) {
 	dsn := os.Getenv("BELJOT_DB_URL")
 	if dsn == "" {
@@ -517,13 +495,10 @@ func TestApplySeasonPoints_ConcurrentMatchesSharingAPlayerLoseNoChange(t *testin
 	if err != nil {
 		t.Skip("skipping integration test: database not available")
 	}
-	// Registered first so it runs LAST, after the row cleanup below.
 	if sqlDB, err := db.DB(); err == nil {
 		t.Cleanup(func() { _ = sqlDB.Close() })
 	}
 
-	// A quarter no other test uses; a run that crashed before its cleanup is
-	// cleared first so the unique started_at cannot fail this one.
 	start := time.Date(2150, time.January, 1, 0, 0, 0, 0, time.UTC)
 	db.Exec(`DELETE FROM player_seasons WHERE season_id IN (SELECT id FROM seasons WHERE started_at = ?)`, start)
 	db.Exec(`DELETE FROM seasons WHERE started_at = ?`, start)
@@ -542,9 +517,6 @@ func TestApplySeasonPoints_ConcurrentMatchesSharingAPlayerLoseNoChange(t *testin
 	})
 	repo := season.NewGormRepository(db)
 
-	// A COMMITTED prior total for the shared player, so both matches find an
-	// existing row and only SELECT ... FOR UPDATE can serialise them (with no
-	// prior row the unique-index wait on the zero-row INSERT would do it alone).
 	_, err = applyAwards(repo, s.ID, map[uint]fixedAward{shared.ID: {change: 100, completed: true}})
 	require.NoError(t, err)
 
@@ -562,8 +534,6 @@ func TestApplySeasonPoints_ConcurrentMatchesSharingAPlayerLoseNoChange(t *testin
 				mu.Lock()
 				seen = append(seen, current[shared.ID])
 				mu.Unlock()
-				// Whoever locks first holds the row long enough for the other
-				// transaction to reach the lock and wait on it.
 				first.Do(func() { time.Sleep(300 * time.Millisecond) })
 				return map[uint]int{shared.ID: 30, other: 10}, nil
 			})
@@ -605,9 +575,6 @@ func TestService_ApplySeasonPoints_ScoresFromThePreMatchRows(t *testing.T) {
 	require.NoError(t, err)
 	pre := map[uint]int{strong.ID: 900, weak.ID: 10, mid.ID: 400}
 
-	// mid + a bot (avg 500) beat strong + weak (avg 455) 1100:700, so the losers
-	// were the underdogs and lose about 16; weak is on 10 SP, so the floor binds.
-	// mid dropped before the end and is scored anyway.
 	outcome := match.MatchOutcome{
 		Seats: [4]match.OutcomeSeat{
 			{UserID: strong.ID, Team: 0, Completed: true},
@@ -641,8 +608,6 @@ func TestService_ApplySeasonPoints_ScoresFromThePreMatchRows(t *testing.T) {
 	assert.Equal(t, 1, row.GamesCompleted, "an absent seat is scored but completes nothing")
 	assert.Equal(t, 2, row.GamesPlayed)
 }
-
-// --- Story 13.2: leaderboard reads ---
 
 // seedStanding creates a user and drops them into the season with a fixed SP
 // total, going through ApplySeasonPoints so the rows are written exactly the way
@@ -681,17 +646,12 @@ func TestLeaderboardPage_OrdersBySPDescending(t *testing.T) {
 		[]uint{entries[0].UserID, entries[1].UserID, entries[2].UserID},
 		"best SP first")
 	assert.Equal(t, 9000, entries[0].SP)
-	// The username comes from the JOIN, not from a second query or a `season` ->
-	// `user` Go import (Story 13.2 D2).
 	assert.Equal(t, high.Username, entries[0].Username)
 	assert.Equal(t, 1, entries[0].GamesPlayed)
 }
 
-// The tiebreak is not cosmetic: without a second ORDER BY column two players on
-// equal SP can swap between the page-1 and page-2 queries and be duplicated or
-// skipped. Ascending user_id is the tiebreak, and CountAhead counts under it.
-// The page and the viewer entry select the stored rank snapshot beside SP, so
-// an ended season can show the rank each row finished on (Story 13.5).
+// TestLeaderboardReads_SelectTheStoredRank checks ties break by ascending user_id across
+// pages and CountAhead, and that reads return the stored rank snapshot.
 func TestLeaderboardReads_SelectTheStoredRank(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
@@ -757,7 +717,6 @@ func TestLeaderboardPage_BreaksTiesByAscendingUserID(t *testing.T) {
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2095, time.April, 1, 0, 0, 0, 0, time.UTC))
 
-	// Created in ascending id order, all on the same SP.
 	a := seedStanding(t, db, repo, s.ID, "lb-t1@s.test", 900)
 	b := seedStanding(t, db, repo, s.ID, "lb-t2@s.test", 900)
 	c := seedStanding(t, db, repo, s.ID, "lb-t3@s.test", 900)
@@ -770,10 +729,8 @@ func TestLeaderboardPage_BreaksTiesByAscendingUserID(t *testing.T) {
 		[]uint{entries[0].UserID, entries[1].UserID, entries[2].UserID})
 }
 
-// THE PREDICATE A REVIEWER SHOULD CHECK FIRST. Table()/Joins() takes GORM out of
-// model-land, so the soft-delete scope does NOT apply automatically and
-// `users.deleted_at IS NULL` is written by hand. A deleted account must vanish
-// from the items AND from the total, or the two contradict each other.
+// TestLeaderboardPage_ExcludesSoftDeletedUsers checks the hand-written
+// `users.deleted_at IS NULL` drops deleted accounts from both items and total.
 func TestLeaderboardPage_ExcludesSoftDeletedUsers(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
@@ -782,7 +739,6 @@ func TestLeaderboardPage_ExcludesSoftDeletedUsers(t *testing.T) {
 	alive := seedStanding(t, db, repo, s.ID, "lb-al@s.test", 1000)
 	gone := seedStanding(t, db, repo, s.ID, "lb-gn@s.test", 50000)
 
-	// Soft delete, the way the app does: GORM stamps deleted_at, the row stays.
 	require.NoError(t, db.Delete(&user.User{}, gone.ID).Error)
 
 	entries, total, err := repo.LeaderboardPage(s.ID, 10, 0)
@@ -792,9 +748,6 @@ func TestLeaderboardPage_ExcludesSoftDeletedUsers(t *testing.T) {
 	assert.Equal(t, alive.ID, entries[0].UserID,
 		"a deleted account must not keep the top slot forever")
 
-	// And the player_seasons row is still there — this is a VISIBILITY filter,
-	// not a cascade, so the test proves the query excluded it rather than the
-	// data having disappeared.
 	row, err := repo.FindPlayerSeason(gone.ID, s.ID)
 	require.NoError(t, err)
 	require.NotNil(t, row)
@@ -811,7 +764,6 @@ func TestLeaderboardPage_OffsetPagingHasNoGapsOrDuplicates(t *testing.T) {
 	const n = 7
 	want := make([]uint, 0, n)
 	for i := 0; i < n; i++ {
-		// Descending SP so creation order is also ladder order.
 		u := seedStanding(t, db, repo, s.ID, fmt.Sprintf("lb-p%d@s.test", i), (n-i)*100)
 		want = append(want, u.ID)
 	}
@@ -830,7 +782,6 @@ func TestLeaderboardPage_OffsetPagingHasNoGapsOrDuplicates(t *testing.T) {
 	}
 	assert.Equal(t, want, got, "the pages concatenate back into the full ladder exactly once")
 
-	// Offset past the end: an empty page, and the total is unchanged.
 	entries, total, err := repo.LeaderboardPage(s.ID, 10, 999)
 	require.NoError(t, err)
 	assert.Empty(t, entries)
@@ -849,17 +800,13 @@ func TestLeaderboardPage_EmptySeasonIsEmptyNotAnError(t *testing.T) {
 	assert.NotNil(t, entries, "an empty page is a slice, so it serializes as [] not null")
 }
 
-// THE INVARIANT THE WHOLE STORY TURNS ON: CountAhead + 1 must equal the row's own
-// slot in the list, for EVERY player — tied and untied alike. If the two
-// predicates ever diverge, a viewer is told a position that contradicts the list
-// they are standing in, and nothing else would notice.
+// TestLeaderboardCountAhead_AgreesWithEveryRowsListPosition checks CountAhead + 1 equals
+// every row's list position, tied or not.
 func TestLeaderboardCountAhead_AgreesWithEveryRowsListPosition(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2094, time.April, 1, 0, 0, 0, 0, time.UTC))
 
-	// Deliberately messy: a clear leader, a three-way tie in the middle, and a
-	// two-way tie at the bottom.
 	sps := []int{5000, 900, 900, 900, 100, 100}
 	for i, sp := range sps {
 		seedStanding(t, db, repo, s.ID, fmt.Sprintf("lb-c%d@s.test", i), sp)
@@ -876,9 +823,6 @@ func TestLeaderboardCountAhead_AgreesWithEveryRowsListPosition(t *testing.T) {
 			e.UserID, e.SP, i+1, i)
 	}
 
-	// Spelled out for the tie specifically: the three players on 900 SP get
-	// DISTINCT positions 2, 3, 4 — not the same number, which a plain
-	// COUNT(sp > 900) would hand all three.
 	tied := make([]int64, 0, 3)
 	for _, e := range entries {
 		if e.SP != 900 {
@@ -935,12 +879,8 @@ func TestLeaderboardPage_IsScopedToOneSeason(t *testing.T) {
 	assert.NotEqual(t, mine.ID, theirs.ID)
 }
 
-// --- Review follow-ups (P1, P7, P8) ---
-
-// insertUnplayedRow writes a player_seasons row with games_played = 0.
-// ApplySeasonPoints never commits one (its zero row is updated in the same
-// transaction), so it is inserted raw purely to prove the games_played >= 1
-// half of the membership predicate is real and not vacuous.
+// insertUnplayedRow writes a raw player_seasons row with games_played = 0, a state
+// ApplySeasonPoints never commits.
 func insertUnplayedRow(t *testing.T, db *gorm.DB, seasonID uint, email string) *user.User {
 	t.Helper()
 	u := makeUser(t, db, email)
@@ -950,10 +890,8 @@ func insertUnplayedRow(t *testing.T, db *gorm.DB, seasonID uint, email string) *
 	return u
 }
 
-// THE LADDER IS EVERYONE WHO PLAYED (Story 13.4). A player who has lost back
-// down to 0 SP is still on it, at a real position, while a row with no games
-// played is not: the real-Postgres proof that `games_played >= 1` governs the
-// items AND the total.
+// TestLeaderboardPage_ListsPlayersAtZeroSP checks a player at 0 SP stays on the ladder
+// while a row with no games played is excluded from items and total.
 func TestLeaderboardPage_ListsPlayersAtZeroSP(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
@@ -972,8 +910,6 @@ func TestLeaderboardPage_ListsPlayersAtZeroSP(t *testing.T) {
 	assert.Equal(t, 0, entries[1].SP)
 	assert.Equal(t, 1, entries[1].GamesPlayed)
 
-	// The unplayed row exists; it is simply not ON the ladder. A visibility rule,
-	// not a delete.
 	row, err := repo.FindPlayerSeason(unplayed.ID, s.ID)
 	require.NoError(t, err)
 	require.NotNil(t, row)
@@ -1003,7 +939,6 @@ func TestLeaderboardCountAhead_AgreesWithTheListAtZeroSP(t *testing.T) {
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2092, time.January, 1, 0, 0, 0, 0, time.UTC))
 
-	// 0-SP players deliberately interleaved with the others by creation order.
 	seedStanding(t, db, repo, s.ID, "lb-x0@s.test", 0)
 	seedStanding(t, db, repo, s.ID, "lb-x1@s.test", 4000)
 	insertUnplayedRow(t, db, s.ID, "lb-x5@s.test")
@@ -1033,7 +968,7 @@ func TestLeaderboardFindEntry_MissesTheThreeUnlistableCases(t *testing.T) {
 	repo := season.NewGormRepository(db)
 	s := makeSeason(t, db, time.Date(2092, time.April, 1, 0, 0, 0, 0, time.UTC))
 
-	never := makeUser(t, db, "lb-e1@s.test") // no player_seasons row at all
+	never := makeUser(t, db, "lb-e1@s.test")
 	unplayed := insertUnplayedRow(t, db, s.ID, "lb-e2@s.test")
 	gone := seedStanding(t, db, repo, s.ID, "lb-e3@s.test", 8000)
 	live := seedStanding(t, db, repo, s.ID, "lb-e4@s.test", 1200)
@@ -1050,8 +985,6 @@ func TestLeaderboardFindEntry_MissesTheThreeUnlistableCases(t *testing.T) {
 		assert.Nil(t, got, "%s must have no listable standing", name)
 	}
 
-	// The controls: a live player gets one, carrying the joined username, and so
-	// does a player who has played down to 0 SP.
 	got, err := repo.FindLeaderboardEntry(s.ID, live.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
@@ -1065,9 +998,6 @@ func TestLeaderboardFindEntry_MissesTheThreeUnlistableCases(t *testing.T) {
 	require.NotNil(t, got, "a played 0-SP player has a standing")
 	assert.Equal(t, 0, got.SP)
 
-	// AND THE POINT OF THE WHOLE FINDING: FindPlayerSeason — the method the viewer
-	// block used to call — still happily returns the soft-deleted account's row.
-	// That asymmetry is why FindLeaderboardEntry exists.
 	leaky, err := repo.FindPlayerSeason(gone.ID, s.ID)
 	require.NoError(t, err)
 	require.NotNil(t, leaky, "FindPlayerSeason has no users join, by design")
@@ -1088,10 +1018,8 @@ func TestLeaderboardFindEntry_IsScopedToOneSeason(t *testing.T) {
 	assert.Nil(t, got, "a standing in another window is not a standing in this one")
 }
 
-// P8: the bounds check at the Go boundary. `limit` feeds both a slice
-// pre-allocation (which PANICS on a negative) and SQL LIMIT (where a negative
-// means "no limit" and returns the entire season) — so an unchecked argument is
-// either a crash or a silent full-table read, neither attributable to the caller.
+// TestLeaderboardPage_RejectsOutOfRangeArguments checks bad limits are rejected before
+// they can panic the slice allocation or become an unbounded SQL LIMIT.
 func TestLeaderboardPage_RejectsOutOfRangeArguments(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
@@ -1117,46 +1045,32 @@ func TestLeaderboardPage_RejectsOutOfRangeArguments(t *testing.T) {
 		})
 	}
 
-	// The smallest legal page still works, so the guard is not off by one.
 	entries, total, err := repo.LeaderboardPage(s.ID, 1, 0)
 	require.NoError(t, err)
 	assert.Len(t, entries, 1)
 	assert.Equal(t, int64(2), total)
 }
 
-// --- Story 13.3: archive, seasons list, by-id lookup, rollover ---
-
-// THE ARCHIVE'S MEMBERSHIP RULE, spelled out against real Postgres:
-// row exists AND games_played >= 1 AND the season ENDED. One test seeds all four
-// boundary cases at once so the predicate is proven as a whole, plus the
-// newest-first order.
+// TestPlayerSeasonArchive_MembershipAndOrder checks the archive holds only ended seasons
+// with games_played >= 1, newest first.
 func TestPlayerSeasonArchive_MembershipAndOrder(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
 	u := makeUser(t, db, "ar-u1@s.test")
 
-	// Three ended windows (2089 Q1..Q3) and the "active" one (2089 Q4) — active
-	// relative to the `now` this test passes, which sits inside Q4.
 	q1 := makeSeason(t, db, time.Date(2089, time.January, 1, 0, 0, 0, 0, time.UTC))
 	q2 := makeSeason(t, db, time.Date(2089, time.April, 1, 0, 0, 0, 0, time.UTC))
 	q3 := makeSeason(t, db, time.Date(2089, time.July, 1, 0, 0, 0, 0, time.UTC))
 	q4 := makeSeason(t, db, time.Date(2089, time.October, 1, 0, 0, 0, 0, time.UTC))
 	now := time.Date(2089, time.November, 15, 12, 0, 0, 0, time.UTC)
 
-	// Q1: played, earned SP — the ordinary archive row.
 	_, err := applyAwards(repo, q1.ID, map[uint]fixedAward{u.ID: {change: 1800, completed: true}})
 	require.NoError(t, err)
-	// Q2: played but ended on 0 SP (a floored loss) — MUST be included; the
-	// archive is "seasons you actually played".
 	_, err = applyAwards(repo, q2.ID, map[uint]fixedAward{u.ID: {change: -30, completed: false}})
 	require.NoError(t, err)
-	// Q3: a row with games_played = 0. ApplySeasonPoints can never write one
-	// (it always counts the game), so it is inserted raw purely to prove the
-	// games_played >= 1 half of the predicate is real and not vacuous.
 	require.NoError(t, db.Exec(`
 		INSERT INTO player_seasons (user_id, season_id, sp, rank_tier, games_played, games_completed, created_at, updated_at)
 		VALUES (?, ?, 0, 'iron', 0, 0, NOW(), NOW())`, u.ID, q3.ID).Error)
-	// Q4: played in the ACTIVE window — excluded, its record is still moving.
 	_, err = applyAwards(repo, q4.ID, map[uint]fixedAward{u.ID: {change: 500, completed: true}})
 	require.NoError(t, err)
 
@@ -1164,7 +1078,6 @@ func TestPlayerSeasonArchive_MembershipAndOrder(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, entries, 2, "Q1 (earned) and Q2 (played, 0 SP) only")
 
-	// Newest-first: Q2 (Apr) before Q1 (Jan).
 	assert.Equal(t, q2.ID, entries[0].SeasonID)
 	assert.Equal(t, "2089 Q2", entries[0].SeasonName)
 	assert.Equal(t, 0, entries[0].SP, "the 0-SP played season is archive history")
@@ -1174,7 +1087,6 @@ func TestPlayerSeasonArchive_MembershipAndOrder(t *testing.T) {
 
 	assert.Equal(t, q1.ID, entries[1].SeasonID)
 	assert.Equal(t, 1800, entries[1].SP, "the prior row is read back unchanged")
-	// The stored rank snapshot rides along (Story 13.5): what the award wrote.
 	assert.Equal(t, "grandmaster", entries[1].RankTier)
 	assert.Nil(t, entries[1].RankDivision)
 	assert.Equal(t, "iron", entries[0].RankTier)
@@ -1214,13 +1126,8 @@ func TestPlayerSeasonArchive_UnknownUserIsEmpty(t *testing.T) {
 	assert.Empty(t, entries)
 }
 
-// A SOFT-DELETED SUBJECT HAS NO READABLE HISTORY. Same reasoning as
-// TestLeaderboardPage_ExcludesSoftDeletedUsers, and the same hand-written
-// `users.deleted_at IS NULL`: without the users join this endpoint would serve a
-// deleted account's whole season history to any authenticated caller while the
-// ladder scrubs the same user. The answer must be an EMPTY archive — a 200 with
-// no items, indistinguishable from an unknown id — never a 404, which is the
-// profile query's job, not this endpoint's.
+// TestPlayerSeasonArchive_ExcludesSoftDeletedUser checks a soft-deleted user's archive
+// comes back empty rather than as a 404.
 func TestPlayerSeasonArchive_ExcludesSoftDeletedUser(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
@@ -1233,7 +1140,6 @@ func TestPlayerSeasonArchive_ExcludesSoftDeletedUser(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Present before the delete, so the test proves the FILTER did the work.
 	entries, err := repo.PlayerSeasonArchive(gone.ID, now)
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
@@ -1245,7 +1151,6 @@ func TestPlayerSeasonArchive_ExcludesSoftDeletedUser(t *testing.T) {
 	assert.NotNil(t, entries)
 	assert.Empty(t, entries, "a deleted account's season history is not readable")
 
-	// Visibility filter, not a cascade: the row itself survives.
 	row, err := repo.FindPlayerSeason(gone.ID, s.ID)
 	require.NoError(t, err)
 	require.NotNil(t, row)
@@ -1285,8 +1190,6 @@ func TestListSeasons_NewestFirst(t *testing.T) {
 
 	seasons, err := repo.ListSeasons()
 	require.NoError(t, err)
-	// The migration seed (and other tests' windows inside this transaction) may
-	// add rows; assert the RELATIVE order of the three this test owns.
 	pos := map[uint]int{}
 	for i, s := range seasons {
 		pos[s.ID] = i
@@ -1320,7 +1223,6 @@ func TestRollover_RunOnceIsIdempotent(t *testing.T) {
 	db := getTestDB(t)
 	repo := season.NewGormRepository(db)
 
-	// A fixed clock in a quarter no other test creates.
 	now := time.Date(2084, time.August, 10, 3, 0, 0, 0, time.UTC)
 	job := season.NewRollover(repo, 0, func() time.Time { return now })
 

@@ -21,46 +21,17 @@ import { StatsGrid } from "./components/StatsGrid";
 import { StreakCallout } from "./components/StreakCallout";
 import { MatchHistory } from "./MatchHistory";
 
-export function ProfilePage() {
-  const { t } = useTranslation();
-  const user = useAuthStore((s) => s.user);
-  const { data: profile, isPending, isError } = useProfileQuery(user?.id);
-  const career = useCareerQuery(user?.id);
-  // The viewer's seasonal standing, for the RankBanner below the hero. The same
-  // cache entry the header's rank chip reads, so this costs no extra request —
-  // and it is push-invalidated by the event:season_points_awarded handler, so a
-  // match settled in another tab moves both readouts together.
-  const seasonQuery = useCurrentSeasonQuery();
-
-  // Story 9.7: adopt the profile response's honor into the auth store.
-  //
-  // event:honor_updated is the live path, but it is delivered over the player's
-  // own socket — and the abandoning seat is BY DEFINITION the one with no live
-  // socket when handleSeatReconnectTimeout fires, so the player whose honor just
-  // got worse is the only one never told. Hub.SendToUser is a silent no-op with
-  // no queue, so that event is gone for good. Without this effect the header chip
-  // kept rendering the pre-abandonment score until the next token refresh or a
-  // reload, which let /profile show a real 44 in the hero's honour band beside a
-  // stale 90 in the chip directly above it — two different numbers for the same
-  // quantity on one screen. (The band was a standalone HonorPanel section when
-  // this was written; the contradiction it closes is unchanged.)
-  //
-  // GET /users/:id/profile recomputes honor from the stored weights on every
-  // read, so it is authoritative by the same rule the WS event is; adopting it
-  // here costs no extra request and closes the contradiction at the one place
-  // both surfaces are visible together.
-  //
-  // Same explicit-type guards as the WS handler, for the same reason: Go zero
-  // values are real values. A score of 0 ("Problematic") and isNewPlayer false
-  // are both legitimate and both falsy, so never test truthiness. The equality
-  // check keeps this to a single write - setUser with identical values would
-  // re-render forever.
-  const honorScore = profile?.honorScore;
-  const honorTier = profile?.honorTier;
-  const honorIsNew = profile?.isNewPlayer;
+/**
+ * Copies the profile's authoritative honor into the auth store, since an abandoning seat
+ * never receives event:honor_updated. Writes only on change, with explicit type checks
+ * because a score of 0 and isNewPlayer false are real values.
+ */
+function useAdoptProfileHonor(
+  honorScore: number | undefined,
+  honorTier: string | undefined,
+  honorIsNew: boolean | undefined,
+) {
   useEffect(() => {
-    // `typeof` first because Number.isInteger is not a type guard - TS cannot
-    // narrow `number | undefined` from it on its own.
     if (
       typeof honorScore !== "number" ||
       !Number.isInteger(honorScore) ||
@@ -81,6 +52,16 @@ export function ProfilePage() {
     }
     setUser({ ...current, honorScore, honorTier, isNewPlayer: honorIsNew });
   }, [honorScore, honorTier, honorIsNew]);
+}
+
+export function ProfilePage() {
+  const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
+  const { data: profile, isPending, isError } = useProfileQuery(user?.id);
+  const career = useCareerQuery(user?.id);
+  const seasonQuery = useCurrentSeasonQuery();
+
+  useAdoptProfileHonor(profile?.honorScore, profile?.honorTier, profile?.isNewPlayer);
 
   if (isPending) {
     return (
@@ -103,9 +84,6 @@ export function ProfilePage() {
   const games = profile?.totalGamesPlayed ?? 0;
   const winRate = games === 0 ? null : Math.round((wins / games) * 100);
 
-  // When the profile query hasn't resolved (e.g. an error after the pending
-  // skeleton), fall back to the client XP curve anchored on the auth-store
-  // level so the bar stays consistent with the level shown — never "0 / 0 XP".
   const xpFallback = xpBarFill(user?.totalXp ?? 0, user?.level ?? 0);
 
   const counts: Record<MatchFilter, number> = {
@@ -119,8 +97,6 @@ export function ProfilePage() {
     <div className="mx-auto max-w-330 px-4 py-8 pb-32 md:px-7" data-testid="profile-page">
       <IdentityHero
         username={username}
-        // The large image from the profile; before it resolves (or if it
-        // failed) the auth store's small one is the best picture on hand.
         avatarUrl={profile ? (profile.avatarLargeUrl ?? null) : (user?.avatarUrl ?? null)}
         userId={user?.id}
         usernameChangedAt={profile?.usernameChangedAt}
@@ -136,11 +112,6 @@ export function ProfilePage() {
         xpIntoLevel={profile?.xpIntoLevel ?? xpFallback.xpIntoLevel}
         xpForNextLevel={profile?.xpForNextLevel ?? xpFallback.xpForNextLevel}
         winRate={winRate}
-        // Honour rides the hero as its bottom band rather than a section of its
-        // own (redesign R3). Still gated on `profile`: with no profile there is
-        // simply no honour band, so the loading transient can never mix a real
-        // value with a 0 fallback — the bug the Story 9.5 review caught on the
-        // XP bar.
         honor={
           profile
             ? {
@@ -156,10 +127,6 @@ export function ProfilePage() {
         }
       />
 
-      {/* The seasonal rank, with the progress the header chip deliberately
-          omits: SP total, distance to the next tier, days left in the window.
-          ABOVE the streak callout — the season standing is the longer-running
-          fact, and the streak reads as a note on current form beneath it. */}
       <RankBanner season={seasonQuery.data} />
 
       {career.data && <StreakCallout streak={career.data.streak} />}
@@ -177,12 +144,6 @@ export function ProfilePage() {
         <StatsGrid games={games} wins={wins} losses={losses} abandoned={abandoned} />
       )}
 
-      {/* Story 13.3: the prior-season archive. Its current-rank chip is
-          suppressed here — the RankBanner above the streak callout is this
-          page's rank surface, and two readouts of one standing on one page is
-          exactly the contradiction the chip was added to avoid. Renders nothing
-          at all for a viewer with no ended seasons, so the page stays
-          byte-identical for a player with no season history. */}
       <SeasonSection userId={user?.id} seasonRank={profile?.seasonRank} showCurrentRank={false} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
@@ -191,13 +152,8 @@ export function ProfilePage() {
         <aside className="flex flex-col gap-3.5 lg:sticky lg:top-20" data-testid="profile-sidebar">
           <LinkedAccounts userId={user?.id} />
 
-          {/* Outside the `career` gate below: the deck is a preference read
-              from the auth store, not career data, so it must still render for
-              a brand-new account whose career query has nothing to show. */}
           <CardDeckPanel />
 
-          {/* Same reasoning as the deck: the audio switches are preferences read
-              from the auth store, so they render for a brand-new account too. */}
           <AudioPanel />
 
           {career.isError ? (

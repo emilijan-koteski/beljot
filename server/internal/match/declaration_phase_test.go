@@ -14,21 +14,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// Session-manager coverage for the Croatian dedicated declaration phase
-// (Story 12.6). The engine can be perfectly correct and the table still freeze:
-// six switches and if-chains here treat an unrecognised phase as "do nothing"
-// — timer arming, timer expiry, the auto-action chain, bot scheduling,
-// disconnect handling, and the reconnect re-arm. None of them fails loudly, so
-// these tests carry more weight than the detection logic.
-
-// croatianDeclaringSession starts a per-move Croatian session and parks it in
-// the declaration phase with all four seats unanswered.
-//
-// windowIn is added to now to produce the session's fixed declaration deadline:
-// pass a negative span to model a window that has already elapsed, a positive
-// one for tests that must observe an existing deadline being preserved. The
-// phase carries NO TurnExpiresAt — nobody is on the clock — so that is asserted
-// here rather than injected.
+// croatianDeclaringSession parks a per-move Croatian session in the declaration phase
+// with all four seats unanswered and its deadline at now+windowIn (negative = already elapsed).
 func croatianDeclaringSession(
 	t *testing.T,
 	hub match.Broadcaster,
@@ -39,8 +26,6 @@ func croatianDeclaringSession(
 	t.Helper()
 
 	mgr := match.NewManager(hub, newMockMatchRepo())
-	// The session's own variant must match the state it runs, or session-level
-	// code that reads it is exercised in the wrong configuration.
 	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", timerSec, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -73,8 +58,6 @@ func answerAll(t *testing.T, state *game.GameState, seats []int, action string) 
 	return state
 }
 
-// --- Wire helpers ---
-
 // wireEvent is one hub message decoded far enough to assert type and ordering.
 type wireEvent struct {
 	kind    string
@@ -105,14 +88,8 @@ func indexOfKind(events []wireEvent, kind string) int {
 	return -1
 }
 
-// indexOfMatchStateWithPhase is the position of the first event:match_state
-// carrying the given phase, or -1.
-//
-// Deliberately takes no *testing.T and asserts nothing: it is called from inside
-// a require.Eventually condition, and testify runs that condition on its own
-// goroutine. A require in there would call t.FailNow off the test goroutine,
-// which Go's testing package does not support. A payload that will not decode
-// simply is not a match.
+// indexOfMatchStateWithPhase is the position of the first event:match_state carrying
+// the given phase, or -1. It asserts nothing so it is safe inside require.Eventually.
 func indexOfMatchStateWithPhase(events []wireEvent, phase string) int {
 	for i, e := range events {
 		if e.kind != ws.EventMatchState {
@@ -143,22 +120,8 @@ func declarationsResolvedWinner(t *testing.T, payload json.RawMessage) *int {
 	return body.WinnerTeam
 }
 
-// assertRevealPrecedesPlayingState is the wire contract the whole handoff rests
-// on: the reveal must reach clients BEFORE the match_state that starts trick 1,
-// because the client's declRevealReady latch expects them in that order.
-//
-// It also proves the fire-once latch was actually consumed by a broadcast arm
-// that emits — deleting the broadcastDeclarationsResolvedIfTransition call from
-// the declare/skip arm leaves every other assertion in this package green.
-// It takes the spy and a watermark rather than a pre-taken slice because it has
-// to WAIT for those two events, not merely look for them. handleTimerExpiry
-// assigns session.gameState and unlocks BEFORE it broadcasts anything
-// (live_match.go), so a test that polls GetStateSnapshot for PhasePlaying can win
-// the race against the broadcasts by a few milliseconds and read a hub that is
-// still empty. Synchronising on the state while asserting on the wire is what
-// made TestDeclarationPhase_TimerExpiryOnLastSeatOpensTrick1 fail 19 runs out of
-// 30 in isolation, with a bare "-1 is not greater than or equal to 0". Wait for
-// the thing you assert.
+// assertRevealPrecedesPlayingState waits for the declarations reveal and the trick-1
+// match_state after the watermark and asserts the reveal reached clients first.
 func assertRevealPrecedesPlayingState(t *testing.T, hub *hubSpy, before int, wantWinner *int) {
 	t.Helper()
 
@@ -202,13 +165,8 @@ func winningTeamOf(t *testing.T, st *game.GameState) *int {
 	return nil
 }
 
-// --- Tests ---
-
-// TestDeclarationPhase_WindowForceClosesTheContest pins the matrix row for an
-// elapsed window: every unanswered seat is treated as having skipped, the
-// contest resolves, and trick 1 opens with a live per-move timer. The phase runs
-// no per-move timer of its own, so this fallback is its ONLY clock — without it
-// an idle table sits in the phase forever.
+// TestDeclarationPhase_WindowForceClosesTheContest checks an elapsed window treats every
+// unanswered seat as skipped, resolves the contest, and opens trick 1 with a live timer.
 func TestDeclarationPhase_WindowForceClosesTheContest(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(100)
@@ -235,8 +193,6 @@ func TestDeclarationPhase_WindowForceClosesTheContest(t *testing.T) {
 		assert.Empty(t, p.Declarations, "seat %d never answered, so it forfeits its melds", seat)
 	}
 
-	// Nobody declared, so the reveal names no winner — but it must still fire,
-	// and still ride ahead of the trick-1 state.
 	assertRevealPrecedesPlayingState(t, hub, before, nil)
 }
 
@@ -247,7 +203,6 @@ func TestDeclarationPhase_WindowKeepsAnswersAlreadyGiven(t *testing.T) {
 	const roomID = uint(101)
 	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, -time.Second)
 
-	// Seats 1-3 declare; seat 0 never answers and is force-closed.
 	state := answerAll(t, gs, []int{1, 2, 3}, game.ActionDeclare)
 	require.Equal(t, game.PhaseDeclaring, state.Phase, "seat 0 still owes an answer")
 	mgr.SetGameStateForTest(roomID, state)
@@ -298,12 +253,8 @@ func TestDeclarationPhase_FinalAnswerRevealsBeforePlayingState(t *testing.T) {
 	assertRevealPrecedesPlayingState(t, hub, before, winningTeamOf(t, after))
 }
 
-// TestDeclarationPhase_DeclareIsNotAnnouncedDuringThePhase is the information-
-// hiding rule at the wire. Bitola broadcasts event:player_declared the moment a
-// declare commits, so the table learns a meld exists; here that would out
-// whoever clicked first, before the contest has even decided whose melds become
-// public — and the losing team's never do. The reveal that follows is the whole
-// announcement.
+// TestDeclarationPhase_DeclareIsNotAnnouncedDuringThePhase checks no event:player_declared
+// is broadcast mid-phase, so the reveal is the only announcement.
 func TestDeclarationPhase_DeclareIsNotAnnouncedDuringThePhase(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(121)
@@ -330,10 +281,8 @@ func TestDeclarationPhase_DeclareIsNotAnnouncedDuringThePhase(t *testing.T) {
 		"and nothing is revealed until every seat has answered")
 }
 
-// TestDeclarationPhase_OtherSeatsMeldsStayMaskedMidPhase is the same rule one
-// layer down: even though the melds are on the server the instant a seat
-// declares, the per-recipient projection must keep them off every other seat's
-// snapshot until the contest resolves.
+// TestDeclarationPhase_OtherSeatsMeldsStayMaskedMidPhase checks a seat's melds stay off
+// every other seat's snapshot until the contest resolves.
 func TestDeclarationPhase_OtherSeatsMeldsStayMaskedMidPhase(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(122)
@@ -343,7 +292,6 @@ func TestDeclarationPhase_OtherSeatsMeldsStayMaskedMidPhase(t *testing.T) {
 	require.NotEmpty(t, state.Players[1].Declarations)
 	require.False(t, state.DeclarationsResolved)
 
-	// Seat 2 is an opponent of seat 1 and has not answered.
 	seen := game.ProjectForSeat(state, 2)
 	assert.Empty(t, seen.Players[1].Declarations, "seat 1's melds must not reach seat 2")
 	assert.True(t, seen.Players[1].DeclarationAnswered,
@@ -351,10 +299,8 @@ func TestDeclarationPhase_OtherSeatsMeldsStayMaskedMidPhase(t *testing.T) {
 	assert.False(t, seen.Players[3].DeclarationAnswered)
 }
 
-// TestDeclarationPhase_NoMeldHandStillOpensThePhase is the reversal that closes
-// the last leak: when NOBODY holds a meld the phase still opens and still asks
-// all four seats. A phase that resolved instantly in that case would announce,
-// by its very absence, that somebody holds one.
+// TestDeclarationPhase_NoMeldHandStillOpensThePhase checks the phase still opens and asks
+// all four seats when nobody holds a meld, so its absence leaks nothing.
 func TestDeclarationPhase_NoMeldHandStillOpensThePhase(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(107)
@@ -363,9 +309,6 @@ func TestDeclarationPhase_NoMeldHandStillOpensThePhase(t *testing.T) {
 	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
-	// A Croatian hand one action short of a resolved bid, with a layout in which
-	// no seat holds a meld: every suit contributes two non-adjacent ranks per
-	// seat, and no rank lands four times in one hand.
 	gs := testfixtures.NewGameCroatianJustDealt()
 	gs.RoomID = roomID
 	layout := [4][]string{
@@ -406,16 +349,13 @@ func TestDeclarationPhase_NoMeldHandStillOpensThePhase(t *testing.T) {
 	assert.Equal(t, -1, indexOfKind(events, ws.EventDeclarationsResolved),
 		"a meld-less hand must be indistinguishable from any other until the seats answer")
 
-	// And it closes normally once they do.
 	state := answerAll(t, opened, []int{1, 2, 3, 0}, game.ActionSkipDeclare)
 	assert.Equal(t, game.PhasePlaying, state.Phase)
 	assert.Equal(t, [2]int{0, 0}, state.DeclarationPoints)
 }
 
-// TestDeclarationPhase_ActionDoesNotExtendTheWindow guards the fixed-deadline
-// rule in HandleAction's PhaseDeclaring arm. The deadline is set on ENTRY only;
-// if each answer refreshed it, three prompt players could keep extending the
-// wait on a fourth who never answers.
+// TestDeclarationPhase_ActionDoesNotExtendTheWindow checks an answer never pushes back
+// the declaration deadline, which is set on entry only.
 func TestDeclarationPhase_ActionDoesNotExtendTheWindow(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(102)
@@ -439,11 +379,8 @@ func TestDeclarationPhase_ActionDoesNotExtendTheWindow(t *testing.T) {
 		"an answer must not push the shared window back")
 }
 
-// TestDeclarationPhase_RejectedActionKeepsTheWindowArmed is the error path of
-// the same arm. HandleAction cancels the turn timer BEFORE applying, so a
-// rejected action — a second answer from a seat that already spoke is the common
-// one — would permanently disarm the phase's only clock unless the error branch
-// re-creates it against the same deadline.
+// TestDeclarationPhase_RejectedActionKeepsTheWindowArmed checks a rejected answer
+// re-arms the phase timer against the same deadline.
 func TestDeclarationPhase_RejectedActionKeepsTheWindowArmed(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(123)
@@ -456,8 +393,6 @@ func TestDeclarationPhase_RejectedActionKeepsTheWindowArmed(t *testing.T) {
 		return st != nil && st.Players[1].DeclarationAnswered
 	}, 2*time.Second, 5*time.Millisecond)
 
-	// Same seat answers again — rejected, and the rejection must not disarm the
-	// window that is about to fire.
 	mgr.HandleAction(client, ws.WSMessage{Type: "action:declare", Payload: []byte(`{}`)})
 
 	require.Eventually(t, func() bool {
@@ -481,7 +416,6 @@ func TestDeclarationPhase_SurrenderLeavesTheWindowAlone(t *testing.T) {
 	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
 	original := mgr.DeclarationExpiresAtForTest(roomID)
 
-	// Seat 3 proposes; its partner is seat 1.
 	proposer := &ws.Client{UserID: gs.Players[3].UserID}
 	mgr.HandleAction(proposer, ws.WSMessage{Type: "action:surrender_request", Payload: []byte(`{}`)})
 
@@ -514,7 +448,6 @@ func TestDeclarationPhase_SurrenderLeavesTheWindowAlone(t *testing.T) {
 		assert.False(t, p.DeclarationAnswered, "seat %d's answer is unaffected by the detour", seat)
 	}
 
-	// And the phase still resolves normally afterwards.
 	mgr.HandleAction(partner, ws.WSMessage{Type: "action:skip_declare", Payload: []byte(`{}`)})
 	require.Eventually(t, func() bool {
 		st := mgr.GetStateSnapshot(roomID)
@@ -522,10 +455,8 @@ func TestDeclarationPhase_SurrenderLeavesTheWindowAlone(t *testing.T) {
 	}, 2*time.Second, 5*time.Millisecond, "the phase must still accept answers after the surrender detour")
 }
 
-// TestDeclarationPhase_IsNotPausable pins the phase OUT of the pause allowlist.
-// It is a fixed-length window with no active turn and no TurnExpiresAt, so
-// pause/unpause — whose whole job is preserving and restoring TurnTimeRemaining
-// — has nothing to carry.
+// TestDeclarationPhase_IsNotPausable checks the declaration phase cannot be paused,
+// since it has no active turn to preserve.
 func TestDeclarationPhase_IsNotPausable(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(103)
@@ -534,7 +465,6 @@ func TestDeclarationPhase_IsNotPausable(t *testing.T) {
 	pauser := &ws.Client{UserID: gs.Players[3].UserID}
 	mgr.HandleAction(pauser, ws.WSMessage{Type: "action:pause", Payload: []byte(`{}`)})
 
-	// Nothing to wait for — assert the phase never changes.
 	assert.Never(t, func() bool {
 		st := mgr.GetStateSnapshot(roomID)
 		return st != nil && st.Phase == game.PhasePaused
@@ -546,11 +476,8 @@ func TestDeclarationPhase_IsNotPausable(t *testing.T) {
 	assert.False(t, after.PauseUsed[3], "a refused pause must not spend the player's one pause")
 }
 
-// TestDeclarationPhase_DisconnectAndReconnectRestoreThePhase is the matrix's
-// disconnect/reconnect pair. HandleDisconnect's phase switch has a silent
-// `default` arm: without the phase listed, a drop opens no reconnect window at
-// all and leaves the seat marked Connected — so the close gate, which counts
-// connected seats, waits out the whole window for an answer that can never come.
+// TestDeclarationPhase_DisconnectAndReconnectRestoreThePhase checks a drop mid-phase
+// opens a reconnect window and marks the seat disconnected, and a reconnect restores it.
 func TestDeclarationPhase_DisconnectAndReconnectRestoreThePhase(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(104)
@@ -589,7 +516,6 @@ func TestDeclarationPhase_DisconnectAndReconnectRestoreThePhase(t *testing.T) {
 	assert.True(t, mgr.DeclarationExpiresAtForTest(roomID).After(time.Now()),
 		"the outage bought them a fresh window rather than an elapsed one")
 
-	// They can still answer, and the phase still closes.
 	client := &ws.Client{UserID: droppedUserID}
 	mgr.HandleAction(client, ws.WSMessage{Type: "action:declare", Payload: []byte(`{}`)})
 	require.Eventually(t, func() bool {
@@ -598,10 +524,8 @@ func TestDeclarationPhase_DisconnectAndReconnectRestoreThePhase(t *testing.T) {
 	}, 2*time.Second, 5*time.Millisecond, "the returning player's answer must be accepted")
 }
 
-// TestDeclarationPhase_AnsweredSeatCannotAnswerAgain is the reconnect row's
-// fairness half: a client that rejoins mid-phase re-renders its dialog from the
-// snapshot, and the answered flag is what stops a skip being upgraded to a
-// declare after the fact.
+// TestDeclarationPhase_AnsweredSeatCannotAnswerAgain checks a seat that already answered
+// cannot answer again, so a skip cannot become a declare after a rejoin.
 func TestDeclarationPhase_AnsweredSeatCannotAnswerAgain(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(124)
@@ -623,10 +547,8 @@ func TestDeclarationPhase_AnsweredSeatCannotAnswerAgain(t *testing.T) {
 		"the first answer stands — a skip may not become a declare")
 }
 
-// TestDeclarationPhase_AllBotSeatsAnswer pins the bot scheduler. Under the
-// simultaneous phase botDecisionSeats must return EVERY unanswered bot seat, not
-// one: scheduling a single seat would leave the rest silent until the window
-// elapsed, turning every hand with bots into a full-ceiling stall.
+// TestDeclarationPhase_AllBotSeatsAnswer checks every unanswered bot seat is scheduled
+// during the phase, not just one.
 func TestDeclarationPhase_AllBotSeatsAnswer(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(105)
@@ -686,15 +608,8 @@ func declarationsResolvedBody(t *testing.T, payload json.RawMessage) (melds []wi
 	return body.Declarations, body.Contested
 }
 
-// TestDeclarationPhase_RevealCarriesEveryMeldPerSeat closes the gap the
-// broadcast-loop deferral named: the producing loop flattens several melds per
-// seat into the payload, and nothing asserted the resulting array. Collapsing
-// that loop to the first meld per seat kept every other test in this package
-// green — while a Croatian hand scored 300 and the reveal rendered one 100 row.
-//
-// The expectations are derived from the resolved engine state rather than
-// hand-copied, so a meld-value change moves both sides together instead of
-// turning this into a stale constant.
+// TestDeclarationPhase_RevealCarriesEveryMeldPerSeat checks the reveal payload carries
+// every meld of every winning seat, with expectations derived from the resolved engine state.
 func TestDeclarationPhase_RevealCarriesEveryMeldPerSeat(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(118)
@@ -721,7 +636,6 @@ func TestDeclarationPhase_RevealCarriesEveryMeldPerSeat(t *testing.T) {
 	require.GreaterOrEqual(t, revealIdx, 0)
 	melds, contested := declarationsResolvedBody(t, events[revealIdx].payload)
 
-	// What the engine actually kept, flattened the same way.
 	want := make([]wireMeld, 0)
 	perSeat := map[int]int{}
 	for seat := 0; seat < 4; seat++ {
@@ -735,8 +649,6 @@ func TestDeclarationPhase_RevealCarriesEveryMeldPerSeat(t *testing.T) {
 		}
 	}
 
-	// Guard the guard: if the fixture ever stops producing a multi-meld seat,
-	// this test would still pass while proving nothing about flattening.
 	maxPerSeat := 0
 	for _, n := range perSeat {
 		if n > maxPerSeat {
@@ -749,7 +661,6 @@ func TestDeclarationPhase_RevealCarriesEveryMeldPerSeat(t *testing.T) {
 	assert.Equal(t, want, melds, "every meld must reach the wire, each carrying its own seat")
 	assert.Len(t, melds, len(want))
 
-	// The awarded total the reveal renders is the sum of the rows it carries.
 	sum := 0
 	for _, m := range melds {
 		sum += m.Value
@@ -757,14 +668,6 @@ func TestDeclarationPhase_RevealCarriesEveryMeldPerSeat(t *testing.T) {
 	assert.Equal(t, after.DeclarationPoints[game.TeamA]+after.DeclarationPoints[game.TeamB], sum,
 		"the rows must add up to what the engine awarded")
 
-	// Every seat declared, so both teams put melds on the table and the reveal
-	// may name the deciding one.
-	//
-	// This also pins WHERE the flag is computed. Resolution has already deleted
-	// the losing team's melds — assert that, so the point is not theoretical —
-	// which means an implementation reading the post-resolution state would see
-	// only the winner and report `false` here. It has to read the pre-resolution
-	// clone.
 	assert.True(t, contested, "both teams declared, so a comparison decided the winner")
 	losers := 0
 	for seat := 0; seat < 4; seat++ {
@@ -777,18 +680,13 @@ func TestDeclarationPhase_RevealCarriesEveryMeldPerSeat(t *testing.T) {
 			"prove `contested` is derived from the pre-resolution state")
 }
 
-// TestDeclarationPhase_RevealReportsAnUncontestedWin is the other half: when
-// only ONE team declares, nothing was compared, and the reveal must say so.
-// Without the flag the client cannot tell the two apart — it only ever receives
-// the winner's melds — and under the Croatian overlap rule a single seat
-// holding several melds is the ordinary shape rather than evidence of a clash.
+// TestDeclarationPhase_RevealReportsAnUncontestedWin checks the reveal reports an
+// uncontested win when only one team declares.
 func TestDeclarationPhase_RevealReportsAnUncontestedWin(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(119)
 	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
 
-	// Seats 1 and 3 are team B and hold the melds; seats 2 and 0 are team A and
-	// SKIP, so exactly one team ever declares.
 	state := gs
 	for _, seat := range []int{1, 2, 3} {
 		action := game.ActionDeclare
@@ -819,33 +717,16 @@ func TestDeclarationPhase_RevealReportsAnUncontestedWin(t *testing.T) {
 
 	assert.False(t, contested, "only one team declared, so nothing was compared")
 	require.NotEmpty(t, melds, "the declaring team's melds must still be revealed")
-	// The uncontested win is still a multi-meld payload — which is exactly why
-	// meld count could never have stood in for "was this contested".
 	assert.Greater(t, len(melds), 1)
 }
 
-// TestDeclarationPhase_RevealReportsAContestWonByAnEarlierSeat is the row the
-// other two `contested` tests structurally could not fail on.
-//
-// Both of them let the LAST seat to answer be redundant: one has every earlier
-// seat declare (so both teams are on the table before the final answer), the
-// other has only one team declare at all. A `contested` derived from the
-// pre-action state passes both.
-//
-// Here the last answerer is the ONLY declarer on its team, which is the shape
-// that breaks that derivation: at broadcast time seat 0's melds exist in
-// neither the pre-action state (it had not answered yet) nor the post-action
-// state (its team lost, so resolution cleared them). Only the engine, inside
-// resolveDeclarationsForHand, ever sees both teams at once — which is why
-// GameState.DeclarationsContested is computed there and merely read here.
+// TestDeclarationPhase_RevealReportsAContestWonByAnEarlierSeat checks the reveal reports
+// a contest whose losing team's only declarer answered last, which pre/post-action state cannot see.
 func TestDeclarationPhase_RevealReportsAContestWonByAnEarlierSeat(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(120)
 	mgr, gs := croatianDeclaringSession(t, hub, roomID, 60, 30*time.Second)
 
-	// Seats 1 and 3 are team B and declare; seat 2 (team A) skips, and seat 0 is
-	// held back so that team A's ONLY declarer is the seat whose answer closes
-	// the phase.
 	require.Equal(t, game.TeamA, game.TeamForSeat(0))
 	require.Equal(t, game.TeamA, game.TeamForSeat(2))
 	state := gs

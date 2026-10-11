@@ -25,33 +25,18 @@ interface InviteFriendsDialogProps {
 }
 
 /**
- * Story 11.5 AC1: the inviter-side panel, opened from the waiting room. Lists
- * the viewer's friends with server-computed availability and an Invite button
- * per available friend.
- *
- * Unavailable friends are shown DISABLED WITH A REASON rather than filtered out.
- * A friend silently missing from the list reads as "we lost your friendship",
- * which is a worse failure than "Ana is in a game right now".
- *
- * The list is advisory: availability is re-checked server-side at invite time,
- * so a row that has gone stale simply yields FRIEND_NOT_AVAILABLE inline.
+ * Inviter-side panel listing the viewer's friends with server-computed availability, unavailable ones disabled with a reason.
+ * Per-row state resets on each open because RoomPage keeps this dialog mounted and earlier invites may have lapsed.
  */
 export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriendsDialogProps) {
   const { t } = useTranslation();
   const { data: friends, isPending, isError } = useInvitableFriends(roomId, open);
   const inviteMutation = useInviteToRoomMutation();
 
-  // Per-friend UI state, keyed by userId: which row is in flight, which have
-  // been invited this session, and any inline per-row error.
   const [invited, setInvited] = useState<Record<number, boolean>>({});
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
 
-  // Per-row state is keyed by userId and lives as long as this component, which
-  // RoomPage mounts unconditionally — so closing the dialog does NOT reset it.
-  // Clear on each open instead: an invite that was declined, expired unanswered,
-  // or died with a disconnect leaves the friend invitable again, and without this
-  // their button stays "Invited" and disabled until a full page reload.
   useEffect(() => {
     if (open) {
       setInvited({});
@@ -68,15 +53,10 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
       case "in_room":
         return t("roomInvite.reasons.inRoom");
       case "in_this_room":
-        // Seated at THIS table. Saying "in another room" about someone the host
-        // can see in the seats is the one reason that reads as a bug.
         return t("roomInvite.reasons.alreadyHere");
       case "room_full":
         return t("roomInvite.reasons.roomFull");
       default:
-        // A slug this client does not know still has to say something — an empty
-        // string renders a disabled button above a blank line with no stated
-        // cause, which reads as a broken row rather than an unavailable friend.
         return t("roomInvite.reasons.unavailable");
     }
   }
@@ -94,19 +74,11 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
     } catch (err) {
       const { kind, message } = inviteFailure(err instanceof FetchError ? err.code : null);
       if (kind === "alreadyPending") {
-        // They already have a live popup for this room — show it as sent rather
-        // than as a failure, which is what it means from the host's side.
         setInvited((prev) => ({ ...prev, [friend.userId]: true }));
       } else if (kind === "roomGone") {
-        // The room closed, the match started, or the host was kicked in another
-        // tab. "Please try again" is a lie here — nothing on this panel can ever
-        // succeed again, so close it instead of inviting a pointless retry.
         toast.error(message);
         onOpenChange(false);
       } else {
-        // Availability is recomputed server-side, so a row can legitimately go
-        // stale between render and click — report it on the row, not as a toast
-        // that loses track of WHICH friend failed.
         setRowErrors((prev) => ({ ...prev, [friend.userId]: message }));
       }
     } finally {

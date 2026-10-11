@@ -1,8 +1,3 @@
-// Client-side mirror of the server's username rules. These are UX-only helpers
-// — the Go server (internal/user/validate.go) remains the sole authority for
-// validation, uniqueness, and the change cooldown. Keep these values in sync
-// with user.UsernameChangeCooldownDays / UsernameMinLength / UsernameMaxLength;
-// the project has no shared type generation between Go and TS.
 export const USERNAME_CHANGE_COOLDOWN_DAYS = 30;
 export const USERNAME_MIN_LENGTH = 3;
 export const USERNAME_MAX_LENGTH = 20;
@@ -33,8 +28,8 @@ export function isUsernameChangeOnCooldown(
 }
 
 /**
- * Client mirror of server user.ValidateUsername. Returns the matching server
- * error CODE (so the UI can reuse the same i18n messages) or null when valid.
+ * Client mirror of server user.ValidateUsername; keep the constants above in sync with it.
+ * Returns the matching server error code, or null when valid.
  */
 export function validateUsernameClient(raw: string): string | null {
   const trimmed = raw.trim();

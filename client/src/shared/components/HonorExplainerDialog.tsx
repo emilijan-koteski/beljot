@@ -19,25 +19,7 @@ type HonorExplainerDialogProps = {
 };
 
 /**
- * "How honour works" — the explainer the shipped product never had.
- *
- * Nothing in the honour system currently states what it measures, and two of the
- * four facts below are things players actively get wrong: that SURRENDERING is
- * not abandonment (it counts as a finished match, so it lifts the score), and
- * that old abandonments decay. Both misconceptions push people toward the
- * behaviour the system exists to discourage — a player who thinks surrender will
- * cost them honour will drop the tab instead.
- *
- * Deliberately controlled rather than self-mounting: every honour surface opens
- * it (the top-bar chip, the profile band, the room badge, the ejection modal), so
- * each host owns a `useState` and renders its own instance. That is less
- * machinery than a shared store for a dialog, and it means the dialog is only
- * mounted where it can actually be opened.
- *
- * Shares the ejection modal's shell verbatim — brass hairline, 52px icon well,
- * mono eyebrow, tinted footer — so the two honour dialogs read as one family.
- * Mobile is this same Radix dialog at viewport width with margins; there is no
- * native sheet, because Beljot is one responsive web app.
+ * Controlled "How honour works" dialog explaining what moves the score and showing the player's standing.
  */
 export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialogProps) {
   const { t } = useTranslation();
@@ -47,9 +29,6 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
   const score = honorScoreOrPrior(user?.honorScore);
   const tier = normalizeHonorTier(user?.honorTier ?? "", score);
 
-  // What moves the score, in the order that matters to a player deciding whether
-  // to stay in a match. "Surrender" sits third on purpose: it reads as a
-  // correction to the two facts above it.
   const facts = [
     { icon: ShieldCheck, key: "finish" },
     { icon: LogOut, key: "drop" },
@@ -162,11 +141,6 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
             />
           </div>
 
-          {/* Your standing, boxed as a callout in BOTH states (user decision
-              2026-07-31): the newcomer variant is an instruction, the scored
-              variant is the dialog's one personal fact, and either would
-              otherwise read as one more body line. Brass tint + hairline, same
-              mix vocabulary as the shell around it. */}
           <div
             role="note"
             data-testid="honor-explainer-standing"
@@ -185,8 +159,6 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
                 strokeWidth={2.25}
               />
             ) : (
-              // The tier's own glyph and colour — the same mark every other
-              // honour surface draws for this player.
               <HonorShield tier={tier} size={16} className="mt-0.5 shrink-0" />
             )}
             <p className="text-ink m-0 text-[13.5px] leading-normal font-semibold">
@@ -217,8 +189,6 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
             background: "color-mix(in srgb, var(--surface-3) 45%, transparent)",
           }}
         >
-          {/* Deep-links to the long-form rules section, so no other honour surface
-              has to explain anything inline. */}
           <Link
             to="/rules#honour"
             onClick={() => onOpenChange(false)}

@@ -8,24 +8,8 @@ import (
 	"time"
 )
 
-// Rollover is the nightly season-rollover job (Story 13.3).
-//
-// A WRAPPER, NOT A SCHEDULER FRAMEWORK. Repository.CurrentSeason already
-// computes the covering quarter, inserts it with ON CONFLICT (started_at)
-// DO NOTHING, and re-reads — the idempotency recipe exists and is tested. This
-// job exists so a ZERO-TRAFFIC deployment still gets its row shortly after a
-// quarter boundary (and the logs prove it ran); correctness never depends on
-// it, because the lazy resolver self-heals on the next read or write anyway.
-//
-// CADENCE IS BOOT-ANCHORED, NOT WALL-CLOCK: this is a plain 24h ticker started
-// at process boot, so a server booted at 14:00 runs its passes at 14:00. There
-// is no time-of-day scheduling and none is needed — the pass is idempotent, and
-// the lazy resolver closes any gap before the next pass anyway.
-//
-// Lifecycle follows the hub idiom (ws/hub.go): a `done` channel closed by
-// Shutdown, started from main.go, stopped during graceful shutdown. Failures
-// are logged via slog and the ticker keeps ticking — a transient DB error on
-// one pass must not kill the job for the rest of the quarter.
+// Rollover is the nightly job that ensures the current season row exists even with zero traffic.
+// Correctness never depends on it, because the lazy resolver in CurrentSeason self-heals on the next read or write.
 type Rollover struct {
 	repo     Repository
 	interval time.Duration
@@ -54,12 +38,8 @@ func NewRollover(repo Repository, interval time.Duration, now func() time.Time) 
 	}
 }
 
-// Start launches the loop: one immediate pass (so a deploy that boots just
-// after a boundary heals right away, not a day later), then one pass per
-// interval until Shutdown.
-//
-// Guarded on BOTH sides: a second Start is a no-op rather than a second ticker
-// loop, and a Start after Shutdown does not run a pass during teardown.
+// Start runs one pass immediately, then one per interval until Shutdown.
+// A second Start, or a Start after Shutdown, is a no-op.
 func (r *Rollover) Start() {
 	if r.started.Swap(true) {
 		return
@@ -104,15 +84,9 @@ func (r *Rollover) RunOnce() error {
 		return fmt.Errorf("season rollover: resolving current season: %w", err)
 	}
 	if current == nil {
-		// The same contract violation resolveSeason guards: "never (nil, nil)"
-		// is documented, not type-enforced.
 		return fmt.Errorf("season rollover: repository returned no season covering %s",
 			r.now().Format(time.RFC3339))
 	}
-	// createdAt is what makes this line diagnostic rather than decorative: every
-	// pass logs "window ensured", so the only way to tell the ONE pass that
-	// actually created the new quarter from the ~90 no-op passes that follow it
-	// is the row's own creation stamp landing near the pass's own timestamp.
 	slog.Info("season rollover: window ensured",
 		"season", current.Name,
 		"endsAt", current.EndsAt.UTC().Format(time.RFC3339),

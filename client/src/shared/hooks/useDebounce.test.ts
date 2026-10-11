@@ -35,8 +35,6 @@ describe("useDebounce", () => {
     rerender({ v: "ab" });
     act(() => vi.advanceTimersByTime(200));
     rerender({ v: "abc" });
-    // 400ms have passed since the first change, but only 200ms since the last —
-    // still debouncing, so the value has not settled yet.
     act(() => vi.advanceTimersByTime(200));
     expect(result.current).toBe("a");
 

@@ -15,72 +15,27 @@ import { getTimeTick, subscribeTimeTick } from "@/shared/lib/timeTick";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { LeaderboardRow as LeaderboardRowData } from "@/shared/types/apiTypes";
 
-/** Rows per request on the full page. Comfortably under the server's cap of 50. */
 const PAGE_SIZE = 25;
 
-/**
- * Re-arm delay for the boundary effect, matching `useSeasonWindowWatch`'s. Only
- * reachable when this client's clock runs ahead of the server's, where the
- * early refetch returns the same still-active window.
- */
 const SEASON_BOUNDARY_RETRY_MS = 5 * 60 * 1000;
 
-/**
- * The full seasonal leaderboard (Story 13.2 AC2), reached from the top nav's
- * "Leaderboard" tab.
- *
- * LOAD-MORE, NOT A NUMBERED PAGER: this codebase's pagination idiom is a single
- * button that appends the next offset page, with a "showing N of M" caption
- * underneath (profile match history). The four body branches — skeleton, error,
- * empty, list — are the same four, in the same order.
- *
- * The viewer's own row is MARKED wherever it appears in the list, and PINNED
- * below the list when it does not: a player ranked 340th would otherwise have to
- * page thirteen times to find out where they stand. The pinned row renders
- * through the same LeaderboardRow, with the username supplied from `authStore` —
- * the server's viewer block deliberately carries no name, because the viewer is
- * the authenticated caller.
- */
+/** The full seasonal leaderboard with load-more paging and the viewer's own row pinned when off-page. */
 export function LeaderboardPage() {
   const { t } = useTranslation();
 
-  // The season picker (Story 13.3). `null` means "the current window" — the
-  // DEFAULT, and deliberately not a season id: the page must render the active
-  // ladder before (and even without) the seasons list resolving, and
-  // `season=current` keeps the request URL independent of which quarter it is.
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const seasonsQuery = useSeasonsQuery();
   const seasons = seasonsQuery.data?.items ?? [];
   const queryClient = useQueryClient();
 
-  // The same shared 30s tick `useSeasonWindowWatch` uses. THE PAGE MUST OBSERVE
-  // THE BOUNDARY TOO: that watch keys on the ACTIVE window's endsAt, and this
-  // page also has to notice when the newest window in its own picker list has
-  // ended. Without the subscription a page left open across the quarter
-  // boundary keeps the "Current" marker on the dead window and keeps rendering
-  // its frozen standings under the present-tense heading.
   const tick = useSyncExternalStore(subscribeTimeTick, getTimeTick, getTimeTick);
 
-  // Re-derived on every render, and the tick subscription above is what makes
-  // renders happen on a 30s cadence — so this ages instead of freezing at mount.
   const nowMs = Date.now();
 
-  // The window covering "now" — identified by its own timestamps rather than
-  // by list position, so a pre-created future row could never mislabel it.
   const currentId = seasons.find(
     (s) => Date.parse(s.startedAt) <= nowMs && nowMs < Date.parse(s.endsAt),
   )?.id;
 
-  // The page's own boundary effect, mirroring `useSeasonWindowWatch`'s.
-  //
-  // IT WATCHES THE NEWEST WINDOW WE KNOW OF, NOT "the current one": at the
-  // moment the boundary passes, NO listed window covers now (that is the whole
-  // problem — the next one exists only on the server), so keying on `currentId`
-  // would go undefined exactly when the effect needs to fire. Once the newest
-  // endsAt we hold is in the past, this page's list AND its `current` ladder
-  // are both provably stale. The refetch brings the new window in, its endsAt
-  // is in the future, and the guard is re-armed for the next quarter. The `at`
-  // stamp is the same clock-skew escape the header's watch carries.
   let newestEndsAt: string | undefined;
   for (const s of seasons) {
     if (newestEndsAt === undefined || Date.parse(s.endsAt) > Date.parse(newestEndsAt)) {
@@ -101,11 +56,6 @@ export function LeaderboardPage() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.season.current() });
   }, [tick, newestEndsAt, queryClient]);
 
-  // PAST-SEASON COPY. A frozen quarter must not be described in the present
-  // tense ("who is climbing fastest this season", "nobody has earned SP yet
-  // this season" — the latter is simply false about a season that is over).
-  // Decided from the selected window's OWN endsAt, so it stays right even while
-  // `currentId` is still resolving.
   const selectedSeason = selectedId === null ? undefined : seasons.find((s) => s.id === selectedId);
   const isPastSeason = selectedSeason !== undefined && Date.parse(selectedSeason.endsAt) <= nowMs;
 
@@ -115,14 +65,6 @@ export function LeaderboardPage() {
 
   const items = useMemo<LeaderboardRowData[]>(() => {
     if (!query.data) return [];
-    // DEDUPED BY userId, not just concatenated. Offset paging over live data can
-    // return the same player twice: if someone above the fold gains SP between
-    // page 1 and page 2, every row below them shifts down one and the row that
-    // was last on page 1 reappears first on page 2. That is the accepted
-    // tradeoff of offset paging here (a keyset cursor is the alternative), but
-    // duplicate React keys are not — they make React reconcile the wrong nodes
-    // and warn in the console. First occurrence wins, which is the one whose
-    // `position` matches the slot the reader already saw.
     const seen = new Set<number>();
     const out: LeaderboardRowData[] = [];
     for (const page of query.data.pages) {
@@ -135,26 +77,13 @@ export function LeaderboardPage() {
     return out;
   }, [query.data]);
 
-  // READ THE LAST PAGE, NOT THE FIRST. Both of these come from the response, and
-  // every response carries a fresh copy — so on a reader who has paged three
-  // deep, `pages[0]` is the oldest snapshot on hand. Their own position and the
-  // season's total both move as matches settle, and showing the stalest value
-  // available is a strange choice when a newer one is right there.
   const latest = query.data?.pages.at(-1);
   const standing = latest?.viewer ?? null;
   const total = latest?.total ?? 0;
 
-  // Pin only when there IS a standing and it is not already on screen. Compared
-  // by user id, not by position: the two come from separate queries, and a match
-  // on identity is the thing that actually decides whether the row is visible.
   const onPage = standing !== null && items.some((row) => row.userId === standing.userId);
   const pinned = standing !== null && !onPage ? standing : null;
 
-  // THE ERROR BRANCH MUST NOT DESTROY ROWS THE READER ALREADY HAS. Checked
-  // before `data`, a failed `fetchNextPage()` — the click at the bottom of 75
-  // loaded rows — replaced all of them with a single line of error text. React
-  // Query keeps the successful pages, so the failure is reported beside them
-  // instead, with a retry that re-runs the fetch that actually failed.
   const showError = query.isError && items.length === 0;
 
   let body;
@@ -190,12 +119,6 @@ export function LeaderboardPage() {
       </div>
     );
   } else {
-    // DRIVEN OFF hasNextPage, not `items.length < total`. The two disagree:
-    // `getNextPageParam` decides from the LAST page's total while that
-    // comparison used the first page's, so a total that shrank (a player deleted
-    // their account) left a button whose click did nothing at all — React Query
-    // has no next page param, so `fetchNextPage()` is a silent no-op. One source
-    // for "is there more", and it is the one the fetch itself consults.
     const showLoadMore = query.hasNextPage;
     body = (
       <>
@@ -229,14 +152,7 @@ export function LeaderboardPage() {
               <LeaderboardRow
                 position={pinned.position}
                 userId={pinned.userId}
-                // From the auth store: the viewer IS the caller, so their name
-                // never crosses the wire on this block. It falls back to the
-                // "you" label rather than an empty string — the store can be
-                // unhydrated (a hard refresh straight onto this URL) while the
-                // query, which needs only the token, has already resolved, and a
-                // nameless pinned row is worse than a generic one.
                 username={viewer?.username || t("season.leaderboard.you")}
-                // Same source as the name, for the same reason.
                 avatarUrl={viewer?.avatarUrl ?? null}
                 sp={pinned.sp}
                 tier={pinned.tier}
@@ -248,8 +164,6 @@ export function LeaderboardPage() {
           </div>
         )}
 
-        {/* A failed fetchNextPage over rows we already have: reported here, with
-            the rows left intact, and retryable. */}
         {query.isError && (
           <div className="mt-2.5 flex items-center gap-3" data-testid="leaderboard-page-error">
             <p className="text-destructive m-0 text-xs" role="status">
@@ -280,11 +194,6 @@ export function LeaderboardPage() {
           </button>
         )}
 
-        {/* Doubles as the append announcement: clicking Load more inserts 25
-            rows with no visual event a screen reader can observe, so this
-            live region reports the new count. `aria-live` rather than
-            role="status" on a caption that is always present, so only the
-            CHANGE is spoken. */}
         <p
           className="text-ink-mute mt-4 text-center text-xs"
           data-testid="leaderboard-count"
@@ -298,9 +207,6 @@ export function LeaderboardPage() {
   }
 
   return (
-    // Narrower than the lobby's max-w-330: a leaderboard row is four short
-    // cells, and stretched across a 1330px column the name and the SP total end
-    // up at opposite edges of the screen with nothing between them.
     <div className="mx-auto max-w-220 px-4 py-8 pb-32 md:px-7" data-testid="leaderboard-page">
       <SectionHeader
         eyebrow={t("season.leaderboard.eyebrow")}
@@ -310,27 +216,6 @@ export function LeaderboardPage() {
         })}
       />
 
-      {/* Season picker (Story 13.3): newest-first straight off the server's
-          order, season tokens rendered VERBATIM. Absent until the list
-          resolves — the page defaults to the current window regardless, so
-          there is nothing to pick from an empty or failed list (a picker whose
-          only row is unclickable would be noise, and the picker failing must
-          not take the ladder with it). Picking the current window maps back to
-          the `current` selector rather than its id, so the default cache entry
-          is reused.
-
-          `seasons.length > 1`, NOT `> 0`: on a fresh deployment — and through
-          the whole of the product's first quarter — the list holds exactly one
-          window, and a picker offering a single already-selected chip is a
-          control that cannot do anything.
-
-          When `currentId` is undefined (no listed window covers this client's
-          clock — skew right at a boundary, or a list fetched a moment before
-          the rollover) the value falls back to the sentinel so no chip reads as
-          selected, and picking any window sends its id. That path is correct
-          rather than merely tolerable: an explicit id is exactly what the
-          reader asked for, and `selectedId` still collapses back to `current`
-          as soon as a covering window is identifiable. */}
       {seasons.length > 1 && (
         <Chips
           value={selectedId ?? currentId ?? -1}

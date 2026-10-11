@@ -129,8 +129,6 @@ func decodeStats(t *testing.T, body []byte) lobby.StatsResponse {
 }
 
 func TestGetStats_BucketsConnectedUsers(t *testing.T) {
-	// 1, 2, 3, 4, 5 online. 1+2 in a game, 3 in a waiting room, 4+5 idle.
-	// 6 in a waiting room but offline → must NOT be counted (connection-aware).
 	hub := &fakeHub{connected: []uint{1, 2, 3, 4, 5}}
 	sessions := &fakeSessions{inMatch: []uint{1, 2}}
 	rooms := &fakeRoomRepo{
@@ -155,13 +153,10 @@ func TestGetStats_BucketsConnectedUsers(t *testing.T) {
 	assert.Equal(t, 2, stats.InLobby, "users 4 and 5")
 	assert.Equal(t, 5, stats.Online)
 	assert.Equal(t, int64(100), stats.Registered)
-	// Invariant: online == sum of buckets.
 	assert.Equal(t, stats.Online, stats.InLobby+stats.InRoom+stats.InMatch)
 }
 
 func TestGetStats_InMatchWinsOverInRoom(t *testing.T) {
-	// User 7 appears in both the session manager (in game) and the
-	// room_players table (waiting). Stale waiting row must not double-count.
 	hub := &fakeHub{connected: []uint{7}}
 	sessions := &fakeSessions{inMatch: []uint{7}}
 	rooms := &fakeRoomRepo{usersByStatus: map[string][]uint{"waiting": {7}}}
@@ -181,13 +176,7 @@ func TestGetStats_InMatchWinsOverInRoom(t *testing.T) {
 }
 
 func TestGetStats_CountsRequesterBeforeTheirSocketRegisters(t *testing.T) {
-	// On login the lobby's first stats fetch races the WS auth handshake: the
-	// HTTP request usually lands before the hub has registered the user's
-	// socket. A lone player then saw "0 online / 0 in lobby" until the next
-	// poll. The requester is online by definition (they just made an
-	// authenticated request), so GetStats must count them even when the hub
-	// doesn't know them yet.
-	hub := &fakeHub{connected: nil} // socket not registered yet
+	hub := &fakeHub{connected: nil}
 	sessions := &fakeSessions{}
 	rooms := &fakeRoomRepo{}
 	users := &fakeUserRepo{count: 1}
@@ -197,7 +186,7 @@ func TestGetStats_CountsRequesterBeforeTheirSocketRegisters(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/lobby/stats", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.Set("userID", uint(9)) // what the auth middleware sets for the requester
+	c.Set("userID", uint(9))
 
 	require.NoError(t, h.GetStats(c))
 
@@ -209,8 +198,6 @@ func TestGetStats_CountsRequesterBeforeTheirSocketRegisters(t *testing.T) {
 }
 
 func TestGetStats_RequesterAlreadyConnectedNotDoubleCounted(t *testing.T) {
-	// Once the requester's socket IS registered, counting them explicitly
-	// must not inflate the totals.
 	hub := &fakeHub{connected: []uint{9}}
 	sessions := &fakeSessions{}
 	rooms := &fakeRoomRepo{}
@@ -274,7 +261,6 @@ func decodePublicStats(t *testing.T, body []byte) lobby.PublicStatsResponse {
 }
 
 func TestGetPublicStats_CountsOnlineAndOpenRooms(t *testing.T) {
-	// 3 connected players; 2 rooms in "waiting" status (the "open tables").
 	hub := &fakeHub{connected: []uint{1, 2, 3}}
 	rooms := &fakeRoomRepo{
 		roomsByStatus: map[string][]room.Room{

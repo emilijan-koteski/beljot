@@ -9,6 +9,7 @@ import (
 	"unicode"
 )
 
+// Config holds the server settings read from BELJOT_* environment variables.
 type Config struct {
 	DatabaseURL string
 	JWTSecret   string
@@ -16,25 +17,14 @@ type Config struct {
 	CORSOrigins []string
 	Environment string
 
-	// Token lifetimes. AccessTokenTTL keeps access JWTs short (default 15m).
-	// RefreshIdleTTL is the sliding window an active session may go unused
-	// before it dies (default 30d); RefreshAbsoluteTTL is the hard cap from
-	// login regardless of activity (default 180d), forcing a periodic re-login.
 	AccessTokenTTL     time.Duration
 	RefreshIdleTTL     time.Duration
 	RefreshAbsoluteTTL time.Duration
 
-	// AppBaseURL is the public origin of the frontend (no trailing slash). Used
-	// to build absolute links in outgoing email (e.g. the password-reset link).
 	AppBaseURL string
 
-	// GoogleClientID is the Google OAuth client ID used to verify GIS ID tokens
-	// (the token audience). Empty means the google SSO provider is simply not
-	// registered — the client hides the button independently via its own env.
 	GoogleClientID string
 
-	// SMTP settings for outgoing transactional email. When SMTPConfigured() is
-	// false the app falls back to a log-only mailer (see cmd/api wiring).
 	SMTPHost     string
 	SMTPPort     int
 	SMTPUsername string
@@ -42,12 +32,6 @@ type Config struct {
 	SMTPFrom     string
 	SMTPFromName string
 
-	// Avatar object storage (S3-compatible: Garage locally and in production).
-	// All six are required outside development. In development an empty
-	// S3Endpoint disables the feature: the avatar endpoints answer 503 and
-	// everything else runs without an object store. PublicAssetsURL is the
-	// public origin the bucket is served from (no trailing slash); avatar URLs
-	// are derived from it at read time, never stored.
 	S3Endpoint      string
 	S3Region        string
 	S3AccessKey     string
@@ -93,6 +77,8 @@ func (c *Config) missingAvatarStorageVars() []string {
 	return missing
 }
 
+// Load reads the config from the environment and exits when a required
+// production setting, such as the JWT secret or avatar storage, is missing.
 func Load() *Config {
 	cfg := &Config{
 		DatabaseURL: getEnv("BELJOT_DB_URL", "postgres://beljot:beljot_dev_password@localhost:5433/beljot?sslmode=disable"),
@@ -112,9 +98,6 @@ func Load() *Config {
 		SMTPHost:     strings.TrimSpace(getEnv("BELJOT_SMTP_HOST", "")),
 		SMTPPort:     getEnvInt("BELJOT_SMTP_PORT", 587),
 		SMTPUsername: strings.TrimSpace(getEnv("BELJOT_SMTP_USERNAME", "")),
-		// Gmail App passwords are shown as four space-separated groups but must be
-		// sent without spaces — strip all whitespace so a value pasted verbatim
-		// ("abcd efgh ijkl mnop") still authenticates.
 		SMTPPassword: stripWhitespace(getEnv("BELJOT_SMTP_PASSWORD", "")),
 		SMTPFrom:     strings.TrimSpace(getEnv("BELJOT_SMTP_FROM", "")),
 		SMTPFromName: getEnv("BELJOT_SMTP_FROM_NAME", "Beljot.online"),
@@ -135,8 +118,6 @@ func Load() *Config {
 		slog.Warn("BELJOT_JWT_SECRET is not set or uses the default value — do not deploy to production without changing it")
 	}
 
-	// Avatar storage: fail fast outside development, like the JWT secret above.
-	// Every missing variable is named so one restart surfaces all of them.
 	if missing := cfg.missingAvatarStorageVars(); len(missing) > 0 {
 		if cfg.Environment != "development" {
 			for _, name := range missing {
@@ -145,8 +126,6 @@ func Load() *Config {
 			os.Exit(1)
 		}
 		if cfg.S3Endpoint != "" {
-			// A half-filled local config is almost certainly a mistake; the
-			// feature stays off rather than failing on the first upload.
 			slog.Warn("avatar storage is partly configured — avatar uploads are disabled", "missing", missing)
 		}
 	}
@@ -159,9 +138,6 @@ func Load() *Config {
 		slog.Warn("BELJOT_GOOGLE_CLIENT_ID is not set in a non-development environment — Google sign-in will be unavailable")
 	}
 
-	// The idle window should not exceed the absolute cap; otherwise the cap is
-	// the only thing that ever ends an active session and the sliding idle
-	// window is meaningless.
 	if cfg.RefreshIdleTTL > cfg.RefreshAbsoluteTTL {
 		slog.Warn("BELJOT_REFRESH_IDLE_TTL exceeds BELJOT_REFRESH_ABSOLUTE_TTL — idle expiry will never fire before the absolute cap",
 			"idleTTL", cfg.RefreshIdleTTL, "absoluteTTL", cfg.RefreshAbsoluteTTL)
@@ -187,11 +163,8 @@ func getEnvInt(key string, fallback int) int {
 	return fallback
 }
 
-// getEnvDuration parses a Go duration string (e.g. "15m", "720h") from the
-// environment, falling back to the default on absence, a parse error, or a
-// non-positive value (a zero/negative TTL would mint already-expired tokens).
-// Note Go's time.ParseDuration has no day unit — express days as hours
-// (30d = 720h).
+// getEnvDuration parses a Go duration such as "15m" or "720h" (there is no day
+// unit) from the environment, falling back when it is unset, invalid or not positive.
 func getEnvDuration(key string, fallback time.Duration) time.Duration {
 	if value, ok := os.LookupEnv(key); ok {
 		if d, err := time.ParseDuration(strings.TrimSpace(value)); err == nil && d > 0 {

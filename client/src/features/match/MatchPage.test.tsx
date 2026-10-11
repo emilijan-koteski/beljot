@@ -18,8 +18,6 @@ import type { HandScoredPayload } from "@/shared/types/wsEvents";
 
 import { MatchPage } from "./MatchPage";
 
-// Mock WebSocket context hooks. The send-message hook returns a stable spy so
-// surrender flow tests can assert outgoing actions.
 const mockSendMessage = vi.fn();
 vi.mock("@/shared/providers/WebSocketContext", () => ({
   useWsSendMessage: () => mockSendMessage,
@@ -30,8 +28,6 @@ vi.mock("@/shared/providers/WebSocketProvider", () => ({
   WebSocketProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-// The audio engine is a jsdom no-op anyway; spying on it lets the "audio" block
-// assert what the page asks for and when.
 const audioEngine = vi.hoisted(() => ({
   playSfx: vi.fn(),
   preloadSfx: vi.fn(() => Promise.resolve()),
@@ -42,23 +38,16 @@ const audioEngine = vi.hoisted(() => ({
 }));
 vi.mock("@/shared/audio/audioEngine", () => audioEngine);
 
-// Preference writes (HUD mute, Settings dialog) resolve by default so the
-// optimistic store write is what the tests observe.
 const mockUpdatePreferences = vi.fn((..._args: unknown[]) => Promise.resolve({}));
 vi.mock("@/shared/api/profile", () => ({
   updatePreferences: (...args: unknown[]) => mockUpdatePreferences(...args),
 }));
 
-// MatchResult reads the room's last match for its collapsible hand breakdown.
-// Held pending by default: most of these tests are about the page, not the
-// breakdown, and a never-settling promise keeps the section unrendered without
-// a network call. The wiring test below drives it explicitly.
 const mockGetRoomLastMatch = vi.fn((_roomId: number): Promise<unknown> => new Promise(() => {}));
 vi.mock("@/shared/api/matches", () => ({
   getRoomLastMatch: (roomId: number) => mockGetRoomLastMatch(roomId),
 }));
 
-// Friendship backs the per-player rows inside the expanded breakdown.
 vi.mock("@/shared/api/friends", () => ({
   getFriendshipStatus: vi.fn(() => Promise.resolve({ status: "none", requestId: null })),
   sendFriendRequest: vi.fn(),
@@ -67,9 +56,6 @@ vi.mock("@/shared/api/friends", () => ({
   removeFriend: vi.fn(),
 }));
 
-// Rooms API — controllable so the return-to-room flow (D146) can assert distinct
-// error copy. getRoom resolves to a healthy membership so the on-mount splash
-// check stays quiet when a room param is present.
 vi.mock("@/shared/api/rooms", () => ({
   getRoom: vi.fn(),
   leaveRoom: vi.fn(),
@@ -105,11 +91,6 @@ const mockMatchState: MatchState = {
   trickWinnerSeat: null,
   awaitingDeclaration: false,
   declarationsResolved: false,
-  // The fixture mirrors what the server actually sends since Story 12.10's
-  // per-recipient projection (most tests view as seat 0): only the viewer's
-  // own `hand` carries cards; every other seat arrives masked to `hand: []`
-  // with the real `handCount`. Tests that view as another seat override the
-  // hands they need.
   players: [
     {
       hand: [{ rank: "K", suit: "S" }],
@@ -200,20 +181,6 @@ const mockMatchState: MatchState = {
   ],
 };
 
-// `fromRoom: true` simulates the navigate state RoomPage / LobbyPage attach
-// when a fresh game starts. Without it, MatchPage skips the splash hold —
-// matching the reload / WS-reconnect remount path. `skipSplash` defaults to
-// advancing past the hold so existing table-level assertions are unaffected;
-// pass `false` when the test itself drives timer progression.
-//
-// MatchPage uses useBlocker, which only works inside a data router — hence
-// createMemoryRouter + RouterProvider. The `path: "*"` route deliberately has
-// no `:roomId` param (mirroring the old plain-BrowserRouter helper), so
-// roomIdNum stays null and the mount-time getRoom splash check is skipped;
-// tests that need the param use an explicit `/match/:roomId` route instead.
-// One QueryClient for the file (MatchResult's last-match query needs a
-// provider). Module-scoped rather than per-render so `rerender` keeps the same
-// cache instead of remounting a fresh one mid-assertion.
 const matchPageQueryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
@@ -283,8 +250,6 @@ describe("MatchPage", () => {
   });
 
   describe("match stake (pot) HUD", () => {
-    // Minimal room detail; userId 10 (the beforeEach user) is seated so the
-    // mount-time membership check passes and the table renders.
     const roomDetail = (coinBuyIn: number) => ({
       room: {
         id: 1,
@@ -331,14 +296,12 @@ describe("MatchPage", () => {
     it("shows the pot (humans × buy-in) once the room buy-in loads", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockGetRoom.mockResolvedValue(roomDetail(500) as any);
-      useMatchStore.getState().setMatchState(mockMatchState); // 4 humans
+      useMatchStore.getState().setMatchState(mockMatchState);
       useMatchStore.getState().setMyPlayerSeat(0);
 
       renderAtRoom1();
       await act(async () => {});
 
-      // Both breakpoints render a pill in jsdom (CSS toggles visibility); each
-      // shows 4 × 500 = 2,000.
       const amounts = screen.getAllByTestId("match-stake-amount");
       expect(amounts.length).toBeGreaterThan(0);
       for (const node of amounts) {
@@ -367,7 +330,7 @@ describe("MatchPage", () => {
       const amounts = screen.getAllByTestId("match-stake-amount");
       expect(amounts.length).toBeGreaterThan(0);
       for (const node of amounts) {
-        expect(node).toHaveTextContent(formatCoins(1000)); // 2 humans × 500
+        expect(node).toHaveTextContent(formatCoins(1000));
       }
     });
 
@@ -391,7 +354,6 @@ describe("MatchPage", () => {
   });
 
   it("uses 'Reconnecting…' copy on refresh / reconnect mounts (no fromRoom flag)", () => {
-    // matchState null + no fromRoom => reload-while-game-in-progress path.
     renderMatchPage();
 
     expect(screen.getByText("Reconnecting to the game…")).toBeInTheDocument();
@@ -399,8 +361,6 @@ describe("MatchPage", () => {
   });
 
   it("uses 'Match is starting…' copy when arriving from room lobby", () => {
-    // No matchState yet, but fromRoom flag is set — this is the room→game beat,
-    // not a recovery. Copy reflects that.
     renderMatchPage({ fromRoom: true, skipSplash: false });
 
     expect(screen.getByText("Match is starting…")).toBeInTheDocument();
@@ -413,7 +373,6 @@ describe("MatchPage", () => {
 
     renderMatchPage({ fromRoom: true, skipSplash: false });
 
-    // Splash visible, table not yet mounted — even though state is ready.
     expect(screen.getByTestId("match-starting-splash")).toBeInTheDocument();
     expect(screen.queryByTestId("trick-area")).not.toBeInTheDocument();
 
@@ -421,13 +380,11 @@ describe("MatchPage", () => {
       vi.advanceTimersByTime(MOTION.GAME_STARTING_SPLASH);
     });
 
-    // After the gate elapses, the table mounts.
     expect(screen.queryByTestId("match-starting-splash")).not.toBeInTheDocument();
     expect(screen.getByTestId("trick-area")).toBeInTheDocument();
   });
 
   it("uses GAME_STARTING_SPLASH_REDUCED hold when reduced-motion is set", () => {
-    // Override matchMedia just for this test so useReducedMotion reports true.
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -449,13 +406,11 @@ describe("MatchPage", () => {
 
     expect(screen.getByTestId("match-starting-splash")).toBeInTheDocument();
 
-    // Just before the reduced duration: still visible.
     act(() => {
       vi.advanceTimersByTime(MOTION.GAME_STARTING_SPLASH_REDUCED - 50);
     });
     expect(screen.getByTestId("match-starting-splash")).toBeInTheDocument();
 
-    // Past the reduced duration but well under the normal one: gone.
     act(() => {
       vi.advanceTimersByTime(100);
     });
@@ -467,9 +422,8 @@ describe("MatchPage", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
 
-    renderMatchPage(); // default: fromRoom = false
+    renderMatchPage();
 
-    // Table is mounted immediately — no artificial hold.
     expect(screen.queryByTestId("match-starting-splash")).not.toBeInTheDocument();
     expect(screen.getByTestId("trick-area")).toBeInTheDocument();
   });
@@ -483,9 +437,6 @@ describe("MatchPage", () => {
 
     unmount();
 
-    // Advancing past the splash duration after unmount must not fire stale
-    // setState (would trigger a React warning / test failure under strict
-    // detection). The mere absence of console errors here is the assertion.
     act(() => {
       vi.advanceTimersByTime(MOTION.GAME_STARTING_SPLASH);
     });
@@ -555,7 +506,6 @@ describe("MatchPage", () => {
 
     renderMatchPage();
 
-    // Set match end data and transition to match_end phase
     act(() => {
       useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
       useMatchStore.getState().setMatchEndData({
@@ -566,13 +516,10 @@ describe("MatchPage", () => {
       });
     });
 
-    // Match result overlay should appear
     expect(screen.getByTestId("match-result")).toBeInTheDocument();
     expect(screen.getByTestId("match-result-team-a-score")).toHaveTextContent("1020");
   });
 
-  // Story 13.5: the SP line reads the store's seasonSettlement, which lands in
-  // the same burst as match_end — so it must reach the overlay live.
   it("shows the Season Points line on the result overlay from the match store", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
@@ -604,8 +551,6 @@ describe("MatchPage", () => {
     expect(screen.getByTestId("season-sp-line")).toHaveTextContent("+24 SP · Gold 2");
   });
 
-  // The abandonment surface reads the same slot: the SP event trails
-  // match_abandoned, so the line arrives while the overlay is already up.
   it("shows the Season Points line on the abandonment overlay when it arrives late", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
@@ -638,10 +583,6 @@ describe("MatchPage", () => {
     );
   });
 
-  // The roomId prop is the ONLY thing that turns the result overlay's hand
-  // breakdown on; deleting it left every other test in this file green, so the
-  // wiring gets its own assertion — the request must reach the API with the
-  // route's room id, and the toggle must appear.
   it("passes the route roomId to MatchResult, which reads that room's last match", async () => {
     mockGetRoom.mockResolvedValue({
       room: { id: 1, status: "playing", coinBuyIn: 0 },
@@ -697,16 +638,12 @@ describe("MatchPage", () => {
     await act(async () => {});
 
     expect(mockGetRoomLastMatch).toHaveBeenCalledWith(1);
-    // The query only starts once the overlay has mounted, and React Query
-    // batches its notifications through a timer — which this file has faked.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(screen.getByTestId("match-result-stats-toggle")).toBeInTheDocument();
   });
 
-  // D145a: a new match's match_state (any live phase) must clear a stale result
-  // overlay left from the previous match.
   it("clears a stale result overlay when a fresh match_state arrives", () => {
     useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "match_end" });
     useMatchStore.getState().setMyPlayerSeat(0);
@@ -720,7 +657,6 @@ describe("MatchPage", () => {
     renderMatchPage();
     expect(screen.getByTestId("match-result")).toBeInTheDocument();
 
-    // A new match begins → match_state arrives with a live phase.
     act(() => {
       useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "dealing" });
     });
@@ -729,7 +665,6 @@ describe("MatchPage", () => {
     expect(useMatchStore.getState().matchEndData).toBeNull();
   });
 
-  // D146: distinct return-to-room error copy per failure code.
   it.each([
     ["MATCH_ALREADY_STARTED", 409, "The next match already started without you."],
     ["NOT_IN_ROOM", 404, "You're no longer in this room."],
@@ -798,9 +733,6 @@ describe("MatchPage", () => {
     expect(screen.getByTestId("error-toast")).toHaveTextContent(message);
   });
 
-  // Story 9.3 AC1: an insolvent return is rejected with 409 INSUFFICIENT_COINS.
-  // Unlike the other return errors, the seat is gone server-side, so we clear
-  // match state and route to the lobby instead of keeping the result overlay.
   it("routes to the lobby (no overlay toast) when return-to-room is rejected for insolvency", async () => {
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
@@ -928,8 +860,6 @@ describe("MatchPage", () => {
     expect(screen.getByTestId("error-toast")).toHaveTextContent("It's not your turn");
   });
 
-  // --- Surrender integration tests (Task 9.6) ---
-
   it("shows SurrenderButton in playing phase, hides in match_end", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
@@ -952,8 +882,6 @@ describe("MatchPage", () => {
   });
 
   it("shows SurrenderPrompt for the partner when surrenderProposerSeat is set", () => {
-    // Local player is seat 2 (Carol); proposer is seat 0 (Alice). Partner of
-    // proposer is (0 + 2) % 4 == 2, i.e. the local player.
     useAuthStore.setState({
       token: "test-token",
       user: makeUser({
@@ -975,7 +903,6 @@ describe("MatchPage", () => {
   });
 
   it("shows SurrenderOpponentBanner for opponents when surrenderProposerSeat is set", () => {
-    // Local player is seat 1 (Bob, team B); proposer is seat 0 (Alice, team A).
     useAuthStore.setState({
       token: "test-token",
       user: makeUser({
@@ -1033,8 +960,6 @@ describe("MatchPage", () => {
     expect(mockSendMessage).toHaveBeenCalledWith("action:surrender_request", {});
   });
 
-  // --- Emote integration tests (Story 8.3) ---
-
   it("shows the emote toggle during the playing phase", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
@@ -1077,8 +1002,6 @@ describe("MatchPage", () => {
   });
 
   it("renders an emote bubble at the correct compass position for an opponent", () => {
-    // Local player at seat 0 (South). Opponent at seat 2 emotes — bubble
-    // should appear at compass 2 (North) from the receiver's perspective.
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
 
@@ -1092,8 +1015,6 @@ describe("MatchPage", () => {
   });
 
   it("renders the sender's own bubble at South (compass 0)", () => {
-    // Local player is seat 1 (Bob). Their own emote should anchor to South
-    // (compass 0) regardless of the absolute seat index.
     useAuthStore.setState({
       token: "test-token",
       user: makeUser({
@@ -1139,13 +1060,6 @@ describe("MatchPage", () => {
   });
 
   it("elevates seat wrappers above the trick area so emotes/surrender banners aren't hidden by thrown cards", () => {
-    // Regression: on phones the EmoteBubble / SurrenderOpponentBanner render
-    // INSIDE the seat wrapper, whose `-translate-*` transform forms a stacking
-    // context — so their own z is trapped there and can't beat the center
-    // TrickArea (rendered later in the DOM at z-auto). The wrapper itself must
-    // carry the seats tier (Z.SEATS) to outrank the thrown cards; otherwise the
-    // cards paint over the emote/banner (most visible on mobile, where seats
-    // overlap the table).
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
 
@@ -1219,9 +1133,6 @@ describe("MatchPage", () => {
     expect(screen.queryByTestId("belot-reveal")).not.toBeInTheDocument();
   });
 
-  // Trick-collect gating: end-of-hand and reveal overlays must wait for the
-  // four-card collect sweep (pendingResolvedTrick) to finish before they mount,
-  // so players see the final card, the winner, and where the cards went.
   describe("trick-collect gating", () => {
     const collectSnapshot: { trick: TrickCard[]; winnerSeat: number } = {
       trick: [
@@ -1256,16 +1167,12 @@ describe("MatchPage", () => {
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 
-      // Hand-end burst: trick_resolved (snapshot) is immediately followed by
-      // hand_scored. The scoreboard must stay hidden while the four cards are
-      // still sweeping to the winner.
       act(() => {
         useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
         useMatchStore.getState().setScoreRevealData(scorePayload);
       });
       expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
 
-      // Collect completes → snapshot cleared (handleFlightComplete) → mounts.
       act(() => {
         useMatchStore.getState().setPendingResolvedTrick(null);
       });
@@ -1300,16 +1207,12 @@ describe("MatchPage", () => {
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 
-      // Unlike declarations, the belot reveal is NOT deferred behind the
-      // collect sweep — the announcer expects "belote!" the instant they
-      // confirm, concurrent with the throw (issue 3).
       act(() => {
         useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
         useMatchStore.getState().setBelotReveal({ playerSeat: 0, team: 0, cardId: "QS" });
       });
       expect(screen.getByTestId("belot-reveal")).toBeInTheDocument();
 
-      // Still up after the collect completes.
       act(() => {
         useMatchStore.getState().setPendingResolvedTrick(null);
       });
@@ -1332,9 +1235,6 @@ describe("MatchPage", () => {
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 
-      // Final-hand burst: trick_resolved (snapshot) → hand_scored → match_end,
-      // with match_end landing while the collect is still sweeping. The match
-      // result must NOT preempt the (still-gated) score reveal.
       act(() => {
         useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
         useMatchStore.getState().setScoreRevealData(scorePayload);
@@ -1348,8 +1248,6 @@ describe("MatchPage", () => {
       expect(screen.queryByTestId("match-result")).not.toBeInTheDocument();
       expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
 
-      // Collect completes → the score reveal surfaces first; the match result
-      // still waits until the reveal is dismissed.
       act(() => {
         useMatchStore.getState().setPendingResolvedTrick(null);
       });
@@ -1377,8 +1275,6 @@ describe("MatchPage", () => {
     });
 
     it("still gates the score reveal for the glow beat under reduced motion", () => {
-      // Reduced-motion path runs no flights and clears the snapshot after
-      // TRICK_RESOLVE_PAUSE — the reveal must wait that beat, not appear instantly.
       window.matchMedia = vi.fn().mockImplementation((query: string) => ({
         matches: query.includes("prefers-reduced-motion"),
         media: query,
@@ -1408,9 +1304,6 @@ describe("MatchPage", () => {
   });
 
   describe("mid-match back-press blocker", () => {
-    // Stack [lobby, match] with the match on top — router.navigate(-1) is the
-    // data-router equivalent of the browser back button (a POP), which the
-    // useBlocker predicate intercepts while the match is active.
     function renderWithHistoryBeneath() {
       const router = createMemoryRouter([{ path: "*", element: <MatchPageRoute /> }], {
         initialEntries: ["/lobby", "/match/1"],
@@ -1426,7 +1319,6 @@ describe("MatchPage", () => {
 
       const router = renderWithHistoryBeneath();
 
-      // Mock window.confirm to decline leaving
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
 
       await act(async () => {
@@ -1434,7 +1326,6 @@ describe("MatchPage", () => {
       });
 
       expect(confirmSpy).toHaveBeenCalledWith("Leave the game? You may lose your progress.");
-      // Game state should not be cleared and the pop is cancelled
       expect(useMatchStore.getState().matchState).not.toBeNull();
       expect(router.state.location.pathname).toBe("/match/1");
 
@@ -1454,9 +1345,6 @@ describe("MatchPage", () => {
       });
 
       expect(confirmSpy).toHaveBeenCalledWith("Leave the game? You may lose your progress.");
-      // Game store wiped; the blocked pop targeted /lobby, so the blocker
-      // takes the proceed() path — the pop itself completes onto the lobby
-      // entry beneath.
       expect(useMatchStore.getState().matchState).toBeNull();
       expect(router.state.location.pathname).toBe("/lobby");
 
@@ -1464,8 +1352,6 @@ describe("MatchPage", () => {
     });
 
     it("does not block the back button once the match has ended", async () => {
-      // Distinct routes (not "*") so the pop actually unmounts MatchPage —
-      // that unmount is what triggers the end-state store cleanup.
       mockGetRoom.mockResolvedValue(
         makeRoomDetail({
           room: makeRoom({
@@ -1528,8 +1414,6 @@ describe("MatchPage", () => {
         await router.navigate(-1);
       });
 
-      // No confirm — the pop goes straight through to the entry beneath, and
-      // the unmount cleanup wipes the ended match from the store.
       expect(confirmSpy).not.toHaveBeenCalled();
       expect(router.state.location.pathname).toBe("/lobby");
       expect(screen.getByTestId("lobby-after-back")).toBeInTheDocument();
@@ -1542,9 +1426,6 @@ describe("MatchPage", () => {
 
   describe("opponent throw flight timing", () => {
     it("never paints the opponent's card at center before the deck→slot flight starts", () => {
-      // jsdom reports zeroed rects, which makes rectFrom() return null and the
-      // flight push bail. Give every element a plausible rect so the deck and
-      // slot measurements succeed like they would in a real browser.
       const gbcrSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
         left: 100,
         top: 100,
@@ -1561,8 +1442,6 @@ describe("MatchPage", () => {
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 
-      // Opponent at seat 1 (east, compass 1) throws 7H — one store commit,
-      // exactly how the WS dispatcher applies event:card_played.
       act(() => {
         useMatchStore.getState().setMatchState({
           ...mockMatchState,
@@ -1571,10 +1450,6 @@ describe("MatchPage", () => {
         });
       });
 
-      // The commit that grows the trick must come up with the flight already
-      // active and the static slot card suppressed. If the slot card renders
-      // here, the card flashes at center for a frame before the flight is
-      // pushed — the "appears, disappears, then slides in" bug.
       expect(
         document.querySelector('[data-testid^="card-flight-throw-opp-1-7H"]'),
       ).toBeInTheDocument();
@@ -1589,7 +1464,6 @@ describe("MatchPage", () => {
       audioEngine.playSfx.mockClear();
     });
 
-    // Seat 0 holds both trump (spades) K and Q and it is their turn to lead.
     function belotEligibleState(): MatchState {
       return {
         ...mockMatchState,
@@ -1622,8 +1496,6 @@ describe("MatchPage", () => {
         fireEvent.click(screen.getByTestId("playing-card-KS"));
       });
 
-      // The announce/pass dialog appears and the card has NOT been sent — nor
-      // sounded: the card-play sound belongs to the throw, not the click.
       expect(screen.getByTestId("belot-prompt")).toBeInTheDocument();
       expect(mockSendMessage).not.toHaveBeenCalledWith("action:play_card", expect.anything());
       expect(audioEngine.playSfx).not.toHaveBeenCalled();
@@ -1641,18 +1513,12 @@ describe("MatchPage", () => {
       act(() => {
         fireEvent.click(screen.getByTestId("belot-prompt-announce"));
       });
-      // The deferred throw sounds once, when it actually happens.
       expect(audioEngine.playSfx).toHaveBeenCalledTimes(1);
       expect(audioEngine.playSfx).toHaveBeenCalledWith("cardPlay");
 
-      // Card is thrown immediately; the announce is held back so it can't race
-      // play_card on the server (the race that produced "Невалидна акција" and
-      // stalled the turn).
       expect(mockSendMessage).toHaveBeenCalledWith("action:play_card", { cardId: "KS" });
       expect(mockSendMessage).not.toHaveBeenCalledWith("action:announce_belot", {});
 
-      // Server registers the deferred play (pendingBelotSeat === my seat) — now
-      // the announce is safe to fire.
       act(() => {
         useMatchStore.getState().setMatchState({ ...belotEligibleState(), pendingBelotSeat: 0 });
       });
@@ -1708,22 +1574,17 @@ describe("MatchPage", () => {
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 
-      // Trick 1 resolves: the reveal is deferred behind the trick-1 sweep.
       act(() => {
         useMatchStore.getState().setPendingResolvedTrick(aSnapshot);
         useMatchStore.getState().setDeclarationReveal(decls);
       });
       expect(screen.queryByTestId("declaration-reveal")).not.toBeInTheDocument();
 
-      // Sweep clears → the reveal latches visible.
       act(() => {
         useMatchStore.getState().setPendingResolvedTrick(null);
       });
       expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
 
-      // A LATER trick resolves while the reveal is still up (players played fast).
-      // It must NOT unmount/re-defer — that's what restarted its countdown every
-      // trick and made it re-appear forever. It stays up for its own 8 s.
       act(() => {
         useMatchStore.getState().setPendingResolvedTrick(aSnapshot);
       });
@@ -1740,10 +1601,6 @@ describe("MatchPage", () => {
       });
       expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
 
-      // Another player plays → a fresh playing match_state lands. The reveal
-      // owns its own 8 s countdown + X, so an unrelated state push must NOT
-      // close it (that was the bug: the dialog vanished the instant anyone
-      // played).
       act(() => {
         useMatchStore.getState().setMatchState({ ...mockMatchState, activePlayerSeat: 1 });
       });
@@ -1760,14 +1617,11 @@ describe("MatchPage", () => {
       });
       expect(screen.getByTestId("declaration-reveal")).toBeInTheDocument();
 
-      // Overlay takes over the table (pause) — the reveal is orphaned (its
-      // component unmounts, so its own countdown can't fire it).
       act(() => {
         useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "paused" });
       });
       expect(screen.queryByTestId("declaration-reveal")).not.toBeInTheDocument();
 
-      // Resume → back to playing. The stale reveal must NOT reappear.
       act(() => {
         useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "playing" });
       });
@@ -1802,15 +1656,13 @@ describe("MatchPage", () => {
         useMatchStore.getState().setScoreRevealData(scorePayload);
       });
       act(() => {
-        vi.advanceTimersByTime(2000); // Continue-enable delay
+        vi.advanceTimersByTime(2000);
       });
       expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
 
       act(() => {
         fireEvent.click(screen.getByTestId("score-reveal-continue"));
       });
-      // Sends the continue action; the dialog stays up in its waiting state —
-      // the server (not the client) decides when the next hand is dealt.
       expect(mockSendMessage).toHaveBeenCalledWith("action:continue", {});
       expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
     });
@@ -1828,7 +1680,6 @@ describe("MatchPage", () => {
       });
       expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
 
-      // Next hand dealt — phase leaves "hand_complete".
       act(() => {
         useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "bidding" });
       });
@@ -1836,8 +1687,6 @@ describe("MatchPage", () => {
     });
 
     it("reconstructs the score dialog from lastHandResult on reconnect", () => {
-      // Reconnect snapshot: phase hand_complete, lastHandResult present, but no
-      // event:hand_scored was received (scoreRevealData stays null until derived).
       useMatchStore.getState().setMatchState({
         ...mockMatchState,
         phase: "hand_complete",
@@ -1853,13 +1702,7 @@ describe("MatchPage", () => {
       expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
     });
   });
-  // Story 12.5: the prompt's fallback detector is the ONE production site that
-  // reads the variant's declaration-overlap rule. The lib tests pass the flag as
-  // a literal and the resolver test is isolated, so without a page-level test
-  // hardcoding the argument to `false` here would keep the whole suite green.
   describe("declaration prompt overlap wiring", () => {
-    // Seat 0 holds quarte 9S-TS-JS-QS (50) and a carré of Jacks (200) sharing
-    // JS. Croatian keeps both melds; Bitola dedups down to the carré.
     function overlapPromptState(variant: MatchState["variant"]): MatchState {
       return {
         ...mockMatchState,
@@ -1895,23 +1738,12 @@ describe("MatchPage", () => {
       renderMatchPage();
 
       const prompt = screen.getByTestId("declaration-prompt");
-      // The shared JS is rendered once in each of the two meld rows.
       expect(within(prompt).getAllByTestId("playing-card-JS")).toHaveLength(2);
       expect(within(prompt).getAllByTestId("playing-card-QS")).toHaveLength(1);
       expect(within(prompt).getAllByTestId("playing-card-JC")).toHaveLength(1);
       expect(within(prompt).getByTestId("declaration-prompt-total")).toHaveTextContent("250");
     });
 
-    // The seat gate on Bitola's trick-1 prompt. It is the ONLY thing keeping the
-    // dialog private to the prompted seat: promptDeclarations is built from the
-    // VIEWER's own hand, so without this check all four seats would render a
-    // prompt during trick 1, three of them would be rejected with
-    // ErrNotYourTurn, and the dialog's mere appearance would announce that a
-    // declaration is outstanding at the table.
-    //
-    // The simultaneous phase deliberately has no such gate, which is exactly why
-    // this needs its own test: every other prompt test in this file sets
-    // activePlayerSeat === myPlayerSeat, so the clause is otherwise unpinned.
     it("shows no prompt to a Bitola seat that is not on the clock", () => {
       useMatchStore.getState().setMatchState({
         ...overlapPromptState("bitola"),
@@ -1930,27 +1762,12 @@ describe("MatchPage", () => {
       renderMatchPage();
 
       const prompt = screen.getByTestId("declaration-prompt");
-      // Only the carré survives, so JS appears once and the quarte's QS not at all.
       expect(within(prompt).getAllByTestId("playing-card-JS")).toHaveLength(1);
       expect(within(prompt).queryByTestId("playing-card-QS")).not.toBeInTheDocument();
       expect(within(prompt).getByTestId("declaration-prompt-total")).toHaveTextContent("200");
     });
   });
 
-  // The dedicated declaration phase (Croatian) is a phase the table has never
-  // rendered before. The prompt gate is phase-agnostic and the table chrome is
-  // phase-independent, so both work here for free — which is exactly why they
-  // would regress silently. Everything below is driven by `phase: "declaring"`
-  // alone.
-  //
-  // The page derives exactly ONE thing from the variant, and it is not in this
-  // block: `matchState.variant` is handed to `RulesDialog` so the rules overlay
-  // opens on the ruleset actually being played (see "rules overlay" below).
-  // Nothing about PLAY branches on it — `variantRules.ts` remains the single
-  // variant→behaviour mapping.
-  // The variant prop on RulesDialog is optional and falls back to Bitola, so
-  // deleting the wiring at MatchPage's render site compiles cleanly and every
-  // RulesDialog test still passes. This is the only thing that catches it.
   describe("rules overlay", () => {
     function openRules(variant: MatchState["variant"]) {
       useMatchStore.getState().setMatchState({ ...mockMatchState, variant });
@@ -1965,7 +1782,6 @@ describe("MatchPage", () => {
         "aria-selected",
         "true",
       );
-      // The Croatian deal, not Bitola's face-up candidate.
       expect(screen.getByText("Deal all eight up front")).toBeInTheDocument();
       expect(screen.queryByText("Deal five each, then turn one up")).not.toBeInTheDocument();
     });
@@ -2061,7 +1877,6 @@ describe("MatchPage", () => {
       expect({ sound: u?.soundVolume, music: u?.musicVolume }).toEqual({ sound: 30, music: 80 });
       expect(audioEngine.setMusicVolume).toHaveBeenLastCalledWith(80);
       expect(audioEngine.startMusic).toHaveBeenCalledTimes(2);
-      // The mute writes the switches only; the levels are never part of it.
       for (const [, body] of mockUpdatePreferences.mock.calls) {
         expect(body).not.toHaveProperty("soundVolume");
         expect(body).not.toHaveProperty("musicVolume");
@@ -2078,7 +1893,6 @@ describe("MatchPage", () => {
       fireEvent.click(screen.getByTestId("mute-button"));
 
       expect(audioPrefs()).toEqual({ sound: false, music: false });
-      // Only the switch that actually moves is sent.
       expect(mockUpdatePreferences).toHaveBeenCalledWith(10, { musicEnabled: false });
     });
 
@@ -2116,7 +1930,6 @@ describe("MatchPage", () => {
         useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
       });
       const receivedAt = useMatchStore.getState().pendingResolvedTrick!.receivedAt;
-      // The winner glow holds first — no sound while the cards sit there.
       expect(collectCalls()).toHaveLength(0);
 
       act(() => {
@@ -2126,8 +1939,6 @@ describe("MatchPage", () => {
     });
 
     it("re-asks with the SAME dedupe key when a remount re-runs the collect for a live snapshot", () => {
-      // Real rects so the collect flights launch and the snapshot outlives the
-      // glow (jsdom never fires animationend) — the reconnect-mid-collect case.
       const gbcrSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
         left: 100,
         top: 100,
@@ -2157,7 +1968,6 @@ describe("MatchPage", () => {
           vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE);
         });
 
-        // The engine drops a repeated key, so this is ONE audible collect.
         const calls = collectCalls();
         expect(calls).toHaveLength(2);
         expect(calls[0]![1]).toEqual({ dedupeKey: String(snapshot!.receivedAt) });
@@ -2211,16 +2021,8 @@ describe("MatchPage", () => {
   });
 
   describe("dedicated declaration phase", () => {
-    // Seat 0 holds a tierce 9S-TS-JS. No seat is on the clock and there is no
-    // turn deadline — the phase asks all four at once and runs its own
-    // mount-anchored window.
     function declaringState(overrides: Partial<MatchState> = {}): MatchState {
       return {
-        // Deliberately NOT a Croatian state: the phase is the only input the
-        // client reacts to, and the tierce below is worth 20 under both rule
-        // sets. Carrying the variant here would quietly suggest the page
-        // branches on it — it does not, and variantRules.ts stays the single
-        // variant→behaviour mapping.
         ...mockMatchState,
         phase: "declaring",
         trumpSuit: "H",
@@ -2252,7 +2054,6 @@ describe("MatchPage", () => {
       return renderMatchPage();
     }
 
-    /** declaringState with the viewer's seat 0 hand replaced (no melds). */
     function meldlessOverride(): Partial<MatchState> {
       return {
         players: mockMatchState.players.map((p) =>
@@ -2280,9 +2081,6 @@ describe("MatchPage", () => {
       expect(within(prompt).getByTestId("declaration-prompt-skip")).toBeEnabled();
     });
 
-    // A seat holding nothing gets the same dialog, but has nothing to decide:
-    // it answers on mount (owner decision — an instant skip, accepting that the
-    // table can tell) and waits on the others with its own answer counted.
     it("answers at once for a seat holding nothing and shows it waiting", () => {
       renderDeclaring(meldlessOverride());
 
@@ -2295,10 +2093,8 @@ describe("MatchPage", () => {
       expect(within(prompt).getByTestId("declaration-prompt-declare")).toBeDisabled();
       const skip = within(prompt).getByTestId("declaration-prompt-skip");
       expect(skip).toBeDisabled();
-      // Nobody had answered yet; the viewer's own skip already counts.
       expect(skip).toHaveTextContent("1/4");
 
-      // Sent once — the window elapsing does not send a second answer.
       act(() => {
         vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP + 100);
       });
@@ -2306,9 +2102,6 @@ describe("MatchPage", () => {
     });
 
     it("shows the prompt to a seat that is not the pinned activePlayerSeat", () => {
-      // activePlayerSeat is 1 in every fixture here; the viewer is seat 0 and
-      // must still be asked. Under the old cursor this was the "not on the
-      // clock" case that rendered nothing.
       renderDeclaring();
 
       expect(screen.getByTestId("declaration-prompt")).toBeInTheDocument();
@@ -2364,9 +2157,6 @@ describe("MatchPage", () => {
       expect(mockSendMessage).not.toHaveBeenCalledWith("action:skip_declare", expect.anything());
     });
 
-    // Nobody is on the clock in this phase, so no seat may be lit as if they
-    // were — it would misdescribe the phase, and under the old cursor it named
-    // a meld holder outright.
     it("flags no seat as active and shows no turn countdown", () => {
       renderDeclaring();
 
@@ -2379,17 +2169,10 @@ describe("MatchPage", () => {
       }
     });
 
-    // Pause is refused by the engine in this phase, so offering the control
-    // would only earn the player a wrong-phase toast. Both HUD surfaces are
-    // asserted: phones use the hamburger menu, not the desktop cluster, so
-    // gating only one leaves half the players able to click a dead button.
     it("withdraws the pause control — the phase is a fixed window, not a turn", () => {
       renderDeclaring();
 
       expect(screen.queryByTestId("pause-button")).not.toBeInTheDocument();
-      // Surrender is still legal in the phase and stays rendered. (The prompt
-      // overlay is modal, so it covers the control for as long as it is up —
-      // the same as every other prompt in the game.)
       expect(screen.getByTestId("surrender-button")).toBeInTheDocument();
     });
 
@@ -2404,10 +2187,6 @@ describe("MatchPage", () => {
     it("does not make cards playable — no trick is open yet", () => {
       renderDeclaring();
 
-      // isMyTurn requires the playing phase. Scoped to the hand — the same card
-      // is also drawn inside the prompt's meld preview. Click the CARD, not its
-      // positioning wrapper: the click handler lives on playing-card-*, and
-      // hand-card-* is the parent it bubbles up to.
       const hand = screen.getByTestId("hand-cards");
       fireEvent.click(within(hand).getByTestId("playing-card-9S"));
       expect(mockSendMessage).not.toHaveBeenCalledWith("action:play_card", expect.anything());
@@ -2434,15 +2213,6 @@ describe("MatchPage", () => {
     });
   });
 
-  // Opponent card counts during a deal that holds two cards back per seat. Both
-  // counts are server-authoritative (players[n].handCount + faceDownCount) —
-  // the page adds them and branches on no variant at all, which is why these
-  // cases are driven by the fields and not by `variant: "croatia"`.
-  //
-  // The fixtures mirror what the server actually sends since Story 12.10's
-  // per-recipient projection: only the VIEWER's own `hand` carries cards; every
-  // opponent arrives with `hand: []` and their real `handCount`. The page must
-  // render opponents' card backs from the count alone.
   describe("opponent card counts with face-down cards outstanding", () => {
     function biddingState(faceDownCount: number): MatchState {
       return {
@@ -2456,8 +2226,6 @@ describe("MatchPage", () => {
         activePlayerSeat: 1,
         players: mockMatchState.players.map((p) => ({
           ...p,
-          // The viewer (seat 0) receives their own six OPEN cards; every other
-          // seat's hand is masked to [] and only handCount says they hold six.
           hand:
             p.seat === 0
               ? ([
@@ -2481,9 +2249,6 @@ describe("MatchPage", () => {
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 
-      // Three opponents (the viewer's own seat renders its real hand instead).
-      // Their hands are empty on the wire, so ×8 can ONLY come from
-      // handCount(6) + faceDownCount(2).
       const counts = screen.getAllByTestId("player-seat-card-count");
       expect(counts).toHaveLength(3);
       for (const c of counts) {
@@ -2492,8 +2257,6 @@ describe("MatchPage", () => {
     });
 
     it("renders the viewer's own two face-down backs for the whole of bidding", () => {
-      // The backs are the ONLY representation of the hidden pair the viewer
-      // gets until trump resolves — the identities never reach the client.
       useMatchStore.getState().setMatchState(biddingState(2));
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
@@ -2528,15 +2291,10 @@ describe("MatchPage", () => {
       renderMatchPage();
 
       expect(screen.queryAllByTestId("hand-card-face-down")).toHaveLength(0);
-      // The merged pair renders face-up instead.
       expect(screen.getByTestId("hand-card-JS")).toBeInTheDocument();
       expect(screen.getByTestId("hand-card-QS")).toBeInTheDocument();
     });
 
-    // The page-level wiring of mustPickTrump -> TrumpPrompt's canPass. The
-    // component's own suite covers the prop; nothing covered the PROP BEING
-    // PASSED, and because canPass defaults to true, deleting the attribute here
-    // silently restores the rejected-Pass button for the forced dealer.
     it("hides the Pass control from the viewer when the server says they must pick", () => {
       const st = biddingState(2);
       useMatchStore.getState().setMatchState({
@@ -2550,7 +2308,6 @@ describe("MatchPage", () => {
       expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
       expect(screen.queryByTestId("trump-prompt-pass")).not.toBeInTheDocument();
       expect(screen.getByTestId("trump-prompt-must-pick")).toBeInTheDocument();
-      // The legal moves are still all there.
       for (const suit of ["S", "H", "D", "C"] as const) {
         expect(screen.getByTestId(`trump-prompt-suit-${suit}`)).toBeEnabled();
       }
@@ -2571,8 +2328,6 @@ describe("MatchPage", () => {
     });
 
     it("does not promise the other seats a pass the dealer cannot make", () => {
-      // Viewer is NOT the bidder: the waiting banner must drop "or pass" too,
-      // which is the same prop reaching the sibling-seat branch.
       const st = biddingState(2);
       useMatchStore.getState().setMatchState({
         ...st,
@@ -2587,10 +2342,6 @@ describe("MatchPage", () => {
       expect(prompt).not.toHaveTextContent(/or pass/i);
     });
 
-    // The page-level wiring of declarationsEnabled -> ScorePanel, for the same
-    // reason as mustPickTrump above: the component's own suite covers the prop,
-    // and because it DEFAULTS to true, dropping the attribute here would leave
-    // every declarations-off table silently unlabelled.
     it("labels the scoreboard when the room plays without declarations", () => {
       useMatchStore.getState().setMatchState({
         ...biddingState(0),
@@ -2602,10 +2353,6 @@ describe("MatchPage", () => {
       expect(screen.getByTestId("score-meta-no-declarations")).toBeInTheDocument();
     });
 
-    // No "missing field" case here, unlike the lobby card's: EventMatchStateSchema
-    // is a z.strictObject requiring declarationsEnabled, so a payload without it
-    // fails the parse and never reaches the store. Testing it would mean casting
-    // past the type to build state the client cannot receive.
     it("leaves the scoreboard unlabelled on an ordinary table", () => {
       useMatchStore.getState().setMatchState({
         ...biddingState(0),
@@ -2617,9 +2364,6 @@ describe("MatchPage", () => {
       expect(screen.queryByTestId("score-meta-no-declarations")).not.toBeInTheDocument();
     });
 
-    // The same page-level wiring for "dosta". It matters MORE here than for
-    // declarations: this prop defaults to false, so dropping the attribute
-    // leaves every stop-at-target table unlabelled and nothing else notices.
     it("labels the scoreboard when the room stops at the target", () => {
       useMatchStore.getState().setMatchState({
         ...biddingState(0),
@@ -2643,9 +2387,6 @@ describe("MatchPage", () => {
     });
 
     it("reads the open hand alone when nothing is held face-down", () => {
-      // The Bitola path and every post-bidding phase: faceDownCount is 0, so
-      // the count must be handCount on its own — opponents' hands are empty
-      // on the wire, never counted.
       useMatchStore.getState().setMatchState(biddingState(0));
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
@@ -2656,12 +2397,6 @@ describe("MatchPage", () => {
     });
 
     it("renders the full masked wire shape — empty foreign declarations and null pendingBelotSeat included", () => {
-      // The complete Story 12.10 mask, every vector at once: opponents' hands
-      // [], their PRE-RESOLUTION declarations [] (the projection empties them
-      // until the reveal), and pendingBelotSeat null because the viewer is not
-      // the holder. The page must render the table normally — all four seats,
-      // the viewer's own card, opponent card backs from handCount alone — and
-      // must not open a belote prompt for a null field.
       const masked: MatchState = {
         ...mockMatchState,
         declarationsResolved: false,
@@ -2682,17 +2417,11 @@ describe("MatchPage", () => {
       for (const c of counts) {
         expect(c).toHaveTextContent("×1");
       }
-      // The viewer's own hand still renders its real card.
       expect(screen.getByTestId("playing-card-KS")).toBeInTheDocument();
-      // A null pendingBelotSeat is "not you", never a prompt.
       expect(screen.queryByTestId("belot-prompt")).not.toBeInTheDocument();
     });
 
     it("falls back to hand.length for a server that predates handCount", () => {
-      // Rolling-deploy window: an OLD server still broadcasts full hands and no
-      // handCount. The cast (not parse) path leaves the field undefined, and
-      // the page must keep rendering opponents from hand.length until the
-      // server flips — never ×NaN, never ×0.
       const legacy = biddingState(0);
       useMatchStore.getState().setMatchState({
         ...legacy,
@@ -2720,7 +2449,6 @@ describe("MatchPage", () => {
       }
     });
   });
-  // Spec: match-audio-deal-transition-polish — the I/O matrix rows.
   describe("match polish: deal, collect sequencing, event sounds, belote", () => {
     const sfxCalls = (name: string) =>
       audioEngine.playSfx.mock.calls.filter(([called]) => called === name);
@@ -2748,7 +2476,6 @@ describe("MatchPage", () => {
       { rank: "J", suit: "H" },
     ];
 
-    /** A freshly dealt candidate hand: bidding round 1, nobody has bid. */
     function dealtState(overrides: Partial<MatchState> = {}): MatchState {
       return {
         ...mockMatchState,
@@ -2772,8 +2499,6 @@ describe("MatchPage", () => {
     }
 
     describe("deal animation", () => {
-      // Real rects so the deal's flights launch (jsdom zeroes them otherwise,
-      // and the flight builder then has nothing to measure).
       let gbcrSpy: ReturnType<typeof vi.spyOn>;
       beforeEach(() => {
         gbcrSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
@@ -2804,15 +2529,12 @@ describe("MatchPage", () => {
           useMatchStore.getState().setMatchState(dealtState());
         });
 
-        // The very first frame of the new hand: empty seats, no prompt, and the
-        // packets already in the overlay (8 packets of 3 and 2 backs).
         expect(dealFlights()).toHaveLength(20);
         expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
         expect(screen.queryByTestId("trump-prompt")).not.toBeInTheDocument();
         expect(seatCount(2)).toBe("×0");
         expect(handCardIds()).toEqual([]);
 
-        // Dealer is seat 1, so seat 2 gets the first packet of three.
         act(() => {
           vi.advanceTimersByTime(MOTION.DEAL_LEAD_IN + MOTION.DEAL_PACKET_FLIGHT);
         });
@@ -2821,21 +2543,17 @@ describe("MatchPage", () => {
         expect(seatCount(2)).toBe("×3");
         expect(seatCount(3)).toBe("×0");
 
-        // Seat 0 (the viewer) is third in line: its first three cards appear
-        // with its packet.
         act(() => {
           vi.advanceTimersByTime(2 * MOTION.DEAL_PACKET_STAGGER);
         });
         expect(handCardIds()).toHaveLength(3);
         expect(screen.queryByTestId("trump-prompt")).not.toBeInTheDocument();
 
-        // Every packet down, the candidate flipped: bidding opens.
         act(() => {
           vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_FIRST);
         });
         expect(sfxCalls("dealPacket")).toHaveLength(8);
         expect(screen.queryByTestId("deal-animation")).not.toBeInTheDocument();
-        // jsdom never reports animationend: the deal takes its flights back.
         expect(dealFlights()).toHaveLength(0);
         expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
         expect(seatCount(2)).toBe("×5");
@@ -2914,7 +2632,7 @@ describe("MatchPage", () => {
             dealtState({
               variant: "croatia",
               trumpCandidate: null,
-              dealerSeat: 3, // the viewer (seat 0) is first in line
+              dealerSeat: 3,
               activePlayerSeat: 0,
               players: dealtState().players.map((p) => ({
                 ...p,
@@ -2953,7 +2671,6 @@ describe("MatchPage", () => {
       });
 
       it("animates the second deal and holds the leader's cards until it lands", () => {
-        // Dealer 3: the viewer leads trick 1 and is first in the second deal.
         const bidding = dealtState({ dealerSeat: 3, activePlayerSeat: 1, handNumber: 1 });
         useMatchStore.getState().setMatchState(bidding);
         useMatchStore.getState().setMyPlayerSeat(0);
@@ -2983,11 +2700,9 @@ describe("MatchPage", () => {
           });
         });
 
-        // The taker's packet carries the face-up candidate with it.
         expect(
           document.querySelector('[data-testid^="card-flight-deal-"][data-testid$="-candidate"]'),
         ).not.toBeNull();
-        // Before the viewer's packet: only the five cards they already held.
         expect(handCardIds()).toHaveLength(5);
         expect(seatCount(1)).toBe("×5");
         expect(sfxCalls("deal")).toHaveLength(0);
@@ -2996,13 +2711,11 @@ describe("MatchPage", () => {
           vi.advanceTimersByTime(MOTION.DEAL_PACKET_FLIGHT);
         });
         expect(handCardIds()).toHaveLength(8);
-        // Still dealing: the lead is not playable yet.
         expect(screen.getByTestId("playing-card-7S")).toHaveAttribute("tabindex", "-1");
 
         act(() => {
           vi.advanceTimersByTime(MOTION.DEAL_DURATION_CANDIDATE_SECOND);
         });
-        // The taker got 2 + the candidate.
         expect(seatCount(1)).toBe("×8");
         expect(sfxCalls("dealPacket")).toHaveLength(4);
         expect(screen.getByTestId("playing-card-7S")).toHaveAttribute("tabindex", "0");
@@ -3040,9 +2753,7 @@ describe("MatchPage", () => {
         useMatchStore.getState().setMyPlayerSeat(0);
         const { router } = renderMatchPage({ fromRoom: true });
 
-        // The live arrival still got its deal…
         expect(screen.getByTestId("deal-animation")).toBeInTheDocument();
-        // …but the entry a reload would restore no longer says "from the room".
         expect(router.state.location.state).toBeNull();
         expect(router.state.location.pathname).toBe("/match/1");
       });
@@ -3065,7 +2776,6 @@ describe("MatchPage", () => {
           useMatchStore.getState().setMatchState(dealtState());
         });
 
-        // Rects are measurable here, so no flight is down to reduced motion alone.
         expect(document.querySelector('[data-testid^="card-flight-deal-"]')).toBeNull();
         expect(screen.queryByTestId("trump-prompt")).not.toBeInTheDocument();
         act(() => {
@@ -3077,8 +2787,6 @@ describe("MatchPage", () => {
     });
 
     describe("trick-collect sequencing", () => {
-      // Seat 0's card is one nobody holds: the viewer's hand (K♠) must not
-      // also sit in the trick.
       const trickA: { trick: TrickCard[]; winnerSeat: number } = {
         trick: [
           { card: { rank: "8", suit: "C" }, playerSeat: 0 },
@@ -3115,7 +2823,6 @@ describe("MatchPage", () => {
         teamBMatchScore: 82,
       };
 
-      // Real rects so collect flights launch (jsdom zeroes them otherwise).
       let gbcrSpy: ReturnType<typeof vi.spyOn>;
       beforeEach(() => {
         gbcrSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
@@ -3152,18 +2859,15 @@ describe("MatchPage", () => {
         });
         expect(collectFlights()).toHaveLength(4);
 
-        // Trick B resolves mid-sweep (fast plays), with the hand's score.
         act(() => {
           useMatchStore.getState().setPendingResolvedTrick(trickB);
           useMatchStore.getState().setScoreRevealData(handScore);
         });
-        // A is gone at once; B's four cards sit in their slots for the glow.
         expect(collectFlights()).toHaveLength(0);
         expect(screen.getAllByTestId(/^trick-slot-card-\d-resolved$/)).toHaveLength(4);
         expect(screen.getByTestId("playing-card-QS")).toBeInTheDocument();
         expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
 
-        // B's glow runs its full length, then B sweeps.
         act(() => {
           vi.advanceTimersByTime(MOTION.TRICK_RESOLVE_PAUSE - 1);
         });
@@ -3174,7 +2878,6 @@ describe("MatchPage", () => {
         expect(collectFlights()).toHaveLength(4);
         expect(screen.queryByTestId("score-reveal")).not.toBeInTheDocument();
 
-        // The reveal waits for B's sweep to land, then opens.
         act(() => {
           for (const el of document.querySelectorAll(
             '[data-testid^="card-flight-collect-"][data-testid$="-animated"]',
@@ -3269,7 +2972,6 @@ describe("MatchPage", () => {
         expect(sfxCalls(sound)).toHaveLength(1);
         const key = sfxCalls(sound)[0]![1];
         unmount();
-        // A remount of the same result asks with the same key (the engine drops it).
         renderMatchPage();
         expect(sfxCalls(sound).at(-1)![1]).toEqual(key);
         expect(sfxCalls(sound === "matchWin" ? "matchLose" : "matchWin")).toHaveLength(0);
@@ -3394,14 +3096,13 @@ describe("MatchPage", () => {
       }
 
       it("ticks once per second in the viewer's red zone, down to 1", () => {
-        // 24 s window: red from 3 s left (1/8).
         useMatchStore.getState().setMatchState(onTheClock(0, 5_000));
         useMatchStore.getState().setMyPlayerSeat(0);
         renderMatchPage();
         expect(sfxCalls("clockTick")).toHaveLength(0);
 
         act(() => {
-          vi.advanceTimersByTime(2_100); // 2.9 s left → "3"
+          vi.advanceTimersByTime(2_100);
         });
         expect(sfxCalls("clockTick")).toHaveLength(1);
         act(() => {
@@ -3412,7 +3113,7 @@ describe("MatchPage", () => {
         });
         expect(sfxCalls("clockTick")).toHaveLength(3);
         act(() => {
-          vi.advanceTimersByTime(2_000); // 0 and past: silent
+          vi.advanceTimersByTime(2_000);
         });
         expect(sfxCalls("clockTick")).toHaveLength(3);
         expect(new Set(sfxCalls("clockTick").map(([, opts]) => opts.dedupeKey)).size).toBe(3);
@@ -3425,12 +3126,10 @@ describe("MatchPage", () => {
         expect(sfxCalls("clockTick")).toHaveLength(1);
         unmount();
 
-        // Same deadline, same second: the same key, so the engine drops it.
         renderMatchPage();
         const keys = () => sfxCalls("clockTick").map(([, opts]) => opts.dedupeKey);
         expect(new Set(keys()).size).toBe(1);
 
-        // What is left of the countdown: "2" and "1", each once, then silence.
         for (let s = 0; s < 4; s++) {
           act(() => {
             vi.advanceTimersByTime(1_000);
@@ -3449,8 +3148,6 @@ describe("MatchPage", () => {
         expect(sfxCalls("clockTick")).toHaveLength(0);
       });
 
-      // Each answer silences the rest of the red zone at the click — the
-      // server's echo never arrives here, so only the page's own marker can.
       const bidding = (overrides: Partial<MatchState> = {}): Partial<MatchState> => ({
         phase: "bidding",
         trumpSuit: null,
@@ -3493,8 +3190,6 @@ describe("MatchPage", () => {
       });
 
       it("stays silent for a declaration window the viewer has already skipped", () => {
-        // The window is 8 s, so its red zone is its last second alone: skip
-        // early, and nothing may tick when that second comes.
         useMatchStore.getState().setMatchState({
           ...mockMatchState,
           phase: "declaring",
@@ -3536,10 +3231,8 @@ describe("MatchPage", () => {
           useMatchStore.getState().setLastError("error:illegal_play");
         });
         act(() => {
-          vi.advanceTimersByTime(1_000); // "2" left, still the viewer's turn
+          vi.advanceTimersByTime(1_000);
         });
-        // The engine drops a re-asked key, so count distinct seconds: "3" (at
-        // mount) and "2" (after the refusal).
         const seconds = new Set(sfxCalls("clockTick").map(([, opts]) => opts.dedupeKey));
         expect(seconds.size).toBe(2);
       });
@@ -3566,7 +3259,7 @@ describe("MatchPage", () => {
         renderMatchPage();
 
         act(() => {
-          vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP - 900); // "1" left of 8
+          vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP - 900);
         });
         expect(sfxCalls("clockTick")).toHaveLength(1);
       });
@@ -3617,8 +3310,6 @@ describe("MatchPage", () => {
         });
         expect(screen.getByTestId("belot-prompt")).toBeInTheDocument();
 
-        // Timeout: the server played KS itself (auto-skipping the announcement)
-        // and moved the turn on.
         act(() => {
           useMatchStore.getState().setMatchState(
             belotTurn({
@@ -3640,8 +3331,6 @@ describe("MatchPage", () => {
         });
         expect(screen.queryByTestId("belot-prompt")).not.toBeInTheDocument();
 
-        // A later server-driven prompt is answered by the player, not by a
-        // stale stored choice.
         act(() => {
           useMatchStore.getState().setMatchState(belotTurn({ pendingBelotSeat: 0 }));
         });
@@ -3661,7 +3350,6 @@ describe("MatchPage", () => {
         });
         expect(mockSendMessage).toHaveBeenCalledWith("action:play_card", { cardId: "KS" });
 
-        // The auto-play won the race: another card went, the turn moved on.
         act(() => {
           useMatchStore.getState().setMatchState(
             belotTurn({
@@ -3670,7 +3358,6 @@ describe("MatchPage", () => {
             }),
           );
         });
-        // Back on the clock later with a server prompt: no stale announce fires.
         act(() => {
           useMatchStore.getState().setMatchState(belotTurn({ pendingBelotSeat: 0 }));
         });

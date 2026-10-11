@@ -13,6 +13,7 @@ export type LadderAccent = {
 type SuitKey = "S" | "H" | "D" | "C";
 
 const SUIT_GLYPH: Record<SuitKey, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
+const TEXT_PRESENTATION_SELECTOR = "\uFE0E";
 const SUIT_COLOR: Record<SuitKey, string> = {
   S: "var(--ink)",
   C: "var(--ink)",
@@ -23,9 +24,8 @@ const SUIT_COLOR: Record<SuitKey, string> = {
 function SuitGlyph({ suit, size = 13 }: { suit: SuitKey; size?: number }) {
   return (
     <span style={{ color: SUIT_COLOR[suit], fontSize: size, lineHeight: 1 }}>
-      {/* U+FE0E forces text (not emoji) rendering so the glyph stays small. */}
       {SUIT_GLYPH[suit]}
-      {"︎"}
+      {TEXT_PRESENTATION_SELECTOR}
     </span>
   );
 }
@@ -195,9 +195,6 @@ export function CardLadder({ title, accent, rows, suit, testId }: Props) {
                 </span>
                 {r.note && (
                   <span
-                    // The strongest/weakest annotations wrap awkwardly beside
-                    // the card name on phones — hidden below sm (the tinted
-                    // top row and the rank order carry the meaning there).
                     className="hidden sm:inline"
                     style={{
                       fontSize: 11.5,

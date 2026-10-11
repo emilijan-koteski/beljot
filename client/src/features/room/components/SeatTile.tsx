@@ -12,8 +12,6 @@ import type { RoomPlayer } from "@/shared/types/apiTypes";
 
 type SeatMode = "us" | "them" | "neutral";
 
-// Diamond placement — only at sm+, where the parent grid defines the matching
-// `grid-template-areas`. Literal class strings so Tailwind's scanner emits them.
 const SEAT_AREA_CLASS = {
   south: "sm:[grid-area:south]",
   east: "sm:[grid-area:east]",
@@ -32,39 +30,18 @@ type SeatTileProps = {
   swapMode: boolean;
   isClickable: boolean;
   isPending: boolean;
-  /**
-   * Reopened-room presence (v2): this seat's human is still away (on the prior
-   * match's result dialog) and has not returned/rejoined yet. Shows a "waiting
-   * to return" badge; the owner Start button is gated until none remain.
-   */
   waitingToReturn?: boolean;
-  /**
-   * This seat's human is below the room's honour bar, so they are what will block
-   * Start (honour redesign R6). Draws an ember ring on the TILE — deliberately not
-   * on the shield, because the shield states the player's own tier and this states
-   * a fact about the room. Cosmetic: the server re-checks at start and return.
-   */
   belowHonorBar?: boolean;
   ownerCanActOnRow: boolean;
   onSelect: () => void;
   onKick?: () => void;
   onPromote?: () => void;
-  /** Owner-only: seat a bot on this EMPTY seat (custom waiting rooms only). */
   onAddBot?: () => void;
-  /** Owner-only: open the remove-bot confirmation for this bot seat. */
   onRemoveBot?: () => void;
 };
 
 /**
- * Per-seat tile in the in-room diamond. Empty seats show a dashed-border pulse
- * dot + "Take this seat" / "Move here" copy; filled seats show an Avatar +
- * name + badges (You / Host / Partner / Opponent / Swap target) + owner-only
- * promote and kick icon buttons in the top corners.
- *
- * Visual mode is viewer-relative: when the viewer is unseated the tile renders
- * neutral parchment, once seated the same-parity tiles become "us" (team A
- * tint, gold edge) and the other parity become "them" (team B tint, silver
- * edge). RoomPage resolves the mode and passes it in; the tile only paints.
+ * Per-seat tile in the in-room diamond, painted in the viewer-relative team mode that RoomPage resolves.
  */
 export function SeatTile({
   seatIndex,
@@ -87,33 +64,19 @@ export function SeatTile({
   onRemoveBot,
 }: SeatTileProps) {
   const { t } = useTranslation();
-  // Size the seated avatar to match the empty-seat placeholder circle
-  // (size-9 / sm:size-10) so a filled seat doesn't bulge larger than an empty
-  // one. Compact = below the sm breakpoint where the layout stacks.
   const isCompact = useMediaQuery("(max-width: 639px)");
   const avatarSize = isCompact ? 36 : 40;
   const filled = Boolean(player);
   const isBot = player?.isBot === true;
-  // Bot identity is seat-derived and rendered client-side — an empty wire
-  // username must never leak through as a blank.
   const displayName = isBot ? botDisplayName(t, seatIndex) : (player?.username ?? "");
-  // In swap mode the kick/promote overlay steps aside — every other filled
-  // seat instead reads as a swap candidate (Shuffle hint on hover), since a
-  // click there fires the swap rather than opening owner controls.
   const showOwnerControls = ownerCanActOnRow && filled && !isYou && !swapMode;
   const showRemoveBot = Boolean(onRemoveBot) && isBot && !swapMode;
   const showAddBot = Boolean(onAddBot) && !filled && !swapMode;
   const showSwapHint = swapMode && filled && !isSwapSource && !isYou;
 
-  // Inline styles for the parchment tokens — Tailwind arbitrary values would
-  // need 6 distinct classes per tile and the design's color tuples (tint,
-  // edge, edge-soft) are easier to read as a map.
   const tokens = MODE_TOKENS[mode];
   const tileStyle: React.CSSProperties = {
     background: filled ? tokens.fill : "transparent",
-    // The ember ring outranks the team edge and the swap/you rings: it is the one
-    // thing on this tile that says "the match cannot start because of this seat",
-    // which is more urgent than whose team it is or that you are mid-swap.
     border: belowHonorBar
       ? "2px solid var(--h1-line)"
       : filled
@@ -132,11 +95,6 @@ export function SeatTile({
 
   return (
     <div
-      // grid-area is applied only at sm+, where the parent defines the diamond
-      // `grid-template-areas`. On phones the parent is a plain 2-col grid with
-      // NO named areas — an unconditional `gridArea: "south"` there matches no
-      // area and collapses all four tiles into one cell (they overlapped). With
-      // it scoped to sm, mobile tiles auto-flow into the 2×2 grid.
       className={cn("group relative", SEAT_AREA_CLASS[cardinal])}
       data-testid={`seat-position-${cardinal}`}
       data-team={seatIndex % 2 === 0 ? "teamA" : "teamB"}
@@ -173,24 +131,7 @@ export function SeatTile({
                 {isHost && <Crown className="text-brass-deep size-3.25" aria-hidden="true" />}
                 {displayName}
               </span>
-              {/* Level, then this player's OWN honour (redesign R6), on one row.
 
-                  Honour is public by design — the profile response already exposes
-                  the same score and tier to anyone — and in the roster it finally
-                  pays off: you can see who you are about to partner with. The level
-                  rides the same roster read and renders FIRST (user decision
-                  2026-07-31), so a seat reads experience, then reliability.
-
-                  The shield always shows THAT PLAYER'S tier, never a verdict about
-                  this room: a seat at 71 is Fair, so it gets the olive shield, not a
-                  red X. Being under the room's bar is a property of the ROOM, and it
-                  is drawn by the tile's ember ring instead. Two different facts, two
-                  different marks.
-
-                  The numbers render in normal seat ink like the name above them —
-                  across the whole redesign only the shield is ever tinted. Both
-                  checks are typeof, never truthiness: level 0 and honour 0 are real
-                  values a brand-new or Problematic seat legitimately holds. */}
               {!isBot &&
                 (typeof player.level === "number" || typeof player.honorScore === "number") && (
                   <div className="flex items-center gap-2">
@@ -206,10 +147,6 @@ export function SeatTile({
                     )}
                     {typeof player.honorScore === "number" && (
                       <span
-                        // leading-none so the number's line box hugs its digits —
-                        // with the inherited line-height the box was ~1.5x the
-                        // font and items-center left the shield riding visibly
-                        // high of the digits' optical centre.
                         className="text-ink-dim inline-flex items-center gap-1 text-[11.5px] leading-none font-bold tabular-nums"
                         data-testid={`seat-honor-${seatIndex}`}
                         data-honor={player.honorScore}
@@ -230,7 +167,6 @@ export function SeatTile({
                   </div>
                 )}
               <div className="flex flex-wrap items-center justify-center gap-1">
-                {/* Bots never show You/Host badges — the bot marker takes their place. */}
                 {isBot && (
                   <span data-testid={`bot-badge-${seatIndex}`}>
                     <Badge tone="bot" icon={<Bot className="size-2.5" aria-hidden="true" />}>
@@ -293,8 +229,6 @@ export function SeatTile({
         )}
       </button>
 
-      {/* Owner-only "add a bot" affordance on empty seats — sits beside the
-          regular "take this seat" click target so both remain reachable. */}
       {showAddBot && (
         <button
           type="button"
@@ -306,19 +240,12 @@ export function SeatTile({
           aria-label={t("room.addBot")}
           title={t("room.addBot")}
           data-testid={`add-bot-seat-${seatIndex}`}
-          // Larger tap target on phones (was size-6.5): too small to hit
-          // reliably, so taps fell through to the seat's take-seat handler.
-          // Desktop keeps the compact size.
           className="bg-bot-soft border-bot-edge text-bot hover:border-bot hover:text-bot-deep absolute top-2 right-2 z-10 inline-flex size-9 items-center justify-center rounded-md border disabled:opacity-40 md:size-6.5"
         >
-          {/* Nudged up 5%: the lucide Bot glyph's visual mass (the robot
-              head) sits low in its viewBox, so true geometric centering
-              reads as off-center. Same rule as the avatar bot glyphs. */}
           <Bot className="size-4.5 -translate-y-[5%] md:size-3.5" />
         </button>
       )}
 
-      {/* Owner-only remove control on bot seats (confirm dialog, kick pattern). */}
       {showRemoveBot && (
         <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <button

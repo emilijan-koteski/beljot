@@ -42,7 +42,6 @@ describe("EmoteBubble", () => {
         <EmoteBubble emote={id} compassPosition={0} onDismiss={vi.fn()} />,
       );
       expect(screen.getByTestId("emote-bubble-0")).toBeInTheDocument();
-      // Glyph content is non-empty (ensures the EMOTE_GLYPHS map covers every id).
       expect(screen.getByTestId("emote-bubble-0").textContent ?? "").not.toBe("");
       unmount();
     }
@@ -96,9 +95,6 @@ describe("EmoteBubble", () => {
   });
 
   it("does not reset the dismiss timer when the parent re-renders with a new onDismiss identity", () => {
-    // Regression: MatchPage passes an inline arrow as onDismiss; if the effect
-    // depends on onDismiss the timer restarts on every parent re-render and
-    // the bubble never auto-dismisses during active gameplay.
     const onDismiss = vi.fn();
     const { rerender } = render(
       <EmoteBubble emote="thumbs_up" compassPosition={0} onDismiss={() => onDismiss()} />,
@@ -107,18 +103,15 @@ describe("EmoteBubble", () => {
     act(() => {
       vi.advanceTimersByTime(1500);
     });
-    // Re-render with a brand-new arrow (different identity, same effect).
     rerender(<EmoteBubble emote="thumbs_up" compassPosition={0} onDismiss={() => onDismiss()} />);
     act(() => {
       vi.advanceTimersByTime(499);
     });
-    // 1500 + 499 = 1999 ms — under the 2000 ms timer; should NOT have fired yet.
     expect(onDismiss).not.toHaveBeenCalled();
 
     act(() => {
       vi.advanceTimersByTime(1);
     });
-    // At exactly 2000 ms from initial mount, the original timer fires once.
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 

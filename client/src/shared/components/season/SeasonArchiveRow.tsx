@@ -8,44 +8,22 @@ import {
   seasonRankLabel,
 } from "@/shared/lib/seasonTier";
 
-/**
- * Coerce a possibly-absent server integer into a renderable one.
- *
- * `Number.isFinite`, never truthiness: 0 is a real Go value for both fields on
- * this row (a played season can carry 0 SP), and `undefined` arrives when a
- * client bundle is newer than the server. Deliberately a LOCAL copy rather than
- * `seasonSpOrZero`, for the reason LeaderboardRow documents: that helper is SP
- * ladder display math, and this row also sanitizes a MATCH COUNT.
- */
+/** Coerces a possibly absent server integer to a finite number, treating 0 as real. */
 function finiteOrZero(value: number | null | undefined): number {
   return Number.isFinite(value) ? Math.max(0, value as number) : 0;
 }
 
 type Props = {
-  /** The machine-stable "YYYY QN" token — rendered VERBATIM, never translated. */
   seasonName: string;
   sp: number;
-  /** The server's raw tier token — normalized here, never trusted as-is. */
   tier: string;
-  /** The stored division, 1–3 or null (Master, Grandmaster, scored before divisions). */
   division: number | null;
   gamesPlayed: number;
 };
 
 /**
- * One prior-season row in a profile's archive (Story 13.3): season token, tier
- * badge + localized tier label, final SP, games played. NOT LeaderboardRow —
- * there is no position, no username and no self state here — but it copies that
- * row's a11y recipe exactly: ONE sr-only sentence carries every value, and
- * every visible cell (plus the badge) is `aria-hidden`, so nothing is announced
- * twice and the terse cells never read as number soup.
- *
- * The rank is the season's FINAL standing: the server's STORED tier and
- * division, never re-derived from the SP total (Story 13.5) — a total scored
- * under older floors would misrank on today's. A row scored before divisions
- * existed has none and renders the bare tier ("Gold"). `normalizeSeasonTier` is
- * the version-skew guard, the same as everywhere else a tier token crosses the
- * wire.
+ * One prior-season row in a profile's archive, showing the stored final tier and division.
+ * A single sr-only sentence carries every value; visible cells are aria-hidden.
  */
 export function SeasonArchiveRow({ seasonName, sp, tier, division, gamesPlayed }: Props) {
   const { t } = useTranslation();
@@ -62,7 +40,6 @@ export function SeasonArchiveRow({ seasonName, sp, tier, division, gamesPlayed }
       data-tier={safeTier}
       className="border-border bg-surface-elevated flex items-center gap-2.5 rounded-[10px] border px-2.5 py-1.5"
     >
-      {/* The row's entire accessible name — everything below is aria-hidden. */}
       <span className="sr-only" data-testid="season-archive-row-summary">
         {t("season.archive.rowAria", {
           season: seasonName,

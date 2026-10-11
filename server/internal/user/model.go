@@ -7,104 +7,29 @@ import (
 )
 
 type User struct {
-	ID                 uint   `gorm:"primaryKey" json:"id"`
-	Email              string `gorm:"uniqueIndex;not null" json:"email"`
-	Username           string `gorm:"uniqueIndex;not null" json:"username"`
-	PasswordHash       string `gorm:"not null" json:"-"`
-	LanguagePreference string `gorm:"default:en;not null" json:"languagePreference"`
-	// CardDeckPreference selects which artwork the 32 card faces are drawn from
-	// (Story 12.4, migration 000020): "french" or "croatian". PURELY VISUAL —
-	// the client derives asset paths from it and nothing else reads it; card
-	// IDs, card values, and every engine/WS payload are identical either way.
-	//
-	// NOT the game variant. rooms.variant is "bitola" / "croatia"; this is
-	// "french" / "croatian". Unrelated enums that happen to share a country —
-	// never cross-wire them.
-	CardDeckPreference string `gorm:"default:french;not null" json:"cardDeckPreference"`
-	// SoundEnabled / MusicEnabled are the in-match audio switches (migration
-	// 000025): card sound effects and the background playlist, independently.
-	// CLIENT-ONLY — nothing on the server reads them. Both default ON: GORM
-	// treats the zero value false as "unset" on Create and writes the tag
-	// default instead, so a registration that never names them gets true, the
-	// same value the migration backfilled. Turning one off therefore always
-	// goes through UpdatePreferences, never through Create.
-	SoundEnabled bool `gorm:"default:true;not null" json:"soundEnabled"`
-	MusicEnabled bool `gorm:"default:true;not null" json:"musicEnabled"`
-	// SoundVolume / MusicVolume are the in-match levels for the same two
-	// channels (migration 000026): whole percentages 0-100, SMALLINT columns
-	// with a CHECK. CLIENT-ONLY, like the switches beside them, which they do
-	// not replace — a switch decides whether a channel plays, the volume how
-	// loud. Both default to 70, the level the client played at before volumes
-	// existed. GORM treats a zero-value 0 as "unset" on Create and writes the
-	// tag default instead, so 0 (silent) is only ever reachable through
-	// UpdatePreferences — never through Create, which never names them.
-	SoundVolume int `gorm:"default:70;not null" json:"soundVolume"`
-	MusicVolume int `gorm:"default:70;not null" json:"musicVolume"`
-	// Wallet fields (Story 9.1). State lives on the users table rather than a
-	// dedicated wallet table; the wallet domain package owns the mutation logic.
-	// WalletBalance default mirrors migration 000009 / wallet.StartingBalance.
-	WalletBalance int `gorm:"not null;default:5000" json:"walletBalance"`
-	// LastLoginAt is a pointer because it is nullable, and time.Time's zero
-	// value would serialize as "0001-01-01T00:00:00Z" instead of null. DB column
-	// is DATE; GORM reads/writes time.Time fine.
-	LastLoginAt     *time.Time `gorm:"column:last_login_at" json:"lastLoginAt,omitempty"`
-	LoginStreakDays int        `gorm:"column:login_streak_days;not null;default:0" json:"loginStreakDays"`
-	// TotalXP is the player's lifetime experience-point total (Story 9.5). The
-	// LEVEL is derived from it (user.LevelForXP), never stored. GORM default +
-	// camelCase JSON tag. DB column total_xp is BIGINT (a lifetime accumulator,
-	// width-matched to this 64-bit Go int) with a CHECK (total_xp >= 0); XP only
-	// ever accrues. (Unlike WalletBalance, which is a bounded INTEGER balance.)
-	TotalXP int `gorm:"not null;default:0" json:"totalXp"`
-	// UsernameChangedAt records when the user last changed their username. It is
-	// a pointer because it is nullable — NULL (never changed) serializes as null,
-	// not time.Time's "0001-01-01T00:00:00Z" zero value. Drives the 30-day change
-	// cooldown (see UsernameChangeCooldownDays). DB column is TIMESTAMPTZ.
-	UsernameChangedAt *time.Time `gorm:"column:username_changed_at" json:"usernameChangedAt,omitempty"`
-	// Honor score storage (Story 9.7, migration 000017). Six columns, all
-	// json:"-" — the API never serializes the raw storage, it serializes the
-	// computed DTO fields in ProfileResponse / RegisterResponseData.
-	//
-	// HonorCompletedWeight / HonorAbandonedWeight are DECAYED running weights:
-	// each finished match contributes 0.5^(age_days/90), so old events fade.
-	// They are only meaningful together with HonorDecayedAt, the timestamp they
-	// were last decayed to. DB type is NUMERIC(14,6), not a float, because
-	// binary float drift in an access-gating trust signal is unacceptable.
-	HonorCompletedWeight float64 `gorm:"column:honor_completed_weight;not null;default:0" json:"-"`
-	HonorAbandonedWeight float64 `gorm:"column:honor_abandoned_weight;not null;default:0" json:"-"`
-	// HonorDecayedAt is a pointer because the column is nullable: NULL means
-	// "never decayed" and DecayFactor treats it as exactly 1.0. (Also avoids
-	// time.Time's zero value serializing as "0001-01-01T00:00:00Z".)
-	HonorDecayedAt *time.Time `gorm:"column:honor_decayed_at" json:"-"`
-	// Raw, UNDECAYED lifetime counts. Their SUM drives the "New Player"
-	// suppression: IsNewPlayer is (completed + abandoned) < 5, i.e. the floor
-	// counts EXPERIENCE, not successes. Do NOT gate on HonorCompletedTotal alone
-	// — that let a 0-completed / 20-abandoned account (real score 5,
-	// "problematic") hide behind the newcomer chip forever, and Story 9.8's join
-	// gate reads isNewPlayer off the same envelope. Always compare against these
-	// raw totals, never the decayed weights, or a returning veteran gets
-	// relabelled a newcomer. BIGINT columns, width-matched to these 64-bit Go
-	// ints.
-	//
-	// HonorCompletedTotal deliberately SURVIVES ResetHonor — a pardon clears the
-	// penalty, not the experience. See ResetHonor in gorm_repo.go.
-	HonorCompletedTotal int64 `gorm:"column:honor_completed_total;not null;default:0" json:"-"`
-	HonorAbandonedTotal int64 `gorm:"column:honor_abandoned_total;not null;default:0" json:"-"`
-	// HonorScoreSnapshot is the DENORMALIZED honor_score column. It exists ONLY
-	// so operators can filter/sort in SQL (WHERE honor_score < 50) and it is
-	// ALLOWED TO LAG — decay means the true score moves as time passes even
-	// when nothing is written.
-	//
-	// NEVER render this and NEVER gate on it. The authoritative value is always
-	// HonorScore(HonorCompletedWeight, HonorAbandonedWeight, HonorDecayedAt,
-	// now) — pure arithmetic on a row you have already loaded. The Go field is
-	// deliberately named ...Snapshot so a misuse reads wrong at the call site.
-	HonorScoreSnapshot int `gorm:"column:honor_score;not null;default:80" json:"-"`
-	// AvatarKey is the object-store PREFIX of the user's avatar pair,
-	// "avatars/<uuid v4>" (migration 000030), or nil for no avatar. Never
-	// serialized: every DTO carries the derived public URL instead (see
-	// AvatarURL in avatar_url.go), so the storage layout never reaches the wire.
-	AvatarKey *string        `gorm:"column:avatar_key" json:"-"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                   uint           `gorm:"primaryKey" json:"id"`
+	Email                string         `gorm:"uniqueIndex;not null" json:"email"`
+	Username             string         `gorm:"uniqueIndex;not null" json:"username"`
+	PasswordHash         string         `gorm:"not null" json:"-"`
+	LanguagePreference   string         `gorm:"default:en;not null" json:"languagePreference"`
+	CardDeckPreference   string         `gorm:"default:french;not null" json:"cardDeckPreference"`
+	SoundEnabled         bool           `gorm:"default:true;not null" json:"soundEnabled"`
+	MusicEnabled         bool           `gorm:"default:true;not null" json:"musicEnabled"`
+	SoundVolume          int            `gorm:"default:70;not null" json:"soundVolume"`
+	MusicVolume          int            `gorm:"default:70;not null" json:"musicVolume"`
+	WalletBalance        int            `gorm:"not null;default:5000" json:"walletBalance"`
+	LastLoginAt          *time.Time     `gorm:"column:last_login_at" json:"lastLoginAt,omitempty"`
+	LoginStreakDays      int            `gorm:"column:login_streak_days;not null;default:0" json:"loginStreakDays"`
+	TotalXP              int            `gorm:"not null;default:0" json:"totalXp"`
+	UsernameChangedAt    *time.Time     `gorm:"column:username_changed_at" json:"usernameChangedAt,omitempty"`
+	HonorCompletedWeight float64        `gorm:"column:honor_completed_weight;not null;default:0" json:"-"`
+	HonorAbandonedWeight float64        `gorm:"column:honor_abandoned_weight;not null;default:0" json:"-"`
+	HonorDecayedAt       *time.Time     `gorm:"column:honor_decayed_at" json:"-"`
+	HonorCompletedTotal  int64          `gorm:"column:honor_completed_total;not null;default:0" json:"-"`
+	HonorAbandonedTotal  int64          `gorm:"column:honor_abandoned_total;not null;default:0" json:"-"`
+	HonorScoreSnapshot   int            `gorm:"column:honor_score;not null;default:80" json:"-"`
+	AvatarKey            *string        `gorm:"column:avatar_key" json:"-"`
+	CreatedAt            time.Time      `json:"createdAt"`
+	UpdatedAt            time.Time      `json:"updatedAt"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"-"`
 }

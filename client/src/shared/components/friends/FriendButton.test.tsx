@@ -102,7 +102,6 @@ describe("FriendButton", () => {
     mockRemove.mockResolvedValue(undefined);
     renderButton(7);
 
-    // The remove affordance opens a confirm dialog — nothing fires yet.
     await user.click(await screen.findByTestId("friend-button-remove"));
     expect(await screen.findByTestId("remove-friend-dialog")).toBeInTheDocument();
     expect(mockRemove).not.toHaveBeenCalled();
@@ -118,7 +117,6 @@ describe("FriendButton", () => {
     renderButton(7);
 
     await user.click(await screen.findByTestId("friend-button-remove"));
-    // Footer convention: the destructive action leads, cancel trails.
     expectActionBeforeStatusQuo("remove-friend-confirm", "remove-friend-cancel");
 
     await user.click(screen.getByTestId("remove-friend-cancel"));
@@ -130,8 +128,6 @@ describe("FriendButton", () => {
   it("flips to Add friend after a successful remove", async () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: makeUser({ id: 99 }) });
-    // "friends" on the first load, then "none" once the remove's onSuccess
-    // invalidation refetches the status — proving the invalidation is live.
     mockGetStatus
       .mockResolvedValueOnce({ status: "friends", requestId: 42 })
       .mockResolvedValue({ status: "none", requestId: null });
@@ -148,7 +144,6 @@ describe("FriendButton", () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: makeUser({ id: 99 }) });
     statusOf("friends", 42);
-    // A hanging remove keeps the mutation pending for the whole assertion.
     mockRemove.mockReturnValue(new Promise(() => {}));
     renderButton(7);
 
@@ -162,8 +157,6 @@ describe("FriendButton", () => {
 
   it("disables remove when the status carries no row id", async () => {
     useAuthStore.setState({ user: makeUser({ id: 99 }) });
-    // A defensive impossibility ("friends" without a row id) must never offer a
-    // confirm that would fire without an id.
     statusOf("friends", null);
     renderButton(7);
 
@@ -184,8 +177,6 @@ describe("FriendButton", () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: makeUser({ id: 99 }) });
     statusOf("pending_incoming", 42);
-    // A hanging accept keeps the mutation pending — both actions target the
-    // same request row, so decline must lock alongside it.
     mockAccept.mockReturnValue(new Promise(() => {}));
     renderButton(7);
 
@@ -198,12 +189,9 @@ describe("FriendButton", () => {
 
   it("renders nothing on the viewer's own profile", () => {
     useAuthStore.setState({ user: makeUser({ id: 7 }) });
-    // A never-resolving status keeps the query pending so the self-guard's null
-    // render is the only output (no post-render state update to wrap in act()).
     mockGetStatus.mockReturnValue(new Promise<never>(() => {}));
     renderButton(7);
 
-    // The self-guard returns null; no button of any state is rendered.
     expect(screen.queryByTestId("friend-button-add")).toBeNull();
     expect(screen.queryByTestId("friend-button")).toBeNull();
   });

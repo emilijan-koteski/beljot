@@ -20,48 +20,20 @@ interface TrumpPromptProps {
   trumpCandidate: Card | null;
   biddingRound: number;
   isActiveBidder: boolean;
-  /** Username of the player currently deciding trump — shown to everyone else. */
   activePlayerName?: string | null;
-  /**
-   * Viewer-relative team of the player currently deciding trump. Colors their
-   * name in the waiting banner — gold for you/your partner, silver for the
-   * opponents — so waiting players can read at a glance whose decision it is.
-   */
   activePlayerTeam?: SeatTeam | null;
   onPick: (suit?: Suit) => void;
   onPass: () => void;
-  /**
-   * Whether a pass is legal for the active bidder right now. False only for the
-   * dealer bidding last (fourth) under a variant where the hand must find a
-   * taker: the server refuses that pass outright, so the control must not be
-   * offered. Server-derived (matchState.mustPickTrump) — the client never
-   * re-derives the rule.
-   *
-   * Also drives the sibling seats' waiting copy, which otherwise promises the
-   * table a pass that cannot happen.
-   */
   canPass?: boolean;
   turnExpiresAt?: string | null;
   timerDurationSec?: number;
 }
 
-// Picker and waiting-chip order: spades, hearts, clubs, diamonds, so the two
-// red suits never sit side by side. The hand fan keeps its own order (HandCards
-// SUIT_ORDER); this one is only the bidding surfaces'.
 const SUITS: Suit[] = ["S", "H", "C", "D"];
 
 /**
- * The four-suit picker grid. One definition serves every case that needs it:
- * Bitola round 2 (where the candidate's suit is locked out as "spent"), and
- * the whole single round of a variant with no candidate at all (where nothing
- * is locked because no suit was ever offered and turned down).
- *
- * Card-style tiles: they take their face treatment from PlayingCard's exported
- * constants rather than restating it, so the tap target keeps reading as "pick
- * this suit's card" even if the deck face changes. Just the suit glyph — the
- * suit name is redundant next to a 60x80 card with a 40px symbol. A locked tile
- * stays in the grid, visibly disabled, so the layout doesn't shift and the
- * lock-out is explicit rather than a suit that silently vanished.
+ * Card-style four-suit picker for free trump naming, used in Bitola round 2 and candidate-less variants.
+ * A locked suit stays in the grid as a disabled tile so the layout does not shift.
  */
 function SuitPickerGrid({
   lockedSuit,
@@ -92,8 +64,6 @@ function SuitPickerGrid({
               background: CARD_FACE_BACKGROUND,
               border: CARD_FACE_BORDER,
               boxShadow: "0 3px 6px rgba(0,0,0,0.3)",
-              // Tile ink is the deck's accent, so a Croatian bell tile is not
-              // labelled with the French red it has nothing to do with.
               color: suitAccent(suit, deck),
               fontFamily: "var(--font-suit)",
               fontSize: 28,
@@ -111,19 +81,8 @@ function SuitPickerGrid({
 }
 
 /**
- * Replaces the Pass button when the server says this seat has no legal pass.
- *
- * Deliberately shaped like a ClassicButton rather than styled as fine print, for
- * two reasons. First, ButtonTimerRing traces a rounded rect around whatever it
- * wraps at `radius` 8 — around a bare line of text that radius exceeds half the
- * height and the sweep degenerates into a lozenge, so the note needs
- * button-height padding and the same 8px corner for the ring to read correctly.
- * Second, it occupies the slot the player's eye is already on; a 0.55-opacity
- * caption there reads as decoration, and the one thing they must understand is
- * that the button they were about to press is gone on purpose.
- *
- * role="status" so the disappearance is announced rather than silently visual —
- * a screen-reader user otherwise just finds one fewer control.
+ * Button-shaped status note that replaces the Pass button when the server says this seat has no legal pass.
+ * It keeps button height and corner radius so the wrapping ButtonTimerRing still traces it correctly.
  */
 function MustPickNote() {
   const { t } = useTranslation();
@@ -162,24 +121,13 @@ export function TrumpPrompt({
 }: TrumpPromptProps) {
   const { t } = useTranslation();
   const promptRef = useFocusTrap<HTMLDivElement>();
-  // Resolved above the early return below, so the waiting view's "considering"
-  // row and the active bidder's picker grid draw the same deck.
   const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
   const showRing = isActiveBidder && Boolean(turnExpiresAt) && (timerDurationSec ?? 0) > 0;
 
   if (!isActiveBidder) {
-    // The active bidder's name is bolded in their viewer-relative team color
-    // (gold = you/partner, silver = opponents). `opacity` would dim the whole
-    // line including the name, so the surrounding copy uses a translucent ink
-    // *color* instead — keeping the team-colored name at full strength.
     const nameColor = activePlayerTeam
       ? teamColors(activePlayerTeam)[0]
       : "var(--ink-light, #f5f2e8)";
-    // Surface all four suits as little parchment "suit chips" beside the copy
-    // whenever the active bidder is choosing freely: Bitola round 2, where the
-    // candidate suit is shown muted/disabled (it can't be picked) mirroring the
-    // active bidder's locked tile, and the single round of a candidate-less
-    // variant, where nothing is locked.
     const showSuitChips = biddingRound === 2 || trumpCandidate === null;
 
     return (
@@ -198,9 +146,6 @@ export function TrumpPrompt({
           }}
         >
           {trumpCandidate && (
-            // shrink-0 so the flex row can't squash the card narrower than its
-            // 44×64 footprint — without it the card compresses to ~32px wide,
-            // stretching the aspect ratio and overflowing the centred pip.
             <div className="shrink-0">
               <PlayingCard card={trumpCandidate} state="default" size="sm" withTransition={false} />
             </div>
@@ -213,10 +158,7 @@ export function TrumpPrompt({
               <Trans
                 i18nKey={
                   !canPass
-                    ? // The active bidder has no pass to make, so the copy must
-                      // not promise the table one. Same key family, forced
-                      // variant.
-                      "match.trumpPrompt.waitingForcedPick"
+                    ? "match.trumpPrompt.waitingForcedPick"
                     : trumpCandidate === null || biddingRound === 2
                       ? "match.trumpPrompt.waitingRound2"
                       : "match.trumpPrompt.waitingRound1"
@@ -263,10 +205,6 @@ export function TrumpPrompt({
     );
   }
 
-  // A round-1 take-it-or-pass on a face-up candidate only exists when there IS a
-  // candidate. Without one, trump is a freely named suit for the whole single
-  // round, so the bidder gets the same four-suit grid Bitola shows in round 2,
-  // and the single "Take" button — which sends no suit — must not render.
   const isFreeSuitPick = trumpCandidate === null;
 
   const title = isFreeSuitPick
@@ -275,9 +213,6 @@ export function TrumpPrompt({
       ? t("match.trumpPrompt.titleRound1")
       : t("match.trumpPrompt.titleRound2");
 
-  // Subtitle copy stays generic — the candidate card is already rendered at
-  // 80×116 directly below, so a "Candidate: T♣" prefix would just repeat in
-  // text what the visual already shows.
   const subtitle = isFreeSuitPick
     ? t("match.trumpPrompt.subtitleFreePick")
     : biddingRound === 1
@@ -294,12 +229,6 @@ export function TrumpPrompt({
         data-testid="trump-prompt"
         className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
       >
-        {/* Scroll guard moves onto the panel itself. A wrapping div with
-            overflow-y-auto would clip the panel's brass halo at its
-            rectangular bounds (CSS forces overflow-x:auto when overflow-y is
-            set). Inline `overflowY: auto` on the panel only overrides the Y
-            axis — X stays hidden for corner clipping, and the panel's own
-            box-shadow is unaffected by its own overflow. */}
         <ClassicPanel
           width={560}
           title={<span id="trump-prompt-title">{title}</span>}
@@ -307,9 +236,6 @@ export function TrumpPrompt({
           style={{ maxHeight: "90vh", overflowY: "auto" }}
         >
           {biddingRound === 1 && trumpCandidate ? (
-            // Round 1 with a candidate: the card sits on the left, descriptive
-            // copy on the right — matches the design's 80×116 card + flex-1
-            // paragraph. The decision is take-this-suit or pass, so no grid.
             <div className="flex items-center gap-5 mb-5">
               <PlayingCard card={trumpCandidate} state="default" size="lg" withTransition={false} />
               <p
@@ -331,8 +257,6 @@ export function TrumpPrompt({
                   />
                 </div>
               )}
-              {/* With a candidate, its suit is spent and locked out. With none,
-                  every suit is on the table and nothing is locked. */}
               <SuitPickerGrid
                 lockedSuit={trumpCandidate?.suit ?? null}
                 onPick={onPick}
@@ -342,10 +266,6 @@ export function TrumpPrompt({
           )}
 
           <div className="flex items-center justify-between gap-3">
-            {/* The round counter only makes sense where a second round exists —
-                the candidate variant. A candidate-less variant bids in a single
-                round, so "Round 1 / 2" would promise a round that can never
-                come; an empty span keeps the flex layout's two ends apart. */}
             <span
               className="font-body text-[11px]"
               style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.55 }}
@@ -358,9 +278,6 @@ export function TrumpPrompt({
             </span>
             <div className="flex items-center gap-3.5">
               {biddingRound === 1 && trumpCandidate && (
-                // Suitless pick — the server binds trump to the candidate's
-                // suit. Never rendered without a candidate: there would be
-                // nothing for the server to bind to and the action is rejected.
                 <ClassicButton
                   variant="primary"
                   onClick={() => onPick()}
@@ -369,14 +286,6 @@ export function TrumpPrompt({
                   {t("match.trumpPrompt.pick")}
                 </ClassicButton>
               )}
-              {/* No Pass control when the server would refuse the pass: the
-                  dealer bidding last (fourth) where the hand must find a
-                  taker. Hiding it is the fix — offering a button whose only
-                  outcome is a rejection toast is the defect, and a dedicated
-                  error code for "you must pick" is explicitly not the answer.
-                  The suit grid above is already the complete set of legal
-                  moves, and the ring stays on the note in its place so the
-                  countdown survives (an expiry here auto-PICKS server-side). */}
               {!canPass ? (
                 showRing ? (
                   <ButtonTimerRing
@@ -389,9 +298,6 @@ export function TrumpPrompt({
                   <MustPickNote />
                 )
               ) : showRing ? (
-                // Visual countdown only — server-authoritative auto-pass on
-                // expiry. A client-side onExpire would race the server's
-                // ActionPassTrump auto-action and surface a wrong-phase toast.
                 <ButtonTimerRing
                   turnExpiresAt={turnExpiresAt}
                   totalDuration={timerDurationSec ?? 0}

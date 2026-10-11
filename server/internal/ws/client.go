@@ -36,8 +36,8 @@ func NewClient(conn *websocket.Conn, hub *Hub, userID uint) *Client {
 	}
 }
 
-// Send enqueues a message for delivery. Safe to call concurrently.
-// Returns false if the client is closed or the buffer is full.
+// Send enqueues a message for delivery and is safe to call concurrently.
+// It returns false if the client is closed or the buffer is full.
 func (c *Client) Send(msg []byte) bool {
 	c.closedMu.Lock()
 	if c.closed {
@@ -66,25 +66,19 @@ func (c *Client) markClosed() {
 	}
 }
 
-// readPump reads messages from the WebSocket connection and forwards them
-// to the hub's incoming channel. It also runs a concurrent ping loop to
-// detect dropped connections. Only one goroutine should call readPump.
+// readPump forwards incoming messages to the hub until the connection closes.
+// It runs pingLoop alongside Read because pong frames are only processed by an active reader.
 func (c *Client) readPump() {
 	defer func() {
 		c.hub.unregister <- c
 		_ = c.conn.CloseNow()
 	}()
 
-	// Concurrent ping loop — Ping must be called alongside Read
-	// so pong frames are processed by the reader.
 	ctx, cancelPing := context.WithCancel(context.Background())
 	defer cancelPing()
 	go c.pingLoop(ctx)
 
 	for {
-		// No per-read timeout — liveness is handled by pingLoop.
-		// Read unblocks when data arrives or the connection is closed
-		// (pingLoop calls CloseNow on pong failure, defer cancels ctx).
 		_, data, err := c.conn.Read(ctx)
 		if err != nil {
 			status := websocket.CloseStatus(err)
@@ -96,7 +90,6 @@ func (c *Client) readPump() {
 			return
 		}
 
-		// Non-blocking send to hub — if buffer is full, close misbehaving client
 		select {
 		case c.hub.incoming <- &IncomingMessage{Client: c, Data: data}:
 		default:

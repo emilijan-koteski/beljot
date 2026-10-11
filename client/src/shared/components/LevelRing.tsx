@@ -1,24 +1,14 @@
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 
 interface LevelRingProps {
-  /** Lifetime level shown in the center (server-authoritative). */
   level: number;
-  /** XP progress within the current level, 0..1 (cosmetic display math). */
   fraction: number;
-  /** Accessible label, e.g. "Level 2, 8 / 250 XP". */
   label: string;
-  /** Outer diameter in px. */
   size?: number;
   testId?: string;
 }
 
-/**
- * Compact lifetime-level ring for the top nav on small screens — the profile
- * WinRateRing motif shrunk down: a felt-green XP-progress arc over a sunken
- * track with the level number centered. Shown below the `sm` breakpoint, where
- * the wider "Lvl N + bar" indicator is hidden so it doesn't crowd the coin pill.
- * The arc fill is cosmetic; the level is server-authoritative.
- */
+/** Compact lifetime-level ring for the top nav on small screens: an XP-progress arc with the level centered. */
 export function LevelRing({ level, fraction, label, size = 30, testId }: LevelRingProps) {
   const reducedMotion = useReducedMotion();
 

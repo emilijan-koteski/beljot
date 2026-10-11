@@ -2,10 +2,8 @@ package room
 
 import "testing"
 
-// Story 9.4 AC1: Quick Play uses a binary affordability bracket — a player who
-// can afford the standard 500 stake is pooled at 500; everyone else (including
-// exactly 0) is pooled at the free bracket (0). quickPlayBuyIn is the single
-// source of truth for that decision.
+// TestQuickPlayBuyIn checks the binary bracket: players who can afford 500 pay
+// the standard stake, everyone else plays free.
 func TestQuickPlayBuyIn(t *testing.T) {
 	tests := []struct {
 		name    string

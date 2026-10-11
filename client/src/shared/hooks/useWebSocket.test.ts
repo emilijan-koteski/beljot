@@ -7,7 +7,6 @@ import type { WsMessage } from "@/shared/types/wsEvents";
 import type { WsConnectionState } from "./useWebSocket";
 import { useWebSocket } from "./useWebSocket";
 
-// Mock WebSocket
 class MockWebSocket {
   static CONNECTING = 0;
   static OPEN = 1;
@@ -40,7 +39,6 @@ class MockWebSocket {
     }
   }
 
-  // Test helpers
   simulateOpen() {
     this.readyState = MockWebSocket.OPEN;
     if (this.onopen) {
@@ -82,7 +80,6 @@ describe("useWebSocket", () => {
     const onMessage = vi.fn();
     const { result } = renderHook(() => useWebSocket({ onMessage }));
 
-    // Flush the deferred setTimeout(connect, 0)
     act(() => vi.advanceTimersByTime(0));
 
     expect(result.current.state).toBe("connecting" as WsConnectionState);
@@ -141,7 +138,6 @@ describe("useWebSocket", () => {
       }),
     );
 
-    // onMessage called for both authenticated (with userId) and card_played
     const calls = onMessage.mock.calls.map((c) => (c[0] as WsMessage).type);
     expect(calls).toContain("event:card_played");
   });
@@ -182,7 +178,6 @@ describe("useWebSocket", () => {
     act(() => ws.simulateClose());
     expect(mockInstances).toHaveLength(1);
 
-    // Advance past reconnection delay (1 second base)
     act(() => vi.advanceTimersByTime(1100));
     expect(mockInstances).toHaveLength(2);
   });
@@ -203,7 +198,6 @@ describe("useWebSocket", () => {
 
     act(() => result.current.sendMessage("action:play_card", { cardId: "KS" }));
 
-    // The auth message + the play_card message
     expect(ws.sent).toHaveLength(2);
     const sent = JSON.parse(ws.sent[1]!);
     expect(sent.type).toBe("action:play_card");

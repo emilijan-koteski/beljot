@@ -13,14 +13,11 @@ type passwordResetText struct {
 	greeting string
 	intro    string
 	button   string
-	fallback string // leads into the raw-link line for clients that strip the button
+	fallback string
 	expiry   string
 	ignore   string
 }
 
-// passwordResetTexts is keyed by the short language code. en is the fallback for
-// any unknown/empty language. mk is intentionally all-Cyrillic; the "Beljot"
-// brand stays Latin to match the rest of the product copy.
 var passwordResetTexts = map[string]passwordResetText{
 	"en": {
 		subject:  "Reset your Beljot password",

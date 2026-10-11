@@ -123,14 +123,11 @@ describe("RankChangeGate", () => {
     renderGate();
 
     await waitFor(() => expect(mockGetCurrentSeason).toHaveBeenCalled());
-    // Let the resolved (stale) read land before asserting it was ignored.
     await act(async () => {});
     expect(screen.getByTestId("rank-change-rank")).toHaveTextContent("Gold 2");
     expect(screen.queryByTestId("rank-change-progress")).not.toBeInTheDocument();
   });
 
-  // Version skew: a tier token this bundle does not know falls back to the SP's
-  // own bucket (1100 SP is Diamond 2) for the label AND for the caught-up check.
   it("falls back to the SP bucket for an unrecognised tier token", async () => {
     mockGetCurrentSeason.mockResolvedValue({
       ...seasonAfterMatch,

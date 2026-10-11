@@ -11,15 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Rooms configured WITHOUT declarations ("bez zvanja"): no melds, no
-// Belote/Rebelote, in either variant. Everything here goes through ApplyAction,
-// and every state is built from a testfixtures factory composed with
-// WithoutDeclarations — never a raw GameState literal.
-//
-// The declarations-ON side of each rule is covered by the pre-existing suites in
-// declarations_test.go and bidding_test.go, which must keep passing untouched:
-// this feature is a gate, not a rewrite.
-
 // TestNoDeclarationsSkipsMeldPrompt covers the Bitola half of the skip. A seat
 // holding a perfectly good meld plays its first card and is never asked.
 func TestNoDeclarationsSkipsMeldPrompt(t *testing.T) {
@@ -27,8 +18,6 @@ func TestNoDeclarationsSkipsMeldPrompt(t *testing.T) {
 		name    string
 		newGame func() *game.GameState
 	}{
-		// Seat 1 holds the quarte JD-QD-KD-AD in both fixtures, so both would be
-		// prompted if declarations were on.
 		{
 			name:    "bitola",
 			newGame: func() *game.GameState { return testfixtures.NewGameFirstTrick(game.SuitHearts) },
@@ -44,8 +33,6 @@ func TestNoDeclarationsSkipsMeldPrompt(t *testing.T) {
 			gs := testfixtures.WithoutDeclarations(tc.newGame())
 			require.False(t, gs.AwaitingDeclaration, "fixture must not start mid-prompt")
 
-			// Seat 1 leads with a card that is NOT part of its quarte, so the
-			// meld is still intact in hand when the prompt check would run.
 			after, err := game.ApplyAction(gs, game.Action{
 				Type:       game.ActionPlayCard,
 				PlayerSeat: 1,
@@ -63,16 +50,13 @@ func TestNoDeclarationsSkipsMeldPrompt(t *testing.T) {
 	}
 }
 
-// TestNoDeclarationsSkipsBelotPrompt is the Belote half. It is a separate code
-// path from the melds — a bonus for holding K+Q of trump, not a meld — so it
-// needs its own coverage, and it is the reason DeclarationsEnabled is read in
-// shouldPromptBelot rather than relying on the DeclarationsResolved seed alone.
+// TestNoDeclarationsSkipsBelotPrompt checks the Belot prompt is skipped when declarations are
+// disabled.
 func TestNoDeclarationsSkipsBelotPrompt(t *testing.T) {
 	tests := []struct {
 		name    string
 		newGame func() *game.GameState
 	}{
-		// Seat 0 holds KH and QH with hearts as trump in both fixtures.
 		{"bitola", func() *game.GameState { return testfixtures.NewGameFirstTrick(game.SuitHearts) }},
 		{"croatia", func() *game.GameState { return testfixtures.NewGameCroatianFirstTrick(game.SuitHearts) }},
 	}
@@ -82,8 +66,6 @@ func TestNoDeclarationsSkipsBelotPrompt(t *testing.T) {
 			gs := testfixtures.WithoutDeclarations(tc.newGame())
 			gs.ActivePlayerSeat = 0
 
-			// Playing the King of trump while still holding the Queen is exactly
-			// the trigger shouldPromptBelot looks for.
 			after, err := game.ApplyAction(gs, game.Action{
 				Type:       game.ActionPlayCard,
 				PlayerSeat: 0,
@@ -118,10 +100,8 @@ func TestNoDeclarationsSkipsBelotOnQueenToo(t *testing.T) {
 	assert.Equal(t, [2]int{0, 0}, after.BelotPoints)
 }
 
-// TestNoDeclarationsCroatianSkipsDeclaringPhase covers the Croatian half of the
-// skip: a resolved bid opens trick 1 directly instead of PhaseDeclaring. This is
-// the one place the config is read to CHOOSE a phase, so a regression here is a
-// whole phase appearing that the room never asked for.
+// TestNoDeclarationsCroatianSkipsDeclaringPhase checks a resolved Croatian bid opens trick 1
+// directly instead of PhaseDeclaring.
 func TestNoDeclarationsCroatianSkipsDeclaringPhase(t *testing.T) {
 	gs := testfixtures.WithoutDeclarations(testfixtures.NewGameCroatianJustDealt())
 	require.Equal(t, game.DeclarationTimingDedicatedPhase, gs.Rules.DeclarationTiming,
@@ -147,10 +127,8 @@ func TestNoDeclarationsCroatianSkipsDeclaringPhase(t *testing.T) {
 	}
 }
 
-// TestNoDeclarationsCroatianStillEntersPhaseWhenEnabled is the paired negative
-// control: with the identical fixture and declarations ON, the phase DOES open.
-// Without it, a bug that skipped the phase unconditionally would pass every
-// assertion above.
+// TestNoDeclarationsCroatianStillEntersPhaseWhenEnabled checks the same fixture does open
+// PhaseDeclaring when declarations are enabled.
 func TestNoDeclarationsCroatianStillEntersPhaseWhenEnabled(t *testing.T) {
 	gs := testfixtures.NewGameCroatianJustDealt()
 
@@ -194,10 +172,8 @@ func TestNoDeclarationsRejectsStaleDeclareActions(t *testing.T) {
 	}
 }
 
-// TestNoDeclarationsCroatianRejectsDeclareOutsideItsPhase pins the Croatian
-// route to the same rejection. Its declare actions are dispatched by PHASE, not
-// by the AwaitingDeclaration flag, so they fail with a phase error rather than
-// an action-required one — and the phase they need never opens.
+// TestNoDeclarationsCroatianRejectsDeclareOutsideItsPhase checks Croatian declare actions fail
+// with a phase error when declarations are disabled.
 func TestNoDeclarationsCroatianRejectsDeclareOutsideItsPhase(t *testing.T) {
 	gs := testfixtures.WithoutDeclarations(testfixtures.NewGameCroatianFirstTrick(game.SuitHearts))
 
@@ -208,11 +184,8 @@ func TestNoDeclarationsCroatianRejectsDeclareOutsideItsPhase(t *testing.T) {
 		"expected a phase or action-required rejection, got %v", err)
 }
 
-// TestNoDeclarationsSurvivesTheHandBoundary is the regression this feature is
-// most likely to grow: the per-hand reset clears DeclarationsResolved, and
-// clearing it unconditionally would skip declarations in hand 1 only and let
-// them reappear from hand 2 onwards. Driven entirely through ApplyAction —
-// trick 8, then the hand-complete acknowledgements that deal the next hand.
+// TestNoDeclarationsSurvivesTheHandBoundary checks declarations stay disabled from hand 2 onwards,
+// driven entirely through ApplyAction.
 func TestNoDeclarationsSurvivesTheHandBoundary(t *testing.T) {
 	gs := testfixtures.WithoutDeclarations(testfixtures.NewGameLastTrick())
 
@@ -257,10 +230,7 @@ func TestDeclarationsOnStillReopensEachHand(t *testing.T) {
 	assert.False(t, next.DeclarationsResolved, "hand 2 must reopen the declaration contest")
 }
 
-// playFinalTrick plays out trick 8 one card per seat, driving the hand into
-// scoring. A local helper rather than a shared one: scoring_test.go's equivalent
-// is unexported to that file, and duplicating four lines beats coupling two
-// suites.
+// playFinalTrick plays out trick 8 one card per seat, driving the hand into scoring.
 func playFinalTrick(t *testing.T, gs *game.GameState) *game.GameState {
 	t.Helper()
 	state := gs
@@ -287,7 +257,6 @@ func TestNoDeclarationsCarriesOntoTheWire(t *testing.T) {
 		assert.False(t, gs.DeclarationsEnabled)
 		assert.Equal(t, gs.Rules.DeclarationsEnabled, gs.DeclarationsEnabled)
 
-		// ProjectForSeat is what actually reaches a client (Story 12.10).
 		for seat := range 4 {
 			assert.False(t, game.ProjectForSeat(gs, seat).DeclarationsEnabled,
 				"seat %d must be told the room's setting", seat)
@@ -303,8 +272,6 @@ func TestNoDeclarationsCarriesOntoTheWire(t *testing.T) {
 
 	t.Run("refreshed after an action, never left stale", func(t *testing.T) {
 		gs := testfixtures.WithoutDeclarations(testfixtures.NewGameFirstTrick(game.SuitHearts))
-		// Deliberately desynchronised: only RefreshDerivedFlags may fix this, and
-		// ApplyAction calls it at its single exit.
 		gs.DeclarationsEnabled = true
 
 		after, err := game.ApplyAction(gs, game.Action{
@@ -319,13 +286,8 @@ func TestNoDeclarationsCarriesOntoTheWire(t *testing.T) {
 	})
 }
 
-// TestNoDeclarationsKeepsHandsPrivate pins the one place the seeded
-// DeclarationsResolved changes which branch existing code takes. ProjectForSeat
-// masks other seats' declaration cards only while the contest is UNRESOLVED
-// (projection.go), and a declarations-off room reports it resolved from the deal
-// — so that mask is off for the whole match. It is safe only because nothing can
-// ever populate Declarations in such a room, which makes the card-privacy
-// invariant rest on that slice staying empty. Assert it rather than trust it.
+// TestNoDeclarationsKeepsHandsPrivate checks Declarations stay empty in a declarations-off room,
+// since projection never masks them there.
 func TestNoDeclarationsKeepsHandsPrivate(t *testing.T) {
 	gs := testfixtures.WithoutDeclarations(testfixtures.NewGameFirstTrick(game.SuitHearts))
 	require.True(t, gs.DeclarationsResolved, "the seed is the precondition this test exists for")
@@ -368,19 +330,12 @@ func TestNoDeclarationsScoresOnCardPointsAlone(t *testing.T) {
 		"card points, last trick and Capot are unaffected on a hand nobody declared in")
 }
 
-// TestNoDeclarationsWithRealMeldsInHandScoresZeroForThem is the assertion the
-// test above CANNOT make. NewGameLastTrick holds one card per seat, so no meld
-// can exist in it and its ON/OFF score equality is close to tautological. Here
-// three seats hold genuinely declarable melds — a quarte and two tierces, worth
-// well over a hundred points if the contest ran — and the hand must still award
-// zero declaration points, with the ON run of the same hand proving the melds
-// were real.
+// TestNoDeclarationsWithRealMeldsInHandScoresZeroForThem checks real melds score zero when
+// declarations are disabled, while the same hand with them enabled scores the melds.
 func TestNoDeclarationsWithRealMeldsInHandScoresZeroForThem(t *testing.T) {
-	// The same eight-card layout both ways; only the toggle differs.
 	off := testfixtures.WithoutDeclarations(testfixtures.NewGameFirstTrick(game.SuitHearts))
 	require.True(t, meldsExistSomewhere(off), "the fixture must actually hold melds, or this proves nothing")
 
-	// Walk the whole hand: every seat plays its first legal card, eight tricks.
 	offFinal := playWholeHand(t, off)
 	require.NotNil(t, offFinal.LastHandResult)
 
@@ -390,10 +345,6 @@ func TestNoDeclarationsWithRealMeldsInHandScoresZeroForThem(t *testing.T) {
 	assert.Equal(t, [2]int{0, 0}, offFinal.DeclarationPoints)
 	assert.Equal(t, [2]int{0, 0}, offFinal.BelotPoints,
 		"seat 0 held K+Q of trump all hand and was never asked")
-	// 152, not 162: TeamXCardPoints are the RAW trick points captured before any
-	// bonus, and the deck holds exactly 152. The familiar 162 is that plus the
-	// 10-point last trick, asserted separately below. Both are untouched by the
-	// toggle — which is the whole claim: only the meld and Belote lines go to zero.
 	assert.Equal(t, 152, offFinal.LastHandResult.TeamACardPoints+offFinal.LastHandResult.TeamBCardPoints,
 		"the raw card-point total is untouched by the toggle")
 	assert.Equal(t, 162,
@@ -401,9 +352,6 @@ func TestNoDeclarationsWithRealMeldsInHandScoresZeroForThem(t *testing.T) {
 			offFinal.LastHandResult.LastTrickBonus+offFinal.LastHandResult.CapotBonus,
 		"and card points plus the last-trick or Capot bonus still make the full 162")
 
-	// The ON control: the same hand, played the same way, DOES award melds. If
-	// this fails the fixture stopped holding melds and the assertions above went
-	// vacuous.
 	onFinal := playWholeHand(t, testfixtures.NewGameFirstTrick(game.SuitHearts))
 	require.NotNil(t, onFinal.LastHandResult)
 	onDecl := onFinal.LastHandResult.TeamADeclPoints + onFinal.LastHandResult.TeamBDeclPoints
@@ -422,10 +370,8 @@ func meldsExistSomewhere(state *game.GameState) bool {
 	return false
 }
 
-// playWholeHand drives every remaining trick by having each seat play its first
-// LEGAL card, answering any prompt the engine raises along the way, until the
-// hand leaves the playing phase. Deliberately dumb: the point is to reach
-// scoring with melds having been in hand, not to play well.
+// playWholeHand plays each seat's first legal card and answers any prompt until the hand leaves
+// the playing phase.
 func playWholeHand(t *testing.T, gs *game.GameState) *game.GameState {
 	t.Helper()
 	state := gs
@@ -436,7 +382,6 @@ func playWholeHand(t *testing.T, gs *game.GameState) *game.GameState {
 
 		seat := state.ActivePlayerSeat
 
-		// Answer whatever the engine is waiting on before trying to play.
 		switch {
 		case state.PendingBelotSeat != nil:
 			next, err := game.ApplyAction(state, game.Action{
@@ -467,7 +412,7 @@ func playWholeHand(t *testing.T, gs *game.GameState) *game.GameState {
 				Type: game.ActionPlayCard, PlayerSeat: seat, Card: &card,
 			})
 			if err != nil {
-				continue // illegal under the follow/trump obligations; try the next
+				continue
 			}
 			state = next
 			played = true

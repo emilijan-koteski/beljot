@@ -16,31 +16,18 @@ export interface RegisterResponse {
   username: string;
   email: string;
   languagePreference: string;
-  // Card deck (Story 12.4) — echoed on the auth envelope so the FIRST card of
-  // the session already draws in the player's chosen deck, with no separate
-  // profile fetch. Seeded `croatian` at registration only when `hr` was picked.
   cardDeckPreference: CardDeck;
-  // Audio switches (migration 000025) — echoed for the same first-paint reason:
-  // a switch turned off on another device must hold for the first card played.
   soundEnabled: boolean;
   musicEnabled: boolean;
-  // Audio volumes (migration 000026), 0-100 — echoed for the same reason.
   soundVolume: number;
   musicVolume: number;
   walletBalance: number;
   loginStreakDays: number;
-  // XP & level (Story 9.5) — echoed on auth so the top-nav banner has them on
-  // load without a separate profile fetch. level is derived server-side.
   totalXp: number;
   level: number;
-  // Honor (Story 9.7) — echoed for the same reason, so the top-nav honor chip
-  // renders on first paint. The TREND is deliberately absent: it needs a
-  // windowed query over matches and only the profile endpoint carries it.
   honorScore: number;
   honorTier: string;
   isNewPlayer: boolean;
-  // The player's 128 px avatar, or null — echoed so the nav pill shows it on
-  // first paint.
   avatarUrl: string | null;
   createdAt: string;
 }
@@ -58,23 +45,18 @@ export interface RefreshResponse {
   username: string;
   email: string;
   languagePreference: string;
-  // Card deck (Story 12.4) — see RegisterResponse.
   cardDeckPreference: CardDeck;
-  // Audio switches and volumes — see RegisterResponse.
   soundEnabled: boolean;
   musicEnabled: boolean;
   soundVolume: number;
   musicVolume: number;
   walletBalance: number;
   loginStreakDays: number;
-  // XP & level (Story 9.5) — see RegisterResponse.
   totalXp: number;
   level: number;
-  // Honor (Story 9.7) — see RegisterResponse.
   honorScore: number;
   honorTier: string;
   isNewPlayer: boolean;
-  // Avatar — see RegisterResponse.
   avatarUrl: string | null;
   createdAt: string;
 }
@@ -88,7 +70,7 @@ export interface SSOLinkRequest {
   password: string;
 }
 
-// SSO issues the exact same session + auth envelope as password login.
+/** SSO issues the same session and auth envelope as password login. */
 export type SSOResponse = RegisterResponse;
 
 export interface ForgotPasswordRequest {
@@ -142,8 +124,7 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
   }
 }
 
-// toFetchError maps an axios failure onto the standard error envelope, falling
-// back to UNKNOWN_ERROR when the response carries no { error } body.
+/** Maps an axios failure onto FetchError, falling back to UNKNOWN_ERROR without an { error } body. */
 function toFetchError(e: unknown, fallbackMessage: string): FetchError {
   const err = e as AxiosError<{ error: { code: string; message: string } }>;
   if (err.response?.data?.error) {
@@ -180,11 +161,6 @@ export async function ssoLink(provider: string, data: SSOLinkRequest): Promise<S
     throw toFetchError(e, "Sign-in failed");
   }
 }
-
-// NOTE: there is deliberately no `refresh()` here. /auth/refresh has exactly
-// one caller — `refreshAccessToken()` in axiosClient.ts — because refresh
-// tokens rotate and a second, uncoordinated caller races the family into a
-// dead generation. Import that singleton instead.
 
 export async function forgotPassword(data: ForgotPasswordRequest): Promise<void> {
   try {

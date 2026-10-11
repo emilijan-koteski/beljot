@@ -12,7 +12,6 @@ const (
 	SuitClubs    Suit = "C"
 )
 
-// AllSuits contains all four suits in standard order.
 var AllSuits = [4]Suit{SuitSpades, SuitHearts, SuitDiamonds, SuitClubs}
 
 // Rank represents a card rank using single-character encoding.
@@ -29,7 +28,6 @@ const (
 	RankAce   Rank = "A"
 )
 
-// AllRanks contains all eight ranks in ascending order (7 through Ace).
 var AllRanks = [8]Rank{Rank7, Rank8, Rank9, RankTen, RankJack, RankQueen, RankKing, RankAce}
 
 // Card represents a playing card with a rank and suit.
@@ -43,12 +41,10 @@ func (c Card) String() string {
 	return string(c.Rank) + string(c.Suit)
 }
 
-// validSuits is a lookup set for validation.
 var validSuits = map[Suit]bool{
 	SuitSpades: true, SuitHearts: true, SuitDiamonds: true, SuitClubs: true,
 }
 
-// validRanks is a lookup set for validation.
 var validRanks = map[Rank]bool{
 	Rank7: true, Rank8: true, Rank9: true, RankTen: true,
 	RankJack: true, RankQueen: true, RankKing: true, RankAce: true,
@@ -82,13 +78,7 @@ const (
 type DealShape string
 
 const (
-	// DealShapeCandidate is the two-stage deal: 3 then 2 cards to each seat, one
-	// card lifted face-up as the public trump candidate, and the remaining 11
-	// held back for stage-2 distribution once a seat takes trump.
-	DealShapeCandidate DealShape = "candidate"
-	// DealShapeAllBeforeBidding deals every card before bidding opens: 3 then 3
-	// to each seat, then 2 more per seat placed face-down. Nothing is held back
-	// and there is no candidate, so bidding is a bare named suit.
+	DealShapeCandidate        DealShape = "candidate"
 	DealShapeAllBeforeBidding DealShape = "all_before_bidding"
 )
 
@@ -96,137 +86,37 @@ const (
 type AllPassOutcome string
 
 const (
-	// AllPassReshuffleAndRotate pools all 32 cards once the second bidding
-	// round is passed out, rotates the dealer counter-clockwise, and deals the
-	// same hand number again.
 	AllPassReshuffleAndRotate AllPassOutcome = "reshuffle_and_rotate"
-	// AllPassDealerMustPick makes the dealer — always the LAST bidder of the
-	// free-suit stage — pick with no right to pass once the other three seats
-	// have passed, so the hand always finds a taker and is never passed out.
-	// With no candidate the free-suit stage IS round 1, so a second round
-	// never opens (the shipped Croatian preset). With a candidate the force
-	// applies at the end of round 2, after a passed-out round 1 opens it.
-	AllPassDealerMustPick AllPassOutcome = "dealer_must_pick"
+	AllPassDealerMustPick     AllPassOutcome = "dealer_must_pick"
 )
 
 // DeclarationTiming names when declarations are collected and revealed.
 type DeclarationTiming string
 
 const (
-	// DeclarationTimingDuringFirstTrick collects each player's declaration as
-	// their turn comes round in trick 1 and reveals the winner at trick 2.
 	DeclarationTimingDuringFirstTrick DeclarationTiming = "during_first_trick"
-	// DeclarationTimingDedicatedPhase runs a phase between bidding and trick 1
-	// in which all four seats declare or skip, then the result is revealed.
-	DeclarationTimingDedicatedPhase DeclarationTiming = "dedicated_phase"
+	DeclarationTimingDedicatedPhase   DeclarationTiming = "dedicated_phase"
 )
 
 // TieRule names how a hand whose two sides tie on points is settled.
 type TieRule string
 
 const (
-	// TieRuleAllToOpponents awards the whole tied pool to the taker's opponents.
 	TieRuleAllToOpponents TieRule = "all_to_opponents"
-	// TieRuleHangingPoints scores the tied hand for nobody and carries the pool
-	// over to whichever side wins the next decisive hand.
-	TieRuleHangingPoints TieRule = "hanging_points"
+	TieRuleHangingPoints  TieRule = "hanging_points"
 )
 
-// VariantRules is the per-rule configuration a variant resolves to. It is the
-// engine's ONLY variant-aware surface: RulesFor is resolved once at game
-// initialization, carried on GameState.Rules, and every divergent branch reads
-// a field here — no engine code compares a variant name (D-VAR-1).
-//
-// Every field is a value type (no pointer, slice, or map) on purpose, so
-// cloneGameState's shallow struct copy carries the whole config correctly with
-// no clone line of its own.
-//
-// All eight fields are populated by both presets from day one. DealShape,
-// HasTrumpCandidate, AllPassOutcome, DeclarationOverlap, DeclarationTiming and
-// DeclarationsEnabled are READ today; TieRule describes each variant's authentic
-// rule and is read once the story that implements it lands.
-//
-// DeclarationsEnabled and StopAtTarget are the two fields a preset does NOT get
-// the final say on: both are per-ROOM choices layered over the variant preset by
-// NewGame. Every other field is variant-derived. See their comments below.
 type VariantRules struct {
-	// DealShape selects the dealing sequence — see DealShape.
-	DealShape DealShape
-	// HasTrumpCandidate is true when one card is lifted face-up and round-1
-	// bidding is a take-it-or-pass on that card's suit. False means trump is a
-	// freely named suit and the taker draws no card.
-	HasTrumpCandidate bool
-	// AllPassOutcome selects what happens when bidding threatens to find no
-	// taker — see AllPassOutcome.
-	AllPassOutcome AllPassOutcome
-	// DeclarationOverlap allows one card to count toward more than one
-	// declaration. False keeps one-card-one-group dedup by higher value.
-	DeclarationOverlap bool
-	// DeclarationTiming selects when declarations are collected — see
-	// DeclarationTiming. Read by handlePickTrump: a dedicated-phase config
-	// opens PhaseDeclaring instead of going straight to trick 1.
-	DeclarationTiming DeclarationTiming
-	// DeclarationsEnabled is whether this game has declarations AT ALL. False is
-	// "bez zvanja": no meld prompt in either variant's timing, no PhaseDeclaring,
-	// no Belote/Rebelote prompt and no +20 — DeclarationPoints and BelotPoints
-	// both stay [0,0] for the whole match and a hand scores on card points, last
-	// trick and Capot alone.
-	//
-	// It disables BELOTE TOO, which is the one thing about this field that is not
-	// self-evident from its name: Belote is a bonus for holding K+Q of trump, not
-	// a meld, and lives on its own code path. Both are off together because a
-	// table that plays without declarations plays without the announcement as
-	// well.
-	//
-	// UNLIKE every other field here, this is a per-ROOM setting, not a variant
-	// property. Both presets return true — the historical and overwhelmingly
-	// common case — and NewGame overrides it from the room's configuration. It is
-	// the first rule-config field exposed at room creation, which is the seam
-	// Epic 12 left open when it made variants presets over a config rather than
-	// hardcoded branches.
-	//
-	// Read in three places, all config reads and never variant comparisons:
-	// handlePickTrump's post-bid branch (skips PhaseDeclaring), the trick-1
-	// prompt check, and shouldPromptBelot. A fourth effect is indirect: NewGame
-	// and the per-hand reset seed DeclarationsResolved from it, which makes the
-	// remaining guards fall out on their own.
+	DealShape           DealShape
+	HasTrumpCandidate   bool
+	AllPassOutcome      AllPassOutcome
+	DeclarationOverlap  bool
+	DeclarationTiming   DeclarationTiming
 	DeclarationsEnabled bool
-	// StopAtTarget is "dosta" (enough): whether the match ends the INSTANT a
-	// team's running total reaches the 1001/501 target, hand unfinished. False —
-	// both presets' value and the historical behaviour — finishes the current hand
-	// and checks the target once, in scoreHand.
-	//
-	// Read by stopAtTargetIfReached (scoring.go) and nowhere else. THAT function's
-	// doc comment is the canonical statement of the rule — what the running total
-	// is, where the checkpoints are and why there are exactly three of them — and
-	// is deliberately not restated here, so there is one place to correct.
-	//
-	// Like DeclarationsEnabled above (and unlike every other field here) this is a
-	// per-ROOM setting, not a variant property. Both presets return false and
-	// NewGame overrides it from the room's configuration. It is the SECOND
-	// rule-config field exposed at room creation.
-	StopAtTarget bool
-	// TieRule selects how a tied hand is settled — see TieRule. This field
-	// states each variant's AUTHENTIC rule; the engine currently awards every
-	// tied hand to the taker's opponents for both variants as a deliberate
-	// interim stand-in, so Bitola's hanging-points value here is not yet
-	// reflected in behaviour.
-	//
-	// Not read yet — behaviour lands with the hanging-points story.
-	TieRule TieRule
+	StopAtTarget        bool
+	TieRule             TieRule
 }
 
-// RulesFor resolves a variant string to its fully-populated rule preset. It is
-// the single variant-aware construct in this package.
-//
-// An unrecognised variant string resolves to the Bitola preset — explicit and
-// tested, never a zero-value config (which would deal no candidate and reject
-// every round-1 take).
-//
-// DeclarationsEnabled is true in both presets because declarations are the
-// default in both variants; StopAtTarget is false in both because finishing the
-// hand is. They are the two fields a caller may override, and only NewGame does
-// so, from the room's settings.
 func RulesFor(v Variant) VariantRules {
 	if v == VariantCroatia {
 		return VariantRules{
@@ -256,39 +146,18 @@ func RulesFor(v Variant) VariantRules {
 type Phase string
 
 const (
-	PhaseDealing Phase = "dealing"
-	PhaseBidding Phase = "bidding"
-	// PhaseDeclaring is the dedicated declaration phase between bidding and
-	// trick 1, entered only under VariantRules.DeclarationTiming ==
-	// DeclarationTimingDedicatedPhase. Seats are prompted one at a time
-	// counter-clockwise from the trick-1 leader; once all four have answered the
-	// contest resolves and the phase moves straight to PhasePlaying at trick 1.
-	// Under DeclarationTimingDuringFirstTrick this phase never occurs.
+	PhaseDealing        Phase = "dealing"
+	PhaseBidding        Phase = "bidding"
 	PhaseDeclaring      Phase = "declaring"
 	PhasePlaying        Phase = "playing"
 	PhaseTrickResolving Phase = "trick_resolving"
 	PhaseHandScoring    Phase = "hand_scoring"
-	// PhaseHandComplete holds after a hand is scored and before the next hand is
-	// dealt: the server waits for players to acknowledge the score (action:continue)
-	// or for an auto-continue timeout, so the score breakdown and trick-collect
-	// animation are seen before the next hand begins.
-	PhaseHandComplete Phase = "hand_complete"
-	PhaseMatchEnd     Phase = "match_end"
-	PhasePaused       Phase = "paused"
-	PhaseDisconnected Phase = "disconnected"
+	PhaseHandComplete   Phase = "hand_complete"
+	PhaseMatchEnd       Phase = "match_end"
+	PhasePaused         Phase = "paused"
+	PhaseDisconnected   Phase = "disconnected"
 )
 
-// AllPhases is every Phase the server can put on the wire, in state-machine
-// order. It exists so the phase strings can be PINNED across the Go/TypeScript
-// boundary: the ws contract test writes this list to a golden, and the client
-// builds its `Phase` union from that same golden, so adding a phase on one side
-// without the other fails a test instead of drifting silently.
-//
-// The client union additionally carries "" for "no game loaded", which is a
-// client-local state the server never sends and so is deliberately absent here.
-//
-// Keep in sync with the constants above — TestAllPhasesCoversEveryConstant
-// scans this file and fails if a constant is declared but not listed.
 func AllPhases() []Phase {
 	return []Phase{
 		PhaseDealing,
@@ -304,7 +173,6 @@ func AllPhases() []Phase {
 	}
 }
 
-// Action type constants for player actions.
 const (
 	ActionPlayCard      = "play_card"
 	ActionPickTrump     = "pick_trump"
@@ -313,17 +181,11 @@ const (
 	ActionSkipDeclare   = "skip_declare"
 	ActionAnnounceBelot = "announce_belot"
 	ActionSkipBelot     = "skip_belot"
-	// ActionContinue acknowledges the hand-complete pause; the next hand deals
-	// once every connected player has continued (or the timeout fires).
-	ActionContinue     = "continue"
-	ActionPause        = "pause"
-	ActionUnpause      = "unpause"
-	ActionOwnerUnpause = "owner_unpause"
+	ActionContinue      = "continue"
+	ActionPause         = "pause"
+	ActionUnpause       = "unpause"
+	ActionOwnerUnpause  = "owner_unpause"
 
-	// Surrender actions (Story 8.2). Each player may initiate at most one
-	// surrender request per match; the proposer's partner accepts (ends match
-	// as opponent win) or declines (consumes the proposer's attempt, play
-	// resumes).
 	ActionSurrenderRequest = "surrender_request"
 	ActionSurrenderAccept  = "surrender_accept"
 	ActionSurrenderDecline = "surrender_decline"
@@ -353,8 +215,6 @@ type Declaration struct {
 	Value      int             `json:"value"`
 }
 
-// TrumpCardPoints maps ranks to their point values when the suit is trump.
-// J=20, 9=14, A=11, T=10, K=4, Q=3, 8=0, 7=0
 var TrumpCardPoints = map[Rank]int{
 	RankJack:  20,
 	Rank9:     14,
@@ -366,8 +226,6 @@ var TrumpCardPoints = map[Rank]int{
 	Rank7:     0,
 }
 
-// NonTrumpCardPoints maps ranks to their point values when the suit is not trump.
-// A=11, T=10, K=4, Q=3, J=2, 9=0, 8=0, 7=0
 var NonTrumpCardPoints = map[Rank]int{
 	RankAce:   11,
 	RankTen:   10,
@@ -379,8 +237,6 @@ var NonTrumpCardPoints = map[Rank]int{
 	Rank7:     0,
 }
 
-// TrumpRankOrder maps ranks to their strength ordering when the suit is trump.
-// Higher value wins. J is strongest (7), 7 is weakest (0).
 var TrumpRankOrder = map[Rank]int{
 	RankJack:  7,
 	Rank9:     6,
@@ -392,8 +248,6 @@ var TrumpRankOrder = map[Rank]int{
 	Rank7:     0,
 }
 
-// NonTrumpRankOrder maps ranks to their strength ordering when the suit is not trump.
-// Higher value wins. A is strongest (7), 7 is weakest (0).
 var NonTrumpRankOrder = map[Rank]int{
 	RankAce:   7,
 	RankTen:   6,
@@ -405,13 +259,8 @@ var NonTrumpRankOrder = map[Rank]int{
 	Rank7:     0,
 }
 
-// NaturalRankSequence lists ranks low-to-high in declaration (sequence) order:
-// 7 < 8 < 9 < T < J < Q < K < A. This is the meld ordering (Jack outranks Ten),
-// distinct from the trick-taking orders above. Source of truth for both the
-// declaration engine and the bot's sequence-adjacency reasoning.
 var NaturalRankSequence = []Rank{Rank7, Rank8, Rank9, RankTen, RankJack, RankQueen, RankKing, RankAce}
 
-// NaturalRankOrder maps a rank to its index in NaturalRankSequence.
 var NaturalRankOrder = func() map[Rank]int {
 	m := make(map[Rank]int, len(NaturalRankSequence))
 	for i, r := range NaturalRankSequence {

@@ -1,4 +1,3 @@
-// Beljot · Rules content — English (source copy, cleaned for terminology consistency).
 import type { RulesLangData } from "./types";
 
 export const en: RulesLangData = {
@@ -89,11 +88,6 @@ export const en: RulesLangData = {
       title: "Shuffle, deal, take trump",
       lede: "Four players, 32 cards, eight to a hand, and a quick round to settle which suit is trump.",
       blocks: [
-        // ONE block, not one per variant. The first two steps are word-for-word
-        // identical in both rulesets and are authored once; the four after them
-        // are scoped, each carrying its own note about that specific step's
-        // counterpart. Bitola and Croatian items alternate so that filtering
-        // either variant leaves a correctly ordered six-step sequence.
         {
           kind: "steps",
           items: [

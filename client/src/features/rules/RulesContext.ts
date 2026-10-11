@@ -5,13 +5,7 @@ import type { Variant } from "@/shared/types/matchTypes";
 import type { RulesContent } from "./content/types";
 
 /**
- * Localized, render-ready rules content plus the variant tab that is currently
- * active, threaded to every rules sub-component (chapters, card ladders,
- * declarations grid) so a language swap OR a tab flip lands in one place.
- *
- * The active variant rides this existing context rather than a prop chain
- * through `Chapter` -> `RuleBlock`: only the leaf block renderer needs it, and
- * every level in between would otherwise have to forward a prop it never reads.
+ * Localized rules content plus the active variant tab, shared by every rules sub-component.
  */
 type RulesContextValue = {
   content: RulesContent;

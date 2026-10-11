@@ -12,12 +12,6 @@ function hand(ids: string[]): Card[] {
   return ids.map(card);
 }
 
-// Compact "type|value|card ids" fingerprint of a detected meld set, purely to
-// keep the expectations below readable. This detector is deterministic — a
-// literal suit order for sequences, insertion-ordered rank grouping for
-// four-of-a-kinds — so meld order and within-meld card order are both part of
-// the contract: the prompt and the reveal render rows and cards in array order.
-// Nothing here sorts, so a reordering regression fails.
 function summarize(decls: { type: string; value: number; cards: Card[] }[]): string[] {
   return decls.map(
     (d) => `${d.type}|${d.value}|${d.cards.map((c) => `${c.rank}${c.suit}`).join(",")}`,
@@ -64,7 +58,6 @@ describe("detectDeclarations", () => {
 
   describe("Bitola dedup", () => {
     it("drops tierce sharing a card with higher-value FoaK", () => {
-      // 7S-8S-9S tierce (20) + 4x9 FoaK (150) — share 9S
       const decls = detectDeclarations(
         hand(["7S", "8S", "9S", "9D", "9H", "9C", "JD", "QC"]),
         false,
@@ -75,7 +68,6 @@ describe("detectDeclarations", () => {
     });
 
     it("drops quarte sharing a card with higher-value FoaK of jacks", () => {
-      // 9S-TS-JS-QS quarte (50) + 4xJ FoaK (200) — share JS
       const decls = detectDeclarations(
         hand(["9S", "TS", "JS", "QS", "JH", "JD", "JC", "7C"]),
         false,
@@ -94,7 +86,6 @@ describe("detectDeclarations", () => {
     });
 
     it("keeps non-overlapping tierce and FoaK", () => {
-      // 7S-8S-9S tierce + 4xJ FoaK. Spade run stops at 9 (9→J not consecutive).
       const decls = detectDeclarations(
         hand(["7S", "8S", "9S", "JS", "JH", "JD", "JC", "7C"]),
         false,
@@ -103,7 +94,6 @@ describe("detectDeclarations", () => {
     });
 
     it("quarte subsumes tierce in detection — single declaration emitted", () => {
-      // Pre-dedup sanity: a 4-card run produces only the maximal quarte.
       const decls = detectDeclarations(
         hand(["JD", "QD", "KD", "AD", "7S", "8S", "7C", "8C"]),
         false,
@@ -114,9 +104,6 @@ describe("detectDeclarations", () => {
     });
 
     it("equal-value clash keeps the carré, not the quinte", () => {
-      // quinte TS-JS-QS-KS-AS (100) + carré of Tens (100) — share TS. The tie
-      // resolves the way declarationBeats rule 2 would: four-of-a-kind wins, so
-      // the survivor is the same meld the server's clash comparison prefers.
       const decls = detectDeclarations(
         hand(["TS", "JS", "QS", "KS", "AS", "TH", "TD", "TC"]),
         false,
@@ -133,14 +120,10 @@ describe("detectDeclarations", () => {
         hand(["9S", "TS", "JS", "QS", "JH", "JD", "JC", "7C"]),
         true,
       );
-      // Order is part of the contract: sequences before four-of-a-kinds, and
-      // each sequence's cards in natural rank order.
       expect(summarize(decls)).toEqual([
         "sequence|50|9S,TS,JS,QS",
         "four_of_a_kind|200|JS,JH,JD,JC",
       ]);
-      // Surviving melds stay separate with their own values; the displayed
-      // total is their plain sum.
       expect(decls.reduce((acc, d) => acc + d.value, 0)).toBe(250);
     });
 
@@ -166,9 +149,6 @@ describe("detectDeclarations", () => {
     });
 
     it("returns exactly the Bitola result on an overlap-free hand", () => {
-      // A genuine deep-equality check on the returned arrays, not a normalized
-      // fingerprint: on an overlap-free hand the two configs must agree down to
-      // meld order, card order and every field.
       const cards = ["7S", "8S", "9S", "JS", "JH", "JD", "JC", "7C"];
       const withOverlap = detectDeclarations(hand(cards), true);
       const withDedup = detectDeclarations(hand(cards), false);

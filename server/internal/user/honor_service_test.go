@@ -23,9 +23,6 @@ type fakeHonorRepo struct {
 	resetCalledFor uint
 	resetErr       error
 
-	// Story 9.8: rows returned by FindManyByIDs for HonorForUsers, plus the ids
-	// it was asked for and a call counter (so "empty input does no DB round-trip"
-	// is provable).
 	rows        []User
 	findIDs     [][]uint
 	findCalls   int
@@ -89,11 +86,9 @@ func TestHonorService_ApplyHonorEvents_TranslatesBothDirections(t *testing.T) {
 	}, now)
 	require.NoError(t, err)
 
-	// Inbound translation reached the repo intact.
 	assert.Equal(t, map[uint]HonorEvent{7: {Abandoned: false}, 9: {Abandoned: true}}, repo.gotEvents)
 	assert.Equal(t, now, repo.gotNow)
 
-	// Outbound translation preserves every field.
 	assert.Equal(t, match.HonorSnapshot{
 		Score: 96, Tier: HonorTierExemplary, CompletedTotal: 40, AbandonedTotal: 0, IsNewPlayer: false,
 	}, out[7])
@@ -129,15 +124,9 @@ func TestHonorService_ResetHonor_DelegatesToRepo(t *testing.T) {
 	assert.Equal(t, uint(42), repo.resetCalledFor)
 }
 
-// --- HonorForUsers (Story 9.8) --------------------------------------------
-
-// HonorForUsers is the READ path Story 9.8's room gate goes through. The thing it
-// must never do is hand back users.honor_score: that column is the lagging
-// filter-only snapshot, and a decayed score moves with wall-clock time even when
-// nothing is written. Every row goes through NewHonorSnapshot instead.
+// TestHonorService_HonorForUsers_RecomputesRatherThanReadingTheSnapshotColumn checks
+// the score is recomputed from weights, never read from honor_score.
 func TestHonorService_HonorForUsers_RecomputesRatherThanReadingTheSnapshotColumn(t *testing.T) {
-	// A flawless veteran whose stored snapshot column is deliberately WRONG (5).
-	// The recomputed value must win: 100*(20+4)/(20+4+0+1) = 2400/25 = 96.
 	repo := &fakeHonorRepo{rows: []User{{
 		ID:                   7,
 		HonorCompletedWeight: 20,
@@ -161,10 +150,8 @@ func TestHonorService_HonorForUsers_RecomputesRatherThanReadingTheSnapshotColumn
 	assert.Equal(t, [][]uint{{7}}, repo.findIDs)
 }
 
-// The New Player flag the gate reads counts EXPERIENCE (completed + abandoned),
-// not successes — the floor 9.7's review moved twice. A 0-completed /
-// 20-abandoned account is NOT a New Player, and its real score is what the gate
-// sees: 100*(0+4)/(0+4+4*20+1) = 400/85 = 5.
+// TestHonorForUsers_NewPlayerFloorCountsExperienceNotSuccesses checks the New Player
+// floor counts completed plus abandoned matches.
 func TestHonorForUsers_NewPlayerFloorCountsExperienceNotSuccesses(t *testing.T) {
 	repo := &fakeHonorRepo{rows: []User{
 		{ID: 1, HonorCompletedWeight: 0, HonorAbandonedWeight: 20, HonorCompletedTotal: 0, HonorAbandonedTotal: 20},
@@ -186,7 +173,7 @@ func TestHonorForUsers_NewPlayerFloorCountsExperienceNotSuccesses(t *testing.T) 
 // One `now` for the whole batch, so two seats checked in the same request cannot
 // be decayed to different instants.
 func TestHonorForUsers_StampsOneClockForTheWholeBatch(t *testing.T) {
-	old := time.Now().UTC().Add(-90 * 24 * time.Hour) // exactly one half-life ago
+	old := time.Now().UTC().Add(-90 * 24 * time.Hour)
 	repo := &fakeHonorRepo{rows: []User{
 		{ID: 1, HonorCompletedWeight: 8, HonorDecayedAt: &old, HonorCompletedTotal: 8},
 		{ID: 2, HonorCompletedWeight: 8, HonorDecayedAt: &old, HonorCompletedTotal: 8},
@@ -196,7 +183,6 @@ func TestHonorForUsers_StampsOneClockForTheWholeBatch(t *testing.T) {
 	out, err := svc.HonorForUsers([]uint{1, 2})
 	require.NoError(t, err)
 	assert.Equal(t, out[1].Score, out[2].Score, "identical rows must decay to an identical score")
-	// One half-life halves the weight: 8 -> ~4, so 100*(4+4)/(4+4+0+1) = 89.
 	assert.Equal(t, 89, out[1].Score)
 }
 

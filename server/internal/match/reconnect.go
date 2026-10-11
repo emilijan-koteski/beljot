@@ -8,17 +8,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// recomputeEarliestReconnectExpiryLocked scans gs.PlayerReconnectExpiresAt and
-// updates the legacy single-pointer fields (DisconnectedSeat +
-// ReconnectExpiresAt) to track whichever seat's window closes soonest. Must
-// be called under session.mu.Lock() after any change to the per-seat array.
-//
-// The pre-Story 7 "single timer" data model only carried one expiry; the
-// per-seat array was added so concurrent disconnects each get their own
-// `reconnectWindowSec`. To keep the wire shape stable for older clients we
-// keep DisconnectedSeat / ReconnectExpiresAt as the *earliest* derivation —
-// new clients can compute richer behaviour from PlayerReconnectExpiresAt
-// directly.
+// recomputeEarliestReconnectExpiryLocked points DisconnectedSeat and
+// ReconnectExpiresAt at the seat whose window closes soonest. Call under session.mu.
 func recomputeEarliestReconnectExpiryLocked(gs *game.GameState) {
 	earliestSeat := -1
 	var earliest *time.Time
@@ -36,20 +27,11 @@ func recomputeEarliestReconnectExpiryLocked(gs *game.GameState) {
 	gs.ReconnectExpiresAt = earliest
 }
 
-// startSeatReconnectTimerLocked arms a per-seat abandon timer that fires after
-// `session.reconnectWindowSec`. Must be called under session.mu.Lock().
-//
-// Each seat owns its own timer + generation counter so concurrent disconnects
-// don't share a clock — Player B dropping mid-Player-A's window gets the full
-// `reconnectWindowSec` from B's drop, regardless of how much time A had left.
-// The hub abandons the match the moment ANY seat's timer fires.
+// startSeatReconnectTimerLocked arms this seat's own abandon timer for
+// reconnectWindowSec. Call under session.mu.
 func (m *Manager) startSeatReconnectTimerLocked(session *LiveMatch, seat int) {
-	session.cancelSeatReconnectTimer(seat) // bumps generation + nils any prior timer
+	session.cancelSeatReconnectTimer(seat)
 	gen := session.seatReconnectGenerations[seat]
-	// expiryGrace: clients render ReconnectExpiresAt and their ring reaches 0
-	// exactly at the window's end — abandon a beat later so nobody watches the
-	// match die while their countdown still shows time (same contract as the
-	// per-move turn timer).
 	session.seatReconnectTimers[seat] = time.AfterFunc(
 		time.Duration(session.reconnectWindowSec)*time.Second+expiryGrace,
 		func() {
@@ -66,7 +48,7 @@ func (m *Manager) HandleDisconnect(userID uint) {
 	roomID, ok := m.userToRoom[userID]
 	if !ok {
 		m.mu.RUnlock()
-		return // Not in a game session — lobby disconnect, no game impact
+		return
 	}
 	session, ok := m.sessions[roomID]
 	m.mu.RUnlock()
@@ -82,38 +64,16 @@ func (m *Manager) HandleDisconnect(userID uint) {
 
 	gs := session.gameState
 
-	// [F3] Only handle disconnect during stable player-facing phases (AC1).
-	// PhaseDisconnected is handled separately below (concurrent disconnect path).
-	// PhaseHandComplete (the score-reveal pause) is included: a drop there must
-	// pause the table — otherwise the seat stays Connected=true and the
-	// allConnectedReady check waits the full auto-continue window for an
-	// acknowledgement that can never arrive, jamming the table (seen when a
-	// mobile client's socket drops during the pause).
-	// PhaseDeclaring (the dedicated declaration phase) is included for the same
-	// reason PhaseHandComplete is: the phase closes once every CONNECTED seat has
-	// answered, so a seat that stays marked Connected while its socket is gone
-	// makes that gate wait out the full window for an answer that can never
-	// arrive — the same jam the score-reveal pause hits.
 	switch gs.Phase {
 	case game.PhasePlaying, game.PhaseBidding, game.PhaseDeclaring, game.PhasePaused, game.PhaseHandComplete:
-		// These are valid phases for disconnect handling — proceed
 	case game.PhaseDisconnected:
-		// Concurrent disconnect: another player's reconnect window is already
-		// active. The data model tracks only one DisconnectedSeat / one reconnect
-		// timer, so we cannot start a second independent window — but we MUST
-		// mark this player's Connected=false and broadcast the event, otherwise
-		// the server keeps treating them as present. If the first player
-		// reconnects, HandleReconnect detects the still-disconnected seat and
-		// chains a fresh disconnect transition for them.
 		m.handleConcurrentDisconnectLocked(session, gs, userID)
 		return
 	default:
-		// Transient phases (dealing, trick_resolving, hand_scoring, match_end) — skip
 		session.mu.Unlock()
 		return
 	}
 
-	// Find the seat index for the disconnected user
 	seat := -1
 	for i, uid := range session.playerIDs {
 		if uid == userID {
@@ -128,12 +88,6 @@ func (m *Manager) HandleDisconnect(userID uint) {
 
 	slog.Info("session: player disconnected", "roomID", roomID, "userID", userID, "seat", seat)
 
-	// Story 8.2: clear pending surrender proposal if the proposer or the
-	// proposer's partner is disconnecting — partner can no longer act on the
-	// prompt while in PhaseDisconnected, so leaving the pointer set would
-	// strand the partner's UI. Capture the proposer seat for a follow-up
-	// event:surrender_declined broadcast so all four clients drop the
-	// prompt/banner. The proposer's SurrenderUsed flag stays consumed.
 	clearedSurrenderProposer := -1
 	if gs.SurrenderProposerSeat != nil {
 		proposer := *gs.SurrenderProposerSeat
@@ -144,14 +98,10 @@ func (m *Manager) HandleDisconnect(userID uint) {
 		}
 	}
 
-	// [F5] Track whether we auto-cleared a pause — if so, TurnTimeRemaining
-	// is already preserved from the original pause and should not be overwritten.
 	pauseWasAutoCleared := false
 
-	// Auto-clear disconnected player's active pause (fixes D54)
 	if gs.PausedPlayers[seat] {
 		gs.PausedPlayers[seat] = false
-		// If game was paused and no other pauses remain, restore previous phase
 		anyPaused := false
 		for _, p := range gs.PausedPlayers {
 			if p {
@@ -166,16 +116,9 @@ func (m *Manager) HandleDisconnect(userID uint) {
 		}
 	}
 
-	// Mark player as disconnected
 	gs.Players[seat].Connected = false
 
-	// [F4] Cancel turn timer (bumps timerGeneration to invalidate any in-flight
-	// stale callback — generation bump is now implicit in cancelTurnTimer).
-	// Capture remaining time (same pattern as pause).
 	session.cancelTurnTimer()
-	// [F5] Only capture TurnTimeRemaining from TurnExpiresAt if we didn't just auto-clear
-	// a pause — in the pause case, TurnTimeRemaining was already stored by the original
-	// pause action and TurnExpiresAt is nil, so we should keep the existing value.
 	if !pauseWasAutoCleared {
 		if gs.TurnExpiresAt != nil {
 			remaining := time.Until(*gs.TurnExpiresAt)
@@ -186,32 +129,19 @@ func (m *Manager) HandleDisconnect(userID uint) {
 		gs.TurnExpiresAt = nil
 	}
 
-	// [F2] Transition to disconnected phase — when current phase is PhasePaused
-	// (other players still have active pauses), save the pre-pause phase, not PhasePaused itself.
 	if gs.Phase == game.PhasePaused {
-		// gs.PreviousPhase already holds the pre-pause phase — keep it as the restore target
-		// (don't overwrite with PhasePaused)
 	} else {
 		gs.PreviousPhase = gs.Phase
 	}
 	gs.Phase = game.PhaseDisconnected
-	// Both Phase writes above (the pause auto-clear restore and this one) bypass
-	// ApplyAction, so the derived wire flags must be recomputed by hand.
 	game.RefreshDerivedFlags(gs)
 
-	// Per-seat reconnect window: this seat gets the full `reconnectWindowSec`
-	// from now, independent of any other seat's clock. Earliest-expiry view
-	// (gs.DisconnectedSeat / gs.ReconnectExpiresAt) is recomputed afterwards
-	// so the legacy single-timer wire fields still reflect the soonest abandon.
 	reconnectExpiry := time.Now().Add(time.Duration(session.reconnectWindowSec) * time.Second)
 	gs.PlayerReconnectExpiresAt[seat] = &reconnectExpiry
 	recomputeEarliestReconnectExpiryLocked(gs)
 
-	// Start this seat's per-seat abandon timer.
 	m.startSeatReconnectTimerLocked(session, seat)
 
-	// [F1] Capture immutable values and build messages BEFORE unlocking to avoid data races.
-	// The gs pointer aliases session.gameState — concurrent HandleAction could mutate after unlock.
 	playerIDs := session.playerIDs
 	username := gs.Players[seat].Username
 
@@ -222,8 +152,6 @@ func (m *Manager) HandleDisconnect(userID uint) {
 	}
 
 	disconnectMsg := buildMessage(ws.EventPlayerDisconnected, disconnectPayload)
-	// Per-seat projected frames for the remaining seats only — the disconnected
-	// seat gets nothing (it has no socket, and its frame would go stale anyway).
 	stateFrames := buildStateFrames(playerIDs, gs, seat)
 
 	var surrenderDeclinedMsg []byte
@@ -236,8 +164,6 @@ func (m *Manager) HandleDisconnect(userID uint) {
 
 	session.mu.Unlock()
 
-	// Broadcast to the remaining human players (exclude the disconnected
-	// player; bot seats have no sockets).
 	remainingPlayers := make([]uint, 0, 3)
 	for i, uid := range playerIDs {
 		if i != seat && uid != 0 {
@@ -245,22 +171,14 @@ func (m *Manager) HandleDisconnect(userID uint) {
 		}
 	}
 	if surrenderDeclinedMsg != nil {
-		// Drop the pending prompt/banner before disconnect overlay takes over.
 		m.hub.BroadcastToUsers(remainingPlayers, surrenderDeclinedMsg)
 	}
 	m.hub.BroadcastToUsers(remainingPlayers, disconnectMsg)
 	m.hub.SendFrames(stateFrames)
 }
 
-// handleConcurrentDisconnectLocked is called when another player disconnects
-// while at least one seat's reconnect window is already active. session.mu
-// MUST be locked on entry; this function unlocks it before returning.
-//
-// Each disconnect gets its own per-seat window (`reconnectWindowSec` from the
-// drop time) and its own per-seat abandon timer — this seat's clock is
-// independent of any seat that dropped earlier. The earliest-expiry view in
-// gs.DisconnectedSeat / gs.ReconnectExpiresAt is recomputed afterwards so
-// the dialog's "soonest abandon" pointer stays correct.
+// handleConcurrentDisconnectLocked gives a seat that drops while another window is
+// running its own reconnect window. Called with session.mu locked; unlocks it.
 func (m *Manager) handleConcurrentDisconnectLocked(session *LiveMatch, gs *game.GameState, userID uint) {
 	seat := -1
 	for i, uid := range session.playerIDs {
@@ -269,7 +187,6 @@ func (m *Manager) handleConcurrentDisconnectLocked(session *LiveMatch, gs *game.
 			break
 		}
 	}
-	// Unknown user, or the seat is already marked disconnected — nothing to do.
 	if seat == -1 || !gs.Players[seat].Connected {
 		session.mu.Unlock()
 		return
@@ -283,10 +200,6 @@ func (m *Manager) handleConcurrentDisconnectLocked(session *LiveMatch, gs *game.
 	gs.Players[seat].Connected = false
 	username := gs.Players[seat].Username
 
-	// Fresh per-seat window for the new drop — does NOT inherit the existing
-	// earliest expiry. Without this, a player who dropped 60 s after the
-	// first one would only get 60 s of window, even though the contract is
-	// `reconnectWindowSec` from their own drop.
 	reconnectExpiry := time.Now().Add(time.Duration(session.reconnectWindowSec) * time.Second)
 	gs.PlayerReconnectExpiresAt[seat] = &reconnectExpiry
 	recomputeEarliestReconnectExpiryLocked(gs)
@@ -299,12 +212,9 @@ func (m *Manager) handleConcurrentDisconnectLocked(session *LiveMatch, gs *game.
 	}
 	disconnectMsg := buildMessage(ws.EventPlayerDisconnected, disconnectPayload)
 	playerIDs := session.playerIDs
-	// Per-seat projected frames for the remaining seats only.
 	stateFrames := buildStateFrames(playerIDs, gs, seat)
 	session.mu.Unlock()
 
-	// Broadcast to the remaining human players (exclude the just-disconnected
-	// player; bot seats have no sockets).
 	remaining := make([]uint, 0, 3)
 	for i, uid := range playerIDs {
 		if i != seat && uid != 0 {
@@ -325,16 +235,14 @@ func hasActivePause(p [4]bool) bool {
 	return false
 }
 
-// HandleReconnect is called by the hub when a client registers (connects or reconnects).
-// If the user is in an active game session that is in PhaseDisconnected, this restores
-// the game state, cancels the reconnect timer, and broadcasts the reconnection to all players.
-// Safe to call for ALL connection registrations — returns immediately for non-game users.
+// HandleReconnect restores a disconnected player's seat in an active session and
+// broadcasts the reconnection. It returns immediately for users not in a game.
 func (m *Manager) HandleReconnect(userID uint) {
 	m.mu.RLock()
 	roomID, ok := m.userToRoom[userID]
 	if !ok {
 		m.mu.RUnlock()
-		return // Not in a game session — lobby connection, no game impact
+		return
 	}
 	session, ok := m.sessions[roomID]
 	m.mu.RUnlock()
@@ -350,16 +258,11 @@ func (m *Manager) HandleReconnect(userID uint) {
 
 	gs := session.gameState
 
-	// Only handle reconnection during PhaseDisconnected
 	if gs.Phase != game.PhaseDisconnected {
 		session.mu.Unlock()
 		return
 	}
 
-	// Find the seat for the reconnecting user. ConnectHandler fires for ALL
-	// connections, including the still-online seats whose WS just authenticated
-	// for the first time, so we silently no-op for users who aren't in this
-	// session or whose seat is already marked Connected.
 	mySeat := -1
 	for i, uid := range session.playerIDs {
 		if uid == userID {
@@ -369,24 +272,13 @@ func (m *Manager) HandleReconnect(userID uint) {
 	}
 	if mySeat == -1 {
 		session.mu.Unlock()
-		return // user is not a player in this session
+		return
 	}
 	if gs.Players[mySeat].Connected {
 		session.mu.Unlock()
-		return // already marked online — no-op (e.g. WS replaced cleanly)
+		return
 	}
 
-	// Validate this seat's own reconnect window has not expired. Each seat
-	// owns its own window now, so we check `PlayerReconnectExpiresAt[mySeat]`
-	// rather than the earliest-expiry derivation. A seat whose own window
-	// fired already has its abandon path in flight — guard against a racy
-	// rejoin landing between fire and timeout-handler-acquires-lock.
-	//
-	// The abandon timer fires expiryGrace AFTER the advertised deadline, so
-	// honor the same cushion here: a reconnect landing inside the grace is
-	// late-but-honest input the contract promises to accept, not a stale
-	// rejoin (the generation check in handleSeatReconnectTimeout keeps the
-	// race-with-abandon path safe either way).
 	if gs.PlayerReconnectExpiresAt[mySeat] == nil ||
 		!time.Now().Before(gs.PlayerReconnectExpiresAt[mySeat].Add(expiryGrace)) {
 		session.mu.Unlock()
@@ -396,10 +288,6 @@ func (m *Manager) HandleReconnect(userID uint) {
 
 	slog.Info("session: player reconnected", "roomID", roomID, "userID", userID, "seat", mySeat)
 
-	// Restore player state for this seat: stop their timer, clear their
-	// expiry, recompute the earliest-expiry derivation. The phase only
-	// reverts when ALL seats are back online — if other seats are still
-	// offline, their timers keep running and we stay in PhaseDisconnected.
 	gs.Players[mySeat].Connected = true
 	session.cancelSeatReconnectTimer(mySeat)
 	gs.PlayerReconnectExpiresAt[mySeat] = nil
@@ -414,31 +302,16 @@ func (m *Manager) HandleReconnect(userID uint) {
 	}
 
 	if allConnected {
-		// Last reconnect — restore the pre-disconnect phase + (where
-		// applicable) re-arm the per-move turn timer. Mirrors the old
-		// "chain==nil && all online" branch.
 		gs.Phase = gs.PreviousPhase
 		gs.PreviousPhase = ""
 		if hasActivePause(gs.PausedPlayers) {
-			// Active pauses from other players survived. Restore PhasePaused
-			// (preserve PreviousPhase as the just-restored Playing/Bidding)
-			// and skip the timer re-arm. Unpause will recompute
-			// TurnExpiresAt from TurnTimeRemaining when the last pause
-			// clears.
 			gs.PreviousPhase = gs.Phase
 			gs.Phase = game.PhasePaused
 			if gs.PreviousPhase == game.PhaseDeclaring {
-				// The declaration phase carries no TurnTimeRemaining for unpause
-				// to recompute from — its only clock is the session's fixed
-				// window. Seed it here so the resume has a deadline to fall
-				// through to, rather than a zero time that fires instantly on
-				// the first answer. (Unreachable while pause is refused inside
-				// the phase; kept so the invariant does not depend on that.)
 				session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
 			}
 		} else if session.timerStyle == "per-move" &&
 			(gs.Phase == game.PhasePlaying || gs.Phase == game.PhaseBidding) {
-			// Restore turn timer (same pattern as unpause timer resume in HandleAction).
 			const minResumeMs int64 = 3000
 			remaining := time.Duration(gs.TurnTimeRemaining) * time.Millisecond
 			if gs.TurnTimeRemaining > 0 && gs.TurnTimeRemaining < minResumeMs {
@@ -449,19 +322,9 @@ func (m *Manager) HandleReconnect(userID uint) {
 			expiry := time.Now().Add(remaining)
 			gs.TurnExpiresAt = &expiry
 			gs.TurnTimeRemaining = 0
-			// cancelTurnTimer bumps timerGeneration; armTurnTimerLocked
-			// captures the post-cancel generation and adds expiryGrace, so the
-			// restored turn keeps the players-see-0-first contract too.
 			session.cancelTurnTimer()
 			m.armTurnTimerLocked(session, remaining, gs.ActivePlayerSeat)
 		} else if gs.Phase == game.PhaseDeclaring {
-			// Restored into the dedicated declaration phase. The disconnect
-			// interrupted a fixed window, so give the table a FRESH one rather
-			// than resuming a deadline that may already have elapsed during the
-			// outage — the returning player needs time to read their own melds.
-			// Their answer, if they gave one, survives on
-			// PlayerState.DeclarationAnswered, so this is not a second chance.
-			// Applies regardless of timer style: the phase has no per-move clock.
 			gs.TurnExpiresAt = nil
 			session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
 			session.cancelTurnTimer()
@@ -470,11 +333,6 @@ func (m *Manager) HandleReconnect(userID uint) {
 				m.handleDeclarationTimeout(session, gen)
 			})
 		} else if gs.Phase == game.PhaseHandComplete {
-			// Restored into the score-reveal pause. The disconnect interrupted the
-			// pause, so give the returning player a FRESH auto-continue window to
-			// read the score (rather than resuming a deadline that may have already
-			// elapsed during the outage), and re-arm the timer. Applies regardless
-			// of timer style.
 			gs.TurnExpiresAt = nil
 			session.handCompleteExpiresAt = time.Now().Add(handCompleteAutoContinue)
 			session.cancelTurnTimer()
@@ -485,14 +343,8 @@ func (m *Manager) HandleReconnect(userID uint) {
 		}
 	}
 
-	// The phase restore above is a direct write that bypasses ApplyAction. Without
-	// this the flags still describe the phase the match was PARKED in: a pause
-	// taken on a forced-pick bidding turn recomputes MustPickTrump to false under
-	// PhasePaused, and restoring PhaseBidding here would ship that false to every
-	// client — offering a Pass control the engine refuses.
 	game.RefreshDerivedFlags(gs)
 
-	// Build messages BEFORE unlocking (data-race prevention — same pattern as HandleDisconnect)
 	playerIDs := session.playerIDs
 	reconnectPayload := ws.PlayerReconnectedPayload{PlayerSeat: mySeat}
 	reconnectMsg := buildMessage(ws.EventPlayerReconnected, reconnectPayload)
@@ -500,27 +352,15 @@ func (m *Manager) HandleReconnect(userID uint) {
 
 	session.mu.Unlock()
 
-	// Broadcast to all human players (reconnecting player needs the state too)
 	humanIDs := humanUserIDs(playerIDs)
 	m.hub.BroadcastToUsers(humanIDs, reconnectMsg)
 	m.hub.SendFrames(stateFrames)
 
-	// The restored phase may put a bot back on the clock (its pending timer
-	// no-oped during the disconnect pause).
 	m.maybeScheduleBotAction(session)
 }
 
-// SyncStateOnConnect pushes the current authoritative match state directly to
-// a user who just (re)registered a WebSocket while being part of an active
-// session. HandleReconnect only restores seats that were marked disconnected —
-// when the hub REPLACES a still-registered socket (the user reconnects before
-// the dead connection is reaped by the ping loop) no disconnect handler ever
-// fires, the seat is still Connected=true, and HandleReconnect no-ops. There
-// is no client→server "request state" message, so without this push the
-// refreshed client would sit on the reconnect splash with no way to recover
-// until some unrelated event happened to broadcast. Call AFTER HandleReconnect
-// so the snapshot reflects any phase restore. Safe for every registration:
-// no-ops for users outside a session.
+// SyncStateOnConnect pushes the current match state to a user who just registered
+// a WebSocket while in a session. Call after HandleReconnect.
 func (m *Manager) SyncStateOnConnect(userID uint) {
 	m.mu.RLock()
 	roomID, ok := m.userToRoom[userID]
@@ -539,9 +379,6 @@ func (m *Manager) SyncStateOnConnect(userID uint) {
 		session.mu.RUnlock()
 		return
 	}
-	// Resolve the user's seat first: the snapshot is projected FOR that seat,
-	// so a user who somehow isn't in playerIDs gets nothing rather than an
-	// unmasked (or wrongly masked) frame.
 	mySeat := -1
 	for seat, uid := range session.playerIDs {
 		if uid == userID {
@@ -553,9 +390,6 @@ func (m *Manager) SyncStateOnConnect(userID uint) {
 		session.mu.RUnlock()
 		return
 	}
-	// A single-frame batch, not SendToUser: SendFrames is the ONLY path by
-	// which match_state reaches the wire, so the spies can hard-fail any state
-	// payload that arrives through the unprojected primitives.
 	stateFrames := []ws.UserFrame{{
 		UserID: userID,
 		Msg:    buildMessage(ws.EventMatchState, game.ProjectForSeat(session.gameState, mySeat)),
@@ -565,16 +399,11 @@ func (m *Manager) SyncStateOnConnect(userID uint) {
 	m.hub.SendFrames(stateFrames)
 }
 
-// handleSeatReconnectTimeout is called when an individual seat's reconnect
-// countdown fires. It transitions the game to PhaseMatchEnd (abandoned),
-// persists the match record, broadcasts event:match_abandoned to all players,
-// and cleans up the session. Called once per per-seat timer — generation
-// staleness check ensures a cancelled timer's queued callback is a no-op.
+// handleSeatReconnectTimeout abandons the match when a seat's reconnect window
+// expires, ignoring callbacks from stale timer generations.
 func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, generation uint64) {
 	session.mu.Lock()
 
-	// Guard: session closed, seat out of range, or generation stale
-	// (this seat reconnected and bumped the counter via cancelSeatReconnectTimer).
 	if session.closed || seat < 0 || seat >= 4 ||
 		session.seatReconnectGenerations[seat] != generation {
 		session.mu.Unlock()
@@ -583,8 +412,6 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 
 	gs := session.gameState
 
-	// Race guard: the seat's timer fired but they reconnected just before we
-	// took the lock. Belt-and-braces with the generation check above.
 	if gs.Players[seat].Connected {
 		session.mu.Unlock()
 		return
@@ -593,28 +420,17 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	abandonedSeat := seat
 	abandonedPlayerID := session.playerIDs[abandonedSeat]
 
-	// Transition game state to match_end (abandoned)
 	gs.Phase = game.PhaseMatchEnd
-	// WinnerTeam stays nil — no winner for abandoned match
-	// Clear disconnect fields (singletons + per-seat array — every other
-	// seat's timer also gets cancelled below).
 	gs.DisconnectedSeat = -1
 	gs.ReconnectExpiresAt = nil
 	for i := 0; i < 4; i++ {
 		gs.PlayerReconnectExpiresAt[i] = nil
 	}
-	// Story 8.2: clear any surrender proposal that survived from before the
-	// disconnect. If HandleDisconnect already cleared it (proposer or partner
-	// was the disconnecting seat) this is a no-op; otherwise (proposer and
-	// partner both stayed connected) we still must drop it before the
-	// abandoned overlay mounts so the SurrenderPrompt doesn't ride along.
 	gs.SurrenderProposerSeat = nil
 
-	// Cancel any active timers (every per-seat reconnect timer + the turn timer).
 	session.cancelAllReconnectTimers()
 	session.cancelTurnTimer()
 
-	// Capture data for broadcast BEFORE unlocking (data race prevention)
 	playerIDs := session.playerIDs
 	roomID := session.roomID
 	startedAt := session.startedAt
@@ -624,31 +440,13 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	variant := string(gs.Variant)
 	matchMode := gs.MatchMode
 	var botSeats [4]bool
-	// Presence snapshot for honor (Story 9.7 + code review 2026-07-29): captured
-	// here under the session lock, because by the time recordHonor runs the lock
-	// is released. Seat `abandonedSeat` is false by definition (that is why its
-	// timer fired); any OTHER false seat is a player who was not at the table when
-	// the match ended, and is charged an abandonment rather than credited.
-	//
-	// The implication runs ONE WAY ONLY: false reliably means absent, but true
-	// does NOT reliably mean present. HandleDisconnect maintains Connected for
-	// drops observed in four phases (reconnect.go:92-109); a socket reaped during
-	// a transient phase leaves the seat reading true for the rest of the match.
-	// So this gate fails OPEN — it under-charges, never over-charges. Pre-existing
-	// disconnect-tracking gap, recorded in deferred-work.md.
 	var connected [4]bool
 	for i := range gs.Players {
 		botSeats[i] = gs.Players[i].IsBot
 		connected[i] = gs.Players[i].Connected
 	}
-	// Snapshot any hands scored before the abandonment so they persist alongside
-	// the match row. Empty when abandonment fires before hand 1 completed.
 	handsCopy := make([]HandResult, len(session.handResults))
 	copy(handsCopy, session.handResults)
-	// Story 13.4: read under the session lock for the SP outcome below.
-	// gs.WonByInstantWin is false on this path in practice — an instant win ends
-	// the match, so no reconnect window can expire afterwards — but it is read
-	// rather than assumed so the two finalizers build the outcome identically.
 	wonByInstantWin := gs.WonByInstantWin
 
 	abandonedPayload := ws.MatchAbandonedPayload{
@@ -658,64 +456,17 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		MatchDurationSec:  int(time.Since(startedAt).Seconds()),
 	}
 	abandonedMsg := buildMessage(ws.EventMatchAbandoned, abandonedPayload)
-	// All human seats, projected per recipient. Delivery is best-effort to
-	// sockets registered AT SEND TIME only: the abandoned seat's user has no
-	// socket (that is why their window expired) and the session is removed
-	// right after, so nothing is queued for them — a later reconnect finds no
-	// session and lands in the lobby, not on this frame.
 	stateFrames := buildStateFrames(playerIDs, gs, -1)
 
 	session.mu.Unlock()
 
-	// Story 9.2 (AC #8): the WHOLE abandoning team forfeits (both −S, no
-	// teammate refund); the winner is the NON-abandoning team. Settle against
-	// that computed winner (also persisted as the record's WinnerTeam below).
-	// No-op when coinBuyIn == 0. Deltas ride the match row below; settlement
-	// events are sent after event:match_abandoned, before the trailing
-	// event:match_state.
 	winningTeam := 1 - game.TeamForSeat(abandonedSeat)
 	deltas, settlementMsgs := m.settleMatch(roomID, playerIDs, botSeats, winningTeam, coinBuyIn)
 
-	// Story 9.5: award XP for the abandonment. The WHOLE abandoning team forfeits
-	// (0 XP); only the non-abandoning team earns (points-so-far). Pass the real
-	// abandonedSeat + the snapshotted team scores ([A,B] index order). Best-effort
-	// like settlement — a failure logs and skips the events but never blocks the
-	// broadcasts. xp_awarded is slotted after coin_settlement, before match_state.
 	xpMsgs := m.awardXP(roomID, playerIDs, botSeats, [2]int{teamAScore, teamBScore}, abandonedSeat)
 
-	// Story 9.7: record honor. Every human seat that was NOT at the table when
-	// the match ended is charged an abandonment — the seat whose window expired
-	// plus any other seat still absent inside its own window (PO decision
-	// 2026-07-29 review pass 2; see computeHonorEvents for the two rules this
-	// replaced and why). Human seats that were still CONNECTED are credited a
-	// completion — including the abandoner's own teammate, who is not punished for
-	// their partner's disconnect, unlike coins and XP which forfeit team-wide.
-	//
-	// Computed from the IN-MEMORY session snapshot above, never by reading the
-	// match row back: unlike the natural-end path, this finalizer broadcasts
-	// BEFORE it persists, so that row does not exist yet.
-	//
-	// Best-effort like settlement and XP. honor_updated is slotted after
-	// xp_awarded, before the trailing match_state.
 	honorMsgs := m.recordHonor(roomID, playerIDs, botSeats, connected, abandonedSeat)
 
-	// Story 13.4: apply Season Points. The abandoned seat takes the fixed
-	// abandonment penalty, its teammate half of what a surrender at this moment
-	// would cost, and the opponents a surrender-scored win; every other human seat
-	// is scored by its team's result whether or not it was connected. Presence
-	// (the `connected` snapshot) only feeds games_completed. The season service
-	// computes every change from the current totals it locks.
-	//
-	// winnerTeam is the same computed non-abandoning team settlement used, never
-	// re-derived. The team scores, presence array and Capot teams (handsCopy) are
-	// the snapshots taken under the session lock above.
-	//
-	// Best-effort like settlement, XP and honor. season_points_awarded is slotted
-	// after honor_updated, before the trailing match_state.
-	//
-	// finalizedAt is stamped HERE, in the finalizer, and threaded down — same
-	// reason as on the natural-end path: which season window an abandonment lands
-	// in must be decided by the moment the match ended.
 	finalizedAt := time.Now().UTC()
 	spMsgs := m.awardSeasonPoints(roomID, buildSPOutcome(spMatchFacts{
 		playerIDs:     playerIDs,
@@ -729,9 +480,6 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		abandonedSeat: abandonedSeat,
 	}), finalizedAt)
 
-	// Broadcast to every human seat still holding a registered socket — the
-	// hub drops unknown IDs, and nothing is queued for a seat that is offline
-	// at send time (the abandoned seat always is).
 	userIDs := humanUserIDs(playerIDs)
 	m.hub.BroadcastToUsers(userIDs, abandonedMsg)
 	for _, sm := range settlementMsgs {
@@ -754,26 +502,20 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		"abandonedSeat", abandonedSeat,
 	)
 
-	// Persist match record with abandoned status. Bot seats persist exactly
-	// as in the completed-match path: NULL IDs + per-seat flags.
 	ids, botFlags, hasBots := matchSeatColumns(playerIDs, botSeats)
 	matchRecord := &Match{
-		RoomID:       roomID,
-		Player1ID:    ids[0],
-		Player2ID:    ids[1],
-		Player3ID:    ids[2],
-		Player4ID:    ids[3],
-		Player1IsBot: botFlags[0],
-		Player2IsBot: botFlags[1],
-		Player3IsBot: botFlags[2],
-		Player4IsBot: botFlags[3],
-		HasBots:      hasBots,
-		TeamAScore:   teamAScore,
-		TeamBScore:   teamBScore,
-		// The real non-abandoning team — the same value settlement used above.
-		// Meaningful because AbandonedBy is set: stats/history read win/loss for
-		// the three non-abandoners off this column, gated on abandoned_by IS NOT
-		// NULL (boot-reconcile rows keep a filler 0 and stay plain "abandoned").
+		RoomID:           roomID,
+		Player1ID:        ids[0],
+		Player2ID:        ids[1],
+		Player3ID:        ids[2],
+		Player4ID:        ids[3],
+		Player1IsBot:     botFlags[0],
+		Player2IsBot:     botFlags[1],
+		Player3IsBot:     botFlags[2],
+		Player4IsBot:     botFlags[3],
+		HasBots:          hasBots,
+		TeamAScore:       teamAScore,
+		TeamBScore:       teamBScore,
 		WinnerTeam:       winningTeam,
 		Variant:          variant,
 		MatchMode:        matchMode,
@@ -794,7 +536,6 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		slog.Info("session: abandoned match persisted", "roomID", roomID, "matchID", matchRecord.ID, "hands", len(handsCopy))
 	}
 
-	// Update room status
 	if m.roomUpdater != nil {
 		if err := m.roomUpdater.UpdateRoomStatus(roomID, "completed"); err != nil {
 			slog.Error("session: failed to update room status", "roomID", roomID, "error", err)

@@ -13,9 +13,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// defaultAccessTokenTTL is the fallback access-token lifetime used by the
-// convenience GenerateAccessToken wrapper (and thus by tests). Production wiring
-// passes the configured value through GenerateAccessTokenWithTTL.
 const defaultAccessTokenTTL = 15 * time.Minute
 
 func HashPassword(password string) (string, error) {
@@ -30,15 +27,12 @@ func CheckPassword(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
-// GenerateAccessToken mints a 15-minute access JWT. It is a thin wrapper over
-// GenerateAccessTokenWithTTL kept so the many test call sites (and any caller
-// that doesn't thread config) stay unchanged.
+// GenerateAccessToken mints an access JWT with the default 15-minute lifetime.
 func GenerateAccessToken(userID uint, secret string) (string, error) {
 	return GenerateAccessTokenWithTTL(userID, secret, defaultAccessTokenTTL)
 }
 
 // GenerateAccessTokenWithTTL mints an access JWT with an explicit lifetime.
-// Claims and signing are identical to before — only the expiry is configurable.
 func GenerateAccessTokenWithTTL(userID uint, secret string, ttl time.Duration) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Subject:   strconv.FormatUint(uint64(userID), 10),
@@ -69,9 +63,8 @@ func ValidateToken(tokenString, secret string) (*jwt.RegisteredClaims, error) {
 	return claims, nil
 }
 
-// mintRefreshToken returns a URL-safe raw refresh token (for the httpOnly
-// cookie) and its SHA-256 hex hash (for storage). The raw token is never
-// persisted — only the hash is, so a DB read cannot recover a usable token.
+// mintRefreshToken returns a URL-safe raw refresh token for the cookie and its SHA-256 hex hash.
+// Only the hash is persisted, so a DB read cannot recover a usable token.
 func mintRefreshToken() (raw, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -87,9 +80,8 @@ func hashRefreshToken(raw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// newFamilyID returns a random opaque identifier for a refresh-token family
-// (one login/session lineage). 16 random bytes hex-encode to 32 chars, matching
-// the family_id column width.
+// newFamilyID returns a random identifier for a refresh-token family (one login lineage).
+// 16 random bytes hex-encode to 32 chars, matching the family_id column width.
 func newFamilyID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

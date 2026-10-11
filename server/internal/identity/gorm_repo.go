@@ -21,8 +21,6 @@ func (r *GormRepository) Create(identity *Identity) error {
 	if err := r.db.Create(identity).Error; err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			// Either unique index (provider+subject taken, or the user already
-			// has an identity for this provider) is the same conflict to callers.
 			return apperr.ErrSSOIdentityInUse
 		}
 		return err

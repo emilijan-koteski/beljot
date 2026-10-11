@@ -1,20 +1,13 @@
 import { cn } from "@/shared/lib/utils";
 
 interface XpBarProps {
-  /** Fill fraction; clamped to [0, 1] here so callers can pass raw ratios. */
   fraction: number;
-  /** Accessible label (e.g. "Level 3, 150 / 350 XP"). */
   label: string;
   className?: string;
   testId?: string;
 }
 
-/**
- * Slim lifetime-XP progress bar (Story 9.5). Presentational only — the fill is
- * cosmetic; level + totals are server-authoritative. The accent (green) fill
- * keeps it visually distinct from the gold coin pill. Exposes the standard
- * progressbar a11y role so screen readers announce the percentage.
- */
+/** Slim lifetime-XP progress bar; clamps the fraction to [0, 1] and exposes the progressbar role. */
 export function XpBar({ fraction, label, className, testId }: XpBarProps) {
   const pct = Math.round(Math.min(1, Math.max(0, fraction)) * 100);
   return (

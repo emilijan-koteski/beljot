@@ -29,8 +29,6 @@ const demotion: Omit<Props, "open" | "onClose"> = {
   progress: { spIntoStep: 90, spForNextStep: 100 },
 };
 
-// Controlled harness mirroring how the gate drives the dialog: `open` is state,
-// and onClose flips it to false (the gate clears the pending change).
 function Harness(props: Omit<Props, "open" | "onClose"> & { initialOpen?: boolean }) {
   const { initialOpen = true, ...rest } = props;
   const [open, setOpen] = useState(initialOpen);
@@ -51,12 +49,10 @@ describe("RankChangeDialog", () => {
     expect(screen.getByTestId("rank-change-rank")).toHaveTextContent("Gold 2");
     expect(screen.getByTestId("rank-change-sp")).toHaveTextContent("+40 SP this match");
     expect(screen.getByTestId("rank-change-progress")).toHaveAttribute("aria-valuenow", "34");
-    // The level-up celebration: the gold halo and a lit medallion.
     expect(screen.getByTestId("rank-change-halo")).toBeInTheDocument();
     expect(screen.getByTestId("rank-change-badge")).toHaveAttribute("data-glow", "true");
   });
 
-  // Story 13.5: a demotion never shows the rank-up celebration.
   it("announces a demotion in the same layout without the celebration", () => {
     render(<Harness {...demotion} />);
 
@@ -107,7 +103,6 @@ describe("RankChangeDialog", () => {
 
     expect(screen.getByTestId("rank-change-rank")).toHaveTextContent("Gold 2");
     expect(screen.queryByTestId("rank-change-progress")).not.toBeInTheDocument();
-    // Same box as the bar, so the centred card does not jump when it lands.
     expect(screen.getByTestId("rank-change-progress-placeholder")).toHaveAttribute(
       "aria-hidden",
       "true",

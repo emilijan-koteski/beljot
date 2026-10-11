@@ -38,9 +38,9 @@ describe("useLobbyReturn", () => {
 
   it("pops back when the lobby entry sits directly beneath the current one", () => {
     setHistoryIdx(3);
-    renderHook(() => useMarkLobbyRoot()); // lobby mounted at idx 3
+    renderHook(() => useMarkLobbyRoot());
 
-    setHistoryIdx(4); // pushed one entry above the lobby (room / match / profile)
+    setHistoryIdx(4);
     const { result } = renderHook(() => useLobbyReturn());
     result.current();
 
@@ -50,9 +50,9 @@ describe("useLobbyReturn", () => {
 
   it("replaces to /lobby when the entry beneath is not the lobby", () => {
     setHistoryIdx(1);
-    renderHook(() => useMarkLobbyRoot()); // lobby recorded at idx 1
+    renderHook(() => useMarkLobbyRoot());
 
-    setHistoryIdx(5); // several entries above — the one beneath is unknown
+    setHistoryIdx(5);
     const { result } = renderHook(() => useLobbyReturn());
     result.current();
 
@@ -70,7 +70,7 @@ describe("useLobbyReturn", () => {
 
   it("replaces to /lobby when the current history index is missing", () => {
     sessionStorage.setItem("beljot:lobby-idx", "3");
-    setHistoryIdx(null); // history.state carries no idx (fresh document)
+    setHistoryIdx(null);
 
     const { result } = renderHook(() => useLobbyReturn());
     result.current();
@@ -92,7 +92,7 @@ describe("useLobbyReturn", () => {
     setHistoryIdx(3);
     expect(canPopToLobby()).toBe(true);
 
-    setHistoryIdx(2); // back on the lobby entry itself
+    setHistoryIdx(2);
     expect(canPopToLobby()).toBe(false);
   });
 
@@ -104,7 +104,6 @@ describe("useLobbyReturn", () => {
   });
 
   it("treats an empty-string stored lobby index as not-poppable", () => {
-    // Number("") is 0 — must not read as a valid lobby at index 0.
     sessionStorage.setItem("beljot:lobby-idx", "");
     setHistoryIdx(1);
 
@@ -118,7 +117,7 @@ describe("useLobbyReturn", () => {
 
     const { result } = renderHook(() => useLobbyReturn());
     result.current();
-    result.current(); // double-tap: must not queue a second pop past the lobby
+    result.current();
 
     expect(mockNavigate).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledWith(-1);
@@ -132,7 +131,7 @@ describe("useLobbyReturn", () => {
     const { result } = renderHook(() => useLobbyReturn());
     result.current();
     window.dispatchEvent(new PopStateEvent("popstate"));
-    setHistoryIdx(4); // user pushed above the lobby again later
+    setHistoryIdx(4);
     result.current();
 
     expect(mockNavigate).toHaveBeenCalledTimes(2);

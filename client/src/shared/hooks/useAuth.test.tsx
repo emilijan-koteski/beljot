@@ -8,8 +8,6 @@ import { useAuthStore } from "@/shared/stores/authStore";
 const refreshAccessToken = vi.fn();
 const changeLanguage = vi.fn(() => Promise.resolve(undefined));
 
-// Only the refresh entry point is stubbed; setAuthRedirect and the axios
-// instance stay real so the hook is exercised as it ships.
 vi.mock("@/shared/api/axiosClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/api/axiosClient")>()),
   refreshAccessToken: () => refreshAccessToken(),
@@ -95,10 +93,6 @@ describe("useAuthInit", () => {
     expect(changeLanguage).toHaveBeenCalledWith("mk");
   });
 
-  // The regression this file exists for. Restoring via a second, uncoordinated
-  // caller rotated the refresh-token family twice; the browser then kept the
-  // superseded cookie and the session died at the NEXT refresh, minutes later
-  // and far from the cause. A remount must never trigger a second rotation.
   it("does not refresh twice when the effect is mounted twice (StrictMode)", async () => {
     restoreSucceeds();
 
@@ -108,8 +102,6 @@ describe("useAuthInit", () => {
     expect(refreshAccessToken).toHaveBeenCalledTimes(1);
   });
 
-  // A locale switch is post-restore cosmetics. It once shared a `.catch` with
-  // the restore itself, so an i18n failure cleared a perfectly valid session.
   it("keeps the session when only the language switch fails", async () => {
     restoreSucceeds();
     changeLanguage.mockRejectedValue(new Error("locale load failed"));

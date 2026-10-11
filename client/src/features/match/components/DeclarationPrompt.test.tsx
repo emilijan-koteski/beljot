@@ -44,7 +44,6 @@ describe("DeclarationPrompt", () => {
     render(
       <DeclarationPrompt declarations={mockDeclarations} onDeclare={vi.fn()} onSkip={vi.fn()} />,
     );
-    // Value appears in the group row and again in the total footer — both are fine.
     expect(screen.getAllByText(/50/).length).toBeGreaterThan(0);
   });
 
@@ -182,14 +181,10 @@ describe("DeclarationPrompt", () => {
       act(() => {
         vi.advanceTimersByTime(6000);
       });
-      // Server-authoritative: auto-skip arrives via state push, not from the client.
       expect(onSkip).not.toHaveBeenCalled();
     });
   });
 
-  // Simultaneous mode is the Croatian dedicated phase: every seat is asked at
-  // once, so the dialog runs its own mount-anchored window, does not close on
-  // the answer, and looks identical whether or not the viewer holds anything.
   describe("simultaneous mode", () => {
     beforeEach(() => {
       vi.useFakeTimers();
@@ -212,7 +207,6 @@ describe("DeclarationPrompt", () => {
 
     it("runs its own countdown ring with no server deadline", () => {
       renderSim();
-      // turnExpiresAt is null for the whole phase — the ring is mount-anchored.
       expect(screen.getByTestId("button-timer-ring")).toBeInTheDocument();
     });
 
@@ -224,8 +218,6 @@ describe("DeclarationPrompt", () => {
       act(() => {
         vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP + 100);
       });
-      // Unlike Bitola's prompt, the client IS the actor here — the server's
-      // force-close ceiling sits well beyond this window rather than racing it.
       expect(onSkip).toHaveBeenCalledTimes(1);
     });
 
@@ -233,7 +225,6 @@ describe("DeclarationPrompt", () => {
       const onSkip = vi.fn();
       renderSim({ declarations: [], onSkip, answeredCount: 1 });
 
-      // Sent on mount — nothing is left for the player to decide.
       expect(onSkip).toHaveBeenCalledTimes(1);
       expect(screen.getByText("No declarations")).toBeInTheDocument();
       expect(screen.getByTestId("declaration-prompt-none")).toBeInTheDocument();
@@ -241,11 +232,9 @@ describe("DeclarationPrompt", () => {
       expect(screen.getByTestId("declaration-prompt-declare")).toBeDisabled();
       const skip = screen.getByTestId("declaration-prompt-skip");
       expect(skip).toBeDisabled();
-      // One seat had answered; the viewer's own skip counts before the echo.
       expect(skip).toHaveTextContent("2/4");
       expect(screen.queryByTestId("button-timer-ring")).not.toBeInTheDocument();
 
-      // Sent once: neither a re-render nor the window's end sends it again.
       act(() => {
         vi.advanceTimersByTime(MOTION.DECLARATION_PHASE_AUTO_SKIP + 100);
       });
@@ -268,12 +257,6 @@ describe("DeclarationPrompt", () => {
       expect(screen.getByTestId("declaration-prompt-skip")).toHaveTextContent("3/4");
     });
 
-    // Once answered, the two waiting panels must be the same DIALOG — same
-    // role, same title slot, same button row. (Before answering they differ by
-    // design: a meld-less seat answers at once, so it never shows the live
-    // countdown.) Asserting rendered width would be worthless here: jsdom has no
-    // layout and returns 0 for every element, so `0 === 0` would pass for two
-    // totally different panels. Structure is what is actually checkable.
     it("keeps the same waiting dialog shape for a meld holder and a meld-less seat", () => {
       function shapeOf(declarations: Declaration[]) {
         const { unmount } = renderSim({ declarations });
@@ -304,22 +287,14 @@ describe("DeclarationPrompt", () => {
       const skip = screen.getByTestId("declaration-prompt-skip");
       expect(skip).toBeDisabled();
       expect(skip).toHaveTextContent("3/4");
-      // The countdown is over for this viewer — they are waiting on the others.
       expect(screen.queryByTestId("button-timer-ring")).not.toBeInTheDocument();
     });
 
-    // The window's onExpire runs on its own schedule, while `answered` only
-    // arrives a round-trip after the click. Without a local latch, a Skip
-    // clicked at 7.9s is followed by the ring's auto-skip at 8.0s, and the
-    // engine rejects that second answer as ErrWrongPhase — a toast for
-    // something the player did correctly.
     it("sends only the first answer, even if the window expires mid-flight", () => {
       const onSkip = vi.fn();
       const onDeclare = vi.fn();
       renderSim({ onSkip, onDeclare });
 
-      // Click just before the window closes; the server has not echoed back yet,
-      // so `answered` is still false.
       fireEvent.click(screen.getByTestId("declaration-prompt-declare"));
       expect(onDeclare).toHaveBeenCalledTimes(1);
 
@@ -336,7 +311,6 @@ describe("DeclarationPrompt", () => {
 
       fireEvent.click(screen.getByTestId("declaration-prompt-skip"));
 
-      // answered is still false — this is the LOCAL latch talking.
       const skip = screen.getByTestId("declaration-prompt-skip");
       expect(skip).toBeDisabled();
       expect(screen.getByTestId("declaration-prompt-declare")).toBeDisabled();

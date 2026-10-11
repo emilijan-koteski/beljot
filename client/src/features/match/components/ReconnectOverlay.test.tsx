@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReconnectOverlay } from "./ReconnectOverlay";
 
-// Mock react-i18next
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
@@ -54,25 +53,21 @@ describe("ReconnectOverlay", () => {
   });
 
   it("renders player name and countdown", () => {
-    const expiresAt = new Date(Date.now() + 120_000).toISOString(); // 2 minutes from now
+    const expiresAt = new Date(Date.now() + 120_000).toISOString();
     render(<ReconnectOverlay disconnectedPlayerName="Alice" reconnectExpiresAt={expiresAt} />);
 
     expect(screen.getByText("Reconnecting...")).toBeInTheDocument();
     expect(screen.getByText(/wait for Alice to reconnect/)).toBeInTheDocument();
     expect(screen.getByTestId("reconnect-countdown")).toBeInTheDocument();
-    // Should show roughly 2:00
     expect(screen.getByTestId("reconnect-countdown").textContent).toBe("2:00");
   });
 
   it("countdown decrements over time", () => {
-    const expiresAt = new Date(Date.now() + 65_000).toISOString(); // 65 seconds
+    const expiresAt = new Date(Date.now() + 65_000).toISOString();
     render(<ReconnectOverlay disconnectedPlayerName="Bob" reconnectExpiresAt={expiresAt} />);
 
     expect(screen.getByTestId("reconnect-countdown").textContent).toBe("1:05");
 
-    // Advance 10 seconds. Ticks align to the deadline's whole-second
-    // boundaries with a small slack (TICK_SLACK_MS), so cross the boundary
-    // by a comfortable margin rather than landing exactly on it.
     act(() => {
       vi.advanceTimersByTime(10_100);
     });
@@ -81,12 +76,9 @@ describe("ReconnectOverlay", () => {
   });
 
   it("falls back to a 'match ended' panel when the window expired without an abandon event", () => {
-    const expiresAt = new Date(Date.now() - 5000).toISOString(); // already expired
+    const expiresAt = new Date(Date.now() - 5000).toISOString();
     render(<ReconnectOverlay disconnectedPlayerName="Carol" reconnectExpiresAt={expiresAt} />);
 
-    // Countdown is replaced by the match-ended fallback view, so the user
-    // isn't stuck on a 0:00 timer when the server already tore down the
-    // session and the abandon broadcast never reached this client.
     expect(screen.queryByTestId("reconnect-countdown")).not.toBeInTheDocument();
     expect(screen.getByTestId("match-ended-title")).toBeInTheDocument();
     expect(screen.getByText("Returning to lobby...")).toBeInTheDocument();
@@ -140,10 +132,8 @@ describe("ReconnectOverlay", () => {
     );
 
     expect(screen.getByTestId("abandon-title")).toHaveTextContent("Eve disconnected — match ended");
-    // Viewer on teamA → Us=450 (a), Them=380 (b)
     expect(screen.getByTestId("abandon-scores")).toHaveTextContent("Final: Us 450 : Them 380");
     expect(screen.getByText("Returning to lobby...")).toBeInTheDocument();
-    // Countdown should NOT be visible
     expect(screen.queryByTestId("reconnect-countdown")).not.toBeInTheDocument();
   });
 
@@ -166,13 +156,11 @@ describe("ReconnectOverlay", () => {
       />,
     );
 
-    // Viewer on teamB → Us=380 (b), Them=450 (a)
     expect(screen.getByTestId("abandon-scores")).toHaveTextContent("Final: Us 380 : Them 450");
   });
 
   it("shows the loss result line when the viewer shares the abandoner's team", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    // Abandoner seat 2 → team A; viewer seat 0 → team A → partner → loss.
     const abandonedData = {
       abandonedByPlayer: 2,
       teamAFinalScore: 450,
@@ -198,7 +186,6 @@ describe("ReconnectOverlay", () => {
 
   it("shows the win result line when the viewer is on the opposing team", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    // Abandoner seat 1 → team B; viewer seat 0 → team A → opponent → win.
     const abandonedData = {
       abandonedByPlayer: 1,
       teamAFinalScore: 450,
@@ -224,7 +211,6 @@ describe("ReconnectOverlay", () => {
 
   it("flips the result line for a teamB viewer (seat parity, not raw team A/B)", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    // Abandoner seat 0 → team A; viewer seat 1 → team B → opponents win.
     const abandonedData = {
       abandonedByPlayer: 0,
       teamAFinalScore: 450,
@@ -248,8 +234,6 @@ describe("ReconnectOverlay", () => {
 
   it("omits the result line when the viewer IS the abandoner (late reconnect)", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    // Viewer seat 2 abandoned — their record says "abandoned", not "loss",
-    // so no win/loss line even though the rest of the panel renders.
     const abandonedData = {
       abandonedByPlayer: 2,
       teamAFinalScore: 450,
@@ -272,11 +256,6 @@ describe("ReconnectOverlay", () => {
     expect(screen.queryByTestId("abandon-result-line")).not.toBeInTheDocument();
   });
 
-  // --- Season Points line (Story 13.5) ---
-
-  // The matrix's partner-abandoned row, and the Design Notes' timing: the SP
-  // event trails match_abandoned in the same burst, so the line must appear
-  // when the prop arrives AFTER the panel has mounted.
   it("shows the teammate's half-loss line, arriving after the panel mounted", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
     const abandonedData = {
@@ -313,7 +292,6 @@ describe("ReconnectOverlay", () => {
     const line = screen.getByTestId("season-sp-line");
     expect(line).toHaveTextContent("Partner abandoned: \u221212 SP (half loss)");
     expect(line).toHaveAttribute("data-trend", "loss");
-    // Both lines together: the record's win/loss and the SP it cost.
     expect(screen.getByTestId("abandon-result-line")).toHaveAttribute("data-result", "loss");
   });
 
@@ -345,8 +323,6 @@ describe("ReconnectOverlay", () => {
     expect(screen.getByTestId("season-sp-line")).toHaveTextContent("+18 SP · Gold 2");
   });
 
-  // The abandoner gets no win/loss line (their record says "abandoned"), but a
-  // late reconnect that did receive the event still states the penalty.
   it("states the abandoner's own penalty even though the result line is omitted", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
     render(
@@ -496,8 +472,8 @@ describe("ReconnectOverlay", () => {
   });
 
   it("renders independent per-row countdowns derived from each player's own expiry", () => {
-    const earliest = new Date(Date.now() + 30_000).toISOString(); // 30 s
-    const later = new Date(Date.now() + 90_000).toISOString(); // 1:30
+    const earliest = new Date(Date.now() + 30_000).toISOString();
+    const later = new Date(Date.now() + 90_000).toISOString();
     render(
       <ReconnectOverlay
         disconnectedPlayerName="Alice"
@@ -511,7 +487,6 @@ describe("ReconnectOverlay", () => {
 
     expect(screen.getByTestId("reconnect-row-countdown-Alice").textContent).toBe("0:30");
     expect(screen.getByTestId("reconnect-row-countdown-Bob").textContent).toBe("1:30");
-    // Center ring tracks the earliest (Alice's 0:30), not Bob's later expiry.
     expect(screen.getByTestId("reconnect-countdown").textContent).toBe("0:30");
   });
 

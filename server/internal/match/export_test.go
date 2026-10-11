@@ -9,7 +9,7 @@ import (
 )
 
 // SetBotDelayForTest overrides the bot think-delay bounds so manager tests
-// with bots don't sleep for real (Story 10.3).
+// with bots don't sleep for real.
 func (m *Manager) SetBotDelayForTest(minDelay, maxDelay time.Duration) {
 	m.botDelayMin = minDelay
 	m.botDelayMax = maxDelay
@@ -54,10 +54,8 @@ func (m *Manager) BotSchedule(roomID uint) {
 	m.maybeScheduleBotAction(lm)
 }
 
-// HandleMatchEndForTest exposes handleMatchEnd for tests in the external
-// session_test package. Used by Story 8.5-1 AC4 tests to assert the
-// persist-before-broadcast invariant directly without driving a full game to
-// match completion.
+// HandleMatchEndForTest exposes handleMatchEnd so tests can assert the
+// persist-before-broadcast invariant without driving a full game.
 func (m *Manager) HandleMatchEndForTest(roomID uint, finalState *game.GameState, surrenderedBy *uint, payload ws.MatchEndPayload) {
 	m.mu.RLock()
 	lm, ok := m.sessions[roomID]
@@ -75,12 +73,8 @@ func AutoActionTypeFor(actionType string) (ws.AutoActionType, bool) {
 	return autoActionTypeFor(actionType)
 }
 
-// AbandonSeatForTest drives the abandonment finalize path
-// (handleSeatReconnectTimeout) deterministically for Story 9.5 tests: it marks
-// the seat disconnected and reads the seat's current reconnect generation so the
-// staleness guard passes, then invokes the timeout handler directly — letting a
-// test assert the abandonment XP award + event ordering without waiting on a
-// real reconnect-window timer.
+// AbandonSeatForTest marks the seat disconnected and invokes the reconnect-timeout
+// handler directly, driving the abandonment path without waiting on a real timer.
 func (m *Manager) AbandonSeatForTest(roomID uint, seat int) {
 	m.mu.RLock()
 	lm, ok := m.sessions[roomID]
@@ -135,10 +129,8 @@ func (m *Manager) ApplyActionForTest(roomID uint, action game.Action) error {
 	return m.applyAndBroadcastAction(lm, action)
 }
 
-// SetGameStateForTest replaces the lm's game state. Used to drive
-// HandleAction through specific mid-game states (declaration prompt, belot
-// prompt) without scripting an entire match. Tests using this helper must
-// call StartMatch first to register the lm and set timer config.
+// SetGameStateForTest replaces the lm's game state to drive specific mid-game
+// states. Tests using this helper must call StartMatch first.
 func (m *Manager) SetGameStateForTest(roomID uint, gs *game.GameState) {
 	m.mu.RLock()
 	lm, ok := m.sessions[roomID]
@@ -212,9 +204,7 @@ func (m *Manager) SetDeclarationExpiresAtForTest(roomID uint, t time.Time) {
 }
 
 // TriggerDeclarationTimeoutForTest cancels any pending timer and re-arms a
-// short-duration one against handleDeclarationTimeout, then returns. Drives the
-// window-elapsed path without waiting out declarationAutoClose. Mirrors
-// TriggerTimerExpiryForTest for the phase that has no per-move timer.
+// short-duration one against handleDeclarationTimeout, then returns.
 func (m *Manager) TriggerDeclarationTimeoutForTest(roomID uint, fireAfter time.Duration) {
 	m.mu.RLock()
 	lm, ok := m.sessions[roomID]
@@ -232,11 +222,7 @@ func (m *Manager) TriggerDeclarationTimeoutForTest(roomID uint, fireAfter time.D
 }
 
 // TriggerTimerExpiryForTest cancels any pending turn timer and re-arms a
-// short-duration timer for the given expectedSeat, then waits for it to fire.
-// Used by tests that drive the auto-action code path on an injected game state
-// where the StartMatch-captured expectedSeat would not match the injected
-// ActivePlayerSeat. The caller should sleep until the auto-action settles
-// before snapshotting state.
+// short-duration timer for expectedSeat, then waits for it to fire.
 func (m *Manager) TriggerTimerExpiryForTest(roomID uint, expectedSeat int, fireAfter time.Duration) {
 	m.mu.RLock()
 	lm, ok := m.sessions[roomID]
@@ -253,6 +239,4 @@ func (m *Manager) TriggerTimerExpiryForTest(roomID uint, expectedSeat int, fireA
 	lm.mu.Unlock()
 }
 
-// errNoSession is returned by the *ForTest helpers when the room has no live
-// session — a test-setup mistake, surfaced rather than silently no-oping.
 var errNoSession = errors.New("match: no live session for room")

@@ -8,10 +8,6 @@ import (
 	"github.com/coder/websocket"
 )
 
-// CloseCodeReplaced signals a kicked-by-newer-connection close. Sits in the
-// app-defined 4000-4999 range so it can't collide with RFC 6455 reserved codes.
-// The client uses this to skip its auto-reconnect path so two tabs as the same
-// user don't enter a kick → reconnect loop.
 const CloseCodeReplaced websocket.StatusCode = 4001
 
 // IncomingMessage pairs a raw message with the client that sent it.
@@ -60,13 +56,11 @@ func NewHub() *Hub {
 }
 
 // SetActionHandler registers a handler for action: prefixed messages.
-// This will be wired to the session manager in Story 4.2.
 func (h *Hub) SetActionHandler(handler ActionHandler) {
 	h.actionHandler = handler
 }
 
 // SetSystemHandler registers a handler for system: prefixed messages.
-// This will be wired to lobby/chat handlers in future stories.
 func (h *Hub) SetSystemHandler(handler SystemHandler) {
 	h.systemHandler = handler
 }
@@ -83,7 +77,8 @@ func (h *Hub) SetDisconnectHandler(handler DisconnectHandler) {
 	h.disconnectHandler = handler
 }
 
-// Run starts the hub's main event loop. Call as a goroutine.
+// Run starts the hub's main event loop and should be called as a goroutine.
+// A newer connection for the same user closes the old one with CloseCodeReplaced, which tells that client not to auto-reconnect.
 func (h *Hub) Run() {
 	for {
 		select {
@@ -95,10 +90,6 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if existing, ok := h.clients[client.UserID]; ok {
 				existing.markClosed()
-				// Send a clean close frame with the app-specific "replaced"
-				// status so the kicked client knows not to auto-reconnect —
-				// otherwise two tabs/devices as the same user enter a tight
-				// reconnect/replace loop. Falls back to CloseNow on error.
 				if err := existing.conn.Close(CloseCodeReplaced, "replaced by newer connection"); err != nil {
 					_ = existing.conn.CloseNow()
 				}
@@ -107,7 +98,6 @@ func (h *Hub) Run() {
 			h.clients[client.UserID] = client
 			h.mu.Unlock()
 			slog.Info("ws: client registered", "userID", client.UserID)
-			// Fire connect handler for reconnection detection
 			if h.connectHandler != nil {
 				go h.connectHandler(client.UserID)
 			}
@@ -118,7 +108,6 @@ func (h *Hub) Run() {
 				delete(h.clients, client.UserID)
 				client.markClosed()
 				slog.Info("ws: client unregistered", "userID", client.UserID)
-				// Fire disconnect handler only for true disconnects (not replacements)
 				if h.disconnectHandler != nil {
 					go h.disconnectHandler(client.UserID)
 				}
@@ -184,22 +173,14 @@ func (h *Hub) SendToUser(userID uint, msg []byte) {
 	}
 }
 
-// UserFrame pairs one recipient with the exact bytes that recipient must
-// receive. The unit of SendFrames: one logical event whose payload differs per
-// recipient (the per-seat projected match_state, Story 12.10).
+// UserFrame pairs one recipient with the exact bytes that recipient must receive.
 type UserFrame struct {
 	UserID uint
 	Msg    []byte
 }
 
-// SendFrames delivers each frame to its own recipient, in slice order, under a
-// single lock pass. The per-recipient counterpart of BroadcastToUsers: where
-// that fans identical bytes out to many users, this carries a DISTINCT frame
-// per user while remaining ONE logical send — so a per-seat state event stays
-// one call on the wire log rather than decomposing into N unicasts. Unknown
-// user IDs are tolerated, mirroring BroadcastToUsers. An empty batch is a
-// legal no-op — a match whose only human seat just disconnected has nobody
-// left to frame.
+// SendFrames delivers a distinct frame to each recipient, in slice order, as one logical send under a single lock.
+// Unknown user IDs are skipped and an empty batch is a no-op.
 func (h *Hub) SendFrames(frames []UserFrame) {
 	if len(frames) == 0 {
 		return
@@ -240,8 +221,7 @@ func (h *Hub) ClientCount() int {
 	return len(h.clients)
 }
 
-// ConnectedUserIDs returns a snapshot of all currently-connected user IDs.
-// Order is unspecified. Caller may mutate the returned slice freely.
+// ConnectedUserIDs returns an unordered snapshot of connected user IDs that the caller may mutate.
 func (h *Hub) ConnectedUserIDs() []uint {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

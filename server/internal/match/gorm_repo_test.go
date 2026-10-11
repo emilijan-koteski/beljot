@@ -38,19 +38,14 @@ func getRepoTestDB(t *testing.T) *gorm.DB {
 	return tx
 }
 
-// repoFixtureSuffix returns a per-call unique 8-digit suffix for fixture
-// usernames / emails / room codes. Uniqueness matters even though the test
-// transaction rolls back: partial unique indexes on users/rooms still check
-// the seeded values against COMMITTED dev-DB rows, so fixed names could
-// collide with real local data.
+// repoFixtureSuffix returns a unique 8-digit suffix for fixture names. Partial unique
+// indexes still check committed dev-DB rows even though the test transaction rolls back.
 func repoFixtureSuffix() string {
 	return fmt.Sprintf("%08d", time.Now().UnixNano()%1e8)
 }
 
-// seedRepoUser inserts a users row via raw SQL (the match package must not
-// import user — user already imports match) and returns its ID. The tag must
-// be unique per run (build it from repoFixtureSuffix) and fit the
-// VARCHAR(20) username column.
+// seedRepoUser inserts a users row via raw SQL, since match cannot import user.
+// The tag must be unique per run and fit the VARCHAR(20) username column.
 func seedRepoUser(t *testing.T, db *gorm.DB, tag string) uint {
 	t.Helper()
 	var id uint
@@ -78,15 +73,8 @@ RETURNING id`,
 	return id
 }
 
-// abandonedFixture seeds the four users + room + the match mix that exercises
-// the per-player abandonment matrix. Seats are [a, b, c, d] in every match, so
-// a/c are team 0 and b/d team 1. Completed times descend from base so the
-// newest-first list order is deterministic (m1 newest .. m4 oldest).
-//
-//	m1: completed, winner 0                              — a/c win, b/d loss
-//	m2: abandoned by a (team 0), winner_team 1           — a abandoned, c loss, b/d win
-//	m3: abandoned, NULL abandoner, filler winner_team 0  — abandoned for everyone
-//	m4: completed via surrender by b, winner 0           — a/c win, b/d loss
+// abandonedFixture holds four seated users and matches m1..m4 (newest first)
+// covering the per-player abandonment matrix.
 type abandonedFixture struct {
 	repo       *match.GormMatchRepository
 	a, b, c, d uint
@@ -98,7 +86,6 @@ func seedAbandonedFixture(t *testing.T, db *gorm.DB) abandonedFixture {
 	t.Helper()
 
 	f := abandonedFixture{repo: match.NewGormMatchRepository(db)}
-	// "rt" + 8-digit suffix + seat letter = 11 chars, inside VARCHAR(20).
 	suffix := repoFixtureSuffix()
 	f.a = seedRepoUser(t, db, "rt"+suffix+"a")
 	f.b = seedRepoUser(t, db, "rt"+suffix+"b")
@@ -139,11 +126,7 @@ func seedAbandonedFixture(t *testing.T, db *gorm.DB) abandonedFixture {
 	return f
 }
 
-// TestGormMatchRepository_GetStatsForUser_PerPlayerAbandonment pins the
-// per-player outcome semantics on abandoned rows: the abandoner (and every
-// participant of a NULL-abandoner row) counts "abandoned"; the partner counts
-// a loss and the opponents a win via the persisted winner_team. Surrendered
-// matches stay plain completed win/loss.
+// TestGormMatchRepository_GetStatsForUser_PerPlayerAbandonment checks per-player win/loss/abandoned stats on abandoned rows.
 func TestGormMatchRepository_GetStatsForUser_PerPlayerAbandonment(t *testing.T) {
 	db := getRepoTestDB(t)
 	f := seedAbandonedFixture(t, db)
@@ -153,13 +136,9 @@ func TestGormMatchRepository_GetStatsForUser_PerPlayerAbandonment(t *testing.T) 
 		viewer                  uint
 		wins, losses, abandoned int
 	}{
-		// a: m1 win, m2 own abandonment, m3 legacy, m4 win.
 		{name: "abandoner", viewer: f.a, wins: 2, losses: 0, abandoned: 2},
-		// b: m1 loss, m2 opponent of abandoner -> win, m3 legacy, m4 loss.
 		{name: "opponent of abandoner", viewer: f.b, wins: 1, losses: 2, abandoned: 1},
-		// c: m1 win, m2 partner of abandoner -> loss, m3 legacy, m4 win.
 		{name: "partner of abandoner", viewer: f.c, wins: 2, losses: 1, abandoned: 1},
-		// d: mirrors b (same team).
 		{name: "second opponent", viewer: f.d, wins: 1, losses: 2, abandoned: 1},
 	}
 	for _, tc := range cases {
@@ -173,10 +152,7 @@ func TestGormMatchRepository_GetStatsForUser_PerPlayerAbandonment(t *testing.T) 
 	}
 }
 
-// TestGormMatchRepository_GetMatchesForUser_OutcomeFilterPerPlayer pins the
-// outcome filter's mirror of the stats semantics: win/loss include the
-// attributable abandoned rows for non-abandoners, "abandoned" keeps only the
-// viewer's own abandonments plus NULL-abandoner legacy rows.
+// TestGormMatchRepository_GetMatchesForUser_OutcomeFilterPerPlayer checks the outcome filter mirrors the stats semantics.
 func TestGormMatchRepository_GetMatchesForUser_OutcomeFilterPerPlayer(t *testing.T) {
 	db := getRepoTestDB(t)
 	f := seedAbandonedFixture(t, db)
@@ -185,7 +161,7 @@ func TestGormMatchRepository_GetMatchesForUser_OutcomeFilterPerPlayer(t *testing
 		name    string
 		viewer  uint
 		outcome string
-		wantIDs []uint // newest-first (completed_at DESC)
+		wantIDs []uint
 	}{
 		{name: "abandoner win", viewer: f.a, outcome: "win", wantIDs: []uint{f.m1, f.m4}},
 		{name: "abandoner loss", viewer: f.a, outcome: "loss", wantIDs: []uint{}},
@@ -212,23 +188,15 @@ func TestGormMatchRepository_GetMatchesForUser_OutcomeFilterPerPlayer(t *testing
 	}
 }
 
-// TestGormMatchRepository_Migration15Semantics replays the migration 000015
-// backfill expression against seeded pre-backfill rows (filler winner_team 0)
-// and verifies attributable abandoned rows flip to the team opposite the
-// abandoner while NULL-abandoner rows keep the filler.
+// TestGormMatchRepository_Migration15Semantics replays the migration 000015 winner_team backfill against seeded rows.
 func TestGormMatchRepository_Migration15Semantics(t *testing.T) {
 	db := getRepoTestDB(t)
 	f := seedAbandonedFixture(t, db)
 
-	// Reset the abandoned rows to the historical filler, as pre-000015 data.
 	require.NoError(t, db.Exec(
 		`UPDATE matches SET winner_team = 0 WHERE id IN (?, ?)`, f.m2, f.m3,
 	).Error)
 
-	// The 000015 up expression with the same status + abandoned_by gate the
-	// migration uses, additionally scoped to this fixture's match IDs so the
-	// replay can never touch (or lock) other abandoned rows that may exist in
-	// a shared dev DB.
 	require.NoError(t, db.Exec(`
 UPDATE matches
 SET winner_team = CASE
@@ -247,10 +215,7 @@ WHERE status = 'abandoned'
 	assert.Equal(t, 0, winner, "NULL-abandoner row keeps the filler 0")
 }
 
-// TestGormMatchRepository_GetCareerAggregatesForUser_StreakPerPlayerAbandonment
-// pins the streak's mirror of the stats semantics: attributable abandoned rows
-// count win/loss via winner_team, while the viewer's own abandonments and
-// NULL-abandoner legacy rows are skipped (the run continues across them).
+// TestGormMatchRepository_GetCareerAggregatesForUser_StreakPerPlayerAbandonment checks streaks skip own and legacy abandonments.
 func TestGormMatchRepository_GetCareerAggregatesForUser_StreakPerPlayerAbandonment(t *testing.T) {
 	db := getRepoTestDB(t)
 	f := seedAbandonedFixture(t, db)
@@ -261,15 +226,9 @@ func TestGormMatchRepository_GetCareerAggregatesForUser_StreakPerPlayerAbandonme
 		kind   string
 		length int
 	}{
-		// a (newest first): m1 win, m2 own abandonment (skipped), m3 legacy
-		// (skipped), m4 win — the run continues across the skipped rows.
 		{name: "abandoner skips own rows", viewer: f.a, kind: "win", length: 2},
-		// b: m1 loss breaks at the m2 abandonment win.
 		{name: "opponent of abandoner", viewer: f.b, kind: "loss", length: 1},
-		// c: m1 win breaks at m2 — the partner-of-abandoner LOSS now counts
-		// (completed-only would have run m1+m4 for a win streak of 2).
 		{name: "partner loss breaks streak", viewer: f.c, kind: "win", length: 1},
-		// d: mirrors b.
 		{name: "second opponent", viewer: f.d, kind: "loss", length: 1},
 	}
 	for _, tc := range cases {
@@ -282,10 +241,7 @@ func TestGormMatchRepository_GetCareerAggregatesForUser_StreakPerPlayerAbandonme
 	}
 }
 
-// TestGormMatchRepository_GetCareerAggregatesForUser_StreakCountsAbandonmentWin
-// reproduces the reported profile bug: a completed loss followed by a newer win
-// via opponent abandonment must read as a win streak of 1, not resurface the
-// older loss as "loss streak 1" (which is what the completed-only filter did).
+// TestGormMatchRepository_GetCareerAggregatesForUser_StreakCountsAbandonmentWin checks a win via opponent abandonment starts a win streak.
 func TestGormMatchRepository_GetCareerAggregatesForUser_StreakCountsAbandonmentWin(t *testing.T) {
 	db := getRepoTestDB(t)
 	repo := match.NewGormMatchRepository(db)
@@ -318,8 +274,6 @@ func TestGormMatchRepository_GetCareerAggregatesForUser_StreakCountsAbandonmentW
 		}
 	}
 
-	// Older: completed loss for w (team 0). Newest: opponent x abandons,
-	// winner_team 0 — an abandonment-derived win for w.
 	older := newMatch(-1*time.Hour, "completed", 1, nil)
 	newest := newMatch(0, "abandoned", 0, &x)
 	require.NoError(t, repo.Create(older))
@@ -331,13 +285,7 @@ func TestGormMatchRepository_GetCareerAggregatesForUser_StreakCountsAbandonmentW
 	assert.Equal(t, 1, agg.StreakLength, "streak length")
 }
 
-// TestGormMatchRepository_GetCareerPointsForUser pins the Story 11.3 lifetime
-// "career points" aggregate: the subject's OWN team score summed across
-// COMPLETED matches only. In the shared fixture the two completed rows (m1
-// natural, m4 surrender) each score 500-400 and the two abandoned rows (m2, m3)
-// are excluded — so team-A player `a` totals 1000 (team_a_score 500+500) and
-// team-B player `b` totals 800 (team_b_score 400+400). A user with no completed
-// matches totals 0.
+// TestGormMatchRepository_GetCareerPointsForUser checks career points sum the user's own team score over completed matches only.
 func TestGormMatchRepository_GetCareerPointsForUser(t *testing.T) {
 	db := getRepoTestDB(t)
 	f := seedAbandonedFixture(t, db)
@@ -362,17 +310,12 @@ func TestGormMatchRepository_GetCareerPointsForUser(t *testing.T) {
 	})
 }
 
-// TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment pins the
-// partner/rival mirrors of the stats semantics: attributable abandoned rows
-// count viewer-relative wins/losses; the viewer's own abandonments and
-// NULL-abandoner rows contribute no win/loss (partners still count them as
-// played; rivals exclude them entirely).
+// TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment checks partner and rival records on abandoned rows.
 func TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment(t *testing.T) {
 	db := getRepoTestDB(t)
 	f := seedAbandonedFixture(t, db)
 
 	t.Run("partner wins include abandonment win", func(t *testing.T) {
-		// b + d: played all 4; the only win is m2 via a's abandonment.
 		rows, err := f.repo.GetTopPartnersForUser(f.b, 5)
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
@@ -382,7 +325,6 @@ func TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment(t *testin
 	})
 
 	t.Run("partner wins exclude viewer's own abandonment", func(t *testing.T) {
-		// a + c: m1 and m4 wins; m2 is a's own abandonment (no win), m3 legacy.
 		rows, err := f.repo.GetTopPartnersForUser(f.a, 5)
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
@@ -392,7 +334,6 @@ func TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment(t *testin
 	})
 
 	t.Run("rival record includes abandonment outcomes", func(t *testing.T) {
-		// b vs a and c: m1 loss, m2 abandonment win, m4 loss; m3 excluded.
 		rows, err := f.repo.GetTopRivalsForUser(f.b, 5)
 		require.NoError(t, err)
 		require.Len(t, rows, 2)
@@ -408,7 +349,6 @@ func TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment(t *testin
 	})
 
 	t.Run("rival record excludes viewer's own abandonment", func(t *testing.T) {
-		// a vs b and d: m1 + m4 wins; m2 (own abandonment) and m3 excluded.
 		rows, err := f.repo.GetTopRivalsForUser(f.a, 5)
 		require.NoError(t, err)
 		require.Len(t, rows, 2)
@@ -419,15 +359,7 @@ func TestGormMatchRepository_TopPartnersAndRivals_PerPlayerAbandonment(t *testin
 	})
 }
 
-// TestGormMatchRepository_GetHonorTrendWindowsForUser pins the Story 9.7 trend
-// windows against the shared abandonment fixture. The canonical viewer gate
-// applies: your OWN abandonment counts against you, someone ELSE's abandonment
-// counts as a completion for you (you stayed), and a NULL-abandoner
-// boot-reconcile row is excluded entirely rather than consuming a window slot.
-//
-// The two-window split (code review 2026-07-29) is done by ROW_NUMBER inside one
-// bounded 2*limit fetch, so it is also asserting that rn <= limit and rn > limit
-// partition the same ordering the single-window version used.
+// TestGormMatchRepository_GetHonorTrendWindowsForUser checks the recent and prior honor windows from the viewer's side.
 func TestGormMatchRepository_GetHonorTrendWindowsForUser(t *testing.T) {
 	db := getRepoTestDB(t)
 	f := seedAbandonedFixture(t, db)
@@ -438,12 +370,8 @@ func TestGormMatchRepository_GetHonorTrendWindowsForUser(t *testing.T) {
 			viewer               uint
 			completed, abandoned int
 		}{
-			// a: m1 completed, m2 own abandonment, m3 EXCLUDED, m4 completed.
 			{name: "abandoner is charged only their own", viewer: f.a, completed: 2, abandoned: 1},
-			// b: m1 + m4 completed, m2 someone else's abandonment -> completed
-			// (b stayed), m3 EXCLUDED.
 			{name: "opponent of abandoner completed all three", viewer: f.b, completed: 3, abandoned: 0},
-			// c: the abandoner's PARTNER. Honor does not punish the teammate.
 			{name: "partner of abandoner is not charged", viewer: f.c, completed: 3, abandoned: 0},
 			{name: "second opponent mirrors the first", viewer: f.d, completed: 3, abandoned: 0},
 		}
@@ -460,7 +388,6 @@ func TestGormMatchRepository_GetHonorTrendWindowsForUser(t *testing.T) {
 	})
 
 	t.Run("the limit splits newest from next-newest", func(t *testing.T) {
-		// limit 1 fetches 2 rows: m1 (completed) then m2 (abandoned by a).
 		w, err := f.repo.GetHonorTrendWindowsForUser(f.a, 1)
 		require.NoError(t, err)
 		assert.Equal(t, 1, w.RecentCompleted, "m1 is the newest eligible row")
@@ -468,7 +395,6 @@ func TestGormMatchRepository_GetHonorTrendWindowsForUser(t *testing.T) {
 		assert.Equal(t, 0, w.PriorCompleted)
 		assert.Equal(t, 1, w.PriorAbandoned, "m2 is a's own abandonment, one slot back")
 
-		// Same two rows from b's side: b stayed through both.
 		w, err = f.repo.GetHonorTrendWindowsForUser(f.b, 1)
 		require.NoError(t, err)
 		assert.Equal(t, 1, w.RecentCompleted)
@@ -478,9 +404,6 @@ func TestGormMatchRepository_GetHonorTrendWindowsForUser(t *testing.T) {
 	})
 
 	t.Run("a partial prior window reports its real size", func(t *testing.T) {
-		// limit 2 fetches up to 4 rows; only 3 are eligible, so recent holds
-		// m1+m2 and prior holds just m4. The caller (HonorTrendWindowed) is what
-		// refuses to compare unequal windows — the repo reports honestly.
 		w, err := f.repo.GetHonorTrendWindowsForUser(f.a, 2)
 		require.NoError(t, err)
 		assert.Equal(t, 1, w.RecentCompleted)
@@ -503,10 +426,7 @@ func TestGormMatchRepository_GetHonorTrendWindowsForUser(t *testing.T) {
 	})
 }
 
-// TestGormMatchRepository_GetLastMatchForRoomAndUser pins the room last-match
-// read: it is scoped to one room, gated on the caller occupying a seat (that
-// predicate IS the endpoint's authorization), resolves to the newest row, and
-// preloads hands in play order.
+// TestGormMatchRepository_GetLastMatchForRoomAndUser checks the newest seated match in one room is returned with ordered hands.
 func TestGormMatchRepository_GetLastMatchForRoomAndUser(t *testing.T) {
 	db := getRepoTestDB(t)
 	repo := match.NewGormMatchRepository(db)
@@ -518,7 +438,6 @@ func TestGormMatchRepository_GetLastMatchForRoomAndUser(t *testing.T) {
 	d := seedRepoUser(t, db, "lm"+suffix+"d")
 	stranger := seedRepoUser(t, db, "lm"+suffix+"z")
 	roomOne := seedRepoRoom(t, db, a, suffix)
-	// A second room needs its own unique name/code — build it from a fresh suffix.
 	roomTwo := seedRepoRoom(t, db, a, repoFixtureSuffix())
 
 	base := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
@@ -543,15 +462,10 @@ func TestGormMatchRepository_GetLastMatchForRoomAndUser(t *testing.T) {
 
 	older := newMatch(roomOne, -2*time.Hour, "completed")
 	newest := newMatch(roomOne, -1*time.Hour, "abandoned")
-	// Newer in wall-clock terms, but a DIFFERENT room — must never be picked.
 	otherRoom := newMatch(roomTwo, 0, "completed")
-	// Every fixture here carries at least one hand: the read requires recorded
-	// play, so a hand-less row would be skipped and "newest wins" / "scoped to
-	// one room" would then pass for the wrong reason.
 	require.NoError(t, repo.CreateWithHands(older, []match.HandResult{
 		{HandNumber: 1, TeamAHandTotal: 100, TeamBHandTotal: 62},
 	}))
-	// Hands are inserted OUT of order so the ASC preload has something to sort.
 	require.NoError(t, repo.CreateWithHands(newest, []match.HandResult{
 		{HandNumber: 3, TeamAHandTotal: 60, TeamBHandTotal: 102},
 		{HandNumber: 1, TeamAHandTotal: 90, TeamBHandTotal: 72},
@@ -611,10 +525,6 @@ func TestGormMatchRepository_GetLastMatchForRoomAndUser(t *testing.T) {
 		assert.Nil(t, got, "only completed / abandoned rows count")
 	})
 
-	// Boot reconcile writes a 0-0 `abandoned` row with NO hands for every room
-	// left in `playing` by a crash (reconcile.go). It is a recovery artifact,
-	// not a game anyone played — surfacing it would show a 0-0 scoreline with an
-	// empty breakdown, reading as a match everybody lost.
 	t.Run("a hand-less reconcile placeholder is not the last match", func(t *testing.T) {
 		room := seedRepoRoom(t, db, a, repoFixtureSuffix())
 		placeholder := newMatch(room, time.Hour, "abandoned")
@@ -628,14 +538,12 @@ func TestGormMatchRepository_GetLastMatchForRoomAndUser(t *testing.T) {
 		assert.Nil(t, got, "a row with no scored hand is not a played match")
 	})
 
-	// ...but it must not shadow a real match that came before it in the room.
 	t.Run("a placeholder does not hide the real match beneath it", func(t *testing.T) {
 		room := seedRepoRoom(t, db, a, repoFixtureSuffix())
 		real := newMatch(room, time.Hour, "completed")
 		require.NoError(t, repo.CreateWithHands(real, []match.HandResult{
 			{HandNumber: 1, TeamAHandTotal: 120, TeamBHandTotal: 42},
 		}))
-		// Written LATER, so it wins on completed_at and would be returned first.
 		placeholder := newMatch(room, 2*time.Hour, "abandoned")
 		require.NoError(t, repo.Create(placeholder))
 

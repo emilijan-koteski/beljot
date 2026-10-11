@@ -20,10 +20,8 @@ type SegmentedProps<T extends string> = {
 };
 
 /**
- * Single source for the parchment toggle controls (variant, match mode,
- * timer). Inactive options sit in a --surface-3 well, active one fills
- * --surface-2 with a hairline shadow. Disabled options dim to --ink-off and
- * keep cursor-not-allowed.
+ * Segmented radio-group toggle used for the parchment option controls.
+ * The active option is raised out of a sunken well; disabled options are dimmed and inert.
  */
 export function Segmented<T extends string>({
   value,

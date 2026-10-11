@@ -29,10 +29,6 @@ describe("DiffMarker", () => {
     renderMarker("dark");
     await user.hover(screen.getByTestId("rules-diff-marker"));
     expect(await screen.findByText("THE-OTHER-VARIANT")).toBeInTheDocument();
-    // RulesDialog paints at Z.UTIL and both portal to document.body as
-    // siblings, so anything at or below Z.UTIL is painted behind an ~98% opaque
-    // panel. jsdom has no paint model, which is why this asserts the tier
-    // rather than visibility — findByText passes either way.
     expect(positionerZ()).toBeGreaterThan(Z.UTIL);
   });
 
@@ -41,7 +37,6 @@ describe("DiffMarker", () => {
     renderMarker("light");
     await user.hover(screen.getByTestId("rules-diff-marker"));
     expect(await screen.findByText("THE-OTHER-VARIANT")).toBeInTheDocument();
-    // No competitor on the standalone page — no inline override.
     expect(positionerZ()).toBe(0);
   });
 });

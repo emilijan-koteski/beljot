@@ -43,7 +43,6 @@ describe("DeclareBanner", () => {
   it("does NOT leak meld details — only the fact a declaration exists", () => {
     render(<DeclareBanner declarerUsername="bob" compassPosition={2} onDismiss={vi.fn()} />);
     const text = screen.getByTestId("declare-banner").textContent ?? "";
-    // No point values or meld names in the announcement.
     expect(text).not.toMatch(/\d/);
     expect(text.toLowerCase()).not.toMatch(/tierce|quarte|quint|carr/);
   });
@@ -110,8 +109,6 @@ describe("DeclareBanner", () => {
   });
 
   it("does not reset the dismiss timer when the parent re-renders with a new onDismiss identity", () => {
-    // Same regression guard as EmoteBubble: MatchPage passes an inline arrow;
-    // a timer keyed on callback identity would restart every parent re-render.
     const onDismiss = vi.fn();
     const { rerender } = render(
       <DeclareBanner declarerUsername="alice" compassPosition={0} onDismiss={() => onDismiss()} />,

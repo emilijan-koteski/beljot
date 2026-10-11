@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PauseOverlay } from "./PauseOverlay";
 
-// Mock react-i18next
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, string>) => {
@@ -293,15 +292,10 @@ describe("PauseOverlay action row", () => {
       />,
     );
 
-    // Both controls take an action, so they get the stacked-column treatment
-    // rather than the action-left / status-quo-right footer pair.
     const resume = screen.getByTestId("pause-resume-button");
     const ownerResume = screen.getByTestId("pause-owner-resume-button");
     expect(resume.compareDocumentPosition(ownerResume)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
-    // DOM order was already resume-first in the old justify-between row, so the
-    // order assertion alone would survive a revert to the side-by-side layout.
-    // The column direction is the part that actually changed.
     const row = screen.getByTestId("pause-actions");
     expect(row).toBe(resume.parentElement);
     expect(row.className).toContain("flex-col");

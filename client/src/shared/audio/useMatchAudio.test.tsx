@@ -181,7 +181,6 @@ describe("useMatchAudio", () => {
     act(() => setMusicLevel(30));
     expect(engine.startMusic).toHaveBeenCalledTimes(2);
 
-    // Between two non-zero levels the playlist just carries on.
     act(() => setMusicLevel(50));
     expect(engine.startMusic).toHaveBeenCalledTimes(2);
     expect(engine.stopMusic).toHaveBeenCalledTimes(1);

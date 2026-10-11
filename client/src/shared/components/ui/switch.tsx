@@ -3,10 +3,8 @@ import { Switch as SwitchPrimitive } from "@base-ui/react/switch";
 import { cn } from "@/shared/lib/utils";
 
 /**
- * On/off switch on the Base UI primitive, which renders `role="switch"` with
- * `aria-checked` and a hidden checkbox for forms. Wrap it in a `<label>` with
- * its text and the primitive labels itself from that, and a click on the text
- * toggles it too.
+ * On/off switch on the Base UI primitive, with `role="switch"` and a hidden form checkbox.
+ * Wrap it in a `<label>` with its text so the text names it and toggles it on click.
  */
 function Switch({ className, ...props }: SwitchPrimitive.Root.Props) {
   return (

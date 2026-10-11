@@ -11,15 +11,12 @@ import (
 	"github.com/emilijan/beljot/server/internal/apperr"
 )
 
-// --- header-only fixtures: enough for DecodeConfig and the predictor, never
-// a decodable image ---
-
 // jpegHeaderOnly is SOI, an Adobe APP14 marker (so a 4-component file reads
 // as CMYK), one frame header (SOF0, or SOF2 when progressive) with the given
 // sampling factors, and a scan header (DecodeConfig reads up to it), then EOI.
 func jpegHeaderOnly(w, h int, progressive bool, comps ...jpegComponent) []byte {
 	out := []byte{0xFF, 0xD8}
-	adobe := []byte("Adobe\x00\x64\x00\x00\x00\x00\x00") // transform 0: unknown (CMYK)
+	adobe := []byte("Adobe\x00\x64\x00\x00\x00\x00\x00")
 	out = append(out, 0xFF, 0xEE, byte((len(adobe)+2)>>8), byte(len(adobe)+2))
 	out = append(out, adobe...)
 
@@ -134,19 +131,16 @@ func packLSB(pairs []uint32) []byte {
 
 func mib(v int64) float64 { return float64(v) / (1 << 20) }
 
-// --- calibration ---
-
-// The predictor must never undershoot a measured peak. These are the peaks of
-// a full Inspect + Render measured on real 16 MP files (review iteration 2,
-// Go 1.26), each rebuilt here as a header of the same shape.
+// The predictor must never undershoot these peaks of a full Inspect + Render on real 16 MP files.
+// Each file is rebuilt here as a header of the same shape.
 func TestPredictDecodeBytes_CoversEveryMeasuredPeak(t *testing.T) {
 	cases := []struct {
-		name     string
-		data     []byte
-		mime     string
-		w, h     int
-		measured float64 // MiB
-		accepted bool
+		name        string
+		data        []byte
+		mime        string
+		w, h        int
+		measuredMiB float64
+		accepted    bool
 	}{
 		{"baseline 4:2:0 JPEG", jpegHeaderOnly(4096, 3906, false, ycc420...), mimeJPEG, 4096, 3906, 74, true},
 		{"8-bit RGBA PNG", pngIHDROnly(4000, 4000, 8, 6, 0, false), mimePNG, 4000, 4000, 110, true},
@@ -160,13 +154,11 @@ func TestPredictDecodeBytes_CoversEveryMeasuredPeak(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := predictDecodeBytes(tc.data, tc.mime, tc.w, tc.h)
 			require.NoError(t, err)
-			assert.GreaterOrEqual(t, mib(got), tc.measured, "prediction below the measured peak")
+			assert.GreaterOrEqual(t, mib(got), tc.measuredMiB, "prediction below the measured peak")
 			assert.Equal(t, tc.accepted, got <= maxDecodeBytes, "predicted %.0f MiB", mib(got))
 		})
 	}
 }
-
-// --- Inspect ---
 
 func TestInspect_HeavyEncodingsAreRejectedBeforeDecode(t *testing.T) {
 	cases := map[string][]byte{

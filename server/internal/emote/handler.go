@@ -9,9 +9,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// rateLimitWindow is the per-user cooldown between accepted emotes. The
-// matching client-side throttle uses the same value for instant UX feedback;
-// the server check is the authoritative gate.
 const rateLimitWindow = 3 * time.Second
 
 // Broadcaster is the subset of *ws.Hub that the emote handler depends on.
@@ -21,10 +18,8 @@ type Broadcaster interface {
 	BroadcastToUsers(userIDs []uint, msg []byte)
 }
 
-// GameMembership resolves the four match participants for a sender by their
-// userID. The emote payload carries no matchID, so the handler relies on
-// userToRoom indexing inside the match manager — wired to *match.Manager
-// in main.go.
+// GameMembership resolves a sender's four match participants and seat by userID,
+// since the emote payload carries no matchID.
 type GameMembership interface {
 	MatchParticipantsByUser(userID uint) (participants [4]uint, seat int, ok bool)
 }
@@ -50,10 +45,8 @@ func NewHandler(hub Broadcaster, game GameMembership) *Handler {
 	}
 }
 
-// HandleAction is the action handler entry point. Composed with
-// match.Manager.HandleAction in main.go via a dispatch closure.
-// Returns silently for any msg.Type other than ws.ActionEmote so the
-// composite caller can route every action through it without filtering.
+// HandleAction handles action:emote and ignores every other message type,
+// so a composite router can pass it every action.
 func (h *Handler) HandleAction(client *ws.Client, msg ws.WSMessage) {
 	if msg.Type != ws.ActionEmote {
 		return
@@ -89,16 +82,12 @@ func (h *Handler) HandleAction(client *ws.Client, msg ws.WSMessage) {
 	if msgBytes == nil {
 		return
 	}
-	// D109 (formally accepted): MatchParticipantsByUser released the RLock before
-	// this broadcast. RemoveSession may have run in the window. BroadcastToUsers
-	// silently skips clients no longer in the hub's registry; a brief tail-of-match
-	// emote delivery is the worst case and is benign. See deferred-work.md D109.
 	h.hub.BroadcastToUsers(participants[:], msgBytes)
 }
 
 // RemoveUser deletes the per-user rate-limit entry, bounding the map to
 // current-active users (not lifetime users). Called via match.Manager's
-// UserRemovedHook on session teardown (D105 + D106).
+// UserRemovedHook on session teardown.
 func (h *Handler) RemoveUser(userID uint) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

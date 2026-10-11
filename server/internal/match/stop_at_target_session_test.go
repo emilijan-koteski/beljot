@@ -14,20 +14,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// The session-manager end of the "dosta" (stop at target) toggle. The engine
-// tests own the rule; these cover the three seams the engine cannot reach:
-//
-//   - StartMatch actually carries the room's choice into the state the session
-//     runs, in both variants.
-//   - a Belote-driven stop emits event:belot_announced and then event:match_end
-//     with NO event:trick_resolved in between. The engine never resolved the
-//     trick the announcement interrupted, so a trick_resolved here would ship a
-//     stale winner for a trick that was abandoned mid-air.
-//   - a declaration-window TIMEOUT that crosses the target goes through
-//     handleMatchEnd: the match is persisted and the session removed. That path
-//     had no PhaseMatchEnd check at all before this rule existed, because nothing
-//     could end a match inside it — without the branch the table hangs forever.
-
 // eventKindsAfter decodes the hub log from a watermark into a plain list of
 // event types, which is all the ordering assertions below need.
 func eventKindsAfter(t *testing.T, hub *hubSpy, before int) []string {
@@ -49,9 +35,8 @@ func indexOf(kinds []string, want string) int {
 	return -1
 }
 
-// TestStartMatch_CarriesStopAtTargetIntoTheSession is the plumbing seam: the
-// room's choice has to survive StartMatch and land on the resolved config the
-// engine reads, not just on the wire mirror the client renders.
+// The room's stop-at-target choice survives StartMatch and lands on the resolved
+// config the engine reads, not just on the wire mirror.
 func TestStartMatch_CarriesStopAtTargetIntoTheSession(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -67,9 +52,6 @@ func TestStartMatch_CarriesStopAtTargetIntoTheSession(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			const roomID = uint(100)
-			// The spy, matching its analogue in no_declarations_session_test.go: this
-			// test reads a state snapshot and never asserts on the wire, so a real hub
-			// plus a goroutine and a Shutdown cleanup buys nothing.
 			hub := &hubSpy{}
 			mgr := match.NewManager(hub, newMockMatchRepo())
 			require.NoError(t, mgr.StartMatch(
@@ -86,8 +68,6 @@ func TestStartMatch_CarriesStopAtTargetIntoTheSession(t *testing.T) {
 			assert.Equal(t, tt.stopAtTarget, gs.StopAtTarget,
 				"and the wire flag the client renders")
 
-			// The room-level override must not disturb the preset it is layered
-			// over — including the OTHER room-level field.
 			assert.True(t, gs.Rules.DeclarationsEnabled,
 				"the declarations setting is independent")
 			preset := game.RulesFor(game.Variant(tt.variant))
@@ -98,18 +78,8 @@ func TestStartMatch_CarriesStopAtTargetIntoTheSession(t *testing.T) {
 	}
 }
 
-// beloteFourthCardBase builds the mid-play Bitola fixture every Belote case here
-// starts from: seat 3 leads a diamond, seats 0 and 1 follow it, and a trump-only
-// seat 2 cuts with the King of trump as the FOURTH card. handlePlayCard then sets
-// PendingBelotSeat and returns before resolving, which is the deferred-trick
-// shape — the one whose event:trick_resolved this arm of broadcastActionResult
-// owes, and the only shape where whether it is owed depends on what seat 2
-// answers.
-//
-// trickNum 1 leaves the declaration contest UNRESOLVED, so the trick that
-// resolves here resolves declarations too and the arm owes an
-// event:declarations_resolved reveal as well. Any other trick number starts with
-// the contest already settled.
+// beloteFourthCardBase builds a mid-play Bitola trick where seat 2 cuts with the King
+// of trump as the fourth card, leaving a deferred trick behind a Belote prompt.
 func beloteFourthCardBase(t *testing.T, roomID uint, trickNum int) *game.GameState {
 	t.Helper()
 
@@ -117,9 +87,6 @@ func beloteFourthCardBase(t *testing.T, roomID uint, trickNum int) *game.GameSta
 	gs.RoomID = roomID
 	gs.BelotAnnounced = false
 	gs.ActivePlayerSeat = 3
-	// Trump-only, so seat 2 cannot follow the diamond lead and must cut with the
-	// King. With its diamonds still in hand it would be obliged to follow instead
-	// and the King would never reach the table.
 	gs.Players[2].Hand = []game.Card{
 		{Rank: game.RankKing, Suit: game.SuitHearts},
 		{Rank: game.RankQueen, Suit: game.SuitHearts},
@@ -132,14 +99,8 @@ func beloteFourthCardBase(t *testing.T, roomID uint, trickNum int) *game.GameSta
 	return gs
 }
 
-// driveToBelotePrompt walks seats 3, 0 and 1 through the trick and then plays
-// seat 2's King of trump, returning the state holding the Belote prompt.
-//
-// It ANSWERS any trick-1 meld prompt with skip_declare rather than dodging it: at
-// trick 1 checkDeclarationPrompt puts each seat holding a meld on the clock before
-// it may play, and the fixture's hands do hold melds. Skipping leaves the contest
-// scoreless, which is still a legitimate reveal (winnerTeam null) and is exactly
-// the event that goes missing when this arm's guard is misplaced.
+// driveToBelotePrompt plays the trick up to seat 2's King of trump, answering any
+// trick-1 meld prompt with skip_declare, and returns the state holding the Belote prompt.
 func driveToBelotePrompt(t *testing.T, gs *game.GameState) *game.GameState {
 	t.Helper()
 
@@ -184,21 +145,13 @@ func driveToBelotePrompt(t *testing.T, gs *game.GameState) *game.GameState {
 	return prompted
 }
 
-// teamHandTotal is everything a team has accumulated in the CURRENT hand. It is
-// the fixed part of a running total; TeamScores is the knob the seeds below turn.
+// teamHandTotal is everything a team has accumulated in the current hand.
 func teamHandTotal(gs *game.GameState, team int) int {
 	return gs.HandPoints[team] + gs.DeclarationPoints[team] + gs.BelotPoints[team]
 }
 
-// beloteCrossingSeed replays the whole sequence — the trick, the prompt and the
-// given Belote answer — with the rule OFF, then returns the TeamScores[TeamA]
-// seed that makes the ON run land on exactly 1001 at the LAST award of that
-// sequence, plus team A's hand total at the PROMPT.
-//
-// By replay rather than by arithmetic, so the numbers come from the engine: a
-// fixture hand or a card-point table can change without quietly turning a
-// crossing test into a vacuous one. The prompt figure is what the
-// announce-but-short case needs in order to prove the +20 alone did not cross.
+// beloteCrossingSeed replays the trick and Belote answer with the rule off and returns
+// the team A seed that lands exactly on 1001 at the last award, plus its hand total at the prompt.
 func beloteCrossingSeed(t *testing.T, trickNum int, answer string) (seed, handAtPrompt int) {
 	t.Helper()
 
@@ -217,10 +170,8 @@ func beloteCrossingSeed(t *testing.T, trickNum int, answer string) (seed, handAt
 	return 1001 - handAfter, handAtPrompt
 }
 
-// beloteStopPrompt is the announce-crosses-on-the-+20 fixture: the one case where
-// the engine returns before finishCardPlay, so the trick is never resolved and no
-// event:trick_resolved may be sent. Team A is seeded so the +20 lands it exactly
-// on 1001.
+// beloteStopPrompt builds the case where the Belote +20 lands team A exactly on 1001,
+// so the trick never resolves and no event:trick_resolved may be sent.
 func beloteStopPrompt(t *testing.T, roomID uint, stopAtTarget bool) *game.GameState {
 	t.Helper()
 
@@ -232,10 +183,8 @@ func beloteStopPrompt(t *testing.T, roomID uint, stopAtTarget bool) *game.GameSt
 	return driveToBelotePrompt(t, gs)
 }
 
-// TestStopAtTarget_BeloteStopEmitsNoTrickResolved is the wire contract for
-// checkpoint 3. It is paired with an OFF control on the identical state, because
-// the control is what proves the suppressed event is one the layer really would
-// otherwise have sent.
+// A Belote stop sends no event:trick_resolved, checked against an OFF control on the
+// identical state that does send it.
 func TestStopAtTarget_BeloteStopEmitsNoTrickResolved(t *testing.T) {
 	t.Run("on: belot_announced then match_end, no trick_resolved", func(t *testing.T) {
 		const roomID = uint(710)
@@ -267,17 +216,11 @@ func TestStopAtTarget_BeloteStopEmitsNoTrickResolved(t *testing.T) {
 			"no hand was scored — the stop nils LastHandResult, which is what gates "+
 				"handJustScored, so a stale hand must not be re-announced: %v", kinds)
 
-		// The guard's actual purpose: handleMatchEnd owns the trailing match_state
-		// and emits it AFTER match_end, so no snapshot may precede the end event.
-		// Shipping one first races MatchPage's stale-state redirect (Story 8.5-1
-		// AC4), which is exactly what the Belote arm's early return prevents.
 		if stateIdx := indexOf(kinds, ws.EventMatchState); stateIdx >= 0 {
 			assert.Greater(t, stateIdx, endIdx,
 				"match_state must not be broadcast ahead of match_end: %v", kinds)
 		}
 
-		// handleMatchEnd ran in full: the match row was written and the session
-		// torn down.
 		matches := repo.getMatches()
 		require.Len(t, matches, 1, "the match must be persisted")
 		assert.Equal(t, 1001, matches[0].TeamAScore)
@@ -313,18 +256,8 @@ func TestStopAtTarget_BeloteStopEmitsNoTrickResolved(t *testing.T) {
 	})
 }
 
-// TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick is the
-// other side of the guard above, and the case the first draft of this arm got
-// wrong. Two ways to reach it, both through the SAME shared broadcast arm:
-//
-//   - skip_belot: awards nothing, but still runs finishCardPlay, so the trick
-//     resolves and checkpoint 1 crosses on its CARD points.
-//   - announce_belot whose +20 falls SHORT: identical, one award later.
-//
-// In both the trick really resolved, so its event:trick_resolved is owed — and at
-// Bitola trick 1 so is the event:declarations_resolved reveal. A guard placed
-// before the deferred-trick block drops them both: a real final trick with no
-// collect animation, and a lost meld reveal.
+// A crossing after skip_belot or a short announce_belot still resolves the trick, so
+// its event:trick_resolved and the trick-1 declarations reveal are owed.
 func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -339,8 +272,6 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 			trickNum: 2,
 		},
 		{
-			// Trick 1, so the resolving trick also resolves the declaration contest
-			// and the reveal is owed alongside the trick winner.
 			name:       "skip_belot at trick 1, trick crosses",
 			answer:     game.ActionSkipBelot,
 			trickNum:   1,
@@ -373,8 +304,6 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 				gs = testfixtures.WithStopAtTarget(gs)
 				prompted := driveToBelotePrompt(t, gs)
 
-				// The premise: whatever this answer awards on its own is NOT what
-				// crosses. Only the trick it then resolves can.
 				belotIfAnnounced := 0
 				if tc.wantAnnounce {
 					belotIfAnnounced = 20
@@ -411,8 +340,6 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 					assert.Less(t, revealIdx, endIdx, "%v", kinds)
 				}
 
-				// The guard still does its job for the snapshot: handleMatchEnd owns
-				// match_end and the trailing match_state, in that order.
 				if stateIdx := indexOf(kinds, ws.EventMatchState); stateIdx >= 0 {
 					assert.Greater(t, stateIdx, endIdx,
 						"match_state must not be broadcast ahead of match_end: %v", kinds)
@@ -455,20 +382,12 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 	}
 }
 
-// TestStopAtTarget_DeclareCrossingEmitsRevealThenMatchEnd covers the declare arm's
-// guard, which had NO test at all: deleting its three lines failed nothing, while
-// its absence ships an event:match_state ahead of event:match_end and races
-// MatchPage's stale-state redirect (Story 8.5-1 AC4).
-//
-// The crossing is the Croatian FOURTH answer — the one action that both closes the
-// contest and awards its points, so the reveal and the match end are owed in the
-// same ApplyAction.
+// A crossing on the Croatian fourth declaration answer emits the reveal and then
+// event:match_end, with no event:match_state ahead of it.
 func TestStopAtTarget_DeclareCrossingEmitsRevealThenMatchEnd(t *testing.T) {
 	answers := []int{1, 2, 3, 0}
 	winnerTeam, award := croatianFullContestAward(t, answers)
 
-	// The first three answers, applied to a session state seeded so the FOURTH
-	// crosses. Returned rather than inlined because both sub-tests need it.
 	seededThreeAnswers := func(t *testing.T, roomID uint, stopAtTarget bool) *game.GameState {
 		t.Helper()
 		gs := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
@@ -512,19 +431,12 @@ func TestStopAtTarget_DeclareCrossingEmitsRevealThenMatchEnd(t *testing.T) {
 		require.GreaterOrEqual(t, endIdx, 0, "and it ended the match: %v", kinds)
 		assert.Less(t, revealIdx, endIdx, "the reveal rides ahead of the match end: %v", kinds)
 
-		// THE guard. Without it broadcastState runs before handleMatchEnd, so a
-		// match_state arrives first and MatchPage may redirect on a match_end phase
-		// with no matchEndData yet.
 		if stateIdx := indexOf(kinds, ws.EventMatchState); stateIdx >= 0 {
 			assert.Greater(t, stateIdx, endIdx,
 				"match_state must not be broadcast ahead of match_end: %v", kinds)
 		}
 		assert.Equal(t, -1, indexOf(kinds, ws.EventHandScored), "%v", kinds)
 
-		// The reveal must still NAME its winner. This is what the removed
-		// accumulator-zeroing broke: broadcastDeclarationsResolvedIfTransition
-		// derives winnerTeam from DeclarationPoints[team] > 0, so a stop that
-		// emptied them shipped winnerTeam null with nothing for the panel to anchor.
 		payload := payloadOfKind(t, hub, before, ws.EventDeclarationsResolved)
 		got := declarationsResolvedWinner(t, payload)
 		require.NotNil(t, got,
@@ -597,8 +509,6 @@ func payloadOfKind(t *testing.T, hub *hubSpy, before int, kind string) json.RawM
 	return nil
 }
 
-// crossingTrickSeats is the play order for the mid-play fixtures below: seat 0
-// leads and the trick runs 0-1-2-3.
 var crossingTrickSeats = []int{0, 1, 2, 3}
 
 // seedCrossingTrick returns the TeamScores value that makes the given team land
@@ -653,19 +563,8 @@ func playCrossingTrick(t *testing.T, mgr *match.Manager, hub *hubSpy, roomID uin
 	return before
 }
 
-// TestStopAtTarget_StaleHandResultIsNotReAnnouncedOrPersisted is the session-layer
-// half of the LastHandResult nil-ing, and it is the half that shows the damage.
-//
-// From hand 2 onwards a real state carries the PREVIOUS hand's HandScore, because
-// startNewHand deliberately never clears it. Both handJustScored and
-// bufferHandResultIfScored gate on "LastHandResult != nil AND a transition into
-// match_end" — which a stop satisfies — so a stale result means a false
-// event:hand_scored for a hand that did not score, and the previous hand's
-// numbers written into a hand_results row for the aborted hand.
-//
-// Every other "no hand_scored / no hand rows" assertion in this file runs on a
-// hand-1 fixture whose result is nil to begin with, so they hold on the fixture
-// rather than on the code. This one does not.
+// From hand 2 the state still carries the previous hand's result, so a stop must
+// not re-announce it as event:hand_scored or persist it as a hand_results row.
 func TestStopAtTarget_StaleHandResultIsNotReAnnouncedOrPersisted(t *testing.T) {
 	const trickNum = 5
 	crossingTeam, seed := seedCrossingTrick(t, trickNum)
@@ -704,17 +603,8 @@ func TestStopAtTarget_StaleHandResultIsNotReAnnouncedOrPersisted(t *testing.T) {
 		"and hand 2's numbers must not be persisted as a hand_results row for the aborted hand")
 }
 
-// TestStopAtTarget_ClearsAnArmedTurnTimer pins the timer/prompt clears on a state
-// where they were actually SET. Every other assertion on them runs on a relaxed
-// fixture whose TurnExpiresAt was already nil, so it holds on the fixture.
-//
-// Honest about the blast radius: deleting those lines does not corrupt anything —
-// it regresses to the shape a NORMAL match end already has, because scoreHand
-// does not clear TurnExpiresAt either and the arm ladder in
-// applyAndBroadcastAction matches no branch on PhaseMatchEnd. So this test pins a
-// deliberate improvement over the pre-existing behaviour, not a crash: a finished
-// match must not ship a snapshot still advertising a live turn deadline that no
-// client can act on.
+// A stop clears an armed turn timer and prompt, so a finished match never ships a
+// snapshot advertising a live turn deadline.
 func TestStopAtTarget_ClearsAnArmedTurnTimer(t *testing.T) {
 	const (
 		trickNum = 5
@@ -734,10 +624,6 @@ func TestStopAtTarget_ClearsAnArmedTurnTimer(t *testing.T) {
 	gs := testfixtures.WithStopAtTarget(testfixtures.NewGameMidPlayWithScores(trickNum, 0, 0))
 	gs.RoomID = roomID
 	gs.TeamScores[crossingTeam] = seed
-	// A REAL armed deadline, the way a per-move turn actually arrives here. The
-	// intermediate plays re-arm it through setTurnExpiry; the crossing one lands on
-	// PhaseMatchEnd, where no arm branch runs — so whatever the engine leaves is
-	// what ships.
 	expiry := time.Now().Add(time.Duration(timerSec) * time.Second)
 	gs.TurnExpiresAt = &expiry
 	gs.TimerDurationSec = timerSec
@@ -750,8 +636,6 @@ func TestStopAtTarget_ClearsAnArmedTurnTimer(t *testing.T) {
 	require.GreaterOrEqual(t, indexOf(kinds, ws.EventMatchEnd), 0,
 		"the trick must have ended the match: %v", kinds)
 
-	// The trailing match_state is handleMatchEnd's, and it is the only one here:
-	// the ActionPlayCard arm returns on PhaseMatchEnd before broadcastState.
 	var snapshot struct {
 		Phase             string  `json:"phase"`
 		TurnExpiresAt     *string `json:"turnExpiresAt"`
@@ -773,9 +657,8 @@ func TestStopAtTarget_ClearsAnArmedTurnTimer(t *testing.T) {
 	assert.Nil(t, snapshot.SurrenderProposer)
 }
 
-// croatianDeclarationAward replays the three-seats-answered force-close with the
-// rule OFF, so the test below can seed the crossing team exactly without
-// hard-coding a meld total that would drift with any meld-value change.
+// croatianDeclarationAward replays the three-seats-answered force-close with the rule
+// off, so the test below can seed the crossing team exactly.
 func croatianDeclarationAward(t *testing.T, answered []int) (winnerTeam, award int) {
 	t.Helper()
 	gs := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
@@ -798,11 +681,8 @@ func croatianDeclarationAward(t *testing.T, answered []int) (winnerTeam, award i
 	return game.TeamA, closed.DeclarationPoints[game.TeamA]
 }
 
-// TestStopAtTarget_DeclarationTimeoutRunsHandleMatchEnd is the stalled-table fix.
-// handleDeclarationTimeout is the one path that can end a match without any
-// player action, and it had no PhaseMatchEnd branch: this test fails by TIMING
-// OUT on a table that never persists, never settles and never releases its
-// session — which is exactly the symptom it guards.
+// A declaration timeout that crosses the target runs handleMatchEnd; without it the
+// table never persists, settles or releases its session and this test times out.
 func TestStopAtTarget_DeclarationTimeoutRunsHandleMatchEnd(t *testing.T) {
 	answered := []int{1, 2, 3}
 	winnerTeam, award := croatianDeclarationAward(t, answered)
@@ -832,10 +712,6 @@ func TestStopAtTarget_DeclarationTimeoutRunsHandleMatchEnd(t *testing.T) {
 	before := len(hub.snapshot())
 	mgr.TriggerDeclarationTimeoutForTest(roomID, 10*time.Millisecond)
 
-	// Waits on BOTH the persisted row and the teardown, because handleMatchEnd
-	// persists first and only removes the session after its broadcasts: polling on
-	// the match row alone and then asserting HasSession immediately is a race the
-	// test loses intermittently.
 	require.Eventually(t, func() bool {
 		return len(repo.getMatches()) == 1 && !mgr.HasSession(roomID)
 	}, 2*time.Second, 5*time.Millisecond,
@@ -849,8 +725,6 @@ func TestStopAtTarget_DeclarationTimeoutRunsHandleMatchEnd(t *testing.T) {
 	assert.Empty(t, repo.getHands(0),
 		"the aborted hand gets no hand_results row")
 
-	// The reveal still fires — the contest really did resolve — and it rides
-	// ahead of the match end, the same ordering the answer-driven path sends.
 	kinds := eventKindsAfter(t, hub, before)
 	revealIdx := indexOf(kinds, ws.EventDeclarationsResolved)
 	endIdx := indexOf(kinds, ws.EventMatchEnd)
@@ -868,14 +742,8 @@ func teamScoreFor(m *match.Match, team int) int {
 	return m.TeamBScore
 }
 
-// TestStopAtTarget_MatchEndPayloadNamesTheStop is the client's only signal that a
-// match ended mid-hand. Without a distinct outcome reason the match-end screen
-// shows a jumped score, a finished match and cards still in the player's hand,
-// with nothing saying why — observed in a live browser run before this landed.
-//
-// The reason is read from the engine's StoppedAtTarget flag rather than inferred:
-// "StopAtTarget on and LastHandResult nil" also describes a surrender and an
-// instant win.
+// The match-end payload names the stop as its outcome reason, read from the engine's
+// StoppedAtTarget flag rather than inferred.
 func TestStopAtTarget_MatchEndPayloadNamesTheStop(t *testing.T) {
 	const roomID = uint(760)
 	hub := &hubSpy{}

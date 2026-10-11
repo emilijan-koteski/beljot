@@ -16,10 +16,8 @@ import (
 
 const authTimeout = 10 * time.Second
 
-// TokenValidator validates a JWT token string and returns the parsed audience
-// and subject (userID as string). Injected at construction time so the ws
-// package does not need to import auth (which would create an import cycle via
-// auth→user→match→ws).
+// TokenValidator validates a JWT and returns its audience and subject (the userID).
+// It is injected so ws does not import auth, which would create an import cycle.
 type TokenValidator func(token string) (audience []string, subject string, err error)
 
 // WSHandler handles WebSocket upgrade and authentication.
@@ -48,7 +46,6 @@ func (h *WSHandler) HandleWS(c echo.Context) error {
 	}
 	defer func() { _ = conn.CloseNow() }()
 
-	// Read first message as auth handshake with timeout
 	authCtx, cancel := context.WithTimeout(context.Background(), authTimeout)
 	defer cancel()
 
@@ -65,7 +62,6 @@ func (h *WSHandler) HandleWS(c echo.Context) error {
 		return nil
 	}
 
-	// Parse token from payload
 	var payload struct {
 		Token string `json:"token"`
 	}
@@ -75,7 +71,6 @@ func (h *WSHandler) HandleWS(c echo.Context) error {
 		return nil
 	}
 
-	// Validate JWT via injected validator (keeps ws free of auth import).
 	audience, subject, err := h.ValidateToken(payload.Token)
 	if err != nil {
 		sendError(conn, ErrorAuthFailed, "invalid or expired token")
@@ -96,15 +91,12 @@ func (h *WSHandler) HandleWS(c echo.Context) error {
 		return nil
 	}
 
-	// Auth success — send confirmation
 	sendSuccess(conn, uint(userID))
 	slog.Info("ws: client authenticated", "userID", userID)
 
-	// Create client and register with hub
 	client := NewClient(conn, h.Hub, uint(userID))
 	h.Hub.register <- client
 
-	// Start read/write pumps — these block until connection closes
 	go client.writePump()
 	client.readPump()
 

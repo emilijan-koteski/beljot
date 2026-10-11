@@ -99,24 +99,8 @@ type recalcFixture struct {
 	idle                    *user.User
 }
 
-// seedRecalcSeason builds a season window no other test uses, queues its job,
-// and stores a small window worked by hand with the live constants (W=30,
-// L=20, S=385, bot seat 600, Capot +5):
-//
-//  1. alice + bot vs two bots, alice wins 1100:700 from 0 SP. Own avg 300 vs
-//     600, E = 0.1426, m = 0.8996: +46.
-//  2. alice, bob, carol, dave (team A = alice, carol); dave abandons at
-//     300:500. A avg 23 vs B avg 0, E_A = 0.5343; scored as B surrendering,
-//     m = 0.5 + (1001 - 500)/1001 = 1.0005: alice and carol +28, dave -120
-//     and bob half of -18.64 = -9, both floored at 0.
-//  3. A boot-reconcile placeholder with all four: skipped.
-//  4. 501, alice + bot vs two bots, an instant win (0:0) with a Capot by
-//     alice's team. Own avg 337 vs 600, E = 0.1718, m = 1.5: +75 +5 = +80.
-//
-// Before the run, alice holds an old-formula row (30841 SP, Grandmaster, 99
-// games), bob, carol and dave have no row (they played before SP tracking),
-// idle has a row but no match in the window, and alice also has a row in the
-// following season.
+// seedRecalcSeason builds an unused season window, queues its job and stores a small hand-worked set of matches.
+// Before the run alice holds a stale old-formula row and the other players have none.
 func seedRecalcSeason(t *testing.T, db *gorm.DB) recalcFixture {
 	t.Helper()
 	start := time.Date(2093, time.July, 1, 0, 0, 0, 0, time.UTC)
@@ -152,11 +136,9 @@ func seedRecalcSeason(t *testing.T, db *gorm.DB) recalcFixture {
 	m4.MatchMode, m4.CompletedAt = "501", at(4*time.Hour)
 	m4.Hands = []match.HandResult{{HandNumber: 1, Capot: true, CapotTeam: intPtr(0)}}
 
-	// Stored out of completion order, so only completed_at can put them right.
 	for _, m := range []match.Match{m4, m2, m1, m3} {
 		storeMatch(t, db, roomID, m)
 	}
-	// Outside the window on both sides: never replayed.
 	before := replayBotTable(0, fx.alice.ID, 0, 1100, 700)
 	before.CompletedAt = start.Add(-time.Second)
 	after := replayBotTable(0, fx.alice.ID, 0, 1100, 700)
@@ -188,15 +170,11 @@ func TestRunPendingRecalculations_RewritesTheSeasonFromItsMatches(t *testing.T) 
 	assert.Equal(t, []uint{fx.idle.ID}, res.Untouched)
 
 	assert.Equal(t, map[uint]storedRow{
-		// 46 + 28 + 80: the old-formula row is overwritten, games recounted.
 		fx.alice.ID: {SP: 154, RankTier: season.TierBronze, RankDivision: intPtr(1), GamesPlayed: 3, GamesCompleted: 3},
-		// Pre-tracking players get a row.
 		fx.bob.ID:   {SP: 0, RankTier: season.TierIron, RankDivision: intPtr(1), GamesPlayed: 1, GamesCompleted: 1},
 		fx.carol.ID: {SP: 28, RankTier: season.TierIron, RankDivision: intPtr(1), GamesPlayed: 1, GamesCompleted: 1},
-		// The abandoner: -120 applied (floored at 0), and not completed.
-		fx.dave.ID: {SP: 0, RankTier: season.TierIron, RankDivision: intPtr(1), GamesPlayed: 1, GamesCompleted: 0},
-		// Not in the replay: left exactly as it was.
-		fx.idle.ID: {SP: 420, RankTier: season.TierSilver, GamesPlayed: 3, GamesCompleted: 3},
+		fx.dave.ID:  {SP: 0, RankTier: season.TierIron, RankDivision: intPtr(1), GamesPlayed: 1, GamesCompleted: 0},
+		fx.idle.ID:  {SP: 420, RankTier: season.TierSilver, GamesPlayed: 3, GamesCompleted: 3},
 	}, seasonRows(t, db, fx.season.ID))
 
 	assert.Equal(t, &storedRow{SP: 777, RankTier: season.TierGold, GamesPlayed: 5, GamesCompleted: 5},
@@ -206,7 +184,6 @@ func TestRunPendingRecalculations_RewritesTheSeasonFromItsMatches(t *testing.T) 
 	require.NotNil(t, done, "the job reads done")
 	assert.True(t, done.Equal(now))
 
-	// The rows are exactly the replay of the window.
 	replay, err := season.ReplayWindow(db, fx.season.StartedAt, fx.season.EndsAt, season.DefaultSPFormula(), season.DefaultLadder())
 	require.NoError(t, err)
 	rows := seasonRows(t, db, fx.season.ID)
@@ -231,7 +208,6 @@ func TestRunPendingRecalculations_RunsOnceAndIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	first := seasonRows(t, db, fx.season.ID)
 
-	// Scribble on a row: a second run must not repair it, because it does not run.
 	require.NoError(t, db.Exec(`UPDATE player_seasons SET sp = 1 WHERE user_id = ? AND season_id = ?`,
 		fx.carol.ID, fx.season.ID).Error)
 	again, err := season.RunPendingRecalculations(db, now.Add(time.Hour))
@@ -270,10 +246,7 @@ func TestRunPendingRecalculations_NoSeasonRowMarksTheJobDone(t *testing.T) {
 	assert.True(t, done.Equal(now))
 }
 
-// The job transaction bounds its lock waits and statements, so a lock another
-// session holds fails the job (pending, retried next start) instead of hanging
-// boot. SET LOCAL outlives the job's released savepoint until the test
-// transaction ends, which is what lets the test read the values back.
+// The job transaction bounds its lock and statement waits so a held lock fails the job instead of hanging boot.
 func TestRunPendingRecalculations_BoundsItsWaits(t *testing.T) {
 	db := recalcDB(t)
 	setting := func(name string) string {
@@ -299,9 +272,6 @@ func TestRunPendingRecalculations_AFailedJobStaysPending(t *testing.T) {
 	otherStart := time.Date(2094, time.July, 1, 0, 0, 0, 0, time.UTC)
 	queueRecalculation(t, db, otherStart)
 
-	// Make carol's recalculated total (28) unwritable, so the job fails on its
-	// third row, after alice's and bob's. NOT VALID so the rows already in the
-	// table are not checked; the test drops it again before the retry.
 	require.NoError(t, db.Exec(`ALTER TABLE player_seasons ADD CONSTRAINT recalc_test_refuse CHECK (sp <> 28) NOT VALID`).Error)
 
 	results, err := season.RunPendingRecalculations(db, time.Date(2094, time.August, 1, 0, 0, 0, 0, time.UTC))

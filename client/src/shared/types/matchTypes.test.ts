@@ -23,17 +23,11 @@ describe("gameTypes", () => {
   });
 
   describe("Phase", () => {
-    // Exhaustiveness map rather than a list. `Record<Phase, true>` makes a
-    // missing member a tsc error and an unknown one an excess-property error,
-    // so widening the union without updating this fails the BUILD. An array the
-    // test writes itself can only ever agree with whatever it was handed — its
-    // length assertion never catches a union change.
     it("names every member of the Phase union", () => {
       const ALL_PHASES: Record<Phase, true> = {
         "": true,
         dealing: true,
         bidding: true,
-        // Dedicated declaration phase — between bidding and trick 1.
         declaring: true,
         playing: true,
         trick_resolving: true,

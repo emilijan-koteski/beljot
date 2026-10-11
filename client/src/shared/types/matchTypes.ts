@@ -1,77 +1,24 @@
-// Card ID format: two-character strings (rank + suit)
-// Rank: 7, 8, 9, T (ten), J, Q, K, A
-// Suit: S (spades), H (hearts), D (diamonds), C (clubs)
-// Examples: KS = King of Spades, TH = Ten of Hearts
-
 export type Suit = "S" | "H" | "D" | "C";
 export type Rank = "7" | "8" | "9" | "T" | "J" | "Q" | "K" | "A";
+
+/** Two-character card id, rank then suit, e.g. "KS" (King of Spades) or "TH" (Ten of Hearts). */
 export type CardId = `${Rank}${Suit}`;
 
-// VARIANTS is every game variant, as a runtime VALUE so that a surface which
-// has to enumerate them (the rules page's tab bar, the in-match rules overlay)
-// derives its list from the union instead of hand-copying it. `Variant` is
-// derived FROM this array, so the two can never disagree.
-//
-// Order is presentation order: `bitola` first — the create-room default and the
-// fallback everywhere a variant is unknown (Quick Play itself now synthesizes
-// Croatian/501 rooms).
 export const VARIANTS = ["bitola", "croatia"] as const;
 
 export type Variant = (typeof VARIANTS)[number];
 
-/**
- * Narrow an untrusted variant string to the union, falling back to `bitola`.
- *
- * The fallback mirrors the engine's own (`game.RulesFor` resolves anything
- * unrecognised to the Bitola preset) so client and server agree on what an
- * unknown variant means. It exists as ONE function because the hand-rolled
- * `v === "croatia" ? "croatia" : "bitola"` it replaces silently resolved every
- * future variant to Bitola with no type error — which, on the rules surfaces, is
- * a page describing the wrong rules over a live table.
- */
+/** Narrow an untrusted variant string to the union, falling back to `bitola` like the engine's `game.RulesFor`. */
 export function normalizeVariant(v: unknown): Variant {
   return VARIANTS.includes(v as Variant) ? (v as Variant) : "bitola";
 }
 
-/**
- * The card-face artwork a player has chosen (Story 12.4). `french` is the
- * original French-suited deck; `croatian` is the German/Hungarian-suited deck
- * (leaves / hearts / bells / acorns).
- *
- * PURELY VISUAL — it selects assets and nothing else. No gameplay, engine, WS
- * payload or bot behaviour reads it.
- *
- * NOT the game variant. This is `croatian`; the variant is `croatia` (see
- * `Variant` above). Two unrelated enums that happen to share a country — a
- * Croatian-variant room does not imply the Croatian deck.
- *
- * Lives here beside `Suit` and `Variant` because it is a wire value carried on
- * the auth envelope and the profile DTO: `shared/` must not reach into
- * `features/` for the type of one of its own fields. `features/match/lib/cardFace`
- * re-exports it for the render code that lives next to it.
- */
+/** The player's chosen card-face artwork, purely visual and unrelated to the `croatia` variant. */
 export type CardDeck = "french" | "croatian";
 
-// The race target for a match. Stringly-typed end to end until now (D139): the
-// server sends "1001"/"501" as a string and every consumer re-tested it with a
-// bare === against a string literal, so a typo produced a silent fallback
-// rather than a compile error.
+/** The race target for a match. */
 export type MatchMode = "1001" | "501";
 
-// SERVER_PHASES is every phase the server can send, in state-machine order.
-// It is a runtime VALUE, not just a type, for two reasons: the Zod schema needs
-// it to validate `phase` as an enum rather than a bare string, and the contract
-// test can compare it byte-for-byte against the Go-owned golden
-// (server/internal/ws/testdata/events/phases.json). Before this existed the
-// phase string was matched by nothing but hand-copying, so a server constant
-// and its client union member could drift with no test failing anywhere.
-//
-// Keep in the SAME ORDER as game.AllPhases() — wsEvents.contract.test.ts
-// compares the two as ordered lists.
-//
-// "declaring" is the dedicated declaration phase between bidding and trick 1.
-// The server decides when it happens — the client only reacts to the phase it
-// is told it is in, and derives nothing about it from the variant.
 export const SERVER_PHASES = [
   "dealing",
   "bidding",
@@ -85,8 +32,7 @@ export const SERVER_PHASES = [
   "disconnected",
 ] as const;
 
-// "" is client-local ("no game loaded") and is never sent by the server, which
-// is why it lives here rather than in SERVER_PHASES.
+/** A server phase, or "" when the client has no game loaded. */
 export type Phase = "" | (typeof SERVER_PHASES)[number];
 
 export type ActionType =
@@ -106,9 +52,7 @@ export type ActionType =
 
 export type DeclarationType = "sequence" | "four_of_a_kind";
 
-// Team string literal — full word, never bare "a"/"b" (Winston's grep-ability rule).
-// Conversion between the integer team index (0/1) used in payload fields and this
-// string literal lives in exactly one helper, `teamStringForIndex`.
+/** Team literal; convert from the 0/1 payload index only through `teamStringForIndex`. */
 export type TeamString = "teamA" | "teamB";
 
 export function teamStringForIndex(i: 0 | 1): TeamString;
@@ -136,6 +80,7 @@ export interface TrickCard {
   playerSeat: number;
 }
 
+/** One seat of the match state; only the viewer's own `hand` carries cards, other seats render from `handCount`. */
 export interface PlayerState {
   hand: Card[];
   seat: number;
@@ -144,38 +89,11 @@ export interface PlayerState {
   team: TeamString;
   declarations: Declaration[];
   connected: boolean;
-  // Bot seats carry userId 0 + empty username; display surfaces render the
-  // localized seat-derived bot name. Check with `isBot === true`, never
-  // truthiness on userId/username.
   isBot: boolean;
-  // Server-authoritative lifetime level (derived from total_xp), captured once
-  // at match start and static for the whole match. Bot seats are 0.
   level: number;
-  // The player's 128 px avatar, captured at match start like `level`; null for
-  // bots and players without one.
   avatarUrl: string | null;
-  // How many cards this seat holds face-down, outside `hand`. Non-zero only
-  // while a Croatian hand is still bidding; 0 everywhere else.
-  //
-  // A count, never the cards: the identities are server-only, and the viewer's
-  // own two arrive on a per-seat event. A seat's rendered stack is
-  // `handCount + faceDownCount`, which is server-authoritative and needs no
-  // client-side variant branch.
   faceDownCount: number;
-  // How many cards this seat holds in `hand` — the open-hand counterpart of
-  // faceDownCount. The server projects every match_state per recipient
-  // (Story 12.10): only the viewer's own `hand` carries cards, every other
-  // seat's arrives empty, and this count is what renders their card backs.
-  // Real hand length on all four seats, the viewer's own included.
   handCount: number;
-  // Whether this seat has answered the dedicated declaration phase — declared
-  // or skipped. Always false outside `phase: "declaring"`.
-  //
-  // Public for all four seats, and safe because the phase asks EVERY seat
-  // regardless of what it holds: this says who has clicked, never who holds a
-  // meld. Drives the viewer's own dialog into its "waiting for the others"
-  // state and survives a reconnect mid-phase, so an answered seat is never
-  // handed a second answer.
   declarationAnswered: boolean;
 }
 
@@ -195,6 +113,7 @@ export interface HandResult {
   teamBHandTotal: number;
 }
 
+/** The match state as projected for one recipient; the server is authoritative on every rule. */
 export interface MatchState {
   id: number;
   roomId: number;
@@ -209,43 +128,8 @@ export interface MatchState {
   trumpCandidate: Card | null;
   biddingRound: number;
   biddingPassCount: number;
-  /** Server-authoritative: the seat on the clock has NO legal pass, so
-   *  pick_trump is its only bid (the dealer, speaking fourth in the single
-   *  bidding round of a variant where the hand must find a taker). Drives
-   *  whether the trump prompt offers a Pass control — the client never
-   *  re-derives the rule. */
   mustPickTrump: boolean;
-  /** Whether this room plays WITH melds and the Belote/Rebelote bonus. False is
-   *  "bez zvanja": the engine skips Bitola's trick-1 prompt, Croatian's
-   *  dedicated declaration phase, and the K+Q-of-trump prompt, and both
-   *  declarationPoints and belotPoints stay [0, 0] all match.
-   *
-   *  The owner's room setting, chosen at creation and fixed for the match. The
-   *  client renders a label from it and derives no rule — the server is
-   *  authoritative on the skip, as it is on every rule.
-   *
-   *  REQUIRED, unlike the same field on `Room` and `RoomCreatedPayload`. The
-   *  difference is which surface validates its shape: match_state is parsed by
-   *  EventMatchStateSchema, a z.strictObject that requires this key, so a payload
-   *  without it is rejected before the store ever sees it. Read it directly here.
-   *  The room payloads have no such schema, so they keep the field optional and
-   *  every reader compares `=== false` so that absent means ON. */
   declarationsEnabled: boolean;
-  /** "Dosta": true when the match ends the INSTANT a team's running total (match
-   *  score + this hand's card points, declarations and Belote) reaches the
-   *  1001/501 target, with the hand left unfinished and neither the last-trick
-   *  +10 nor the Capot +100 awarded. False — the default — finishes the hand and
-   *  checks the target once, after scoring.
-   *
-   *  The owner's room setting, chosen at creation and fixed for the match. The
-   *  client renders a label from it and derives no rule: the engine alone decides
-   *  when a match stops, as it does for every rule.
-   *
-   *  REQUIRED, for exactly the reason declarationsEnabled above is: match_state
-   *  is parsed by EventMatchStateSchema, a z.strictObject that requires this key,
-   *  so a payload without it never reaches the store. The room payloads have no
-   *  such schema, so they keep the field optional and every reader compares
-   *  `=== true` so that absent means OFF. */
   stopAtTarget: boolean;
   activePlayerSeat: number;
   trickNumber: number;
@@ -258,8 +142,6 @@ export interface MatchState {
   teamScores: [number, number];
   handPoints: [number, number];
   declarationPoints: [number, number];
-  /** Belote/rebelote bonus (K+Q of trump). Classified as a declaration, kept
-   *  separate from handPoints (card points). See server GameState.BelotPoints. */
   belotPoints: [number, number];
   tricksWon: [number, number];
   pendingBelotSeat: number | null;
@@ -276,9 +158,5 @@ export interface MatchState {
   surrenderUsed: [boolean, boolean, boolean, boolean];
   disconnectedSeat: number;
   reconnectExpiresAt: string | null;
-  /** Per-seat reconnect window expiry (RFC3339, nullable per seat). The
-   *  server tracks one window per disconnected player so concurrent drops
-   *  don't share a clock — `disconnectedSeat` / `reconnectExpiresAt` above
-   *  remain the legacy view of whichever seat closes soonest. */
   playerReconnectExpiresAt: [string | null, string | null, string | null, string | null];
 }

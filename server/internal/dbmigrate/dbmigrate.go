@@ -1,5 +1,3 @@
-// Package dbmigrate applies the SQL migrations embedded in server/migrations at
-// process start, so a deploy is a single image with no separate migrate step.
 package dbmigrate
 
 import (
@@ -16,12 +14,8 @@ import (
 	"github.com/emilijan/beljot/server/migrations"
 )
 
-// Up applies every pending migration and returns the resulting schema version.
-// It opens its own short-lived connection: the driver closes whatever *sql.DB
-// it is handed, so sharing the app's pool would tear the pool down. A Postgres
-// advisory lock inside golang-migrate keeps two replicas from racing. A dirty
-// version (a half-applied migration) is reported by Up itself as
-// migrate.ErrDirty, so it cannot slip through to Version.
+// Up applies every pending embedded migration and returns the resulting schema version.
+// It opens its own connection because the migrate driver closes the *sql.DB it is given.
 func Up(databaseURL string) (uint, error) {
 	src, err := iofs.New(migrations.FS, ".")
 	if err != nil {

@@ -9,11 +9,7 @@ interface ClassicButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /**
- * Action button used inside ClassicPanel overlays.
- *
- *  • `primary` — brass gradient + dark engraved label (Take, Continue,
- *    Announce Belot…).
- *  • `ghost`   — translucent felt with brass border (Pass, Decline, Skip…).
+ * Action button used inside ClassicPanel overlays, as a brass `primary` or a translucent felt `ghost`.
  */
 export const ClassicButton = forwardRef<HTMLButtonElement, ClassicButtonProps>(
   function ClassicButton(

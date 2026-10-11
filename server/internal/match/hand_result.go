@@ -3,11 +3,7 @@ package match
 import "time"
 
 // HandResult persists the scoring breakdown for a single completed hand of a match.
-// Buffered in session memory during play, then flushed transactionally alongside
-// the Match row via MatchRepository.CreateWithHands when the match ends.
-//
-// Distinct from game.HandScore (the in-memory broadcast struct): this type is
-// DB-facing and carries MatchID + HandNumber, not the match-lifecycle fields.
+// It is written alongside the Match row by MatchRepository.CreateWithHands.
 type HandResult struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	MatchID         uint      `gorm:"not null;index;uniqueIndex:idx_hand_results_match_hand" json:"matchId"`

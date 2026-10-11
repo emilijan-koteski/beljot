@@ -1,17 +1,10 @@
 /// <reference types="vite/client" />
 
-/**
- * Build identity injected by Vite `define` (vite.config.ts): the commit SHA in
- * CI images, "dev" locally. NOT defined under vitest (separate config), so read
- * it through shared/lib/appVersion.ts, which guards with `typeof`.
- */
+/** Build identity injected by Vite `define`; undefined under vitest, so read it via shared/lib/appVersion.ts. */
 declare const __APP_VERSION__: string;
 
+/** Vite env vars; the Google button is hidden when VITE_GOOGLE_CLIENT_ID is unset or empty. */
 interface ImportMetaEnv {
-  /**
-   * Google OAuth client ID for the GIS "Continue with Google" button.
-   * Optional — when unset/empty the button is hidden entirely.
-   */
   readonly VITE_GOOGLE_CLIENT_ID?: string;
 }
 

@@ -115,8 +115,6 @@ describe("legalCards", () => {
   });
 
   it("must follow led suit and overplay highest non-trump led-suit card on the table", () => {
-    // Trump is clubs; spades led with QS, then opponent KS (non-trump rank
-    // order: K=5, Q=4). Hand has TS (6), 7S (0). Must overplay → only TS.
     const myHand = hand(["7S", "TS", "KD", "AC"]);
     const state = makeState({
       mySeat: 3,
@@ -129,8 +127,6 @@ describe("legalCards", () => {
   });
 
   it("falls back to all led non-trump suit cards when no overplay exists", () => {
-    // Trump is diamonds; hearts led with KH. Hand: 7H (0), 8H (1) — both
-    // below KH (5). No overplay possible → both 7H and 8H are legal (rule 2).
     const myHand = hand(["7H", "8H"]);
     const state = makeState({
       mySeat: 2,
@@ -143,11 +139,6 @@ describe("legalCards", () => {
   });
 
   it("led non-trump cut by trump → any heart legal, off-suit and trump excluded", () => {
-    // Trump is diamonds. Hearts led with KH; seat 3 (opponent of seat 2)
-    // trumped with 7D. Hand has 8H, AH, KC and a trump QD. Once a trump has cut
-    // the trick the led suit can no longer win, so both 8H and AH are legal
-    // follows — but holding the led suit forces a follow, so the off-suit KC
-    // and even the trump QD stay illegal.
     const myHand = hand(["8H", "AH", "KC", "QD"]);
     const state = makeState({
       mySeat: 2,
@@ -164,9 +155,6 @@ describe("legalCards", () => {
   });
 
   it("multiple higher led-suit cards — all strictly higher are legal", () => {
-    // Trump=diamonds. Hearts led with JH (non-trump rank 3). Hand has QH (4),
-    // KH (5), AH (7) — all strictly higher than JH. The helper must return
-    // every overplay, not just the maximum.
     const myHand = hand(["QH", "KH", "AH", "8C"]);
     const state = makeState({
       mySeat: 1,
@@ -179,11 +167,6 @@ describe("legalCards", () => {
   });
 
   it("must overplay led non-trump even when highest card on table came from partner", () => {
-    // Partner exemption applies only to void-in-led-suit (rule 3). When the
-    // player has led-suit cards, the overplay rule still applies regardless
-    // of who played the current high card.
-    // Trump=diamonds. Seat 2 (partner of seat 0) led KH; seat 1 (opp) plays 7H.
-    // Seat 0's hand: 8H, AH. Must overplay → only AH.
     const myHand = hand(["8H", "AH"]);
     const state = makeState({
       mySeat: 0,
@@ -196,8 +179,6 @@ describe("legalCards", () => {
   });
 
   it("must over-trump when led suit is trump and over-trump exists", () => {
-    // Trump is spades, led spades with 9S (order 6). My hand has JS (7) and 7S (0).
-    // Must play JS (only over-trump).
     const myHand = hand(["7S", "JS", "AH"]);
     const state = makeState({
       mySeat: 1,
@@ -210,8 +191,6 @@ describe("legalCards", () => {
   });
 
   it("falls back to any card of led trump suit when no over-trump", () => {
-    // Trump is spades, led spades with JS (order 7, top). No over-trump possible.
-    // Can play any spade.
     const myHand = hand(["7S", "9S", "AH"]);
     const state = makeState({
       mySeat: 1,
@@ -224,9 +203,6 @@ describe("legalCards", () => {
   });
 
   it("must trump when void in led suit and opponent is winning", () => {
-    // Opponent (seat 0, team A) led 10D and is winning the trick.
-    // I'm seat 1 (team B), void in diamonds, holding two clubs (trump) and a heart.
-    // Must trump.
     const myHand = hand(["8C", "9C", "AH"]);
     const state = makeState({
       mySeat: 1,
@@ -240,9 +216,6 @@ describe("legalCards", () => {
   });
 
   it("must over-trump when void and opponent has already trumped", () => {
-    // Led diamonds. Seat 2 (opponent of seat 1) trumped with 8C (order 1).
-    // I'm seat 1, void in diamonds. My trumps: 7C (order 0), JC (order 7).
-    // Must over-trump → only JC.
     const myHand = hand(["7C", "JC", "AH"]);
     const state = makeState({
       mySeat: 1,
@@ -255,11 +228,6 @@ describe("legalCards", () => {
   });
 
   it("void in led suit with trump in hand → must cut even when partner is winning", () => {
-    // Bitola variant has no partner-winning exemption: a void player who holds
-    // any trump must cut. Seat 2 leads TD; seat 3 plays 7D. Seat 0 (partner of
-    // seat 2 — team A) is void in D and holds trump clubs 8C/9C plus AH.
-    // No trump is on the table yet, so the over-trump filter falls through and
-    // both trumps are legal; AH (non-trump) must be excluded.
     const myHand = hand(["8C", "9C", "AH"]);
     const state = makeState({
       mySeat: 0,
@@ -273,9 +241,6 @@ describe("legalCards", () => {
   });
 
   it("img_two: void with trump, partner already trumped — must over-trump, diamonds illegal", () => {
-    // Trump = Hearts. Trick: cvetanka(seat 1) 9C, emilijan(seat 2) QH (trump),
-    // irena(seat 3) 7C. Kiro(seat 0) is void in clubs and holds 9H + TH (over-
-    // trump QH(2)) plus diamonds. Only the over-trumps are legal.
     const myHand = hand(["9H", "TH", "8D", "TD", "JD", "QD", "AD"]);
     const state = makeState({
       mySeat: 0,
@@ -289,10 +254,6 @@ describe("legalCards", () => {
   });
 
   it("img_three: void with one trump, partner winning non-trump — only that trump", () => {
-    // Trump = Spades. Trick: cvetanka(seat 1) 9C, kiro(seat 2) AC (partner of
-    // seat 0 — team A), irena(seat 3) TC. Emilijan(seat 0) is void in clubs and
-    // holds the single trump 8S plus J♦ + K♦. With no trump on the table yet,
-    // the only legal play is 8S; both diamonds must be excluded.
     const myHand = hand(["8S", "JD", "KD"]);
     const state = makeState({
       mySeat: 0,
@@ -306,10 +267,6 @@ describe("legalCards", () => {
   });
 
   it("img_four: void in non-trump, no trump on table yet — every trump legal, no non-trumps", () => {
-    // Trump = Hearts. Trick: irena(seat 1) 7S, cvetanka(seat 2) 9S, partner
-    // emilijan(seat 3) plays a club (no spades, no trumps). Kiro(seat 0) is
-    // void in spades and holds four hearts plus three diamonds. With no trump
-    // on the table, every heart in hand is legal and every diamond is illegal.
     const myHand = hand(["7H", "8H", "TH", "KH", "7D", "8D", "TD"]);
     const state = makeState({
       mySeat: 0,
@@ -323,9 +280,6 @@ describe("legalCards", () => {
   });
 
   it("void with trump, partner already winning with a trump — falls through to any trump", () => {
-    // Branch fallback: void in led suit, has trumps, but none over-trumps the
-    // highest trump on the table (which happens to belong to partner). Must
-    // still cut — non-trump card stays illegal.
     const myHand = hand(["QH", "KH", "7C"]);
     const state = makeState({
       mySeat: 0,
@@ -352,10 +306,6 @@ describe("legalCards", () => {
   });
 
   it("derives led suit from currentTrick[0] when leadSuit is stale/null (race between card_played and match_state)", () => {
-    // Simulates the window after event:card_played has appended the opener to
-    // currentTrick but the follow-up event:match_state hasn't synced leadSuit yet.
-    // Without deriving from currentTrick, the leadSuit===null fallback would
-    // return the full hand and all cards would flash as legal.
     const myHand = hand(["7S", "KS", "AH", "9D"]);
     const state = makeState({
       mySeat: 0,
@@ -376,7 +326,6 @@ describe("legalCards", () => {
       leadSuit: null,
       currentTrick: [],
     });
-    // Simulate server sending null instead of [] — cast to bypass the type lie.
     (state as unknown as { currentTrick: TrickCard[] | null }).currentTrick = null;
     expect(legalCards(state, 0)).toEqual(myHand);
   });

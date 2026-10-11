@@ -99,6 +99,8 @@ import { compassOffset, SLOT_POSITIONS } from "./lib/trickLayout";
 import { useDealController } from "./lib/useDealController";
 import { rulesForVariant } from "./lib/variantRules";
 
+const TAILWIND_MD_PX = 768;
+
 function rectFrom(el: Element | null): FlightRect | null {
   if (!el) return null;
   const r = el.getBoundingClientRect();
@@ -106,17 +108,13 @@ function rectFrom(el: Element | null): FlightRect | null {
   return { left: r.left, top: r.top, width: r.width, height: r.height };
 }
 
+/** Measures a trick slot's rect from its DOM anchor, falling back to trick-area
+ *  offsets when the anchor is not laid out yet. */
 function measureTrickSlotRect(compass: 0 | 1 | 2 | 3): FlightRect | null {
-  // Prefer the dedicated slot anchor — TrickArea always renders a
-  // `data-testid="trick-slot-{compass}"` element at each slot position so
-  // the overlay can measure the real DOM rect (the spec's "Always" rule).
   const slotEl = document.querySelector(`[data-testid="trick-slot-${compass}"]`);
   const slotRect = rectFrom(slotEl);
   if (slotRect) return slotRect;
 
-  // Fallback: trick-area rect + relative slot offsets. Used when the slot
-  // anchor isn't laid out yet (initial render race) or in tests where
-  // jsdom doesn't compute layout.
   const ta = document.querySelector('[data-testid="trick-area"]');
   const r = rectFrom(ta);
   if (!r) return null;
@@ -131,10 +129,8 @@ function measureTrickSlotRect(compass: 0 | 1 | 2 | 3): FlightRect | null {
   };
 }
 
+/** Mid-flight waypoint for the self throw: a slot-sized rect at viewport bottom-center. */
 function viewportBottomCenterRect(): FlightRect {
-  // Mid-flight waypoint for the self throw — the card visibly arcs through
-  // viewport bottom-center before continuing up to the south slot. Width
-  // matches `md` so the size morph stays continuous through the waypoint.
   const w = TRICK_SLOT_W;
   const h = TRICK_SLOT_H;
   return {
@@ -146,57 +142,35 @@ function viewportBottomCenterRect(): FlightRect {
 }
 
 /**
- * Final rect for a trick-collect flight. Returns a TRICK_SLOT-sized rect
- * (no scaling — pure translate-and-fade) anchored to the winner's compass
- * position in viewport coords.
- *
- * Why compass + viewport, not DOM measurement: DOM measurement here turned
- * out to be flaky (deck stack visibility-toggling on the last trick of a
- * hand, and a recurring "always lands at the same seat" race when the
- * effect captured a stale rect). The seat positions in `SEAT_POSITIONS`
- * are hard-anchored to the viewport edges via CSS, so we can compute the
- * destination directly from the compass without consulting the DOM at
- * collect time. The rim insets mirror `SEAT_POSITIONS` per breakpoint:
- * phones hug the edge (`right-3 / top-6 / left-3` = 12 / 24 / 12 px), md+
- * sits off the wood rim (`right-16 / top-16 / left-16` = 64 px). The inboard
- * nudge (~half the seat frame) lands the cards near the seat's avatar.
+ * Final rect for a trick-collect flight, anchored to the winner's compass position in viewport
+ * coords. Seats are CSS-anchored to the viewport edges, so this skips the flaky DOM read.
  */
 function winnerCollectRect(winner: number, myPlayerSeat: number): FlightRect {
   const compass = compassOffset(winner, myPlayerSeat);
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  // Breakpoint-aware rim insets matching `SEAT_POSITIONS` (Tailwind `md` =
-  // 768 px). Computed from the same `vw` the destination math uses so the
-  // two never drift. The inboard nudge approximates half the seat frame
-  // (compact 60 px / md 80 px) so cards land on the avatar, not past it.
-  const compact = vw < 768;
-  const sideInset = compact ? 12 : 64; // right-3 / left-3 vs right-16 / left-16
-  const topInset = compact ? 24 : 64; // top-6 vs top-16
+  const compact = vw < TAILWIND_MD_PX;
+  const sideInset = compact ? 12 : 64;
+  const topInset = compact ? 24 : 64;
   const inboard = compact ? 40 : 56;
 
   let cx: number;
   let cy: number;
   switch (compass) {
     case 0:
-      // Self → bottom-center landing zone above the viewport edge. Cards
-      // slide down from the trick area and fade — the gesture the user
-      // asked for: "simple slide to the bottom center and fade them away".
       cx = vw / 2;
       cy = vh - TRICK_SLOT_H / 2 - 24;
       break;
     case 1:
-      // East opponent. Tucked in from the rim by about a card width.
       cx = vw - sideInset - inboard;
       cy = vh / 2;
       break;
     case 2:
-      // Teammate / north. Just below the top rim.
       cx = vw / 2;
       cy = topInset + inboard;
       break;
     case 3:
-      // West opponent. Mirror of east.
       cx = sideInset + inboard;
       cy = vh / 2;
       break;
@@ -210,20 +184,16 @@ function winnerCollectRect(winner: number, myPlayerSeat: number): FlightRect {
   };
 }
 
-/** Collect flights are named `collect-<receivedAt>-<cardId>`, so every flight
- *  can be traced to the resolved trick it sweeps. */
 const COLLECT_FLIGHT = "collect-";
 function collectFlightPrefix(receivedAt: number): string {
   return `${COLLECT_FLIGHT}${receivedAt}-`;
 }
 
 const SEAT_POSITIONS: Record<number, string> = {
-  // Phones hug the screen edges (matching the scoreboard inset); md+ insets off
-  // the wood rim as before.
-  0: "bottom-48 left-1/2 -translate-x-1/2 md:bottom-44", // South (self) - above the fanned hand
-  1: "right-3 top-1/2 -translate-y-1/2 md:right-16", // East (next player counter-clockwise)
-  2: "top-6 left-1/2 -translate-x-1/2 md:top-16", // North (partner) - clears the wordmark on md+
-  3: "left-3 top-1/2 -translate-y-1/2 md:left-16", // West (third player)
+  0: "bottom-48 left-1/2 -translate-x-1/2 md:bottom-44",
+  1: "right-3 top-1/2 -translate-y-1/2 md:right-16",
+  2: "top-6 left-1/2 -translate-x-1/2 md:top-16",
+  3: "left-3 top-1/2 -translate-y-1/2 md:left-16",
 };
 
 const SEAT_ORIENTATIONS: Record<number, SeatOrientation> = {
@@ -278,12 +248,7 @@ export function MatchPage() {
   const pendingResolvedTrick = useMatchStore((s) => s.pendingResolvedTrick);
   const clearPendingResolvedTrick = useMatchStore((s) => s.clearPendingResolvedTrick);
 
-  // Card sounds + background music. The page's mount is the audio session: music
-  // runs only while this page is mounted, and stops when the player leaves.
   useMatchAudio();
-  // HUD mute reflects "any audio on" and toggles BOTH switches together: if
-  // either is on it turns both off, and only when both are off does it turn
-  // both back on. One PATCH carries whichever of the two actually changes.
   const audioOn =
     resolveAudioEnabled(user?.soundEnabled) || resolveAudioEnabled(user?.musicEnabled);
   const handleToggleMute = useCallback(() => {
@@ -293,18 +258,7 @@ export function MatchPage() {
   const muteLabel = audioOn ? t("match.hud.mute") : t("match.hud.unmute");
   const MuteIcon = audioOn ? Volume2 : VolumeX;
 
-  // "Game is starting…" splash gate — holds the themed loading screen for a
-  // deliberate minimum duration when arriving from RoomPage (or LobbyPage
-  // quick-play auto-start). The triggering navigation passes
-  // `state: { fromRoom: true }`; mounts without that flag (page reload, WS
-  // reconnect, deep-link) skip the artificial hold so reload-to-recover stays
-  // snappy. Reduced-motion users get a shorter beat. Duration is captured at
-  // mount — mid-splash OS motion-preference flips do NOT reset the timer.
   const location = useLocation();
-  // Read once, at mount, then dropped from the history entry: browsers keep
-  // `history.state` across a reload, so a flag left there would replay the
-  // splash — and, in a fresh hand 1, the opening deal the server no longer
-  // holds the clock for — on every refresh.
   const [cameFromRoom] = useState(
     () => (location.state as { fromRoom?: boolean } | null)?.fromRoom === true,
   );
@@ -314,12 +268,9 @@ export function MatchPage() {
       { pathname: location.pathname, search: location.search, hash: location.hash },
       { replace: true, state: null },
     );
-    // Mount-only: the arrival flag is consumed exactly once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the arrival flag is consumed exactly once, at mount
   }, []);
   const prefersReducedMotion = useReducedMotion();
-  // Phone layout: compact seats (vertical, smaller avatars, name-only) and a
-  // tighter center trick area. Matches Tailwind's `md` breakpoint (768px).
   const isCompactTable = useMediaQuery("(max-width: 767px)");
   const [splashElapsed, setSplashElapsed] = useState(!cameFromRoom);
   useEffect(() => {
@@ -329,46 +280,21 @@ export function MatchPage() {
       : MOTION.GAME_STARTING_SPLASH;
     const timer = window.setTimeout(() => setSplashElapsed(true), duration);
     return () => clearTimeout(timer);
-    // Intentionally exclude `prefersReducedMotion` from deps — the duration
-    // is locked at mount; a mid-splash OS preference flip must not restart
-    // the timer (could double the wait the user experiences).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- duration is locked at mount; a motion-preference flip must not restart it
   }, [cameFromRoom]);
 
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const errorToastTimerRef = useRef<number | null>(null);
-  // Story 9.3: the room's buy-in, captured from the mount-time getRoom fetch so
-  // the return-time 409 handler can seed the lobby insolvency modal locally if
-  // the system:insolvent_ejected WS frame is dropped/late (the WS event remains
-  // the canonical source and overwrites this when it lands).
   const roomBuyInRef = useRef<number | null>(null);
-  // Cached alongside the buy-in for the return-time HONOR ejection fallback, for the
-  // same reason: once the server frees the seat the client no longer holds the room.
   const roomMinHonorRef = useRef<number | null>(null);
-  // Same buy-in lifted into state so the match-stake (pot) HUD can render it.
-  // The ref above stays the synchronous source for the return-time insolvency
-  // fallback; this drives a re-render once the mount-time getRoom resolves.
   const [roomBuyIn, setRoomBuyIn] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
-  // Mobile HUD: the bottom action buttons collapse into a top-right hamburger.
   const [hudMenuOpen, setHudMenuOpen] = useState(false);
-  // Surrender confirm, driven from the mobile menu (the menu closes on tap, so
-  // it can't host the SurrenderButton's own confirm — see SurrenderConfirmDialog).
   const [surrenderConfirmOpen, setSurrenderConfirmOpen] = useState(false);
-  // Local card-throw animation: set on play_card dispatch, cleared shortly
-  // after so HandCards hides the played card via visibility:hidden while the
-  // CardFlight overlay paints the motion. The actual hand removal arrives via
-  // the next matchState push, which keys the remaining cards by id so HandCards
-  // stays stable across the hand-off.
   const [flyingCardId, setFlyingCardId] = useState<string | null>(null);
   const flyingClearTimerRef = useRef<number | null>(null);
 
-  // What the viewer has already answered, so the urgent clock tick stops at
-  // the click rather than a round-trip later: the deadline of a turn they
-  // ended (card, bid, Belote answer), and the hand whose declaration window
-  // they answered. A Bitola trick-1 declare/skip is deliberately not recorded:
-  // the same deadline then runs on for the card they still owe.
   const [answeredDeadline, setAnsweredDeadline] = useState<string | null>(null);
   const [answeredWindowHand, setAnsweredWindowHand] = useState<number | null>(null);
   const markTurnAnswered = useCallback(() => {
@@ -379,24 +305,7 @@ export function MatchPage() {
     if (live?.phase === "declaring") setAnsweredWindowHand(live.handNumber);
   }, []);
 
-  // Belote/Rebelote is decided BEFORE the card is thrown: clicking a trump K/Q
-  // while holding the other stashes the card id here and shows a local prompt
-  // instead of sending play_card, so opponents don't see the card land until
-  // the player announces or passes.
   const [belotPromptCardId, setBelotPromptCardId] = useState<string | null>(null);
-  // After the player answers the local prompt we do NOT send announce/skip
-  // immediately — we stash the choice here (true = announce, false = decline)
-  // and fire it only once the server confirms the deferred play by reporting
-  // pendingBelotSeat === my seat. Sending play_card + announce_belot back-to-
-  // back raced on the server: each inbound WS message is handled in its own
-  // goroutine (ws/hub.go), so announce_belot could be applied BEFORE play_card
-  // had set PendingBelotSeat — the engine then rejected it as an invalid action
-  // ("Невалидна акција") and the turn stalled until a refresh. Gating the send
-  // on the confirmed pending seat removes the race entirely.
-  //
-  // The choice carries the card it was made for, so it can be recognised as
-  // stale once the server has moved past that card without ever holding it for
-  // us (below).
   const [pendingLocalBelotChoice, setPendingLocalBelotChoice] = useState<{
     cardId: string;
     announce: boolean;
@@ -412,19 +321,10 @@ export function MatchPage() {
     setPendingLocalBelotChoice(null);
   }, [pendingBelotSeat, pendingLocalBelotChoice, myPlayerSeat, sendMessage]);
 
-  // The server can move past the Belote card without us: the per-move timer
-  // expires while the local prompt is open and it auto-plays (and, for the K/Q
-  // itself, auto-skips the announcement), or our deferred play_card loses that
-  // race and is rejected. Either way the prompt is for a decision that no longer
-  // exists and must close, and a stored answer must not linger to fire on some
-  // later, server-driven prompt. "Moved past" is read off the state the server
-  // sent: it is no longer our turn in play, or the card has left our hand
-  // without the server holding the prompt for us.
   const belotTurnOpen = useMatchStore((s) => {
     const live = s.matchState;
     return live !== null && live.phase === "playing" && live.activePlayerSeat === myPlayerSeat;
   });
-  // A string, so the selector result is stable between unrelated updates.
   const myHandIds = useMatchStore(
     (s) =>
       s.matchState?.players
@@ -446,13 +346,7 @@ export function MatchPage() {
     if (!belotTurnOpen || !choiceCardHeld) setPendingLocalBelotChoice(null);
   }, [pendingLocalBelotChoice, pendingBelotSeat, myPlayerSeat, belotTurnOpen, choiceCardHeld]);
 
-  // CardFlight overlay state — viewport-fixed flying cards that handle all
-  // throw and collect motion in one continuous element per card. While a
-  // cardId is in flight, both HandCards (source) and TrickArea (slot) hide
-  // their static rendering of that card so the overlay is the only painter.
   const [activeFlights, setActiveFlights] = useState<CardFlightDescriptor[]>([]);
-  // Face-up cards the overlay is painting right now. Deal packets fly face-down
-  // and name no card, so they never hide anything on the table.
   const flightingCardIds = useMemo(
     () =>
       new Set(
@@ -460,41 +354,11 @@ export function MatchPage() {
       ),
     [activeFlights],
   );
-  // The resolved trick whose collect sweep is under way: set (to the snapshot's
-  // `receivedAt`) the moment its four collect flights are pushed. While it names
-  // the live snapshot, TrickArea keeps ALL four snapshot cards suppressed — not
-  // just the ones with a live flight. The four collect flights finish on
-  // separate `animationend` events (slightly staggered, each its own React
-  // batch), so a card leaves `flightingCardIds` the instant its flight ends
-  // while the snapshot still drives the static slot render — re-painting that
-  // card at center for a frame or two before the snapshot finally clears. That
-  // stagger is the "cards blink back to the middle then vanish" bug;
-  // suppressing the whole snapshot for the collect window closes the gap.
-  //
-  // Keyed by trick rather than a boolean so a NEW snapshot is never mistaken
-  // for one mid-sweep: when trick N resolves while N-1 is still sweeping, N
-  // starts out un-collected and gets its full winner glow.
   const [collectingReceivedAt, setCollectingReceivedAt] = useState<number | null>(null);
   const isCollecting =
     pendingResolvedTrick !== null && collectingReceivedAt === pendingResolvedTrick.receivedAt;
-  // Tracks the last currentTrick length we processed so opponent-throw flights
-  // fire exactly once per growth event (and not on, e.g., a reconnect that
-  // shrinks the trick).
   const prevTrickLenRef = useRef(0);
 
-  // When the server auto-plays a card for the local player (per-move timer
-  // expired), the dispatcher writes pendingAutoPlayedCard. Mirror it into
-  // flyingCardId so HandCards animates the throw the same way it does for a
-  // manual click — without this, the card just vanishes from the hand.
-  //
-  // Layout effect, same reason as the opponent-throw effect below: the
-  // dispatcher grows currentTrick in the same batched commit that sets
-  // pendingAutoPlayedCard, so TrickArea paints the card at the south slot on
-  // that commit's frame unless the flight (and with it the suppression) is
-  // pushed before paint. The rects measured here reflect the just-committed
-  // DOM — getBoundingClientRect() forces layout. The hand still contains the
-  // card at this point (event:card_played only updates the trick; hand removal
-  // arrives with the trailing event:match_state), so the source rect resolves.
   useLayoutEffect(() => {
     if (!pendingAutoPlayedCard) return;
     setFlyingCardId(pendingAutoPlayedCard.cardId);
@@ -505,8 +369,6 @@ export function MatchPage() {
       setFlyingCardId(null);
       flyingClearTimerRef.current = null;
     }, FLAG_LIFETIME.FLYING_CARD);
-    // Auto-played throw flight: measure the hand card + south slot rects and
-    // push a self-throw flight, mirroring handlePlayCard's overlay wiring.
     if (myPlayerSeat !== null && !prefersReducedMotion) {
       const cardId = pendingAutoPlayedCard.cardId;
       const receivedAt = pendingAutoPlayedCard.receivedAt;
@@ -533,22 +395,6 @@ export function MatchPage() {
     setPendingAutoPlayedCard(null);
   }, [pendingAutoPlayedCard, setPendingAutoPlayedCard, myPlayerSeat, prefersReducedMotion]);
 
-  // Opponent throw — when currentTrick grows by one card and the newest card
-  // was played by a non-local seat, push a CardFlight from that seat's deck
-  // stack to their compass slot. The legacy trickLand keyframe in TrickArea
-  // is gone, so without this the opponent's card would simply pop into the
-  // slot with no flight.
-  //
-  // Must be useLayoutEffect, and the flight must be pushed synchronously: the
-  // same commit that grows currentTrick makes TrickArea paint the card at its
-  // center slot, and the card is only suppressed once it appears in
-  // `flightingCardIds`. A passive effect (or any rAF deferral) pushes the
-  // flight one paint too late — the card flashes at center for a frame, then
-  // vanishes and flies in from the deck. Layout effects run before paint and
-  // React flushes their state updates pre-paint, so the first painted frame
-  // already has the slot suppressed and the flight at its 0% keyframe.
-  // getBoundingClientRect() forces layout here, so the measured rects reflect
-  // the just-committed DOM.
   const currentTrick = matchState?.currentTrick;
   useLayoutEffect(() => {
     const trick = currentTrick ?? [];
@@ -581,26 +427,13 @@ export function MatchPage() {
     }
   }, [currentTrick, myPlayerSeat, prefersReducedMotion]);
 
-  // Trick-collect orchestration. When pendingResolvedTrick is captured by
-  // the WS dispatcher, hold it for TRICK_RESOLVE_PAUSE so the winner glow
-  // reads, then measure the four slot rects + the winner destination rect
-  // and push four collect flights. Reduced-motion users skip the flights and
-  // see the snapshot vanish after a short hold (preserving the glow).
   useEffect(() => {
     if (!pendingResolvedTrick) return;
     if (myPlayerSeat === null) return;
 
-    // The collect sound marks the moment the cards LEAVE the table, in both
-    // motion modes. It is keyed by the snapshot's capture stamp, so a remount
-    // that re-runs this effect for the same still-live snapshot (reconnect
-    // mid-collect) cannot sound the same trick twice.
     const collectSoundKey = String(pendingResolvedTrick.receivedAt);
 
     if (prefersReducedMotion) {
-      // Hold the snapshot long enough for the user to register the winner
-      // glow — match the full-motion glow phase so reduced-motion users
-      // don't get a sub-second flash they can't process. No flights run, but
-      // the sound still does: reduced motion is not reduced audio.
       const reducedTimer = window.setTimeout(() => {
         playSfx("trickCollect", { dedupeKey: collectSoundKey });
         clearPendingResolvedTrick(pendingResolvedTrick.receivedAt);
@@ -608,13 +441,6 @@ export function MatchPage() {
       return () => clearTimeout(reducedTimer);
     }
 
-    // Fallback safety clear: if the overlay's `animationend` doesn't fire
-    // (component unmount / WS reconnect mid-collect / browser timer
-    // throttling) the snapshot would otherwise stick and superimpose the
-    // resolved trick over the next hand. Schedule a guaranteed clear
-    // slightly past the natural collect animation end. handleFlightComplete
-    // clears via the same guarded setter on the happy path, and clearing twice
-    // is a no-op — as is clearing a snapshot that a newer trick has replaced.
     const FALLBACK_CLEAR_MS = MOTION.TRICK_RESOLVE_PAUSE + MOTION.CARD_FLIGHT_COLLECT + 400;
     const fallbackClearTimer = window.setTimeout(() => {
       clearPendingResolvedTrick(pendingResolvedTrick.receivedAt);
@@ -623,18 +449,9 @@ export function MatchPage() {
     const winner = pendingResolvedTrick.winnerSeat;
     const snapshot = pendingResolvedTrick.trick;
     const receivedAt = pendingResolvedTrick.receivedAt;
-    // `receivedAt` (the snapshot's capture timestamp) uniquely identifies this
-    // trick, so it already disambiguates back-to-back tricks that share a card
-    // id. We deliberately do NOT key off live matchState.trickNumber here, nor
-    // depend on it below: the trailing event:match_state bumps trickNumber
-    // mid-collect, and if that were an effect dependency the effect would re-run
-    // and push a SECOND batch of collect flights from the (still-centered)
-    // slots — the cards would appear to snap back to center and fly again.
 
     const glowTimer = window.setTimeout(() => {
       playSfx("trickCollect", { dedupeKey: collectSoundKey });
-      // Winner destination — compass-anchored to the viewport, no DOM read.
-      // (See `winnerCollectRect` for the rationale.)
       const destRect = winnerCollectRect(winner, myPlayerSeat);
 
       const newFlights: CardFlightDescriptor[] = [];
@@ -649,7 +466,6 @@ export function MatchPage() {
           fromRect,
           toRect: destRect,
           durationMs: MOTION.CARD_FLIGHT_COLLECT,
-          // Cards fade as they reach the winner's pile.
           endOpacity: 0,
         });
       }
@@ -658,8 +474,6 @@ export function MatchPage() {
         clearPendingResolvedTrick(receivedAt);
         return;
       }
-      // Enter the collect window: TrickArea now suppresses every snapshot card
-      // (see `isCollecting`) so none re-paints at center as the flights finish.
       setCollectingReceivedAt(receivedAt);
       setActiveFlights((prev) => [...prev, ...newFlights]);
     }, MOTION.TRICK_RESOLVE_PAUSE);
@@ -670,12 +484,6 @@ export function MatchPage() {
     };
   }, [pendingResolvedTrick, myPlayerSeat, prefersReducedMotion, clearPendingResolvedTrick]);
 
-  // A newer resolved trick finalises the previous one at once. Trick N can
-  // resolve while N-1 is still sweeping (fast plays, timeout chains): the store
-  // snapshot is already N's, so N-1's flights are dropped here, before paint —
-  // otherwise their `animationend` would land mid-way through N's glow and
-  // clear N's snapshot with them (the cut sweeps and vanishing cards). Any
-  // flight of an older trick goes; only the live one's may stay.
   const liveResolvedAt = pendingResolvedTrick?.receivedAt ?? null;
   useLayoutEffect(() => {
     const livePrefix = liveResolvedAt === null ? null : collectFlightPrefix(liveResolvedAt);
@@ -688,16 +496,10 @@ export function MatchPage() {
     });
   }, [liveResolvedAt]);
 
-  // Flight completion — the overlay is done painting it.
   const handleFlightComplete = useCallback((flightId: string) => {
     setActiveFlights((prev) => prev.filter((f) => f.id !== flightId));
   }, []);
 
-  // The live trick's sweep is over once its last collect flight has landed:
-  // clear its snapshot before paint. Its cards are already suppressed for the
-  // whole collect window (`isCollecting`), so nothing flickers in between. The
-  // clear matches this trick's own stamp, so it can never tear down a newer
-  // snapshot.
   useLayoutEffect(() => {
     if (!isCollecting || pendingResolvedTrick === null) return;
     const prefix = collectFlightPrefix(pendingResolvedTrick.receivedAt);
@@ -706,12 +508,6 @@ export function MatchPage() {
     }
   }, [activeFlights, isCollecting, pendingResolvedTrick, clearPendingResolvedTrick]);
 
-  // Cards TrickArea must not statically paint because the CardFlight overlay
-  // owns them right now: every in-flight card, plus — once the collect sweep
-  // has begun — the full resolved-trick snapshot, so a card that finishes its
-  // flight ahead of its siblings doesn't flash back at center (issue: collect
-  // "blink"). During the pre-collect glow phase `isCollecting` is false, so the
-  // four settled cards stay visible (with the winner glow) as intended.
   const suppressedCardIds = useMemo(() => {
     if (!isCollecting || pendingResolvedTrick === null) return flightingCardIds;
     const ids = new Set(flightingCardIds);
@@ -721,13 +517,6 @@ export function MatchPage() {
     return ids;
   }, [isCollecting, pendingResolvedTrick, flightingCardIds]);
 
-  // Deal controller — every deal (opening deal, all-pass reshuffle, the
-  // candidate's second deal) animates: face-down packets fly from the dealer's
-  // seat, each seat's cards appear as its packet lands, and nothing asks for a
-  // decision until the last one is down. The server holds the next actor's
-  // deadline back by the same length (deal_grace.go). A mount into a hand in
-  // progress (reload, reconnect) never replays one; arriving straight from the
-  // room animates the opening deal once the splash is gone.
   const dealView = useDealController({
     matchState,
     myPlayerSeat,
@@ -739,14 +528,6 @@ export function MatchPage() {
   });
   const dealing = dealView.dealing;
 
-  // ScoreReveal needs the trump suit / caller seat AND the hand number from
-  // the just-finished hand (for its title + contract-held subtitle). The
-  // server pushes the next-hand matchState (trumpSuit=null, handNumber already
-  // incremented) close to the hand_scored payload, so by the time the reveal
-  // mounts those live fields describe the NEXT hand — which is why the title
-  // showed "Hand 2 — results" right after hand 1 finished. Snapshot them
-  // whenever a hand is live (trumpSuit set); the snapshot survives the
-  // next-hand reset and feeds ScoreReveal the finished hand's values.
   const lastTrumpRef = useRef<{
     suit: Suit | null;
     callerSeat: number | null;
@@ -772,36 +553,19 @@ export function MatchPage() {
     setErrorToast(null);
   }, []);
 
-  // Overlay flow state: normal → capot_animation → score_reveal → normal/match_result
   type OverlayPhase = "normal" | "capot_animation" | "score_reveal" | "match_result";
   const [overlayPhase, setOverlayPhase] = useState<OverlayPhase>("normal");
 
-  // Server-gated hand-complete: true once the local player has clicked Continue
-  // and we're waiting for the server to deal the next hand (other players ready
-  // or the auto-continue timeout). Swaps the score dialog's button to "waiting".
   const [handCompleteAcked, setHandCompleteAcked] = useState(false);
 
-  // Chat sidebar open/closed — lifted here so the rules/settings cluster can
-  // hide the emote button while the chat sidebar is occupying the right rail.
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Match chat history is tied to the MatchPage lifecycle — clear it on
-  // unmount (navigation away, abandonment, match-end → lobby) so the next
-  // match starts with an empty panel. Ephemeral by design (AC #6).
   useEffect(() => {
     return () => {
       useChatStore.getState().clearMatch();
     };
   }, []);
 
-  // Trigger overlay flow when score reveal data arrives. Held while a
-  // trick-collect snapshot is still in flight (pendingResolvedTrick) so the
-  // final card, the winner glow, and the four-card collect sweep stay visible
-  // before the scoreboard covers the table — at hand-end the server fires
-  // hand_scored back-to-back with trick_resolved, so without this gate the
-  // overlay mounts before the collect (which only starts after
-  // TRICK_RESOLVE_PAUSE) has a chance to play. The snapshot clears on
-  // collect-complete (or the ~1.96s fallback), re-running this effect.
   useEffect(() => {
     if (scoreRevealData !== null && overlayPhase === "normal" && pendingResolvedTrick === null) {
       if (scoreRevealData.capot) {
@@ -812,10 +576,6 @@ export function MatchPage() {
     }
   }, [scoreRevealData, overlayPhase, pendingResolvedTrick]);
 
-  // Server-gated hand-complete: dismiss the score dialog when the server deals
-  // the next hand (matchState.phase leaves "hand_complete"). Until then the
-  // dialog stays up — in its "waiting" state once acknowledged. Match-end ends
-  // via PhaseMatchEnd (never hand_complete), so this never interferes with it.
   const prevHandCompletePhaseRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     const phase = matchState?.phase;
@@ -827,12 +587,6 @@ export function MatchPage() {
     prevHandCompletePhaseRef.current = phase;
   }, [matchState?.phase, setScoreRevealData]);
 
-  // Reconnect into the hand-complete pause: the reconnecting client receives a
-  // match_state (phase "hand_complete") but missed the event:hand_scored that
-  // normally arms the score dialog. Reconstruct it from the persisted
-  // lastHandResult so the player still sees the recap and can acknowledge.
-  // The rebuilt payload is remembered so its capot banner stays silent: it
-  // describes a moment the table already heard (or this client never saw).
   const rebuiltScoreRevealRef = useRef<HandScoredPayload | null>(null);
   useEffect(() => {
     if (
@@ -850,14 +604,6 @@ export function MatchPage() {
     }
   }, [matchState, scoreRevealData, setScoreRevealData]);
 
-  // Clear declaration / belot reveals when an overlay takes over the table
-  // (pause, disconnect, match-end/abandon, or the end-of-hand overlay
-  // sequence). These are the only moments a reveal can be orphaned past the
-  // point it describes: the reveal component is render-gated off behind the
-  // overlay, so its own auto-close countdown can't fire, and on reconnect /
-  // resume it would otherwise re-render stale (D69 / D71). During normal play
-  // the reveal is left strictly to its own countdown + X — unrelated
-  // match_states (e.g. another player's card-play snapshot) must NOT close it.
   useEffect(() => {
     const phase = matchState?.phase;
     const overlayCovering =
@@ -879,21 +625,6 @@ export function MatchPage() {
     setBelotReveal,
   ]);
 
-  // Declaration reveal visibility latch. The reveal is deferred behind the
-  // trick-1 collect sweep (so who-won-trick-1 reads first) — but ONLY the first
-  // one: once the table is clear of a sweep after the reveal arrives we latch
-  // it visible and keep it mounted for the rest of its life, so later tricks'
-  // collects no longer unmount it. Gating directly on the live
-  // `pendingResolvedTrick` (the old behaviour) tore the reveal down on every
-  // trick's collect and remounted it with a fresh 8 s timer, so across fast
-  // tricks the countdown never finished and the dialog re-appeared every trick
-  // (its own AutoCloseRing only fires while it stays mounted). The belot/trump
-  // reveals aren't collect-gated, so they don't need this.
-  //
-  // When declarations are collected in a dedicated phase instead, the reveal
-  // arrives before a single card has been played, so `pendingResolvedTrick` is
-  // null and the latch flips immediately — the deferral has nothing to wait for
-  // and costs nothing.
   const [declRevealReady, setDeclRevealReady] = useState(false);
   useEffect(() => {
     if (declarationReveal === null) {
@@ -905,7 +636,6 @@ export function MatchPage() {
     }
   }, [declarationReveal, pendingResolvedTrick]);
 
-  // Derive myPlayerSeat on first game state
   useEffect(() => {
     if (matchState && user && myPlayerSeat === null) {
       const myPlayer = matchState.players.find((p) => p.userId === user.id);
@@ -915,8 +645,6 @@ export function MatchPage() {
     }
   }, [matchState, user, myPlayerSeat, setMyPlayerSeat]);
 
-  // Redirect to lobby on stale match_end state (e.g. page refresh after abandonment
-  // when matchAbandonedData/matchEndData are lost from in-memory store)
   useEffect(() => {
     if (
       matchState &&
@@ -929,19 +657,6 @@ export function MatchPage() {
     }
   }, [matchState, matchEndData, matchAbandonedData, clearGame, navigate]);
 
-  // Splash-state classifier — when the user lands on /game/:id we need to
-  // distinguish between (a) they belong here and we're just waiting for the
-  // WS push, (b) the room exists but the match already finished, (c) the
-  // room exists but they were never seated in it, (d) the room id doesn't
-  // resolve at all. Without this guard, deep-linking to a stale/abandoned
-  // room left the splash showing "Reconnecting to the game…" forever.
-  //
-  // Source priority:
-  //   1. HTTP GET /api/rooms/:id — authoritative source of room status +
-  //      seat-membership. Fires on mount.
-  //   2. WS-fallback — if the HTTP check passes but the server still doesn't
-  //      push match_state within a short window (e.g. session torn down after
-  //      the room status was checked), classify as "noActiveSession" too.
   type SplashIssue = "noActiveSession" | "notMember" | "invalid";
   const wsConnectionState = useWsConnectionState();
   const [splashIssue, setSplashIssue] = useState<SplashIssue | null>(null);
@@ -952,8 +667,6 @@ export function MatchPage() {
     getRoom(roomIdNum)
       .then((detail) => {
         if (cancelled) return;
-        // Cache the room's buy-in for the return-time insolvency fallback (P4)
-        // and surface it to the match-stake HUD.
         roomBuyInRef.current = detail.room.coinBuyIn;
         roomMinHonorRef.current = detail.room.minHonor;
         setRoomBuyIn(detail.room.coinBuyIn);
@@ -962,9 +675,6 @@ export function MatchPage() {
           setSplashIssue("notMember");
           return;
         }
-        // Server room status is one of "waiting" | "in_progress" | "completed"
-        // | "cancelled". Only "waiting" / "in_progress" expect a live session;
-        // anything else means the match wrapped up and the session is gone.
         if (detail.room.status !== "waiting" && detail.room.status !== "in_progress") {
           setSplashIssue("noActiveSession");
         }
@@ -980,9 +690,6 @@ export function MatchPage() {
 
   useEffect(() => {
     if (matchState) {
-      // Game state arrived after we declared an issue (rare race: HTTP check
-      // returned "completed" but a fresh session started a moment later).
-      // Cancel the redirect so we don't yank the user out of a real game.
       if (splashIssue === "noActiveSession") setSplashIssue(null);
       return;
     }
@@ -1003,16 +710,6 @@ export function MatchPage() {
     return () => clearTimeout(redirectTimer);
   }, [splashIssue, matchState, clearGame, navigate]);
 
-  // Transition to match result after the score reveal is dismissed (if the
-  // match ended). Held while a score reveal is still pending (scoreRevealData)
-  // or a trick-collect sweep is in flight (pendingResolvedTrick): on the final
-  // hand the server fires hand_scored then (after persistence) match_end
-  // back-to-back, and the score-reveal effect above is itself gated on the
-  // collect — without this guard match_result would win the race and skip the
-  // final-hand score reveal (and capot animation) entirely, snapping straight
-  // to the result mid-sweep. The natural end-of-hand transition runs via
-  // handleScoreRevealContinue; this effect only fires for match ends with no
-  // score reveal (surrender / abandonment), where both guards are already null.
   useEffect(() => {
     if (
       matchEndData !== null &&
@@ -1024,12 +721,6 @@ export function MatchPage() {
     }
   }, [matchEndData, overlayPhase, scoreRevealData, pendingResolvedTrick]);
 
-  // D145a: a NEW match started under a stale result overlay. matchEndData is set
-  // only after match_end (which also sets phase "match_end"); once the room
-  // reopens and a fresh match's match_state arrives with any live phase, the old
-  // result is stale — clear it + drop the overlay so the new table renders
-  // instead of the lingering "match over" dialog. Gating on matchEndData !== null
-  // keeps this inert during normal play and on the legitimate end state.
   useEffect(() => {
     const phase = matchState?.phase;
     if (matchEndData !== null && phase !== undefined && phase !== "match_end") {
@@ -1038,19 +729,10 @@ export function MatchPage() {
     }
   }, [matchState?.phase, matchEndData, setMatchEndData]);
 
-  // Track whether the most recent client action was a surrender so the next
-  // ErrInvalidAction / ErrWrongPhase rejection can route to the
-  // surrender-specific i18n strings instead of the generic ones.
   const surrenderActionInFlightRef = useRef(false);
 
-  // Error toast display — uses same mapping as useWsDispatch error routing.
-  // Timer is tracked via ref (not effect cleanup) so the 3 s auto-dismiss isn't
-  // cancelled by the re-run triggered by setLastError(null).
   useEffect(() => {
     if (!lastError) return;
-    // The server refused something the viewer sent, so a turn or window they
-    // were marked as having answered may still be theirs: let the urgent tick
-    // run for it again.
     setAnsweredDeadline(null);
     setAnsweredWindowHand(null);
     const ERROR_I18N: Record<string, string> = {
@@ -1095,11 +777,6 @@ export function MatchPage() {
     };
   }, []);
 
-  // Browser back-button interception via the data router's blocker (replaces
-  // the old pushState-sentinel + popstate listener). Armed only for POPs while
-  // the match is genuinely live — on the end/abandon overlays back must go
-  // straight out with no confirm. Pushes/replaces (our own redirects and
-  // laterals) are never blocked.
   const matchActive =
     matchState !== null &&
     matchState.phase !== "match_end" &&
@@ -1114,17 +791,9 @@ export function MatchPage() {
     if (backBlocker.state !== "blocked") return;
     if (window.confirm(t("match.leaveConfirm"))) {
       clearGame();
-      // Decide via the blocked navigation's own target — NOT by probing
-      // window.history.state at confirm time: the router's URL revert for a
-      // blocked POP is async, so the live history entry is indeterminate
-      // here. blocker.location is stable, and also handles multi-entry jumps
-      // (history long-press): proceed only when the pop actually lands on
-      // the lobby.
       if (backBlocker.location.pathname === "/lobby") {
         backBlocker.proceed();
       } else {
-        // Deep link / fresh reconnect / jump elsewhere: cancel the pop and
-        // replace the match entry with the lobby.
         backBlocker.reset();
         navigate("/lobby", { replace: true });
       }
@@ -1133,17 +802,8 @@ export function MatchPage() {
     }
   }, [backBlocker, clearGame, navigate, t]);
 
-  // Back-pop off the result/abandon overlay unmounts the page without going
-  // through the explicit "Return to lobby/room" buttons (which wipe the store
-  // themselves). Clear the ended match on unmount so its stale end state can't
-  // leak into the next mount. Mid-match unmounts must NOT clear — reconnection
-  // (useReconnectionRedirect) depends on the live matchState surviving.
   useEffect(() => {
     return () => {
-      // StrictMode guard: the dev-only probe unmount runs this cleanup while
-      // the URL is still on the match page — clearing then would wipe a
-      // result overlay the user never saw. Only a real navigation away (URL
-      // already off /match when unmount cleanups run) clears.
       if (window.location.pathname.startsWith("/match")) return;
       const store = useMatchStore.getState();
       if (
@@ -1156,13 +816,8 @@ export function MatchPage() {
     };
   }, []);
 
-  // --- Action handlers ---
   const executePlayCard = useCallback(
     (cardId: string) => {
-      // Measure the source (hand card) and destination (south trick slot)
-      // BEFORE we hide the card via flyingCardId. Read the hand from the
-      // live store (not the closed-over `matchState`) so a concurrent WS
-      // update between render and click can't leave us with a stale lookup.
       let flight: CardFlightDescriptor | null = null;
       if (!prefersReducedMotion && myPlayerSeat !== null) {
         const liveGameState = useMatchStore.getState().matchState;
@@ -1176,20 +831,12 @@ export function MatchPage() {
             card,
             fromRect: sourceRect,
             toRect: destRect,
-            // Self throw arcs through viewport bottom-center so the card
-            // visibly travels down to the screen lip and back up to the
-            // table — matches the motion the user described.
             waypointRect: viewportBottomCenterRect(),
             durationMs: MOTION.CARD_FLIGHT_SELF_THROW,
           };
         }
       }
 
-      // Trigger the hand-throw flight immediately so the gesture starts
-      // before the WS round-trip completes. The card is cleared from the
-      // local hand by the next matchState push (server removes it from
-      // `players[seat].hand`); flyingCardId controls the source-side
-      // visibility:hidden so the overlay's flying card is the only painter.
       setFlyingCardId(cardId);
       const flightToPush = flight;
       if (flightToPush) {
@@ -1202,8 +849,6 @@ export function MatchPage() {
         setFlyingCardId(null);
         flyingClearTimerRef.current = null;
       }, FLAG_LIFETIME.FLYING_CARD);
-      // The own manual play sounds HERE, at the click, in step with the
-      // optimistic throw — the WS dispatcher skips this play's non-auto echo.
       playSfx("cardPlay");
       markTurnAnswered();
       sendMessage(ACTION_PLAY_CARD, { cardId });
@@ -1211,9 +856,6 @@ export function MatchPage() {
     [sendMessage, prefersReducedMotion, myPlayerSeat, markTurnAnswered],
   );
 
-  // Card click entry point. If the clicked card is Belote/Rebelote-eligible
-  // (trump K/Q while holding the other), defer the play and show the local
-  // announce/pass prompt FIRST — the card is only thrown after the decision.
   const handlePlayCard = useCallback(
     (cardId: string) => {
       const live = useMatchStore.getState().matchState;
@@ -1231,12 +873,6 @@ export function MatchPage() {
     [executePlayCard, myPlayerSeat],
   );
 
-  // Local Belote/Rebelote decision: throw the card now, and remember the
-  // choice. The matching announce/skip is sent by the pendingBelotSeat effect
-  // above once the server has registered the deferred play — never alongside
-  // play_card, so the two can't race on the server (issue: "Невалидна акција"
-  // + stalled turn). The server-driven prompt stays suppressed meanwhile
-  // (pendingLocalBelotChoice !== null), so no duplicate dialog flashes.
   const handleLocalBelotDecision = useCallback(
     (announce: boolean) => {
       const cardId = belotPromptCardId;
@@ -1333,40 +969,23 @@ export function MatchPage() {
 
   const handleScoreRevealContinue = useCallback(() => {
     if (matchEndData !== null) {
-      // Match over — dismiss locally and show the result; no next hand to await.
       setScoreRevealData(null);
       setOverlayPhase("match_result");
       return;
     }
-    // Server-gated hand-complete pause: acknowledge and wait for the server to
-    // deal the next hand (all connected players ready, or the auto-continue
-    // timeout). The dialog stays up in its "waiting" state until the next-hand
-    // match_state dismisses it (the phase-transition effect above).
     sendMessage(ACTION_CONTINUE, {});
     setHandCompleteAcked(true);
   }, [matchEndData, sendMessage, setScoreRevealData]);
 
   const handleReturnToLobby = useCallback(() => {
-    // Leave the room before navigating: otherwise our room_players row lingers,
-    // and once a teammate clicks "Return to room" (flipping it back to waiting)
-    // our stale membership traps us in ALREADY_IN_ROOM on any future join/create
-    // — and if we were the owner, ownership never transfers. Best-effort: the
-    // lobby navigation proceeds regardless of the leave result.
     if (roomIdNum !== null) {
-      void leaveRoom(roomIdNum).catch(() => {
-        // best-effort cleanup — a failed leave must not block returning to lobby
-      });
+      void leaveRoom(roomIdNum).catch(() => {});
     }
     setMatchEndData(null);
     clearGame();
     returnToLobby();
   }, [roomIdNum, clearGame, returnToLobby, setMatchEndData]);
 
-  // "Return to room" — reopen the same room (status completed → waiting) and go
-  // back to the room lobby on the original seat so the group can play again.
-  // On rejection (kicked/left, or the room is gone) keep the player on the
-  // result overlay and surface a toast so they can still choose "Return to
-  // lobby" — rather than navigating to a notice that unmounts instantly.
   const handleReturnToRoom = useCallback(async () => {
     if (roomIdNum === null) {
       setMatchEndData(null);
@@ -1378,24 +997,13 @@ export function MatchPage() {
       await returnToRoom(roomIdNum);
       setMatchEndData(null);
       clearGame();
-      // Lateral within the flow (match → room lobby): replace so the dead
-      // match entry doesn't linger beneath the reopened room.
       navigate(`/rooms/${roomIdNum}`, { replace: true });
     } catch (err) {
       if (errorToastTimerRef.current !== null) {
         clearTimeout(errorToastTimerRef.current);
       }
       const code = err instanceof FetchError ? err.code : null;
-      // Story 9.3 AC1: insolvency — the seat is gone server-side, so (unlike the
-      // other return errors) we must NOT keep the player on the result overlay.
-      // Clear match state and route to the lobby; the per-user
-      // system:insolvent_ejected event populates the lobby's insolvency modal
-      // with the exact balance/buy-in (the client no longer holds the room).
       if (code === "INSUFFICIENT_COINS") {
-        // Fallback: seed the lobby modal from locally-known numbers in case the
-        // per-user system:insolvent_ejected WS frame is dropped/late, so the
-        // player always learns WHY they were routed out. Only when nothing has
-        // set the signal yet — the WS event is canonical and must win if present.
         if (
           roomBuyInRef.current !== null &&
           user !== null &&
@@ -1413,14 +1021,6 @@ export function MatchPage() {
         returnToLobby();
         return;
       }
-      // Story 9.8 AC6: the honor gate behaves EXACTLY like insolvency here — the
-      // server ejects the barred returner and only then returns the 409, so the seat
-      // is already gone and the player must not be left on the result overlay. D3
-      // calls this the checkpoint that actually fires in practice (honor moves at
-      // match end and the abandoner stays seated), so this is the common path, not
-      // an edge. Same dropped-frame fallback as above; minHonor comes from the cached
-      // room and the score from the viewer's own envelope via honorScoreOrPrior,
-      // never `|| 80` — a real 0 must survive.
       if (code === "HONOR_TOO_LOW" || code === "NEW_PLAYER_NOT_ALLOWED") {
         if (
           roomMinHonorRef.current !== null &&
@@ -1429,8 +1029,6 @@ export function MatchPage() {
         ) {
           setRoomEjection({
             roomId: roomIdNum,
-            // Not meaningful for an honor ejection, zeroed exactly as the WS
-            // handler does; the modal reads minHonor/honor.
             buyIn: 0,
             balance: 0,
             minHonor: roomMinHonorRef.current,
@@ -1443,9 +1041,6 @@ export function MatchPage() {
         returnToLobby();
         return;
       }
-      // D146: distinct copy per failure — 409 the next match already started,
-      // 404 we're no longer a member (kicked/left). Anything else (network) keeps
-      // the generic message.
       const messageKey =
         code === "MATCH_ALREADY_STARTED"
           ? "match.matchResult.returnToRoomAlreadyStarted"
@@ -1466,16 +1061,6 @@ export function MatchPage() {
     returnToLobby();
   }, [clearGame, returnToLobby, setMatchAbandonedData]);
 
-  // Declaration-prompt melds. The server stamps them on the player once it has
-  // recorded a declare; until then the prompt previews what the server WILL
-  // record, so the detector must run under the same rule config — resolved from
-  // the variant, since the server's rule struct is never serialized.
-  //
-  // Memoized because detection allocates a fresh array, which inline in JSX
-  // would hand DeclarationPrompt a new identity on every unrelated re-render.
-  // It sits above the loading-state early return below so the hook order is
-  // unconditional, which is why it re-derives the seat's player rather than
-  // reusing the post-guard `myPlayer`.
   const promptPlayer = matchState?.players.find((p) => p.seat === myPlayerSeat);
   const declarationOverlap = rulesForVariant(matchState?.variant).declarationOverlap;
   const promptHandKey = (promptPlayer?.hand ?? []).map((c) => `${c.rank}${c.suit}`).join(",");
@@ -1484,22 +1069,10 @@ export function MatchPage() {
       promptPlayer !== undefined && promptPlayer.declarations.length > 0
         ? promptPlayer.declarations
         : detectDeclarations(promptPlayer?.hand ?? [], declarationOverlap),
-    // promptHandKey stands in for the hand array, whose identity churns with
-    // every snapshot even when the cards are unchanged.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- promptHandKey stands in for the hand array, whose identity churns every snapshot
     [promptPlayer?.declarations, promptHandKey, declarationOverlap],
   );
 
-  // Loading state — themed with the in-game felt + brass palette so the
-  // transition into the table doesn't flash a generic dark splash. We can't
-  // render the full TableBackdrop (no matchState yet), so this is a slimmed-
-  // down felt gradient + brass spinner using the same tokens. Two copy paths:
-  //   • From room lobby (`cameFromRoom`): "Game is starting…", held for
-  //     `MOTION.GAME_STARTING_SPLASH` even if state is already in hand — the
-  //     deliberate beat masks the room→game transition so dealing / trump
-  //     prompt don't appear in the same instant the page enters.
-  //   • Reload / WS reconnect / deep-link: "Reconnecting to the game…",
-  //     shown only until state arrives, with no artificial floor.
   if (!splashElapsed || !matchState || myPlayerSeat === null) {
     return (
       <div
@@ -1548,55 +1121,30 @@ export function MatchPage() {
     );
   }
 
-  // Viewer team derivation — single rule, frontend only. Components rendered
-  // below this guard always have a non-null myPlayerSeat, so viewerTeam is
-  // always a real TeamString when we're inside an active match.
   const viewerTeam: TeamString = myPlayerSeat % 2 === 0 ? "teamA" : "teamB";
 
-  // Display-only target derived from the server's matchMode; the not-"501"
-  // fallback to 1001 mirrors the server's matchTarget() semantics. The
-  // match-end decision itself is exclusively server-side.
   const matchTarget = matchState.matchMode === "501" ? 501 : 1001;
 
-  // Total match stake (the pot) — every human player's buy-in summed. Mirrors
-  // the server settlement math (computeSettlement: pot = numHumans × buyIn);
-  // bots never contribute. roomBuyIn is null until the mount-time getRoom
-  // resolves, so the stake reads 0 (pill hidden) until then. Display-only.
   const matchStake =
     roomBuyIn !== null ? matchState.players.filter((p) => !p.isBot).length * roomBuyIn : 0;
 
-  // Pause state
   const isRoomOwner = myPlayerSeat !== null && matchState.ownerSeat === myPlayerSeat;
   const isPaused = matchState.phase === "paused";
 
-  // The phases where a seat is genuinely on the clock: bidding, the dedicated
-  // declaration phase (Croatian collects declarations between bidding and trick
-  // 1), and play. The server runs a per-move turn timer and accepts
-  // pause/surrender in all three, so the seat countdown and the HUD controls
-  // must appear in all three or they vanish mid-hand. Phase-driven, never
-  // variant-driven — the client is told which phase it is in.
   const isTurnPhase =
     matchState.phase === "playing" ||
     matchState.phase === "bidding" ||
     matchState.phase === "declaring";
 
-  // Single source of truth for "is an overlay covering the table". Used to
-  // gate reveals (D112) and the dealer/trump pill (dealer-indicator D97).
   const isOverlayActive =
     isPaused ||
     matchEndData !== null ||
     matchAbandonedData !== null ||
     matchState.phase === "disconnected";
-  // The dedicated declaration phase is a fixed window rather than a turn: nobody
-  // is on the clock, there is no turnExpiresAt to preserve, and the server
-  // rejects action:pause there outright. Offering the control would only earn
-  // the player a wrong-phase toast. Surrender stays available in all three
-  // phases, which is why this is separate from isTurnPhase.
   const isPausablePhase = isTurnPhase && matchState.phase !== "declaring";
   const canPause =
     !isPaused && isPausablePhase && myPlayerSeat !== null && !matchState.pauseUsed?.[myPlayerSeat];
 
-  // Surrender state (Story 8.2)
   const surrenderProposerSeat = matchState.surrenderProposerSeat;
   const isProposer = surrenderProposerSeat !== null && surrenderProposerSeat === myPlayerSeat;
   const isPartnerOfProposer =
@@ -1627,56 +1175,23 @@ export function MatchPage() {
         ) ?? undefined)
       : undefined;
 
-  // Compute playable card IDs — block during prompts and pause
   const isMyTurn =
     matchState.activePlayerSeat === myPlayerSeat &&
     matchState.phase === "playing" &&
     !matchState.awaitingDeclaration &&
     matchState.pendingBelotSeat !== myPlayerSeat;
-  // The hand takes a click only once the table is settled: not while the last
-  // trick is still glowing or sweeping to its winner (the viewer usually leads
-  // the next one, and a throw there landed on top of the sweep), and not while
-  // the second deal is still bringing the rest of the hand in. The server's
-  // clock is unaffected — this only holds the click.
   const canPlayNow = isMyTurn && pendingResolvedTrick === null && !dealing;
   const myPlayer = matchState.players.find((p) => p.seat === myPlayerSeat);
-  // Cards the viewer holds but has not been shown yet (Croatian bidding). The
-  // server sends a COUNT per seat, never the identities, so this can render
-  // backs without ever putting the cards on the client. The cards themselves
-  // arrive only in the post-pick snapshot, once trump is resolved.
-  //
-  // Mid-deal only the packets that have landed are in the fan.
   const shownHand = dealView.visibleHand(myPlayer?.hand ?? [], myPlayer?.faceDownCount ?? 0);
   const myHand = shownHand.hand;
   const myFaceDownCount = shownHand.faceDownCount;
   const playableCardIds =
     canPlayNow && myPlayerSeat !== null ? legalCardIds(matchState, myPlayerSeat) : [];
 
-  // Bidding state. The prompt waits for the deal to finish.
   const isBiddingPhase = matchState.phase === "bidding";
   const showTrumpPrompt = isBiddingPhase && !dealing;
   const isActiveBidder = showTrumpPrompt && matchState.activePlayerSeat === myPlayerSeat;
 
-  // Declaration state. Held while a trump-take reveal is on screen so the two
-  // don't stack: after a pick the server sends trump_selected then a match_state
-  // with awaitingDeclaration back-to-back, so without this guard the "trump
-  // taken" reveal and the "you have declarations" prompt appear in the same
-  // render. The reveal auto-dismisses (or the player closes it), then the
-  // prompt surfaces — a deliberate beat between the two.
-  //
-  // The dedicated phase (Croatian) asks all four seats AT ONCE, so every seat
-  // sees the dialog — a seat holding nothing included: it answers (skips) the
-  // moment the dialog mounts and opens straight into "no declarations, waiting
-  // for the others" (owner decision: an instant answer may tell the table
-  // which seats hold nothing; clicking Skip for them only held the table).
-  // The phase used to prompt meld holders one at a time, so activePlayerSeat
-  // named exactly who held a meld and the table learned it before they chose.
-  // Keyed off the server's phase and the seat's own answered flag, never off
-  // the variant.
-  //
-  // Bitola keeps its seat gate: promptDeclarations is built from the VIEWER's
-  // own hand, so without it all four seats would render a trick-1 prompt and
-  // three would be rejected with ErrNotYourTurn.
   const isDeclarationPhase = matchState.phase === "declaring";
   const declarationAnsweredCount = matchState.players.filter((p) => p.declarationAnswered).length;
   const showDeclarationPrompt =
@@ -1686,10 +1201,6 @@ export function MatchPage() {
       ? myPlayer !== undefined && declarationReveal === null
       : matchState.awaitingDeclaration === true && matchState.activePlayerSeat === myPlayerSeat);
 
-  // The viewer's own decision on the clock, for the urgent tick: their turn in
-  // play (a card, a Bitola trick-1 declaration, or a Belote answer — all on
-  // the same per-move deadline) or their bid, once the deal has landed; or the
-  // dedicated declaration window while it is open and unanswered.
   const ownTurnDeadline =
     !dealing &&
     (matchState.phase === "bidding" || matchState.phase === "playing") &&
@@ -1704,37 +1215,23 @@ export function MatchPage() {
     !myPlayer.declarationAnswered &&
     answeredWindowHand !== matchState.handNumber;
 
-  // Belot state. The local pre-play prompt (belotPromptCardId) takes priority;
-  // the server-driven prompt is the fallback and is suppressed while the local
-  // flow owns the decision (belotPromptCardId set, or our send still resolving).
   const showLocalBelotPrompt = belotPromptCardId !== null;
   const localBelotIsKing = belotPromptCardId?.startsWith("K") ?? false;
-  // The server-driven prompt is the fallback (e.g. an auto-played K/Q). It is
-  // suppressed while the local flow owns the decision: either the local prompt
-  // is still open, or the player already answered it and we're waiting to fire
-  // the announce/skip on the confirmed pending seat (pendingLocalBelotChoice).
   const showBelotPrompt =
     matchState.pendingBelotSeat === myPlayerSeat &&
     pendingLocalBelotChoice === null &&
     !showLocalBelotPrompt;
-  // The triggering K/Q is the last card of the current trick at prompt time.
   const belotPromptLastTrickCard = showBelotPrompt
     ? (matchState.currentTrick[matchState.currentTrick.length - 1] ?? null)
     : null;
   const belotPromptIsKing = belotPromptLastTrickCard?.card.rank === "K";
 
-  // Emote bubbles are suppressed while an overlay or pause owns the screen; the
-  // store still records the latest emote so re-emergence renders the live one.
   const emotesVisible =
     matchEndData === null &&
     matchAbandonedData === null &&
     matchState.phase !== "paused" &&
     matchState.phase !== "disconnected";
 
-  // Surrender "opponent is proposing" banner — shown to the opposing team while
-  // a proposal is pending. Anchored to the proposer's seat (compass 1 or 3 in
-  // practice). On phones it renders inside that seat's wrapper (avatar-anchored,
-  // below); on desktop it's the standalone viewport-anchored layer.
   const showSurrenderBanner =
     isOpponentOfProposer &&
     myPlayerSeat !== null &&
@@ -1747,14 +1244,10 @@ export function MatchPage() {
       className="game-table h-screen w-screen overflow-hidden relative bg-background"
       data-testid="match-page"
     >
-      {/* Static table chrome — felt + wood rim + brass oval + filigree */}
       <TableBackdrop compact={isCompactTable} />
-      {/* Floating particles + soft top beam (decorative, reduced-motion aware) */}
       <TableAmbience intensity={0.9} tint="#ffe9b0" />
-      {/* "Beljot.online" wordmark — top center */}
       <Wordmark />
 
-      {/* Score panel - top left */}
       <ScorePanel
         viewerTeam={viewerTeam}
         teamAScore={matchState.teamScores[0]}
@@ -1771,24 +1264,11 @@ export function MatchPage() {
         lastTrickTeam={scoreRevealData?.lastTrickTeam}
         handNumber={matchState.handNumber}
         variantLabel={variantLabel(t, matchState.variant)}
-        // Passed straight through, NOT via `!== false` like the room surfaces:
-        // match_state is validated by a strict Zod schema that requires this key,
-        // so a payload without it never reaches the store at all. The absent-means-ON
-        // guard belongs only where nothing validates the shape (Room, RoomCreated).
         declarationsEnabled={matchState.declarationsEnabled}
-        // Passed straight through for the same reason: the strict schema requires
-        // the key, so there is nothing to guard against here.
         stopAtTarget={matchState.stopAtTarget}
         matchTarget={matchTarget}
       />
 
-      {/* Top-right HUD column (desktop): the trump indicator (gated to play
-          phases per AC 4.4.5, hidden behind any active overlay) with the
-          match-stake pill beneath it. The column is top-anchored and grows
-          downward — before trump is taken it holds only the stake, so the
-          stake sits at the top; once the indicator appears the stake drops
-          directly beneath it. The dealer is indicated by a chip on the dealer's
-          avatar (Stage 2), so no standalone dealer pill is rendered here. */}
       <div
         className="absolute top-4 right-4 hidden flex-col items-end gap-2 md:flex"
         style={{ zIndex: Z.HUD }}
@@ -1814,47 +1294,21 @@ export function MatchPage() {
         {matchStake > 0 && <StakePill amount={matchStake} />}
       </div>
 
-      {/* Player seats at compass positions */}
       {matchState.players.map((player) => {
         const compass = compassOffset(player.seat, myPlayerSeat);
         const isSelf = player.seat === myPlayerSeat;
-        // Nobody is on the clock during the dedicated declaration phase — all
-        // four seats answer at once. activePlayerSeat is still set there (pinned
-        // to the trick-1 leader, where it has to land anyway), so the highlight
-        // and its countdown ring are suppressed on the phase rather than on the
-        // seat. Leaving one seat lit would both misdescribe the phase and, back
-        // when it was a cursor, name a meld holder.
-        //
-        // Nor mid-deal: nobody is asked for anything until the last packet has
-        // landed, so no seat is lit and no ring runs before its prompt exists.
         const isActive =
           !dealing && !isDeclarationPhase && matchState.activePlayerSeat === player.seat;
-        // Caller chip only shows the suit when this seat IS the trump caller.
         const isCaller =
           matchState.trumpCallerSeat !== null &&
           matchState.trumpCallerSeat === player.seat &&
           matchState.trumpSuit !== null;
 
-        // Phone: the emote bubble is anchored to this seat's avatar (rendered
-        // inside the positioned seat wrapper), not viewport-offset like
-        // desktop — so it stays beside the seat wherever the compact layout
-        // parks it. Desktop keeps the standalone viewport-anchored layer below.
         const emoteSlot =
           isCompactTable && emotesVisible ? activeEmotes[player.seat as 0 | 1 | 2 | 3] : null;
-        // Trick-1 "has a declaration" banner — same compact anchoring as the
-        // emote bubble. Not gated by emotesVisible: it's game information,
-        // not social chrome.
         const declareSlot = isCompactTable ? activeDeclares[player.seat as 0 | 1 | 2 | 3] : null;
 
         return (
-          // `z-20` elevates the whole seat above the center TrickArea (which
-          // renders later in the DOM at z-auto). Crucial on phones: the compact
-          // EmoteBubble / SurrenderOpponentBanner are rendered INSIDE this
-          // wrapper, and the wrapper's `-translate-*` transform forms a stacking
-          // context — so their own `z-20` is trapped here and can't beat the
-          // thrown cards unless the wrapper itself outranks the trick area. Sits
-          // below every dialog/overlay (z-30+), so cards stay under emotes while
-          // modals stay on top.
           <div
             key={player.seat}
             className={`absolute ${SEAT_POSITIONS[compass]}`}
@@ -1866,25 +1320,6 @@ export function MatchPage() {
               isSelf={isSelf}
               isActive={isActive}
               seatTeam={seatTeam(player.seat, myPlayerSeat)}
-              // An opponent's stack is every card they physically hold, which
-              // during Croatian bidding is six open plus two face-down. Both
-              // counts are server-authoritative, so this needs no variant
-              // branch. Own seat renders its real hand instead (see myHand),
-              // so it passes undefined.
-              //
-              // handCount, not hand.length: the server projects match_state
-              // per recipient (Story 12.10), so an opponent's `hand` arrives
-              // EMPTY and only the count crosses the wire — their cards never
-              // reach this client at all.
-              //
-              // The `??` fallbacks are not defensive noise: match_state is CAST
-              // to MatchState, not parsed, so a server that predates either
-              // field yields undefined and `6 + undefined` renders "×NaN" on
-              // every seat. A client-first rolling deploy is exactly that
-              // window — an old server still sends full hands and no handCount,
-              // and hand.length keeps rendering them correctly until it flips.
-              //
-              // Mid-deal the stack shows only the packets that have landed.
               cardCount={
                 isSelf
                   ? undefined
@@ -1927,7 +1362,6 @@ export function MatchPage() {
         );
       })}
 
-      {/* Trick area - center */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
         <TrickArea
           trick={matchState.currentTrick}
@@ -1939,13 +1373,6 @@ export function MatchPage() {
         />
       </div>
 
-      {/* Hand cards - bottom center. While a personal action prompt is up
-          ONLY the TRUMP prompt (isActiveBidder) the hand is lifted to
-          Z.BIDDER_HAND — between the OverlayBackdrop dim (Z.PROMPT_DIM) and the
-          panel (Z.PROMPT) — so the bidder can read their cards to decide
-          take/pass. The declaration and belot prompts intentionally do NOT lift
-          it (you don't pick a card to answer them), so it stays in the seats
-          layer and is dimmed like the rest of the table. */}
       <div
         className="absolute bottom-4 left-1/2 -translate-x-1/2"
         style={isActiveBidder ? { zIndex: Z.BIDDER_HAND } : undefined}
@@ -1961,8 +1388,6 @@ export function MatchPage() {
         />
       </div>
 
-      {/* Pause + surrender controls — bottom-left HUD cluster (desktop only;
-          phones fold these into the top-right hamburger menu below). */}
       {isTurnPhase && (
         <div className="absolute bottom-4 left-4 z-10 hidden items-center gap-2 md:flex">
           {isPausablePhase && (
@@ -1988,11 +1413,6 @@ export function MatchPage() {
         </div>
       )}
 
-      {/* Rules + settings + mute + emote — bottom-right HUD cluster sitting LEFT
-          of the chat FAB. The whole cluster is hidden while the chat dock is
-          open, since the floating panel covers this corner; it returns on close.
-          Mute flips BOTH audio switches at once; its icon and label say what a
-          press will do. */}
       {overlayPhase === "normal" && !isChatOpen && (
         <div
           className="absolute bottom-4 right-24 hidden items-center gap-2 md:flex"
@@ -2025,21 +1445,12 @@ export function MatchPage() {
         </div>
       )}
 
-      {/* Match-stake pill (mobile) — top-right, just left of the hamburger
-          (right-3 + size-9). Its own block, not gated on overlayPhase, so it
-          persists like the score panel; Z.HUD keeps it under dialogs/blockers
-          but above the partner avatar. */}
       {matchStake > 0 && (
         <div className="absolute top-3 right-14 md:hidden" style={{ zIndex: Z.HUD }}>
           <StakePill amount={matchStake} />
         </div>
       )}
 
-      {/* Mobile HUD menu — the bottom action clusters fold into a top-right
-          hamburger; only the chat FAB stays at the bottom-right on phones.
-          Available during blockers (pause/reconnect) — gated only on the
-          end-of-hand overlay sequence — and floated at CHROME_TOP so it sits
-          above a blocker's dim. */}
       {overlayPhase === "normal" && (
         <div className="md:hidden">
           <button
@@ -2067,7 +1478,6 @@ export function MatchPage() {
 
           {hudMenuOpen && (
             <>
-              {/* tap-away backdrop */}
               <button
                 type="button"
                 aria-hidden="true"
@@ -2167,9 +1577,6 @@ export function MatchPage() {
         </div>
       )}
 
-      {/* Surrender confirm (mobile HUD menu path). Owned here, not by the menu,
-          so closing the menu doesn't unmount the modal. Auto-dismisses if
-          surrender stops being available (partner proposed / attempt spent). */}
       {surrenderConfirmOpen && canSurrenderRequest && (
         <SurrenderConfirmDialog
           onCancel={() => setSurrenderConfirmOpen(false)}
@@ -2180,9 +1587,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Surrender prompt — partner-only, modal. Suppress while a match-end
-          / match-abandoned overlay is up so the prompt's focus trap doesn't
-          swallow Tab navigation to the Return-to-Lobby button. */}
       {isPartnerOfProposer && matchEndData === null && matchAbandonedData === null && (
         <SurrenderPrompt
           proposerUsername={proposerUsername}
@@ -2191,11 +1595,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Surrender opponent banner (desktop) — non-modal status strip
-          viewport-anchored beside the proposer's seat. On phones it's rendered
-          inside the proposer's seat wrapper instead (avatar-anchored, above),
-          so this standalone layer is desktop-only. Same overlay gate as the
-          prompt. */}
       {!isCompactTable && showSurrenderBanner && surrenderProposerSeat !== null && (
         <SurrenderOpponentBanner
           proposerUsername={proposerUsername}
@@ -2203,7 +1602,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Pause overlay */}
       {isPaused && (
         <PauseOverlay
           pausedPlayers={matchState.pausedPlayers}
@@ -2217,12 +1615,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Reconnect overlay — shown during disconnect countdown OR abandonment.
-          `disconnectedPlayers` carries each offline seat's individual
-          reconnect expiry so the per-row countdowns can run independently of
-          the center ring. The center ring counts down to whichever seat
-          closes soonest (the same value the server publishes via
-          `matchState.reconnectExpiresAt`). */}
       {((matchState.phase === "disconnected" &&
         matchState.disconnectedSeat !== -1 &&
         matchState.reconnectExpiresAt) ||
@@ -2255,18 +1647,8 @@ export function MatchPage() {
         />
       )}
 
-      {/* Next-hand UI is suppressed while the end-of-hand overlay sequence
-          (capot animation → score reveal → match result) owns the screen.
-          Without this gate the new hand's deal animation + first-bidder
-          trump prompt paint behind the score reveal because both layers
-          live at z-50; their order in the DOM decides the painted result.
-          Holding them off until overlayPhase === "normal" makes the
-          end-of-hand summary unambiguously the front overlay, then the
-          new-hand prompts surface in sequence as the player dismisses it. */}
       {overlayPhase === "normal" && (
         <>
-          {/* Deal in progress: the candidate turning over at the centre and
-              the reshuffle caption. The packets fly in the CardFlight overlay. */}
           {dealing && dealView.deal !== null && (
             <DealAnimation
               flippedCandidate={
@@ -2279,7 +1661,6 @@ export function MatchPage() {
             />
           )}
 
-          {/* Trump bidding prompt overlay — once the deal has landed */}
           {showTrumpPrompt && (
             <TrumpPrompt
               trumpCandidate={matchState.trumpCandidate}
@@ -2298,10 +1679,6 @@ export function MatchPage() {
               }
               onPick={handlePickTrump}
               onPass={handlePassTrump}
-              // Server-authoritative: false only for the dealer bidding last
-              // (fourth) of a variant where the hand must find a taker. The
-              // client never re-derives the rule, so no variant branch appears
-              // here.
               canPass={!matchState.mustPickTrump}
               turnExpiresAt={matchState.turnExpiresAt}
               timerDurationSec={matchState.timerDurationSec}
@@ -2310,10 +1687,6 @@ export function MatchPage() {
         </>
       )}
 
-      {/* Declaration prompt overlay. In the dedicated phase this is on every
-          seat's screen at once, in the same shape, and stays up in a waiting
-          state after the viewer answers — so nobody can read anyone else's
-          melds, or whether they had any, off the table. */}
       {showDeclarationPrompt && myPlayer && (
         <DeclarationPrompt
           declarations={promptDeclarations}
@@ -2327,12 +1700,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Local Belote/Rebelote prompt — shown the instant the player clicks a
-          trump K/Q while holding the other, BEFORE the card is thrown. The
-          decision sends play_card + announce/skip. The move timer is still on
-          the play, so the prompt carries that same per-move ring: if it runs
-          out, the server auto-plays and the prompt closes (see the belot
-          effects above). */}
       {showLocalBelotPrompt && matchState.trumpSuit && (
         <BelotPrompt
           isKing={localBelotIsKing}
@@ -2344,8 +1711,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Server-driven Belot prompt overlay — fallback for plays the client did
-          not intercept (e.g. auto-play); suppressed during the local flow. */}
       {showBelotPrompt && matchState.trumpSuit && (
         <BelotPrompt
           isKing={belotPromptIsKing}
@@ -2357,15 +1722,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Declaration resolution reveal — silently consumed while an overlay
-          covers the table (D112). Deferred behind the trick-1 collect sweep via
-          the `declRevealReady` latch (set once the table is first clear of a
-          sweep) so trick 1's cards visibly reach the winner before this panel
-          mounts — the reveal arrives in the same WS burst as trick_resolved and
-          would otherwise hide who won. The latch (vs. gating live on
-          `pendingResolvedTrick`) keeps the panel mounted through LATER tricks'
-          collects, so its own 8 s AutoCloseRing finishes once instead of being
-          unmounted/restarted every trick and re-appearing forever. */}
       {declarationReveal && !isOverlayActive && declRevealReady && (
         <DeclarationReveal
           payload={declarationReveal}
@@ -2376,13 +1732,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Belot / Re-belot reveal — shown the moment the announcement lands, in
-          parallel with the throw (and, when the K/Q was the trick-resolving 4th
-          card, the collect sweep). It is deliberately NOT gated behind the
-          trick-collect snapshot: the announcer expects "belote!" to appear when
-          they confirm, not seconds later after the cards have swept away. Only
-          the overlay-active gate remains (pause / disconnect / match-end).
-          Keyed on payload so back-to-back reveals remount cleanly. */}
       {belotReveal && !isOverlayActive && (
         <BelotReveal
           key={`${belotReveal.playerSeat}-${belotReveal.cardId}`}
@@ -2396,9 +1745,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Trump-take reveal — center-of-table announcement toast that glows
-          in the caller's viewer-relative team color (Gold = Us, Silver = Them)
-          and auto-closes after 8 s with an X-with-countdown-ring escape. */}
       {trumpReveal && (
         <TrumpReveal
           key={`${trumpReveal.playerSeat}-${trumpReveal.cardId}`}
@@ -2411,13 +1757,8 @@ export function MatchPage() {
         />
       )}
 
-      {/* Match chat dock — bottom-right floating window broadcasting to the 4 participants */}
       <MatchChatDock isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
 
-      {/* Emote bubbles (desktop) — one per seat that has an active emote,
-          viewport-anchored beside each seat. On phones the bubble is rendered
-          inside the seat wrapper instead (anchored to the avatar), so this
-          standalone layer is desktop-only. */}
       {!isCompactTable &&
         emotesVisible &&
         matchState.players.map((player) => {
@@ -2434,10 +1775,6 @@ export function MatchPage() {
           );
         })}
 
-      {/* Declaration banners (desktop) — trick-1 "has a declaration" notice,
-          viewport-anchored beside the declarer's seat. On phones it's rendered
-          inside the seat wrapper instead (avatar-anchored, above), so this
-          standalone layer is desktop-only. */}
       {!isCompactTable &&
         matchState.players.map((player) => {
           const slot = activeDeclares[player.seat as 0 | 1 | 2 | 3];
@@ -2453,7 +1790,6 @@ export function MatchPage() {
           );
         })}
 
-      {/* Capot animation overlay */}
       {overlayPhase === "capot_animation" &&
         scoreRevealData?.capotTeam !== null &&
         scoreRevealData?.capotTeam !== undefined && (
@@ -2470,7 +1806,6 @@ export function MatchPage() {
           />
         )}
 
-      {/* Score reveal overlay */}
       {overlayPhase === "score_reveal" && scoreRevealData !== null && (
         <ScoreReveal
           data={scoreRevealData}
@@ -2484,7 +1819,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Match result overlay */}
       {overlayPhase === "match_result" && matchEndData !== null && (
         <MatchResult
           data={matchEndData}
@@ -2500,7 +1834,6 @@ export function MatchPage() {
         />
       )}
 
-      {/* Urgent clock tick for the viewer's own decision (renders nothing). */}
       <UrgentTick
         turnDeadline={ownTurnDeadline}
         turnTotalSec={matchState.timerDurationSec}
@@ -2508,13 +1841,8 @@ export function MatchPage() {
         windowTotalSec={MOTION.DECLARATION_PHASE_AUTO_SKIP / 1000}
       />
 
-      {/* CardFlight overlay — viewport-fixed layer that paints all in-flight
-          cards (self throw, opponent throw, take-collect). Mounted last so
-          its z-index sits above the table and any other game chrome but
-          below modal dialogs / score reveal (which set their own z-index). */}
       <CardFlight flights={activeFlights} onComplete={handleFlightComplete} />
 
-      {/* Settings + rules dialogs — driven by the bottom-right HUD buttons */}
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <RulesDialog
         open={rulesOpen}
@@ -2523,7 +1851,6 @@ export function MatchPage() {
         stopAtTarget={matchState.stopAtTarget}
       />
 
-      {/* Error toast */}
       {errorToast && (
         <div
           className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-destructive/90 text-text-primary font-body text-sm px-4 py-2 rounded-lg flex items-center gap-3"

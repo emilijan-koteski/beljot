@@ -15,17 +15,9 @@ type DurationSliderProps = {
   unitLabel: string;
   rangeLabel?: string;
   presets?: number[];
-  /**
-   * Explicit marks, overriding the default every-10 derivation. Pass this when the
-   * meaningful positions are not evenly spaced — the honour gate's ticks sit on
-   * TIER BOUNDARIES (50/70/85/95), which no fixed interval can express.
-   */
   ticks?: SliderTick[];
-  /** CSS background for the filled portion. Defaults to the brass→accent gradient. */
   fillStyle?: string;
-  /** Overrides the big numeric readout, for values that read better as a word. */
   valueText?: string;
-  /** A second static marker drawn on the track, distinct from the thumb. */
   marker?: SliderMarker;
   className?: string;
   testId?: string;
@@ -34,14 +26,8 @@ type DurationSliderProps = {
 const DEFAULT_PRESETS = [15, 30, 60, 120];
 
 /**
- * Discrete range slider. Built for the per-move timer (10-120s, step 5s) and
- * reused by the create-room honour gate (0-100, step 5). The native
- * <input type="range"> sits over the painted track for full a11y + keyboard +
- * screen-reader value reporting.
- *
- * Everything beyond the original timer API is additive and defaulted, so the
- * timer's appearance and behaviour are unchanged: omit `ticks`, `fillStyle`,
- * `valueText` and `marker` and this is the component it always was.
+ * Discrete range slider with a native range input layered over a painted track.
+ * Ticks, the marker and the thumb anchor on the track box, not the asymmetrically padded shell.
  */
 export function DurationSlider({
   value,
@@ -62,8 +48,6 @@ export function DurationSlider({
   const span = max - min || 1;
   const pct = ((value - min) / span) * 100;
 
-  // Default marks every 10 units, emphasising the presets — the timer's original
-  // behaviour, kept as the fallback so that call site needs no change.
   const resolvedTicks: SliderTick[] =
     ticks ??
     (() => {
@@ -104,11 +88,6 @@ export function DurationSlider({
           hasTickLabels && "pb-6",
         )}
       >
-        {/* Everything below anchors on the TRACK's own box, never the padded
-            shell: the caption (pt-7) and tick-label (pb-6) paddings are
-            asymmetric, so centring ticks or the native thumb on the shell put
-            them visibly off the track line the moment one padding was present
-            without the other. */}
         <div className="relative">
           <div className="bg-surface-sunken border-border relative h-1.5 overflow-hidden rounded-[3px] border">
             <div
@@ -148,8 +127,6 @@ export function DurationSlider({
               );
             })}
 
-            {/* Read-only second marker. Drawn in ink so it never competes with the
-              thumb for "this is the value you are setting". */}
             {markerPct !== null && (
               <span
                 data-testid={testId ? `${testId}-marker` : undefined}
@@ -160,11 +137,6 @@ export function DurationSlider({
                   style={{ left: `${markerPct}%` }}
                 />
                 {marker?.label && (
-                  // Floats OUTSIDE the shell, just above its top edge, instead of
-                  // renting box height via extra top padding — the shell stays the
-                  // same height with or without a caption (user decision
-                  // 2026-07-31). Nothing up the chain clips: only the track itself
-                  // is overflow-hidden.
                   <span
                     className="bg-surface-elevated border-border text-ink absolute -translate-x-1/2 rounded-[4px] border px-1 py-px font-mono text-[9.5px] font-semibold whitespace-nowrap"
                     style={{ left: `${markerPct}%`, bottom: "calc(100% + 16px)" }}

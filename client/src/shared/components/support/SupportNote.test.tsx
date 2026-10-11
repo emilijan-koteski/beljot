@@ -8,8 +8,6 @@ import { BMC_MARK_SRC } from "@/shared/components/support/supportLinks";
 import { SupportNote } from "@/shared/components/support/SupportNote";
 
 describe("SupportNote", () => {
-  // Both placements render the same `support.note`; `variant` only changes the
-  // type scale. Asserted per variant so a future re-split shows up here.
   it.each(["auth", "lobby"] as const)("renders the same wording in the %s note", (variant) => {
     render(<SupportNote variant={variant} />);
     expect(screen.getByTestId("support-note").textContent).toContain(
@@ -22,8 +20,6 @@ describe("SupportNote", () => {
     render(<SupportNote variant="auth" />);
 
     const icon = screen.getByTestId("support-note-icon");
-    // The STILL frame: a looping GIF in a footer line is the nagging this
-    // feature is built to avoid.
     expect(icon).toHaveAttribute("src", BMC_MARK_SRC);
     expect(icon).toHaveAttribute("alt", "");
     expect(icon).toHaveAttribute("aria-hidden", "true");

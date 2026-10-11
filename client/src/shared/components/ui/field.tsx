@@ -7,8 +7,6 @@ type FieldProps = {
   label: string;
   htmlFor?: string;
   hint?: React.ReactNode;
-  /** A "(?)" popover next to the label — hover-on-desktop / tap-to-pin, for
-   *  an explanation that would otherwise have to sit as a permanent hint. */
   info?: React.ReactNode;
   infoAriaLabel?: string;
   infoTestId?: string;
@@ -20,11 +18,8 @@ type FieldProps = {
 };
 
 /**
- * Brass-deep micro-caps label + optional (?) info popover + optional
- * right-aligned hint slot + the input + an inline error message. The label
- * flips to `--danger` when the field carries an error. Promoted from
- * features/auth/components/AuthCard.tsx — now the third consumer (Create
- * Room) needs it too.
+ * Form field with a micro-caps label, optional info popover and hint, the input, and an inline error.
+ * The label switches to the danger colour when the field has an error.
  */
 export function Field({
   label,

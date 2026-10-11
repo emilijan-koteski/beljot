@@ -1,6 +1,5 @@
 import type { Card, Declaration, Rank, Suit } from "@/shared/types/matchTypes";
 
-// Natural rank order for sequences: 7 < 8 < 9 < T < J < Q < K < A.
 const NATURAL_RANK_INDEX: Record<Rank, number> = {
   "7": 0,
   "8": 1,
@@ -15,10 +14,9 @@ const NATURAL_RANK_INDEX: Record<Rank, number> = {
 const SEQUENCE_POINTS: Record<number, number> = {
   3: 20,
   4: 50,
-  // 5+ = 100 (handled below)
 };
+const LONG_SEQUENCE_POINTS = 100;
 
-// Only ranks with non-zero card points are declarable (no 4x7 or 4x8).
 const FOUR_OF_A_KIND_POINTS: Partial<Record<Rank, number>> = {
   J: 200,
   "9": 150,
@@ -29,9 +27,7 @@ const FOUR_OF_A_KIND_POINTS: Partial<Record<Rank, number>> = {
 };
 
 /**
- * i18n sub-key (under `match.declaration`) for a meld's Rules name: Tierce /
- * Quarte / Quint by run length, Carré for four-of-a-kind — matching the rules
- * reference page. Points are shown separately in the UI, never in this label.
+ * Return the `match.declaration` i18n sub-key for a meld's rules name: Tierce, Quarte or Quint by run length, Carré for four-of-a-kind.
  */
 export function declarationLabelKey(
   type: string,
@@ -44,21 +40,12 @@ export function declarationLabelKey(
 }
 
 /**
- * Mirror of server/internal/game/declarations.go `detectDeclarations`.
- * Scans a hand for sequences (3+ consecutive same-suit cards in natural order)
- * and four-of-a-kind (same rank across all 4 suits). Longer sequences subsume
- * shorter subsequences within them.
- *
- * `overlap` must come from `rulesForVariant(...).declarationOverlap` — the
- * single client resolver — and is required so no caller can silently fall back
- * to the wrong variant's rule. When it is true a card may count toward more
- * than one declaration, so the one-card-one-group dedup is skipped and every
- * detected meld survives, exactly as the server records it.
+ * Mirror of the server's `detectDeclarations`: find maximal same-suit sequences of 3+ and four-of-a-kinds in a hand.
+ * `overlap` (from `rulesForVariant`) lets a card count in several melds; otherwise one-card-one-group dedup applies.
  */
 export function detectDeclarations(hand: Card[], overlap: boolean): Declaration[] {
   const decls: Declaration[] = [];
 
-  // Sequences
   const bySuit: Record<Suit, Card[]> = { S: [], H: [], D: [], C: [] };
   for (const c of hand) {
     bySuit[c.suit].push(c);
@@ -82,7 +69,7 @@ export function detectDeclarations(hand: Card[], overlap: boolean): Declaration[
         const seqLen = i - seqStart;
         if (seqLen >= 3) {
           const seqCards = cards.slice(seqStart, i);
-          const pts = SEQUENCE_POINTS[seqLen] ?? 100;
+          const pts = SEQUENCE_POINTS[seqLen] ?? LONG_SEQUENCE_POINTS;
           decls.push({
             type: "sequence",
             cards: seqCards,
@@ -95,7 +82,6 @@ export function detectDeclarations(hand: Card[], overlap: boolean): Declaration[
     }
   }
 
-  // Four-of-a-kind
   const byRank: Partial<Record<Rank, Card[]>> = {};
   for (const c of hand) {
     const arr = byRank[c.rank] ?? [];
@@ -117,30 +103,18 @@ export function detectDeclarations(hand: Card[], overlap: boolean): Declaration[
     }
   }
 
-  // A card may participate in several declarations under this config, so every
-  // detected meld stands on its own.
   if (overlap) return decls;
   return dedupBitola(decls);
 }
 
 /**
- * Applies the one-card-one-group rule (what `declarationOverlap: false`
- * selects). Among declarations that share at least one card, the highest-value
- * one is kept and the rest are dropped. Stable — original order is preserved
- * among survivors.
- *
- * Equal-value ties keep the four-of-a-kind, mirroring `declarationBeats` rule 2
- * in the Go engine, so the survivor is the meld the clash comparison would have
- * preferred. Rule 2 alone settles every reachable tie: overlap is only possible
- * between a sequence and a four-of-a-kind, since sequences are maximal
- * per-suit runs and four-of-a-kinds are rank-disjoint.
+ * Apply the one-card-one-group rule: among melds sharing a card keep the highest value, four-of-a-kind on a tie (as the Go engine's `declarationBeats`).
+ * Survivors keep their original order.
  */
 function dedupBitola(decls: Declaration[]): Declaration[] {
   if (decls.length <= 1) return decls;
 
   const order = decls.map((_, i) => i);
-  // Stable sort by value descending, four-of-a-kind first on a tie (Array.sort
-  // in modern engines is stable).
   order.sort((a, b) => {
     const da = decls[a]!;
     const db = decls[b]!;

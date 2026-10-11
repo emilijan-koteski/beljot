@@ -19,6 +19,7 @@ func (r *GormRepository) Create(token *PasswordResetToken) error {
 	return r.db.Create(token).Error
 }
 
+// FindValidByHash returns the unused, unexpired token with this hash, or (nil, nil) if none exists.
 func (r *GormRepository) FindValidByHash(tokenHash string) (*PasswordResetToken, error) {
 	var t PasswordResetToken
 	err := r.db.
@@ -33,10 +34,10 @@ func (r *GormRepository) FindValidByHash(tokenHash string) (*PasswordResetToken,
 	return &t, nil
 }
 
+// MarkUsed stamps used_at on a still-unused token and reports whether this call consumed it.
+// The `used_at IS NULL` guard makes consumption atomic under concurrent resets.
 func (r *GormRepository) MarkUsed(id uint) (bool, error) {
 	now := time.Now()
-	// The `used_at IS NULL` guard makes consumption atomic: only one of two
-	// concurrent resets for the same token sees RowsAffected == 1.
 	res := r.db.Model(&PasswordResetToken{}).
 		Where("id = ? AND used_at IS NULL", id).
 		Update("used_at", now)
@@ -46,6 +47,7 @@ func (r *GormRepository) MarkUsed(id uint) (bool, error) {
 	return res.RowsAffected == 1, nil
 }
 
+// DeleteByUserID removes every reset token for a user so only the newest link stays live.
 func (r *GormRepository) DeleteByUserID(userID uint) error {
 	return r.db.Where("user_id = ?", userID).Delete(&PasswordResetToken{}).Error
 }

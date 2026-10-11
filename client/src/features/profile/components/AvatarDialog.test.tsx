@@ -42,8 +42,6 @@ function jpeg(name = "me.jpg", bytes = 1024, type = "image/jpeg"): File {
 type Props = Parameters<typeof AvatarDialog>[0];
 
 function renderDialog(props: Partial<Props> = {}) {
-  // Not createTestQueryClient: its gcTime of 0 would drop the seeded, unobserved
-  // profile entry before the mutation could patch it.
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -66,8 +64,6 @@ function input(): HTMLInputElement {
   return screen.getByTestId("avatar-dialog-input") as HTMLInputElement;
 }
 
-// jsdom implements neither. Installed for the whole file and never removed:
-// the dialog's unmount cleanup revokes after each test's own hooks have run.
 const createObjectURL = vi.fn(() => "blob:preview");
 const revokeObjectURL = vi.fn();
 URL.createObjectURL = createObjectURL;
@@ -93,7 +89,6 @@ describe("AvatarDialog", () => {
     expect(input()).toHaveAttribute("type", "file");
     expect(input()).toHaveAttribute("accept", "image/jpeg,image/png,image/webp");
     expect(screen.getByTestId("avatar-dialog-upload")).toBeDisabled();
-    // No avatar yet, so there is nothing to remove.
     expect(screen.queryByTestId("avatar-dialog-remove")).not.toBeInTheDocument();
   });
 
@@ -101,7 +96,6 @@ describe("AvatarDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    // The polite live region is mounted, empty, before there is anything to say.
     expect(screen.getByTestId("avatar-dialog-live")).toBeEmptyDOMElement();
 
     await user.upload(input(), jpeg("huge.jpg", 2_097_153));
@@ -128,7 +122,6 @@ describe("AvatarDialog", () => {
   });
 
   it("rejects a known-wrong type inline", async () => {
-    // applyAccept off: the picker filter is not the only line of defence.
     const user = userEvent.setup({ applyAccept: false });
     renderDialog();
 
@@ -161,7 +154,6 @@ describe("AvatarDialog", () => {
     await user.click(screen.getByTestId("avatar-dialog-upload"));
     expect(mockUploadAvatar).toHaveBeenCalledWith(1, file, expect.any(Function));
 
-    // In flight: progress shows, nothing can be pressed.
     reportProgress(0.5);
     await waitFor(() =>
       expect(screen.getByTestId("avatar-dialog-progress")).toHaveAttribute("aria-valuenow", "50"),
@@ -177,7 +169,6 @@ describe("AvatarDialog", () => {
     const cached = client.getQueryData<ProfileResponse>(queryKeys.profile.detail(1));
     expect(cached?.avatarUrl).toBe(SMALL);
     expect(cached?.avatarLargeUrl).toBe(LARGE);
-    // The preview's object URL is released once the dialog lets go of it.
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview"));
   });
 
@@ -214,7 +205,6 @@ describe("AvatarDialog", () => {
     await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith(i18n.t(key)));
     expect(onClose).not.toHaveBeenCalled();
     expect(useAuthStore.getState().user?.avatarUrl).toBeNull();
-    // The picked file survives, so a retry is one click.
     expect(screen.getByTestId("avatar-dialog-upload")).toBeEnabled();
   });
 

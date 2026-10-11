@@ -8,11 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// viewerTeamCase maps the viewer's seat to their team index — 0 (team A) for
-// seats 0/2, 1 (team B) for seats 1/3 — given four userID bindings in
-// player1..player4 order. Mirrors game.TeamForSeat without coupling the match
-// package to the game engine. viewerTeamCaseM is the same expression with the
-// matches table qualified as `m` for use inside joins.
 const viewerTeamCase = `(CASE
 	WHEN player1_id = ? THEN 0
 	WHEN player2_id = ? THEN 1
@@ -56,17 +51,10 @@ func (r *GormMatchRepository) CreateWithHands(match *Match, hands []HandResult) 
 	})
 }
 
+// GetStatsForUser counts the user's wins, losses, and abandonments. Another
+// player's abandonment counts as a win or loss; the user's own or an
+// unattributed one counts as abandoned.
 func (r *GormMatchRepository) GetStatsForUser(userID uint) (wins, losses, abandoned int, err error) {
-	// Single round-trip: FILTER aggregation over matches the user participates
-	// in. The viewer's team per row is derived from their seat via a CASE
-	// (seat 0/2 → 0 team A; 1/3 → 1 team B) matching game.TeamForSeat.
-	//
-	// Abandoned matches score per player: the abandoner (and every participant
-	// of a NULL-abandoner boot-reconcile row) counts "abandoned"; the other
-	// three count win/loss by winner_team — the non-abandoning team, persisted
-	// live and backfilled by migration 000015. winner_team on abandoned rows is
-	// meaningful ONLY when abandoned_by IS NOT NULL, hence the gate. A user with
-	// zero matches yields (0, 0, 0, nil) — GORM's Scan into zero-valued struct.
 	var row struct {
 		Wins      int
 		Losses    int
@@ -99,22 +87,8 @@ WHERE player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?
 	return row.Wins, row.Losses, row.Abandoned, nil
 }
 
-// GetHonorTrendWindowsForUser splits the user's most recent 2*limit matches into
-// the newest `limit` and the `limit` before those, counting completions vs
-// abandonments in each (Story 9.7 trend). The windows themselves ARE the recency
-// mechanism, so no half-life decay is applied to these counts.
-//
-// The inner SELECT picks one bounded window of 2*limit rows (newest first, LIMIT
-// with no OFFSET — see deferred item D82) and stamps each with a ROW_NUMBER; the
-// outer FILTER aggregation buckets by rn <= limit vs rn > limit. One round-trip,
-// no pagination, and the split cannot tear under a concurrent completion the way
-// two separate OFFSET queries could.
-//
-// Both buckets use the canonical viewer gate verbatim —
-// `abandoned_by IS NOT NULL AND abandoned_by <> ?` for someone else's
-// abandonment — so a future grep for that predicate finds this site too. Rows
-// with abandoned_by IS NULL are excluded by the inner WHERE: a boot-reconcile row
-// is a server fault, not a player signal.
+// GetHonorTrendWindowsForUser counts completions and abandonments in the user's
+// newest `limit` matches and in the `limit` matches before those.
 func (r *GormMatchRepository) GetHonorTrendWindowsForUser(userID uint, limit int) (HonorTrendWindows, error) {
 	var w HonorTrendWindows
 	if limit <= 0 {
@@ -169,13 +143,6 @@ func (r *GormMatchRepository) GetMatchesForUser(userID uint, limit, offset int, 
 			userID, userID, userID, userID,
 		)
 
-	// Viewer-relative outcome filter. The viewer's team per row is derived from
-	// their seat via the same CASE used by GetStatsForUser (seats 0/2 → 0,
-	// 1/3 → 1). Mirrors GetStatsForUser's per-player abandonment semantics:
-	// attributable abandoned rows (abandoned_by IS NOT NULL) count as win/loss
-	// by winner_team for the three non-abandoners, while the abandoner and all
-	// participants of NULL-abandoner rows keep "abandoned". Unknown / empty
-	// outcome leaves the completed+abandoned set.
 	switch outcome {
 	case "win":
 		query = query.Where(
@@ -196,9 +163,6 @@ func (r *GormMatchRepository) GetMatchesForUser(userID uint, limit, offset int, 
 		return nil, 0, err
 	}
 
-	// "old" → oldest-first; default ("new") → newest-first. Tie-break by id in
-	// the same direction for a stable order. The literals are derived from a
-	// validated allowlist (see parseMatchesQuery) so there is no injection risk.
 	dir := "DESC"
 	if sort == "old" {
 		dir = "ASC"
@@ -221,11 +185,8 @@ func (r *GormMatchRepository) GetMatchesForUser(userID uint, limit, offset int, 
 	return items, total, nil
 }
 
-// GetLastMatchForRoomAndUser returns the room's most recent completed /
-// abandoned match in which userID held one of the four seats, hands preloaded
-// in play order. (nil, nil) when there is none — either the room never hosted
-// a match or the caller did not play the one it hosted, which the handler maps
-// to the same 404 so the two cases are indistinguishable to a stranger.
+// GetLastMatchForRoomAndUser returns the room's most recent finished match with
+// recorded hands that userID played, or (nil, nil) when there is none.
 func (r *GormMatchRepository) GetLastMatchForRoomAndUser(roomID, userID uint) (*Match, error) {
 	var m Match
 	err := r.db.
@@ -235,12 +196,6 @@ func (r *GormMatchRepository) GetLastMatchForRoomAndUser(roomID, userID uint) (*
 			"player1_id = ? OR player2_id = ? OR player3_id = ? OR player4_id = ?",
 			userID, userID, userID, userID,
 		).
-		// A row with no scored hand is not a match anyone played: boot reconcile
-		// writes a 0-0 `abandoned` placeholder with no hands for every room left
-		// in `playing` by a crash (reconcile.go), and a real abandonment inside
-		// the first hand lands in the same shape. Surfacing either as "the last
-		// match" shows a 0-0 scoreline and an empty breakdown, which reads as a
-		// played game that everybody lost. Require recorded play instead.
 		Where("EXISTS (SELECT 1 FROM hand_results hr WHERE hr.match_id = matches.id)").
 		Preload("Hands", func(db *gorm.DB) *gorm.DB {
 			return db.Order("hand_number ASC")
@@ -257,15 +212,11 @@ func (r *GormMatchRepository) GetLastMatchForRoomAndUser(roomID, userID uint) (*
 	return &m, nil
 }
 
-// GetCareerAggregatesForUser computes the viewer-relative career metrics across
-// every match the user participated in: capots won by their team, average
-// completed-match duration, the single best hand their team scored, and the
-// current win/loss streak. Each metric is a focused query; the streak's leading
-// run is counted in Go over a bounded newest-first window.
+// GetCareerAggregatesForUser computes the user's capots won, average match
+// duration, last played time, best hand, and current win/loss streak.
 func (r *GormMatchRepository) GetCareerAggregatesForUser(userID uint) (CareerAggregates, error) {
 	var agg CareerAggregates
 
-	// Capots won by the viewer's team (capot_team equals the viewer's team).
 	if err := r.db.Raw(`
 SELECT COUNT(*)
 FROM hand_results h
@@ -279,7 +230,6 @@ WHERE (m.player1_id = ? OR m.player2_id = ? OR m.player3_id = ? OR m.player4_id 
 		return CareerAggregates{}, err
 	}
 
-	// Average completed-match duration in seconds.
 	var avg float64
 	if err := r.db.Raw(`
 SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (completed_at - started_at))), 0)
@@ -292,7 +242,6 @@ WHERE status = 'completed'
 	}
 	agg.AvgMatchSeconds = int(math.Round(avg))
 
-	// Most recent match (completed or abandoned) for the "last played" line.
 	var lp struct{ LastPlayed *time.Time }
 	if err := r.db.Raw(`
 SELECT MAX(completed_at) AS last_played
@@ -308,7 +257,6 @@ WHERE status IN ('completed', 'abandoned')
 		agg.LastPlayedAt = *lp.LastPlayed
 	}
 
-	// Best single hand the viewer's team ever scored.
 	var bh struct {
 		Points      int
 		HandNumber  int
@@ -337,13 +285,6 @@ LIMIT 1`,
 		agg.BestHandAt = bh.CompletedAt
 	}
 
-	// Current streak — leading run of identical outcomes, newest first, with the
-	// same per-player abandonment semantics as GetStatsForUser: completed
-	// matches plus attributable abandoned rows (abandoned_by set, not the
-	// viewer) count win/loss via the persisted winner_team. The viewer's own
-	// abandonments and NULL-abandoner legacy rows are neither win nor loss —
-	// they are skipped, so a streak continues across them. The 200-row window
-	// is far beyond any real streak length while keeping the query cheap.
 	var outcomes []struct{ Won bool }
 	if err := r.db.Raw(`
 SELECT (winner_team = `+viewerTeamCase+`) AS won
@@ -380,13 +321,7 @@ LIMIT 200`,
 	return agg, nil
 }
 
-// GetCareerPointsForUser sums the subject's OWN team score across their
-// COMPLETED matches — the lifetime "career points scored" figure on the public
-// profile (Story 11.3). The team per row is derived from the player's seat via
-// the same viewerTeamCase as GetStatsForUser (seats 0/2 → team_a_score, 1/3 →
-// team_b_score). Only status = 'completed' rows count: in-progress rows have no
-// final total and abandoned rows never reach a real score. COALESCE keeps a
-// user with no completed matches at 0 rather than NULL.
+// GetCareerPointsForUser sums the user's own team score across their completed matches.
 func (r *GormMatchRepository) GetCareerPointsForUser(userID uint) (int64, error) {
 	var total int64
 	err := r.db.Raw(`
@@ -405,11 +340,8 @@ WHERE status = 'completed'
 	return total, nil
 }
 
-// GetTopPartnersForUser returns the most-played teammates — the same-team seat
-// across each match — ordered by matches played together. wins mirrors
-// GetStatsForUser's per-player semantics: completed wins plus attributable
-// abandoned rows the viewer's team won; the viewer's own abandonments and
-// NULL-abandoner legacy rows never count as wins (but do count as played).
+// GetTopPartnersForUser returns the user's most frequent teammates, ordered by
+// matches played together, with the wins they shared.
 func (r *GormMatchRepository) GetTopPartnersForUser(userID uint, limit int) ([]PartnerAggregate, error) {
 	var rows []PartnerAggregate
 	err := r.db.Raw(`
@@ -452,12 +384,8 @@ LIMIT ?`,
 	return rows, nil
 }
 
-// GetTopRivalsForUser returns the most-faced opponents — the two opposite-team
-// seats, unpivoted into one row each — ordered by matches played against them.
-// wins/losses are viewer-relative and mirror GetStatsForUser's per-player
-// semantics: completed matches plus attributable abandoned rows (abandoned_by
-// set, not the viewer); the viewer's own abandonments and NULL-abandoner
-// legacy rows are excluded entirely.
+// GetTopRivalsForUser returns the user's most frequent opponents with viewer-relative
+// wins and losses. The user's own and unattributed abandonments are excluded.
 func (r *GormMatchRepository) GetTopRivalsForUser(userID uint, limit int) ([]RivalAggregate, error) {
 	var rows []RivalAggregate
 	err := r.db.Raw(`

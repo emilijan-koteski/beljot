@@ -12,11 +12,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// Every roster-carrying payload in the room package carries the player's
-// avatar URL beside their username: the RoomPlayer struct serializes it, and
-// the hand-built WS maps have to add it by hand. These tests pin the hand-built
-// ones, where a missing key would be invisible to every struct-based test.
-
 const avatarP2 = "https://assets.test/avatars/22222222-2222-4222-8222-222222222222/128.webp"
 
 // payloadMap decodes a broadcast message's payload into a generic map.
@@ -57,8 +52,6 @@ func TestSelectSeat_SeatUpdatedCarriesAvatarURL(t *testing.T) {
 	p := findBroadcast(t, broadcaster, "system:seat_updated")
 	assert.Equal(t, avatarP2, p["avatarUrl"])
 
-	// The HTTP roster is RoomPlayer-serialized: the avatar rides it too, and a
-	// player without one carries an explicit null.
 	var resp struct {
 		Data struct {
 			Players []map[string]any `json:"players"`
@@ -95,8 +88,6 @@ func TestJoinRoom_PlayerJoinedCarriesAvatarURL(t *testing.T) {
 		r := &room.Room{Name: "Avatar Join Pic", OwnerID: 100, Status: "waiting", PlayerCount: 1}
 		require.NoError(t, repo.Create(r))
 		require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 100, Username: "Owner"}))
-		// The mock stores the handler's row as-is; the real JOIN fills the
-		// avatar on the re-read, which this stands in for.
 		repo.addPlayerHook = func(p *room.RoomPlayer) {
 			if p.UserID == 200 {
 				p.AvatarURL = strPtr(avatarP2)
@@ -112,7 +103,7 @@ func TestJoinRoom_PlayerJoinedCarriesAvatarURL(t *testing.T) {
 
 func TestSwapSeats_SeatUpdatedCarriesAvatarURL(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
-	seedSeatedRoom(t, repo) // owner=100 seat 0, P2=200 seat 1, P3=300 seat 2, P4=400 seat 3
+	seedSeatedRoom(t, repo)
 	for _, p := range repo.players {
 		if p.UserID == 200 {
 			p.AvatarURL = strPtr(avatarP2)
@@ -166,7 +157,6 @@ func TestTransferOwnership_OwnerChangedCarriesNewOwnerAvatar(t *testing.T) {
 	p := findBroadcast(t, broadcaster, "system:room_owner_changed")
 	assert.Equal(t, avatarP2, p["newOwnerAvatarUrl"])
 
-	// The lobby card update reuses the same hydration.
 	lobby := findBroadcast(t, broadcaster, "system:room_updated")
 	assert.Equal(t, avatarP2, lobby["ownerAvatarUrl"])
 	assert.Equal(t, "P2", lobby["ownerUsername"])
@@ -302,7 +292,6 @@ func TestQuickPlay_SeatedBroadcastsCarryAvatarURL(t *testing.T) {
 			}
 			require.NoError(t, repo.Create(existing))
 			require.NoError(t, repo.AddPlayer(&room.RoomPlayer{RoomID: existing.ID, UserID: 20, Seat: intPtr(0), Team: strPtr("teamA")}))
-			// Stands in for the JOIN the real re-read does.
 			repo.addPlayerHook = func(p *room.RoomPlayer) {
 				if p.UserID == 30 {
 					p.AvatarURL = avatar

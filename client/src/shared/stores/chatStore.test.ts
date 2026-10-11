@@ -15,7 +15,6 @@ function makeMessage(overrides: Partial<ChatMessagePayload> = {}): ChatMessagePa
   };
 }
 
-// alice(1) is the local user in these fixtures; bob(2)/carol(3) are friends.
 function makeWhisper(overrides: Partial<WhisperPayload> = {}): WhisperPayload {
   return {
     fromUserId: 2,
@@ -131,8 +130,6 @@ describe("chatStore", () => {
 
     const state = useChatStore.getState();
     expect(state.matchMessages).toHaveLength(200);
-    // Length is capped but the monotonic counter keeps growing — required for
-    // the sidebar's unread badge to stay accurate after the ring buffer fills.
     expect(state.matchMessagesReceivedTotal).toBe(210);
   });
 
@@ -149,8 +146,6 @@ describe("chatStore", () => {
     useChatStore.getState().appendLobby(makeMessage());
     expect(useChatStore.getState().matchMessagesReceivedTotal).toBe(0);
   });
-
-  // --- Room partition ---
 
   it("appendRoom adds a message to the room partition", () => {
     useChatStore.getState().appendRoom(makeMessage({ scope: "room", message: "r1" }));
@@ -195,8 +190,6 @@ describe("chatStore", () => {
     expect(useChatStore.getState().matchMessagesReceivedTotal).toBe(0);
   });
 
-  // --- hasSent* placeholder flags ---
-
   it("markSent flags are independent across channels", () => {
     useChatStore.getState().markSentLobby();
     let state = useChatStore.getState();
@@ -227,10 +220,7 @@ describe("chatStore", () => {
     expect(useChatStore.getState().hasSentRoom).toBe(false);
   });
 
-  // --- Whisper threads (Story 11.4) ---
-
   it("appendWhisper keys an incoming thread by the sender's username", () => {
-    // me = alice(1); bob(2) whispers me → thread keyed by "bob".
     useChatStore.getState().appendWhisper(makeWhisper(), 1);
     const state = useChatStore.getState();
     expect(Object.keys(state.whisperThreads)).toEqual(["bob"]);
@@ -239,7 +229,6 @@ describe("chatStore", () => {
   });
 
   it("appendWhisper keys an outgoing (own-echo) thread by the recipient's username", () => {
-    // me = alice(1); my own-echo to bob → still keyed by "bob".
     const echo = makeWhisper({
       fromUserId: 1,
       fromUsername: "alice",
@@ -279,8 +268,6 @@ describe("chatStore", () => {
   });
 
   it("appendWhisper bumps unread on the active thread when the dock is CLOSED", () => {
-    // The active channel is only "read" while it is on screen. A closed (or
-    // unmounted) dock must still count the whisper, or it lands silently.
     useChatStore.getState().setDockOpen(true);
     useChatStore.getState().setActiveChannel("whisper:bob");
     useChatStore.getState().setDockOpen(false);
@@ -331,7 +318,7 @@ describe("chatStore", () => {
   });
 
   it("whisper threads are independent across friends", () => {
-    useChatStore.getState().appendWhisper(makeWhisper(), 1); // from bob
+    useChatStore.getState().appendWhisper(makeWhisper(), 1);
     useChatStore
       .getState()
       .appendWhisper(makeWhisper({ fromUserId: 3, fromUsername: "carol", message: "yo" }), 1);
@@ -360,8 +347,6 @@ describe("chatStore", () => {
     expect(state.roomMessages).toHaveLength(0);
   });
 
-  // openWhisper is how a surface OUTSIDE the dock (the friend list's whisper
-  // button) starts a conversation.
   it("openWhisper seeds an empty thread, selects it and raises an open request", () => {
     useChatStore.getState().openWhisper("bob");
     const state = useChatStore.getState();

@@ -2,10 +2,8 @@ package room
 
 import "github.com/emilijan/beljot/server/internal/match"
 
-// StaleRoomRepositoryAdapter wraps a RoomRepository and satisfies
-// match.StaleRoomRepository. It bridges the room-typed values the DB layer
-// returns into the narrow types the match.Manager.ReconcileStaleRooms needs,
-// without creating an import cycle (room→match is fine; match no longer imports room).
+// StaleRoomRepositoryAdapter wraps a RoomRepository to satisfy match.StaleRoomRepository
+// without match importing room.
 type StaleRoomRepositoryAdapter struct {
 	Repo RoomRepository
 }

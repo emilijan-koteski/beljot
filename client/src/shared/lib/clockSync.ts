@@ -1,25 +1,4 @@
-// Client↔server clock-offset estimation.
-//
-// Match WS messages stamp `serverNow` — the server's wall clock at send time
-// (see `WsMessage` / Go `WSMessage`). Each sample observes
-// `serverNow − Date.now() = trueOffset − one-way latency`, so every sample
-// UNDERestimates the true offset by that message's delivery latency. The max
-// over a rolling window is therefore the estimate with the least latency
-// error. A bounded window (rather than an all-time max) lets the estimate
-// follow genuine clock changes (NTP step, WSL2 drift, laptop resume) within a
-// few messages.
-//
-// Module-level singleton (not React state): countdown hooks read it on every
-// tick, and nothing needs to re-render just because the estimate moved by a
-// few milliseconds.
-
 const WINDOW_SIZE = 10;
-// Age cap on samples: a clock STEP (client NTP catch-up, laptop resume) makes
-// every later sample lower, and a pure count-based max would hold the stale
-// high estimate until 10 more messages arrive — minutes during idle turns.
-// Dropping old samples at record time bounds that staleness. (Eviction runs
-// only when a new stamp arrives; between messages nothing reads-and-caches,
-// so a lazy sweep is sufficient.)
 const MAX_SAMPLE_AGE_MS = 120_000;
 
 interface OffsetSample {
@@ -30,7 +9,10 @@ interface OffsetSample {
 let samples: OffsetSample[] = [];
 let offsetMs = 0;
 
-/** Feed one `serverNow` envelope stamp into the estimator. NaN-safe (ignored). */
+/**
+ * Feeds one `serverNow` stamp into the estimator, ignoring unparseable input. Each
+ * sample underestimates the offset by its latency, so the max over a recent window wins.
+ */
 export function recordServerNow(serverNowIso: string): void {
   const serverMs = new Date(serverNowIso).getTime();
   if (Number.isNaN(serverMs)) return;
@@ -50,11 +32,7 @@ export function serverNowMs(): number {
   return Date.now() + offsetMs;
 }
 
-/**
- * Ms until `deadlineIso` on the server's clock, clamped ≥ 0. Unparseable
- * input counts as already expired (0) — matches how countdown widgets treat
- * a missing deadline.
- */
+/** Ms until `deadlineIso` on the server's clock, clamped ≥ 0; unparseable input counts as expired. */
 export function remainingMsUntil(deadlineIso: string): number {
   const deadlineMs = new Date(deadlineIso).getTime();
   if (Number.isNaN(deadlineMs)) return 0;

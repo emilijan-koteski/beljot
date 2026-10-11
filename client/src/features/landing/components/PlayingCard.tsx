@@ -1,13 +1,5 @@
 import type { CSSProperties } from "react";
 
-// ─────────────────────────────────────────────────────────────────────────
-// Marketing recreation of a Beljot playing card. Geometry scales off `w`
-// (height = w × 1.4, type/pip sizes are fractions of w), so a single `w`
-// prop drives the whole card. Colours come from the scope-stable card/suit
-// tokens (`--card-face`, `--suit-red`, `--suit-black`) so a card renders the
-// same cream face whether it sits on parchment or inside a `.felt-surface`.
-// ─────────────────────────────────────────────────────────────────────────
-
 export type SuitName = "hearts" | "diamonds" | "spades" | "clubs";
 
 const SUIT: Record<SuitName, { ch: string; red: boolean }> = {
@@ -17,8 +9,6 @@ const SUIT: Record<SuitName, { ch: string; red: boolean }> = {
   clubs: { ch: "♣", red: false },
 };
 
-// Serif stack renders the suit glyphs consistently across platforms, matching
-// the app's SuitRule / auth-footer convention.
 const SUIT_FONT = "var(--font-suit)";
 
 type SuitProps = {
@@ -58,6 +48,8 @@ type PlayingCardProps = CardSpec & {
   style?: CSSProperties;
 };
 
+// Marketing recreation of a Beljot playing card whose whole geometry scales off `w`.
+// Colours come from scope-stable card/suit tokens, so the face looks the same on parchment or felt.
 export function PlayingCard({
   rank = "A",
   suit = "hearts",

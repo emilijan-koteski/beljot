@@ -1,4 +1,3 @@
-// Beljot · Rules content — Serbian (authored; ekavian, Latin, Bela terminology).
 import type { RulesLangData } from "./types";
 
 export const sr: RulesLangData = {
@@ -88,9 +87,6 @@ export const sr: RulesLangData = {
       title: "Promešaj, podeli, zovi adut",
       lede: "Četiri igrača, 32 karte, osam u ruci i brz krug da se odredi koja je boja adut.",
       blocks: [
-        // Jedan blok, ne po jedan za svaku varijantu. Prva dva koraka identična
-        // su u oba pravila i napisana su jednom; sledeća četiri označena su po
-        // varijanti, svaki sa svojom napomenom o svom paru.
         {
           kind: "steps",
           items: [

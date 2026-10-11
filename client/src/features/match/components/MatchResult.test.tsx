@@ -33,14 +33,11 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-// The room's last match feeds the collapsible hand breakdown. Mocked per test:
-// undefined data (the default) must leave the whole section unrendered.
 const mockGetRoomLastMatch = vi.fn();
 vi.mock("@/shared/api/matches", () => ({
   getRoomLastMatch: (...args: unknown[]) => mockGetRoomLastMatch(...args),
 }));
 
-// Friendship reads back the per-player Add-friend row inside the breakdown.
 const mockGetFriendshipStatus = vi.fn(
   (): Promise<FriendshipStatus> => Promise.resolve({ status: "none", requestId: null }),
 );
@@ -286,7 +283,6 @@ describe("MatchResult", () => {
   it("formats match duration correctly", () => {
     renderResult({ viewerTeam: "teamA" });
 
-    // 725 seconds = 12m 5s
     expect(screen.getByTestId("match-result-duration")).toHaveTextContent("12m 5s");
   });
 
@@ -346,7 +342,6 @@ describe("MatchResult", () => {
     expect(note).toHaveTextContent(/your opponent/);
   });
 
-  // Story 9.2 — coin outcome moved from a transient toast into this dialog.
   it("renders the won amount with a positive coin delta", () => {
     renderResult({ coinDelta: 500 });
     const coins = screen.getByTestId("match-result-coins");
@@ -370,7 +365,6 @@ describe("MatchResult", () => {
     renderResult({});
     expect(screen.queryByTestId("match-result-coins")).toBeNull();
   });
-  // --- Collapsible hand breakdown (room last-match stats) ---
 
   it("renders no stats section without a roomId — there is nothing to read", () => {
     renderResult({});
@@ -398,7 +392,6 @@ describe("MatchResult", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByTestId("match-result-stats-panel")).toBeNull();
 
-    // Collapsed section sits ABOVE the two footer actions.
     expectPrecedes("match-result-stats", "match-result-actions");
   });
 
@@ -410,27 +403,17 @@ describe("MatchResult", () => {
 
     expect(screen.getByTestId("match-result-stats-panel")).toBeInTheDocument();
     expect(screen.getByTestId("match-history-hands-grid")).toBeInTheDocument();
-    // handsLayout="stacked" forces the per-hand cards even though jsdom's
-    // matchMedia reports the desktop viewport — the desktop grid would
-    // overflow the 520px panel.
     expect(screen.getByTestId("match-history-hand-row")).toBeInTheDocument();
     expect(screen.queryByTestId("match-history-hands-grid")?.className).not.toContain(
       "overflow-x-auto",
     );
 
-    // One action row per human co-player, and never a reinvite here: everyone
-    // is still present and "Return to room" already covers regrouping.
     const rows = await screen.findAllByTestId("match-player-action-row");
     expect(rows).toHaveLength(3);
     expect(screen.queryByTestId("match-player-reinvite-11")).toBeNull();
   });
-  // P1: the cache key is per-ROOM, and the room lobby populates it BEFORE the
-  // match starts. With the client-wide 30s staleTime a short match (a
-  // surrender) ends inside that window, so the overlay would be handed match
-  // N-1 out of cache and paint it as the result the player just lived through.
   it("never paints a cached row from a PREVIOUS match in the same room", async () => {
     const client = makeClient();
-    // Same room, different match: the scores do not match this match_end.
     client.setQueryData(
       queryKeys.matches.lastByRoom(7),
       makeLastMatch({ id: 41, teamAScore: 640, teamBScore: 1010, winnerTeam: 1 }),
@@ -439,8 +422,6 @@ describe("MatchResult", () => {
 
     renderResult({ roomId: 7, client });
 
-    // Nothing at all until the fresh read lands — not the stale row, not a
-    // toggle that would open onto it.
     expect(screen.queryByTestId("match-result-stats")).toBeNull();
     await waitFor(() => expect(mockGetRoomLastMatch).toHaveBeenCalledWith(7));
     expect(screen.queryByTestId("match-result-stats")).toBeNull();
@@ -452,7 +433,6 @@ describe("MatchResult", () => {
       queryKeys.matches.lastByRoom(7),
       makeLastMatch({ id: 41, teamAScore: 640, teamBScore: 1010, winnerTeam: 1 }),
     );
-    // matchData is 1020 / 850, winnerTeam 0.
     mockGetRoomLastMatch.mockResolvedValue(
       makeLastMatch({ id: 42, teamAScore: 1020, teamBScore: 850, winnerTeam: 0 }),
     );
@@ -462,8 +442,6 @@ describe("MatchResult", () => {
     expect(await screen.findByTestId("match-result-stats-toggle")).toBeInTheDocument();
   });
 
-  // P2: a seat-chip <Link> here would PUSH-navigate out of the match, unmounting
-  // MatchPage before the player has returned to the room or left it.
   it("renders no profile links inside the overlay", async () => {
     mockGetRoomLastMatch.mockResolvedValue(
       makeLastMatch({ teamAScore: 1020, teamBScore: 850, winnerTeam: 0 }),
@@ -475,7 +453,6 @@ describe("MatchResult", () => {
     expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
 
-  // P3: RemoveFriendDialog is a z-50 shadcn Dialog; this panel is Z.PROMPT (74).
   it("offers no Remove-friend control inside the overlay", async () => {
     mockGetFriendshipStatus.mockResolvedValue({ status: "friends", requestId: 1 });
     mockGetRoomLastMatch.mockResolvedValue(
@@ -488,9 +465,6 @@ describe("MatchResult", () => {
     expect(screen.queryByTestId("friend-button-remove")).toBeNull();
   });
 
-  // A "dosta" match ends with cards still in the player's hand and a score that
-  // jumped, so without a line naming the rule the screen reads as a bug. Verified
-  // live: "They Won!" with three unplayed cards and no explanation.
   it("explains a match that stopped at the target", () => {
     renderResult({
       data: { ...matchData, outcomeReason: "target_reached" },

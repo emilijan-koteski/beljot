@@ -1,8 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Stub sonner so toast assertions can run; the real module exports more than
-// these methods but the dispatcher only touches `info`/`warning`/`success`/`error`.
 vi.mock("sonner", () => ({
   toast: {
     info: vi.fn(),
@@ -12,8 +10,6 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// The audio engine is a no-op in jsdom anyway; mocking it lets the card-sound
-// block at the bottom assert exactly which WS messages ask for a sound.
 const mockPlaySfx = vi.hoisted(() => vi.fn());
 vi.mock("@/shared/audio/audioEngine", () => ({
   playSfx: mockPlaySfx,
@@ -161,7 +157,6 @@ describe("useWsDispatch", () => {
   });
 
   it("routes system:room_created to queryClient room cache", () => {
-    // Seed the cache with an empty rooms list
     queryClient.setQueryData<Room[]>(queryKeys.rooms.list("waiting"), []);
 
     const { result } = renderHook(() => useWsDispatch());
@@ -195,7 +190,6 @@ describe("useWsDispatch", () => {
   });
 
   it("routes system:room_updated to queryClient room cache", () => {
-    // Pre-populate with a room
     queryClient.setQueryData<Room[]>(queryKeys.rooms.list("waiting"), [
       makeRoom({
         id: 2,
@@ -246,7 +240,6 @@ describe("useWsDispatch", () => {
   });
 
   it("updates the in-room store when system:room_updated targets the current room", () => {
-    // The viewer is seated in room 2, which is currently private.
     const store = useRoomStore.getState();
     store.setRoom(
       makeRoom({
@@ -271,7 +264,6 @@ describe("useWsDispatch", () => {
     store.setCurrentRoomId(2);
 
     const { result } = renderHook(() => useWsDispatch());
-    // Owner flips the room to public — broadcast reaches the seated viewer.
     result.current({
       type: "system:room_updated",
       payload: {
@@ -293,7 +285,6 @@ describe("useWsDispatch", () => {
       },
     });
 
-    // The in-room view (roomStore) must reflect the flip, not just the lobby grid.
     expect(useRoomStore.getState().room?.isPrivate).toBe(false);
   });
 
@@ -343,7 +334,6 @@ describe("useWsDispatch", () => {
       },
     });
 
-    // A different room's update must not mutate the current room's view.
     expect(useRoomStore.getState().room?.isPrivate).toBe(true);
   });
 
@@ -427,11 +417,9 @@ describe("useWsDispatch", () => {
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
-    // These should not throw or route to any store
     dispatch({ type: "system:authenticated", payload: { userId: 42 } });
     dispatch({ type: "error:auth_failed", payload: { message: "bad token" } });
 
-    // No rooms added to cache
     expect(queryClient.getQueryData(queryKeys.rooms.list("waiting"))).toBeUndefined();
   });
 
@@ -452,11 +440,6 @@ describe("useWsDispatch", () => {
   });
 
   it("does NOT clear declarationReveal / belotReveal on an unrelated event:match_state", () => {
-    // A reveal must survive trailing/standalone match_states (e.g. the snapshot
-    // another player's card-play broadcasts mid-reveal) — closing it on an
-    // unrelated state push was the bug where the declaration dialog vanished
-    // the instant anyone played. Stale-reveal clearing on reconnect now lives
-    // in MatchPage's overlay-clear effect, not the dispatcher.
     useMatchStore.setState({
       declarationReveal: {
         winnerTeam: 0,
@@ -492,10 +475,6 @@ describe("useWsDispatch", () => {
   });
 
   it("preserves declarationReveal across the trailing event:match_state in normal flow", () => {
-    // Server flow (manager.go:513→554): event:declarations_resolved is
-    // emitted, then event:match_state is broadcast for state sync. The
-    // trailing snapshot must NOT wipe the reveal that just rendered, or
-    // the user never sees declarations.
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
@@ -526,9 +505,6 @@ describe("useWsDispatch", () => {
   });
 
   it("preserves belotReveal across the trailing event:match_state in normal flow", () => {
-    // Server flow (manager.go:609→614): event:belot_announced is emitted,
-    // then event:match_state is broadcast. Same suppression contract as
-    // declarations_resolved.
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
@@ -553,9 +529,6 @@ describe("useWsDispatch", () => {
   });
 
   it("keeps the reveal across multiple event:match_state pushes (no single-shot wipe)", () => {
-    // The reveal lives for its full countdown regardless of how many
-    // match_states arrive while it's up — players keep acting (each play
-    // broadcasts a snapshot) and the declaration dialog must not blink out.
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
@@ -577,7 +550,6 @@ describe("useWsDispatch", () => {
     expect(useMatchStore.getState().declarationReveal).not.toBeNull();
 
     dispatch({ type: "event:match_state", payload: mockMatchState });
-    // Still up after a second (and any later) snapshot.
     expect(useMatchStore.getState().declarationReveal).not.toBeNull();
   });
 
@@ -598,17 +570,11 @@ describe("useWsDispatch", () => {
   });
 
   it("snapshots the full trick into pendingResolvedTrick on event:trick_resolved", () => {
-    // Reproduces the production race: event:card_played for the 4th card
-    // arrives, then event:trick_resolved arrives in the same tick. The
-    // dispatcher must snapshot all four cards into pendingResolvedTrick
-    // BEFORE clearing currentTrick, otherwise the collect animation can't
-    // run because TrickArea sees currentTrick jump 3 → 0.
     useMatchStore.getState().setMatchState(mockMatchState);
 
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
-    // Simulate four card_played events filling the trick.
     dispatch({
       type: "event:card_played",
       payload: { playerSeat: 0, cardId: "KS", autoPlayed: false },
@@ -627,25 +593,19 @@ describe("useWsDispatch", () => {
     });
     expect(useMatchStore.getState().matchState?.currentTrick).toHaveLength(4);
 
-    // Now the resolve event clears the trick.
     dispatch({
       type: "event:trick_resolved",
       payload: { winnerSeat: 2, winnerTeam: 0, cards: ["KS", "7H", "AD", "9C"] },
     });
 
     const state = useMatchStore.getState();
-    // Live trick zeroed (server cleared it).
     expect(state.matchState?.currentTrick).toHaveLength(0);
-    // Snapshot has all four cards + winner — drives the collect flight.
     expect(state.pendingResolvedTrick).not.toBeNull();
     expect(state.pendingResolvedTrick?.trick).toHaveLength(4);
     expect(state.pendingResolvedTrick?.winnerSeat).toBe(2);
   });
 
   it("does not snapshot when event:trick_resolved arrives with an already-empty trick", () => {
-    // Reconnect-style edge case: the snapshot should only fire when there's
-    // actually a trick to capture. An empty currentTrick means we'd render
-    // nothing in the collect animation, so we don't bother.
     useMatchStore.getState().setMatchState(mockMatchState);
 
     const { result } = renderHook(() => useWsDispatch());
@@ -754,11 +714,6 @@ describe("useWsDispatch", () => {
     expect(state.matchEndData?.matchDurationSec).toBe(300);
   });
 
-  // The room last-match cache is keyed per ROOM, so the entry the room lobby
-  // populated describes the PREVIOUS match the moment this one starts — and the
-  // client-wide 30s staleTime means a short match ends while it still counts as
-  // fresh. match_end must evict it, or the end-of-match overlay is handed match
-  // N-1 out of cache.
   it("evicts the room last-match cache on event:match_end", () => {
     queryClient.setQueryData(queryKeys.matches.lastByRoom(7), { id: 41 });
     queryClient.setQueryData(queryKeys.matches.lastByRoom(9), { id: 12 });
@@ -798,9 +753,6 @@ describe("useWsDispatch", () => {
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
-    // A variant that names trump freely has no card to show, so the server
-    // sends an empty cardId rather than suppressing the event — suppressing it
-    // would mean a take under that variant fires no reveal at all.
     dispatch({
       type: "event:trump_selected",
       payload: { playerSeat: 2, trumpSuit: "S", cardId: "" },
@@ -817,8 +769,6 @@ describe("useWsDispatch", () => {
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
 
-    // "10S" is the dangerous one: a bare length check lets it through and the
-    // reveal slices it into rank "1" / suit "0".
     for (const cardId of ["X", "10S", "JSX", "js", "XS", "JX"]) {
       dispatch({
         type: "event:trump_selected",
@@ -830,8 +780,6 @@ describe("useWsDispatch", () => {
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
-
-  // --- Room lobby event dispatch tests ---
 
   it("dispatches system:bot_added / system:bot_removed to roomStore by seat", () => {
     const { result } = renderHook(() => useWsDispatch());
@@ -880,11 +828,10 @@ describe("useWsDispatch", () => {
     expect(state.players).toHaveLength(1);
     expect(state.players[0]!.userId).toBe(42);
     expect(state.players[0]!.username).toBe("Alice");
-    expect(state.players[0]!.id).toBe(42); // Uses userId, not hardcoded 0 (D24 fix)
+    expect(state.players[0]!.id).toBe(42);
   });
 
   it("dispatches system:player_left to roomStore", () => {
-    // Pre-populate a player
     useRoomStore.getState().addPlayer(
       {
         id: 42,
@@ -961,7 +908,6 @@ describe("useWsDispatch", () => {
       type: "system:player_joined",
       payload: { roomId: 10, userId: 42, username: "Alice", avatarUrl: url, playerCount: 2 },
     });
-    // An older server sends no key; a garbled one sends a non-string.
     dispatch({
       type: "system:player_joined",
       payload: { roomId: 10, userId: 43, username: "Bob", playerCount: 3 },
@@ -1078,7 +1024,6 @@ describe("useWsDispatch", () => {
   });
 
   it("appends system:chat_message with scope=match to chatStore.matchMessages when in a match", () => {
-    // Dispatcher requires matchStore.roomId to be set (defence in depth)
     useMatchStore.setState({ roomId: 42 });
 
     const { result } = renderHook(() => useWsDispatch());
@@ -1107,8 +1052,6 @@ describe("useWsDispatch", () => {
   });
 
   it("drops scope=match payloads when matchStore.roomId is null (no active match)", () => {
-    // roomId=null is the default from beforeEach reset — a match payload
-    // arriving after clearGame must not leak into the next match's history.
     expect(useMatchStore.getState().roomId).toBeNull();
 
     const { result } = renderHook(() => useWsDispatch());
@@ -1129,7 +1072,6 @@ describe("useWsDispatch", () => {
   });
 
   it("appends system:chat_message with scope=room to chatStore.roomMessages when in a room", () => {
-    // Dispatcher requires roomStore.currentRoomId to be set (defence in depth)
     useRoomStore.setState({ currentRoomId: 5 });
 
     const { result } = renderHook(() => useWsDispatch());
@@ -1159,9 +1101,6 @@ describe("useWsDispatch", () => {
   });
 
   it("drops scope=room payloads when roomStore.currentRoomId is null", () => {
-    // currentRoomId=null is the default from beforeEach reset — a stale room
-    // payload arriving after leaving the room must not leak into the next
-    // room's history.
     expect(useRoomStore.getState().currentRoomId).toBeNull();
 
     const { result } = renderHook(() => useWsDispatch());
@@ -1213,7 +1152,7 @@ describe("useWsDispatch", () => {
       { userId: 1, username: null, message: "x", timestamp: "x", scope: "lobby" },
       { userId: 1, username: "x", message: 42, timestamp: "x", scope: "lobby" },
       { userId: 1, username: "x", message: "x", timestamp: undefined, scope: "lobby" },
-      { userId: 1, username: "x", message: "x", timestamp: "x" /* no scope */ },
+      { userId: 1, username: "x", message: "x", timestamp: "x" },
     ];
 
     for (const payload of malformedPayloads) {
@@ -1252,10 +1191,6 @@ describe("useWsDispatch", () => {
   });
 
   it("ignores system:room_kicked when currentRoomId is null", () => {
-    // currentRoomId=null means the user is not viewing any room. Setting
-    // kickedFromRoomId here would persist as a sticky flag and trip on a
-    // later re-entry to the same room — so the dispatcher requires a
-    // positive room match.
     expect(useRoomStore.getState().currentRoomId).toBeNull();
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1267,8 +1202,6 @@ describe("useWsDispatch", () => {
 
     expect(useRoomStore.getState().kickedFromRoomId).toBeNull();
   });
-
-  // --- Insolvency ejection (Story 9.3) ---
 
   it("dispatches system:insolvent_ejected to roomStore as an 'ejected' signal", () => {
     const { result } = renderHook(() => useWsDispatch());
@@ -1288,8 +1221,6 @@ describe("useWsDispatch", () => {
   });
 
   it("dispatches system:insolvent_ejected regardless of currentRoomId (direct per-user push)", () => {
-    // currentRoomId is null (player not on any room page) — the event must still
-    // set the signal because it is a direct per-user push.
     expect(useRoomStore.getState().currentRoomId).toBeNull();
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1304,8 +1235,6 @@ describe("useWsDispatch", () => {
   });
 
   it("ignores a malformed system:insolvent_ejected payload", () => {
-    // reset() deliberately preserves roomEjection (so the lobby modal
-    // survives RoomPage's unmount), so clear it explicitly for this assertion.
     useRoomStore.getState().setRoomEjection(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1334,8 +1263,6 @@ describe("useWsDispatch", () => {
       reason: "roomClosed",
     });
   });
-
-  // --- Honor ejection (Story 9.8 AC6/AC8) ---
 
   it("dispatches system:honor_ejected to roomStore as an 'honor' signal", () => {
     const { result } = renderHook(() => useWsDispatch());
@@ -1370,8 +1297,6 @@ describe("useWsDispatch", () => {
     expect(useRoomStore.getState().roomEjection?.reason).toBe("honor");
     expect(useRoomStore.getState().roomEjection?.roomId).toBe(3);
   });
-
-  // --- Story 11.5: system:room_invite ---------------------------------------
 
   it("dispatches system:room_invite into roomStore.roomInvite", () => {
     useRoomStore.getState().setRoomInvite(null);
@@ -1409,8 +1334,6 @@ describe("useWsDispatch", () => {
   });
 
   it("accepts a free, public, non-host, ungated invite rather than rejecting the falsy values", () => {
-    // coinBuyIn 0, minHonor 0 and isPrivate/isHostInvite false are all real Go
-    // values — truthiness checks would silently drop this entirely valid invite.
     useRoomStore.getState().setRoomInvite(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1439,8 +1362,6 @@ describe("useWsDispatch", () => {
   });
 
   it("ignores a system:room_invite whose expiresAt is missing or unparseable", () => {
-    // expiresAt drives the ONLY auto-dismiss. Coercing a bad one to "" would
-    // leave a popup on screen forever while its server grant quietly expired.
     useRoomStore.getState().setRoomInvite(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1481,8 +1402,6 @@ describe("useWsDispatch", () => {
   });
 
   it("accepts an honor score of 0 rather than rejecting it as falsy", () => {
-    // A real Go 0 must survive: the guard is typeof === "number", never
-    // truthiness. Same for a minHonor of 0.
     useRoomStore.getState().setRoomEjection(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1522,8 +1441,6 @@ describe("useWsDispatch", () => {
     expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 
-  // --- Surrender (Story 8.2) ---
-
   it("dispatches event:surrender_proposed to matchStore.surrenderProposed", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
 
@@ -1547,8 +1464,6 @@ describe("useWsDispatch", () => {
   });
 
   it("ignores event:surrender_proposed when no active game state", () => {
-    // Defence in depth — matchState=null means no active match, so the
-    // proposal must not surface in the store.
     expect(useMatchStore.getState().matchState).toBeNull();
 
     const { result } = renderHook(() => useWsDispatch());
@@ -1614,10 +1529,6 @@ describe("useWsDispatch", () => {
     expect(toast.info).toHaveBeenCalledTimes(1);
   });
 
-  // Story 12.8: the forced dealer pick is the only auto-action that COMMITS the
-  // hand (it names trump) rather than declining something, so it must reach the
-  // table as its own toast — the allowlist above it silently dropped anything
-  // unrecognised, which would have made it invisible.
   it("fires a distinct info toast for event:auto_action of type pick_trump", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     const tSpy = vi.spyOn(i18n, "t");
@@ -1626,14 +1537,8 @@ describe("useWsDispatch", () => {
       type: "event:auto_action",
       payload: { playerSeat: 0, type: "pick_trump" },
     });
-    // Reaching a toast at all is the first half: the type allowlist ahead of
-    // this branch drops anything it does not recognise, which would have made
-    // the forced pick silent.
     expect(toast.info).toHaveBeenCalledTimes(1);
 
-    // The second half is WHICH copy. This suite runs without an i18n bundle, so
-    // t() resolves to undefined and the toast argument cannot be compared —
-    // spy on the translator instead and assert the key.
     expect(tSpy).toHaveBeenCalledWith("match.timer.autoPickedTrump", { player: "Alice" });
     expect(tSpy).not.toHaveBeenCalledWith("match.timer.autoPassed", expect.anything());
   });
@@ -1659,13 +1564,10 @@ describe("useWsDispatch", () => {
       type: "event:auto_action",
       payload: { playerSeat: 1, type: "bogus" as unknown as "pass_trump" },
     });
-    // NaN slips through `typeof === "number"`; the explicit Number.isInteger
-    // guard must reject it so toasts never render "Player NaN".
     result.current({
       type: "event:auto_action",
       payload: { playerSeat: Number.NaN, type: "pass_trump" },
     });
-    // Non-integer floats also rejected by the integer guard.
     result.current({
       type: "event:auto_action",
       payload: { playerSeat: 1.5, type: "pass_trump" },
@@ -1720,10 +1622,6 @@ describe("useWsDispatch", () => {
       payload: { code: "SURRENDER_EXHAUSTED", message: "already used" },
     });
 
-    // i18next without an initialized bundle in this test suite returns the
-    // resolved key path or undefined depending on setup; the load-bearing
-    // assertion is that the dispatcher calls toast.error exactly once for
-    // this event type, which the previous "does NOT crash" test missed.
     expect(toast.error).toHaveBeenCalledTimes(1);
   });
 
@@ -1739,8 +1637,6 @@ describe("useWsDispatch", () => {
 
     expect(useMatchStore.getState().lastError).toBe("error:surrender_exhausted");
   });
-
-  // --- Story 8.5-1 AC2: error:match_start_failed ---
 
   it("dispatches error:match_start_failed via toast and writes lastError", () => {
     expect(useMatchStore.getState().lastError).toBeNull();
@@ -1774,8 +1670,6 @@ describe("useWsDispatch", () => {
     warnSpy.mockRestore();
   });
 
-  // --- Emote (Story 8.3) ---
-
   it("writes a valid system:emote payload to matchStore.activeEmotes", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
 
@@ -1808,14 +1702,13 @@ describe("useWsDispatch", () => {
       { playerSeat: "2", emote: "thumbs_up" },
       { playerSeat: 0, emote: "shrug" },
       { playerSeat: 0, emote: 42 },
-      { playerSeat: 0 /* no emote */ },
+      { playerSeat: 0 },
     ];
 
     for (const payload of malformedPayloads) {
       dispatch({ type: "system:emote", payload });
     }
 
-    // No slots written.
     expect(useMatchStore.getState().activeEmotes).toEqual({
       0: null,
       1: null,
@@ -1845,8 +1738,6 @@ describe("useWsDispatch", () => {
     });
   });
 
-  // --- Player declared (trick-1 "has a declaration" banner) ---
-
   it("writes a valid event:player_declared payload to matchStore.activeDeclares", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
 
@@ -1861,7 +1752,6 @@ describe("useWsDispatch", () => {
     const slot = useMatchStore.getState().activeDeclares[2];
     expect(slot).not.toBeNull();
     expect(typeof slot?.receivedAt).toBe("number");
-    // Other seats untouched.
     expect(useMatchStore.getState().activeDeclares[0]).toBeNull();
   });
 
@@ -1944,17 +1834,11 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
       newBalance: 5500,
       pot: 2000,
     });
-    // The win/loss amount now lives in the result dialog, not a toast.
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
   });
 
   it("renders the balance update + result settlement for a default-bracket Quick Play match (Story 9.4)", () => {
-    // Quick Play was free before Story 9.4, so event:coin_settlement never fired
-    // for a matchmade game. A default-bracket (500) Quick Play match now settles
-    // exactly like a manual staked room — pot = 4 humans × 500 = 2000, the winning
-    // pair splits it (+1000 each) — so the same handler must update the wallet
-    // balance and stash the delta for the end-of-match result dialog.
     const { result } = renderHook(() => useWsDispatch());
     result.current({
       type: "event:coin_settlement",
@@ -2031,8 +1915,6 @@ describe("useWsDispatch — coin settlement (Story 9.2)", () => {
       },
     });
 
-    // match_end resets the settlement so a subsequent free match can't show
-    // the previous match's coin delta in the result dialog.
     expect(useMatchStore.getState().coinSettlement).toBeNull();
   });
 });
@@ -2172,8 +2054,6 @@ describe("useWsDispatch — honor updated (Story 9.7)", () => {
   });
 
   it("accepts a legitimate zero score and a false isNewPlayer", () => {
-    // Go zero values serialize as real values — the handler must not guard on
-    // truthiness, or a Problematic player's 0 would be silently dropped.
     const { result } = renderHook(() => useWsDispatch());
     result.current({
       type: "event:honor_updated",
@@ -2309,15 +2189,6 @@ describe("useWsDispatch — whisper (Story 11.4)", () => {
   });
 });
 
-// event:season_points_awarded (Story 13.1, reshaped by 13.5). The branch has four
-// jobs and no other test reaches it: RankBanner.test.tsx feeds the season in as
-// a prop and never mounts a QueryClient, and the WS contract test only pins
-// payload shape.
-//
-// The invalidation matters more here than for most handlers: useCurrentSeasonQuery
-// is deliberately NOT polled, so this is the ONLY path that refreshes the banner
-// after a match. Drop the invalidateQueries call and the banner shows a stale SP
-// total until a full reload, with nothing failing.
 describe("useWsDispatch - season points", () => {
   const validPayload = {
     spChange: 24,
@@ -2364,9 +2235,6 @@ describe("useWsDispatch - season points", () => {
     });
   });
 
-  // The matrix's division-up row: 650 -> 690 is Gold 1 -> Gold 2. A rank change
-  // is now announced by the post-match RankChangeDialog (owner request
-  // 2026-09-26), so the handler stores it and fires no toast at all.
   it("stores a division promotion for the post-match dialog and fires no toast", () => {
     const { result } = renderHook(() => useWsDispatch());
 
@@ -2393,8 +2261,6 @@ describe("useWsDispatch - season points", () => {
     expect(toast.info).not.toHaveBeenCalled();
   });
 
-  // The matrix's tier-down row: 610 -> 590 is Gold 1 -> Silver 3. Stored as a
-  // DEMOTION, which the dialog renders subdued; never a success toast.
   it("stores a demotion for the subdued dialog and never fires the success toast", () => {
     const { result } = renderHook(() => useWsDispatch());
 
@@ -2422,7 +2288,6 @@ describe("useWsDispatch - season points", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  // The matrix's same-division row: 700 -> 690 stays Gold 2.
   it("stores nothing when the rank did not change, even on an SP loss", () => {
     const { result } = renderHook(() => useWsDispatch());
 
@@ -2450,7 +2315,6 @@ describe("useWsDispatch - season points", () => {
       type: "event:season_points_awarded",
       payload: { ...validPayload, newSeasonSp: 690, rankTier: "gold", rankChange: "promoted" },
     });
-    // The next match moves 10 SP inside Gold 2: no rank change.
     result.current({
       type: "event:season_points_awarded",
       payload: { ...validPayload, spChange: 10, newSeasonSp: 700, rankTier: "gold" },
@@ -2490,8 +2354,6 @@ describe("useWsDispatch - season points", () => {
   });
 
   it("still accepts a zero-SP award, which is a real value", () => {
-    // The matrix's loss-at-0 row. `spChange: 0` is falsy and legitimate, so a
-    // truthiness guard would drop this frame and lose the "0 SP" line.
     const spy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useWsDispatch());
 
@@ -2505,9 +2367,6 @@ describe("useWsDispatch - season points", () => {
     expect(useRankChangeStore.getState().pending).toBeNull();
   });
 
-  // The whole reason the store exists: unlike the SP line's settlement, a
-  // pending rank change must survive the match ending so the dialog can open
-  // back in the lobby/room.
   it("keeps a pending rank change across match_end and match_abandoned", () => {
     const { result } = renderHook(() => useWsDispatch());
 
@@ -2592,7 +2451,6 @@ describe("useWsDispatch - season points", () => {
       { ...validPayload, rankChange: undefined },
       { ...validPayload, reason: "quit" },
       { ...validPayload, seasonName: 3 },
-      // The 13.1 shape a stale server would still send.
       {
         spEarned: 24,
         newSeasonSp: 424,
@@ -2639,7 +2497,6 @@ describe("useWsDispatch — card sounds", () => {
   });
 
   it("keeps the echo of the local player's own manual play silent", () => {
-    // MatchPage already sounded it at the click, in step with the throw.
     send({
       type: "event:card_played",
       payload: { playerSeat: 0, cardId: "KS", autoPlayed: false },
@@ -2656,8 +2513,6 @@ describe("useWsDispatch — card sounds", () => {
   });
 
   it("still sounds the 4th card when trick_resolved arrives in the same batch", () => {
-    // The 4th card's flight never runs (the snapshot takes over), which is why
-    // the sound is keyed to the WS message rather than to the flight.
     useMatchStore.getState().setMatchState({
       ...mockMatchState,
       currentTrick: [

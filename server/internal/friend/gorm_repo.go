@@ -9,6 +9,9 @@ import (
 	"github.com/emilijan/beljot/server/internal/apperr"
 )
 
+const uniqueViolation = "23505"
+
+// GormRepository is the Postgres-backed friendship Repository.
 type GormRepository struct {
 	db *gorm.DB
 }
@@ -17,14 +20,12 @@ func NewGormRepository(db *gorm.DB) *GormRepository {
 	return &GormRepository{db: db}
 }
 
+// Create inserts a pending friendship. The unique index covers the normalized pair, so
+// a duplicate in either direction returns apperr.ErrFriendRequestExists.
 func (r *GormRepository) Create(f *Friendship) error {
 	if err := r.db.Create(f).Error; err != nil {
-		// The unique index idx_friendships_pair is on the NORMALIZED pair
-		// (LEAST/GREATEST), so it fires here for a duplicate in EITHER direction —
-		// including the reverse-duplicate race the handler's non-atomic FindByPair
-		// pre-check cannot close on its own. Both map to ErrFriendRequestExists.
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
 			return apperr.ErrFriendRequestExists
 		}
 		return err
@@ -32,6 +33,7 @@ func (r *GormRepository) Create(f *Friendship) error {
 	return nil
 }
 
+// FindByID returns the row with the given id, or (nil, nil) when none match.
 func (r *GormRepository) FindByID(id uint) (*Friendship, error) {
 	var f Friendship
 	if err := r.db.First(&f, id).Error; err != nil {
@@ -43,6 +45,8 @@ func (r *GormRepository) FindByID(id uint) (*Friendship, error) {
 	return &f, nil
 }
 
+// FindByPair returns the friendship between a and b in either direction,
+// or (nil, nil) when none exists.
 func (r *GormRepository) FindByPair(a, b uint) (*Friendship, error) {
 	var f Friendship
 	err := r.db.
@@ -57,12 +61,8 @@ func (r *GormRepository) FindByPair(a, b uint) (*Friendship, error) {
 	return &f, nil
 }
 
-// Accept flips a pending row to accepted in a single conditional UPDATE — the
-// recipient-only guard (friend_id = recipientID) and the pending precondition
-// live in the WHERE clause, so enforcement is atomic and a double-accept race
-// cannot both win (modeled on user.UpdateUsername). GORM stamps updated_at
-// automatically on the Update. rows==0 means: not the recipient, already
-// accepted, or the row is gone — the handler maps all three to a uniform 404.
+// Accept atomically flips a pending row to accepted when recipientID is its recipient.
+// It returns rows affected: 0 means not the recipient, already accepted, or missing.
 func (r *GormRepository) Accept(id, recipientID uint) (int64, error) {
 	res := r.db.Model(&Friendship{}).
 		Where("id = ? AND friend_id = ? AND status = ?", id, recipientID, FriendStatusPending).
@@ -70,7 +70,8 @@ func (r *GormRepository) Accept(id, recipientID uint) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
-// Delete removes a pending row under the same recipient-only guard (decline).
+// Delete declines a pending row under the same recipient-only guard as Accept
+// and returns rows affected.
 func (r *GormRepository) Delete(id, recipientID uint) (int64, error) {
 	res := r.db.
 		Where("id = ? AND friend_id = ? AND status = ?", id, recipientID, FriendStatusPending).
@@ -78,11 +79,8 @@ func (r *GormRepository) Delete(id, recipientID uint) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
-// Unfriend removes an ACCEPTED row in a single conditional DELETE. The guard is
-// party-agnostic ((user_id=? OR friend_id=?)) — the one deliberate divergence
-// from Accept/Delete's recipient-only guard, because an accepted friendship
-// belongs to both sides equally. rows==0 means: not a party, not accepted, or
-// the row is gone — the handler maps all three to a uniform 404.
+// Unfriend atomically removes an accepted row when userID is either party.
+// It returns rows affected: 0 means not a party, not accepted, or missing.
 func (r *GormRepository) Unfriend(id, userID uint) (int64, error) {
 	res := r.db.
 		Where("id = ? AND (user_id = ? OR friend_id = ?) AND status = ?", id, userID, userID, FriendStatusAccepted).
@@ -90,6 +88,8 @@ func (r *GormRepository) Unfriend(id, userID uint) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
+// ListAccepted returns the user's accepted friendships in either direction,
+// as a non-nil slice.
 func (r *GormRepository) ListAccepted(userID uint) ([]Friendship, error) {
 	rows := []Friendship{}
 	if err := r.db.
@@ -101,6 +101,8 @@ func (r *GormRepository) ListAccepted(userID uint) ([]Friendship, error) {
 	return rows, nil
 }
 
+// ListIncomingPending returns the pending requests sent to the user, newest first,
+// as a non-nil slice.
 func (r *GormRepository) ListIncomingPending(userID uint) ([]Friendship, error) {
 	rows := []Friendship{}
 	if err := r.db.
@@ -112,6 +114,7 @@ func (r *GormRepository) ListIncomingPending(userID uint) ([]Friendship, error) 
 	return rows, nil
 }
 
+// AreFriends reports whether a and b have an accepted friendship in either direction.
 func (r *GormRepository) AreFriends(a, b uint) (bool, error) {
 	var count int64
 	if err := r.db.Model(&Friendship{}).

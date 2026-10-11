@@ -6,9 +6,7 @@ type SliderProps = Omit<
   SliderPrimitive.Root.Props<number>,
   "className" | "children" | "aria-label"
 > & {
-  /** Accessible name. Forwarded to the thumb's range input, which is what a screen reader lands on. */
   "aria-label"?: string;
-  /** Screen-reader text for a value (e.g. `30%`); defaults to the bare number. */
   getAriaValueText?: (value: number) => string;
   className?: string;
   trackClassName?: string;
@@ -17,22 +15,8 @@ type SliderProps = Omit<
 };
 
 /**
- * Single-thumb slider on the Base UI primitive, which renders a real
- * `<input type="range">` inside the thumb for keyboard and screen-reader
- * support. `onValueChange` fires live while dragging; `onValueCommitted` fires
- * once on release (and once per keyboard step).
- *
- * The default look follows the app tokens; every part takes its own className
- * so a surface with its own palette (the brass in-match dialog) restyles the
- * track, fill and thumb without forking the component. Disabled state is
- * exposed as `data-disabled` on every part.
- *
- * The track is outlined with an inset shadow, not a border: the primitive
- * sizes the fill with `height: inherit`, so a border would push the fill out
- * past the bottom of the track.
- *
- * The control, which takes the presses, is 24 px tall — the minimum target
- * size — around the thin visual track.
+ * Single-thumb Base UI slider whose track, fill and thumb each accept their own className.
+ * The track uses an inset shadow, not a border, because a border would push the inherited-height fill out of it.
  */
 function Slider({
   "aria-label": ariaLabel,

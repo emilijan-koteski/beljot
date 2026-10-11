@@ -51,7 +51,7 @@ func TestDisconnectedPhaseRejectsAllActions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gs := testfixtures.NewGameDisconnected(2) // seat 2 disconnected
+			gs := testfixtures.NewGameDisconnected(2)
 			result, err := game.ApplyAction(gs, tt.action)
 			assert.Nil(t, result)
 			assert.ErrorIs(t, err, apperr.ErrPlayerDisconnected)
@@ -67,7 +67,6 @@ func TestNewGameDisconnectedFixture(t *testing.T) {
 	assert.Equal(t, 1, gs.DisconnectedSeat)
 	assert.False(t, gs.Players[1].Connected)
 
-	// Other players remain connected
 	assert.True(t, gs.Players[0].Connected)
 	assert.True(t, gs.Players[2].Connected)
 	assert.True(t, gs.Players[3].Connected)

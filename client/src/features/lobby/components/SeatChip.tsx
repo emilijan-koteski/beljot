@@ -9,9 +9,7 @@ export type SeatTeam = "A" | "B";
 type Props = {
   username: string | null;
   team: SeatTeam;
-  /** Bot seat — the disc shows the bot glyph instead of a name initial. */
   bot?: boolean;
-  /** The seated player's 128 px avatar; the initial renders without one. */
   avatarUrl?: string | null;
   testId?: string;
 };
@@ -34,11 +32,8 @@ const TOKENS = {
 } as const;
 
 /**
- * Single seat slot inside the lobby card's 2×2 team grid.
- *
- * Empty seats render a dashed brass-tinted outline; filled seats show the
- * player's picture (or initial) inside a colored disc + their username, with
- * the team color signaling Us (Gold) vs Them (Silver) at a glance.
+ * One seat in the room card's 2×2 team grid: a dashed outline when empty.
+ * A filled seat shows the avatar, bot glyph, or initial in a team-coloured disc beside the name.
  */
 export function SeatChip({ username, team, bot = false, avatarUrl, testId }: Props) {
   const { t } = useTranslation();

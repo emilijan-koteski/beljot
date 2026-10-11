@@ -17,13 +17,6 @@ export type WsConnectionState =
   | "connected"
   | "replaced";
 
-/**
- * App-specific WS close code matching the server's `CloseCodeReplaced`
- * (`server/internal/ws/hub.go`). Sent when a newer connection for the same
- * user joins and kicks this one. The client must NOT auto-reconnect on this
- * code — otherwise two tabs as the same user enter a tight kick/reconnect
- * loop that floods the server with auth churn.
- */
 const CLOSE_CODE_REPLACED = 4001;
 
 interface UseWebSocketOptions {
@@ -43,6 +36,10 @@ function getWsUrl(): string {
   return `${protocol}//${window.location.host}/ws`;
 }
 
+/**
+ * Keep an authenticated WebSocket open with exponential-backoff reconnects.
+ * A CLOSE_CODE_REPLACED close parks in "replaced" instead, so two tabs never kick each other in a loop.
+ */
 export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketReturn {
   const [state, setState] = useState<WsConnectionState>("disconnected");
   const wsRef = useRef<WebSocket | null>(null);
@@ -67,7 +64,6 @@ export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketRe
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
 
-    // Guard against being called while already connecting
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) return;
 
     const token = useAuthStore.getState().token;
@@ -101,8 +97,6 @@ export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketRe
         return;
       }
 
-      // Clock-offset sample: match messages stamp the server's wall clock on
-      // the envelope so countdowns can render against corrected time.
       if (typeof message.serverNow === "string") {
         recordServerNow(message.serverNow);
       }
@@ -124,17 +118,12 @@ export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketRe
         return;
       }
 
-      // Forward all other messages to dispatch
       onMessageRef.current(message);
     };
 
     ws.onclose = (event: CloseEvent) => {
       if (!mountedRef.current || wsRef.current !== ws) return;
       wsRef.current = null;
-      // The server sends CLOSE_CODE_REPLACED when another tab/device for the
-      // same user took over the slot. Auto-reconnecting here would just kick
-      // the newer connection back, so we park in a terminal "replaced" state
-      // until the user explicitly takes action (refresh, re-login, logout).
       if (event.code === CLOSE_CODE_REPLACED) {
         updateState("replaced");
         return;
@@ -143,22 +132,15 @@ export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketRe
       scheduleReconnect();
     };
 
-    ws.onerror = () => {
-      // onclose will fire after onerror — reconnection handled there
-    };
+    ws.onerror = () => {};
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAuthFailure = useCallback(async () => {
     try {
-      // Coordinated singleton refresh: sets + broadcasts the new access token
-      // (and re-hydrates the user), shared with the 401 interceptor and the
-      // proactive scheduler so a WS auth failure never spawns a second refresh.
       await refreshAccessToken();
-      // Retry connection with fresh token
       reconnectAttemptRef.current = 0;
       scheduleReconnect();
     } catch {
-      // Refresh failed — user must re-login
       useAuthStore.getState().logout();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -181,14 +163,11 @@ export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketRe
 
   useEffect(() => {
     mountedRef.current = true;
-    // Defer connect so React.StrictMode's synchronous unmount cancels
-    // the timer before any WebSocket is created, avoiding the
-    // "WebSocket is closed before the connection is established" warning.
-    const connectTimer = setTimeout(connect, 0);
+    const deferredConnectSurvivingStrictMode = setTimeout(connect, 0);
 
     return () => {
       mountedRef.current = false;
-      clearTimeout(connectTimer);
+      clearTimeout(deferredConnectSurvivingStrictMode);
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -200,18 +179,15 @@ export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketRe
     };
   }, [connect]);
 
-  // Reconnect when token changes (e.g., after refresh)
   useEffect(() => {
     const unsub = useAuthStore.subscribe((state, prev) => {
       if (state.token && !prev.token && mountedRef.current) {
-        // Token appeared (login or refresh) — connect if disconnected
         if (!wsRef.current) {
           reconnectAttemptRef.current = 0;
           connect();
         }
       }
       if (!state.token && prev.token) {
-        // Token cleared (logout) — disconnect
         if (wsRef.current) {
           wsRef.current.close(1000, "logout");
           wsRef.current = null;

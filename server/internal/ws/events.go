@@ -1,19 +1,9 @@
 package ws
 
-// WebSocket event contract — keep in sync with client/src/shared/types/wsEvents.ts
-
-// Event type prefixes:
-// action: — client -> server
-// event:  — server -> client (game state)
-// error:  — server -> client (errors)
-// system: — server -> client (platform events)
-
-// --- Authentication events ---
 const ActionAuthenticate = "action:authenticate"
 const SystemAuthenticated = "system:authenticated"
 const ErrorAuthFailed = "error:auth_failed"
 
-// --- Game action events (client -> server) ---
 const ActionPlayCard = "action:play_card"
 const ActionPickTrump = "action:pick_trump"
 const ActionPassTrump = "action:pass_trump"
@@ -25,12 +15,10 @@ const ActionPause = "action:pause"
 const ActionUnpause = "action:unpause"
 const ActionOwnerUnpause = "action:owner_unpause"
 
-// --- Surrender actions (Story 8.2) ---
 const ActionSurrenderRequest = "action:surrender_request"
 const ActionSurrenderAccept = "action:surrender_accept"
 const ActionSurrenderDecline = "action:surrender_decline"
 
-// --- Game state events (server -> client) ---
 const EventMatchState = "event:match_state"
 const EventCardPlayed = "event:card_played"
 const EventTrickResolved = "event:trick_resolved"
@@ -44,35 +32,20 @@ const EventMatchPaused = "event:match_paused"
 const EventMatchResumed = "event:match_resumed"
 const EventAutoAction = "event:auto_action"
 
-// --- Economy events (Story 9.2) ---
-// EventCoinSettlement is sent per-human at match end (after event:match_end)
-// carrying that player's own net coin delta and resulting wallet balance. Sent
-// per-user (not broadcast) because NewBalance differs per player; Pot is shared.
 const EventCoinSettlement = "event:coin_settlement"
 
-// CoinSettlementPayload is the typed payload for EventCoinSettlement events.
-// CoinDelta is the net wallet change for the match (winner: +winnings,
-// loser: -buyIn, net-zero possible); NewBalance is the post-settlement balance.
+// CoinSettlementPayload is sent per human at match end with their net coin delta and new balance.
+// It is sent per user because NewBalance differs per player.
 type CoinSettlementPayload struct {
 	CoinDelta  int `json:"coinDelta"`
 	NewBalance int `json:"newBalance"`
 	Pot        int `json:"pot"`
 }
 
-// --- XP & progression events (Story 9.5) ---
-// EventXPAwarded is sent per-human at match end, slotted AFTER
-// event:coin_settlement and BEFORE the trailing event:match_state (preserving
-// the Story 8.5-1 ordering contract). It carries that player's own XP earned
-// this match, their new lifetime total, the derived level, and whether they
-// leveled up. Sent per-user (not broadcast) because the values differ per
-// player. The level is server-authoritative (derived from total_xp); the client
-// never decides it.
 const EventXPAwarded = "event:xp_awarded"
 
-// XPAwardedPayload is the typed payload for EventXPAwarded events. XPEarned is
-// the XP gained this match (>= 0); NewTotalXP is the post-award lifetime total;
-// NewLevel is the level derived from NewTotalXP; LeveledUp is true when NewLevel
-// exceeds the pre-award level (drives the optional level-up flourish).
+// XPAwardedPayload is sent per human at match end with their XP earned, new total and derived level.
+// The level is server-authoritative; LeveledUp drives the client's level-up flourish.
 type XPAwardedPayload struct {
 	XPEarned   int  `json:"xpEarned"`
 	NewTotalXP int  `json:"newTotalXp"`
@@ -80,38 +53,10 @@ type XPAwardedPayload struct {
 	LeveledUp  bool `json:"leveledUp"`
 }
 
-// --- Honor events (Story 9.7) ---
-
-// EventHonorUpdated is sent per-human at match end, slotted AFTER
-// event:xp_awarded and BEFORE the trailing event:match_state. The full
-// ordering contract on both finalizers is therefore:
-//
-//	match_end | match_abandoned
-//	  -> coin_settlement
-//	  -> xp_awarded
-//	  -> honor_updated
-//	  -> match_state
-//
-// It is a NEW event type rather than extra fields on an existing payload, on
-// purpose: the client's payload schemas are z.strictObject, so widening an
-// existing event breaks stale tabs that are still running the old bundle,
-// whereas an unknown event type is simply ignored by them.
-//
-// Sent per-user (not broadcast) because the values differ per player — in an
-// abandoned match one seat's honor drops while the other three rise.
 const EventHonorUpdated = "event:honor_updated"
 
-// HonorUpdatedPayload is the typed payload for EventHonorUpdated events.
-//
-// HonorScore is the AUTHORITATIVE recomputed value (0-100), not the lagging
-// users.honor_score snapshot column. HonorTier is a stable machine token
-// ("exemplary" | "trusted" | "fair" | "unreliable" | "problematic") that the
-// client maps to an i18n label and colour — a display string must never cross
-// the wire. HonorCompletedTotal / HonorAbandonedTotal are RAW undecayed
-// lifetime counts. IsNewPlayer is true below the matches-played floor
-// (completed + abandoned < 5 — it counts experience, not successes), and is
-// a PRESENTATION hint only: the score and tier are still populated and are
-// still what any future gate reads.
+// HonorUpdatedPayload is sent per human at match end with their authoritative honor score and raw lifetime totals.
+// HonorTier is a machine token the client maps to a label; IsNewPlayer is a presentation hint only.
 type HonorUpdatedPayload struct {
 	HonorScore          int    `json:"honorScore"`
 	HonorTier           string `json:"honorTier"`
@@ -120,63 +65,10 @@ type HonorUpdatedPayload struct {
 	IsNewPlayer         bool   `json:"isNewPlayer"`
 }
 
-// --- Seasonal rank events (Story 13.1) ---
-
-// EventSeasonPointsAwarded is sent per-human at match end, slotted AFTER
-// event:honor_updated and BEFORE the trailing event:match_state. The full
-// ordering contract on both finalizers is therefore:
-//
-//	match_end | match_abandoned
-//	  -> coin_settlement
-//	  -> xp_awarded
-//	  -> honor_updated
-//	  -> season_points_awarded
-//	  -> match_state
-//
-// It is a NEW event type rather than extra fields on event:xp_awarded (the
-// obvious place, since both are progression), for the same reason
-// EventHonorUpdated is: the client's payload schemas are z.strictObject, so
-// WIDENING an existing payload breaks every stale tab still running the old
-// bundle, whereas an unknown event type is simply ignored by them. Story 13.5
-// reshaped THIS payload in place (divisions, rank change, reason), so a stale
-// tab drops it; that is accepted at the release boundary that ships the new
-// ladder. It costs the stale tab the toast AND the season.current invalidation
-// the frame would have triggered, so its rank chip and banner stay stale until
-// that query refetches on its own or the tab reloads.
-//
-// Sent per-user (not broadcast) because the values differ per player — the
-// winners' gains, the losers' losses and an abandoner's penalty all land in the
-// same burst.
 const EventSeasonPointsAwarded = "event:season_points_awarded"
 
-// SeasonPointsAwardedPayload is the typed payload for EventSeasonPointsAwarded
-// (reshaped by Story 13.5; spEarned and tieredUp are gone).
-//
-// SPChange is the SIGNED change this match applied to this player's season SP:
-// positive for a win, negative for a loss or an abandonment, and the APPLIED
-// change, new total minus previous, so at the 0 floor it can be smaller than
-// the formula's own number (a player on 10 SP whose loss computes to -18
-// receives -10). The formula lives in season/sp_formula.go. 0 is a REAL value,
-// not a missing one.
-//
-// NewSeasonSP is the post-match season total, never below 0. RankTier is a
-// STABLE MACHINE TOKEN ("iron" | "bronze" | "silver" | "gold" | "platinum" |
-// "diamond" | "master" | "grandmaster") that the client maps to an i18n label
-// and colour — a display string must never cross the wire, the same
-// non-negotiable HonorUpdatedPayload's HonorTier states. RankDivision is 1-3
-// for Iron through Diamond and null for Master and Grandmaster, which are
-// single. Both are derived from the new total by season/tier.go.
-//
-// RankChange compares the RANK (tier, then division) before and after the
-// match, never SP alone: one of RankChangePromoted, RankChangeDemoted or
-// RankChangeNone. It drives the client's promotion toast (success) and
-// demotion notice (info). Reason says why the change is what it is:
-// SPReasonAbandoned for the seat whose reconnect window expired,
-// SPReasonPartnerAbandoned for that seat's teammate, SPReasonNormal for
-// everyone else and for every seat of a match that ended normally.
-//
-// SeasonName is the machine-stable "YYYY QN" window identifier, rendered
-// VERBATIM by the client and never translated.
+// SeasonPointsAwardedPayload is sent per human at match end with the applied, signed SP change and the new rank.
+// Match-end events go match_end, coin_settlement, xp_awarded, honor_updated, season_points_awarded, match_state.
 type SeasonPointsAwardedPayload struct {
 	SPChange     int    `json:"spChange"`
 	NewSeasonSP  int    `json:"newSeasonSp"`
@@ -187,23 +79,17 @@ type SeasonPointsAwardedPayload struct {
 	SeasonName   string `json:"seasonName"`
 }
 
-// Rank-change tokens carried in SeasonPointsAwardedPayload.RankChange. STABLE
-// MACHINE TOKENS, mirrored by the client's wsEvents.ts union.
 const (
 	RankChangePromoted = "promoted"
 	RankChangeDemoted  = "demoted"
 	RankChangeNone     = "none"
 )
 
-// Season Points award reasons carried in SeasonPointsAwardedPayload.Reason.
-// STABLE MACHINE TOKENS, mirrored by the client's wsEvents.ts union.
 const (
 	SPReasonNormal           = "normal"
 	SPReasonAbandoned        = "abandoned"
 	SPReasonPartnerAbandoned = "partner_abandoned"
 )
-
-// --- Game event payload structs ---
 
 // CardPlayedPayload is the typed payload for EventCardPlayed events.
 type CardPlayedPayload struct {
@@ -213,28 +99,20 @@ type CardPlayedPayload struct {
 }
 
 // TrumpSelectedPayload is the typed payload for EventTrumpSelected events.
-// CardID carries the originally face-up trumpCandidate the picker absorbed —
-// the post-pick GameState clears trumpCandidate to nil, so this event is the
-// only place clients can read it.
+// CardID is the face-up trump candidate the picker absorbed, which the post-pick state no longer carries.
 type TrumpSelectedPayload struct {
 	PlayerSeat int    `json:"playerSeat"`
 	TrumpSuit  string `json:"trumpSuit"`
 	CardID     string `json:"cardId"`
 }
 
-// PlayerDeclaredPayload is the typed payload for EventPlayerDeclared events.
-// Emitted the moment a player commits a declare action during trick 1, so the
-// table sees WHO holds declarations right away. Deliberately carries only the
-// seat — type, value, and cards stay secret until EventDeclarationsResolved
-// reveals the winning team's melds at the end of trick 1.
+// PlayerDeclaredPayload announces that a seat declared during trick 1.
+// It carries only the seat; the melds stay secret until EventDeclarationsResolved.
 type PlayerDeclaredPayload struct {
 	PlayerSeat int `json:"playerSeat"`
 }
 
-// DeclarationPayload is one revealed meld inside a DeclarationsResolvedPayload.
-// The shape is flat — one entry per meld, each carrying its own PlayerSeat —
-// so a single seat holding several overlapping melds (the normal case under a
-// DeclarationOverlap config) needs no nesting and no payload change.
+// DeclarationPayload is one revealed meld inside a DeclarationsResolvedPayload, tagged with its own seat.
 type DeclarationPayload struct {
 	PlayerSeat int      `json:"playerSeat"`
 	Type       string   `json:"type"`
@@ -242,20 +120,8 @@ type DeclarationPayload struct {
 	Cards      []string `json:"cards"`
 }
 
-// DeclarationsResolvedPayload is the typed payload for
-// EventDeclarationsResolved events. It carries only the WINNING team's melds —
-// the engine clears the losing team's at resolution — so every entry counts
-// toward the awarded total.
-//
-// WinnerTeam is nil when no seat declared at all.
-//
-// Contested reports whether BOTH teams put a meld on the table, i.e. whether a
-// comparison actually decided the winner. The client cannot infer this from the
-// melds it receives: with only the winner's melds on the wire, "we out-declared
-// them" and "we were the only team to declare" look identical, and under a
-// DeclarationOverlap config one seat holding two melds is ordinary rather than
-// evidence of a contest. The reveal uses it to decide whether to name the
-// highest meld as the deciding one.
+// DeclarationsResolvedPayload carries only the winning team's melds; WinnerTeam is nil when no seat declared.
+// Contested reports whether both teams declared, which the client cannot infer from the winner's melds alone.
 type DeclarationsResolvedPayload struct {
 	WinnerTeam   *int                 `json:"winnerTeam"`
 	Contested    bool                 `json:"contested"`
@@ -282,33 +148,23 @@ type MatchResumedPayload struct {
 	OwnerOverride bool `json:"ownerOverride"`
 }
 
-// AutoActionType enumerates the non-card auto-actions emitted on per-move
-// timer expiry. Card auto-play does NOT produce an EventAutoAction — it
-// continues to use the AutoPlayed flag on EventCardPlayed.
+// AutoActionType enumerates the non-card auto-actions emitted on per-move timer expiry.
+// Card auto-play uses the AutoPlayed flag on EventCardPlayed instead.
 type AutoActionType string
 
 const (
 	AutoActionPassTrump   AutoActionType = "pass_trump"
 	AutoActionSkipDeclare AutoActionType = "skip_declare"
 	AutoActionSkipBelot   AutoActionType = "skip_belot"
-	// AutoActionPickTrump is emitted when the timed-out seat had no legal pass
-	// (the dealer bidding last — fourth — of a variant where the hand must find
-	// a taker), so the server named a suit on its behalf. Unlike the three
-	// above, this auto-action CHANGES the hand rather than declining something —
-	// it fixes trump for the whole hand — which is exactly why it must be
-	// announced rather than left to be inferred from the state snapshot.
-	AutoActionPickTrump AutoActionType = "pick_trump"
+	AutoActionPickTrump   AutoActionType = "pick_trump"
 )
 
-// AutoActionPayload is the typed payload for EventAutoAction events.
-// Informational one-shot — clients use it to surface a toast naming the
-// timed-out player. Authoritative state still rides EventMatchState.
+// AutoActionPayload is the typed payload for EventAutoAction, used by clients to toast the timed-out player.
 type AutoActionPayload struct {
 	PlayerSeat int            `json:"playerSeat"`
 	Type       AutoActionType `json:"type"`
 }
 
-// --- Disconnect/reconnect events (server -> client) ---
 const EventPlayerDisconnected = "event:player_disconnected"
 const EventPlayerReconnected = "event:player_reconnected"
 const EventMatchAbandoned = "event:match_abandoned"
@@ -317,7 +173,7 @@ const EventMatchAbandoned = "event:match_abandoned"
 type PlayerDisconnectedPayload struct {
 	PlayerSeat         int    `json:"playerSeat"`
 	Username           string `json:"username"`
-	ReconnectExpiresAt string `json:"reconnectExpiresAt"` // ISO 8601 timestamp
+	ReconnectExpiresAt string `json:"reconnectExpiresAt"`
 }
 
 // PlayerReconnectedPayload is the typed payload for EventPlayerReconnected events.
@@ -334,39 +190,27 @@ type MatchAbandonedPayload struct {
 }
 
 // OutcomeReason is the typed outcome discriminator carried in event:match_end.
-// Epic 9 will add OutcomeReasonInsolvency and OutcomeReasonHonorEject.
 type OutcomeReason string
 
 const (
-	OutcomeReasonNatural     OutcomeReason = "natural"
-	OutcomeReasonSurrender   OutcomeReason = "surrender"
-	OutcomeReasonTimeout     OutcomeReason = "timeout"
-	OutcomeReasonAbandonment OutcomeReason = "abandonment"
-	// OutcomeReasonTargetReached is a room playing "dosta": a team's running
-	// total reached the match target part-way through a hand, so the match ended
-	// there and that hand was never finished. Distinct from Natural because the
-	// player's experience is different in a way the UI must explain — the score
-	// jumps and the match is over with cards still in hand, and the hand
-	// breakdown is one hand short because the aborted hand is deliberately never
-	// scored.
+	OutcomeReasonNatural       OutcomeReason = "natural"
+	OutcomeReasonSurrender     OutcomeReason = "surrender"
+	OutcomeReasonTimeout       OutcomeReason = "timeout"
+	OutcomeReasonAbandonment   OutcomeReason = "abandonment"
 	OutcomeReasonTargetReached OutcomeReason = "target_reached"
 )
 
 // MatchEndPayload is the typed payload for EventMatchEnd events.
-// OutcomeReason is always present on the wire ("natural" | "surrender" | "timeout" | "abandonment").
-// SurrenderedBySeat carries a seat index (0..3) only when OutcomeReason == "surrender".
-// The name disambiguates this seat-index field from the persistence column
-// `match.SurrenderedBy` which holds a userID (uint).
+// SurrenderedBySeat is a seat index (0..3), set only when OutcomeReason is "surrender".
 type MatchEndPayload struct {
 	WinnerTeam        int           `json:"winnerTeam"`
 	TeamAFinalScore   int           `json:"teamAFinalScore"`
 	TeamBFinalScore   int           `json:"teamBFinalScore"`
 	MatchDurationSec  int           `json:"matchDurationSec"`
-	OutcomeReason     OutcomeReason `json:"outcomeReason,omitempty"`     // "natural" | "surrender" | "timeout" | "abandonment" | "target_reached"
-	SurrenderedBySeat *int          `json:"surrenderedBySeat,omitempty"` // seat index, only when outcomeReason == "surrender"
+	OutcomeReason     OutcomeReason `json:"outcomeReason,omitempty"`
+	SurrenderedBySeat *int          `json:"surrenderedBySeat,omitempty"`
 }
 
-// --- Surrender events (Story 8.2) ---
 const EventSurrenderProposed = "event:surrender_proposed"
 const EventSurrenderDeclined = "event:surrender_declined"
 
@@ -386,7 +230,6 @@ type SurrenderDeclinedPayload struct {
 	DecliningSeat int `json:"decliningSeat"`
 }
 
-// --- Game error events (server -> client) ---
 const ErrorInvalidAction = "error:invalid_action"
 const ErrorNotYourTurn = "error:not_your_turn"
 const ErrorWrongPhase = "error:wrong_phase"
@@ -397,49 +240,20 @@ const ErrorNotRoomOwner = "error:not_room_owner"
 const ErrorPlayerDisconnected = "error:player_disconnected"
 const ErrorSurrenderExhausted = "error:surrender_exhausted"
 
-// ErrorMustPickTrump is sent when a seat passes but the rules give it no
-// pass to make — the dealer bidding last under AllPassDealerMustPick. Kept
-// apart from ErrorInvalidAction so the client can distinguish it from a
-// rejected suit; the UI normally hides Pass in this state, so receiving it
-// means a stale client or a hand-crafted frame.
 const ErrorMustPickTrump = "error:must_pick_trump"
 
-// ErrorMatchStartFailed is broadcast to the four would-be participants of an
-// auto-start that reached a "ready to start" state in the room transaction
-// but whose subsequent matchStarter.StartMatch call returned an error. Story
-// 8.5-1 AC2 — instead of stranding the room in a permanent "playing" state
-// with no live session, the room is reverted to "waiting" and clients are
-// told to stay on the room-lobby page rather than navigate to /game/{id}.
 const ErrorMatchStartFailed = "error:match_start_failed"
 
-// --- Room events ---
 const SystemRoomCreated = "system:room_created"
 const SystemRoomUpdated = "system:room_updated"
 
-// --- Room player events ---
 const SystemPlayerJoined = "system:player_joined"
 const SystemPlayerLeft = "system:player_left"
 const SystemRoomKicked = "system:room_kicked"
 const SystemRoomOwnerChanged = "system:room_owner_changed"
 
-// SystemRoomClosedInsolvent is broadcast to every still-seated member when a
-// room closes because no present-and-solvent player remained to own it (Story
-// 9.3 AC4) — the owner left or was barred for insolvency and no one could
-// inherit. Recipients route to the lobby with a "room closed" notice. Uses the
-// system: prefix like every sibling room-lifecycle event.
-//
-// Story 9.8 REUSES this event for honor closes: when an owner is honor-ejected
-// and no eligible heir remains, every still-seated member receives this same
-// event. The payload is {roomId} and the client copy is already reason-agnostic,
-// so it is behaviourally correct for both reasons. The WIRE STRING IS DELIBERATELY
-// UNCHANGED — renaming it would break stale tabs for zero user-visible gain.
 const SystemRoomClosedInsolvent = "system:room_closed_insolvent"
 
-// SystemInsolventEjected is a per-user push (via the per-recipient broadcast,
-// like event:coin_settlement — not a room broadcast) to a player ejected at
-// match start because they could not afford the buy-in at the authoritative
-// charge (Story 9.3 AC5). Carries the exact numbers so the client modal can
-// show balance vs buy-in.
 const SystemInsolventEjected = "system:insolvent_ejected"
 
 // RoomKickedPayload is the typed payload for SystemRoomKicked events,
@@ -449,54 +263,29 @@ type RoomKickedPayload struct {
 	Reason string `json:"reason"`
 }
 
-// RoomClosedInsolventPayload is the typed payload for SystemRoomClosedInsolvent
-// events (Story 9.3).
+// RoomClosedInsolventPayload is the typed payload for SystemRoomClosedInsolvent events.
 type RoomClosedInsolventPayload struct {
 	RoomID uint `json:"roomId"`
 }
 
-// InsolventEjectedPayload is the typed payload for SystemInsolventEjected
-// events (Story 9.3). Balance and BuyIn drive the client modal's exact numbers.
+// InsolventEjectedPayload is the typed payload for SystemInsolventEjected events.
+// Balance and BuyIn drive the client modal's exact numbers.
 type InsolventEjectedPayload struct {
 	RoomID  uint `json:"roomId"`
 	BuyIn   int  `json:"buyIn"`
 	Balance int  `json:"balance"`
 }
 
-// SystemHonorEjected is a per-user push to a player ejected from a room because
-// their honor score no longer clears the room's gate (Story 9.8 AC6). Its sibling
-// is SystemInsolventEjected: same shape, same delivery, same client pipeline —
-// a pre-match, room-lifecycle, per-user notice.
-//
-// The system: prefix is DELIBERATE and load-bearing (Story 9.8 D4). The epic wrote
-// `event:honor_eject`, which is wrong twice over: event: is reserved for in-match
-// game-state events with an ordering contract inside the match finalizers, and this
-// fires pre-match at the room level. It also has a mechanical consequence — the WS
-// drift gate (events_contract_test.go's `cases` table, the Zod schemas, the golden
-// files, the MutualExtends witnesses) covers ONLY event:* typed payloads. Every
-// system:* sibling here (InsolventEjectedPayload, RoomClosedInsolventPayload,
-// PlayerReturnedPayload) is absent from it. So this event has ZERO drift-gate
-// touchpoints, and the correct diff is two files: this one and wsEvents.ts. A
-// contributor adding a golden or a `cases` row for it has misread the gate's scope.
-//
-// Note also that an honor ejection NEVER produces a match_abandoned: it is
-// pre-match and room-level, so epics.md's predicted "honor_eject" addition to that
-// event's reason union does not apply (9.3 never appended "insolvency" either).
 const SystemHonorEjected = "system:honor_ejected"
 
-// HonorEjectedPayload is the typed payload for SystemHonorEjected events (Story
-// 9.8). MinHonor is the room's threshold; Honor is the ejected player's own
-// AUTHORITATIVE recomputed score (never the lagging users.honor_score column), so
-// the client modal can state both numbers. Not drift-gated — see SystemHonorEjected.
+// HonorEjectedPayload is the typed payload for SystemHonorEjected events.
+// Honor is the player's authoritative recomputed score, shown beside the room's MinHonor.
 type HonorEjectedPayload struct {
 	RoomID   uint `json:"roomId"`
 	MinHonor int  `json:"minHonor"`
 	Honor    int  `json:"honor"`
 }
 
-// SystemPlayerReturned is broadcast to a reopened room's members when a player
-// re-enters it after a match (via "Return to room"). It drives the lobby
-// "waiting to return" presence state — keep in sync with wsEvents.ts.
 const SystemPlayerReturned = "system:player_returned"
 
 // PlayerReturnedPayload is the typed payload for SystemPlayerReturned events.
@@ -505,28 +294,19 @@ type PlayerReturnedPayload struct {
 	UserID uint `json:"userId"`
 }
 
-// --- Seat and game events ---
 const SystemSeatUpdated = "system:seat_updated"
 const SystemMatchStarted = "system:match_started"
 
-// --- Bot seating events (Story 10.3) ---
-// Payloads: bot_added {roomId, seat, team}; bot_removed {roomId, seat}.
-// Bot identity is seat-derived and rendered client-side, so no name rides
-// the wire.
 const SystemBotAdded = "system:bot_added"
 const SystemBotRemoved = "system:bot_removed"
 
-// --- Chat events ---
 const ActionChatMessage = "action:chat_message"
 const SystemChatMessage = "system:chat_message"
 
-// --- Emote events (Story 8.3) ---
 const ActionEmote = "action:emote"
 const SystemEmote = "system:emote"
 
 // EmoteID is the canonical identifier for a preset in-game emote.
-// Wire format is the snake_case string; the typed constants below are the
-// single source of truth for the whitelist.
 type EmoteID string
 
 const (
@@ -538,9 +318,6 @@ const (
 	EmoteHeart    EmoteID = "heart"
 )
 
-// ValidEmoteIDs is the O(1) whitelist used by the emote handler to reject
-// unknown IDs. Mirrors the EMOTE_IDS array on the client; both sides must
-// stay in sync (project-rule: WS contract files updated in the same commit).
 var ValidEmoteIDs = map[EmoteID]struct{}{
 	EmoteThumbsUp: {},
 	EmoteClap:     {},
@@ -551,17 +328,13 @@ var ValidEmoteIDs = map[EmoteID]struct{}{
 }
 
 // EmoteRequest is the typed payload for ActionEmote (client → server).
-// Emote is decoded as a plain string and validated against ValidEmoteIDs by
-// the handler — keeping the request loose lets the handler log the raw value
-// on rejection without needing to round-trip through EmoteID.
+// Emote stays a plain string so the handler can log a rejected raw value.
 type EmoteRequest struct {
 	Emote string `json:"emote"`
 }
 
 // EmotePayload is the typed payload for SystemEmote (server → client).
-// PlayerSeat is the sender's seat (0..3) resolved by the server; the
-// receiving client looks up the username from gameState.players, so this
-// payload deliberately omits username (different from ChatMessagePayload).
+// It omits the username because clients resolve it from the seat.
 type EmotePayload struct {
 	PlayerSeat int     `json:"playerSeat"`
 	Emote      EmoteID `json:"emote"`
@@ -569,8 +342,8 @@ type EmotePayload struct {
 
 // ChatMessageRequest is the typed payload for ActionChatMessage (client → server).
 type ChatMessageRequest struct {
-	Channel string `json:"channel"`          // "lobby" | "match" | "room"
-	RoomID  *uint  `json:"roomId,omitempty"` // required when channel == "match" or "room"
+	Channel string `json:"channel"`
+	RoomID  *uint  `json:"roomId,omitempty"`
 	Text    string `json:"text"`
 }
 
@@ -579,24 +352,10 @@ type ChatMessagePayload struct {
 	UserID    uint   `json:"userId"`
 	Username  string `json:"username"`
 	Message   string `json:"message"`
-	Timestamp string `json:"timestamp"` // ISO 8601 (RFC3339) UTC
-	Scope     string `json:"scope"`     // "lobby" | "match" | "room"
+	Timestamp string `json:"timestamp"`
+	Scope     string `json:"scope"`
 }
 
-// --- Friend events (Story 11.2) ---
-
-// SystemFriendRequest is a per-user push to a recipient who is currently
-// connected when someone sends them a friend request (Story 11.2 AC2). Like
-// every system:* push it is best-effort and online-only: SendToUser is an
-// unqueued no-op for offline users (no offline inbox — same model as chat /
-// honor / coins), so the durable delivery path is the recipient seeing the
-// request in GET /friends/requests on next load. POST /friends/request must
-// succeed regardless of the recipient's connection state.
-//
-// The system: prefix keeps this OUTSIDE the WS drift gate — no golden file, no
-// Zod schema, no events_contract_test.go `cases` row — exactly like every other
-// system:* event here (chat, emote, room lifecycle, honor eject). The complete
-// contract is two files: this one and client/src/shared/types/wsEvents.ts.
 const SystemFriendRequest = "system:friend_request"
 
 // FriendRequestPayload is the typed payload for SystemFriendRequest events.
@@ -607,28 +366,9 @@ type FriendRequestPayload struct {
 	FromUsername string `json:"fromUsername"`
 }
 
-// --- Whisper events (Story 11.4) ---
-
-// ActionWhisper (client→server) + SystemWhisper (server→client) carry a private
-// one-to-one message between two friends. They mirror the chat/emote pipeline
-// exactly (action:* in, system:* out) — NOT event:whisper as the epic's literal
-// wording suggested (Story 11.4 D1, PO-confirmed 2026-08-14). event:* is reserved
-// for in-match game-state payloads with an ordering contract, and is the ONLY
-// prefix inside the WS drift gate (goldens + Zod schemas + contract tests). A
-// whisper is an ephemeral platform message, structurally identical to chat, so it
-// follows the chat/emote precedent: ZERO drift-gate touchpoints (no golden JSON,
-// no Zod schema, no events_contract_test.go row — verified against every other
-// system:* sibling here). The complete contract is two files: this one and
-// client/src/shared/types/wsEvents.ts.
 const ActionWhisper = "action:whisper"
 const SystemWhisper = "system:whisper"
 
-// Whisper error events — all sent to the SENDER only (never the target). Like
-// every error:* they are outside the drift gate.
-//
-//	ErrorNotFriends              — target is not an accepted friend (or unknown username)
-//	ErrorWhisperBlockedInGame    — target is in the sender's current room/match (anti-collusion)
-//	ErrorWhisperRecipientOffline — target is not currently connected (whispers are real-time only)
 const ErrorNotFriends = "error:not_friends"
 const ErrorWhisperBlockedInGame = "error:whisper_blocked_in_game"
 const ErrorWhisperRecipientOffline = "error:whisper_recipient_offline"
@@ -639,44 +379,21 @@ type WhisperRequest struct {
 	Text       string `json:"text"`
 }
 
-// WhisperPayload is the typed payload for SystemWhisper (server → client). The
-// SAME payload is delivered to BOTH participants — the recipient AND the sender
-// (own-echo, so the sender's thread renders their own message). The client keys
-// the thread by whichever participant is NOT the local user.
+// WhisperPayload is the typed payload for SystemWhisper, delivered to both the recipient and the sender.
+// The client keys the thread by whichever participant is not the local user.
 type WhisperPayload struct {
 	FromUserID   uint   `json:"fromUserId"`
 	FromUsername string `json:"fromUsername"`
 	ToUserID     uint   `json:"toUserId"`
 	ToUsername   string `json:"toUsername"`
 	Message      string `json:"message"`
-	Timestamp    string `json:"timestamp"` // ISO 8601 (RFC3339Nano) UTC
+	Timestamp    string `json:"timestamp"`
 }
 
-// --- Room invite events (Story 11.5) ---
-
-// SystemRoomInvite is a per-user push to a friend who has been invited into a
-// waiting room (Story 11.5 AC2). Like every system:* push it is best-effort and
-// online-only — SendToUser is an unqueued no-op for offline users, and there is
-// no offline inbox. That is correct here: an invite is a real-time popup with a
-// TTL, so an undelivered invite simply is never actioned.
-//
-// The system: prefix is a deliberate deviation from the epic AC's literal
-// event:room_invite (Story 11.5 D1, PO-confirmed 2026-08-14). A room invite is a
-// pre-match, room-level platform push — structurally identical to
-// system:honor_ejected / system:room_updated — whereas event:* is reserved for
-// in-match game state and is the ONLY prefix inside the WS drift gate. So this
-// event has ZERO drift-gate touchpoints: no golden file, no Zod schema, no
-// events_contract_test.go row. The complete contract is two files: this one and
-// client/src/shared/types/wsEvents.ts.
 const SystemRoomInvite = "system:room_invite"
 
 // RoomInvitePayload is the typed payload for SystemRoomInvite events.
-//
-// IsHostInvite is the field the client branches on: true means the inviter was
-// the room OWNER and a server-issued one-time grant will carry the invitee past
-// the password gate (so no password prompt is shown). It is NOT a bypass token —
-// the authoritative grant lives server-side in the InviteRegistry and is looked
-// up by the authenticated userID. A tampered client flag changes nothing.
+// IsHostInvite only drives the UI; the real password-gate grant lives server-side in the InviteRegistry.
 type RoomInvitePayload struct {
 	InviteID        uint64 `json:"inviteId"`
 	RoomID          uint   `json:"roomId"`
@@ -686,16 +403,9 @@ type RoomInvitePayload struct {
 	CoinBuyIn       int    `json:"coinBuyIn"`
 	IsPrivate       bool   `json:"isPrivate"`
 	IsHostInvite    bool   `json:"isHostInvite"`
-	// MinHonor is the room's honor floor (0 = ungated). It rides along so the
-	// invite popup can render the SPECIFIC "you need N honor" message on a
-	// rejected accept, exactly like every other join entry point. Without it the
-	// invitee is the only joiner in the app who gets the numberless generic copy.
-	MinHonor int `json:"minHonor"`
-	// ExpiresAt is an ABSOLUTE ISO 8601 (RFC3339) UTC timestamp, never a relative
-	// duration — same discipline as the turn timer.
-	ExpiresAt string `json:"expiresAt"`
+	MinHonor        int    `json:"minHonor"`
+	ExpiresAt       string `json:"expiresAt"`
 }
 
-// --- General error events ---
 const SystemError = "system:error"
 const ErrorUnknownEvent = "error:unknown_event"

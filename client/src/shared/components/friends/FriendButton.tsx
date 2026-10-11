@@ -16,40 +16,15 @@ import type { FriendshipStatus } from "@/shared/types/apiTypes";
 import { RemoveFriendDialog } from "./RemoveFriendDialog";
 
 interface FriendButtonProps {
-  /** The subject whose profile is being viewed (the validated /players/:id id). */
   userId: number;
-  /** The subject's username, interpolated into the remove-friend confirm dialog. */
   username: string;
-  /**
-   * Drops the profile-page `my-5` rhythm (see the wrapper below) for surfaces
-   * that own their own spacing — the per-player action rows in the match-stats
-   * card, where 20px of vertical margin per row would shred the list. Layout
-   * only: every state, label and handler is unchanged.
-   */
   compact?: boolean;
-  /**
-   * Offer "Remove friend" in the `friends` state. FALSE inside the in-match
-   * overlay: the confirm it opens is a shadcn Dialog at the primitive's `z-50`,
-   * while the match-result panel sits at `Z.PROMPT` (74) — the confirm would
-   * paint BEHIND the overlay, invisible and unclickable, with the pending-guard
-   * locking every dismissal path. Suppressing the affordance is the honest fix;
-   * unfriending belongs on the profile, not mid-celebration.
-   */
   allowRemove?: boolean;
 }
 
 /**
- * Friendship action on a public profile (Story 11.2, AC7). Drives its label and
- * action entirely from GET /friends/status/:id, so EVERY state maps to a real
- * affordance — it is never a dead/placeholder button:
- *
- *   none             -> "Add Friend"        (sends a request)
- *   pending_outgoing -> "Request sent"      (disabled)
- *   pending_incoming -> "Accept request"    (accepts) + "Decline" (declines)
- *   friends          -> "Friends" (disabled, with a check) + "Remove friend"
- *                       (opens a confirm dialog, then unfriends)
- *
- * Never rendered for the viewer's own profile.
+ * Friendship action for another player, driven by their friendship status so every state maps to a real action.
+ * Pass allowRemove={false} on overlays above z-50, where the remove confirm dialog would render hidden behind them.
  */
 export function FriendButton({
   userId,
@@ -67,13 +42,8 @@ export function FriendButton({
   const removeMutation = useRemoveFriendMutation();
   const [removeOpen, setRemoveOpen] = useState(false);
 
-  // Defensive self-guard: the public page is not reached for the viewer's own id
-  // in practice, but never show the button there.
   if (viewer && viewer.id === userId) return null;
 
-  // While the status loads, hold the space with a neutral skeleton — never a
-  // labelled button, which would assert a false relationship ("Add friend" on an
-  // existing friend) during the load.
   if (status.isPending) {
     return (
       <div
@@ -84,10 +54,6 @@ export function FriendButton({
     );
   }
 
-  // On a status-query error we don't know the relationship; default to the
-  // actionable "none" affordance rather than a permanently dead disabled button —
-  // the server is authoritative and rejects a duplicate with a 409 (surfaced by
-  // the mutation's onError toast).
   const { status: state, requestId }: FriendshipStatus = status.data ?? {
     status: "none",
     requestId: null,
@@ -107,8 +73,6 @@ export function FriendButton({
                 variant="outline"
                 size="sm"
                 data-testid="friend-button-remove"
-                // requestId === null should be impossible for "friends", but never
-                // offer a confirm that could fire without a row id.
                 disabled={removeMutation.isPending || requestId === null}
                 onClick={() => setRemoveOpen(true)}
               >
@@ -122,11 +86,6 @@ export function FriendButton({
                   if (removeMutation.isPending || requestId === null) return;
                   removeMutation.mutate(
                     { requestId, userId },
-                    // Close on settled: on success the invalidated status query
-                    // flips the button to "Add friend"; on error (e.g. the other
-                    // party won the both-unfriend race → 404) the hook's toast
-                    // reports it and a lingering dialog would just restate a
-                    // stale question.
                     { onSettled: () => setRemoveOpen(false) },
                   );
                 }}
@@ -147,8 +106,6 @@ export function FriendButton({
       );
       break;
     case "pending_incoming": {
-      // Accept and Decline act on the same request row — never let them race:
-      // either one in flight disables both.
       const actionPending = acceptMutation.isPending || declineMutation.isPending;
       content = (
         <>
@@ -162,9 +119,6 @@ export function FriendButton({
           >
             <Check /> {t("friends.acceptRequest")}
           </Button>
-          {/* Deliberate asymmetry: decline needs no confirm dialog (mirrors the
-              lobby requests list — the sender can simply re-send), while
-              remove-friend destroys an established relationship and gets one. */}
           <Button
             variant="outline"
             size="sm"
@@ -181,7 +135,6 @@ export function FriendButton({
       break;
     }
     default:
-      // "none"
       content = (
         <Button
           size="sm"
@@ -195,10 +148,6 @@ export function FriendButton({
   }
 
   return (
-    // my-5 (not mt-only): the row needs the same 20px gap below it as above,
-    // otherwise it sits flush against whatever follows on the public profile —
-    // the streak callout has no top margin of its own. `compact` drops it for
-    // hosts that space their own rows.
     <div
       className={`flex flex-wrap items-center gap-2 ${compact ? "" : "my-5"}`}
       data-testid="friend-button"

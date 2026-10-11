@@ -7,7 +7,6 @@ import { SidePanel } from "./SidePanel";
 
 type MilestonesProps = {
   capots: number;
-  /** Lifetime total game points scored across completed matches (Story 11.3). */
   careerPoints: number;
   bestHand?: BestHand;
   avgMatchSeconds: number;

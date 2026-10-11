@@ -11,10 +11,6 @@ import { makeRoom, makeRoomDetail, makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
-// Story 10.3 — bot seating in the room lobby: owner add/remove affordances,
-// localized seat-derived identity, swap-flow participation, and the start
-// gate counting bot-covered seats.
-
 const mockNavigate = vi.fn();
 vi.mock("react-router", async () => {
   const actual = await vi.importActual("react-router");
@@ -39,9 +35,6 @@ vi.mock("@/shared/api/rooms", () => ({
   transferOwnership: vi.fn(),
 }));
 
-// The room's last-match panel reads GET /rooms/:id/last-match. Rejected here so
-// these suites never touch the network; the action-bar button stays unrendered,
-// which is what a room with no viewer-played match looks like.
 vi.mock("@/shared/api/matches", () => ({
   getRoomLastMatch: vi.fn(() => Promise.reject(new Error("no last match"))),
 }));
@@ -173,7 +166,6 @@ describe("RoomPage bot seating", () => {
     await waitFor(() => expect(screen.getByTestId("player-seat-2")).toBeInTheDocument());
     expect(screen.getByTestId("bot-name-2")).toHaveTextContent("Bot 3");
     expect(screen.getByTestId("bot-badge-2")).toBeInTheDocument();
-    // The avatar renders the bot glyph, not a name initial.
     expect(
       within(screen.getByTestId("player-seat-2")).getByTestId("avatar-icon"),
     ).toBeInTheDocument();
@@ -190,7 +182,6 @@ describe("RoomPage bot seating", () => {
     await userEvent.click(screen.getByTestId("add-bot-seat-1"));
 
     await waitFor(() => expect(mockAddBot).toHaveBeenCalledWith(1, 1));
-    // Players from the response land in the store — the bot tile renders.
     expect(await screen.findByTestId("bot-name-1")).toHaveTextContent("Bot 2");
   });
 
@@ -222,7 +213,6 @@ describe("RoomPage bot seating", () => {
     await waitFor(() => expect(screen.getByTestId("remove-bot-2")).toBeInTheDocument());
     await userEvent.click(screen.getByTestId("remove-bot-2"));
 
-    // Confirm dialog opens with the localized bot name, then confirm.
     expect(await screen.findByTestId("remove-bot-dialog-title")).toHaveTextContent("Bot 3");
     await userEvent.click(screen.getByTestId("remove-bot-confirm"));
 
@@ -251,7 +241,6 @@ describe("RoomPage bot seating", () => {
 
     renderRoomPage();
 
-    // Click the bot tile (swap source), then an empty seat (target).
     await waitFor(() => expect(screen.getByTestId("player-seat-1")).toBeInTheDocument());
     await userEvent.click(screen.getByTestId("player-seat-1"));
     await userEvent.click(screen.getByTestId("player-seat-3"));
@@ -269,8 +258,8 @@ describe("RoomPage bot seating", () => {
     renderRoomPage();
 
     await waitFor(() => expect(screen.getByTestId("player-seat-1")).toBeInTheDocument());
-    await userEvent.click(screen.getByTestId("player-seat-1")); // bot = source
-    await userEvent.click(screen.getByTestId("player-seat-0")); // own seat = target
+    await userEvent.click(screen.getByTestId("player-seat-1"));
+    await userEvent.click(screen.getByTestId("player-seat-0"));
 
     await waitFor(() => expect(mockSwapSeats).toHaveBeenCalledWith(1, 1, 0));
   });
@@ -290,8 +279,8 @@ describe("RoomPage bot seating", () => {
     renderRoomPage();
 
     await waitFor(() => expect(screen.getByTestId("player-seat-1")).toBeInTheDocument());
-    await userEvent.click(screen.getByTestId("player-seat-1")); // bot = source
-    await userEvent.click(screen.getByTestId("player-seat-2")); // bob = target
+    await userEvent.click(screen.getByTestId("player-seat-1"));
+    await userEvent.click(screen.getByTestId("player-seat-2"));
 
     await waitFor(() => expect(mockSwapSeats).toHaveBeenCalledWith(1, 1, 2));
   });
@@ -311,8 +300,8 @@ describe("RoomPage bot seating", () => {
     renderRoomPage();
 
     await waitFor(() => expect(screen.getByTestId("player-seat-2")).toBeInTheDocument());
-    await userEvent.click(screen.getByTestId("player-seat-2")); // bob = source
-    await userEvent.click(screen.getByTestId("player-seat-1")); // bot = target
+    await userEvent.click(screen.getByTestId("player-seat-2"));
+    await userEvent.click(screen.getByTestId("player-seat-1"));
 
     await waitFor(() => expect(mockSwapSeats).toHaveBeenCalledWith(1, 2, 1));
   });

@@ -37,10 +37,9 @@ export function useCreateRoomMutation() {
   });
 }
 
+/** Join a room, passing the password only for private rooms. */
 export function useJoinRoomMutation() {
   const queryClient = useQueryClient();
-  // Story 9.6: threads an optional private-room password through to joinRoom.
-  // Public-room joins pass `{ id }` with no password (unchanged request shape).
   return useMutation<Room, Error, { id: number; password?: string }>({
     mutationFn: ({ id, password }) => joinRoom(id, password),
     onSuccess: () => {
@@ -50,12 +49,8 @@ export function useJoinRoomMutation() {
 }
 
 /**
- * Invite a friend into a waiting room (Story 11.5, AC2). On success the room's
- * invitable-friends roster is invalidated so the just-invited friend's row
- * re-renders against fresh availability (they may now be mid-join).
- *
- * Errors are surfaced by the caller — the panel renders them inline per row
- * rather than as a page-level toast.
+ * Invite a friend into a waiting room and refresh its invitable-friends roster.
+ * Errors are left to the caller, which renders them inline per row.
  */
 export function useInviteToRoomMutation() {
   const queryClient = useQueryClient();
@@ -67,9 +62,7 @@ export function useInviteToRoomMutation() {
   });
 }
 
-// Declining is fire-and-forget: the popup closes immediately either way, since a
-// failed void only means the invite lapses on its own TTL instead of at once.
-// Blocking the dismissal on a network round-trip would be a worse trade.
+/** Decline a room invite fire-and-forget; a failure only means the invite lapses on its own TTL. */
 export function useDeclineRoomInviteMutation() {
   return useMutation<void, Error, number>({
     mutationFn: (roomId) => declineRoomInvite(roomId),
@@ -154,7 +147,7 @@ export function useSwapSeatsMutation() {
   });
 }
 
-// Owner privacy edit (Story 9.6): set/change the password or revert to public.
+/** Set or change the room password, or revert the room to public. */
 export function useUpdateRoomPrivacyMutation() {
   const queryClient = useQueryClient();
   return useMutation<Room, Error, { roomId: number; isPrivate: boolean; password?: string }>({

@@ -103,24 +103,20 @@ func errorCodeOf(t *testing.T, raw []byte) string {
 // the lobby refresh.
 func TestReturnToRoom_FirstReturn_ReopensAndClearsBots(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
-	// owner=100 at seat 0, human 200 at seat 1; bots fill seats 2 and 3.
 	seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, []int{2, 3})
 
 	rec := doReturnToRoom(e, "1", validToken(100))
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// Room reopened.
 	r, err := repo.FindByID(1)
 	require.NoError(t, err)
 	require.NotNil(t, r)
 	assert.Equal(t, "waiting", r.Status)
 
-	// Bots cleared.
 	bots, err := repo.FindBotsByRoomID(1)
 	require.NoError(t, err)
 	assert.Empty(t, bots)
 
-	// Human seats preserved.
 	players, err := repo.FindPlayersByRoomID(1)
 	require.NoError(t, err)
 	require.Len(t, players, 2)
@@ -128,9 +124,6 @@ func TestReturnToRoom_FirstReturn_ReopensAndClearsBots(t *testing.T) {
 		require.NotNil(t, p.Seat, "returner %d lost their seat", p.UserID)
 	}
 
-	// Broadcasts: one system:bot_removed per cleared seat, then a
-	// system:player_returned for the returner (v2), all room-scoped; plus a
-	// lobby-wide system:room_updated.
 	require.Len(t, broadcaster.calls, 3)
 	assert.Equal(t, "system:bot_removed", msgTypeOf(t, broadcaster.calls[0].msg))
 	assert.Equal(t, "system:bot_removed", msgTypeOf(t, broadcaster.calls[1].msg))
@@ -138,7 +131,6 @@ func TestReturnToRoom_FirstReturn_ReopensAndClearsBots(t *testing.T) {
 	require.Len(t, broadcaster.allCalls, 1)
 	assert.Equal(t, "system:room_updated", msgTypeOf(t, broadcaster.allCalls[0].msg))
 
-	// Response carries the reopened room detail (humans only — bots gone).
 	var resp map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	var detail room.RoomDetailResponse
@@ -154,21 +146,16 @@ func TestReturnToRoom_FirstReturn_ReopensAndClearsBots(t *testing.T) {
 func TestReturnToRoom_AlreadyWaiting_Idempotent(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
 	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, []int{2, 3})
-	r.Status = "waiting" // already reopened by a prior returner
+	r.Status = "waiting"
 
 	rec := doReturnToRoom(e, "1", validToken(200))
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// Still waiting; bots left untouched (only the first reopen clears them).
 	assert.Equal(t, "waiting", r.Status)
 	bots, err := repo.FindBotsByRoomID(1)
 	require.NoError(t, err)
 	assert.Len(t, bots, 2)
 
-	// The reopen side effects stay silent — no bot_removed fan-out, no redundant
-	// lobby room_updated (the first returner already broadcast both). But the
-	// returner is still announced present: a single system:player_returned fires
-	// (v2) so the owner's "waiting to return" gate updates.
 	require.Len(t, broadcaster.calls, 1)
 	assert.Equal(t, "system:player_returned", msgTypeOf(t, broadcaster.calls[0].msg))
 	assert.Empty(t, broadcaster.allCalls)
@@ -180,11 +167,10 @@ func TestReturnToRoom_NonMember_Rejected(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
 	seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, []int{2, 3})
 
-	rec := doReturnToRoom(e, "1", validToken(999)) // 999 is not in the room
+	rec := doReturnToRoom(e, "1", validToken(999))
 	require.Equal(t, http.StatusNotFound, rec.Code)
 	assert.Equal(t, "NOT_IN_ROOM", errorCodeOf(t, rec.Body.Bytes()))
 
-	// Room untouched, nothing broadcast.
 	r, err := repo.FindByID(1)
 	require.NoError(t, err)
 	assert.Equal(t, "completed", r.Status)
@@ -217,7 +203,6 @@ func TestReturnToRoom_MarksPresentAndBroadcasts(t *testing.T) {
 	detail := decodeRoomDetail(t, rec.Body.Bytes())
 	assert.Equal(t, []uint{100}, detail.ReturnedUserIds, "returner should be present")
 
-	// No bots to clear → the only room-scoped broadcast is player_returned.
 	require.Len(t, broadcaster.calls, 1)
 	assert.Equal(t, "system:player_returned", msgTypeOf(t, broadcaster.calls[0].msg))
 	var payload struct {
@@ -228,7 +213,6 @@ func TestReturnToRoom_MarksPresentAndBroadcasts(t *testing.T) {
 	assert.Equal(t, uint(1), payload.RoomID)
 	assert.Equal(t, uint(100), payload.UserID)
 
-	// A second returner accumulates (sorted ascending for deterministic payloads).
 	rec2 := doReturnToRoom(e, "1", validToken(200))
 	require.Equal(t, http.StatusOK, rec2.Code)
 	assert.Equal(t, []uint{100, 200}, decodeRoomDetail(t, rec2.Body.Bytes()).ReturnedUserIds)
@@ -263,8 +247,6 @@ func TestReturnToRoom_LeaveRemovesPresence(t *testing.T) {
 	assert.Equal(t, []uint{100}, detail.ReturnedUserIds, "leaver should be dropped from presence")
 }
 
-// --- Story 9.3: return-time affordability gate ---
-
 // AC1: a returner who can still afford the buy-in reopens the room normally —
 // the gate is transparent on the solvent path.
 func TestReturnToRoom_SufficientBalance_Proceeds(t *testing.T) {
@@ -285,7 +267,7 @@ func TestReturnToRoom_SufficientBalance_Proceeds(t *testing.T) {
 // AC1: an insolvent returner is rejected with 409, their seat is freed, and the
 // room + lobby are told (system:player_left + system:room_updated).
 func TestReturnToRoom_Insolvent_RejectedAndSeatFreed(t *testing.T) {
-	wallet := &stubWallet{balance: 0} // returner can no longer afford the buy-in
+	wallet := &stubWallet{balance: 0}
 	e, repo, broadcaster, _ := setupCoinTestBC(nil, wallet)
 	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
 	r.CoinBuyIn = 500
@@ -294,21 +276,17 @@ func TestReturnToRoom_Insolvent_RejectedAndSeatFreed(t *testing.T) {
 	require.Equal(t, http.StatusConflict, rec.Code)
 	assert.Equal(t, "INSUFFICIENT_COINS", errorCodeOf(t, rec.Body.Bytes()))
 
-	// 200's seat is freed; only the owner remains.
 	players, _ := repo.FindPlayersByRoomID(1)
 	require.Len(t, players, 1)
 	assert.Equal(t, uint(100), players[0].UserID)
 
-	// Room stays completed (an insolvent return never reopens it).
 	persisted, _ := repo.FindByID(1)
 	assert.Equal(t, "completed", persisted.Status)
 
-	// The room hears player_left; the lobby hears room_updated.
 	require.Len(t, broadcastsOfType(t, broadcaster, "system:player_left"), 1)
 	require.Len(t, broadcaster.allCalls, 1)
 	assert.Equal(t, "system:room_updated", msgTypeOf(t, broadcaster.allCalls[0].msg))
 
-	// The ejected returner gets a per-user system:insolvent_ejected with numbers.
 	ejects := broadcastsOfType(t, broadcaster, "system:insolvent_ejected")
 	require.Len(t, ejects, 1)
 	assert.Equal(t, []uint{200}, ejects[0].userIDs)
@@ -327,7 +305,7 @@ func TestReturnToRoom_Insolvent_RejectedAndSeatFreed(t *testing.T) {
 func TestReturnToRoom_ZeroBuyIn_NeverBars(t *testing.T) {
 	wallet := &stubWallet{balance: 0}
 	e, repo, _, _ := setupCoinTestBC(nil, wallet)
-	seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil) // CoinBuyIn defaults to 0
+	seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
 
 	rec := doReturnToRoom(e, "1", validToken(200))
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -339,14 +317,11 @@ func TestReturnToRoom_ZeroBuyIn_NeverBars(t *testing.T) {
 // AC4: an insolvent OWNER returning hands ownership to the first present-and-
 // solvent seated human.
 func TestReturnToRoom_InsolventOwner_TransfersOwnership(t *testing.T) {
-	// Owner (100) reads as balance 0 (GetBalance); candidate 200 is solvent
-	// (GetBalances map). Both differ because the gate reads GetBalance and the
-	// heir check reads GetBalances.
 	wallet := &stubWallet{balance: 0, balances: map[uint]int{200: 5000}}
 	e, repo, _, reg := setupCoinTestBC(nil, wallet)
 	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)
 	r.CoinBuyIn = 500
-	reg.Add(1, 200) // 200 has returned (present)
+	reg.Add(1, 200)
 
 	rec := doReturnToRoom(e, "1", validToken(100))
 	require.Equal(t, http.StatusConflict, rec.Code)
@@ -362,7 +337,6 @@ func TestReturnToRoom_InsolventOwner_TransfersOwnership(t *testing.T) {
 // AC4: an insolvent owner with no present-and-solvent heir closes the room and
 // the still-seated members are told via system:room_closed_insolvent.
 func TestReturnToRoom_InsolventOwner_NoHeir_ClosesRoom(t *testing.T) {
-	// 200 is solvent but NOT present (never returned), so not a valid heir.
 	wallet := &stubWallet{balance: 0, balances: map[uint]int{200: 5000}}
 	e, repo, broadcaster, _ := setupCoinTestBC(nil, wallet)
 	r := seedFinishedRoom(repo, 100, map[uint]int{100: 0, 200: 1}, nil)

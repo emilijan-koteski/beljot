@@ -31,8 +31,6 @@ vi.mock("@/shared/api/matches", () => ({
   getUserMatches: (...args: unknown[]) => mockGetUserMatches(...args),
 }));
 
-// Story 13.3: SeasonSection is in the page tree, so the archive read must be
-// mocked (default: nothing to show — the section stays out of the DOM).
 const mockGetSeasonArchive = vi.fn();
 vi.mock("@/shared/api/season", () => ({
   getSeasonArchive: (...args: unknown[]) => mockGetSeasonArchive(...args),
@@ -62,8 +60,6 @@ function publicProfileFixture(
     isNewPlayer: false,
     honorTrendDelta: 0,
     honorTrendDirection: "flat",
-    // Story 13.3: null is the wire default for a subject with no standing in
-    // the active season.
     seasonRank: null,
     ...overrides,
   };
@@ -133,8 +129,6 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     mockGetSeasonArchive.mockResolvedValue({ items: [] });
     mockGetCareer.mockResolvedValue(careerFixture());
     mockGetUserMatches.mockResolvedValue(emptyMatches());
-    // A viewer with a DISTINCT honor from the subject, so a hydration leak would
-    // be obvious. This is the inverse of ProfilePage's honor-hydration test.
     useAuthStore.setState({
       token: "test-token",
       user: makeUser({ id: 1, honorScore: 90, honorTier: "trusted", isNewPlayer: false }),
@@ -150,7 +144,6 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     await waitFor(() => expect(screen.getByTestId("public-profile-page")).toBeInTheDocument());
     expect(mockGetPublicProfile).toHaveBeenCalledWith(2);
     expect(screen.getByTestId("profile-username")).toHaveTextContent("subjectplayer");
-    // The honor band shows the SUBJECT's recomputed score, not the viewer's 90.
     expect(screen.getByTestId("profile-honor")).toHaveAttribute("data-honor", "30");
   });
 
@@ -187,9 +180,6 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     renderAt("2");
 
     await waitFor(() => expect(screen.getByTestId("public-profile-page")).toBeInTheDocument());
-    // cardDeckPreference is absent from PublicProfileResponse by construction,
-    // so a picker here could only ever edit the VIEWER's own deck from somebody
-    // else's page. It must be structurally absent, not merely disabled.
     expect(screen.queryByTestId("profile-card-deck")).not.toBeInTheDocument();
     expect(screen.queryByTestId("profile-deck-option-french")).not.toBeInTheDocument();
     expect(screen.queryByTestId("profile-deck-option-croatian")).not.toBeInTheDocument();
@@ -201,8 +191,6 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     renderAt("2");
 
     await waitFor(() => expect(screen.getByTestId("public-profile-page")).toBeInTheDocument());
-    // A switch here could only ever flip the VIEWER's own audio from somebody
-    // else's page — structurally absent, not merely disabled.
     expect(screen.queryByTestId("profile-audio")).not.toBeInTheDocument();
     expect(screen.queryByTestId("profile-sound-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("profile-music-toggle")).not.toBeInTheDocument();
@@ -227,8 +215,6 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     renderAt("2");
 
     await waitFor(() => expect(screen.getByTestId("public-profile-page")).toBeInTheDocument());
-    // The viewer's own honor in the store is untouched — the self-only hydration
-    // effect is structurally absent from this page (D5).
     expect(useAuthStore.getState().user?.honorScore).toBe(90);
     expect(useAuthStore.getState().user?.honorTier).toBe("trusted");
   });
@@ -269,13 +255,9 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
 
     const history = await screen.findByTestId("match-history-list");
     expect(within(history).getAllByText("subjectplayer").length).toBeGreaterThan(0);
-    // The subject is NOT the viewer, so no "You" marker anywhere in the row.
     expect(within(history).queryByText("You")).not.toBeInTheDocument();
   });
 
-  // Story 13.3 INVERTED the old graceful-absence test: the reserved slot is now
-  // filled — with the SUBJECT's rank chip and archive — while the
-  // hidden-when-empty contract survives as the variant below.
   it("renders the subject's seasonal rank chip and prior-season archive", async () => {
     mockGetPublicProfile.mockResolvedValue(
       publicProfileFixture({
@@ -305,12 +287,9 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     expect(chip.textContent).toContain("2026 Q3");
     const list = await screen.findByTestId("prior-season-archive");
     expect(list.querySelectorAll('[data-testid="season-archive-row"]')).toHaveLength(1);
-    // The archive is the SUBJECT's, keyed on the path id — never the viewer's.
     expect(mockGetSeasonArchive).toHaveBeenCalledWith(2);
   });
 
-  // The hidden-when-empty variant of the same contract: a subject with no
-  // season history renders NO season surface at all — never an empty state.
   it("renders no seasonal-rank section for a subject without season history", async () => {
     mockGetPublicProfile.mockResolvedValue(publicProfileFixture({ seasonRank: null }));
     mockGetSeasonArchive.mockResolvedValue({ items: [] });
@@ -340,8 +319,6 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
   });
 
   it("renders not-found for a non-canonical numeric id (1e2) without querying the API", async () => {
-    // Number("1e2") === 100, but the strict guard rejects the non-canonical
-    // spelling so it cannot alias to a real-but-different subject (player 100).
     renderAt("1e2");
 
     expect(screen.getByTestId("public-profile-not-found")).toBeInTheDocument();
@@ -357,16 +334,10 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     renderAt("2");
 
     const empty = await screen.findByTestId("match-history-empty");
-    // Third-person copy about the subject, not the viewer's "Quick Play" onboarding.
     expect(empty).toHaveTextContent(/hasn't played any matches/i);
-    // The self-only "go play" CTA must never render on someone else's profile.
     expect(screen.queryByTestId("match-history-empty-cta")).not.toBeInTheDocument();
   });
 
-  // Every surface here is written for the SELF page by default, where the reader
-  // is the subject. On a public profile the reader is a visitor, so second-person
-  // copy told them to play 5 matches / to shake off a losing run that belongs to
-  // someone else entirely.
   it("writes the honour newcomer hint about the subject, not at the viewer", async () => {
     mockGetPublicProfile.mockResolvedValue(publicProfileFixture({ isNewPlayer: true }));
 

@@ -1,8 +1,5 @@
 /**
- * Top-center wordmark — "Beljot.online" in the table's serif tone.
- *
- * The brand is fixed (not localized) per design intent. The `.online` suffix
- * is rendered in the brass accent so the eye lands on the domain.
+ * Top-center "Beljot.online" wordmark, intentionally not localized, with the suffix in brass.
  */
 export function Wordmark() {
   return (

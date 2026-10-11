@@ -9,9 +9,6 @@ import { WinLoseBar } from "./WinLoseBar";
 
 type PartnerSpotlightProps = {
   partners: PartnerStat[];
-  /** False on ANOTHER player's profile (Story 11.3): the empty state tells the
-   *  reader to go play a few matches, which only makes sense when the reader is
-   *  the subject. Selects the third-person `emptyPublic` copy. */
   subjectIsSelf?: boolean;
 };
 
@@ -20,9 +17,12 @@ function winRate(wins: number, total: number): number {
   return total === 0 ? 0 : Math.round((wins / total) * 100);
 }
 
-/** Avatar + name + together-stats for the featured partner — shared by the
- *  linked wrapper and the non-linked fallback for soft-deleted users. The
- *  hover underline only fires inside the `group`-classed Link. */
+/** Soft-deleted partners arrive with a valid id but an empty username; linking them would 404. */
+function isSoftDeleted(partner: PartnerStat): boolean {
+  return partner.username === "";
+}
+
+/** Avatar, name and together-stats for the featured partner, linked or not. */
 function FeaturedPartner({ featured }: { featured: PartnerStat }) {
   const { t } = useTranslation();
   return (
@@ -76,11 +76,7 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
       testId="profile-partners"
     >
       <div className="mb-3.5 flex flex-col gap-2">
-        {/* Bots ARE excluded server-side (NULL seat ids never reach this list),
-            but soft-deleted users are not: they arrive with a valid userId and
-            an empty username. Linking them would 404, so the link is gated on
-            a non-empty username. */}
-        {featured.username !== "" ? (
+        {!isSoftDeleted(featured) ? (
           <Link
             to={`/players/${featured.userId}`}
             aria-label={t("friends.viewProfileAria", { username: featured.username })}
@@ -104,8 +100,7 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
               className="bg-surface-elevated border-border flex flex-col gap-1.5 rounded-[10px] border px-2.5 py-2"
             >
               <div className="flex items-center gap-2.5">
-                {/* Same soft-deleted guard as the featured partner above. */}
-                {p.username !== "" ? (
+                {!isSoftDeleted(p) ? (
                   <Link
                     to={`/players/${p.userId}`}
                     aria-label={t("friends.viewProfileAria", { username: p.username })}

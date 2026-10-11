@@ -17,8 +17,7 @@ func NewWalletHandler(service *Service) *WalletHandler {
 	return &WalletHandler{service: service}
 }
 
-// getUserID reads the authenticated user id the auth middleware stored on the
-// echo context. Mirrors user.getUserID (unexported there, so duplicated here).
+// getUserID reads the authenticated user id the auth middleware stored on the echo context.
 func getUserID(c echo.Context) (uint, error) {
 	val := c.Get("userID")
 	if val == nil {
@@ -31,10 +30,8 @@ func getUserID(c echo.Context) (uint, error) {
 	return userID, nil
 }
 
-// ProcessDailyLogin handles POST /api/v1/wallet/daily-login. It is the single
-// grant point for the daily bonus: idempotent and safe to call on every app
-// bootstrap (and to retry), it grants at most once per UTC day and returns the
-// outcome in the { "data": ... } envelope.
+// ProcessDailyLogin handles POST /api/v1/wallet/daily-login, granting the bonus at most once per UTC day.
+// It is idempotent and safe to call on every app bootstrap.
 func (h *WalletHandler) ProcessDailyLogin(c echo.Context) error {
 	userID, err := getUserID(c)
 	if err != nil {

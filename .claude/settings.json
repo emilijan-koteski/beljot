@@ -178,6 +178,44 @@
     ]
   },
 
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/comment_policy.py\" pretool",
+            "timeout": 15,
+            "statusMessage": "Checking comment policy"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/comment_policy.py\" stop",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/comment_policy.py\" stop",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  },
+
   "attribution": {
     "commit": "",
     "pr": ""

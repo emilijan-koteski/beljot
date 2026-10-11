@@ -7,8 +7,6 @@ import { useRoomStore } from "./roomStore";
 describe("roomStore", () => {
   beforeEach(() => {
     useRoomStore.getState().reset();
-    // reset() deliberately preserves roomEjection (Story 9.3), so clear it
-    // explicitly between tests to keep them isolated.
     useRoomStore.getState().setRoomEjection(null);
   });
 
@@ -164,7 +162,6 @@ describe("roomStore", () => {
     const store = useRoomStore.getState();
     store.addBot(10, 1, "teamB");
     store.addBot(10, 3, "teamB");
-    // Duplicate seat is a no-op (e.g. REST response raced the WS event).
     store.addBot(10, 1, "teamB");
 
     const players = useRoomStore.getState().players;
@@ -208,10 +205,6 @@ describe("roomStore", () => {
   });
 
   it("applies the human↔bot swap event sequence (seat_updated, bot_removed, bot_added)", () => {
-    // Server order for an owner swapping bob (seat 2) with a bot (seat 1):
-    // system:seat_updated moves the human first, then system:bot_removed
-    // clears the bot's old seat and system:bot_added lands it on the
-    // human's vacated one.
     const store = useRoomStore.getState();
     store.addPlayer(
       {
@@ -256,8 +249,6 @@ describe("roomStore", () => {
       1,
     );
 
-    // A bot_added for a seat a human still occupies is stale/out-of-order —
-    // inserting would dual-occupy the seat in the store.
     useRoomStore.getState().addBot(10, 2, "teamA");
 
     const players = useRoomStore.getState().players;
@@ -268,7 +259,6 @@ describe("roomStore", () => {
   it("updatePlayerSeat never matches bot rows (all bots share userId 0)", () => {
     const store = useRoomStore.getState();
     store.addBot(10, 1, "teamB");
-    // A (hypothetical) seat update for userId 0 must not drag the bot along.
     useRoomStore.getState().updatePlayerSeat(0, 2, "teamA", 1);
 
     const players = useRoomStore.getState().players;
@@ -314,7 +304,7 @@ describe("roomStore", () => {
     const { markReturned } = useRoomStore.getState();
     markReturned(10);
     markReturned(20);
-    markReturned(10); // duplicate
+    markReturned(10);
     expect(useRoomStore.getState().returnedUserIds).toEqual([10, 20]);
   });
 
@@ -333,8 +323,6 @@ describe("roomStore", () => {
     expect(useRoomStore.getState().returnedUserIds).toEqual([]);
     expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
   });
-
-  // --- Room ejection (Story 9.3, widened by Story 9.8) ---
 
   it("setRoomEjection sets and clears the ejection notice", () => {
     useRoomStore.getState().setRoomEjection({
@@ -374,8 +362,6 @@ describe("roomStore", () => {
   });
 
   it("reset PRESERVES an honor-ejection notice too, not just the insolvency one", () => {
-    // The preservation is reason-agnostic by construction; pinned so a future
-    // narrowing of reset() cannot silently drop the honor branch.
     useRoomStore.getState().setRoomEjection({
       roomId: 7,
       buyIn: 0,
@@ -397,20 +383,15 @@ describe("roomStore", () => {
       reason: "roomClosed",
     });
     useRoomStore.getState().reset();
-    // Survives reset (RoomPage calls reset() on unmount while navigating to lobby).
     expect(useRoomStore.getState().roomEjection).toEqual({
       roomId: 7,
       buyIn: 500,
       balance: 100,
       reason: "roomClosed",
     });
-    // ...but other state is cleared as usual.
     expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
   });
 
-  // Story 11.5: an invite can land while the player is navigating out of a room,
-  // and RoomPage calls reset() on unmount — dropping it there would lose a live
-  // invite the player never got to answer.
   it("reset PRESERVES an in-flight room invite", () => {
     useRoomStore.getState().setRoomInvite(
       makeRoomInvite({

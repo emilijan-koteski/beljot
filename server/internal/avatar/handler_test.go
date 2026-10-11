@@ -36,8 +36,6 @@ const (
 
 var prefixPattern = regexp.MustCompile(`^avatars/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
-// --- fakes ----------------------------------------------------------------
-
 type storedObject struct {
 	contentType  string
 	cacheControl string
@@ -113,8 +111,6 @@ func (u *fakeUsers) key(id uint) *string {
 	defer u.mu.Unlock()
 	return u.keys[id]
 }
-
-// --- harness --------------------------------------------------------------
 
 // testErrorHandler mirrors main.go's appErrorHandler.
 func testErrorHandler(err error, c echo.Context) {
@@ -228,8 +224,6 @@ func pairKeys(prefix string) []string {
 	return []string{prefix + "/256.webp", prefix + "/128.webp"}
 }
 
-// --- happy paths ----------------------------------------------------------
-
 func TestUpload_StoresTwoImmutableWebPsAndReturnsBothURLs(t *testing.T) {
 	hs := newHarness(t)
 	rec := hs.upload(t, jpegBytes(t, gradientImage(1600, 1200)))
@@ -245,7 +239,6 @@ func TestUpload_StoresTwoImmutableWebPsAndReturnsBothURLs(t *testing.T) {
 	assert.Equal(t, testAssetsURL+"/"+*prefix+"/128.webp", *resp.AvatarURL)
 	assert.Equal(t, testAssetsURL+"/"+*prefix+"/256.webp", *resp.AvatarLargeURL)
 
-	// The literal wire keys: the typed decode above would follow a renamed tag.
 	var wire map[string]map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &wire))
 	keys := make([]string, 0, len(wire["data"]))
@@ -315,14 +308,12 @@ func TestRemove_WithoutAvatarIsStill204(t *testing.T) {
 func TestUpload_ExactlyTheFileCapIsAccepted(t *testing.T) {
 	hs := newHarness(t)
 	data := jpegBytes(t, gradientImage(400, 400))
-	data = append(data, make([]byte, MaxFileBytes-len(data))...) // trailing bytes after EOI
+	data = append(data, make([]byte, MaxFileBytes-len(data))...)
 	require.Len(t, data, MaxFileBytes)
 
 	rec := hs.upload(t, data)
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
-
-// --- rejections -----------------------------------------------------------
 
 func TestUpload_SomeoneElsesIDIsForbidden(t *testing.T) {
 	hs := newHarness(t)
@@ -357,14 +348,10 @@ func TestUpload_NoFilePart(t *testing.T) {
 func TestUpload_TooManyBytes(t *testing.T) {
 	hs := newHarness(t)
 
-	// The file part one byte over 2 MiB: the body is still under its cap, so
-	// the part limit is what trips.
 	rec := hs.upload(t, make([]byte, MaxFileBytes+1))
 	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
 	assert.Equal(t, "AVATAR_TOO_LARGE", errorCode(t, rec))
 
-	// A body over its cap before the avatar part is even reached: the
-	// MaxBytesReader is what trips.
 	body, ct := multipartBody(t,
 		part{field: "padding", data: make([]byte, maxBodyBytes)},
 		part{field: "avatar", data: pngBytes(t, gradientImage(200, 200))},
@@ -387,7 +374,7 @@ func TestUpload_WrongTypeIsDecidedByBytesNotName(t *testing.T) {
 	for name, data := range cases {
 		t.Run(name, func(t *testing.T) {
 			hs := newHarness(t)
-			rec := hs.upload(t, data) // always named photo.jpg, declared image/jpeg
+			rec := hs.upload(t, data)
 			assert.Equal(t, http.StatusUnsupportedMediaType, rec.Code)
 			assert.Equal(t, "AVATAR_UNSUPPORTED_TYPE", errorCode(t, rec))
 			assert.Empty(t, hs.store.puts)
@@ -409,8 +396,6 @@ func TestUpload_OversizedDimensionsAreRejectedBeforeDecode(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			hs := newHarness(t)
-			// The decode slot is taken: a request that needed it would wait and
-			// answer 503. A header-only rejection never asks for it.
 			for i := 0; i < decodeSlots; i++ {
 				hs.h.slots <- struct{}{}
 			}
@@ -429,7 +414,6 @@ func TestUpload_RateLimitedAfterTenPerRollingHour(t *testing.T) {
 	hs.h.now = func() time.Time { return clock }
 	img := pngBytes(t, gradientImage(160, 160))
 
-	// Rejected files spend no budget.
 	for i := 0; i < 12; i++ {
 		require.Equal(t, http.StatusBadRequest, hs.upload(t, pngBytes(t, gradientImage(64, 64))).Code)
 	}
@@ -443,10 +427,8 @@ func TestUpload_RateLimitedAfterTenPerRollingHour(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 	assert.Equal(t, "AVATAR_UPLOAD_RATE_LIMITED", errorCode(t, rec))
 
-	// DELETE is never limited.
 	assert.Equal(t, http.StatusNoContent, hs.do(t, http.MethodDelete, ownerID, nil, "").Code)
 
-	// The window rolls: an hour after the first counted upload, one slot frees.
 	clock = time.Date(2026, 9, 29, 11, 1, 0, 1, time.UTC)
 	assert.Equal(t, http.StatusOK, hs.upload(t, img).Code)
 	assert.Equal(t, http.StatusTooManyRequests, hs.upload(t, img).Code)
@@ -543,7 +525,7 @@ func TestUpload_OverBudgetIsRefusedBeforeTheBody(t *testing.T) {
 // once, and spends no budget.
 func TestUpload_OneInFlightPerUser(t *testing.T) {
 	hs := newHarness(t)
-	require.True(t, hs.h.admit.enter(ownerID)) // the upload already in flight
+	require.True(t, hs.h.admit.enter(ownerID))
 
 	rec := hs.upload(t, pngBytes(t, gradientImage(160, 160)))
 	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
@@ -641,8 +623,6 @@ func TestHandler_StorageDisabledAnswers503(t *testing.T) {
 	assert.Zero(t, users.calls)
 }
 
-// --- failures after the first write --------------------------------------
-
 func TestUpload_PutFailureLeavesNoOrphansAndNoKeyChange(t *testing.T) {
 	for _, failing := range []string{"/256.webp", "/128.webp"} {
 		t.Run(failing, func(t *testing.T) {
@@ -674,8 +654,6 @@ func TestUpload_KeyUpdateFailureDeletesTheFreshPair(t *testing.T) {
 	assert.Empty(t, hs.store.objects, "both fresh objects are deleted")
 	assert.ElementsMatch(t, hs.store.puts, hs.store.deletes)
 }
-
-// --- helpers --------------------------------------------------------------
 
 func TestNewPrefixIsAVersion4UUID(t *testing.T) {
 	seen := map[string]bool{}
@@ -719,7 +697,7 @@ func TestUploadLimiter_RefundHandsBackExactlyOneHit(t *testing.T) {
 	assert.True(t, l.allow(1, t0.Add(2*time.Minute)), "the refunded hit frees one upload")
 	assert.Len(t, l.hits[1], 1)
 
-	l.refund(1, first) // already gone: no-op
+	l.refund(1, first)
 	assert.Len(t, l.hits[1], 1)
 }
 

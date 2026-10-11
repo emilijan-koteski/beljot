@@ -13,7 +13,6 @@ import (
 func TestInviteRegistry_IssueAndConsumeHostGrantOnce(t *testing.T) {
 	r := room.NewInviteRegistry()
 
-	// Nothing issued yet.
 	assert.False(t, r.Pending(1, 42))
 	assert.False(t, r.ConsumeHostGrant(1, 42))
 
@@ -22,7 +21,6 @@ func TestInviteRegistry_IssueAndConsumeHostGrantOnce(t *testing.T) {
 	assert.True(t, expiresAt.After(time.Now()))
 	assert.True(t, r.Pending(1, 42))
 
-	// One-time: the first consume succeeds, the second finds nothing.
 	assert.True(t, r.ConsumeHostGrant(1, 42))
 	assert.False(t, r.ConsumeHostGrant(1, 42))
 	assert.False(t, r.Pending(1, 42))
@@ -33,7 +31,6 @@ func TestInviteRegistry_NonHostGrantIsNeverConsumable(t *testing.T) {
 
 	r.Issue(1, 42, 7, false)
 
-	// The invite exists (the popup is real) but carries NO password bypass.
 	assert.True(t, r.Pending(1, 42))
 	assert.False(t, r.ConsumeHostGrant(1, 42))
 	assert.True(t, r.Pending(1, 42), "a rejected non-host consume must not void the invite")
@@ -44,7 +41,6 @@ func TestInviteRegistry_GrantsAreScopedToRoomAndInvitee(t *testing.T) {
 
 	r.Issue(1, 42, 7, true)
 
-	// A grant for (room 1, user 42) must not admit another room or another user.
 	assert.False(t, r.ConsumeHostGrant(2, 42))
 	assert.False(t, r.ConsumeHostGrant(1, 43))
 	assert.True(t, r.ConsumeHostGrant(1, 42))
@@ -70,7 +66,6 @@ func TestInviteRegistry_ReissueReplacesAndRefreshesTheGrant(t *testing.T) {
 	second, _ := r.Issue(1, 42, 7, true)
 	assert.NotEqual(t, first, second, "each invite gets its own id")
 
-	// The replaced grant's timer must not void the fresh one.
 	time.Sleep(40 * time.Millisecond)
 	assert.True(t, r.Pending(1, 42))
 	assert.True(t, r.ConsumeHostGrant(1, 42))
@@ -79,13 +74,11 @@ func TestInviteRegistry_ReissueReplacesAndRefreshesTheGrant(t *testing.T) {
 func TestInviteRegistry_VoidAndVoidRoomAndVoidUser(t *testing.T) {
 	r := room.NewInviteRegistry()
 
-	// Void drops a single pair.
 	r.Issue(1, 42, 7, true)
 	r.Void(1, 42)
 	assert.False(t, r.ConsumeHostGrant(1, 42))
-	r.Void(1, 42) // no-op on an already-voided pair
+	r.Void(1, 42)
 
-	// VoidRoom drops every outstanding invite for a room (fill / close).
 	r.Issue(1, 42, 7, true)
 	r.Issue(1, 43, 7, true)
 	r.Issue(2, 42, 9, true)
@@ -94,7 +87,6 @@ func TestInviteRegistry_VoidAndVoidRoomAndVoidUser(t *testing.T) {
 	assert.False(t, r.ConsumeHostGrant(1, 43))
 	assert.True(t, r.ConsumeHostGrant(2, 42), "VoidRoom must not touch other rooms")
 
-	// VoidUser drops the invitee's grants across every room (lobby disconnect).
 	r.Issue(1, 42, 7, true)
 	r.Issue(2, 42, 9, true)
 	r.Issue(2, 43, 9, true)

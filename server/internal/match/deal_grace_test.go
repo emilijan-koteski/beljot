@@ -14,10 +14,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// Deal grace: each animated deal adds its client animation length to the next
-// actor's deadline and to a bot actor's think delay (deal_grace.go). These
-// values mirror client/src/shared/lib/motion.ts; the client pins its side in
-// dealSchedule.test.ts.
 const (
 	graceCandidateFirst  = 2100 * time.Millisecond
 	graceAllBeforeBid    = 2260 * time.Millisecond
@@ -73,7 +69,6 @@ func TestDealGrace_NextHandPushesOnlyTheFirstBidder(t *testing.T) {
 	gs.HandCompleteReady = [4]bool{true, true, true, false}
 	mgr.SetGameStateForTest(100, gs)
 
-	// The last acknowledgement deals the next hand.
 	from := time.Now()
 	sendAs(mgr, 40, "action:continue", `{}`)
 	st := mgr.GetStateSnapshot(100)
@@ -81,7 +76,6 @@ func TestDealGrace_NextHandPushesOnlyTheFirstBidder(t *testing.T) {
 	require.Equal(t, 2, st.HandNumber)
 	assertWindow(t, st, from, perMoveWindow+graceCandidateFirst)
 
-	// The first bidder's pass opens an ordinary turn: no deal, no grace.
 	first := st.ActivePlayerSeat
 	from = time.Now()
 	sendAs(mgr, st.Players[first].UserID, "action:pass_trump", `{}`)
@@ -96,7 +90,6 @@ func TestDealGrace_ReshuffleIsADeal(t *testing.T) {
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
-	// Round 2, three passes: the dealer (seat 0) passing passes the hand out.
 	mgr.SetGameStateForTest(100, testfixtures.NewGameMidBidding(7))
 	from := time.Now()
 	sendAs(mgr, 10, "action:pass_trump", `{}`)
@@ -138,8 +131,6 @@ func TestDealGrace_HandCompleteTimeoutIsADeal(t *testing.T) {
 
 	deadline := time.Now().Add(30 * time.Millisecond)
 	injectHandCompletePause(t, mgr, deadline)
-	// One acknowledgement arms the fallback against the seeded deadline; the
-	// other three never come, so the timeout deals.
 	sendAs(mgr, 10, "action:continue", `{}`)
 	require.True(t, waitFor(time.Second, func() bool {
 		st := mgr.GetStateSnapshot(100)
@@ -156,7 +147,6 @@ func TestDealGrace_SecondDealPushesTheLeader(t *testing.T) {
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
-	// Seat 1 takes the face-up candidate: the reserve goes out 3/3/3/(2+candidate).
 	mgr.SetGameStateForTest(100, testfixtures.NewGameJustDealt())
 	from := time.Now()
 	sendAs(mgr, 20, "action:pick_trump", `{}`)
@@ -186,9 +176,6 @@ func TestDealGrace_DelaysABotFirstBidder(t *testing.T) {
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
-	// StartMatch may already have armed the opening bidder. Deal the next hand
-	// so that a DIFFERENT bot opens it, or that armed delay would stand in for
-	// the one under test.
 	gs := mgr.GetStateSnapshot(100)
 	armed := gs.ActivePlayerSeat
 	bidder := 1
@@ -197,7 +184,7 @@ func TestDealGrace_DelaysABotFirstBidder(t *testing.T) {
 	}
 	gs = markBots(gs, 1, 2, 3)
 	gs.Phase = game.PhaseHandComplete
-	gs.DealerSeat = (bidder + 2) % 4 // next dealer = +1, first bidder = +2
+	gs.DealerSeat = (bidder + 2) % 4
 	gs.HandCompleteReady = [4]bool{false, true, true, true}
 	mgr.SetGameStateForTest(100, gs)
 
@@ -219,7 +206,7 @@ func TestDealGrace_DelaysABotFirstBidder(t *testing.T) {
 // The Belote beat itself: at most 200 ms under the production 1–2.5 s bounds,
 // for the announcer only — every other seat keeps its full think delay.
 func TestBot_BelotBeatIsAtMost200ms(t *testing.T) {
-	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo()) // production delays
+	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
 	announcer := 1
 	gs := testfixtures.NewGameMidPlay(1)
 	gs.PendingBelotSeat = &announcer
@@ -234,13 +221,11 @@ func TestBot_BelotBeatIsAtMost200ms(t *testing.T) {
 // think delay: with the production 1–2.5 s delays it still answers well under
 // a second after the K/Q lands.
 func TestBot_BelotAnswerTakesAShortBeat(t *testing.T) {
-	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo()) // production delays
+	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
 	mgr.SetDealGraceForTest(false)
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
-	// StartMatch armed the opening bidder's delay; hold the prompt on another
-	// bot so that pending delay cannot stand in for the one under test.
 	armed := mgr.GetStateSnapshot(100).ActivePlayerSeat
 	announcer := 1
 	for announcer == armed {

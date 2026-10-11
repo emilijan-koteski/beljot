@@ -24,8 +24,6 @@ function descriptor(overrides: Partial<CardFlightDescriptor> = {}): CardFlightDe
 describe("CardFlight", () => {
   it("renders nothing when there are no flights", () => {
     const { container } = render(<CardFlight flights={[]} onComplete={vi.fn()} />);
-    // Empty render — overlay does not mount when there's nothing in flight,
-    // so testing libraries do not find the data-testid.
     expect(container.querySelector('[data-testid="card-flight-overlay"]')).toBeNull();
   });
 
@@ -67,9 +65,6 @@ describe("CardFlight", () => {
     const overlay = screen.getByTestId("card-flight-overlay");
     const styleTag = overlay.querySelector("style");
     expect(styleTag).not.toBeNull();
-    // The keyframe name embeds the per-flight safeId; we don't pin the
-    // animScope (useId-driven), but the tail must contain the flight id
-    // sanitized of dashes etc.
     expect(styleTag!.textContent).toMatch(/@keyframes cardFlight_.*throw_self_KS_1/);
   });
 
@@ -78,10 +73,6 @@ describe("CardFlight", () => {
     render(<CardFlight flights={[descriptor({ id: "test-1" })]} onComplete={onComplete} />);
 
     const animatedEl = screen.getByTestId("card-flight-test-1-animated");
-    // The handler is attached natively via addEventListener (see FlightCard
-    // — works around React 19 + jsdom synthetic event flake), so a plain
-    // bubbling event triggers it. Wrap in act() so the parent's setActiveFlights
-    // updates downstream of onComplete are flushed before the assertion.
     act(() => {
       animatedEl.dispatchEvent(new Event("animationend", { bubbles: true }));
     });

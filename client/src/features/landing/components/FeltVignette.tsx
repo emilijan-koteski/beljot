@@ -3,20 +3,6 @@ import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 import { CardFan } from "@/features/landing/components/CardFan";
 import { PlayingCard, Suit } from "@/features/landing/components/PlayingCard";
 
-// ─────────────────────────────────────────────────────────────────────────
-// A compact felt-table scene — centre trick, three seat chips and your hand,
-// with a Trump badge. Self-contained: the root carries `.felt-surface` so the
-// light ink / brass / team tokens resolve correctly wherever it's dropped
-// (the dark hero, or the parchment features section). Pure illustration —
-// data is static.
-//
-// The scene is authored at a fixed "design" size (width × height) so all the
-// absolute seat/card geometry can stay in plain pixels. The inner stage is
-// then scaled to whatever width the board actually renders at, so on a narrow
-// (mobile) column the whole vignette shrinks proportionally and fits, instead
-// of overflowing and overlapping its own seats.
-// ─────────────────────────────────────────────────────────────────────────
-
 type FeltLabels = { trump: string; opponent: string; partner: string };
 
 type FeltVignetteProps = {
@@ -77,6 +63,8 @@ function Seat({ name, sub, team, pos, flip = false }: SeatProps) {
   );
 }
 
+// Static felt-table illustration authored at a fixed design size.
+// The stage scales to the board's rendered width so it shrinks to fit narrow columns.
 export function FeltVignette({
   width = 560,
   height = 360,
@@ -85,9 +73,6 @@ export function FeltVignette({
   style,
 }: FeltVignetteProps) {
   const boardRef = useRef<HTMLDivElement>(null);
-  // Scale the design-size stage to the board's rendered content width. Starts
-  // at 1 so the very first paint (and jsdom, which doesn't lay out) renders at
-  // design scale; the layout effect snaps it to the real ratio before paint.
   const [scale, setScale] = useState(1);
 
   useLayoutEffect(() => {
@@ -122,7 +107,6 @@ export function FeltVignette({
         ...style,
       }}
     >
-      {/* brass inner ring — tracks the board itself so it stays crisp at any size */}
       <div
         style={{
           position: "absolute",
@@ -132,7 +116,6 @@ export function FeltVignette({
         }}
       />
 
-      {/* design-size stage — scaled down to fit the rendered board width */}
       <div
         style={{
           position: "absolute",
@@ -144,7 +127,6 @@ export function FeltVignette({
           transform: `scale(${scale})`,
         }}
       >
-        {/* centre trick */}
         <div style={{ position: "absolute", left: "50%", top: "46%", width: 0, height: 0 }}>
           <div style={{ position: "absolute", transform: "translate(-50%,-95%) rotate(-8deg)" }}>
             <PlayingCard rank="Q" suit="hearts" w={62} />
@@ -180,7 +162,6 @@ export function FeltVignette({
           pos={{ left: "50%", top: 16, transform: "translateX(-50%)" }}
         />
 
-        {/* your hand */}
         <div
           style={{ position: "absolute", left: "50%", bottom: -6, transform: "translateX(-50%)" }}
         >
@@ -200,7 +181,6 @@ export function FeltVignette({
           />
         </div>
 
-        {/* trump badge */}
         <div
           style={{
             position: "absolute",

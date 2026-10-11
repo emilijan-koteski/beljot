@@ -112,26 +112,17 @@ func TestReplay(t *testing.T) {
 	ladder, err := season.NewLadder([]int{0, 20, 40, 600, 800, 1000, 1200, 1400})
 	require.NoError(t, err)
 
-	// 1. Bot table, user 1 wins 1100:700 from 0 SP. Own avg 300 vs 600, E = 0.167:
-	//    +45. The bots' team made a Capot, which pays nobody.
 	m1 := botTable(1, 1, 0, 1100, 700)
 	m1.Hands = []match.HandResult{{HandNumber: 1, Capot: true, CapotTeam: team(1)}}
-	// 2. Four humans, users 1 and 3 (avg 22.5) surrender to 2 and 4 (avg 0) at
-	//    300:500. m = 1.2003, E_winner = 0.470: winners +38, losers -25, floored.
 	m2 := fourHumans(2, [4]uint{1, 2, 3, 4}, 1, 300, 500)
 	m2.SurrenderedBy = uid(1)
-	// 3. A boot-reconcile placeholder: skipped.
 	m3 := fourHumans(3, [4]uint{1, 2, 3, 4}, 0, 100, 100)
 	m3.Status = "abandoned"
-	// 4. 501, users 2 and 4 (avg 38) against user 1 and a bot (avg 310); user 4
-	//    abandons at 200:400. m = 1.1008, E_winner = 0.811: user 1 +12, user 2
-	//    half of -8.32 = -4, user 4 -120.
 	m4 := match.Match{
 		ID: 4, Status: "abandoned", MatchMode: "501", AbandonedBy: uid(4),
 		Player1ID: uid(2), Player2ID: uid(1), Player3ID: uid(4), Player4IsBot: true,
 		TeamAScore: 200, TeamBScore: 400, WinnerTeam: 1, CompletedAt: t0.Add(4 * time.Minute),
 	}
-	// 5. An unknown mode: skipped.
 	m5 := fourHumans(5, [4]uint{1, 2, 3, 4}, 0, 1100, 700)
 	m5.MatchMode = "301"
 
@@ -154,7 +145,6 @@ func TestReplay(t *testing.T) {
 		},
 	}, sum)
 
-	// --trace-user: the same replay, with user 1's match-by-match record.
 	_, traced, err := replay([]match.Match{m1, m2, m3, m4, m5}, names, f, ladder, 1)
 	require.NoError(t, err)
 	assert.Equal(t, []traceRow{
@@ -163,8 +153,6 @@ func TestReplay(t *testing.T) {
 		{N: 3, MatchID: 4, At: m4.CompletedAt, Won: true, Before: 20, Change: 12, After: 32},
 	}, traced.Trace, "skipped matches leave no trace row")
 
-	// A floored loss traces the APPLIED change: user 4's abandonment computes to
-	// -120 but only 38 SP were there to lose.
 	_, traced, err = replay([]match.Match{m1, m2, m3, m4, m5}, names, f, ladder, 4)
 	require.NoError(t, err)
 	require.Len(t, traced.Trace, 2)
@@ -184,8 +172,6 @@ func TestPrintReplay_SkipReasonsInSortedOrder(t *testing.T) {
 }
 
 func TestReplay_IsTheAwardPathArithmetic(t *testing.T) {
-	// Replaying one match must give exactly ComputeSPChanges-then-floor for every
-	// seat: the replay is only as useful as its agreement with the live formula.
 	f := season.DefaultSPFormula()
 	m := fourHumans(1, [4]uint{1, 2, 3, 4}, 0, 1100, 700)
 	o, err := season.OutcomeFor(m)
@@ -201,7 +187,6 @@ func TestReplay_IsTheAwardPathArithmetic(t *testing.T) {
 }
 
 func TestTemplatePools_RelabelToTheHumansSide(t *testing.T) {
-	// The human sits at seat 1 (team B) and wins 1100 to 700 with a Capot.
 	won := match.Match{
 		ID: 1, Status: "completed", MatchMode: "1001",
 		Player1IsBot: true, Player2ID: uid(5), Player3IsBot: true, Player4IsBot: true,
@@ -251,8 +236,6 @@ func TestSweep(t *testing.T) {
 	for i, r := range rows {
 		want := float64(opts.f.BotSeatSP) + 2*opts.f.Scale*math.Log10(r.P*opts.f.BaseWin/((1-r.P)*opts.f.BaseLoss))
 		assert.InDelta(t, want, r.AnalyticSettle, 1e-9)
-		// The simulated settle point tracks the analytic one closely; the 0 floor
-		// and rounding only nudge it.
 		assert.InDelta(t, r.AnalyticSettle, r.SimSettle, 25, "p=%.2f", r.P)
 		if i > 0 {
 			assert.Greater(t, r.SimSettle, rows[i-1].SimSettle, "a better win rate settles higher")
@@ -262,11 +245,6 @@ func TestSweep(t *testing.T) {
 		assert.LessOrEqual(t, r.AfterNMedian, r.AfterNP90)
 	}
 
-	// With equal win and loss margins the settle points sit on the analytic
-	// line, which at the approved S = 385 is below the tuning targets: those were
-	// met on Q3's REAL margins, where wins are wider than losses (see
-	// TestSweep_WiderWinMarginsSettleHigher). What holds at any margin is the
-	// bottom of the ladder.
 	byP := map[string]sweepRow{}
 	for _, r := range rows {
 		byP[fmt.Sprintf("%.2f", r.P)] = r
@@ -305,8 +283,6 @@ func TestSweep_SamplesThePools(t *testing.T) {
 	cfg := opts.sweep
 	cfg.WinRates = []float64{0.5}
 	cfg.Runs, cfg.Horizon, cfg.AfterN = 50, 40, 20
-	// Every win is a whitewash (m = 1.5) and every loss the narrowest (m = 0.5),
-	// so the sampled sweep must climb faster than the fixed-margin one.
 	cfg.Won = []outcomeTemplate{{scores: [2]int{1001, 0}, target: 1001}}
 	cfg.Lost = []outcomeTemplate{{scores: [2]int{1001, 1001}, target: 1001}}
 	sampled, err := sweep(cfg, opts.f, opts.ladder)

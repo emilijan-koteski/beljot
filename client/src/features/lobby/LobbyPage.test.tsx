@@ -54,7 +54,6 @@ afterEach(() => {
 });
 
 function renderLobbyPage() {
-  // Default mocks so the page can render without unhandled query rejections.
   mockGetRooms.mockResolvedValue([]);
   mockGetLobbyStats.mockResolvedValue({
     inLobby: 0,
@@ -105,13 +104,6 @@ describe("LobbyPage", () => {
     expect(screen.getByTestId("stats-active-ratio")).toBeInTheDocument();
   });
 
-  // NO SEASON SURFACE ON THE LOBBY AT ALL. Story 13.2's top-ten aside and
-  // Story 13.1's rank banner both left: the standings have a dedicated page one
-  // click away in the top nav, and the rank's badge + tier name now ride the
-  // header on every route. Asserted as an ABSENCE because the page must stay
-  // free of the fetches they brought with them — `@/shared/api/season` is
-  // deliberately not mocked in this file any more, so a re-added season query
-  // would surface as a real unmocked request rather than as a quiet re-render.
   it("mounts no seasonal surface — no rank banner, no leaderboard aside", () => {
     renderLobbyPage();
 
@@ -334,14 +326,11 @@ describe("LobbyPage", () => {
     await user.click(screen.getByTestId("room-card-join"));
 
     await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9, undefined));
-    // Message is composed locally from the room's buy-in (500) and our balance (300).
     const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
     expect(msg).toContain("500");
     expect(msg).toContain("300");
     expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
   });
-
-  // --- Honor gate (Story 9.8 AC9) ---
 
   const gatedRoom = {
     id: 9,
@@ -372,16 +361,12 @@ describe("LobbyPage", () => {
     renderLobbyPage();
 
     await waitFor(() => expect(screen.getByTestId("room-card")).toBeInTheDocument());
-    // AC5: gated rooms stay LISTED and labelled, never filtered out.
     expect(screen.getByTestId("room-card-min-honor")).toHaveAttribute("data-min-honor", "85");
     expect(screen.getByTestId("room-card-veterans-only")).toBeInTheDocument();
     expect(screen.getByTestId("room-card-join")).toBeInTheDocument();
   });
 
   it("locks Join on a room the viewer cannot qualify for, without firing a request", async () => {
-    // The redesign puts the gate's verdict in the button. A player who provably
-    // cannot pass is spared the click that was always going to 409, so no request
-    // leaves the client at all.
     const user = userEvent.setup();
     const { useAuthStore } = await import("@/shared/stores/authStore");
     useAuthStore.setState({
@@ -395,7 +380,6 @@ describe("LobbyPage", () => {
     const join = screen.getByTestId("room-card-join");
     expect(join).toHaveAttribute("data-locked", "true");
     expect(join).toBeDisabled();
-    // The numbers live in the tooltip, never as copy on the card.
     expect(join).toHaveAttribute("title", expect.stringContaining("85"));
     expect(join).toHaveAttribute("title", expect.stringContaining("42"));
 
@@ -404,10 +388,6 @@ describe("LobbyPage", () => {
   });
 
   it("composes the HONOR_TOO_LOW toast from the room's threshold and the viewer's score", async () => {
-    // The toast still exists for a genuine RACE — the client thought the viewer
-    // qualified (42 >= 40) and the server disagreed, e.g. the owner raised the bar
-    // between render and click. That is now the only way this code path runs, which
-    // is why the fixture must be a room the viewer passes client-side.
     const user = userEvent.setup();
     const { toast } = await import("sonner");
     const { FetchError } = await import("@/shared/api/axiosClient");
@@ -424,7 +404,6 @@ describe("LobbyPage", () => {
     await user.click(screen.getByTestId("room-card-join"));
 
     await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(9, undefined));
-    // Composed locally (Decision B: the error payload carries only the code).
     const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
     expect(msg).toContain("40");
     expect(msg).toContain("42");
@@ -432,13 +411,6 @@ describe("LobbyPage", () => {
   });
 
   it("renders a real honor score of 0 in the HONOR_TOO_LOW toast", async () => {
-    // honorScoreOrPrior, never `|| 80`: a score of 0 is a legitimate Go value and
-    // must not be replaced by the prior. This exact bug was patched in 9.7.
-    //
-    // A New Player passes the client mirror on the toggle alone (D1: newcomers are
-    // never score-checked), so the button is live even at a score of 0 — and the
-    // server can still 409 if they graduated in between. That race is what keeps
-    // this path reachable.
     const user = userEvent.setup();
     const { toast } = await import("sonner");
     const { FetchError } = await import("@/shared/api/axiosClient");
@@ -461,8 +433,6 @@ describe("LobbyPage", () => {
   });
 
   it("shows the veterans-only toast for NEW_PLAYER_NOT_ALLOWED", async () => {
-    // Same race shape: newcomers welcome when the grid rendered, veterans-only by
-    // the time the join landed.
     const user = userEvent.setup();
     const { toast } = await import("sonner");
     const { FetchError } = await import("@/shared/api/axiosClient");
@@ -492,7 +462,6 @@ describe("LobbyPage", () => {
       user: makeUser({ username: "me", honorScore: 42, isNewPlayer: false }),
     });
 
-    // One gated room they fail, one ungated room they pass.
     mockGetRooms.mockResolvedValueOnce([
       gatedRoom,
       {
@@ -509,13 +478,9 @@ describe("LobbyPage", () => {
     await waitFor(() => expect(screen.getAllByTestId("room-card")).toHaveLength(2));
     await user.click(screen.getByTestId("filter-chip-qualify"));
 
-    // Filtering the grid is where the explaining belongs — the gate becomes a
-    // shorter list rather than a wall.
     await waitFor(() => expect(screen.getAllByTestId("room-card")).toHaveLength(1));
     expect(screen.getByText("Open Table")).toBeInTheDocument();
   });
-
-  // --- Private rooms (Story 9.6) ---
 
   const privateRoom = {
     id: 9,
@@ -548,7 +513,6 @@ describe("LobbyPage", () => {
     await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
     await user.click(screen.getByTestId("room-card-join"));
 
-    // The dialog opens; no join fires until the password is submitted.
     expect(await screen.findByTestId("password-prompt-dialog")).toBeInTheDocument();
     expect(mockJoinRoom).not.toHaveBeenCalled();
 
@@ -585,8 +549,6 @@ describe("LobbyPage support note", () => {
 
     const note = screen.getByTestId("support-note");
     expect(note.textContent).toContain("A hobby project — you can always buy me a coffee.");
-    // Below the room-count footnote, i.e. the very bottom of the page — never
-    // near the hero or the room grid.
     const footnote = screen.getByText(/Showing/);
     expect(footnote.compareDocumentPosition(note)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });

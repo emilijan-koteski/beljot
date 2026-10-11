@@ -18,10 +18,6 @@ describe("HonorBandMeter", () => {
     expect(marker).toHaveStyle({ left: "87%" });
   });
 
-  // The shipped tick row was `flex justify-between`, which spread the six labels
-  // evenly (0/20/40/60/80/100% of the width) over a track that is linear in the
-  // score: "95" sat at 80%, so an honest marker at 87% rendered to the RIGHT of
-  // it and an 87 read as all but perfect. Labels and marker share one scale now.
   it("labels each band boundary at its true position, not evenly spread", () => {
     render(<HonorBandMeter score={87} testId="meter" />);
 

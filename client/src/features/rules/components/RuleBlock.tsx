@@ -56,11 +56,7 @@ function tierRange(tier: HonorTier): string {
 }
 
 /**
- * The honour-tier ladder. Names come from the shared `profile.honor.tier.*`
- * i18n keys (the same strings every badge and meter shows — the rules must
- * never call a tier by a different word), coloured with the tier's own ramp
- * hue; ranges are derived from HONOR_TIER_BANDS. Only the sentence tails and
- * the host note are authored per locale.
+ * Honour-tier ladder using the shared `profile.honor.tier.*` names and ranges derived from HONOR_TIER_BANDS.
  */
 function TiersBlock({
   block,
@@ -156,13 +152,8 @@ function CardBlock() {
 }
 
 /**
- * Renders one content block by kind, for the variant tab that is active.
- *
- * A block scoped to the other variant renders nothing at all — that is what
- * makes switching tabs swap `basics` and `melds` while the four shared chapters
- * visibly do not move. A scoped block also carries a difference marker naming
- * what the other variant does; `p` and `note` have no header to hang it on, so
- * it sits inline at the end of their text.
+ * Renders one content block for the active variant tab, or nothing if it is scoped to the other variant.
+ * Scoped blocks carry a difference marker naming what the other variant does.
  */
 export function RuleBlock({ block }: { block: RuleBlockType }) {
   const activeVariant = useRulesVariant();
@@ -216,11 +207,8 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
     case "tiers":
       return <TiersBlock block={block} marker={marker} />;
 
-    // Items are filtered FIRST and numbered from the survivors, so the visible
-    // 01..06 is gapless on both tabs. Numbering over `block.items` would render
-    // 01, 02, 03, 05 wherever the skipped item belonged to the other variant.
     case "steps": {
-      const items = visibleFor(block.items, activeVariant);
+      const visibleItems = visibleFor(block.items, activeVariant);
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {marker ? (
@@ -236,7 +224,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
               gap: 10,
             }}
           >
-            {items.map((it, i) => (
+            {visibleItems.map((it, i) => (
               <li
                 key={i}
                 style={{

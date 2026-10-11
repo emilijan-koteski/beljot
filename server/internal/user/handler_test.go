@@ -42,21 +42,15 @@ func (f *fakeSeasonReader) CurrentSeasonRank(userID uint, _ time.Time) (*season.
 	return f.rank, nil
 }
 
-// --- Mock Match Repository (for user handler tests) ---
-
 type mockMatchRepo struct {
-	matches []match.Match // newest first (by completed_at); seeded in test order
+	matches []match.Match
 	err     error
 
-	// Stats-path overrides — when statsOverride is non-nil, GetStatsForUser
-	// returns these values regardless of r.matches. This lets the handler
-	// test drive the stats branch without seeding full Match rows.
 	statsOverride   *struct{ wins, losses, abandoned int }
 	statsErr        error
 	getStatsCalls   int
 	lastStatsUserID uint
 
-	// Career-path overrides drive the GetCareer handler without full SQL.
 	careerAgg          match.CareerAggregates
 	careerErr          error
 	careerPoints       int64
@@ -68,13 +62,6 @@ type mockMatchRepo struct {
 	rivalsErr          error
 	getCareerCalls     int
 
-	// Honor trend-window overrides (Story 9.7). lastHonorWindowLimit records
-	// the limit the handler asked for, so a test can assert it matches the
-	// server-side window constant rather than a hard-coded literal.
-	//
-	// honorWindow* is the RECENT window and honorPrior* the one before it. The
-	// trend only renders when both hold the same match count (code review
-	// 2026-07-29), so a test that wants a non-flat trend must populate both.
 	honorWindowCompleted int
 	honorWindowAbandoned int
 	honorPriorCompleted  int
@@ -122,10 +109,6 @@ func (r *mockMatchRepo) GetMatchesForUser(userID uint, limit, offset int, outcom
 		if seatID(m.Player1ID) != userID && seatID(m.Player2ID) != userID && seatID(m.Player3ID) != userID && seatID(m.Player4ID) != userID {
 			continue
 		}
-		// Viewer-relative outcome filter mirroring the production SQL:
-		// attributable abandoned rows (abandoned_by set, not the viewer) count
-		// win/loss by winner_team; the abandoner and NULL-abandoner legacy rows
-		// stay "abandoned".
 		countsWinLoss := m.Status == "completed" ||
 			(m.Status == "abandoned" && m.AbandonedBy != nil && *m.AbandonedBy != userID)
 		switch outcome {
@@ -144,7 +127,6 @@ func (r *mockMatchRepo) GetMatchesForUser(userID uint, limit, offset int, outcom
 		}
 		filtered = append(filtered, m)
 	}
-	// Mirror the production query's ORDER BY completed_at <dir>, id <dir>.
 	asc := sort == "old"
 	sortpkg.SliceStable(filtered, func(i, j int) bool {
 		if !filtered[i].CompletedAt.Equal(filtered[j].CompletedAt) {
@@ -169,10 +151,8 @@ func (r *mockMatchRepo) GetMatchesForUser(userID uint, limit, offset int, outcom
 	return filtered[offset:end], total, nil
 }
 
-// GetLastMatchForRoomAndUser mirrors the production query: the newest
-// completed/abandoned row for the room in which userID holds a seat, hands
-// ordered by hand number. nil when there is none — participation is the gate,
-// so a non-participant is indistinguishable from "no match".
+// GetLastMatchForRoomAndUser returns the newest completed or abandoned match in the room where
+// userID holds a seat, or nil when there is none.
 func (r *mockMatchRepo) GetLastMatchForRoomAndUser(roomID, userID uint) (*match.Match, error) {
 	if r.err != nil {
 		return nil, r.err
@@ -255,11 +235,8 @@ func (r *mockMatchRepo) GetHonorTrendWindowsForUser(userID uint, limit int) (mat
 	}, nil
 }
 
-// GetStatsForUser returns the test-controlled stats override if set, else
-// computes the four counts from seeded matches using the same predicate as
-// the production SQL (participation by any seat; team derived from viewer's
-// seat). Tracks call count + last userID so auth-failure tests can assert
-// the stats path was NOT invoked.
+// GetStatsForUser returns statsOverride when set, else counts wins, losses and abandons from
+// the seeded matches. It records the call count and last userID.
 func (r *mockMatchRepo) GetStatsForUser(userID uint) (int, int, int, error) {
 	r.getStatsCalls++
 	r.lastStatsUserID = userID
@@ -284,9 +261,6 @@ func (r *mockMatchRepo) GetStatsForUser(userID uint) (int, int, int, error) {
 		}
 		switch m.Status {
 		case "abandoned":
-			// Per-player: only the abandoner (or every participant of a
-			// NULL-abandoner legacy row) counts "abandoned"; the rest score
-			// win/loss by winner_team — mirroring the production SQL gate.
 			if m.AbandonedBy == nil || *m.AbandonedBy == userID {
 				abandoned++
 			} else if m.WinnerTeam == viewerSeat%2 {
@@ -306,18 +280,10 @@ func (r *mockMatchRepo) GetStatsForUser(userID uint) (int, int, int, error) {
 }
 
 type mockUserRepo struct {
-	users  []*user.User
-	nextID uint
-	// updateUsernameErr, when set, forces UpdateUsername to return it — used to
-	// simulate the DB unique-index race (pg 23505 → ErrUsernameTaken) that the
-	// handler's pre-check can't otherwise reproduce.
-	updateUsernameErr error
-	// failUpdatePreferences, when set, forces UpdatePreferences to return it
-	// WITHOUT writing anything — the only way to exercise the all-or-nothing
-	// contract, since the real repo's single UPDATE cannot half-apply by itself.
-	failUpdatePreferences error
-	// updatePreferencesCalls counts repo writes, so a test can assert the handler
-	// issues exactly ONE per request regardless of how many fields it carried.
+	users                  []*user.User
+	nextID                 uint
+	updateUsernameErr      error
+	failUpdatePreferences  error
 	updatePreferencesCalls int
 }
 
@@ -370,10 +336,8 @@ func (m *mockUserRepo) FindByID(id uint) (*user.User, error) {
 	return nil, nil
 }
 
-// SearchByUsername mirrors the production query in memory: case-insensitive
-// substring match, self + soft-deleted (absent from m.users) excluded, ordered
-// by username ascending, capped at limit. Returns nil on no match — the handler
-// is what normalises that to a [] slice.
+// SearchByUsername matches usernames case-insensitively, excluding the caller, sorted and capped
+// at limit. It returns nil when nothing matches.
 func (m *mockUserRepo) SearchByUsername(query string, excludeUserID uint, limit int) ([]user.User, error) {
 	needle := strings.ToLower(query)
 	var out []user.User
@@ -413,10 +377,8 @@ func (m *mockUserRepo) Count() (int64, error) {
 	return int64(len(m.users)), nil
 }
 
-// UpdatePreferences mirrors the real repo's ALL-OR-NOTHING contract: every
-// supplied column is applied to the in-memory row together, so a test asserting
-// the half-applied case has to force the failure rather than rely on ordering.
-// failUpdatePreferences, when set, fails BEFORE writing anything.
+// UpdatePreferences applies every supplied column together, or fails before writing anything
+// when failUpdatePreferences is set.
 func (m *mockUserRepo) UpdatePreferences(id uint, prefs user.PreferencesUpdate) error {
 	m.updatePreferencesCalls++
 	if m.failUpdatePreferences != nil {
@@ -462,7 +424,6 @@ func (m *mockUserRepo) UpdateUsername(id uint, username string) (time.Time, erro
 	if m.updateUsernameErr != nil {
 		return time.Time{}, m.updateUsernameErr
 	}
-	// Emulate the DB unique index: a live row owned by another user blocks it.
 	for _, u := range m.users {
 		if u.Username == username && u.ID != id {
 			return time.Time{}, apperr.ErrUsernameTaken
@@ -569,11 +530,9 @@ func (m *mockUserRepo) ResetHonor(userID uint) error {
 
 func (m *mockUserRepo) addUser(username, email, lang string) *user.User {
 	u := &user.User{
-		ID:       m.nextID,
-		Username: username,
-		Email:    email,
-		// Every preference is seeded to its DB default so a test asserting
-		// "the other field was left alone" has a real value to compare against.
+		ID:                 m.nextID,
+		Username:           username,
+		Email:              email,
 		LanguagePreference: lang,
 		CardDeckPreference: user.CardDeckFrench,
 		SoundEnabled:       true,
@@ -641,8 +600,6 @@ func setupUserHandlerWithSeason() (*mockUserRepo, *mockMatchRepo, *fakeSeasonRea
 	api.GET("/users/:id/matches", handler.ListMatches)
 	api.PATCH("/users/:id/preferences", handler.UpdatePreferences)
 	api.PATCH("/users/:id/username", handler.UpdateUsername)
-	// Registered here exactly as main.go does — a /rooms path served by the
-	// user handler, so the route wiring is covered by the same tests.
 	api.GET("/rooms/:id/last-match", handler.GetRoomLastMatch)
 
 	return repo, matchRepo, seasonReader, e
@@ -791,13 +748,12 @@ func TestGetProfile_IncludesWalletFields(t *testing.T) {
 	assert.Equal(t, 5, data.LoginStreakDays)
 }
 
-// TestGetProfile_IncludesXPAndLevel pins Story 9.5 AC4: the self-only profile
-// carries total XP, the derived level, and the per-level progress that drives
-// the XP bar. Level 3 band is threshold(3)=450 .. threshold(4)=800 (span 350).
+// TestGetProfile_IncludesXPAndLevel checks the self profile carries total XP, level and
+// per-level progress.
 func TestGetProfile_IncludesXPAndLevel(t *testing.T) {
 	repo, e := setupUserHandler()
 	u := repo.addUser("xpuser", "xp@example.com", "en")
-	u.TotalXP = 600 // level 3; 150 into a 350-wide band
+	u.TotalXP = 600
 
 	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
 	require.NoError(t, err)
@@ -816,14 +772,11 @@ func TestGetProfile_IncludesXPAndLevel(t *testing.T) {
 	assert.Equal(t, 350, data.XPForNextLevel)
 }
 
-// TestGetProfile_IncludesHonor pins Story 9.7 AC8: the self-only profile
-// carries the recomputed score, the tier token, the raw lifetime counts, the
-// New Player flag and the trend — and the trend asks the repository for exactly
-// the server-side window size rather than a hard-coded 20.
+// TestGetProfile_IncludesHonor checks the self profile carries score, tier, lifetime counts,
+// the New Player flag and the trend.
 func TestGetProfile_IncludesHonor(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
 	u := repo.addUser("honoruser", "honor@example.com", "en")
-	// 20 completed / 1 abandoned, written just now: 100*24/29 = 82.8 -> 83.
 	now := time.Now().UTC()
 	u.HonorCompletedWeight = 20
 	u.HonorAbandonedWeight = 1
@@ -831,10 +784,6 @@ func TestGetProfile_IncludesHonor(t *testing.T) {
 	u.HonorCompletedTotal = 20
 	u.HonorAbandonedTotal = 1
 
-	// The trend compares the two 20-match windows against each other, NOT
-	// against the lifetime score. Recent: 20/0 -> 100*24/25 = 96. Prior: 18/2 ->
-	// 100*22/31 = 70.97 -> 71. Delta +25, comfortably past the threshold. Both
-	// windows hold 20 matches, which is what makes them comparable at all.
 	matchRepo.honorWindowCompleted = 20
 	matchRepo.honorWindowAbandoned = 0
 	matchRepo.honorPriorCompleted = 18
@@ -864,28 +813,18 @@ func TestGetProfile_IncludesHonor(t *testing.T) {
 		"the handler must ask for the server-side window size, not a literal")
 }
 
-// TestGetProfile_FlawlessActivePlayerReadsFlat is the regression test for the
-// 2026-07-29 code-review finding: the trend used to compare a 20-match window
-// (whose arithmetic maximum is 96, because the Beta(4,1) prior's 4
-// pseudo-completions are a heavy drag at n=20) against the LIFETIME score
-// (98-100 for an active player, computed from an unbounded decayed weight). A
-// player who had never abandoned a single match therefore rendered a red
-// "Slipping -2/-3/-4" forever.
-//
-// With two equal windows the prior drag cancels, so a spotless record reads flat.
+// TestGetProfile_FlawlessActivePlayerReadsFlat checks a spotless record with two equal
+// trend windows reads as flat.
 func TestGetProfile_FlawlessActivePlayerReadsFlat(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
 	u := repo.addUser("flawless", "flawless@example.com", "en")
 	now := time.Now().UTC()
-	// 60 clean matches inside one half-life: lifetime 100*64/65 = 98.5 -> 98,
-	// which is ABOVE the 96 window cap. This is the exact shape that inverted.
 	u.HonorCompletedWeight = 60
 	u.HonorAbandonedWeight = 0
 	u.HonorDecayedAt = &now
 	u.HonorCompletedTotal = 60
 	u.HonorAbandonedTotal = 0
 
-	// Never abandoned anything in either window.
 	matchRepo.honorWindowCompleted = 20
 	matchRepo.honorWindowAbandoned = 0
 	matchRepo.honorPriorCompleted = 20
@@ -919,7 +858,6 @@ func TestGetProfile_PartialPriorWindowReadsFlat(t *testing.T) {
 	u.HonorDecayedAt = &now
 	u.HonorCompletedTotal = 25
 
-	// 25 finished matches: a full recent window of 20, but only 5 behind it.
 	matchRepo.honorWindowCompleted = 20
 	matchRepo.honorWindowAbandoned = 0
 	matchRepo.honorPriorCompleted = 5
@@ -969,10 +907,8 @@ func TestGetProfile_NewPlayerStillCarriesScoreAndTier(t *testing.T) {
 	assert.Equal(t, int64(2), data.HonorCompletedTotal)
 }
 
-// A player with no history sits at the Beta(4,1) prior of 80, not at 0 — the
-// whole point of the pseudo-count. A zero honorScore in the JSON would be a
-// real 0 (Go zero values serialize as real values), so this also guards the
-// client's "never use truthiness" rule from the server side.
+// TestGetProfile_NoHistorySitsAtThePrior checks a player with no history scores the
+// Beta(4,1) prior of 80, not 0.
 func TestGetProfile_NoHistorySitsAtThePrior(t *testing.T) {
 	repo, _, e := setupUserHandlerWithMatches()
 	u := repo.addUser("blankuser", "blank@example.com", "en")
@@ -1036,22 +972,17 @@ func TestGetProfile_UserNotFound(t *testing.T) {
 	assert.Equal(t, "USER_NOT_FOUND", errResp["error"]["code"])
 }
 
-// Story 11.3: a foreign id is no longer 403 — it returns 200 with the PUBLIC
-// projection for :id. This is also the D1 correctness guard: the honor/stats
-// must be the SUBJECT's (user 2), never the viewer's (user 1), which only holds
-// if the handler keyed FindByID/GetStatsForUser/GetHonorTrendWindowsForUser on
-// paramID.
+// TestGetProfile_ForeignID_ReturnsPublicProjection checks a foreign id returns the public
+// projection keyed on the subject, not the viewer.
 func TestGetProfile_ForeignID_ReturnsPublicProjection(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
 	now := time.Now().UTC()
 
-	// Viewer (id 1): a New Player with a distinct score (2 completed → 86).
 	viewer := repo.addUser("viewer", "viewer@example.com", "en")
 	viewer.HonorCompletedWeight = 2
 	viewer.HonorDecayedAt = &now
 	viewer.HonorCompletedTotal = 2
 
-	// Subject (id 2): a veteran with a different score (20/1 → 83, "fair").
 	subject := repo.addUser("subject", "subject@example.com", "en")
 	subject.HonorCompletedWeight = 20
 	subject.HonorAbandonedWeight = 1
@@ -1059,7 +990,6 @@ func TestGetProfile_ForeignID_ReturnsPublicProjection(t *testing.T) {
 	subject.HonorCompletedTotal = 20
 	subject.HonorAbandonedTotal = 1
 
-	// Stats belong to the subject; the mock records which id was queried.
 	matchRepo.statsOverride = &struct{ wins, losses, abandoned int }{5, 3, 1}
 
 	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
@@ -1073,7 +1003,6 @@ func TestGetProfile_ForeignID_ReturnsPublicProjection(t *testing.T) {
 	var data user.PublicProfileResponse
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
 
-	// Identity + honor are the subject's, not the viewer's.
 	assert.Equal(t, subject.ID, data.ID)
 	assert.Equal(t, "subject", data.Username)
 	assert.Equal(t, 83, data.HonorScore, "subject's 20/1 score, not the viewer's 86")
@@ -1084,7 +1013,6 @@ func TestGetProfile_ForeignID_ReturnsPublicProjection(t *testing.T) {
 	assert.Equal(t, 1, data.Abandoned)
 	assert.Equal(t, 9, data.TotalGamesPlayed)
 
-	// The subject id — not the viewer — drove the stats query.
 	assert.Equal(t, subject.ID, matchRepo.lastStatsUserID,
 		"GetStatsForUser must be keyed on paramID (the subject), not authUserID")
 }
@@ -1122,15 +1050,10 @@ func TestGetProfile_PublicProjection_NeverLeaksPrivateFields(t *testing.T) {
 	assert.NotContains(t, body, "soundVolume", "audio volumes are private")
 	assert.NotContains(t, body, "musicVolume", "audio volumes are private")
 	assert.NotContains(t, body, "usernameChangedAt", "username-cooldown state is private")
-	// The public-safe fields ARE present — seasonRank included (Story 13.3):
-	// the key must ride the public shape (as an object or null), and nothing
-	// private may join it.
 	assert.Contains(t, body, "honorScore")
 	assert.Contains(t, body, "totalXp")
 	assert.Contains(t, body, "seasonRank")
 }
-
-// --- Story 13.3: seasonRank on both profile shapes ---
 
 // The SELF branch carries the reader's block verbatim, keyed on the subject.
 func TestGetProfile_SeasonRankPresentOnSelf(t *testing.T) {
@@ -1158,9 +1081,6 @@ func TestGetProfile_SeasonRankPresentOnSelf(t *testing.T) {
 	assert.Equal(t, 680, data.SeasonRank.SP)
 	assert.Equal(t, u.ID, seasonReader.lastUserID, "the rank is the SUBJECT's")
 
-	// THE LITERAL WIRE KEYS of the nested block — the client's SeasonRank type
-	// is hand-maintained against them and decode-into-struct cannot police a
-	// renamed tag.
 	var raw struct {
 		SeasonRank map[string]any `json:"seasonRank"`
 	}
@@ -1318,8 +1238,6 @@ func TestGetProfile_MissingAuth(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
-// --- SearchUsers tests (Story 11.1) ---
-
 func doSearchUsers(e *echo.Echo, rawQuery, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users"+rawQuery, nil)
 	if token != "" {
@@ -1334,10 +1252,10 @@ func doSearchUsers(e *echo.Echo, rawQuery, token string) *httptest.ResponseRecor
 // username, and never includes the requesting user themselves.
 func TestSearchUsers_Success(t *testing.T) {
 	repo, e := setupUserHandler()
-	me := repo.addUser("alSearcher", "me@example.com", "en") // also contains "al"
+	me := repo.addUser("alSearcher", "me@example.com", "en")
 	repo.addUser("alice", "alice@example.com", "en")
 	repo.addUser("albert", "albert@example.com", "en")
-	repo.addUser("zeta", "zeta@example.com", "en") // control: no "al"
+	repo.addUser("zeta", "zeta@example.com", "en")
 
 	token, err := auth.GenerateAccessToken(me.ID, testJWTSecret)
 	require.NoError(t, err)
@@ -1469,13 +1387,6 @@ func TestUpdatePreferences_MissingAuth(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
-// --- Card deck preference (Story 12.4) ---
-//
-// The endpoint is a PARTIAL update: each field is independently optional,
-// validated and written. Before 12.4 both were plain strings, so a deck-only
-// PATCH carried languagePreference:"" implicitly and 400'd with
-// INVALID_LANGUAGE — these tests are what pin that shut.
-
 func TestUpdatePreferences_DeckOnly_LeavesLanguageAlone(t *testing.T) {
 	repo, e := setupUserHandler()
 	u := repo.addUser("testuser", "test@example.com", "mk")
@@ -1489,8 +1400,6 @@ func TestUpdatePreferences_DeckOnly_LeavesLanguageAlone(t *testing.T) {
 	var resp map[string]map[string]string
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	assert.Equal(t, "croatian", resp["data"]["cardDeckPreference"])
-	// Echo only what was written: a blank languagePreference in the response
-	// would clobber the client's cached value when it merged the echo.
 	assert.NotContains(t, resp["data"], "languagePreference")
 
 	assert.Equal(t, "croatian", repo.users[0].CardDeckPreference)
@@ -1553,9 +1462,6 @@ func TestUpdatePreferences_EveryDeckIsAccepted(t *testing.T) {
 }
 
 func TestUpdatePreferences_InvalidCardDeck(t *testing.T) {
-	// "german" is the deck family the Croatian faces belong to but not a value
-	// we ship, and "croatia" is the game VARIANT — the exact cross-wiring this
-	// rejects.
 	for _, deck := range []string{"german", "croatia", "hungarian", "FRENCH", ""} {
 		t.Run(deck, func(t *testing.T) {
 			repo, e := setupUserHandler()
@@ -1620,11 +1526,6 @@ func TestUpdatePreferences_BothFields_OneInvalid_WritesNeither(t *testing.T) {
 	})
 }
 
-// --- Audio preferences (migration 000025) ---
-//
-// Two independent switches on the same PARTIAL endpoint. They are *bool on the
-// wire so an absent switch is left alone rather than read as "off".
-
 // decodePreferencesEcho returns the echoed data object with raw values, so a
 // test can assert an echoed false as well as a key that is absent.
 func decodePreferencesEcho(t *testing.T, rec *httptest.ResponseRecorder) map[string]json.RawMessage {
@@ -1658,8 +1559,6 @@ func TestUpdatePreferences_AudioSwitchOnly_LeavesEverythingElseAlone(t *testing.
 			rec := doUpdatePreferences(e, "1", tc.body, token)
 			require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
 
-			// Echo only what was written: a false echo for the switch the caller
-			// did NOT send would turn it off in the client's cached user.
 			data := decodePreferencesEcho(t, rec)
 			assert.Len(t, data, 1)
 			assert.JSONEq(t, "false", string(data[tc.key]))
@@ -1692,7 +1591,6 @@ func TestUpdatePreferences_BothAudioSwitches(t *testing.T) {
 	assert.False(t, repo.users[0].MusicEnabled)
 	assert.Equal(t, 1, repo.updatePreferencesCalls)
 
-	// And back on again — true is a value like any other, not "unset".
 	rec = doUpdatePreferences(e, "1", `{"soundEnabled":true,"musicEnabled":true}`, token)
 	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
 	data = decodePreferencesEcho(t, rec)
@@ -1732,7 +1630,6 @@ func TestUpdatePreferences_InvalidAudioValue_WritesNothing(t *testing.T) {
 		`{"musicEnabled":0}`,
 		`{"soundEnabled":{}}`,
 		`{"languagePreference":"mk","soundEnabled":"yes"}`,
-		// null decodes to "absent", so a body that is ONLY nulls names nothing.
 		`{"soundEnabled":null,"musicEnabled":null}`,
 	}
 	for _, body := range bodies {
@@ -1769,11 +1666,6 @@ func TestUpdatePreferences_AudioWithInvalidDeck_WritesNeither(t *testing.T) {
 	assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
 }
 
-// --- Audio volumes (migration 000026) ---
-//
-// Two 0-100 levels on the same PARTIAL endpoint. *int on the wire so an absent
-// volume is left alone rather than read as 0 (silent).
-
 func TestUpdatePreferences_AudioVolumeOnly_LeavesEverythingElseAlone(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -1800,15 +1692,12 @@ func TestUpdatePreferences_AudioVolumeOnly_LeavesEverythingElseAlone(t *testing.
 			rec := doUpdatePreferences(e, "1", tc.body, token)
 			require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
 
-			// Echo only what was written: a 0 echo for the volume the caller did
-			// NOT send would silence it in the client's cached user.
 			data := decodePreferencesEcho(t, rec)
 			assert.Len(t, data, 1)
 			assert.JSONEq(t, tc.echo, string(data[tc.key]))
 
 			assert.Equal(t, tc.wantSound, repo.users[0].SoundVolume)
 			assert.Equal(t, tc.wantMusic, repo.users[0].MusicVolume)
-			// A volume is not a switch: both stay on, and nothing else moves.
 			assert.True(t, repo.users[0].SoundEnabled)
 			assert.True(t, repo.users[0].MusicEnabled)
 			assert.Equal(t, "mk", repo.users[0].LanguagePreference)
@@ -1860,10 +1749,8 @@ func TestUpdatePreferences_SwitchesLeaveVolumesAlone(t *testing.T) {
 	assert.Equal(t, 80, repo.users[0].MusicVolume)
 }
 
-// A volume must be a JSON integer in 0-100. Out of range fails validation; a
-// fraction, string or boolean fails the decode. Either way the answer is 400
-// and — because both happen before any write — nothing changes, including a
-// valid field sent alongside the bad one.
+// TestUpdatePreferences_InvalidAudioVolume_WritesNothing checks a bad volume answers 400
+// and leaves every field unchanged.
 func TestUpdatePreferences_InvalidAudioVolume_WritesNothing(t *testing.T) {
 	bodies := []string{
 		`{"soundVolume":-1}`,
@@ -1881,7 +1768,6 @@ func TestUpdatePreferences_InvalidAudioVolume_WritesNothing(t *testing.T) {
 		`{"soundVolume":40,"musicVolume":101}`,
 		`{"soundEnabled":false,"musicVolume":-1}`,
 		`{"languagePreference":"mk","soundVolume":"x"}`,
-		// null decodes to "absent", so a body that is ONLY nulls names nothing.
 		`{"soundVolume":null,"musicVolume":null}`,
 	}
 	for _, body := range bodies {
@@ -1903,8 +1789,6 @@ func TestUpdatePreferences_InvalidAudioVolume_WritesNothing(t *testing.T) {
 		})
 	}
 }
-
-// --- UpdateUsername tests (Change Username feature) ---
 
 func doUpdateUsername(e *echo.Echo, userID, body, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/users/"+userID+"/username", strings.NewReader(body))
@@ -1945,7 +1829,6 @@ func TestUpdateUsername_Success(t *testing.T) {
 	assert.Equal(t, "newname", resp.Data.Username)
 	require.NotNil(t, resp.Data.UsernameChangedAt)
 
-	// Row mutated and cooldown stamp set.
 	assert.Equal(t, "newname", repo.users[0].Username)
 	require.NotNil(t, repo.users[0].UsernameChangedAt)
 }
@@ -2093,8 +1976,6 @@ func TestUpdateUsername_BadRequestInvalidID(t *testing.T) {
 	}
 }
 
-// --- ListMatches tests (Story 7.1) ---
-
 func doListMatches(e *echo.Echo, userID, query, token string) *httptest.ResponseRecorder {
 	path := "/api/v1/users/" + userID + "/matches"
 	if query != "" {
@@ -2158,10 +2039,8 @@ func TestListMatches_EmptyList(t *testing.T) {
 	assert.Equal(t, 0, resp.Offset)
 }
 
-// TestListMatches_BotInclusiveMatchMarksBots pins the Story 10.3 history
-// contract: bot-inclusive rows carry hasBots, bot seats serialize as
-// {userId:0, username:"", isBot:true}, viewer-seat derivation skips NULL
-// player IDs, and bot seats never reach the users lookup.
+// TestListMatches_BotInclusiveMatchMarksBots checks bot rows carry hasBots and bot seats
+// serialize as isBot without a users lookup.
 func TestListMatches_BotInclusiveMatchMarksBots(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
 	viewer := repo.addUser("alice", "alice@example.com", "en")
@@ -2225,14 +2104,9 @@ func TestListMatches_WinLossAbandonedOutcomes(t *testing.T) {
 	opp1 := repo.addUser("opp1", "o1@example.com", "en")
 	opp2 := repo.addUser("opp2", "o2@example.com", "en")
 
-	// Viewer sits at seat 0 (team A). seats: [viewer, opp1, mate, opp2].
 	seats := [4]uint{viewer.ID, opp1.ID, mate.ID, opp2.ID}
 	base := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
-	// Completed, team A wins -> outcome "win".
-	// Completed, team B wins -> outcome "loss".
-	// Abandoned BY THE VIEWER -> outcome "abandoned" (non-abandoners get
-	// win/loss instead — covered by TestListMatches_PerPlayerAbandonment).
 	abandoner := viewer.ID
 	matchRepo.matches = []match.Match{
 		seedMatch(1, base, base.Add(25*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1010, 640, nil),
@@ -2250,21 +2124,17 @@ func TestListMatches_WinLossAbandonedOutcomes(t *testing.T) {
 	require.Len(t, resp.Items, 3)
 	assert.Equal(t, int64(3), resp.Total)
 
-	// Outcomes ordered as seeded (mock returns insertion order).
 	assert.Equal(t, "win", resp.Items[0].Outcome)
 	assert.Equal(t, "loss", resp.Items[1].Outcome)
 	assert.Equal(t, "abandoned", resp.Items[2].Outcome)
 
-	// endReason: natural completions vs the abandoned row.
 	assert.Equal(t, "natural", resp.Items[0].EndReason)
 	assert.Equal(t, "natural", resp.Items[1].EndReason)
 	assert.Equal(t, "abandonment", resp.Items[2].EndReason)
 
-	// Viewer seat is always 0 in this setup.
 	for _, item := range resp.Items {
 		assert.Equal(t, 0, item.ViewerSeat)
 		require.Len(t, item.Players, 4)
-		// Seat-ordered 0..3.
 		assert.Equal(t, 0, item.Players[0].Seat)
 		assert.Equal(t, viewer.ID, item.Players[0].UserID)
 		assert.Equal(t, "viewer", item.Players[0].Username)
@@ -2273,7 +2143,6 @@ func TestListMatches_WinLossAbandonedOutcomes(t *testing.T) {
 		assert.Equal(t, "opp2", item.Players[3].Username)
 	}
 
-	// Abandoned row carries abandonedBy.
 	require.NotNil(t, resp.Items[2].AbandonedBy)
 	assert.Equal(t, viewer.ID, *resp.Items[2].AbandonedBy)
 }
@@ -2287,9 +2156,6 @@ func TestListMatches_PaginationBounds(t *testing.T) {
 
 	seats := [4]uint{viewer.ID, 2, 3, 4}
 	base := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
-	// Seed so completedAt descends as IDs ascend — the mock sorts by
-	// completed_at DESC, id DESC (matching production), so after sorting the
-	// page order is [1, 2, 3, 4, 5].
 	for i := 1; i <= 5; i++ {
 		completed := base.Add(time.Duration(60-10*i) * time.Minute)
 		matchRepo.matches = append(matchRepo.matches, seedMatch(
@@ -2300,7 +2166,6 @@ func TestListMatches_PaginationBounds(t *testing.T) {
 	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
 	require.NoError(t, err)
 
-	// total=5, limit=2, offset=2 -> items[2..3] (IDs 3, 4)
 	rec := doListMatches(e, strconvUint(viewer.ID), "limit=2&offset=2", token)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	resp := decodeMatchesResponse(t, rec.Body.Bytes())
@@ -2311,7 +2176,6 @@ func TestListMatches_PaginationBounds(t *testing.T) {
 	assert.Equal(t, uint(3), resp.Items[0].ID)
 	assert.Equal(t, uint(4), resp.Items[1].ID)
 
-	// offset past end -> empty items, total still 5
 	rec = doListMatches(e, strconvUint(viewer.ID), "limit=2&offset=100", token)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	resp = decodeMatchesResponse(t, rec.Body.Bytes())
@@ -2328,7 +2192,6 @@ func TestListMatches_OrdersByCompletedAtDesc(t *testing.T) {
 
 	seats := [4]uint{viewer.ID, 2, 3, 4}
 	base := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
-	// Seed oldest first; the repo must reorder newest first.
 	matchRepo.matches = []match.Match{
 		seedMatch(10, base, base.Add(5*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1001, 500, nil),
 		seedMatch(11, base.Add(1*time.Hour), base.Add(1*time.Hour+5*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1001, 500, nil),
@@ -2342,7 +2205,6 @@ func TestListMatches_OrdersByCompletedAtDesc(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	resp := decodeMatchesResponse(t, rec.Body.Bytes())
 	require.Len(t, resp.Items, 3)
-	// Newest completedAt first: 12, 11, 10.
 	assert.Equal(t, uint(12), resp.Items[0].ID)
 	assert.Equal(t, uint(11), resp.Items[1].ID)
 	assert.Equal(t, uint(10), resp.Items[2].ID)
@@ -2387,20 +2249,16 @@ func TestListMatches_HandsEmbedded(t *testing.T) {
 	assert.Equal(t, "loss", resp.Items[0].Outcome, "viewer is team A, winner is team B -> loss")
 }
 
-// Story 11.3: matches for a foreign SUBJECT are public and computed
-// viewer-relative to the SUBJECT (not the requesting viewer). The subject sits
-// at seat 1 on the losing team, so the subject-keyed outcome is "loss" with
-// viewerSeat 1 — a viewer-keyed bug (the viewer isn't in the match) would
-// default to seat 0 / "win", so this pins the paramID swap.
+// TestListMatches_ForeignSubject_ViewerRelativeToSubject checks a foreign subject's
+// matches are computed relative to the subject, not the viewer.
 func TestListMatches_ForeignSubject_ViewerRelativeToSubject(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
-	viewer := repo.addUser("viewer", "viewer@example.com", "en") // id 1, not in the match
+	viewer := repo.addUser("viewer", "viewer@example.com", "en")
 	subject := repo.addUser("subject", "subject@example.com", "en")
 	p3 := repo.addUser("p3", "p3@example.com", "en")
 	p4 := repo.addUser("p4", "p4@example.com", "en")
 	mate := repo.addUser("mate", "mate@example.com", "en")
 
-	// seat0=p3 (A), seat1=subject (B), seat2=p4 (A), seat3=mate (B). Team A wins.
 	seats := [4]uint{p3.ID, subject.ID, p4.ID, mate.ID}
 	base := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 	matchRepo.matches = []match.Match{
@@ -2498,15 +2356,13 @@ func TestListMatches_NoPIILeak(t *testing.T) {
 
 func strconvUint(u uint) string { return strconv.FormatUint(uint64(u), 10) }
 
-// --- Extended GetProfile with aggregate stats (Story 7.2) ---
-
 func TestGetProfile_WithStats(t *testing.T) {
 	cases := []struct {
 		name     string
 		wins     int
 		losses   int
 		aband    int
-		expected int // totalGamesPlayed
+		expected int
 	}{
 		{"zero games", 0, 0, 0, 0},
 		{"mixed outcomes", 7, 3, 1, 11},
@@ -2535,10 +2391,8 @@ func TestGetProfile_WithStats(t *testing.T) {
 			assert.Equal(t, tc.losses, data.Losses)
 			assert.Equal(t, tc.aband, data.Abandoned)
 			assert.Equal(t, tc.expected, data.TotalGamesPlayed)
-			// Invariant: total == wins + losses + abandoned.
 			assert.Equal(t, data.Wins+data.Losses+data.Abandoned, data.TotalGamesPlayed,
 				"totalGamesPlayed invariant")
-			// Identity fields preserved.
 			assert.Equal(t, u.ID, data.ID)
 			assert.Equal(t, "alice", data.Username)
 			assert.Equal(t, "en", data.LanguagePreference)
@@ -2548,7 +2402,6 @@ func TestGetProfile_WithStats(t *testing.T) {
 
 func TestGetProfile_StatsDBError(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
-	// Distinctive email so any partial-payload leak is obvious in the 500 body.
 	u := repo.addUser("alice", "alice-err-probe@example.com", "en")
 	matchRepo.statsErr = errors.New("db boom")
 
@@ -2563,7 +2416,6 @@ func TestGetProfile_StatsDBError(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "INTERNAL_ERROR", errResp["error"]["code"])
 
-	// PII guard: the error-branch response body must not leak user fields either.
 	body := rec.Body.String()
 	assert.NotContains(t, body, "alice-err-probe@example.com", "email must never leak on 500")
 	assert.NotContains(t, body, "\"email\"", "email field must not appear on 500")
@@ -2573,7 +2425,6 @@ func TestGetProfile_StatsDBError(t *testing.T) {
 
 func TestGetProfile_NeverLeaksPII(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
-	// Use a distinctive email so any leak is obvious in the response body.
 	u := repo.addUser("alice", "alice-leak-probe@example.com", "en")
 	matchRepo.statsOverride = &struct{ wins, losses, abandoned int }{3, 1, 0}
 
@@ -2592,10 +2443,6 @@ func TestGetProfile_NeverLeaksPII(t *testing.T) {
 }
 
 func TestGetProfile_AuthFailures_DoNotCallStats(t *testing.T) {
-	// 400 on bad id, 401 on missing token — stats repo must not be invoked
-	// because the request is rejected before the stats call. (A foreign id is
-	// no longer rejected — Story 11.3 serves it the public projection, covered
-	// by TestGetProfile_ForeignID_ReturnsPublicProjection.)
 	t.Run("bad path id", func(t *testing.T) {
 		repo, matchRepo, e := setupUserHandlerWithMatches()
 		u := repo.addUser("alice", "alice@example.com", "en")
@@ -2615,11 +2462,8 @@ func TestGetProfile_AuthFailures_DoNotCallStats(t *testing.T) {
 	})
 }
 
-// TestGetProfile_StatsMatchListTotal verifies the invariant from AC #2: the
-// sum wins+losses+abandoned computed by GetStatsForUser matches the total
-// returned by GetMatchesForUser for the same user, across a realistic seed.
-// Uses the mock's seed-driven stats path (statsOverride not set) so both
-// code paths exercise the same participation predicate.
+// TestGetProfile_StatsMatchListTotal checks wins, losses and abandons from GetStatsForUser
+// sum to the match list total.
 func TestGetProfile_StatsMatchListTotal(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
 	viewer := repo.addUser("viewer", "v@example.com", "en")
@@ -2628,12 +2472,6 @@ func TestGetProfile_StatsMatchListTotal(t *testing.T) {
 	p4 := repo.addUser("p4", "p4@example.com", "en")
 	bystander := repo.addUser("bystander", "b@example.com", "en")
 
-	// Viewer across multiple seats + team outcomes:
-	//  - seat 0 (team A), completed, team A wins -> win
-	//  - seat 0 (team A), completed, team B wins -> loss
-	//  - seat 3 (team B), completed, team B wins -> win (exercises CASE at seat 3)
-	//  - seat 2 (team A), abandoned -> abandoned
-	//  - match not involving viewer (bystander-only) -> ignored in both paths
 	base := time.Date(2026, 4, 10, 12, 0, 0, 0, time.UTC)
 	abandoner := viewer.ID
 	matchRepo.matches = []match.Match{
@@ -2657,7 +2495,6 @@ func TestGetProfile_StatsMatchListTotal(t *testing.T) {
 	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
 	require.NoError(t, err)
 
-	// Hit /profile — drives GetStatsForUser and returns aggregate counts.
 	profRec := doGetProfile(e, strconvUint(viewer.ID), token)
 	require.Equal(t, http.StatusOK, profRec.Code)
 	var resp map[string]json.RawMessage
@@ -2665,22 +2502,18 @@ func TestGetProfile_StatsMatchListTotal(t *testing.T) {
 	var prof user.ProfileResponse
 	require.NoError(t, json.Unmarshal(resp["data"], &prof))
 
-	// Hit /matches — drives GetMatchesForUser and returns total count.
 	matchRec := doListMatches(e, strconvUint(viewer.ID), "limit=50", token)
 	require.Equal(t, http.StatusOK, matchRec.Code)
 	matchResp := decodeMatchesResponse(t, matchRec.Body.Bytes())
 
-	// AC #2 invariant: aggregate sum must equal matches total.
 	assert.Equal(t, int64(prof.TotalGamesPlayed), matchResp.Total,
 		"totalGamesPlayed must equal /matches total for same user")
 	assert.Equal(t, prof.Wins+prof.Losses+prof.Abandoned, prof.TotalGamesPlayed)
 
-	// Expected by construction: 2 wins, 1 loss, 1 abandoned, bystander ignored.
 	assert.Equal(t, 2, prof.Wins)
 	assert.Equal(t, 1, prof.Losses)
 	assert.Equal(t, 1, prof.Abandoned)
 
-	// Bystander's profile: sees only their one match (a win — seat 0 team A, team A wins).
 	byToken, err := auth.GenerateAccessToken(bystander.ID, testJWTSecret)
 	require.NoError(t, err)
 	byRec := doGetProfile(e, strconvUint(bystander.ID), byToken)
@@ -2695,26 +2528,20 @@ func TestGetProfile_StatsMatchListTotal(t *testing.T) {
 	assert.Equal(t, 1, byProf.TotalGamesPlayed)
 }
 
-// Story 11.3 removed the self-gate, so a huge id no longer risks a wraparound
-// auth bypass — it simply resolves to no user and 404s. The self-vs-public
-// branch still compares paramID as uint64 (D86), so a 2^32+1 request from
-// user 1 never falls into the self branch and never serves user 1's private
-// profile.
+// TestGetProfile_HugeUnknownID_NotFound checks an id above 2^32 returns 404 and never
+// serves user 1's private profile.
 func TestGetProfile_HugeUnknownID_NotFound(t *testing.T) {
 	repo, e := setupUserHandler()
-	repo.addUser("alice", "alice@example.com", "en") // gets ID=1
+	repo.addUser("alice", "alice@example.com", "en")
 
 	token, err := auth.GenerateAccessToken(1, testJWTSecret)
 	require.NoError(t, err)
 
-	// 4294967297 = 2^32 + 1; no such user exists.
 	rec := doGetProfile(e, "4294967297", token)
 	assert.Equal(t, http.StatusNotFound, rec.Code,
 		"a huge unknown id resolves to no user and 404s, not a wraparound self-serve (D86)")
 	assert.Equal(t, "USER_NOT_FOUND", errCode(t, rec))
 }
-
-// --- ListMatches outcome filter + sort ---
 
 func TestListMatches_OutcomeFilter(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
@@ -2723,19 +2550,16 @@ func TestListMatches_OutcomeFilter(t *testing.T) {
 	_ = repo.addUser("p3", "p3@example.com", "en")
 	_ = repo.addUser("p4", "p4@example.com", "en")
 
-	seats := [4]uint{viewer.ID, 2, 3, 4} // viewer seat 0 → team A
+	seats := [4]uint{viewer.ID, 2, 3, 4}
 	base := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
-	// Per-player abandonment semantics: the opponent's abandonment (match 4)
-	// counts as a viewer win; the viewer's own (match 3) and the legacy
-	// NULL-abandoner row (match 5) stay "abandoned".
 	viewerAb := viewer.ID
-	oppAb := uint(2) // seat 1, team B → winner_team 0 = viewer's team
+	oppAb := uint(2)
 	matchRepo.matches = []match.Match{
-		seedMatch(1, base, base.Add(20*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1010, 600, nil),                                    // win
-		seedMatch(2, base.Add(-1*time.Hour), base.Add(-1*time.Hour+20*time.Minute), seats, "completed", 1, nil, "bitola", "1001", 700, 1010, nil),     // loss
-		seedMatch(3, base.Add(-2*time.Hour), base.Add(-2*time.Hour+5*time.Minute), seats, "abandoned", 1, &viewerAb, "bitola", "1001", 300, 200, nil), // abandoned (own)
-		seedMatch(4, base.Add(-3*time.Hour), base.Add(-3*time.Hour+5*time.Minute), seats, "abandoned", 0, &oppAb, "bitola", "1001", 400, 300, nil),    // win (opponent abandoned)
-		seedMatch(5, base.Add(-4*time.Hour), base.Add(-4*time.Hour+5*time.Minute), seats, "abandoned", 0, nil, "bitola", "1001", 0, 0, nil),           // abandoned (legacy NULL)
+		seedMatch(1, base, base.Add(20*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1010, 600, nil),
+		seedMatch(2, base.Add(-1*time.Hour), base.Add(-1*time.Hour+20*time.Minute), seats, "completed", 1, nil, "bitola", "1001", 700, 1010, nil),
+		seedMatch(3, base.Add(-2*time.Hour), base.Add(-2*time.Hour+5*time.Minute), seats, "abandoned", 1, &viewerAb, "bitola", "1001", 300, 200, nil),
+		seedMatch(4, base.Add(-3*time.Hour), base.Add(-3*time.Hour+5*time.Minute), seats, "abandoned", 0, &oppAb, "bitola", "1001", 400, 300, nil),
+		seedMatch(5, base.Add(-4*time.Hour), base.Add(-4*time.Hour+5*time.Minute), seats, "abandoned", 0, nil, "bitola", "1001", 0, 0, nil),
 	}
 
 	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
@@ -2766,21 +2590,19 @@ func TestListMatches_OutcomeFilter(t *testing.T) {
 	}
 }
 
-// TestListMatches_PerPlayerAbandonment pins the full I/O matrix of the
-// per-player outcome + endReason mapping across all four perspectives on one
-// abandoned match (abandoner / partner / two opponents), the legacy
-// NULL-abandoner row, and the surrender/natural completed variants.
+// TestListMatches_PerPlayerAbandonment checks outcome and endReason for every seat of an
+// abandoned match, legacy rows, and completed variants.
 func TestListMatches_PerPlayerAbandonment(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
-	p1 := repo.addUser("p1", "p1@example.com", "en") // seat 0, team A
-	p2 := repo.addUser("p2", "p2@example.com", "en") // seat 1, team B
-	p3 := repo.addUser("p3", "p3@example.com", "en") // seat 2, team A
-	p4 := repo.addUser("p4", "p4@example.com", "en") // seat 3, team B
+	p1 := repo.addUser("p1", "p1@example.com", "en")
+	p2 := repo.addUser("p2", "p2@example.com", "en")
+	p3 := repo.addUser("p3", "p3@example.com", "en")
+	p4 := repo.addUser("p4", "p4@example.com", "en")
 
 	seats := [4]uint{p1.ID, p2.ID, p3.ID, p4.ID}
 	base := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
-	abandoner := p1.ID   // team A abandons → winner_team 1
-	surrenderer := p2.ID // team B surrenders → completed, winner_team 0
+	abandoner := p1.ID
+	surrenderer := p2.ID
 
 	surrendered := seedMatch(3, base.Add(-2*time.Hour), base.Add(-2*time.Hour+15*time.Minute),
 		seats, "completed", 0, nil, "bitola", "1001", 720, 430, nil)
@@ -2796,8 +2618,7 @@ func TestListMatches_PerPlayerAbandonment(t *testing.T) {
 	cases := []struct {
 		name   string
 		viewer uint
-		// Expected per match ID: outcome + endReason.
-		want map[uint][2]string
+		want   map[uint][2]string
 	}{
 		{name: "abandoner", viewer: p1.ID, want: map[uint][2]string{
 			1: {"abandoned", "abandonment"},
@@ -2881,8 +2702,6 @@ func TestListMatches_BadRequest_InvalidOutcomeOrSort(t *testing.T) {
 	}
 }
 
-// --- GetCareer ---
-
 func TestGetCareer_Success(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
 	viewer := repo.addUser("viewer", "v@example.com", "en")
@@ -2926,7 +2745,6 @@ func TestGetCareer_Success(t *testing.T) {
 	assert.Equal(t, "rival", data.TopRivals[0].Username)
 	assert.Equal(t, 4, data.TopRivals[0].Wins)
 
-	// No PII leak in the career response either.
 	body := rec.Body.String()
 	assert.NotContains(t, body, "@example.com")
 	assert.NotContains(t, body, "passwordHash")
@@ -3012,10 +2830,8 @@ func TestGetCareer_DBError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 
-// A both-fields request must apply WHOLE or not at all. Before the write became
-// a single multi-column UPDATE it was two sequential calls, so a failure on the
-// second answered 500 with the first change already committed — the client
-// reverts its optimistic deck and never learns its language moved.
+// TestUpdatePreferences_WriteFailure_LeavesNothingApplied checks a failed both-fields
+// update applies neither field.
 func TestUpdatePreferences_WriteFailure_LeavesNothingApplied(t *testing.T) {
 	repo, e := setupUserHandler()
 	u := repo.addUser("testuser", "test@example.com", "en")
@@ -3027,8 +2843,6 @@ func TestUpdatePreferences_WriteFailure_LeavesNothingApplied(t *testing.T) {
 	rec := doUpdatePreferences(e, "1", `{"languagePreference":"mk","cardDeckPreference":"croatian"}`, token)
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 
-	// Neither column moved. The repo is the atomicity boundary; the handler just
-	// has to make ONE call to it.
 	assert.Equal(t, "en", repo.users[0].LanguagePreference)
 	assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
 }
@@ -3063,8 +2877,6 @@ func TestUpdatePreferences_IssuesOneWritePerRequest(t *testing.T) {
 	}
 }
 
-// --- GetRoomLastMatch tests (room last-match stats) ---
-
 func doGetRoomLastMatch(e *echo.Echo, roomID, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/rooms/"+roomID+"/last-match", nil)
 	if token != "" {
@@ -3093,7 +2905,6 @@ func TestGetRoomLastMatch_ParticipantGetsNewestRoomMatch(t *testing.T) {
 	mate := repo.addUser("mate", "m@example.com", "en")
 	opp2 := repo.addUser("opp2", "o2@example.com", "en")
 
-	// Viewer at seat 1 (team B) so a seat-0 fallback would be visible.
 	seats := [4]uint{opp1.ID, viewer.ID, opp2.ID, mate.ID}
 	base := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	hands := []match.HandResult{
@@ -3104,7 +2915,6 @@ func TestGetRoomLastMatch_ParticipantGetsNewestRoomMatch(t *testing.T) {
 	older.RoomID = 7
 	newest := seedMatch(2, base, base.Add(25*time.Minute), seats, "completed", 1, nil, "croatia", "1001", 640, 1010, hands)
 	newest.RoomID = 7
-	// A newer match in a DIFFERENT room must never win the recency race.
 	otherRoom := seedMatch(3, base.Add(time.Hour), base.Add(90*time.Minute), seats, "completed", 0, nil, "bitola", "1001", 1001, 300, nil)
 	otherRoom.RoomID = 8
 	matchRepo.matches = []match.Match{older, newest, otherRoom}
@@ -3235,10 +3045,8 @@ func TestGetRoomLastMatch_BotSeatsMarked(t *testing.T) {
 	}
 }
 
-// An abandoned row is still the room's last match: the status allowlist covers
-// it, so the ROOM dialog can show the game that fell over. (Nothing on the
-// client polls for it — the end-of-match overlay never renders on an
-// abandonment; that path shows ReconnectOverlay instead.)
+// TestGetRoomLastMatch_AbandonedRowIsReturned checks an abandoned match still counts as
+// the room's last match.
 func TestGetRoomLastMatch_AbandonedRowIsReturned(t *testing.T) {
 	repo, matchRepo, e := setupUserHandlerWithMatches()
 	viewer := repo.addUser("viewer", "v@example.com", "en")
@@ -3263,8 +3071,6 @@ func TestGetRoomLastMatch_AbandonedRowIsReturned(t *testing.T) {
 	assert.Equal(t, "abandonment", item.EndReason)
 	assert.Equal(t, "win", item.Outcome, "non-abandoner on the winning team")
 }
-
-// --- Avatars: every identity DTO carries the derived 128 URL ---
 
 const testAssetsBase = "https://assets.test"
 
@@ -3315,7 +3121,6 @@ func TestGetProfile_BothShapesCarryBothAvatarURLs(t *testing.T) {
 		})
 	}
 
-	// A player without an avatar: both keys present, both null.
 	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
 	require.NoError(t, err)
 	data := decodeData(t, doGetProfile(e, strconvUint(viewer.ID), token)).(map[string]any)

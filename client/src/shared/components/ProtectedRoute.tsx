@@ -9,6 +9,7 @@ function ProtectedContent() {
   return <Outlet />;
 }
 
+/** Gates authenticated routes; unauthenticated users go to the landing page, matching logout and the 401 redirect. */
 export function ProtectedRoute() {
   const token = useAuthStore((s) => s.token);
   const isLoading = useAuthStore((s) => s.isLoading);
@@ -18,10 +19,6 @@ export function ProtectedRoute() {
   }
 
   if (!token) {
-    // Unauthenticated → the public landing ("/"), the logged-out home (it has
-    // its own "Log in" CTA). Keeping this aligned with the logout navigation
-    // and the axios 401 redirect means a deliberate logout always lands on the
-    // landing, never racing to /login as the protected tree unmounts.
     return <Navigate to="/" replace />;
   }
 

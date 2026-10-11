@@ -11,9 +11,6 @@ import { TestProviders } from "@/test-utils";
 const mockListFriends = vi.fn();
 const mockListRequests = vi.fn();
 
-// The card now contains the requests section too, so the friends API stub has to
-// cover both queries. Requests default to empty — that section then draws
-// nothing, which is what every test below expects unless it says otherwise.
 vi.mock("@/shared/api/friends", () => ({
   listFriends: (...args: unknown[]) => mockListFriends(...args),
   listFriendRequests: (...args: unknown[]) => mockListRequests(...args),
@@ -21,8 +18,6 @@ vi.mock("@/shared/api/friends", () => ({
   declineFriendRequest: vi.fn(),
 }));
 
-// The card hosts player search behind its header icon; no test here types a
-// query, so the stub only has to exist.
 vi.mock("@/shared/api/users", () => ({
   searchUsers: vi.fn().mockResolvedValue([]),
 }));
@@ -64,8 +59,6 @@ describe("FriendList", () => {
     const bobRow = rows.find((r) => r.getAttribute("data-user-id") === "2")!;
     const carolRow = rows.find((r) => r.getAttribute("data-user-id") === "3")!;
 
-    // Whispers are real-time: the server rejects one to an offline friend, so the
-    // button is not offered there.
     expect(within(bobRow).getByTestId("friend-whisper")).toBeInTheDocument();
     expect(within(carolRow).queryByTestId("friend-whisper")).toBeNull();
   });
@@ -89,15 +82,11 @@ describe("FriendList", () => {
     await user.click(screen.getByTestId("friend-whisper"));
 
     const state = useChatStore.getState();
-    // A thread the pair has never used is seeded empty, so the dock's
-    // activeThread guard resolves it instead of snapping back to primary.
     expect(state.whisperThreads.bob).toEqual([]);
     expect(state.activeChannel).toBe("whisper:bob");
     expect(state.whisperOpenRequest).toBe(before + 1);
   });
 
-  // Player search lives in this card's header now — one icon, expanded on demand,
-  // instead of a permanent full-width card holding an almost-always-empty field.
   it("expands player search from the header icon and collapses it again", async () => {
     const user = userEvent.setup();
     mockListFriends.mockResolvedValue([]);
@@ -113,7 +102,6 @@ describe("FriendList", () => {
 
     expect(screen.getByTestId("player-search")).toHaveFocus();
     expect(screen.getByTestId("player-search-toggle")).toHaveAttribute("aria-expanded", "true");
-    // The friend list is not replaced by the search — both stay readable.
     expect(screen.getByTestId("friend-list-empty")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("player-search-toggle"));

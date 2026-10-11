@@ -12,20 +12,11 @@ import { PlayingCard } from "./PlayingCard";
 
 interface BelotPromptProps {
   isKing: boolean;
-  /**
-   * Trump suit — drives which Q/K to render. Optional so existing test
-   * renders that don't care about the cards still work; falls back to
-   * spades for purely visual purposes.
-   */
   trumpSuit?: Suit;
   onAnnounce: () => void;
   onDecline: () => void;
   turnExpiresAt?: string | null;
   timerDurationSec?: number;
-  // Defensive component-level invariant: ring renders only when the viewer is
-  // the active player. Caller (MatchPage) already gates this prompt on
-  // pendingBelotSeat === myPlayerSeat, so this defaults true; any future
-  // caller that mounts the prompt for a non-active viewer must opt out.
   isActivePlayer?: boolean;
 }
 
@@ -39,8 +30,6 @@ export function BelotPrompt({
   isActivePlayer = true,
 }: BelotPromptProps) {
   const { t } = useTranslation();
-  // Escape declines the announcement and forfeits the +20 bonus per the rule.
-  // fixed inset-0 prevents leak through scrolled stacking.
   const promptRef = useFocusTrap<HTMLDivElement>({ onEscape: onDecline });
   const showRing = isActivePlayer && Boolean(turnExpiresAt) && (timerDurationSec ?? 0) > 0;
 
@@ -64,9 +53,6 @@ export function BelotPrompt({
             title={<span id="belot-prompt-title">{t(titleKey)}</span>}
             subtitle={t(subtitleKey)}
           >
-            {/* Q + K of trump side-by-side. The card matching the just-played
-                K/Q lifts up with the lime playable halo so the player sees
-                exactly which card the announcement is anchored to. */}
             <div className="flex justify-center items-end gap-3.5 mt-2 mb-5">
               <PlayingCard
                 card={{ rank: "Q", suit: trumpSuit }}
@@ -82,9 +68,6 @@ export function BelotPrompt({
               />
             </div>
 
-            {/* Brass-bordered accent strip — small felt callout reminding the
-                player of the +20 swing if they announce. Sits in the same
-                family as the panel chrome. */}
             <div
               className="mb-3.5 px-3 py-2 rounded-lg flex items-center gap-2 font-body"
               style={{
@@ -117,11 +100,6 @@ export function BelotPrompt({
                 {t(announceKey)}
               </ClassicButton>
               {showRing ? (
-                // Visual countdown only — the server runs its own per-move
-                // timer and auto-skips the belot announcement on expiry. The
-                // resulting state push dismisses this prompt, so a client-side
-                // onExpire would race the server and surface a wrong-phase
-                // error toast for an action the user did not take.
                 <ButtonTimerRing
                   turnExpiresAt={turnExpiresAt}
                   totalDuration={timerDurationSec ?? 0}

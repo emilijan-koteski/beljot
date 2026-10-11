@@ -21,6 +21,10 @@ interface FieldErrors {
   password?: string;
 }
 
+/**
+ * Email/password login page with Google SSO.
+ * The sign-in controls use tabIndex 1-3 so they precede the Forgot link rendered above the password input.
+ */
 export function LoginPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -69,8 +73,6 @@ export function LoginPage() {
     try {
       const res = await loginMutation.mutateAsync({ email, password });
       await reconcileLanguagePreference(res, i18n.language);
-      // Replace: /lobby is the app root — back from it must exit the app,
-      // never return to the login form.
       navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError) {
@@ -103,15 +105,6 @@ export function LoginPage() {
         {t("auth.login.title")}
       </h1>
 
-      {/* Tab order is set with tabIndex 1-2-3 on the three sign-in controls, NOT by
-          DOM order. "Forgot?" belongs beside the Password label visually, and that
-          slot renders above the input — so in document order it sat between the two
-          credentials and caught the Tab out of the email field. Positive tabIndex
-          values are the one thing that separates focus order from source order, and
-          they promote these three ahead of every other tabbable element: on a login
-          page that IS the meaningful order — email → password → Sign in, then
-          everything else (Forgot, Google, Register) in source order. Keep the three
-          numbers contiguous, and leave everything else at 0. */}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" data-testid="login-form">
         <Field
           label={t("auth.login.emailLabel")}
@@ -208,8 +201,6 @@ export function LoginPage() {
 
       <GoogleSignInButton onCredential={handleGoogleCredential} />
 
-      {/* The Google button on /login can REGISTER a brand-new account, so the
-          same ToS/privacy small-print as on the register page applies here. */}
       <p
         className="text-ink-mute mt-3 text-center text-xs leading-normal"
         data-testid="sso-consent-note"

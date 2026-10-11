@@ -16,9 +16,6 @@ import { makeRoom, makeRoomDetail, makeRoomPlayer, makeUser, QueryWrapper } from
 
 import { RoomPage } from "./RoomPage";
 
-// Mock react-router useParams and useNavigate. The route id lives in a hoisted
-// box so a test can drive a MALFORMED :id through the page (vi.mock factories
-// run before module-level `let` bindings are initialised, hence vi.hoisted).
 const mockNavigate = vi.fn();
 const { routeParams } = vi.hoisted(() => ({ routeParams: { id: "1" } }));
 vi.mock("react-router", async () => {
@@ -30,7 +27,6 @@ vi.mock("react-router", async () => {
   };
 });
 
-// Mock API
 vi.mock("@/shared/api/rooms", () => ({
   addBot: vi.fn(),
   removeBot: vi.fn(),
@@ -45,17 +41,11 @@ vi.mock("@/shared/api/rooms", () => ({
   transferOwnership: vi.fn(),
 }));
 
-// Mock WebSocket connection state + sendMessage hook (ChatDock pulls both)
-// The room's last-match panel reads GET /rooms/:id/last-match. Controlled here
-// so the action-bar button's presence is a property of the fixture, not of a
-// stray network call: a rejection (the 404 a room with no playable-by-you match
-// returns) leaves the button unrendered.
 const mockGetRoomLastMatch = vi.fn();
 vi.mock("@/shared/api/matches", () => ({
   getRoomLastMatch: (roomId: number) => mockGetRoomLastMatch(roomId),
 }));
 
-// Friendship backs the per-player rows inside the last-match dialog.
 const mockGetFriendshipStatus = vi.fn();
 vi.mock("@/shared/api/friends", () => ({
   getFriendshipStatus: (id: number) => mockGetFriendshipStatus(id),
@@ -70,7 +60,6 @@ vi.mock("@/shared/providers/WebSocketContext", () => ({
   useWsSendMessage: () => vi.fn(),
 }));
 
-// Mock sonner toast
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -127,7 +116,6 @@ const defaultRoom = makeRoom({
   isQuickPlay: false,
   coinBuyIn: 0,
   isPrivate: false,
-  // Ungated by default (Story 9.8).
   minHonor: 0,
   allowNewPlayers: true,
   createdAt: "",
@@ -145,17 +133,12 @@ const defaultUser = makeUser({
 beforeEach(() => {
   mockLeaveRoom.mockResolvedValue(undefined);
   mockJoinRoom.mockResolvedValue(defaultRoom);
-  // Default: this room has no last match the viewer played (the server's 404).
   mockGetRoomLastMatch.mockReset();
   mockGetRoomLastMatch.mockRejectedValue(new FetchError(404, "NOT_FOUND", "not found"));
   mockGetFriendshipStatus.mockReset();
   mockGetFriendshipStatus.mockResolvedValue({ status: "none", requestId: null });
   routeParams.id = "1";
-  // jsdom has no scrollIntoView — the nested ChatDock calls it on mount.
   Element.prototype.scrollIntoView = vi.fn();
-  // jsdom has no matchMedia — RoomPage reads `prefers-reduced-motion` to
-  // decide between the rotation transition + delayed "your seat" label and
-  // the snap path. Default matches=false (animations allowed).
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
@@ -274,7 +257,6 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-0")).toBeInTheDocument();
     });
 
-    // Names also surface in the team legend, so scope to the seat tiles.
     expect(within(screen.getByTestId("player-seat-0")).getByText("alice")).toBeInTheDocument();
     expect(within(screen.getByTestId("player-seat-1")).getByText("bob")).toBeInTheDocument();
   });
@@ -307,7 +289,6 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-0")).toBeInTheDocument();
     });
 
-    // Three empty seats each show the "Take this seat" prompt.
     expect(screen.getAllByText("Take this seat")).toHaveLength(3);
   });
 
@@ -422,10 +403,6 @@ describe("RoomPage", () => {
   it("auto-joins when arriving via direct URL as a non-member (deep link)", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    // Viewer alice (id 10) is NOT among the players — she pasted the room URL
-    // directly instead of going through the lobby's Join, so she never became
-    // a member. Without auto-join the server rejects seat selection with
-    // ErrNotInRoom and sends her no room WS events.
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
         room: { ...defaultRoom, ownerId: 20, playerCount: 1 },
@@ -486,9 +463,6 @@ describe("RoomPage", () => {
   it("prompts for a password instead of blind-joining on a deep link to a private room", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
-    // Viewer alice (id 10) deep-links to a PRIVATE room she isn't seated in. A
-    // blind auto-join would be rejected with WRONG_ROOM_PASSWORD, so the page
-    // must prompt for the password and only join once she submits it.
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
         room: { ...defaultRoom, ownerId: 20, playerCount: 1, isPrivate: true },
@@ -517,13 +491,11 @@ describe("RoomPage", () => {
     const user = userEvent.setup();
     renderRoomPage();
 
-    // The prompt appears and no blind join has fired.
     await waitFor(() => {
       expect(screen.getByTestId("password-prompt-dialog")).toBeInTheDocument();
     });
     expect(mockJoinRoom).not.toHaveBeenCalled();
 
-    // Submitting the password joins with it.
     await user.type(screen.getByTestId("password-prompt-input"), "sesame");
     await user.click(screen.getByTestId("password-prompt-submit"));
 
@@ -531,13 +503,6 @@ describe("RoomPage", () => {
       expect(mockJoinRoom).toHaveBeenCalledWith(1, "sesame");
     });
   });
-
-  // --- Honor gate on the deep-link paths (Story 9.8 AC9) ---
-  //
-  // RoomPage has TWO join call paths: the public auto-join effect and
-  // joinDeepLinkPrivate. 9.6's review found the deep-link path needed the
-  // identical fix the lobby path had received, and it surfaced only in manual
-  // E2E — so both are covered here.
 
   const bobSeated = {
     id: 1,
@@ -570,7 +535,6 @@ describe("RoomPage", () => {
     await waitFor(() => expect(mockJoinRoom).toHaveBeenCalledWith(1, undefined));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
 
-    // Composed locally from the room's threshold and the viewer's own score.
     const msg = vi.mocked(toast.error).mock.calls.at(-1)?.[0] as string;
     expect(msg).toContain("85");
     expect(msg).toContain("42");
@@ -619,7 +583,6 @@ describe("RoomPage", () => {
     const user = userEvent.setup();
     renderRoomPage();
 
-    // The private room prompts first; the honor gate only bites on submit.
     await waitFor(() => expect(screen.getByTestId("password-prompt-dialog")).toBeInTheDocument());
     await user.type(screen.getByTestId("password-prompt-input"), "sesame");
     await user.click(screen.getByTestId("password-prompt-submit"));
@@ -633,11 +596,6 @@ describe("RoomPage", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
   });
 
-  // Completes the 2 codes x 2 call paths matrix. Both paths route through the same
-  // joinFailureMessage(code, room) helper, which is the structural fix AC9 asked
-  // for — but "they share a helper" is exactly the assumption 9.6 made before its
-  // deep-link path turned out to need the identical fix, so the fourth cell is
-  // asserted rather than inferred.
   it("surfaces the newcomer gate on the private deep-link path too", async () => {
     useAuthStore.setState({
       user: makeUser({ id: 10, username: "alice", isNewPlayer: true }),
@@ -675,12 +633,6 @@ describe("RoomPage", () => {
   });
 
   it("does not re-prompt for the password when a stale cache omits a just-joined member", async () => {
-    // Regression: re-entering a private room right after joining elsewhere (e.g.
-    // join-by-code → navigate here) used to spuriously re-open the password
-    // prompt. refetchOnMount:"always" still serves the cached snapshot
-    // synchronously, and that snapshot can omit the just-joined viewer; the
-    // auto-join effect must wait for the post-mount fetch (isFetchedAfterMount)
-    // before judging membership.
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
     const privateRoom = { ...defaultRoom, ownerId: 20, isPrivate: true, playerCount: 2 };
@@ -695,7 +647,6 @@ describe("RoomPage", () => {
       isBot: false,
       createdAt: "",
     };
-    // alice (the viewer) is a member but not yet seated (seat null).
     const aliceMember = {
       id: 2,
       roomId: 1,
@@ -708,7 +659,6 @@ describe("RoomPage", () => {
       createdAt: "",
     };
 
-    // Seed the detail cache with a STALE snapshot that omits alice...
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
@@ -717,7 +667,6 @@ describe("RoomPage", () => {
       players: [bob],
       returnedUserIds: [],
     });
-    // ...while the fresh post-mount fetch shows alice IS a member.
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
         room: privateRoom,
@@ -737,7 +686,6 @@ describe("RoomPage", () => {
     await waitFor(() => expect(mockGetRoom).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByTestId("room-page")).toBeInTheDocument());
 
-    // Membership is judged on the fresh data (alice present) → no prompt, no join.
     expect(screen.queryByTestId("password-prompt-dialog")).not.toBeInTheDocument();
     expect(mockJoinRoom).not.toHaveBeenCalled();
   });
@@ -773,9 +721,6 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("room-page")).toBeInTheDocument();
     });
 
-    // A hard navigation (typing /lobby in the address bar, refresh, tab close)
-    // unloads the document — React never runs the unmount-cleanup leave, so the
-    // leave must go out via a keepalive request fired on `pagehide`.
     window.dispatchEvent(new Event("pagehide"));
 
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -787,7 +732,7 @@ describe("RoomPage", () => {
   });
 
   it("displays loading skeleton while fetching", () => {
-    mockGetRoom.mockReturnValue(new Promise(() => {})); // never resolves
+    mockGetRoom.mockReturnValue(new Promise(() => {}));
 
     renderRoomPage();
 
@@ -805,8 +750,6 @@ describe("RoomPage", () => {
 
     expect(screen.getByText("Room not found")).toBeInTheDocument();
   });
-
-  // --- Team color indicators ---
 
   it("renders Us and Them legend labels once seated", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
@@ -837,8 +780,6 @@ describe("RoomPage", () => {
     });
     expect(screen.getByText("Them")).toBeInTheDocument();
   });
-
-  // --- Seat selection ---
 
   it("calls selectSeat API when clicking an empty seat", async () => {
     const user = userEvent.setup();
@@ -908,7 +849,6 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
-    // Seat 1 is empty — click it
     await user.click(screen.getByTestId("player-seat-1"));
 
     expect(mockSelectSeat).toHaveBeenCalledWith(1, 1);
@@ -954,8 +894,6 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
-    // Seat 1 is occupied by bob — clicking it never fires a seat selection
-    // (for the owner it enters swap mode instead; for others it's inert).
     await user.click(screen.getByTestId("player-seat-1"));
 
     expect(mockSelectSeat).not.toHaveBeenCalled();
@@ -1007,7 +945,6 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-0")).toBeInTheDocument();
     });
 
-    // Click empty seat 1 to switch
     await user.click(screen.getByTestId("player-seat-1"));
 
     expect(mockSelectSeat).toHaveBeenCalledWith(1, 1);
@@ -1050,8 +987,6 @@ describe("RoomPage", () => {
       expect(toast.error).toHaveBeenCalled();
     });
   });
-
-  // --- Start Game ---
 
   it("renders Start Game button for room owner", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
@@ -1159,8 +1094,6 @@ describe("RoomPage", () => {
     expect(screen.getByTestId("start-game")).toBeDisabled();
   });
 
-  // v2 presence gate: a reopened room with all four seats occupied but a
-  // not-yet-returned human keeps Start disabled and flags the absent seat.
   it("disables Start and flags absent seats until every seated human has returned", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
@@ -1215,7 +1148,7 @@ describe("RoomPage", () => {
       makeRoomDetail({
         room: { ...defaultRoom, playerCount: 4 },
         players: fourSeated,
-        returnedUserIds: [10, 20, 30], // dave (seat 3) is still away
+        returnedUserIds: [10, 20, 30],
       }),
     );
 
@@ -1566,15 +1499,6 @@ describe("RoomPage", () => {
     });
   });
 
-  // --- Quick Play Room Behavior ---
-
-  // NOTE: Quick Play rooms no longer render in RoomPage — they redirect to the
-  // dedicated /matchmaking/:id screen (see the redirect test below and
-  // MatchmakingPage.test.tsx). The former QP CTA/seat tests here moved with that
-  // behaviour.
-
-  // --- Room-scoped chat ---
-
   it("renders the room chat panel once the room is loaded", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
@@ -1627,7 +1551,6 @@ describe("RoomPage", () => {
       }),
     );
 
-    // Seed roomMessages to verify they get cleared
     useChatStore.setState({
       roomMessages: [
         {
@@ -1656,8 +1579,6 @@ describe("RoomPage", () => {
 
     expect(useChatStore.getState().roomMessages).toHaveLength(0);
   });
-
-  // --- Owner pre-game controls (Story 8.1) ---
 
   function fourSeatedRoomQuery(ownerSeat = 0) {
     return makeRoomDetail({
@@ -1721,16 +1642,13 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-0")).toBeInTheDocument();
     });
 
-    // Owner's own tile (seat 0) does NOT render a kick icon
     expect(screen.queryByTestId("kick-player-0")).not.toBeInTheDocument();
-    // Non-owner seated tiles (seats 1, 2, 3) all render a kick icon
     expect(screen.getByTestId("kick-player-1")).toBeInTheDocument();
     expect(screen.getByTestId("kick-player-2")).toBeInTheDocument();
     expect(screen.getByTestId("kick-player-3")).toBeInTheDocument();
   });
 
   it("hides kick icons for non-owner viewers", async () => {
-    // Sign in as user 20 (bob), who is NOT the owner
     useAuthStore.setState({
       user: { ...defaultUser, id: 20, username: "bob" },
       token: "tok",
@@ -1784,7 +1702,6 @@ describe("RoomPage", () => {
 
     await user.click(screen.getByTestId("kick-player-1"));
 
-    // Dialog renders with the target player's username embedded in the prompt
     await waitFor(() => {
       expect(screen.getByTestId("kick-confirm")).toBeInTheDocument();
     });
@@ -1831,13 +1748,11 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
-    // First click on seat 1 (bob, non-owner) — enter swap mode
     await user.click(screen.getByTestId("player-seat-1"));
     await waitFor(() => {
       expect(screen.getByTestId("swap-mode-banner")).toBeInTheDocument();
     });
 
-    // Second click on seat 3 (dave, non-owner) — fires the swap
     await user.click(screen.getByTestId("player-seat-3"));
 
     expect(mockSwapSeats).toHaveBeenCalledWith(1, 1, 3);
@@ -1846,7 +1761,6 @@ describe("RoomPage", () => {
   it("fires the swap when target seat is empty (move-to-empty)", async () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    // Owner alice at seat 0, bob at seat 1, seats 2 & 3 empty.
     const partial = makeRoomDetail({
       room: { ...defaultRoom, ownerId: 10, playerCount: 2 },
       players: [
@@ -1883,13 +1797,11 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
-    // First click on seat 1 (bob, non-owner) — enter swap mode
     await user.click(screen.getByTestId("player-seat-1"));
     await waitFor(() => {
       expect(screen.getByTestId("swap-mode-banner")).toBeInTheDocument();
     });
 
-    // Click empty seat 2 — should fire swap (move bob into seat 2)
     await user.click(screen.getByTestId("player-seat-2"));
 
     expect(mockSwapSeats).toHaveBeenCalledWith(1, 1, 2);
@@ -1906,13 +1818,11 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
-    // First click — enter swap mode
     await user.click(screen.getByTestId("player-seat-1"));
     await waitFor(() => {
       expect(screen.getByTestId("swap-mode-banner")).toBeInTheDocument();
     });
 
-    // Click the same seat again — cancels (no swap call)
     await user.click(screen.getByTestId("player-seat-1"));
 
     expect(mockSwapSeats).not.toHaveBeenCalled();
@@ -1920,7 +1830,6 @@ describe("RoomPage", () => {
 
   it("non-owner clicking their own seat leaves the seat (non-quick-play)", async () => {
     const user = userEvent.setup();
-    // Sign in as bob (user 20), who sits at seat 1 in fourSeatedRoomQuery and is NOT the owner.
     useAuthStore.setState({
       user: { ...defaultUser, id: 20, username: "bob" },
       token: "tok",
@@ -1934,17 +1843,13 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
-    // Clicking the own seat tile fires leaveSeat(roomId).
     await user.click(screen.getByTestId("player-seat-1"));
 
     expect(mockLeaveSeat).toHaveBeenCalledWith(1);
-    // Self-click must NOT also fire selectSeat for the same seat.
     expect(mockSelectSeat).not.toHaveBeenCalled();
   });
 
   it("owner clicking their own seat does not unseat them", async () => {
-    // alice is the owner at seat 0. The owner cannot unseat themselves —
-    // their only exit is leave-room. Clicking the own tile must be a no-op.
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(fourSeatedRoomQuery());
@@ -1983,11 +1888,7 @@ describe("RoomPage", () => {
     });
   });
 
-  // --- In-room dropdown owner controls (kick from list, transfer ownership) ---
-
   function partialRoomQuery() {
-    // alice (owner, seat 0), bob (seat 1), carol (in room but unseated).
-    // Used to exercise the kick-from-list path on an unseated player.
     return makeRoomDetail({
       room: { ...defaultRoom, ownerId: 10, playerCount: 3 },
       players: [
@@ -2042,8 +1943,6 @@ describe("RoomPage", () => {
 
     await user.click(screen.getByTestId("in-room-count"));
 
-    // Carol is unseated, so she has no diamond tile — only the dropdown row
-    // can host the kick affordance for her.
     const kickFromList = await screen.findByTestId("kick-list-30");
     await user.click(kickFromList);
 
@@ -2071,7 +1970,6 @@ describe("RoomPage", () => {
 
     await user.click(screen.getByTestId("in-room-count"));
 
-    // Bob is not the owner — no kick affordance on any list row.
     expect(screen.queryByTestId("kick-list-30")).not.toBeInTheDocument();
     expect(screen.queryByTestId("kick-list-10")).not.toBeInTheDocument();
   });
@@ -2089,7 +1987,6 @@ describe("RoomPage", () => {
     });
     await user.click(screen.getByTestId("in-room-count"));
 
-    // Bob is seated and not the owner — the promote affordance must render.
     await user.click(await screen.findByTestId("promote-player-20"));
     await user.click(await screen.findByTestId("transfer-confirm"));
 
@@ -2126,10 +2023,7 @@ describe("RoomPage", () => {
     });
     await user.click(screen.getByTestId("in-room-count"));
 
-    // Bob is seated — affordance renders.
     expect(await screen.findByTestId("promote-player-20")).toBeInTheDocument();
-    // Carol is unseated — affordance hidden so the owner can't try a server
-    // round-trip that the backend would reject with CANNOT_PROMOTE_UNSEATED.
     expect(screen.queryByTestId("promote-player-30")).not.toBeInTheDocument();
   });
 
@@ -2167,8 +2061,6 @@ describe("RoomPage", () => {
 
     renderRoomPage();
 
-    // Wait for the seed effect to set currentRoomId, then simulate the
-    // dispatcher setting kickedFromRoomId from a system:room_kicked event.
     await waitFor(() => {
       expect(screen.getByTestId("room-page")).toBeInTheDocument();
     });
@@ -2184,7 +2076,6 @@ describe("RoomPage", () => {
       );
     });
     expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
-    // The flag is cleared so the effect doesn't re-fire on a future mount.
     expect(useRoomStore.getState().kickedFromRoomId).toBeNull();
   });
 
@@ -2222,20 +2113,12 @@ describe("RoomPage", () => {
       expect(mockNavigate).toHaveBeenCalledWith("/matchmaking/1", { replace: true });
     });
 
-    // The seat grid never renders — this surface is for custom rooms only.
     expect(screen.queryByTestId("room-page")).not.toBeInTheDocument();
 
-    // hasLeftRef is set before the redirect, so unmounting must NOT fire the
-    // cleanup `/leave` that would eject the player from the queue.
     unmount();
     expect(mockLeaveRoom).not.toHaveBeenCalled();
   });
 });
-
-// --- Honour in the waiting room (honour redesign R6) ------------------------
-//
-// The waiting room showed honour NOWHERE before this: the lobby card carried both
-// chips, then they vanished the moment you were inside the room they described.
 
 describe("RoomPage honour", () => {
   const seat = (
@@ -2289,8 +2172,6 @@ describe("RoomPage honour", () => {
 
   it("says nothing about declarations on an ordinary room, absent field included", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    // defaultRoom carries no declarationsEnabled at all, which is the shape an
-    // older server sends. Absent must read as ON, so no badge.
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
         room: { ...defaultRoom, playerCount: 1 },
@@ -2320,9 +2201,6 @@ describe("RoomPage honour", () => {
 
   it("says nothing about dosta on an ordinary room, absent field included", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
-    // defaultRoom carries no stopAtTarget at all, which is the shape an older
-    // server sends. Absent must read as OFF, so no badge — the mirror of the
-    // declarations case above, with the polarity flipped.
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
         room: { ...defaultRoom, playerCount: 1 },
@@ -2359,8 +2237,6 @@ describe("RoomPage honour", () => {
         room: { ...defaultRoom, playerCount: 2, minHonor: 85 },
         players: [
           seat(10, "alice", 0, { honorScore: 96, honorTier: "exemplary" }),
-          // 71 is Fair — the seat gets the OLIVE shield, not a red X. Being under
-          // this room's bar is drawn by the tile's ring instead.
           seat(20, "bob", 1, { honorScore: 71, honorTier: "fair" }),
         ],
       }),
@@ -2371,13 +2247,11 @@ describe("RoomPage honour", () => {
     await waitFor(() => expect(screen.getByTestId("seat-honor-0")).toBeInTheDocument());
     expect(screen.getByTestId("seat-honor-0")).toHaveAttribute("data-honor", "96");
     expect(screen.getByTestId("seat-honor-1")).toHaveAttribute("data-honor", "71");
-    // The shield states the PLAYER's tier, never a verdict about the room.
     expect(within(screen.getByTestId("seat-honor-1")).getByTestId("honor-shield")).toHaveAttribute(
       "data-tier",
       "fair",
     );
 
-    // Only the below-bar seat's tile is ringed.
     expect(screen.getByTestId("seat-position-east")).toHaveAttribute(
       "data-below-honor-bar",
       "true",
@@ -2414,15 +2288,12 @@ describe("RoomPage honour", () => {
     await waitFor(() => expect(screen.getByTestId("seat-level-0")).toBeInTheDocument());
     expect(screen.getByTestId("seat-level-0")).toHaveAttribute("data-level", "7");
     expect(screen.getByTestId("seat-level-0")).toHaveTextContent("Lvl 7");
-    // Level and honour share one row, level FIRST (user decision 2026-07-31).
     const row = screen.getByTestId("seat-level-0").parentElement;
     expect(within(row as HTMLElement).getByTestId("seat-honor-0")).toBeInTheDocument();
     expect(row?.firstElementChild).toBe(screen.getByTestId("seat-level-0"));
   });
 
   it("renders a real level 0, and no level chip for a seat whose level did not arrive", async () => {
-    // Same coercion rule as honour: 0 is a legitimate value (a brand-new
-    // account), while `undefined` means "not read" and renders nothing.
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
@@ -2439,12 +2310,10 @@ describe("RoomPage honour", () => {
     await waitFor(() => expect(screen.getByTestId("seat-level-0")).toBeInTheDocument());
     expect(screen.getByTestId("seat-level-0")).toHaveAttribute("data-level", "0");
     expect(screen.queryByTestId("seat-level-1")).toBeNull();
-    // The level-less seat still shows its honour.
     expect(screen.getByTestId("seat-honor-1")).toBeInTheDocument();
   });
 
   it("shows no shield for a seat whose honour did not arrive", async () => {
-    // A degraded honour read must never make a seat look like it has score 0.
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
@@ -2457,12 +2326,9 @@ describe("RoomPage honour", () => {
 
     await waitFor(() => expect(screen.getByTestId("player-seat-0")).toBeInTheDocument());
     expect(screen.queryByTestId("seat-honor-0")).toBeNull();
-    // And it is never treated as the blocking seat.
     expect(screen.getByTestId("seat-position-south")).not.toHaveAttribute("data-below-honor-bar");
   });
 });
-
-// --- Room last-match stats entry point --------------------------------------
 
 describe("RoomPage last match", () => {
   const roomPlayer = (userId: number, username: string, s: number): RoomPlayer => ({
@@ -2531,15 +2397,11 @@ describe("RoomPage last match", () => {
     expect(await screen.findByTestId("last-match-dialog")).toBeInTheDocument();
   });
 
-  // The `playersInRoom` prop is what hides Reinvite for someone already back at
-  // the table; dropping it left every other RoomPage test green, so the wiring
-  // is asserted here end to end rather than only inside the dialog's own suite.
   it("hides Reinvite for a co-player who is already seated in the room", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
         room: { ...defaultRoom, playerCount: 2 },
-        // bob (11) played the last match AND is back in the room; carol (12) is not.
         players: [roomPlayer(10, "alice", 0), roomPlayer(11, "bob", 1)],
       }),
     );
@@ -2550,15 +2412,10 @@ describe("RoomPage last match", () => {
     await userEvent.click(await screen.findByTestId("open-last-match"));
     await screen.findByTestId("last-match-dialog");
 
-    // carol is a friend who is NOT here — she gets the control.
     expect(await screen.findByTestId("match-player-reinvite-12")).toBeInTheDocument();
-    // bob is sitting at the table already — inviting him would be nonsense.
     expect(screen.queryByTestId("match-player-reinvite-11")).toBeNull();
   });
 
-  // A non-numeric :id makes Number(id) NaN, and NaN is `!== undefined` — without
-  // the finite-and-positive guard the hook enables and requests
-  // /rooms/NaN/last-match.
   it("does not read the last match for a malformed route id", async () => {
     routeParams.id = "abc";
     useAuthStore.setState({ user: defaultUser, token: "tok" });
@@ -2575,9 +2432,6 @@ describe("RoomPage last match", () => {
     expect(screen.queryByTestId("open-last-match")).toBeNull();
   });
 
-  // Disabling a query does NOT evict its cache: once the match starts, the row
-  // fetched while the room was `waiting` is still sitting there, so the data
-  // check alone would keep the button on screen off stale state.
   it("drops the button when the room leaves waiting, even with the row still cached", async () => {
     seedRoom();
     mockGetRoomLastMatch.mockResolvedValue(lastMatch);
@@ -2603,8 +2457,6 @@ describe("RoomPage last match", () => {
     );
     renderRoomPage();
 
-    // Quick-play rooms redirect to the matchmaking screen — this page renders
-    // nothing for them, and must not have fired the read on the way past.
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
     expect(mockGetRoomLastMatch).not.toHaveBeenCalled();
   });

@@ -66,28 +66,18 @@ func cards(ids ...string) []game.Card {
 	return out
 }
 
-// --- Bidding evaluator ---
-
 func TestDecide_Bidding(t *testing.T) {
 	tests := []struct {
-		name      string
-		seat      int
-		hand      []game.Card
-		round     int
-		candidate string // card id; "" keeps the fixture default (AH)
-		// noCandidate switches the row onto a Croatian fixture: no trump
-		// candidate at all, so trump is a freely named suit in the single
-		// bidding round and the seat holds six open cards plus a face-down
-		// pair that stays hidden — from the bot too — until trump resolves.
+		name        string
+		seat        int
+		hand        []game.Card
+		round       int
+		candidate   string
 		noCandidate bool
-		// faceDown overrides the fixture's face-down pair (noCandidate rows
-		// only). Those two cards never reach the bot's view during bidding.
-		faceDown []game.Card
-		// forcedPick puts the row in the state where the engine refuses a pass:
-		// the dealer bidding last (fourth) with no legal pass.
-		forcedPick bool
-		wantType   string
-		wantSuit   *game.Suit
+		faceDown    []game.Card
+		forcedPick  bool
+		wantType    string
+		wantSuit    *game.Suit
 	}{
 		{
 			name:     "round 1 five of candidate suit picks",
@@ -104,9 +94,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType: game.ActionPickTrump,
 		},
 		{
-			// Candidate inclusion (rule 1a): only 2 hearts in hand, but the
-			// face-up AH the picker would receive completes J+9+A — 3 trumps incl.
-			// the Jack with no 7/8 — so it is a take.
 			name:     "round 1 candidate completes jack+nine to a qualifying three picks",
 			seat:     1,
 			hand:     cards("JH", "9H", "7S", "8S", "9S"),
@@ -114,8 +101,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType: game.ActionPickTrump,
 		},
 		{
-			// Same two trumps, but the candidate is the 7H, so the completed three
-			// is J+9+7 — a 7 is present, so rule 1b makes it too weak to call.
 			name:      "round 1 candidate completes to three with a seven passes",
 			seat:      1,
 			hand:      cards("JH", "9H", "7S", "8S", "9S"),
@@ -124,8 +109,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			// Rule 1b: J+7+8 (and any 7-or-8) is too weak. Candidate 8H completes
-			// J+7 in hand to the bare J+7+8 three.
 			name:      "round 1 three with jack and a seven and eight passes",
 			seat:      1,
 			hand:      cards("JH", "7H", "7S", "8S", "9S"),
@@ -134,8 +117,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			// Rule 1b exception: the weak J+8+7 three still calls when the hand
-			// holds a side Ace (AS) as an outside winner.
 			name:      "round 1 three with jack and a seven and eight but a side ace picks",
 			seat:      1,
 			hand:      cards("JH", "8H", "AS", "7C", "8C"),
@@ -144,7 +125,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			// Same weak three but no side Ace anywhere — still a pass.
 			name:      "round 1 three with jack and a seven and eight and no side ace passes",
 			seat:      1,
 			hand:      cards("JH", "8H", "KS", "7C", "8C"),
@@ -153,7 +133,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			// Rule 1c: 9+Ace pair with a side Ace (spades AS) — take.
 			name:      "round 1 nine ace pair with a side ace picks",
 			seat:      1,
 			hand:      cards("9H", "AH", "AS", "8S", "KD"),
@@ -162,8 +141,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			// Point 1: a lone side Ace is now enough — the Ace no longer needs a
-			// second card of its suit to back it, so a singleton AS still calls.
 			name:      "round 1 nine ace pair with a lone side ace picks",
 			seat:      1,
 			hand:      cards("9H", "AH", "AS", "8D", "KC"),
@@ -172,7 +149,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			// Rule 1c still needs a side Ace: 9+Ace pair with no outside Ace passes.
 			name:      "round 1 nine ace pair with no side ace passes",
 			seat:      1,
 			hand:      cards("9H", "AH", "KS", "8D", "KC"),
@@ -181,8 +157,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			// Point 2: exactly two trumps that are the Jack and the 9, plus a side
-			// Ace — a take. Candidate 9H completes JH-in-hand to the {J,9} pair.
 			name:      "round 1 two trumps jack and nine with a side ace picks",
 			seat:      1,
 			hand:      cards("JH", "AS", "7C", "8C", "7D"),
@@ -191,7 +165,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			// Point 2: {J,9} but no side Ace anywhere — pass.
 			name:      "round 1 two trumps jack and nine without a side ace passes",
 			seat:      1,
 			hand:      cards("JH", "7C", "8C", "7D", "8D"),
@@ -200,8 +173,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			// Point 2 is {J,9}-only: two trumps that are the Jack and Ace (not the
-			// 9) do not qualify, even with a side Ace.
 			name:      "round 1 two trumps jack and ace does not qualify",
 			seat:      1,
 			hand:      cards("JH", "AS", "7C", "8C", "7D"),
@@ -233,9 +204,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantSuit: suitPtr(game.SuitSpades),
 		},
 		{
-			// Round-2 candidate awareness: diamonds is a 9+Ace pick and the club Ace
-			// supplies the side Ace. The face-up candidate TC still lands in the
-			// picker's hand as a side card, but a lone side Ace already suffices.
 			name:      "round 2 candidate side card completes a nine ace pick",
 			seat:      1,
 			hand:      cards("9D", "AD", "KD", "AC", "7H"),
@@ -259,10 +227,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType: game.ActionPassTrump,
 		},
 		{
-			// No candidate: round 1 is already a free-suit choice, so a pick
-			// must CARRY the suit — the round-1 suitless pick is a
-			// candidate-variant rule, not a universal one. Five spades in the
-			// six open cards clears the bar on its own.
 			name:        "no candidate round 1 picks and carries the suit",
 			seat:        1,
 			hand:        cards("7S", "8S", "9S", "TS", "JS", "7H"),
@@ -273,8 +237,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantSuit:    suitPtr(game.SuitSpades),
 		},
 		{
-			// Same shape, nothing qualifying, and a pass is still legal in round
-			// 1 — so the bot passes rather than inventing a call.
 			name:        "no candidate round 1 junk passes",
 			seat:        1,
 			hand:        cards("7S", "8H", "9D", "TC", "QS", "KH"),
@@ -284,11 +246,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:    game.ActionPassTrump,
 		},
 		{
-			// The face-down pair never reaches the view: the two hidden
-			// diamonds would make five and clear the bar, but the pair is
-			// hidden from the bot for the whole single round — so nothing
-			// qualifies and the bot passes, exactly like a human seeing only
-			// its six open cards.
 			name:        "no candidate does not count the hidden pair",
 			seat:        1,
 			hand:        cards("7D", "8D", "9D", "7S", "8S", "7H"),
@@ -298,11 +255,6 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:    game.ActionPassTrump,
 		},
 		{
-			// The forced dealer. Deliberately junk — no suit clears the
-			// threshold — so a bot that only knew the threshold would pass and
-			// be rejected forever. Diamonds is the highest-scoring holding of
-			// the six VISIBLE cards (three of them, one the Jack); the hidden
-			// pair must not sway the call.
 			name:        "forced dealer picks its best suit rather than passing",
 			seat:        0,
 			hand:        cards("7D", "8D", "JD", "7S", "8H", "9C"),
@@ -324,9 +276,6 @@ func TestDecide_Bidding(t *testing.T) {
 					gs.Players[tt.seat].FaceDownCards = tt.faceDown
 				}
 				if tt.forcedPick {
-					// The other three seats have already passed, so the dealer
-					// on the clock has no legal pass. Asserted, not assumed —
-					// the row's whole meaning depends on it.
 					gs.BiddingPassCount = 3
 					gs.DealerSeat = tt.seat
 				}
@@ -347,10 +296,6 @@ func TestDecide_Bidding(t *testing.T) {
 
 			assert.Equal(t, tt.wantType, action.Type)
 			assert.Equal(t, tt.seat, action.PlayerSeat)
-			// A suitless round-1 pick is a CANDIDATE-variant rule: the engine
-			// locks trump to the candidate's suit and ignores action.Suit. With
-			// no candidate round 1 is a free-suit choice like round 2, so the
-			// pick must carry a suit — asserted through wantSuit on those rows.
 			if tt.round == 1 && gs.TrumpCandidate != nil && tt.wantType == game.ActionPickTrump {
 				assert.Nil(t, action.Suit, "round 1 pick on a candidate carries no suit")
 			}
@@ -362,13 +307,9 @@ func TestDecide_Bidding(t *testing.T) {
 	}
 }
 
-// TestDecide_ForcedDealerNeverPasses is the bot half of the Story 12.8 deadlock
-// fix, stated as an invariant rather than one table row: in the state where the
-// engine refuses a pass, NO hand may produce pass_trump. A single row proves one
-// hand; this proves the property across every deal the fixture can hold.
+// TestDecide_ForcedDealerNeverPasses checks that no hand produces pass_trump
+// in the state where the engine refuses a pass.
 func TestDecide_ForcedDealerNeverPasses(t *testing.T) {
-	// Every seat takes the dealer's chair in turn, so the assertion does not
-	// rest on one seat's holding.
 	for seat := 0; seat < 4; seat++ {
 		gs := testfixtures.NewGameCroatianMidBidding(3)
 		gs.DealerSeat = seat
@@ -380,15 +321,12 @@ func TestDecide_ForcedDealerNeverPasses(t *testing.T) {
 			"seat %d: a pass here is rejected by the engine, forever", seat)
 		require.NotNil(t, action.Suit, "seat %d: a free-suit pick must carry a suit", seat)
 
-		// Not merely non-pass: the engine must actually accept it.
 		_, err := game.ApplyAction(gs, action)
 		require.NoError(t, err, "seat %d: the forced pick must be legal", seat)
 	}
 }
 
 func suitPtr(s game.Suit) *game.Suit { return &s }
-
-// --- Prompt decisions ---
 
 func TestDecide_AlwaysDeclares(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(1)
@@ -400,12 +338,8 @@ func TestDecide_AlwaysDeclares(t *testing.T) {
 	assert.Equal(t, 0, action.PlayerSeat)
 }
 
-// TestDecide_AnswersDedicatedDeclarationPhase pins the Croatian phase branch.
-// Every seat is asked at once there, so the bot decides for itself from what it
-// holds rather than being told by a prompt flag. It is also a crash guard:
-// View.LegalCards is populated only in PhasePlaying, so a fall-through to
-// chooseCard here would index legal[0] on a nil slice and panic INSIDE the
-// session's critical section — taking the table down, not just the bot.
+// TestDecide_AnswersDedicatedDeclarationPhase checks the bot declares or skips on its own in the Croatian phase,
+// without falling through to card play, where LegalCards is nil and would panic.
 func TestDecide_AnswersDedicatedDeclarationPhase(t *testing.T) {
 	gs := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
 	require.Equal(t, game.PhaseDeclaring, gs.Phase)
@@ -420,8 +354,6 @@ func TestDecide_AnswersDedicatedDeclarationPhase(t *testing.T) {
 			assert.Equal(t, game.ActionDeclare, action.Type, "seat %d", seat)
 			assert.Equal(t, seat, action.PlayerSeat)
 
-			// Not merely non-empty: the engine must actually accept it, or the
-			// scheduler re-arms the seat on rejection and livelocks.
 			_, err := game.ApplyAction(gs, action)
 			require.NoError(t, err, "seat %d: the bot's declare must be legal", seat)
 		}
@@ -458,7 +390,7 @@ func TestDecide_AlwaysAnnouncesBelot(t *testing.T) {
 
 func TestDecide_AcceptsPartnerSurrender(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(1)
-	proposer := 2 // partner of seat 0
+	proposer := 2
 	gs.SurrenderProposerSeat = &proposer
 	gs.ActivePlayerSeat = 0
 
@@ -467,26 +399,17 @@ func TestDecide_AcceptsPartnerSurrender(t *testing.T) {
 		"surrender accept takes priority over card play")
 }
 
-// --- Card play (trump is Hearts in NewGameMidPlay; bot at seat 0, team A) ---
-
 func TestDecide_CardPlay(t *testing.T) {
 	tests := []struct {
-		name       string
-		hand       []game.Card // bot seat 0
-		trick      []game.TrickCard
-		callerSeat int // fixture default 1 (opponents); 0 = bot's team
-		played     []string
-		// declaredBySeat maps a seat to the card ids it revealed via
-		// declarations (known holdings). The declaration type/value are
-		// immaterial to the bot, so the test wraps them in one Declaration.
+		name           string
+		hand           []game.Card
+		trick          []game.TrickCard
+		callerSeat     int
+		played         []string
 		declaredBySeat map[int][]string
 		wantCard       string
 	}{
 		{
-			// Partner trumped and the trick is closed, but the AS is an
-			// unprotected boss (no TS behind it): throwing it surrenders control
-			// of spades, so the bot smears the QS and keeps the Ace as the master.
-			// A duck would have dumped the 7S, so the smear stays observable.
 			name: "smear keeps the unprotected ace boss when partner trumped",
 			hand: cards("AS", "QS", "7S"),
 			trick: []game.TrickCard{
@@ -498,10 +421,6 @@ func TestDecide_CardPlay(t *testing.T) {
 			wantCard:   "QS",
 		},
 		{
-			// Partner's Ace wins outright, and with it gone the bot's TS is the
-			// promoted boss of spades — unprotected (the KS still out kills the
-			// JS as a backup), so the Ten stays home and the JS carries the
-			// points. A duck would have dumped the 8S.
 			name: "smear low and keep the promoted ten when partner cashes the ace",
 			hand: cards("TS", "JS", "8S"),
 			trick: []game.TrickCard{
@@ -593,10 +512,6 @@ func TestDecide_CardPlay(t *testing.T) {
 			wantCard:   "7C",
 		},
 		{
-			// Partner declared the low trumps and opponents are void of trump,
-			// so there is nothing to draw — cash the side Ace, never lead the
-			// master JH at the partner. (Without declaration memory the bot
-			// would lead JH to "draw".)
 			name:           "declared: opponents void of trump, cash side ace not the master trump",
 			hand:           cards("JH", "AS", "7C"),
 			trick:          nil,
@@ -606,11 +521,6 @@ func TestDecide_CardPlay(t *testing.T) {
 			wantCard:       "AS",
 		},
 		{
-			// Partner declared the master JH (and the rest of the top trumps);
-			// opponents still hold lower trumps. The bot now KNOWS the team
-			// controls the top, so it draws with its own best trump (9H).
-			// (Without declaration memory JH/QH/KH/AH look unseen and the bot
-			// would not draw.)
 			name:           "declared: partner holds the master so the bot draws with its best trump",
 			hand:           cards("9H", "7C"),
 			trick:          nil,
@@ -619,9 +529,6 @@ func TestDecide_CardPlay(t *testing.T) {
 			wantCard:       "9H",
 		},
 		{
-			// Opponents won the contest and declared all four aces, so AS is a
-			// KNOWN opponent threat — the bot must not treat its KS as a boss.
-			// Guards against dropping known-opponent cards from the threat set.
 			name:           "declared: opponent ace keeps the king from being a false boss",
 			hand:           cards("KS", "7C", "8D"),
 			trick:          nil,
@@ -668,19 +575,14 @@ func TestDecide_CardPlay(t *testing.T) {
 	}
 }
 
-// TestDecide_PartnerTakesTrick covers the follow-play "don't overtake a trick
-// the partner is guaranteed to take" branch. The bot (seat 0) plays second to
-// an AD lead from seat 3; its partner (seat 2, last to play) declared the top
-// trumps (9H–QH). The duck is sound ONLY when the partner is provably void in
-// the led suit, so it must ruff and — being last — wins. A partner that might
-// still have to follow diamonds could be forced under by the opponent between
-// them, so the bot must not duck on a mere declared beater.
+// TestDecide_PartnerTakesTrick checks the bot ducks a trick its partner is guaranteed to take,
+// which holds only when the partner is provably void in the led suit and can ruff last.
 func TestDecide_PartnerTakesTrick(t *testing.T) {
 	tests := []struct {
 		name            string
-		hand            []game.Card // bot seat 0; nil = the default KD,7D
+		hand            []game.Card
 		partnerVoidDiam bool
-		playedHearts    []string // declared trumps the partner has already played
+		playedHearts    []string
 		wantCard        string
 	}{
 		{
@@ -689,10 +591,6 @@ func TestDecide_PartnerTakesTrick(t *testing.T) {
 			wantCard:        "KD",
 		},
 		{
-			// Boss-guard on this smear site too: with the AD falling in this very
-			// trick the bot's TD is the promoted diamond boss with no backup (the
-			// KD and QD still out kill the JD as one) — kept home. The JD carries
-			// the points instead, where a duck would have dumped the 7D.
 			name:            "partner takes the trick: smear keeps the promoted ten",
 			hand:            cards("TD", "JD", "7D"),
 			partnerVoidDiam: true,
@@ -713,7 +611,7 @@ func TestDecide_PartnerTakesTrick(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gs := testfixtures.NewGameMidPlay(1) // trump = Hearts
+			gs := testfixtures.NewGameMidPlay(1)
 			hand := tt.hand
 			if hand == nil {
 				hand = cards("KD", "7D")
@@ -731,7 +629,7 @@ func TestDecide_PartnerTakesTrick(t *testing.T) {
 
 			mem := bot.NewMemory()
 			if tt.partnerVoidDiam {
-				mem.ObservePlay(2, card("8C"), &lead) // discarded a club on a diamond lead
+				mem.ObservePlay(2, card("8C"), &lead)
 			}
 			for _, id := range tt.playedHearts {
 				mem.ObservePlay(2, card(id), nil)
@@ -747,10 +645,8 @@ func TestDecide_PartnerTakesTrick(t *testing.T) {
 	}
 }
 
-// TestDecide_LastTrickRetention covers endgame retention ("dix de der", +10):
-// at the second-to-last trick (two cards in hand) the bot keeps the master
-// trump back for the forced trick 8 instead of squandering it now. Bot is
-// seat 0 (team A); trump is Hearts in NewGameMidPlay.
+// TestDecide_LastTrickRetention checks the bot keeps the master trump back for trick 8
+// at the second-to-last trick instead of spending it now.
 func TestDecide_LastTrickRetention(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -762,8 +658,6 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 		wantCard       string
 	}{
 		{
-			// Without retention the bot would draw the JH on trick 7; instead it
-			// leads the junk and banks the JH for the forced trick 8.
 			name:       "lead retains the master trump and spends the junk",
 			hand:       cards("JH", "7C"),
 			trick:      nil,
@@ -771,7 +665,6 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 			wantCard:   "7C",
 		},
 		{
-			// 9H is the master once the only higher trump (JH) is gone — retain it.
 			name:       "non-absolute master is retained once higher trumps are played",
 			hand:       cards("9H", "7C"),
 			trick:      nil,
@@ -780,8 +673,6 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 			wantCard:   "7C",
 		},
 		{
-			// Void in the led suit forces a cut: the engine's legal set is {JH}
-			// only, so the master is played and retention cannot override it.
 			name:       "forced cut plays the master — retention never overrides a forced play",
 			hand:       cards("JH", "7C"),
 			trick:      []game.TrickCard{{Card: card("AD"), PlayerSeat: 3}},
@@ -789,8 +680,6 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 			wantCard:   "JH",
 		},
 		{
-			// Two trumps, forced to cut: spend the lower trump (it wins now) and
-			// keep the master JH for the last trick.
 			name:       "cut with the lower trump and keep the master",
 			hand:       cards("JH", "9H"),
 			trick:      []game.TrickCard{{Card: card("7D"), PlayerSeat: 3}},
@@ -798,9 +687,6 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 			wantCard:   "9H",
 		},
 		{
-			// Partner declared a trump (JH) above the bot's master (9H): the team
-			// already takes trick 8, so retention defers and the bot draws as
-			// before instead of fighting the partner.
 			name:           "partner controls the last trick so retention defers and the bot draws",
 			hand:           cards("9H", "7C"),
 			trick:          nil,
@@ -809,10 +695,6 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 			wantCard:       "9H",
 		},
 		{
-			// Following trick 7 while the partner currently wins it (with 7H):
-			// the engine's over-trump rule forces the bot to beat its own
-			// partner, so it spends the lower trump (9H) — which wins now — and
-			// keeps the master JH for the forced trick 8.
 			name: "follow over a winning partner spends the lower trump and keeps the master",
 			hand: cards("JH", "9H"),
 			trick: []game.TrickCard{
@@ -824,8 +706,6 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 			wantCard:   "9H",
 		},
 		{
-			// Three cards — not the endgame decision point — so retention is
-			// gated out and the bot draws the master as usual.
 			name:       "not the endgame leaves draw behavior unchanged",
 			hand:       cards("JH", "AS", "7C"),
 			trick:      nil,
@@ -833,8 +713,6 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 			wantCard:   "JH",
 		},
 		{
-			// No trump held: side bosses are excluded from retention, so the bot
-			// cashes the Ace now exactly as before.
 			name:       "no master trump cashes the side boss now",
 			hand:       cards("AS", "7C"),
 			trick:      nil,
@@ -880,8 +758,6 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 	}
 }
 
-// --- Card-play tweaks (Rules 4, 5.1.1, 6, 7) ---
-
 // obs is one observed play fed to bot Memory. lead is the OLD trick's lead suit
 // (nil when the card led the trick); a non-follow marks the seat void in lead.
 type obs struct {
@@ -907,7 +783,7 @@ func runPlayTweakCases(t *testing.T, tests []playTweakCase) {
 	t.Helper()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gs := testfixtures.NewGameMidPlay(1) // trump = Hearts
+			gs := testfixtures.NewGameMidPlay(1)
 			gs.Players[0].Hand = tt.hand
 			gs.CurrentTrick = tt.trick
 			gs.ActivePlayerSeat = 0
@@ -941,44 +817,36 @@ func runPlayTweakCases(t *testing.T, tests []playTweakCase) {
 	}
 }
 
-// TestDecide_DrawTrumpsForPartner covers Rule 4: when the PARTNER (seat 2)
-// called trump and the bot leads without the master, it leads its highest trump
-// to strip opponents (assuming the partner holds the top trumps), unless the
-// partner is void in trump or a known opponent holding outranks the bot's best.
+// TestDecide_DrawTrumpsForPartner checks the bot leads its highest trump when the partner called trump,
+// unless the partner is void in trump or a known opponent holding outranks it.
 func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 	hearts := game.SuitHearts
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// 9 + 8 trumps, no honor: sacrifice the low 8 and KEEP the 9 — never
-			// lead the 9 (a near-master) into the partner's Jack.
 			name:       "partner called with nine and junk: lead the low trump and keep the nine",
 			hand:       cards("9H", "8H", "AS", "7C"),
 			callerSeat: 2,
 			wantCard:   "8H",
 		},
 		{
-			// Honor order: Queen is the weakest honor, so it leads first.
 			name:       "partner called with honors: sacrifice the queen first",
 			hand:       cards("QH", "KH", "AS", "7C"),
 			callerSeat: 2,
 			wantCard:   "QH",
 		},
 		{
-			// Ten precedes the Ace in the honor order, so it leads before the ace.
 			name:       "partner called with ten and ace: lead the ten before the ace",
 			hand:       cards("TH", "AH", "8S", "7C"),
 			callerSeat: 2,
 			wantCard:   "TH",
 		},
 		{
-			// 9 + Ace: the Ace is an honor and leads; the 9 is kept back.
 			name:       "partner called with nine and ace: lead the ace and keep the nine",
 			hand:       cards("9H", "AH", "8S", "7C"),
 			callerSeat: 2,
 			wantCard:   "AH",
 		},
 		{
-			// The lone trump is the 9 — never lead it; fall through to the side boss.
 			name:       "partner called with a lone nine: do not draw, cash the side boss",
 			hand:       cards("9H", "AS", "8D", "7C"),
 			callerSeat: 2,
@@ -988,7 +856,7 @@ func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 			name:       "partner void in trump: do not draw, cash the side boss",
 			hand:       cards("9H", "8H", "AS", "7C"),
 			callerSeat: 2,
-			observes:   []obs{{seat: 2, card: "8D", lead: &hearts}}, // void hearts
+			observes:   []obs{{seat: 2, card: "8D", lead: &hearts}},
 			wantCard:   "AS",
 		},
 		{
@@ -1017,18 +885,12 @@ func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 			wantCard:   "JH",
 		},
 		{
-			// No honor and no boss: lead the lowest non-9 trump (the 7).
 			name:       "partner called with low trumps and no boss: lead the lowest non-nine trump",
 			hand:       cards("8H", "7H", "KD", "7C"),
 			callerSeat: 2,
 			wantCard:   "7H",
 		},
 		{
-			// Partner (seat 2) called and declared the 8-9-10 trump tierce — a
-			// MAXIMAL run, so it provably lacks the JH (it would have shown the
-			// quarte J-10-9-8). The bot lacks it too, so an opponent holds the
-			// master: drawing a trump only donates the trick to it. Skip the draw
-			// and cash the side Ace instead.
 			name:           "partner's declared tierce proves the opponents hold the master: do not draw",
 			hand:           cards("QH", "KH", "AS", "7C"),
 			callerSeat:     2,
@@ -1036,9 +898,6 @@ func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 			wantCard:       "AS",
 		},
 		{
-			// Control: the partner's declared run INCLUDES the Jack (J-10-9), so the
-			// team controls the master — the bot still draws, sacrificing its
-			// weakest honor (the Queen).
 			name:           "partner's declared run includes the jack: still draw for the partner",
 			hand:           cards("QH", "KH", "AS", "7C"),
 			callerSeat:     2,
@@ -1048,18 +907,11 @@ func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 	})
 }
 
-// TestDecide_PreserveBossOnForcedOvertake covers Rule 5.1.1: when the partner
-// has safely won the trick but every legal card would overtake (e.g. the
-// overplay rule forces the bot higher), the bot captures with its strongest
-// card unless that card is the boss/master — then it drops to the second
-// strongest and keeps the boss for later.
+// TestDecide_PreserveBossOnForcedOvertake checks that when every legal card overtakes a safe partner win,
+// the bot captures with its strongest card but keeps the boss back.
 func TestDecide_PreserveBossOnForcedOvertake(t *testing.T) {
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// Point 7: partner (seat 2) wins with QS, bot closes the trick holding
-			// AS+TS, both forced over QS. Holding BOTH the Ace and Ten, the bot
-			// smears the AS — the TS becomes the suit's new boss, so no control is
-			// lost — banking the higher points now.
 			name: "forced over partner with ace and ten smears the ace",
 			hand: cards("AS", "TS", "7H"),
 			trick: []game.TrickCard{
@@ -1071,8 +923,6 @@ func TestDecide_PreserveBossOnForcedOvertake(t *testing.T) {
 			wantCard:   "AS",
 		},
 		{
-			// The Ace+Ten exception is exactly that pair: with the Ace boss but no
-			// Ten held, preserve the Ace and drop to the King.
 			name: "forced over partner with the ace boss but no ten keeps the ace",
 			hand: cards("AS", "KS", "7H"),
 			trick: []game.TrickCard{
@@ -1084,7 +934,6 @@ func TestDecide_PreserveBossOnForcedOvertake(t *testing.T) {
 			wantCard:   "KS",
 		},
 		{
-			// With AS and TS already gone, KS is now the boss → drop to QS.
 			name: "promoted king boss drops to the queen",
 			hand: cards("KS", "QS", "7H"),
 			trick: []game.TrickCard{
@@ -1097,7 +946,6 @@ func TestDecide_PreserveBossOnForcedOvertake(t *testing.T) {
 			wantCard:   "QS",
 		},
 		{
-			// AS still unseen, so KS is not the boss → play the strongest KS.
 			name: "strongest played when it is not the boss",
 			hand: cards("KS", "QS", "7H"),
 			trick: []game.TrickCard{
@@ -1109,8 +957,6 @@ func TestDecide_PreserveBossOnForcedOvertake(t *testing.T) {
 			wantCard:   "KS",
 		},
 		{
-			// Void in led: bot must cut over the partner's winning AD; both trumps
-			// overtake. JH is the trump master → drop to 9H.
 			name: "forced trump over partner keeps the master jack",
 			hand: cards("JH", "9H", "7C"),
 			trick: []game.TrickCard{
@@ -1124,11 +970,8 @@ func TestDecide_PreserveBossOnForcedOvertake(t *testing.T) {
 	})
 }
 
-// TestDecide_LastToPlayBanksHighest covers Rule 6: as the last player winning
-// over an opponent by following a non-trump led suit, the bot banks the
-// highest-point led-suit winner (safe now) instead of the cheapest (which it
-// would otherwise have to lead next trick into a possible ruff). Ruff wins and
-// non-last positions are unaffected.
+// TestDecide_LastToPlayBanksHighest checks the last player winning by following a side suit
+// banks its highest-point winner instead of the cheapest.
 func TestDecide_LastToPlayBanksHighest(t *testing.T) {
 	runPlayTweakCases(t, []playTweakCase{
 		{
@@ -1143,8 +986,6 @@ func TestDecide_LastToPlayBanksHighest(t *testing.T) {
 			wantCard:   "AS",
 		},
 		{
-			// Leader is seat 3, so seat 0 plays SECOND (not last) — Rule 6 is gated
-			// out and the bot wins cheaply with the ten, keeping the ace.
 			name: "not last over the king wins cheaply with the ten",
 			hand: cards("AS", "TS", "7C"),
 			trick: []game.TrickCard{
@@ -1178,10 +1019,8 @@ func TestDecide_LastToPlayBanksHighest(t *testing.T) {
 	})
 }
 
-// TestDecide_LeadIntoPartnerVoid covers Rule 7: with no boss to cash, the bot
-// leads the lowest card of a side suit the partner is known void in (and the
-// partner can still ruff, i.e. not void in trump) so the partner trumps and
-// wins. Opponents called trump in these cases, so the partner trump-draw is off.
+// TestDecide_LeadIntoPartnerVoid checks the bot leads the lowest card of a side suit the partner is void in
+// while the partner can still ruff.
 func TestDecide_LeadIntoPartnerVoid(t *testing.T) {
 	diamonds := game.SuitDiamonds
 	spades := game.SuitSpades
@@ -1191,7 +1030,7 @@ func TestDecide_LeadIntoPartnerVoid(t *testing.T) {
 			name:       "partner void in diamonds with trump: lead the lowest diamond",
 			hand:       cards("7D", "KD", "9C"),
 			callerSeat: 1,
-			observes:   []obs{{seat: 2, card: "7C", lead: &diamonds}}, // partner void diamonds
+			observes:   []obs{{seat: 2, card: "7C", lead: &diamonds}},
 			wantCard:   "7D",
 		},
 		{
@@ -1199,8 +1038,8 @@ func TestDecide_LeadIntoPartnerVoid(t *testing.T) {
 			hand:       cards("8C", "KD", "9S"),
 			callerSeat: 1,
 			observes: []obs{
-				{seat: 2, card: "7C", lead: &diamonds}, // void diamonds
-				{seat: 2, card: "8D", lead: &hearts},   // void trump
+				{seat: 2, card: "7C", lead: &diamonds},
+				{seat: 2, card: "8D", lead: &hearts},
 			},
 			wantCard: "8C",
 		},
@@ -1208,35 +1047,26 @@ func TestDecide_LeadIntoPartnerVoid(t *testing.T) {
 			name:       "bot void in the partner's void suit: cannot feed, lead safe low",
 			hand:       cards("KD", "9C", "7H"),
 			callerSeat: 1,
-			observes:   []obs{{seat: 2, card: "7C", lead: &spades}}, // partner void spades
+			observes:   []obs{{seat: 2, card: "7C", lead: &spades}},
 			wantCard:   "9C",
 		},
 		{
 			name:       "own boss outranks feeding the ruff: cash the ace first",
 			hand:       cards("AS", "7D", "9C"),
 			callerSeat: 1,
-			observes:   []obs{{seat: 2, card: "7C", lead: &diamonds}}, // partner void diamonds
+			observes:   []obs{{seat: 2, card: "7C", lead: &diamonds}},
 			wantCard:   "AS",
 		},
 	})
 }
 
-// TestDecide_SmearOntoPartnerBoss covers Rule 8: when the partner LEADS the
-// boss of a non-trump suit (e.g. the Ace) and the bot follows 3rd with one
-// opponent still to play, the bot smears high points onto the trick instead of
-// dumping a 7/8 — accepting the unknown ruff risk. It keeps points home only
-// when the last opponent is KNOWN void in the led suit (near-certain ruff).
-// Seating: partner (seat 2) leads, opp (seat 3) follows, bot (seat 0) is 3rd,
-// opp (seat 1) is the 4th still to play. Trump = Hearts.
+// TestDecide_SmearOntoPartnerBoss checks the bot smears points onto a partner-led boss when following third,
+// unless the last opponent is known void in the led suit.
 func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
 	spades := game.SuitSpades
 	hearts := game.SuitHearts
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// Partner's Ace is the boss; the last opponent's void is unknown. Once
-			// the Ace cashes, the bot's TS is the promoted boss of spades with no
-			// backup (the unseen KS kills the JS as one) — so the risk-smear gives
-			// the JS and keeps the Ten. A duck would have dumped the 7S.
 			name: "risk-smear keeps the promoted ten and gives the jack",
 			hand: cards("TS", "JS", "7S", "8C"),
 			trick: []game.TrickCard{
@@ -1247,9 +1077,6 @@ func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
 			wantCard:   "JS",
 		},
 		{
-			// Void in led and in trump: the AD is an unprotected boss (no TD
-			// behind it), so the bot keeps it and smears the best boss-safe card
-			// of another suit — the QC. A duck would have dumped the 7C.
 			name: "smear a boss-safe card from another suit when void in led and trump",
 			hand: cards("AD", "QC", "7C"),
 			trick: []game.TrickCard{
@@ -1260,8 +1087,6 @@ func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
 			wantCard:   "QC",
 		},
 		{
-			// The last opponent (seat 1) is KNOWN void in spades and trumps still
-			// remain it could hold — near-certain ruff, so keep points home.
 			name: "keep points home when the void opponent can still ruff",
 			hand: cards("TS", "7S", "8C"),
 			trick: []game.TrickCard{
@@ -1269,14 +1094,10 @@ func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
 				{Card: card("8S"), PlayerSeat: 3},
 			},
 			callerSeat: 1,
-			observes:   []obs{{seat: 1, card: "7C", lead: &spades}}, // seat 1 void spades
+			observes:   []obs{{seat: 1, card: "7C", lead: &spades}},
 			wantCard:   "7S",
 		},
 		{
-			// Last opponent (seat 1) is void in spades BUT also known void in trump,
-			// so it cannot ruff — smear anyway even into the led-suit void. The KS
-			// is boss-safe (the TS is still out), so the smear stays observable:
-			// kept points home, this would have been the 7S.
 			name: "smear into a void opponent that cannot ruff",
 			hand: cards("KS", "7S", "8C"),
 			trick: []game.TrickCard{
@@ -1285,15 +1106,12 @@ func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
 			},
 			callerSeat: 1,
 			observes: []obs{
-				{seat: 1, card: "7C", lead: &spades}, // seat 1 void spades
-				{seat: 1, card: "8D", lead: &hearts}, // seat 1 void trump -> cannot ruff
+				{seat: 1, card: "7C", lead: &spades},
+				{seat: 1, card: "8D", lead: &hearts},
 			},
 			wantCard: "KS",
 		},
 		{
-			// Partner is winning with the Ten but the Ace is still unseen — not the
-			// boss, so don't smear; keep points home. (Bot's K+7 are both below the
-			// Ten, so no overplay is forced and the choice is free.)
 			name: "keep points home when the partner card is not the boss",
 			hand: cards("KS", "7S", "8C"),
 			trick: []game.TrickCard{
@@ -1304,8 +1122,6 @@ func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
 			wantCard:   "7S",
 		},
 		{
-			// Void in led but HOLDING trump: forced to ruff the partner (Bitola has
-			// no exemption). Nothing to smear, so the cheap ruff is played.
 			name: "forced ruff over the partner plays the cheap trump",
 			hand: cards("JH", "9H", "7C"),
 			trick: []game.TrickCard{
@@ -1316,10 +1132,6 @@ func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
 			wantCard:   "9H",
 		},
 		{
-			// Regression: when the partner's win is already SAFE (bot closes the
-			// trick), the safe-smear still fires — but the TS, promoted to boss by
-			// the partner's Ace, is unprotected and stays home. The JS carries the
-			// points, where a duck would have dumped the 9S.
 			name: "safe partner win smears the high boss-safe card",
 			hand: cards("TS", "JS", "9S"),
 			trick: []game.TrickCard{
@@ -1333,25 +1145,12 @@ func TestDecide_SmearOntoPartnerBoss(t *testing.T) {
 	})
 }
 
-// TestDecide_CheapestSecureWinner covers the secure-take rule: when the bot
-// takes a contested trick with an opponent still to play — forced over a
-// winning partner, or overtaking an opponent — and there is material at stake
-// (points in the trick or on the cheapest take), it prefers the cheapest card
-// no yet-to-play opponent could still beat, gambling on the cheapest beatable
-// winner only when nothing is provably secure. The security check is
-// seat-aware: cards declared by an opponent who already acted this trick,
-// unseen suits a remaining opponent is provably void in, and cards a seat
-// pinned to the led suit could never legally play are not threats. On a
-// pointless trick no secure winner is ever spent. (The guaranteed-partner-
-// take duck lives in TestDecide_PartnerTakesTrickTrumpLed.) Trump = Hearts.
+// TestDecide_CheapestSecureWinner checks the bot takes a contested trick with material at stake
+// using the cheapest card no remaining opponent could still beat.
 func TestDecide_CheapestSecureWinner(t *testing.T) {
 	hearts := game.SuitHearts
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// Forced overplay over the partner's QH with the TH still unseen: the
-			// cheap KH would donate the trick (and its points) to the Ten's
-			// holder. Holding the 9H and JH itself, the bot's AH is the cheapest
-			// trump no opponent card can beat — it secures the take.
 			name: "forced overplay over the partner plays the cheapest secure trump",
 			hand: cards("KH", "AH", "9H", "JH", "7C"),
 			trick: []game.TrickCard{
@@ -1362,9 +1161,6 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 			wantCard:   "AH",
 		},
 		{
-			// Forced overplay with nothing secure: AH/TH/9H/JH are all unseen, so
-			// every overplay the bot owns can be overtaken. Donate minimally —
-			// the cheapest overtaker — exactly as before.
 			name: "forced overplay with no secure winner donates the cheapest",
 			hand: cards("QH", "KH"),
 			trick: []game.TrickCard{
@@ -1375,10 +1171,6 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 			wantCard:   "QH",
 		},
 		{
-			// Opponent leads the KS (4 pts) and the bot must ruff, holding the master
-			// 9H (JH already played) and the junk 8H. On a low-stake (4 < 14) ruff
-			// the bot KEEPS the master and cuts with the expendable 8H, accepting the
-			// speculative over-ruff — no opponent is known void in spades.
 			name: "low-stake ruff keeps the master nine and cuts with the low trump",
 			hand: cards("9H", "8H", "7C"),
 			trick: []game.TrickCard{
@@ -1389,11 +1181,6 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 			wantCard:   "8H",
 		},
 		{
-			// Seat-aware security: the TH and 9H are still unseen, but the only
-			// player left behind the bot (seat 1) is known void in trump — nobody
-			// who still acts can beat ANY of the bot's trumps, so the cheap KH is
-			// already guaranteed. Burning the JH here would waste the master on a
-			// trick the King takes for free.
 			name: "forced overplay with the remaining opponent void in trump plays the king",
 			hand: cards("KH", "AH", "JH", "7C"),
 			trick: []game.TrickCard{
@@ -1401,15 +1188,10 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 				{Card: card("8H"), PlayerSeat: 3},
 			},
 			callerSeat: 1,
-			observes:   []obs{{seat: 1, card: "8D", lead: &hearts}}, // seat 1 void trump
+			observes:   []obs{{seat: 1, card: "8D", lead: &hearts}},
 			wantCard:   "KH",
 		},
 		{
-			// Seat 3 declared the JH but has ALREADY acted (it led the KS), so the
-			// 9H is effectively the master. Still, the 4-pt trick is not worth the
-			// master on a speculative over-ruff, so the bot keeps the 9H and cuts
-			// with the 8H (the security detection is exercised by the fat-trick and
-			// forced-overplay cases, where the secure card is a non-control trump).
 			name: "low-stake ruff keeps the effective master behind the acted leader",
 			hand: cards("9H", "8H", "7C"),
 			trick: []game.TrickCard{
@@ -1420,12 +1202,6 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 			wantCard:       "8H",
 		},
 		{
-			// Material-stake gate: a pointless 7D lead is ruffed with the 8H even
-			// though every unseen higher trump beats it — zero points sit in the
-			// trick and the 8H adds none, so there is nothing worth securing and
-			// the master JH is not burnt to win nothing. (A side 7C keeps the
-			// hand off the two-card retention path, which would bank the JH for
-			// its own reasons.)
 			name: "pointless trick is ruffed cheaply, the master is not burnt to secure it",
 			hand: cards("JH", "8H", "7C"),
 			trick: []game.TrickCard{
@@ -1435,12 +1211,6 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 			wantCard:   "8H",
 		},
 		{
-			// Follow-suit security: the yet-to-play opponent (seat 1) revealed a
-			// spade tierce plus the KH — holding the led suit, it is FORCED to
-			// follow spades, so its KH can never land on this trick. With the JH
-			// already played, the cheap 8H ruff is provably secure; without the
-			// follow-suit filter the revealed KH would veto it and the bot would
-			// burn the 14-pt 9H instead.
 			name: "opponent pinned to the led suit cannot veto the cheap secure ruff",
 			hand: cards("9H", "8H", "7C"),
 			trick: []game.TrickCard{
@@ -1454,20 +1224,13 @@ func TestDecide_CheapestSecureWinner(t *testing.T) {
 	})
 }
 
-// TestDecide_TrumpEconomyTake covers preserving the control trumps (J, 9) on the
-// take: bank the highest expendable trump that is safe against KNOWN over-ruffs
-// (2a), and burn a control trump to secure only when the pot is worth at least
-// its value or a known over-ruff makes a cheap take a certain loss (2b).
-// Trump = Hearts; bot = seat 0, partner = seat 2, opponents = seats 1 & 3.
+// TestDecide_TrumpEconomyTake checks the bot banks the highest safe expendable trump on a take,
+// burning a control trump only when the pot is worth it or a known over-ruff forces it.
 func TestDecide_TrumpEconomyTake(t *testing.T) {
 	spades := game.SuitSpades
 	hearts := game.SuitHearts
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// 2a: early ruff of the opponent's TS (10 pts). The 9H is unseen, so the
-			// AH is not ABSOLUTELY secure (an unseen 9H could over-ruff) and only the
-			// JH is guaranteed — but no opponent is known void in spades, so the
-			// over-ruff is purely speculative. Bank the AH; keep the master JH.
 			name: "early ruff banks the ace and keeps the master",
 			hand: cards("JH", "AH", "7C"),
 			trick: []game.TrickCard{
@@ -1477,11 +1240,6 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 			wantCard:   "AH",
 		},
 		{
-			// 2b (pot worth the master): the bot is third; the partner (seat 2) led
-			// the AS (11), the opponent (seat 3) ruffed with the TH (10) — 21 points
-			// on the table. Forced to over-ruff, the bot has AH and JH; the AH is
-			// only speculatively safe, but 21 >= 20 (the Jack's value), so it locks
-			// the fat trick with the master JH.
 			name: "fat trick worth the master is secured with the jack",
 			hand: cards("JH", "AH", "8H"),
 			trick: []game.TrickCard{
@@ -1492,9 +1250,6 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 			wantCard:   "JH",
 		},
 		{
-			// 2b boundary (pot NOT worth the master): same shape but the partner led
-			// the 8S (0), so only the opponent's TH (10) is on the table — 10 < 20.
-			// The bot keeps the master and over-ruffs with the expendable AH.
 			name: "small trick keeps the master and over-ruffs with the ace",
 			hand: cards("JH", "AH", "8H"),
 			trick: []game.TrickCard{
@@ -1505,30 +1260,17 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 			wantCard:   "AH",
 		},
 		{
-			// Known over-ruff on a small trick: seat 1 (yet to play) is known void in
-			// spades and may still hold a trump, so the AH would likely be over-ruffed
-			// and donated. The 4-pt trick is not worth the master, so the bot ruffs
-			// cheaply (8H) and concedes — neither burning the JH nor donating the AH.
 			name: "known over-ruff on a small trick ruffs cheap and concedes",
 			hand: cards("JH", "AH", "8H", "7C"),
 			trick: []game.TrickCard{
 				{Card: card("KS"), PlayerSeat: 3},
 			},
 			callerSeat: 1,
-			observes:   []obs{{seat: 1, card: "8D", lead: &spades}}, // seat 1 void in spades
+			observes:   []obs{{seat: 1, card: "8D", lead: &spades}},
 			wantCard:   "8H",
 		},
 
-		// --- Trump lead: no control to reserve, but the pot must be real ---
-		// On a trump lead the overplay rule spends a trump either way, so holding
-		// the J/9 back only donates a cheaper trump. The ruff value gate
-		// (trickPoints >= controlTrumpValue) is replaced here by trickPoints > 0.
 		{
-			// The reported leak. Bot (seat 0) is third; partner (seat 2) led Q♥ and
-			// seat 3 played 7♥ — 3 points showing. Forced above the Q♥ holding
-			// T♥ 9♥ J♥ with the A♥ unseen at seat 1. The old value gate (3 < 14)
-			// refused the 9♥ and ducked the T♥, which seat 1 took with the A♥ — 24
-			// points donated. Only the J♥ (in hand) beats the 9♥.
 			name: "forced over the partner's trump queen secures with the 9",
 			hand: cards("JH", "9H", "TH", "7C", "8S"),
 			trick: []game.TrickCard{
@@ -1539,9 +1281,6 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 			wantCard:   "9H",
 		},
 		{
-			// Same shape at the other call site: seat 3 overtook the partner's Q♥
-			// with the K♥, so an OPPONENT is winning — 7 points, still under the 9's
-			// own value of 14. The cheapest winner T♥ loses to the unseen A♥.
 			name: "forced over a winning opponent's trump king secures with the 9",
 			hand: cards("JH", "9H", "TH", "7C", "8S"),
 			trick: []game.TrickCard{
@@ -1552,10 +1291,6 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 			wantCard:   "9H",
 		},
 		{
-			// GUARDS THE trickPoints > 0 CLAUSE. Seat 3 led the 8♥ (0 pts) and the
-			// bot holds J♥ + Q♥. The callers' stake gate does NOT stop this: it
-			// prices the cheapest legal card (0 + Q♥'s 3 = 3 > 0), so it opens.
-			// Only trickPoints > 0 keeps the master back.
 			name: "pointless trump lead keeps the master and donates the queen",
 			hand: cards("JH", "QH", "7C", "8S"),
 			trick: []game.TrickCard{
@@ -1565,9 +1300,6 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 			wantCard:   "QH",
 		},
 		{
-			// The same shape with a REAL pot: seat 3, void in hearts, discarded the
-			// A♠ (11 pts) onto the partner's 8♥ lead. Now spending the master is
-			// right — the Q♥ loses to any of the four unseen higher trumps.
 			name: "trump lead with a fat pot spends the master over a cheap trump",
 			hand: cards("JH", "QH", "7C", "8S"),
 			trick: []game.TrickCard{
@@ -1578,9 +1310,6 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 			wantCard:   "JH",
 		},
 		{
-			// Partner still to play BEHIND us: seat 3 leads, bot is second, partner
-			// (seat 2) plays last. The partner is never a threat, so the J♥ is
-			// secure and the 3-point pot justifies it.
 			name: "trump lead with the partner behind us still secures",
 			hand: cards("JH", "KH", "7C", "8S"),
 			trick: []game.TrickCard{
@@ -1590,9 +1319,6 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 			wantCard:   "JH",
 		},
 		{
-			// Unchanged: the cheapest secure winner is NOT a control trump, so the
-			// pre-existing early return handles it before the new branch. Seat 1
-			// (the only seat left) is known void in trump, so nothing beats the K♥.
 			name: "trump lead with a non-control secure winner still takes the king",
 			hand: cards("KH", "AH", "JH", "7C"),
 			trick: []game.TrickCard{
@@ -1600,12 +1326,10 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 				{Card: card("7H"), PlayerSeat: 3},
 			},
 			callerSeat: 1,
-			observes:   []obs{{seat: 1, card: "8D", lead: &hearts}}, // seat 1 void in trump
+			observes:   []obs{{seat: 1, card: "8D", lead: &hearts}},
 			wantCard:   "KH",
 		},
 		{
-			// Unchanged: NOTHING securely wins, so the new branch cannot fire (it
-			// requires a secure winner). A♥ T♥ 9♥ J♥ are all unseen.
 			name: "trump lead with no secure winner donates the cheapest",
 			hand: cards("KH", "QH", "7C"),
 			trick: []game.TrickCard{
@@ -1618,21 +1342,11 @@ func TestDecide_TrumpEconomyTake(t *testing.T) {
 	})
 }
 
-// TestDecide_PartnerTakesTrickTrumpLed covers the trump-led extension of the
-// partnerTakesTrick duck: on a trump lead the partner needs no void proof —
-// it must follow trump, and the overplay rule forces its known threat-proof
-// beater out, so the trick is the team's. The bot then never spends a secure
-// winner of its own; forced to overtake anyway, it banks high points via
-// strongestPreservingBoss. A declared beater that is NOT threat-proof gives
-// no guarantee, and the normal take/duck path runs. Trump = Hearts.
+// TestDecide_PartnerTakesTrickTrumpLed checks the bot ducks a trump lead its partner provably takes,
+// banking high points when forced to overtake anyway.
 func TestDecide_PartnerTakesTrickTrumpLed(t *testing.T) {
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// Seat 3 leads the KH while the partner's declared JH is still behind
-			// it — the overplay rule forces the Jack (threat-proof) out, so the
-			// trick is already the team's. The bot, squeezed over the King
-			// itself, donates the TH and never spends the 14-pt 9H on a take the
-			// partner has locked up.
 			name: "partner forced to win the trump lead: dump the ten, keep the nine",
 			hand: cards("9H", "TH"),
 			trick: []game.TrickCard{
@@ -1643,12 +1357,6 @@ func TestDecide_PartnerTakesTrickTrumpLed(t *testing.T) {
 			wantCard:       "TH",
 		},
 		{
-			// Forced overtake under the guaranteed take: both the KH and TH must
-			// overplay the led QH, and the partner's declared JH still wins the
-			// trick — whatever the bot plays lands in the team's pile, so it
-			// banks the 10-pt Ten (strongestPreservingBoss; the TH is no master
-			// while the AH and 9H are out) instead of wasting the slot on the
-			// 4-pt King.
 			name: "forced overtake under the partner's guaranteed take banks the ten",
 			hand: cards("KH", "TH"),
 			trick: []game.TrickCard{
@@ -1659,10 +1367,6 @@ func TestDecide_PartnerTakesTrickTrumpLed(t *testing.T) {
 			wantCard:       "TH",
 		},
 		{
-			// Negative gate: the partner declared the AH, but the JH and 9H are
-			// still unseen — the Ace is NOT threat-proof, so the trump lead gives
-			// no guarantee and the bot must not smear. It falls through to the
-			// normal path and discards low (a wrong duck would smear the KD).
 			name: "declared ace that is not threat-proof gives no guaranteed take",
 			hand: cards("KD", "7D"),
 			trick: []game.TrickCard{
@@ -1675,21 +1379,13 @@ func TestDecide_PartnerTakesTrickTrumpLed(t *testing.T) {
 	})
 }
 
-// TestDecide_BossPreservingSmear covers the boss-guard on smears: a boss is
-// smeared only when another held card of its suit is also a boss once it
-// leaves (the Ace backed by the Ten, generalized — including the trump
-// master), or when it cannot convert to a future trick anyway (endgame with a
-// possible ruff looming, or a suit an opponent already ruffs). When no
-// candidate is boss-safe at all, the plain highest-point smear stands.
-// Trump = Hearts.
+// TestDecide_BossPreservingSmear checks the bot smears a boss only when another held card becomes boss after it
+// or when the boss cannot win a later trick anyway.
 func TestDecide_BossPreservingSmear(t *testing.T) {
 	hearts := game.SuitHearts
 	diamonds := game.SuitDiamonds
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// Partner trumped and the bot closes the trick holding BOTH the AS and
-			// TS: the Ace is a protected boss — the Ten stays boss once the Ace
-			// leaves — so the highest points are still smeared.
 			name: "smear the ace when the ten protects it",
 			hand: cards("AS", "TS", "7H"),
 			trick: []game.TrickCard{
@@ -1701,11 +1397,6 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 			wantCard:   "AS",
 		},
 		{
-			// Every smear candidate is an unprotected boss worth guarding: the
-			// lone AS, and the TC promoted once the AC was played (both opponents
-			// are out of trump, so the endgame exception stays quiet). Nothing is
-			// boss-safe, so the fallback smears the highest points — the old
-			// behavior, preserved.
 			name: "all candidates unprotected bosses falls back to the highest points",
 			hand: cards("AS", "TC"),
 			trick: []game.TrickCard{
@@ -1716,16 +1407,12 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 			callerSeat: 1,
 			observes: []obs{
 				{seat: 1, card: "AC"},
-				{seat: 1, card: "7C", lead: &hearts}, // seat 1 void trump
-				{seat: 3, card: "9C", lead: &hearts}, // seat 3 void trump
+				{seat: 1, card: "7C", lead: &hearts},
+				{seat: 3, card: "9C", lead: &hearts},
 			},
 			wantCard: "AS",
 		},
 		{
-			// The boss-guard covers the trump master too: partner ruffed with the
-			// JH and the bot closes, forced to under-ruff. With the Jack gone the
-			// bot's 9H is the master trump and has no backup — keep it (a trump
-			// master can never be ruffed away) and smear the QH.
 			name: "smear keeps the unprotected master trump under the partner jack",
 			hand: cards("9H", "QH", "8H"),
 			trick: []game.TrickCard{
@@ -1737,9 +1424,6 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 			wantCard:   "QH",
 		},
 		{
-			// Same under-ruff but holding 9H AND AH: once the Jack falls they are
-			// BOTH masters, each protecting the other, so the bot banks the higher
-			// points — the canonical 9 smeared under the partner's Jack.
 			name: "smear the nine under the partner jack when the ace backs it",
 			hand: cards("9H", "AH", "7C"),
 			trick: []game.TrickCard{
@@ -1751,10 +1435,6 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 			wantCard:   "9H",
 		},
 		{
-			// Endgame exception: two cards left and an opponent may still hold a
-			// trump. The lone AS wins trick 8 only if nobody ruffs — hoarding it
-			// just donates its 11 points to that ruff, so it is banked NOW onto
-			// the partner's safe trick.
 			name: "endgame boss an opponent could ruff is banked not hoarded",
 			hand: cards("AS", "8C"),
 			trick: []game.TrickCard{
@@ -1766,9 +1446,6 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 			wantCard:   "AS",
 		},
 		{
-			// Same endgame, but both opponents are provably out of trump: the AS
-			// is an uncuttable trick-8 winner, so the guard holds — smear the 8C
-			// and keep the Ace for the last trick.
 			name: "endgame uncuttable boss stays guarded",
 			hand: cards("AS", "8C"),
 			trick: []game.TrickCard{
@@ -1778,16 +1455,12 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 			},
 			callerSeat: 1,
 			observes: []obs{
-				{seat: 1, card: "7C", lead: &hearts}, // seat 1 void trump
-				{seat: 3, card: "9C", lead: &hearts}, // seat 3 void trump
+				{seat: 1, card: "7C", lead: &hearts},
+				{seat: 3, card: "9C", lead: &hearts},
 			},
 			wantCard: "8C",
 		},
 		{
-			// Dead-suit exception: both opponents already showed out of diamonds
-			// and can still hold trumps, so the AD gets ruffed the moment its
-			// suit is led — it can never convert. Bank its 11 points now instead
-			// of hoarding a dead master.
 			name: "dead-suit boss is banked when an opponent ruffs its suit",
 			hand: cards("AD", "QC", "7C"),
 			trick: []game.TrickCard{
@@ -1797,21 +1470,16 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 			},
 			callerSeat: 1,
 			observes: []obs{
-				{seat: 1, card: "8H", lead: &diamonds}, // seat 1 void diamonds
-				{seat: 3, card: "9H", lead: &diamonds}, // seat 3 void diamonds
+				{seat: 1, card: "8H", lead: &diamonds},
+				{seat: 3, card: "9H", lead: &diamonds},
 			},
 			wantCard: "AD",
 		},
 	})
 }
 
-// TestDecide_RetainUncuttableBoss covers the endgame-retention generalization
-// (Point 3): an uncuttable non-trump boss is a guaranteed trick-8 winner too.
-// Holding the master trump PLUS such a boss, the bot spends the master first
-// (leads the trump) and keeps the boss for the last trick. Holding only a LOWER
-// trump plus the boss, it defers — cashing the boss now is already best, since
-// the partner keeps trick-8 control. Trump = Hearts; both opponents (seats 1, 3)
-// are marked void in trump so the side boss cannot be ruffed.
+// TestDecide_RetainUncuttableBoss checks the bot treats an uncuttable side boss as a trick-8 winner,
+// spending the master trump first and keeping the boss for the last trick.
 func TestDecide_RetainUncuttableBoss(t *testing.T) {
 	hearts := game.SuitHearts
 	oppsVoidTrump := []obs{
@@ -1820,8 +1488,6 @@ func TestDecide_RetainUncuttableBoss(t *testing.T) {
 	}
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// Master JH + uncuttable boss AS: lead the master first, keep the AS.
-			// (The old rule spent the AS first and banked the JH.)
 			name:       "master trump plus uncuttable boss leads the trump first",
 			hand:       cards("JH", "AS"),
 			callerSeat: 0,
@@ -1829,8 +1495,6 @@ func TestDecide_RetainUncuttableBoss(t *testing.T) {
 			wantCard:   "JH",
 		},
 		{
-			// Lower trump 9H + boss AS: JH is still out, so 9H is not the master —
-			// defer and cash the boss now (the partner secures trick 8).
 			name:       "lower trump plus boss cashes the boss now",
 			hand:       cards("9H", "AS"),
 			callerSeat: 0,
@@ -1840,11 +1504,8 @@ func TestDecide_RetainUncuttableBoss(t *testing.T) {
 	})
 }
 
-// TestDecide_CashBossPrefersTenWithAceTen covers Point 4: when cashing a side
-// boss and holding BOTH the Ace and Ten of that suit, the bot leads the Ten
-// (also a boss, since it holds the Ace) and keeps the Ace as the guaranteed
-// master. The exception is the Ace+Ten pair only. Opponents (seat 1) called
-// trump, so the trump-draw leads are off.
+// TestDecide_CashBossPrefersTenWithAceTen checks the bot cashes the Ten before the Ace
+// when it holds both of a side suit.
 func TestDecide_CashBossPrefersTenWithAceTen(t *testing.T) {
 	runPlayTweakCases(t, []playTweakCase{
 		{
@@ -1860,7 +1521,6 @@ func TestDecide_CashBossPrefersTenWithAceTen(t *testing.T) {
 			wantCard:   "AS",
 		},
 		{
-			// King+Queen is not the Ace+Ten pair — cash the higher (promoted) boss.
 			name:       "king and queen boss cashes the king not the queen",
 			hand:       cards("KS", "QS", "7C"),
 			callerSeat: 1,
@@ -1870,22 +1530,17 @@ func TestDecide_CashBossPrefersTenWithAceTen(t *testing.T) {
 	})
 }
 
-// TestDecide_OnlyTrumpsLeadMasterElseLowest covers Point 5: with only trumps in
-// hand the bot leads the highest trump ONLY when it is the master; otherwise it
-// leads the lowest trump, keeping its stronger trumps back. Opponents (seat 1)
-// called trump so the trump-draw leads are off and the "only trumps left" branch
-// is reached; three trumps keep it out of the two-card retention path.
+// TestDecide_OnlyTrumpsLeadMasterElseLowest checks that with only trumps in hand
+// the bot leads the highest trump when it is the master and the lowest otherwise.
 func TestDecide_OnlyTrumpsLeadMasterElseLowest(t *testing.T) {
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// JH is the absolute master → lead it.
 			name:       "master in hand leads the highest trump",
 			hand:       cards("JH", "9H", "7H"),
 			callerSeat: 1,
 			wantCard:   "JH",
 		},
 		{
-			// JH still out, so 9H is not the master → lead the lowest trump (7H).
 			name:       "no master leads the lowest trump",
 			hand:       cards("9H", "8H", "7H"),
 			callerSeat: 1,
@@ -1894,12 +1549,8 @@ func TestDecide_OnlyTrumpsLeadMasterElseLowest(t *testing.T) {
 	})
 }
 
-// TestDecide_NoDrawWhenOpponentsOutOfTrump covers Point 6: once BOTH opponents
-// are known void in trump, the remaining trumps are split between the bot and
-// its partner, so leading trump to "draw" only strips the partner's control. The
-// bot leads a side suit instead (cashing a boss / leading safe) and lets the
-// partner keep the trump lead. Without this the partner's UNKNOWN trumps look
-// unseen and the bot would lead its master trump. Our team called trump.
+// TestDecide_NoDrawWhenOpponentsOutOfTrump checks the bot leads a side suit instead of trump
+// once both opponents are known void in trump.
 func TestDecide_NoDrawWhenOpponentsOutOfTrump(t *testing.T) {
 	hearts := game.SuitHearts
 	oppsVoidTrump := []obs{
@@ -1908,8 +1559,6 @@ func TestDecide_NoDrawWhenOpponentsOutOfTrump(t *testing.T) {
 	}
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			// Holds the master JH, but opponents are out of trump — cash the side
-			// boss AS rather than lead the master into the partner.
 			name:       "opponents out of trump cash the side boss not the master",
 			hand:       cards("JH", "AS", "KD", "7C"),
 			callerSeat: 0,
@@ -1917,7 +1566,6 @@ func TestDecide_NoDrawWhenOpponentsOutOfTrump(t *testing.T) {
 			wantCard:   "AS",
 		},
 		{
-			// No side boss either — lead a safe low side card, still never the trump.
 			name:       "opponents out of trump and no boss lead safe low not the trump",
 			hand:       cards("JH", "KD", "8D", "7C"),
 			callerSeat: 0,
@@ -1950,24 +1598,19 @@ func TestDecide_AlwaysLegal(t *testing.T) {
 	assert.True(t, found, "chosen card %s must be in the engine's legal set", action.Card)
 }
 
-// --- Memory ---
-
 func TestMemory_VoidInference(t *testing.T) {
 	mem := bot.NewMemory()
 	lead := game.SuitSpades
 
-	// Seat 2 fails to follow spades — void in spades.
 	mem.ObservePlay(2, card("7H"), &lead)
 	voids := mem.KnownVoids()
 	assert.True(t, voids[2][bot.SuitIndex(game.SuitSpades)])
 	assert.False(t, voids[2][bot.SuitIndex(game.SuitHearts)])
 
-	// Following the led suit reveals nothing.
 	mem.ObservePlay(3, card("9S"), &lead)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[3][bot.SuitIndex(game.SuitSpades)])
 
-	// A lead (no led suit yet) reveals nothing.
 	mem.ObservePlay(0, card("AC"), nil)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[0][bot.SuitIndex(game.SuitClubs)])
@@ -1981,31 +1624,23 @@ func TestMemory_SyncHandResets(t *testing.T) {
 	mem.ObservePlay(2, card("7H"), &lead)
 	require.NotEmpty(t, mem.PlayedCards())
 
-	// Same hand → no reset.
 	mem.SyncHand(1)
 	assert.Len(t, mem.PlayedCards(), 1)
 
-	// New hand → full reset.
 	mem.SyncHand(2)
 	assert.Empty(t, mem.PlayedCards())
 	assert.False(t, mem.KnownVoids()[2][bot.SuitIndex(game.SuitSpades)])
 }
 
-// TestDecide_ReportedTrumpLeadLeakEndToEnd drives the reported position through
-// the rules engine and asserts the MATERIAL outcome. runPlayTweakCases only
-// asserts which card Decide returns, so on its own it cannot show the trick was
-// won — and the bug is a points leak, not a card choice: a regression that wins
-// the trick while conceding material would pass a TricksWon-only assertion.
-//
-// Trump = Hearts. Seat 2 (the bot's partner) leads Q(H), seat 3 plays 7(H), the
-// bot at seat 0 is forced above the Q(H), and seat 1 holds the A(H).
+// TestDecide_ReportedTrumpLeadLeakEndToEnd plays the reported trump-lead position through the engine
+// and asserts the points outcome, not just the card choice.
 func TestDecide_ReportedTrumpLeadLeakEndToEnd(t *testing.T) {
-	gs := testfixtures.NewGameMidPlay(1) // trump = Hearts
+	gs := testfixtures.NewGameMidPlay(1)
 	gs.Players[0].Hand = cards("JH", "9H", "TH", "8S")
 	gs.Players[1].Hand = cards("AH", "7S", "8D", "9D")
 	gs.Players[2].Hand = cards("QH", "AS", "KS", "QS")
 	gs.Players[3].Hand = cards("7H", "TS", "7D", "KD")
-	gs.ActivePlayerSeat = 2 // the partner leads
+	gs.ActivePlayerSeat = 2
 
 	play := func(seat int, id string) {
 		t.Helper()
@@ -2026,30 +1661,20 @@ func TestDecide_ReportedTrumpLeadLeakEndToEnd(t *testing.T) {
 	assert.Equal(t, "9H", action.Card.String(), "bot must secure the trick, not donate the TH")
 	play(0, action.Card.String())
 
-	play(1, "AH") // the Ace that used to take this trick
+	play(1, "AH")
 
-	// Q(H) 3 + 7(H) 0 + 9(H) 14 + A(H) 11 = 28. Before the fix the bot played the
-	// T(H), seat 1 took the trick with the A(H), and team B banked 24 instead.
 	assert.Equal(t, 1, gs.TricksWon[game.TeamA], "the bot's team must take the trick")
 	assert.Equal(t, 0, gs.TricksWon[game.TeamB], "the opponents must not take the trick")
 	assert.Equal(t, 28, gs.HandPoints[game.TeamA], "the bot's team must bank the trick points")
 	assert.Equal(t, 0, gs.HandPoints[game.TeamB], "the opponents must bank nothing")
 }
 
-// TestDecide_TrickSevenRetentionBeatsContesting pins the trick-7 shape as
-// deliberately NOT part of the fix above, and proves why with a two-trick
-// playout. It exists to stop a future change from "fixing" retention here.
-//
-// The same trump-lead shape at exactly two cards in hand is decided by
-// retainLastTrickWinner, which banks the master and spends the spare. Looked at
-// over trick 7 alone that concedes 24 points and reads like the reported bug.
-// Played out over BOTH remaining tricks it is the better line: the master takes
-// exactly one trick either way, so it should take trick 8 — the trick carrying
-// the +10 "dix de der" and the opponents' last cards.
+// TestDecide_TrickSevenRetentionBeatsContesting plays out the last two tricks to show that keeping the master for trick 8
+// beats contesting trick 7.
 func TestDecide_TrickSevenRetentionBeatsContesting(t *testing.T) {
 	build := func() *game.GameState {
 		gs := testfixtures.NewGameMidPlay(7)
-		gs.Players[0].Hand = cards("JH", "TH") // bot: master JH + spare TH
+		gs.Players[0].Hand = cards("JH", "TH")
 		gs.Players[1].Hand = cards("9H", "AH")
 		gs.Players[2].Hand = cards("QH", "8S")
 		gs.Players[3].Hand = cards("7H", "9S")
@@ -2074,7 +1699,6 @@ func TestDecide_TrickSevenRetentionBeatsContesting(t *testing.T) {
 		play(3, "7H")
 		play(0, trick7Bot)
 		play(1, "AH")
-		// Trick 8: the trick-7 winner leads; every seat has one card left.
 		last := map[int]string{0: trick8Bot, 1: "9H", 2: "8S", 3: "9S"}
 		for s, n := gs.ActivePlayerSeat, 0; n < 4; s, n = (s+1)%4, n+1 {
 			play(s, last[s])
@@ -2082,14 +1706,13 @@ func TestDecide_TrickSevenRetentionBeatsContesting(t *testing.T) {
 		return gs.HandPoints
 	}
 
-	// What the bot actually does at two cards: spend the spare, bank the master.
 	action := bot.Decide(viewFromState(build(), 0, bot.NewMemory()))
 	require.NotNil(t, action.Card)
 	assert.Equal(t, "TH", action.Card.String(),
 		"at two cards retention must bank the master for the +10 trick")
 
-	retain := playOut(t, "TH", "JH")  // spare now, master takes trick 8 + the +10
-	contest := playOut(t, "JH", "TH") // master now, spare loses trick 8 + the +10
+	retain := playOut(t, "TH", "JH")
+	contest := playOut(t, "JH", "TH")
 
 	assert.Equal(t, [2]int{44, 24}, retain, "retaining banks trick 8 and the +10")
 	assert.Equal(t, [2]int{34, 34}, contest, "contesting trick 7 gives trick 8 away")
@@ -2097,10 +1720,8 @@ func TestDecide_TrickSevenRetentionBeatsContesting(t *testing.T) {
 		"retention must remain the better line — do not add a contest guard here")
 }
 
-// TestObserveDeclarations_OverlapRecordsEachCardOnce pins KnownCards' "exact
-// cards held" invariant under a declaration-overlap config, where one card can
-// legitimately appear in two of the same seat's melds. Concatenating the melds
-// would store the shared JS twice.
+// TestObserveDeclarations_OverlapRecordsEachCardOnce checks a card shared by two melds of one seat
+// is stored in KnownCards only once.
 func TestObserveDeclarations_OverlapRecordsEachCardOnce(t *testing.T) {
 	var players [4]game.PlayerState
 	players[0].Declarations = []game.Declaration{

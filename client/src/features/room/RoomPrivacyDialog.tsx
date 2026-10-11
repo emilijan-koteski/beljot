@@ -30,11 +30,8 @@ interface RoomPrivacyDialogProps {
 }
 
 /**
- * Story 9.6 (AC6): owner-only control to make a waiting room private (set/change
- * the password) or revert it to public. Changing privacy never ejects seated
- * players — the gate is join-time only. On success the server broadcasts
- * system:room_updated; we also update the local room store from the response so
- * the badge flips immediately.
+ * Owner-only dialog to make a waiting room private (set or change its password) or public again.
+ * Updates the local room store from the response so the badge flips immediately.
  */
 export function RoomPrivacyDialog({ open, room, onClose }: RoomPrivacyDialogProps) {
   const { t } = useTranslation();
@@ -46,7 +43,6 @@ export function RoomPrivacyDialog({ open, room, onClose }: RoomPrivacyDialogProp
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Re-seed from the current room state each time the dialog opens.
   useEffect(() => {
     if (open) {
       setMakePrivate(room.isPrivate);
@@ -56,9 +52,6 @@ export function RoomPrivacyDialog({ open, room, onClose }: RoomPrivacyDialogProp
     }
   }, [open, room.isPrivate]);
 
-  // MIN is per-character (matches the server's rune count); MAX is the bcrypt
-  // byte limit, so measure UTF-8 bytes — not UTF-16 .length — to agree with the
-  // server and never accept a multibyte password it would reject as too long.
   const passwordValid =
     !makePrivate ||
     (password.length >= MIN_ROOM_PASSWORD &&

@@ -6,15 +6,11 @@ import (
 	"github.com/emilijan/beljot/server/internal/apperr"
 )
 
-// sequencePoints maps sequence length to point value.
 var sequencePoints = map[int]int{
 	3: 20,
 	4: 50,
-	// 5+ = 100 (handled in code)
 }
 
-// fourOfAKindPoints maps rank to point value for four-of-a-kind declarations.
-// Only ranks with non-zero card points are declarable (no 4×7 or 4×8).
 var fourOfAKindPoints = map[Rank]int{
 	RankJack:  200,
 	Rank9:     150,
@@ -24,41 +20,25 @@ var fourOfAKindPoints = map[Rank]int{
 	RankQueen: 100,
 }
 
-// detectDeclarations scans a player's hand for all valid declarations.
-// Returns sequences and four-of-a-kind combinations with their point values.
-// Longer sequences subsume shorter subsequences within them.
-//
-// overlap comes from VariantRules.DeclarationOverlap and must always be passed
-// explicitly by the caller from the game state's resolved config — never
-// defaulted, and never derived from the variant name. When it is true a single
-// card may count toward more than one declaration, so the one-card-one-group
-// dedup is skipped and every detected meld survives.
+// detectDeclarations returns every sequence and four-of-a-kind in hand with its point value.
+// When overlap is false a card counts toward at most one declaration.
 func detectDeclarations(hand []Card, overlap bool) []Declaration {
 	var decls []Declaration
 
-	// --- Sequences: consecutive ranks of the same suit ---
-	// Group cards by suit
 	bySuit := map[Suit][]Card{}
 	for _, c := range hand {
 		bySuit[c.Suit] = append(bySuit[c.Suit], c)
 	}
 
-	// AllSuits order, never the map's: Go randomizes map iteration per run, and
-	// the order melds are appended in is the order they reach the wire, the
-	// declaration-contract golden, and the client's reveal panel. Iterating
-	// bySuit directly made TestVariantRulesAndDeclarationsContract fail roughly
-	// one run in four on any hand holding two melds.
 	for _, suit := range AllSuits {
 		cards := bySuit[suit]
 		if len(cards) < 3 {
 			continue
 		}
-		// Sort by natural rank order
 		sort.Slice(cards, func(i, j int) bool {
 			return NaturalRankOrder[cards[i].Rank] < NaturalRankOrder[cards[j].Rank]
 		})
 
-		// Find maximal consecutive sequences
 		seqStart := 0
 		for i := 1; i <= len(cards); i++ {
 			consecutive := i < len(cards) &&
@@ -68,7 +48,7 @@ func detectDeclarations(hand []Card, overlap bool) []Declaration {
 				if seqLen >= 3 {
 					seqCards := make([]Card, seqLen)
 					copy(seqCards, cards[seqStart:i])
-					pts := 100 // 5+
+					pts := 100
 					if v, ok := sequencePoints[seqLen]; ok {
 						pts = v
 					}
@@ -83,13 +63,10 @@ func detectDeclarations(hand []Card, overlap bool) []Declaration {
 		}
 	}
 
-	// --- Four-of-a-kind: player holds all 4 suits of the same rank ---
 	byRank := map[Rank][]Card{}
 	for _, c := range hand {
 		byRank[c.Rank] = append(byRank[c.Rank], c)
 	}
-	// AllRanks order, for the same reason as AllSuits above: a hand with two
-	// four-of-a-kinds must emit them in a fixed order.
 	for _, rank := range AllRanks {
 		cards := byRank[rank]
 		if len(cards) == 4 {
@@ -105,27 +82,14 @@ func detectDeclarations(hand []Card, overlap bool) []Declaration {
 		}
 	}
 
-	// A card may participate in several declarations under this config, so
-	// every detected meld stands on its own.
 	if overlap {
 		return decls
 	}
 	return dedupOneCardOneGroup(decls)
 }
 
-// dedupOneCardOneGroup applies the one-card-one-group rule (the behaviour
-// VariantRules.DeclarationOverlap=false selects). Among
-// declarations that share at least one card, the highest-Value one is kept
-// and the rest are dropped. Stable — original order is preserved among
-// survivors.
-//
-// Equal-Value ties keep the four-of-a-kind, matching declarationBeats rule 2,
-// so the survivor is the same meld the clash comparison would have preferred.
-// Rule 2 alone settles every reachable tie here: overlap is only possible
-// between a sequence and a four-of-a-kind (sequences are maximal per-suit
-// runs, so two sequences never share a card; four-of-a-kinds are
-// rank-disjoint), and the later chain steps need trump and seat, neither of
-// which is known at detection time.
+// dedupOneCardOneGroup keeps the highest-value declaration among those sharing a card, preferring four-of-a-kind on ties.
+// Survivors keep their original order.
 func dedupOneCardOneGroup(decls []Declaration) []Declaration {
 	if len(decls) <= 1 {
 		return decls
@@ -175,24 +139,12 @@ func dedupOneCardOneGroup(decls []Declaration) []Declaration {
 	return out
 }
 
-// hasDeclarableCombinations returns true if the hand contains any valid
-// declarations. overlap has the same meaning as in detectDeclarations; the
-// predicate is in fact invariant under it (dedup keeps at least one meld from
-// any non-empty set), but the parameter is threaded through so the two
-// functions cannot drift apart.
+// hasDeclarableCombinations reports whether the hand contains any valid declaration.
 func hasDeclarableCombinations(hand []Card, overlap bool) bool {
 	return len(detectDeclarations(hand, overlap)) > 0
 }
 
-// HasDeclarableCombinations reports whether the seat holds anything it could
-// declare, under the overlap rule this game's config resolved. Exported for the
-// bot-view builder: in the dedicated declaration phase every seat is asked, so a
-// bot must know whether declare is legal for it before choosing between declare
-// and skip — the engine rejects a declare from an empty hand, and a rejected bot
-// action re-arms into a reschedule loop.
-//
-// Reads the rule off the state's own config, never the variant name (D-VAR-1),
-// so the bot receives a consequence and never learns which variant it plays.
+// HasDeclarableCombinations reports whether the seat holds anything it could declare under the game's overlap rule.
 func HasDeclarableCombinations(state *GameState, seat int) bool {
 	if seat < 0 || seat > 3 {
 		return false
@@ -200,26 +152,9 @@ func HasDeclarableCombinations(state *GameState, seat int) bool {
 	return hasDeclarableCombinations(state.Players[seat].Hand, state.Rules.DeclarationOverlap)
 }
 
-// resolveDeclarations compares all players' declarations after trick 1.
-// Returns winning team index (0=team A, 1=team B) and total declaration points
-// for the winning team. Returns -1 and 0 if no declarations exist.
-//
-// The winner is the team holding the SINGLE strongest declaration on the
-// table — never the team with the larger meld sum. Once the winning team is
-// chosen, the awarded total is the sum of that team's declarations only;
-// the losing team scores 0 regardless of how many melds they held.
-// Belot (K+Q of trump) is awarded separately via handleAnnounceBelot and
-// does not flow through this function.
-//
-// Resolution rules (applied to each team's strongest meld via declarationBeats):
-// 1. Pick each team's single strongest declaration
-// 2. Higher point value wins; on tie, four-of-a-kind beats sequence
-// 3. On tie among sequences: higher top card (natural rank order, J > 10) wins
-// 4. On tie: trump-suit sequence beats non-trump
-// 5. On tie: team whose declaring player is earlier in play order wins
-// 6. Winning team scores the sum of ALL their declarations
+// resolveDeclarations picks the team holding the single strongest declaration and returns it with the sum of that team's declarations.
+// It returns -1 and 0 when nobody declared.
 func resolveDeclarations(players [4]PlayerState, trumpSuit Suit, trickLeaderSeat int) (winningTeam int, totalPoints int) {
-	// Collect best declaration per team
 	type teamBest struct {
 		decl       *Declaration
 		playerSeat int
@@ -238,12 +173,10 @@ func resolveDeclarations(players [4]PlayerState, trumpSuit Suit, trickLeaderSeat
 		}
 	}
 
-	// No declarations at all
 	if bestByTeam[0] == nil && bestByTeam[1] == nil {
 		return -1, 0
 	}
 
-	// One team has declarations, the other doesn't
 	if bestByTeam[0] == nil {
 		return 1, teamDeclarationTotal(players, 1)
 	}
@@ -251,7 +184,6 @@ func resolveDeclarations(players [4]PlayerState, trumpSuit Suit, trickLeaderSeat
 		return 0, teamDeclarationTotal(players, 0)
 	}
 
-	// Both teams have declarations — compare best
 	b0, b1 := bestByTeam[0], bestByTeam[1]
 	if declarationBeats(b0.decl, b0.playerSeat, b1.decl, b1.playerSeat, trumpSuit, trickLeaderSeat) {
 		return 0, teamDeclarationTotal(players, 0)
@@ -262,19 +194,14 @@ func resolveDeclarations(players [4]PlayerState, trumpSuit Suit, trickLeaderSeat
 // declarationBeats returns true if declaration a (from seatA) beats
 // declaration b (from seatB) using the full tiebreaker chain.
 func declarationBeats(a *Declaration, seatA int, b *Declaration, seatB int, trumpSuit Suit, trickLeaderSeat int) bool {
-	// 1. Higher value wins
 	if a.Value != b.Value {
 		return a.Value > b.Value
 	}
 
-	// 2. Four-of-a-kind beats sequence at equal value
 	if a.Type != b.Type {
 		return a.Type == DeclarationFourOfAKind
 	}
 
-	// 3. For equal-value sequences: higher top card wins. Sequences rank by the
-	// NATURAL declaration order (7<8<9<10<J<Q<K<A) — NOT the trick-taking order,
-	// where Ten outranks Jack. In a meld, Jack outranks Ten.
 	if a.Type == DeclarationSequence && b.Type == DeclarationSequence {
 		topA := sequenceTopCard(a.Cards)
 		topB := sequenceTopCard(b.Cards)
@@ -284,7 +211,6 @@ func declarationBeats(a *Declaration, seatA int, b *Declaration, seatB int, trum
 			return orderA > orderB
 		}
 
-		// 4. Trump suit sequence wins
 		suitA := a.Cards[0].Suit
 		suitB := b.Cards[0].Suit
 		if (suitA == trumpSuit) != (suitB == trumpSuit) {
@@ -292,7 +218,6 @@ func declarationBeats(a *Declaration, seatA int, b *Declaration, seatB int, trum
 		}
 	}
 
-	// 5. Earlier in play order from trick leader wins
 	distA := (seatA - trickLeaderSeat + 4) % 4
 	distB := (seatB - trickLeaderSeat + 4) % 4
 	return distA < distB
@@ -322,10 +247,7 @@ func teamDeclarationTotal(players [4]PlayerState, team int) int {
 	return total
 }
 
-// handleDeclaring processes the actions valid inside PhaseDeclaring, the
-// dedicated declaration phase Croatian runs between bidding and trick 1.
-// declare and skip_declare are the only ones — play_card in particular is
-// rejected, since no trick is open yet.
+// handleDeclaring dispatches declare and skip_declare during PhaseDeclaring and rejects everything else.
 func handleDeclaring(state *GameState, action Action) (*GameState, error) {
 	if state.Phase != PhaseDeclaring {
 		return nil, apperr.ErrWrongPhase
@@ -341,29 +263,8 @@ func handleDeclaring(state *GameState, action Action) (*GameState, error) {
 	}
 }
 
-// openDeclarationPhase enters PhaseDeclaring from a resolved bid. Every seat is
-// asked AT ONCE and answers independently; there is no cursor and no seat on the
-// clock.
-//
-// That simultaneity is the whole point, not a convenience. The one-at-a-time
-// cursor this replaced prompted only meld-holding seats, so ActivePlayerSeat
-// during the phase named exactly the seats holding melds and the table learned
-// who had one before they chose — which is the secret skipping is supposed to
-// keep. Here every seat answers whatever it holds, so nothing on the wire
-// separates a meld holder from anyone else until the reveal.
-//
-// ActivePlayerSeat is pinned to (DealerSeat+1)%4 — where it must land for trick
-// 1 anyway — and stays there for the phase's whole duration. It is a positional
-// constant, uncorrelated with anyone's cards, which keeps every path that
-// assumes a 0-3 seat working without a sentinel. Clients suppress the
-// active-seat highlight on the phase, since no one is on the clock.
-//
-// TrickNumber is deliberately 0: no trick is open, and Bitola's trick-1
-// declaration path (checkDeclarationPrompt, resolveTrickWithDeclarations) is
-// guarded on TrickNumber == 1, so it can never engage here.
-//
-// AwaitingDeclaration stays false throughout — it is Bitola's "this seat is
-// being asked" flag, and there is no such seat here.
+// openDeclarationPhase enters PhaseDeclaring, where every seat answers at once so nobody learns who holds a meld.
+// ActivePlayerSeat is pinned to the trick-1 leader and TrickNumber stays 0.
 func openDeclarationPhase(state *GameState) {
 	state.Phase = PhaseDeclaring
 	state.TrickNumber = 0
@@ -375,16 +276,7 @@ func openDeclarationPhase(state *GameState) {
 	}
 }
 
-// allDeclarationsAnswered reports whether every CONNECTED seat has answered the
-// dedicated declaration phase. Disconnected seats are excluded for the same
-// reason allConnectedReady excludes them from the score-reveal pause: a dropped
-// player must not hold the table hostage.
-//
-// On the ORDINARY disconnect path this exclusion is belt-and-braces rather than
-// load-bearing: HandleDisconnect moves the whole table to PhaseDisconnected, so
-// no answer reaches this gate until the seat is back. It earns its keep on the
-// concurrent-disconnect path, where a second seat is marked Connected=false
-// while the phase itself is restored and answers keep flowing.
+// allDeclarationsAnswered reports whether every connected seat has answered the declaration phase.
 func allDeclarationsAnswered(state *GameState) bool {
 	for i := range state.Players {
 		if state.Players[i].Connected && !state.Players[i].DeclarationAnswered {
@@ -394,17 +286,7 @@ func allDeclarationsAnswered(state *GameState) bool {
 	return true
 }
 
-// maybeCloseDeclarationPhase ends the phase once every connected seat has
-// answered, and does nothing otherwise.
-//
-// The contest resolves through the SAME resolveDeclarationsForHand Bitola uses
-// at trick 2 (DeclarationsResolved flips false→true here, so the match layer's
-// fire-once reveal latch works unchanged) and the game moves straight to
-// PhasePlaying at trick 1 — the reveal panel floats over live play exactly as it
-// does in Bitola.
-//
-// Answer ORDER cannot affect the outcome: resolveDeclarations breaks ties on
-// trickLeaderSeat, a positional fact, never on who spoke first.
+// maybeCloseDeclarationPhase closes the declaration phase once every connected seat has answered.
 func maybeCloseDeclarationPhase(state *GameState) {
 	if !allDeclarationsAnswered(state) {
 		return
@@ -412,10 +294,7 @@ func maybeCloseDeclarationPhase(state *GameState) {
 	closeDeclarationPhase(state)
 }
 
-// closeDeclarationPhase resolves the contest and opens trick 1 unconditionally.
-// Split out from maybeCloseDeclarationPhase so the session manager's fixed
-// window can force it through ForceCloseDeclarationPhase without re-testing a
-// gate it has already decided to override.
+// closeDeclarationPhase resolves the declaration contest and opens trick 1 unconditionally.
 func closeDeclarationPhase(state *GameState) {
 	resolveDeclarationsForHand(state)
 
@@ -428,45 +307,24 @@ func closeDeclarationPhase(state *GameState) {
 	state.TrickNumber = 1
 	state.CurrentTrick = []TrickCard{}
 
-	// "Dosta" checkpoint 2 of 3 (the rule itself is stated once, on
-	// stopAtTargetIfReached): the declaration contest just awarded points, so
-	// a team may have crossed the target before a single card was played. Checked
-	// LAST, after PhasePlaying is set, so the stop wins over the transition — the
-	// phase never becomes playing on the wire and trickNumber stays 0 for a
-	// crossing Croatian contest. This is the single choke point for the Croatian
-	// declaring→playing move, so it covers both the answer-driven close and
-	// ForceCloseDeclarationPhase.
 	if stopAtTargetIfReached(state) {
-		// The stop already reverted Phase to PhaseMatchEnd and cleared
-		// AwaitingDeclaration; trick 1's opening is undone here so the aborted
-		// hand's snapshot does not claim a trick was under way.
 		state.TrickNumber = 0
 	}
 }
 
-// ForceCloseDeclarationPhase resolves the declaration contest and opens trick 1
-// regardless of who has answered — every unanswered seat is treated as having
-// skipped. The session manager calls it when the phase's fixed window elapses,
-// so an absent or idle seat cannot stall the table.
-//
-// Mirrors ForceAdvanceHandComplete, including its bypass of the action
-// dispatcher: this is a server-initiated advance, not a player action.
+// ForceCloseDeclarationPhase resolves the declaration contest and opens trick 1, treating unanswered seats as skipped.
+// The session manager calls it when the phase's fixed window elapses.
 func ForceCloseDeclarationPhase(state *GameState) (*GameState, error) {
 	if state.Phase != PhaseDeclaring {
 		return nil, apperr.ErrWrongPhase
 	}
 	newState := cloneGameState(state)
 	closeDeclarationPhase(newState)
-	// Every bypass of the action dispatcher owes this: ApplyAction refreshes the
-	// derived wire flags on its way out, and a direct Phase write does not.
 	RefreshDerivedFlags(newState)
 	return newState, nil
 }
 
-// handleDeclare processes a declare action — at trick 1 under
-// DeclarationTimingDuringFirstTrick, or inside PhaseDeclaring under
-// DeclarationTimingDedicatedPhase.
-// Auto-detects all declarations from the player's hand and stores them.
+// handleDeclare detects and stores the player's declarations at trick 1 or during PhaseDeclaring.
 func handleDeclare(state *GameState, action Action) (*GameState, error) {
 	if err := checkDeclarationAnswerable(state, action.PlayerSeat); err != nil {
 		return nil, err
@@ -480,15 +338,12 @@ func handleDeclare(state *GameState, action Action) (*GameState, error) {
 
 	newState := cloneGameState(state)
 
-	// Set player seat on each declaration
 	for i := range decls {
 		decls[i].PlayerSeat = action.PlayerSeat
 	}
 	newState.Players[action.PlayerSeat].Declarations = decls
 	newState.AwaitingDeclaration = false
 
-	// In the dedicated phase nothing else ends the phase — Bitola relies on the
-	// same seat's following play_card, which does not exist here.
 	if newState.Phase == PhaseDeclaring {
 		newState.Players[action.PlayerSeat].DeclarationAnswered = true
 		maybeCloseDeclarationPhase(newState)
@@ -497,9 +352,7 @@ func handleDeclare(state *GameState, action Action) (*GameState, error) {
 	return newState, nil
 }
 
-// handleSkipDeclare processes a skip_declare action — at trick 1 under
-// DeclarationTimingDuringFirstTrick, or inside PhaseDeclaring under
-// DeclarationTimingDedicatedPhase.
+// handleSkipDeclare records a skip_declare at trick 1 or during PhaseDeclaring.
 func handleSkipDeclare(state *GameState, action Action) (*GameState, error) {
 	if err := checkDeclarationAnswerable(state, action.PlayerSeat); err != nil {
 		return nil, err
@@ -508,7 +361,6 @@ func handleSkipDeclare(state *GameState, action Action) (*GameState, error) {
 	newState := cloneGameState(state)
 	newState.AwaitingDeclaration = false
 
-	// See handleDeclare: the dedicated phase owns its own close.
 	if newState.Phase == PhaseDeclaring {
 		newState.Players[action.PlayerSeat].DeclarationAnswered = true
 		maybeCloseDeclarationPhase(newState)
@@ -517,19 +369,8 @@ func handleSkipDeclare(state *GameState, action Action) (*GameState, error) {
 	return newState, nil
 }
 
-// checkDeclarationAnswerable is the shared admission test for declare and
-// skip_declare, and the ONE place the two declaration timings diverge on who
-// may speak.
-//
-//   - Dedicated phase (Croatian): any of the four seats may answer, in any
-//     order, at any time while the phase is open — that is what makes the phase
-//     simultaneous. A seat that has already answered is rejected, so a stale
-//     click or a reconnected client cannot overwrite its own skip with a
-//     declare after seeing the table sit still.
-//   - Trick 1 (Bitola): unchanged — the prompted seat is the active seat and
-//     AwaitingDeclaration must be set.
-//
-// Selected by the phase already on state, never by the variant name (D-VAR-1).
+// checkDeclarationAnswerable reports whether seat may declare or skip now.
+// In PhaseDeclaring any unanswered seat may answer; at trick 1 only the prompted active seat may.
 func checkDeclarationAnswerable(state *GameState, seat int) error {
 	if seat < 0 || seat > 3 {
 		return apperr.ErrNotYourTurn
@@ -574,10 +415,6 @@ func hasBelot(hand []Card, trumpSuit Suit) bool {
 // shouldPromptBelot returns true if the played card triggers a Belot announcement prompt.
 // The hand parameter must be the player's hand BEFORE the card was removed.
 func shouldPromptBelot(state *GameState, playedCard Card, handBeforePlay []Card) bool {
-	// A room playing without declarations has no Belote either — the +20 for
-	// holding K+Q of trump is an announcement, and a table that plays "bez
-	// zvanja" plays without it. Unlike the meld skip this needs its own check:
-	// Belote is not a meld, so DeclarationsResolved does not gate it.
 	if !state.Rules.DeclarationsEnabled {
 		return false
 	}
@@ -586,7 +423,6 @@ func shouldPromptBelot(state *GameState, playedCard Card, handBeforePlay []Card)
 	}
 	trumpSuit := *state.TrumpSuit
 
-	// Card must be K or Q of trump
 	if playedCard.Suit != trumpSuit {
 		return false
 	}
@@ -594,12 +430,11 @@ func shouldPromptBelot(state *GameState, playedCard Card, handBeforePlay []Card)
 		return false
 	}
 
-	// Player must have held both K and Q before playing
 	return hasBelot(handBeforePlay, trumpSuit)
 }
 
-// handleAnnounceBelot processes an announce_belot action.
-// Awards 20 points to the announcing player's team.
+// handleAnnounceBelot awards 20 points to the announcing player's team.
+// The target check is deferred while a trick-1 declaration contest is still open, so declared melds are scored first.
 func handleAnnounceBelot(state *GameState, action Action) (*GameState, error) {
 	if state.PendingBelotSeat == nil || *state.PendingBelotSeat != action.PlayerSeat {
 		return nil, apperr.ErrBelotNotAvailable
@@ -607,46 +442,15 @@ func handleAnnounceBelot(state *GameState, action Action) (*GameState, error) {
 
 	newState := cloneGameState(state)
 	team := TeamForSeat(action.PlayerSeat)
-	// Belote is a declaration, not card points — tracked in BelotPoints so it
-	// surfaces under declarations everywhere (it still counts toward the team's
-	// hand total and transfers on a failed contract / capot like any point).
 	newState.BelotPoints[team] += 20
 	newState.BelotAnnounced = true
 	newState.PendingBelotSeat = nil
 
-	// "Dosta" checkpoint 3 of 3 (see stopAtTargetIfReached): the +20 just landed.
-	// Normally the check returns BEFORE finishCardPlay — letting the deferred turn
-	// flow run would advance play, or resolve the whole trick, with a team already
-	// over the target, which is the one thing "dosta" forbids. The cost is a trick
-	// abandoned with up to four cards face up, which is exactly where play stopped
-	// and is truthful to show. handleSkipBelot below awards nothing, so it needs no
-	// hook.
-	//
-	// THE ONE DEFERRAL IN THE WHOLE RULE, and it is a correctness fix rather than a
-	// nicety. Under Bitola timing seats declare DURING trick 1 and the contest is
-	// resolved only when that trick completes (resolveTrickWithDeclarations), and
-	// DeclarationPoints is written in exactly one place — resolveDeclarationsForHand.
-	// So a +20 that crosses part-way through trick 1 would end the match with every
-	// declared meld still unconverted: a player who declared a quarte simply loses
-	// it, and in a close match that decides the winner. Deferring means the +20 is
-	// banked now, trick 1 plays out (at most two or three more cards), and
-	// checkpoint 1 evaluates a COMPLETE running total at the trick-1 resolution.
-	//
-	// The condition needs no variant comparison (D-VAR-1) and no new state field:
-	// Croatian has already resolved its dedicated declaration phase before trick 1
-	// opens, and a declarations-off room starts every hand with DeclarationsResolved
-	// seeded true, so neither of them ever defers. Both non-deferrals are asserted.
-	//
-	// REJECTED, and must not be reintroduced: resolving the contest here, at the
-	// Belote moment, so the checkpoint could fire immediately. At card 2 the later
-	// seats have not been asked yet, so that would settle an INCOMPLETE contest and
-	// clear melds that were never compared — a worse loss than the one it fixes.
 	deferForOpenTrick1Contest := newState.TrickNumber == 1 && !newState.DeclarationsResolved
 	if !deferForOpenTrick1Contest && stopAtTargetIfReached(newState) {
 		return newState, nil
 	}
 
-	// Resume deferred turn flow
 	finishCardPlay(newState)
 
 	return newState, nil
@@ -661,7 +465,6 @@ func handleSkipBelot(state *GameState, action Action) (*GameState, error) {
 	newState := cloneGameState(state)
 	newState.PendingBelotSeat = nil
 
-	// Resume deferred turn flow
 	finishCardPlay(newState)
 
 	return newState, nil
@@ -670,17 +473,13 @@ func handleSkipBelot(state *GameState, action Action) (*GameState, error) {
 // finishCardPlay completes the deferred post-card-play flow after Belot resolution.
 // Advances the active player and resolves the trick if 4 cards have been played.
 func finishCardPlay(state *GameState) {
-	// Advance active player (was deferred during Belot prompt)
-	// The seat stored in the trick's last card is the player who just played.
 	lastCard := state.CurrentTrick[len(state.CurrentTrick)-1]
 	state.ActivePlayerSeat = (lastCard.PlayerSeat + 1) % 4
 
-	// Check declaration prompt for next player at trick 1
 	if state.TrickNumber == 1 && len(state.CurrentTrick) < 4 {
 		checkDeclarationPrompt(state)
 	}
 
-	// Resolve trick if 4 cards have been played
 	if len(state.CurrentTrick) == 4 {
 		resolveTrickWithDeclarations(state)
 	}
@@ -691,46 +490,24 @@ func finishCardPlay(state *GameState) {
 func resolveTrickWithDeclarations(state *GameState) {
 	resolveTrick(state)
 
-	// After trick 1 resolves, resolve declarations
 	if state.TrickNumber == 2 && !state.DeclarationsResolved {
-		// We just incremented from trick 1 to trick 2 in resolveTrick
 		resolveDeclarationsForHand(state)
 	}
-	// Handle the edge case where trick 1 was the 8th trick (impossible in standard
-	// Belot since trickNumber starts at 1 and goes to 8, but for safety):
 	if state.Phase == PhaseHandScoring && !state.DeclarationsResolved {
 		resolveDeclarationsForHand(state)
 	}
 
-	// "Dosta" checkpoint 1 of 3 (see stopAtTargetIfReached), and the one that
-	// covers the most ground: the
-	// trick's card points AND (at trick 1 in Bitola) the declaration contest have
-	// both just landed, so this single site tests one settled total for tricks 1-7
-	// and for Bitola's trick-1 resolve. Hooked on the OUTER function rather than
-	// resolveTrick precisely so there is no window in which a half-updated total
-	// is tested.
-	//
-	// stopAtTargetIfReached self-suppresses on PhaseHandScoring, so trick 8 falls
-	// straight through to its normal scoreHand path below — a completed hand keeps
-	// its bonuses and its own target check in both settings.
 	if stopAtTargetIfReached(state) {
 		return
 	}
 
-	// After all tricks complete, score the hand and start next hand (or end match).
-	// PhaseHandScoring is only set by resolveTrick when TrickNumber == 8.
 	if state.Phase == PhaseHandScoring {
 		scoreHand(state)
 	}
 }
 
-// bothTeamsDeclared reports whether each team put at least one meld on the
-// table — the only condition under which the winner was decided by a
-// comparison rather than by being the sole declarer.
-//
-// Must be read BEFORE resolveDeclarationsForHand clears the losing team's
-// declarations, which is why its single caller is that function's first
-// statement.
+// bothTeamsDeclared reports whether each team put at least one meld on the table.
+// It must be read before resolveDeclarationsForHand clears the losing team's declarations.
 func bothTeamsDeclared(state *GameState) bool {
 	var teamA, teamB bool
 	for seat := 0; seat < 4; seat++ {
@@ -748,21 +525,13 @@ func bothTeamsDeclared(state *GameState) bool {
 
 // resolveDeclarationsForHand resolves declarations after trick 1 and awards points.
 func resolveDeclarationsForHand(state *GameState) {
-	// Record whether a comparison decided this contest while BOTH teams' melds
-	// are still on the table. Everything below destroys the evidence: the
-	// losing team's declarations are cleared a few lines down, and under
-	// DeclarationTimingDedicatedPhase the seat whose answer triggered this call
-	// had its melds stored moments ago in the SAME ApplyAction — so a caller
-	// comparing the pre- and post-action states cannot see them at all.
 	state.DeclarationsContested = bothTeamsDeclared(state)
 
-	// Determine trick 1 leader: the player after the dealer
 	trickLeaderSeat := (state.DealerSeat + 1) % 4
 
 	winningTeam, totalPoints := resolveDeclarations(state.Players, *state.TrumpSuit, trickLeaderSeat)
 	if winningTeam >= 0 {
 		state.DeclarationPoints[winningTeam] = totalPoints
-		// Clear losing team's declarations
 		losingTeam := 1 - winningTeam
 		for seat := 0; seat < 4; seat++ {
 			if TeamForSeat(seat) == losingTeam {
@@ -773,21 +542,12 @@ func resolveDeclarationsForHand(state *GameState) {
 	state.DeclarationsResolved = true
 }
 
-// checkDeclarationPrompt sets AwaitingDeclaration if the current active player
-// has declarable combinations and it's trick 1.
-//
-// This is also the Bitola half of the declarations-off skip, and it needs no
-// check of its own: a room with Rules.DeclarationsEnabled false starts every
-// hand with DeclarationsResolved already true (NewGame and startNewHand seed
-// it), so the guard below returns before a seat is ever prompted. Do not add a
-// redundant config read here — the seeded flag is the single mechanism, and two
-// mechanisms would be two things to keep in step.
+// checkDeclarationPrompt sets AwaitingDeclaration if it is trick 1 and the active player has declarable combinations.
 func checkDeclarationPrompt(state *GameState) {
 	if state.TrickNumber != 1 || state.DeclarationsResolved {
 		return
 	}
 	seat := state.ActivePlayerSeat
-	// Check if this player already has declarations stored (already declared)
 	if len(state.Players[seat].Declarations) > 0 {
 		return
 	}

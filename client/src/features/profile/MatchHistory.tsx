@@ -11,14 +11,7 @@ import { SectionHeader } from "./components/SectionHeader";
 
 interface MatchHistoryProps {
   userId: number | undefined;
-  /** Per-outcome counts for the filter chips, sourced from profile stats. */
   counts: Record<MatchFilter, number>;
-  /**
-   * Whether the profile being viewed is the viewer's own (Story 11.3). On a
-   * PUBLIC profile (false) the subject's seat is labelled with the subject's
-   * username instead of the "YOU" badge — the subject is not the viewer.
-   * Defaults to true (the self profile).
-   */
   subjectIsSelf?: boolean;
 }
 
@@ -52,8 +45,8 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
     />
   );
 
-  // Truly empty (no games at all) — show the onboarding empty state, no filters.
-  if (counts.all === 0 && !query.isPending && !query.isError) {
+  const hasNoGamesAtAll = counts.all === 0 && !query.isPending && !query.isError;
+  if (hasNoGamesAtAll) {
     return (
       <section data-testid="match-history">
         {header}
@@ -61,10 +54,6 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
           className="bg-surface border-border space-y-3 rounded-lg border border-dashed p-10 text-center text-sm"
           data-testid="match-history-empty"
         >
-          {/* On a public profile (subjectIsSelf=false) the subject has never
-              played — address them in the third person and drop the viewer's
-              "Quick Play" CTA, which would tell the VIEWER to go play on someone
-              else's page (Story 11.3 review). */}
           <p className="text-ink-dim m-0">
             {t(subjectIsSelf ? "profile.matchHistory.empty" : "profile.matchHistory.emptyPublic")}
           </p>

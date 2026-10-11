@@ -47,7 +47,7 @@ describe("useRoomUpdates — D144 reopened room visibility", () => {
     handleWsMessage(roomUpdated({ ...room(2), status: "waiting" }));
 
     const rooms = queryClient.getQueryData<Room[]>(WAITING) ?? [];
-    expect(rooms.map((r) => r.id)).toEqual([2, 1]); // upserted (prepended)
+    expect(rooms.map((r) => r.id)).toEqual([2, 1]);
   });
 
   it("updates an existing waiting room in place without duplicating", () => {

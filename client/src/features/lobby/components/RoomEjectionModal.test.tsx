@@ -74,7 +74,6 @@ describe("RoomEjectionModal", () => {
     expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 
-  // Honor ejection (Story 9.8 AC6/AC10) — the third copy branch.
   it("renders the honor variant with the room's threshold and the player's score", () => {
     useRoomStore.getState().setRoomEjection({
       roomId: 7,
@@ -87,15 +86,12 @@ describe("RoomEjectionModal", () => {
     renderModal();
 
     expect(screen.getByTestId("room-ejection-modal")).toBeInTheDocument();
-    // Numbers asserted through data-*, so the test stays i18n-independent.
     const body = screen.getByTestId("room-ejection-body");
     expect(body).toHaveAttribute("data-min-honor", "80");
     expect(body).toHaveAttribute("data-honor", "55");
   });
 
   it("renders a real honor score of 0 rather than treating it as absent", () => {
-    // A score of 0 is a legitimate Go value. A truthiness check anywhere in this
-    // path would swallow it.
     useRoomStore.getState().setRoomEjection({
       roomId: 7,
       buyIn: 0,
@@ -139,8 +135,6 @@ describe("RoomEjectionModal", () => {
     expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 
-  // --- Honour branch additions (honour redesign R8) ---
-
   it("draws the honour comparison to scale, with the numbers alongside", () => {
     useRoomStore.getState().setRoomEjection({
       roomId: 7,
@@ -152,8 +146,6 @@ describe("RoomEjectionModal", () => {
     });
     renderModal();
 
-    // A sentence with two numbers makes the player do the arithmetic; two bars on
-    // a shared 0-100 axis show how far off they are at a glance.
     expect(screen.getByTestId("room-ejection-you")).toHaveAttribute("data-value", "55");
     expect(screen.getByTestId("room-ejection-table")).toHaveAttribute("data-value", "80");
   });
@@ -183,12 +175,9 @@ describe("RoomEjectionModal", () => {
     });
     renderModal();
 
-    // Without this the modal is a dead end, which is what turns a nudge into a
-    // churn moment.
     const browse = screen.getByTestId("room-ejection-browse");
     expect(browse).toBeInTheDocument();
     await userEvent.click(browse);
-    // Dismisses the notice on the way out, so it cannot re-fire on arrival.
     expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 

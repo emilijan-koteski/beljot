@@ -43,7 +43,6 @@ describe("useMatchStartRedirect (D145b)", () => {
     });
 
     expect(screen.getByTestId("pathname")).toHaveTextContent("/match/7");
-    // Signal consumed so it cannot fire again.
     expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
     expect(useRoomStore.getState().matchStarted).toBe(false);
   });
@@ -56,8 +55,6 @@ describe("useMatchStartRedirect (D145b)", () => {
       useRoomStore.getState().setMatchStartedRoomId(7);
     });
 
-    // Already on target → no navigation, but the sticky flag is cleared so a
-    // later RoomPage mount is not bounced straight back to /match (edge fix).
     expect(screen.getByTestId("pathname")).toHaveTextContent("/match/7");
     expect(useRoomStore.getState().matchStartedRoomId).toBeNull();
     expect(useRoomStore.getState().matchStarted).toBe(false);
@@ -68,10 +65,6 @@ describe("useMatchStartRedirect (D145b)", () => {
     expect(screen.getByTestId("pathname")).toHaveTextContent("/lobby");
   });
 
-  // History-stack shaping: the hook pushes only when leaving from the lobby
-  // (so back returns to the live lobby root) and replaces from anywhere else
-  // (so no dead entry lingers beneath the match). Asserted behaviorally via a
-  // data router: pop back after the redirect and observe where we land.
   function renderWithRouter(initialPath: string) {
     const router = createMemoryRouter([{ path: "*", element: <Harness /> }], {
       initialEntries: ["/somewhere-before", initialPath],
@@ -108,7 +101,6 @@ describe("useMatchStartRedirect (D145b)", () => {
     await act(async () => {
       await router.navigate(-1);
     });
-    // The room entry was replaced by the match — back skips straight past it.
     expect(router.state.location.pathname).toBe("/somewhere-before");
   });
 });

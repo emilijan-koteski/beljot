@@ -9,7 +9,6 @@ import { expectActionBeforeStatusQuo, makeUser } from "@/test-utils";
 
 import { TrumpPrompt } from "./TrumpPrompt";
 
-// --- Scope Amendment 1: the suit picker shows the deck the player will see ---
 describe("TrumpPrompt card deck", () => {
   afterEach(() => {
     useAuthStore.setState({ token: null, user: null, isLoading: false });
@@ -36,8 +35,6 @@ describe("TrumpPrompt card deck", () => {
       expect(mark.tagName).toBe("IMG");
       expect(mark).toHaveAttribute("src", `/suits/croatian/${suit}.webp`);
     }
-    // Tile ink follows the accent too — a bells tile is gold, not French red.
-    // rgb() because jsdom re-serialises hex in `color`.
     expect(screen.getByTestId("trump-prompt-suit-D").style.color).toBe("rgb(201, 162, 60)");
   });
 
@@ -70,9 +67,6 @@ describe("TrumpPrompt card deck", () => {
       />,
     );
 
-    // The mark is decorative, so the button's aria-label is the ONLY thing a
-    // screen-reader user gets — and a gold bell announced as "Diamonds" is the
-    // defect this pins shut. Names follow the deck exactly as the artwork does.
     for (const suit of ["S", "H", "D", "C"] as const) {
       expect(screen.getByTestId(`trump-prompt-suit-${suit}`)).toBeInTheDocument();
     }
@@ -99,9 +93,6 @@ describe("TrumpPrompt card deck", () => {
     expect(screen.getByLabelText("Spades")).toBeInTheDocument();
   });
 
-  // Item 13: three of four seats see the WAITING branch during bidding, and its
-  // "considering" chips are deck-aware too — every other deck test here renders
-  // the active bidder.
   it("draws Croatian icons on the waiting view's considering chips", () => {
     signIn("croatian");
     render(
@@ -122,7 +113,6 @@ describe("TrumpPrompt card deck", () => {
       expect(mark.tagName).toBe("IMG");
       expect(mark).toHaveAttribute("src", `/suits/croatian/${suit}.webp`);
     }
-    // Bells chip ink is gold, not the French red.
     expect(screen.getByTestId("trump-prompt-considering-D").style.color).toBe("rgb(201, 162, 60)");
     expect(screen.getByLabelText("Bells")).toBeInTheDocument();
   });
@@ -231,8 +221,6 @@ describe("TrumpPrompt", () => {
         onPass={vi.fn()}
       />,
     );
-    // Waiting players now see the candidate card so they know what the active
-    // bidder turned down — but never the interactive PICK/PASS suit buttons.
     expect(screen.getByTestId("playing-card-KH")).toBeInTheDocument();
     expect(screen.queryByTestId("trump-prompt-suit-S")).not.toBeInTheDocument();
   });
@@ -247,8 +235,6 @@ describe("TrumpPrompt", () => {
         onPass={vi.fn()}
       />,
     );
-    // All four suits render so waiting players see the full set; the candidate
-    // (hearts) is shown disabled because it can't be picked in round 2.
     expect(screen.getByTestId("trump-prompt-considering")).toBeInTheDocument();
     expect(screen.getByTestId("trump-prompt-considering-S")).toBeInTheDocument();
     expect(screen.getByTestId("trump-prompt-considering-D")).toBeInTheDocument();
@@ -257,7 +243,6 @@ describe("TrumpPrompt", () => {
     expect(candidateChip).toBeInTheDocument();
     expect(candidateChip).toHaveAttribute("aria-disabled", "true");
     expect(candidateChip).toHaveAttribute("data-locked", "true");
-    // The three pickable suits are not flagged locked.
     expect(screen.getByTestId("trump-prompt-considering-S")).not.toHaveAttribute("data-locked");
   });
 
@@ -320,7 +305,6 @@ describe("TrumpPrompt", () => {
         onPass={vi.fn()}
       />,
     );
-    // Use spades — hearts is the candidate suit (KH) and is locked out in round 2.
     await user.click(screen.getByTestId("trump-prompt-suit-S"));
     expect(onPick).toHaveBeenCalledWith("S");
   });
@@ -335,8 +319,6 @@ describe("TrumpPrompt", () => {
         onPass={vi.fn()}
       />,
     );
-    // Candidate is KH — H stays in the grid as a visibly disabled tile so
-    // the layout is stable and the lock-out is explicit.
     const lockedButton = screen.getByTestId("trump-prompt-suit-H");
     expect(lockedButton).toBeDisabled();
     expect(lockedButton).toHaveAttribute("aria-disabled", "true");
@@ -372,9 +354,6 @@ describe("TrumpPrompt", () => {
         onPass={vi.fn()}
       />,
     );
-    // The originally face-up candidate (KH) is given to the picker as their
-    // 8th card after they choose a suit, so it must stay visible alongside
-    // the suit-selection grid.
     expect(screen.getByTestId("playing-card-KH")).toBeInTheDocument();
   });
 
@@ -402,12 +381,9 @@ describe("TrumpPrompt", () => {
       />,
     );
     expect(screen.queryByTestId(/^playing-card-/)).not.toBeInTheDocument();
-    // Suit buttons still render so the player isn't blocked from picking.
     expect(screen.getByTestId("trump-prompt-suit-S")).toBeInTheDocument();
   });
 
-  // --- Candidate-less bidding (a variant that names trump freely in its
-  // single round). The Bitola assertions above must keep holding unchanged.
   describe("no trump candidate (free-suit variant)", () => {
     it("renders the four-suit grid in ROUND 1 with nothing locked and no candidate card", () => {
       render(
@@ -429,9 +405,6 @@ describe("TrumpPrompt", () => {
     });
 
     it("is driven by candidate-absence, not the round number", () => {
-      // The single-round variant never leaves round 1, but the component must
-      // key off trumpCandidate === null alone — a stray round value from a
-      // stale snapshot must not change the grid.
       render(
         <TrumpPrompt
           trumpCandidate={null}
@@ -457,9 +430,6 @@ describe("TrumpPrompt", () => {
         />,
       );
       expect(screen.queryByTestId("trump-prompt-pick")).not.toBeInTheDocument();
-      // Passing is still offered: only the dealer's own (fourth) pass is
-      // refused, which the server reports through canPass (see the
-      // forced-dealer block below), not something the prompt infers.
       expect(screen.getByTestId("trump-prompt-pass")).toBeInTheDocument();
     });
 
@@ -480,9 +450,6 @@ describe("TrumpPrompt", () => {
     });
 
     it("renders the free-pick title and subtitle, not a raw i18n key", () => {
-      // i18n.parity.test.ts only proves the key EXISTS in all four locales — a
-      // typo in the key name here would render the key string itself, and only
-      // an assertion on the rendered copy catches that.
       render(
         <TrumpPrompt
           trumpCandidate={null}
@@ -494,7 +461,6 @@ describe("TrumpPrompt", () => {
       );
       expect(screen.getByText("Take trump — any suit")).toBeInTheDocument();
       expect(screen.getByText("All four suits are yours to take.")).toBeInTheDocument();
-      // Neither the candidate-bound round-1 copy nor a bare key may appear.
       const panel = screen.getByTestId("trump-prompt");
       expect(panel.textContent).not.toContain("match.trumpPrompt");
       expect(panel.textContent).not.toContain("Take trump or pass");
@@ -534,8 +500,6 @@ describe("TrumpPrompt", () => {
     });
   });
 
-  // Bitola regression: round 1 WITH a candidate must still be the
-  // take-it-or-pass layout — one card, one Take button, no suit grid.
   it("keeps Bitola's candidate-bound titles unchanged in both rounds", () => {
     const { unmount } = render(
       <TrumpPrompt
@@ -578,13 +542,6 @@ describe("TrumpPrompt", () => {
     expect(screen.getByTestId("playing-card-KH")).toBeInTheDocument();
   });
 
-  // --- The forced dealer (Story 12.8). Under a variant where the hand must find
-  // a taker, the dealer bidding last (fourth, in the single round) has no legal
-  // pass: the server refuses it outright. Rendering the button anyway turned the
-  // only visible "get out of this" control into a guaranteed error toast, so it
-  // is hidden. canPass is server-derived (matchState.mustPickTrump) — this
-  // component never infers the rule, which is why every case here sets it
-  // explicitly.
   describe("forced pick (canPass=false)", () => {
     it("hides the Pass control from the active bidder", () => {
       render(
@@ -598,11 +555,9 @@ describe("TrumpPrompt", () => {
         />,
       );
       expect(screen.queryByTestId("trump-prompt-pass")).not.toBeInTheDocument();
-      // The four suits remain — they are the complete set of legal moves.
       for (const suit of ["S", "H", "D", "C"] as const) {
         expect(screen.getByTestId(`trump-prompt-suit-${suit}`)).toBeEnabled();
       }
-      // And the player is told why, rather than left wondering.
       expect(screen.getByTestId("trump-prompt-must-pick")).toBeInTheDocument();
     });
 
@@ -620,7 +575,6 @@ describe("TrumpPrompt", () => {
       expect(screen.getByTestId("trump-prompt-pass")).toBeInTheDocument();
       unmount();
 
-      // Omitted defaults to true, so every existing caller keeps its Pass.
       render(
         <TrumpPrompt
           trumpCandidate={null}
@@ -648,8 +602,6 @@ describe("TrumpPrompt", () => {
           timerDurationSec={30}
         />,
       );
-      // The clock still runs — an expiry here auto-PICKS server-side — so the
-      // ring must not disappear with the button it used to wrap.
       const ring = screen.getByTestId("button-timer-ring");
       expect(ring.querySelector('[data-testid="trump-prompt-must-pick"]')).toBeInTheDocument();
       expect(screen.queryByTestId("trump-prompt-pass")).not.toBeInTheDocument();
@@ -688,9 +640,6 @@ describe("TrumpPrompt", () => {
     });
   });
 
-  // --- Footer round counter. Only a candidate variant has a second round, so
-  // only a candidate render may count rounds; a candidate-less variant bids in
-  // a single round and must not show "Round 1 / 2".
   describe("footer round counter", () => {
     it("shows the round label while a candidate is on the table", () => {
       render(
@@ -706,8 +655,6 @@ describe("TrumpPrompt", () => {
     });
 
     it("shows the round label in round 1 too while a candidate is on the table", () => {
-      // Pins the guard to trumpCandidate !== null, not biddingRound === 2 — a
-      // regression to the round test would pass the other two cases here.
       render(
         <TrumpPrompt
           trumpCandidate={trumpCandidate}
@@ -749,7 +696,6 @@ describe("TrumpPrompt", () => {
     );
     const ring = screen.getByTestId("button-timer-ring");
     expect(ring).toBeInTheDocument();
-    // Ring should wrap the Pass button so a Tab from the dialog still reaches Pass.
     expect(ring.querySelector('[data-testid="trump-prompt-pass"]')).toBeInTheDocument();
   });
 
@@ -825,7 +771,6 @@ describe("TrumpPrompt", () => {
       act(() => {
         vi.advanceTimersByTime(6000);
       });
-      // Server-authoritative: auto-pass arrives via state push, not from the client.
       expect(onPass).not.toHaveBeenCalled();
     });
   });
@@ -840,10 +785,6 @@ describe("TrumpPrompt", () => {
         onPass={vi.fn()}
       />,
     );
-    // Constraint lives on the panel itself, not the dialog wrapper — wrapping
-    // the panel in an overflow-clipping div clips the brass halo at the
-    // wrapper's rectangular bounds. Putting the constraint on the panel
-    // leaves its own box-shadow intact.
     const dialog = screen.getByRole("dialog");
     const panel = dialog.firstElementChild as HTMLElement | null;
     expect(panel).not.toBeNull();

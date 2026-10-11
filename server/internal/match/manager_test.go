@@ -15,12 +15,10 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// --- Mock Match Repository ---
-
 type mockMatchRepo struct {
 	mu      sync.Mutex
 	matches []*match.Match
-	hands   [][]match.HandResult // index-aligned with matches (same order as Create / CreateWithHands calls)
+	hands   [][]match.HandResult
 	err     error
 }
 
@@ -63,7 +61,6 @@ func (r *mockMatchRepo) GetMatchesForUser(userID uint, limit, offset int, outcom
 	if r.err != nil {
 		return nil, 0, r.err
 	}
-	// Not exercised by session-manager tests — return empty page.
 	_, _, _, _, _ = userID, limit, offset, outcome, sort
 	return nil, 0, nil
 }
@@ -86,7 +83,6 @@ func (r *mockMatchRepo) GetStatsForUser(userID uint) (int, int, int, error) {
 	if r.err != nil {
 		return 0, 0, 0, r.err
 	}
-	// Not exercised by session-manager tests — return zero counts.
 	_ = userID
 	return 0, 0, 0, nil
 }
@@ -130,13 +126,8 @@ func (r *mockMatchRepo) getMatches() []*match.Match {
 	return result
 }
 
-// getHands returns the hand rows persisted alongside the match at index i (the
-// order Create / CreateWithHands were called in).
-//
-// This is the only honest place to assert "the aborted hand got no hand_results
-// row": Manager.HandResults reads the LIVE session's buffer, and handleMatchEnd
-// removes the session on its way out — so after a match ends that helper returns
-// nil for a missing session and any Empty assertion on it passes vacuously.
+// getHands returns the hand rows persisted with the match at index i. Use it
+// after a match ends, since Manager.HandResults reads the already-removed session.
 func (r *mockMatchRepo) getHands(i int) []match.HandResult {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -148,11 +139,6 @@ func (r *mockMatchRepo) getHands(i int) []match.HandResult {
 	return out
 }
 
-// --- Hub Adapter ---
-// The session manager expects *ws.Hub, but we need to test with a mock.
-// We'll create a real hub but intercept via SetActionHandler for integration testing.
-// For unit tests, we test the Manager's public methods directly.
-
 func defaultPlayers() [4]match.PlayerSeatInfo {
 	return [4]match.PlayerSeatInfo{
 		{UserID: 10, Username: "player1", Seat: 0},
@@ -161,8 +147,6 @@ func defaultPlayers() [4]match.PlayerSeatInfo {
 		{UserID: 40, Username: "player4", Seat: 3},
 	}
 }
-
-// --- Tests ---
 
 func TestStartMatch_CreatesSession(t *testing.T) {
 	hub := ws.NewHub()
@@ -221,9 +205,6 @@ func TestStartMatch_StampsAvatarURLs(t *testing.T) {
 }
 
 func TestStartMatch_501MatchMode_PropagatesToState(t *testing.T) {
-	// "501" was rejected at room creation until story 10.2, so this leg of the
-	// room → StartMatch → GameState seam was previously dead for 501 and is
-	// pinned here with the non-default mode (the test above pins "1001").
 	hub := ws.NewHub()
 	go hub.Run()
 	defer hub.Shutdown()
@@ -250,11 +231,8 @@ func TestStartMatch_BroadcastsInitialState(t *testing.T) {
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
 	require.NoError(t, err)
 
-	// Give broadcast time to process
 	time.Sleep(50 * time.Millisecond)
 
-	// The hub broadcast goes to connected clients — since no real WS clients
-	// are connected, we verify the session was created and state is valid
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
 	assert.Equal(t, game.PhaseBidding, state.Phase)
@@ -268,7 +246,6 @@ func TestHandleAction_InvalidUser(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// No session exists — client not in any game
 	client := &ws.Client{UserID: 999}
 	payload, _ := json.Marshal(map[string]string{"cardId": "KS"})
 	msg := ws.WSMessage{
@@ -276,7 +253,6 @@ func TestHandleAction_InvalidUser(t *testing.T) {
 		Payload: payload,
 	}
 
-	// Should not panic
 	mgr.HandleAction(client, msg)
 	time.Sleep(50 * time.Millisecond)
 }
@@ -295,12 +271,10 @@ func TestHandleAction_PlayCard_ParsesCorrectly(t *testing.T) {
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
 
-	// Find the active player and a card they hold
 	activeSeat := state.ActivePlayerSeat
 	activeUserID := state.Players[activeSeat].UserID
 	require.True(t, len(state.Players[activeSeat].Hand) > 0, "active player should have cards")
 
-	// Try to play a card (may fail due to game rules, but it should parse correctly)
 	card := state.Players[activeSeat].Hand[0]
 	payload, _ := json.Marshal(map[string]string{"cardId": card.String()})
 	msg := ws.WSMessage{
@@ -311,9 +285,6 @@ func TestHandleAction_PlayCard_ParsesCorrectly(t *testing.T) {
 	client := &ws.Client{UserID: activeUserID}
 	mgr.HandleAction(client, msg)
 	time.Sleep(50 * time.Millisecond)
-
-	// The action may succeed or fail depending on game phase (bidding vs playing)
-	// but it should not panic
 }
 
 func TestHandleAction_BiddingActions(t *testing.T) {
@@ -331,11 +302,9 @@ func TestHandleAction_BiddingActions(t *testing.T) {
 	require.NotNil(t, state)
 	assert.Equal(t, game.PhaseBidding, state.Phase)
 
-	// The active player should be able to pick or pass trump
 	activeSeat := state.ActivePlayerSeat
 	activeUserID := state.Players[activeSeat].UserID
 
-	// Try pick_trump
 	msg := ws.WSMessage{
 		Type:    "action:pick_trump",
 		Payload: json.RawMessage(`{}`),
@@ -344,10 +313,8 @@ func TestHandleAction_BiddingActions(t *testing.T) {
 	mgr.HandleAction(client, msg)
 	time.Sleep(100 * time.Millisecond)
 
-	// Check state changed — either trump was picked or not depending on rules
 	newState := mgr.GetStateSnapshot(100)
 	require.NotNil(t, newState)
-	// After picking trump in bidding, phase should transition to playing
 	assert.Equal(t, game.PhasePlaying, newState.Phase)
 	assert.NotNil(t, newState.TrumpSuit)
 }
@@ -405,11 +372,9 @@ func TestIsUserInMatch(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// Unknown user → false
 	assert.False(t, mgr.IsUserInMatch(10))
 	assert.False(t, mgr.IsUserInMatch(999))
 
-	// After StartMatch → all 4 seated players are in game
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
 	require.NoError(t, err)
 
@@ -419,7 +384,6 @@ func TestIsUserInMatch(t *testing.T) {
 	assert.True(t, mgr.IsUserInMatch(40))
 	assert.False(t, mgr.IsUserInMatch(999), "non-player should not be in game")
 
-	// After RemoveSession → users no longer in game
 	mgr.RemoveSession(100)
 	assert.False(t, mgr.IsUserInMatch(10))
 	assert.False(t, mgr.IsUserInMatch(20))
@@ -435,13 +399,11 @@ func TestMatchParticipantsByUser(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// No session yet → (zero, -1, false) for every userID.
 	ids, seat, ok := mgr.MatchParticipantsByUser(10)
 	assert.False(t, ok)
 	assert.Equal(t, -1, seat)
 	assert.Equal(t, [4]uint{}, ids)
 
-	// After StartMatch → resolves to (participants, seat, true) for each player.
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 
 	for expectedSeat, userID := range []uint{10, 20, 30, 40} {
@@ -452,13 +414,11 @@ func TestMatchParticipantsByUser(t *testing.T) {
 			"user %d expected at seat %d", userID, expectedSeat)
 	}
 
-	// Non-participant → (zero, -1, false).
 	ids, seat, ok = mgr.MatchParticipantsByUser(999)
 	assert.False(t, ok)
 	assert.Equal(t, -1, seat)
 	assert.Equal(t, [4]uint{}, ids)
 
-	// After RemoveSession → all participants stop resolving.
 	mgr.RemoveSession(100)
 	for _, userID := range []uint{10, 20, 30, 40} {
 		_, _, ok := mgr.MatchParticipantsByUser(userID)
@@ -474,12 +434,10 @@ func TestMatchParticipants(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// No session yet for this roomID → (zero, false)
 	ids, ok := mgr.MatchParticipants(100)
 	assert.False(t, ok)
 	assert.Equal(t, [4]uint{}, ids)
 
-	// After StartMatch → 4 player IDs returned, indexed by seat
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
 	require.NoError(t, err)
 
@@ -487,18 +445,14 @@ func TestMatchParticipants(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, [4]uint{10, 20, 30, 40}, ids)
 
-	// A different roomID → (zero, false)
 	_, ok = mgr.MatchParticipants(999)
 	assert.False(t, ok)
 
-	// After RemoveSession → (zero, false)
 	mgr.RemoveSession(100)
 	ids, ok = mgr.MatchParticipants(100)
 	assert.False(t, ok)
 	assert.Equal(t, [4]uint{}, ids)
 }
-
-// --- Timer Tests ---
 
 func TestStartMatch_PerMoveTimer_SetsTurnExpiresAt(t *testing.T) {
 	hub := ws.NewHub()
@@ -552,7 +506,6 @@ func TestHandleAction_PerMoveTimer_ResetsOnAction(t *testing.T) {
 	firstExpiry := state.TurnExpiresAt
 	require.NotNil(t, firstExpiry)
 
-	// Perform a valid action (pick trump in bidding phase)
 	activeSeat := state.ActivePlayerSeat
 	activeUserID := state.Players[activeSeat].UserID
 
@@ -566,7 +519,6 @@ func TestHandleAction_PerMoveTimer_ResetsOnAction(t *testing.T) {
 
 	newState := mgr.GetStateSnapshot(100)
 	require.NotNil(t, newState)
-	// After picking trump, phase transitions to playing — new expiry for next player
 	if newState.TurnExpiresAt != nil {
 		assert.True(t, !newState.TurnExpiresAt.Before(*firstExpiry),
 			"new TurnExpiresAt should be >= first expiry (timer reset)")
@@ -581,7 +533,6 @@ func TestPerMoveTimer_AutoPlayOnExpiry(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// Use a very short timer (1 second) so it expires quickly in the test
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false)
 	require.NoError(t, err)
 
@@ -589,7 +540,6 @@ func TestPerMoveTimer_AutoPlayOnExpiry(t *testing.T) {
 	require.NotNil(t, state)
 	assert.Equal(t, game.PhaseBidding, state.Phase)
 
-	// Pick trump to transition to playing phase (where auto-play can happen)
 	activeSeat := state.ActivePlayerSeat
 	activeUserID := state.Players[activeSeat].UserID
 	client := &ws.Client{UserID: activeUserID}
@@ -609,15 +559,11 @@ func TestPerMoveTimer_AutoPlayOnExpiry(t *testing.T) {
 		totalBefore += len(p.Hand)
 	}
 
-	// Wait for timer to expire and auto-play to fire. With 1s timer, multiple
-	// auto-steps may be needed (skip declaration → skip belot → play card),
-	// each taking 1s. Wait long enough for all steps.
 	time.Sleep(4500 * time.Millisecond)
 
 	afterAutoPlay := mgr.GetStateSnapshot(100)
 	require.NotNil(t, afterAutoPlay, "session should still exist after auto-play")
 
-	// At least one card should have been played after enough timer cycles
 	cardCountAfter := 0
 	for _, p := range afterAutoPlay.Players {
 		cardCountAfter += len(p.Hand)
@@ -633,11 +579,9 @@ func TestPerMoveTimer_ConcurrentActionAndExpiry(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	// Use 1-second timer
 	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false)
 	require.NoError(t, err)
 
-	// Transition to playing phase
 	state := mgr.GetStateSnapshot(100)
 	activeSeat := state.ActivePlayerSeat
 	activeUserID := state.Players[activeSeat].UserID
@@ -653,9 +597,6 @@ func TestPerMoveTimer_ConcurrentActionAndExpiry(t *testing.T) {
 	require.NotNil(t, playingState)
 	require.Equal(t, game.PhasePlaying, playingState.Phase)
 
-	// Fire many concurrent actions and let the timer expire simultaneously.
-	// This tests that the generation counter prevents stale timer callbacks
-	// from acting on the wrong turn.
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
@@ -668,7 +609,6 @@ func TestPerMoveTimer_ConcurrentActionAndExpiry(t *testing.T) {
 			seat := s.ActivePlayerSeat
 			uid := s.Players[seat].UserID
 			c := &ws.Client{UserID: uid}
-			// Try to play a card (may fail if not our turn)
 			if len(s.Players[seat].Hand) > 0 {
 				card := s.Players[seat].Hand[0]
 				payload, _ := json.Marshal(map[string]string{"cardId": card.String()})
@@ -681,23 +621,15 @@ func TestPerMoveTimer_ConcurrentActionAndExpiry(t *testing.T) {
 		}()
 	}
 
-	// Let timer expire concurrently with actions
 	time.Sleep(1200 * time.Millisecond)
 	wg.Wait()
 
-	// The session should still be valid (no panic, no corruption)
 	finalState := mgr.GetStateSnapshot(100)
 	require.NotNil(t, finalState, "session should survive concurrent access")
 }
 
-// --- Hand-result buffering (Story 7.1) ---
-
-// bufferTestResult produces a game.HandScore populated with distinctive values so
-// mapping correctness can be asserted.
-// handNumber is required, not defaulted: a HandScore outlives its hand, so both
-// the broadcast gate and the persisted row now key off which hand the result
-// actually describes. A fixture that leaves it zero is a result belonging to no
-// hand, which is what a stale carried-forward result looks like.
+// bufferTestResult builds a game.HandScore with distinctive values for the given
+// hand, so mapping correctness can be asserted.
 func bufferTestResult(handNumber, a, b int) *game.HandScore {
 	capotTeam := game.TeamB
 	return &game.HandScore{
@@ -727,7 +659,6 @@ func TestBufferHandResultIfScored_HandAdvanced(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(900, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 
-	// Normal hand completion: HandNumber advances from 3 → 4.
 	old := &game.GameState{HandNumber: 3}
 	next := &game.GameState{HandNumber: 4, LastHandResult: bufferTestResult(3, 81, 81)}
 
@@ -756,7 +687,6 @@ func TestBufferHandResultIfScored_MatchEnd(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(901, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 
-	// On match end startNewHand does NOT run, so HandNumber stays the same.
 	old := &game.GameState{HandNumber: 7}
 	next := &game.GameState{HandNumber: 7, Phase: game.PhaseMatchEnd, LastHandResult: bufferTestResult(7, 100, 62)}
 
@@ -777,7 +707,6 @@ func TestBufferHandResultIfScored_Noop_NoTransition(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(902, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 
-	// No hand advance, not match end: buffer must stay empty.
 	old := &game.GameState{HandNumber: 2}
 	next := &game.GameState{HandNumber: 2, Phase: game.PhasePlaying, LastHandResult: bufferTestResult(2, 10, 20)}
 
@@ -803,8 +732,6 @@ func TestBufferHandResultIfScored_Noop_NilHandResult(t *testing.T) {
 	assert.Empty(t, mgr.HandResults(903))
 }
 
-// --- Surrender (Story 8.2) ---
-
 func TestSurrender_RequestSucceeds(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -815,12 +742,11 @@ func TestSurrender_RequestSucceeds(t *testing.T) {
 
 	require.NoError(t, mgr.StartMatch(800, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 
-	// Bidding phase is valid for surrender.
 	state := mgr.GetStateSnapshot(800)
 	require.NotNil(t, state)
 	assert.Equal(t, game.PhaseBidding, state.Phase)
 
-	client := &ws.Client{UserID: 10} // seat 0
+	client := &ws.Client{UserID: 10}
 	mgr.HandleAction(client, ws.WSMessage{
 		Type:    "action:surrender_request",
 		Payload: json.RawMessage(`{}`),
@@ -846,22 +772,18 @@ func TestSurrender_AcceptPersistsMatchAsCompleted(t *testing.T) {
 
 	require.NoError(t, mgr.StartMatch(801, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 
-	// Seat 0 (team A) requests surrender.
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
 		Payload: json.RawMessage(`{}`),
 	})
 	time.Sleep(50 * time.Millisecond)
 
-	// Seat 2 (partner of seat 0) accepts.
 	mgr.HandleAction(&ws.Client{UserID: 30}, ws.WSMessage{
 		Type:    "action:surrender_accept",
 		Payload: json.RawMessage(`{}`),
 	})
 	time.Sleep(100 * time.Millisecond)
 
-	// Match record persisted with surrendered_by = seat 0's userID;
-	// status stays "completed" (not "surrendered").
 	matches := repo.getMatches()
 	require.Len(t, matches, 1)
 	m := matches[0]
@@ -871,7 +793,6 @@ func TestSurrender_AcceptPersistsMatchAsCompleted(t *testing.T) {
 	assert.Equal(t, uint(10), *m.SurrenderedBy)
 	assert.Nil(t, m.AbandonedBy, "AbandonedBy stays nil for surrender end")
 
-	// Session removed.
 	assert.False(t, mgr.HasSession(801))
 }
 
@@ -885,14 +806,12 @@ func TestSurrender_DeclineKeepsSessionActive(t *testing.T) {
 
 	require.NoError(t, mgr.StartMatch(802, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 
-	// Seat 0 requests
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
 		Payload: json.RawMessage(`{}`),
 	})
 	time.Sleep(30 * time.Millisecond)
 
-	// Seat 2 (partner) declines
 	mgr.HandleAction(&ws.Client{UserID: 30}, ws.WSMessage{
 		Type:    "action:surrender_decline",
 		Payload: json.RawMessage(`{}`),
@@ -905,7 +824,6 @@ func TestSurrender_DeclineKeepsSessionActive(t *testing.T) {
 	assert.True(t, state.SurrenderUsed[0], "proposer's attempt remains consumed on decline")
 	assert.True(t, mgr.HasSession(802))
 
-	// No match record persisted.
 	assert.Empty(t, repo.getMatches())
 }
 
@@ -930,7 +848,6 @@ func TestSurrender_ExhaustedAfterDecline(t *testing.T) {
 	})
 	time.Sleep(30 * time.Millisecond)
 
-	// Seat 0 retries — should be rejected, state unchanged.
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
 		Payload: json.RawMessage(`{}`),
@@ -959,8 +876,6 @@ func TestSurrender_SecondRequestWhilePending_Rejected(t *testing.T) {
 	})
 	time.Sleep(30 * time.Millisecond)
 
-	// Seat 1 (different player, still has their own attempt) requests while
-	// seat 0's proposal is pending.
 	mgr.HandleAction(&ws.Client{UserID: 20}, ws.WSMessage{
 		Type:    "action:surrender_request",
 		Payload: json.RawMessage(`{}`),
@@ -984,14 +899,12 @@ func TestSurrender_NonPartnerAccept_Rejected(t *testing.T) {
 
 	require.NoError(t, mgr.StartMatch(805, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 
-	// Seat 0 requests
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
 		Payload: json.RawMessage(`{}`),
 	})
 	time.Sleep(30 * time.Millisecond)
 
-	// Seat 1 (opponent) tries to accept — must be rejected.
 	mgr.HandleAction(&ws.Client{UserID: 20}, ws.WSMessage{
 		Type:    "action:surrender_accept",
 		Payload: json.RawMessage(`{}`),
@@ -1016,14 +929,12 @@ func TestSurrender_PauseInteraction_PreservesProposal(t *testing.T) {
 
 	require.NoError(t, mgr.StartMatch(806, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 
-	// Seat 0 requests surrender
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
 		Payload: json.RawMessage(`{}`),
 	})
 	time.Sleep(30 * time.Millisecond)
 
-	// Seat 1 pauses
 	mgr.HandleAction(&ws.Client{UserID: 20}, ws.WSMessage{
 		Type:    "action:pause",
 		Payload: json.RawMessage(`{}`),
@@ -1036,7 +947,6 @@ func TestSurrender_PauseInteraction_PreservesProposal(t *testing.T) {
 	require.NotNil(t, paused.SurrenderProposerSeat, "surrender proposal survives pause")
 	assert.Equal(t, 0, *paused.SurrenderProposerSeat)
 
-	// Seat 1 unpauses (clears their own pause)
 	mgr.HandleAction(&ws.Client{UserID: 20}, ws.WSMessage{
 		Type:    "action:unpause",
 		Payload: json.RawMessage(`{}`),
@@ -1082,14 +992,6 @@ func TestRemoveSession_CallsUserRemovedHooks(t *testing.T) {
 	assert.False(t, mgr.HasSession(900), "session should be removed")
 }
 
-// --- Within-turn prompt timer preservation (declaration / belot) ---
-//
-// The active player's per-move turn timer must persist across declaration and
-// belot prompts — the prompt is part of the same turn budget, not a fresh
-// window. Driver: SetGameStateForTest injects a controlled state with a known
-// TurnExpiresAt; we then issue the prompt action through HandleAction and
-// snapshot the resulting expiry.
-
 // firstTrickStateAt builds an injectable state at trick 1 / phase=playing with
 // a fixed TurnExpiresAt and the given activeSeat. Trump is hearts so seat 0
 // holds Belot (KH+QH) for the play-card-into-belot scenario.
@@ -1112,7 +1014,6 @@ func TestHandleAction_Declare_PreservesTurnExpiry(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
 
-	// Seat 1 holds the JD-QD-KD-AD quarte and is the active player at trick 1.
 	expiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(1, expiry, true))
 
@@ -1167,8 +1068,6 @@ func TestHandleAction_PlayCardTriggeringBelot_PreservesTurnExpiry(t *testing.T) 
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
 
-	// Seat 0 holds KH+QH on hearts trump — playing KH triggers the belot prompt
-	// with PendingBelotSeat=0 and the turn does NOT advance.
 	expiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(0, expiry, false))
 
@@ -1197,7 +1096,6 @@ func TestHandleAction_AnnounceBelot_RefreshesTurnExpiryForNextSeat(t *testing.T)
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
 
-	// First, drive seat 0 into the belot prompt by playing KH.
 	oldExpiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(0, oldExpiry, false))
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
@@ -1210,8 +1108,6 @@ func TestHandleAction_AnnounceBelot_RefreshesTurnExpiryForNextSeat(t *testing.T)
 	require.NotNil(t, mid)
 	require.NotNil(t, mid.PendingBelotSeat, "setup: belot prompt must be open before announcing")
 
-	// Now the player announces — finishCardPlay advances the seat, so the next
-	// player gets a fresh full-duration window.
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    ws.ActionAnnounceBelot,
 		Payload: json.RawMessage(`{}`),
@@ -1261,16 +1157,8 @@ func TestHandleAction_SkipBelot_RefreshesTurnExpiryForNextSeat(t *testing.T) {
 	assert.NotEqual(t, 0, newState.ActivePlayerSeat, "skip_belot must advance the seat")
 }
 
-// TestHandleAction_InvalidAction_PreservesOriginalTurnExpiry guards against the
-// regression where a failing action would silently mint a fresh full-duration
-// turn timer. Reproduces the production symptom: the active player's UI shows
-// "0s" while the server is actually running an extended timer that nobody
-// sees, so the auto-throw fires several seconds late. Any client (not just
-// the active seat) can hit this branch by sending an illegal action, which
-// also opened a fairness loophole — spamming invalid clicks would extend the
-// active player's turn indefinitely. After the fix, an invalid action MUST
-// preserve oldState.TurnExpiresAt so client UIs stay aligned with the
-// server-side deadline.
+// TestHandleAction_InvalidAction_PreservesOriginalTurnExpiry checks that a rejected
+// action keeps the existing TurnExpiresAt instead of minting a fresh turn timer.
 func TestHandleAction_InvalidAction_PreservesOriginalTurnExpiry(t *testing.T) {
 	hub := ws.NewHub()
 	go hub.Run()
@@ -1280,9 +1168,6 @@ func TestHandleAction_InvalidAction_PreservesOriginalTurnExpiry(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
 
-	// Inject a known TurnExpiresAt with seat 1 active, then have a non-active
-	// seat (UserID=10 → seat 0) attempt to play a card. ApplyAction returns
-	// ErrNotYourTurn; the timer must NOT be extended.
 	originalExpiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(1, originalExpiry, false))
 

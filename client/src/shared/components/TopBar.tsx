@@ -22,15 +22,6 @@ import { cn } from "@/shared/lib/utils";
 import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-// One list, two renderers: the ≥md link row AND the mobile dropdown below both
-// map over this, and each item's `data-testid` derives from the second segment
-// of its labelKey (`nav.play` -> `nav-play` / `nav-menu-play`).
-//
-// Leaderboard sits second, next to Play: it is a play-adjacent destination, and
-// the pair reads as "what's on" before the personal/reference tabs. Adding it
-// puts a FOURTH tab into the md..lg band the brand wordmark already yielded to
-// (see the note on `app-name` below) — re-measure that band before adding a
-// fifth.
 const navItems = [
   { path: "/lobby", labelKey: "nav.play" },
   { path: "/leaderboard", labelKey: "nav.leaderboard" },
@@ -39,25 +30,17 @@ const navItems = [
 ] as const;
 
 type TopBarProps = {
-  /** Show nav links (Play / Profile / Rules). Default false. */
   showNav?: boolean;
-  /** Show username pill + logout dropdown. Default false. */
   showUserMenu?: boolean;
-  /**
-   * When true, the LanguageSelector also pushes the picked language to the
-   * server. AppLayout passes this; AuthLayout leaves it off.
-   */
   persistLanguage?: boolean;
-  /** Override the LanguageSelector's test-id prefix to preserve auth tests. */
   languageTestIdPrefix?: string;
-  /**
-   * Render the full "Beljot.online" wordmark and keep it visible at every
-   * breakpoint (including phones). AuthLayout passes this so the pre-auth
-   * screens show the complete brand instead of a logo-only mobile header.
-   */
   showFullBrand?: boolean;
 };
 
+/**
+ * App header with the brand, nav links, progression readouts, wallet, language picker and user menus.
+ * The SupportDialog is mounted outside both dropdowns because a dropdown unmounts its subtree on select.
+ */
 export function TopBar({
   showNav = false,
   showUserMenu = false,
@@ -71,17 +54,10 @@ export function TopBar({
   const returnToLobby = useLobbyReturn();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  // Support explainer, opened from either menu. The dialog is mounted OUTSIDE
-  // both dropdowns — a dropdown unmounts its own subtree on select, which
-  // would close the dialog in the same tick it opened.
   const [supportOpen, setSupportOpen] = useState(false);
 
-  // History-stack shaping: navigating between the top-level pages must not
-  // grow the stack — only the lobby → X hop is a push. Links whose target is
-  // the lobby itself go through returnToLobby() (pop back to the live lobby
-  // entry when it sits beneath, replace otherwise) while keeping their real
-  // href for a11y / open-in-new-tab; modified clicks keep native behavior.
   const onLobbyPath = location.pathname === "/lobby";
+  /** Returns to the lobby without growing the history stack; modified clicks keep native link behavior. */
   function handleLobbyLinkClick(e: ReactMouseEvent<HTMLAnchorElement>) {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
       return;
@@ -89,13 +65,9 @@ export function TopBar({
     returnToLobby();
   }
 
-  // Lifetime XP progress for the header level indicators (cosmetic fill; level
-  // itself is server-authoritative). Computed once and shared by the phone ring
-  // and the ≥sm "Lvl N + bar".
   const xp = user ? xpBarFill(user.totalXp, user.level) : null;
 
-  // Clear auth state, then land on the public landing page ("/"). Without the
-  // explicit navigate, ProtectedRoute would only fall back to /login.
+  /** Clears auth state and lands on the public landing page rather than /login. */
   function handleLogout() {
     logout();
     navigate("/");
@@ -120,22 +92,6 @@ export function TopBar({
           className="size-7 shrink-0"
           data-testid="app-logo"
         />
-        {/* Full "Beljot.online" wordmark — the ".online" suffix is brass, the
-            same gold as the logo's border. By default it hides below lg so the
-            logo alone holds the left edge, freeing width for the coin balance +
-            level + language + user pill; the Link's aria-label still
-            carries "Beljot" for assistive tech.
-
-            The floor was md until the 2026-07-29 E2E pass measured this row: at
-            md the wordmark (117px), the nav links AND the username pill all
-            switch on at once, so the bar needed 903px inside a 758px viewport
-            and scrolled horizontally for every signed-in user from 768px to
-            1023px. The wordmark is the largest item that carries no unique
-            information (the logo beside it is the same brand, and the aria-label
-            is unchanged), so it yields the md..lg band first.
-
-            showFullBrand keeps it visible at every breakpoint — used by the
-            pre-auth screens, where the bar is otherwise empty. */}
         <span
           className={cn(
             "font-display text-ink text-xl font-semibold tracking-tight whitespace-nowrap",
@@ -172,29 +128,11 @@ export function TopBar({
         </div>
       )}
 
-      {/* min-w-0 lets this cluster be a shrink target so the ONE flexible item
-          inside it (the username) can truncate instead of pushing the row wider
-          than the viewport. Every fixed-size pill below is shrink-0 + nowrap, so
-          none of them can collapse or wrap onto a second line. */}
       <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2 lg:gap-2.5">
-        {/* Seasonal rank. Tier badge + tier name, and the badge alone on
-            phones — the header carries the rank's IDENTITY, never its SP total
-            (the profile's RankBanner owns the arithmetic). Placed left of the
-            lifetime level so the two progression readouts read as one cluster,
-            ahead of the wallet. Gated on `user` like every other pill here: the
-            endpoint behind it is auth-only, and AuthLayout mounts this same bar
-            with no one signed in. */}
         {user && <HeaderRankChip />}
 
-        {/* Lifetime level + XP progress (Story 9.5). Level is server-authoritative
-            (user.level); the fill is cosmetic display math. Live-updates via the
-            event:xp_awarded handler that writes user.level / user.totalXp on the
-            auth store. Two responsive treatments: a compact ring on phones, and
-            the wider "Lvl N + bar" from the sm breakpoint up. */}
         {user && xp && (
           <>
-            {/* Phones (<sm): compact level ring with the level centered, so the
-                wider Lvl+bar doesn't crowd the coin pill on narrow screens. */}
             <div className="flex shrink-0 sm:hidden">
               <LevelRing
                 level={user.level}
@@ -207,7 +145,6 @@ export function TopBar({
                 testId="xp-ring"
               />
             </div>
-            {/* ≥sm: level text + linear XP bar. */}
             <div className="hidden shrink-0 items-center gap-2 sm:flex" data-testid="xp-indicator">
               <span
                 className="text-ink text-xs font-semibold whitespace-nowrap tabular-nums"
@@ -225,10 +162,6 @@ export function TopBar({
           </>
         )}
 
-        {/* Coin balance pill (Story 9.1). Sits left of the language selector.
-            Explicit number rendering — `0` is a real balance, never treated as
-            falsy. The login streak is surfaced in the daily-reward dialog and the
-            profile, not in the header. */}
         {user && (
           <div
             className="bg-surface-elevated flex shrink-0 items-center gap-1.5 rounded-full border border-border py-1 pr-3 pl-2.5"
@@ -243,14 +176,6 @@ export function TopBar({
 
         <LanguageSelector persistToServer={persistLanguage} testIdPrefix={languageTestIdPrefix} />
 
-        {/* Desktop (≥md): username pill with a logout dropdown.
-
-            This is the row's only elastic item, so it is the designated shrink
-            target: min-w-0 on the trigger plus truncate on the name means a long
-            username ellipsises instead of pushing the bar past the viewport. The
-            avatar and chevron stay shrink-0 so the pill never loses its shape.
-            Without this a 20-character username (the column max) reintroduced the
-            horizontal scroll that the md..lg fixes above remove. */}
         {showUserMenu && user && (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -303,9 +228,6 @@ export function TopBar({
           </DropdownMenu>
         )}
 
-        {/* Phones (<md): one hamburger folds the nav links, the support entry and
-            logout that the bar can't fit. The language picker stays beside it as
-            its own icon. */}
         {(showNav || (showUserMenu && user)) && (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -378,8 +300,6 @@ export function TopBar({
         )}
       </div>
 
-      {/* Reaches every page that renders a TopBar menu — which excludes the
-          match route, so nothing support-related can appear mid-game. */}
       <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
     </nav>
   );

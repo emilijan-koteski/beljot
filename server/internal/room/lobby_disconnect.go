@@ -11,21 +11,15 @@ import (
 
 const lobbyDisconnectTimeout = 10 * time.Second
 
-// LobbyDisconnectHandler manages pre-game lobby disconnections.
-// When a player disconnects while in a room lobby (status "waiting"),
-// their seat is freed after a short timeout (10 seconds). If they
-// reconnect within the window, the timer is cancelled.
+// LobbyDisconnectHandler frees a waiting-room seat after a short timeout when its
+// player disconnects. Reconnecting within the window cancels the timer.
 type LobbyDisconnectHandler struct {
-	repo RoomRepository
-	// hub is the Broadcaster interface rather than a concrete *ws.Hub for the
-	// reason that interface was introduced: this handler builds a room payload
-	// by hand, and a test cannot assert the keys it carries unless the broadcast
-	// is observable. *ws.Hub satisfies it, so cmd/api wiring is unchanged.
+	repo     RoomRepository
 	hub      Broadcaster
 	presence *PresenceRegistry
 	invites  *InviteRegistry
 	mu       sync.Mutex
-	pending  map[uint]*lobbyDisconnect // userID → pending disconnect
+	pending  map[uint]*lobbyDisconnect
 }
 
 type lobbyDisconnect struct {
@@ -33,11 +27,8 @@ type lobbyDisconnect struct {
 	roomID uint
 }
 
-// NewLobbyDisconnectHandler creates a new handler for lobby disconnect events.
-//
-// invites must be the SAME registry the room and invite handlers share; a nil
-// one is replaced with an empty registry so tests can omit it, matching the
-// presence parameter's affordance.
+// NewLobbyDisconnectHandler creates a handler for lobby disconnect events. Nil
+// presence or invites get empty registries, and a typed-nil *ws.Hub becomes a nil hub.
 func NewLobbyDisconnectHandler(repo RoomRepository, hub Broadcaster, presence *PresenceRegistry, invites *InviteRegistry) *LobbyDisconnectHandler {
 	if presence == nil {
 		presence = NewPresenceRegistry()
@@ -45,14 +36,6 @@ func NewLobbyDisconnectHandler(repo RoomRepository, hub Broadcaster, presence *P
 	if invites == nil {
 		invites = NewInviteRegistry()
 	}
-	// Normalizing a typed-nil hub, rather than deleting the `h.hub == nil` guards
-	// the broadcast helpers below still carry. Those guards were written against a
-	// concrete *ws.Hub, where nil really was nil; now that the field is an
-	// interface, a nil *ws.Hub handed in here would sit inside a NON-nil
-	// Broadcaster, slip straight past them and panic on the first broadcast.
-	// Keeping the guards and normalizing preserves the "no hub means no
-	// broadcasting" affordance that presence and invites above already offer;
-	// dropping them would turn the same call into a panic instead.
 	if h, ok := hub.(*ws.Hub); ok && h == nil {
 		hub = nil
 	}
@@ -65,13 +48,12 @@ func NewLobbyDisconnectHandler(repo RoomRepository, hub Broadcaster, presence *P
 	}
 }
 
-// HandleDisconnect is called when a player disconnects. If the player is in a
-// room lobby (status "waiting"), a 10-second timer starts. On expiry the player
-// is removed from the room and remaining players are notified.
+// HandleDisconnect starts a 10-second timer when a player in a waiting room
+// disconnects. On expiry the player is removed and the remaining players are notified.
 func (h *LobbyDisconnectHandler) HandleDisconnect(userID uint) {
 	rp, err := h.repo.FindPlayerRoom(userID)
 	if err != nil || rp == nil {
-		return // Not in any room
+		return
 	}
 
 	room, err := h.repo.FindByID(rp.RoomID)
@@ -79,13 +61,11 @@ func (h *LobbyDisconnectHandler) HandleDisconnect(userID uint) {
 		return
 	}
 
-	// Only handle lobby disconnects (room not yet started)
 	if room.Status != "waiting" {
 		return
 	}
 
 	h.mu.Lock()
-	// Cancel any existing timer for this user (shouldn't happen, but be safe)
 	if existing, ok := h.pending[userID]; ok {
 		existing.timer.Stop()
 		delete(h.pending, userID)
@@ -127,7 +107,6 @@ func (h *LobbyDisconnectHandler) handleTimeout(userID uint, roomID uint) {
 	delete(h.pending, userID)
 	h.mu.Unlock()
 
-	// Look up player info before removing
 	var leavingUsername string
 	players, _ := h.repo.FindPlayersByRoomID(roomID)
 	for _, p := range players {
@@ -141,18 +120,12 @@ func (h *LobbyDisconnectHandler) handleTimeout(userID uint, roomID uint) {
 	if err != nil || room == nil {
 		return
 	}
-	// Double-check room is still in waiting status
 	if room.Status != "waiting" {
 		return
 	}
 
-	// Set inside the transaction when the disconnect emptied the room and closed
-	// it. This is the one room-close transition that does not sit beside a
-	// presence.Clear, so it needs its own invite void (AC2) — otherwise grants
-	// into a closed room survive until their TTL.
 	roomClosed := false
 
-	// Remove the player from the room
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
 		if err := tx.RemovePlayer(roomID, userID); err != nil {
 			return err
@@ -160,7 +133,6 @@ func (h *LobbyDisconnectHandler) handleTimeout(userID uint, roomID uint) {
 		if err := tx.DecrementPlayerCount(roomID); err != nil {
 			return err
 		}
-		// Handle owner transfer or room closure
 		if room.OwnerID == userID {
 			remainingPlayers, err := tx.FindPlayersByRoomID(roomID)
 			if err != nil {
@@ -186,18 +158,13 @@ func (h *LobbyDisconnectHandler) handleTimeout(userID uint, roomID uint) {
 
 	slog.Info("room: lobby player removed after disconnect timeout", "userID", userID, "roomID", roomID)
 
-	// Drop their presence (auto-clears the room entry when the last present
-	// member times out).
 	h.presence.Remove(roomID, userID)
 
-	// The disconnected player can no longer vouch for anyone here, and if their
-	// leaving closed the room nobody can join it at all (AC2).
 	h.invites.VoidInviter(roomID, userID)
 	if roomClosed {
 		h.invites.VoidRoom(roomID)
 	}
 
-	// Broadcast player_left to remaining room participants
 	remainingPlayers, err := h.repo.FindPlayersByRoomID(roomID)
 	if err != nil || len(remainingPlayers) == 0 {
 		return
@@ -226,7 +193,6 @@ func (h *LobbyDisconnectHandler) handleTimeout(userID uint, roomID uint) {
 
 	h.broadcastToUsers(userIDs, ws.SystemPlayerLeft, payload)
 
-	// Broadcast room_updated to lobby
 	if postRoom != nil {
 		h.broadcastRoomUpdated(postRoom)
 	}
@@ -247,14 +213,13 @@ func (h *LobbyDisconnectHandler) broadcastToUsers(userIDs []uint, msgType string
 	h.hub.BroadcastToUsers(userIDs, msg)
 }
 
+// broadcastRoomUpdated sends the hand-built lobby-wide room_updated payload. Its keys,
+// including the per-room rule flags, must match roomLifecyclePayload.
 func (h *LobbyDisconnectHandler) broadcastRoomUpdated(r *Room) {
 	if h.hub == nil {
 		return
 	}
 	if r.OwnerUsername == "" {
-		// Best-effort hydration so disconnect-driven updates carry the host
-		// avatar the lobby card needs. Silently swallow errors — the rest of
-		// the payload is still valid without the username field.
 		_ = h.repo.LoadOwnerUsernames([]*Room{r})
 	}
 	payload := map[string]interface{}{
@@ -268,22 +233,12 @@ func (h *LobbyDisconnectHandler) broadcastRoomUpdated(r *Room) {
 		"matchMode":            r.MatchMode,
 		"timerStyle":           r.TimerStyle,
 		"timerDurationSeconds": r.TimerDurationSeconds,
-		// The two per-room RULE flags. This is the third and last hand-built room
-		// payload in Go — the others are roomLifecyclePayload and Quick Play's own
-		// room_created — and the one easiest to miss, because it fires only on a
-		// lobby disconnect. Without these keys a bez-zvanja or stop-at-target room
-		// loses its chip the moment any lobby player drops, and gets it back only
-		// on a full refetch.
-		//
-		// It is also the map that actually shipped broken: declarationsEnabled was
-		// missed here and caught in review. Both keys are under test now — see
-		// lobby_disconnect_payload_test.go, which is why hub is a Broadcaster.
-		"declarationsEnabled": r.DeclarationsEnabled,
-		"stopAtTarget":        r.StopAtTarget,
-		"playerCount":         r.PlayerCount,
-		"status":              r.Status,
-		"createdAt":           r.CreatedAt.UTC().Format(time.RFC3339),
-		"updatedAt":           r.UpdatedAt.UTC().Format(time.RFC3339),
+		"declarationsEnabled":  r.DeclarationsEnabled,
+		"stopAtTarget":         r.StopAtTarget,
+		"playerCount":          r.PlayerCount,
+		"status":               r.Status,
+		"createdAt":            r.CreatedAt.UTC().Format(time.RFC3339),
+		"updatedAt":            r.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {

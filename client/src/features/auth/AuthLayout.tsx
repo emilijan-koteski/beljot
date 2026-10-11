@@ -7,13 +7,8 @@ import { TopBar } from "@/shared/components/TopBar";
 const LINKEDIN_URL = "https://www.linkedin.com/in/emilijan-koteski/";
 
 /**
- * Parchment-themed shell for the pre-authentication routes (Login + Register).
- * Hosts the shared <TopBar /> (no nav, no user menu, no server persistence
- * for the language picker) and a centered stage for the page's <AuthCard />.
- *
- * Mounted once via App.tsx as a layout route around `/login` and `/register`,
- * so navigating between the two pages doesn't remount the top bar or the
- * footer credit — only the card swaps.
+ * Parchment-themed layout route for the pre-authentication pages.
+ * Hosts the shared TopBar and footer so only the page's AuthCard swaps on navigation.
  */
 export function AuthLayout() {
   return (
@@ -50,9 +45,6 @@ export function AuthLayout() {
           }}
         />
 
-        {/* Second line, under the credit: the quiet support reminder. Mounted
-            on the LAYOUT, so login, register, forgot-password and
-            reset-password all carry it without four separate edits. */}
         <SupportNote variant="auth" />
       </footer>
     </div>

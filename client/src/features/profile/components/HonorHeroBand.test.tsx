@@ -19,7 +19,6 @@ function renderBand(overrides: Partial<Props> = {}) {
     trendDirection: "flat",
     ...overrides,
   };
-  // MemoryRouter: the explainer dialog this band opens deep-links to /rules.
   return render(
     <MemoryRouter>
       <HonorHeroBand {...props} />
@@ -46,8 +45,6 @@ describe("HonorHeroBand (honour redesign R3)", () => {
   });
 
   it("never renders the raw completed / abandoned counts (user decision 2026-07-31)", () => {
-    // The Статистика tiles already carry these numbers; repeating them in the
-    // band was duplication. The totals still feed the newcomer "n / 5" counter.
     renderBand({ completedTotal: 42, abandonedTotal: 3 });
 
     expect(screen.queryByTestId("profile-honor-completed")).not.toBeInTheDocument();
@@ -57,16 +54,12 @@ describe("HonorHeroBand (honour redesign R3)", () => {
   it("marks the banded meter at the score", () => {
     renderBand({ score: 50 });
 
-    // Assert the computed position through data-value rather than the DOM shape,
-    // so the meter's internals can change without breaking this.
     const marker = screen.getByTestId("profile-honor-meter-marker");
     expect(marker).toHaveAttribute("data-value", "50");
     expect(marker.style.left).toBe("50%");
   });
 
   it("renders a zero score as a real 0, not as the prior", () => {
-    // Go zero values serialize as real values — a legitimate 0 ("Problematic")
-    // must never be coerced into the 80 fallback by a truthiness check.
     renderBand({ score: 0, tier: "problematic" });
 
     expect(screen.getByTestId("profile-honor")).toHaveAttribute("data-honor", "0");
@@ -118,8 +111,6 @@ describe("HonorHeroBand (honour redesign R3)", () => {
       renderBand({ isNewPlayer: true, completedTotal: 2, abandonedTotal: 0 });
 
       expect(screen.getByTestId("profile-honor")).toHaveAttribute("data-new-player", "true");
-      // The redesign replaces the bare "New Player" label with a counter, so the
-      // state says how to LEAVE it rather than only naming it.
       const progress = screen.getByTestId("profile-honor-new");
       expect(progress).toHaveAttribute("data-value", "2");
       expect(progress).toHaveTextContent("2");
@@ -130,8 +121,6 @@ describe("HonorHeroBand (honour redesign R3)", () => {
     });
 
     it("counts abandonments toward the floor, not just completions", () => {
-      // The floor is experience, not successes — the exact bypass two server
-      // review passes closed. 0 completed / 4 abandoned is 4 of 5, not 0 of 5.
       renderBand({ isNewPlayer: true, completedTotal: 0, abandonedTotal: 4 });
 
       expect(screen.getByTestId("profile-honor-new")).toHaveAttribute("data-value", "4");
@@ -153,7 +142,6 @@ describe("HonorHeroBand (honour redesign R3)", () => {
   });
 
   it("colours by score when the server sends an unknown tier token", () => {
-    // Version skew: a newer server ships a tier this bundle has never heard of.
     renderBand({ score: 97, tier: "legendary" });
 
     expect(screen.getByTestId("profile-honor")).toHaveAttribute("data-tier", "exemplary");
@@ -163,8 +151,6 @@ describe("HonorHeroBand (honour redesign R3)", () => {
   it("opens the explainer from the band", async () => {
     renderBand();
 
-    // One trigger at every width: the icon button. The mobile-only labelled link
-    // it once paired with claimed a full row of its own and is gone.
     expect(screen.getByTestId("profile-honor-explainer-button")).toBeInTheDocument();
     expect(screen.queryByTestId("profile-honor-explainer-link")).not.toBeInTheDocument();
     expect(screen.getByTestId("profile-honor-explainer-button").className).not.toMatch(

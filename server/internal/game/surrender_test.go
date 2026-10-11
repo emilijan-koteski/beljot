@@ -132,9 +132,6 @@ func TestSurrenderRequest(t *testing.T) {
 }
 
 func TestSurrenderAccept(t *testing.T) {
-	// Each case proposer → expected winning team.
-	// Seat 0/2 = team A (team 0); Seat 1/3 = team B (team 1). Winner is the
-	// opposite team of the proposer.
 	cases := []struct {
 		proposer   int
 		wantWinner int
@@ -192,7 +189,6 @@ func TestSurrenderAccept(t *testing.T) {
 		gs.SurrenderProposerSeat = &seat
 		gs.SurrenderUsed[0] = true
 
-		// Opponents of seat 0 are seats 1 and 3.
 		_, err := game.ApplyAction(gs, game.Action{
 			Type:       game.ActionSurrenderAccept,
 			PlayerSeat: 1,
@@ -225,14 +221,13 @@ func TestSurrenderDecline(t *testing.T) {
 		seat := 1
 		gs.SurrenderProposerSeat = &seat
 		gs.SurrenderUsed[1] = true
-		// Capture state to ensure other fields don't drift
 		origPhase := gs.Phase
 		origActive := gs.ActivePlayerSeat
 		origScores := gs.TeamScores
 
 		newState, err := game.ApplyAction(gs, game.Action{
 			Type:       game.ActionSurrenderDecline,
-			PlayerSeat: 3, // partner of seat 1
+			PlayerSeat: 3,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, newState)
@@ -250,7 +245,7 @@ func TestSurrenderDecline(t *testing.T) {
 		seat := 0
 		gs.SurrenderProposerSeat = &seat
 		gs.SurrenderUsed[0] = true
-		gs.SurrenderUsed[2] = true // partner already used theirs separately
+		gs.SurrenderUsed[2] = true
 
 		newState, err := game.ApplyAction(gs, game.Action{
 			Type:       game.ActionSurrenderDecline,
@@ -293,7 +288,6 @@ func TestSurrenderDecline(t *testing.T) {
 func TestSurrenderPureFunctionDiscipline(t *testing.T) {
 	t.Run("request does not mutate input", func(t *testing.T) {
 		gs := testfixtures.NewGameMidPlay(1)
-		// Snapshot relevant fields by value
 		origUsed := gs.SurrenderUsed
 		origProposer := gs.SurrenderProposerSeat
 

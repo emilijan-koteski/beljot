@@ -14,37 +14,15 @@ import { inviteFailure } from "@/shared/lib/inviteFailure";
 
 interface MatchPlayerActionsProps {
   match: MatchListItem;
-  /**
-   * Room to invite back into. Required for the Reinvite control to render at
-   * all — without it there is nothing to invite anyone to.
-   */
   roomId?: number;
-  /**
-   * Offer the Reinvite control. False in the end-of-match dialog: everyone is
-   * still present and "Return to room" already covers regrouping.
-   */
   showReinvite?: boolean;
-  /** User ids currently in the room — someone already at the table needs no invite. */
   playersInRoom?: number[];
-  /**
-   * Offer "Remove friend" alongside the friendship state. FALSE in the
-   * end-of-match overlay, whose z-order the confirm dialog cannot escape — see
-   * FriendButton's `allowRemove`.
-   */
   allowRemoveFriend?: boolean;
 }
 
 /**
- * Per-player follow-up actions for a finished match: Add-friend for everyone
- * you played with, plus (in the room lobby only) an invite back into the room.
- *
- * Rendered as the `footer` of `MatchStatsCard`, which is why it takes the match
- * rather than a player list — the seats, the bot flags and the viewer's own
- * seat all come from the same viewer-relative DTO the card draws.
- *
- * Bot seats and the viewer's own seat are skipped, as is a soft-deleted
- * participant (userId > 0 with an empty username): there is no account left to
- * befriend or invite.
+ * Per-player Add-friend and (room lobby only) Reinvite actions for a finished match.
+ * Skips bot seats, the viewer's own seat, and soft-deleted participants.
  */
 export function MatchPlayerActions({
   match,
@@ -104,17 +82,8 @@ function PlayerActionRow({
   const { t } = useTranslation();
   const status = useFriendshipStatus(player.userId);
   const inviteMutation = useInviteToRoomMutation();
-  // Confirmation only — NOT a latch. The invite's fate is server-side (declined,
-  // lapsed on its TTL, or died with a disconnect), and this row cannot observe
-  // any of them; disabling on success would strand a friend who is invitable
-  // again behind a page reload. The button keeps its "Invited" read-back but
-  // stays pressable, and a redundant press comes back as
-  // INVITE_ALREADY_PENDING — which says exactly the right thing.
   const [invited, setInvited] = useState(false);
 
-  // Reinvite is friends-only because POST /rooms/:id/invite is friends-only —
-  // offering it to a stranger would render a button whose only outcome is
-  // NOT_FRIENDS. It also hides for someone already at the table.
   const canReinvite =
     showReinvite &&
     roomId !== undefined &&
@@ -128,10 +97,6 @@ function PlayerActionRow({
       setInvited(true);
       toast.success(t("matchStats.reinviteSent", { username: player.username }));
     } catch (err) {
-      // Every kind is a toast here: unlike the invite panel's list rows, this
-      // control has no inline slot of its own. The row stays interactive after
-      // a rejection — room-full and not-available are both transient, and a
-      // retry a moment later is the natural response.
       toast.error(inviteFailure(err instanceof FetchError ? err.code : null).message);
     }
   }

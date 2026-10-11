@@ -99,9 +99,6 @@ describe("MatchHistory", () => {
     mockGetUserMatches.mockReset();
   });
 
-  // In a hook, not at the end of the locale test's body: a failed assertion
-  // returns early and would leak mk into every test that runs after it in this
-  // file. Matches how RoomCard / RoomPage.locale restore theirs.
   afterEach(async () => {
     await i18n.changeLanguage("en");
   });
@@ -123,7 +120,6 @@ describe("MatchHistory", () => {
 
   it("renders the filtered-empty state (not onboarding) when a filter matches nothing", async () => {
     mockGetUserMatches.mockResolvedValueOnce(makeResponse([], 0));
-    // counts.all > 0 → the user has games, just none for this view.
     renderMatchHistory(1, { all: 12, win: 0, loss: 0, abandoned: 0 });
     expect(await screen.findByTestId("match-history-empty-filtered")).toBeInTheDocument();
     expect(screen.queryByTestId("match-history-empty")).not.toBeInTheDocument();
@@ -134,7 +130,6 @@ describe("MatchHistory", () => {
     renderMatchHistory();
     await screen.findByTestId("match-history-row");
 
-    // Initial fetch uses outcome "all", sort "new".
     expect(mockGetUserMatches).toHaveBeenLastCalledWith(1, 20, 0, { outcome: "all", sort: "new" });
 
     fireEvent.click(screen.getByTestId("match-history-filter-win"));
@@ -174,8 +169,6 @@ describe("MatchHistory", () => {
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
     expect(within(row).getByTestId("match-history-bots-marker")).toBeInTheDocument();
-    // Opponent seats 1 and 3 are bots — seat-derived localized names, with
-    // the bot glyph (not a name initial) in the chip avatars.
     expect(within(row).getByText("Bot 2")).toBeInTheDocument();
     expect(within(row).getByText("Bot 4")).toBeInTheDocument();
     expect(within(row).getAllByTestId("avatar-icon")).toHaveLength(2);
@@ -188,16 +181,12 @@ describe("MatchHistory", () => {
     expect(within(row).queryByTestId("match-history-bots-marker")).not.toBeInTheDocument();
   });
 
-  // Story 12.8: match history rendered no variant at all, even though the DTO
-  // and the client type both carried it — so a Croatian match was
-  // indistinguishable from a Bitola one after the fact.
   it("renders the variant on each row", async () => {
     mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch({ variant: "croatia" })], 1));
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
     const chip = within(row).getByTestId("match-history-variant");
     expect(chip).toHaveAttribute("data-variant", "croatia");
-    // Localized, not the raw server string title-cased.
     expect(chip).toHaveTextContent("Croatian");
     expect(chip).not.toHaveTextContent("croatia");
   });
@@ -217,7 +206,6 @@ describe("MatchHistory", () => {
     expect(within(row).getByText("mate")).toBeInTheDocument();
     expect(within(row).getByText(/opp1/)).toBeInTheDocument();
     expect(within(row).getByText(/opp2/)).toBeInTheDocument();
-    // Viewer is on teamA → "Us" first (1010), "Them" second (640)
     expect(within(row).getByText("1010")).toBeInTheDocument();
     expect(within(row).getByText("640")).toBeInTheDocument();
     expect(within(row).getByTestId("match-history-outcome")).toHaveAttribute("data-outcome", "win");
@@ -229,11 +217,9 @@ describe("MatchHistory", () => {
     );
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
-    // Viewer on teamB → Us=800 (teamB score) appears first as data-team="teamB"
     const scoreSpans = within(row)
       .getAllByText(/^(800|200)$/)
       .map((el) => ({ text: el.textContent, team: el.getAttribute("data-team") }));
-    // First score span should be the viewer's team
     expect(scoreSpans[0]).toEqual({ text: "800", team: "teamB" });
     expect(scoreSpans[1]).toEqual({ text: "200", team: "teamA" });
   });
@@ -258,8 +244,6 @@ describe("MatchHistory", () => {
   });
 
   it("shows the ended-early marker with abandonment wording for a non-abandoner", async () => {
-    // Opponent's abandonment counts as a win for the viewer — the row carries
-    // the muted abandonment marker next to the outcome chip.
     mockGetUserMatches.mockResolvedValueOnce(
       makeResponse(
         [makeMatch({ status: "abandoned", outcome: "win", endReason: "abandonment" })],
@@ -301,8 +285,6 @@ describe("MatchHistory", () => {
   });
 
   it("hides the ended-early marker on the abandoner's own row (outcome abandoned)", async () => {
-    // The abandoner (and legacy NULL-abandoner rows) already say it via the
-    // "Abandoned" chip — no duplicate marker.
     mockGetUserMatches.mockResolvedValueOnce(
       makeResponse(
         [makeMatch({ status: "abandoned", outcome: "abandoned", endReason: "abandonment" })],
@@ -339,9 +321,6 @@ describe("MatchHistory", () => {
     expect(screen.queryByTestId("match-history-detail")).not.toBeInTheDocument();
   });
 
-  // Clickable player names: human teammate/opponent chips link to the public
-  // profile; bot, missing and subject chips stay inert; a name click must
-  // never toggle the row; the chevron stays the one real toggle button.
   it("renders human teammate/opponent chips as links to their public profiles", async () => {
     mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
     renderMatchHistory();
@@ -364,7 +343,6 @@ describe("MatchHistory", () => {
     mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
-    // The subject's chip renders, but never as a link.
     expect(within(row).getByText("viewer")).toBeInTheDocument();
     expect(
       within(row).queryByRole("link", { name: "View viewer's profile" }),
@@ -390,7 +368,6 @@ describe("MatchHistory", () => {
     );
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
-    // Only the human teammate links out; both bot chips stay inert.
     const links = within(row).getAllByRole("link");
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAttribute("href", "/players/12");
@@ -413,7 +390,6 @@ describe("MatchHistory", () => {
     );
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
-    // Seat 3 has no player — its "—" chip renders as a plain span, not a link.
     const chips = within(row).getAllByTestId("match-seat-chip");
     const missingChip = chips.find((c) => c.textContent?.includes("—"));
     expect(missingChip).toBeDefined();
@@ -422,9 +398,6 @@ describe("MatchHistory", () => {
   });
 
   it("keeps deleted-user chips non-interactive", async () => {
-    // A soft-deleted participant arrives with a real userId but an empty
-    // username (the server hydrates usernames from the users table, which
-    // excludes deleted rows) — the "—" chip must not link to a sure 404.
     mockGetUserMatches.mockResolvedValueOnce(
       makeResponse(
         [
@@ -446,7 +419,6 @@ describe("MatchHistory", () => {
     const deletedChip = chips.find((c) => c.textContent?.includes("—"));
     expect(deletedChip).toBeDefined();
     expect(deletedChip?.tagName).toBe("SPAN");
-    // Only the two still-existing opponents link out.
     expect(within(row).getAllByRole("link")).toHaveLength(2);
   });
 
@@ -521,7 +493,6 @@ describe("MatchHistory", () => {
     fireEvent.click(within(row).getByRole("button"));
 
     expect(screen.getByTestId("match-history-hand-capot")).toBeInTheDocument();
-    // Viewer is at seat 0 (teamA, index 0); contractingTeam is 0 → "us" side failed.
     const failed = screen.getByTestId("match-history-hand-failed");
     expect(failed).toHaveTextContent(/us/);
     expect(failed).not.toHaveTextContent(/them/);
@@ -529,12 +500,12 @@ describe("MatchHistory", () => {
 
   it("renders failed-contract pill as 'Them' when viewer was NOT on the contracting team", async () => {
     const match = makeMatch({
-      viewerSeat: 1, // teamB
+      viewerSeat: 1,
       hands: [
         makeHand({
           handNumber: 1,
           failedContract: true,
-          contractingTeam: 0, // teamA contracted; viewer is teamB → Them
+          contractingTeam: 0,
           teamACardPoints: 0,
           teamAHandTotal: 0,
           teamBCardPoints: 162,
@@ -547,7 +518,6 @@ describe("MatchHistory", () => {
     const row = await screen.findByTestId("match-history-row");
     fireEvent.click(within(row).getByRole("button"));
 
-    // Viewer is teamB; teamA contracted and failed → "them" side failed.
     const failed = screen.getByTestId("match-history-hand-failed");
     expect(failed).toHaveTextContent(/them/);
   });

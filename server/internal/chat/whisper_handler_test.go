@@ -14,8 +14,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// --- Whisper fakes ---
-
 type whisperSend struct {
 	userID uint
 	msg    []byte
@@ -92,7 +90,7 @@ func (f *fakeFriends) AreFriends(a, b uint) (bool, error) {
 }
 
 type fakePresence struct {
-	rooms map[uint]uint // userID → active roomID; absent means "not in any active room/match"
+	rooms map[uint]uint
 	err   error
 }
 
@@ -107,8 +105,6 @@ func (p *fakePresence) ActiveRoomID(userID uint) (uint, bool, error) {
 	r, ok := p.rooms[userID]
 	return r, ok, nil
 }
-
-// --- Whisper helpers ---
 
 func whisperMessage(t *testing.T, toUsername, text string) ws.WSMessage {
 	t.Helper()
@@ -134,15 +130,12 @@ func newWhisperFixture(hub *whisperHubSpy, friends *fakeFriends, presence *fakeP
 	return chat.NewWhisperHandler(hub, repo, friends, presence), repo
 }
 
-// --- Tests ---
-
 func TestWhisper_FriendWhisper_DeliveredToBothParticipants(t *testing.T) {
 	hub := newWhisperHubSpy(10, 20)
 	h, _ := newWhisperFixture(hub, newFakeFriends([2]uint{10, 20}), newFakePresence())
 
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", "hey there"))
 
-	// Delivered exactly once to the target AND once to the sender (own-echo).
 	require.Equal(t, 2, hub.count(), "whisper delivered to BOTH participants")
 	require.Len(t, hub.sendsTo(20), 1, "target receives the whisper")
 	require.Len(t, hub.sendsTo(10), 1, "sender receives own-echo")
@@ -159,14 +152,12 @@ func TestWhisper_FriendWhisper_DeliveredToBothParticipants(t *testing.T) {
 	assert.Equal(t, "hey there", payload.Message)
 	assert.NotEmpty(t, payload.Timestamp, "server stamps RFC3339 timestamp")
 
-	// Sender's own-echo carries the identical payload.
 	senderEnv := decodeWhisperEnvelope(t, hub.sendsTo(10)[0])
 	assert.Equal(t, ws.SystemWhisper, senderEnv.Type)
 }
 
 func TestWhisper_NonFriend_RejectedToSenderOnly(t *testing.T) {
 	hub := newWhisperHubSpy(10, 20)
-	// alice and bob are NOT friends.
 	h, _ := newWhisperFixture(hub, newFakeFriends(), newFakePresence())
 
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", "hey"))
@@ -181,8 +172,6 @@ func TestWhisper_UnknownUsername_RejectedAsNotFriends(t *testing.T) {
 	hub := newWhisperHubSpy(10)
 	h, _ := newWhisperFixture(hub, newFakeFriends(), newFakePresence())
 
-	// "ghost" resolves to no user — do NOT disclose "no such user"; it's simply
-	// not a friend.
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "ghost", "hey"))
 
 	require.Equal(t, 1, hub.count())
@@ -193,7 +182,7 @@ func TestWhisper_UnknownUsername_RejectedAsNotFriends(t *testing.T) {
 func TestWhisper_SameRoomOrMatch_Blocked(t *testing.T) {
 	hub := newWhisperHubSpy(10, 20)
 	presence := newFakePresence()
-	presence.rooms[10] = 7 // both in the same active room/match
+	presence.rooms[10] = 7
 	presence.rooms[20] = 7
 	h, _ := newWhisperFixture(hub, newFakeFriends([2]uint{10, 20}), presence)
 
@@ -208,7 +197,7 @@ func TestWhisper_SameRoomOrMatch_Blocked(t *testing.T) {
 func TestWhisper_DifferentRoom_Allowed(t *testing.T) {
 	hub := newWhisperHubSpy(10, 20)
 	presence := newFakePresence()
-	presence.rooms[10] = 7 // different active rooms — a valid whisper target
+	presence.rooms[10] = 7
 	presence.rooms[20] = 9
 	h, _ := newWhisperFixture(hub, newFakeFriends([2]uint{10, 20}), presence)
 
@@ -221,7 +210,7 @@ func TestWhisper_DifferentRoom_Allowed(t *testing.T) {
 func TestWhisper_OneInRoomOneInLobby_Allowed(t *testing.T) {
 	hub := newWhisperHubSpy(10, 20)
 	presence := newFakePresence()
-	presence.rooms[10] = 7 // sender in a room, target in the lobby (absent)
+	presence.rooms[10] = 7
 	h, _ := newWhisperFixture(hub, newFakeFriends([2]uint{10, 20}), presence)
 
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", "hey"))
@@ -230,7 +219,6 @@ func TestWhisper_OneInRoomOneInLobby_Allowed(t *testing.T) {
 }
 
 func TestWhisper_OfflineTarget_RejectedAndNotDelivered(t *testing.T) {
-	// Only the sender is connected; bob is offline.
 	hub := newWhisperHubSpy(10)
 	h, _ := newWhisperFixture(hub, newFakeFriends([2]uint{10, 20}), newFakePresence())
 
@@ -251,11 +239,9 @@ func TestWhisper_RejectsEmptyAndTooLong(t *testing.T) {
 	}
 	assert.Equal(t, 0, hub.count(), "empty/whitespace whispers ignored (nothing sent, no error)")
 
-	// 501 runes rejected (no delivery).
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", strings.Repeat("x", 501)))
 	assert.Equal(t, 0, hub.count(), "501-rune whisper rejected")
 
-	// 500 runes accepted (boundary).
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", strings.Repeat("y", 500)))
 	assert.Equal(t, 2, hub.count(), "500-rune whisper accepted and delivered to both")
 }
@@ -264,11 +250,9 @@ func TestWhisper_LengthCapIsRunesNotBytes(t *testing.T) {
 	hub := newWhisperHubSpy(10, 20)
 	h, _ := newWhisperFixture(hub, newFakeFriends([2]uint{10, 20}), newFakePresence())
 
-	// 500 Cyrillic runes = 1000 bytes — accepted (rune cap, not byte cap).
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", strings.Repeat("ч", 500)))
 	assert.Equal(t, 2, hub.count(), "500-rune Cyrillic whisper accepted")
 
-	// 501 Cyrillic runes rejected — no new delivery.
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", strings.Repeat("ч", 501)))
 	assert.Equal(t, 2, hub.count(), "501-rune Cyrillic whisper rejected")
 }
@@ -316,7 +300,6 @@ func TestWhisper_PresenceLookupError_FailsClosed(t *testing.T) {
 	hub := newWhisperHubSpy(10, 20)
 	presence := newFakePresence()
 	presence.err = errors.New("presence db down")
-	// alice & bob ARE friends — the presence lookup is what fails.
 	h, _ := newWhisperFixture(hub, newFakeFriends([2]uint{10, 20}), presence)
 
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", "hey"))
@@ -328,8 +311,6 @@ func TestWhisper_PresenceLookupError_FailsClosed(t *testing.T) {
 func TestWhisper_TargetLookupError_FailsClosed(t *testing.T) {
 	hub := newWhisperHubSpy(10, 20)
 	h, repo := newWhisperFixture(hub, newFakeFriends([2]uint{10, 20}), newFakePresence())
-	// The target username resolution errors — must fail closed WITHOUT leaking
-	// "not_friends" (which would disclose an internal DB fault as a friend verdict).
 	repo.findByUsernameErr = errors.New("user db down")
 
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", "hey"))
@@ -341,7 +322,6 @@ func TestWhisper_TargetLookupError_FailsClosed(t *testing.T) {
 func TestWhisper_SenderLookupError_FailsClosed(t *testing.T) {
 	hub := newWhisperHubSpy(10, 20)
 	h, repo := newWhisperFixture(hub, newFakeFriends([2]uint{10, 20}), newFakePresence())
-	// The sender resolution errors before anything else — silent no-op.
 	repo.findByIDErr = errors.New("user db down")
 
 	h.HandleAction(&ws.Client{UserID: 10}, whisperMessage(t, "bob", "hey"))

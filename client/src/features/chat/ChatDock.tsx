@@ -16,9 +16,7 @@ import type {
 } from "@/shared/types/wsEvents";
 import { ACTION_CHAT_MESSAGE, ACTION_WHISPER } from "@/shared/types/wsEvents";
 
-// A single rendered line, normalized across the primary channel
-// (ChatMessagePayload) and whisper threads (WhisperPayload) so ChatLine can
-// render either. `whisper` toggles the pink skin.
+// A chat line normalized across the primary channel and whisper threads.
 interface DisplayLine {
   key: string;
   userId: number;
@@ -27,10 +25,8 @@ interface DisplayLine {
   timestamp: string;
 }
 
-// Parse a `/w <username> <message>` command. Returns null when the text is not a
-// `/w` command at all. Returns { complete: false } for an in-progress command
-// ("/w" or "/w bob" with no message yet) so the caller can swallow it rather
-// than leak a partial command to the public channel.
+// Parses a `/w <username> <message>` command, returning null when the text is not one.
+// An incomplete command returns { complete: false } so it is swallowed instead of sent publicly.
 function parseWhisperCommand(
   raw: string,
 ): { complete: true; toUsername: string; text: string } | { complete: false } | null {
@@ -46,28 +42,15 @@ function parseWhisperCommand(
 const PEEK_MS = 2000;
 const PEEK_MAX_CHARS = 90;
 const MAX_MESSAGE_LENGTH = 500;
-/** Shared chrome for the closed FAB's two count chips (public + whisper), so
- *  the pair is one shape in two colours. `relative` lets the front chip take a
- *  z-index inside the flex anchor. */
 const FAB_CHIP_CLASS =
   "border-surface relative inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 px-1.5 text-[11px] font-bold leading-none tabular-nums";
-/** How long a sent `/w` keeps the right to switch the view to its thread. Past
- *  this the send is treated as failed, so a rejected whisper cannot hijack the
- *  view later when that friend whispers first. */
 const PENDING_WHISPER_MS = 5000;
 
 type Variant = "lobby" | "room" | "match";
 
 interface ChatDockBaseProps {
-  /** Extra class(es) applied to the dock root(s) — used by the in-game wrapper
-   *  to attach the `.chat-dock-match` skin. */
   className?: string;
-  /** Resolve a sender's username color (team tinting). When omitted, usernames
-   *  render in the default muted style (lobby/global chat has no teams). */
   resolveNameColor?: (userId: number) => string | undefined;
-  /** Controlled open state. When `onOpenChange` is provided the dock is
-   *  controlled (the in-game dock lifts this so the HUD can react); otherwise
-   *  it manages its own open state internally. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
@@ -80,26 +63,8 @@ type ChatDockProps = ChatDockBaseProps &
   );
 
 /**
- * Bottom-right floating chat dock, shared across lobby (global channel), room
- * (room-scoped channel), and the in-game table (match channel). Closed state is
- * a 56px FAB with an unread badge + 2-second "peek" bubble for each new incoming
- * message. Open state is a 340×480 panel docked to the same corner.
- *
- * Lifecycle:
- *   - The unread counter increments for every incoming message that isn't
- *     mine while the dock is closed; opening the dock clears it.
- *   - The peek auto-dismisses PEEK_MS after its last arrival; new arrivals
- *     reset the timer so the latest message always gets its full window.
- *   - Pre-existing messages (received before this component mounted in the
- *     same session) are NOT replayed as peek bubbles — only messages that
- *     arrive while the dock is mounted + closed trigger the peek.
- *
- * The variant selects which chat-store slice to read/write and which i18n key
- * namespace to use, so all three docks share visual chrome, lifecycle logic,
- * and data-testids while staying scoped to their own channel. Per-channel
- * sender coloring is supplied by the wrapper via `resolveNameColor`, keeping
- * this component free of any lobby- or game-specific store coupling. The felt
- * theme is purely a CSS re-skin (`.chat-dock-match`), not a code branch.
+ * Floating bottom-right chat dock shared by the lobby, room, and match channels.
+ * Closed it is a FAB with unread chips and a peek bubble; open it is a panel with whisper tabs.
  */
 export function ChatDock(props: ChatDockProps) {
   const { variant, resolveNameColor, className } = props;
@@ -116,9 +81,6 @@ export function ChatDock(props: ChatDockProps) {
   const connectionState = useWsConnectionState();
   const isConnected = connectionState === "connected";
 
-  // Whisper channel state (Story 11.4). Threads are global (keyed by the other
-  // participant's username); only one dock mounts at a time, so a single active
-  // channel + tab strip is sufficient.
   const whisperThreads = useChatStore((s) => s.whisperThreads);
   const whisperUnread = useChatStore((s) => s.whisperUnread);
   const activeChannel = useChatStore((s) => s.activeChannel);
@@ -127,31 +89,19 @@ export function ChatDock(props: ChatDockProps) {
   const whisperOpenRequest = useChatStore((s) => s.whisperOpenRequest);
 
   const threadKeys = useMemo(() => Object.keys(whisperThreads).sort(), [whisperThreads]);
-  // Total unread across all whisper threads. Surfaced on the CLOSED FAB as its
-  // OWN pink chip, beside (never folded into) the brass public-channel chip, so
-  // an incoming whisper is distinguishable from public noise while the dock is
-  // shut — the per-thread tab badges only render while the dock is open.
-  // Numeric only (no content peek), so private message text never hits the FAB.
   const whisperUnreadTotal = useMemo(
     () => Object.values(whisperUnread).reduce((sum, n) => sum + n, 0),
     [whisperUnread],
   );
-  // Effective active thread: the store's activeChannel, but only if it still
-  // points at a live thread — otherwise fall back to the primary channel. Keeps
-  // the dock resilient to a thread being cleared out from under a stale tab.
   const activeThread =
     activeChannel !== "primary" && whisperThreads[activeChannel.slice("whisper:".length)]
       ? activeChannel.slice("whisper:".length)
       : null;
 
-  // Open state: controlled when the parent wires `onOpenChange` (in-game dock),
-  // otherwise self-managed (lobby/room).
   const [internalOpen, setInternalOpen] = useState(false);
   const onOpenChange = props.onOpenChange;
   const isControlled = onOpenChange != null;
   const open = isControlled ? props.open === true : internalOpen;
-  // Stable across renders: the whisper-open effect below depends on it, and an
-  // identity that changed every render would re-run that effect every render.
   const setOpen = useCallback(
     (next: boolean) => {
       if (onOpenChange) onOpenChange(next);
@@ -165,13 +115,8 @@ export function ChatDock(props: ChatDockProps) {
   const [peekVisible, setPeekVisible] = useState(false);
   const seenCountRef = useRef(messages.length);
 
-  // Listen for new incoming messages — increment unread + show peek (closed),
-  // or clear (open). Skip messages from the local user.
   useEffect(() => {
     if (messages.length < seenCountRef.current) {
-      // Buffer shrank (channel cleared / match teardown) — drop any stale
-      // unread + peek and resync, so the badge never lingers over an empty
-      // history.
       seenCountRef.current = messages.length;
       setUnread(0);
       setPeekVisible(false);
@@ -187,14 +132,12 @@ export function ChatDock(props: ChatDockProps) {
     setPeekVisible(true);
   }, [messages, me?.id, open]);
 
-  // Auto-dismiss peek after PEEK_MS; resets on every new arrival.
   useEffect(() => {
     if (!peekVisible) return;
     const handle = window.setTimeout(() => setPeekVisible(false), PEEK_MS);
     return () => window.clearTimeout(handle);
   }, [peekVisible, messages.length]);
 
-  // Opening the dock clears unread + hides peek immediately.
   useEffect(() => {
     if (open) {
       setUnread(0);
@@ -202,20 +145,11 @@ export function ChatDock(props: ChatDockProps) {
     }
   }, [open]);
 
-  // Tell the store whether the active channel is actually on screen. A closed
-  // dock — or an unmounted one, on a page that has no dock at all — must still
-  // count an incoming whisper as unread, even on the last-selected thread;
-  // otherwise it lands silently with no tab badge and no FAB badge.
   useEffect(() => {
     setDockOpen(open);
     return () => setDockOpen(false);
   }, [open, setDockOpen]);
 
-  // Someone outside the dock asked for a whisper thread (the friend list's
-  // whisper button): the store has already selected it, so all that is left is
-  // to be open. Baselined at mount, so only requests raised while this dock is
-  // alive count — a stale counter from an earlier page must not pop the dock
-  // open the moment the next one mounts.
   const handledWhisperOpen = useRef(whisperOpenRequest);
   useEffect(() => {
     if (whisperOpenRequest === handledWhisperOpen.current) return;
@@ -223,22 +157,9 @@ export function ChatDock(props: ChatDockProps) {
     setOpen(true);
   }, [whisperOpenRequest, setOpen]);
 
-  // Phone treatment: the open panel is a full-screen overlay, but `fixed
-  // inset-0` sizes to the LAYOUT viewport, which the mobile on-screen keyboard
-  // does not shrink on iOS — the browser pans to the focused input and drags
-  // the header off-screen. Pin the panel to the VISUAL viewport instead
-  // (height + top offset) so header and composer stay visible above the
-  // keyboard. Android is handled by `interactive-widget=resizes-content`
-  // (index.html); desktop (sm+) keeps the corner panel untouched.
   const isPhone = useMediaQuery("(max-width: 639px)");
   const viewportBox = useVisualViewport(open && isPhone);
 
-  // Keep the newest message in view (open state only). Smooth-scroll ONLY for
-  // messages arriving while the panel is open — a short, watchable hop. Every
-  // other trigger (opening the panel, keyboard show/hide resizing it) jumps
-  // instantly: animating from the top through a long history on open is slow
-  // and annoying. `prevCountRef` also tracks while closed, so history that
-  // accumulated in the closed state doesn't smooth-scroll on open.
   const listEndRef = useRef<HTMLDivElement | null>(null);
   const prevCountRef = useRef(messages.length);
   useEffect(() => {
@@ -255,24 +176,14 @@ export function ChatDock(props: ChatDockProps) {
     setDraft("");
   }
 
-  // A `/w bob …` typed in the primary channel used to send and leave you where
-  // you were, so the reply landed in a tab you were not reading. Remember who the
-  // command addressed and switch once their thread EXISTS — the thread is created
-  // by the server's echo, so its appearance is the success signal. A rejected
-  // whisper (not friends / offline / mid-match) creates nothing and raises a
-  // toast, and you stay put. Not needed when composing inside a thread: you are
-  // already there.
   const pendingWhisper = useRef<{ username: string; at: number } | null>(null);
   useEffect(() => {
     const pending = pendingWhisper.current;
     if (!pending) return;
-    // The server owns the canonical spelling; the typed target may differ in case.
     const key = Object.keys(whisperThreads).find(
       (k) => k.toLowerCase() === pending.username.toLowerCase(),
     );
     if (!key) {
-      // Give up after a beat, so a whisper that was rejected cannot hijack the
-      // view later when that same friend happens to whisper first.
       if (Date.now() - pending.at > PENDING_WHISPER_MS) pendingWhisper.current = null;
       return;
     }
@@ -283,9 +194,6 @@ export function ChatDock(props: ChatDockProps) {
   function send() {
     if (!isConnected) return;
 
-    // `/w <username> <message>` sends a whisper from ANY channel. A partial
-    // command ("/w" / "/w bob") is swallowed so it never leaks to the public
-    // channel; a non-`/w` message falls through to the channel logic below.
     const whisper = parseWhisperCommand(draft);
     if (whisper) {
       if (whisper.complete) {
@@ -298,8 +206,6 @@ export function ChatDock(props: ChatDockProps) {
     const text = draft.trim();
     if (!text) return;
 
-    // Active whisper thread → the composer whispers that friend directly (no
-    // `/w` prefix needed).
     if (activeThread) {
       sendWhisper(activeThread, text);
       return;
@@ -317,9 +223,7 @@ export function ChatDock(props: ChatDockProps) {
     setDraft("");
   }
 
-  // Cycle channels with Tab (Valorant-style): primary → each open thread →
-  // primary. Shift+Tab reverses. Only intercepts Tab when at least one whisper
-  // thread exists, so accessibility tab-out is preserved in the common case.
+  // Cycles through the primary channel and each whisper thread; Shift+Tab reverses.
   function cycleChannel(direction: 1 | -1) {
     if (threadKeys.length === 0) return;
     const channels = ["primary", ...threadKeys.map(whisperChannel)];
@@ -334,14 +238,9 @@ export function ChatDock(props: ChatDockProps) {
   const testIdRoot =
     variant === "match" ? "match-chat" : variant === "room" ? "room-chat" : "lobby-chat";
 
-  // Felt theme is a pure CSS re-skin: `.chat-dock-match` re-points the accent +
-  // surface tokens, and `backdrop-blur` frosts the translucent panel/FAB/peek.
   const skin = variant === "match" ? "chat-dock-match" : "";
   const frosted = variant === "match" ? "backdrop-blur-md" : "";
 
-  // The lines rendered in the open panel depend on the active channel: the
-  // primary channel's own slice, or the active whisper thread (pink). Both are
-  // normalized to DisplayLine so ChatLine renders either.
   const displayLines: DisplayLine[] = useMemo(() => {
     if (activeThread) {
       return (whisperThreads[activeThread] ?? []).map((m) => ({
@@ -361,39 +260,12 @@ export function ChatDock(props: ChatDockProps) {
     }));
   }, [activeThread, whisperThreads, messages]);
 
-  // ── Closed state ──────────────────────────────────────────────────────
   if (!open) {
-    // Two independent chips, not one sum: brass counts the public channel,
-    // pink the whisper total across every thread. A single combined number made
-    // a private whisper arithmetically indistinguishable from public noise —
-    // you saw "3" and could not tell whether anyone had whispered you. Content
-    // is still never previewed here (the peek stays primary-channel only).
     const hasPublicUnread = unread > 0;
     const hasWhisperUnread = whisperUnreadTotal > 0;
     const bothChips = hasPublicUnread && hasWhisperUnread;
-    // Stagger mirrors the dealer/trump-caller pair on a PlayerSeat: the pair
-    // overlaps so it reads as one stack, and the higher-signal chip (pink — the
-    // rarer, personal event) sits in front. Laid out as a flex row with a fixed
-    // negative margin rather than two absolute `right` offsets: a chip grows
-    // with its digit count, so a fixed offset that looks right at "2" buries
-    // the brass digit at "12". A margin keeps the overlap at 6px whatever the
-    // widths — enough to read as a stack, never enough to clip a number. The
-    // shrink-wrapped container keeps its anchor, so a whisper-free FAB is
-    // pixel-identical to what it was before the split.
-    //
-    // Overflow form narrows when the chips are paired: two "99+" chips are
-    // ~34px each and, overlapped by 6px, run ~62px across a 56px button — the
-    // pair would hang off both sides. Paired, an over-99 count drops to two
-    // characters; a lone chip keeps the wider, more precise "99+". Counts below
-    // 100 are never abbreviated either way, so brass "12" beside pink "1" still
-    // reads exactly.
     const overflowLabel = bothChips ? "9+" : "99+";
     const chipLabel = (n: number) => (n > 99 ? overflowLabel : String(n));
-    // Every count has to ride on the BUTTON's accessible name: an `aria-label`
-    // replaces the name of its whole subtree, so a number rendered in a chip —
-    // or an sr-only span beside it — is never announced. Both counts are named,
-    // public first, matching the chips' left-to-right order; and the announced
-    // numbers are exact, never the visually clamped ones.
     const fabLabel = [
       t(keys.openLabel),
       hasPublicUnread ? t("chat.unreadCount", { count: unread }) : null,
@@ -472,20 +344,15 @@ export function ChatDock(props: ChatDockProps) {
     );
   }
 
-  // ── Open state ────────────────────────────────────────────────────────
   return (
     <aside
       data-testid={`${testIdRoot}-dock`}
       className={cn(
-        // Full-screen overlay on phones so chat is comfortable to read/type;
-        // the docked 340×480 corner panel returns at sm+ (desktop treatment).
         "bg-surface fixed inset-0 z-50 flex flex-col overflow-hidden sm:inset-auto sm:right-4.5 sm:bottom-4.5 sm:h-120 sm:w-85 sm:animate-[card-in_.18s_ease_both] sm:rounded-lg sm:border sm:border-border sm:shadow-(--chat-shadow-panel)",
         frosted,
         skin,
         className,
       )}
-      // Present only on phones with the VisualViewport API (see above): sizes
-      // the overlay to the visible area, overriding inset-0's top/bottom.
       style={
         viewportBox
           ? { top: viewportBox.offsetTop, height: viewportBox.height, bottom: "auto" }
@@ -559,8 +426,6 @@ export function ChatDock(props: ChatDockProps) {
               send();
               return;
             }
-            // Tab cycles channels when whisper threads exist (Valorant-style);
-            // otherwise it keeps its default focus-navigation behaviour.
             if (e.key === "Tab" && threadKeys.length > 0) {
               e.preventDefault();
               cycleChannel(e.shiftKey ? -1 : 1);
@@ -666,14 +531,7 @@ function ChatLine({
       <span
         className={cn(
           "max-w-[85%] rounded-2xl border px-2.5 py-1.5 text-xs",
-          // Two independent signals, so a bubble says both things at once.
-          // BORDER = which channel: the pink hairline runs down both sides of a
-          // whisper thread, marking it private no matter who spoke.
           whisper ? "border-(--whisper-border)" : mine ? "border-accent/40" : "border-border",
-          // FILL = who sent it: mine is tinted (pink in a whisper, accent in the
-          // primary channel), what arrives is neutral parchment. Tinting incoming
-          // whispers too — the original treatment — left a column of pink on both
-          // sides with only alignment to separate them.
           mine
             ? whisper
               ? "bg-(--whisper-fill) text-(--whisper-ink)"
@@ -687,9 +545,7 @@ function ChatLine({
   );
 }
 
-// A single channel tab in the whisper switcher — the primary channel or a per
-// friend whisper thread. Renders an unread dot when a non-active whisper thread
-// has pending messages (Story 11.4 AC5).
+// A channel switcher tab for the primary channel or a whisper thread, with an unread badge.
 function ChannelTab({
   label,
   active,

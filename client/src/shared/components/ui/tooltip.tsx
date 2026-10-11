@@ -14,6 +14,10 @@ function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
+/**
+ * Tooltip popup portalled to `document.body` with an arrow.
+ * Pass `zIndex` from `shared/lib/zLayers` when it opens inside a layer stacked above `z-50`.
+ */
 function TooltipContent({
   className,
   side = "top",
@@ -25,13 +29,6 @@ function TooltipContent({
   ...props
 }: TooltipPrimitive.Popup.Props &
   Pick<TooltipPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset"> & {
-    /**
-     * Stacking tier for the portalled positioner, for the case where the default
-     * `z-50` is not enough: the portal target is `document.body`, so a tooltip
-     * opened from inside a higher layer lands as that layer's SIBLING and paints
-     * behind it. Pass a value from `shared/lib/zLayers` — an inline z-index is
-     * the repo convention precisely so the number stays traceable to that file.
-     */
     zIndex?: number;
   }) {
   return (

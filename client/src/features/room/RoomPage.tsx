@@ -78,21 +78,10 @@ import { useChatStore } from "@/shared/stores/chatStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
-// Cardinal positions for the diamond seat layout. In the waiting room seat
-// indices map 1:1 to fixed cardinal positions (no viewer-relative rotation).
-// This is intentionally different from the in-game table where the viewer
-// rotates to the bottom: in the lobby the player has no hand to anchor, and
-// rotating after a click made seat selection feel unpredictable ("I clicked
-// the top tile but landed at the bottom"). Fixed positions match the click
-// target.
+// Waiting-room seat position. Seats map to fixed cardinals, unlike the in-game table
+// that rotates the viewer to the bottom.
 type CardinalPosition = "south" | "east" | "north" | "west";
 
-// Render order for the seat tiles. Seats are partnered by parity (0 & 2 are
-// one team, 1 & 3 the other). On mobile the tiles flow into a 2-column grid in
-// this order, so each ROW is a team — row 1 = seats 0 & 2 (teammates side by
-// side), row 2 = seats 1 & 3 (opponents) — instead of teams stacked as columns.
-// On sm+ every tile is explicitly placed by its cardinal grid-area, so this
-// order has no effect on the desktop diamond.
 const SEAT_RENDER_ORDER = [0, 2, 1, 3] as const;
 
 const SEAT_TO_CARDINAL: Record<number, CardinalPosition> = {
@@ -106,9 +95,8 @@ function getPlayerAtSeat(players: RoomPlayer[], seatIndex: number): RoomPlayer |
   return players.find((p) => p.seat === seatIndex);
 }
 
-// Team-legend indicator — a small rounded square that mirrors the seat tiles:
-// neutral = dashed cream border + blinking brass dot (viewer unseated); us/them
-// = solid gold/silver border + a static team dot (viewer seated).
+// Team-legend square mirroring the seat tiles: dashed and blinking while the viewer is unseated,
+// solid gold or silver with a team dot once seated.
 function LegendIndicator({ variant }: { variant: "neutral" | "us" | "them" }) {
   const tokens = {
     neutral: { border: "var(--border-2)", dot: "var(--brass)", dashed: true, pulse: true },
@@ -132,12 +120,8 @@ function LegendIndicator({ variant }: { variant: "neutral" | "us" | "them" }) {
   );
 }
 
-// Leave the room in a way that survives a full document unload (typing a URL in
-// the address bar, refresh, tab close). React does NOT run effect cleanups on a
-// hard unload, so the unmount-cleanup leave below never fires and an in-flight
-// XHR would be aborted — leaving the player a member, which then blocks joining
-// any other room (ErrAlreadyInRoom). `keepalive` lets this POST outlive the
-// page; auth rides the same Bearer token axios uses (plus cookies, harmless).
+// Leaves the room with a keepalive POST that outlives a hard unload (refresh, tab close, address-bar nav).
+// React skips effect cleanups on unload, so without this the player stays a member and cannot join other rooms.
 function sendLeaveBeacon(roomId: number, token: string) {
   void fetch(`/api/v1/rooms/${roomId}/leave`, {
     method: "POST",
@@ -154,14 +138,11 @@ export function RoomPage() {
   const returnToLobby = useLobbyReturn();
   const currentUser = useAuthStore((s) => s.user);
 
-  // TanStack Query for initial REST fetch
   const roomQuery = useRoomDetailQuery(id ? Number(id) : undefined);
 
-  // WebSocket connection state — used to refetch after reconnection
   const wsState = useWsConnectionState();
   const prevWsStateRef = useRef(wsState);
 
-  // Zustand store for real-time WS updates (source of truth for rendering)
   const storeRoom = useRoomStore((s) => s.room);
   const storePlayers = useRoomStore((s) => s.players);
   const matchStarted = useRoomStore((s) => s.matchStarted);
@@ -169,18 +150,11 @@ export function RoomPage() {
   const roomEjection = useRoomStore((s) => s.roomEjection);
   const returnedUserIds = useRoomStore((s) => s.returnedUserIds);
 
-  const hasLeftRef = useRef(false);
+  const skipAutoLeaveRef = useRef(false);
   const hasJoinedRef = useRef(false);
-  // Guards the deep-link auto-join below to a single attempt (the query data
-  // changes on refetch, and React StrictMode double-invokes effects in dev).
   const joinAttemptedRef = useRef(false);
-  // Holds a deferred unmount-leave ({ id, timer }) so React StrictMode's dev-only
-  // setup→cleanup→setup cycle can cancel it before it fires — see the leave-on-
-  // unmount effect below.
   const pendingLeaveRef = useRef<{ id: number; timer: ReturnType<typeof setTimeout> } | null>(null);
 
-  // Owner-only transient UI state — kept local instead of pushed into a store
-  // because nothing outside RoomPage cares about it.
   const [swapSourceSeat, setSwapSourceSeat] = useState<number | null>(null);
   const [kickConfirm, setKickConfirm] = useState<{
     seat: number;
@@ -192,20 +166,13 @@ export function RoomPage() {
     username: string;
   } | null>(null);
   const [removeBotConfirm, setRemoveBotConfirm] = useState<{ seat: number } | null>(null);
-  // Story 9.6: owner privacy edit dialog open state.
   const [showPrivacy, setShowPrivacy] = useState(false);
-  // Story 11.5: the friend-invite panel, open from the waiting room.
   const [showInviteFriends, setShowInviteFriends] = useState(false);
-  // The room's last-match stats panel, opened from the action bar.
   const [showLastMatch, setShowLastMatch] = useState(false);
 
-  // Deep-link / refresh to a private room the viewer isn't seated in: the
-  // auto-join below must prompt for the password instead of joining blind
-  // (Story 9.6 review patch). null = no prompt; errorKey keeps it open on retry.
   const [deepLinkPrivateRoom, setDeepLinkPrivateRoom] = useState<Room | null>(null);
   const [deepLinkPasswordError, setDeepLinkPasswordError] = useState<string | null>(null);
 
-  // Mutations
   const joinRoomMutation = useJoinRoomMutation();
   const selectSeatMutation = useSelectSeatMutation();
   const startGameMutation = useStartMatchMutation();
@@ -217,7 +184,6 @@ export function RoomPage() {
   const addBotMutation = useAddBotMutation();
   const removeBotMutation = useRemoveBotMutation();
 
-  // Seed roomStore from query data
   useEffect(() => {
     if (roomQuery.data) {
       const store = useRoomStore.getState();
@@ -232,51 +198,20 @@ export function RoomPage() {
     }
   }, [roomQuery.data]);
 
-  // Deep-link / direct-URL entry: reaching this page without going through the
-  // lobby's "Join" means the server has no membership row for us, so seat
-  // selection is rejected (ErrNotInRoom) and we receive no room WS broadcasts —
-  // the page looks dead, you can only leave. When the fetched room shows we are
-  // NOT yet a member of an open (waiting, non-quick-play) room, join it here —
-  // mirroring what the lobby's Join does — then refetch to pick up membership.
-  // Maps a deep-link join failure to its toast copy. Shared by BOTH of this page's
-  // join call paths — the public auto-join effect below and joinDeepLinkPrivate —
-  // deliberately: 9.6's review found the deep-link path needed the identical fix
-  // the lobby path had received, and it surfaced only in manual E2E. One function
-  // means a new error code cannot be added to one path and forgotten on the other.
-  //
-  // The numbers are composed LOCALLY (Story 9.2 Decision B): the server's error
-  // payload carries only a code, and we hold the room plus our own auth envelope.
-  //
-  // Story 11.5 D4 moved the body to shared/lib/joinFailure so the friend-invite
-  // accept — a fourth join entry point — cannot fork it. This wrapper keeps the
-  // local call sites unchanged.
   function joinFailureMessage(code: string | null, room: Room): string {
     return sharedJoinFailureMessage(code, room);
   }
 
   useEffect(() => {
     if (!roomQuery.isSuccess || !roomQuery.data || !id) return;
-    // Judge membership ONLY on data fetched fresh after this mount. With
-    // refetchOnMount:"always" React Query still serves the cached snapshot
-    // synchronously while the forced refetch runs in the background; that stale
-    // snapshot can omit a viewer who just joined (e.g. via join-by-code or the
-    // lobby card) and navigated straight here. Acting on it would spuriously
-    // re-open the private-room password prompt — or blind-join a public room —
-    // for someone who is already a member. Wait for the post-mount fetch.
     if (!roomQuery.isFetchedAfterMount) return;
     if (joinAttemptedRef.current) return;
     const { room, players } = roomQuery.data;
     const userId = useAuthStore.getState().user?.id;
     if (!userId) return;
-    // Already a member (arrived via lobby / already seated) — nothing to do.
     if (players.some((p) => p.userId === userId)) return;
-    // Quick-play rooms redirect to /matchmaking; closed / in-progress rooms are
-    // handled by their own guards. Only a joinable waiting room is auto-joined.
     if (room.isQuickPlay || room.status !== "waiting") return;
 
-    // Private room (Story 9.6): a passwordless auto-join is rejected with
-    // WRONG_ROOM_PASSWORD. Prompt for the password instead — the prompt's submit
-    // drives the join. Mark the attempt so this effect doesn't re-fire.
     if (room.isPrivate) {
       joinAttemptedRef.current = true;
       setDeepLinkPasswordError(null);
@@ -293,23 +228,18 @@ export function RoomPage() {
       })
       .catch((err) => {
         const code = err instanceof FetchError ? err.code : null;
-        // ALREADY_IN_ROOM: a membership exists after all (e.g. another tab) —
-        // resync from the server rather than bouncing to the lobby.
         if (code === "ALREADY_IN_ROOM") {
           hasJoinedRef.current = true;
           void roomQuery.refetch();
           return;
         }
-        hasLeftRef.current = true; // suppress the unmount cleanup-leave
+        skipAutoLeaveRef.current = true;
         toast.error(joinFailureMessage(code, room));
         navigate("/lobby", { replace: true });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomQuery.isSuccess, roomQuery.isFetchedAfterMount, roomQuery.data, id]);
 
-  // Drives the private-room deep-link join from the password prompt. Mirrors the
-  // auto-join then/catch above but threads the entered password and keeps the
-  // prompt open with an inline error on a wrong password (Story 9.6, AC4).
   function joinDeepLinkPrivate(room: Room, password: string) {
     setDeepLinkPasswordError(null);
     joinRoomMutation
@@ -322,7 +252,6 @@ export function RoomPage() {
       .catch((err) => {
         const code = err instanceof FetchError ? err.code : null;
         if (code === "WRONG_ROOM_PASSWORD") {
-          // Keep the prompt open with the inline error so the player can retry.
           setDeepLinkPasswordError("room.errors.wrongPassword");
           return;
         }
@@ -332,26 +261,20 @@ export function RoomPage() {
           void roomQuery.refetch();
           return;
         }
-        hasLeftRef.current = true; // suppress the unmount cleanup-leave
+        skipAutoLeaveRef.current = true;
         setDeepLinkPrivateRoom(null);
         toast.error(joinFailureMessage(code, room));
         navigate("/lobby", { replace: true });
       });
   }
 
-  // Quick-play rooms have their own dedicated matchmaking screen — a deep link
-  // or refresh that lands here must redirect to /matchmaking/:id. Gate on the
-  // authoritative query result, and set hasLeftRef FIRST so the unmount
-  // auto-leave below does not remove the player from the queue we're sending
-  // them into.
   useEffect(() => {
     if (roomQuery.isSuccess && roomQuery.data?.room.isQuickPlay && id) {
-      hasLeftRef.current = true;
+      skipAutoLeaveRef.current = true;
       navigate(`/matchmaking/${id}`, { replace: true });
     }
   }, [roomQuery.isSuccess, roomQuery.data, id, navigate]);
 
-  // Refetch room state after WebSocket reconnects to catch events missed during disconnect
   useEffect(() => {
     const prev = prevWsStateRef.current;
     prevWsStateRef.current = wsState;
@@ -360,41 +283,20 @@ export function RoomPage() {
     }
   }, [wsState, roomQuery]);
 
-  // Handle match_started from WebSocket — navigate all players to the game page.
-  // Pass `fromRoom: true` so MatchPage's splash gate triggers (deliberate beat
-  // masking the room→game transition).
   useEffect(() => {
     if (matchStarted && id) {
-      hasLeftRef.current = true; // Prevent cleanup leave on navigation
-      // Lateral within the flow (room → match): replace so the back button
-      // never lands on the dead room entry once the match is over.
+      skipAutoLeaveRef.current = true;
       navigate(`/match/${id}`, { replace: true, state: { fromRoom: true } });
     }
   }, [matchStarted, id, navigate]);
 
-  // Closed-room auto-redirect — once a match ends (or the room is cancelled)
-  // the row flips to a terminal status but the URL still resolves. Without
-  // this guard, deep-linking to a finished room rendered the seat grid and
-  // "waiting for owner to start" copy as if the room were live. We surface a
-  // "Room is closed" message for a beat, then navigate to /lobby. Note that
-  // "playing" is *not* terminal — the room is live and existing in-room logic
-  // (kick gating, matchStarted handler) already covers that path.
   const currentRoomStatus = storeRoom?.status ?? roomQuery.data?.room.status ?? null;
   const isRoomClosed =
     currentRoomStatus === "completed" ||
     currentRoomStatus === "cancelled" ||
     currentRoomStatus === "finished";
-  // The room's most recent match, for the action-bar stats panel. Read while
-  // the room is back in `waiting` — that is the lobby state the button lives
-  // in, and it is where the group lands after a match ends. Quick-play rooms
-  // are excluded: they render on the matchmaking screen, never this page.
-  // A 404 (no match, or the viewer did not play it) simply leaves `data`
-  // undefined and the button unrendered — see useRoomLastMatchQuery.
   const currentRoomIsQuickPlay =
     storeRoom?.isQuickPlay ?? roomQuery.data?.room.isQuickPlay ?? false;
-  // Validate the route param the same way MatchPage does (`roomIdNum`): a
-  // non-numeric :id makes `Number(id)` NaN, which is `!== undefined` and would
-  // sail through the hook's guard into a request for `/rooms/NaN/last-match`.
   const parsedRoomId = id ? Number(id) : null;
   const roomIdNum =
     parsedRoomId !== null && Number.isFinite(parsedRoomId) && parsedRoomId > 0
@@ -405,59 +307,40 @@ export function RoomPage() {
 
   useEffect(() => {
     if (!isRoomClosed || matchStarted) return;
-    hasLeftRef.current = true; // Don't fire the cleanup-leave on the way out
+    skipAutoLeaveRef.current = true;
     const timer = setTimeout(() => {
       navigate("/lobby", { replace: true });
     }, 2000);
     return () => clearTimeout(timer);
   }, [isRoomClosed, matchStarted, navigate]);
 
-  // Handle system:room_kicked — toast + redirect kicked user back to /lobby.
-  // Suppress the unmount auto-leave: the server has already removed us, so
-  // the cleanup `/leave` would 404; setting hasLeftRef before navigate keeps
-  // the cleanup quiet.
   useEffect(() => {
     if (kickedFromRoomId !== null && id && kickedFromRoomId === Number(id)) {
-      hasLeftRef.current = true;
+      skipAutoLeaveRef.current = true;
       toast.error(t("room.kickedToast", { name: storeRoom?.name ?? "" }));
       useRoomStore.getState().setKickedFromRoom(null);
       returnToLobby();
     }
   }, [kickedFromRoomId, id, returnToLobby, storeRoom?.name, t]);
 
-  // Story 9.3: when WE are ejected at match start — for insolvency, or (Story 9.8)
-  // for honor — the server has already freed our seat, so suppress the unmount
-  // auto-leave (it would 404 and log a console error). The always-mounted
-  // useRoomEjectRedirect handles the lobby navigation + modal; here we only quiet
-  // the cleanup-leave, mirroring the kick path above. Reason-agnostic by design:
-  // any non-null notice means our seat is already gone.
   useEffect(() => {
     if (roomEjection !== null && id && roomEjection.roomId === Number(id)) {
-      hasLeftRef.current = true;
+      skipAutoLeaveRef.current = true;
     }
   }, [roomEjection, id]);
 
-  // Clear swap-mode whenever the room exits "waiting" status — owner controls
-  // disappear in the same render, so a stale source-seat must not survive.
   useEffect(() => {
     if (storeRoom && storeRoom.status !== "waiting") {
       setSwapSourceSeat(null);
     }
   }, [storeRoom]);
 
-  // Clear swap-mode if the source player vacates their seat (left the room or
-  // moved seats while we were deciding) — otherwise the next click would fire
-  // a swap with an empty source seat and trip SEAT_NOT_OCCUPIED.
   useEffect(() => {
     if (swapSourceSeat !== null && getPlayerAtSeat(storePlayers, swapSourceSeat) === undefined) {
       setSwapSourceSeat(null);
     }
   }, [storePlayers, swapSourceSeat]);
 
-  // Reset stores on unmount AND on :id change — React Router keeps RoomPage
-  // mounted across /rooms/:id navigations, so a []-dep cleanup would let
-  // room-A chat leak into room-B's UI. Keying the cleanup on `id` fires it
-  // both when the route param changes and when the component unmounts.
   useEffect(() => {
     return () => {
       useRoomStore.getState().reset();
@@ -465,19 +348,6 @@ export function RoomPage() {
     };
   }, [id]);
 
-  // Leave room on unmount if player joined and hasn't explicitly left.
-  // NOTE: this covers SPA navigation only — a hard unload (address-bar nav to
-  // /lobby, refresh, tab close) does NOT run React cleanups; the `pagehide`
-  // handler below covers that case with a keepalive request.
-  //
-  // The leave is DEFERRED by a macrotask instead of fired inline so it survives
-  // React StrictMode's dev-only setup→cleanup→setup remount: the synthetic
-  // cleanup schedules a leave, then the immediate re-setup (same id) cancels it
-  // before the timer runs. Without this, returning to a room you're still a
-  // member of (warm React-Query cache → `hasJoinedRef` set synchronously on
-  // mount) fired a spurious `/leave` that vacated your seat and transferred
-  // ownership away. A genuine unmount (or an id change A→B) has no matching
-  // re-setup, so the leave still fires.
   useEffect(() => {
     const roomId = Number(id);
     if (pendingLeaveRef.current && pendingLeaveRef.current.id === roomId) {
@@ -485,7 +355,7 @@ export function RoomPage() {
       pendingLeaveRef.current = null;
     }
     return () => {
-      if (id && hasJoinedRef.current && !hasLeftRef.current) {
+      if (id && hasJoinedRef.current && !skipAutoLeaveRef.current) {
         const timer = setTimeout(() => {
           pendingLeaveRef.current = null;
           leaveRoomMutation.mutate(roomId);
@@ -496,13 +366,9 @@ export function RoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Hard unload (typing a URL, refresh, tab close): fire a keepalive leave so
-  // the membership doesn't linger and trap the user "in a room". On a refresh
-  // the deep-link auto-join above re-establishes membership when the room page
-  // reloads, so this only sticks when the user actually navigates away.
   useEffect(() => {
     const onPageHide = () => {
-      if (id && hasJoinedRef.current && !hasLeftRef.current) {
+      if (id && hasJoinedRef.current && !skipAutoLeaveRef.current) {
         const token = useAuthStore.getState().token;
         if (token) sendLeaveBeacon(Number(id), token);
       }
@@ -511,10 +377,6 @@ export function RoomPage() {
     return () => window.removeEventListener("pagehide", onPageHide);
   }, [id]);
 
-  // `justCopied` flips the copy-code button into a transient success state
-  // (check icon + "Copied!" inline) so the user gets immediate confirmation
-  // without relying on the toast alone — the toast is easy to miss when the
-  // user's eyes are on the button they just clicked.
   const [justCopied, setJustCopied] = useState(false);
   const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -538,39 +400,30 @@ export function RoomPage() {
   };
 
   const handleLeaveRoom = async () => {
-    hasLeftRef.current = true;
+    skipAutoLeaveRef.current = true;
     try {
       await leaveRoomMutation.mutateAsync(Number(id));
     } catch (err) {
-      // Story 8.5-1 AC3: server returns 409 MATCH_ALREADY_STARTED when the
-      // room transitioned to "playing" between the user clicking leave and
-      // the leave tx running. Surface a toast and abort the navigation —
-      // the client should stay in the room (the auto-start UI flow takes
-      // over from here).
       if (err instanceof FetchError && err.code === "MATCH_ALREADY_STARTED") {
-        hasLeftRef.current = false;
+        skipAutoLeaveRef.current = false;
         toast.error(t("room.errors.alreadyStarted"));
         return;
       }
-      // Other errors: still navigate back (preserves prior UX).
     }
     returnToLobby();
   };
 
   const handleSelectSeat = async (seatIndex: number) => {
     if (!storeRoom) return;
-    // If the owner is in swap-mode, route the click to the swap target handler
-    // instead of the regular seat-select path.
     if (swapSourceSeat !== null) {
       handleSwapTarget(seatIndex);
       return;
     }
     try {
       const data = await selectSeatMutation.mutateAsync({ roomId: storeRoom.id, seat: seatIndex });
-      // Update players from response (in case WS hasn't arrived yet)
       useRoomStore.getState().setPlayers(data.players);
       if (data.matchStarted) {
-        hasLeftRef.current = true;
+        skipAutoLeaveRef.current = true;
         navigate(`/match/${storeRoom.id}`, { replace: true, state: { fromRoom: true } });
         return;
       }
@@ -586,13 +439,6 @@ export function RoomPage() {
   const handleSwapTarget = async (targetSeat: number) => {
     if (!storeRoom || swapSourceSeat === null) return;
 
-    // Click the source again, the current user's own seat, or any click while
-    // a swap is already pending cancels swap mode without firing the API.
-    // Empty target seats are valid — they trigger a move-to-empty server-side.
-    // Exception: when the SOURCE is a bot, the owner's own seat is a valid
-    // target ("swap yourself with a bot") — the server runs the human ↔ bot
-    // swap atomically. The own-seat cancel stays for human sources, where
-    // clicking yourself has always meant "never mind".
     const targetPlayer = getPlayerAtSeat(players, targetSeat);
     const sourcePlayer = getPlayerAtSeat(players, swapSourceSeat);
     const sourceIsBot = sourcePlayer?.isBot === true;
@@ -660,8 +506,6 @@ export function RoomPage() {
       useRoomStore.getState().setPlayers(data.players);
     } catch (err) {
       if (err instanceof FetchError && err.code === "NO_BOT_ON_SEAT") {
-        // The bot is already gone (e.g. a concurrent removal) — store converges
-        // via the WS snapshot; nothing to surface.
         return;
       }
       toast.error(t("room.errors.removeBotFailed"));
@@ -699,7 +543,6 @@ export function RoomPage() {
         roomId: storeRoom.id,
         userId: target.userId,
       });
-      // Server WS broadcast (system:room_owner_changed) converges store state.
     } catch (err) {
       if (err instanceof FetchError) {
         if (err.code === "NOT_ROOM_OWNER") {
@@ -728,8 +571,6 @@ export function RoomPage() {
         roomId: storeRoom.id,
         userId: target.userId,
       });
-      // Server WS broadcast (system:player_left) converges store state — no
-      // optimistic update.
     } catch (err) {
       if (err instanceof FetchError) {
         if (err.code === "NOT_ROOM_OWNER") {
@@ -749,7 +590,7 @@ export function RoomPage() {
     if (!storeRoom || startGameMutation.isPending) return;
     try {
       await startGameMutation.mutateAsync(storeRoom.id);
-      hasLeftRef.current = true; // Prevent cleanup leave on navigation
+      skipAutoLeaveRef.current = true;
       navigate(`/match/${storeRoom.id}`, { replace: true, state: { fromRoom: true } });
     } catch (err) {
       if (err instanceof FetchError && err.code === "NOT_ROOM_OWNER") {
@@ -757,21 +598,11 @@ export function RoomPage() {
       } else if (err instanceof FetchError && err.code === "NOT_ALL_SEATED") {
         toast.error(t("room.errors.notAllSeated"));
       } else if (err instanceof FetchError && err.code === "INSUFFICIENT_COINS") {
-        // A seated human went insolvent at the instant of start; the server
-        // rolled back the charge and reverted the room to waiting. (Full
-        // per-player ejection UX lands in Story 9.3.)
         toast.error(t("room.errors.insufficientCoinsStart"));
       } else if (
         err instanceof FetchError &&
         (err.code === "HONOR_TOO_LOW" || err.code === "NEW_PLAYER_NOT_ALLOWED")
       ) {
-        // Story 9.8 AC6: a seated human failed the honor re-check, so the server
-        // ejected that seat and refused the start. Without this branch the owner
-        // fell through to "try again" — advice that fails identically every time,
-        // since a seat is now empty. Deliberately NON-DISCLOSING: it never says
-        // which player or which of the two gates, mirroring how
-        // insufficientCoinsStart withholds whose balance was short. Per-seat
-        // disclosure is Open Question 5 / Epic 11, and is a separate decision.
         toast.error(t("room.errors.honorGateStart"));
       } else {
         toast.error(t("room.errors.startFailed"));
@@ -779,7 +610,6 @@ export function RoomPage() {
     }
   };
 
-  // Use query loading state for initial load
   if (roomQuery.isPending) {
     return (
       <div className="mx-auto max-w-330 px-8 py-8" data-testid="room-page-loading">
@@ -816,13 +646,8 @@ export function RoomPage() {
     );
   }
 
-  // Render from store (source of truth after initial seed), fall back to query data
-  // during the brief window before the seeding effect runs
   const room = storeRoom ?? roomQuery.data!.room;
 
-  // Quick-play rooms live on the dedicated matchmaking screen; the redirect
-  // effect above navigates there. Render nothing rather than flashing the
-  // custom-room seat grid for a frame.
   if (room.isQuickPlay) return null;
 
   const players = storePlayers.length > 0 ? storePlayers : roomQuery.data!.players;
@@ -835,22 +660,10 @@ export function RoomPage() {
       : t("lobby.card.timerSeconds", { seconds: room.timerDurationSeconds ?? "?" });
 
   const isOwner = currentUser !== null && currentUser.id === room.ownerId;
-  // Owner-only privacy edit control — waiting, non-quick-play rooms only.
-  // Also decides the header layout: when present it widens the right-hand
-  // group too much to float over the title on mobile, so the group drops into
-  // normal flow instead (see the card header below).
   const canEditPrivacy = isOwner && room.status === "waiting" && !room.isQuickPlay;
   const seatedCount = players.filter((p) => p.seat !== null).length;
   const allSeated = seatedCount === 4;
 
-  // Presence gate (v2): every seated HUMAN must be "back" in the room (returned
-  // after a match, or freshly joined) before the owner can start — so an
-  // ex-player still on the previous match's result dialog is never pulled in.
-  // Bots are never gated. Gating only engages once presence is tracked for the
-  // room (returnedUserIds non-empty) — always true in production for a waiting
-  // room since the owner/reopener is present and create/join mark presence; an
-  // empty set means "no presence info", so fall back to the plain seated check
-  // and show no "waiting to return" badges.
   const seatedHumans = players.filter((p) => p.seat !== null && p.isBot !== true);
   const presenceTracked = returnedUserIds.length > 0;
   const allReturned =
@@ -858,14 +671,6 @@ export function RoomPage() {
   const isWaitingToReturn = (p: RoomPlayer): boolean =>
     presenceTracked && p.seat !== null && p.isBot !== true && !returnedUserIds.includes(p.userId);
 
-  // Honour gate, per seat (redesign R6). Cosmetic — the server re-checks at both
-  // return and start, and it is the authority — but marking the blocking seat BEFORE
-  // the owner presses Start is the whole point: previously the owner clicked, a seat
-  // silently vanished, and they got a 409 with no way to know which one or why.
-  //
-  // Only decides for seats whose honour actually arrived. A seat with no score
-  // (a bot, or a read that failed) is never marked as blocking, so a degraded
-  // honour read can never make the room look un-startable.
   const isBelowHonorBar = (p: RoomPlayer): boolean =>
     honorRoomIsGated(room) &&
     p.isBot !== true &&
@@ -885,14 +690,8 @@ export function RoomPage() {
     return viewerSeat % 2 === seatIndex % 2 ? "us" : "them";
   };
 
-  // Team legend (seated): render both seats of each diagonal pair as slots so
-  // the viewer sees their whole table at a glance. Whichever pair contains the
-  // viewer is "Us". `slotLabel` returns null for an empty (still "open") seat.
   const yourPair = viewerSeat !== null && viewerSeat % 2 === 0 ? [0, 2] : [1, 3];
   const otherPair = yourPair[0] === 0 ? [1, 3] : [0, 2];
-  // Render a diagonal pair's two seats as "(name + name)" — your own seat reads
-  // "you" (accent), an empty seat reads a blinking "open". The parentheses
-  // bracket the pair so the legend reads "Us (you + open) vs Them (open + open)".
   const renderSlots = (pair: number[]) => (
     <span className="text-ink-mute inline-flex flex-wrap items-center">
       <span className="text-ink-off" aria-hidden>
@@ -926,17 +725,11 @@ export function RoomPage() {
     </span>
   );
 
-  // Roster avatar tone — mirrors the seat tiles' perspective coloring: gold
-  // (us) / silver (them) for seated players once the viewer has sat, and
-  // felt-green (undetermined) for standing members AND for everyone while the
-  // viewer is still unseated (no team perspective established yet).
   const rosterTeam = (p: RoomPlayer): "A" | "B" | null => {
     if (p.seat === null || viewerSeat === null) return null;
     return resolveSeatMode(p.seat) === "us" ? "A" : "B";
   };
 
-  // Live player rows for the open owner-confirmation dialogs — re-derived from
-  // the roster so the dialog's seat/team chips reflect the current state.
   const kickTarget = kickConfirm
     ? (players.find((p) => p.userId === kickConfirm.userId) ?? null)
     : null;
@@ -944,10 +737,6 @@ export function RoomPage() {
     ? (players.find((p) => p.userId === transferConfirm.userId) ?? null)
     : null;
 
-  // Action-bar CTA — one primary felt-green button whose label/enabled state is
-  // driven by swap mode, quick-play auto-start, and ownership. Only the owner's
-  // "Start match" (all seated, not swapping) is interactive; everything else is
-  // a disabled "waiting" affordance.
   const inSwapMode = swapSourceSeat !== null;
   let ctaLabel: string;
   let ctaDisabled = true;
@@ -959,10 +748,6 @@ export function RoomPage() {
     ctaLabel = allSeated ? t("room.autoStarting") : t("room.waitingForPlayers");
   } else if (isOwner) {
     ctaTestId = "start-game";
-    // A blocked seat disables Start but does NOT relabel it: the CTA keeps saying
-    // "Start match" and the ember-ringed seat is the explanation. Stuffing the
-    // reason into the button would say it in the one place that cannot show WHICH
-    // seat, and the reason sits in the title for anyone who wants words.
     ctaDisabled =
       !allSeated || !allReturned || blockedSeats.length > 0 || startGameMutation.isPending;
     ctaOnClick = ctaDisabled ? undefined : handleStartGame;
@@ -980,10 +765,6 @@ export function RoomPage() {
   return (
     <div className="mx-auto max-w-330 px-4 pt-6 pb-24 md:px-8 md:pb-6">
       <div data-testid="room-page">
-        {/* Room info card — parchment chrome (brass top hairline + soft inset
-            shadow). Left: name + meta row (host · roster · seated count).
-            Right: game-mode badges + copy-code chip. No top back button —
-            the bottom "Leave room" action returns to the lobby. */}
         <div
           className="bg-surface border-border relative mb-4 rounded-lg border p-4 shadow-[0_18px_44px_-28px_rgba(14,58,36,0.32),0_2px_0_rgba(255,255,255,0.6)_inset] md:mb-6 md:p-6"
           data-testid="room-info-card"
@@ -993,9 +774,6 @@ export function RoomPage() {
             className="pointer-events-none absolute -top-px right-7 left-7 h-0.5 bg-[linear-gradient(90deg,transparent,var(--brass)_50%,transparent)] opacity-70"
           />
 
-          {/* Row 1 — title (truncates when the row runs out of space) with the
-              owner-only privacy control + copy-code chip pinned to its right, at
-              every breakpoint. */}
           <div className="flex items-center gap-3">
             <h1
               className="font-display text-ink m-0 min-w-0 flex-1 truncate text-[20px] leading-tight font-bold tracking-[-0.6px] md:text-[28px]"
@@ -1016,8 +794,6 @@ export function RoomPage() {
                       ? t("room.privacy.manageButtonPrivate")
                       : t("room.privacy.manageButtonPublic")
                   }
-                  // Icon-only square on mobile (label hidden, aria-label keeps
-                  // the accessible name); full labelled button from md up.
                   className="w-7 px-0 whitespace-nowrap md:w-auto md:px-2.5"
                 >
                   <Lock className="size-3.5" />
@@ -1041,8 +817,6 @@ export function RoomPage() {
             </div>
           </div>
 
-          {/* Row 2 — host / occupancy / seated meta on the left, game-mode chips
-              on the right (stacked on mobile, split apart at md). */}
           <div className="mt-3 flex flex-col gap-3 md:mt-4 md:flex-row md:items-center md:justify-between md:gap-4">
             <div className="text-ink-dim flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] md:text-[13px]">
               <span className="inline-flex items-center gap-1.5">
@@ -1085,8 +859,6 @@ export function RoomPage() {
                         const isYou = !isBotRow && currentUser?.id === p.userId;
                         const isRoomOwner = !isBotRow && p.userId === room.ownerId;
                         const isWaiting = room.status === "waiting";
-                        // Kick/promote act on user accounts — bot rows are
-                        // managed from their seat tile's remove control.
                         const ownerCanActOnRow =
                           isOwner && isWaiting && !isRoomOwner && !isYou && !isBotRow;
                         const ownerCanKickRow = ownerCanActOnRow;
@@ -1204,8 +976,6 @@ export function RoomPage() {
               </span>
             </div>
             <div
-              // Shrink every chip on mobile (smaller padding + text) to trim
-              // the card height; `md:` restores the desktop badge sizing.
               className="flex flex-wrap items-center gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-[11px] md:justify-end md:gap-2 md:[&>span]:px-2.5 md:[&>span]:py-1 md:[&>span]:text-xs"
               data-testid="room-info-badges"
             >
@@ -1215,10 +985,6 @@ export function RoomPage() {
               <Badge tone="brass">
                 <span data-testid="badge-match-mode">{matchModeText}</span>
               </Badge>
-              {/* Next to the variant and match mode, because it is the same kind
-                  of fact: what the rules of this table ARE. Rendered only when
-                  declarations are off, and read with `=== false` so an absent
-                  field (an older server) reads as on. */}
               {room.declarationsEnabled === false && (
                 <Badge tone="neutral" icon={<Ban className="size-3" />}>
                   <span
@@ -1230,9 +996,6 @@ export function RoomPage() {
                   </span>
                 </Badge>
               )}
-              {/* Next to it for the same reason, and rendered only when "dosta"
-                  is on. Read with `=== true` so an absent field (an older server,
-                  or a hand-built payload that omits the key) reads as off. */}
               {room.stopAtTarget === true && (
                 <Badge tone="neutral" icon={<Flag className="size-3" />}>
                   <span
@@ -1249,15 +1012,9 @@ export function RoomPage() {
               </Badge>
               <Badge tone="brass" icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}>
                 <span data-testid="badge-buy-in">
-                  {/* Icon-only unit — the brass coin badge conveys "coins". */}
                   {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
                 </span>
               </Badge>
-              {/* Honour gate (redesign R6). The waiting room showed the gate
-                  NOWHERE before this: the lobby card carried both chips, then they
-                  vanished the moment you were inside the room they described. Same
-                  Badge component and sizing as its neighbours, so it is a room
-                  property like Bitola or 1001 — not a scoreboard. */}
               {room.minHonor > 0 && (
                 <Badge
                   tone="neutral"
@@ -1296,16 +1053,7 @@ export function RoomPage() {
           </div>
         </div>
 
-        {/* Action bar — sits directly under the info card (second block) so the
-            primary action is reachable without scrolling past the legend/seats.
-            Leave-room (and, in swap mode, a "pick a target" chip) on the left;
-            one primary CTA on the right whose state is resolved above (Start
-            match / Finish swap to start / Waiting …). */}
         <div
-          // Single row on every size: Leave on the left (a compact door icon on
-          // phones, labelled button at sm+), the primary CTA pushed to the right
-          // via justify-between. The CTA sizes to its label (not full width); a
-          // long label wraps rather than clipping.
           className="border-border bg-surface mb-4 flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 sm:mb-6 sm:gap-3 sm:px-4 sm:py-3"
           data-testid="action-bar"
         >
@@ -1315,17 +1063,11 @@ export function RoomPage() {
               onClick={handleLeaveRoom}
               data-testid="leave-room"
               aria-label={t("room.leaveRoom")}
-              // Door icon-only on phones (label hidden; aria-label keeps the
-              // accessible name); labelled text button from sm up.
               className="text-destructive hover:text-destructive size-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
             >
               <DoorOpen className="size-5 sm:size-4" />
               <span className="hidden sm:inline">{t("room.leaveRoom")}</span>
             </Button>
-            {/* Story 11.5: invite friends into this table. Waiting rooms only.
-                Quick play needs no guard here — those rooms returned above (the
-                matchmaking screen owns them), so this is always a custom room.
-                Icon-only on phones, like Leave. */}
             {room.status === "waiting" && (
               <Button
                 variant="ghost"
@@ -1338,15 +1080,6 @@ export function RoomPage() {
                 <span className="hidden sm:inline">{t("roomInvite.panel.openButton")}</span>
               </Button>
             )}
-            {/* Last-match stats. Renders only once the query HAS the match —
-                a room whose last match the viewer did not play (or that never
-                hosted one) 404s, and an absent button is the honest answer
-                there: there is nothing behind it to show.
-
-                Gated on `waiting` as well, matching Invite-friends beside it:
-                DISABLING a query does not evict its cache, so once the room
-                leaves `waiting` the fetched row lingers and the data check
-                alone would keep the button up off stale state. */}
             {roomIsWaiting && lastMatchQuery.data !== undefined && (
               <Button
                 variant="ghost"
@@ -1381,21 +1114,12 @@ export function RoomPage() {
                   : undefined
             }
             data-testid={ctaTestId}
-            // Single-line pill that shares the row: min-w-0 + shrink override the
-            // button's default shrink-0 so a long (usually disabled "waiting …")
-            // label truncates with an ellipsis when the action bar runs out of
-            // space, instead of wrapping into a tall block or shoving Leave.
-            // Tighter height/padding/type on mobile; full cta size from sm up.
             className="h-9 min-w-0 shrink px-3.5 text-[13px] sm:h-11.5 sm:px-5.5 sm:text-[14.5px]"
           >
             <span className="min-w-0 truncate">{ctaLabel}</span>
           </Button>
         </div>
 
-        {/* Team legend — dashed parchment card in every state. Unseated: a
-            single neutral square indicator + "open seats" copy. Seated: the
-            two diagonal pairs read "Us {you + open} vs Them {open + open}",
-            centred, with solid gold/silver square indicators. */}
         <div
           className="border-border-2 bg-surface mb-3 rounded-lg border border-dashed px-3 py-2 sm:px-4 sm:py-3"
           data-testid="team-legend"
@@ -1426,16 +1150,7 @@ export function RoomPage() {
           )}
         </div>
 
-        {/* Diamond seat layout. Seats are pinned to fixed cardinal positions
-            (seat 0 → south, 1 → east, 2 → north, 3 → west) — the lobby does
-            NOT rotate. Visual mode is viewer-relative: once the viewer sits,
-            same-parity tiles become "us" (gold tint) and the other parity
-            become "them" (silver tint). When unseated everything is neutral. */}
         <div className="relative mb-4 sm:mb-6" data-testid="seats-grid">
-          {/* Partner connectors (sm+ diamond) — vertical for the Team A pair,
-              horizontal for the Team B pair. Sit behind seat tiles via z-index.
-              The stacked mobile layout has its own horizontal connectors (added
-              just below). Color follows the viewer's perspective when seated. */}
           <div aria-hidden className="pointer-events-none absolute inset-0 z-0 hidden sm:block">
             <div
               className="absolute top-[12%] left-1/2 h-[76%] w-0.5 -translate-x-1/2 opacity-50"
@@ -1461,11 +1176,6 @@ export function RoomPage() {
             />
           </div>
 
-          {/* Partner connectors (mobile stacked layout) — here each team is a
-              ROW (teammates side by side), so both connectors are horizontal:
-              one across the top row (seats 0 & 2), one across the bottom row
-              (seats 1 & 3). Behind the tiles via z-0; colour viewer-relative,
-              mirroring the diamond connectors above. */}
           <div aria-hidden className="pointer-events-none absolute inset-0 z-0 block sm:hidden">
             <div
               className="absolute top-1/4 left-[12%] h-0.5 w-[76%] -translate-y-1/2 opacity-50"
@@ -1504,16 +1214,12 @@ export function RoomPage() {
               const isSeatOwner =
                 player !== undefined && !isBotSeat && player.userId === room.ownerId;
               const isWaiting = room.status === "waiting";
-              // Kick/promote act on user accounts — bot seats get the
-              // dedicated remove-bot control instead.
               const ownerCanKick =
                 isOwner && isWaiting && player !== undefined && !isSeatOwner && !isBotSeat;
               const ownerCanRemoveBot = isOwner && isWaiting && isBotSeat;
               const ownerCanAddBot =
                 isOwner && isWaiting && player === undefined && !room.isQuickPlay;
               const isSwapSource = swapSourceSeat === seatIndex;
-              // Bot tiles participate in the owner's swap flow as both source
-              // and target, exactly like humans.
               const ownerCanInitiateSwap =
                 isOwner && isWaiting && player !== undefined && !isCurrentUser && !inSwapMode;
               const canLeaveOwnSeat =
@@ -1607,9 +1313,6 @@ export function RoomPage() {
               );
             })}
 
-            {/* Felt-green centre diamond — only in the 3×3 desktop layout (the
-                mobile 2×2 stack has no centre cell). Reads just "TABLE"; the
-                points mode already lives in the room-info card above. */}
             <div
               className="hidden items-center justify-center sm:flex"
               style={{ gridArea: "center" }}
@@ -1641,7 +1344,6 @@ export function RoomPage() {
 
       <RoomChatDock roomId={room.id} />
 
-      {/* Owner transfer-ownership confirmation dialog */}
       <TransferOwnershipDialog
         open={transferConfirm !== null}
         onOpenChange={(open) => {
@@ -1659,7 +1361,6 @@ export function RoomPage() {
         }}
       />
 
-      {/* Owner kick confirmation dialog */}
       <KickPlayerDialog
         open={kickConfirm !== null}
         onOpenChange={(open) => {
@@ -1675,7 +1376,6 @@ export function RoomPage() {
         }}
       />
 
-      {/* Owner remove-bot confirmation dialog (kick pattern) */}
       <RemoveBotDialog
         open={removeBotConfirm !== null}
         onOpenChange={(open) => {
@@ -1695,14 +1395,12 @@ export function RoomPage() {
         }}
       />
 
-      {/* Friend-invite panel (Story 11.5) */}
       <InviteFriendsDialog
         open={showInviteFriends}
         roomId={room.id}
         onOpenChange={setShowInviteFriends}
       />
 
-      {/* Room last-match stats panel */}
       <LastMatchDialog
         open={showLastMatch}
         roomId={room.id}
@@ -1710,10 +1408,8 @@ export function RoomPage() {
         playersInRoom={players.map((p) => p.userId)}
       />
 
-      {/* Owner privacy edit dialog (Story 9.6) */}
       <RoomPrivacyDialog open={showPrivacy} room={room} onClose={() => setShowPrivacy(false)} />
 
-      {/* Private-room password prompt for a deep-link / refresh join (Story 9.6 review patch) */}
       <PasswordPromptDialog
         open={deepLinkPrivateRoom !== null}
         roomName={deepLinkPrivateRoom?.name ?? ""}
@@ -1723,11 +1419,9 @@ export function RoomPage() {
           if (deepLinkPrivateRoom) joinDeepLinkPrivate(deepLinkPrivateRoom, password);
         }}
         onClose={() => {
-          // Declining the prompt: a private room can't be viewed without joining,
-          // so bounce to the lobby (suppress the unmount auto-leave first).
           setDeepLinkPrivateRoom(null);
           setDeepLinkPasswordError(null);
-          hasLeftRef.current = true;
+          skipAutoLeaveRef.current = true;
           navigate("/lobby", { replace: true });
         }}
       />

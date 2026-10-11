@@ -22,16 +22,7 @@ interface PauseOverlayProps {
 }
 
 /**
- * Pause overlay — felt panel with per-player rows showing pause status.
- *
- *  • Player who actively paused → "Resume" button.
- *  • Player who hasn't used their pause yet → "Pause" stack button.
- *  • Player who already used their pause → quiet "waiting…" line.
- *  • Room owner → additional "Resume All" override (matches the server's
- *    ACTION_OWNER_UNPAUSE privilege; see [server/internal/game/pause.go]).
- *
- * No timer here — pause is open-ended on the server side. Players choose to
- * resume manually.
+ * Pause overlay listing each player's pause status, with Resume, Pause, and owner-only Resume All controls.
  */
 export function PauseOverlay({
   pausedPlayers,
@@ -46,9 +37,6 @@ export function PauseOverlay({
   const { t } = useTranslation();
   const hasActivePause = pausedPlayers[myPlayerSeat];
   const canStackPause = !hasActivePause && !pauseUsed[myPlayerSeat];
-  // Names of everyone currently paused. The subtitle verb must agree with how
-  // many there are, so we pick a plural key for 2+ (Slavic locales inflect the
-  // verb — "паузираше" → "паузираа"; English reuses the same sentence).
   const pausedNames = pausedPlayers
     .map((isPaused, seat) => (isPaused ? playerDisplayName(t, players[seat]) : null))
     .filter(Boolean);
@@ -125,14 +113,6 @@ export function PauseOverlay({
             })}
           </div>
 
-          {/* Neither control here keeps the status quo — resuming your own pause
-              and force-resuming everyone are both actions — so they get the
-              both-actions treatment: their own centred, full-width, stacked
-              row rather than a right-anchored action/cancel pair. The
-              player-level control leads; the owner override sits below it in a
-              red-tinted felt ghost variant — still in the ClassicButton family
-              (felt + serif), with a Crown glyph and red border flagging it as
-              admin-only. */}
           <div
             className="mt-2 flex w-full flex-col items-stretch gap-2 text-center"
             data-testid="pause-actions"

@@ -41,9 +41,8 @@ function AuthAwareRedirect() {
 }
 
 /**
- * Root layout route: runs the app-wide auth bootstrap hooks and gates the
- * whole route tree while the initial session refresh is in flight — the same
- * behavior the pre-data-router AppRoutes component had.
+ * Root layout route that runs the app-wide auth bootstrap hooks.
+ * Renders nothing while the initial session refresh is in flight.
  */
 function AppShell() {
   useAuthInit();
@@ -59,12 +58,8 @@ function AppShell() {
   return <Outlet />;
 }
 
-// Data router (createBrowserRouter) — required for useBlocker (MatchPage's
-// mid-match back-press confirmation). The route tree is unchanged from the
-// previous <BrowserRouter>+<Routes> setup, wrapped under the AppShell layout.
-// Built lazily inside App() (not at module scope): createBrowserRouter writes
-// to window.history on construction, and importing a component must not have
-// side effects.
+// Builds the data router that useBlocker needs; called lazily from App() because
+// createBrowserRouter writes to window.history on construction.
 function createAppRouter() {
   return createBrowserRouter(
     createRoutesFromElements(
@@ -80,8 +75,6 @@ function createAppRouter() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
           </Route>
         </Route>
-        {/* Public reference pages — reachable by guests (from the landing footer)
-          and authed users alike. The layout adapts to auth state. */}
         <Route element={<PublicContentLayout />}>
           <Route path="/rules" element={<RulesPage />} />
         </Route>
@@ -89,13 +82,7 @@ function createAppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/lobby" element={<LobbyPage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            {/* Seasonal leaderboard (Story 13.2). Inside ProtectedRoute AND
-                AppLayout: the endpoint behind it is auth-gated, and the page is
-                reached from the TopBar tab that only AppLayout renders. */}
             <Route path="/leaderboard" element={<LeaderboardPage />} />
-            {/* Public player profile (Story 11.3): any logged-in viewer, under
-                the TopBar + auth gate. "Public" = not self-restricted, not
-                unauthenticated. */}
             <Route path="/players/:id" element={<PublicPlayerProfilePage />} />
             <Route path="/rooms/:id" element={<RoomPage />} />
             <Route path="/matchmaking/:id" element={<MatchmakingPage />} />
@@ -113,10 +100,6 @@ export function App() {
   return (
     <QueryProvider>
       <RouterProvider router={router} />
-      {/* Single app-wide sonner host. Without this mounted, every toast.*()
-          call (join/settlement feedback, auth errors, etc.) is silently
-          invisible — the Toaster component existed but was never rendered.
-          Bottom-center keeps toasts clear of the bottom-right chat FAB. */}
       <Toaster position="bottom-center" />
     </QueryProvider>
   );

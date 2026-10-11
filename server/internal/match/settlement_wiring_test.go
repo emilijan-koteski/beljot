@@ -49,7 +49,6 @@ func TestHandleMatchEnd_SettlesCoins(t *testing.T) {
 	mgr.SetWalletSettler(settler)
 
 	roomID := uint(100)
-	// coinBuyIn 500 → pot 2000; team A (seats 0,2 → users 10,30) wins.
 	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 500, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -62,7 +61,6 @@ func TestHandleMatchEnd_SettlesCoins(t *testing.T) {
 	payload := ws.MatchEndPayload{WinnerTeam: game.TeamA, TeamAFinalScore: 1010, TeamBFinalScore: 700, MatchDurationSec: 600}
 	mgr.HandleMatchEndForTest(roomID, finalState, nil, payload)
 
-	// Winners (team A: users 10, 30) each credited the full half-pot (1000).
 	require.Equal(t, 1, settler.applyCalls)
 	assert.Equal(t, map[uint]int{10: 1000, 30: 1000}, settler.applyCredits)
 

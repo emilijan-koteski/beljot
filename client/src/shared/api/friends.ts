@@ -1,12 +1,6 @@
 import { axiosClient } from "@/shared/api/axiosClient";
 import type { Friend, FriendRequest, FriendshipStatus } from "@/shared/types/apiTypes";
 
-/**
- * Friend API (Story 11.2, FR6). Maps 1:1 to the `friend` backend domain. Every
- * function returns the UNWRAPPED payload — the axios response interceptor
- * already strips the `{ data }` envelope, so callers never touch `.data.data`.
- */
-
 /** Send a friend request to `userId`. The requester is the authenticated caller. */
 export function sendFriendRequest(userId: number): Promise<void> {
   return axiosClient.post("/friends/request", { userId });

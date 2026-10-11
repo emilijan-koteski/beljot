@@ -13,17 +13,11 @@ vi.mock("react-i18next", () => ({
         "match.score.heading": "Scoreboard",
         "lobby.card.noDeclarations": "No declarations",
         "lobby.card.stopAtTarget": "Stop at target",
-        // The aria strings are mocked because the component no longer carries a
-        // hardcoded defaultValue for them: en.json owns the copy and
-        // i18n.parity.test.ts gates the other three locales, so duplicating it in
-        // the component only let it drift.
         "lobby.card.noDeclarationsAriaLabel":
           "This room plays without declarations and without Belote",
         "lobby.card.stopAtTargetAriaLabel":
           "This room ends the match the moment a team reaches the target, without finishing the hand",
       };
-      // Honour the component's defaultValue contract so the test mock matches
-      // production i18n behavior (interpolated strings used by score-meta etc.).
       return (
         translations[key] ?? (typeof opts?.defaultValue === "string" ? opts.defaultValue : key)
       );
@@ -66,7 +60,6 @@ describe("ScorePanel", () => {
     expect(screen.getByTestId("score-panel")).toBeInTheDocument();
     expect(screen.getByTestId("score-a")).toHaveTextContent("450");
     expect(screen.getByTestId("score-b")).toHaveTextContent("320");
-    // Viewer is teamA, so the team-A row says "Us" and team-B says "Them"
     expect(screen.getByTestId("score-label-a")).toHaveTextContent("Us");
     expect(screen.getByTestId("score-label-b")).toHaveTextContent("Them");
   });
@@ -82,8 +75,6 @@ describe("ScorePanel", () => {
       />,
     );
 
-    // The north partner avatar sits at Z.SEATS; on phones the top-left panel
-    // overlaps it, so it must outrank the seats or it gets painted over.
     expect(screen.getByTestId("score-panel-mobile").style.zIndex).toBe(String(Z.HUD));
     expect(Z.HUD).toBeGreaterThan(Z.SEATS);
   });
@@ -221,7 +212,6 @@ describe("ScorePanel", () => {
         declarationsEnabled={false}
       />,
     );
-    // No leading separator when it is the only segment.
     expect(screen.getByTestId("score-meta")).toHaveTextContent(/^No declarations$/);
   });
 
@@ -286,15 +276,10 @@ describe("ScorePanel", () => {
         stopAtTarget
       />,
     );
-    // No leading separator when it is the only segment.
     expect(screen.getByTestId("score-meta")).toHaveTextContent(/^Stop at target$/);
   });
 
   it("keeps the segment separator out of each rule chip's accessible name", () => {
-    // An aria-label REPLACES an element's whole accessible name, so a " · " left
-    // inside the labelled span is swallowed by the label — the separator stops
-    // existing for assistive tech while still rendering visually. Both rule
-    // segments therefore put it outside the span.
     render(
       <ScorePanel
         viewerTeam="teamA"
@@ -312,11 +297,9 @@ describe("ScorePanel", () => {
     const declarations = screen.getByTestId("score-meta-no-declarations");
     const stop = screen.getByTestId("score-meta-stop-at-target");
 
-    // The visible text of each chip is the label alone, no separator.
     expect(declarations).toHaveTextContent(/^No declarations$/);
     expect(stop).toHaveTextContent(/^Stop at target$/);
 
-    // And the separators are still on the page, one per chip, in the band.
     expect(screen.getByTestId("score-meta")).toHaveTextContent(
       "Hand 3 · Bitola · No declarations · Stop at target",
     );
@@ -349,7 +332,6 @@ describe("ScorePanel", () => {
       />,
     );
     const rows = container.querySelectorAll('[data-testid^="score-row-"]');
-    // Viewer is teamB, so the teamB ("Us") row must precede the teamA ("Them") row.
     expect(rows[0]?.getAttribute("data-testid")).toBe("score-row-b");
     expect(rows[1]?.getAttribute("data-testid")).toBe("score-row-a");
   });

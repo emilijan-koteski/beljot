@@ -49,15 +49,7 @@ describe("authStore", () => {
     expect(mockLogoutApi).toHaveBeenCalled();
   });
 
-  // Story 8.5-1 AC6 (D66): logout must wipe session-scoped stores so a
-  // re-login does not inherit stale state. Without this, the 401 →
-  // refresh-fail → logout path leaves matchStore.matchState populated and
-  // useReconnectionRedirect navigates the freshly re-logged-in user to a
-  // finished game's /game/{id} page.
   it("clears matchStore on logout", () => {
-    // Bypass setMatchState's normalization (which expects a full MatchState
-    // shape) — the test only cares that matchState is non-null before logout
-    // and null after. Other tests cover the MatchState shape.
     useMatchStore.setState({
       matchState: {
         phase: "match_end",

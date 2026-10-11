@@ -22,7 +22,6 @@ function archive(over: Partial<SeasonArchiveResponse> = {}): SeasonArchiveRespon
       {
         seasonId: 5,
         seasonName: "2026 Q2",
-        // A PRE-DIVISION season: an old-formula total with its stored bare tier.
         sp: 3500,
         tier: "silver",
         division: null,
@@ -73,10 +72,7 @@ describe("SeasonSection", () => {
     expect(chip).toHaveAttribute("data-tier", "gold");
     expect(screen.getByTestId("profile-season-tier").textContent).toBe("Gold 2");
     expect(chip.textContent).toContain((680).toLocaleString());
-    // The machine token, verbatim.
     expect(chip.textContent).toContain("2026 Q4");
-    // The chip's ONLY accessible name (the visible cells are aria-hidden), so it
-    // must carry the full rank, division included.
     expect(chip.querySelector(".sr-only")?.textContent).toBe(
       `Current season 2026 Q4: Gold 2, ${(680).toLocaleString()} SP`,
     );
@@ -89,9 +85,6 @@ describe("SeasonSection", () => {
     expect(mockGetArchive).toHaveBeenCalledWith(2);
   });
 
-  // The current season shows tier PLUS division, the ended pre-division season
-  // beside it its STORED tier with none — never a rank re-derived from its SP
-  // (3500 old-formula SP would bucket as Grandmaster).
   it("shows the current rank with its division and a pre-division archive row without", async () => {
     mockGetArchive.mockResolvedValue(archive());
 
@@ -104,14 +97,11 @@ describe("SeasonSection", () => {
     expect(screen.getByTestId("profile-season-tier").textContent).toBe("Gold 2");
   });
 
-  // The epic AC: the whole archive is OMITTED from the DOM for players with no
-  // played seasons — never an empty state.
   it("renders no archive section at all when the archive is empty", async () => {
     mockGetArchive.mockResolvedValue({ items: [] });
 
     renderSection({ userId: 2, seasonRank: rank });
 
-    // Chip still renders (they have a current rank), archive never appears.
     expect(screen.getByTestId("profile-season")).toBeInTheDocument();
     await waitFor(() => expect(mockGetArchive).toHaveBeenCalled());
     expect(screen.queryByTestId("prior-season-archive")).not.toBeInTheDocument();
@@ -137,8 +127,6 @@ describe("SeasonSection", () => {
     expect(screen.queryByTestId("prior-season-archive")).not.toBeInTheDocument();
   });
 
-  // The archive is supplementary history: a failed read hides the list rather
-  // than erroring the profile.
   it("renders no archive on a failed read, without an error surface", async () => {
     mockGetArchive.mockRejectedValue(new Error("boom"));
 
@@ -153,12 +141,9 @@ describe("SeasonSection", () => {
     renderSection({ userId: undefined, seasonRank: rank });
 
     expect(mockGetArchive).not.toHaveBeenCalled();
-    // The chip needs no id — it comes off the profile response.
     expect(screen.getByTestId("profile-season")).toBeInTheDocument();
   });
 
-  // A played season at 0 SP is a REAL rank: the chip must render Iron rather
-  // than treating 0 as absent (Go zero values are real values).
   it("renders a 0-SP current rank as Iron", () => {
     mockGetArchive.mockResolvedValue({ items: [] });
 
@@ -183,10 +168,6 @@ describe("SeasonSection", () => {
     expect(screen.getByTestId("profile-season")).toHaveAttribute("data-tier", "gold");
   });
 
-  // A NETWORK BLIP MUST NOT DELETE HISTORY THE READER IS LOOKING AT. React
-  // Query keeps the resolved pages when a background refetch fails, so gating
-  // the section on `isError` made a failed refetch drop an already-rendered
-  // archive and jump the profile's layout.
   it("keeps the rendered archive when a refetch fails", async () => {
     mockGetArchive.mockResolvedValueOnce(archive());
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -211,11 +192,6 @@ describe("SeasonSection", () => {
     ).toHaveLength(2);
   });
 
-  // --- showCurrentRank: the self profile suppresses the chip ---
-
-  // The self page's RankBanner already states the viewer's tier, SP and
-  // progress above the streak callout; the chip would be a second, smaller
-  // readout of the same standing further down the same page.
   it("omits the chip when the caller suppresses it, keeping the archive", async () => {
     mockGetArchive.mockResolvedValue(archive());
 
@@ -225,8 +201,6 @@ describe("SeasonSection", () => {
     expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
   });
 
-  // With the chip gone the whole section is the archive, so the subtitle must
-  // stop promising a current rank above it.
   it("drops the current-rank clause from the subtitle when the chip is suppressed", async () => {
     mockGetArchive.mockResolvedValue(archive());
 
@@ -237,9 +211,6 @@ describe("SeasonSection", () => {
     expect(section.textContent).not.toContain(i18n.t("season.archive.sub"));
   });
 
-  // THE SUBTITLE FOLLOWS THE CHIP, NOT THE FLAG: a public profile whose subject
-  // has not played this season renders no chip either, and the same promise
-  // would be just as wrong there.
   it("drops the clause for a subject with no current standing, chip left enabled", async () => {
     mockGetArchive.mockResolvedValue(archive());
 
@@ -249,9 +220,6 @@ describe("SeasonSection", () => {
     expect(section.textContent).toContain(i18n.t("season.archive.subArchiveOnly"));
   });
 
-  // Suppressing the chip does NOT keep an archive-less section alive on a
-  // technicality: with nothing left to show the component still contributes
-  // nothing to the DOM.
   it("renders nothing at all with the chip suppressed and an empty archive", async () => {
     mockGetArchive.mockResolvedValue({ items: [] });
 

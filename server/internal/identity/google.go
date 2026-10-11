@@ -10,19 +10,12 @@ import (
 	"github.com/emilijan/beljot/server/internal/apperr"
 )
 
-// googleVerifyTimeout bounds a single token verification, JWKS fetch included.
-// Without it a hung Google endpoint would wedge handler goroutines for as long
-// as the client keeps the request open.
 const googleVerifyTimeout = 10 * time.Second
 
-// GoogleProvider verifies Google Identity Services ID tokens. Verification is
-// fully server-side via idtoken.Validate (signature against Google's JWKS,
-// audience == our OAuth client ID, expiry) plus an explicit issuer check —
-// idtoken.Validate does not pin the issuer itself.
+// GoogleProvider verifies Google Identity Services ID tokens server-side.
+// idtoken.Validate checks signature, audience and expiry; the issuer is checked explicitly.
 type GoogleProvider struct {
 	clientID string
-	// validate is idtoken.Validate, injectable so tests can exercise the
-	// claim-mapping and issuer gate without real Google tokens.
 	validate func(ctx context.Context, idToken, audience string) (*idtoken.Payload, error)
 }
 
@@ -34,11 +27,8 @@ func (p *GoogleProvider) Name() string {
 	return "google"
 }
 
-// Verify validates the ID token and maps Google's claims onto the
-// provider-agnostic ExternalIdentity. Every failure collapses to
-// apperr.ErrSSOInvalidCredential — expired, forged, wrong-audience, and
-// malformed tokens are deliberately indistinguishable to the client; the
-// specifics are logged here.
+// Verify validates the ID token and maps Google's claims onto ExternalIdentity.
+// Every failure returns apperr.ErrSSOInvalidCredential so the client cannot tell causes apart.
 func (p *GoogleProvider) Verify(ctx context.Context, credential string) (*ExternalIdentity, error) {
 	ctx, cancel := context.WithTimeout(ctx, googleVerifyTimeout)
 	defer cancel()
@@ -58,8 +48,6 @@ func (p *GoogleProvider) Verify(ctx context.Context, credential string) (*Extern
 		EmailVerified: boolClaim(payload.Claims, "email_verified"),
 		DisplayName:   stringClaim(payload.Claims, "name"),
 	}
-	// A GIS sign-in token always carries sub + email; their absence means this
-	// is not a token we can authenticate with.
 	if ext.Subject == "" || ext.Email == "" {
 		slog.Warn("google id-token missing subject or email claim")
 		return nil, apperr.ErrSSOInvalidCredential
@@ -72,8 +60,7 @@ func stringClaim(claims map[string]interface{}, key string) string {
 	return s
 }
 
-// boolClaim tolerates the string form ("true") some IdPs emit for boolean
-// claims; anything else reads as false — the safe default for email_verified.
+// boolClaim reads a boolean claim, accepting the string form "true"; anything else is false.
 func boolClaim(claims map[string]interface{}, key string) bool {
 	switch v := claims[key].(type) {
 	case bool:

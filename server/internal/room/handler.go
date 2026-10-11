@@ -24,10 +24,6 @@ import (
 )
 
 var (
-	// Both engine variants are creatable (Epic 12, Story 12.8). Still a
-	// hand-maintained list rather than a derivation from internal/game: adding a
-	// variant constant to the engine must not make it creatable here until its
-	// rules are actually finished. See variant_allowlist_test.go.
 	validVariants    = map[string]bool{"bitola": true, "croatia": true}
 	validMatchModes  = map[string]bool{"1001": true, "501": true}
 	validTimerStyles = map[string]bool{"relaxed": true, "per-move": true}
@@ -35,34 +31,17 @@ var (
 )
 
 const (
-	codeChars  = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	codeLength = 6
-	maxRetries = 3
-	// quickPlayStandardBuyIn is the single Quick Play affordability threshold
-	// AND the default-bracket stake (Story 9.4, Decision D1/D2). A player who can
-	// afford this plays for it; everyone else plays free (0). It equals the
-	// create-room default buy-in so casual matchmade games carry the same stake
-	// as a hand-made standard room.
-	quickPlayStandardBuyIn = 500
-	// quickPlayTimerDurationSeconds is the per-move timer (seconds) stamped onto
-	// every synthesized Quick Play room (Story 9.4, Decision D5). Within the
-	// create-room [10,120] range; flows unchanged through StartMatch.
+	codeChars                     = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	codeLength                    = 6
+	maxRetries                    = 3
+	quickPlayStandardBuyIn        = 500
 	quickPlayTimerDurationSeconds = 30
-	// roomPasswordMinLength / roomPasswordMaxBytes bound a private-room password
-	// (Story 9.6, FR60). Min 4 is intentionally lower-friction than the 8-char
-	// account minimum — room passwords are shared casually among friends. Max 72
-	// bytes is bcrypt's hard input limit: bcrypt silently ignores input past 72
-	// bytes, so rejecting longer input keeps two passwords differing only past
-	// byte 72 from hashing equal. Both are tunable placeholders.
-	roomPasswordMinLength = 4
-	roomPasswordMaxBytes  = 72
+	roomPasswordMinLength         = 4
+	roomPasswordMaxBytes          = 72
 )
 
-// validateRoomPassword enforces the private-room password rules (Story 9.6).
-// Non-empty, >= roomPasswordMinLength characters (runes, matching the "characters"
-// wording and the client's per-character minimum), <= roomPasswordMaxBytes bytes
-// (the bcrypt input limit, which is byte-bound). Server is the authority; the
-// client's field validation is cosmetic.
+// validateRoomPassword enforces the private-room password rules, counting the minimum in
+// runes and capping at bcrypt's 72-byte input limit.
 func validateRoomPassword(pw string) error {
 	if pw == "" {
 		return apperr.ErrRoomPasswordRequired
@@ -76,40 +55,15 @@ func validateRoomPassword(pw string) error {
 	return nil
 }
 
-// honorGated reports whether this room enforces an honor requirement at all.
-//
-// A room is ungated only when BOTH gates are off, which is the overwhelmingly
-// common case. Every call site short-circuits on this so an ungated join performs
-// NO honor read whatsoever (Story 9.8 D5) — JoinRoom is a hot path. Declared as a
-// method so no call site re-spells the condition and they cannot drift apart.
+// honorGated reports whether this room enforces an honor requirement at all, so ungated
+// rooms (the common case) skip every honor read.
 func (r *Room) honorGated() bool {
 	return r.MinHonor > 0 || !r.AllowNewPlayers
 }
 
-// honorGateError evaluates the honor gate for one player against one room and
-// returns nil to admit, or the apperr to reject with (Story 9.8, FR57). Pure —
-// all four call sites (CreateRoom's creator self-gate, JoinRoom, ReturnToRoom,
-// StartMatch) share this one implementation and one table-driven test.
-//
-// The two gates are INDEPENDENT (D1 — this overrides the epic, which nested both
-// rejections under min_honor > 0 and would have made allow_new_players dead in a
-// 0-gate room):
-//
-//	if isNewPlayer: admit iff AllowNewPlayers   // the score is NOT consulted
-//	else:           admit iff Score >= MinHonor // MinHonor 0 => always true
-//
-// The non-obvious half is the first branch: a New Player is never score-checked,
-// so with AllowNewPlayers a newcomer enters a MinHonor = 95 room on the 80 prior.
-// That is the entire purpose of the toggle — it is the owner's explicit "I'll take
-// an unknown" switch, and removing the branch would make the toggle meaningless.
-//
-// isNewPlayer is evaluated FIRST, so a New Player in a MinHonor > 0 /
-// AllowNewPlayers = false room gets ErrNewPlayerNotAllowed, never ErrHonorTooLow.
-//
-// snap must come from user.NewHonorSnapshot (the recomputed, authoritative score),
-// never from users.honor_score (the lagging filter-only column) — see D5 and the
-// HonorScoreSnapshot field comment in user/model.go. The boundary is inclusive:
-// Score == MinHonor admits.
+// honorGateError returns nil to admit a player or the apperr to reject with.
+// A New Player is admitted only by AllowNewPlayers and is never score-checked;
+// anyone else needs at least MinHonor.
 func honorGateError(r *Room, snap user.HonorSnapshot) error {
 	if snap.IsNewPlayer {
 		if r.AllowNewPlayers {
@@ -123,10 +77,8 @@ func honorGateError(r *Room, snap user.HonorSnapshot) error {
 	return nil
 }
 
-// quickPlayBuyIn maps a wallet balance to the Quick Play bracket buy-in. The
-// model is binary (Story 9.4, Decision D1): balance >= 500 → 500, else 0. The
-// returned value is BOTH the matchmaking pool key (rooms.coin_buy_in) and the
-// per-human stake charged at auto-start — no min-of-balances, no extra column.
+// quickPlayBuyIn maps a wallet balance to the Quick Play bracket buy-in, which is both
+// the matchmaking pool key and the per-human stake.
 func quickPlayBuyIn(balance int) int {
 	if balance >= quickPlayStandardBuyIn {
 		return quickPlayStandardBuyIn
@@ -141,54 +93,22 @@ type CreateRoomRequest struct {
 	TimerStyle           string `json:"timerStyle"`
 	TimerDurationSeconds *int   `json:"timerDurationSeconds"`
 	ReconnectWindowSec   *int   `json:"reconnectWindowSec"`
-	// CoinBuyIn is a pointer so "omitted" (nil → default 500) is distinguishable
-	// from an explicit 0 (a free room). min 0, no maximum (Story 9.2 AC #1).
-	CoinBuyIn *int `json:"coinBuyIn"`
-	// IsPrivate + Password configure a private room (Story 9.6, FR60). Password is
-	// required only when IsPrivate is true; it is bcrypt-hashed into
-	// rooms.password_hash and never stored or logged in plaintext.
-	IsPrivate bool   `json:"isPrivate"`
-	Password  string `json:"password"`
-	// MinHonor + AllowNewPlayers configure the honor gate (Story 9.8, FR57). BOTH
-	// are pointers, mirroring CoinBuyIn above, so "omitted" is distinguishable from
-	// an explicit 0 / false: nil MinHonor defaults to 0 (ungated) and nil
-	// AllowNewPlayers defaults to TRUE (open), whereas an explicit false is a
-	// deliberate veterans-only room and must survive.
-	MinHonor        *int  `json:"minHonor"`
-	AllowNewPlayers *bool `json:"allowNewPlayers"`
-	// DeclarationsEnabled turns melds AND the Belote/Rebelote bonus on or off for
-	// the room. A pointer for the same reason as AllowNewPlayers above: nil
-	// (omitted) must default to TRUE — declarations are how the game has always
-	// been played here — while an explicit false is the owner deliberately
-	// choosing "bez zvanja" and has to survive. A plain bool would make every
-	// client that has not shipped the toggle yet silently create
-	// declarations-less rooms.
-	DeclarationsEnabled *bool `json:"declarationsEnabled"`
-	// StopAtTarget is "dosta": end the match the instant a team's running total
-	// reaches the 1001/501 target, hand unfinished. A pointer for symmetry with
-	// DeclarationsEnabled above, though the polarity is the opposite one: nil
-	// (omitted) defaults to FALSE — finish the hand, which is how every match here
-	// has always ended — so a client that has not shipped the toggle keeps
-	// creating rooms that behave exactly as before.
-	StopAtTarget *bool `json:"stopAtTarget"`
+	CoinBuyIn            *int   `json:"coinBuyIn"`
+	IsPrivate            bool   `json:"isPrivate"`
+	Password             string `json:"password"`
+	MinHonor             *int   `json:"minHonor"`
+	AllowNewPlayers      *bool  `json:"allowNewPlayers"`
+	DeclarationsEnabled  *bool  `json:"declarationsEnabled"`
+	StopAtTarget         *bool  `json:"stopAtTarget"`
 }
 
 // MatchStarter is the interface the room handler uses to start a live match.
-// coinBuyIn (Story 9.2) is the per-human stake captured onto the session.
 type MatchStarter interface {
 	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool) error
 }
 
-// WalletService is the subset of *wallet.Service the room handler needs. Story
-// 9.2 added the join-time affordability read (GetBalance) and the atomic
-// match-start stake charge (ChargeStakes). Story 9.3 widens it with the batch
-// solvency read (GetBalances — for ownership-transfer candidate selection and
-// the start-time insolvency prefilter) and the refund path (ApplySettlement —
-// credits back charged stakes when matchStarter.StartMatch fails). An interface
-// (not a concrete dependency) keeps room decoupled from wallet internals and
-// lets handler tests inject a stub. Import direction stays acyclic (room →
-// wallet). Optional — nil means no economy enforcement (legacy / tests that
-// don't exercise coins).
+// WalletService is the subset of *wallet.Service the room handler needs. A nil
+// WalletService disables economy enforcement.
 type WalletService interface {
 	GetBalance(userID uint) (int, error)
 	GetBalances(userIDs []uint) (map[uint]int, error)
@@ -196,31 +116,9 @@ type WalletService interface {
 	ApplySettlement(credits map[uint]int) error
 }
 
-// HonorService is the subset of *user.HonorService the room handler needs for the
-// honor gate (Story 9.8, FR57). It is declared HERE, in room, and satisfied by the
-// concrete service injected from main.go — the same narrow-interface pattern as
-// WalletService above, which keeps room decoupled from user's internals and lets
-// handler tests inject a stub with a call counter.
-//
-// Optional: nil means NO honor enforcement (legacy setups / tests that don't
-// exercise honor), mirroring the nil-walletService affordance. A read ERROR,
-// however, is never treated as nil — it fails the request, because a failed honor
-// read must never open a closed door.
-//
-// IMPORT DIRECTION (Story 9.8 D6) — the one thing to get right here. `user` must
-// NEVER import `room`: room -> auth -> user already exists, so user -> room would
-// close the cycle. The DTO crossing this interface is therefore a `user`-owned type
-// (user.HonorSnapshot) and `room` imports `user`. Verified acyclic: room -> user ->
-// match, and match does not import room.
-//
-// Deliberately NOT added to user.UserRepository: HonorForUsers is a pure addition
-// to the concrete *user.HonorService built on the existing FindManyByIDs, so no
-// repository mock anywhere in the tree needs a new method.
+// HonorService is the subset of *user.HonorService the room handler needs for the honor
+// gate. A nil HonorService disables honor enforcement; user must never import room.
 type HonorService interface {
-	// HonorForUsers returns each requested user's AUTHORITATIVE honor snapshot
-	// (score recomputed at read time, plus the isNewPlayer flag the gate needs),
-	// keyed by user ID. Unknown IDs — and bot id 0 — are simply absent from the
-	// result rather than an error.
 	HonorForUsers(userIDs []uint) (map[uint]user.HonorSnapshot, error)
 }
 
@@ -247,32 +145,21 @@ type RoomHandler struct {
 	presence      *PresenceRegistry
 	walletService WalletService
 	honorService  HonorService
-	// invites holds the one-time host-invite grants (Story 11.5). RoomHandler only
-	// ever CONSUMES and VOIDS them — grants are issued by InviteHandler, which must
-	// be constructed with this same registry.
-	invites *InviteRegistry
-	// quickFill is the server-authoritative auto-fill scheduler that backfills
-	// empty Quick Play seats with bots on a paced cadence (see quick_fill.go).
-	// Always non-nil after NewRoomHandler; the intervals are test-overridable.
-	quickFill *quickFillScheduler
+	invites       *InviteRegistry
+	quickFill     *quickFillScheduler
 }
 
 func NewRoomHandler(repo RoomRepository, matchStarter MatchStarter, hub Broadcaster, presence *PresenceRegistry, walletService WalletService, honorService HonorService, invites *InviteRegistry) *RoomHandler {
-	// Default to a private registry when none is injected (keeps test setups
-	// that don't exercise presence working without threading a registry).
 	if presence == nil {
 		presence = NewPresenceRegistry()
 	}
-	// Same affordance for invites: a nil registry yields an empty private one, so
-	// no grant ever exists and every join takes the normal password path.
 	if invites == nil {
 		invites = NewInviteRegistry()
 	}
 	return &RoomHandler{repo: repo, matchStarter: matchStarter, hub: hub, presence: presence, walletService: walletService, honorService: honorService, invites: invites, quickFill: newQuickFillScheduler(defaultQuickFillFastInterval, defaultQuickFillPatientInterval)}
 }
 
-// broadcastToRoom sends a WebSocket message to all players in a room.
-// Broadcast is best-effort — errors are logged but never fail the HTTP response.
+// broadcastToRoom sends a best-effort WebSocket message to all players in a room.
 func (h *RoomHandler) broadcastToRoom(roomID uint, msgType string, payload interface{}) {
 	if h.hub == nil {
 		return
@@ -325,11 +212,8 @@ func (h *RoomHandler) broadcastToAll(msgType string, payload interface{}) {
 	h.hub.BroadcastAll(msg)
 }
 
-// mergeBotPlayers appends synthetic bot entries to a humans-only players
-// slice. This is the single place bots enter a players array — every payload
-// path that serializes players must route through it. The wire signature of
-// a bot is {id:0, userId:0, username:"", seat, team, isBot:true}; team
-// derives from seat parity exactly like humans.
+// mergeBotPlayers appends synthetic bot entries to a humans-only players slice. Every
+// payload path that serializes players must route through it.
 func mergeBotPlayers(players []RoomPlayer, bots []RoomBot) []RoomPlayer {
 	if len(bots) == 0 {
 		if players == nil {
@@ -343,21 +227,18 @@ func mergeBotPlayers(players []RoomPlayer, bots []RoomBot) []RoomPlayer {
 		seat := b.Seat
 		team := teamForSeat(seat)
 		out = append(out, RoomPlayer{
-			RoomID: b.RoomID,
-			Seat:   &seat,
-			Team:   &team,
-			IsBot:  true,
-			// Real seat time from the room_bots row — without it the wire
-			// carries the zero time.Time ("0001-01-01T00:00:00Z").
+			RoomID:    b.RoomID,
+			Seat:      &seat,
+			Team:      &team,
+			IsBot:     true,
 			CreatedAt: b.CreatedAt,
 		})
 	}
 	return out
 }
 
-// playersWithBots loads the room's humans + bots and returns the merged wire
-// players array. Broadcast-path errors are logged, not returned — same
-// best-effort contract as the other broadcast helpers.
+// playersWithBots loads the room's humans and bots and returns the merged wire players
+// array, logging rather than returning errors.
 func (h *RoomHandler) playersWithBots(roomID uint) []RoomPlayer {
 	players, err := h.repo.FindPlayersByRoomID(roomID)
 	if err != nil {
@@ -370,33 +251,18 @@ func (h *RoomHandler) playersWithBots(roomID uint) []RoomPlayer {
 		bots = nil
 	}
 	roster := mergeBotPlayers(players, bots)
-	// Every response built from this helper (seat select, swap, promote, leave,
-	// bot add/remove) REPLACES the client's whole roster, so it must carry the
-	// same honour/level decoration as the GET detail — without this, taking a
-	// seat wiped every seat's shield and level until the next full refetch.
 	h.attachPlayerHonor(roster)
 	return roster
 }
 
-// roomLifecyclePayload builds the WS payload shared by `system:room_created`
-// and `system:room_updated`. Ensures `ownerUsername` is hydrated so the lobby
-// grid can render host avatars without an extra round-trip per row, embeds
-// `players` so seat chips render correctly the instant the card appears, and
-// always carries `createdAt`/`updatedAt` so the client's <RelativeTime>
-// component has a valid ISO to format.
-//
-// r.Players, when pre-populated by the caller, must be the HUMANS-ONLY slice
-// (every call site passes FindPlayersByRoomID output) — bots are merged here
-// so the payload always carries the full seat picture.
+// roomLifecyclePayload builds the WS payload shared by system:room_created and
+// system:room_updated, merging bots into the humans-only r.Players.
 func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 	if r.OwnerUsername == "" {
 		if err := h.repo.LoadOwnerUsernames([]*Room{r}); err != nil {
 			slog.Error("broadcast: failed to load owner username", "roomID", r.ID, "error", err)
 		}
 	}
-	// Always include `players` — even an empty slice — so the client can rely
-	// on the field's presence and never end up with `undefined` seat chips on
-	// a freshly-broadcast room.
 	players := r.Players
 	if players == nil {
 		fetched, err := h.repo.FindPlayersByRoomID(r.ID)
@@ -425,30 +291,16 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		"timerStyle":           r.TimerStyle,
 		"timerDurationSeconds": r.TimerDurationSeconds,
 		"coinBuyIn":            r.CoinBuyIn,
-		// Derived privacy flag (Story 9.6) — this map is hand-built, so the
-		// Room.IsPrivate struct tag / AfterFind hook don't apply; compute it here.
-		"isPrivate": r.PasswordHash != nil,
-		// Honor gate (Story 9.8) — same hand-built-map trap as isPrivate above, and
-		// invisible in every HTTP test because those serialize the struct instead.
-		// system:room_created and system:room_updated both flow through here, so
-		// omitting these two keys would leave a live lobby card rendering a gated
-		// room as ungated until the next full refetch.
-		"minHonor":        r.MinHonor,
-		"allowNewPlayers": r.AllowNewPlayers,
-		// Same hand-built-map trap again: the lobby card's "no declarations" chip
-		// reads this key, so omitting it would leave a live card describing a
-		// declarations-less room as a normal one until the next full refetch.
-		"declarationsEnabled": r.DeclarationsEnabled,
-		// And again for "dosta": the lobby card, the waiting room and the
-		// scoreboard all chip a stop-at-target room, so an omission here would
-		// leave a live card describing it as a finish-the-hand table until the
-		// next full refetch.
-		"stopAtTarget": r.StopAtTarget,
-		"playerCount":  r.PlayerCount,
-		"status":       r.Status,
-		"isQuickPlay":  r.IsQuickPlay,
-		"createdAt":    r.CreatedAt.UTC().Format(time.RFC3339),
-		"updatedAt":    r.UpdatedAt.UTC().Format(time.RFC3339),
+		"isPrivate":            r.PasswordHash != nil,
+		"minHonor":             r.MinHonor,
+		"allowNewPlayers":      r.AllowNewPlayers,
+		"declarationsEnabled":  r.DeclarationsEnabled,
+		"stopAtTarget":         r.StopAtTarget,
+		"playerCount":          r.PlayerCount,
+		"status":               r.Status,
+		"isQuickPlay":          r.IsQuickPlay,
+		"createdAt":            r.CreatedAt.UTC().Format(time.RFC3339),
+		"updatedAt":            r.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -457,11 +309,8 @@ func (h *RoomHandler) broadcastRoomUpdated(r *Room) {
 	h.broadcastToAll(ws.SystemRoomUpdated, h.roomLifecyclePayload(r))
 }
 
-// broadcastRoomSeatSnapshot pushes a system:room_updated event to every
-// connected client with the freshly-fetched players[] so lobby grid seat
-// chips stay in sync after seat changes. Without this, system:seat_updated
-// (which only fans out to room participants) leaves third-party lobby
-// watchers showing stale empty chips.
+// broadcastRoomSeatSnapshot pushes a system:room_updated event with fresh players to
+// every connected client so lobby seat chips stay in sync.
 func (h *RoomHandler) broadcastRoomSeatSnapshot(roomID uint, players []RoomPlayer) {
 	r, err := h.repo.FindByID(roomID)
 	if err != nil || r == nil {
@@ -477,11 +326,6 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		return apperr.ErrUnauthorized
 	}
 
-	// Reject if the user is already in an active room (mirrors JoinRoom /
-	// QuickPlay / QuickJoin). Without this guard a user already seated in a
-	// room — e.g. a second device, or a client that drifted onto the lobby —
-	// could spin up a brand-new room and orphan the old one (observed in
-	// production as duplicate/ownerless rooms).
 	existingRoom, err := h.repo.FindPlayerRoom(userID)
 	if err != nil {
 		return fmt.Errorf("checking existing room: %w", err)
@@ -548,9 +392,6 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		reconnectWindow = req.ReconnectWindowSec
 	}
 
-	// Coin buy-in (Story 9.2 AC #1): nil → default 500; explicit value must be
-	// >= 0 (no maximum — owner freedom). Server is the authority; the client's
-	// field is cosmetic.
 	coinBuyIn := 500
 	if req.CoinBuyIn != nil {
 		coinBuyIn = *req.CoinBuyIn
@@ -559,10 +400,6 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		}
 	}
 
-	// The creator is auto-seated and will be charged the buy-in at match start,
-	// so block creating a room they can't afford — mirrors the JoinRoom
-	// affordability check (check-only; no coins move here). Server is the
-	// authority; the modal's disabled-button guard is cosmetic.
 	if coinBuyIn > 0 && h.walletService != nil {
 		balance, balErr := h.walletService.GetBalance(userID)
 		if balErr != nil {
@@ -573,12 +410,6 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		}
 	}
 
-	// Honor gate (Story 9.8 AC3, FR57): nil MinHonor → 0 (no bar); an explicit value
-	// outside [0,100] rejects — the same interval the rooms.min_honor CHECK enforces,
-	// in the same unit on both sides of the wire (9.6 shipped a min in runes and a
-	// max in bytes and needed a review patch; a plain integer range stays symmetric).
-	// nil AllowNewPlayers → true, so an old client that never sends the field keeps
-	// creating open rooms.
 	minHonor := 0
 	if req.MinHonor != nil {
 		minHonor = *req.MinHonor
@@ -591,33 +422,16 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		allowNewPlayers = *req.AllowNewPlayers
 	}
 
-	// nil DeclarationsEnabled → true, same "omitted means the historical
-	// behaviour" rule as allowNewPlayers above. No range or compatibility check
-	// applies: both values are legal in both variants, so the only wrong answer
-	// here would be defaulting an absent field to false.
 	declarationsEnabled := true
 	if req.DeclarationsEnabled != nil {
 		declarationsEnabled = *req.DeclarationsEnabled
 	}
 
-	// nil StopAtTarget → FALSE, the mirror of the block above with the polarity
-	// flipped: "omitted means the historical behaviour" here means finishing the
-	// hand before the target is checked, which is how every match played before
-	// this column existed ended. Both values are legal in both variants, so there
-	// is no range or compatibility check.
 	stopAtTarget := false
 	if req.StopAtTarget != nil {
 		stopAtTarget = *req.StopAtTarget
 	}
 
-	// The creator must satisfy their OWN gate (Story 9.8 D7). CreateRoom auto-seats
-	// the creator, so an owner who sets min_honor = 95 while sitting at 60 — or
-	// allow_new_players = false while being a New Player themselves — would be
-	// ejected from their own room by the AC6 re-check at the first Start, taking
-	// ownership transfer or a room close with them. This mirrors the buy-in
-	// affordability check immediately above, which exists for the identical reason,
-	// and rejects with the same code the join gate would have returned. Server is the
-	// authority; the modal's disabled-submit guard is cosmetic.
 	gateProbe := &Room{MinHonor: minHonor, AllowNewPlayers: allowNewPlayers}
 	if gateProbe.honorGated() {
 		snap, enforced, herr := h.honorSnapshotFor(userID)
@@ -628,33 +442,12 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 			if gateErr := honorGateError(gateProbe, snap); gateErr != nil {
 				return gateErr
 			}
-			// Review 2026-07-30 (PO decision) — the self-gate goes one step FURTHER
-			// than honorGateError, and deliberately so.
-			//
-			// honorGateError never score-checks a New Player (D1), which is right for
-			// JOINING: the toggle is the owner's "I'll take an unknown" switch. But
-			// applied to the CREATOR it made the D7 self-gate a no-op for exactly the
-			// accounts whose score is about to move. A newcomer at 0 completed /
-			// 4 abandoned holds 19 and could set min_honor = 80; one finished match
-			// makes them experienced at 100x5/22 = 23, and the AC6 re-check then
-			// ejects them from the room they just made, transferring ownership or
-			// closing it. Capping at the fixed 80 prior would NOT have closed that —
-			// the bar has to be their own current score.
-			//
-			// So: a creator may only set a bar they satisfy RIGHT NOW, newcomer or
-			// not. This mirrors the buy-in affordability check above (you cannot
-			// create a room you cannot afford to sit in) and changes nothing about
-			// D1 at the join gate.
 			if snap.IsNewPlayer && snap.Score < minHonor {
 				return apperr.ErrHonorTooLow
 			}
 		}
 	}
 
-	// Private room (Story 9.6, FR60): when requested, validate + bcrypt-hash the
-	// password into PasswordHash (nil = public). Reuse the auth bcrypt helper — do
-	// not import bcrypt directly here. Server is the authority; the modal's toggle
-	// is cosmetic.
 	var passwordHash *string
 	if req.IsPrivate {
 		if err := validateRoomPassword(req.Password); err != nil {
@@ -684,20 +477,11 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		CoinBuyIn:            coinBuyIn,
 		PasswordHash:         passwordHash,
 		MinHonor:             minHonor,
-		// Both set EXPLICITLY, always. room.Room declares AllowNewPlayers and
-		// DeclarationsEnabled without a GORM `default` tag (see their field
-		// comments: a default tag would make `false` uninsertable), which means a
-		// hand-built &Room{} that omits either field inserts false — a silently
-		// veterans-only room, or a silently declarations-less one.
-		AllowNewPlayers:     allowNewPlayers,
-		DeclarationsEnabled: declarationsEnabled,
-		// Spelled out for consistency with its two siblings above, even though the
-		// GORM trap inverts for this one: with no `default` tag an omitted field
-		// would insert FALSE, which happens to be the safe historical value. State
-		// what the owner chose rather than lean on that coincidence.
-		StopAtTarget: stopAtTarget,
-		Status:       "waiting",
-		PlayerCount:  1,
+		AllowNewPlayers:      allowNewPlayers,
+		DeclarationsEnabled:  declarationsEnabled,
+		StopAtTarget:         stopAtTarget,
+		Status:               "waiting",
+		PlayerCount:          1,
 	}
 
 	var createErr error
@@ -710,10 +494,6 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 			if err := tx.AddPlayer(rp); err != nil {
 				return fmt.Errorf("adding creator to room players: %w", err)
 			}
-			// Auto-seat the creator at seat 0. With the 4-player room cap an
-			// unseated owner could be locked out if 3 invitees took the open
-			// seats first; combined with the owner-cannot-leave-seat rule
-			// this guarantees the room is always startable from creation.
 			ownerSeat := 0
 			if err := tx.UpdatePlayerSeat(room.ID, userID, ownerSeat, teamForSeat(ownerSeat)); err != nil {
 				return fmt.Errorf("auto-seating creator: %w", err)
@@ -737,20 +517,10 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		return createErr
 	}
 
-	// The creator is present from the moment the room exists — without this the
-	// reopened-room Start gate (all seated humans present) would block the owner
-	// on the very first match.
 	h.presence.Add(room.ID, userID)
 
-	// Derive IsPrivate on the in-memory room before the response/broadcast: GORM's
-	// AfterFind hook does NOT fire on a freshly-Created struct (Create fires
-	// AfterCreate), so without this the just-created room would serialize
-	// isPrivate=false even when private (Story 9.6, Decision D4).
 	room.IsPrivate = room.PasswordHash != nil
 
-	// Broadcast system:room_created to all connected clients (lobby-wide).
-	// roomLifecyclePayload also populates room.OwnerUsername so the JSON
-	// response immediately below carries it.
 	h.broadcastToAll(ws.SystemRoomCreated, h.roomLifecyclePayload(room))
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{"data": room})
@@ -771,9 +541,6 @@ func (h *RoomHandler) ListRooms(c echo.Context) error {
 		return fmt.Errorf("listing rooms: %w", err)
 	}
 
-	// Hydrate `ownerUsername` + `players` on each row via two batch queries
-	// so the lobby grid renders host avatars + seat chips in a single fetch
-	// (no N+1 per visible card).
 	roomPtrs := make([]*Room, len(rooms))
 	roomIDs := make([]uint, len(rooms))
 	for i := range rooms {
@@ -800,13 +567,9 @@ func (h *RoomHandler) ListRooms(c echo.Context) error {
 }
 
 type RoomDetailResponse struct {
-	Room    *Room        `json:"room"`
-	Players []RoomPlayer `json:"players"`
-	// ReturnedUserIds lists the seated/joined users currently "present" in a
-	// reopened room (returned via "Return to room" or freshly joined), as
-	// opposed to ex-players still lingering on the match result dialog. Drives
-	// the RoomPage "waiting to return" state and the owner Start gate.
-	ReturnedUserIds []uint `json:"returnedUserIds"`
+	Room            *Room        `json:"room"`
+	Players         []RoomPlayer `json:"players"`
+	ReturnedUserIds []uint       `json:"returnedUserIds"`
 }
 
 func (h *RoomHandler) GetRoom(c echo.Context) error {
@@ -887,23 +650,14 @@ func (h *RoomHandler) GetRoomByCode(c echo.Context) error {
 	})
 }
 
-// JoinRoomRequest carries the optional private-room password (Story 9.6). The
-// body is optional: public-room joins send none, so a bind failure on an empty
-// body is tolerated (req stays zero-value → empty password → harmless for public
-// rooms, treated as a wrong password for private ones).
+// JoinRoomRequest carries the optional private-room password; public-room joins send no
+// body.
 type JoinRoomRequest struct {
 	Password string `json:"password"`
 }
 
-// voidInvitesIfFull drops a room's outstanding friend invites once all four
-// seats are covered (humans + bots, the same capacity arithmetic JoinRoom's gate
-// uses). An invite is issued against a vacancy; when the vacancy is gone the
-// grant must not outlive it (Story 11.5 AC2), so a freed seat later cannot be
-// entered on a stale password bypass.
-//
-// Best-effort and post-commit: two indexed reads, and a read failure simply
-// leaves the grants to their own TTL. It is never allowed to fail the request
-// that filled the room.
+// voidInvitesIfFull drops a room's outstanding friend invites once all four seats are
+// covered. It is best-effort and never fails the request that filled the room.
 func (h *RoomHandler) voidInvitesIfFull(roomID uint) {
 	r, err := h.repo.FindByID(roomID)
 	if err != nil || r == nil {
@@ -929,8 +683,6 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		return apperr.ErrRoomNotFound
 	}
 
-	// Public-room joins send no body; tolerate a bind error so an empty body
-	// never 400s the request (Story 9.6, AC5).
 	var req JoinRoomRequest
 	_ = c.Bind(&req)
 
@@ -946,28 +698,6 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		return apperr.ErrRoomNotFound
 	}
 
-	// Private-room gate (Story 9.6, AC4): the authoritative password check fires
-	// at exactly one place — the seat-granting join. A nil hash (public room)
-	// skips it entirely (AC5). A wrong OR missing password both yield
-	// ErrWrongRoomPassword — the two are indistinguishable, and the attempted
-	// password is never logged. bcrypt's CheckPassword compares against the salt,
-	// so this must never be a plain string equality.
-	//
-	// Story 11.5 AC3 opens EXACTLY ONE hole in this gate, and only here: a friend
-	// invited by the room OWNER carries a server-issued one-time grant that stands
-	// in for the password. The grant is looked up by the AUTHENTICATED userID +
-	// roomID — the client sends no bypass flag and cannot self-authorize (D3).
-	// Nothing else changes: every gate below still runs for an invitee exactly as
-	// for any other joiner (D2/AC6). The consult sits INSIDE the nil-hash branch so
-	// a grant only matters when there is actually a password to bypass.
-	//
-	// The check is a PEEK, not a consume. This block is the first of six gates —
-	// capacity, bot-capacity, already-in-room, coin and honor all run below — and
-	// burning the grant here would spend it on a rejection the invitee can recover
-	// from (a seat frees up, they top up, they leave the other room). Their retry
-	// would then hit bcrypt with a password they were never given, and the client
-	// has no way to render that. The grant is spent on SUCCESS instead, by the
-	// VoidUser(userID) call after the transaction commits.
 	if room.PasswordHash != nil {
 		if !h.invites.HasHostGrant(uint(roomID), userID) {
 			if auth.CheckPassword(*room.PasswordHash, req.Password) != nil {
@@ -980,10 +710,6 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		return apperr.ErrRoomFull
 	}
 
-	// Bot-covered seats count toward capacity: every member must be able to
-	// claim a seat eventually (humans ≤ seated humans + free seats), so a
-	// room where humans + bots already cover all four seats is full for
-	// joiners even though PlayerCount is below 4.
 	bots, err := h.repo.FindBotsByRoomID(uint(roomID))
 	if err != nil {
 		return fmt.Errorf("counting room bots: %w", err)
@@ -1000,11 +726,6 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		return apperr.ErrAlreadyInRoom
 	}
 
-	// Coin affordability check (Story 9.2 AC #2). Check-only — NO coins are
-	// deducted at join; the authoritative charge is the atomic re-validation in
-	// StartMatch (Decision A). A short balance rejects with INSUFFICIENT_COINS;
-	// the client composes the user-facing message locally from its own balance
-	// and the room's coinBuyIn (Decision B).
 	if room.CoinBuyIn > 0 && h.walletService != nil {
 		balance, balErr := h.walletService.GetBalance(userID)
 		if balErr != nil {
@@ -1015,15 +736,6 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		}
 	}
 
-	// Honor gate (Story 9.8 AC4, FR57). Deliberately APPENDED LAST, after the coin
-	// check: the password / capacity / already-in-room / coin sequence above is a
-	// hardened order, and appending keeps this diff reviewable rather than reshuffling
-	// it. The visible consequence is that a player who is both broke and short on
-	// honor gets INSUFFICIENT_COINS — intentional, and harmless (they cannot join
-	// either way).
-	//
-	// An ungated room performs NO honor read at all: JoinRoom is a hot path and
-	// almost every room is ungated (D5).
 	if room.honorGated() {
 		snap, enforced, herr := h.honorSnapshotFor(userID)
 		if herr != nil {
@@ -1058,28 +770,13 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		return fmt.Errorf("joining room: %w", err)
 	}
 
-	// Mark the fresh joiner present so they count toward the reopened-room
-	// Start gate (and seed presence for first-ever joins, which is harmless).
 	h.presence.Add(uint(roomID), userID)
 
-	// The joiner is in a room now, so every invite still addressed to them —
-	// including ones from other rooms — is unactionable (AC2). If they took the
-	// last seat, this room's remaining invites die with the vacancy.
-	//
-	// This is ALSO where a host grant is finally spent: the password gate above
-	// only peeked at it, so a join that failed a later gate left it intact for a
-	// retry. Reaching this line means the join succeeded, which is the one moment
-	// the grant has done its job and must not be reusable.
 	h.invites.VoidUser(userID)
 	h.voidInvitesIfFull(uint(roomID))
 
-	// Broadcast system:player_joined to room participants
 	players, broadcastErr := h.repo.FindPlayersByRoomID(uint(roomID))
 	if broadcastErr == nil {
-		// Hydrate honour/level so already-seated viewers can draw the joiner's
-		// chips immediately — the payload is the only thing they receive (no
-		// roster refetch happens on a join). Lenient like every roster
-		// decoration: on a failed read the fields are simply absent.
 		h.attachPlayerHonor(players)
 		var joiner *RoomPlayer
 		for i := range players {
@@ -1116,25 +813,19 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		h.broadcastToUsers(userIDs, ws.SystemPlayerJoined, payload)
 	}
 
-	// Broadcast system:room_updated to lobby browse page
 	h.broadcastRoomUpdated(updatedRoom)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": updatedRoom})
 }
 
-// UpdateRoomPrivacyRequest is the body of POST /rooms/:id/privacy (Story 9.6).
-// IsPrivate true requires a non-empty Password (re-hashed and stored); false
-// clears password_hash to NULL, making the room public again.
+// UpdateRoomPrivacyRequest is the body of POST /rooms/:id/privacy.
 type UpdateRoomPrivacyRequest struct {
 	IsPrivate bool   `json:"isPrivate"`
 	Password  string `json:"password"`
 }
 
-// UpdateRoomPrivacy lets a room owner set/change the password or revert the room
-// to public, while the room is still in waiting status (Story 9.6, AC6). It is a
-// new action-style endpoint (mirroring /kick, /transfer-ownership) rather than a
-// generic PATCH. Changing or clearing the password does NOT eject seated players
-// — the privacy gate is join-time only, and nothing here re-checks seated players.
+// UpdateRoomPrivacy lets a waiting room's owner set, change, or clear the password.
+// Seated players are not re-checked, since the privacy gate applies only at join time.
 func (h *RoomHandler) UpdateRoomPrivacy(c echo.Context) error {
 	userID, err := auth.GetUserID(c)
 	if err != nil {
@@ -1159,9 +850,6 @@ func (h *RoomHandler) UpdateRoomPrivacy(c echo.Context) error {
 	if room.Status != "waiting" {
 		return apperr.ErrRoomNotWaiting
 	}
-	// Defense-in-depth for AC7: quick-play rooms are structurally public and
-	// must never be privatized. The UI hides this control for quick-play rooms,
-	// so this rejects only a direct/crafted API call.
 	if room.IsQuickPlay {
 		return apperr.ErrQuickPlayRoomPrivacy
 	}
@@ -1188,28 +876,15 @@ func (h *RoomHandler) UpdateRoomPrivacy(c echo.Context) error {
 		return fmt.Errorf("updating room privacy: %w", err)
 	}
 
-	// Surface the derived flag on the in-memory room (no DB read-back fires
-	// AfterFind here) and broadcast system:room_updated so every lobby card flips
-	// its lock indicator live. Seats/presence are deliberately untouched (AC6).
 	room.IsPrivate = room.PasswordHash != nil
 	h.broadcastRoomUpdated(room)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": room})
 }
 
-// honorSnapshotsFor reads the AUTHORITATIVE honor snapshots for the given users
-// (Story 9.8). `enforced` is false when no honor service is wired, which is the
-// nil-walletService affordance: the caller then skips the gate entirely.
-//
-// A read ERROR is never treated as "not enforced" — it is returned, and every
-// caller fails the request with it (a wrapped 500). A failed honor read must never
-// open a closed door. A requested user whose row is MISSING is likewise an error,
-// not an admit: the zero-value snapshot has IsNewPlayer false and Score 0, which
-// would silently sail through an allow_new_players = false / min_honor = 0 room.
-//
-// Call this only after Room.honorGated() has returned true — on an ungated room the
-// correct number of honor reads is zero (D5). Bot seats (UserID 0) are filtered
-// out; room_players holds humans only, so this is belt-and-braces.
+// honorSnapshotsFor reads the authoritative honor snapshots for the given users, with
+// enforced false when no honor service is wired. A read error or a missing row is
+// returned as an error, never an admit.
 func (h *RoomHandler) honorSnapshotsFor(userIDs []uint) (snaps map[uint]user.HonorSnapshot, enforced bool, err error) {
 	if h.honorService == nil {
 		return nil, false, nil
@@ -1235,20 +910,9 @@ func (h *RoomHandler) honorSnapshotsFor(userIDs []uint) (snaps map[uint]user.Hon
 	return read, true, nil
 }
 
-// attachPlayerHonor hydrates HonorScore / HonorTier / Level on each HUMAN seat for the
-// waiting-room roster (honour redesign R6). Mutates in place and returns nothing:
-// it is presentation, and there is no caller that wants a value back.
-//
-// DELIBERATELY LENIENT, unlike honorSnapshotsFor. That reader is the GATE's, where
-// a missing row must fail the request — a zero-value snapshot reads as an
-// experienced player with score 0 and would sail through a veterans-only room. Here
-// the honour is decoration on a roster: if the read fails, or the service is not
-// wired, or one row is absent, the seat simply gets no shield. Failing a room-detail
-// request because a shield could not be drawn would take the whole waiting room
-// down for a cosmetic reason.
-//
-// Bots (UserID 0) are skipped: they have no account, and a bot seat can never be
-// the thing that blocks Start on honour.
+// attachPlayerHonor hydrates HonorScore, HonorTier, and Level on each human seat in
+// place. Unlike the gate's reader it is lenient: failures just leave a seat without honor
+// data.
 func (h *RoomHandler) attachPlayerHonor(players []RoomPlayer) {
 	if h.honorService == nil || len(players) == 0 {
 		return
@@ -1281,9 +945,7 @@ func (h *RoomHandler) attachPlayerHonor(players []RoomPlayer) {
 	}
 }
 
-// honorSnapshotFor is the single-user form of honorSnapshotsFor, for the three
-// gates that check exactly one player (CreateRoom's creator self-gate, JoinRoom,
-// ReturnToRoom).
+// honorSnapshotFor is the single-user form of honorSnapshotsFor.
 func (h *RoomHandler) honorSnapshotFor(userID uint) (snap user.HonorSnapshot, enforced bool, err error) {
 	snaps, enforced, err := h.honorSnapshotsFor([]uint{userID})
 	if err != nil || !enforced {
@@ -1291,33 +953,13 @@ func (h *RoomHandler) honorSnapshotFor(userID uint) (snap user.HonorSnapshot, en
 	}
 	snap, ok := snaps[userID]
 	if !ok {
-		// Reachable only with userID 0, which honorSnapshotsFor filters out — it then
-		// short-circuits on the now-empty request and returns an empty map with NO
-		// error, so a bare snaps[userID] would hand back the zero snapshot. A zero
-		// snapshot reads as an EXPERIENCED player with score 0 and sails straight
-		// through a min_honor 0 / allow_new_players false room. That is verbatim the
-		// hazard honorSnapshotsFor's own doc comment closes for missing rows, so close
-		// it here too rather than trusting every caller to pre-validate the ID.
 		return user.HonorSnapshot{}, true, fmt.Errorf("reading honor for room gate: no honor row for user %d", userID)
 	}
 	return snap, true, nil
 }
 
-// honorCandidateSnapshots reads honor for OWNERSHIP-HEIR CANDIDATES, and is
-// deliberately more forgiving than honorSnapshotsFor: a candidate whose row is
-// missing is simply absent from the result, and the eligibility closure then
-// treats them as ineligible.
-//
-// The distinction matters. For the gate's SUBJECT a missing row must fail the
-// request, because a zero-value snapshot reads as an experienced player with a
-// score of 0 and would sail through a min_honor 0 / veterans-only room. But a
-// missing CANDIDATE row must not fail the whole ejection — the subject has
-// already failed the gate and their seat has to be freed either way, so 500ing
-// out would leave a barred player seated. Skipping that one candidate is the
-// conservative choice, and the map still covers EVERY other seated human, which
-// is what keeps this clear of 9.3's one-entry-map finding.
-//
-// A read ERROR is still returned: that is a systemic failure, not one absent row.
+// honorCandidateSnapshots reads honor for ownership-heir candidates, omitting any
+// candidate whose row is missing instead of failing. A read error is still returned.
 func (h *RoomHandler) honorCandidateSnapshots(userIDs []uint) (map[uint]user.HonorSnapshot, error) {
 	if h.honorService == nil || len(userIDs) == 0 {
 		return map[uint]user.HonorSnapshot{}, nil
@@ -1338,14 +980,9 @@ func (h *RoomHandler) honorCandidateSnapshots(userIDs []uint) (map[uint]user.Hon
 	return read, nil
 }
 
-// honorPrefilterAtStart re-evaluates the honor gate for every seated human at match
-// start and ejects each failing seat through the shared start-path eject flow (Story
-// 9.8 AC6/AC7). It returns nil when the match may proceed, or the 409 apperr the
-// owner should receive when at least one seat was ejected (the match then does NOT
-// start; ejectSeatsAtStart owns the revert-to-"waiting" or the room close).
-//
-// It MUST be called before any money moves — see the call site in StartMatch.
-// `players` is room_players for the room (humans only; bots never hold honor).
+// honorPrefilterAtStart re-checks the honor gate for every seated human at match start
+// and ejects failing seats, returning the 409 apperr when any were ejected. It must run
+// before any money moves.
 func (h *RoomHandler) honorPrefilterAtStart(roomID uint, room *Room, players []RoomPlayer) error {
 	if !room.honorGated() {
 		return nil
@@ -1365,10 +1002,6 @@ func (h *RoomHandler) honorPrefilterAtStart(roomID uint, room *Room, players []R
 		return nil
 	}
 
-	// Collect EVERY failing seat, not just the first. An abandonment charges every
-	// absent human seat (9.7 AC3, review pass 2), so a single match end can push
-	// several seats below the threshold at once — including the owner plus another
-	// player, which is what makes the AC7 ownership-transfer path reachable.
 	notices := make(map[uint]ejectNotice)
 	rejectByUser := make(map[uint]error)
 	for _, id := range humanIDs {
@@ -1381,8 +1014,6 @@ func (h *RoomHandler) honorPrefilterAtStart(roomID uint, room *Room, players []R
 		return nil
 	}
 
-	// An heir must pass the honor gate too (AC7). snaps already covers every seated
-	// human, so no second read and no one-entry map.
 	honorEligible := func(candidateID uint) bool {
 		cs, ok := snaps[candidateID]
 		if !ok {
@@ -1391,11 +1022,6 @@ func (h *RoomHandler) honorPrefilterAtStart(roomID uint, room *Room, players []R
 		return honorGateError(room, cs) == nil
 	}
 
-	// Heir eligibility is present-agnostic here (presence is cleared at start) but
-	// still solvency-aware, mirroring the insolvency path: the heir is the player who
-	// will be charged at the next start attempt. Read balances only when the room is
-	// actually staked and a wallet is wired; a nil map means "solvency not evaluated"
-	// (see startEligible), never "everyone is broke".
 	var balances map[uint]int
 	if room.CoinBuyIn > 0 && h.walletService != nil {
 		seatedIDs := make([]uint, 0, len(humanIDs))
@@ -1407,18 +1033,12 @@ func (h *RoomHandler) honorPrefilterAtStart(roomID uint, room *Room, players []R
 		if b, berr := h.walletService.GetBalances(seatedIDs); berr == nil {
 			balances = b
 		} else {
-			// Degrade to honor-only heir selection rather than skipping the ejection.
-			// The next StartMatch re-runs the authoritative solvency prefilter anyway,
-			// so an insolvent heir cannot actually start a match unpaid.
 			slog.Error("failed to read balances for honor-eject heir selection", "roomID", roomID, "error", berr)
 		}
 	}
 
 	h.ejectSeatsAtStart(roomID, room, notices, balances, honorEligible, players)
 
-	// Report the OWNER's own rejection when the owner was ejected — that is whose
-	// request this is. Otherwise report the lowest-ID ejected seat's code, so the
-	// response is deterministic rather than dependent on map iteration order.
 	if ownerErr, ok := rejectByUser[room.OwnerID]; ok {
 		return ownerErr
 	}
@@ -1430,32 +1050,15 @@ func (h *RoomHandler) honorPrefilterAtStart(roomID uint, room *Room, players []R
 	return rejectByUser[ejected[0]]
 }
 
-// transferOwnershipOrClose reassigns room ownership away from a departing owner
-// (who must ALREADY be removed from room_players before this is called) to the
-// first seated human — in seat order ascending — for whom isEligible reports
-// true, or closes the room when none qualifies. Bots (UserID 0) never inherit.
-//
-// It runs INSIDE the caller's transaction (tx) and performs NO broadcasts:
-// best-effort WS fan-out must happen post-commit, so the caller acts on the
-// returned values. On transfer it sets room.OwnerID + persists and returns the
-// new owner's ID. On close it flips the room to "completed", evicts every
-// remaining member + bot (mirroring the legacy owner-leave close) and returns
-// closed=true plus seatedNotify — the seated human IDs still in the room when it
-// closed, so the caller can route them to the lobby via system:room_closed_insolvent.
-//
-// Shared by LeaveRoom's owner branch (Task 3), the return-time insolvency eject
-// (Task 1), and the StartMatch insolvency eject (Task 4). Eligibility is the
-// CALLER's policy: present-AND-solvent for the return/leave paths; solvent-only
-// for the start path, where presence is already cleared (see StartMatch). Story 9.3.
+// transferOwnershipOrClose hands ownership to the first eligible seated human by seat
+// order, or closes the room when none qualifies. It runs inside the caller's tx and never
+// broadcasts.
 func (h *RoomHandler) transferOwnershipOrClose(tx RoomRepository, room *Room, isEligible func(candidateID uint) bool) (newOwnerID *uint, closed bool, seatedNotify []uint, err error) {
 	players, err := tx.FindPlayersByRoomID(room.ID)
 	if err != nil {
 		return nil, false, nil, fmt.Errorf("finding remaining players: %w", err)
 	}
 
-	// Seated humans in seat order ascending make the transfer choice
-	// deterministic (AC4). room_players are humans only, so the UserID != 0
-	// guard is belt-and-suspenders against a stray bot/zero row.
 	seated := make([]RoomPlayer, 0, len(players))
 	for _, p := range players {
 		if p.Seat != nil && p.UserID != 0 {
@@ -1475,9 +1078,6 @@ func (h *RoomHandler) transferOwnershipOrClose(tx RoomRepository, room *Room, is
 		}
 	}
 
-	// No eligible candidate: close the room and evict everyone so nobody is
-	// stranded in a dead room and it can't reopen into a broken, owner-less
-	// state. The seated humans are the ones who need routing to the lobby.
 	for _, p := range seated {
 		seatedNotify = append(seatedNotify, p.UserID)
 	}
@@ -1502,13 +1102,8 @@ func (h *RoomHandler) transferOwnershipOrClose(tx RoomRepository, room *Room, is
 	return nil, true, seatedNotify, nil
 }
 
-// ejectKind names WHY a seat was ejected. It selects the per-user WS push and the
-// returned apperr, and nothing else: the seat free, the ownership move, the
-// revert-to-"waiting", the player_left / room_updated / room_closed_insolvent
-// fan-out and the failure logging are byte-identical for both reasons. That is why
-// the two helpers below are parameterized rather than duplicated (Story 9.8 D8) —
-// they are ~140 lines of review-hardened transaction each, and copy-pasting them
-// would double the surface of the two functions most likely to regress.
+// ejectKind names why a seat was ejected, selecting the per-user WS push and the returned
+// apperr.
 type ejectKind int
 
 const (
@@ -1516,21 +1111,17 @@ const (
 	ejectKindHonor
 )
 
-// ejectNotice describes one seat's ejection: the reason plus the numbers that
-// reason's per-user push carries. Only the fields belonging to `kind` are read.
+// ejectNotice describes one seat's ejection: the reason plus the numbers its push
+// carries.
 type ejectNotice struct {
-	kind ejectKind
-	// buyIn / balance feed system:insolvent_ejected (Story 9.3).
-	buyIn   int
-	balance int
-	// minHonor / honor feed system:honor_ejected (Story 9.8). honor is the player's
-	// AUTHORITATIVE recomputed score, never users.honor_score.
+	kind     ejectKind
+	buyIn    int
+	balance  int
 	minHonor int
 	honor    int
 }
 
-// push resolves this notice into the (message type, typed payload) pair for the
-// per-user WS push — the single point where the two ejection reasons diverge.
+// push resolves this notice into the message type and payload for the per-user WS push.
 func (n ejectNotice) push(roomID uint) (string, any) {
 	if n.kind == ejectKindHonor {
 		return ws.SystemHonorEjected, ws.HonorEjectedPayload{
@@ -1546,19 +1137,17 @@ func (n ejectNotice) push(roomID uint) (string, any) {
 	}
 }
 
-// insolventNotice builds the Story 9.3 ejection notice for one seat.
+// insolventNotice builds the insolvency ejection notice for one seat.
 func insolventNotice(buyIn, balance int) ejectNotice {
 	return ejectNotice{kind: ejectKindInsolvent, buyIn: buyIn, balance: balance}
 }
 
-// honorNotice builds the Story 9.8 ejection notice for one seat.
+// honorNotice builds the honor ejection notice for one seat.
 func honorNotice(minHonor, honor int) ejectNotice {
 	return ejectNotice{kind: ejectKindHonor, minHonor: minHonor, honor: honor}
 }
 
-// insolventNotices builds the per-seat notices for an insolvency eject at start:
-// every listed user gets the room's buy-in and their own just-read balance. Keeps
-// the four start-path call sites one-liners after the Story 9.8 generalization.
+// insolventNotices builds the per-seat notices for an insolvency eject at start.
 func insolventNotices(ids []uint, buyIn int, balances map[uint]int) map[uint]ejectNotice {
 	out := make(map[uint]ejectNotice, len(ids))
 	for _, id := range ids {
@@ -1567,19 +1156,9 @@ func insolventNotices(ids []uint, buyIn int, balances map[uint]int) map[uint]eje
 	return out
 }
 
-// ejectReturner frees a barred returner's seat (transferring or closing the room if
-// they were the owner), fans out the room + lobby updates, pushes `notice` to the
-// ejected player, and returns rejectWith (an HTTP 409 apperr) so their client routes
-// to the lobby with the ejection modal (Story 9.3 AC1/AC4; Story 9.8 AC6/AC7). The
-// seat-free + ownership move run in one row-locked tx to serialize against
-// concurrent returns/leaves; broadcasts fan out post-commit (best-effort, never
-// in-tx).
-//
-// `notice` and `rejectWith` are the ONLY reason-dependent inputs — insolvency passes
-// insolventNotice + ErrInsufficientCoins, honor passes honorNotice + ErrHonorTooLow
-// or ErrNewPlayerNotAllowed. extraEligible lets the caller AND an additional
-// predicate into the ownership-eligibility check (Story 9.8 AC7 widens it with the
-// honor gate); nil means no extra requirement.
+// ejectReturner frees a barred returner's seat, moves or closes ownership in one locked
+// tx, broadcasts post-commit, and returns rejectWith. extraEligible, when non-nil,
+// narrows ownership eligibility.
 func (h *RoomHandler) ejectReturner(roomID, userID uint, notice ejectNotice, rejectWith error, extraEligible func(candidateID uint) bool, room *Room, members []RoomPlayer) error {
 	var leavingUsername string
 	for _, p := range members {
@@ -1589,9 +1168,6 @@ func (h *RoomHandler) ejectReturner(roomID, userID uint, notice ejectNotice, rej
 		}
 	}
 
-	// Ownership eligibility (present-AND-solvent, plus the caller's extra predicate)
-	// computed before the tx so no wallet or honor read runs inside the lock — only
-	// needed when the OWNER is ejected.
 	var ownerEligible func(candidateID uint) bool
 	if room.OwnerID == userID {
 		presentSet := make(map[uint]bool)
@@ -1617,17 +1193,9 @@ func (h *RoomHandler) ejectReturner(roomID, userID uint, notice ejectNotice, rej
 			if !presentSet[candidateID] {
 				return false
 			}
-			// A nil balances map means solvency was neither read nor readable (a free
-			// room, or no wallet service wired) — so it is simply not a requirement,
-			// exactly as startEligible treats it. The previous shape inverted this and
-			// judged EVERY candidate ineligible on a nil map, which is 9.3's
-			// "closed a room that had solvent heirs" finding in a new costume.
-			// Behaviour is unchanged wherever balances is non-nil.
 			if buyIn > 0 && balances != nil && balances[candidateID] < buyIn {
 				return false
 			}
-			// Story 9.8 AC7: an heir must ALSO pass the honor gate, on top of the
-			// present-AND-solvent requirement. nil = no extra requirement.
 			return extraEligible == nil || extraEligible(candidateID)
 		}
 	}
@@ -1705,46 +1273,20 @@ func (h *RoomHandler) ejectReturner(roomID, userID uint, notice ejectNotice, rej
 		h.broadcastToUsers(closedNotify, ws.SystemRoomClosedInsolvent, ws.RoomClosedInsolventPayload{RoomID: roomID})
 	}
 
-	// Tell the ejected returner directly so their client routes to the lobby with
-	// the exact numbers for their reason's modal. The HTTP 409 can't carry them, and
-	// the client no longer holds the room (roomStore resets on RoomPage unmount), so
-	// this per-user event is the modal's data source — the same event the start-time
-	// eject uses (Story 9.3 AC1/AC5; Story 9.8 AC6).
 	msgType, payload := notice.push(roomID)
 	h.broadcastToUsers([]uint{userID}, msgType, payload)
 
 	return rejectWith
 }
 
-// ejectSeatsAtStart frees every barred seat at match start (Story 9.3 AC5; Story
-// 9.8 AC6), pushes each ejected player their reason's per-user event, and — when the
-// owner is among them — transfers ownership or closes the room via the shared
-// helper. The match does NOT start (a freed seat means not-all-seated), so the
-// room is reverted to "waiting" (unless closed) and the lobby refreshed. Best-
-// effort: any DB error is logged and the per-user pushes still fan out so no one
-// is left believing a match is about to start.
-//
-// presence was already cleared at start, so ownership eligibility here is
-// solvent-only (no presence requirement — see the StartMatch ejection note),
-// widened by the caller's extraEligible (Story 9.8 AC7 adds the honor gate; nil
-// means no extra requirement).
-//
-// notices is keyed by ejected user ID and carries both the reason and the numbers
-// that reason's push needs — it replaces 9.3's (insolventIDs, balances) pair.
-// Iteration order over a map is random, so the DB work below is order-independent
-// by construction (each seat is freed individually and the owner check is a
-// per-seat comparison). balances still carries every seated human's balance for
-// the solvency half of eligibility — a one-entry map would make every solvent heir
-// look broke and wrongly close a room that has a valid heir (Story 9.3's review
-// finding).
+// ejectSeatsAtStart frees every barred seat at match start, pushes each ejected player
+// their notice, and reverts the room to waiting or closes it. DB errors are logged and
+// the pushes still go out.
 func (h *RoomHandler) ejectSeatsAtStart(roomID uint, room *Room, notices map[uint]ejectNotice, balances map[uint]int, extraEligible func(candidateID uint) bool, members []RoomPlayer) {
 	ejectedIDs := make([]uint, 0, len(notices))
 	for id := range notices {
 		ejectedIDs = append(ejectedIDs, id)
 	}
-	// Sort so the seat-freeing loop, the logs and the fan-out are deterministic
-	// (map iteration order is randomized in Go, which would make a failure
-	// mid-loop non-reproducible).
 	sort.Slice(ejectedIDs, func(i, j int) bool { return ejectedIDs[i] < ejectedIDs[j] })
 
 	ejectedSet := make(map[uint]bool, len(ejectedIDs))
@@ -1752,24 +1294,14 @@ func (h *RoomHandler) ejectSeatsAtStart(roomID uint, room *Room, notices map[uin
 		ejectedSet[id] = true
 	}
 
-	// Solvent-only eligibility: presence is cleared at start, and an already-ejected
-	// candidate is never a valid heir. balances holds every seated human read for
-	// the prefilter, so a solvent seated human resolves to a >= buyIn value here.
 	buyIn := room.CoinBuyIn
 	startEligible := func(candidateID uint) bool {
 		if ejectedSet[candidateID] {
 			return false
 		}
-		// A nil balances map means the caller neither read nor could read balances —
-		// a free room, or no wallet service wired — so solvency is simply not a
-		// requirement here. Treating nil as "everybody is broke" would close rooms
-		// that have perfectly valid heirs, which is 9.3's review finding in a new
-		// costume. Every insolvency caller passes a freshly-read non-nil map, so
-		// their behaviour is unchanged.
 		if buyIn > 0 && balances != nil && balances[candidateID] < buyIn {
 			return false
 		}
-		// Story 9.8 AC7: an heir must ALSO pass the honor gate.
 		return extraEligible == nil || extraEligible(candidateID)
 	}
 
@@ -1787,7 +1319,6 @@ func (h *RoomHandler) ejectSeatsAtStart(roomID uint, room *Room, notices map[uin
 		ownerEjected := false
 		for _, id := range ejectedIDs {
 			if rmErr := tx.RemovePlayer(roomID, id); rmErr != nil {
-				// A concurrent leave may already have freed the seat — tolerate it.
 				if !errors.Is(rmErr, apperr.ErrNotInRoom) {
 					return fmt.Errorf("freeing ejected seat %d: %w", id, rmErr)
 				}
@@ -1826,19 +1357,11 @@ func (h *RoomHandler) ejectSeatsAtStart(roomID uint, room *Room, notices map[uin
 	})
 	if txErr != nil {
 		slog.Error("failed to eject barred seats at start", "roomID", roomID, "error", txErr)
-		// The revert-to-"waiting" lived inside the rolled-back tx, so the room is
-		// still "playing" (set by the committed outer StartMatch tx) with no live
-		// session. Un-brick it with a best-effort out-of-tx revert, mirroring the
-		// charge-failure branches. roomClosed can't be true here (the close path is
-		// inside the same rolled-back tx).
 		if uerr := h.repo.UpdateStatus(roomID, "waiting"); uerr != nil {
 			slog.Error("failed to revert room to waiting after eject failure", "roomID", roomID, "error", uerr)
 		}
-		// Fall through: still push the per-user ejections + lobby refresh below.
 	}
 
-	// Per-user ejection push (Story 9.3 AC5; Story 9.8 AC6) — each ejected player's
-	// client routes to the lobby with the exact numbers for their reason's modal.
 	for _, id := range ejectedIDs {
 		msgType, payload := notices[id].push(roomID)
 		h.broadcastToUsers([]uint{id}, msgType, payload)
@@ -1857,11 +1380,6 @@ func (h *RoomHandler) ejectSeatsAtStart(roomID uint, room *Room, notices map[uin
 		h.broadcastToUsers(closedNotify, ws.SystemRoomClosedInsolvent, ws.RoomClosedInsolventPayload{RoomID: roomID})
 	}
 
-	// Tell the REMAINING in-room players each freed seat is gone (and who the new
-	// owner is, if it transferred). system:room_updated only refreshes the lobby
-	// grid — not the in-room roster — so without a player_left the ejected seat and
-	// stale host badge linger on RoomPage. Skip on close (room_closed_insolvent
-	// routes everyone) and on tx failure (the seats were not actually freed).
 	if txErr == nil && !roomClosed {
 		usernames := make(map[uint]string, len(members))
 		for _, p := range members {
@@ -1912,7 +1430,6 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 		return apperr.ErrRoomNotFound
 	}
 
-	// Capture the leaving player's username before the transaction removes them
 	var leavingUsername string
 	prePlayers, _ := h.repo.FindPlayersByRoomID(uint(roomID))
 	for _, p := range prePlayers {
@@ -1922,13 +1439,6 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 		}
 	}
 
-	// When the OWNER leaves, ownership moves to a present-AND-solvent seated
-	// human (Story 9.3 AC4 — supersedes v2's "no auto-transfer from an absent
-	// owner"). Compute eligibility BEFORE the tx so no wallet read runs inside
-	// the locked transaction. presentSet is the room's live presence (populated
-	// on join/return; empty only after a restart, in which case the room closes
-	// — acceptable per the best-effort presence contract); balances gates
-	// solvency for staked rooms (a free room is trivially solvent).
 	var ownerEligible func(candidateID uint) bool
 	if room.OwnerID == userID {
 		presentSet := make(map[uint]bool)
@@ -1962,11 +1472,6 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 	var roomClosed bool
 	var closedNotify []uint
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		// Story 8.5-1 AC3: row-lock the room INSIDE the tx so the status check
-		// is serialized against any concurrent auto-start tx that flips status
-		// to "playing". FindByIDForUpdate issues SELECT ... FOR UPDATE under
-		// the hood; without it, default READ COMMITTED isolation would let
-		// both tx read status="waiting" and both commit.
 		freshRoom, err := tx.FindByIDForUpdate(uint(roomID))
 		if err != nil {
 			return fmt.Errorf("re-fetching room for leave gate: %w", err)
@@ -1974,11 +1479,6 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 		if freshRoom == nil {
 			return apperr.ErrRoomNotFound
 		}
-		// Only block leaves while a match is actively in progress. Allow leaves
-		// on "completed" rooms so post-match unmount auto-leave
-		// (room-page unmount cleanup) does not log spurious 409s — and a
-		// manual click on Leave for a completed match does what the user
-		// expects.
 		if freshRoom.Status == "playing" {
 			return apperr.ErrMatchAlreadyStarted
 		}
@@ -1989,8 +1489,6 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 			return fmt.Errorf("decrementing player count: %w", err)
 		}
 		if room.OwnerID == userID {
-			// Re-fetch room inside tx to get current state after decrement, then
-			// hand off to the shared transfer-or-close helper (present-and-solvent).
 			freshRoom, err := tx.FindByID(uint(roomID))
 			if err != nil {
 				return fmt.Errorf("re-fetching room: %w", err)
@@ -2013,22 +1511,13 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 		return fmt.Errorf("leaving room: %w", err)
 	}
 
-	// Drop the leaver's presence. Remove auto-clears the room's whole presence
-	// entry once the last present user leaves (empty-room close).
 	h.presence.Remove(uint(roomID), userID)
-	// A player who has left can no longer vouch for anyone: their outstanding
-	// invites into this room die with their membership. This matters most for an
-	// owner-leave — ownership transfers to a remaining player, and a stale host
-	// grant would otherwise keep bypassing the NEW owner's password.
 	h.invites.VoidInviter(uint(roomID), userID)
-	// When the owner-leave closed the room (no eligible human remained), wipe the
-	// whole presence entry — the evicted stragglers are no longer members.
 	if roomClosed {
 		h.presence.Clear(uint(roomID))
 		h.invites.VoidRoom(uint(roomID))
 	}
 
-	// Broadcast system:player_left to remaining room participants (not the leaving player)
 	remainingPlayers, broadcastErr := h.repo.FindPlayersByRoomID(uint(roomID))
 	postRoom, postErr := h.repo.FindByID(uint(roomID))
 	if broadcastErr == nil && len(remainingPlayers) > 0 {
@@ -2052,18 +1541,10 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 		h.broadcastToUsers(userIDs, ws.SystemPlayerLeft, payload)
 	}
 
-	// If the owner-leave closed the room for lack of an eligible heir, tell the
-	// seated humans who were still in it to route to the lobby (Story 9.3 AC4).
-	// In the legacy owner-alone / unseated-straggler closes this list is empty,
-	// so the broadcast is a silent no-op and LeaveRoom's prior behavior holds.
 	if roomClosed && len(closedNotify) > 0 {
 		h.broadcastToUsers(closedNotify, ws.SystemRoomClosedInsolvent, ws.RoomClosedInsolventPayload{RoomID: uint(roomID)})
 	}
 
-	// Broadcast system:room_updated to ALL lobby browsers — even when the
-	// room emptied out and was flipped to "completed". Without this, a
-	// lobby grid that received the room_created event has no way to learn
-	// the room closed, so the stale tile lingers forever.
 	if postErr == nil && postRoom != nil {
 		h.broadcastRoomUpdated(postRoom)
 	}
@@ -2071,19 +1552,9 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": map[string]string{"message": "left room"}})
 }
 
-// ReturnToRoom reopens a finished room so the same group can play another match
-// without recreating it. Ending a match flips the room to "completed" and tears
-// down its live session, but every room_players row (with its seat/team)
-// survives — so a returner reclaims their original seat for free and no one else
-// can take it (seat-selection already blocks occupied seats).
-//
-// The first caller flips "completed" -> "waiting" and clears any bots left over
-// from the previous match; a later/concurrent call when the room is already
-// "waiting" is an idempotent no-op success. Only a current member may reopen the
-// room, which inherently bars a player the owner kicked (or who left)
-// post-match. This is v1 — there is deliberately no presence layer; see
-// deferred-work.md (v2) for the "waiting to return" display and start-gating on
-// every seated human being present.
+// ReturnToRoom reopens a finished room so the same group can play again in their seats.
+// Only current members may reopen, and a call on an already waiting room is a no-op
+// success.
 func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 	userID, err := auth.GetUserID(c)
 	if err != nil {
@@ -2095,8 +1566,6 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		return apperr.ErrRoomNotFound
 	}
 
-	// Reject non-members up front: a kicked/left player's room_players row is
-	// gone, so they can neither reopen nor re-enter the room.
 	members, err := h.repo.FindPlayersByRoomID(uint(roomID))
 	if err != nil {
 		return fmt.Errorf("finding room players: %w", err)
@@ -2112,12 +1581,6 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		return apperr.ErrNotInRoom
 	}
 
-	// Story 9.3 AC1/AC2/AC3: return-time affordability gate. Load the room and,
-	// ONLY for a staked room with an economy wired, re-read the caller's balance.
-	// A free room (CoinBuyIn == 0) never bars (AC2) and skips this entire block,
-	// leaving the reopen/presence/broadcast path below byte-identical to today.
-	// A player who simply hasn't acted on the result dialog yet stays held-as-
-	// seated (AC3) — this gate fires only when they actually click "Return".
 	gateRoom, err := h.repo.FindByID(uint(roomID))
 	if err != nil {
 		return fmt.Errorf("finding room for return gate: %w", err)
@@ -2135,17 +1598,6 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		}
 	}
 
-	// Story 9.8 AC6/AC7: return-time HONOR gate, immediately after the insolvency
-	// gate above and through the same ejection flow.
-	//
-	// This is the checkpoint that actually fires in practice (D3). Honor only moves
-	// at match end, and an abandoning player's room_players row survives — 9.3 AC3
-	// holds them as seated — so the realistic sequence is abandon -> reconnect ->
-	// "Return to room" -> gate. Gating only at StartMatch would leave the
-	// ejected-to-be player sitting in the room until the owner clicks Start, at which
-	// point the match would refuse to start for no visible reason.
-	//
-	// An ungated room performs NO honor read at all (D5).
 	if gateRoom.honorGated() {
 		snap, enforced, herr := h.honorSnapshotFor(userID)
 		if herr != nil {
@@ -2153,19 +1605,6 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		}
 		if enforced {
 			if gateErr := honorGateError(gateRoom, snap); gateErr != nil {
-				// Ownership eligibility is widened with the honor gate (AC7): an heir
-				// must pass it too. Read every OTHER seated human's honor once, here,
-				// outside the transaction — exactly as GetBalances is hoisted above —
-				// and cover ALL of them, not just the failing seat. A one-entry map is
-				// the bug 9.3's review found for balances: it made every candidate look
-				// ineligible and closed rooms that had valid heirs.
-				//
-				// Only read when ownership can actually move. ejectReturner consults
-				// extraEligible solely inside its `room.OwnerID == userID` branch, so
-				// for a non-owner returner this was a wasted round-trip — and a failure
-				// in it returned 500 out of an ejection whose outcome it could not
-				// influence, leaving a barred player seated. nil = no extra requirement,
-				// which ejectReturner already handles.
 				var honorEligible func(candidateID uint) bool
 				if gateRoom.OwnerID == userID {
 					candidateIDs := make([]uint, 0, len(members))
@@ -2191,17 +1630,9 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		}
 	}
 
-	// clearedSeats records bot seats removed during the reopen so we can fan out
-	// system:bot_removed after the tx commits — broadcasts are best-effort and
-	// must never run inside the transaction. reopened is false on the idempotent
-	// "already waiting" path so we don't re-broadcast a redundant reopen (the
-	// first returner already told the lobby).
 	var clearedSeats []int
 	var reopened bool
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		// Row-lock the room so concurrent first-returns (all four clients see the
-		// result dialog at the same instant) serialize: only the first flips
-		// status, the rest fall through the "waiting" no-op below.
 		freshRoom, err := tx.FindByIDForUpdate(uint(roomID))
 		if err != nil {
 			return fmt.Errorf("re-fetching room for return: %w", err)
@@ -2211,7 +1642,7 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		}
 		switch freshRoom.Status {
 		case "waiting":
-			return nil // already reopened — idempotent
+			return nil
 		case "completed":
 			reopened = true
 			if err := tx.UpdateStatus(uint(roomID), "waiting"); err != nil {
@@ -2229,7 +1660,6 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 			}
 			return nil
 		default:
-			// "playing": a match is live; there is nothing to reopen.
 			return apperr.ErrMatchAlreadyStarted
 		}
 	}); err != nil {
@@ -2240,10 +1670,6 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		return fmt.Errorf("returning to room: %w", err)
 	}
 
-	// Post-commit, best-effort broadcasts — only when THIS call performed the
-	// reopen. An idempotent "already waiting" return must stay silent: the first
-	// returner already cleared bots and refreshed the lobby, so re-broadcasting
-	// would fan out a redundant room_updated per remaining click.
 	postRoom, err := h.repo.FindByID(uint(roomID))
 	if err != nil {
 		return fmt.Errorf("re-fetching room after return: %w", err)
@@ -2261,9 +1687,6 @@ func (h *RoomHandler) ReturnToRoom(c echo.Context) error {
 		h.broadcastRoomUpdated(postRoom)
 	}
 
-	// Mark the returner present and announce it to the room — on EVERY successful
-	// return (member), not just the reopen, so each returner flips their own
-	// "waiting to return" seat to present and the owner Start gate can re-evaluate.
 	h.presence.Add(uint(roomID), userID)
 	h.invites.VoidUser(userID)
 	h.voidInvitesIfFull(uint(roomID))
@@ -2340,10 +1763,6 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 	var previousSeat *int
 	seatChanged := false
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		// Row-lock the room so seat takes serialize against the bot endpoints
-		// (AddBot/RemoveBot/SwapSeats) and the start transition — no DB
-		// constraint spans room_players.seat/room_bots.seat, so without the
-		// lock a human and a bot can race onto the same seat.
 		room, err := tx.FindByIDForUpdate(uint(roomID))
 		if err != nil {
 			return fmt.Errorf("finding room: %w", err)
@@ -2355,27 +1774,22 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 			return apperr.ErrMatchNotStartable
 		}
 
-		// Check if seat is already taken
 		existing, err := tx.FindPlayerBySeat(uint(roomID), seat)
 		if err != nil {
 			return fmt.Errorf("checking seat occupancy: %w", err)
 		}
 		if existing != nil {
 			if existing.UserID == userID {
-				// Player already in this seat — no-op
 				return nil
 			}
 			return apperr.ErrSeatTaken
 		}
-		// Bot seats read as OCCUPIED for self-seating — only the owner's swap
-		// flow may displace a bot.
 		if taken, err := botOccupiesSeat(tx, uint(roomID), seat); err != nil {
 			return fmt.Errorf("checking bot seat occupancy: %w", err)
 		} else if taken {
 			return apperr.ErrSeatTaken
 		}
 
-		// Check if player is in this room and has an existing seat to clear
 		player, err := tx.FindPlayerRoom(userID)
 		if err != nil {
 			return fmt.Errorf("finding player room: %w", err)
@@ -2384,7 +1798,6 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 			return apperr.ErrNotInRoom
 		}
 
-		// Capture previous seat before clearing
 		if player.Seat != nil {
 			prev := *player.Seat
 			previousSeat = &prev
@@ -2412,7 +1825,6 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 		return fmt.Errorf("fetching players after seat update: %w", err)
 	}
 
-	// Broadcast system:seat_updated to room participants
 	if seatChanged {
 		var username string
 		var avatarURL *string
@@ -2436,7 +1848,6 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 		h.broadcastRoomSeatSnapshot(uint(roomID), players)
 	}
 
-	// Check if Quick Play room should auto-start now that a seat was taken.
 	matchStarted, err := h.autoStartIfFull(uint(roomID))
 	if err != nil {
 		return err
@@ -2450,11 +1861,8 @@ func (h *RoomHandler) SelectSeat(c echo.Context) error {
 	})
 }
 
-// startAutoStartedMatch invokes matchStarter.StartMatch for an auto-start path
-// that has already flipped room.Status to "playing" inside its tx. Returns
-// nil when no matchStarter is wired (test setups skip this) or when StartMatch
-// succeeds. The caller is responsible for reverting the status flip when this
-// returns a non-nil error (Story 8.5-1 AC2).
+// startAutoStartedMatch starts the match for a room an auto-start path already flipped to
+// playing. The caller must revert the status flip when this returns an error.
 func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomPlayer, bots []RoomBot) error {
 	if h.matchStarter == nil {
 		return nil
@@ -2470,10 +1878,6 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 			}
 		}
 	}
-	// Bot-filled seats travel into the rules-engine seat info flagged IsBot,
-	// mirroring the manual-start block: without this a bot seat would be a
-	// zero-valued {Seat:0, IsBot:false} entry and clobber seat 0's human. Bots
-	// carry no UserID/Username — identity is seat-derived and rendered client-side.
 	for _, b := range bots {
 		if b.Seat >= 0 && b.Seat <= 3 {
 			seatInfo[b.Seat] = match.PlayerSeatInfo{
@@ -2483,23 +1887,6 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 		}
 	}
 
-	// Story 9.4 (AC2/AC3): charge the bracket stake atomically BEFORE the session
-	// goes live, mirroring the manual /start path (StartMatch). Only human seats
-	// pay — `players` is the room_players (humans only); bot seats live in `bots`
-	// and never accrue a stake. The whole block is skipped for the free bracket
-	// (CoinBuyIn == 0). ChargeStakes is the AUTHORITATIVE money guard (FOR UPDATE)
-	// — the join-time bracket gate is never trusted here. `charged`/`chargedIDs`
-	// record the debit so a later StartMatch failure can refund it.
-	//
-	// Insolvency at quick-play auto-start is a near-impossible edge (a >=500
-	// player held by ALREADY_IN_ROOM cannot spend elsewhere, and balances only
-	// rise via the daily reward), but the eject path is wired as a defensive
-	// safety net. ejectSeatsAtStart reverts the room to "waiting" (or closes
-	// it) and fans out the per-player ejection itself, so this returns
-	// ErrInsufficientCoins to tell the caller (autoStartIfFull) NOT to run the
-	// generic revert — that would wrongly tell the remaining players the match
-	// "failed". Story 9.3 patch: pass the FULL prefilter balances map to the
-	// eject helper so a solvent heir is never mistaken for broke.
 	charged := false
 	var chargedIDs []uint
 	if autoStartRoom.CoinBuyIn > 0 && h.walletService != nil {
@@ -2510,8 +1897,6 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 
 		balances, berr := h.walletService.GetBalances(humanIDs)
 		if berr != nil {
-			// A generic failure — let the caller revert the room to "waiting" and
-			// broadcast error:match_start_failed.
 			return fmt.Errorf("reading balances for auto-start: %w", berr)
 		}
 
@@ -2522,22 +1907,12 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 			}
 		}
 		if len(insolvent) > 0 {
-			// extraEligible is nil: a Quick Play room is ungated by construction
-			// (Story 9.8 AC12 — the synthesis sets min_honor 0 / allow_new_players
-			// true explicitly), so there is no honor requirement for an heir to meet.
 			h.ejectSeatsAtStart(autoStartRoom.ID, autoStartRoom, insolventNotices(insolvent, autoStartRoom.CoinBuyIn, balances), balances, nil, players)
 			return apperr.ErrInsufficientCoins
 		}
 
-		// Authoritative atomic charge. A TOCTOU race can still surface ONE
-		// insolvent user — eject that user too and abort rather than start with
-		// an unpaid stake.
 		if insolventID, chargeErr := h.walletService.ChargeStakes(humanIDs, autoStartRoom.CoinBuyIn); chargeErr != nil {
 			if errors.Is(chargeErr, apperr.ErrInsufficientCoins) {
-				// Refresh just the insolvent user's balance for the modal number,
-				// but keep the FULL prefilter balances map (ownership eligibility
-				// reads every seated human; a one-entry map wrongly closes a room
-				// with a valid heir — Story 9.3 patch).
 				if fresh, ferr := h.walletService.GetBalances([]uint{insolventID}); ferr == nil {
 					balances[insolventID] = fresh[insolventID]
 				}
@@ -2556,9 +1931,6 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 	}
 	reconnectWindow := resolveReconnectWindow(autoStartRoom.ReconnectWindowSec)
 	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled, autoStartRoom.StopAtTarget); serr != nil {
-		// Charge succeeded but the session failed to start: refund every charged
-		// human (no coins destroyed). The caller (autoStartIfFull) reverts the
-		// room to "waiting" and broadcasts error:match_start_failed.
 		if charged {
 			refund := make(map[uint]int, len(chargedIDs))
 			for _, id := range chargedIDs {
@@ -2573,15 +1945,9 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 	return nil
 }
 
-// revertAutoStart compensates for a failed matchStarter.StartMatch: it flips
-// the room status back to "waiting" and broadcasts error:match_start_failed
-// to the four would-be participants so their clients keep them on the
-// room-lobby page instead of navigating to a non-existent /game/{id}.
-// Story 8.5-1 AC2.
-//
-// `players` may be nil — revertAutoStart will re-fetch from the room state
-// so the four participants get the failure broadcast even when the caller
-// failed to load them.
+// revertAutoStart flips a room back to waiting after a failed StartMatch and broadcasts
+// error:match_start_failed to the would-be participants, re-fetching them when players is
+// nil.
 func (h *RoomHandler) revertAutoStart(roomID uint, autoStartRoom *Room, players []RoomPlayer) {
 	revertErr := h.repo.RunInTransaction(func(tx RoomRepository) error {
 		r, err := tx.FindByIDForUpdate(roomID)
@@ -2591,10 +1957,6 @@ func (h *RoomHandler) revertAutoStart(roomID uint, autoStartRoom *Room, players 
 		if r == nil {
 			return nil
 		}
-		// Idempotency: only revert if the room is still in the "playing"
-		// state we flipped it into. A concurrent code path may have already
-		// transitioned the room to "completed"/"abandoned" and we must not
-		// resurrect it back to "waiting".
 		if r.Status != "playing" {
 			autoStartRoom.Status = r.Status
 			return nil
@@ -2603,25 +1965,14 @@ func (h *RoomHandler) revertAutoStart(roomID uint, autoStartRoom *Room, players 
 		if err := tx.Update(r); err != nil {
 			return fmt.Errorf("reverting room status to waiting: %w", err)
 		}
-		// Update the caller-visible Room so the subsequent broadcast carries
-		// the reverted status.
 		autoStartRoom.Status = "waiting"
 		return nil
 	})
 	if revertErr != nil {
-		// Bail out on revert-tx failure: room is stuck in "playing" with no
-		// live session, broadcasting error:match_start_failed AND telling
-		// clients to stay on the room-lobby page would just compound the
-		// problem (every subsequent action rejects on status != "waiting").
-		// Logging is the best we can do here; a follow-up health check or
-		// admin sweep will need to clean the row up.
 		slog.Error("failed to revert auto-start status flip; aborting failure broadcast", "roomID", roomID, "error", revertErr)
 		return
 	}
 
-	// If the caller didn't supply a players slice (e.g. their own
-	// FindPlayersByRoomID failed), re-fetch so the four participants still
-	// receive the failure broadcast and don't silently stall.
 	if len(players) == 0 {
 		if fetched, ferr := h.repo.FindPlayersByRoomID(roomID); ferr == nil {
 			players = fetched
@@ -2641,17 +1992,13 @@ func (h *RoomHandler) revertAutoStart(roomID uint, autoStartRoom *Room, players 
 		})
 	}
 
-	// Tell lobby browse pages that the room is back to "waiting" so their
-	// row state matches the reverted DB row.
 	if autoStartRoom.Status == "waiting" {
 		h.broadcastRoomUpdated(autoStartRoom)
 	}
 }
 
-// seatPlayerIntoQuickRoom adds the player to an existing quick play room and
-// auto-assigns the lowest empty seat. It MUST be called inside a transaction.
-// Returns the assigned seat/team and a fresh copy of the room. Shared by the
-// QuickPlay "found existing room" branch and the QuickJoin handler.
+// seatPlayerIntoQuickRoom adds the player to a quick play room at the lowest empty seat.
+// It must be called inside a transaction.
 func seatPlayerIntoQuickRoom(tx RoomRepository, roomID, userID uint) (seat int, team string, room *Room, err error) {
 	rp := &RoomPlayer{RoomID: roomID, UserID: userID}
 	if err = tx.AddPlayer(rp); err != nil {
@@ -2675,24 +2022,14 @@ func seatPlayerIntoQuickRoom(tx RoomRepository, roomID, userID uint) (seat int, 
 	return seat, team, room, nil
 }
 
-// autoStartIfFull row-locks the room and, when it is a quick play room in
-// "waiting" status with all four seats filled, flips it to "playing" and
-// starts the game session. On a successful start it broadcasts
-// system:match_started to room participants and system:room_updated to the
-// lobby and returns true. If the session fails to start it reverts the status
-// flip (Story 8.5-1 AC2) and returns false. Returns false (no error) when the
-// room is not yet ready to start. This is the single source of truth for the
-// auto-start transition shared by SelectSeat, QuickPlay, and QuickJoin.
+// autoStartIfFull row-locks the room and starts the match when a waiting quick play room
+// has all four seats filled. It returns true only when the match started.
 func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 	matchStarted := false
 	var autoStartRoom *Room
 	var autoStartPlayers []RoomPlayer
 	var autoStartBots []RoomBot
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		// Story 8.5-1 AC3 + P1: row-lock the room AND re-fetch players INSIDE
-		// the auto-start tx so a concurrent LeaveRoom committing between the
-		// seat-update tx and this tx can never leak a departed player into the
-		// rules-engine seat snapshot.
 		r, err := tx.FindByIDForUpdate(roomID)
 		if err != nil {
 			return fmt.Errorf("fetching room for auto-start check: %w", err)
@@ -2704,9 +2041,6 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 		if err != nil {
 			return fmt.Errorf("fetching players for auto-start check: %w", err)
 		}
-		// Bot-filled seats count toward the four (Quick Play bot auto-fill):
-		// a room fills when seated humans + bots cover all four seats. Bots and
-		// humans never share a seat, so the sum is a faithful coverage count.
 		bots, err := tx.FindBotsByRoomID(roomID)
 		if err != nil {
 			return fmt.Errorf("fetching bots for auto-start check: %w", err)
@@ -2734,30 +2068,16 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 	}
 
 	if matchStarted && autoStartRoom != nil {
-		// Story 8.5-1 AC2: gate system:match_started AND the playing-status
-		// broadcast on matchStarter.StartMatch success. On failure, revert the
-		// status flip so the room is not stranded in "playing" with no live
-		// session and tell the four would-be participants to stay put.
 		startErr := h.startAutoStartedMatch(autoStartRoom, autoStartPlayers, autoStartBots)
 		if startErr != nil {
 			slog.Error("failed to start auto-started game session", "roomID", roomID, "error", startErr)
-			// Story 9.4: an insolvency at charge time was fully handled inside
-			// startAutoStartedMatch (room reverted to "waiting"/closed + per-player
-			// ejection broadcast). Running the generic revert here would wrongly
-			// broadcast error:match_start_failed to the remaining players, so skip
-			// it — only generic start failures (StartMatch/charge errors) revert.
 			if !errors.Is(startErr, apperr.ErrInsufficientCoins) {
 				h.revertAutoStart(roomID, autoStartRoom, autoStartPlayers)
 			}
 			matchStarted = false
 		} else {
-			// Match is live — clear presence (quick-play, but keep parity with
-			// the manual StartMatch path).
 			h.presence.Clear(roomID)
 			h.invites.VoidRoom(roomID)
-			// The room started, so the auto-fill scheduler has nothing left to
-			// do — cancel it (single source of truth for the started transition,
-			// shared by SelectSeat / QuickPlay / QuickJoin).
 			h.cancelQuickFill(roomID)
 			h.broadcastToRoom(roomID, ws.SystemMatchStarted, map[string]interface{}{
 				"roomId": roomID,
@@ -2792,7 +2112,6 @@ func (h *RoomHandler) KickPlayer(c echo.Context) error {
 		return apperr.ErrBadRequest
 	}
 
-	// Capture the kicked player's username before the transaction removes them
 	var kickedUsername string
 	prePlayers, _ := h.repo.FindPlayersByRoomID(uint(roomID))
 	for _, p := range prePlayers {
@@ -2853,27 +2172,18 @@ func (h *RoomHandler) KickPlayer(c echo.Context) error {
 		return fmt.Errorf("kicking player: %w", err)
 	}
 
-	// If the post-tx re-fetch returned nil (e.g. concurrent room cleanup), bail
-	// out of the broadcast/response branches that need PlayerCount rather than
-	// dereferencing a nil pointer.
 	if postRoom == nil {
 		return apperr.ErrRoomNotFound
 	}
 
-	// Drop the kicked player's presence so they no longer count toward the Start
-	// gate (their /return is already rejected as a non-member — see ReturnToRoom).
 	h.presence.Remove(uint(roomID), req.UserID)
-	// A kicked player's invites go with them — they are no longer a member, so
-	// nothing they issued should still admit anyone.
 	h.invites.VoidInviter(uint(roomID), req.UserID)
 
-	// Broadcast: kicked user gets system:room_kicked
 	h.broadcastToUsers([]uint{req.UserID}, ws.SystemRoomKicked, ws.RoomKickedPayload{
 		RoomID: uint(roomID),
 		Reason: "kicked_by_owner",
 	})
 
-	// Broadcast: remaining members get system:player_left
 	remainingPlayers, broadcastErr := h.repo.FindPlayersByRoomID(uint(roomID))
 	if broadcastErr == nil {
 		userIDs := make([]uint, 0, len(remainingPlayers))
@@ -2887,7 +2197,6 @@ func (h *RoomHandler) KickPlayer(c echo.Context) error {
 			"playerCount": postRoom.PlayerCount,
 		})
 
-		// Broadcast: lobby browse page gets system:room_updated
 		h.broadcastRoomUpdated(postRoom)
 	}
 
@@ -2900,11 +2209,8 @@ type TransferOwnershipRequest struct {
 	UserID uint `json:"userId"`
 }
 
-// TransferOwnership reassigns room ownership from the current owner to a
-// seated room member. Restricted to non-self seated targets; an unseated
-// promotion would let the new owner immediately get stuck (4-seat cap with
-// no spot to take). All clients converge on the new owner via a single
-// system:room_owner_changed broadcast plus the lobby system:room_updated.
+// TransferOwnership reassigns room ownership from the current owner to another seated
+// room member.
 func (h *RoomHandler) TransferOwnership(c echo.Context) error {
 	ownerID, err := auth.GetUserID(c)
 	if err != nil {
@@ -2983,21 +2289,12 @@ func (h *RoomHandler) TransferOwnership(c echo.Context) error {
 		return apperr.ErrRoomNotFound
 	}
 
-	// The previous owner is no longer the host, so the host grants they issued
-	// must not keep bypassing the new owner's password (AC3 — the bypass encodes
-	// HOST authority, and that authority has just moved).
 	h.invites.VoidInviter(uint(roomID), previousOwnerID)
 
-	// The promoted player's avatar: FindPlayerRoom (above) reads no user
-	// columns, so hydrate the owner fields here, best-effort. The room_updated
-	// broadcast below then reuses them instead of reading again.
 	if err := h.repo.LoadOwnerUsernames([]*Room{postRoom}); err != nil {
 		slog.Error("transfer ownership: failed to load new owner identity", "roomID", roomID, "error", err)
 	}
 
-	// Broadcast: every room member converges on the new owner. Lobby browse
-	// page also gets system:room_updated so the room card's "Hosted by …"
-	// stays accurate.
 	h.broadcastToRoom(uint(roomID), ws.SystemRoomOwnerChanged, map[string]interface{}{
 		"roomId":            roomID,
 		"newOwnerId":        postRoom.OwnerID,
@@ -3051,24 +2348,15 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 		team         string
 		previousSeat int
 	}
-	// humanMoves collects the seat_updated broadcasts owed to HUMAN
-	// participants (0, 1, or 2 entries). botMove, when set, is a bot
-	// relocation broadcast as bot_removed{from} + bot_added{to}.
 	var humanMoves []swapped
 	type botRelocation struct {
 		from int
 		to   int
 	}
 	var botMove *botRelocation
-	// botNoOp marks a bot ↔ bot swap: identity is seat-derived, so swapping
-	// two bots is observably nothing — success with no state change and no
-	// broadcasts.
 	var botNoOp bool
 
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		// Row-lock the room so bot-involved rearrangements serialize against
-		// concurrent seat takes, add-bot calls, and the start transition
-		// (story-8.5-1 pattern).
 		r, err := tx.FindByIDForUpdate(uint(roomID))
 		if err != nil {
 			return fmt.Errorf("finding room: %w", err)
@@ -3103,7 +2391,6 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 			return apperr.ErrSeatNotOccupied
 		}
 
-		// bot ↔ bot: observable no-op (identity is seat-derived).
 		if botA && botB {
 			botNoOp = true
 			return nil
@@ -3125,10 +2412,6 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 			return nil
 		}
 
-		// Exactly one bot involved → relocate it to the opposite seat. If a
-		// human occupies that seat they move to the bot's seat in the same
-		// transaction (human ↔ bot swap); otherwise the bot moves to the
-		// empty seat.
 		if botA || botB {
 			botFrom, botTo := seatA, seatB
 			otherHuman := pB
@@ -3148,7 +2431,6 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 			return nil
 		}
 
-		// Humans only from here on — original swap / move-to-empty semantics.
 		if pA == nil || pB == nil {
 			var mover *RoomPlayer
 			var fromSeat, toSeat int
@@ -3177,16 +2459,12 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 
 	players := h.playersWithBots(uint(roomID))
 
-	// bot ↔ bot: success with no state change and no broadcasts.
 	if botNoOp {
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"data": PlayersResponse{Players: players},
 		})
 	}
 
-	// Broadcast system:seat_updated for each HUMAN move, then the bot
-	// relocation as bot_removed{from} + bot_added{to}. Multi-event sequences
-	// are sent as separate messages, never batched.
 	for _, mv := range humanMoves {
 		h.broadcastToRoom(uint(roomID), ws.SystemSeatUpdated, map[string]interface{}{
 			"roomId":       roomID,
@@ -3209,8 +2487,6 @@ func (h *RoomHandler) SwapSeats(c echo.Context) error {
 			"team":   teamForSeat(botMove.to),
 		})
 	}
-	// Single snapshot broadcast after the per-room events so lobby viewers
-	// see the final state in one cache update, not intermediate ones.
 	humansOnly, err := h.repo.FindPlayersByRoomID(uint(roomID))
 	if err != nil {
 		return fmt.Errorf("fetching players after swap: %w", err)
@@ -3240,11 +2516,8 @@ type AddBotRequest struct {
 	Seat *int `json:"seat"`
 }
 
-// AddBot seats a bot on an empty seat of a waiting room. Owner-only; rejected
-// for quick-play rooms (they auto-start on 4 humans). Runs inside a
-// row-locking transaction so concurrent seat takes, double add-bot calls, and
-// the start transition serialize — the unique (room_id, seat) index is the
-// backstop for anything that slips through.
+// AddBot seats a bot on an empty seat of a waiting non-quick-play room, owner only,
+// inside a row-locking transaction.
 func (h *RoomHandler) AddBot(c echo.Context) error {
 	userID, err := auth.GetUserID(c)
 	if err != nil {
@@ -3282,9 +2555,6 @@ func (h *RoomHandler) AddBot(c echo.Context) error {
 		if r.IsQuickPlay {
 			return apperr.ErrBotsNotAllowed
 		}
-		// Seat-range check sits after the ownership/state gates (KickPlayer
-		// order): a non-owner probing with a junk seat gets NOT_ROOM_OWNER,
-		// not INVALID_SEAT.
 		if seat < 0 || seat > 3 {
 			return apperr.ErrInvalidSeat
 		}
@@ -3305,10 +2575,6 @@ func (h *RoomHandler) AddBot(c echo.Context) error {
 				return apperr.ErrSeatTaken
 			}
 		}
-		// Every member must keep a claimable seat: humans + bots may never
-		// exceed the four seats, or unseated members would be stranded in a
-		// waiting room they can neither sit in nor start from (JoinRoom
-		// enforces the same invariant from the joiner's side).
 		if r.PlayerCount+len(bots) >= 4 {
 			return apperr.ErrRoomFull
 		}
@@ -3327,13 +2593,8 @@ func (h *RoomHandler) AddBot(c echo.Context) error {
 		return fmt.Errorf("adding bot: %w", err)
 	}
 
-	// A bot can take the last free seat just as a human can, so the same
-	// invite-void applies (Story 11.5 AC2).
 	h.voidInvitesIfFull(uint(roomID))
 
-	// Broadcast after commit: bot_added to room participants, then the lobby
-	// seat snapshot so browse-page seat chips refresh. Separate ordered
-	// messages, never batched.
 	h.broadcastToRoom(uint(roomID), ws.SystemBotAdded, map[string]interface{}{
 		"roomId": roomID,
 		"seat":   seat,
@@ -3407,11 +2668,8 @@ func (h *RoomHandler) RemoveBot(c echo.Context) error {
 	})
 }
 
-// LeaveSeat clears the calling player's seat without removing them from the
-// room. It is the inverse of SelectSeat for the seated state — the player
-// stays a room member (player_count unchanged) but is no longer in a seat.
-// Disallowed in quick-play rooms, where the seating loop is meant to fill
-// instantly and start a game; seated players must instead leave the room.
+// LeaveSeat clears the calling player's seat without removing them from the room. It is
+// disallowed in quick-play rooms.
 func (h *RoomHandler) LeaveSeat(c echo.Context) error {
 	userID, err := auth.GetUserID(c)
 	if err != nil {
@@ -3442,10 +2700,6 @@ func (h *RoomHandler) LeaveSeat(c echo.Context) error {
 		if r.IsQuickPlay {
 			return apperr.ErrQuickPlayLeaveSeatBlocked
 		}
-		// Owner stays seated by design: with the 4-player room cap, an unseated
-		// owner could be locked out of re-seating once others fill the seats.
-		// Owners that want to leave the table use LeaveRoom (which transfers
-		// ownership) instead.
 		if r.OwnerID == userID {
 			return apperr.ErrOwnerCannotLeaveSeat
 		}
@@ -3484,8 +2738,6 @@ func (h *RoomHandler) LeaveSeat(c echo.Context) error {
 		return fmt.Errorf("fetching players after leave-seat: %w", err)
 	}
 
-	// The leaver is still in the room, so the post-write roster (which JOINs
-	// users) has their avatar; FindPlayerRoom inside the transaction does not.
 	var avatarURL *string
 	for _, p := range players {
 		if p.UserID == userID {
@@ -3494,8 +2746,6 @@ func (h *RoomHandler) LeaveSeat(c echo.Context) error {
 		}
 	}
 
-	// Broadcast a system:seat_updated with seat=null/team=null so other clients
-	// remove the player from the seat tile but keep them in the room roster.
 	h.broadcastToRoom(uint(roomID), ws.SystemSeatUpdated, map[string]interface{}{
 		"roomId":       roomID,
 		"userId":       userID,
@@ -3525,9 +2775,6 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 
 	var updatedRoom *Room
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		// Row-lock the room so the start transition serializes against seat
-		// takes and the bot endpoints — the coverage check below must see a
-		// settled seat picture.
 		room, err := tx.FindByIDForUpdate(uint(roomID))
 		if err != nil {
 			return fmt.Errorf("finding room: %w", err)
@@ -3557,20 +2804,12 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 			return fmt.Errorf("finding room bots: %w", err)
 		}
 
-		// Every room member must hold a seat — pre-bots this was implied by
-		// the 4-seated-humans gate (capacity 4 ⇒ all members seated); with
-		// bots covering seats it must be explicit, or unseated members would
-		// receive system:match_started with no seat, no userToRoom entry and
-		// no state. The owner kicks lingering unseated members first.
 		for _, p := range players {
 			if p.Seat == nil {
 				return apperr.ErrNotAllSeated
 			}
 		}
 
-		// Every seat 0–3 must be covered by exactly one human or bot. The
-		// seating paths guarantee exclusivity (a bot can't take a human seat
-		// and vice versa), so coverage is the only check needed.
 		var seatCovered [4]bool
 		for _, p := range players {
 			if p.Seat != nil && *p.Seat >= 0 && *p.Seat <= 3 {
@@ -3603,22 +2842,14 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 		return fmt.Errorf("starting game: %w", err)
 	}
 
-	// Match is live — presence is no longer meaningful; clear it so the next
-	// reopen starts from an empty "who's back" set.
 	h.presence.Clear(uint(roomID))
-	// The room is no longer joinable, so any outstanding invite is dead (AC2).
 	h.invites.VoidRoom(uint(roomID))
 
-	// Start match via match starter
 	if h.matchStarter != nil {
 		players, err := h.repo.FindPlayersByRoomID(uint(roomID))
 		if err != nil {
 			slog.Error("failed to load players for game start", "roomID", roomID, "error", err)
 		} else if bots, berr := h.repo.FindBotsByRoomID(uint(roomID)); berr != nil {
-			// Proceeding with bots=nil would leave bot seats zero-valued in
-			// seatInfo ({Seat:0, IsBot:false}), clobbering seat 0's human in
-			// the manager's seat loop — skip the start exactly like the
-			// players-load failure above.
 			slog.Error("failed to load bots for game start", "roomID", roomID, "error", berr)
 		} else {
 			var seatInfo [4]match.PlayerSeatInfo
@@ -3641,43 +2872,7 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 				}
 			}
 
-			// Story 9.2/9.3 (AC5): charge each human seat the buy-in atomically
-			// BEFORE the session goes live, so a failed charge never leaves a live
-			// match with an unpaid stake. Bots never pay — `players` is the
-			// room_players (humans only); bot seats live in `bots`. The room is
-			// already row-locked to "playing", so the seat picture is settled.
-			// ChargeStakes is the AUTHORITATIVE money guard (FOR UPDATE re-
-			// validation) — the return-time gate (AC1) is never trusted here.
-			//
-			// Story 9.3 replaces 9.2's whole-table rollback with PER-PLAYER
-			// ejection. ChargeStakes reports only the first insolvent user and
-			// rolls back atomically, so a GetBalances prefilter is needed to find
-			// and eject EVERY insolvent seat. `charged` records whether stakes were
-			// actually debited so a later StartMatch failure can refund them.
-			// Story 9.8 AC6: mid-session HONOR re-check, run BEFORE the coin block
-			// below. The ordering is load-bearing, not stylistic: ChargeStakes commits
-			// money, so an honor ejection discovered after it would need a refund.
-			// Gate first, charge second — no stake is ever charged and refunded for a
-			// player who was about to be ejected.
-			//
-			// An ungated room short-circuits with zero honor reads (D5). In practice
-			// the only thing that trips this is an abandonment in the previous match:
-			// a completed match raises honor, and decay only lowers it over months.
 			if honorErr := h.honorPrefilterAtStart(uint(roomID), updatedRoom, players); honorErr != nil {
-				// Two very different failures come back here, and only one of them
-				// has already cleaned up.
-				//
-				// A 409 gate rejection means seats WERE ejected, and ejectSeatsAtStart
-				// owns the revert-to-"waiting" or the room close (including the
-				// out-of-tx un-brick when its own tx rolls back). Nothing to do.
-				//
-				// Anything else is a honor READ failure with no ejection at all — and
-				// the outer tx has already committed Status = "playing", so returning
-				// bare would strand the room in "playing" with no live session: it
-				// vanishes from the lobby, and JoinRoom / StartMatch / ReturnToRoom /
-				// LeaveRoom all then refuse, trapping every seated player until the
-				// next boot reconcile. Un-brick it exactly as the balance-read and
-				// charge failures below do.
 				if !errors.Is(honorErr, apperr.ErrHonorTooLow) && !errors.Is(honorErr, apperr.ErrNewPlayerNotAllowed) {
 					slog.Error("failed to read honor for start prefilter", "roomID", roomID, "error", honorErr)
 					if uerr := h.repo.UpdateStatus(uint(roomID), "waiting"); uerr != nil {
@@ -3715,29 +2910,12 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 					}
 				}
 				if len(insolvent) > 0 {
-					// Per-player ejection: free every insolvent seat, push
-					// system:insolvent_ejected to each, transfer/close if the owner
-					// was insolvent. The match does not start; the owner gets 409.
-					//
-					// extraEligible is nil, and that is sound rather than an omission:
-					// the honor prefilter above runs BEFORE this whole block and returns
-					// early on any failing seat, so reaching here proves every seated
-					// human already passes the room's honor gate (Story 9.8 AC7).
 					h.ejectSeatsAtStart(uint(roomID), updatedRoom, insolventNotices(insolvent, updatedRoom.CoinBuyIn, balances), balances, nil, players)
 					return apperr.ErrInsufficientCoins
 				}
 
-				// Authoritative atomic charge. A TOCTOU race (a balance dropped
-				// between the prefilter read and the FOR UPDATE lock) can still
-				// surface ONE insolvent user — eject that user too and abort rather
-				// than start with an unpaid stake.
 				if insolventID, chargeErr := h.walletService.ChargeStakes(humanIDs, updatedRoom.CoinBuyIn); chargeErr != nil {
 					if errors.Is(chargeErr, apperr.ErrInsufficientCoins) {
-						// Refresh just the insolvent user's balance for an accurate modal
-						// number, but keep the FULL prefilter `balances` map: ownership
-						// eligibility in transferOwnershipOrClose reads every seated
-						// human's balance, so a one-entry map would make every solvent
-						// heir look broke and wrongly CLOSE a room that has a valid heir.
 						if fresh, ferr := h.walletService.GetBalances([]uint{insolventID}); ferr == nil {
 							balances[insolventID] = fresh[insolventID]
 						}
@@ -3761,14 +2939,6 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 			}
 			reconnectWindow := resolveReconnectWindow(updatedRoom.ReconnectWindowSec)
 			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled, updatedRoom.StopAtTarget); serr != nil {
-				// Story 9.3 (deferred-work item 1): the charge succeeded but the
-				// session failed to start. Refund every charged human (no coins
-				// destroyed), revert the room to "waiting" (no room stranded in
-				// "playing"), and tell the four participants to stay on the room
-				// page via error:match_start_failed — do NOT broadcast match_started
-				// (the previous code did, leaving clients navigating to a dead
-				// match). Return an error so the owner's /start request does not
-				// resolve OK and auto-navigate into the dead match.
 				slog.Error("failed to start game session", "roomID", roomID, "error", serr)
 				if charged {
 					refund := make(map[uint]int, len(chargedIDs))
@@ -3793,12 +2963,10 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 		}
 	}
 
-	// Broadcast system:match_started to all room participants
 	h.broadcastToRoom(uint(roomID), ws.SystemMatchStarted, map[string]interface{}{
 		"roomId": roomID,
 	})
 
-	// Broadcast system:room_updated to lobby browse page
 	h.broadcastRoomUpdated(updatedRoom)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": updatedRoom})
@@ -3818,11 +2986,6 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 		return apperr.ErrAlreadyInRoom
 	}
 
-	// Story 9.4 (AC1): bracket the caller by affordability BEFORE matchmaking so
-	// they can only match into — or synthesize — a room of their own bracket
-	// (500 if they can afford the standard stake, else the free 0 pool). A nil
-	// walletService (legacy setups / tests that don't exercise coins) degrades
-	// to the free bracket so the matchmaking path still runs.
 	buyIn := 0
 	if h.walletService != nil {
 		balance, berr := h.walletService.GetBalance(userID)
@@ -3837,13 +3000,6 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 	var assignedTeam string
 	createdNew := false
 	var createErr error
-	// Story 8.5-1 AC5: track room IDs whose join tx failed in this retry loop
-	// so the next iteration's FindQuickPlayRoom skips them. Without this, a
-	// drifted room (player_count<4 but every seat taken) would be returned
-	// every iteration, the inner pickFirstEmptySeat would raise ErrRoomFull,
-	// the tx would roll back leaving the drift unchanged, and the loop would
-	// burn its retry budget on the same row before surfacing the opaque
-	// ErrRoomFull AC5 promised never to surface.
 	triedRoomIDs := make(map[uint]bool)
 	var lastTriedRoomID uint
 	for i := 0; i < maxRetries; i++ {
@@ -3874,48 +3030,21 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 
 			timerDuration := quickPlayTimerDurationSeconds
 			newRoom := &Room{
-				Name:      "Quick Play " + code,
-				Code:      code,
-				OwnerID:   userID,
-				Variant:   "croatia",
-				MatchMode: "501",
-				// Story 9.4 (AC5, Decision D5): quick-play games default to a
-				// per-move 30s timer (was relaxed/no timer) so casual matchmade
-				// games keep moving. The value flows through StartMatch unchanged
-				// — the per-move timer UI already exists (Story 4.5).
+				Name:                 "Quick Play " + code,
+				Code:                 code,
+				OwnerID:              userID,
+				Variant:              "croatia",
+				MatchMode:            "501",
 				TimerStyle:           "per-move",
 				TimerDurationSeconds: &timerDuration,
 				IsQuickPlay:          true,
-				// Story 9.4 (AC1, Decision D1): the caller's affordability bracket
-				// (500 or 0) IS the synthesized room's stake AND its matchmaking
-				// pool key — players who can afford 500 pool together, everyone
-				// else pools at 0 (free). Charged atomically at auto-start.
-				CoinBuyIn: buyIn,
-				// PasswordHash stays nil — quick-play rooms are never private
-				// (Story 9.6, AC7). The QuickPlay/QuickJoin paths never prompt for
-				// or accept a password, so synthesized rooms are always public.
-				//
-				// Both honor-gate columns are set EXPLICITLY to their open values
-				// (Story 9.8 AC12): quick play is ungated by construction, has no
-				// honor bracket, and QuickPlay/QuickJoin gain no honor gate and no new
-				// error code. AllowNewPlayers in particular MUST be spelled out here —
-				// room.Room declares it without a GORM `default` tag (that tag would
-				// make `false` uninsertable), so omitting it would insert false and
-				// turn every Quick Play table veterans-only.
-				MinHonor:        0,
-				AllowNewPlayers: true,
-				// Quick Play plays WITH declarations, spelled out for exactly the
-				// same reason as AllowNewPlayers above: no GORM `default` tag, so an
-				// omitted field would insert false and silently strip melds and
-				// Belote from every matchmade table. Quick Play offers no rule
-				// choices — it is Croatian, 501, declarations on.
-				DeclarationsEnabled: true,
-				// Quick Play finishes the hand, spelled out explicitly for the same
-				// reason as its siblings above. Quick Play offers no rule choices — it
-				// is Croatian, 501, declarations on, finish the hand.
-				StopAtTarget: false,
-				Status:       "waiting",
-				PlayerCount:  1,
+				CoinBuyIn:            buyIn,
+				MinHonor:             0,
+				AllowNewPlayers:      true,
+				DeclarationsEnabled:  true,
+				StopAtTarget:         false,
+				Status:               "waiting",
+				PlayerCount:          1,
 			}
 			if err := tx.Create(newRoom); err != nil {
 				return err
@@ -3941,14 +3070,6 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 		if errors.Is(createErr, apperr.ErrRoomCodeTaken) || errors.Is(createErr, apperr.ErrRoomNameTaken) {
 			continue
 		}
-		// Story 8.5-1 AC5 (D29 symptom): pickFirstEmptySeat raises ErrRoomFull
-		// when the player_count denormalized counter says the room has free
-		// seats but every seat row is occupied. Mark the drifted room as
-		// tried and retry — exclusion guarantees the next iteration either
-		// picks a different room or falls through to the create-new-room
-		// branch, satisfying AC5's "successful join into a different/new
-		// room — never an opaque 5xx" promise.
-		// TODO: drift root-cause is D29 (Phase 2) — this only treats the symptom.
 		if errors.Is(createErr, apperr.ErrRoomFull) {
 			if lastTriedRoomID != 0 {
 				triedRoomIDs[lastTriedRoomID] = true
@@ -3964,11 +3085,8 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 		return createErr
 	}
 
-	// Mark present (quick-play rooms auto-start so the gate never applies, but
-	// keeps the registry consistent for the room-detail payload).
 	h.presence.Add(resultRoom.ID, userID)
 
-	// Broadcast lobby-wide events for QuickPlay
 	if createdNew {
 		h.broadcastToAll(ws.SystemRoomCreated, map[string]interface{}{
 			"id":                   resultRoom.ID,
@@ -3980,41 +3098,23 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 			"timerStyle":           resultRoom.TimerStyle,
 			"timerDurationSeconds": resultRoom.TimerDurationSeconds,
 			"coinBuyIn":            resultRoom.CoinBuyIn,
-			// Sent even though a synthesized quick-play room is always
-			// declarations-on and the lobby card treats an absent key as on. This
-			// map is the third key list in this file and every omission on it has
-			// been a latent bug waiting for the default to stop matching; state the
-			// value rather than rely on the reader's default.
-			"declarationsEnabled": resultRoom.DeclarationsEnabled,
-			// Same reasoning: a synthesized quick-play room always finishes the hand
-			// and the lobby card treats an absent key as off, but every omission on
-			// this hand-built map has been a latent bug waiting for the default to
-			// stop matching. State the value.
-			"stopAtTarget": resultRoom.StopAtTarget,
-			"playerCount":  resultRoom.PlayerCount,
-			"status":       resultRoom.Status,
-			"isQuickPlay":  resultRoom.IsQuickPlay,
+			"declarationsEnabled":  resultRoom.DeclarationsEnabled,
+			"stopAtTarget":         resultRoom.StopAtTarget,
+			"playerCount":          resultRoom.PlayerCount,
+			"status":               resultRoom.Status,
+			"isQuickPlay":          resultRoom.IsQuickPlay,
 		})
 	} else {
-		// Joined an existing room — broadcast updated player count
 		h.broadcastRoomUpdated(resultRoom)
 	}
 
-	// Mirror JoinRoom's broadcasts so existing room members see the QuickPlay
-	// joiner appear in their seat.
 	h.broadcastQuickPlayerSeated(resultRoom, userID, assignedSeat, assignedTeam)
 
-	// Auto-start when all four seats are filled (4th joiner closes the room).
 	matchStarted, err := h.autoStartIfFull(resultRoom.ID)
 	if err != nil {
 		return err
 	}
 
-	// Arm / reset the bot auto-fill scheduler unless the match already started
-	// (autoStartIfFull cancels it on a successful start). A brand-new room arms a
-	// fresh timer whose cadence is chosen from the idle-lobby count; joining an
-	// existing waiting room resets its inactivity timer so a fresh human never has
-	// a bot dropped on them within the patient window.
 	if !matchStarted {
 		if createdNew {
 			h.startQuickFill(resultRoom.ID, userID)
@@ -4032,11 +3132,8 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 	})
 }
 
-// QuickJoin seats the caller into a SPECIFIC quick play room (the one they
-// clicked in the lobby grid) and runs the auto-start check, returning the same
-// {room, seat, matchStarted} shape as QuickPlay. Custom (non quick-play) rooms
-// are rejected — they go through JoinRoom + manual seat selection. The frontend
-// ports the joiner to the matchmaking screen rather than the in-room seat grid.
+// QuickJoin seats the caller into a specific quick play room and runs the auto-start
+// check, returning the same shape as QuickPlay.
 func (h *RoomHandler) QuickJoin(c echo.Context) error {
 	userID, err := auth.GetUserID(c)
 	if err != nil {
@@ -4048,7 +3145,6 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		return apperr.ErrRoomNotFound
 	}
 
-	// Reject if the user is already in a room (mirrors QuickPlay).
 	existing, err := h.repo.FindPlayerRoom(userID)
 	if err != nil {
 		return fmt.Errorf("checking existing room: %w", err)
@@ -4057,9 +3153,6 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		return apperr.ErrAlreadyInRoom
 	}
 
-	// Story 9.4 (AC4): bracket the caller so a cross-bracket tap can be rejected
-	// cleanly (read before the row-lock tx — no wallet call inside the lock). A
-	// nil walletService (legacy/tests) degrades to the free bracket.
 	callerBuyIn := 0
 	if h.walletService != nil {
 		balance, berr := h.walletService.GetBalance(userID)
@@ -4073,8 +3166,6 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 	var assignedSeat int
 	var assignedTeam string
 	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
-		// Row-lock the room to serialize against concurrent joiners and the
-		// auto-start transition.
 		r, err := tx.FindByIDForUpdate(uint(roomID))
 		if err != nil {
 			return fmt.Errorf("finding room: %w", err)
@@ -4085,13 +3176,9 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		if !r.IsQuickPlay {
 			return apperr.ErrRoomNotQuickPlay
 		}
-		// Match JoinRoom's convention: a non-waiting room reads as not found.
 		if r.Status != "waiting" {
 			return apperr.ErrRoomNotFound
 		}
-		// Story 9.4 (AC4): a cross-bracket tap never seats the player into a
-		// stake they don't belong to — reject before the capacity check so the
-		// player learns it's the wrong bracket, not merely "full".
 		if r.CoinBuyIn != callerBuyIn {
 			return apperr.ErrQuickPlayBracketMismatch
 		}
@@ -4107,10 +3194,6 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		resultRoom = joined
 		return nil
 	}); err != nil {
-		// ErrRoomFull also surfaces from pickFirstEmptySeat's drift guard
-		// (player_count<4 but every seat taken). The user picked one specific
-		// table, so we cannot retry into another — return ROOM_FULL honestly
-		// rather than an opaque 5xx.
 		if errors.Is(err, apperr.ErrAlreadyInRoom) || errors.Is(err, apperr.ErrRoomNotFound) ||
 			errors.Is(err, apperr.ErrRoomNotQuickPlay) || errors.Is(err, apperr.ErrRoomFull) ||
 			errors.Is(err, apperr.ErrQuickPlayBracketMismatch) {
@@ -4119,23 +3202,16 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		return fmt.Errorf("quick joining room: %w", err)
 	}
 
-	// Mark present (mirrors QuickPlay; quick-play rooms auto-start).
 	h.presence.Add(resultRoom.ID, userID)
 
-	// Joined an existing room — refresh the lobby grid, then mirror JoinRoom's
-	// room-scoped player_joined + seat_updated broadcasts.
 	h.broadcastRoomUpdated(resultRoom)
 	h.broadcastQuickPlayerSeated(resultRoom, userID, assignedSeat, assignedTeam)
 
-	// Auto-start when this join filled the last seat.
 	matchStarted, err := h.autoStartIfFull(resultRoom.ID)
 	if err != nil {
 		return err
 	}
 
-	// A human joined a specific waiting Quick Play room: reset its inactivity
-	// timer so an already-armed patient countdown restarts (autoStartIfFull
-	// cancels the scheduler outright when this join started the match).
 	if !matchStarted {
 		h.resetQuickFill(resultRoom.ID)
 	}
@@ -4149,11 +3225,8 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 	})
 }
 
-// broadcastQuickPlayerSeated mirrors JoinRoom's broadcasts for a player who was
-// auto-seated into a quick play room: player_joined seeds them into existing
-// members' roomStore, seat_updated places them in the auto-assigned seat,
-// and a fresh room snapshot updates every lobby viewer's grid card. Multi-event
-// sequences are sent as separate ordered messages, never batched.
+// broadcastQuickPlayerSeated mirrors JoinRoom's broadcasts for a player auto-seated into
+// a quick play room, sending each event as a separate ordered message.
 func (h *RoomHandler) broadcastQuickPlayerSeated(r *Room, userID uint, seat int, team string) {
 	roomPlayers, err := h.repo.FindPlayersByRoomID(r.ID)
 	if err != nil {
@@ -4189,8 +3262,6 @@ func (h *RoomHandler) broadcastQuickPlayerSeated(r *Room, userID uint, seat int,
 		"team":         team,
 		"previousSeat": nil,
 	})
-	// Seat broadcast above is room-scoped; push a fresh room snapshot to every
-	// lobby viewer so the auto-assigned seat appears on grid cards.
 	h.broadcastRoomSeatSnapshot(r.ID, roomPlayers)
 }
 

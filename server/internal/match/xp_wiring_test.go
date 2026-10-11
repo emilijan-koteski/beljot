@@ -14,15 +14,13 @@ import (
 	"github.com/emilijan/beljot/server/internal/ws"
 )
 
-// stubXPAwarder records the awards ApplyXPAwards received and returns canned new
-// totals. LevelForXP delegates to the real curve so NewLevel/LeveledUp in the
-// emitted event reflect production behavior. Satisfies match.XPAwarder.
+// stubXPAwarder records the awards it receives and returns canned new totals,
+// using the real level curve for NewLevel and LeveledUp.
 type stubXPAwarder struct {
 	applyCalls int
 	lastAwards map[uint]int
 	newTotals  map[uint]int
-	// totalXP feeds LevelsForUsers (userID -> total_xp); unset IDs report 0.
-	totalXP map[uint]int
+	totalXP    map[uint]int
 }
 
 func (s *stubXPAwarder) ApplyXPAwards(awards map[uint]int) (map[uint]int, error) {
@@ -33,7 +31,7 @@ func (s *stubXPAwarder) ApplyXPAwards(awards map[uint]int) (map[uint]int, error)
 		if v, ok := s.newTotals[id]; ok {
 			out[id] = v
 		} else {
-			out[id] = delta // default: new total == earned (started from 0)
+			out[id] = delta
 		}
 	}
 	return out, nil
@@ -80,11 +78,8 @@ func firstIndexOfType(calls []hubCall, eventType string) int {
 	return -1
 }
 
-// TestHandleMatchEnd_AwardsXP locks in Story 9.5 AC1/AC7 on the normal-end path:
-// a FREE match (coinBuyIn 0) still awards XP (XP is points-based, coin-
-// independent), both teams earn, and a per-human event:xp_awarded fires for each
-// of the four seats — ordered AFTER coin_settlement (none here) and BEFORE the
-// trailing event:match_state.
+// A free match still awards XP to both teams, with one event:xp_awarded per human
+// ordered before the trailing event:match_state.
 func TestHandleMatchEnd_AwardsXP(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -93,7 +88,6 @@ func TestHandleMatchEnd_AwardsXP(t *testing.T) {
 	mgr.SetXPAwarder(awarder)
 
 	roomID := uint(200)
-	// coinBuyIn 0 → free match; XP must still be awarded.
 	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -107,8 +101,6 @@ func TestHandleMatchEnd_AwardsXP(t *testing.T) {
 
 	mgr.HandleMatchEndForTest(roomID, finalState, nil, ws.MatchEndPayload{WinnerTeam: game.TeamA})
 
-	// Awarder called once with the right per-user deltas — both teams earn,
-	// teammates equal, loser (team B) still earns.
 	require.Equal(t, 1, awarder.applyCalls)
 	assert.Equal(t, map[uint]int{10: 101, 20: 70, 30: 101, 40: 70}, awarder.lastAwards)
 
@@ -121,7 +113,6 @@ func TestHandleMatchEnd_AwardsXP(t *testing.T) {
 	assert.Equal(t, 4, countTypeBetween(calls, "event:xp_awarded", matchEndIdx, trailingStateIdx),
 		"all four humans receive an xp_awarded between match_end and match_state")
 
-	// The payload carries the derived level (server-authoritative).
 	for i := matchEndIdx + 1; i < trailingStateIdx; i++ {
 		if containsType(calls[i].msg, "event:xp_awarded") {
 			p := decodeXPAwarded(t, calls[i].msg)
@@ -137,7 +128,6 @@ func TestHandleMatchEnd_NoAwarderNoXP(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
 	mgr := match.NewManager(hub, repo)
-	// No SetXPAwarder call.
 
 	roomID := uint(202)
 	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
@@ -166,11 +156,9 @@ func TestHandleMatchEnd_BotSeatEarnsNoXP(t *testing.T) {
 	awarder := &stubXPAwarder{}
 	mgr := match.NewManager(hub, repo)
 	mgr.SetXPAwarder(awarder)
-	// Park bot think-delay an hour out so no bot action fires during the test.
 	mgr.SetBotDelayForTest(time.Hour, time.Hour)
 
 	roomID := uint(203)
-	// Seat 3 (team B) is a bot.
 	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(3), "relaxed", 0, 10, 120, 0, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -179,12 +167,11 @@ func TestHandleMatchEnd_BotSeatEarnsNoXP(t *testing.T) {
 	winner := game.TeamA
 	finalState.WinnerTeam = &winner
 	finalState.Phase = game.PhaseMatchEnd
-	finalState.TeamScores[game.TeamA] = 1000 // seats 0,2 → 100 each
-	finalState.TeamScores[game.TeamB] = 300  // seat 1 → 30, bot seat 3 → 0
+	finalState.TeamScores[game.TeamA] = 1000
+	finalState.TeamScores[game.TeamB] = 300
 
 	mgr.HandleMatchEndForTest(roomID, finalState, nil, ws.MatchEndPayload{WinnerTeam: game.TeamA})
 
-	// Only the three humans (10, 20, 30); the bot (seat 3, userID 0) is absent.
 	require.Equal(t, 1, awarder.applyCalls)
 	assert.Equal(t, map[uint]int{10: 100, 20: 30, 30: 100}, awarder.lastAwards)
 	_, hasBot := awarder.lastAwards[0]
@@ -199,11 +186,8 @@ func TestHandleMatchEnd_BotSeatEarnsNoXP(t *testing.T) {
 	assert.Equal(t, 3, xpCount, "only the three humans receive xp_awarded")
 }
 
-// TestAbandonment_AwardsXP locks in Story 9.5 AC3/AC7 on the abandonment path:
-// the WHOLE abandoning team forfeits XP (absent from the awards map) while the
-// non-abandoning team earns the points-so-far amount, and each non-abandoning
-// human's event:xp_awarded is ordered after coin_settlement and before the
-// trailing event:match_state.
+// On abandonment the whole abandoning team forfeits XP while the other team earns,
+// with each event ordered after coin_settlement and before match_state.
 func TestAbandonment_AwardsXP(t *testing.T) {
 	repo := &timestampedRepo{}
 	hub := &hubSpy{}
@@ -221,11 +205,9 @@ func TestAbandonment_AwardsXP(t *testing.T) {
 	gs.TeamScores[game.TeamB] = 300
 	mgr.SetGameStateForTest(roomID, gs)
 
-	// Seat 2 (userID 30, team A) abandons → the whole of team A (10, 30) forfeits.
 	mgr.AbandonSeatForTest(roomID, 2)
 
 	require.Equal(t, 1, awarder.applyCalls)
-	// Team B (20, 40) each earn floor(300/10)=30; team A is absent (forfeited).
 	assert.Equal(t, map[uint]int{20: 30, 40: 30}, awarder.lastAwards)
 	_, aForfeited := awarder.lastAwards[10]
 	assert.False(t, aForfeited, "abandoning team member 10 must forfeit (absent from awards)")

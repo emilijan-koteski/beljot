@@ -14,7 +14,7 @@ func sumDeltas(d [4]int) int {
 
 func TestComputeSettlement(t *testing.T) {
 	const S = 500
-	ids := [4]uint{10, 20, 30, 40} // seat → userID
+	ids := [4]uint{10, 20, 30, 40}
 	noBots := [4]bool{false, false, false, false}
 
 	tests := []struct {
@@ -26,15 +26,13 @@ func TestComputeSettlement(t *testing.T) {
 		wantDeltas  [4]int
 		wantPot     int
 		wantCredits map[uint]int
-		// wantSink is the number of coins removed from circulation (no human
-		// winner). When 0, deltas must sum to 0 (coin-conserving).
-		wantSink int
+		wantSink    int
 	}{
 		{
 			name:        "all-human 2v2, team 0 wins (classic 4S split)",
 			playerIDs:   ids,
 			botSeats:    noBots,
-			winningTeam: 0, // seats 0,2
+			winningTeam: 0,
 			buyIn:       S,
 			wantDeltas:  [4]int{+S, -S, +S, -S},
 			wantPot:     4 * S,
@@ -44,7 +42,7 @@ func TestComputeSettlement(t *testing.T) {
 			name:        "all-human 2v2, team 1 wins",
 			playerIDs:   ids,
 			botSeats:    noBots,
-			winningTeam: 1, // seats 1,3
+			winningTeam: 1,
 			buyIn:       S,
 			wantDeltas:  [4]int{-S, +S, -S, +S},
 			wantPot:     4 * S,
@@ -52,42 +50,40 @@ func TestComputeSettlement(t *testing.T) {
 		},
 		{
 			name:        "H+B vs H+B, human winner takes whole pot (bot teammate paid nothing)",
-			playerIDs:   [4]uint{10, 20, 0, 40}, // seat 2 is a bot
+			playerIDs:   [4]uint{10, 20, 0, 40},
 			botSeats:    [4]bool{false, false, true, false},
-			winningTeam: 0, // seats 0,2 — only seat 0 is human
+			winningTeam: 0,
 			buyIn:       S,
-			// 3 humans → pot 3S; sole human winner (seat 0) gets all 3S, net +2S
 			wantDeltas:  [4]int{+2 * S, -S, 0, -S},
 			wantPot:     3 * S,
 			wantCredits: map[uint]int{10: 3 * S},
 		},
 		{
 			name:        "H+B vs B+B, lone human on winning team nets zero (gets own stake back)",
-			playerIDs:   [4]uint{10, 0, 0, 0}, // only seat 0 human
+			playerIDs:   [4]uint{10, 0, 0, 0},
 			botSeats:    [4]bool{false, true, true, true},
 			winningTeam: 0,
 			buyIn:       S,
-			// 1 human → pot 1S; sole winner credited 1S, net 0
 			wantDeltas:  [4]int{0, 0, 0, 0},
 			wantPot:     1 * S,
 			wantCredits: map[uint]int{10: S},
 		},
 		{
 			name:        "H+B vs B+B, lone human loses → coin sink (AC #9)",
-			playerIDs:   [4]uint{10, 0, 0, 0}, // only seat 0 human, on team 0
+			playerIDs:   [4]uint{10, 0, 0, 0},
 			botSeats:    [4]bool{false, true, true, true},
-			winningTeam: 1, // bots win; no human winner
+			winningTeam: 1,
 			buyIn:       S,
 			wantDeltas:  [4]int{-S, 0, 0, 0},
 			wantPot:     1 * S,
-			wantCredits: map[uint]int{}, // sink: nobody credited
+			wantCredits: map[uint]int{},
 			wantSink:    S,
 		},
 		{
 			name:        "abandonment: winner = non-abandoning team, whole abandoning team forfeits",
 			playerIDs:   ids,
 			botSeats:    noBots,
-			winningTeam: 1, // e.g. seat 0 abandoned (team 0) → 1 - TeamForSeat(0) = 1
+			winningTeam: 1,
 			buyIn:       S,
 			wantDeltas:  [4]int{-S, +S, -S, +S},
 			wantPot:     4 * S,
@@ -95,11 +91,10 @@ func TestComputeSettlement(t *testing.T) {
 		},
 		{
 			name:        "odd split: 3 humans, 2-human team wins, remainder to lowest seat (Decision C)",
-			playerIDs:   [4]uint{10, 20, 30, 0}, // seat 3 bot
+			playerIDs:   [4]uint{10, 20, 30, 0},
 			botSeats:    [4]bool{false, false, false, true},
-			winningTeam: 0, // seats 0,2 win (both human)
-			buyIn:       3, // pot 9, share 4, remainder 1 → lowest winning seat (0)
-			// seat 0: credit 5 (4+1 remainder) − 3 = +2; seat 2: credit 4 − 3 = +1
+			winningTeam: 0,
+			buyIn:       3,
 			wantDeltas:  [4]int{+2, -3, +1, 0},
 			wantPot:     9,
 			wantCredits: map[uint]int{10: 5, 30: 4},
@@ -123,11 +118,8 @@ func TestComputeSettlement(t *testing.T) {
 			assert.Equal(t, tc.wantPot, pot, "pot")
 			assert.Equal(t, tc.wantCredits, credits, "credits")
 
-			// Coin conservation: with a human winner the table is zero-sum;
-			// otherwise the forfeited stakes are removed (the sink).
 			assert.Equal(t, -tc.wantSink, sumDeltas(deltas), "coin conservation (sum of deltas)")
 
-			// Bot seats are never credited.
 			for seat := 0; seat < 4; seat++ {
 				if tc.botSeats[seat] {
 					assert.Equal(t, 0, deltas[seat], "bot seat %d delta must be 0", seat)

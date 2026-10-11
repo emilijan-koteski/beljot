@@ -36,7 +36,6 @@ import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 type Props = {
   room: Room;
   onJoin: (room: Room) => void;
-  /** 0-based render index for the staggered card-in animation. */
   index?: number;
 };
 
@@ -47,8 +46,6 @@ function seatOf(
 ): { username: string | null; bot: boolean; avatarUrl?: string | null } {
   const found = players?.find((p) => p.seat === seat);
   if (!found) return { username: null, bot: false };
-  // Bot identity is seat-derived and localized — an empty wire username must
-  // never render as a blank chip.
   if (found.isBot === true) return { username: botDisplayName(t, seat), bot: true };
   return { username: found.username || null, bot: false, avatarUrl: found.avatarUrl };
 }
@@ -64,15 +61,10 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
   const hasBots = room.players?.some((p) => p.isBot === true) ?? false;
   const delay = `${Math.min(index * 28, 320)}ms`;
 
-  // Honour gate, cosmetic mirror of the server's. `honorQualifies` treats absent
-  // room fields as ungated, which is what the QuickPlay system:room_created
-  // payload needs (it is hand-built and omits both keys, and a synthesized
-  // quick-play room genuinely is ungated).
   const viewer = useAuthStore((s) => s.user);
   const viewerHonor = honorScoreOrPrior(viewer?.honorScore);
   const qualifies = honorQualifies(room, viewer ?? {});
   const locked = !qualifies;
-  // The shield's tone describes the REQUIREMENT's tier, not the viewer's.
   const requirementTier = honorTierForScore(room.minHonor);
 
   return (
@@ -122,20 +114,6 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
           <span>
             {variantLabel(t, room.variant)} · {modeLabel(t, room.matchMode)}
           </span>
-          {/* Rendered ONLY when declarations are off. `=== false`, never
-              truthiness: an absent field means ON, and a truthiness check would
-              chip every payload that omits it. The only omitter left is a server
-              that predates the column — every hand-built room payload in Go now
-              carries both rule flags, each one under test (roomLifecyclePayload,
-              QuickPlay's own room_created, and the lobby-disconnect map). The
-              default room stays unchipped so the chip always carries
-              information. */}
-          {/* role="img" is what makes the aria-label authoritative. ARIA does not
-                  guarantee aria-label is honoured on a ROLELESS generic element, so on a
-                  bare <span> a screen reader may fall back to the short visible text and
-                  drop the explanation entirely. The role makes the chip one named node.
-                  Kept as aria-label rather than a visually-hidden sibling so the chip's
-                  textContent stays exactly the visible label. */}
           {room.declarationsEnabled === false && (
             <>
               <Dot />
@@ -150,12 +128,6 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               </span>
             </>
           )}
-          {/* Rendered ONLY when "dosta" is on — the mirror of the chip above,
-              with the polarity flipped because here the interesting state is the
-              true one. `=== true`, never truthiness: an absent field means OFF,
-              and the only payload that omits the key is one from a server
-              predating the column. The default room stays unchipped so the chip
-              always carries information. */}
           {room.stopAtTarget === true && (
             <>
               <Dot />
@@ -180,8 +152,6 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
           <Dot />
           <span className="inline-flex items-center gap-1" data-testid="room-card-buy-in">
             <Coins className="size-3" style={{ color: COIN_GOLD }} />
-            {/* Icon-only unit — the coin glyph conveys "coins", so the card
-                shows just the grouped number (or "Free" at 0). */}
             {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
           </span>
           <Dot />
@@ -204,14 +174,6 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               {t("lobby.card.public")}
             </span>
           )}
-          {/* Honor gate (Story 9.8 AC5). Both chips are CONDITIONAL: an ungated
-              room's card is visually unchanged from before this story, and every
-              ungated card would otherwise grow two chips carrying no information.
-              Gated rooms stay LISTED and labelled — mirroring 9.6's "listed but
-              locked" decision, the player sees the requirement and decides.
-              Compared explicitly (> 0, === false), never by truthiness: a real 0
-              and a real false are legitimate Go values. Each chip carries text
-              plus a glyph, so colour is never the only signal. */}
           {room.minHonor > 0 && (
             <>
               <Dot />
@@ -220,10 +182,6 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
                 data-testid="room-card-min-honor"
                 data-min-honor={room.minHonor}
                 aria-label={t("lobby.card.minHonorAriaLabel", { minHonor: room.minHonor })}
-                // The numbers live in the tooltip, never as copy on the card — the
-                // card says what the ROOM asks for; the button says whether you
-                // pass. A viewer-specific sentence on every card would be noise on
-                // the many they do qualify for.
                 title={
                   qualifies
                     ? undefined
@@ -233,13 +191,6 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
                       })
                 }
               >
-                {/* Tinted by the tier the REQUIREMENT falls in, not by the viewer's
-                    standing: 85+ is Trusted, so this shield is felt green on every
-                    card whether you hold 96 or 42. That keeps the chip a property
-                    of the room, and stops the lobby looking like a scoreboard of
-                    the viewer. The "85+" itself stays the same muted ink as the
-                    timer and buy-in beside it, so the chip weighs what its
-                    neighbours weigh. */}
                 <HonorShield tier={requirementTier} size={12} />
                 {t("lobby.card.minHonor", { minHonor: honorFloorLabel(room.minHonor) })}
               </span>
@@ -290,13 +241,6 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
           <Users className="size-3" />
           {t("lobby.card.occupancy", { seated })}
         </span>
-        {/* The gate's verdict lives HERE, not on the card. Not qualifying changes
-            exactly one thing: Join becomes Locked. The numbers sit in the honour
-            chip's title and in the toast that still fires on a genuine race.
-
-            Still cosmetic — the server re-validates every join, so this only
-            spares the player a click that was always going to 409. `full` wins
-            over `locked` because a full room cannot be joined for any reason. */}
         <button
           onClick={() => !full && !locked && onJoin(room)}
           disabled={full || locked}

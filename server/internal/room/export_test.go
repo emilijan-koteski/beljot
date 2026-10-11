@@ -2,10 +2,6 @@ package room
 
 import "time"
 
-// This file is compiled only under `go test` (the _test.go suffix) and exposes
-// the unexported Quick Play auto-fill scheduler to the external room_test
-// package so its behaviour can be driven deterministically.
-
 // SetQuickFillIntervals overrides the scheduler cadence. Tests set a large
 // interval and drive ticks manually via TriggerQuickFillTick so real timers
 // never fire mid-test.
@@ -50,11 +46,8 @@ func (h *RoomHandler) InvokeQuickFillTick(roomID uint, generation uint64) {
 	h.quickFillTick(roomID, generation)
 }
 
-// TriggerQuickFillTick fires exactly one scheduler tick synchronously, using the
-// entry's current generation so it passes the staleness guard. It stops the
-// pending real timer first so the AfterFunc doesn't also fire. A no-op when no
-// timer is armed. The tick may re-arm a new (large-interval) timer; call
-// CancelQuickFill at test end to clean it up.
+// TriggerQuickFillTick stops the armed timer and fires one tick synchronously at the current generation.
+// The tick may re-arm a timer, so call CancelQuickFill at test end.
 func (h *RoomHandler) TriggerQuickFillTick(roomID uint) {
 	if h.quickFill == nil {
 		return

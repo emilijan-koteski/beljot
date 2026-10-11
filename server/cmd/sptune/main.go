@@ -1,18 +1,3 @@
-// Command sptune replays stored matches through the competitive Season Points
-// formula, in memory, to tune its constants (Story 13.4). It is an OFFLINE tool:
-// it never writes to any database (every read runs in a READ ONLY transaction)
-// and it is never built into the production image, which builds ./cmd/api only.
-//
-//	go run ./cmd/sptune --db-url <replay source> [--from ...] [--to ...] [overrides]
-//
-// It prints the constants in force, a per-player table for the window (matches,
-// win %, bot-only matches and win %, final SP, tier, division, and the match at
-// which the player first reached Silver), and a synthetic bot-table sweep that
-// gives each win rate's settle point and its SP after the first N matches.
-// Without --db-url only the sweep runs, at a fixed margin.
-//
-// The replay itself is season.ReplayMatches, the same core the server's
-// one-time season recalculation writes its rows from (season/recalc.go).
 package main
 
 import (
@@ -48,6 +33,8 @@ type options struct {
 	trace  uint
 }
 
+// main replays stored matches through the Season Points formula, read-only and offline,
+// and prints a per-player report plus a synthetic win-rate sweep (sweep only without --db-url).
 func main() {
 	opts, err := parseFlags(os.Args[1:], os.Stderr)
 	if err != nil {
@@ -237,8 +224,6 @@ func printConstants(out io.Writer, opts options) {
 	fmt.Fprintln(out, "Constants")
 	fmt.Fprintf(out, "  W (base win) %g   L (base loss) %g   S (scale) %g   Capot bonus %+d   bot seat %d SP\n",
 		f.BaseWin, f.BaseLoss, f.Scale, f.CapotBonus, f.BotSeatSP)
-	// The extremes at the maximum margin against a certain result (E = 0 or 1);
-	// the best win includes the Capot bonus, which is added after scaling.
 	worstLoss := -int(math.Round(f.BaseLoss * 1.5 * 2))
 	bestWin := int(math.Round(f.BaseWin*1.5*2)) + f.CapotBonus
 	fmt.Fprintf(out, "  abandon penalty %d   worst possible loss %d   best possible win %+d\n",

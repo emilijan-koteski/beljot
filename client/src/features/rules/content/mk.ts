@@ -1,4 +1,3 @@
-// Beljot · Rules content — Macedonian (cleaned for terminology consistency).
 import type { RulesLangData } from "./types";
 
 export const mk: RulesLangData = {
@@ -89,9 +88,6 @@ export const mk: RulesLangData = {
       title: "Измешај, подели, земи адут",
       lede: "Четворица играчи, 32 карти, осум во рака и брз круг да се одреди која боја е адут.",
       blocks: [
-        // Еден блок, не по еден за секоја варијанта. Првите два чекора се
-        // идентични во двете правила и се напишани еднаш; следните четири се
-        // означени по варијанта, секој со своја забелешка за својот пар.
         {
           kind: "steps",
           items: [

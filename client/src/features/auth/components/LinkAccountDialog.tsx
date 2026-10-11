@@ -13,27 +13,19 @@ import {
 } from "@/shared/components/ui/dialog";
 import { Input } from "@/shared/components/ui/input";
 
+/** Props for LinkAccountDialog; errorKey is the i18n key of an inline error shown while the player retries. */
 interface LinkAccountDialogProps {
   open: boolean;
-  /** Email of the existing password account being linked — shown in the lede. */
   email: string;
-  /** True while the link request is in flight (disables submit, shows pending copy). */
   pending: boolean;
-  /**
-   * i18n key of the error to show (e.g. "auth.sso.linkDialog.errors.wrongPassword"),
-   * or null. When set, the dialog stays open so the player can retry.
-   */
   errorKey: string | null;
   onSubmit: (password: string) => void;
   onClose: () => void;
 }
 
 /**
- * Password confirmation shown when an SSO sign-in matches an existing password
- * account (SSO_LINK_REQUIRED). It only collects and submits the password —
- * the authoritative check and the actual link happen server-side on
- * POST /auth/sso/:provider/link. A wrong password keeps the dialog open with
- * the inline error; nothing is linked until the password checks out.
+ * Password confirmation shown when an SSO sign-in matches an existing password account.
+ * It only collects the password for the server-side link, and cannot be dismissed while pending.
  */
 export function LinkAccountDialog({
   open,
@@ -45,13 +37,9 @@ export function LinkAccountDialog({
 }: LinkAccountDialogProps) {
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
-  // Hide the inline error the moment the player edits the password — a stale
-  // "wrong password" shouldn't linger while they retype. Re-armed whenever the
-  // parent reports a fresh error (errorKey transitions to non-null).
   const [errorDismissed, setErrorDismissed] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Clear any stale password whenever the dialog (re)opens.
   useEffect(() => {
     if (open) {
       setPassword("");
@@ -60,7 +48,6 @@ export function LinkAccountDialog({
     }
   }, [open]);
 
-  // A fresh error from the parent re-shows the message even after a prior edit.
   useEffect(() => {
     if (errorKey !== null) setErrorDismissed(false);
   }, [errorKey]);
@@ -74,9 +61,6 @@ export function LinkAccountDialog({
   }
 
   return (
-    // While the link request is in flight the dialog is not dismissable —
-    // Escape/backdrop dismissal arrives here as onOpenChange(false) and is
-    // ignored, so the in-flight state can't be silently abandoned.
     <Dialog
       open={open}
       onOpenChange={(next) => {

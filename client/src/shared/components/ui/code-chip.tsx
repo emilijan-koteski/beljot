@@ -5,8 +5,6 @@ import { cn } from "@/shared/lib/utils";
 type CodeChipProps = {
   code: string;
   label?: string;
-  /** `labeled` (default) = brass "CODE" label half + value. `compact` = single
-   *  pill with a leading key glyph, no label half (in-room room-info card). */
   variant?: "labeled" | "compact";
   dense?: boolean;
   copied?: boolean;
@@ -18,13 +16,8 @@ type CodeChipProps = {
 };
 
 /**
- * Brass "CODE" label-half + monospace value-half. Click-to-copy when onCopy is
- * supplied; the copied state flips colors to accent + check glyph and the
- * label half drops its brass background so the whole chip reads as one tone.
- *
- * Used as the in-room copy-link chip and inside the create-room live preview.
- * When copied is uncontrolled, callers should briefly toggle it via state
- * (e.g. 1.5s) and call onCopy() to write to the clipboard.
+ * Room-code chip with a label half and a monospace value half, or a single compact pill.
+ * Click-to-copy when onCopy is supplied; `copied` switches it to the accent tone.
  */
 export function CodeChip({
   code,

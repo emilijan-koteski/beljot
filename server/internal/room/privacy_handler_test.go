@@ -18,10 +18,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-// seedPrivateRoom inserts a waiting private room (owner = ownerID) with the given
-// plaintext password bcrypt-hashed into PasswordHash, mirroring how CreateRoom
-// stores it. Direct mock seeding (not via the handler) so join/edit tests start
-// from a known private room without driving the create path.
+// seedPrivateRoom inserts a waiting private room whose password is bcrypt-hashed
+// into PasswordHash, mirroring how CreateRoom stores it.
 func seedPrivateRoom(t *testing.T, repo *mockRoomRepo, name, code string, ownerID uint, password string) *room.Room {
 	t.Helper()
 	hash, err := auth.HashPassword(password)
@@ -45,15 +43,12 @@ func seedPrivateRoom(t *testing.T, repo *mockRoomRepo, name, code string, ownerI
 	return r
 }
 
-// --- Create-room privacy (AC1, AC2) ---
-
 func TestCreateRoom_Private_HashesPersistsAndHidesHash(t *testing.T) {
 	e, repo := setupTest()
 	body := `{"name":"Friends Only","variant":"bitola","matchMode":"1001","timerStyle":"relaxed","isPrivate":true,"password":"hunter2"}`
 	rec := doCreateRoom(e, body, validToken(5))
 	require.Equal(t, http.StatusCreated, rec.Code)
 
-	// The hash must never appear in the JSON response (json:"-").
 	raw := rec.Body.String()
 	assert.NotContains(t, raw, "passwordHash")
 	assert.NotContains(t, raw, "password_hash")
@@ -93,9 +88,6 @@ func TestCreateRoom_Private_ShortPassword(t *testing.T) {
 
 func TestCreateRoom_Private_ShortMultibytePassword(t *testing.T) {
 	e, _ := setupTest()
-	// "аб" is 2 Cyrillic runes but 4 bytes — the minimum counts runes ("characters"),
-	// so this is rejected as too short. A byte-count check would wrongly accept it.
-	// Story 9.6 review patch (server/client length-unit alignment).
 	body := `{"name":"Multibyte Short","variant":"bitola","matchMode":"1001","timerStyle":"relaxed","isPrivate":true,"password":"аб"}`
 	rec := doCreateRoom(e, body, validToken(5))
 	require.Equal(t, http.StatusBadRequest, rec.Code)
@@ -104,7 +96,7 @@ func TestCreateRoom_Private_ShortMultibytePassword(t *testing.T) {
 
 func TestCreateRoom_Private_TooLongPassword(t *testing.T) {
 	e, _ := setupTest()
-	longPw := strings.Repeat("x", 73) // 73 bytes > bcrypt's 72-byte limit
+	longPw := strings.Repeat("x", 73)
 	body := `{"name":"Too Long","variant":"bitola","matchMode":"1001","timerStyle":"relaxed","isPrivate":true,"password":"` + longPw + `"}`
 	rec := doCreateRoom(e, body, validToken(5))
 	require.Equal(t, http.StatusBadRequest, rec.Code)
@@ -113,7 +105,6 @@ func TestCreateRoom_Private_TooLongPassword(t *testing.T) {
 
 func TestCreateRoom_Public_NoPasswordHash(t *testing.T) {
 	e, repo := setupTest()
-	// isPrivate omitted (false) — even with a stray password it stays public.
 	body := `{"name":"Open Table","variant":"bitola","matchMode":"1001","timerStyle":"relaxed"}`
 	rec := doCreateRoom(e, body, validToken(5))
 	require.Equal(t, http.StatusCreated, rec.Code)
@@ -128,8 +119,6 @@ func TestCreateRoom_Public_NoPasswordHash(t *testing.T) {
 	require.NotNil(t, persisted)
 	assert.Nil(t, persisted.PasswordHash, "public room has a nil password_hash")
 }
-
-// --- Join gate (AC4, AC5) ---
 
 func TestJoinRoom_Private_CorrectPasswordSeats(t *testing.T) {
 	e, repo := setupTest()
@@ -164,15 +153,12 @@ func TestJoinRoom_Private_MissingPasswordRejected(t *testing.T) {
 	e, repo := setupTest()
 	seedPrivateRoom(t, repo, "Private Missing", "PRVM01", 1, "letmein")
 
-	// No body at all (doJoinRoom sends nil) — missing == wrong, indistinguishable.
 	rec := doJoinRoom(e, "1", validToken(10))
 	require.Equal(t, http.StatusConflict, rec.Code)
 	assert.Equal(t, "WRONG_ROOM_PASSWORD", errCodeOf(t, rec))
 }
 
 func TestJoinRoom_Public_NoBodySucceeds(t *testing.T) {
-	// AC5 regression guard: adding the optional password bind must not break the
-	// public-room join, which sends no body.
 	e, repo := setupTest()
 	seedRoom(repo, "Public Join", "waiting")
 
@@ -184,11 +170,9 @@ func TestJoinRoom_Public_NoBodySucceeds(t *testing.T) {
 	assert.Equal(t, uint(10), players[0].UserID)
 }
 
-// --- Owner privacy edit (AC6) ---
-
 func TestUpdateRoomPrivacy_OwnerSetsPassword(t *testing.T) {
 	e, repo := setupTest()
-	seedRoom(repo, "Becoming Private", "waiting") // owner = 1, public
+	seedRoom(repo, "Becoming Private", "waiting")
 
 	rec := doPostJSON(e, "/api/v1/rooms/1/privacy", validToken(1), `{"isPrivate":true,"password":"sesame"}`)
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -248,7 +232,7 @@ func TestUpdateRoomPrivacy_SetMissingPasswordRejected(t *testing.T) {
 
 func TestUpdateRoomPrivacy_NonOwnerRejected(t *testing.T) {
 	e, repo := setupTest()
-	seedRoom(repo, "Not Yours", "waiting") // owner = 1
+	seedRoom(repo, "Not Yours", "waiting")
 
 	rec := doPostJSON(e, "/api/v1/rooms/1/privacy", validToken(99), `{"isPrivate":true,"password":"sesame"}`)
 	require.Equal(t, http.StatusForbidden, rec.Code)
@@ -257,7 +241,7 @@ func TestUpdateRoomPrivacy_NonOwnerRejected(t *testing.T) {
 
 func TestUpdateRoomPrivacy_NonWaitingRejected(t *testing.T) {
 	e, repo := setupTest()
-	seedRoom(repo, "Already Playing", "playing") // owner = 1
+	seedRoom(repo, "Already Playing", "playing")
 
 	rec := doPostJSON(e, "/api/v1/rooms/1/privacy", validToken(1), `{"isPrivate":true,"password":"sesame"}`)
 	require.Equal(t, http.StatusConflict, rec.Code)
@@ -266,8 +250,6 @@ func TestUpdateRoomPrivacy_NonWaitingRejected(t *testing.T) {
 
 func TestUpdateRoomPrivacy_DoesNotEjectSeatedPlayers(t *testing.T) {
 	e, repo := setupTest()
-	// Owner 1 + two seated members; make it private first so clearing exercises
-	// the no-ejection path on a state change.
 	r := seedRoomWithPlayers(repo, "Keep Seats", 1, 1, 10, 20)
 	hash, err := auth.HashPassword("secret")
 	require.NoError(t, err)
@@ -285,7 +267,7 @@ func TestUpdateRoomPrivacy_DoesNotEjectSeatedPlayers(t *testing.T) {
 
 func TestUpdateRoomPrivacy_BroadcastsRoomUpdated(t *testing.T) {
 	e, repo, broadcaster := setupTestWithBroadcast()
-	seedRoom(repo, "Broadcast Me", "waiting") // owner = 1
+	seedRoom(repo, "Broadcast Me", "waiting")
 
 	rec := doPostJSON(e, "/api/v1/rooms/1/privacy", validToken(1), `{"isPrivate":true,"password":"sesame"}`)
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -308,9 +290,6 @@ func TestUpdateRoomPrivacy_BroadcastsRoomUpdated(t *testing.T) {
 
 func TestUpdateRoomPrivacy_QuickPlayRoomRejected(t *testing.T) {
 	e, repo := setupTest()
-	// A quick-play room owned by user 1. Privatizing it must be rejected
-	// server-side (AC7 invariant) even though the owner+waiting checks pass —
-	// the UI hides this control for quick-play rooms, so this guards a direct call.
 	r := &room.Room{
 		Name:        "Quick Play ABC123",
 		Code:        "QPABC1",
@@ -336,8 +315,6 @@ func TestUpdateRoomPrivacy_QuickPlayRoomRejected(t *testing.T) {
 	assert.Nil(t, persisted.PasswordHash, "quick-play room stays public")
 }
 
-// --- Quick Play stays public (AC7) ---
-
 func TestQuickPlay_SynthesizedRoomStaysPublic(t *testing.T) {
 	e, repo := setupCoinTest(nil, &stubWallet{balance: 5000})
 
@@ -349,8 +326,6 @@ func TestQuickPlay_SynthesizedRoomStaysPublic(t *testing.T) {
 	assert.True(t, persisted.IsQuickPlay)
 	assert.Nil(t, persisted.PasswordHash, "quick-play rooms are never private (AC7)")
 }
-
-// --- AfterFind derivation (AC2/AC3, DB-backed) ---
 
 // getRoomTestDB opens a per-test transaction against the dev DB (BELJOT_DB_URL,
 // default port 5433) and rolls it back on cleanup. Skips when no DB is reachable
@@ -397,14 +372,8 @@ func TestRoom_AfterFindDerivesIsPrivate(t *testing.T) {
 	assert.False(t, gotPub.IsPrivate, "AfterFind derives isPrivate=false from a NULL hash")
 }
 
-// --- FindPlayerRoom room identity (invite-panel reason, DB-backed) -----------
-
-// The invite panel decides "in this room" vs "in another room" by comparing
-// FindPlayerRoom's RoomID against the room being invited into. That query is a
-// `Table("room_players").Joins("rooms")` with an implicit SELECT * — both tables
-// carry `id`, `created_at` and `updated_at`, so this pins that the ROOM_ID column
-// still lands in the struct intact. If it ever scanned as 0 or as rooms.id, every
-// friend seated at the host's own table would read as "in another room".
+// TestFindPlayerRoom_ReportsTheRoomThePlayerIsActuallyIn pins that the joined SELECT *
+// scans room_players.room_id intact rather than as 0 or rooms.id.
 func TestFindPlayerRoom_ReportsTheRoomThePlayerIsActuallyIn(t *testing.T) {
 	db := getRoomTestDB(t)
 	repo := room.NewGormRepository(db)
@@ -414,7 +383,6 @@ func TestFindPlayerRoom_ReportsTheRoomThePlayerIsActuallyIn(t *testing.T) {
 	require.NoError(t, db.Create(host).Error)
 	require.NoError(t, db.Create(guest).Error)
 
-	// Two live rooms, so a wrong scan cannot accidentally match.
 	other := &room.Room{Name: "FPR Other", Code: "FPROTH", OwnerID: host.ID, Variant: "bitola", MatchMode: "1001", TimerStyle: "relaxed", Status: "waiting", PlayerCount: 1}
 	hosted := &room.Room{Name: "FPR Hosted", Code: "FPRHST", OwnerID: host.ID, Variant: "bitola", MatchMode: "1001", TimerStyle: "relaxed", Status: "waiting", PlayerCount: 2}
 	require.NoError(t, repo.Create(other))

@@ -5,18 +5,10 @@ import (
 	"time"
 )
 
-// inviteTTL bounds how long a friend room invite (Story 11.5) stays actionable.
-// An invite is a real-time popup, not an inbox item: if the friend has not acted
-// within the window the room has almost certainly moved on, so the grant is
-// dropped rather than left to authorize a stale bypass minutes later.
 const inviteTTL = 60 * time.Second
 
-// inviteGrant is one outstanding invite for one (room, invitee) pair.
-//
-// isHost is the ONLY thing that authorizes a password bypass. A non-host
-// member's invite is recorded all the same — the popup and its expiry are
-// identical — it simply never satisfies ConsumeHostGrant, so the invitee lands
-// on the normal password prompt (AC4).
+// inviteGrant is one outstanding invite for one (room, invitee) pair. Only isHost
+// authorizes a password bypass; a non-host invite never satisfies ConsumeHostGrant.
 type inviteGrant struct {
 	id        uint64
 	inviterID uint
@@ -25,23 +17,14 @@ type inviteGrant struct {
 	timer     *time.Timer
 }
 
-// InviteRegistry holds the server-issued one-time invite grants that let a
-// HOST-invited friend past a private room's password gate (Story 11.5, AC3/D3).
-//
-// The bypass is server-authorized by construction: a grant is looked up by the
-// authenticated userID + roomID at join time, and the client never sends a
-// bypass flag of any kind (JoinRoomRequest gains no field). There is no way for
-// a client to self-authorize.
-//
-// Like PresenceRegistry and the lobby-disconnect timers this is in-process,
-// mutex-guarded, and deliberately NOT durable: an invite is ephemeral, so losing
-// every outstanding grant on restart is correct behaviour, not data loss. The
-// friend simply re-requests an invite.
+// InviteRegistry holds the server-issued one-time grants that let a host-invited
+// friend past a private room's password. It is in-process and deliberately not
+// durable, since invites are ephemeral.
 type InviteRegistry struct {
 	mu     sync.Mutex
 	ttl    time.Duration
 	nextID uint64
-	grants map[uint]map[uint]*inviteGrant // roomID → inviteeID → grant
+	grants map[uint]map[uint]*inviteGrant
 }
 
 // NewInviteRegistry creates an empty registry using the default invite TTL.
@@ -49,10 +32,8 @@ func NewInviteRegistry() *InviteRegistry {
 	return NewInviteRegistryWithTTL(inviteTTL)
 }
 
-// NewInviteRegistryWithTTL is the tunable-TTL constructor. Tests use it to make
-// expiry observable without sleeping for a minute; production uses the default.
-// A non-positive ttl falls back to the default rather than issuing grants that
-// are born expired.
+// NewInviteRegistryWithTTL creates a registry with a custom TTL, mainly for tests.
+// A non-positive ttl falls back to the default.
 func NewInviteRegistryWithTTL(ttl time.Duration) *InviteRegistry {
 	if ttl <= 0 {
 		ttl = inviteTTL
@@ -63,21 +44,9 @@ func NewInviteRegistryWithTTL(ttl time.Duration) *InviteRegistry {
 	}
 }
 
-// Issue records an invite from inviterID to inviteeID for roomID and returns the
-// invite id (echoed to the client in the system:room_invite push) and its expiry.
-//
-// isHost must be true only when the inviter is the room OWNER — that is what
-// makes the grant consumable as a password bypass. Re-inviting the same friend
-// replaces the outstanding grant and restarts the clock; the replaced grant's
-// timer is stopped first so it cannot void its own successor.
-//
-// A replacement NEVER downgrades an existing non-expired host grant. Without
-// that rule an ordinary member who invites the same friend right after the owner
-// did would silently strip the owner's password bypass, and the invitee would be
-// asked for a password the host meant to wave them past. The stronger grant wins
-// and only the clock is refreshed. (The handler additionally refuses to issue at
-// all while an invite is pending, so this is defence in depth for any future
-// caller.)
+// Issue records an invite for the pair, replacing any outstanding one, and returns
+// its id and expiry. Only the room owner's invite should pass isHost, and a
+// replacement never downgrades a live host grant.
 func (r *InviteRegistry) Issue(roomID, inviteeID, inviterID uint, isHost bool) (uint64, time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -104,7 +73,6 @@ func (r *InviteRegistry) Issue(roomID, inviteeID, inviterID uint, isHost bool) (
 		isHost:    isHost,
 		expiresAt: time.Now().Add(r.ttl),
 	}
-	// Capture the id so a fired timer for a REPLACED grant is a no-op.
 	grantID := g.id
 	g.timer = time.AfterFunc(r.ttl, func() { r.expire(roomID, inviteeID, grantID) })
 	byInvitee[inviteeID] = g
@@ -112,19 +80,9 @@ func (r *InviteRegistry) Issue(roomID, inviteeID, inviterID uint, isHost bool) (
 	return g.id, g.expiresAt
 }
 
-// HasHostGrant reports whether a valid HOST invite grant exists for the pair
-// WITHOUT consuming it. This — not ConsumeHostGrant — is what JoinRoom asks at
-// the password gate.
-//
-// The distinction matters because the password block is only the FIRST of six
-// gates: capacity, bot-capacity, already-in-room, coin affordability and honor
-// all still run after it. Consuming there would burn the grant on a rejection
-// the invitee can recover from (a seat frees up, they top up their coins, they
-// leave the other room) and their retry would then hit the bcrypt gate for a
-// password they were never given. The grant is instead spent on SUCCESS, by the
-// VoidUser(userID) call that already runs after a completed join — see JoinRoom.
-//
-// An expired grant is deleted on the way out, same as ConsumeHostGrant.
+// HasHostGrant reports whether a valid host grant exists for the pair without
+// consuming it. JoinRoom checks this at the password gate so a rejection by a later
+// gate does not burn the grant.
 func (r *InviteRegistry) HasHostGrant(roomID, inviteeID uint) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -140,15 +98,8 @@ func (r *InviteRegistry) HasHostGrant(roomID, inviteeID uint) bool {
 	return g.isHost
 }
 
-// ConsumeHostGrant reports whether a valid HOST invite grant exists for the pair
-// and, if so, deletes it — the grant is one-time by construction.
-//
-// It returns false for a missing grant, an expired one, and a non-host one. A
-// rejected non-host grant is deliberately LEFT IN PLACE: it is not a bypass
-// token, so consuming it would only make the invite vanish for no reason.
-//
-// JoinRoom uses the non-consuming HasHostGrant instead (see above); this stays
-// as the registry's explicit one-time primitive.
+// ConsumeHostGrant reports whether a valid host grant exists for the pair and
+// deletes it if so. A non-host grant is left in place, since it is not a bypass token.
 func (r *InviteRegistry) ConsumeHostGrant(roomID, inviteeID uint) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -219,13 +170,9 @@ func (r *InviteRegistry) VoidUser(inviteeID uint) {
 	}
 }
 
-// VoidInviter drops every outstanding invite a given player issued into one
-// room. Called when that player stops being able to vouch for an invitee — they
-// left the room, were kicked, or handed ownership away (AC2/AC3).
-//
-// Without it a grant issued by a departed EX-owner would keep bypassing the
-// CURRENT owner's password for the rest of its TTL, which is exactly the
-// authority the host-only bypass is supposed to encode.
+// VoidInviter drops every invite a player issued into one room once they can no
+// longer vouch for invitees. This stops a departed ex-owner's grant from bypassing
+// the current owner's password.
 func (r *InviteRegistry) VoidInviter(roomID, inviterID uint) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

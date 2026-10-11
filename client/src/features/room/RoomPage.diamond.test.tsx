@@ -1,17 +1,3 @@
-// Diamond layout invariant test. The waiting room pins seat indices to
-// fixed cardinal positions (seat 0 → south, 1 → east, 2 → north, 3 → west)
-// regardless of which seat the viewer occupies. This is intentionally
-// different from the in-game table which DOES rotate to put the viewer at
-// the bottom — in the lobby, rotating after a click made seat selection
-// feel unpredictable ("I clicked the top tile but landed at the bottom").
-//
-// JSDOM caveat: `getBoundingClientRect()` returns zeroed coordinates, so
-// asserting visual position via geometry is meaningless here. We instead
-// read the inline `gridArea` style — that is what the CSS Grid
-// `grid-template-areas` resolution depends on, and it survives JSDOM's
-// render. (Visual geometry is re-checked in a real browser via Playwright
-// in the verification step of the redesign change.)
-
 import "@/shared/i18n/i18n";
 
 import { render, screen, waitFor } from "@testing-library/react";
@@ -24,9 +10,6 @@ import { makeRoom, makeRoomDetail, makeUser, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
-// Mirror the existing RoomPage.test.tsx mock surface — RoomPage pulls
-// router, room API, WS context, and toasts. Without these the render
-// throws before we get to the seat tiles.
 const mockNavigate = vi.fn();
 vi.mock("react-router", async () => {
   const actual = await vi.importActual("react-router");
@@ -48,9 +31,6 @@ vi.mock("@/shared/api/rooms", () => ({
   swapSeats: vi.fn(),
 }));
 
-// The room's last-match panel reads GET /rooms/:id/last-match. Rejected here so
-// these suites never touch the network; the action-bar button stays unrendered,
-// which is what a room with no viewer-played match looks like.
 vi.mock("@/shared/api/matches", () => ({
   getRoomLastMatch: vi.fn(() => Promise.reject(new Error("no last match"))),
 }));
@@ -71,10 +51,8 @@ import { getRoom, leaveRoom } from "@/shared/api/rooms";
 const mockGetRoom = vi.mocked(getRoom);
 const mockLeaveRoom = vi.mocked(leaveRoom);
 
-// fourSeated builds a fully-seated lobby: seats 0,2 → teamA, 1,3 → teamB.
-// `viewerUserId` selects which seat the rendered viewer occupies.
+// Builds a fully seated lobby (seats 0,2 on team A, 1,3 on team B) with the viewer at viewerSeat.
 function fourSeated(viewerSeat: number) {
-  // viewerSeat → userId map: viewer is always userId 100 for clarity.
   const usernames = ["alice", "bob", "carol", "dave"];
   const players = [0, 1, 2, 3].map((seat) => ({
     id: seat + 1,
@@ -167,11 +145,6 @@ describe("RoomPage diamond layout invariant", () => {
       const east = screen.getByTestId("seat-position-east");
       const west = screen.getByTestId("seat-position-west");
 
-      // Placement source — JSDOM doesn't compute layout, but the responsive
-      // `sm:[grid-area:<cardinal>]` class survives the React render and is what
-      // drives the CSS-Grid `grid-template-areas` resolution at sm+. (It's
-      // scoped to sm so the mobile 2-col grid auto-flows instead of collapsing
-      // every tile into one cell.)
       expect(south.className).toContain("sm:[grid-area:south]");
       expect(north.className).toContain("sm:[grid-area:north]");
       expect(east.className).toContain("sm:[grid-area:east]");
@@ -188,17 +161,11 @@ describe("RoomPage diamond layout invariant", () => {
         return Number(match![1]);
       }
 
-      // Fixed-position contract: seat indices map 1:1 to cardinals
-      // regardless of viewer. Click target visually matches click result.
       expect(seatIndexAt(south as HTMLElement)).toBe(0);
       expect(seatIndexAt(east as HTMLElement)).toBe(1);
       expect(seatIndexAt(north as HTMLElement)).toBe(2);
       expect(seatIndexAt(west as HTMLElement)).toBe(3);
 
-      // Partnership data-team contract still holds: vertical pair (0+2) =
-      // Team A, horizontal pair (1+3) = Team B. This is the layout's
-      // visual partnership cue (vertical lane = Team A, horizontal lane =
-      // Team B) and downstream styles depend on `data-team` being set.
       expect((south as HTMLElement).getAttribute("data-team")).toBe("teamA");
       expect((north as HTMLElement).getAttribute("data-team")).toBe("teamA");
       expect((east as HTMLElement).getAttribute("data-team")).toBe("teamB");

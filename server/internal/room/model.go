@@ -6,193 +6,59 @@ import (
 	"gorm.io/gorm"
 )
 
+// Room is a game table and its per-room rules. The bool rule columns carry no GORM `default`
+// tag on purpose, because GORM would then omit a false from INSERTs; PasswordHash never
+// leaves the server.
 type Room struct {
-	ID      uint   `gorm:"primaryKey" json:"id"`
-	Name    string `gorm:"size:100;not null" json:"name"`
-	Code    string `gorm:"size:6;uniqueIndex;not null" json:"code"`
-	OwnerID uint   `gorm:"not null;index" json:"ownerId"`
-	// OwnerUsername is populated at the handler layer via a JOIN to `users`
-	// before serialization. Not persisted on rooms (no migration), avoids the
-	// extra write-path responsibility a denormalized column would create.
-	OwnerUsername string `gorm:"-" json:"ownerUsername"`
-	// OwnerAvatarURL is the owner's 128 px avatar (null when none), hydrated in
-	// the same users read as OwnerUsername, for the lobby card's host disc.
-	OwnerAvatarURL *string `gorm:"-" json:"ownerAvatarUrl"`
-	// Players is populated by the list-rooms handler so the lobby grid can
-	// render seat chips inline without an extra round-trip per card. Marked
-	// `omitempty` so the GET /rooms/:id detail endpoint, which returns players
-	// via its own envelope, doesn't accidentally double-serialize them.
-	Players              []RoomPlayer `gorm:"-" json:"players,omitempty"`
-	Variant              string       `gorm:"size:20;not null;default:bitola" json:"variant"`
-	MatchMode            string       `gorm:"size:10;not null;default:1001" json:"matchMode"`
-	TimerStyle           string       `gorm:"size:20;not null;default:relaxed" json:"timerStyle"`
-	TimerDurationSeconds *int         `json:"timerDurationSeconds"`
-	ReconnectWindowSec   *int         `json:"reconnectWindowSec"`
-	// CoinBuyIn is the per-human stake (coins) each seated human pays at match
-	// start (Story 9.2). min 0, no maximum (owner freedom); create-room defaults
-	// to 500, quick-play rooms persist 0. DB CHECK enforces >= 0.
-	CoinBuyIn int `gorm:"not null;default:0" json:"coinBuyIn"`
-	// PasswordHash is the bcrypt hash of a private room's password (Story 9.6,
-	// FR60). NULL (nil pointer) is the public-room sentinel; a non-nil hash means
-	// the room is private. `json:"-"` keeps the hash strictly server-side — it is
-	// NEVER serialized to any client, WS payload, or log line.
-	PasswordHash *string `gorm:"size:60" json:"-"`
-	// IsPrivate is the derived, wire-facing privacy flag (Story 9.6). It is NOT a
-	// column (`gorm:"-"`) — it is computed from PasswordHash != nil so the boolean
-	// can never drift from the hash. Auto-populated on every DB read by the
-	// AfterFind hook below; CreateRoom and the hand-built roomLifecyclePayload set
-	// it explicitly because those paths don't read back through GORM.
-	IsPrivate bool `gorm:"-" json:"isPrivate"`
-	// MinHonor is the minimum honor score an EXPERIENCED player must clear to join
-	// (Story 9.8, FR57). 0 means no bar, and is the default. The DB CHECK bounds it
-	// to [0,100]; the handler range-validates the same interval so client and server
-	// agree in the same unit (a plain integer — no rune/byte asymmetry like 9.6's
-	// password bounds had).
-	//
-	// The value the gate compares against is NEVER users.honor_score (the lagging
-	// snapshot column) — it is the score recomputed at request time through
-	// user.NewHonorSnapshot. See honorGateError in handler.go.
-	MinHonor int `gorm:"not null;default:0" json:"minHonor"`
-	// AllowNewPlayers is whether players with no established track record
-	// (user.IsNewPlayer — fewer than 5 finished-or-abandoned matches) may join at
-	// all (Story 9.8, FR57). It is INDEPENDENT of MinHonor (D1): a New Player is
-	// never score-checked, so this toggle is the owner's explicit "I'll take an
-	// unknown" switch, and it applies even in a MinHonor == 0 room.
-	//
-	// NO `default` TAG, DELIBERATELY — this is a silent-data-corruption trap, not a
-	// style preference. GORM does not send a zero-valued field (0, "", false) in an
-	// INSERT when that field declares a `default` tag; it lets the database apply
-	// the default instead. With `gorm:"default:true"` it would be IMPOSSIBLE to
-	// create a room with allow_new_players = false: the value would silently flip
-	// to true. (Per the GORM docs: "any zero value fields like 0, '', false won't
-	// be saved into the database for those fields defined default value … you might
-	// want to use a pointer type or Scanner/Valuer to avoid this.") Omitting the tag
-	// makes GORM send the real boolean every time; the DB-side DEFAULT TRUE in
-	// migration 000018 still covers the backfill and any raw insert.
-	//
-	// The inverse trap is closed by construction: with no GORM default, a hand-built
-	// &Room{...} that FORGETS this field inserts false (veterans-only). Both &Room{}
-	// sites therefore set it explicitly — CreateRoom and the Quick Play synthesis.
-	//
-	// Rejected alternatives: *bool (drags nil-handling into every read path for what
-	// is only a write-path problem) and inverting the column to `veterans_only`
-	// (deviates from the AC-mandated column name and installs a permanent double
-	// negative at every call site).
-	AllowNewPlayers bool `gorm:"not null" json:"allowNewPlayers"`
-	// DeclarationsEnabled is whether this room plays WITH melds and the
-	// Belote/Rebelote bonus. True is the default and reproduces every match
-	// played before this column existed; false is "bez zvanja" — no meld prompt,
-	// no dedicated Croatian declaration phase, no K+Q-of-trump prompt, no +20, so
-	// a hand scores on card points, last trick and Capot alone.
-	//
-	// Variant-independent by construction. It is resolved into VariantRules at
-	// game init and read there as a config field, so neither variant's skip is a
-	// variant-name comparison (Epic 12, D-VAR-1). This is the first per-room
-	// override of a rule-config field.
-	//
-	// NO `default` TAG, DELIBERATELY — the exact trap documented on
-	// AllowNewPlayers above, and here it is even more direct: GORM omits
-	// zero-valued fields from an INSERT when they declare a `default`, so
-	// `gorm:"default:true"` would make declarations_enabled = false
-	// uninsertable, i.e. the toggle could never actually be turned off. The
-	// DB-side DEFAULT TRUE in migration 000021 still covers the backfill and any
-	// raw insert.
-	//
-	// The inverse trap is closed the same way: with no GORM default, a hand-built
-	// &Room{...} that FORGETS this field inserts false — a silently
-	// declarations-less room. Both &Room{} sites therefore set it explicitly:
-	// CreateRoom and the Quick Play synthesis.
-	DeclarationsEnabled bool `gorm:"not null" json:"declarationsEnabled"`
-	// StopAtTarget is "dosta" (enough): whether the match ends the INSTANT a team
-	// reaches the 1001/501 target, hand unfinished. False is the default and
-	// reproduces every match played before this column existed — the current hand
-	// always plays to trick 8 and the target is checked once, in scoreHand, after
-	// the last-trick or Capot bonus and the failed-hand rule have been applied.
-	//
-	// True makes the engine end the match the moment a team's running total
-	// reaches the target, mid-hand; the aborted hand earns neither end-of-hand
-	// bonus and gets no hand_results row. The rule itself — the running total, the
-	// checkpoints and why there are exactly three — is stated once, on
-	// game.stopAtTargetIfReached, and deliberately not restated here.
-	//
-	// Automatic, never player-callable: no button, no action. Variant-independent
-	// by construction, like DeclarationsEnabled above — it is resolved into
-	// VariantRules at game init and read there as a config field, so neither
-	// variant's stop is a variant-name comparison (Epic 12, D-VAR-1). This is the
-	// SECOND per-room override of a rule-config field.
-	//
-	// NO `default` TAG, DELIBERATELY — the same GORM trap documented on
-	// AllowNewPlayers and DeclarationsEnabled above: GORM omits zero-valued
-	// fields from an INSERT when they declare a `default`, so a tag here would
-	// make one of the two values uninsertable. The DB-side DEFAULT FALSE in
-	// migration 000022 covers the backfill and any raw insert.
-	//
-	// The trap INVERTS here, and that is worth stating rather than leaving the
-	// next reader to work out: the safe default is FALSE, so a hand-built
-	// &Room{...} that FORGETS this field inserts today's behaviour rather than a
-	// silently broken room. The tag is still omitted — an explicit TRUE has to
-	// stay insertable, and the three sibling columns then read identically. Both
-	// &Room{} sites set it explicitly anyway: CreateRoom and the Quick Play
-	// synthesis.
-	StopAtTarget bool           `gorm:"not null" json:"stopAtTarget"`
-	Status       string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
-	PlayerCount  int            `gorm:"not null;default:1" json:"playerCount"`
-	IsQuickPlay  bool           `gorm:"not null;default:false" json:"isQuickPlay"`
-	CreatedAt    time.Time      `json:"createdAt"`
-	UpdatedAt    time.Time      `json:"updatedAt"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                   uint           `gorm:"primaryKey" json:"id"`
+	Name                 string         `gorm:"size:100;not null" json:"name"`
+	Code                 string         `gorm:"size:6;uniqueIndex;not null" json:"code"`
+	OwnerID              uint           `gorm:"not null;index" json:"ownerId"`
+	OwnerUsername        string         `gorm:"-" json:"ownerUsername"`
+	OwnerAvatarURL       *string        `gorm:"-" json:"ownerAvatarUrl"`
+	Players              []RoomPlayer   `gorm:"-" json:"players,omitempty"`
+	Variant              string         `gorm:"size:20;not null;default:bitola" json:"variant"`
+	MatchMode            string         `gorm:"size:10;not null;default:1001" json:"matchMode"`
+	TimerStyle           string         `gorm:"size:20;not null;default:relaxed" json:"timerStyle"`
+	TimerDurationSeconds *int           `json:"timerDurationSeconds"`
+	ReconnectWindowSec   *int           `json:"reconnectWindowSec"`
+	CoinBuyIn            int            `gorm:"not null;default:0" json:"coinBuyIn"`
+	PasswordHash         *string        `gorm:"size:60" json:"-"`
+	IsPrivate            bool           `gorm:"-" json:"isPrivate"`
+	MinHonor             int            `gorm:"not null;default:0" json:"minHonor"`
+	AllowNewPlayers      bool           `gorm:"not null" json:"allowNewPlayers"`
+	DeclarationsEnabled  bool           `gorm:"not null" json:"declarationsEnabled"`
+	StopAtTarget         bool           `gorm:"not null" json:"stopAtTarget"`
+	Status               string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
+	PlayerCount          int            `gorm:"not null;default:1" json:"playerCount"`
+	IsQuickPlay          bool           `gorm:"not null;default:false" json:"isQuickPlay"`
+	CreatedAt            time.Time      `json:"createdAt"`
+	UpdatedAt            time.Time      `json:"updatedAt"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// AfterFind derives the wire-facing IsPrivate flag from PasswordHash on every
-// GORM read (FindByID / FindByCode / FindByStatus / FindPlayerRoom, list and
-// detail queries), so no per-handler edit is needed to surface privacy. Paths
-// that don't read back through GORM — the freshly-Created room in CreateRoom and
-// the hand-built roomLifecyclePayload map — set IsPrivate explicitly (Story 9.6).
+// AfterFind derives IsPrivate from PasswordHash on every GORM read. Paths that skip GORM reads,
+// like CreateRoom and roomLifecyclePayload, set it explicitly.
 func (r *Room) AfterFind(tx *gorm.DB) error {
 	r.IsPrivate = r.PasswordHash != nil
 	return nil
 }
 
+// RoomPlayer is a seated human, or a synthetic bot entry when IsBot is set. The honour and level
+// fields are pointers so nil (not read, or a bot) stays distinct from a real 0.
 type RoomPlayer struct {
-	ID       uint   `gorm:"primaryKey" json:"id"`
-	RoomID   uint   `gorm:"not null;index" json:"roomId"`
-	UserID   uint   `gorm:"not null;index" json:"userId"`
-	Username string `gorm:"-" json:"username"`
-	// AvatarURL is the player's 128 px avatar (null when none, and always null
-	// for bots), derived from users.avatar_key by the same JOIN that reads the
-	// username. Every roster payload built from RoomPlayer carries it.
-	AvatarURL *string `gorm:"-" json:"avatarUrl"`
-	Seat      *int    `json:"seat"`
-	Team      *string `gorm:"size:10" json:"team"`
-	// IsBot marks synthetic bot entries merged into wire payloads. Bots are
-	// NOT room_players rows (the user_id FK forbids it) — they live in
-	// room_bots and enter players arrays only via mergeBotPlayers as
-	// {id:0, userId:0, username:"", seat, team, isBot:true}. Humans always
-	// serialize isBot:false.
-	IsBot bool `gorm:"-" json:"isBot"`
-	// Honour, attached for the waiting-room roster (honour redesign R6). Not a
-	// column — hydrated per-request from user.HonorService.HonorForUsers, which
-	// recomputes from the stored weights.
-	//
-	// POINTERS so "not read" is distinguishable from a real 0: an honour score of
-	// 0 is a legitimate value ("Problematic"), and a plain int would make the
-	// two indistinguishable — the exact class of bug the 9.7/9.8 reviews closed
-	// repeatedly. nil means "no honour available for this seat" (a bot, an honour
-	// service that is not wired, or a read that failed) and the client renders no
-	// shield rather than a wrong one.
-	//
-	// Public-safe: the profile response already exposes the same score and tier
-	// to anyone, so the roster reveals nothing new. It is deliberately NOT the
-	// counts or the trend — a seatmate needs to know how reliable someone is, not
-	// their history.
-	HonorScore *int    `gorm:"-" json:"honorScore,omitempty"`
-	HonorTier  *string `gorm:"-" json:"honorTier,omitempty"`
-	// Level is the seat's lifetime level, hydrated alongside honour from the same
-	// read for the roster (level renders before the shield on each seat tile).
-	// Same pointer semantics as HonorScore: nil means "not read" (a bot, or the
-	// hydration failed), while a real level 0 — a brand-new account — arrives as 0.
-	Level     *int      `gorm:"-" json:"level,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	RoomID     uint      `gorm:"not null;index" json:"roomId"`
+	UserID     uint      `gorm:"not null;index" json:"userId"`
+	Username   string    `gorm:"-" json:"username"`
+	AvatarURL  *string   `gorm:"-" json:"avatarUrl"`
+	Seat       *int      `json:"seat"`
+	Team       *string   `gorm:"size:10" json:"team"`
+	IsBot      bool      `gorm:"-" json:"isBot"`
+	HonorScore *int      `gorm:"-" json:"honorScore,omitempty"`
+	HonorTier  *string   `gorm:"-" json:"honorTier,omitempty"`
+	Level      *int      `gorm:"-" json:"level,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 // RoomBot is a bot occupying a seat in a waiting room. Bots have no user

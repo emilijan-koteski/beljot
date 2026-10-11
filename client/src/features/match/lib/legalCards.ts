@@ -67,43 +67,25 @@ function applyMustOverplayLedSuit(
 }
 
 /**
- * Mirror of server/internal/game/validation.go `legalCards`. Returns the subset
- * of the seat's hand that is legal to play given the current trick state.
- * Bitola variant: follow the led suit when held — the overplay obligation (play
- * a higher led-suit card) applies only while the led suit can still win (led
- * suit is trump, or no trump has cut the trick yet); once a trump cuts a
- * non-trump-led trick, any card of the led suit is legal. When void in the led
- * suit, must cut with trump if any is held (over-trump if possible, otherwise
- * any trump) — no partner-winning exemption; otherwise any card is legal.
+ * Mirror of the server's `legalCards`: the cards in a seat's hand that may be played into the current trick.
+ * The led suit comes from the trick's first card, since `state.leadSuit` can lag behind a `card_played` event.
  */
 export function legalCards(state: MatchState, seat: number): Card[] {
   const player = state.players[seat];
   if (!player) return [];
   const hand = player.hand ?? [];
 
-  // currentTrick can be null on the wire during trick resolution (server emits
-  // nil between tricks, which JSON-serializes to null). Treat null/empty as
-  // "leading the next trick" → any card is legal.
   const currentTrick = state.currentTrick ?? [];
   if (currentTrick.length === 0) return hand;
   if (state.trumpSuit === null) return hand;
 
   const trumpSuit = state.trumpSuit;
-  // Derive the led suit from the first card in the trick rather than
-  // state.leadSuit. The server sends event:card_played and event:match_state
-  // as separate messages; between them the client briefly has currentTrick
-  // populated but leadSuit still stale from the previous trick's cleanup.
-  // currentTrick[0] is atomically consistent with the current trick, so
-  // using it closes that race — no "all cards legal" flash.
   const first = currentTrick[0];
   if (!first) return hand;
   const ledSuit = first.card.suit;
   const suitCards = filterBySuit(hand, ledSuit);
 
   if (suitCards.length > 0) {
-    // Overplay applies only while the led suit can still win: led suit is
-    // trump, or no trump has cut the trick yet. Once a trump cuts a non-trump-
-    // led trick, any card of the led suit is legal.
     const ledSuitCanWin =
       ledSuit === trumpSuit || highestTrumpInTrick(currentTrick, trumpSuit) === null;
     if (ledSuitCanWin) {
@@ -128,11 +110,8 @@ export function legalCardIds(state: MatchState, seat: number): string[] {
 }
 
 /**
- * True when playing `card` would trigger a Belote/Rebelote announcement: it is
- * the trump King or Queen and the hand (before playing) also holds the partner
- * (trump Queen or King). Mirrors the server's `shouldPromptBelot` so the client
- * can prompt the player BEFORE sending play_card — the card must not be thrown
- * (or shown to opponents) until the player decides to announce or pass.
+ * True when playing `card` would trigger Belote: it is the trump King or Queen and the hand also holds its partner.
+ * Mirrors the server's `shouldPromptBelot` so the client can prompt before sending play_card.
  */
 export function isBelotEligible(card: Card, hand: Card[], trump: Suit): boolean {
   if (card.suit !== trump) return false;

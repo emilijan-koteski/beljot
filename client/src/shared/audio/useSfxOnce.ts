@@ -6,11 +6,8 @@ const payloadKeys = new WeakMap<object, string>();
 let nextPayloadKey = 0;
 
 /**
- * A dedupe key that names one event payload. The same object — a reveal the
- * store still holds when the page remounts — always gets the same key, so its
- * sound is not heard twice; every new payload gets a key no earlier one ever
- * had, so a later match or hand can never be silenced by an old key that
- * happens to look the same.
+ * Returns a dedupe key unique to this payload object, stable across remounts.
+ * A new payload never reuses an older payload's key, so it is never silenced.
  */
 export function payloadSoundKey(payload: object): string {
   let key = payloadKeys.get(payload);

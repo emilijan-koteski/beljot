@@ -19,49 +19,22 @@ import { WinRateRing } from "./WinRateRing";
 
 type IdentityHeroProps = {
   username: string;
-  /**
-   * The subject's 256 px avatar (the hero is the one disc drawn large enough
-   * to need it), or null for the initial disc.
-   */
   avatarUrl?: string | null;
-  /**
-   * Authenticated self's id — enables username edit-in-place and the avatar
-   * edit button (undefined = read-only, as on every public profile).
-   */
   userId?: number;
-  /** When the username was last changed; drives the edit cooldown. */
   usernameChangedAt?: string | null;
   createdAt: string;
-  /** Completed-at of the most recent match, if any, for the "last played" line. */
   lastPlayedAt?: string;
   games: number;
   wins: number;
   losses: number;
   capots: number;
-  /** Coin wallet balance (Story 9.1). Ignored when hidePrivatePills is set. */
   walletBalance: number;
-  /** Daily-login streak (Story 9.1) — distinct from the win/loss streak.
-   *  Ignored when hidePrivatePills is set. */
   loginStreakDays: number;
-  /**
-   * Story 11.3: on a PUBLIC profile the viewer must never see the subject's (or
-   * their own) wallet + login-streak pills — both are private and are fed from
-   * the viewer's authStore on the self page. When true, neither pill renders.
-   */
   hidePrivatePills?: boolean;
-  /** Lifetime level (Story 9.5) — server-derived from total XP. */
   level: number;
-  /** XP earned past the current level's threshold (server-provided). */
   xpIntoLevel: number;
-  /** Size of the current level's XP band (server-provided). */
   xpForNextLevel: number;
-  /** 0–100, or null with no games. */
   winRate: number | null;
-  /**
-   * Honour (Story 9.7, redesigned): rendered as the hero's full-width bottom
-   * band. Optional so the hero stays usable without it — omit and the band and
-   * its hairline rule simply do not render.
-   */
   honor?: HonorHeroBandProps;
 };
 
@@ -76,12 +49,7 @@ function HeroPill({
 }: {
   value: number | string;
   label: string;
-  /** When provided, replaces the visible text label; `label` is kept for the
-      tooltip + accessible name so the meaning isn't lost (e.g. the coins pill). */
   icon?: ReactNode;
-  /** Fuller hover-tooltip text that overrides the default `label` title (e.g. the
-      streak pill explains "logged in N days in a row"). The accessible name stays
-      the short `label` + value. */
   titleText?: string;
   tone: PillTone;
 }) {
@@ -173,14 +141,7 @@ export function IdentityHero({
       }}
       data-testid="profile-identity-hero"
     >
-      {/* Left region is a 2-col grid: [avatar | identity]. The stat pills and XP
-          block break to a full-width row beneath the avatar on mobile
-          (col-span-2, flush to the left edge) and tuck into the identity column
-          to the right of the avatar on sm+ (col-start-2). */}
       <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-5 gap-y-4">
-        {/* The hero is above the fold, so its picture loads eagerly; every
-            other disc on the page stays lazy. The edit button exists only on
-            the self profile (userId set), never on a public one. */}
         <div className="relative shrink-0">
           <Avatar name={username} avatarUrl={avatarUrl} eager size={96} halo="profile" />
           {userId !== undefined && (
@@ -212,9 +173,6 @@ export function IdentityHero({
             userId={userId}
             usernameChangedAt={usernameChangedAt}
           />
-          {/* Below sm the two meta lines stack on their own rows (no middot) —
-              the inline pair wraps unpredictably next to long usernames on
-              phones. sm+ keeps the single "member since · played" line. */}
           <div className="text-ink-dim flex flex-col gap-0.5 text-[13px] sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
             {memberSince && <span data-testid="profile-member-since">{memberSince}</span>}
             {memberSince && lastPlayed && <span className="text-ink-off hidden sm:inline">·</span>}
@@ -223,16 +181,10 @@ export function IdentityHero({
         </div>
 
         <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:col-start-2">
-          {/* The lifetime level (Story 9.5) is shown in the labelled XP-progress
-              block just below, so no separate level pill is repeated here. */}
           <HeroPill value={games} label={t("profile.hero.games")} tone="neutral" />
           <HeroPill value={wins} label={t("profile.hero.wins")} tone="accent" />
           <HeroPill value={losses} label={t("profile.hero.losses")} tone="neutral" />
           <HeroPill value={capots} label={t("profile.hero.capots")} tone="brass" />
-          {/* Wallet + login-streak pills are PRIVATE (Story 11.3): shown only on
-              the self profile, never on a public one. Matches the header coin
-              pill: neutral surface + border, ink number, off-theme gold coin
-              icon (see COIN_GOLD). */}
           {!hidePrivatePills && (
             <>
               <HeroPill
@@ -260,18 +212,6 @@ export function IdentityHero({
           )}
         </div>
 
-        {/* Lifetime XP progress bar (Story 9.5, AC4). Level + numeric progress
-            on top, the bar below. xpIntoLevel / xpForNextLevel are server-
-            provided; the bar fill is cosmetic. The seasonal rank deliberately
-            does NOT live in this column: Story 13.3 built it as the page-level
-            SeasonSection (current-rank chip + prior-season archive), which has
-            the width this slot lacks.
-
-            Honour is NOT in this column, and the original reason still holds —
-            the score, tier, meter, counts and trend need more width than this
-            narrow slot beside the XP bar. The redesign's answer is the full-width
-            band at the foot of the card (HonorHeroBand below), which gives it that
-            width without putting it outside the card. */}
         <div
           className="col-span-2 flex max-w-xs flex-col gap-1 sm:col-span-1 sm:col-start-2"
           data-testid="profile-xp"
@@ -300,8 +240,6 @@ export function IdentityHero({
         <WinRateRing rate={winRate} />
       </div>
 
-      {/* Full-width bottom band spanning both hero columns, so identity, level,
-          win rate and reliability read as one profile rather than four. */}
       {honor && <HonorHeroBand {...honor} />}
     </header>
   );

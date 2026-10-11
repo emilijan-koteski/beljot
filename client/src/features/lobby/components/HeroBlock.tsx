@@ -8,7 +8,6 @@ import { StatPill } from "@/features/lobby/components/StatPill";
 import type { LobbyStats } from "@/shared/api/lobby";
 
 type Props = {
-  /** Total open room count, rendered next to the title in tabular nums. */
   openCount: number;
   stats: LobbyStats | undefined;
   onQuickPlay: () => void;

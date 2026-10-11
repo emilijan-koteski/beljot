@@ -15,25 +15,16 @@ import { Input } from "@/shared/components/ui/input";
 
 interface PasswordPromptDialogProps {
   open: boolean;
-  /** Name of the private room being entered — shown in the prompt description. */
   roomName: string;
-  /** True while a join attempt is in flight (disables submit, shows pending copy). */
   pending: boolean;
-  /**
-   * i18n key of the error to show (e.g. "room.errors.wrongPassword"), or null.
-   * When set, the dialog stays open so the player can retry (Story 9.6, AC4).
-   */
   errorKey: string | null;
   onSubmit: (password: string) => void;
   onClose: () => void;
 }
 
 /**
- * Story 9.6: password gate shown before a private-room join from either entry
- * point (the lobby card click and the join-by-code tile). It only collects and
- * submits the password — the authoritative check happens server-side on
- * POST /rooms/:id/join. A wrong/missing password keeps the dialog open with the
- * error (the parent controls errorKey); never navigates away on failure.
+ * Password prompt shown before joining a private room; the server does the real check.
+ * Stays open showing the parent-supplied errorKey so the player can retry.
  */
 export function PasswordPromptDialog({
   open,
@@ -45,13 +36,9 @@ export function PasswordPromptDialog({
 }: PasswordPromptDialogProps) {
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
-  // Hide the inline error the moment the player edits the password — a stale
-  // "wrong password" shouldn't linger while they retype. Re-armed whenever the
-  // parent reports a fresh error (errorKey transitions to non-null).
   const [errorDismissed, setErrorDismissed] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Clear any stale password whenever the dialog (re)opens for a room.
   useEffect(() => {
     if (open) {
       setPassword("");
@@ -60,7 +47,6 @@ export function PasswordPromptDialog({
     }
   }, [open]);
 
-  // A fresh error from the parent re-shows the message even after a prior edit.
   useEffect(() => {
     if (errorKey !== null) setErrorDismissed(false);
   }, [errorKey]);

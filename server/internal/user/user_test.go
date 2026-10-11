@@ -26,7 +26,6 @@ func getTestDB(t *testing.T) *gorm.DB {
 		t.Skip("skipping integration test: database not available")
 	}
 
-	// Use a transaction that will be rolled back after the test
 	tx := db.Begin()
 	t.Cleanup(func() {
 		tx.Rollback()
@@ -106,28 +105,14 @@ func TestGormUserRepository_FindByUsername_NotFound(t *testing.T) {
 	assert.Nil(t, found)
 }
 
-// TestGormUserRepository_SearchByUsername exercises the Story 11.1 ILIKE search
-// against a real Postgres inside the rolled-back test transaction. Everything
-// runs off one shared seed so the wildcard-escape and ordering guarantees are
-// checked against the same population.
+// TestGormUserRepository_SearchByUsername exercises the ILIKE search against a real Postgres.
+// Fixtures are prefixed so real rows in a developer DB never land in the exact-set assertions.
 func TestGormUserRepository_SearchByUsername(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormUserRepository(db)
 
-	// Every seeded username carries this prefix, and every query below searches
-	// for it. getTestDB hands out a rolled-back transaction, which isolates this
-	// test from OTHER TESTS but not from rows already in the database it runs
-	// against — a developer DB holds real accounts, and a genuine "alice" made
-	// the exact-set assertions below fail. Namespacing the fixtures means no
-	// real username can land in a result set, so the assertions can stay exact
-	// (and therefore keep proving escaping and ordering) instead of being
-	// loosened to "contains".
 	const pfx = "sbufx_"
 
-	// mk inserts a user with a unique email derived from the username (email is
-	// itself uniquely indexed). Usernames here intentionally bypass the app-level
-	// [a-zA-Z0-9_] charset (there is no DB CHECK) so the % / _ literal-match
-	// probes can be seeded at all.
 	mk := func(username string) *User {
 		u := &User{
 			Email:              username + "@search.test",
@@ -139,17 +124,17 @@ func TestGormUserRepository_SearchByUsername(t *testing.T) {
 		return u
 	}
 
-	searcher := mk("aliSearcher") // contains "ali" — proves self-exclusion
-	mk("Alice")                   // case-insensitive: found by "ali"
-	mk("alicia")                  // substring: found by "ali"
-	bob := mk("Bob")              // control: never matches "ali" or a literal "%"
-	mk("car_ol")                  // literal underscore probe
-	mk("carXol")                  // must NOT match a "car_ol" query if _ were a wildcard
-	mk("pct%name")                // literal percent probe
+	searcher := mk("aliSearcher")
+	mk("Alice")
+	mk("alicia")
+	bob := mk("Bob")
+	mk("car_ol")
+	mk("carXol")
+	mk("pct%name")
 	mk("zzalpha")
 	mk("zzbeta")
 	mk("zzgamma")
-	ghost := mk("ghostali") // soft-deleted below — must never appear in "ali"
+	ghost := mk("ghostali")
 	require.NoError(t, repo.Delete(ghost.ID))
 
 	usernames := func(us []User) []string {
@@ -163,7 +148,6 @@ func TestGormUserRepository_SearchByUsername(t *testing.T) {
 	t.Run("case-insensitive substring, self + soft-deleted excluded", func(t *testing.T) {
 		res, err := repo.SearchByUsername(pfx+"ali", searcher.ID, 10)
 		require.NoError(t, err)
-		// "Alice" + "alicia"; NOT the searcher (self), NOT "ghostali" (soft-deleted).
 		names := usernames(res)
 		assert.ElementsMatch(t, []string{pfx + "Alice", pfx + "alicia"}, names)
 		assert.NotContains(t, names, pfx+"aliSearcher")
@@ -184,10 +168,6 @@ func TestGormUserRepository_SearchByUsername(t *testing.T) {
 	})
 
 	t.Run("percent matches literally, not as match-everything", func(t *testing.T) {
-		// This one query cannot be prefix-scoped: the whole point is to pass a
-		// bare "%" and prove it is not treated as match-everything. So assert
-		// on the seeded control instead of on an exact set — Bob has no "%" in
-		// his name and would be returned if the wildcard escaped the escaping.
 		res, err := repo.SearchByUsername("%", searcher.ID, 10)
 		require.NoError(t, err)
 		names := usernames(res)
@@ -209,11 +189,7 @@ func TestGormUserRepository_SearchByUsername(t *testing.T) {
 	})
 }
 
-// --- Audio preferences (migration 000025) ---
-
-// Registration never names the two switches, so this is the path every new
-// account takes: a zero-value false must land as the column's TRUE default,
-// both in the row and in the struct the auth handler echoes.
+// Registration never names the audio switches, so a zero-value false must land as the TRUE default.
 func TestGormUserRepository_Create_AudioPreferencesDefaultOn(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormUserRepository(db)
@@ -234,10 +210,7 @@ func TestGormUserRepository_Create_AudioPreferencesDefaultOn(t *testing.T) {
 	assert.True(t, reloaded.MusicEnabled)
 }
 
-// The migration's column DEFAULT is what every pre-existing row and every
-// non-GORM writer relies on. GORM's Create sends the tag default explicitly, so
-// the test above never exercises it: insert a row naming neither column in raw
-// SQL, the way a row that predates migration 000025 was written, and read both.
+// A raw insert naming neither audio column exercises the migration's column DEFAULT.
 func TestGormUserRepository_AudioPreferencesDefaultTrueOnRawInsert(t *testing.T) {
 	db := getTestDB(t)
 
@@ -257,9 +230,7 @@ func TestGormUserRepository_AudioPreferencesDefaultTrueOnRawInsert(t *testing.T)
 	assert.True(t, got.MusicEnabled, "a row inserted without music_enabled must land on TRUE")
 }
 
-// false is a real value on the preferences path: the map-based Updates must
-// write it rather than skip it as a zero value, and must leave every column the
-// update did not name exactly as it was.
+// false must be written on the preferences path while unnamed columns stay untouched.
 func TestGormUserRepository_UpdatePreferences_AudioSwitches(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormUserRepository(db)
@@ -298,11 +269,7 @@ func TestGormUserRepository_UpdatePreferences_EmptyAndMissing(t *testing.T) {
 	assert.ErrorIs(t, repo.UpdatePreferences(999999, PreferencesUpdate{MusicEnabled: &off}), apperr.ErrUserNotFound)
 }
 
-// --- Audio volumes (migration 000026) ---
-
-// Registration never names the two volumes, so this is the path every new
-// account takes: a zero value must land as the tag default of 70, both in the
-// row and in the struct the auth handler echoes.
+// Registration never names the volumes, so a zero value must land as the tag default of 70.
 func TestGormUserRepository_Create_AudioVolumesDefault70(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormUserRepository(db)
@@ -323,9 +290,7 @@ func TestGormUserRepository_Create_AudioVolumesDefault70(t *testing.T) {
 	assert.Equal(t, 70, reloaded.MusicVolume)
 }
 
-// The migration's column DEFAULT is what every pre-existing row and every
-// non-GORM writer relies on, and GORM's Create sends the tag default itself, so
-// only a raw insert naming neither column exercises it.
+// A raw insert naming neither volume column exercises the migration's column DEFAULT.
 func TestGormUserRepository_AudioVolumesDefault70OnRawInsert(t *testing.T) {
 	db := getTestDB(t)
 
@@ -345,9 +310,7 @@ func TestGormUserRepository_AudioVolumesDefault70OnRawInsert(t *testing.T) {
 	assert.Equal(t, 70, got.MusicVolume, "a row inserted without music_volume must land on 70")
 }
 
-// 0 is a real value on the preferences path: the map-based Updates must write
-// it rather than skip it as a zero value, and must leave every column the
-// update did not name exactly as it was.
+// 0 must be written on the preferences path while unnamed columns stay untouched.
 func TestGormUserRepository_UpdatePreferences_AudioVolumes(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormUserRepository(db)
@@ -378,10 +341,8 @@ func TestGormUserRepository_UpdatePreferences_AudioVolumes(t *testing.T) {
 	assert.Equal(t, 0, reloaded.MusicVolume)
 }
 
-// The column CHECKs are the backstop for any writer that skips the handler's
-// validation: each volume column must refuse a level outside 0-100 with a
-// Postgres check violation (SQLSTATE 23514) on its own constraint. One subtest
-// per case, each in its own transaction: the failed statement aborts it.
+// Each volume column CHECK must reject a level outside 0-100 with SQLSTATE 23514.
+// Each case runs in its own transaction because the failed statement aborts it.
 func TestGormUserRepository_UpdatePreferences_AudioVolumeOutOfRangeRejectedByDB(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -422,9 +383,7 @@ func TestGormUserRepository_UpdatePreferences_AudioVolumeOutOfRangeRejectedByDB(
 	}
 }
 
-// UpdateAvatarKey writes the new prefix and hands back the one it replaced, so
-// the caller can delete exactly the orphaned pair; clearing returns the last
-// prefix too, and a missing row is ErrUserNotFound.
+// UpdateAvatarKey writes the new prefix and returns the one it replaced, also when clearing.
 func TestGormUserRepository_UpdateAvatarKey(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormUserRepository(db)

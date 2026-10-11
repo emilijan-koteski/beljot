@@ -106,8 +106,6 @@ describe("TrumpReveal — Wax Seal", () => {
     expect(screen.getByTestId("trump-reveal-copy")).toHaveTextContent("Spades is trump this hand");
     const seal = screen.getByTestId("trump-reveal-seal");
     expect(seal.getAttribute("data-suit")).toBe("S");
-    // With a hero card the seal stays pinned to its corner and takes no halo of
-    // its own — the halo lives behind the card.
     expect(seal.className).toContain("absolute");
     expect(seal.style.boxShadow).not.toContain("0 0 32px");
     expect(screen.queryByTestId("trump-reveal-candidate")).toBeNull();
@@ -124,9 +122,7 @@ describe("TrumpReveal — Wax Seal", () => {
         onComplete={vi.fn()}
       />,
     );
-    // The passed candidate card is the hero in both rounds now.
     expect(screen.getByTestId("playing-card-9S")).toBeInTheDocument();
-    // Seal carries the CHOSEN suit (Diamonds), not the candidate's (Spades).
     expect(screen.getByTestId("trump-reveal-seal").getAttribute("data-suit")).toBe("D");
     expect(screen.getByTestId("trump-reveal-eyebrow")).toHaveTextContent("free pick");
     const copy = screen.getByTestId("trump-reveal-copy");
@@ -239,9 +235,6 @@ describe("TrumpReveal — Wax Seal", () => {
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  // --- Candidate-less take (a variant that names trump freely and gives the
-  // taker no card). The server sends an empty cardId rather than suppressing
-  // the event, so the reveal must render without a hero card.
   describe("no trump candidate (empty cardId)", () => {
     it("renders the panel, the seal, and 'named {suit} as trump' with no hero card", () => {
       render(
@@ -258,8 +251,6 @@ describe("TrumpReveal — Wax Seal", () => {
       expect(screen.getByTestId("trump-reveal-taker")).toHaveTextContent("Carol");
       expect(screen.getByTestId("trump-reveal-seal").getAttribute("data-suit")).toBe("C");
       expect(screen.getByTestId("trump-reveal-copy")).toHaveTextContent("named Clubs as trump");
-      // No candidate existed, so neither the hero card nor the "was on the
-      // table" subline may appear.
       expect(screen.queryByTestId(/^playing-card-/)).not.toBeInTheDocument();
       expect(screen.queryByTestId("trump-reveal-candidate")).toBeNull();
     });
@@ -303,8 +294,6 @@ describe("TrumpReveal — Wax Seal", () => {
     });
 
     it("gives the seal its own team-coloured halo when it is the hero", () => {
-      // With a hero card the halo sits behind the card; with none the seal
-      // carries it, or it reads as an unglowing stamp inside a glowing panel.
       render(
         <TrumpReveal
           playerSeat={2}
@@ -317,14 +306,9 @@ describe("TrumpReveal — Wax Seal", () => {
       );
       const seal = screen.getByTestId("trump-reveal-seal");
       expect(seal.style.boxShadow).toContain("0 0 32px");
-      // The seal also leaves the card's absolute corner anchor behind.
       expect(seal.className).not.toContain("absolute");
     });
 
-    // Empty is the only non-2-character shape that renders. Everything else is
-    // malformed and must be dropped rather than sliced into a plausible card —
-    // "10S" is the dangerous one a bare length check lets through, where
-    // parseCardId reads rank "1" and suit "0".
     it.each(["J", "10S", "JSX", "js", "XS", "JX"])(
       "returns null for the malformed cardId %s",
       (cardId) => {
@@ -344,7 +328,6 @@ describe("TrumpReveal — Wax Seal", () => {
   });
 
   it("glows gold (Us) when the caller is on the viewer's team", () => {
-    // caller seat 2, viewer seat 0 — same parity → gold
     render(
       <TrumpReveal
         playerSeat={2}
@@ -360,7 +343,6 @@ describe("TrumpReveal — Wax Seal", () => {
   });
 
   it("glows silver (Them) when the caller is on the opposing team", () => {
-    // caller seat 1, viewer seat 0 — opposite parity → silver
     render(
       <TrumpReveal
         playerSeat={1}
@@ -376,10 +358,6 @@ describe("TrumpReveal — Wax Seal", () => {
   });
 });
 
-// --- Scope Amendment 1: the wax seal follows the active deck ---
-//
-// The seal is the largest suit mark in the app (30 px), which is what set the
-// icon resolution, so it is also where a wrong accent is most visible.
 describe("TrumpReveal card deck", () => {
   afterEach(() => {
     useAuthStore.setState({ token: null, user: null, isLoading: false });
@@ -406,12 +384,9 @@ describe("TrumpReveal card deck", () => {
     expect(mark.tagName).toBe("IMG");
     expect(mark).toHaveAttribute("src", "/suits/croatian/S.webp");
 
-    // Leaves are green, so the wax ring must not be the French near-black.
-    // rgb() because jsdom re-serialises hex in `border`.
     const seal = screen.getByTestId("trump-reveal-seal");
     expect(seal.style.borderColor).toBe("rgb(74, 122, 58)");
     expect(seal.style.borderColor).not.toBe("rgb(26, 26, 26)");
-    // The testid and data-suit contract is unchanged by the deck.
     expect(seal).toHaveAttribute("data-suit", "S");
   });
 
@@ -428,14 +403,10 @@ describe("TrumpReveal card deck", () => {
       />,
     );
 
-    // The seal's aria-label IS the suit name, and the body copy repeats it.
     expect(screen.getByTestId("trump-reveal-seal")).toHaveAttribute("aria-label", "Bells");
     expect(screen.getByTestId("trump-reveal").textContent).not.toContain("Diamonds");
   });
 
-  // Item 13: SUIT_INK_ON_FELT was pinned as a table but nothing asserted that
-  // TrumpReveal actually READS it — repointing the body copy at SUIT_ACCENT
-  // would have wrecked legibility on both decks with no test failing.
   it("inks the suit word with the on-felt palette, not the parchment accent", () => {
     signIn("croatian");
     const { container } = render(
@@ -449,8 +420,6 @@ describe("TrumpReveal card deck", () => {
       />,
     );
 
-    // SUIT_INK_ON_FELT.croatian.D = #e8c766 (lifted), NOT SUIT_ACCENT's #c9a23c:
-    // the parchment gold is unreadable on dark felt.
     const inked = Array.from(container.querySelectorAll("b")).map(
       (b) => (b as HTMLElement).style.color,
     );
@@ -471,7 +440,6 @@ describe("TrumpReveal card deck", () => {
       />,
     );
 
-    // #ff8585 — `--suit-red-up`, exactly what shipped before this story.
     const inked = Array.from(container.querySelectorAll("b")).map(
       (b) => (b as HTMLElement).style.color,
     );

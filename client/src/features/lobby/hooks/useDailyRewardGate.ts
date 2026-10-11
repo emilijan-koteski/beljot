@@ -10,19 +10,8 @@ export interface DailyReward {
 }
 
 /**
- * useDailyRewardGate fires the daily-login claim exactly once per authenticated
- * app session and exposes the reward to display. Mounted in the authenticated
- * shell (AppLayout) so it covers explicit login, registration, AND refresh-token
- * auto-login uniformly — the single bootstrap entry point.
- *
- * It always refreshes the stored balance/streak from the response, and only
- * surfaces a reward (opening the dialog) when the server actually granted one.
- *
- * StrictMode safety: a synchronous ref guard ensures only ONE request fires
- * across React 18's mount→unmount→remount cycle. We deliberately do NOT cancel
- * the in-flight request on cleanup — doing so would suppress the reward on the
- * StrictMode remount. The endpoint is idempotent server-side regardless, so a
- * stray second call could never double-grant.
+ * Claims the daily-login reward once per authenticated session, syncs the stored
+ * balance and streak, and exposes any granted reward; a failed claim is ignored.
  */
 export function useDailyRewardGate() {
   const token = useAuthStore((s) => s.token);
@@ -40,7 +29,6 @@ export function useDailyRewardGate() {
       .then((res) => {
         const user = useAuthStore.getState().user;
         if (user) {
-          // Immutable replace — keep balance/streak on authStore.user in sync.
           useAuthStore.getState().setUser({
             ...user,
             walletBalance: res.newBalance,
@@ -55,10 +43,7 @@ export function useDailyRewardGate() {
           });
         }
       })
-      .catch(() => {
-        // Non-fatal: a failed daily-login claim must never block the app. Next
-        // session retries; the idempotent endpoint makes retries safe.
-      });
+      .catch(() => undefined);
   }, [token, isLoading]);
 
   return {

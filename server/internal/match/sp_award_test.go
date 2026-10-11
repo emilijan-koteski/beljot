@@ -8,11 +8,6 @@ import (
 	"github.com/emilijan/beljot/server/internal/game"
 )
 
-// Table-driven coverage of the match-side SP outcome builder (Story 13.4).
-// buildSPOutcome and capotTeams are unexported, so this test lives in package
-// `match` alongside them; the formula itself is tested in season, and the
-// wiring and event ordering in sp_wiring_test.go (package match_test).
-
 func capot(team int) *int { return &team }
 
 func TestBuildSPOutcome(t *testing.T) {
@@ -42,7 +37,6 @@ func TestBuildSPOutcome(t *testing.T) {
 			},
 		},
 		{
-			// The target is the engine's own for the mode.
 			name: "501 surrender with stale presence flags",
 			facts: spMatchFacts{
 				playerIDs: allHuman, connected: [4]bool{false, false, true, true},
@@ -60,8 +54,6 @@ func TestBuildSPOutcome(t *testing.T) {
 			},
 		},
 		{
-			// Bot seats carry no user; any id sitting in a bot seat's slot is
-			// ignored. Capot teams come from the hand rows, once per team.
 			name: "bot table with an instant win and Capots",
 			facts: spMatchFacts{
 				playerIDs: [4]uint{10, 0, 99, 0}, botSeats: [4]bool{false, true, true, true},
@@ -85,9 +77,6 @@ func TestBuildSPOutcome(t *testing.T) {
 			},
 		},
 		{
-			// Seat 0's window expired and seat 3 is inside its own window: both
-			// are absent (Completed false) but both stay in the outcome, and the
-			// formula scores seat 3 by its team's result.
 			name: "abandonment with a second seat disconnected",
 			facts: spMatchFacts{
 				playerIDs: allHuman, connected: [4]bool{false, true, true, false},
