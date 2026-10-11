@@ -7,7 +7,7 @@
 # every PR and push.
 #
 # Forbidden token regex copied verbatim from AC-001 of the spec
-# `_bmad-output/implementation-artifacts/spec-team-us-them-and-cross-seat-layout.md`.
+# `_bmad-output/archive/implementation-artifacts/spec-team-us-them-and-cross-seat-layout.md`.
 # Do NOT edit the regex without renegotiating the frozen-after-approval
 # spec section.
 #

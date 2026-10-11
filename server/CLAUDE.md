@@ -18,7 +18,7 @@ go run -tags nodynamic ./cmd/api                      # API on :8080, needs the 
 - A domain package has the same shape: `model.go`, `repository.go` (interface), `gorm_repo.go`, `handler.go`, and `service.go` when needed.
 - `internal/game/` is the pure rules engine. `ApplyAction(state, action)` returns a new state or an error, with no side effects.
 - `internal/match/` is the session manager (`Manager`). It calls the engine, runs timers, broadcasts results and settles coins, XP, honor and season points.
-- `internal/ws/` holds the hub and `router.go`, which dispatches by event type only and carries no game logic.
+- `internal/ws/` holds the hub, which routes frames by prefix to the registered action and system handlers and carries no game logic.
 - `internal/bot/` decides bot moves from a projected `View`, never from the raw state.
 
 ## Conventions

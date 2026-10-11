@@ -128,9 +128,9 @@ player's language — see `match.card.suit.{deck}.{S,H,D,C}` in
 
 The source art is 32 PNGs at 450x700 RGB, ~520 KB each — 16.6 MB for the deck,
 which is unshippable: `warmDeck()` fetches all 32 faces on match entry, so the
-deck's total size is one download the player waits on. `scripts/import-croatian-deck.py`
-is the transform that makes it shippable, and it lives in the repo so the import
-stays reproducible rather than a thing that happened once on somebody's laptop.
+deck's total size is one download the player waits on. The deck was imported once
+by `scripts/import-croatian-deck.py`, which now lives only in git history (added in
+commit `baf69ab`, `git show baf69ab:scripts/import-croatian-deck.py`).
 
 Per file: resize to **400x560 with Lanczos** (this is what bakes the 9:14 to 5:7
 stretch in — no padding, and the source aspect ratio is deliberately *not*
@@ -142,13 +142,9 @@ Two source files are misnamed and are remapped on import: `AQ.png` and `TQ.png`
 are both *bells*, i.e. `AD` and `TD`. The real queens (`QC/QD/QH/QS`) are all
 present and correct.
 
-**To re-import** (needs no project dependency — `pillow` is pulled ephemerally):
-
-```sh
-uv run --with pillow python scripts/import-croatian-deck.py [source-dir]
-```
-
-The script is idempotent and rewrites the same 32 outputs.
+**To re-import**, restore the script from commit `baf69ab` and run it with
+`uv run --with pillow python scripts/import-croatian-deck.py [source-dir]`. It is
+idempotent and rewrites the same 32 outputs.
 
 ## Suit symbols — the UI chrome
 
@@ -199,11 +195,10 @@ Filenames are the canonical card-ID suit letters. The source uses French-suit
 names, so the importer maps them explicitly: leaves=S, hearts=H, bells=D,
 acorns=C — the same mapping as the faces, verified visually against them.
 
-**To re-import:**
-
-```sh
-uv run --with pillow python scripts/import-croatian-suits.py [source-dir]
-```
+**To re-import:** the suits were imported once by `scripts/import-croatian-suits.py`,
+which now lives only in git history (added in commit `baf69ab`). Restore it with
+`git show baf69ab:scripts/import-croatian-suits.py` and run it with
+`uv run --with pillow python scripts/import-croatian-suits.py [source-dir]`.
 
 ### The accent palette
 

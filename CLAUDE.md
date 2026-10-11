@@ -14,6 +14,7 @@ make lint          # client: tsc, eslint, prettier --check; server: golangci-lin
 make test          # vitest run + go test -tags nodynamic ./...
 make lint-client   # or lint-server / test-client / test-server for one side
 make build         # client dist + server binary
+make hooks         # once per clone: pre-commit runs make lint and make test
 ```
 
 - Always pass `-tags nodynamic` to `go test`, `go run` and `go build`. It selects the pure-Go WebP encoder the production image ships.
@@ -29,7 +30,7 @@ server/cmd/api/                  entry point: config, migrations, DI wiring, mid
 server/internal/<domain>/        one package per domain (auth, room, match, game, season, wallet, ...)
 server/internal/game/            pure rules engine
 server/internal/match/           live match sessions, timers, settlement
-server/internal/ws/              WebSocket hub, router, event contract
+server/internal/ws/              WebSocket hub and event contract
 server/migrations/               SQL migrations, embedded and applied by the binary at startup
 docs/                            deployment, migration, audio, card deck notes
 _bmad-output/                    BMAD planning artifacts (specs, epics, stories)
