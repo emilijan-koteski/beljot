@@ -1,7 +1,7 @@
 ---
 project_name: "beljot"
 user_name: "Emilijan"
-date: "2026-04-06"
+date: "2026-10-11"
 sections_completed:
   [
     "technology_stack",
@@ -13,356 +13,124 @@ sections_completed:
     "critical_rules",
   ]
 status: "complete"
-rule_count: 95
 optimized_for_llm: true
+verified_against: "e8d3d0c"
 ---
 
 # Project Context for AI Agents
 
-_This file contains critical rules and patterns that AI agents must follow when implementing code in this project. Focus on unobvious details that agents might otherwise miss._
+_Rules BMAD agents must follow in this repo. The hand-written agent instructions are the source of truth and load automatically in Claude Code: `CLAUDE.md`, `client/CLAUDE.md`, `server/CLAUDE.md`, and `.claude/rules/game-rules.md` (path-scoped to game, bot, match and rules code). Read them first. This file only adds what they do not say; where anything here conflicts with them or with the code, they win._
 
 ---
 
-## Technology Stack & Versions
-
-### Frontend
-
-- **TypeScript** (strict mode), **React 19**, compiled via **SWC**
-- **Vite 6** — dev server + production bundler
-- **Tailwind CSS v4** via `@tailwindcss/vite` plugin — CSS-first configuration only. **No `tailwind.config.js`** — all theming via `@theme` directives in `index.css`
-- **shadcn/ui** — components are owned copies in `src/shared/components/ui/`. Install via `npx shadcn@latest add <component>`, never `npm install`. Never create UI primitive files manually
-- **Zustand** — 5 partitioned stores: `authStore`, `lobbyStore`, `gameStore`, `chatStore`, `roomLobbyStore`
-- **React Router v7**
-- **react-i18next** — JSON translation files, English + Serbian (Latin)
-- **Vitest** — Vite-native testing (Jest-compatible API)
-- **Node 18+** required (React 19 + Vite 6 dependency)
-
-### Backend
-
-- **Go** (latest stable) — pin exact version in `go.mod`
-- **Echo v4** — Do NOT upgrade to v5. v5 migration deferred until community hardening (Dec 2026+)
-- **GORM** + **PostgreSQL** — uses GORM default naming strategy: `snake_case` columns, auto-pluralized table names, magic `CreatedAt`/`UpdatedAt`/`DeletedAt` fields. Do not override these conventions
-- **nhooyr.io/websocket** — import path is `nhooyr.io/websocket`, repo lives at `github.com/coder/websocket` (rebrand). Do not confuse with gorilla/websocket
-- **golang-migrate** — CLI-only, invoked via Makefile (`make migrate`). Not embedded as a Go library in application code
-- **testify** — assertion library for Go tests
-- **slog** (stdlib) — structured JSON logging to stdout
-- **bcrypt** — password hashing
-
-### Infrastructure
-
-- **Docker Compose** (dev) — PostgreSQL only. Go server and Vite dev server run natively on host for hot reload
-- **Docker** (prod) — Go app + PostgreSQL as containers behind host-level Caddy
-- **Caddy** — on host (not in Docker), automatic HTTPS via Let's Encrypt
-- **GitHub Actions CI** — `make test` + `make lint` on every push. CI needs: Go (pinned), Node (pinned), PostgreSQL, `golangci-lint`
-- **Contabo VPS** — single server for Phase 1-2
-
-### Build Orchestration
-
-- **Makefile** — unified commands: `dev`, `build`, `test`, `lint`, `migrate`, `seed`, `deploy`, `backup`
-
-## Critical Implementation Rules
-
-### Language-Specific Rules
-
-**TypeScript:**
-
-- Strict mode enforced — no `any` types, no implicit `any`
-- JSON wire format is always `camelCase` (matches Go struct JSON tags)
-- No shared type generation between frontend/backend — manual sync via the WebSocket event contract files (`wsEvents.ts` + `events.go`)
-- Immutable state updates only in Zustand stores — replace whole objects, never mutate directly
-- Use union literal types (`type Suit = 'hearts' | 'diamonds' | ...`), not TypeScript `enum` — mirrors Go string constants without drift
-- Never use JS truthiness checks on numeric or boolean fields from the Go backend — Go zero values (`0`, `""`, `false`) serialize as real values, not `null`. Always use explicit comparisons (`=== 0`, `=== false`)
-- All incoming WebSocket messages must be parsed and validated through a typed dispatch function — never use raw `JSON.parse` results (`any`) directly in component or store code
-
-**Go:**
-
-- All JSON struct tags use `camelCase` (e.g., `json:"createdAt"`)
-- All struct fields intended for JSON must be exported (PascalCase) with explicit `json:"camelCase"` tags — unexported fields silently vanish from JSON output
-- Game rules engine is a **pure function**: `ApplyAction(state, action) -> (state, error)` — zero side effects inside the engine
-- Rules engine must **clone slices before mutation** — use `slices.Clone()` or `copy()` when manipulating cards, players, or declarations within `ApplyAction`. Go slices share underlying arrays; modifying without copying violates the pure function contract
-- GameState is a **serializable Go struct** with ordered field sections (metadata, hand state, trick state, player states, scoring, timer) — new fields go in the correct section
-- Config loaded once at startup into `config.Config` struct, injected via DI — no `os.Getenv()` calls anywhere else
-- Structured logging via `slog` — internal errors logged, user-facing messages are generic
-- Error control flow uses `errors.Is()` against centralized `apperr` errors — always wrap errors with `%w` verb (`fmt.Errorf("...: %w", err)`), never `%v`, to preserve the error chain
-- Use `*time.Time` (pointer) for optional timestamp fields — Go's `time.Time` zero value serializes as `"0001-01-01T00:00:00Z"`, not `null`
-- GORM soft deletes (`DeletedAt`) are automatic — all GORM queries exclude soft-deleted rows. If raw SQL is unavoidable, always filter on `deleted_at IS NULL`
-
-**Cross-Language:**
-
-- WebSocket event contract defined in both `wsEvents.ts` and `events.go` — both files updated in the same commit, no exceptions
-- Date/time: ISO 8601 strings in JSON, `timestamptz` in PostgreSQL, locale-formatted for display via i18n
-- IDs: integer auto-increment (GORM default) — no UUIDs in Phase 1
-
-### Framework-Specific Rules
-
-**React / Frontend:**
-
-- Components are **purely presentational** for game features — all game state from server via WebSocket, no local game logic
-- Feature folder organization: `features/auth/`, `features/game/`, `features/lobby/`, `features/profile/`, `features/chat/` — new features get their own folder
-- Components never call `fetch()` directly — all HTTP requests through `shared/api/` client functions via `fetchClient.ts` (handles auth headers, error parsing, token refresh)
-- `fetchClient.ts` owns the entire 401 → refresh → retry cycle — individual API functions never handle 401 themselves. Only if refresh fails does it redirect to login
-- Zustand store partitioning by lifecycle: `authStore` persists across app, `gameStore` wiped on match end, `lobbyStore` active in lobby, `chatStore` active when connected, `roomLobbyStore` active in room lobby (real-time seat/player updates via WS)
-- `gameStore` is wiped on **navigation away from the game page**, not on receiving `game_over` event — final game state must remain available for score reveal and post-game display
-- Each store manages its own `isLoading` boolean — skeleton loaders for lists, no full-page spinners
-- React Error Boundary at app level as safety net
-- Frontend validation is cosmetic/UX only (blur validation on forms) — server is the authority
-- Style shadcn/ui components via Tailwind classes and CSS variables in consuming components — modify `shared/components/ui/` source files only for project-wide design token changes, never for feature-specific styling
-
-**Echo / Backend:**
-
-- Every domain package follows the same shape: `model.go`, `repository.go`, `gorm_repo.go`, `handler.go`, `service.go` (if needed), `{domain}_test.go`
-- Handlers call repository **interfaces**, never GORM directly
-- All domain errors defined in `internal/apperr/errors.go` — Echo error handler middleware maps them to HTTP status codes / WS error events
-- Middleware registration order in `main.go` is load-bearing: **CORS → Logging → Error Handler → Auth**. New middleware must be inserted at the correct position
-- Single multiplexed WebSocket connection per client — game state, lobby updates, chat, timers, disconnect detection all on one pipe, distinguished by event `type`
-- WebSocket event prefixes: `action:` (client→server), `event:` (server→client game state), `error:` (server→client errors), `system:` (server→client platform events)
-- `ws/router.go` performs **type-based dispatch only** — zero game logic, zero validation. Even "is it this player's turn?" belongs in session manager
-- Session manager is the orchestrator — receives player actions, calls rules engine, broadcasts results, manages timers. Side effects live here, not in the rules engine
-- Multi-event sequences (card played → trick resolved → score update) must be sent as **separate ordered messages**, not batched into a single payload — frontend animations depend on ordering
-- On WebSocket reconnection, after auth handshake succeeds, the server must **restore the client's room/lobby subscriptions** from session state before sending the game state snapshot
-- Timer synchronization via absolute server timestamps — server sends "turn expires at Unix timestamp X", clients render countdown. Never send relative durations
-- WebSocket handler tests must use `httptest.Server` with a real WebSocket client connection, not mocked read/write interfaces
-
-**Authentication Flow:**
+## Stack and versions
 
-- JWT access token stored in memory only (Zustand `authStore`) — never in `localStorage`
-- Refresh token in `httpOnly` cookie — auto-sent on `/auth/refresh` calls
-- WebSocket auth: JWT sent in first message after connection. On token expiry mid-game: reconnect → `/auth/refresh` (cookie auto-sent) → new access token → authenticate WebSocket
+- Tool versions are pinned in `mise.toml`: Go 1.26, Node 22, golangci-lint 2.14.0, golang-migrate 4.20.1. Do not assume other versions.
+- Stack lists and folder layout: see `CLAUDE.md` (Layout), `client/CLAUDE.md` and `server/CLAUDE.md`. Do not copy them here.
+- Do not upgrade Echo to v5. The WebSocket library is `github.com/coder/websocket` (not gorilla, not the old `nhooyr.io` path).
+- Persistence is GORM on PostgreSQL 16 with GORM's default naming: snake_case columns, pluralized tables, `CreatedAt`/`UpdatedAt`/`DeletedAt`. Do not override it. IDs are `uint` auto-increment, not UUIDs.
+- Avatars live in S3-compatible object storage (Garage in dev and prod), handled by `server/internal/avatar`.
 
-### Testing Rules
+## Running and verifying
 
-**Backend Testing (Go):**
+- Commands and flags: `CLAUDE.md` (Commands). Always pass `-tags nodynamic` to Go builds and tests.
+- `make dev` starts Postgres on host port 5433 (not 5432) and Garage S3 on 3900/3902 via `docker-compose.yml`, then Vite (5173) and the API (8080).
+- There are no `make seed`, `make deploy` or `make backup` targets; tests create their own data. `make hooks` opts into `.githooks/pre-commit` (runs `make lint` and `make test`); it is not installed by default, so CI is the gate.
+- CI (`.github/workflows/ci.yml`) runs on pull requests to `master` and is called by the Deploy workflow on every push to `master`: `make lint-client`, `make test-client`, golangci-lint, CLI migrations against a Postgres 16 service, `make test-server`.
+- Migrations: the binary embeds `server/migrations` and applies pending ones at startup (`server/internal/dbmigrate`). `make migrate` is the manual CLI path against `BELJOT_DB_URL`. Numbering and up/down rules: `server/CLAUDE.md` (Migrations).
 
-- Go standard `testing` package + `testify` for assertions
-- Tests co-located with source files: `rules_engine_test.go` next to `rules_engine.go`
-- Rules engine tests use **factory functions** from `internal/game/testfixtures/` exclusively — no raw `GameState{}` struct literals, even if they compile. When `GameState` gains new fields, factories are the single update point. If no existing factory fits, create a new one
-- Rules engine tests must use **Go table-driven test pattern** (`[]struct{ name string; ... }` with `t.Run`) — each test function covers one rule category with multiple cases per variant
-- Test the rules engine through **`ApplyAction` only** — internal functions (`bidding.go`, `declarations.go`, `scoring.go`, `validation.go`) are tested indirectly through their effect on `ApplyAction` output. This preserves refactoring freedom
-- Session manager tests must include **reconnection scenarios**: disconnect at each game phase (bidding, playing, between tricks, between hands). Verify the state snapshot sent to a reconnecting client matches the server's **projected** view for that seat (Story 12.10: own hand real, every other seat's hand masked to `[]` with `handCount`, no `deck` key) — never the raw in-process state, which since 12.10 must not reach any wire
-- Integration tests that touch PostgreSQL must use a **per-test transaction with rollback** — never rely on test execution order or shared test data between test functions
-- Tests create all their own data — never reference or depend on seed data from `make seed`. Seed data is for manual development only
+## Deployment
 
-**Frontend Testing (Vitest):**
+- A push to `master` deploys to production unless the commit message contains `[skip ci]` (see `CLAUDE.md`, Git and deployment).
+- GitHub Actions builds `beljot-backend` and `beljot-frontend` images to GHCR (only the side that changed), then Dokploy rolls the Docker Swarm services. Full detail: `docs/DEPLOYMENT.md`.
+- Traefik terminates TLS and routes `/api`, `/ws` and `/health` to the backend on 8080; everything else goes to the nginx frontend image serving the SPA. The Go server never serves static files.
+- Production configuration is `BELJOT_*` environment variables set in Dokploy. Never commit `.env`; `.env.example` holds placeholders only.
 
-- Vitest — Vite-native, Jest-compatible API
-- Tests co-located with components: `LoginPage.test.tsx` next to `LoginPage.tsx`
-- Game components are presentational — test that they render correctly given server state, not game logic
-- Use `data-testid` attributes for element selection, never CSS class names or DOM structure (classes change with Tailwind tweaks)
-- Test descriptions use present tense: `it('renders error when login fails')`, not `it('should render error...')`
+## Language rules
 
-**Quality Gates:**
+**TypeScript**
 
-- `make lint` + `make test` in CI on every push — blocks merge on failure
-- Pre-commit hook runs `make lint`
-- `make test` runs both stacks: `go test ./...` + `npx vitest run`
+- Strict mode; no `any`.
+- Never use raw `JSON.parse` output for WebSocket frames. All incoming frames go through `shared/hooks/useWsDispatch.ts`, validated by the Zod schemas in `shared/types/wsEvents.schemas.ts`.
 
-### Code Quality & Style Rules
+**Go**
 
-**Naming Conventions:**
+- JSON fields must be exported with explicit `json:"camelCase"` tags; unexported fields silently vanish from the output.
+- `GameState` is a serializable struct grouped in sections (metadata, hand, trick, players, scoring, timer). Put new fields in the right section.
+- Log internal errors with `slog`; user-facing messages stay generic.
 
-| Context             | Convention                        | Examples                                               |
-| ------------------- | --------------------------------- | ------------------------------------------------------ |
-| Database tables     | `snake_case`, plural              | `users`, `matches`, `rooms`                            |
-| Database columns    | `snake_case`                      | `player_id`, `created_at`                              |
-| Foreign keys        | `{table_singular}_id`             | `user_id`, `match_id`                                  |
-| Indexes             | `idx_{table}_{column}`            | `idx_users_email`                                      |
-| JSON wire format    | `camelCase`                       | `createdAt`, `playerId`                                |
-| REST endpoints      | plural, kebab-case                | `/api/v1/match-history`, `/api/v1/rooms`               |
-| WS events           | prefixed `snake_case`             | `action:play_card`, `event:trick_resolved`             |
-| Frontend components | `PascalCase.tsx`                  | `PlayingCard.tsx`, `ScorePanel.tsx`                    |
-| Frontend hooks      | `camelCase.ts`                    | `useWebSocket.ts`, `useAuth.ts`                        |
-| Frontend stores     | `camelCase.ts`                    | `gameStore.ts`, `authStore.ts`                         |
-| Frontend types      | `camelCase.ts`                    | `gameTypes.ts`, `wsEvents.ts`                          |
-| Backend files       | `snake_case.go`                   | `rules_engine.go`, `ws_handler.go`                     |
-| Backend tests       | `_test.go` suffix                 | `rules_engine_test.go`                                 |
-| i18n keys           | `{feature}.{component}.{element}` | `auth.login.emailLabel`, `game.trumpPrompt.pickButton` |
+**Cross-language**
 
-**GORM Struct Tag Bridge (three conventions in one field):**
+- Timestamps are ISO 8601 strings in JSON and `timestamptz` in Postgres, formatted for display via i18n.
+- Card IDs are two characters, rank plus suit (`KS`, `TH`, `7D`). Defined in `server/internal/game/types.go` and `client/src/shared/types/matchTypes.ts` (`CardId`).
 
-```go
-type Match struct {
-    ID        uint      `gorm:"primaryKey" json:"id"`
-    RoomID    uint      `gorm:"column:room_id" json:"roomId"`    // DB: room_id, JSON: roomId
-    CreatedAt time.Time `json:"createdAt"`                        // DB: created_at (GORM auto)
-}
-```
+## Framework rules
 
-**Import Ordering:**
+**Client** (details in `client/CLAUDE.md`)
 
-- TypeScript: (1) React/framework → (2) third-party libraries → (3) `shared/` imports → (4) relative imports. Blank line between each group. Enforced by ESLint import plugin
-- Go: (1) standard library → (2) third-party packages → (3) internal project packages. Blank line between groups. Enforced by `goimports`
+- HTTP goes through `shared/api/` modules on `axiosClient.ts`, consumed via TanStack Query hooks in `shared/hooks/queries/` and `shared/hooks/mutations/`. Do not reference `fetchClient.ts`; it does not exist.
+- Stores are `authStore`, `matchStore`, `roomStore`, `chatStore`, `levelUpStore`, `rankChangeStore` in `shared/stores/`.
+- `matchStore` is cleared when the player leaves the match page, not on the match-end event; the final state must survive for the score reveal.
+- Client-side validation is UX only; the server is the authority.
+- Features live in `client/src/features/`: auth, chat, friends, landing, leaderboard, legal, lobby, match, profile, room, rules. New features get their own folder.
+- One frontend API module per backend resource (`rooms.ts`, `matches.ts`, `wallet.ts`, ...). A new backend domain with HTTP endpoints gets a new module.
 
-**Export Convention:**
+**Server** (details in `server/CLAUDE.md`)
 
-- Named exports only in TypeScript — no `export default`. Component filename must match the exported component name exactly (`PlayingCard.tsx` exports `PlayingCard`)
+- The session manager is `server/internal/match` (`Manager`): it validates turn order, calls the engine, runs timers, broadcasts, and owns all side effects. The `ws` hub only routes frames by prefix to the registered handlers.
+- One multiplexed WebSocket per client carries game state, lobby, chat, timers and presence, distinguished by event `type`.
+- Session state is guarded by mutexes; concurrent disconnects create independent pauses with their own reconnect windows. Pauses stack, and the room owner can clear all of them.
+- Errors map to HTTP through `appErrorHandler` in `cmd/api/main.go` using `internal/apperr` values. REST routes live under `/api/v1/`, plural and kebab-case.
 
-**API Client Mapping:**
+**Authentication**
 
-- Frontend API client files in `shared/api/` map 1:1 to backend domain packages. New backend domain = new API client file. Use the REST resource name for the file
+- Access token in memory (`authStore`), refresh token in an httpOnly cookie. The WebSocket authenticates with the access token in its first message; on expiry the client refreshes through `axiosClient.ts` and re-authenticates.
 
-**Linting & Formatting:**
+## Testing rules
 
-- Go: `gofmt` + `golangci-lint` (`.golangci.yml`) — runs in CI, blocks merge on failure
-- TypeScript: ESLint + Prettier — runs in CI, blocks merge on failure
-- Pre-commit hook: `make lint` runs both Go and TS linters
+Baseline rules are in `client/CLAUDE.md` and `server/CLAUDE.md` (Testing). In addition:
 
-**Feature-Complete Checklist (Definition of Done):**
+- Engine tests go through `ApplyAction` only. Internal files (`bidding.go`, `declarations.go`, `scoring.go`, `validation.go`) are covered by their effect on its output. Factories that do not fit get a new factory in `internal/game/testfixtures`.
+- Session tests cover reconnection at each phase (bidding, playing, between tricks, between hands) and assert the projected view for the seat, never raw state.
+- Database tests wrap each test in a transaction rolled back in `t.Cleanup`; they never share data across tests.
+- Client game components are tested as renderers of server state, not as game logic.
 
-Every feature must pass all items before it is considered complete — this is a hard gate, not a suggestion:
+## Code quality
 
-- [ ] Server handler + repository layer + tests
-- [ ] Domain errors added to `internal/apperr/errors.go` (if new error cases)
-- [ ] WebSocket events added to **both** contract files (if real-time feature)
-- [ ] Frontend component + co-located test
-- [ ] API client function in `shared/api/` (if HTTP endpoint)
-- [ ] i18n strings added to **all** translation files
-- [ ] Linter passes (`make lint`)
-- [ ] All existing tests pass (`make test`)
+| Context          | Convention                        | Example                                     |
+| ---------------- | --------------------------------- | ------------------------------------------- |
+| DB tables        | snake_case, plural                | `users`, `rooms`                            |
+| Foreign keys     | `{table_singular}_id`             | `user_id`, `match_id`                       |
+| Indexes          | `idx_{table}_{column}`            | `idx_users_email`                           |
+| WS events        | prefixed snake_case               | `action:play_card`, `event:trick_resolved`  |
+| Client files     | `PascalCase.tsx` / `camelCase.ts` | `PlayingCard.tsx`, `useWebSocket.ts`        |
+| Go files         | `snake_case.go`                   | `rules_engine.go`                           |
+| i18n keys        | `{feature}.{component}.{element}` | `auth.login.emailLabel`                     |
 
-### Development Workflow Rules
+- Imports: the client uses `simple-import-sort` (`npx eslint --fix`). Go linting is the golangci-lint set in `server/.golangci.yml`; no import-order linter is configured.
+- Comments are restricted by a hook; see `CLAUDE.md` (Comments).
 
-**Build Commands:**
+## Workflow rules
 
-- `make dev` — runs concurrently: Docker Compose PostgreSQL (port 5432) + Vite dev server (port 5173) + Go Echo server (port 8080). If startup fails, check for orphaned processes on ports 5173/8080 first
-- `make build` — production: `npm run build` → `client/dist/` + `docker build` Go binary
-- `make test` — both stacks: `npx vitest run` + `go test ./...`
-- `make lint` — both stacks: ESLint + Prettier + `golangci-lint`
-- `make migrate` — `golang-migrate` CLI against `$DB_URL`
-- `make seed` — populates dev database with test accounts, rooms, and game states (development only, not for tests)
-- `make deploy` — `scripts/deploy.sh` (build, push images, SSH restart on VPS)
-
-**Branch Naming:**
-
-- Format: `{type}/{epic-or-story-id}-{short-description}`
-- Types: `feat`, `fix`, `chore`, `refactor`, `test`
-- Examples: `feat/E2-S3-auth-login`, `fix/E4-S1-trick-resolution`, `chore/E1-S1-project-scaffold`
-- Always reference the story or epic ID so branches trace back to the sprint plan
-
-**Commit Messages:**
-
-- Format: `{type}({scope}): {description}`
-- Scope matches backend domain package or frontend feature folder
-- Keep description under 72 characters
-- Examples: `feat(game): implement trump bidding for Bitola variant`, `fix(ws): restore room subscriptions on reconnect`, `test(rules): add table-driven tests for declaration scoring`
-
-**One Story = One Branch = One PR:**
-
-- Each story gets its own branch and PR — no mixing stories in a single branch
-- If you discover a bug while working on a story, file it separately — don't fix it in the current branch unless it directly blocks the story
-
-**Database Migrations:**
-
-- Migration files use sequential numbering: `{NNNNNN}_{description}.up.sql` / `.down.sql`
-- Before creating a new migration, check the highest existing number in `server/migrations/` and increment by 1. Never skip numbers
-- Every `.up.sql` migration must have a corresponding `.down.sql` that fully reverses the change — no exceptions
-
-**Environment Variables:**
-
-- `SCREAMING_SNAKE_CASE` naming convention
-- App-specific vars prefixed with `BELJOT_`: `BELJOT_DB_URL`, `BELJOT_JWT_SECRET`, `BELJOT_PORT`
-- PostgreSQL vars use standard Docker names: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
-- Dev: `.env` loaded by Docker Compose + `go run`
-- Production: Docker env vars in `docker-compose.prod.yml`
-- CI: GitHub Actions secrets
-- `.env.example` with all vars and placeholder values checked into git — no secrets in repo
-
-**Production Topology:**
-
-- Caddy (on host) serves static frontend files from `client/dist/` directly and proxies `/api/` and `/ws` to the Go Docker container
-- The Go server does NOT serve static files in production
-- Go app + PostgreSQL run as Docker containers behind host-level Caddy
-
-**API Response Formats:**
-
-- HTTP success: `{ "data": { ... } }`
-- HTTP error: `{ "error": { "code": "ROOM_FULL", "message": "..." } }`
-- HTTP status codes: 200, 201, 400, 401, 403, 404, 409, 500
-- WebSocket message: `{ "type": "event:card_played", "payload": { ... } }`
-
-**CI/CD:**
-
-- GitHub Actions: `make test` + `make lint` on every push — blocks merge on failure
-- Deployment starts manual (`make deploy`), automated later
-
-### Critical Don't-Miss Rules
-
-**Anti-Patterns:**
-
-| Do NOT                                             | Do Instead                                                            |
-| -------------------------------------------------- | --------------------------------------------------------------------- |
-| Call `fetch()` directly in components              | Use `shared/api/` client functions                                    |
-| Define errors inline in handlers                   | Add to `internal/apperr/errors.go`                                    |
-| Put game logic in handlers or WebSocket layer      | Keep in `internal/game/` as pure functions                            |
-| Store JWT in localStorage                          | Keep access token in memory (Zustand)                                 |
-| Build game state with raw struct literals in tests | Use `testfixtures/` factory functions                                 |
-| Add WS events to only one contract file            | Update both `wsEvents.ts` and `events.go` together                    |
-| Use `PascalCase` or `snake_case` in JSON           | Always `camelCase` in wire format                                     |
-| Send relative timer durations ("30 seconds")       | Send absolute timestamps ("expires at X")                             |
-| Assume clockwise turn order                        | Counter-clockwise: `(currentPlayer + 1) % 4` — seats are numbered CCW |
-| Continue rotation after trick resolves             | Trick winner leads the next trick — rotation resets                   |
-| Compare `state.Variant` inside the rules engine     | Branch on `VariantRules` config fields — presets, not variant names   |
-| Auto-award Belote bonus (K+Q of trump)             | Require player announcement — prompt on trump K/Q play                |
-
-**Security Rules:**
-
-- Server-authoritative architecture is non-negotiable — zero client-side game logic
-- All game logic executes server-side; client renders received state only
-- Never trust client-submitted game actions — validate everything server-side
-- HTTPS + WSS only, enforced by Caddy
-- CORS configured for specific origin(s) — no wildcard
-- No secrets in repo — `.env.example` has placeholders only
-
-**Game Rules — Critical Correctness:**
-
-- **Turn order is counter-clockwise** — dealing, bidding, and trick play. Seats are numbered counter-clockwise (0→1→2→3→0). Turn advancement: `(currentPlayer + 1) % 4`. Never clockwise
-- **Trick winner leads next trick** — rotation resets to the winner, then continues counter-clockwise
-- **Trump bidding branches by rule config, not variant name (D-VAR-1)**. **Bitola** has TWO bidding rounds: round 1 offers the public flipped candidate's suit, round 2 opens all suits, and four passes in round 2 reshuffles and rotates the dealer. **Croatian** (corrected 2026-08-22, owner rule) has a SINGLE bidding round: no candidate card at all (trump is a bare named suit, freely chosen), each player bids on their 6 visible cards — the 2 face-down cards stay hidden from EVERYONE, their owner included, until trump is resolved — starting to the dealer's right; the dealer speaks last (fourth) and, when the other three pass ("dalje"), is FORCED to pick ("pod mus") — no round 2, no reshuffle, no mid-bidding reveal. The 2 face-down cards merge into every hand only once trump is set. Keep separate code paths per outcome (never a generic bidding soup), but select between them by reading a `VariantRules` config field — NEVER by comparing `state.Variant`. `bitola` and `croatia` are preset resolvers over that config; a future story exposes the individual rules at room creation. See Epic 12 / D-VAR-1
-- **Declarations resolved at first trick only** — after all four cards played on trick 1. Highest-value set wins ties. Only the winning team's declarations count. After resolution, declarations are locked for that hand
-- **Declaration single-use (Bitola)** — a single card may belong to only one declaration group. When two detected groups share a card (e.g. sequence 9-T-J-Q of spades AND four Jacks sharing J♠), keep the higher-value group and drop the other. Enforced in `detectDeclarations` via a dedup pass. **Croatian allows the overlap** — a card MAY count in more than one declaration, so the dedup pass is skipped by config (Story 12.5); confirmed 2026-08-18
-- **Declaration phase timing (Bitola)** — declarations happen during trick 1 as each player plays their first card; reveal fires at the start of trick 2 before the first card. **Croatian has a dedicated declaration phase** between bidding and trick 1: trump is set, all eight cards are visible, all four players declare or skip, the result is revealed, and only then does trick 1 begin. This is a NEW state-machine phase (Story 12.6); confirmed 2026-08-18
-- **Declaration reveal** — small panel anchored to the winning player's seat showing their actual cards for ~4 seconds (1.5s for reduced-motion). Auto-dismisses. Losing team's declarations are never revealed. Points remain pending (not locked in) until hand-end scoring
-- **Belote / Rebelote bonus requires player announcement** — when a player plays trump K or Q and holds the other, UI prompts for announcement. Terminology is rank-bound, not play-order-bound: announcing on the Queen is "Belote", on the King is "Rebelote". If declined on the first K/Q played, bonus is forfeit — no second chance on the other card. +20 pts to the announcing team, pending until hand end. Reveal shows the announced card only (not the partner). Same in both variants
-- **Card-play validation** in `validation.go` (`legalCards`): (1) **follow the led suit if held** — the overplay obligation (play a strictly higher led-suit card) applies ONLY while the led suit can still win the trick, i.e. the led suit is trump OR no trump has cut the trick yet; once a trump cuts a non-trump-led trick, **any** card of the led suit is legal (gate: `ledSuit == trumpSuit || highestTrumpInTrick(trick) == nil`); (2) **if void in the led suit and holding trump, must cut** — over-trump the highest trump on the table if able, otherwise any trump (no partner-winning exemption); (3) **if void in both led suit and trump, any card is legal**
-- **Two-phase scoring** in `scoring.go`: hand scoring (card points + declarations + last trick/Capot bonuses → failed hand check) feeds into match scoring (cumulative team totals → win condition check). Keep as separate functions
-- **Failed hand**: the taker's team must score **strictly more** than the opponents to succeed. An equal total (a tie, e.g. 81:81 of the 162 base points) is a failed hand for the taker. On a failed hand the taker's team scores 0 and all points (both teams' card points + declarations + bonuses) transfer to the opponents. Decided in exactly one place — `scoring.go` `scoreHand` (`contractingTotal <= opposingTotal`)
-- **Tied-hand rule is variant-specific (interim simplification).** The "tie → all points to the opponents" behavior above is the **Croatian-variant** rule, currently applied to **all** variants. The **Bitola variant** must eventually use **hanging points (carry-over)** on a tie (points held over, nobody scores, carried to the next decisive hand) — Story 12.7 (Epic 12, Phase 3). Do NOT "fix" the current Bitola tie behavior as a bug; it is a deliberate stand-in. See `deferred-work.md` and `spec-fix-tie-fails-trump-caller.md`
-- **Capot** (+100) replaces last-trick bonus (+10), not added to it
-- **Match target tiebreaker**: if both teams cross 1001/501 in the same hand, the taker's team (team that called trump) wins — taking trump is the tiebreaker
-- **Auto-play on timer expiry**: first legal card sorted by suit then rank
-
-**Card ID Format (Standardized Everywhere):**
-
-- Two-character strings: rank + suit
-- Rank: `7`, `8`, `9`, `T` (ten), `J`, `Q`, `K`, `A`
-- Suit: `S` (spades), `H` (hearts), `D` (diamonds), `C` (clubs)
-- Examples: `KS` = King of Spades, `TH` = Ten of Hearts, `7D` = Seven of Diamonds
-- Used in game state, WebSocket payloads, and frontend rendering
-- Defined once in `game/types.go` and `gameTypes.ts`
-
-**Disconnection & Reconnection Edge Cases:**
-
-- Disconnection mid-trick, during trump bidding, after card played but before broadcast — all must be handled
-- Reconnecting player gets full state snapshot from serializable GameState struct
-- Session manager must handle **concurrent disconnection** safely — use mutex or channel-based synchronization. Two simultaneous disconnects = two pause events with independent reconnect windows
-- Pause stacking: multiple players can have active pauses simultaneously
-- Room owner can override and clear all active pauses
+- Branch and commit formats: `CLAUDE.md` (Git and deployment).
+- Keep a story's change focused. File an unrelated bug separately unless it blocks the story.
+- A feature is done when it has: handler, repository and tests; any new domain errors in `server/internal/apperr/`; WebSocket events in both `server/internal/ws/events.go` and `client/src/shared/types/wsEvents.ts` (plus its Zod schema); a co-located client test; strings in all four locales (en, sr, hr, mk); `make lint` and `make test` passing.
+
+## Game rules (owner-confirmed)
+
+The full, authoritative list is `.claude/rules/game-rules.md`. Do not "fix" any of these toward generic Belot. Key points for planning:
+
+- Play is counter-clockwise; next seat is `(seat + 1) % 4`. The trick winner leads the next trick.
+- Bidding, declarations, deal shape and tie handling branch on `VariantRules` fields (`server/internal/game/types.go`, presets from `RulesFor`), never on `state.Variant`. Keep a separate code path per outcome.
+- **Bitola:** two bidding rounds over a flipped candidate card; four passes in round 2 reshuffle and rotate the dealer. Declarations are made during trick 1 and revealed at the start of trick 2. A card can belong to only one declaration.
+- **Croatian:** one round, no candidate card. Players bid on six visible cards; the two face-down cards stay hidden from everyone until trump is set. Bidding starts to the dealer's right; if the other three pass, the dealer must pick. A dedicated declaration phase sits between bidding and trick 1, and one card may count in several declarations.
+- Only the winning declaration team scores declarations; the losing team's are never revealed. The reveal banner shows for 4 s (1.5 s with reduced motion), from `shared/lib/motion.ts`.
+- Belote/Rebelote (+20) counts only when announced: on the Queen it is Belote, on the King Rebelote. Declining on the first card forfeits it.
+- Card play (`validation.go` `legalCards`, mirrored in `client/src/features/match/lib/legalCards.ts`): follow suit, overplaying only while the led suit can still win; if void and holding trump, cut and over-trump when able; otherwise any card.
+- Scoring (`scoring.go`): the taker's team must score strictly more; a tie fails and all points go to the opponents (`contractingTotal <= opposingTotal` in `scoreHand`). Bitola's preset already declares `TieRuleHangingPoints`, but `scoreHand` does not read it yet; the current tie behavior is a deliberate stand-in, not a bug.
+- Capot (+100) replaces the last-trick bonus (+10). If both teams cross the target in the same hand, the taker's team wins. Timer auto-play picks the first legal card sorted by suit, then rank.
+- Reconnecting or observing seats receive a projected state: own hand real, other hands `[]` with `handCount`, no deck. Deal and splash grace in `match/deal_grace.go` must match `motion.ts`.
 
 ---
 
-## Usage Guidelines
-
-**For AI Agents:**
-
-- Read this file before implementing any code
-- Follow ALL rules exactly as documented
-- When in doubt, prefer the more restrictive option
-- Update this file if new patterns emerge
-
-**For Humans:**
-
-- Keep this file lean and focused on agent needs
-- Update when technology stack changes
-- Review quarterly for outdated rules
-- Remove rules that become obvious over time
-
-Last Updated: 2026-06-14
+Last Updated: 2026-10-11
