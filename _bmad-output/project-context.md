@@ -42,7 +42,7 @@ _Rules BMAD agents must follow in this repo. The hand-written agent instructions
 ## Deployment
 
 - A push to `master` deploys to production unless the commit message contains `[skip ci]` (see `CLAUDE.md`, Git and deployment).
-- GitHub Actions builds `beljot-backend` and `beljot-frontend` images to GHCR (only the side that changed), then Dokploy rolls the Docker Swarm services. Full detail: `docs/DEPLOYMENT.md`.
+- GitHub Actions builds `beljot-backend` and `beljot-frontend` images to GHCR (only the side that changed), then Dokploy rolls the Docker Swarm services.
 - Traefik terminates TLS and routes `/api`, `/ws` and `/health` to the backend on 8080; everything else goes to the nginx frontend image serving the SPA. The Go server never serves static files.
 - Production configuration is `BELJOT_*` environment variables set in Dokploy. Never commit `.env`; `.env.example` holds placeholders only.
 

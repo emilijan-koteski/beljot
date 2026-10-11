@@ -58,7 +58,7 @@ A PreToolUse hook (`.claude/hooks/comment_policy.py`) rejects new comments that 
 
 ## Git and deployment
 
-- **A push to `master` deploys to production.** The Deploy workflow runs CI, builds images to GHCR and rolls the Dokploy services. Details are in `docs/DEPLOYMENT.md`.
+- **A push to `master` deploys to production.** The Deploy workflow runs CI, builds images to GHCR and rolls the Dokploy services.
 - **`[skip ci]` in a commit message skips both CI and the deploy.** Use it only for changes that must not ship yet, or that cannot affect the build.
 - CI also runs on pull requests to `master`.
 - Branches: `{type}/{short-description}`, types `feat`, `fix`, `chore`, `refactor`, `test`, `docs`, `ci`.

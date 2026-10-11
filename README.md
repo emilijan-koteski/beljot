@@ -102,14 +102,12 @@ scripts/                         repository maintenance scripts
 
 A push to `master` deploys to production. The Deploy workflow runs CI, builds the backend and frontend images that changed, pushes them to GHCR and tells Dokploy to roll the matching services. A commit message containing `[skip ci]` skips both CI and the deploy. CI also runs on pull requests to `master`.
 
-Images, secrets, environment variables and the full pipeline are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Images, secrets and environment variables are configured in GitHub Actions and the Dokploy project; none of them live in the repo.
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production setup on Dokploy, images, secrets and environment |
-| [docs/MIGRATION.md](docs/MIGRATION.md) | Runbook for the move from the old Contabo host to Dokploy |
 | [docs/audio.md](docs/audio.md) | In-match sound effects and music |
 | [docs/card-deck.md](docs/card-deck.md) | Card face and suit symbol assets for each deck |
 | [docs/bot/BOT_RULES.md](docs/bot/BOT_RULES.md) | How the bot decides its moves |
