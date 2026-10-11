@@ -10,7 +10,7 @@ export interface RegisterRequest {
   languagePreference: string;
 }
 
-export interface RegisterResponse {
+interface RegisterResponse {
   token: string;
   id: number;
   username: string;
@@ -37,41 +37,19 @@ export interface LoginRequest {
   password: string;
 }
 
-export type LoginResponse = RegisterResponse;
+type LoginResponse = RegisterResponse;
 
-export interface RefreshResponse {
-  token: string;
-  id: number;
-  username: string;
-  email: string;
-  languagePreference: string;
-  cardDeckPreference: CardDeck;
-  soundEnabled: boolean;
-  musicEnabled: boolean;
-  soundVolume: number;
-  musicVolume: number;
-  walletBalance: number;
-  loginStreakDays: number;
-  totalXp: number;
-  level: number;
-  honorScore: number;
-  honorTier: string;
-  isNewPlayer: boolean;
-  avatarUrl: string | null;
-  createdAt: string;
-}
-
-export interface SSOLoginRequest {
+interface SSOLoginRequest {
   credential: string;
 }
 
-export interface SSOLinkRequest {
+interface SSOLinkRequest {
   credential: string;
   password: string;
 }
 
 /** SSO issues the same session and auth envelope as password login. */
-export type SSOResponse = RegisterResponse;
+type SSOResponse = RegisterResponse;
 
 export interface ForgotPasswordRequest {
   email: string;

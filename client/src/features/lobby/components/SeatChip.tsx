@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { AvatarImage } from "@/shared/components/ui/avatar";
 import { cn } from "@/shared/lib/utils";
 
-export type SeatTeam = "A" | "B";
+type SeatTeam = "A" | "B";
 
 type Props = {
   username: string | null;

@@ -11,7 +11,7 @@ import { playSfx, setMusicVolume } from "./audioEngine";
 
 export const COMMIT_COALESCE_MS = 250;
 
-export interface AudioVolumeControl {
+interface AudioVolumeControl {
   value: number;
   onValueChange: (value: number) => void;
   onValueCommitted: (value: number) => void;

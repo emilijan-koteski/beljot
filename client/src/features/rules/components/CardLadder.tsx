@@ -2,7 +2,7 @@ import type { CardRow } from "@/features/rules/content/types";
 import { useRules } from "@/features/rules/RulesContext";
 
 // Accent palette for one ladder (trump = felt-green, off-trump = brass).
-export type LadderAccent = {
+type LadderAccent = {
   eyebrow: string;
   ink: string;
   edge: string;

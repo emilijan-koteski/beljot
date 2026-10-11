@@ -4,7 +4,7 @@ export type { CardDeck };
 
 export type CardSize = "sm" | "md" | "lg";
 
-export interface CardDimensions {
+interface CardDimensions {
   width: number;
   height: number;
   radius: number;
@@ -37,7 +37,7 @@ export const CARD_FACE_BORDER = "1px solid rgba(0,0,0,0.15)";
 
 const DECK_EXT: Record<CardDeck, string> = { french: "svg", croatian: "webp" };
 
-export const DEFAULT_CARD_DECK: CardDeck = "french";
+const DEFAULT_CARD_DECK: CardDeck = "french";
 
 /**
  * Narrow an unvalidated deck value to a `CardDeck`, falling back to the French default.

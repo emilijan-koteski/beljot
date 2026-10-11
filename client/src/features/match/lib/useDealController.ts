@@ -11,7 +11,7 @@ import { buildDealSchedule, type DealKind, type DealSchedule } from "./dealSched
  * What the deal controller remembers about one table state, keyed by `handNumber:dealerSeat`.
  * Only the fields a deal can change are kept, so an ordinary card play never looks like a deal.
  */
-export interface DealObservation {
+interface DealObservation {
   dealId: string;
   phase: Phase;
   handNumber: number;
@@ -25,7 +25,7 @@ export interface DealObservation {
   myHandIds: string[];
 }
 
-export interface DetectedDeal {
+interface DetectedDeal {
   id: string;
   kind: DealKind;
   dealerSeat: number;
@@ -36,7 +36,7 @@ export interface DetectedDeal {
   candidate: Card | null;
 }
 
-export interface ActiveDeal extends DetectedDeal {
+interface ActiveDeal extends DetectedDeal {
   schedule: DealSchedule;
   startedAt: number;
   landed: number;
@@ -52,7 +52,7 @@ function cardIdOf(card: Card): string {
   return `${card.rank}${card.suit}`;
 }
 
-export function observeDeal(state: MatchState, mySeat: number): DealObservation {
+function observeDeal(state: MatchState, mySeat: number): DealObservation {
   const counts = state.players.map(
     (p) => (p.handCount ?? p.hand.length) + (p.faceDownCount ?? 0),
   ) as [number, number, number, number];
@@ -101,7 +101,7 @@ function openingDeal(o: DealObservation, isReshuffle: boolean): DetectedDeal {
  * Returns the deal the table just went through, or null if none is worth animating.
  * A null `prev` animates only when `animateOpening` is set, so a reload never replays a deal.
  */
-export function detectDeal(
+function detectDeal(
   prev: DealObservation | null,
   cur: DealObservation,
   animateOpening: boolean,
@@ -236,7 +236,7 @@ interface DealControllerInput {
   updateFlights: (update: (flights: CardFlightDescriptor[]) => CardFlightDescriptor[]) => void;
 }
 
-export interface DealView {
+interface DealView {
   dealing: boolean;
   deal: ActiveDeal | null;
   seatCardCount: (seat: number) => number | null;

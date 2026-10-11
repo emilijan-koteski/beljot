@@ -77,22 +77,6 @@ export const HONOR_TIER_COLOR: Record<HonorTier, string> = {
   problematic: "var(--h1)",
 };
 
-export const HONOR_TIER_SOFT: Record<HonorTier, string> = {
-  exemplary: "var(--h5-soft)",
-  trusted: "var(--h4-soft)",
-  fair: "var(--h3-soft)",
-  unreliable: "var(--h2-soft)",
-  problematic: "var(--h1-soft)",
-};
-
-export const HONOR_TIER_LINE: Record<HonorTier, string> = {
-  exemplary: "var(--h5-line)",
-  trusted: "var(--h4-line)",
-  fair: "var(--h3-line)",
-  unreliable: "var(--h2-line)",
-  problematic: "var(--h1-line)",
-};
-
 /** Label for a room's honour floor: "60+" below the top of the scale, a bare "100" at it. */
 export function honorFloorLabel(minHonor: number | null | undefined): string {
   const floor = honorCountOrZero(minHonor);
@@ -100,7 +84,7 @@ export function honorFloorLabel(minHonor: number | null | undefined): string {
 }
 
 /** The subset of a room the honour gate reads, satisfied by both `Room` and preview objects. */
-export type HonorGateRoom = {
+type HonorGateRoom = {
   minHonor?: number | null;
   allowNewPlayers?: boolean | null;
 };

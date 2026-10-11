@@ -72,7 +72,7 @@ function OutcomeChip({ outcome }: { outcome: MatchOutcome }) {
 }
 
 /** Hand layout: "auto" picks table or cards from the viewport, "stacked" always uses cards. */
-export type HandsLayout = "auto" | "stacked";
+type HandsLayout = "auto" | "stacked";
 
 interface HandsGridProps {
   hands: MatchHandView[];

@@ -62,7 +62,7 @@ export interface PublicProfileResponse {
 }
 
 /** A partial preferences update; the server validates and writes each field independently. */
-export interface UpdatePreferencesRequest {
+interface UpdatePreferencesRequest {
   languagePreference?: string;
   cardDeckPreference?: CardDeck;
   soundEnabled?: boolean;
@@ -72,7 +72,7 @@ export interface UpdatePreferencesRequest {
 }
 
 /** Only the fields the server wrote, so untouched preferences are never clobbered on merge. */
-export interface UpdatePreferencesResponse {
+interface UpdatePreferencesResponse {
   languagePreference?: string;
   cardDeckPreference?: CardDeck;
   soundEnabled?: boolean;
@@ -101,7 +101,7 @@ export interface UpdateUsernameRequest {
   username: string;
 }
 
-export interface UpdateUsernameResponse {
+interface UpdateUsernameResponse {
   username: string;
   usernameChangedAt: string;
 }
@@ -114,7 +114,7 @@ export function updateUsername(
 }
 
 /** The two public URLs of a freshly uploaded avatar (128 and 256 px WebP). */
-export interface UploadAvatarResponse {
+interface UploadAvatarResponse {
   avatarUrl: string | null;
   avatarLargeUrl: string | null;
 }

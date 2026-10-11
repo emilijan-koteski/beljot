@@ -2,7 +2,7 @@ import { type ButtonHTMLAttributes, forwardRef } from "react";
 
 import { MOTION } from "@/shared/lib/motion";
 
-export type ClassicButtonVariant = "primary" | "ghost";
+type ClassicButtonVariant = "primary" | "ghost";
 
 interface ClassicButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ClassicButtonVariant;

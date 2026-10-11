@@ -8,8 +8,6 @@ import type { CardDeck, CardSize } from "../lib/cardFace";
 import { CARD_FACE_BACKGROUND, CARD_SIZES, cardFaceUrl, resolveCardDeck } from "../lib/cardFace";
 
 export type CardState = "default" | "playable" | "unplayable" | "face-down";
-export type { CardSize };
-
 interface PlayingCardProps {
   card: Card | null;
   state: CardState;

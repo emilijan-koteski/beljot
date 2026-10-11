@@ -1,29 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import type {
-  ProfileResponse,
-  UpdatePreferencesRequest,
-  UpdateUsernameRequest,
-} from "@/shared/api/profile";
-import {
-  removeAvatar,
-  updatePreferences,
-  updateUsername,
-  uploadAvatar,
-} from "@/shared/api/profile";
+import type { ProfileResponse, UpdateUsernameRequest } from "@/shared/api/profile";
+import { removeAvatar, updateUsername, uploadAvatar } from "@/shared/api/profile";
 import { queryKeys } from "@/shared/api/queryKeys";
 import { useAuthStore } from "@/shared/stores/authStore";
-
-export function useUpdatePreferencesMutation(userId: number) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (prefs: UpdatePreferencesRequest) => updatePreferences(userId, prefs),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.profile.detail(userId) });
-    },
-  });
-}
 
 /** Rename the user, patching both the profile cache and the auth store so the page and the TopBar update without a refetch. */
 export function useUpdateUsernameMutation(userId: number) {
@@ -63,7 +44,7 @@ function adoptAvatar(
 }
 
 /** Avatar upload input; onProgress receives the sent fraction from 0 to 1. */
-export interface UploadAvatarVariables {
+interface UploadAvatarVariables {
   file: File;
   onProgress?: (fraction: number) => void;
 }

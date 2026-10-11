@@ -310,23 +310,6 @@ func TestShuffleDeck(t *testing.T) {
 	})
 }
 
-func TestTeamStringForIndex_SafeOnOutOfRange(t *testing.T) {
-	tests := []struct {
-		name  string
-		index int
-	}{
-		{"negative", -1},
-		{"two", 2},
-		{"large", 100},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			result := game.TeamStringForIndex(tc.index)
-			assert.Equal(t, "", result, "out-of-range index should return empty string, not panic")
-		})
-	}
-}
-
 // TestRulesForPresets checks both presets are fully populated, differ on every variant divergence, and that unknown variants fall back to Bitola.
 // DeclarationsEnabled is a per-room setting rather than a divergence, so both presets return true.
 func TestRulesForPresets(t *testing.T) {

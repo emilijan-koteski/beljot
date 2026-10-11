@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 
 import type { WsConnectionState } from "@/shared/hooks/useWebSocket";
 
-export interface WebSocketContextValue {
+interface WebSocketContextValue {
   sendMessage: (type: string, payload: unknown) => void;
   connectionState: WsConnectionState;
 }

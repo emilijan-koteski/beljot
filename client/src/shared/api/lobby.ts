@@ -14,7 +14,7 @@ export function getLobbyStats(): Promise<LobbyStats> {
 
 // Public, unauthenticated landing-page counts. Served by GET /api/v1/stats
 // (no auth middleware), so this resolves for logged-out visitors.
-export interface PublicStats {
+interface PublicStats {
   online: number;
   openRooms: number;
 }

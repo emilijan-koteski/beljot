@@ -5,7 +5,7 @@ export function xpThreshold(level: number): number {
   return LEVEL_CURVE_COEFFICIENT * level * level;
 }
 
-export interface XpBarFill {
+interface XpBarFill {
   xpIntoLevel: number;
   xpForNextLevel: number;
   fraction: number;

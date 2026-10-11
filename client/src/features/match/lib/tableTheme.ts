@@ -12,10 +12,6 @@ export const TEAM_GOLD = ["#e8c25a", "#a07d1a"] as const;
 
 export const TEAM_SILVER = ["#d8dde4", "#8b919a"] as const;
 
-export const TURN_LIME = ["#00e5a0", "#00a878"] as const;
-
-export const TURN_URGENT = ["#ef4444", "#b91c1c"] as const;
-
 export type TeamGradient = readonly [string, string];
 
 /** Resolve the bright/deep gradient stops for a viewer-relative team. */

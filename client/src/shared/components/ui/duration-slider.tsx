@@ -1,10 +1,10 @@
 import { cn } from "@/shared/lib/utils";
 
 /** One mark on the track. `label` renders under it; `emphasis` draws it taller. */
-export type SliderTick = { value: number; label?: string; emphasis?: boolean };
+type SliderTick = { value: number; label?: string; emphasis?: boolean };
 
 /** A second, read-only mark — e.g. "your own score" against a threshold. */
-export type SliderMarker = { value: number; label?: string };
+type SliderMarker = { value: number; label?: string };
 
 type DurationSliderProps = {
   value: number;

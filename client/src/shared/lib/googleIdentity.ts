@@ -47,7 +47,7 @@ function warnLoadFailureOnce(): void {
  * Loads the GIS script once, sharing the cached promise. Resolves false (never
  * rejects) on failure and clears the cache so a later navigation can retry.
  */
-export function loadGoogleIdentity(): Promise<boolean> {
+function loadGoogleIdentity(): Promise<boolean> {
   if (gsiLoadPromise) return gsiLoadPromise;
 
   gsiLoadPromise = new Promise<boolean>((resolve) => {
@@ -87,7 +87,7 @@ export function getGoogleClientId(): string {
   return (import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "").trim();
 }
 
-export interface RenderGoogleButtonOptions {
+interface RenderGoogleButtonOptions {
   clientId: string;
   parent: HTMLElement;
   locale?: string;

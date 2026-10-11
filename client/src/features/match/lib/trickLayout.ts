@@ -1,11 +1,11 @@
-export type Compass = 0 | 1 | 2 | 3;
+type Compass = 0 | 1 | 2 | 3;
 
 export function compassOffset(seat: number, myPlayerSeat: number): Compass {
   return ((((seat - myPlayerSeat) % 4) + 4) % 4) as Compass;
 }
 
 /** A trick card's offset from the trick-area center toward its player, plus a rotation jitter. */
-export interface SlotPosition {
+interface SlotPosition {
   offsetX: number;
   offsetY: number;
   rotation: number;

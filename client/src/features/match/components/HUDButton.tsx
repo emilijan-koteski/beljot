@@ -1,6 +1,6 @@
 import { type ButtonHTMLAttributes, forwardRef, type ReactNode } from "react";
 
-export type HUDButtonVariant = "default" | "danger";
+type HUDButtonVariant = "default" | "danger";
 
 interface HUDButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ReactNode;

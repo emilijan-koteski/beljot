@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { claimDailyLogin } from "@/shared/api/wallet";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-export interface DailyReward {
+interface DailyReward {
   amount: number;
   streakDay: number;
   newBalance: number;

@@ -1,7 +1,7 @@
 import { Lock } from "lucide-react";
 import type { CSSProperties } from "react";
 
-export type Seat = [initial: string | null, name: string, team: "a" | "b"];
+type Seat = [initial: string | null, name: string, team: "a" | "b"];
 
 type RoomCardProps = {
   title: string;

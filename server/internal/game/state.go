@@ -131,28 +131,6 @@ func TeamForSeat(seat int) int {
 	return seat % 2
 }
 
-// TeamStringForIndex returns "teamA" for 0, "teamB" for 1. Returns empty string for values outside {0, 1}.
-func TeamStringForIndex(i int) string {
-	switch i {
-	case TeamA:
-		return "teamA"
-	case TeamB:
-		return "teamB"
-	}
-	return ""
-}
-
-// TeamIndexForString returns 0 for "teamA", 1 for "teamB". Returns -1 for unknown.
-func TeamIndexForString(s string) int {
-	switch s {
-	case "teamA":
-		return TeamA
-	case "teamB":
-		return TeamB
-	}
-	return -1
-}
-
 // ShuffleDeck randomly shuffles a deck of cards in-place.
 func ShuffleDeck(deck []Card) {
 	rand.Shuffle(len(deck), func(i, j int) {

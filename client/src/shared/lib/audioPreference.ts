@@ -2,16 +2,16 @@ import { updatePreferences } from "@/shared/api/profile";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 /** Every audio preference on the account: two on/off switches and each channel's 0-100 volume. */
-export interface AudioPreferences {
+interface AudioPreferences {
   soundEnabled: boolean;
   musicEnabled: boolean;
   soundVolume: number;
   musicVolume: number;
 }
-export type AudioPreferenceField = keyof AudioPreferences;
+type AudioPreferenceField = keyof AudioPreferences;
 export type AudioSwitchField = "soundEnabled" | "musicEnabled";
 export type AudioVolumeField = "soundVolume" | "musicVolume";
-export type AudioPreferencesPatch = Partial<AudioPreferences>;
+type AudioPreferencesPatch = Partial<AudioPreferences>;
 
 const FIELDS: readonly AudioPreferenceField[] = [
   "soundEnabled",

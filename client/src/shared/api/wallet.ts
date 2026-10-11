@@ -1,7 +1,7 @@
 import { axiosClient } from "@/shared/api/axiosClient";
 
 // Mirrors the server wallet.DailyLoginResult contract (camelCase wire format).
-export interface DailyLoginResult {
+interface DailyLoginResult {
   granted: boolean;
   amount: number;
   streakDay: number;

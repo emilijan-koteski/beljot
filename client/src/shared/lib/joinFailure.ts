@@ -8,7 +8,7 @@ import { useAuthStore } from "@/shared/stores/authStore";
  * Room numbers a join-failure message can interpolate; a missing one falls back
  * to that branch's generic copy. A full `Room` satisfies this structurally.
  */
-export interface JoinFailureContext {
+interface JoinFailureContext {
   coinBuyIn?: number;
   minHonor?: number;
 }

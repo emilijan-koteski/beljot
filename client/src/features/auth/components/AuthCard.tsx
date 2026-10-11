@@ -6,7 +6,7 @@ import { Field } from "@/shared/components/ui/field";
 import { SuitRule } from "@/shared/components/ui/suit-rule";
 import { cn } from "@/shared/lib/utils";
 
-export { Field, SuitRule };
+export { Field };
 
 type AuthCardProps = {
   eyebrow: string;

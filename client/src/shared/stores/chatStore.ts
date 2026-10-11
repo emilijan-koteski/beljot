@@ -7,7 +7,7 @@ const MAX_MESSAGES = 200;
 // A chat channel is either the dock's own primary channel (lobby/room/match) or
 // an open whisper thread keyed by the OTHER participant's username. Threads are
 // created lazily when the first whisper (sent or received) for that friend lands.
-export type ChatChannel = "primary" | `whisper:${string}`;
+type ChatChannel = "primary" | `whisper:${string}`;
 
 export function whisperChannel(username: string): ChatChannel {
   return `whisper:${username}`;

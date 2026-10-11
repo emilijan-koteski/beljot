@@ -3,7 +3,7 @@ import { create } from "zustand";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
 /** Room-ejection notice shown once by the lobby arrival modal; `reason` selects the copy. */
-export interface RoomEjection {
+interface RoomEjection {
   roomId: number;
   buyIn: number;
   balance: number;
@@ -26,7 +26,7 @@ export interface RoomInvite {
   expiresAt: string;
 }
 
-export interface RoomState {
+interface RoomState {
   room: Room | null;
   players: RoomPlayer[];
   matchStarted: boolean;

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** The data a post-match level-up dialog needs. */
-export interface LevelUpInfo {
+interface LevelUpInfo {
   newLevel: number;
   newTotalXp: number;
   xpEarned: number;

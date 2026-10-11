@@ -24,7 +24,7 @@ export const PLAIN_ROWS: CardBase[] = [
   { rank: "7", pts: 0, strength: 8 },
 ];
 
-export type DeclarationBase = {
+type DeclarationBase = {
   id: string;
   pts: number;
   tier: 0 | 1 | 2 | 3;

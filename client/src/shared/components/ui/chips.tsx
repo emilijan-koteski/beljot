@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-export type ChipOption<T extends string | number> = {
+type ChipOption<T extends string | number> = {
   value: T;
   label: React.ReactNode;
   icon?: React.ReactNode;

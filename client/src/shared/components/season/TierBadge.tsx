@@ -8,7 +8,7 @@ import { cn } from "@/shared/lib/utils";
  * Badge scale. `md` is the RankBanner's original size; `sm` fits a list row;
  * `lg` is the medallion of the post-match rank-change dialog.
  */
-export type TierBadgeSize = "sm" | "md" | "lg";
+type TierBadgeSize = "sm" | "md" | "lg";
 
 const SIZE_CLASSES: Record<TierBadgeSize, { ring: string; glyph: string }> = {
   sm: { ring: "size-7", glyph: "size-3.5" },

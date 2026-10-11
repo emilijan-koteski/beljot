@@ -19,6 +19,3 @@ export const Z = {
   CHROME_TOP: 120,
   TOAST: 130,
 } as const;
-
-/** A stacking tier from `Z`; higher is closer to the viewer. Apply it as an inline `zIndex`. */
-export type ZLayer = (typeof Z)[keyof typeof Z];

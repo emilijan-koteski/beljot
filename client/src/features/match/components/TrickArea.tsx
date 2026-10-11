@@ -7,7 +7,7 @@ import { PlayingCard } from "./PlayingCard";
 const EMPTY_TRICK: TrickCard[] = [];
 const EMPTY_SET: ReadonlySet<string> = new Set();
 
-export interface PendingResolvedSnapshot {
+interface PendingResolvedSnapshot {
   trick: TrickCard[];
   winnerSeat: number;
 }

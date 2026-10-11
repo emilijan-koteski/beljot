@@ -1,4 +1,4 @@
-export type ProfileLabels = {
+type ProfileLabels = {
   member: string;
   games: string;
   winrate: string;

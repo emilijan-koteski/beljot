@@ -11,12 +11,12 @@ export interface LinkedIdentity {
 // LinkedAccountsResponse is the GET /users/:id/identities payload. hasPassword
 // tells the client whether the account can still be signed into without any
 // linked identity — it drives the "cannot unlink your last method" UX.
-export interface LinkedAccountsResponse {
+interface LinkedAccountsResponse {
   hasPassword: boolean;
   identities: LinkedIdentity[];
 }
 
-export interface LinkIdentityRequest {
+interface LinkIdentityRequest {
   credential: string;
 }
 

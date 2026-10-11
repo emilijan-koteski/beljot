@@ -71,7 +71,7 @@ export type MatchFilter = "all" | "win" | "loss" | "abandoned";
 /** Completed-at ordering: "new" (newest first, default) or "old". */
 export type MatchSort = "new" | "old";
 
-export interface MatchListParams {
+interface MatchListParams {
   outcome?: MatchFilter;
   sort?: MatchSort;
 }

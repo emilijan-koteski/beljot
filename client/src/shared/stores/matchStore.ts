@@ -19,29 +19,29 @@ import type {
  * Snapshot of the just-resolved trick, captured before currentTrick clears so
  * the collect animation can still play.
  */
-export interface PendingResolvedTrick {
+interface PendingResolvedTrick {
   trick: TrickCard[];
   winnerSeat: number;
   receivedAt: number;
 }
 
 /** Per-seat emote slot; receivedAt doubles as a remount key. */
-export interface ActiveEmote {
+interface ActiveEmote {
   emote: EmoteID;
   receivedAt: number;
 }
 
-export type ActiveEmotesMap = Record<0 | 1 | 2 | 3, ActiveEmote | null>;
+type ActiveEmotesMap = Record<0 | 1 | 2 | 3, ActiveEmote | null>;
 
 /** Per-seat trick-one declaration banner slot; receivedAt doubles as a remount key. */
-export interface ActiveDeclare {
+interface ActiveDeclare {
   receivedAt: number;
 }
 
-export type ActiveDeclaresMap = Record<0 | 1 | 2 | 3, ActiveDeclare | null>;
+type ActiveDeclaresMap = Record<0 | 1 | 2 | 3, ActiveDeclare | null>;
 
 /** Signals that the server auto-played the local player's card, so the hand-throw animation runs. */
-export interface PendingAutoPlayedCard {
+interface PendingAutoPlayedCard {
   cardId: string;
   receivedAt: number;
 }
@@ -52,7 +52,7 @@ export type SeasonSettlement = Pick<
   "spChange" | "newSeasonSp" | "rankTier" | "rankDivision" | "reason"
 >;
 
-export interface MatchStoreState {
+interface MatchStoreState {
   matchState: MatchState | null;
   myPlayerSeat: number | null;
   roomId: number | null;

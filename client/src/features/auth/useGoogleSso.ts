@@ -8,7 +8,7 @@ import { FetchError } from "@/shared/api/axiosClient";
 import { useSSOLinkMutation, useSSOLoginMutation } from "@/shared/hooks/mutations/useAuth";
 import { decodeCredentialEmail } from "@/shared/lib/googleIdentity";
 
-export interface LinkDialogProps {
+interface LinkDialogProps {
   open: boolean;
   email: string;
   pending: boolean;
@@ -18,7 +18,7 @@ export interface LinkDialogProps {
 }
 
 /** Wire handleGoogleCredential to GoogleSignInButton and spread linkDialogProps onto LinkAccountDialog. */
-export interface UseGoogleSsoResult {
+interface UseGoogleSsoResult {
   handleGoogleCredential: (credential: string) => Promise<void>;
   linkDialogProps: LinkDialogProps;
 }

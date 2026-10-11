@@ -23,9 +23,6 @@ function update(updater: (rooms: Room[]) => Room[]) {
   queryClient.setQueryData<Room[]>(WAITING, (old) => (old ? updater(old) : undefined));
 }
 
-/** Marker hook for the lobby's live room list; the WS dispatcher calls handleWsMessage directly. */
-export function useRoomUpdates() {}
-
 /** Applies a WS room event to the cached waiting-room list, ignoring frames that fail to parse. */
 export function handleWsMessage(event: MessageEvent): void {
   try {

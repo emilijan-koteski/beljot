@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export interface VisualViewportBox {
+interface VisualViewportBox {
   height: number;
   offsetTop: number;
 }

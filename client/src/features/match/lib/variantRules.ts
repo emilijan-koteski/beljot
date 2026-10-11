@@ -4,7 +4,7 @@ import type { Variant } from "@/shared/types/matchTypes";
  * Client mirror of the server's `game.VariantRules` facts the UI needs, derived from the
  * variant string. The server never sends this config over the wire.
  */
-export interface VariantRuleFacts {
+interface VariantRuleFacts {
   readonly declarationOverlap: boolean;
 }
 

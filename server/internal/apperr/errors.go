@@ -1,9 +1,6 @@
 package apperr
 
-import (
-	"fmt"
-	"net/http"
-)
+import "net/http"
 
 type AppError struct {
 	Code    string `json:"code"`
@@ -21,10 +18,6 @@ func NewAppError(code string, message string, status int) *AppError {
 		Message: message,
 		Status:  status,
 	}
-}
-
-func Wrap(err error, appErr *AppError) error {
-	return fmt.Errorf("%s: %w", appErr.Message, appErr)
 }
 
 var (

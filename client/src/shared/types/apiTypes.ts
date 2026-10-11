@@ -1,16 +1,5 @@
 import type { CardDeck, MatchMode, Variant } from "./matchTypes";
 
-export interface ApiResponse<T> {
-  data: T;
-}
-
-export interface ApiErrorResponse {
-  error: {
-    code: string;
-    message: string;
-  };
-}
-
 /** The signed-in user's own account; numeric and boolean fields are real Go zero values, so compare explicitly, never by truthiness. */
 export interface User {
   id: number;

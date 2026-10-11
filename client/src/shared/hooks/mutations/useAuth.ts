@@ -75,12 +75,12 @@ export function useRegisterMutation() {
   });
 }
 
-export interface SSOLoginVariables {
+interface SSOLoginVariables {
   provider: string;
   credential: string;
 }
 
-export interface SSOLinkVariables {
+interface SSOLinkVariables {
   provider: string;
   credential: string;
   password: string;

@@ -4,9 +4,9 @@ import i18n from "i18next";
  * Outcomes of a rejected room invite: `rejected` shows the message, `alreadyPending`
  * may read as sent, and `roomGone` means the inviting surface should close.
  */
-export type InviteFailureKind = "rejected" | "alreadyPending" | "roomGone";
+type InviteFailureKind = "rejected" | "alreadyPending" | "roomGone";
 
-export interface InviteFailure {
+interface InviteFailure {
   kind: InviteFailureKind;
   message: string;
 }
