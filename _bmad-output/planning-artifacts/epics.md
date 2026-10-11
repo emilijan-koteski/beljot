@@ -172,9 +172,9 @@ NFR17: A single player's disconnection must not affect game state integrity or c
 **From Architecture — Phase Scoping:**
 
 - Phase 1: ~25 FRs (auth, Bitola variant only, lobby/rooms, real-time session, chat, disconnect handling, basic match history, i18n EN+SR, desktop web)
-- Phase 2: Coin economy (FR53–55), XP/lifetime level (FR33–34), honor system (FR56–57), private rooms (FR60), room owner kick/seat (FR58), team surrender (FR28a), in-game emotes (FR32), additional languages MK+HR (FR45), 501 mode (FR15 — moved from Phase 3 on 2026-06-11, see sprint-change-proposal-2026-06-11.md)
+- Phase 2: Coin economy (FR53–55), XP/lifetime level (FR33–34), honor system (FR56–57), private rooms (FR60), room owner kick/seat (FR58), team surrender (FR28a), in-game emotes (FR32), additional languages MK+HR (FR45), 501 mode (FR15 — moved from Phase 3 on 2026-06-11, see _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-06-11.md)
 - Phase 3: Player search (FR5), friends (FR6), friend whisper chat (FR61), friend room invites (FR62), public profiles (FR47), Croatian variant (FR8), in-app rules reference (FR29)
-- Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40, FR65, FR66), social login (FR3 — Google shipped early via Story 14.1; Facebook Story 14.2 pending). Mobile (FR52) descoped 2026-08-14 — Epic 15 removed (see sprint-change-proposal-2026-08-14.md)
+- Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40, FR65, FR66), social login (FR3 — Google shipped early via Story 14.1; Facebook Story 14.2 pending). Mobile (FR52) descoped 2026-08-14 — Epic 15 removed (see _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-08-14.md)
 - Phase 5: Spectator (FR48), achievements (FR49), cosmetics (FR50), tournaments (FR51)
 - Agents must NOT implement the Croatian variant before Phase 3 (501 mode was moved to Phase 2 / Epic 10 on 2026-06-11 and is no longer phase-gated)
 - Tied-hand rule diverges by variant (deferred to Epic 12 / Phase 3): the interim engine applies the **Croatian** rule (a tie sends all points to the taker's opponents) to all variants; the **Bitola** variant must later use **hanging points (carry-over)** instead. See `deferred-work.md`. Do not treat the current Bitola tie behavior as a bug before then.
@@ -250,7 +250,7 @@ FR48: Epic 16 — Spectator/observer mode
 FR49: Epic 16 — Achievements and badges
 FR50: Epic 16 — Cosmetic purchases — purchasable cosmetics only; the free deck-style preference is FR63/Epic 12
 FR51: Epic 16 — Bracket-style tournaments
-FR52: [descoped 2026-08-14] — Epic 15 removed; mobile-responsive layout delivered incidentally across Phase 1–2, PWA/native dropped (see sprint-change-proposal-2026-08-14.md)
+FR52: [descoped 2026-08-14] — Epic 15 removed; mobile-responsive layout delivered incidentally across Phase 1–2, PWA/native dropped (see _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-08-14.md)
 FR53: Epic 9 — Room coin buy-in + match pot settlement
 FR54: Epic 9 — Coin sources (registration + daily streak)
 FR55: Epic 9 — Quick Play coin bracketing
@@ -340,7 +340,7 @@ Players earn and spend coins (room buy-in, per-match settlement, daily/streak re
 
 ### Epic 10: Additional Languages, 501 Mode & Bot Players
 
-The i18n system is extended with Macedonian and Croatian translations, giving players a fuller native-language experience independent of the social layer. The epic also delivers the 501-point match mode for shorter casual matches (Story 10.2, moved from Epic 12 on 2026-06-11) and owner-seated bot players that fill empty seats with competent, human-paced play (Story 10.3, added 2026-06-11) — see sprint-change-proposal-2026-06-11.md.
+The i18n system is extended with Macedonian and Croatian translations, giving players a fuller native-language experience independent of the social layer. The epic also delivers the 501-point match mode for shorter casual matches (Story 10.2, moved from Epic 12 on 2026-06-11) and owner-seated bot players that fill empty seats with competent, human-paced play (Story 10.3, added 2026-06-11) — see _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-06-11.md.
 
 **FRs covered:** FR45, FR15, FR59
 **Phase:** 2
@@ -381,7 +381,7 @@ Players can register and log in using Google or Facebook OAuth, with account lin
 
 ### Epic 15: Mobile Experience — [REMOVED 2026-08-14]
 
-Removed via bmad-correct-course (see sprint-change-proposal-2026-08-14.md). The mobile-responsive layout and touch-friendly card interaction were delivered incidentally across Phase 1–2 (responsive MatchPage, useVisualViewport, 320px-safe cards); the PWA/native scope (manifest, service worker, installability, offline splash, push) was never built and is dropped. FR52 is marked [descoped]. Epic 16 keeps its number.
+Removed via bmad-correct-course (see _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-08-14.md). The mobile-responsive layout and touch-friendly card interaction were delivered incidentally across Phase 1–2 (responsive MatchPage, useVisualViewport, 320px-safe cards); the PWA/native scope (manifest, service worker, installability, offline splash, push) was never built and is dropped. FR52 is marked [descoped]. Epic 16 keeps its number.
 
 **FRs covered:** — (FR52 descoped)
 **Phase:** — (removed)
@@ -1842,7 +1842,7 @@ As a player,
 I want to be cleanly redirected to the lobby when I can no longer afford a room's buy-in,
 So that I'm never stuck at a seat I can't use and the room can keep going for those who can.
 
-This story extends the existing **Return to Room** flow (`spec-return-to-room-after-match.md` / `spec-return-to-room-presence-v2.md`): the affordability check fires at the moment a player attempts to return, and — for the insolvency / owner-leave case only — it supersedes v2's "no auto-transfer of ownership from an absent owner" rule.
+This story extends the existing **Return to Room** flow (`_bmad-output/archive/implementation-artifacts/spec-return-to-room-after-match.md` / `_bmad-output/archive/implementation-artifacts/spec-return-to-room-presence-v2.md`): the affordability check fires at the moment a player attempts to return, and — for the insolvency / owner-leave case only — it supersedes v2's "no auto-transfer of ownership from an absent owner" rule.
 
 **Acceptance Criteria:**
 
@@ -2047,7 +2047,7 @@ So that I can self-select into a community of reliable players.
 
 ## Epic 10: Additional Languages, 501 Mode & Bot Players
 
-The i18n system is extended with Macedonian and Croatian translations, giving players a fuller native-language experience independent of the social layer. The epic also delivers the 501-point match mode for shorter casual matches (Story 10.2, moved from Epic 12 on 2026-06-11) and owner-seated bot players that fill empty seats with competent, human-paced play (Story 10.3, added 2026-06-11) — see sprint-change-proposal-2026-06-11.md.
+The i18n system is extended with Macedonian and Croatian translations, giving players a fuller native-language experience independent of the social layer. The epic also delivers the 501-point match mode for shorter casual matches (Story 10.2, moved from Epic 12 on 2026-06-11) and owner-seated bot players that fill empty seats with competent, human-paced play (Story 10.3, added 2026-06-11) — see _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-06-11.md.
 
 ### Story 10.1: Macedonian and Croatian Translations
 
@@ -2079,7 +2079,7 @@ So that I can play in my native language.
 
 ### Story 10.2: 501-Point Match Mode
 
-_Moved from Epic 12 (was Story 12.2) on 2026-06-11 — see sprint-change-proposal-2026-06-11.md. Acceptance criteria unchanged._
+_Moved from Epic 12 (was Story 12.2) on 2026-06-11 — see _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-06-11.md. Acceptance criteria unchanged._
 
 As a player,
 I want to play shorter 501-point matches,
@@ -2105,7 +2105,7 @@ So that I can enjoy a quicker game when I don't have time for a full 1001 match.
 
 ### Story 10.3: Bot Players
 
-_Added 2026-06-11 via bmad-correct-course (sprint-change-proposal-2026-06-11.md). Scheduled after Story 10.2 and before Epic 9. This is the largest Phase 2 story — if story validation flags it as oversized, shard it (e.g., 10.3 bot foundation: seating + legal play + timing; 10.4 strategy hardening) rather than thinning acceptance criteria._
+_Added 2026-06-11 via bmad-correct-course (_bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-06-11.md). Scheduled after Story 10.2 and before Epic 9. This is the largest Phase 2 story — if story validation flags it as oversized, shard it (e.g., 10.3 bot foundation: seating + legal play + timing; 10.4 strategy hardening) rather than thinning acceptance criteria._
 
 As a room owner,
 I want to seat bots on the empty seats of my room,
@@ -2358,7 +2358,7 @@ So that the platform supports both major Balkan Belot variants without either on
 
 ### Story 12.2: [moved] 501-Point Match Mode
 
-Moved to Epic 10 as **Story 10.2** on 2026-06-11 (see sprint-change-proposal-2026-06-11.md). The 12.2 designation is retired; Story 12.3 keeps its number.
+Moved to Epic 10 as **Story 10.2** on 2026-06-11 (see _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-06-11.md). The 12.2 designation is retired; Story 12.3 keeps its number.
 
 ### Story 12.3: In-App Rules Reference
 
@@ -2427,7 +2427,7 @@ So that I can play with the deck I grew up with rather than the one the platform
 **When** they are added
 **Then** they live under `client/public/cards/{deck}/`, are generated through `scripts/recolor-cards.mjs` rather than hand-edited, and their provenance and licence are recorded in `docs/card-deck.md`
 
-**Dependencies:** artwork must be sourced under a compatible licence before this story starts (procurement, not engineering); `spec-svg-card-deck.md`'s frozen `/cards/{ID}.svg` path contract needs a change-log entry; the three-way auth-envelope duplication (`axiosClient.ts`, `hooks/mutations/useAuth.ts`, `hooks/useAuth.ts`) should be unified here while all three files are open.
+**Dependencies:** artwork must be sourced under a compatible licence before this story starts (procurement, not engineering); `_bmad-output/archive/implementation-artifacts/spec-svg-card-deck.md`'s frozen `/cards/{ID}.svg` path contract needs a change-log entry; the three-way auth-envelope duplication (`axiosClient.ts`, `hooks/mutations/useAuth.ts`, `hooks/useAuth.ts`) should be unified here while all three files are open.
 
 ### Story 12.5: Croatian Declaration Overlap
 
@@ -2821,7 +2821,7 @@ So that I have another one-tap sign-in option.
 
 ## Epic 15: Mobile Experience — [REMOVED 2026-08-14]
 
-Removed via bmad-correct-course (sprint-change-proposal-2026-08-14.md). Rationale: the mobile-responsive layout and touch-friendly card interaction (tap-to-play) already shipped incidentally across Phase 1–2 — responsive MatchPage layout, `useVisualViewport` keyboard handling, 320px-safe cards — while the PWA/native scope (web app manifest, service worker, installability, offline splash, push notifications for match invites) was never built and is descoped. FR52 is retired in the FR Coverage Map. Story 15.1 is withdrawn; Epic 16 retains its number.
+Removed via bmad-correct-course (_bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-08-14.md). Rationale: the mobile-responsive layout and touch-friendly card interaction (tap-to-play) already shipped incidentally across Phase 1–2 — responsive MatchPage layout, `useVisualViewport` keyboard handling, 320px-safe cards — while the PWA/native scope (web app manifest, service worker, installability, offline splash, push notifications for match invites) was never built and is descoped. FR52 is retired in the FR Coverage Map. Story 15.1 is withdrawn; Epic 16 retains its number.
 
 ## Epic 16: Spectator, Achievements, Cosmetics & Tournaments
 

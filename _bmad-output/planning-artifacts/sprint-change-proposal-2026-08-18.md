@@ -60,7 +60,7 @@ Two source claims were **rejected** rather than adopted. The article omits any m
 
 A Croatian/German-suited card deck is wanted as a **player setting**, modelled on the language selector, not as a purchasable cosmetic. `FR50` (Epic 16, Phase 5) covers purchasable card backs and table themes, so this needs its own requirement and its own story inside Epic 12.
 
-This is newly cheap: `spec-svg-card-deck.md` shipped 2026-08-18 (`d917b3a`), so card faces already render from vendored SVGs where the filename **is** the card ID, geometry is owned by `client/src/features/match/lib/cardFace.ts`, and the deck is regenerated through `scripts/recolor-cards.mjs`.
+This is newly cheap: `_bmad-output/archive/implementation-artifacts/spec-svg-card-deck.md` shipped 2026-08-18 (`d917b3a`), so card faces already render from vendored SVGs where the filename **is** the card ID, geometry is owned by `client/src/features/match/lib/cardFace.ts`, and the deck is regenerated through `scripts/recolor-cards.mjs`.
 
 ---
 
@@ -103,7 +103,7 @@ Sequencing is load-bearing: **12.1 → 12.5 → 12.6 → 12.7 → 12.8**, with 1
 - **`project-context.md` — actively wrong and must be corrected.** Line 319 mandates *"Separate code paths in `bidding.go`, never a generic flow"* and line 303's anti-pattern table says *"Branch by variant from the start"*. Both instruct a dev agent to do the precise opposite of D-VAR-1. This file is read before every story; left uncorrected, the first agent to pick up 12.1 hardcodes `variant == "croatia"` and the preset design dies on contact. Its Croatian bidding description is also factually wrong (it describes a one-round forced pick).
 - `architecture.md` — the phase transition table (~line 1015) has no slot for a declaration phase.
 - `deferred-work.md` — the hanging-points item is promoted to Story 12.7; D67 is promoted to Story 12.5; the belot-all-eight-of-a-suit item stays deferred, annotated as applying to both variants.
-- `spec-svg-card-deck.md` — `<frozen-after-approval>`, and its path contract (`/cards/{ID}.svg`) changes to `/cards/{deck}/{ID}.svg`. Per that spec's own terms this is a human renegotiation, recorded as a change-log entry rather than a silent override.
+- `_bmad-output/archive/implementation-artifacts/spec-svg-card-deck.md` — `<frozen-after-approval>`, and its path contract (`/cards/{ID}.svg`) changes to `/cards/{deck}/{ID}.svg`. Per that spec's own terms this is a human renegotiation, recorded as a change-log entry rather than a silent override.
 - **PRD — no change.** `epics.md` is the canonical living FR list, per the FR59 / FR60 / FR61 / FR62 precedent.
 - **UX spec — no change required**, though 12.6 introduces a blocking four-player prompt with no existing pattern and 12.4 adds a Settings section; both are captured in story ACs.
 
@@ -279,7 +279,7 @@ So that I can play with the deck I grew up with rather than the one the platform
 **When** they are added
 **Then** they live under `client/public/cards/{deck}/`, are generated through `scripts/recolor-cards.mjs` rather than hand-edited, and their provenance and licence are recorded in `docs/card-deck.md`
 
-**Dependencies:** artwork must be sourced under a compatible licence before this story starts; `spec-svg-card-deck.md`'s frozen path contract needs a change-log entry; the three-way auth-envelope duplication should be unified here.
+**Dependencies:** artwork must be sourced under a compatible licence before this story starts; `_bmad-output/archive/implementation-artifacts/spec-svg-card-deck.md`'s frozen path contract needs a change-log entry; the three-way auth-envelope duplication should be unified here.
 
 #### Story 12.5: Croatian Declaration Overlap
 
@@ -448,7 +448,7 @@ Header `last_updated` → `2026-08-18`.
 | `project-context.md` declaration + tie notes | Promote the three "(deferred)" Croatian asides to specified rules, pointing at Stories 12.5 / 12.6 / 12.7 |
 | `architecture.md` (~line 1015) | Add the Croatian declaration phase to the phase transition table |
 | `deferred-work.md` | Hanging-points item → promoted to Story 12.7. D67 → promoted to Story 12.5. Belot-all-eight-of-a-suit → stays deferred, annotated as applying to **both** variants (not implemented for Bitola either; rules-page text only). |
-| `spec-svg-card-deck.md` | Change-log entry renegotiating the frozen `/cards/{ID}.svg` path to `/cards/{deck}/{ID}.svg` |
+| `_bmad-output/archive/implementation-artifacts/spec-svg-card-deck.md` | Change-log entry renegotiating the frozen `/cards/{ID}.svg` path to `/cards/{deck}/{ID}.svg` |
 
 **The `project-context.md` edits are the highest-value item in this proposal.** That file is loaded before every story. Lines 303 and 319 currently instruct a dev agent to do the exact opposite of D-VAR-1, and its Croatian bidding description is factually wrong.
 
@@ -464,7 +464,7 @@ Header `last_updated` → `2026-08-18`.
 |-------------|-------|
 | `epics.md` — 4a, 4b, 4c, 4d | PO / Dev |
 | `sprint-status.yaml` — 4e | PO / Dev |
-| `project-context.md`, `architecture.md`, `deferred-work.md`, `spec-svg-card-deck.md` — 4f | PO / Dev |
+| `project-context.md`, `architecture.md`, `deferred-work.md`, `_bmad-output/archive/implementation-artifacts/spec-svg-card-deck.md` — 4f | PO / Dev |
 
 ### Then — story cycle
 

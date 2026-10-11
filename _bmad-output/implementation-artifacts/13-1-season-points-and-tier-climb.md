@@ -22,7 +22,7 @@ This story delivers **SP accrual + a derived 8-tier ladder + the lobby RankBanne
 
 - The **leaderboard** (list, endpoint, nav tab, lobby panel) — that is **Story 13.2**.
 - The **rollover scheduler**, the prior-season **profile archive**, or any cron/job infrastructure — that is **Story 13.3**. This story ships no scheduler. It makes 13.3 an optimisation, not a prerequisite, via the lazy season resolver in [Design Decision D1](#design-decisions).
-- **ELO / hidden MMR / placement matches / LP / sub-ranks (Silver II) / rank-reveal modal / SP decay.** The PRD's older journey prose (`prd.md:225`) and the product brief (`product-brief-beljot-2026-02-21.md:233`) describe an ELO + placement-match + I/II/III sub-rank model. **That model is dead.** The canonical spec is the epic AC (SP formula, flat 8 tiers, no placements) as reset by `sprint-change-proposal-2026-04-18.md:130`. See [Design Decision D6](#design-decisions).
+- **ELO / hidden MMR / placement matches / LP / sub-ranks (Silver II) / rank-reveal modal / SP decay.** The PRD's older journey prose (`prd.md:225`) and the product brief (`_bmad-output/archive/planning-artifacts/product-brief-beljot-2026-02-21.md:233`) describe an ELO + placement-match + I/II/III sub-rank model. **That model is dead.** The canonical spec is the epic AC (SP formula, flat 8 tiers, no placements) as reset by `_bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-04-18.md:130`. See [Design Decision D6](#design-decisions).
 - Any **gating** on tier or SP. Nothing unlocks. Same rule Story 9.5 held for level.
 
 ## Acceptance Criteria
@@ -121,11 +121,11 @@ Flag at review for PO ratification.
 
 ### D6 — The UX RankBanner spec is stale; SP replaces LP/placement
 
-`ux-design-specification.md:753-758` specifies RankBanner states as `unranked` / `placement ("Placement: X/3")` / `ranked (LP + progress)`. That is the retired ELO model. `sprint-change-proposal-2026-04-18.md:51` explicitly lists "seasonal RankBanner in SP mode" as an outstanding UX update that was never made.
+`ux-design-specification.md:753-758` specifies RankBanner states as `unranked` / `placement ("Placement: X/3")` / `ranked (LP + progress)`. That is the retired ELO model. `_bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-04-18.md:51` explicitly lists "seasonal RankBanner in SP mode" as an outstanding UX update that was never made.
 
 **The epic AC3 is canonical.** Build exactly the five elements it names: tier badge (colour + glow), tier name, current SP, progress bar to next tier, days remaining in season. There is no unranked state and no placement state — a player at 0 SP is **Iron**, which is a real tier and renders normally.
 
-This is the same resolution Story 9.5 recorded as its D2 (`9-5-xp-and-level-system.md:231`), which called RankBanner "the Epic-13 surface". This story is that surface.
+This is the same resolution Story 9.5 recorded as its D2 (`_bmad-output/archive/implementation-artifacts/9-5-xp-and-level-system.md:231`), which called RankBanner "the Epic-13 surface". This story is that surface.
 
 ### D7 — `rank_tier` is stored but NEVER authoritative
 
@@ -345,11 +345,11 @@ Add no library for the tier ladder, the quarter math, or the countdown. Go's `ti
 - [Source: _bmad-output/planning-artifacts/epics.md#L62] — FR37, the 8-tier ladder
 - [Source: _bmad-output/planning-artifacts/prd.md#L168] — SP formula, quarterly seasons, no decay, soft reset
 - [Source: _bmad-output/planning-artifacts/prd.md#L225] — **STALE** ELO/placement/Silver-II journey prose; superseded (D6)
-- [Source: _bmad-output/planning-artifacts/sprint-change-proposal-2026-04-18.md#L130] — SP tier thresholds as reset; #L50 flags the un-done architecture pass for `seasons`/`player_seasons`; #L51 flags the un-done "RankBanner in SP mode" UX pass
+- [Source: _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-04-18.md#L130] — SP tier thresholds as reset; #L50 flags the un-done architecture pass for `seasons`/`player_seasons`; #L51 flags the un-done "RankBanner in SP mode" UX pass
 - [Source: _bmad-output/planning-artifacts/ux-design-specification.md#L753] — **STALE** RankBanner states (unranked/placement/LP); superseded (D6). #L331 — rank badges use tier-specific colours, Grandmaster = accent + glow
 - [Source: _bmad-output/planning-artifacts/architecture.md#L887] — Progression FR33-FR40 mapping (stale, see Project Structure Notes); #L640 — flat RankBanner path (stale); #L199 — data architecture (PostgreSQL/GORM, no caching in Phase 1, design queries caching-ready)
-- [Source: _bmad-output/implementation-artifacts/9-5-xp-and-level-system.md#L17] — the scope guardrail that deferred RankBanner/rank/LP/season to Epic 13; #L231 (D2) — epic AC overrides PRD prose, no gating
-- [Source: _bmad-output/implementation-artifacts/9-7-honor-score-system.md] — presence gate, tier tokens, stored-vs-authoritative split, client mirror convention
+- [Source: _bmad-output/archive/implementation-artifacts/9-5-xp-and-level-system.md#L17] — the scope guardrail that deferred RankBanner/rank/LP/season to Epic 13; #L231 (D2) — epic AC overrides PRD prose, no gating
+- [Source: _bmad-output/archive/implementation-artifacts/9-7-honor-score-system.md] — presence gate, tier tokens, stored-vs-authoritative split, client mirror convention
 - [Source: _bmad-output/project-context.md] — full rule set: stack versions, naming, testing, anti-patterns, Feature-Complete checklist
 - [Source: server/internal/match/xp_award.go] — structural template (D2's participation-reward philosophy, bot/empty guard, best-effort degradation)
 - [Source: server/internal/match/honor_record.go#L67] — `computeHonorEvents` presence gate (D5)

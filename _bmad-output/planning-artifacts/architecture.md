@@ -4,9 +4,9 @@ lastStep: 8
 status: "complete"
 completedAt: "2026-04-05"
 inputDocuments:
-  - product-brief-beljot-2026-02-21.md
+  - ../archive/planning-artifacts/product-brief-beljot-2026-02-21.md
   - prd.md
-  - prd-validation-report.md
+  - ../archive/planning-artifacts/prd-validation-report.md
   - ux-design-specification.md
 workflowType: "architecture"
 project_name: "beljot"
@@ -65,7 +65,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 3. **WebSocket for all real-time features** — game state, lobby, chat, disconnect detection, timer sync
 4. **Desktop web only** — 1280x720 minimum viewport, evergreen browsers, no mobile
 5. **i18n at launch** — English + Serbian (Latin), extensible architecture for future languages
-6. **No AI fill-in on disconnection** — disconnection = pause or abandon, never AI fill-in. (Amended 2026-06-11: owner-seated bot players were added as Story 10.3 — bots may be seated in empty slots before game start, but still never replace a disconnected human mid-match. See sprint-change-proposal-2026-06-11.md.)
+6. **No AI fill-in on disconnection** — disconnection = pause or abandon, never AI fill-in. (Amended 2026-06-11: owner-seated bot players were added as Story 10.3 — bots may be seated in empty slots before game start, but still never replace a disconnected human mid-match. See _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-06-11.md.)
 7. **Solo developer** — architecture must be pragmatically scoped; avoid over-engineering
 
 **Implicit constraints:**

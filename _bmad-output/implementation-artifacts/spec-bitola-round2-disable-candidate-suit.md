@@ -5,8 +5,8 @@ created: "2026-04-30"
 status: "in-review"
 baseline_commit: "2fc3c7c"
 context:
-  - _bmad-output/implementation-artifacts/spec-bitola-round2-trump-prompt-shows-candidate.md
-  - _bmad-output/implementation-artifacts/3-2-trump-bidding-bitola-variant.md
+  - _bmad-output/archive/implementation-artifacts/spec-bitola-round2-trump-prompt-shows-candidate.md
+  - _bmad-output/archive/implementation-artifacts/3-2-trump-bidding-bitola-variant.md
   - _bmad-output/project-context.md
 ---
 

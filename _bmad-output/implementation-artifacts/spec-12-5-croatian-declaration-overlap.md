@@ -30,7 +30,7 @@ baseline_commit: "65e4966208e0883ca3f90549db9d40d05814ead3"
 **Ask First:**
 
 - If a hand can be constructed where two sequences, or two four-of-a-kinds, share a card — contradicting the maximal-run and rank-disjoint reasoning the tie fix rests on — stop before generalizing dedup to the full `declarationBeats` chain (which would need trump and seat, unavailable at detection time).
-- If closing D67 turns out to need any change to the reveal's layout, centering, timing, or payload shape, stop: those are frozen by `spec-center-declaration-dialog.md` and `spec-declaration-reveal-cards-and-timing.md`.
+- If closing D67 turns out to need any change to the reveal's layout, centering, timing, or payload shape, stop: those are frozen by `_bmad-output/archive/implementation-artifacts/spec-center-declaration-dialog.md` and `_bmad-output/archive/implementation-artifacts/spec-declaration-reveal-cards-and-timing.md`.
 
 **Never:**
 
@@ -88,7 +88,7 @@ baseline_commit: "65e4966208e0883ca3f90549db9d40d05814ead3"
 - `features/match/MatchPage.tsx:2009-2019` — prompt uses `myPlayer.declarations` when non-empty, else the local `detectDeclarations(myPlayer.hand)`; `matchState.variant` is typed at `shared/types/matchTypes.ts:107` and read today only at `MatchPage.tsx:1539`. The client cannot read `Rules` (`json:"-"`), so it must resolve overlap from the variant.
 - `features/match/components/DeclarationReveal.tsx:198` maps every declaration; `:68` `declarations[0]` is an emptiness guard only; `:103` centring; `:87` tiebreaker gate; `:243-244` per-row `declaration-reveal-declarer` with `data-seat`. Tests already cover one seat with two overlapping melds (`DeclarationReveal.test.tsx:205-226`) and two teammates (`:228-250`); centring is locked at `:126-166`, timing at `:316-357`.
 - `features/match/lib/declarations.test.ts:53-88` — five Bitola dedup tests whose assertions must not change.
-- `bot/memory.go:59-67` `ObserveDeclarations` concatenates each meld's cards with no dedup, so overlap records a shared card twice, breaking the "exact cards" invariant `spec-bot-declaration-memory.md` documented. Consumers are all set/existence based today, so this is hardening, not a live bug. The maximal-run soundness argument at `bot/bot.go:695-703` still holds — overlap does not change run maximality.
+- `bot/memory.go:59-67` `ObserveDeclarations` concatenates each meld's cards with no dedup, so overlap records a shared card twice, breaking the "exact cards" invariant `_bmad-output/archive/implementation-artifacts/spec-bot-declaration-memory.md` documented. Consumers are all set/existence based today, so this is hardening, not a live bug. The maximal-run soundness argument at `bot/bot.go:695-703` still holds — overlap does not change run maximality.
 
 ## Tasks & Acceptance
 

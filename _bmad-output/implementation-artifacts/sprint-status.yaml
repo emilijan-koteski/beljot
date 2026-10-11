@@ -142,7 +142,7 @@ development_status:
   epic-9-retrospective: optional
 
   # --- Epic 11: Friends & Public Profiles (Phase 3) ---
-  # 11-4, 11-5 added 2026-08-14 via bmad-correct-course (FR61/FR62; sprint-change-proposal-2026-08-14.md)
+  # 11-4, 11-5 added 2026-08-14 via bmad-correct-course (FR61/FR62; _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-08-14.md)
   # — friend whisper chat + friend room invites; both depend on 11-2 (friend model) + server presence.
   # 11-1 story created 2026-08-14 (create-story) — FR5 player search: new authenticated GET /api/v1/users?search=
   # (case-insensitive ILIKE substring, escaped wildcards, self+soft-delete excluded, capped at 10; first ILIKE in the
@@ -203,7 +203,7 @@ development_status:
   epic-13-retrospective: optional
 
   # --- Epic 14: Social Login (Phase 4) ---
-  # 14-1 split 2026-08-14 via bmad-correct-course (sprint-change-proposal-2026-08-14.md): Google shipped
+  # 14-1 split 2026-08-14 via bmad-correct-course (_bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-08-14.md): Google shipped
   # during Phase 1-2 (provider-agnostic SSO handler + GoogleClientID + google.svg) → done; Facebook not
   # wired in production → 14-2 backlog. Epic in-progress (Story 14.1 delivered ahead of Phase 4).
   epic-14: in-progress
@@ -212,7 +212,7 @@ development_status:
   epic-14-retrospective: optional
 
   # --- Epic 15: Mobile Experience — REMOVED 2026-08-14 ---
-  # Removed via bmad-correct-course (sprint-change-proposal-2026-08-14.md): mobile-responsive layout +
+  # Removed via bmad-correct-course (_bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-08-14.md): mobile-responsive layout +
   # touch interaction shipped incidentally across Phase 1-2; PWA/native (manifest, service worker,
   # installability, offline, push) never built and descoped. FR52 descoped. Epic 16 retains its number.
 

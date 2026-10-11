@@ -17,7 +17,7 @@ stepsCompleted:
     "step-11-polish",
     "step-12-complete",
   ]
-inputDocuments: ["product-brief-beljot-2026-02-21.md"]
+inputDocuments: ["../archive/planning-artifacts/product-brief-beljot-2026-02-21.md"]
 documentCounts:
   briefs: 1
   research: 0

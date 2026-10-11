@@ -74,7 +74,7 @@ Authorised by the project owner on 2026-08-21, after this spec was approved, sup
 - `cardFace.ts:19-46` — `ART_ASPECT`/`ART_RADIUS_RATIO`/`CARD_SIZES`. Read-only: the Croatian art is encoded to 5:7 so these hold.
 - `cardFace.test.ts:17,21` assert `/cards/KS.svg`; `:33` asserts `existsSync(public/cards/{ID}.svg)`; `PlayingCard.test.tsx:25,32,39` assert the `src`. These pin the old flat path and must be updated for both decks. `:42,46` (ratio/radius) must keep passing unchanged.
 - `scripts/recolor-cards.mjs:29,65` — `CARDS_DIR` is the flat `public/cards`; after the move it finds zero SVGs. Repoint to `cards/french`.
-- `_bmad-output/implementation-artifacts/spec-svg-card-deck.md` — `done` and frozen; its `/cards/{ID}.svg` path contract is what this story renegotiates. Append a Spec Change Log entry there rather than silently overriding it.
+- `_bmad-output/archive/implementation-artifacts/spec-svg-card-deck.md` — `done` and frozen; its `/cards/{ID}.svg` path contract is what this story renegotiates. Append a Spec Change Log entry there rather than silently overriding it.
 
 **Trump-indicator surfaces (Scope Amendment 1).** Four components each declare their own suit-glyph map and their own red/black colour split. Render sizes are the ceiling that sets the icon resolution — the largest is 30 px.
 
@@ -130,7 +130,7 @@ Authorised by the project owner on 2026-08-21, after this spec was approved, sup
 - [x] `client/src/features/match/components/SettingsDialog.tsx` -- add a Card Deck section mirroring Language, with `settings-deck-option-{deck}` test ids -- same optimistic-with-revert persistence.
 - [x] `client/src/features/profile/components/CardDeckPanel.tsx` + `ProfilePage.tsx` -- new `SidePanel` beside `LinkedAccounts` -- the deck is settable outside a match.
 - [x] tests -- update `cardFace.test.ts` (both decks' paths and asset existence) and `PlayingCard.test.tsx` (src per deck, localized labels); add Go coverage for every I/O Matrix row; assert the panel never mounts on `PublicPlayerProfilePage` -- the Matrix is the contract.
-- [x] `_bmad-output/implementation-artifacts/spec-svg-card-deck.md` -- append a Spec Change Log entry recording the `/cards/{ID}.svg` -> `/cards/{deck}/{ID}.{ext}` renegotiation -- a frozen contract is renegotiated in writing, never silently.
+- [x] `_bmad-output/archive/implementation-artifacts/spec-svg-card-deck.md` -- append a Spec Change Log entry recording the `/cards/{ID}.svg` -> `/cards/{deck}/{ID}.{ext}` renegotiation -- a frozen contract is renegotiated in writing, never silently.
 
 **Execution — Scope Amendment 1:**
 
