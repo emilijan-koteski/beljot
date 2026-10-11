@@ -38,8 +38,8 @@ vi.mock("@/shared/api/matches", () => ({
   getRoomLastMatch: (...args: unknown[]) => mockGetRoomLastMatch(...args),
 }));
 
-const mockGetFriendshipStatus = vi.fn(
-  (): Promise<FriendshipStatus> => Promise.resolve({ status: "none", requestId: null }),
+const mockGetFriendshipStatus = vi.fn((): Promise<FriendshipStatus> =>
+  Promise.resolve({ status: "none", requestId: null }),
 );
 vi.mock("@/shared/api/friends", () => ({
   getFriendshipStatus: () => mockGetFriendshipStatus(),

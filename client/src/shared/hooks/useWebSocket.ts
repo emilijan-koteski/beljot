@@ -11,11 +11,7 @@ import {
 } from "@/shared/types/wsEvents";
 
 export type WsConnectionState =
-  | "disconnected"
-  | "connecting"
-  | "authenticating"
-  | "connected"
-  | "replaced";
+  "disconnected" | "connecting" | "authenticating" | "connected" | "replaced";
 
 const CLOSE_CODE_REPLACED = 4001;
 

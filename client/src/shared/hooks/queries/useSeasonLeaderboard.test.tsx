@@ -69,8 +69,7 @@ describe("useSeasonLeaderboardQuery (widget)", () => {
       .getQueryCache()
       .find({ queryKey: queryKeys.season.leaderboard(10, "current") });
     const options = entry?.observers[0]?.options as
-      | { refetchInterval?: number; refetchOnWindowFocus?: boolean }
-      | undefined;
+      { refetchInterval?: number; refetchOnWindowFocus?: boolean } | undefined;
     expect(options?.refetchInterval).toBeGreaterThan(0);
     expect(options?.refetchInterval).toBeGreaterThanOrEqual(30_000);
     expect(options?.refetchOnWindowFocus).toBe(true);
