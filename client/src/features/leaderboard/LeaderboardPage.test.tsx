@@ -1,7 +1,7 @@
 import "@/shared/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
@@ -88,6 +88,7 @@ describe("LeaderboardPage", () => {
   });
 
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
