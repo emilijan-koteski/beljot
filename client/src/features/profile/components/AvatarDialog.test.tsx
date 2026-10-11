@@ -1,7 +1,7 @@
 import "@/shared/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -154,10 +154,8 @@ describe("AvatarDialog", () => {
     await user.click(screen.getByTestId("avatar-dialog-upload"));
     expect(mockUploadAvatar).toHaveBeenCalledWith(1, file, expect.any(Function));
 
-    reportProgress(0.5);
-    await waitFor(() =>
-      expect(screen.getByTestId("avatar-dialog-progress")).toHaveAttribute("aria-valuenow", "50"),
-    );
+    act(() => reportProgress(0.5));
+    expect(screen.getByTestId("avatar-dialog-progress")).toHaveAttribute("aria-valuenow", "50");
     expect(screen.getByTestId("avatar-dialog-cancel")).toBeDisabled();
     expect(screen.getByTestId("avatar-dialog-upload")).toBeDisabled();
 

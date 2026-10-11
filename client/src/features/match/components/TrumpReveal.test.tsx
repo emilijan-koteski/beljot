@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -185,9 +185,13 @@ describe("TrumpReveal — Wax Seal", () => {
         onComplete={onComplete}
       />,
     );
-    vi.advanceTimersByTime(7000);
+    act(() => {
+      vi.advanceTimersByTime(7000);
+    });
     expect(onComplete).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1500);
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
     expect(onComplete).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
@@ -214,7 +218,9 @@ describe("TrumpReveal — Wax Seal", () => {
         onComplete={onComplete}
       />,
     );
-    vi.advanceTimersByTime(2000);
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
     expect(onComplete).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
@@ -360,6 +366,7 @@ describe("TrumpReveal — Wax Seal", () => {
 
 describe("TrumpReveal card deck", () => {
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 

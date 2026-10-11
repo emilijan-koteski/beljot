@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -100,6 +100,7 @@ describe("MatchHistory", () => {
   });
 
   afterEach(async () => {
+    cleanup();
     await i18n.changeLanguage("en");
   });
 

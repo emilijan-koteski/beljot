@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BelotReveal } from "./BelotReveal";
@@ -147,9 +147,13 @@ describe("BelotReveal", () => {
         onComplete={onComplete}
       />,
     );
-    vi.advanceTimersByTime(7900);
+    act(() => {
+      vi.advanceTimersByTime(7900);
+    });
     expect(onComplete).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(200);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
     expect(onComplete).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
@@ -175,7 +179,9 @@ describe("BelotReveal", () => {
         onComplete={onComplete}
       />,
     );
-    vi.advanceTimersByTime(1600);
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
     expect(onComplete).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });

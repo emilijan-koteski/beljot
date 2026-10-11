@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -75,6 +75,7 @@ describe("RegisterPage", () => {
   });
 
   afterEach(async () => {
+    cleanup();
     await i18n.changeLanguage("en");
   });
 
@@ -388,6 +389,10 @@ describe("RegisterPage", () => {
       honorTier: "fair",
       isNewPlayer: true,
       createdAt: "2026-04-10T00:00:00Z",
+    });
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/lobby", { replace: true });
     });
   });
 

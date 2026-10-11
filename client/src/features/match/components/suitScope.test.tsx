@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,6 +24,7 @@ describe("suit surfaces outside Scope Amendment 1", () => {
   });
 
   afterEach(() => {
+    cleanup();
     Element.prototype.scrollIntoView = realScrollIntoView;
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });

@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -36,6 +36,7 @@ function statusOf(state: FriendshipState, requestId: number | null = null) {
 }
 
 afterEach(() => {
+  cleanup();
   vi.clearAllMocks();
   useAuthStore.setState({ user: null });
 });

@@ -1,11 +1,12 @@
 import "@/shared/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { formatCoins } from "@/shared/lib/formatCoins";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { makeUser } from "@/test-utils";
 
@@ -55,21 +56,31 @@ function renderWithRouter(initialPath: string) {
   );
 }
 
+/** Renders the layout for the signed-in user and waits until the daily-login claim has synced the balance into the top bar. */
+async function renderSignedIn(initialPath: string) {
+  const view = renderWithRouter(initialPath);
+  await waitFor(() =>
+    expect(screen.getByTestId("coin-balance")).toHaveTextContent(formatCoins(5000)),
+  );
+  return view;
+}
+
 describe("AppLayout", () => {
   beforeEach(() => {
     useAuthStore.setState({
       token: "test-token",
-      user: makeUser({ loginStreakDays: 1 }),
+      user: makeUser({ loginStreakDays: 1, walletBalance: 1200 }),
       isLoading: false,
     });
   });
 
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
-  it("renders nav bar with all tabs", () => {
-    renderWithRouter("/lobby");
+  it("renders nav bar with all tabs", async () => {
+    await renderSignedIn("/lobby");
 
     expect(screen.getByTestId("app-nav")).toBeInTheDocument();
     expect(screen.getByTestId("app-name")).toHaveTextContent("Beljot");
@@ -79,49 +90,49 @@ describe("AppLayout", () => {
     expect(screen.getByTestId("nav-rules")).toHaveTextContent("Rules");
   });
 
-  it("shows the Beljot logo before the wordmark", () => {
-    renderWithRouter("/lobby");
+  it("shows the Beljot logo before the wordmark", async () => {
+    await renderSignedIn("/lobby");
 
     const logo = screen.getByTestId("app-logo");
     expect(logo).toBeInTheDocument();
     expect(logo).toHaveAttribute("src", "/beljot-logo.svg");
   });
 
-  it("highlights active tab for /lobby", () => {
-    renderWithRouter("/lobby");
+  it("highlights active tab for /lobby", async () => {
+    await renderSignedIn("/lobby");
 
     const playTab = screen.getByTestId("nav-play");
     expect(playTab).toHaveAttribute("aria-current", "page");
   });
 
-  it("highlights active tab for /profile", () => {
-    renderWithRouter("/profile");
+  it("highlights active tab for /profile", async () => {
+    await renderSignedIn("/profile");
 
     const profileTab = screen.getByTestId("nav-profile");
     expect(profileTab).toHaveAttribute("aria-current", "page");
   });
 
-  it("highlights active tab for /leaderboard", () => {
-    renderWithRouter("/leaderboard");
+  it("highlights active tab for /leaderboard", async () => {
+    await renderSignedIn("/leaderboard");
 
     expect(screen.getByTestId("nav-leaderboard")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("nav-play")).not.toHaveAttribute("aria-current");
   });
 
-  it("renders outlet content", () => {
-    renderWithRouter("/lobby");
+  it("renders outlet content", async () => {
+    await renderSignedIn("/lobby");
 
     expect(screen.getByTestId("lobby-content")).toBeInTheDocument();
   });
 
-  it("renders language selector", () => {
-    renderWithRouter("/lobby");
+  it("renders language selector", async () => {
+    await renderSignedIn("/lobby");
 
     expect(screen.getByTestId("language-selector")).toBeInTheDocument();
   });
 
-  it("displays current user's username and avatar", () => {
-    renderWithRouter("/lobby");
+  it("displays current user's username and avatar", async () => {
+    await renderSignedIn("/lobby");
 
     const userButton = screen.getByTestId("nav-user");
     expect(userButton).toBeInTheDocument();
@@ -131,7 +142,7 @@ describe("AppLayout", () => {
 
   it("shows dropdown with logout option and logs out on click", async () => {
     const user = userEvent.setup();
-    renderWithRouter("/lobby");
+    await renderSignedIn("/lobby");
 
     await user.click(screen.getByTestId("nav-user"));
 

@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -25,6 +25,7 @@ describe("RoomEjectionModal", () => {
     useRoomStore.getState().setRoomEjection(null);
   });
   afterEach(() => {
+    cleanup();
     useRoomStore.getState().setRoomEjection(null);
   });
 
@@ -119,7 +120,7 @@ describe("RoomEjectionModal", () => {
     expect(body).not.toHaveAttribute("data-honor");
   });
 
-  it("clears an honor notice when the action is clicked", () => {
+  it("clears an honor notice when the action is clicked", async () => {
     useRoomStore.getState().setRoomEjection({
       roomId: 7,
       buyIn: 0,
@@ -130,8 +131,7 @@ describe("RoomEjectionModal", () => {
     });
     renderModal();
 
-    expect(screen.getByTestId("room-ejection-action")).toBeInTheDocument();
-    useRoomStore.getState().setRoomEjection(null);
+    await userEvent.click(screen.getByTestId("room-ejection-action"));
     expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 
@@ -200,6 +200,7 @@ describe("RoomEjectionModal footer order", () => {
     useRoomStore.getState().setRoomEjection(null);
   });
   afterEach(() => {
+    cleanup();
     useRoomStore.getState().setRoomEjection(null);
   });
 

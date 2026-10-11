@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { SeasonArchiveRow } from "@/shared/components/season/SeasonArchiveRow";
@@ -23,6 +23,7 @@ function renderRow(over: Partial<Parameters<typeof SeasonArchiveRow>[0]> = {}) {
 
 describe("SeasonArchiveRow", () => {
   afterEach(async () => {
+    cleanup();
     await i18n.changeLanguage("en");
   });
 

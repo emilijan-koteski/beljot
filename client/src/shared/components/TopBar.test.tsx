@@ -1,7 +1,7 @@
 import "@/shared/i18n/i18n";
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router";
@@ -76,6 +76,7 @@ describe("TopBar logout", () => {
   });
 
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
@@ -98,6 +99,7 @@ describe("TopBar logout", () => {
 
 describe("TopBar coin balance", () => {
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
@@ -127,6 +129,7 @@ describe("TopBar coin balance", () => {
 
 describe("TopBar XP level (Story 9.5)", () => {
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
@@ -151,6 +154,7 @@ describe("TopBar XP level (Story 9.5)", () => {
 
 describe("TopBar honor (Story 9.7)", () => {
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
@@ -169,6 +173,7 @@ describe("TopBar history-stack shaping", () => {
   });
 
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
     sessionStorage.clear();
     resetLobbyReturnGuardForTests();
@@ -243,6 +248,7 @@ describe("TopBar leaderboard tab", () => {
   });
 
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
@@ -290,6 +296,7 @@ describe("TopBar seasonal rank chip", () => {
   });
 
   afterEach(async () => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
     await i18n.changeLanguage("en");
   });
@@ -380,6 +387,7 @@ describe("TopBar support entry", () => {
   });
 
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
@@ -447,6 +455,7 @@ describe("TopBar support entry", () => {
 
 describe("TopBar nav pill avatar", () => {
   afterEach(() => {
+    cleanup();
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 

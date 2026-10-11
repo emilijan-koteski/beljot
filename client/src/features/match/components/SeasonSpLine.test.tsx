@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { i18n } from "@/shared/i18n/i18n";
@@ -24,6 +24,7 @@ function renderLine(over: Partial<SeasonSettlement> = {}) {
 
 describe("SeasonSpLine", () => {
   afterEach(async () => {
+    cleanup();
     await i18n.changeLanguage("en");
   });
 

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
@@ -367,9 +367,13 @@ describe("DeclarationReveal", () => {
         onComplete={onComplete}
       />,
     );
-    vi.advanceTimersByTime(7900);
+    act(() => {
+      vi.advanceTimersByTime(7900);
+    });
     expect(onComplete).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(200);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
     expect(onComplete).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
@@ -394,7 +398,9 @@ describe("DeclarationReveal", () => {
         onComplete={onComplete}
       />,
     );
-    vi.advanceTimersByTime(1600);
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
     expect(onComplete).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });

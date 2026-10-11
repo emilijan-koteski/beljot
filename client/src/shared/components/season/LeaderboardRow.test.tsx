@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -32,6 +32,7 @@ function renderRow(
 }
 
 afterEach(async () => {
+  cleanup();
   await i18n.changeLanguage("en");
 });
 

@@ -1,7 +1,7 @@
 import "@/shared/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -62,6 +62,7 @@ describe("RoomInviteModal", () => {
     vi.mocked(toast.error).mockReset();
   });
   afterEach(() => {
+    cleanup();
     useRoomStore.getState().setRoomInvite(null);
   });
 
@@ -212,6 +213,7 @@ describe("RoomInviteModal footer order", () => {
     useRoomStore.getState().setRoomInvite(null);
   });
   afterEach(() => {
+    cleanup();
     useRoomStore.getState().setRoomInvite(null);
   });
 

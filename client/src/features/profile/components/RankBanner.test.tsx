@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RankBanner } from "@/features/profile/components/RankBanner";
@@ -33,6 +33,7 @@ describe("RankBanner", () => {
   });
 
   afterEach(async () => {
+    cleanup();
     vi.useRealTimers();
     await i18n.changeLanguage("en");
   });

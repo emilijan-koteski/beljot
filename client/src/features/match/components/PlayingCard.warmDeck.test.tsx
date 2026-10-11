@@ -68,9 +68,10 @@ describe("warmDeck", () => {
 
   it("warms the SECOND deck when the player switches — the latch is per deck", async () => {
     const { PlayingCard, useAuthStore } = await freshGraph();
-    render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
+    const first = render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
     expect(warmed.every((src) => src.startsWith("/cards/french/"))).toBe(true);
 
+    first.unmount();
     warmed = [];
     useAuthStore.setState({
       user: makeUser({ cardDeckPreference: "croatian" }),
@@ -85,13 +86,15 @@ describe("warmDeck", () => {
 
   it("does not re-warm a deck it already warmed once, after switching back", async () => {
     const { PlayingCard, useAuthStore } = await freshGraph();
-    render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
+    const french = render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
+    french.unmount();
 
     useAuthStore.setState({
       user: makeUser({ cardDeckPreference: "croatian" }),
       isLoading: false,
     });
-    render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
+    const croatian = render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
+    croatian.unmount();
 
     warmed = [];
     useAuthStore.setState({

@@ -1,7 +1,7 @@
 import "@/shared/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -151,6 +151,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.clearAllMocks();
   useAuthStore.setState({ user: null, token: null });
   useChatStore.setState({ lobbyMessages: [], matchMessages: [], roomMessages: [] });

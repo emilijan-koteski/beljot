@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -198,6 +198,7 @@ describe("PlayerSeat", () => {
 
   describe("trump chip card deck", () => {
     afterEach(() => {
+      cleanup();
       useAuthStore.setState({ token: null, user: null, isLoading: false });
     });
 

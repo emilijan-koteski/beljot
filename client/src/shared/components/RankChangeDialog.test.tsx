@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ComponentProps, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -36,6 +36,7 @@ function Harness(props: Omit<Props, "open" | "onClose"> & { initialOpen?: boolea
 }
 
 afterEach(async () => {
+  cleanup();
   await i18n.changeLanguage("en");
 });
 
