@@ -1,5 +1,5 @@
 [tools]
 go = "1.26"
 node = "22"
-"aqua:golang-migrate/migrate" = "latest"
+"aqua:golang-migrate/migrate" = "4.20.1"
 golangci-lint = "2.14.0"

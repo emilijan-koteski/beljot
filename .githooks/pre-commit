@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Runs make lint and make test before every commit.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+fail() {
+  echo "pre-commit: $1 failed. Fix it, or skip in an emergency with: git commit --no-verify" >&2
+  exit 1
+}
+
+echo "pre-commit: running make lint"
+make lint || fail "make lint"
+
+echo "pre-commit: running make test"
+make test || fail "make test"

@@ -1,4 +1,4 @@
-.PHONY: dev build test test-client test-server lint lint-client lint-server migrate seed
+.PHONY: dev build test test-client test-server lint lint-client lint-server migrate hooks
 
 -include .env
 export
@@ -35,5 +35,5 @@ lint-server:
 migrate:
 	migrate -path server/migrations -database "$(BELJOT_DB_URL)" up
 
-seed:
-	@echo "Seed script not yet implemented"
+hooks:
+	git config core.hooksPath .githooks
