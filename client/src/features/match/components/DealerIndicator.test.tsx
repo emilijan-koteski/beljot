@@ -1,3 +1,5 @@
+import "@/shared/i18n/i18n";
+
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -9,6 +11,7 @@ describe("DealerIndicator", () => {
     const indicator = screen.getByTestId("dealer-indicator");
     expect(indicator).toBeInTheDocument();
     expect(screen.getByTestId("dealer-name").textContent).toBe("Ana");
+    expect(indicator).toHaveTextContent("Dealer");
   });
 
   it("has aria-live polite for screen reader updates", () => {
@@ -18,7 +21,7 @@ describe("DealerIndicator", () => {
 
   it("has an aria-label set on the indicator", () => {
     render(<DealerIndicator dealerName="Ana" />);
-    expect(screen.getByTestId("dealer-indicator")).toHaveAttribute("aria-label");
+    expect(screen.getByTestId("dealer-indicator")).toHaveAttribute("aria-label", "Dealer: Ana");
   });
 
   it("renders nothing when dealerName is blank", () => {

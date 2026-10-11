@@ -1235,6 +1235,7 @@ describe("useWsDispatch", () => {
   });
 
   it("ignores a malformed system:insolvent_ejected payload", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     useRoomStore.getState().setRoomEjection(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1245,6 +1246,12 @@ describe("useWsDispatch", () => {
     });
 
     expect(useRoomStore.getState().roomEjection).toBeNull();
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("system:insolvent_ejected"),
+      expect.anything(),
+    );
+    warnSpy.mockRestore();
   });
 
   it("dispatches system:room_closed_insolvent to roomStore as a 'roomClosed' signal", () => {
@@ -1362,6 +1369,7 @@ describe("useWsDispatch", () => {
   });
 
   it("ignores a system:room_invite whose expiresAt is missing or unparseable", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     useRoomStore.getState().setRoomInvite(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1386,9 +1394,16 @@ describe("useWsDispatch", () => {
 
     dispatch({ type: "system:room_invite", payload: { ...base, expiresAt: "not-a-date" } });
     expect(useRoomStore.getState().roomInvite).toBeNull();
+    expect(warnSpy).toHaveBeenCalledTimes(3);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("system:room_invite"),
+      expect.anything(),
+    );
+    warnSpy.mockRestore();
   });
 
   it("ignores a malformed system:room_invite payload", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     useRoomStore.getState().setRoomInvite(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1399,6 +1414,12 @@ describe("useWsDispatch", () => {
     });
 
     expect(useRoomStore.getState().roomInvite).toBeNull();
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("system:room_invite"),
+      expect.anything(),
+    );
+    warnSpy.mockRestore();
   });
 
   it("accepts an honor score of 0 rather than rejecting it as falsy", () => {
@@ -1416,6 +1437,7 @@ describe("useWsDispatch", () => {
   });
 
   it("ignores a malformed system:honor_ejected payload", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     useRoomStore.getState().setRoomEjection(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1426,9 +1448,16 @@ describe("useWsDispatch", () => {
     });
 
     expect(useRoomStore.getState().roomEjection).toBeNull();
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("system:honor_ejected"),
+      expect.anything(),
+    );
+    warnSpy.mockRestore();
   });
 
   it("ignores a system:honor_ejected payload missing the honor score entirely", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     useRoomStore.getState().setRoomEjection(null);
     const { result } = renderHook(() => useWsDispatch());
     const dispatch = result.current;
@@ -1439,6 +1468,12 @@ describe("useWsDispatch", () => {
     });
 
     expect(useRoomStore.getState().roomEjection).toBeNull();
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("system:honor_ejected"),
+      expect.anything(),
+    );
+    warnSpy.mockRestore();
   });
 
   it("dispatches event:surrender_proposed to matchStore.surrenderProposed", () => {
@@ -2075,6 +2110,7 @@ describe("useWsDispatch — honor updated (Story 9.7)", () => {
   });
 
   it("ignores a malformed honor payload without touching the user", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { result } = renderHook(() => useWsDispatch());
     const malformed = [
       { ...validPayload, honorScore: "73" },
@@ -2093,6 +2129,12 @@ describe("useWsDispatch — honor updated (Story 9.7)", () => {
 
     expect(useAuthStore.getState().user?.honorScore).toBe(90);
     expect(useAuthStore.getState().user?.honorTier).toBe("trusted");
+    expect(warnSpy).toHaveBeenCalledTimes(malformed.length);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("event:honor_updated"),
+      expect.anything(),
+    );
+    warnSpy.mockRestore();
   });
 
   it("is a no-op when no user is signed in", () => {

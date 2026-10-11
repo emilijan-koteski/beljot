@@ -461,6 +461,7 @@ describe("ProfilePage", () => {
   });
 
   it("renders the rank banner from the current-season endpoint", async () => {
+    mockGetProfile.mockResolvedValueOnce(profileFixture());
     renderProfilePage();
 
     const banner = await screen.findByTestId("rank-banner");
@@ -470,6 +471,7 @@ describe("ProfilePage", () => {
   });
 
   it("places the rank banner above the streak callout", async () => {
+    mockGetProfile.mockResolvedValueOnce(profileFixture());
     mockGetCareer.mockResolvedValue(careerFixture({ streak: { kind: "win", length: 3 } }));
 
     renderProfilePage();

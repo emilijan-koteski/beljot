@@ -41,6 +41,7 @@ function renderWithRouter(initialPath: string) {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
+          <Route path="/" element={<div data-testid="landing" />} />
           <Route element={<AppLayout />}>
             <Route path="/lobby" element={<div data-testid="lobby-content">Lobby</div>} />
             <Route
@@ -158,6 +159,7 @@ describe("AppLayout", () => {
       expect(state.user).toBeNull();
       expect(state.token).toBeNull();
     });
+    expect(await screen.findByTestId("landing")).toBeInTheDocument();
   });
 
   it("does not display user widget when no user is logged in", () => {

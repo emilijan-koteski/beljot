@@ -235,10 +235,22 @@ describe("TopBar history-stack shaping", () => {
   });
 
   it("keeps native behavior for modified clicks on the Play link", () => {
-    renderAtWithRouter("/profile");
+    const router = renderAtWithRouter("/profile");
+    let preventedByApp: boolean | null = null;
+    const stopDocumentNavigation = (event: MouseEvent) => {
+      preventedByApp = event.defaultPrevented;
+      event.preventDefault();
+    };
+    window.addEventListener("click", stopDocumentNavigation);
 
-    const passedThrough = fireEvent.click(screen.getByTestId("nav-play"), { ctrlKey: true });
-    expect(passedThrough).toBe(true);
+    try {
+      fireEvent.click(screen.getByTestId("nav-play"), { ctrlKey: true });
+    } finally {
+      window.removeEventListener("click", stopDocumentNavigation);
+    }
+
+    expect(preventedByApp).toBe(false);
+    expect(router.state.location.pathname).toBe("/profile");
   });
 });
 
