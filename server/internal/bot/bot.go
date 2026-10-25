@@ -955,8 +955,8 @@ func trickPoints(v View, trump game.Suit) int {
 }
 
 // bestSmear returns the highest-point non-overtaking card, skipping an unbacked boss worth
-// guarding. Falls back to highestPointNonOvertaking when only such bosses remain, and returns nil
-// when every card overtakes.
+// guarding, and discards the Ten instead of a non-trump Ace it backs. Falls back to
+// highestPointNonOvertaking when only such bosses remain, and returns nil when every card overtakes.
 func bestSmear(v View, legal []game.Card, trump game.Suit) *game.Card {
 	if len(v.CurrentTrick) == 0 {
 		return nil
@@ -986,7 +986,20 @@ func bestSmear(v View, legal []game.Card, trump game.Suit) *game.Card {
 	if best == nil && hasCandidate {
 		return highestPointNonOvertaking(v, legal, trump)
 	}
-	return best
+	return tenUnderAce(v, legal, best, trump)
+}
+
+// tenUnderAce swaps a non-trump Ace for the Ten of its suit when the Ten is legal and does not
+// overtake. The Ten tells the partner the Ace is still held.
+func tenUnderAce(v View, legal []game.Card, best *game.Card, trump game.Suit) *game.Card {
+	if best == nil || best.Suit == trump || best.Rank != game.RankAce {
+		return best
+	}
+	ten := findRankOfSuit(legal, best.Suit, game.RankTen)
+	if ten == nil || wouldOvertake(*ten, v.CurrentTrick, trump) {
+		return best
+	}
+	return ten
 }
 
 // heldSameSuitBoss reports whether the hand holds another card of c's suit that is itself a boss —

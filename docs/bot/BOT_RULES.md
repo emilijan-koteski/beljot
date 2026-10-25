@@ -514,10 +514,18 @@ Trump **masters** are always guarded (nothing ruffs a trump). When **every** can
 unprotected boss (one must be given), the bot smears the **highest-point** one — the plain
 old behavior, by explicit product decision.
 
+**Ten under the Ace.** When the chosen smear is a non-trump Ace and the Ten of the same suit is
+legal and does not overtake, the bot discards the **Ten** instead and keeps the Ace. That is the
+table convention: it tells a human partner "I hold the Ace of this suit, return it". The cost is
+one point on a trick the team already won (the Ten is worth 10, the Ace 11; the lab measured at
+most 0.02 points per hand), and the Ace stays home as the suit's boss. Without the Ten the Ace
+rules above apply unchanged.
+
 Example (boss-guard): partner trumped and safely won, bot last holding **A♠ Q♠ 7♠** (no T♠) ->
 smear **Q♠** and keep the Ace as the master of spades. Old behavior threw the Ace.
 
-Example (protected boss): same trick, holding **A♠ + T♠** -> smear **A♠** (the Ten stays boss).
+Example (protected boss): same trick, holding **A♠ + T♠** -> smear **T♠** (Ten under the Ace;
+the Ace stays boss and shows the partner it is held).
 
 Example (endgame exception): trick 7, hand **A♠ + 8♣**, partner safely won, an opponent may
 still hold a trump -> smear **A♠** (bank 11; keeping it donates it to the trick-8 ruff). With
@@ -668,6 +676,7 @@ Blind spots if you want a stronger bot (the first four are logged in
 | Secure the take on a trump lead when points are on the table | `trumpEconomyTake` (trump-lead branch), `trickPoints` | `server/internal/bot/bot.go` |
 | Trick 7: bank the master unconditionally (do NOT add a contest guard) | `retainLastTrickWinner`, `TestDecide_TrickSevenRetentionBeatsContesting` | `server/internal/bot/bot.go` |
 | Boss-preserving smear (backup test, endgame/dead-suit exceptions) | `bestSmear`, `bossWorthGuarding`, `heldSameSuitBoss` | `server/internal/bot/bot.go` |
+| Ten under the Ace on the partner's safe trick | `bestSmear` (the Ten preference), `tenUnderAce` | `server/internal/bot/bot.go` |
 | Never fight a partner forced to win a trump-led trick | `partnerTakesTrick` (trump-led branch) | `server/internal/bot/bot.go` |
 | Bank the high card as last player | `highestPointsLedSuitWinner` + `chooseFollow` | `server/internal/bot/bot.go` |
 | Take with the cheapest card no led-suit card can beat | `cheapestLedSecureWinner` + `chooseFollow` | `server/internal/bot/bot.go` |

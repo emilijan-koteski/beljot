@@ -1395,7 +1395,7 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 	diamonds := game.SuitDiamonds
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			name: "smear the ace when the ten protects it",
+			name: "smear the ten and keep the ace it backs",
 			hand: cards("AS", "TS", "7H"),
 			trick: []game.TrickCard{
 				{Card: card("8S"), PlayerSeat: 1},
@@ -1403,7 +1403,7 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 				{Card: card("7D"), PlayerSeat: 3},
 			},
 			callerSeat: 1,
-			wantCard:   "AS",
+			wantCard:   "TS",
 		},
 		{
 			name: "all candidates unprotected bosses falls back to the highest points",
@@ -1483,6 +1483,25 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 				{seat: 3, card: "9H", lead: &diamonds},
 			},
 			wantCard: "AD",
+		},
+	})
+}
+
+func TestDecide_TenUnderTheAceOnPartnersSafeTrick(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "void in trump, throws the ten and keeps the ace to show it",
+			hand:       cards("AS", "TS", "7D"),
+			trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}},
+			callerSeat: 2,
+			wantCard:   "TS",
+		},
+		{
+			name:       "ace without the ten keeps the unbacked boss and smears elsewhere",
+			hand:       cards("AS", "KS", "7D"),
+			trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}},
+			callerSeat: 2,
+			wantCard:   "KS",
 		},
 	})
 }
