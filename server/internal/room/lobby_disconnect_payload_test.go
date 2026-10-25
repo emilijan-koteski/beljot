@@ -25,6 +25,17 @@ func (c *captureBroadcaster) BroadcastAll(msg []byte) {
 	c.all = append(c.all, msg)
 }
 
+// payloadRepo stubs the reads roomLifecyclePayload makes. Any other repository call panics.
+type payloadRepo struct {
+	RoomRepository
+	players []RoomPlayer
+	bots    []RoomBot
+}
+
+func (r payloadRepo) LoadOwnerUsernames(_ []*Room) error               { return nil }
+func (r payloadRepo) FindPlayersByRoomID(_ uint) ([]RoomPlayer, error) { return r.players, nil }
+func (r payloadRepo) FindBotsByRoomID(_ uint) ([]RoomBot, error)       { return r.bots, nil }
+
 // TestBroadcastRoomUpdated_CarriesEveryRuleFlag checks that the disconnect room_updated
 // payload carries every per-room rule flag. It is internal because broadcastRoomUpdated
 // is unexported and a real disconnect takes 10 seconds.
@@ -34,17 +45,18 @@ func TestBroadcastRoomUpdated_CarriesEveryRuleFlag(t *testing.T) {
 		declarationsEnabled  bool
 		stopAtTarget         bool
 		declarationsTransfer bool
+		clockwise            bool
 	}{
-		{name: "all at their defaults", declarationsEnabled: true, stopAtTarget: false, declarationsTransfer: true},
-		{name: "declarations off, dosta on", declarationsEnabled: false, stopAtTarget: true, declarationsTransfer: true},
-		{name: "declarations on, dosta on, no transfer", declarationsEnabled: true, stopAtTarget: true, declarationsTransfer: false},
-		{name: "declarations off, dosta off, no transfer", declarationsEnabled: false, stopAtTarget: false, declarationsTransfer: false},
+		{name: "all at their defaults", declarationsEnabled: true, stopAtTarget: false, declarationsTransfer: true, clockwise: false},
+		{name: "declarations off, dosta on, clockwise", declarationsEnabled: false, stopAtTarget: true, declarationsTransfer: true, clockwise: true},
+		{name: "declarations on, dosta on, no transfer", declarationsEnabled: true, stopAtTarget: true, declarationsTransfer: false, clockwise: false},
+		{name: "declarations off, dosta off, no transfer, clockwise", declarationsEnabled: false, stopAtTarget: false, declarationsTransfer: false, clockwise: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hub := &captureBroadcaster{}
-			h := NewLobbyDisconnectHandler(nil, hub, nil, nil)
+			h := NewLobbyDisconnectHandler(payloadRepo{}, hub, nil, nil)
 
 			h.broadcastRoomUpdated(&Room{
 				ID:                   7,
@@ -58,6 +70,7 @@ func TestBroadcastRoomUpdated_CarriesEveryRuleFlag(t *testing.T) {
 				DeclarationsEnabled:  tt.declarationsEnabled,
 				StopAtTarget:         tt.stopAtTarget,
 				DeclarationsTransfer: tt.declarationsTransfer,
+				Clockwise:            tt.clockwise,
 			})
 
 			require.Len(t, hub.all, 1, "expected exactly one broadcast")
@@ -80,6 +93,10 @@ func TestBroadcastRoomUpdated_CarriesEveryRuleFlag(t *testing.T) {
 			transfer, ok := payload["declarationsTransfer"]
 			require.True(t, ok, "declarationsTransfer key missing from the payload")
 			assert.Equal(t, tt.declarationsTransfer, transfer)
+
+			clockwise, ok := payload["clockwise"]
+			require.True(t, ok, "clockwise key missing from the payload")
+			assert.Equal(t, tt.clockwise, clockwise)
 		})
 	}
 }
@@ -120,7 +137,7 @@ func TestBroadcastRoomUpdated_CarriesOwnerAvatarURL(t *testing.T) {
 	for name, avatar := range map[string]*string{"with avatar": &url, "without": nil} {
 		t.Run(name, func(t *testing.T) {
 			hub := &captureBroadcaster{}
-			h := NewLobbyDisconnectHandler(nil, hub, nil, nil)
+			h := NewLobbyDisconnectHandler(payloadRepo{}, hub, nil, nil)
 			h.broadcastRoomUpdated(&Room{
 				ID: 7, Name: "Test Room", OwnerID: 100, OwnerUsername: "Owner", OwnerAvatarURL: avatar,
 				Variant: "bitola", MatchMode: "1001", Status: "waiting",
@@ -139,4 +156,35 @@ func TestBroadcastRoomUpdated_CarriesOwnerAvatarURL(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBroadcastRoomUpdated_SendsTheFullLobbySnapshot(t *testing.T) {
+	hub := &captureBroadcaster{}
+	seat := 0
+	repo := payloadRepo{
+		players: []RoomPlayer{{RoomID: 7, UserID: 100, Seat: &seat}},
+		bots:    []RoomBot{{RoomID: 7, Seat: 2}},
+	}
+	h := NewLobbyDisconnectHandler(repo, hub, nil, nil)
+
+	h.broadcastRoomUpdated(&Room{
+		ID: 7, Name: "Test Room", OwnerID: 100, OwnerUsername: "Owner",
+		Variant: "bitola", MatchMode: "1001", Status: "waiting", PlayerCount: 1,
+		CoinBuyIn: 50, MinHonor: 40, AllowNewPlayers: false,
+	})
+
+	require.Len(t, hub.all, 1)
+	var msg ws.WSMessage
+	require.NoError(t, json.Unmarshal(hub.all[0], &msg))
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(msg.Payload, &payload))
+
+	players, ok := payload["players"].([]any)
+	require.True(t, ok, "players must be a list, got %T", payload["players"])
+	assert.Len(t, players, 2, "the seated human plus the bot")
+	assert.Equal(t, float64(50), payload["coinBuyIn"])
+	assert.Equal(t, float64(40), payload["minHonor"])
+	assert.Equal(t, false, payload["allowNewPlayers"])
+	assert.Equal(t, false, payload["isPrivate"])
+	assert.Equal(t, false, payload["isQuickPlay"])
 }

@@ -144,6 +144,7 @@ export interface MatchState {
   declarationsEnabled: boolean;
   stopAtTarget: boolean;
   declarationsTransfer: boolean;
+  clockwise: boolean;
   activePlayerSeat: number;
   trickNumber: number;
   currentTrick: TrickCard[];

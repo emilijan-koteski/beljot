@@ -154,7 +154,7 @@ func HasDeclarableCombinations(state *GameState, seat int) bool {
 
 // resolveDeclarations picks the team holding the single strongest declaration and returns it with the sum of that team's declarations.
 // It returns -1 and 0 when nobody declared.
-func resolveDeclarations(players [4]PlayerState, trumpSuit Suit, trickLeaderSeat int) (winningTeam int, totalPoints int) {
+func resolveDeclarations(players [4]PlayerState, trumpSuit Suit, trickLeaderSeat int, rules VariantRules) (winningTeam int, totalPoints int) {
 	type teamBest struct {
 		decl       *Declaration
 		playerSeat int
@@ -167,7 +167,7 @@ func resolveDeclarations(players [4]PlayerState, trumpSuit Suit, trickLeaderSeat
 		for i := range players[seat].Declarations {
 			d := &players[seat].Declarations[i]
 			current := bestByTeam[team]
-			if current == nil || declarationBeats(d, seat, current.decl, current.playerSeat, trumpSuit, trickLeaderSeat) {
+			if current == nil || declarationBeats(d, seat, current.decl, current.playerSeat, trumpSuit, trickLeaderSeat, rules) {
 				bestByTeam[team] = &teamBest{decl: d, playerSeat: seat}
 			}
 		}
@@ -185,7 +185,7 @@ func resolveDeclarations(players [4]PlayerState, trumpSuit Suit, trickLeaderSeat
 	}
 
 	b0, b1 := bestByTeam[0], bestByTeam[1]
-	if declarationBeats(b0.decl, b0.playerSeat, b1.decl, b1.playerSeat, trumpSuit, trickLeaderSeat) {
+	if declarationBeats(b0.decl, b0.playerSeat, b1.decl, b1.playerSeat, trumpSuit, trickLeaderSeat, rules) {
 		return 0, teamDeclarationTotal(players, 0)
 	}
 	return 1, teamDeclarationTotal(players, 1)
@@ -193,7 +193,7 @@ func resolveDeclarations(players [4]PlayerState, trumpSuit Suit, trickLeaderSeat
 
 // declarationBeats returns true if declaration a (from seatA) beats
 // declaration b (from seatB) using the full tiebreaker chain.
-func declarationBeats(a *Declaration, seatA int, b *Declaration, seatB int, trumpSuit Suit, trickLeaderSeat int) bool {
+func declarationBeats(a *Declaration, seatA int, b *Declaration, seatB int, trumpSuit Suit, trickLeaderSeat int, rules VariantRules) bool {
 	if a.Value != b.Value {
 		return a.Value > b.Value
 	}
@@ -218,9 +218,7 @@ func declarationBeats(a *Declaration, seatA int, b *Declaration, seatB int, trum
 		}
 	}
 
-	distA := (seatA - trickLeaderSeat + 4) % 4
-	distB := (seatB - trickLeaderSeat + 4) % 4
-	return distA < distB
+	return rules.PlayDistance(trickLeaderSeat, seatA) < rules.PlayDistance(trickLeaderSeat, seatB)
 }
 
 // sequenceTopCard returns the highest-ranked card in a sequence.
@@ -270,7 +268,7 @@ func openDeclarationPhase(state *GameState) {
 	state.TrickNumber = 0
 	state.CurrentTrick = []TrickCard{}
 	state.AwaitingDeclaration = false
-	state.ActivePlayerSeat = (state.DealerSeat + 1) % 4
+	state.ActivePlayerSeat = state.Rules.NextSeat(state.DealerSeat)
 	for i := range state.Players {
 		state.Players[i].DeclarationAnswered = false
 	}
@@ -303,7 +301,7 @@ func closeDeclarationPhase(state *GameState) {
 	}
 	state.AwaitingDeclaration = false
 	state.Phase = PhasePlaying
-	state.ActivePlayerSeat = (state.DealerSeat + 1) % 4
+	state.ActivePlayerSeat = state.Rules.NextSeat(state.DealerSeat)
 	state.TrickNumber = 1
 	state.CurrentTrick = []TrickCard{}
 
@@ -474,7 +472,7 @@ func handleSkipBelot(state *GameState, action Action) (*GameState, error) {
 // Advances the active player and resolves the trick if 4 cards have been played.
 func finishCardPlay(state *GameState) {
 	lastCard := state.CurrentTrick[len(state.CurrentTrick)-1]
-	state.ActivePlayerSeat = (lastCard.PlayerSeat + 1) % 4
+	state.ActivePlayerSeat = state.Rules.NextSeat(lastCard.PlayerSeat)
 
 	if state.TrickNumber == 1 && len(state.CurrentTrick) < 4 {
 		checkDeclarationPrompt(state)
@@ -527,9 +525,9 @@ func bothTeamsDeclared(state *GameState) bool {
 func resolveDeclarationsForHand(state *GameState) {
 	state.DeclarationsContested = bothTeamsDeclared(state)
 
-	trickLeaderSeat := (state.DealerSeat + 1) % 4
+	trickLeaderSeat := state.Rules.NextSeat(state.DealerSeat)
 
-	winningTeam, totalPoints := resolveDeclarations(state.Players, *state.TrumpSuit, trickLeaderSeat)
+	winningTeam, totalPoints := resolveDeclarations(state.Players, *state.TrumpSuit, trickLeaderSeat, state.Rules)
 	if winningTeam >= 0 {
 		state.DeclarationPoints[winningTeam] = totalPoints
 		losingTeam := 1 - winningTeam

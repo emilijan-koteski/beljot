@@ -213,35 +213,12 @@ func (h *LobbyDisconnectHandler) broadcastToUsers(userIDs []uint, msgType string
 	h.hub.BroadcastToUsers(userIDs, msg)
 }
 
-// broadcastRoomUpdated sends the hand-built lobby-wide room_updated payload. Its keys,
-// including the per-room rule flags, must match roomLifecyclePayload.
+// broadcastRoomUpdated sends the lobby-wide room_updated snapshot built by roomLifecyclePayload.
 func (h *LobbyDisconnectHandler) broadcastRoomUpdated(r *Room) {
 	if h.hub == nil {
 		return
 	}
-	if r.OwnerUsername == "" {
-		_ = h.repo.LoadOwnerUsernames([]*Room{r})
-	}
-	payload := map[string]interface{}{
-		"id":                   r.ID,
-		"name":                 r.Name,
-		"code":                 r.Code,
-		"ownerId":              r.OwnerID,
-		"ownerUsername":        r.OwnerUsername,
-		"ownerAvatarUrl":       r.OwnerAvatarURL,
-		"variant":              r.Variant,
-		"matchMode":            r.MatchMode,
-		"timerStyle":           r.TimerStyle,
-		"timerDurationSeconds": r.TimerDurationSeconds,
-		"declarationsEnabled":  r.DeclarationsEnabled,
-		"stopAtTarget":         r.StopAtTarget,
-		"declarationsTransfer": r.DeclarationsTransfer,
-		"playerCount":          r.PlayerCount,
-		"status":               r.Status,
-		"createdAt":            r.CreatedAt.UTC().Format(time.RFC3339),
-		"updatedAt":            r.UpdatedAt.UTC().Format(time.RFC3339),
-	}
-	payloadBytes, err := json.Marshal(payload)
+	payloadBytes, err := json.Marshal(roomLifecyclePayload(h.repo, r))
 	if err != nil {
 		return
 	}

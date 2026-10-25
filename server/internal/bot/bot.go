@@ -712,7 +712,7 @@ func seatsYetToPlay(v View) []int {
 	leader := v.CurrentTrick[0].PlayerSeat
 	out := make([]int, 0, 3)
 	for pos := len(v.CurrentTrick) + 1; pos < 4; pos++ {
-		out = append(out, (leader+pos)%4)
+		out = append(out, game.StepSeat(leader, pos, v.Clockwise))
 	}
 	return out
 }

@@ -49,7 +49,7 @@ func TestMatchState_EachRecipientGetsOwnProjectedFrame(t *testing.T) {
 	mgr := match.NewManager(hub, newMockMatchRepo())
 
 	const roomID = uint(100)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameJustDealt()
@@ -151,7 +151,7 @@ func TestSyncStateOnConnect_UnicastIsProjectedForReconnectingSeat(t *testing.T) 
 	mgr := match.NewManager(hub, newMockMatchRepo())
 
 	const roomID = uint(100)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameJustDealt()
@@ -181,7 +181,7 @@ func TestHandleDisconnect_RemainingSeatsGetOwnProjections(t *testing.T) {
 	mgr := match.NewManager(hub, newMockMatchRepo())
 
 	const roomID = uint(100)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameJustDealt()
@@ -213,7 +213,7 @@ func TestMatchState_BotSeatsGetNoFrame(t *testing.T) {
 	const roomID = uint(100)
 	players := defaultPlayers()
 	players[2] = match.PlayerSeatInfo{UserID: 0, Username: "", Seat: 2, IsBot: true}
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", players, "relaxed", 0, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", players, "relaxed", 0, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameJustDealt()

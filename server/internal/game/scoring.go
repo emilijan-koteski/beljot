@@ -161,7 +161,7 @@ func stopAtTargetIfReached(state *GameState) bool {
 // LastHandResult is kept so the session manager can still broadcast it.
 func startNewHand(state *GameState) {
 	state.HandNumber++
-	state.DealerSeat = (state.DealerSeat + 1) % 4
+	state.DealerSeat = state.Rules.NextSeat(state.DealerSeat)
 
 	state.TrumpSuit = nil
 	state.TrumpCallerSeat = nil
@@ -203,7 +203,7 @@ func startNewHand(state *GameState) {
 	ShuffleDeck(deck)
 	dealCards(state, deck)
 
-	state.ActivePlayerSeat = (state.DealerSeat + 1) % 4
+	state.ActivePlayerSeat = state.Rules.NextSeat(state.DealerSeat)
 
 	if winnerTeam := checkInstantWin(state); winnerTeam != nil {
 		state.WinnerTeam = winnerTeam

@@ -162,7 +162,7 @@ func TestDeclarationsTransfer_ResolvedOnceAtNewGame(t *testing.T) {
 				[4]uint{10, 20, 30, 40},
 				[4]string{"a", "b", "c", "d"},
 				[4]bool{},
-				v, "1001", 1, true, false, want,
+				v, "1001", 1, true, false, want, false,
 			)
 			assert.Equal(t, want, gs.Rules.DeclarationsTransfer, "%s: the config the engine reads", v)
 			assert.Equal(t, want, gs.DeclarationsTransfer, "%s: the wire flag the client renders", v)

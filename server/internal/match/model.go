@@ -34,6 +34,7 @@ type Match struct {
 	DeclarationsEnabled  bool         `gorm:"not null" json:"declarationsEnabled"`
 	StopAtTarget         bool         `gorm:"not null" json:"stopAtTarget"`
 	DeclarationsTransfer bool         `gorm:"not null" json:"declarationsTransfer"`
+	Clockwise            bool         `gorm:"not null" json:"clockwise"`
 	StartedAt            time.Time    `gorm:"not null" json:"startedAt"`
 	CompletedAt          time.Time    `gorm:"not null" json:"completedAt"`
 	Status               string       `gorm:"size:20;not null;default:completed" json:"status"`

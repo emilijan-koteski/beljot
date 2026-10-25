@@ -20,10 +20,12 @@ func TestListMatches_CarriesTheRulesTheMatchWasPlayedUnder(t *testing.T) {
 		declarationsEnabled  bool
 		stopAtTarget         bool
 		declarationsTransfer bool
+		clockwise            bool
 	}{
-		{"all at their defaults", true, false, true},
-		{"declarations do not transfer", true, false, false},
-		{"every rule changed", false, true, false},
+		{"all at their defaults", true, false, true, false},
+		{"declarations do not transfer", true, false, false, false},
+		{"clockwise play", true, false, true, true},
+		{"every rule changed", false, true, false, true},
 	}
 
 	for _, tt := range tests {
@@ -48,6 +50,7 @@ func TestListMatches_CarriesTheRulesTheMatchWasPlayedUnder(t *testing.T) {
 				DeclarationsEnabled:  tt.declarationsEnabled,
 				StopAtTarget:         tt.stopAtTarget,
 				DeclarationsTransfer: tt.declarationsTransfer,
+				Clockwise:            tt.clockwise,
 				StartedAt:            now.Add(-30 * time.Minute),
 				CompletedAt:          now,
 				Status:               "completed",
@@ -65,7 +68,9 @@ func TestListMatches_CarriesTheRulesTheMatchWasPlayedUnder(t *testing.T) {
 			assert.Equal(t, tt.declarationsEnabled, item.DeclarationsEnabled)
 			assert.Equal(t, tt.stopAtTarget, item.StopAtTarget)
 			assert.Equal(t, tt.declarationsTransfer, item.DeclarationsTransfer)
+			assert.Equal(t, tt.clockwise, item.Clockwise)
 			assert.Contains(t, rec.Body.String(), `"declarationsTransfer":`, "the key must be on the wire")
+			assert.Contains(t, rec.Body.String(), `"clockwise":`, "the key must be on the wire")
 		})
 	}
 }

@@ -46,13 +46,13 @@ func handlePassTrump(state *GameState) (*GameState, error) {
 	newState := cloneGameState(state)
 
 	newState.BiddingPassCount++
-	newState.ActivePlayerSeat = (newState.ActivePlayerSeat + 1) % 4
+	newState.ActivePlayerSeat = newState.Rules.NextSeat(newState.ActivePlayerSeat)
 
 	if newState.BiddingPassCount == 4 {
 		if newState.BiddingRound == 1 {
 			newState.BiddingRound = 2
 			newState.BiddingPassCount = 0
-			newState.ActivePlayerSeat = (newState.DealerSeat + 1) % 4
+			newState.ActivePlayerSeat = newState.Rules.NextSeat(newState.DealerSeat)
 		} else {
 			newState = reshuffleAndRedeal(newState)
 		}
@@ -98,7 +98,7 @@ func handlePickTrump(state *GameState, action Action) (*GameState, error) {
 		deck := newState.Deck
 		idx := 0
 		for i := 0; i < 4; i++ {
-			s := (newState.DealerSeat + 1 + i) % 4
+			s := newState.Rules.SeatAfter(newState.DealerSeat, 1+i)
 			n := 3
 			if s == seat {
 				n = 2
@@ -126,7 +126,7 @@ func handlePickTrump(state *GameState, action Action) (*GameState, error) {
 	}
 
 	newState.Phase = PhasePlaying
-	newState.ActivePlayerSeat = (newState.DealerSeat + 1) % 4
+	newState.ActivePlayerSeat = newState.Rules.NextSeat(newState.DealerSeat)
 	newState.TrickNumber = 1
 	newState.CurrentTrick = []TrickCard{}
 
@@ -171,14 +171,14 @@ func reshuffleAndRedeal(state *GameState) *GameState {
 	state.TrumpCallerSeat = nil
 
 	ShuffleDeck(deck)
-	state.DealerSeat = (state.DealerSeat + 1) % 4
+	state.DealerSeat = state.Rules.NextSeat(state.DealerSeat)
 
 	dealCards(state, deck)
 
 	state.Phase = PhaseDealing
 	state.BiddingRound = 1
 	state.BiddingPassCount = 0
-	state.ActivePlayerSeat = (state.DealerSeat + 1) % 4
+	state.ActivePlayerSeat = state.Rules.NextSeat(state.DealerSeat)
 
 	return state
 }

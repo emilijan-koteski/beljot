@@ -9,6 +9,7 @@ import {
   KeyRound,
   Lock,
   LockOpen,
+  RotateCw,
   Unlink,
   UserCheck,
   Users,
@@ -154,6 +155,20 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               >
                 <Unlink className="size-3" />
                 {t("lobby.card.noDeclarationsTransfer")}
+              </span>
+            </>
+          )}
+          {room.clockwise === true && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="room-card-clockwise"
+                role="img"
+                aria-label={t("lobby.card.clockwiseAriaLabel")}
+              >
+                <RotateCw className="size-3" />
+                {t("lobby.card.clockwise")}
               </span>
             </>
           )}

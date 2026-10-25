@@ -120,10 +120,10 @@ Baseline rules are in `client/CLAUDE.md` and `server/CLAUDE.md` (Testing). In ad
 
 The full, authoritative list is `.claude/rules/game-rules.md`. Do not "fix" any of these toward generic Belot. Key points for planning:
 
-- Play is counter-clockwise; next seat is `(seat + 1) % 4`. The trick winner leads the next trick.
+- Play is counter-clockwise by default; the room's "Direction of play" rule (`VariantRules.Clockwise`) makes it clockwise for the whole match. Never hard-code the next seat as `(seat + 1) % 4`: step through `VariantRules.NextSeat`, `SeatAfter` and `PlayDistance`, which all go through `game.StepSeat`. The trick winner leads the next trick.
 - Bidding, declarations, deal shape and tie handling branch on `VariantRules` fields (`server/internal/game/types.go`, presets from `RulesFor`), never on `state.Variant`. Keep a separate code path per outcome.
 - **Bitola:** two bidding rounds over a flipped candidate card; four passes in round 2 reshuffle and rotate the dealer. Declarations are made during trick 1 and revealed at the start of trick 2. A card can belong to only one declaration.
-- **Croatian:** one round, no candidate card. Players bid on six visible cards; the two face-down cards stay hidden from everyone until trump is set. Bidding starts to the dealer's right; if the other three pass, the dealer must pick. A dedicated declaration phase sits between bidding and trick 1, and one card may count in several declarations.
+- **Croatian:** one round, no candidate card. Players bid on six visible cards; the two face-down cards stay hidden from everyone until trump is set. Bidding starts with the seat after the dealer in the direction of play; if the other three pass, the dealer must pick. A dedicated declaration phase sits between bidding and trick 1, and one card may count in several declarations.
 - Only the winning declaration team scores declarations; the losing team's are never revealed. The reveal banner shows for 4 s (1.5 s with reduced motion), from `shared/lib/motion.ts`.
 - Belote/Rebelote (+20) counts only when announced: on the Queen it is Belote, on the King Rebelote. Declining on the first card forfeits it.
 - Card play (`validation.go` `legalCards`, mirrored in `client/src/features/match/lib/legalCards.ts`): follow suit, overplaying only while the led suit can still win; if void and holding trump, cut and over-trump when able; otherwise any card.

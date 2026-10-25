@@ -101,11 +101,12 @@ type CreateRoomRequest struct {
 	DeclarationsEnabled  *bool  `json:"declarationsEnabled"`
 	StopAtTarget         *bool  `json:"stopAtTarget"`
 	DeclarationsTransfer *bool  `json:"declarationsTransfer"`
+	Clockwise            bool   `json:"clockwise"`
 }
 
 // MatchStarter is the interface the room handler uses to start a live match.
 type MatchStarter interface {
-	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool) error
+	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) error
 }
 
 // WalletService is the subset of *wallet.Service the room handler needs. A nil
@@ -256,24 +257,24 @@ func (h *RoomHandler) playersWithBots(roomID uint) []RoomPlayer {
 	return roster
 }
 
-// roomLifecyclePayload builds the WS payload shared by system:room_created and
-// system:room_updated, merging bots into the humans-only r.Players.
-func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
+// roomLifecyclePayload builds the lobby-wide room snapshot that every system:room_created and
+// system:room_updated broadcast sends, merging bots into the humans-only r.Players.
+func roomLifecyclePayload(repo RoomRepository, r *Room) map[string]any {
 	if r.OwnerUsername == "" {
-		if err := h.repo.LoadOwnerUsernames([]*Room{r}); err != nil {
+		if err := repo.LoadOwnerUsernames([]*Room{r}); err != nil {
 			slog.Error("broadcast: failed to load owner username", "roomID", r.ID, "error", err)
 		}
 	}
 	players := r.Players
 	if players == nil {
-		fetched, err := h.repo.FindPlayersByRoomID(r.ID)
+		fetched, err := repo.FindPlayersByRoomID(r.ID)
 		if err != nil {
 			slog.Error("broadcast: failed to load room players", "roomID", r.ID, "error", err)
 			fetched = []RoomPlayer{}
 		}
 		players = fetched
 	}
-	bots, err := h.repo.FindBotsByRoomID(r.ID)
+	bots, err := repo.FindBotsByRoomID(r.ID)
 	if err != nil {
 		slog.Error("broadcast: failed to load room bots", "roomID", r.ID, "error", err)
 		bots = nil
@@ -298,6 +299,7 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		"declarationsEnabled":  r.DeclarationsEnabled,
 		"stopAtTarget":         r.StopAtTarget,
 		"declarationsTransfer": r.DeclarationsTransfer,
+		"clockwise":            r.Clockwise,
 		"playerCount":          r.PlayerCount,
 		"status":               r.Status,
 		"isQuickPlay":          r.IsQuickPlay,
@@ -308,7 +310,7 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 
 // broadcastRoomUpdated sends a system:room_updated event to all connected clients.
 func (h *RoomHandler) broadcastRoomUpdated(r *Room) {
-	h.broadcastToAll(ws.SystemRoomUpdated, h.roomLifecyclePayload(r))
+	h.broadcastToAll(ws.SystemRoomUpdated, roomLifecyclePayload(h.repo, r))
 }
 
 // broadcastRoomSeatSnapshot pushes a system:room_updated event with fresh players to
@@ -488,6 +490,7 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		DeclarationsEnabled:  declarationsEnabled,
 		StopAtTarget:         stopAtTarget,
 		DeclarationsTransfer: declarationsTransfer,
+		Clockwise:            req.Clockwise,
 		Status:               "waiting",
 		PlayerCount:          1,
 	}
@@ -529,7 +532,7 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 
 	room.IsPrivate = room.PasswordHash != nil
 
-	h.broadcastToAll(ws.SystemRoomCreated, h.roomLifecyclePayload(room))
+	h.broadcastToAll(ws.SystemRoomCreated, roomLifecyclePayload(h.repo, room))
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{"data": room})
 }
@@ -1938,7 +1941,7 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 		timerDuration = *autoStartRoom.TimerDurationSeconds
 	}
 	reconnectWindow := resolveReconnectWindow(autoStartRoom.ReconnectWindowSec)
-	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled, autoStartRoom.StopAtTarget, autoStartRoom.DeclarationsTransfer); serr != nil {
+	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled, autoStartRoom.StopAtTarget, autoStartRoom.DeclarationsTransfer, autoStartRoom.Clockwise); serr != nil {
 		if charged {
 			refund := make(map[uint]int, len(chargedIDs))
 			for _, id := range chargedIDs {
@@ -2946,7 +2949,7 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 				timerDuration = *updatedRoom.TimerDurationSeconds
 			}
 			reconnectWindow := resolveReconnectWindow(updatedRoom.ReconnectWindowSec)
-			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled, updatedRoom.StopAtTarget, updatedRoom.DeclarationsTransfer); serr != nil {
+			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled, updatedRoom.StopAtTarget, updatedRoom.DeclarationsTransfer, updatedRoom.Clockwise); serr != nil {
 				slog.Error("failed to start game session", "roomID", roomID, "error", serr)
 				if charged {
 					refund := make(map[uint]int, len(chargedIDs))
@@ -3052,6 +3055,7 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				DeclarationsEnabled:  true,
 				StopAtTarget:         false,
 				DeclarationsTransfer: true,
+				Clockwise:            false,
 				Status:               "waiting",
 				PlayerCount:          1,
 			}
@@ -3097,23 +3101,7 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 	h.presence.Add(resultRoom.ID, userID)
 
 	if createdNew {
-		h.broadcastToAll(ws.SystemRoomCreated, map[string]interface{}{
-			"id":                   resultRoom.ID,
-			"name":                 resultRoom.Name,
-			"code":                 resultRoom.Code,
-			"ownerId":              resultRoom.OwnerID,
-			"variant":              resultRoom.Variant,
-			"matchMode":            resultRoom.MatchMode,
-			"timerStyle":           resultRoom.TimerStyle,
-			"timerDurationSeconds": resultRoom.TimerDurationSeconds,
-			"coinBuyIn":            resultRoom.CoinBuyIn,
-			"declarationsEnabled":  resultRoom.DeclarationsEnabled,
-			"stopAtTarget":         resultRoom.StopAtTarget,
-			"declarationsTransfer": resultRoom.DeclarationsTransfer,
-			"playerCount":          resultRoom.PlayerCount,
-			"status":               resultRoom.Status,
-			"isQuickPlay":          resultRoom.IsQuickPlay,
-		})
+		h.broadcastToAll(ws.SystemRoomCreated, roomLifecyclePayload(h.repo, resultRoom))
 	} else {
 		h.broadcastRoomUpdated(resultRoom)
 	}

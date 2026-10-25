@@ -66,6 +66,7 @@ function makeState(args: {
     declarationsEnabled: true,
     stopAtTarget: false,
     declarationsTransfer: true,
+    clockwise: false,
     activePlayerSeat: args.mySeat,
     trickNumber: 1,
     currentTrick: args.currentTrick,
