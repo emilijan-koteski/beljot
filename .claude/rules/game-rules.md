@@ -25,7 +25,7 @@ These are owner-confirmed rules. Do not "fix" them toward a generic Belot rulese
 Select the path from a `VariantRules` field, never by comparing the variant name. Keep each outcome as its own code path.
 
 - **Bitola:** two rounds. Round 1 offers the flipped candidate's suit, round 2 opens every other suit. Four passes in round 2 reshuffle and move the dealer.
-- **Croatian:** one round with no candidate card. Players bid on their six visible cards, and the two face-down cards stay hidden from everyone, their owner included, until trump is set. Bidding starts to the dealer's right and the dealer speaks last. If the other three pass, the dealer must pick a suit. There is no second round and no reshuffle.
+- **Croatian:** one round with no candidate card. Players bid on their six visible cards, and the two face-down cards stay hidden from everyone, their owner included, until trump is set. Bidding starts with the seat after the dealer in the direction of play (the dealer's right by default, the left in a clockwise room), and the dealer speaks last. If the other three pass, the dealer must pick a suit. There is no second round and no reshuffle.
 
 ## Declarations
 

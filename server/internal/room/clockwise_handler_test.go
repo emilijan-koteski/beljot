@@ -98,7 +98,7 @@ func TestQuickPlay_SynthesizedRoomPlaysCounterClockwise(t *testing.T) {
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(payloadOf(t, created), &payload))
 	got, ok := payload["clockwise"]
-	require.True(t, ok, "QuickPlay's own room_created map must carry clockwise")
+	require.True(t, ok, "QuickPlay's room_created must carry clockwise")
 	assert.Equal(t, false, got)
 }
 

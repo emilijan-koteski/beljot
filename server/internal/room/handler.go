@@ -257,24 +257,24 @@ func (h *RoomHandler) playersWithBots(roomID uint) []RoomPlayer {
 	return roster
 }
 
-// roomLifecyclePayload builds the WS payload shared by system:room_created and
-// system:room_updated, merging bots into the humans-only r.Players.
-func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
+// roomLifecyclePayload builds the lobby-wide room snapshot that every system:room_created and
+// system:room_updated broadcast sends, merging bots into the humans-only r.Players.
+func roomLifecyclePayload(repo RoomRepository, r *Room) map[string]any {
 	if r.OwnerUsername == "" {
-		if err := h.repo.LoadOwnerUsernames([]*Room{r}); err != nil {
+		if err := repo.LoadOwnerUsernames([]*Room{r}); err != nil {
 			slog.Error("broadcast: failed to load owner username", "roomID", r.ID, "error", err)
 		}
 	}
 	players := r.Players
 	if players == nil {
-		fetched, err := h.repo.FindPlayersByRoomID(r.ID)
+		fetched, err := repo.FindPlayersByRoomID(r.ID)
 		if err != nil {
 			slog.Error("broadcast: failed to load room players", "roomID", r.ID, "error", err)
 			fetched = []RoomPlayer{}
 		}
 		players = fetched
 	}
-	bots, err := h.repo.FindBotsByRoomID(r.ID)
+	bots, err := repo.FindBotsByRoomID(r.ID)
 	if err != nil {
 		slog.Error("broadcast: failed to load room bots", "roomID", r.ID, "error", err)
 		bots = nil
@@ -310,7 +310,7 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 
 // broadcastRoomUpdated sends a system:room_updated event to all connected clients.
 func (h *RoomHandler) broadcastRoomUpdated(r *Room) {
-	h.broadcastToAll(ws.SystemRoomUpdated, h.roomLifecyclePayload(r))
+	h.broadcastToAll(ws.SystemRoomUpdated, roomLifecyclePayload(h.repo, r))
 }
 
 // broadcastRoomSeatSnapshot pushes a system:room_updated event with fresh players to
@@ -532,7 +532,7 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 
 	room.IsPrivate = room.PasswordHash != nil
 
-	h.broadcastToAll(ws.SystemRoomCreated, h.roomLifecyclePayload(room))
+	h.broadcastToAll(ws.SystemRoomCreated, roomLifecyclePayload(h.repo, room))
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{"data": room})
 }
@@ -3101,24 +3101,7 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 	h.presence.Add(resultRoom.ID, userID)
 
 	if createdNew {
-		h.broadcastToAll(ws.SystemRoomCreated, map[string]interface{}{
-			"id":                   resultRoom.ID,
-			"name":                 resultRoom.Name,
-			"code":                 resultRoom.Code,
-			"ownerId":              resultRoom.OwnerID,
-			"variant":              resultRoom.Variant,
-			"matchMode":            resultRoom.MatchMode,
-			"timerStyle":           resultRoom.TimerStyle,
-			"timerDurationSeconds": resultRoom.TimerDurationSeconds,
-			"coinBuyIn":            resultRoom.CoinBuyIn,
-			"declarationsEnabled":  resultRoom.DeclarationsEnabled,
-			"stopAtTarget":         resultRoom.StopAtTarget,
-			"declarationsTransfer": resultRoom.DeclarationsTransfer,
-			"clockwise":            resultRoom.Clockwise,
-			"playerCount":          resultRoom.PlayerCount,
-			"status":               resultRoom.Status,
-			"isQuickPlay":          resultRoom.IsQuickPlay,
-		})
+		h.broadcastToAll(ws.SystemRoomCreated, roomLifecyclePayload(h.repo, resultRoom))
 	} else {
 		h.broadcastRoomUpdated(resultRoom)
 	}

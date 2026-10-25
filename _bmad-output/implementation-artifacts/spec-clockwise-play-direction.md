@@ -114,6 +114,9 @@ Dealer seat 0 in every row.
 - Tests: the engine rows of the matrix are in `game/clockwise_test.go`. The deal packet order needs the unexported `dealCards`, so it sits in `game/clockwise_internal_test.go` with the helper tests. The bot row is `bot/seats_yet_to_play_internal_test.go`, and the session test is `match/clockwise_session_internal_test.go` because `buildBotView` is unexported. The existing rule-flag tests for completed, abandoned and reconciled match rows, match history and the lobby disconnect payload now carry `clockwise` too.
 - The create-room field sits under "Match end", a Segmented with `RotateCcw` / `RotateCw` icons. Every chip and note renders only on `clockwise === true`.
 - DB tests ran against a throwaway `postgres:16-alpine` on port 5544 (migrate up, down 1, up again), not the dev database.
+- Follow-up commit, at the owner's request, fixed the three deferred triage items (rows 1, 9 and 14):
+  - The direction rule is documented in `.claude/rules/game-rules.md` (Croatian bidding), `_bmad-output/project-context.md` (the turn-order line and Croatian bidding), and the root CLAUDE.md list of constants mirrored by hand (the seat step).
+  - Every lobby-wide room broadcast now goes through one package-level `roomLifecyclePayload(repo, room)`: `room_created` from CreateRoom and QuickPlay, `room_updated` from the room handler, and the lobby-disconnect `room_updated`. QuickPlay's `room_created` used to omit `players`, `createdAt`, `updatedAt`, the owner fields and the privacy and honor gates. The disconnect frame used to omit `players`, `coinBuyIn`, `isPrivate`, `minHonor`, `allowNewPlayers` and `isQuickPlay`, which left the lobby's seat chips stale after a lobby disconnect.
 
 ## Spec Change Log
 
