@@ -1,8 +1,12 @@
 package bot_test
 
 import (
+	"math"
 	"math/rand/v2"
+	"os"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,12 +27,7 @@ func TestSimulation_HeuristicBeatsRandomBaseline(t *testing.T) {
 	handsPlayed := 0
 
 	for handsPlayed < handsTarget {
-		gs := game.NewGame(
-			[4]uint{0, 0, 0, 0},
-			[4]string{"", "", "", ""},
-			[4]bool{true, true, true, true},
-			game.VariantBitola, "1001", 1, true, false, true, false,
-		)
+		gs := newBitolaGame()
 		gs.DealerSeat = 0
 		gs.ActivePlayerSeat = (gs.DealerSeat + 1) % 4
 		mem := bot.NewMemory()
@@ -127,10 +126,7 @@ func playOneHandWith(
 // nextSimAction picks the acting seat and its action: team A (seats 0/2) via
 // bot.Decide over a redacted view, team B (seats 1/3) via random-legal moves.
 func nextSimAction(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action) {
-	seat := gs.ActivePlayerSeat
-	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil {
-		seat = *gs.PendingBelotSeat
-	}
+	seat := actingSeat(gs)
 	if seat%2 == 0 {
 		return seat, bot.Decide(viewFromState(gs, seat, mem))
 	}
@@ -286,4 +282,197 @@ func croatianBotDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int
 	}
 
 	return seat, bot.Decide(viewFromState(gs, seat, mem))
+}
+
+const (
+	searchFromTrick = 3
+	searchDeadline  = 5 * time.Second
+)
+
+func newBitolaGame() *game.GameState {
+	return game.NewGame(
+		[4]uint{0, 0, 0, 0},
+		[4]string{"", "", "", ""},
+		[4]bool{true, true, true, true},
+		game.VariantBitola, "1001", 1, true, false, true, false,
+	)
+}
+
+func actingSeat(gs *game.GameState) int {
+	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil {
+		return *gs.PendingBelotSeat
+	}
+	return gs.ActivePlayerSeat
+}
+
+func requireSimulationRun(t *testing.T) {
+	t.Helper()
+	if os.Getenv("BELJOT_BOT_SIM") != "1" {
+		t.Skip("search simulation: set BELJOT_BOT_SIM=1 to run it")
+	}
+}
+
+// searchPlayer decides like a search-backed bot seat and counts how often the search ran and reached a decision.
+type searchPlayer struct {
+	applied int
+	decided int
+}
+
+func (p *searchPlayer) decide(gs *game.GameState, mem *bot.Memory, seat int) game.Action {
+	v := viewFromState(gs, seat, mem)
+	if bot.SearchApplies(v, searchFromTrick) {
+		p.applied++
+		if res, ok := bot.SearchCard(v, time.Now().Add(searchDeadline)); ok {
+			p.decided++
+			return bot.DecideWith(v, &res)
+		}
+	}
+	return bot.Decide(v)
+}
+
+func TestSimulation_SearchBeatsRandomBaseline(t *testing.T) {
+	requireSimulationRun(t)
+	const handsTarget = 60
+	rng := rand.New(rand.NewPCG(42, 1))
+	player := &searchPlayer{}
+	drive := func(gs *game.GameState, mem *bot.Memory, moves *rand.Rand) (int, game.Action) {
+		seat := actingSeat(gs)
+		if seat%2 == 0 {
+			return seat, player.decide(gs, mem, seat)
+		}
+		return seat, randomLegalAction(gs, seat, moves)
+	}
+
+	searchPoints := 0
+	totalPoints := 0
+	handsPlayed := 0
+	for handsPlayed < handsTarget {
+		gs := newBitolaGame()
+		gs.DealerSeat = 0
+		gs.ActivePlayerSeat = (gs.DealerSeat + 1) % 4
+
+		result, ok := playOneHandWith(t, gs, bot.NewMemory(), rng, drive, nil)
+		if !ok {
+			continue
+		}
+		searchPoints += result.TeamAHandTotal
+		totalPoints += result.TeamAHandTotal + result.TeamBHandTotal
+		handsPlayed++
+	}
+
+	require.Positive(t, totalPoints)
+	require.Positive(t, player.decided, "the search never reached a decision, so the run proves nothing")
+	share := float64(searchPoints) / float64(totalPoints)
+	t.Logf("search share over %d hands: %.1f%% (%d/%d points); search ran at %d card plays and decided %d",
+		handsPlayed, share*100, searchPoints, totalPoints, player.applied, player.decided)
+	assert.GreaterOrEqual(t, share, 0.60,
+		"the search must take at least 60%% of all points vs the random baseline")
+}
+
+func TestSimulation_SearchDoesNotLoseToTheRules(t *testing.T) {
+	requireSimulationRun(t)
+	const deals = 40
+	rng := rand.New(rand.NewPCG(7, 7))
+	player := &searchPlayer{}
+
+	advantages := make([]float64, 0, deals)
+	passedOut := 0
+	for dealNumber := range deals {
+		advantage, ok := duplicateAdvantage(t, shuffledDeck(rng), dealNumber%4, player)
+		if !ok {
+			passedOut++
+		}
+		advantages = append(advantages, advantage)
+	}
+
+	require.Positive(t, player.decided, "the search never reached a decision, so the run proves nothing")
+	mean, se := meanAndStandardError(advantages)
+	t.Logf("search minus rules per deal over %d deals: %+.2f +/- %.2f (%d passed out); search ran at %d card plays and decided %d",
+		deals, mean, se, passedOut, player.applied, player.decided)
+	assert.GreaterOrEqual(t, mean, -3.0,
+		"the search must not lose more than 3 points per deal to the rule layer")
+}
+
+func shuffledDeck(rng *rand.Rand) []game.Card {
+	deck := game.NewDeck()
+	rng.Shuffle(len(deck), func(i, j int) { deck[i], deck[j] = deck[j], deck[i] })
+	return deck
+}
+
+// dealtGame gives every seat its cards from the deck in seat order, then the candidate and the reserve, with the
+// engine's own deal shape and the given dealer.
+func dealtGame(t *testing.T, deck []game.Card, dealer int) *game.GameState {
+	t.Helper()
+	gs := newBitolaGame()
+	next := 0
+	for i := range gs.Players {
+		size := len(gs.Players[i].Hand)
+		gs.Players[i].Hand = slices.Clone(deck[next : next+size])
+		next += size
+	}
+	candidate := deck[next]
+	gs.TrumpCandidate = &candidate
+	next++
+	require.Len(t, gs.Deck, len(deck)-next, "the deck handed in must have the engine's deal shape")
+	gs.Deck = slices.Clone(deck[next:])
+	gs.DealerSeat = dealer
+	gs.ActivePlayerSeat = gs.Rules.NextSeat(dealer)
+	return gs
+}
+
+// duplicateAdvantage plays one deal twice with the searching and rule-based teams swapping seats, and returns the
+// search team's banked award minus the rule team's, averaged over the two games. A deal that passes out scores 0.
+func duplicateAdvantage(t *testing.T, deck []game.Card, dealer int, player *searchPlayer) (float64, bool) {
+	t.Helper()
+	total := 0
+	for searchTeam := range 2 {
+		diff, ok := playDuplicateGame(t, deck, dealer, searchTeam, player)
+		if !ok {
+			return 0, false
+		}
+		total += diff
+	}
+	return float64(total) / 2, true
+}
+
+// playDuplicateGame plays the deal with the search on the given team and the rule layer on the other. It reports false
+// when bidding passed out, because the engine then reshuffles with its own randomness and the deal is gone.
+func playDuplicateGame(
+	t *testing.T, deck []game.Card, dealer, searchTeam int, player *searchPlayer,
+) (int, bool) {
+	t.Helper()
+	passedOut := false
+	drive := func(gs *game.GameState, mem *bot.Memory, _ *rand.Rand) (int, game.Action) {
+		seat := actingSeat(gs)
+		if gs.DealerSeat != dealer {
+			passedOut = true
+		}
+		if passedOut || seat%2 != searchTeam {
+			return seat, bot.Decide(viewFromState(gs, seat, mem))
+		}
+		return seat, player.decide(gs, mem, seat)
+	}
+
+	result, ok := playOneHandWith(t, dealtGame(t, deck, dealer), bot.NewMemory(), nil, drive, nil)
+	if passedOut {
+		return 0, false
+	}
+	require.True(t, ok, "a deal that did not pass out must score a hand")
+	if searchTeam == game.TeamA {
+		return result.TeamAHandTotal - result.TeamBHandTotal, true
+	}
+	return result.TeamBHandTotal - result.TeamAHandTotal, true
+}
+
+func meanAndStandardError(values []float64) (mean, se float64) {
+	n := float64(len(values))
+	for _, v := range values {
+		mean += v
+	}
+	mean /= n
+	squares := 0.0
+	for _, v := range values {
+		squares += (v - mean) * (v - mean)
+	}
+	return mean, math.Sqrt(squares / (n - 1) / n)
 }
