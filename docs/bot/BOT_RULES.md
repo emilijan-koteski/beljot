@@ -489,6 +489,13 @@ gamble.
   preserving the control trumps **J/9** whenever the pot doesn't justify spending one; if
   nothing is provably secure, or the trick is pointless, take **as cheaply as possible**
   (`cheapestWinning`) as before.
+- **Plain suit led, an opponent still to play:** before falling back to the cheapest take, the
+  bot takes with the lowest-point led-suit card that overtakes and that **no led-suit card an
+  opponent could still hold** outranks (`cheapestLedSecureWinner`). A ruff would beat the Ace
+  too, so unseen trumps are not an argument for a lower card. Example: opponents play 7♠ and
+  8♠, bot third holds A♠ Q♠ with the K♠ and T♠ unseen -> play **A♠**; the Queen would lose to
+  the last player's King or Ten and the kept Ace would be ruffed later. Once the K♠ and T♠ are
+  gone the Queen suffices. A trump cut, or a trump lead, leaves it inert.
 - Cannot win: **discard** the lowest value, preserving trump.
 
 **The boss-preserving smear (`bestSmear` + `bossWorthGuarding`)** — used at all three smear
@@ -667,6 +674,7 @@ Blind spots if you want a stronger bot (the first four are logged in
 | Boss-preserving smear (backup test, endgame/dead-suit exceptions) | `bestSmear`, `bossWorthGuarding`, `heldSameSuitBoss` | `server/internal/bot/bot.go` |
 | Never fight a partner forced to win a trump-led trick | `partnerTakesTrick` (trump-led branch) | `server/internal/bot/bot.go` |
 | Bank the high card as last player | `highestPointsLedSuitWinner` + `chooseFollow` | `server/internal/bot/bot.go` |
+| Take with the cheapest card no led-suit card can beat | `cheapestLedSecureWinner` + `chooseFollow` | `server/internal/bot/bot.go` |
 | Lead into the partner's void | `leadIntoPartnerVoid` | `server/internal/bot/bot.go` |
 | Smear onto the partner's boss (risk) | `shouldSmearOntoPartnerBoss`, `opponentMayHoldTrump` | `server/internal/bot/bot.go` |
 | Endgame +10 retention (master trump or uncuttable boss) | `retainLastTrickWinner`, `isUncuttableBoss` | `server/internal/bot/bot.go` |

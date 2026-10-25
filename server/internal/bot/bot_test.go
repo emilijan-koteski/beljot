@@ -1818,6 +1818,40 @@ func TestDecide_PartnersLocatedAceMakesTheKingABoss(t *testing.T) {
 	})
 }
 
+func TestDecide_TakesWithTheCardNoLedSuitCardBeats(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "third hand takes with the ace, not the queen the last player can beat",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			wantCard:   "AS",
+		},
+		{
+			name:       "queen suffices once the king and ten are gone",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "KS"}, {seat: 1, card: "TS"}},
+			wantCard:   "QS",
+		},
+		{
+			name:       "a trump cut leaves the rule inert and the bot discards low",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8H"), PlayerSeat: 3}},
+			callerSeat: 1,
+			wantCard:   "QS",
+		},
+		{
+			name:       "ace and ten over an opponent's low card take with the ten",
+			hand:       cards("AS", "TS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			wantCard:   "TS",
+		},
+	})
+}
+
 func TestCardsProvablyAbsent(t *testing.T) {
 	tests := []struct {
 		name     string

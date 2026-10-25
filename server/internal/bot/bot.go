@@ -237,6 +237,9 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 				return *c
 			}
 		}
+		if c := cheapestLedSecureWinner(v, legal, trump); c != nil {
+			return *c
+		}
 		return *cheap
 	}
 	return lowestValue(legal, trump)
@@ -736,6 +739,40 @@ func cheapestWinning(v View, legal []game.Card, trump game.Suit) *game.Card {
 	for i := range legal {
 		c := legal[i]
 		if !wouldOvertake(c, v.CurrentTrick, trump) {
+			continue
+		}
+		pts := cardPoints(c, trump)
+		strength := cardStrengthOf(c, trump)
+		if best == nil || pts < bestPts || (pts == bestPts && strength < bestStrength) {
+			best = &legal[i]
+			bestPts = pts
+			bestStrength = strength
+		}
+	}
+	return best
+}
+
+// cheapestLedSecureWinner returns the lowest-point (then weakest) legal led-suit card that takes
+// the trick and that no led-suit threat outranks, or nil. A ruff beats any led-suit card, so
+// unseen trumps are no argument for a higher one.
+func cheapestLedSecureWinner(v View, legal []game.Card, trump game.Suit) *game.Card {
+	led := v.CurrentTrick[0].Card.Suit
+	if led == trump {
+		return nil
+	}
+	ledThreats := threats(v)
+	var best *game.Card
+	bestPts := -1
+	bestStrength := -1
+	for i := range legal {
+		c := legal[i]
+		if c.Suit != led || !wouldOvertake(c, v.CurrentTrick, trump) {
+			continue
+		}
+		outranked := slices.ContainsFunc(ledThreats, func(t game.Card) bool {
+			return t.Suit == led && game.NonTrumpRankOrder[t.Rank] > game.NonTrumpRankOrder[c.Rank]
+		})
+		if outranked {
 			continue
 		}
 		pts := cardPoints(c, trump)
