@@ -20,6 +20,8 @@ vi.mock("react-i18next", () => ({
         "team.them": "Them",
         "match.scoreReveal.subtitleFailedUs": "Went down · all points to us",
         "match.scoreReveal.subtitleFailedThem": "Went down · all points to them",
+        "match.scoreReveal.subtitleFailedCardsUs": "Went down · card points to us",
+        "match.scoreReveal.subtitleFailedCardsThem": "Went down · card points to them",
       };
       if (key === "match.scoreReveal.subtitleHeldYour" && opts) {
         return `Pulled it off · you took trump on ${opts.suit}`;
@@ -163,6 +165,69 @@ describe("ScoreReveal", () => {
       <ScoreReveal data={failedData} viewerTeam="teamB" onContinue={vi.fn()} />,
     );
     expect(container.textContent).toContain("Went down · all points to them");
+  });
+
+  it.each([
+    ["teamB" as const, "Went down · card points to us"],
+    ["teamA" as const, "Went down · card points to them"],
+  ])(
+    "names only the card points on a fall when declarations do not transfer (viewer %s)",
+    (viewerTeam, subtitle) => {
+      const failedData = { ...normalData, failedContract: true, contractingTeam: 0 };
+      const { container } = render(
+        <ScoreReveal
+          data={failedData}
+          viewerTeam={viewerTeam}
+          onContinue={vi.fn()}
+          declarationsTransfer={false}
+        />,
+      );
+      expect(container.textContent).toContain(subtitle);
+      expect(container.textContent).not.toContain("all points");
+    },
+  );
+
+  it("keeps the all-points subtitle on a fall when declarations transfer", () => {
+    const failedData = { ...normalData, failedContract: true, contractingTeam: 0 };
+    const { container } = render(
+      <ScoreReveal
+        data={failedData}
+        viewerTeam="teamB"
+        onContinue={vi.fn()}
+        declarationsTransfer
+      />,
+    );
+    expect(container.textContent).toContain("Went down · all points to us");
+  });
+
+  it("shows the server's award in the hand-total row when the fallen team's declarations are voided", () => {
+    const voidedFall: HandScoredPayload = {
+      ...normalData,
+      teamACardPoints: 50,
+      teamBCardPoints: 102,
+      teamADeclPoints: 20,
+      teamBDeclPoints: 0,
+      lastTrickTeam: 1,
+      lastTrickBonus: 10,
+      failedContract: true,
+      contractingTeam: 0,
+      teamAHandTotal: 0,
+      teamBHandTotal: 162,
+    };
+    render(
+      <ScoreReveal
+        data={voidedFall}
+        viewerTeam="teamB"
+        onContinue={vi.fn()}
+        declarationsTransfer={false}
+      />,
+    );
+
+    const declRow = screen.getByTestId("row-decl-points");
+    expect(declRow.querySelector("[data-team='teamA']")).toHaveTextContent("20");
+    const handTotalRow = screen.getByTestId("row-hand-total");
+    expect(handTotalRow.querySelector("[data-team='teamA']")).toHaveTextContent("0");
+    expect(handTotalRow.querySelector("[data-team='teamB']")).toHaveTextContent("162");
   });
 
   it("shows the contract-held subtitle when the viewer's team called trump", () => {

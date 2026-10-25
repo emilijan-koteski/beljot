@@ -10,10 +10,14 @@ import (
 // repository. The narrow type keeps the match package free of a room import
 // (which would create an import cycle via room→auth→user→match).
 type StaleRoom struct {
-	ID        uint
-	Variant   string
-	MatchMode string
-	UpdatedAt time.Time
+	ID                   uint
+	Variant              string
+	MatchMode            string
+	DeclarationsEnabled  bool
+	StopAtTarget         bool
+	DeclarationsTransfer bool
+	Clockwise            bool
+	UpdatedAt            time.Time
 }
 
 // StaleRoomPlayer is the seat-occupancy data ReconcileStaleRooms needs.
@@ -80,24 +84,28 @@ func (m *Manager) reconcileStaleRoom(roomRepo StaleRoomRepository, r StaleRoom) 
 	if m.matchRepo != nil && seatedCount == 4 {
 		ids, botFlags, hasBots := matchSeatColumns(seated, botSeats)
 		record := &Match{
-			RoomID:       r.ID,
-			Player1ID:    ids[0],
-			Player2ID:    ids[1],
-			Player3ID:    ids[2],
-			Player4ID:    ids[3],
-			Player1IsBot: botFlags[0],
-			Player2IsBot: botFlags[1],
-			Player3IsBot: botFlags[2],
-			Player4IsBot: botFlags[3],
-			HasBots:      hasBots,
-			TeamAScore:   0,
-			TeamBScore:   0,
-			WinnerTeam:   0,
-			Variant:      r.Variant,
-			MatchMode:    r.MatchMode,
-			StartedAt:    r.UpdatedAt,
-			CompletedAt:  time.Now(),
-			Status:       "abandoned",
+			RoomID:               r.ID,
+			Player1ID:            ids[0],
+			Player2ID:            ids[1],
+			Player3ID:            ids[2],
+			Player4ID:            ids[3],
+			Player1IsBot:         botFlags[0],
+			Player2IsBot:         botFlags[1],
+			Player3IsBot:         botFlags[2],
+			Player4IsBot:         botFlags[3],
+			HasBots:              hasBots,
+			TeamAScore:           0,
+			TeamBScore:           0,
+			WinnerTeam:           0,
+			Variant:              r.Variant,
+			MatchMode:            r.MatchMode,
+			DeclarationsEnabled:  r.DeclarationsEnabled,
+			StopAtTarget:         r.StopAtTarget,
+			DeclarationsTransfer: r.DeclarationsTransfer,
+			Clockwise:            r.Clockwise,
+			StartedAt:            r.UpdatedAt,
+			CompletedAt:          time.Now(),
+			Status:               "abandoned",
 		}
 		if err := m.matchRepo.CreateWithHands(record, nil); err != nil {
 			slog.Error("session: failed to persist reconciled abandoned match",

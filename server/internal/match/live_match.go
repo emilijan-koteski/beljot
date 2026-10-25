@@ -211,7 +211,7 @@ func (m *Manager) AddUserRemovedHook(fn func(userID uint)) {
 
 // StartMatch creates a new game session from room data and broadcasts the initial state.
 // coinBuyIn is the per-human stake for settlement, 0 for no-economy matches.
-func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool) error {
+func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) error {
 	m.mu.Lock()
 	if _, exists := m.sessions[roomID]; exists {
 		m.mu.Unlock()
@@ -227,7 +227,7 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		botSeats[p.Seat] = p.IsBot
 	}
 
-	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID, declarationsEnabled, stopAtTarget)
+	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID, declarationsEnabled, stopAtTarget, declarationsTransfer, clockwise)
 
 	for _, p := range players {
 		if !p.IsBot {
@@ -984,32 +984,34 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	}), finalizedAt)
 
 	matchRecord := &Match{
-		RoomID:              session.roomID,
-		Player1ID:           ids[0],
-		Player2ID:           ids[1],
-		Player3ID:           ids[2],
-		Player4ID:           ids[3],
-		Player1IsBot:        botFlags[0],
-		Player2IsBot:        botFlags[1],
-		Player3IsBot:        botFlags[2],
-		Player4IsBot:        botFlags[3],
-		HasBots:             hasBots,
-		TeamAScore:          finalState.TeamScores[game.TeamA],
-		TeamBScore:          finalState.TeamScores[game.TeamB],
-		WinnerTeam:          winnerTeam,
-		Variant:             string(finalState.Variant),
-		MatchMode:           finalState.MatchMode,
-		DeclarationsEnabled: finalState.Rules.DeclarationsEnabled,
-		StopAtTarget:        finalState.Rules.StopAtTarget,
-		StartedAt:           session.startedAt,
-		CompletedAt:         time.Now(),
-		Status:              "completed",
-		SurrenderedBy:       surrenderedBy,
-		CoinBuyIn:           session.coinBuyIn,
-		Player1CoinDelta:    deltas[0],
-		Player2CoinDelta:    deltas[1],
-		Player3CoinDelta:    deltas[2],
-		Player4CoinDelta:    deltas[3],
+		RoomID:               session.roomID,
+		Player1ID:            ids[0],
+		Player2ID:            ids[1],
+		Player3ID:            ids[2],
+		Player4ID:            ids[3],
+		Player1IsBot:         botFlags[0],
+		Player2IsBot:         botFlags[1],
+		Player3IsBot:         botFlags[2],
+		Player4IsBot:         botFlags[3],
+		HasBots:              hasBots,
+		TeamAScore:           finalState.TeamScores[game.TeamA],
+		TeamBScore:           finalState.TeamScores[game.TeamB],
+		WinnerTeam:           winnerTeam,
+		Variant:              string(finalState.Variant),
+		MatchMode:            finalState.MatchMode,
+		DeclarationsEnabled:  finalState.Rules.DeclarationsEnabled,
+		StopAtTarget:         finalState.Rules.StopAtTarget,
+		DeclarationsTransfer: finalState.Rules.DeclarationsTransfer,
+		Clockwise:            finalState.Rules.Clockwise,
+		StartedAt:            session.startedAt,
+		CompletedAt:          time.Now(),
+		Status:               "completed",
+		SurrenderedBy:        surrenderedBy,
+		CoinBuyIn:            session.coinBuyIn,
+		Player1CoinDelta:     deltas[0],
+		Player2CoinDelta:     deltas[1],
+		Player3CoinDelta:     deltas[2],
+		Player4CoinDelta:     deltas[3],
 	}
 
 	if err := m.matchRepo.CreateWithHands(matchRecord, handsCopy); err != nil {

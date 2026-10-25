@@ -619,6 +619,26 @@ func WithStopAtTarget(gs *game.GameState) *game.GameState {
 	return gs
 }
 
+func WithoutDeclarationsTransfer(gs *game.GameState) *game.GameState {
+	gs.Rules.DeclarationsTransfer = false
+	gs.DeclarationsTransfer = false
+	return gs
+}
+
+// WithClockwise switches a fixture to clockwise play, re-seating a bidding turn by its pass count and a declaring
+// phase or empty trick-1 lead on the dealer's clockwise neighbour. Mid-trick fixtures keep their deliberate seats.
+func WithClockwise(gs *game.GameState) *game.GameState {
+	gs.Rules.Clockwise = true
+	gs.Clockwise = true
+	switch {
+	case gs.Phase == game.PhaseBidding:
+		gs.ActivePlayerSeat = gs.Rules.SeatAfter(gs.DealerSeat, 1+gs.BiddingPassCount)
+	case gs.Phase == game.PhaseDeclaring, gs.TrickNumber == 1 && len(gs.CurrentTrick) == 0:
+		gs.ActivePlayerSeat = gs.Rules.NextSeat(gs.DealerSeat)
+	}
+	return gs
+}
+
 func WithScoredPreviousHand(gs *game.GameState, handNumber int) *game.GameState {
 	if handNumber < 2 {
 		panic("testfixtures: WithScoredPreviousHand needs handNumber >= 2 — hand 1 has no previous hand")

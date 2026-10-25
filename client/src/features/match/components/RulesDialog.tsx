@@ -27,6 +27,8 @@ interface RulesDialogProps {
   onOpenChange: (open: boolean) => void;
   variant?: Variant;
   stopAtTarget?: boolean;
+  declarationsTransfer?: boolean;
+  clockwise?: boolean;
 }
 
 const PANEL_ID = "rules-dialog-panel";
@@ -49,7 +51,14 @@ const useDarkVariant = () => (useContext(DarkRulesCtx) as DarkRulesValue).varian
  * In-game rules reference in the dark felt chrome, sharing its content with the standalone /rules page.
  * A sticky chapter index scroll-spies a single scrolling body.
  */
-export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: RulesDialogProps) {
+export function RulesDialog({
+  open,
+  onOpenChange,
+  variant,
+  stopAtTarget,
+  declarationsTransfer,
+  clockwise,
+}: RulesDialogProps) {
   const { t, i18n } = useTranslation();
   const content = getRulesContent(i18n.language);
   const { sections, ui } = content;
@@ -277,20 +286,19 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
                   })}
                 </div>
                 {stopAtTarget === true && (
-                  <div
-                    className="mt-3 rounded-lg px-3 py-2.5"
-                    style={{
-                      background: "rgba(201,168,118,0.10)",
-                      border: "1px solid rgba(201,168,118,0.32)",
-                      fontFamily: "var(--font-body)",
-                      fontSize: 12.5,
-                      lineHeight: 1.5,
-                      color: INK,
-                    }}
-                    data-testid="rules-dialog-stop-at-target-note"
-                  >
+                  <TableRuleNote testId="rules-dialog-stop-at-target-note">
                     {t("match.rules.stopAtTargetNote")}
-                  </div>
+                  </TableRuleNote>
+                )}
+                {declarationsTransfer === false && (
+                  <TableRuleNote testId="rules-dialog-no-declarations-transfer-note">
+                    {t("match.rules.noDeclarationsTransferNote")}
+                  </TableRuleNote>
+                )}
+                {clockwise === true && (
+                  <TableRuleNote testId="rules-dialog-clockwise-note">
+                    {t("match.rules.clockwiseNote")}
+                  </TableRuleNote>
                 )}
                 <DarkRulesCtx.Provider value={{ content, variant: activeVariant }}>
                   <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(activeVariant)}>
@@ -332,6 +340,26 @@ export function RulesDialog({ open, onOpenChange, variant, stopAtTarget }: Rules
   );
 
   return createPortal(dialog, document.body);
+}
+
+/** A callout naming a room rule this table plays differently from the chapters below. */
+function TableRuleNote({ testId, children }: { testId: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="mt-3 rounded-lg px-3 py-2.5"
+      style={{
+        background: "rgba(201,168,118,0.10)",
+        border: "1px solid rgba(201,168,118,0.32)",
+        fontFamily: "var(--font-body)",
+        fontSize: 12.5,
+        lineHeight: 1.5,
+        color: INK,
+      }}
+      data-testid={testId}
+    >
+      {children}
+    </div>
+  );
 }
 
 function DarkChapter({

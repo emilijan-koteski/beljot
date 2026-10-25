@@ -84,6 +84,8 @@ const mockMatchState: MatchState = {
   mustPickTrump: false,
   declarationsEnabled: true,
   stopAtTarget: false,
+  declarationsTransfer: true,
+  clockwise: false,
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],
@@ -1711,6 +1713,29 @@ describe("MatchPage", () => {
       });
       expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
     });
+
+    it("names only the card points on a fall when the room's declarations do not transfer", () => {
+      useMatchStore.getState().setMatchState({
+        ...mockMatchState,
+        phase: "hand_complete",
+        declarationsTransfer: false,
+        lastHandResult: {
+          ...handScore,
+          failedContract: true,
+          contractingTeam: 1,
+          teamAHandTotal: 162,
+          teamBHandTotal: 0,
+        },
+        teamScores: [162, 0],
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.getByTestId("score-reveal")).toHaveTextContent("Went down · card points to us");
+    });
   });
   describe("declaration prompt overlap wiring", () => {
     function overlapPromptState(variant: MatchState["variant"]): MatchState {
@@ -1804,6 +1829,22 @@ describe("MatchPage", () => {
       );
       expect(screen.getByText("Deal five each, then turn one up")).toBeInTheDocument();
       expect(screen.queryByText("Deal all eight up front")).not.toBeInTheDocument();
+    });
+
+    it("notes the voided declarations on a table whose declarations do not transfer", () => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, declarationsTransfer: false });
+      renderMatchPage();
+      fireEvent.click(screen.getByTestId("rules-button"));
+
+      expect(screen.getByTestId("rules-dialog-no-declarations-transfer-note")).toBeInTheDocument();
+    });
+
+    it("notes the leftward play on a clockwise table", () => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, clockwise: true });
+      renderMatchPage();
+      fireEvent.click(screen.getByTestId("rules-button"));
+
+      expect(screen.getByTestId("rules-dialog-clockwise-note")).toBeInTheDocument();
     });
   });
 
@@ -2352,48 +2393,20 @@ describe("MatchPage", () => {
       expect(prompt).not.toHaveTextContent(/or pass/i);
     });
 
-    it("labels the scoreboard when the room plays without declarations", () => {
+    it("keeps room rules out of the scoreboard header", () => {
       useMatchStore.getState().setMatchState({
         ...biddingState(0),
         declarationsEnabled: false,
-      });
-      useMatchStore.getState().setMyPlayerSeat(0);
-      renderMatchPage();
-
-      expect(screen.getByTestId("score-meta-no-declarations")).toBeInTheDocument();
-    });
-
-    it("leaves the scoreboard unlabelled on an ordinary table", () => {
-      useMatchStore.getState().setMatchState({
-        ...biddingState(0),
-        declarationsEnabled: true,
-      });
-      useMatchStore.getState().setMyPlayerSeat(0);
-      renderMatchPage();
-
-      expect(screen.queryByTestId("score-meta-no-declarations")).not.toBeInTheDocument();
-    });
-
-    it("labels the scoreboard when the room stops at the target", () => {
-      useMatchStore.getState().setMatchState({
-        ...biddingState(0),
         stopAtTarget: true,
+        declarationsTransfer: false,
+        clockwise: true,
       });
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 
-      expect(screen.getByTestId("score-meta-stop-at-target")).toBeInTheDocument();
-    });
-
-    it("leaves the scoreboard unlabelled on a finish-the-hand table", () => {
-      useMatchStore.getState().setMatchState({
-        ...biddingState(0),
-        stopAtTarget: false,
-      });
-      useMatchStore.getState().setMyPlayerSeat(0);
-      renderMatchPage();
-
-      expect(screen.queryByTestId("score-meta-stop-at-target")).not.toBeInTheDocument();
+      const meta = screen.getByTestId("score-meta");
+      expect(meta).not.toHaveTextContent(/declarations|target|transfer|clockwise/i);
+      expect(meta.textContent?.split(" · ")).toHaveLength(2);
     });
 
     it("reads the open hand alone when nothing is held face-down", () => {
@@ -2568,6 +2581,39 @@ describe("MatchPage", () => {
         expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
         expect(seatCount(2)).toBe("×5");
         expect(handCardIds()).toHaveLength(5);
+      });
+
+      it("deals a clockwise hand from the seat on the dealer's other side", () => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          useMatchStore
+            .getState()
+            .setMatchState(dealtState({ clockwise: true, dealerSeat: 1, activePlayerSeat: 0 }));
+        });
+
+        const packetLand = (i: number) =>
+          MOTION.DEAL_LEAD_IN + i * MOTION.DEAL_PACKET_STAGGER + MOTION.DEAL_PACKET_FLIGHT;
+        act(() => {
+          vi.advanceTimersByTime(packetLand(0));
+        });
+        expect(handCardIds()).toHaveLength(3);
+        expect(seatCount(3)).toBe("×0");
+        expect(seatCount(2)).toBe("×0");
+
+        act(() => {
+          vi.advanceTimersByTime(packetLand(1) - packetLand(0));
+        });
+        expect(seatCount(3)).toBe("×3");
+        expect(seatCount(2)).toBe("×0");
+
+        act(() => {
+          vi.advanceTimersByTime(packetLand(2) - packetLand(1));
+        });
+        expect(seatCount(2)).toBe("×3");
+        expect(seatCount(1)).toBe("×0");
       });
 
       it("turns the candidate face-up at the end of the deal", () => {

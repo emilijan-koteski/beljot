@@ -160,24 +160,26 @@ type MatchHandView struct {
 
 // MatchListItem is the per-match DTO returned by GET /users/:id/matches.
 type MatchListItem struct {
-	ID                  uint            `json:"id"`
-	Variant             string          `json:"variant"`
-	MatchMode           string          `json:"matchMode"`
-	StartedAt           time.Time       `json:"startedAt"`
-	CompletedAt         time.Time       `json:"completedAt"`
-	Status              string          `json:"status"`
-	WinnerTeam          int             `json:"winnerTeam"`
-	TeamAScore          int             `json:"teamAScore"`
-	TeamBScore          int             `json:"teamBScore"`
-	HasBots             bool            `json:"hasBots"`
-	AbandonedBy         *uint           `json:"abandonedBy,omitempty"`
-	ViewerSeat          int             `json:"viewerSeat"`
-	Outcome             string          `json:"outcome"`
-	EndReason           string          `json:"endReason"`
-	DeclarationsEnabled bool            `json:"declarationsEnabled"`
-	StopAtTarget        bool            `json:"stopAtTarget"`
-	Players             []MatchPlayer   `json:"players"`
-	Hands               []MatchHandView `json:"hands"`
+	ID                   uint            `json:"id"`
+	Variant              string          `json:"variant"`
+	MatchMode            string          `json:"matchMode"`
+	StartedAt            time.Time       `json:"startedAt"`
+	CompletedAt          time.Time       `json:"completedAt"`
+	Status               string          `json:"status"`
+	WinnerTeam           int             `json:"winnerTeam"`
+	TeamAScore           int             `json:"teamAScore"`
+	TeamBScore           int             `json:"teamBScore"`
+	HasBots              bool            `json:"hasBots"`
+	AbandonedBy          *uint           `json:"abandonedBy,omitempty"`
+	ViewerSeat           int             `json:"viewerSeat"`
+	Outcome              string          `json:"outcome"`
+	EndReason            string          `json:"endReason"`
+	DeclarationsEnabled  bool            `json:"declarationsEnabled"`
+	StopAtTarget         bool            `json:"stopAtTarget"`
+	DeclarationsTransfer bool            `json:"declarationsTransfer"`
+	Clockwise            bool            `json:"clockwise"`
+	Players              []MatchPlayer   `json:"players"`
+	Hands                []MatchHandView `json:"hands"`
 }
 
 // MatchesListResponse is the envelope returned by GET /users/:id/matches.
@@ -896,8 +898,10 @@ func buildMatchListItem(m match.Match, viewerID uint, identities map[uint]partic
 		Outcome:     outcome,
 		EndReason:   endReason,
 
-		DeclarationsEnabled: m.DeclarationsEnabled,
-		StopAtTarget:        m.StopAtTarget,
+		DeclarationsEnabled:  m.DeclarationsEnabled,
+		StopAtTarget:         m.StopAtTarget,
+		DeclarationsTransfer: m.DeclarationsTransfer,
+		Clockwise:            m.Clockwise,
 
 		Players: players,
 		Hands:   hands,

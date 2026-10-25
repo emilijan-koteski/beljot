@@ -283,6 +283,7 @@ func seedQuickPlayRoomWithStake(t *testing.T, repo *mockRoomRepo, code string, b
 		Status:               "waiting",
 		PlayerCount:          len(seatedUserIDs),
 		CoinBuyIn:            buyIn,
+		DeclarationsTransfer: true,
 	}
 	require.NoError(t, repo.Create(r))
 	for i, uid := range seatedUserIDs {
@@ -351,6 +352,8 @@ func TestQuickJoin_AutoStartChargesDefaultBracket(t *testing.T) {
 	assert.Equal(t, 500, starter.lastCoinBuyIn, "the bracket stake threads into the session for settlement")
 	assert.Equal(t, "per-move", starter.lastTimerStyle, "AC5: timer style reaches StartMatch on auto-start")
 	assert.Equal(t, 30, starter.lastTimerDurationSec, "AC5: per-move 30s duration reaches StartMatch")
+	assert.True(t, starter.lastDeclarationsTransfer, "the room's transfer rule reaches StartMatch on auto-start")
+	assert.False(t, starter.lastStopAtTarget, "and the rule arguments are not crossed")
 
 	persisted, _ := repo.FindByID(1)
 	assert.Equal(t, "playing", persisted.Status)

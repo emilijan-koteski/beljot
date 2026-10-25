@@ -77,8 +77,11 @@ func bidHand(v View) []game.Card {
 	return append(slices.Clone(v.Hand), *v.TrumpCandidate)
 }
 
+// seatsPassedBefore returns how many seats bid before this one in the current round, counted from
+// the seat after the dealer in the direction of play.
 func seatsPassedBefore(v View) int {
-	return (v.Seat - v.DealerSeat - 1 + 4) % 4
+	first := game.StepSeat(v.DealerSeat, 1, v.Clockwise)
+	return game.StepSeat(0, v.Seat-first, v.Clockwise)
 }
 
 // decideBid picks or passes trump from the hand-shape table, taking the best-scoring suit when

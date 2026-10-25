@@ -221,4 +221,46 @@ describe("RulesDialog (in-game)", () => {
     render(<RulesDialog open onOpenChange={() => {}} />);
     expect(screen.queryByTestId("rules-dialog-stop-at-target-note")).not.toBeInTheDocument();
   });
+
+  it("notes that a fallen team's declarations are voided when they do not transfer", () => {
+    render(<RulesDialog open onOpenChange={() => {}} declarationsTransfer={false} />);
+    expect(screen.getByTestId("rules-dialog-no-declarations-transfer-note")).toHaveTextContent(
+      /voided instead of going to the other team/i,
+    );
+  });
+
+  it("shows no transfer note when declarations transfer or the flag is absent", () => {
+    const { unmount } = render(<RulesDialog open onOpenChange={() => {}} declarationsTransfer />);
+    expect(
+      screen.queryByTestId("rules-dialog-no-declarations-transfer-note"),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    render(<RulesDialog open onOpenChange={() => {}} />);
+    expect(
+      screen.queryByTestId("rules-dialog-no-declarations-transfer-note"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("notes that play moves to the left on a clockwise table", () => {
+    render(<RulesDialog open onOpenChange={() => {}} clockwise />);
+    expect(screen.getByTestId("rules-dialog-clockwise-note")).toHaveTextContent(
+      /play moves to the left \(clockwise\)/i,
+    );
+  });
+
+  it("shows no direction note on a counter-clockwise table or when the flag is absent", () => {
+    const { unmount } = render(<RulesDialog open onOpenChange={() => {}} clockwise={false} />);
+    expect(screen.queryByTestId("rules-dialog-clockwise-note")).not.toBeInTheDocument();
+    unmount();
+
+    render(<RulesDialog open onOpenChange={() => {}} />);
+    expect(screen.queryByTestId("rules-dialog-clockwise-note")).not.toBeInTheDocument();
+  });
+
+  it("shows both table notes when the table stops at the target and voids declarations", () => {
+    render(<RulesDialog open onOpenChange={() => {}} stopAtTarget declarationsTransfer={false} />);
+    expect(screen.getByTestId("rules-dialog-stop-at-target-note")).toBeInTheDocument();
+    expect(screen.getByTestId("rules-dialog-no-declarations-transfer-note")).toBeInTheDocument();
+  });
 });

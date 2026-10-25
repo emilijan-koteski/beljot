@@ -15,36 +15,38 @@ type PlayerSeatInfo struct {
 // Match is a completed game match record persisted to the database. Bot seats
 // persist a NULL player ID with IsBot set, and HasBots marks the whole match.
 type Match struct {
-	ID                  uint         `gorm:"primaryKey" json:"id"`
-	RoomID              uint         `gorm:"not null;index" json:"roomId"`
-	Player1ID           *uint        `gorm:"index" json:"player1Id"`
-	Player2ID           *uint        `gorm:"index" json:"player2Id"`
-	Player3ID           *uint        `gorm:"index" json:"player3Id"`
-	Player4ID           *uint        `gorm:"index" json:"player4Id"`
-	Player1IsBot        bool         `gorm:"not null;default:false" json:"player1IsBot"`
-	Player2IsBot        bool         `gorm:"not null;default:false" json:"player2IsBot"`
-	Player3IsBot        bool         `gorm:"not null;default:false" json:"player3IsBot"`
-	Player4IsBot        bool         `gorm:"not null;default:false" json:"player4IsBot"`
-	HasBots             bool         `gorm:"not null;default:false;index" json:"hasBots"`
-	TeamAScore          int          `gorm:"column:team_a_score;not null" json:"teamAScore"`
-	TeamBScore          int          `gorm:"column:team_b_score;not null" json:"teamBScore"`
-	WinnerTeam          int          `gorm:"not null" json:"winnerTeam"`
-	Variant             string       `gorm:"size:20;not null" json:"variant"`
-	MatchMode           string       `gorm:"size:10;not null" json:"matchMode"`
-	DeclarationsEnabled bool         `gorm:"not null" json:"declarationsEnabled"`
-	StopAtTarget        bool         `gorm:"not null" json:"stopAtTarget"`
-	StartedAt           time.Time    `gorm:"not null" json:"startedAt"`
-	CompletedAt         time.Time    `gorm:"not null" json:"completedAt"`
-	Status              string       `gorm:"size:20;not null;default:completed" json:"status"`
-	AbandonedBy         *uint        `gorm:"index" json:"abandonedBy,omitempty"`
-	SurrenderedBy       *uint        `gorm:"index" json:"surrenderedBy,omitempty"`
-	CoinBuyIn           int          `gorm:"not null;default:0" json:"coinBuyIn"`
-	Player1CoinDelta    int          `gorm:"not null;default:0" json:"player1CoinDelta"`
-	Player2CoinDelta    int          `gorm:"not null;default:0" json:"player2CoinDelta"`
-	Player3CoinDelta    int          `gorm:"not null;default:0" json:"player3CoinDelta"`
-	Player4CoinDelta    int          `gorm:"not null;default:0" json:"player4CoinDelta"`
-	CreatedAt           time.Time    `json:"createdAt"`
-	Hands               []HandResult `gorm:"foreignKey:MatchID;constraint:OnDelete:CASCADE" json:"-"`
+	ID                   uint         `gorm:"primaryKey" json:"id"`
+	RoomID               uint         `gorm:"not null;index" json:"roomId"`
+	Player1ID            *uint        `gorm:"index" json:"player1Id"`
+	Player2ID            *uint        `gorm:"index" json:"player2Id"`
+	Player3ID            *uint        `gorm:"index" json:"player3Id"`
+	Player4ID            *uint        `gorm:"index" json:"player4Id"`
+	Player1IsBot         bool         `gorm:"not null;default:false" json:"player1IsBot"`
+	Player2IsBot         bool         `gorm:"not null;default:false" json:"player2IsBot"`
+	Player3IsBot         bool         `gorm:"not null;default:false" json:"player3IsBot"`
+	Player4IsBot         bool         `gorm:"not null;default:false" json:"player4IsBot"`
+	HasBots              bool         `gorm:"not null;default:false;index" json:"hasBots"`
+	TeamAScore           int          `gorm:"column:team_a_score;not null" json:"teamAScore"`
+	TeamBScore           int          `gorm:"column:team_b_score;not null" json:"teamBScore"`
+	WinnerTeam           int          `gorm:"not null" json:"winnerTeam"`
+	Variant              string       `gorm:"size:20;not null" json:"variant"`
+	MatchMode            string       `gorm:"size:10;not null" json:"matchMode"`
+	DeclarationsEnabled  bool         `gorm:"not null" json:"declarationsEnabled"`
+	StopAtTarget         bool         `gorm:"not null" json:"stopAtTarget"`
+	DeclarationsTransfer bool         `gorm:"not null" json:"declarationsTransfer"`
+	Clockwise            bool         `gorm:"not null" json:"clockwise"`
+	StartedAt            time.Time    `gorm:"not null" json:"startedAt"`
+	CompletedAt          time.Time    `gorm:"not null" json:"completedAt"`
+	Status               string       `gorm:"size:20;not null;default:completed" json:"status"`
+	AbandonedBy          *uint        `gorm:"index" json:"abandonedBy,omitempty"`
+	SurrenderedBy        *uint        `gorm:"index" json:"surrenderedBy,omitempty"`
+	CoinBuyIn            int          `gorm:"not null;default:0" json:"coinBuyIn"`
+	Player1CoinDelta     int          `gorm:"not null;default:0" json:"player1CoinDelta"`
+	Player2CoinDelta     int          `gorm:"not null;default:0" json:"player2CoinDelta"`
+	Player3CoinDelta     int          `gorm:"not null;default:0" json:"player3CoinDelta"`
+	Player4CoinDelta     int          `gorm:"not null;default:0" json:"player4CoinDelta"`
+	CreatedAt            time.Time    `json:"createdAt"`
+	Hands                []HandResult `gorm:"foreignKey:MatchID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
 // matchSeatColumns projects a session's seat array into the persistence

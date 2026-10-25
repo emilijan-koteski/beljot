@@ -87,7 +87,8 @@ calibration in `BOT_V2_LAB_RESULTS.md` §3.
 
 For one suit of the bid hand: **count** is the number of cards of that suit, **side Aces** is the
 number of Aces in the other three suits, and **position** is the number of seats that have
-already passed in the current round, `(seat - dealer - 1) mod 4`: 0 for the first seat to speak,
+already passed in the current round, counted from the seat after the dealer in the room's
+direction of play (`seatsPassedBefore`): 0 for the first seat to speak,
 3 for the dealer. The bot calls the suit when **any** row matches.
 
 | # | Cards of the suit | Side Aces | Variant and position |

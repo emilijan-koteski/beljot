@@ -766,14 +766,22 @@
       "declarationsOn": "Uključena",
       "declarationsOff": "Isključena",
       "declarationsHint": "Bez zvanja nema ni Bele, a dijeljenja se broje samo na bodove iz karata",
+      "declarationsTransfer": "Zvanja pri padu",
+      "declarationsTransferOn": "Pobjednicima",
+      "declarationsTransferOff": "Poništavaju se",
+      "declarationsTransferHint": "Kad ekipa padne ili ne uzme nijedan štih, njezina zvanja i Bela obično idu drugoj ekipi. „Poništavaju se“ znači da ih nitko ne dobiva",
       "matchEnd": "Kraj meča",
       "matchEndFinish": "Dovrši dijeljenje",
       "matchEndStop": "Dosta",
       "matchEndHint": "Uz „dosta“ meč završava u trenutku kad ekipa dosegne cilj, i usred dijeljenja, bez bonusa za zadnju ruku i bez kapota",
+      "direction": "Smjer igre",
+      "directionCounterClockwise": "Udesno",
+      "directionClockwise": "Ulijevo",
+      "directionHint": "Udesno je uobičajeni smjer, suprotno od kazaljke na satu; ulijevo igra ide u smjeru kazaljke",
       "advanced": {
         "title": "Napredne postavke",
         "changedCount": "{{count}} promijenjeno",
-        "summary": "Zvanja, kraj meča, privatnost, tko može sjesti"
+        "summary": "Zvanja, zvanja pri padu, kraj meča, smjer igre, privatnost, tko može sjesti"
       }
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · živo se osvježava",
@@ -850,7 +858,11 @@
       "noDeclarations": "Bez zvanja",
       "noDeclarationsAriaLabel": "Ova soba igra bez zvanja i bez Bele",
       "stopAtTarget": "Dosta",
-      "stopAtTargetAriaLabel": "Ova soba završava meč u trenutku kad ekipa dosegne cilj, bez dovršavanja dijeljenja"
+      "stopAtTargetAriaLabel": "Ova soba završava meč u trenutku kad ekipa dosegne cilj, bez dovršavanja dijeljenja",
+      "noDeclarationsTransfer": "Bez prijenosa zvanja",
+      "noDeclarationsTransferAriaLabel": "U ovoj sobi zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju se umjesto da idu drugoj ekipi",
+      "clockwise": "Igra ulijevo",
+      "clockwiseAriaLabel": "U ovoj sobi igra se kreće ulijevo: dijeljenje, licitiranje, štihovi i sljedeći djelitelj idu ulijevo"
     },
     "chat": {
       "title": "Lobi chat",
@@ -1003,6 +1015,8 @@
       "subtitleHeldTheir": "Prošli · oni su zvali adut {{suit}}",
       "subtitleFailedUs": "Pali · svi bodovi za nas",
       "subtitleFailedThem": "Pali · svi bodovi za njih",
+      "subtitleFailedCardsUs": "Pali · bodovi iz karata za nas",
+      "subtitleFailedCardsThem": "Pali · bodovi iz karata za njih",
       "cardPoints": "Bodovi karata",
       "declarationPoints": "Zvanja",
       "lastTrickBonus": "Bonus posljednjeg štiha",
@@ -1162,7 +1176,9 @@
       "label": "Ulog"
     },
     "rules": {
-      "stopAtTargetNote": "Ovaj stol igra s dosta: mač završava u trenutku kad jedna ekipa dosegne cilj, bez dovršavanja ruke. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gdje se ruka prvo odigra do kraja."
+      "stopAtTargetNote": "Ovaj stol igra s dosta: mač završava u trenutku kad jedna ekipa dosegne cilj, bez dovršavanja ruke. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gdje se ruka prvo odigra do kraja.",
+      "noDeclarationsTransferNote": "Za ovim stolom zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju se umjesto da idu drugoj ekipi. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gdje ta zvanja idu drugoj ekipi.",
+      "clockwiseNote": "Za ovim stolom igra se kreće ulijevo: dijeljenje, licitiranje, štihovi i sljedeći djelitelj idu ulijevo. Poglavlja niže opisuju uobičajenu igru udesno."
     }
   },
   "auth": {

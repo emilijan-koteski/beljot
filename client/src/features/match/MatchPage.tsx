@@ -1264,8 +1264,6 @@ export function MatchPage() {
         lastTrickTeam={scoreRevealData?.lastTrickTeam}
         handNumber={matchState.handNumber}
         variantLabel={variantLabel(t, matchState.variant)}
-        declarationsEnabled={matchState.declarationsEnabled}
-        stopAtTarget={matchState.stopAtTarget}
         matchTarget={matchTarget}
       />
 
@@ -1816,6 +1814,7 @@ export function MatchPage() {
           trumpCallerSeat={matchState.trumpCallerSeat ?? lastTrumpRef.current.callerSeat}
           acknowledged={handCompleteAcked}
           matchTarget={matchTarget}
+          declarationsTransfer={matchState.declarationsTransfer}
         />
       )}
 
@@ -1849,6 +1848,8 @@ export function MatchPage() {
         onOpenChange={setRulesOpen}
         variant={matchState.variant}
         stopAtTarget={matchState.stopAtTarget}
+        declarationsTransfer={matchState.declarationsTransfer}
+        clockwise={matchState.clockwise}
       />
 
       {errorToast && (

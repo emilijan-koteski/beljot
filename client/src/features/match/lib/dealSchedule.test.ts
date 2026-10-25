@@ -5,7 +5,7 @@ import { MOTION } from "@/shared/lib/motion";
 import { buildDealSchedule, DEAL_DURATION, type DealKind } from "./dealSchedule";
 
 describe("buildDealSchedule", () => {
-  it("deals 3 then 2 from the dealer's left, then flips the candidate", () => {
+  it("deals 3 then 2 from the dealer's right, then flips the candidate", () => {
     const s = buildDealSchedule("candidateFirst", 2);
 
     expect(s.packets.map((p) => [p.seat, p.count])).toEqual([
@@ -47,6 +47,44 @@ describe("buildDealSchedule", () => {
     ]);
     expect(s.packets[0]!.startMs).toBe(0);
     expect(s.candidateFlipMs).toBeNull();
+  });
+
+  it.each<[DealKind, number[]]>([
+    ["candidateFirst", [3, 2, 1, 0, 3, 2, 1, 0]],
+    ["allBeforeBidding", [3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0]],
+    ["candidateSecond", [3, 2, 1, 0]],
+  ])("deals %s clockwise from the dealer's left", (kind, seats) => {
+    const s = buildDealSchedule(kind, 0, 3, true);
+
+    expect(s.packets.map((p) => p.seat)).toEqual(seats);
+  });
+
+  it("deals counter-clockwise when the direction is left out or false", () => {
+    expect(buildDealSchedule("candidateFirst", 0).packets.map((p) => p.seat)).toEqual(
+      buildDealSchedule("candidateFirst", 0, null, false).packets.map((p) => p.seat),
+    );
+    expect(
+      buildDealSchedule("candidateFirst", 0, null, false)
+        .packets.slice(0, 4)
+        .map((p) => p.seat),
+    ).toEqual([1, 2, 3, 0]);
+  });
+
+  it("gives the clockwise taker 2 plus the candidate in the second deal", () => {
+    const s = buildDealSchedule("candidateSecond", 0, 1, true);
+
+    expect(s.packets.map((p) => [p.seat, p.count, p.withCandidate])).toEqual([
+      [3, 3, false],
+      [2, 3, false],
+      [1, 2, true],
+      [0, 3, false],
+    ]);
+  });
+
+  it("keeps every published duration when dealing clockwise", () => {
+    (["candidateFirst", "allBeforeBidding", "candidateSecond"] as const).forEach((kind) => {
+      expect(buildDealSchedule(kind, 2, 1, true).totalMs).toBe(DEAL_DURATION[kind]);
+    });
   });
 
   it("staggers packets and lands each one a flight after it leaves", () => {

@@ -13,7 +13,10 @@ These are owner-confirmed rules. Do not "fix" them toward a generic Belot rulese
 
 ## Turn order and tricks
 
-- Play is counter-clockwise for dealing, bidding and tricks. Seats run 0, 1, 2, 3 counter-clockwise and the next seat is `(seat + 1) % 4`.
+- Seats run 0, 1, 2, 3 counter-clockwise around the table, and they never move on screen.
+- Play is counter-clockwise by default: the next seat is `(seat + 1) % 4`. The room's "Direction of play" rule (`VariantRules.Clockwise`, default off) makes it clockwise, so the next seat is `(seat + 3) % 4`. The flag is fixed for the whole match.
+- Never hard-code the step. The engine moves through `VariantRules.NextSeat`, `SeatAfter` and `PlayDistance` in `types.go`, which all go through `game.StepSeat`. The direction covers the deal order, the first bidder, Bitola round 2, the reshuffle and between-hand dealer moves, the trick-1 leader, the turn advance (including after a Belote prompt), the declaration tiebreak distance, the bot's `seatsYetToPlay`, and the client's `dealSchedule.ts`.
+- Partners (`seat + 2`), teams (`seat % 2`) and the trick winner do not depend on the direction.
 - The trick winner leads the next trick.
 - Card IDs are rank plus suit: ranks `7 8 9 T J Q K A`, suits `S H D C` (for example `KS`, `TH`).
 
@@ -22,7 +25,7 @@ These are owner-confirmed rules. Do not "fix" them toward a generic Belot rulese
 Select the path from a `VariantRules` field, never by comparing the variant name. Keep each outcome as its own code path.
 
 - **Bitola:** two rounds. Round 1 offers the flipped candidate's suit, round 2 opens every other suit. Four passes in round 2 reshuffle and move the dealer.
-- **Croatian:** one round with no candidate card. Players bid on their six visible cards, and the two face-down cards stay hidden from everyone, their owner included, until trump is set. Bidding starts to the dealer's right and the dealer speaks last. If the other three pass, the dealer must pick a suit. There is no second round and no reshuffle.
+- **Croatian:** one round with no candidate card. Players bid on their six visible cards, and the two face-down cards stay hidden from everyone, their owner included, until trump is set. Bidding starts with the seat after the dealer in the direction of play (the dealer's right by default, the left in a clockwise room), and the dealer speaks last. If the other three pass, the dealer must pick a suit. There is no second round and no reshuffle.
 
 ## Declarations
 
@@ -40,8 +43,12 @@ Select the path from a `VariantRules` field, never by comparing the variant name
 ## Scoring
 
 - Hand scoring and match scoring are separate functions in `scoring.go`.
-- The taker's team must score strictly more than the opponents. A tie fails, and all points go to the opponents. Bitola will eventually carry tied points over; the current tie behavior is a deliberate stand-in, not a bug.
+- The taker's team must score strictly more than the opponents, declarations on both sides counted. A tie fails, and the opponents take the hand. Bitola will eventually carry tied points over; the current tie behavior is a deliberate stand-in, not a bug.
 - Capot (+100) replaces the last-trick bonus (+10). It is not added to it.
+- A fall or a Capot gives one side the whole hand. What happens to declarations then is the room's "Declarations on a fall" rule (`VariantRules.DeclarationsTransfer`), which `wholeHandAward` in `scoring.go` applies:
+  - **On (default):** the side taking the hand banks every point, including both sides' declarations and Belote.
+  - **Off:** that side banks all card points plus only its own declarations and Belote. The other side's are voided, and nobody scores them.
+  - Belote follows the declarations, and a Capot obeys the rule just like a fall. A room with declarations off always stores the rule as on.
 - If both teams cross the target in the same hand, the higher total wins; an exact tie goes to the taker's team (`determineMatchWinner`).
 - On timer expiry, auto-play picks the first legal card sorted by suit, then rank.
 

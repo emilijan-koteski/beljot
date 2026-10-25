@@ -2215,6 +2215,67 @@ describe("RoomPage honour", () => {
     expect(screen.queryByTestId("badge-stop-at-target")).not.toBeInTheDocument();
   });
 
+  it("badges a room whose declarations do not transfer", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1, declarationsTransfer: false },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
+
+    renderRoomPage();
+
+    const badge = await screen.findByTestId("badge-no-declarations-transfer");
+    expect(badge).toHaveTextContent("No declaration transfer");
+  });
+
+  it("badges a room that plays clockwise", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1, clockwise: true },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
+
+    renderRoomPage();
+
+    const badge = await screen.findByTestId("badge-clockwise");
+    expect(badge).toHaveTextContent("Clockwise");
+    expect(badge).toHaveAccessibleName(/play moves to the left/i);
+  });
+
+  it("says nothing about the direction on an ordinary room, absent field included", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("badge-variant")).toBeInTheDocument());
+    expect(screen.queryByTestId("badge-clockwise")).not.toBeInTheDocument();
+  });
+
+  it("says nothing about the transfer on an ordinary room, absent field included", async () => {
+    useAuthStore.setState({ user: defaultUser, token: "tok" });
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({
+        room: { ...defaultRoom, playerCount: 1 },
+        players: [seat(10, "alice", 0)],
+      }),
+    );
+
+    renderRoomPage();
+
+    await waitFor(() => expect(screen.getByTestId("badge-variant")).toBeInTheDocument());
+    expect(screen.queryByTestId("badge-no-declarations-transfer")).not.toBeInTheDocument();
+  });
+
   it("renders no honour badges on an ungated room", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(

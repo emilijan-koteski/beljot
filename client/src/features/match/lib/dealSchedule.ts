@@ -36,20 +36,27 @@ const ROUNDS: Record<DealKind, ReadonlyArray<{ count: number; faceDown: boolean 
   candidateSecond: [{ count: 3, faceDown: false }],
 };
 
+/** The seat `turns` turns after `seat`: seat+1 counter-clockwise, seat+3 clockwise, as the server steps. */
+function seatAfter(seat: number, turns: number, clockwise: boolean): number {
+  const step = clockwise ? 3 : 1;
+  return (seat + step * turns) % 4;
+}
+
 /**
- * Build the timed packet list for one deal, round by round from the seat after the dealer, exactly as the server deals.
- * `takerSeat` is required for `candidateSecond` and ignored otherwise.
+ * Build the timed packet list for one deal, round by round from the seat after the dealer in the match's
+ * direction of play, exactly as the server deals. `takerSeat` is required for `candidateSecond` and ignored otherwise.
  */
 export function buildDealSchedule(
   kind: DealKind,
   dealerSeat: number,
   takerSeat: number | null = null,
+  clockwise = false,
 ): DealSchedule {
   const leadIn = kind === "candidateSecond" ? 0 : MOTION.DEAL_LEAD_IN;
   const packets: DealPacket[] = [];
   for (const round of ROUNDS[kind]) {
     for (let i = 0; i < 4; i++) {
-      const seat = (dealerSeat + 1 + i) % 4;
+      const seat = seatAfter(dealerSeat, 1 + i, clockwise);
       const isTaker = kind === "candidateSecond" && seat === takerSeat;
       const startMs = leadIn + packets.length * MOTION.DEAL_PACKET_STAGGER;
       packets.push({

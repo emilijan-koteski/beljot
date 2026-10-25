@@ -10,9 +10,11 @@ import {
   History,
   Lock,
   LockOpen,
+  RotateCw,
   Send,
   Shuffle,
   Trophy,
+  Unlink,
   UserCheck,
   Users,
   UserX,
@@ -1004,6 +1006,28 @@ export function RoomPage() {
                     aria-label={t("lobby.card.stopAtTargetAriaLabel")}
                   >
                     {t("lobby.card.stopAtTarget")}
+                  </span>
+                </Badge>
+              )}
+              {room.declarationsTransfer === false && (
+                <Badge tone="neutral" icon={<Unlink className="size-3" />}>
+                  <span
+                    data-testid="badge-no-declarations-transfer"
+                    role="img"
+                    aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
+                  >
+                    {t("lobby.card.noDeclarationsTransfer")}
+                  </span>
+                </Badge>
+              )}
+              {room.clockwise === true && (
+                <Badge tone="neutral" icon={<RotateCw className="size-3" />}>
+                  <span
+                    data-testid="badge-clockwise"
+                    role="img"
+                    aria-label={t("lobby.card.clockwiseAriaLabel")}
+                  >
+                    {t("lobby.card.clockwise")}
                   </span>
                 </Badge>
               )}

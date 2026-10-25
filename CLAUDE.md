@@ -44,7 +44,7 @@ _bmad-output/                    BMAD planning artifacts (specs, epics, stories)
 - **Timers use absolute server timestamps** ("expires at"), never relative durations.
 - **Multi-step game events are separate ordered messages.** Client animations depend on the order.
 - **Domain errors live in `server/internal/apperr/`.** HTTP errors are `{ "error": { "code", "message" } }`, success is `{ "data": ... }`.
-- **Client and server mirror some constants by hand:** honor bands, the season tier ladder, deal and splash timings, and card IDs. When you change one side, search the other for the same value.
+- **Client and server mirror some constants by hand:** honor bands, the season tier ladder, deal and splash timings, card IDs, the match-mode target (`game.MatchTarget` and `matchTargetFor` in `client/src/shared/types/matchTypes.ts`), and the seat step (`game.StepSeat` and `seatAfter` in `client/src/features/match/lib/dealSchedule.ts`). When you change one side, search the other for the same value.
 - **i18n:** every UI string goes into all four locales in `client/src/shared/i18n/` (en, sr, hr, mk). A parity test fails otherwise.
 
 ## Comments

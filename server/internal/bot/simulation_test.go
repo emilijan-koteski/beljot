@@ -27,7 +27,7 @@ func TestSimulation_HeuristicBeatsRandomBaseline(t *testing.T) {
 			[4]uint{0, 0, 0, 0},
 			[4]string{"", "", "", ""},
 			[4]bool{true, true, true, true},
-			game.VariantBitola, "1001", 1, true, false,
+			game.VariantBitola, "1001", 1, true, false, true, false,
 		)
 		gs.DealerSeat = 0
 		gs.ActivePlayerSeat = (gs.DealerSeat + 1) % 4
@@ -208,7 +208,7 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 			[4]uint{0, 0, 0, 0},
 			[4]string{"", "", "", ""},
 			[4]bool{true, true, true, true},
-			game.VariantCroatia, "1001", 1, true, false,
+			game.VariantCroatia, "1001", 1, true, false, true, false,
 		)
 		require.Equal(t, game.DeclarationTimingDedicatedPhase, gs.Rules.DeclarationTiming)
 		mem := bot.NewMemory()

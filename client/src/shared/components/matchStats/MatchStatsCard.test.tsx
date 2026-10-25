@@ -236,5 +236,45 @@ describe("MatchStatsCard", () => {
       expect(screen.queryByTestId("match-history-no-declarations")).not.toBeInTheDocument();
       expect(screen.queryByTestId("match-history-stop-at-target")).not.toBeInTheDocument();
     });
+
+    it("names a match whose declarations did not transfer", () => {
+      renderCard({ match: makeMatch({ declarationsTransfer: false }) });
+
+      const chip = screen.getByTestId("match-history-no-declarations-transfer");
+      expect(chip).toHaveTextContent("No declaration transfer");
+      expect(chip).toHaveAccessibleName(/voided instead of going to the other team/i);
+    });
+
+    it("leaves the transfer unchipped when it is on or absent from an older server", () => {
+      renderCard({ match: makeMatch({ declarationsTransfer: true }) });
+      expect(
+        screen.queryByTestId("match-history-no-declarations-transfer"),
+      ).not.toBeInTheDocument();
+
+      const legacy = makeMatch();
+      delete (legacy as { declarationsTransfer?: boolean }).declarationsTransfer;
+      renderCard({ match: legacy });
+      expect(
+        screen.queryByTestId("match-history-no-declarations-transfer"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("names a match that was played clockwise", () => {
+      renderCard({ match: makeMatch({ clockwise: true }) });
+
+      const chip = screen.getByTestId("match-history-clockwise");
+      expect(chip).toHaveTextContent("Clockwise");
+      expect(chip).toHaveAccessibleName(/play moves to the left/i);
+    });
+
+    it("leaves the direction unchipped when it is counter-clockwise or absent from an older server", () => {
+      renderCard({ match: makeMatch({ clockwise: false }) });
+      expect(screen.queryByTestId("match-history-clockwise")).not.toBeInTheDocument();
+
+      const legacy = makeMatch();
+      delete (legacy as { clockwise?: boolean }).clockwise;
+      renderCard({ match: legacy });
+      expect(screen.queryByTestId("match-history-clockwise")).not.toBeInTheDocument();
+    });
   });
 });

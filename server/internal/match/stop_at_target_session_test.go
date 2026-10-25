@@ -56,7 +56,7 @@ func TestStartMatch_CarriesStopAtTargetIntoTheSession(t *testing.T) {
 			mgr := match.NewManager(hub, newMockMatchRepo())
 			require.NoError(t, mgr.StartMatch(
 				roomID, tt.variant, "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0,
-				true, tt.stopAtTarget,
+				true, tt.stopAtTarget, true, false,
 			))
 			t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -192,7 +192,7 @@ func TestStopAtTarget_BeloteStopEmitsNoTrickResolved(t *testing.T) {
 		repo := newMockMatchRepo()
 		mgr := match.NewManager(hub, repo)
 		require.NoError(t, mgr.StartMatch(
-			roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true,
+			roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false,
 		))
 		t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -235,7 +235,7 @@ func TestStopAtTarget_BeloteStopEmitsNoTrickResolved(t *testing.T) {
 		hub := &hubSpy{}
 		mgr := match.NewManager(hub, newMockMatchRepo())
 		require.NoError(t, mgr.StartMatch(
-			roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false,
+			roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false,
 		))
 		t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -295,7 +295,7 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 				repo := newMockMatchRepo()
 				mgr := match.NewManager(hub, repo)
 				require.NoError(t, mgr.StartMatch(
-					roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true,
+					roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false,
 				))
 				t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -359,7 +359,7 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 				hub := &hubSpy{}
 				mgr := match.NewManager(hub, newMockMatchRepo())
 				require.NoError(t, mgr.StartMatch(
-					roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false,
+					roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false,
 				))
 				t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -411,7 +411,7 @@ func TestStopAtTarget_DeclareCrossingEmitsRevealThenMatchEnd(t *testing.T) {
 		repo := newMockMatchRepo()
 		mgr := match.NewManager(hub, repo)
 		require.NoError(t, mgr.StartMatch(
-			roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, true,
+			roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, true, true, false,
 		))
 		t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -455,7 +455,7 @@ func TestStopAtTarget_DeclareCrossingEmitsRevealThenMatchEnd(t *testing.T) {
 		hub := &hubSpy{}
 		mgr := match.NewManager(hub, newMockMatchRepo())
 		require.NoError(t, mgr.StartMatch(
-			roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false,
+			roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false, true, false,
 		))
 		t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -574,7 +574,7 @@ func TestStopAtTarget_StaleHandResultIsNotReAnnouncedOrPersisted(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true,
+		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -617,7 +617,7 @@ func TestStopAtTarget_ClearsAnArmedTurnTimer(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "bitola", "1001", defaultPlayers(), "per-move", timerSec, 10, 120, 0, true, true,
+		roomID, "bitola", "1001", defaultPlayers(), "per-move", timerSec, 10, 120, 0, true, true, true, false,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -692,7 +692,7 @@ func TestStopAtTarget_DeclarationTimeoutRunsHandleMatchEnd(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, true,
+		roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, true, true, false,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -750,7 +750,7 @@ func TestStopAtTarget_MatchEndPayloadNamesTheStop(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true,
+		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 

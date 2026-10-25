@@ -159,6 +159,8 @@ describe("CreateRoomModal", () => {
         allowNewPlayers: true,
         declarationsEnabled: true,
         stopAtTarget: false,
+        declarationsTransfer: true,
+        clockwise: false,
       });
     });
   });
@@ -200,6 +202,8 @@ describe("CreateRoomModal", () => {
         allowNewPlayers: true,
         declarationsEnabled: true,
         stopAtTarget: false,
+        declarationsTransfer: true,
+        clockwise: false,
       });
     });
   });
@@ -254,6 +258,8 @@ describe("CreateRoomModal", () => {
         allowNewPlayers: true,
         declarationsEnabled: true,
         stopAtTarget: false,
+        declarationsTransfer: true,
+        clockwise: false,
       });
     });
   });
@@ -439,6 +445,8 @@ describe("CreateRoomModal", () => {
 
     expect(screen.queryByTestId("declarations-segmented")).not.toBeInTheDocument();
     expect(screen.queryByTestId("match-end-segmented")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("declarations-transfer-segmented")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("direction-segmented")).not.toBeInTheDocument();
     expect(screen.queryByTestId("private-room-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("min-honor-chips")).not.toBeInTheDocument();
     expect(screen.getByTestId("advanced-settings-toggle")).toHaveAttribute(
@@ -455,6 +463,8 @@ describe("CreateRoomModal", () => {
 
     expect(screen.getByTestId("declarations-segmented")).toBeInTheDocument();
     expect(screen.getByTestId("match-end-segmented")).toBeInTheDocument();
+    expect(screen.getByTestId("declarations-transfer-segmented")).toBeInTheDocument();
+    expect(screen.getByTestId("direction-segmented")).toBeInTheDocument();
     expect(screen.getByTestId("private-room-toggle")).toBeInTheDocument();
     expect(screen.getByTestId("min-honor-chips")).toBeInTheDocument();
     expect(screen.getByTestId("allow-new-players-toggle")).toBeInTheDocument();
@@ -921,6 +931,221 @@ describe("CreateRoomModal", () => {
       "true",
     );
     expect(screen.queryByTestId("preview-stop-at-target")).not.toBeInTheDocument();
+  });
+
+  it("defaults declarations on a fall to the winners and shows no preview chip", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+    await openAdvanced(user);
+
+    expect(screen.getByTestId("declarations-transfer-segmented-transfer")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByTestId("declarations-transfer-segmented-transfer")).toHaveTextContent(
+      "To the winners",
+    );
+    expect(screen.getByTestId("declarations-transfer-segmented-void")).toHaveTextContent("Voided");
+    expect(screen.queryByTestId("preview-no-declarations-transfer")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("advanced-settings-badge")).not.toBeInTheDocument();
+  });
+
+  it("mirrors a voided transfer into the preview card and the changed-settings badge", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+    await openAdvanced(user);
+
+    await user.click(screen.getByTestId("declarations-transfer-segmented-void"));
+
+    expect(await screen.findByTestId("preview-no-declarations-transfer")).toHaveTextContent(
+      "No declaration transfer",
+    );
+    expect(screen.getByTestId("advanced-settings-badge")).toHaveTextContent("1 changed");
+  });
+
+  it("submits declarationsTransfer false when the voided segment is selected", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 13,
+      name: "No Transfer",
+      code: "NTR001",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      coinBuyIn: 500,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-10-25T09:00:00Z",
+      updatedAt: "2026-10-25T09:00:00Z",
+    });
+
+    renderModal(true);
+    await openAdvanced(user);
+    await setRoomName(user, "No Transfer");
+    await user.click(screen.getByTestId("declarations-transfer-segmented-void"));
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "No Transfer",
+          declarationsTransfer: false,
+          declarationsEnabled: true,
+          stopAtTarget: false,
+        }),
+      );
+    });
+  });
+
+  it("hides declarations on a fall while declarations are off and submits it as transferring", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 14,
+      name: "Bez Zvanja",
+      code: "NTR002",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      coinBuyIn: 500,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-10-25T09:00:00Z",
+      updatedAt: "2026-10-25T09:00:00Z",
+    });
+
+    renderModal(true);
+    await openAdvanced(user);
+    await setRoomName(user, "Bez Zvanja");
+    await user.click(screen.getByTestId("declarations-transfer-segmented-void"));
+    await user.click(screen.getByTestId("declarations-segmented-off"));
+
+    expect(screen.queryByTestId("declarations-transfer-segmented")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("preview-no-declarations-transfer")).not.toBeInTheDocument();
+    expect(screen.getByTestId("advanced-settings-badge")).toHaveTextContent("1 changed");
+
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Bez Zvanja",
+          declarationsEnabled: false,
+          declarationsTransfer: true,
+        }),
+      );
+    });
+  });
+
+  it("resets declarations on a fall back to the winners when the modal is dismissed", async () => {
+    const user = userEvent.setup();
+    const { onOpenChange } = renderModal(true);
+    await openAdvanced(user);
+
+    await user.click(screen.getByTestId("declarations-transfer-segmented-void"));
+    expect(await screen.findByTestId("preview-no-declarations-transfer")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("cancel-button"));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    await openAdvanced(user);
+    expect(screen.getByTestId("declarations-transfer-segmented-transfer")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.queryByTestId("preview-no-declarations-transfer")).not.toBeInTheDocument();
+  });
+
+  it("defaults the direction of play to counter-clockwise and shows no preview chip", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+    await openAdvanced(user);
+
+    expect(screen.getByTestId("direction-segmented-counterClockwise")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByTestId("direction-segmented-counterClockwise")).toHaveTextContent(
+      "Counter-clockwise",
+    );
+    expect(screen.getByTestId("direction-segmented-clockwise")).toHaveTextContent("Clockwise");
+    expect(screen.queryByTestId("preview-clockwise")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("advanced-settings-badge")).not.toBeInTheDocument();
+  });
+
+  it("mirrors clockwise play into the preview card and the changed-settings badge", async () => {
+    const user = userEvent.setup();
+    renderModal(true);
+    await openAdvanced(user);
+
+    await user.click(screen.getByTestId("direction-segmented-clockwise"));
+
+    const chip = await screen.findByTestId("preview-clockwise");
+    expect(chip).toHaveTextContent("Clockwise");
+    expect(chip).toHaveAccessibleName(/play moves to the left/i);
+    expect(screen.getByTestId("advanced-settings-badge")).toHaveTextContent("1 changed");
+  });
+
+  it("submits clockwise true when the clockwise segment is selected", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 15,
+      name: "Lefty",
+      code: "CWR001",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "1001",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      coinBuyIn: 500,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-10-25T09:00:00Z",
+      updatedAt: "2026-10-25T09:00:00Z",
+    });
+
+    renderModal(true);
+    await openAdvanced(user);
+    await setRoomName(user, "Lefty");
+    await user.click(screen.getByTestId("direction-segmented-clockwise"));
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Lefty",
+          clockwise: true,
+          declarationsEnabled: true,
+          declarationsTransfer: true,
+          stopAtTarget: false,
+        }),
+      );
+    });
+  });
+
+  it("resets the direction of play to counter-clockwise when the modal is dismissed", async () => {
+    const user = userEvent.setup();
+    const { onOpenChange } = renderModal(true);
+    await openAdvanced(user);
+
+    await user.click(screen.getByTestId("direction-segmented-clockwise"));
+    expect(await screen.findByTestId("preview-clockwise")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("cancel-button"));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    await openAdvanced(user);
+    expect(screen.getByTestId("direction-segmented-counterClockwise")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.queryByTestId("preview-clockwise")).not.toBeInTheDocument();
   });
 
   it("surfaces the server's INVALID_MIN_HONOR rejection in the form banner", async () => {

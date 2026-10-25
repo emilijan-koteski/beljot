@@ -41,6 +41,8 @@ func TestEventsJSONContract(t *testing.T) {
 			MustPickTrump:         false,
 			DeclarationsEnabled:   true,
 			StopAtTarget:          false,
+			DeclarationsTransfer:  true,
+			Clockwise:             false,
 			Deck:                  []game.Card{},
 			TrickNumber:           4,
 			CurrentTrick:          []game.TrickCard{},

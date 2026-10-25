@@ -54,7 +54,7 @@ func TestPerMoveTimer_BiddingPhaseAutoPasses(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetDealGraceForTest(false)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false, true, false))
 
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
@@ -87,7 +87,7 @@ func TestAutoAction_SkipDeclare_ChainsToAutoPlayWithoutExtension(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false, true, false))
 
 	gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
 	gs.RoomID = 100
@@ -121,7 +121,7 @@ func TestAutoAction_ChainedBelotPrompt_AdvancesPastDoomedSeat(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false, true, false))
 
 	gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
 	gs.RoomID = 100
@@ -162,7 +162,7 @@ func TestAutoAction_SkipBelot_AdvancesSeatAndArmsFreshTimer(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false, true, false))
 
 	gs := testfixtures.NewGameFirstTrick(game.SuitDiamonds)
 	gs.RoomID = 100
@@ -207,7 +207,7 @@ func TestPerMoveTimer_BitolaRoundOnePassoutOpensRoundTwo(t *testing.T) {
 	mgr := match.NewManager(hub, newMockMatchRepo())
 
 	const roomID = uint(100)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameMidBidding(0)

@@ -62,17 +62,19 @@ type HandScore struct {
 // GameState is the complete, serializable game state. ProjectForSeat masks by enumeration, so every new
 // field must be triaged as public, server-only (json:"-"), or masked per seat in ProjectForSeat.
 type GameState struct {
-	ID                  uint         `json:"id"`
-	RoomID              uint         `json:"roomId"`
-	Variant             Variant      `json:"variant"`
-	MatchMode           string       `json:"matchMode"`
-	Phase               Phase        `json:"phase"`
-	OwnerSeat           int          `json:"ownerSeat"`
-	Rules               VariantRules `json:"-"`
-	DeclarationsEnabled bool         `json:"declarationsEnabled"`
-	StopAtTarget        bool         `json:"stopAtTarget"`
-	StoppedAtTarget     bool         `json:"-"`
-	WonByInstantWin     bool         `json:"-"`
+	ID                   uint         `json:"id"`
+	RoomID               uint         `json:"roomId"`
+	Variant              Variant      `json:"variant"`
+	MatchMode            string       `json:"matchMode"`
+	Phase                Phase        `json:"phase"`
+	OwnerSeat            int          `json:"ownerSeat"`
+	Rules                VariantRules `json:"-"`
+	DeclarationsEnabled  bool         `json:"declarationsEnabled"`
+	StopAtTarget         bool         `json:"stopAtTarget"`
+	DeclarationsTransfer bool         `json:"declarationsTransfer"`
+	Clockwise            bool         `json:"clockwise"`
+	StoppedAtTarget      bool         `json:"-"`
+	WonByInstantWin      bool         `json:"-"`
 
 	HandNumber       int    `json:"handNumber"`
 	DealerSeat       int    `json:"dealerSeat"`
@@ -138,15 +140,17 @@ func ShuffleDeck(deck []Card) {
 	})
 }
 
-// NewGame creates a 4-player game, resolves the variant rules once with the room's declarationsEnabled
-// and stopAtTarget overrides, picks a random dealer, and deals. The room flags are positional so a
-// forgotten argument fails to compile instead of silently starting a match without declarations.
-func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint, declarationsEnabled bool, stopAtTarget bool) *GameState {
+// NewGame creates a 4-player game, resolves the variant rules once with the room's declarationsEnabled,
+// stopAtTarget, declarationsTransfer and clockwise overrides, picks a random dealer, and deals. The room flags
+// are positional so a forgotten argument fails to compile instead of silently starting a match on the wrong rules.
+func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) *GameState {
 	dealerSeat := rand.IntN(4)
 
 	rules := RulesFor(variant)
 	rules.DeclarationsEnabled = declarationsEnabled
 	rules.StopAtTarget = stopAtTarget
+	rules.DeclarationsTransfer = declarationsTransfer
+	rules.Clockwise = clockwise
 
 	gs := &GameState{
 		RoomID:               roomID,
@@ -154,11 +158,13 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 		Rules:                rules,
 		DeclarationsEnabled:  rules.DeclarationsEnabled,
 		StopAtTarget:         rules.StopAtTarget,
+		DeclarationsTransfer: rules.DeclarationsTransfer,
+		Clockwise:            rules.Clockwise,
 		MatchMode:            matchMode,
 		Phase:                PhaseDealing,
 		HandNumber:           1,
 		DealerSeat:           dealerSeat,
-		ActivePlayerSeat:     (dealerSeat + 1) % 4,
+		ActivePlayerSeat:     rules.NextSeat(dealerSeat),
 		BiddingRound:         1,
 		BiddingPassCount:     0,
 		TrickNumber:          0,
@@ -204,13 +210,13 @@ func dealCards(gs *GameState, deck []Card) {
 	dealer := gs.DealerSeat
 
 	for i := 0; i < 4; i++ {
-		seat := (dealer + 1 + i) % 4
+		seat := gs.Rules.SeatAfter(dealer, 1+i)
 		gs.Players[seat].Hand = append(gs.Players[seat].Hand, slices.Clone(deck[cardIdx:cardIdx+3])...)
 		cardIdx += 3
 	}
 
 	for i := 0; i < 4; i++ {
-		seat := (dealer + 1 + i) % 4
+		seat := gs.Rules.SeatAfter(dealer, 1+i)
 		gs.Players[seat].Hand = append(gs.Players[seat].Hand, slices.Clone(deck[cardIdx:cardIdx+2])...)
 		cardIdx += 2
 	}
@@ -232,14 +238,14 @@ func dealAllBeforeBidding(gs *GameState, deck []Card) {
 
 	for batch := 0; batch < 2; batch++ {
 		for i := 0; i < 4; i++ {
-			seat := (dealer + 1 + i) % 4
+			seat := gs.Rules.SeatAfter(dealer, 1+i)
 			gs.Players[seat].Hand = append(gs.Players[seat].Hand, slices.Clone(deck[cardIdx:cardIdx+3])...)
 			cardIdx += 3
 		}
 	}
 
 	for i := 0; i < 4; i++ {
-		seat := (dealer + 1 + i) % 4
+		seat := gs.Rules.SeatAfter(dealer, 1+i)
 		gs.Players[seat].FaceDownCards = slices.Clone(deck[cardIdx : cardIdx+2])
 		cardIdx += 2
 	}

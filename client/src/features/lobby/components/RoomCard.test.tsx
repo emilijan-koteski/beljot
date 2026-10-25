@@ -274,6 +274,98 @@ describe("RoomCard", () => {
       );
     }
   });
+
+  it("leaves a room whose declarations transfer unchipped", () => {
+    render(<RoomCard room={{ ...baseRoom, declarationsTransfer: true }} onJoin={() => {}} />);
+
+    expect(screen.queryByTestId("room-card-no-declarations-transfer")).not.toBeInTheDocument();
+  });
+
+  it("chips a room whose declarations do not transfer", () => {
+    render(<RoomCard room={{ ...baseRoom, declarationsTransfer: false }} onJoin={() => {}} />);
+
+    const chip = screen.getByTestId("room-card-no-declarations-transfer");
+    expect(chip).toHaveTextContent("No declaration transfer");
+    expect(chip).toHaveAttribute("role", "img");
+    expect(chip).toHaveAccessibleName(/voided instead of going to the other team/i);
+  });
+
+  it("treats an absent declarationsTransfer as ON, never as off", () => {
+    const withoutTheField: Room = { ...baseRoom, declarationsTransfer: true };
+    delete withoutTheField.declarationsTransfer;
+
+    render(<RoomCard room={withoutTheField} onJoin={() => {}} />);
+
+    expect(screen.queryByTestId("room-card-no-declarations-transfer")).not.toBeInTheDocument();
+  });
+
+  it("localizes the no-transfer chip in every locale", async () => {
+    for (const locale of ["en", "mk", "hr", "sr"] as const) {
+      await i18n.changeLanguage(locale);
+
+      const { unmount } = render(
+        <RoomCard room={{ ...baseRoom, declarationsTransfer: false }} onJoin={() => {}} />,
+      );
+
+      const text = (
+        screen.getByTestId("room-card-no-declarations-transfer").textContent ?? ""
+      ).trim();
+      expect(text, `${locale} chip text`).not.toBe("");
+      expect(text, `${locale} must not render the raw key`).not.toContain("lobby.card");
+
+      if (locale === "mk") {
+        expect(text, "mk is all-Cyrillic").toMatch(/^[Ѐ-ӿ\s]+$/);
+      } else {
+        expect(text, `${locale} is Latin`).toMatch(/^[A-Za-zČčĆćĐđŠšŽž\s]+$/);
+      }
+
+      unmount();
+    }
+  });
+
+  it("chips a room that plays clockwise", () => {
+    render(<RoomCard room={{ ...baseRoom, clockwise: true }} onJoin={() => {}} />);
+
+    const chip = screen.getByTestId("room-card-clockwise");
+    expect(chip).toHaveTextContent("Clockwise");
+    expect(chip).toHaveAttribute("role", "img");
+    expect(chip).toHaveAccessibleName(/play moves to the left/i);
+  });
+
+  it("leaves a counter-clockwise room unchipped, absent field included", () => {
+    const { unmount } = render(
+      <RoomCard room={{ ...baseRoom, clockwise: false }} onJoin={() => {}} />,
+    );
+    expect(screen.queryByTestId("room-card-clockwise")).not.toBeInTheDocument();
+    unmount();
+
+    const withoutTheField: Room = { ...baseRoom, clockwise: false };
+    delete withoutTheField.clockwise;
+    render(<RoomCard room={withoutTheField} onJoin={() => {}} />);
+    expect(screen.queryByTestId("room-card-clockwise")).not.toBeInTheDocument();
+  });
+
+  it("localizes the clockwise chip in every locale", async () => {
+    for (const locale of ["en", "mk", "hr", "sr"] as const) {
+      await i18n.changeLanguage(locale);
+
+      const { unmount } = render(
+        <RoomCard room={{ ...baseRoom, clockwise: true }} onJoin={() => {}} />,
+      );
+
+      const text = (screen.getByTestId("room-card-clockwise").textContent ?? "").trim();
+      expect(text, `${locale} chip text`).not.toBe("");
+      expect(text, `${locale} must not render the raw key`).not.toContain("lobby.card");
+
+      if (locale === "mk") {
+        expect(text, "mk is all-Cyrillic").toMatch(/^[Ѐ-ӿ\s]+$/);
+      } else {
+        expect(text, `${locale} is Latin`).toMatch(/^[A-Za-zČčĆćĐđŠšŽž\s]+$/);
+      }
+
+      unmount();
+    }
+  });
 });
 
 describe("RoomCard avatars", () => {

@@ -64,7 +64,7 @@ export interface FriendshipStatus {
   requestId: number | null;
 }
 
-/** A game room; optional `declarationsEnabled` means on when absent (`=== false`) and `stopAtTarget` off when absent (`=== true`). */
+/** A game room; optional `declarationsEnabled` and `declarationsTransfer` mean on when absent (`=== false`), `stopAtTarget` and `clockwise` off (`=== true`). */
 export interface Room {
   id: number;
   name: string;
@@ -83,6 +83,8 @@ export interface Room {
   allowNewPlayers: boolean;
   declarationsEnabled?: boolean;
   stopAtTarget?: boolean;
+  declarationsTransfer?: boolean;
+  clockwise?: boolean;
   status: string;
   playerCount: number;
   isQuickPlay: boolean;
@@ -103,6 +105,8 @@ export interface CreateRoomRequest {
   allowNewPlayers: boolean;
   declarationsEnabled: boolean;
   stopAtTarget: boolean;
+  declarationsTransfer: boolean;
+  clockwise: boolean;
 }
 
 export interface RoomPlayer {

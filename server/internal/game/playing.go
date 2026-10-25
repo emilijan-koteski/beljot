@@ -82,7 +82,7 @@ func handlePlayCard(state *GameState, action Action) (*GameState, error) {
 		return newState, nil
 	}
 
-	newState.ActivePlayerSeat = (newState.ActivePlayerSeat + 1) % 4
+	newState.ActivePlayerSeat = newState.Rules.NextSeat(newState.ActivePlayerSeat)
 
 	if newState.TrickNumber == 1 && len(newState.CurrentTrick) < 4 {
 		checkDeclarationPrompt(newState)

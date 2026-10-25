@@ -301,7 +301,7 @@ export const SYSTEM_ROOM_CREATED = "system:room_created" as const;
 export const SYSTEM_ROOM_UPDATED = "system:room_updated" as const;
 
 /**
- * Lobby room snapshot; an absent declarationsEnabled means on and an absent stopAtTarget means off.
+ * Lobby room snapshot; an absent declarationsEnabled or declarationsTransfer means on and an absent stopAtTarget or clockwise means off.
  */
 export interface RoomCreatedPayload {
   id: number;
@@ -323,12 +323,14 @@ export interface RoomCreatedPayload {
   allowNewPlayers: boolean;
   declarationsEnabled?: boolean;
   stopAtTarget?: boolean;
+  declarationsTransfer?: boolean;
+  clockwise?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 /**
- * Lobby room snapshot; an absent declarationsEnabled means on and an absent stopAtTarget means off.
+ * Lobby room snapshot; an absent declarationsEnabled or declarationsTransfer means on and an absent stopAtTarget or clockwise means off.
  */
 export interface RoomUpdatedPayload {
   id: number;
@@ -350,6 +352,8 @@ export interface RoomUpdatedPayload {
   allowNewPlayers: boolean;
   declarationsEnabled?: boolean;
   stopAtTarget?: boolean;
+  declarationsTransfer?: boolean;
+  clockwise?: boolean;
   createdAt: string;
   updatedAt: string;
 }

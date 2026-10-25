@@ -21,8 +21,6 @@ interface ScorePanelProps {
   matchTarget?: number;
   handNumber?: number;
   variantLabel?: string;
-  declarationsEnabled?: boolean;
-  stopAtTarget?: boolean;
 }
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
@@ -146,8 +144,6 @@ export function ScorePanel({
   matchTarget = 1001,
   handNumber,
   variantLabel,
-  declarationsEnabled = true,
-  stopAtTarget = false,
 }: ScorePanelProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -271,52 +267,31 @@ export function ScorePanel({
         aria-live="polite"
       >
         <div
-          className="flex items-center justify-between px-4 py-2 font-body text-[10.5px] uppercase tracking-wider"
+          className="flex items-center gap-1.5 px-4 py-2 font-body text-[10.5px] uppercase tracking-wider"
           style={{
             color: BRASS_LABEL,
             borderBottom: "1px solid rgba(255,255,255,0.06)",
           }}
         >
           <span>{t("match.score.heading", { defaultValue: "Scoreboard" })}</span>
-          {(handNumber !== undefined || variantLabel || !declarationsEnabled || stopAtTarget) && (
-            <span style={{ opacity: 0.85 }} data-testid="score-meta">
-              {handNumber !== undefined && variantLabel
-                ? t("match.score.handVariant", {
-                    hand: handNumber,
-                    variant: variantLabel,
-                    defaultValue: `Hand ${handNumber} · ${variantLabel}`,
-                  })
-                : handNumber !== undefined
-                  ? t("match.score.handLabel", {
+          {(handNumber !== undefined || variantLabel) && (
+            <>
+              <span aria-hidden>·</span>
+              <span style={{ opacity: 0.85 }} data-testid="score-meta">
+                {handNumber !== undefined && variantLabel
+                  ? t("match.score.handVariant", {
                       hand: handNumber,
-                      defaultValue: `Hand ${handNumber}`,
+                      variant: variantLabel,
+                      defaultValue: `Hand ${handNumber} · ${variantLabel}`,
                     })
-                  : variantLabel}
-              {!declarationsEnabled && (
-                <>
-                  {(handNumber !== undefined || variantLabel) && " · "}
-                  <span
-                    data-testid="score-meta-no-declarations"
-                    role="img"
-                    aria-label={t("lobby.card.noDeclarationsAriaLabel")}
-                  >
-                    {t("lobby.card.noDeclarations", { defaultValue: "No declarations" })}
-                  </span>
-                </>
-              )}
-              {stopAtTarget && (
-                <>
-                  {(handNumber !== undefined || variantLabel || !declarationsEnabled) && " · "}
-                  <span
-                    data-testid="score-meta-stop-at-target"
-                    role="img"
-                    aria-label={t("lobby.card.stopAtTargetAriaLabel")}
-                  >
-                    {t("lobby.card.stopAtTarget", { defaultValue: "Stop at target" })}
-                  </span>
-                </>
-              )}
-            </span>
+                  : handNumber !== undefined
+                    ? t("match.score.handLabel", {
+                        hand: handNumber,
+                        defaultValue: `Hand ${handNumber}`,
+                      })
+                    : variantLabel}
+              </span>
+            </>
           )}
         </div>
 

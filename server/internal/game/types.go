@@ -107,38 +107,66 @@ const (
 )
 
 type VariantRules struct {
-	DealShape           DealShape
-	HasTrumpCandidate   bool
-	AllPassOutcome      AllPassOutcome
-	DeclarationOverlap  bool
-	DeclarationTiming   DeclarationTiming
-	DeclarationsEnabled bool
-	StopAtTarget        bool
-	TieRule             TieRule
+	DealShape            DealShape
+	HasTrumpCandidate    bool
+	AllPassOutcome       AllPassOutcome
+	DeclarationOverlap   bool
+	DeclarationTiming    DeclarationTiming
+	DeclarationsEnabled  bool
+	StopAtTarget         bool
+	DeclarationsTransfer bool
+	Clockwise            bool
+	TieRule              TieRule
+}
+
+// StepSeat returns the seat n turns after seat, where n may be negative to step back. Turns pass to seat+1 by
+// default and to seat+3 when clockwise.
+func StepSeat(seat, n int, clockwise bool) int {
+	if clockwise {
+		n = -n
+	}
+	return ((seat+n)%4 + 4) % 4
+}
+
+// NextSeat returns the seat that acts after seat in the rules' direction of play.
+func (r VariantRules) NextSeat(seat int) int {
+	return StepSeat(seat, 1, r.Clockwise)
+}
+
+// SeatAfter returns the seat that acts n turns after seat in the rules' direction of play.
+func (r VariantRules) SeatAfter(seat, n int) int {
+	return StepSeat(seat, n, r.Clockwise)
+}
+
+// PlayDistance returns how many turns play takes to move from seat `from` to seat `to` in the rules' direction of play.
+func (r VariantRules) PlayDistance(from, to int) int {
+	return StepSeat(0, to-from, r.Clockwise)
 }
 
 func RulesFor(v Variant) VariantRules {
 	if v == VariantCroatia {
 		return VariantRules{
-			DealShape:           DealShapeAllBeforeBidding,
-			HasTrumpCandidate:   false,
-			AllPassOutcome:      AllPassDealerMustPick,
-			DeclarationOverlap:  true,
-			DeclarationTiming:   DeclarationTimingDedicatedPhase,
-			DeclarationsEnabled: true,
-			StopAtTarget:        false,
-			TieRule:             TieRuleAllToOpponents,
+			DealShape:            DealShapeAllBeforeBidding,
+			HasTrumpCandidate:    false,
+			AllPassOutcome:       AllPassDealerMustPick,
+			DeclarationOverlap:   true,
+			DeclarationTiming:    DeclarationTimingDedicatedPhase,
+			DeclarationsEnabled:  true,
+			StopAtTarget:         false,
+			DeclarationsTransfer: true,
+			TieRule:              TieRuleAllToOpponents,
 		}
 	}
 	return VariantRules{
-		DealShape:           DealShapeCandidate,
-		HasTrumpCandidate:   true,
-		AllPassOutcome:      AllPassReshuffleAndRotate,
-		DeclarationOverlap:  false,
-		DeclarationTiming:   DeclarationTimingDuringFirstTrick,
-		DeclarationsEnabled: true,
-		StopAtTarget:        false,
-		TieRule:             TieRuleHangingPoints,
+		DealShape:            DealShapeCandidate,
+		HasTrumpCandidate:    true,
+		AllPassOutcome:       AllPassReshuffleAndRotate,
+		DeclarationOverlap:   false,
+		DeclarationTiming:    DeclarationTimingDuringFirstTrick,
+		DeclarationsEnabled:  true,
+		StopAtTarget:         false,
+		DeclarationsTransfer: true,
+		TieRule:              TieRuleHangingPoints,
 	}
 }
 

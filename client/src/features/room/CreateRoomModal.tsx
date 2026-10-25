@@ -10,8 +10,11 @@ import {
   KeyRound,
   Lock,
   LockOpen,
+  RotateCcw,
+  RotateCw,
   Settings,
   Shuffle,
+  Unlink,
   UserCheck,
   Users,
   Zap,
@@ -87,6 +90,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [matchMode, setMatchMode] = useState<MatchMode>("1001");
   const [declarationsEnabled, setDeclarationsEnabled] = useState(true);
   const [stopAtTarget, setStopAtTarget] = useState(false);
+  const [declarationsTransfer, setDeclarationsTransfer] = useState(true);
+  const [clockwise, setClockwise] = useState(false);
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
   const [timerDuration, setTimerDuration] = useState(30);
   const [coinBuyIn, setCoinBuyIn] = useState(DEFAULT_BUY_IN);
@@ -118,6 +123,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const failsOwnNewPlayerGate = honorKnown && meIsNewPlayer && !allowNewPlayers;
   const failsOwnHonorGate = honorKnown && meHonor < effectiveMinHonor;
   const failsOwnGate = failsOwnNewPlayerGate || failsOwnHonorGate;
+  const effectiveDeclarationsTransfer = !declarationsEnabled || declarationsTransfer;
 
   useEffect(() => {
     if (!advOpen && (failsOwnGate || (isPrivate && !passwordValid))) setAdvOpen(true);
@@ -126,6 +132,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const advancedChangedCount = [
     declarationsEnabled !== true,
     stopAtTarget !== false,
+    effectiveDeclarationsTransfer !== true,
+    clockwise !== false,
     isPrivate !== false,
     effectiveMinHonor !== DEFAULT_MIN_HONOR,
     allowNewPlayers !== true,
@@ -160,6 +168,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         allowNewPlayers,
         declarationsEnabled,
         stopAtTarget,
+        declarationsTransfer: effectiveDeclarationsTransfer,
+        clockwise,
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
@@ -217,6 +227,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setMatchMode("1001");
       setDeclarationsEnabled(true);
       setStopAtTarget(false);
+      setDeclarationsTransfer(true);
+      setClockwise(false);
       setTimerStyle("relaxed");
       setTimerDuration(30);
       setCoinBuyIn(DEFAULT_BUY_IN);
@@ -261,6 +273,28 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         : "lobby.createRoomModal.matchEndStop",
     ),
   }));
+
+  const declarationsTransferOptions = (["transfer", "void"] as const).map((value) => ({
+    value,
+    label: t(
+      value === "transfer"
+        ? "lobby.createRoomModal.declarationsTransferOn"
+        : "lobby.createRoomModal.declarationsTransferOff",
+    ),
+  }));
+
+  const directionOptions = [
+    {
+      value: "counterClockwise" as const,
+      label: t("lobby.createRoomModal.directionCounterClockwise"),
+      icon: <RotateCcw className="size-3.5" />,
+    },
+    {
+      value: "clockwise" as const,
+      label: t("lobby.createRoomModal.directionClockwise"),
+      icon: <RotateCw className="size-3.5" />,
+    },
+  ];
 
   const timerOptions = [
     {
@@ -532,6 +566,22 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                   />
                 </Field>
 
+                {declarationsEnabled && (
+                  <Field
+                    label={t("lobby.createRoomModal.declarationsTransfer")}
+                    info={t("lobby.createRoomModal.declarationsTransferHint")}
+                    infoTestId="declarations-transfer-info-toggle"
+                  >
+                    <Segmented
+                      value={declarationsTransfer ? "transfer" : "void"}
+                      onValueChange={(v) => setDeclarationsTransfer(v === "transfer")}
+                      options={declarationsTransferOptions}
+                      testId="declarations-transfer-segmented"
+                      ariaLabel={t("lobby.createRoomModal.declarationsTransfer")}
+                    />
+                  </Field>
+                )}
+
                 <Field
                   label={t("lobby.createRoomModal.matchEnd")}
                   info={t("lobby.createRoomModal.matchEndHint")}
@@ -543,6 +593,20 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                     options={matchEndOptions}
                     testId="match-end-segmented"
                     ariaLabel={t("lobby.createRoomModal.matchEnd")}
+                  />
+                </Field>
+
+                <Field
+                  label={t("lobby.createRoomModal.direction")}
+                  info={t("lobby.createRoomModal.directionHint")}
+                  infoTestId="direction-info-toggle"
+                >
+                  <Segmented
+                    value={clockwise ? "clockwise" : "counterClockwise"}
+                    onValueChange={(v) => setClockwise(v === "clockwise")}
+                    options={directionOptions}
+                    testId="direction-segmented"
+                    ariaLabel={t("lobby.createRoomModal.direction")}
                   />
                 </Field>
 
@@ -723,6 +787,8 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               allowNewPlayers={allowNewPlayers}
               declarationsEnabled={declarationsEnabled}
               stopAtTarget={stopAtTarget}
+              declarationsTransfer={effectiveDeclarationsTransfer}
+              clockwise={clockwise}
               hostUsername={meUsername || "host"}
             />
           </aside>
@@ -807,6 +873,8 @@ function PreviewCard({
   allowNewPlayers,
   declarationsEnabled,
   stopAtTarget,
+  declarationsTransfer,
+  clockwise,
   hostUsername,
 }: {
   name: string;
@@ -820,6 +888,8 @@ function PreviewCard({
   allowNewPlayers: boolean;
   declarationsEnabled: boolean;
   stopAtTarget: boolean;
+  declarationsTransfer: boolean;
+  clockwise: boolean;
   hostUsername: string;
 }) {
   const { t } = useTranslation();
@@ -884,6 +954,34 @@ function PreviewCard({
               >
                 <Flag className="size-3" />
                 {t("lobby.card.stopAtTarget")}
+              </span>
+            </>
+          )}
+          {!declarationsTransfer && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="preview-no-declarations-transfer"
+                role="img"
+                aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
+              >
+                <Unlink className="size-3" />
+                {t("lobby.card.noDeclarationsTransfer")}
+              </span>
+            </>
+          )}
+          {clockwise && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="preview-clockwise"
+                role="img"
+                aria-label={t("lobby.card.clockwiseAriaLabel")}
+              >
+                <RotateCw className="size-3" />
+                {t("lobby.card.clockwise")}
               </span>
             </>
           )}
