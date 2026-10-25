@@ -42,7 +42,7 @@ Select the path from a `VariantRules` field, never by comparing the variant name
 - Hand scoring and match scoring are separate functions in `scoring.go`.
 - The taker's team must score strictly more than the opponents. A tie fails, and all points go to the opponents. Bitola will eventually carry tied points over; the current tie behavior is a deliberate stand-in, not a bug.
 - Capot (+100) replaces the last-trick bonus (+10). It is not added to it.
-- If both teams cross the target in the same hand, the taker's team wins.
+- If both teams cross the target in the same hand, the higher total wins; an exact tie goes to the taker's team (`determineMatchWinner`).
 - On timer expiry, auto-play picks the first legal card sorted by suit, then rank.
 
 ## Wire and state
