@@ -11,15 +11,6 @@ vi.mock("react-i18next", () => ({
         "match.score.trick": "trick",
         "match.score.thisHand": "this hand",
         "match.score.heading": "Scoreboard",
-        "lobby.card.noDeclarations": "No declarations",
-        "lobby.card.stopAtTarget": "Stop at target",
-        "lobby.card.noDeclarationsAriaLabel":
-          "This room plays without declarations and without Belote",
-        "lobby.card.stopAtTargetAriaLabel":
-          "This room ends the match the moment a team reaches the target, without finishing the hand",
-        "lobby.card.noDeclarationsTransfer": "No declaration transfer",
-        "lobby.card.noDeclarationsTransferAriaLabel":
-          "In this room, the declarations and Belote of a team that goes down or is swept are voided instead of going to the other team",
       };
       return (
         translations[key] ?? (typeof opts?.defaultValue === "string" ? opts.defaultValue : key)
@@ -156,7 +147,7 @@ describe("ScorePanel", () => {
     expect(screen.getByTestId("score-meta")).toHaveTextContent("Hand 3 · Bitola");
   });
 
-  it("appends the no-declarations segment when the room plays without them", () => {
+  it("separates the heading from the hand and variant with a visible dot", () => {
     render(
       <ScorePanel
         viewerTeam="teamA"
@@ -164,203 +155,13 @@ describe("ScorePanel", () => {
         teamBScore={0}
         teamATricks={0}
         teamBTricks={0}
-        handNumber={3}
-        variantLabel="Bitola"
-        declarationsEnabled={false}
+        handNumber={7}
+        variantLabel="Croatian"
       />,
     );
-    expect(screen.getByTestId("score-meta")).toHaveTextContent("Hand 3 · Bitola · No declarations");
-  });
-
-  it("says nothing about declarations on an ordinary table", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        handNumber={3}
-        variantLabel="Bitola"
-        declarationsEnabled
-      />,
+    expect(screen.getByTestId("score-meta").parentElement).toHaveTextContent(
+      /^Scoreboard·Hand 7 · Croatian$/,
     );
-    expect(screen.getByTestId("score-meta")).toHaveTextContent("Hand 3 · Bitola");
-    expect(screen.queryByTestId("score-meta-no-declarations")).not.toBeInTheDocument();
-  });
-
-  it("defaults to declarations on, so a bare render is never mislabelled", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        handNumber={3}
-        variantLabel="Bitola"
-      />,
-    );
-    expect(screen.queryByTestId("score-meta-no-declarations")).not.toBeInTheDocument();
-  });
-
-  it("shows the no-declarations segment alone when there is no hand or variant", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        declarationsEnabled={false}
-      />,
-    );
-    expect(screen.getByTestId("score-meta")).toHaveTextContent(/^No declarations$/);
-  });
-
-  it("appends the stop-at-target segment when the room plays dosta", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        handNumber={3}
-        variantLabel="Bitola"
-        stopAtTarget
-      />,
-    );
-    expect(screen.getByTestId("score-meta")).toHaveTextContent("Hand 3 · Bitola · Stop at target");
-  });
-
-  it("shows both rule segments when the table plays dosta without declarations", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        handNumber={3}
-        variantLabel="Bitola"
-        declarationsEnabled={false}
-        stopAtTarget
-      />,
-    );
-    expect(screen.getByTestId("score-meta")).toHaveTextContent(
-      "Hand 3 · Bitola · No declarations · Stop at target",
-    );
-  });
-
-  it("defaults to finishing the hand, so a bare render is never mislabelled", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        handNumber={3}
-        variantLabel="Bitola"
-      />,
-    );
-    expect(screen.queryByTestId("score-meta-stop-at-target")).not.toBeInTheDocument();
-  });
-
-  it("shows the stop-at-target segment alone when there is no hand or variant", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        stopAtTarget
-      />,
-    );
-    expect(screen.getByTestId("score-meta")).toHaveTextContent(/^Stop at target$/);
-  });
-
-  it("keeps the segment separator out of each rule chip's accessible name", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        handNumber={3}
-        variantLabel="Bitola"
-        declarationsEnabled={false}
-        stopAtTarget
-      />,
-    );
-
-    const declarations = screen.getByTestId("score-meta-no-declarations");
-    const stop = screen.getByTestId("score-meta-stop-at-target");
-
-    expect(declarations).toHaveTextContent(/^No declarations$/);
-    expect(stop).toHaveTextContent(/^Stop at target$/);
-
-    expect(screen.getByTestId("score-meta")).toHaveTextContent(
-      "Hand 3 · Bitola · No declarations · Stop at target",
-    );
-
-    expect(declarations).toHaveAccessibleName(/without declarations and without Belote/i);
-    expect(stop).toHaveAccessibleName(/without finishing the hand/i);
-  });
-
-  it("defaults to transferring declarations, so a bare render carries no transfer segment", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        handNumber={3}
-        variantLabel="Bitola"
-      />,
-    );
-    expect(screen.queryByTestId("score-meta-no-declarations-transfer")).not.toBeInTheDocument();
-  });
-
-  it("appends the no-transfer segment after every other rule segment", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        handNumber={3}
-        variantLabel="Bitola"
-        declarationsEnabled={false}
-        stopAtTarget
-        declarationsTransfer={false}
-      />,
-    );
-    const chip = screen.getByTestId("score-meta-no-declarations-transfer");
-    expect(chip).toHaveTextContent(/^No declaration transfer$/);
-    expect(chip).toHaveAccessibleName(/voided instead of going to the other team/i);
-    expect(screen.getByTestId("score-meta")).toHaveTextContent(
-      "Hand 3 · Bitola · No declarations · Stop at target · No declaration transfer",
-    );
-  });
-
-  it("shows the no-transfer segment alone when there is no hand or variant", () => {
-    render(
-      <ScorePanel
-        viewerTeam="teamA"
-        teamAScore={0}
-        teamBScore={0}
-        teamATricks={0}
-        teamBTricks={0}
-        declarationsTransfer={false}
-      />,
-    );
-    expect(screen.getByTestId("score-meta")).toHaveTextContent(/^No declaration transfer$/);
   });
 
   it("hides the metadata pill when neither handNumber nor variantLabel is provided", () => {
