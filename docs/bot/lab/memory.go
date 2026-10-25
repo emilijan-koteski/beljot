@@ -14,6 +14,7 @@ type Memory struct {
 	voids      [4][4]bool
 	trumpVoids [4][4]bool
 	declared   [4][]game.Card
+	located    [4][]game.Card
 }
 
 // NewMemory returns a Memory primed for the first hand.
@@ -31,6 +32,7 @@ func (m *Memory) SyncHand(handNumber int) {
 		m.voids = [4][4]bool{}
 		m.trumpVoids = [4][4]bool{}
 		m.declared = [4][]game.Card{}
+		m.located = [4][]game.Card{}
 	}
 }
 
@@ -87,10 +89,10 @@ func (m *Memory) ObserveDeclarations(players [4]game.PlayerState) {
 
 // ObserveCandidate records that the caller received the face-up candidate card.
 func (m *Memory) ObserveCandidate(seat int, c game.Card) {
-	if seat < 0 || seat > 3 || slices.Contains(m.declared[seat], c) {
+	if seat < 0 || seat > 3 || slices.Contains(m.located[seat], c) {
 		return
 	}
-	m.declared[seat] = append(m.declared[seat], c)
+	m.located[seat] = append(m.located[seat], c)
 }
 
 // PlayedCards returns a copy of the cards seen this hand.
@@ -103,11 +105,25 @@ func (m *Memory) KnownVoids() [4][4]bool {
 	return m.voids
 }
 
-// KnownCards returns a clone of the per-seat revealed declaration cards.
-func (m *Memory) KnownCards() [4][]game.Card {
+// DeclaredCards returns a clone of the per-seat revealed declaration cards.
+func (m *Memory) DeclaredCards() [4][]game.Card {
 	var out [4][]game.Card
 	for seat := range m.declared {
 		out[seat] = slices.Clone(m.declared[seat])
+	}
+	return out
+}
+
+// KnownCards returns, per seat, the revealed declaration cards followed by the located cards, without duplicates.
+func (m *Memory) KnownCards() [4][]game.Card {
+	var out [4][]game.Card
+	for seat := range out {
+		out[seat] = slices.Clone(m.declared[seat])
+		for _, c := range m.located[seat] {
+			if !slices.Contains(out[seat], c) {
+				out[seat] = append(out[seat], c)
+			}
+		}
 	}
 	return out
 }
