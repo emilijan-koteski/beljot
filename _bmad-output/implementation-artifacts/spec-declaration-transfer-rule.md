@@ -91,6 +91,9 @@ Taker = team A in every row. "Cards" includes the last-trick bonus, so the two s
 - Beyond the Code Map: the abandoned-match row written on a reconnect timeout (`match/reconnect.go`) and the one written for a stale room at boot (`match/reconcile.go`, via `StaleRoom` and `room/stale_room_adapter.go`) now record the flag too. Without that, GORM would write `false` there and history would label every abandoned match "No declaration transfer". The sibling `declarationsEnabled` and `stopAtTarget` flags are still missing on those two rows, a pre-existing gap left as is.
 - The create-room field sits directly under "Declarations" and is hidden while declarations are off. A room without declarations always submits and stores `declarationsTransfer: true`, which `CreateRoom` also enforces.
 - Client tests must run on the pinned Node 22 (`mise exec --`); on Node 24 `MatchPage.test.tsx` fails 81 tests at baseline as well.
+- Follow-up commit, at the owner's request:
+  - Fixed both deferred triage items: abandoned and reconciled rows now record all three rule flags, and `.claude/rules/game-rules.md` documents the rule.
+  - Renamed Capot in the mk locale and rules content from „капот“ to „чаљо“.
 
 ## Spec Change Log
 

@@ -19,6 +19,8 @@ func (a *StaleRoomRepositoryAdapter) FindByStatus(status string) ([]match.StaleR
 			ID:                   r.ID,
 			Variant:              r.Variant,
 			MatchMode:            r.MatchMode,
+			DeclarationsEnabled:  r.DeclarationsEnabled,
+			StopAtTarget:         r.StopAtTarget,
 			DeclarationsTransfer: r.DeclarationsTransfer,
 			UpdatedAt:            r.UpdatedAt,
 		}

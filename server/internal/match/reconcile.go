@@ -13,6 +13,8 @@ type StaleRoom struct {
 	ID                   uint
 	Variant              string
 	MatchMode            string
+	DeclarationsEnabled  bool
+	StopAtTarget         bool
 	DeclarationsTransfer bool
 	UpdatedAt            time.Time
 }
@@ -96,6 +98,8 @@ func (m *Manager) reconcileStaleRoom(roomRepo StaleRoomRepository, r StaleRoom) 
 			WinnerTeam:           0,
 			Variant:              r.Variant,
 			MatchMode:            r.MatchMode,
+			DeclarationsEnabled:  r.DeclarationsEnabled,
+			StopAtTarget:         r.StopAtTarget,
 			DeclarationsTransfer: r.DeclarationsTransfer,
 			StartedAt:            r.UpdatedAt,
 			CompletedAt:          time.Now(),

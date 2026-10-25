@@ -40,8 +40,12 @@ Select the path from a `VariantRules` field, never by comparing the variant name
 ## Scoring
 
 - Hand scoring and match scoring are separate functions in `scoring.go`.
-- The taker's team must score strictly more than the opponents. A tie fails, and all points go to the opponents. Bitola will eventually carry tied points over; the current tie behavior is a deliberate stand-in, not a bug.
+- The taker's team must score strictly more than the opponents, declarations on both sides counted. A tie fails, and the opponents take the hand. Bitola will eventually carry tied points over; the current tie behavior is a deliberate stand-in, not a bug.
 - Capot (+100) replaces the last-trick bonus (+10). It is not added to it.
+- A fall or a Capot gives one side the whole hand. What happens to declarations then is the room's "Declarations on a fall" rule (`VariantRules.DeclarationsTransfer`), which `wholeHandAward` in `scoring.go` applies:
+  - **On (default):** the side taking the hand banks every point, including both sides' declarations and Belote.
+  - **Off:** that side banks all card points plus only its own declarations and Belote. The other side's are voided, and nobody scores them.
+  - Belote follows the declarations, and a Capot obeys the rule just like a fall. A room with declarations off always stores the rule as on.
 - If both teams cross the target in the same hand, the taker's team wins.
 - On timer expiry, auto-play picks the first legal card sorted by suit, then rank.
 

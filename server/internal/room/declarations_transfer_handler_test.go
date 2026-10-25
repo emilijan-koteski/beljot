@@ -239,21 +239,38 @@ func TestRoom_DeclarationsTransferDefaultsTrueOnRawInsert(t *testing.T) {
 	assert.True(t, got.DeclarationsTransfer, "a row inserted without the column must land on TRUE")
 }
 
-// TestStaleRoomAdapter_CarriesDeclarationsTransfer checks a room left playing by a previous process hands
-// its rule to the reconciler, which writes it onto the abandoned match row.
-func TestStaleRoomAdapter_CarriesDeclarationsTransfer(t *testing.T) {
-	for _, want := range []bool{true, false} {
-		repo := newMockRoomRepo()
-		require.NoError(t, repo.Create(&room.Room{
-			Name: "Stale Transfer", Code: "STL001", OwnerID: 1,
-			Variant: "bitola", MatchMode: "1001", TimerStyle: "relaxed",
-			Status: "playing", PlayerCount: 4, DeclarationsTransfer: want,
-		}))
-		adapter := &room.StaleRoomRepositoryAdapter{Repo: repo}
+// TestStaleRoomAdapter_CarriesRuleFlags checks a room left playing by a previous process hands every rule
+// flag to the reconciler, uncrossed, which writes them onto the abandoned match row.
+func TestStaleRoomAdapter_CarriesRuleFlags(t *testing.T) {
+	cases := []struct {
+		name                 string
+		declarationsEnabled  bool
+		stopAtTarget         bool
+		declarationsTransfer bool
+	}{
+		{name: "room defaults", declarationsEnabled: true, stopAtTarget: false, declarationsTransfer: true},
+		{name: "no declarations and stop at target", declarationsEnabled: false, stopAtTarget: true, declarationsTransfer: true},
+		{name: "stop at target and declarations voided", declarationsEnabled: true, stopAtTarget: true, declarationsTransfer: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newMockRoomRepo()
+			require.NoError(t, repo.Create(&room.Room{
+				Name: "Stale Rules", Code: "STL001", OwnerID: 1,
+				Variant: "bitola", MatchMode: "1001", TimerStyle: "relaxed",
+				Status: "playing", PlayerCount: 4,
+				DeclarationsEnabled:  tc.declarationsEnabled,
+				StopAtTarget:         tc.stopAtTarget,
+				DeclarationsTransfer: tc.declarationsTransfer,
+			}))
+			adapter := &room.StaleRoomRepositoryAdapter{Repo: repo}
 
-		stale, err := adapter.FindByStatus("playing")
-		require.NoError(t, err)
-		require.Len(t, stale, 1)
-		assert.Equal(t, want, stale[0].DeclarationsTransfer)
+			stale, err := adapter.FindByStatus("playing")
+			require.NoError(t, err)
+			require.Len(t, stale, 1)
+			assert.Equal(t, tc.declarationsEnabled, stale[0].DeclarationsEnabled, "declarationsEnabled")
+			assert.Equal(t, tc.stopAtTarget, stale[0].StopAtTarget, "stopAtTarget")
+			assert.Equal(t, tc.declarationsTransfer, stale[0].DeclarationsTransfer, "declarationsTransfer")
+		})
 	}
 }

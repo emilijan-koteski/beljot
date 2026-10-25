@@ -439,6 +439,8 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	teamBScore := gs.TeamScores[game.TeamB]
 	variant := string(gs.Variant)
 	matchMode := gs.MatchMode
+	declarationsEnabled := gs.Rules.DeclarationsEnabled
+	stopAtTarget := gs.Rules.StopAtTarget
 	declarationsTransfer := gs.Rules.DeclarationsTransfer
 	var botSeats [4]bool
 	var connected [4]bool
@@ -520,6 +522,8 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		WinnerTeam:           winningTeam,
 		Variant:              variant,
 		MatchMode:            matchMode,
+		DeclarationsEnabled:  declarationsEnabled,
+		StopAtTarget:         stopAtTarget,
 		DeclarationsTransfer: declarationsTransfer,
 		StartedAt:            startedAt,
 		CompletedAt:          time.Now(),
