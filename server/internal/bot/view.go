@@ -31,9 +31,10 @@ type View struct {
 	HandPoints [2]int
 	TricksWon  [2]int
 
-	PlayedCards []game.Card
-	KnownVoids  [4][4]bool
-	KnownCards  [4][]game.Card
+	PlayedCards   []game.Card
+	KnownVoids    [4][4]bool
+	KnownCards    [4][]game.Card
+	DeclaredCards [4][]game.Card
 }
 
 // SuitIndex maps a suit to its index in KnownVoids' second dimension.

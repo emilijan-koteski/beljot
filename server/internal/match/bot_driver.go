@@ -203,6 +203,7 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		v.PlayedCards = mem.PlayedCards()
 		v.KnownVoids = mem.KnownVoids()
 		v.KnownCards = mem.KnownCards()
+		v.DeclaredCards = mem.DeclaredCards()
 	}
 	return v
 }
@@ -220,6 +221,13 @@ func (m *Manager) observeBotMemory(session *LiveMatch, oldState, newState *game.
 		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit, oldState.TrumpSuit)
 	}
 	mem.SyncHand(newState.HandNumber)
+	if action.Type == game.ActionPickTrump && oldState.TrumpCandidate != nil {
+		mem.ObserveLocatedCard(action.PlayerSeat, *oldState.TrumpCandidate)
+	}
+	if action.Type == game.ActionAnnounceBelot && newState.TrumpSuit != nil {
+		mem.ObserveLocatedCard(action.PlayerSeat, game.Card{Rank: game.RankKing, Suit: *newState.TrumpSuit})
+		mem.ObserveLocatedCard(action.PlayerSeat, game.Card{Rank: game.RankQueen, Suit: *newState.TrumpSuit})
+	}
 	if newState.DeclarationsResolved && newState.Rules.DeclarationsEnabled {
 		mem.ObserveDeclarations(newState.Players)
 	}

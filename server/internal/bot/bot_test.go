@@ -41,6 +41,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		PlayedCards:         mem.PlayedCards(),
 		KnownVoids:          mem.KnownVoids(),
 		KnownCards:          mem.KnownCards(),
+		DeclaredCards:       mem.DeclaredCards(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -777,6 +778,7 @@ type playTweakCase struct {
 	trick          []game.TrickCard
 	callerSeat     int
 	observes       []obs
+	located        map[int][]string
 	declaredBySeat map[int][]string
 	wantCard       string
 }
@@ -799,6 +801,11 @@ func runPlayTweakCases(t *testing.T, tests []playTweakCase) {
 			mem := bot.NewMemory()
 			for _, o := range tt.observes {
 				mem.ObservePlay(o.seat, card(o.card), o.lead, gs.TrumpSuit)
+			}
+			for seat, ids := range tt.located {
+				for _, id := range ids {
+					mem.ObserveLocatedCard(seat, card(id))
+				}
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -905,6 +912,13 @@ func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 			callerSeat:     2,
 			declaredBySeat: map[int][]string{2: {"JH", "TH", "9H"}},
 			wantCard:       "QH",
+		},
+		{
+			name:       "partner's located trumps are no declared run: still draw for the partner",
+			hand:       cards("QH", "KH", "AS", "7C"),
+			callerSeat: 2,
+			located:    map[int][]string{2: {"8H", "9H", "TH"}},
+			wantCard:   "QH",
 		},
 	})
 }
@@ -1779,4 +1793,34 @@ func TestObserveDeclarations_OverlapRecordsEachCardOnce(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{"9S", "TS", "JS", "QS", "JH", "JD", "JC"}, ids,
 		"the shared JS must be recorded exactly once")
+}
+
+func TestMemory_LocatedCardsJoinKnownCardsButNotDeclaredCards(t *testing.T) {
+	mem := bot.NewMemory()
+	mem.ObserveLocatedCard(2, card("AS"))
+	mem.ObserveLocatedCard(2, card("AS"))
+	assert.Equal(t, cards("AS"), mem.KnownCards()[2])
+	assert.Empty(t, mem.DeclaredCards()[2])
+	mem.SyncHand(2)
+	assert.Empty(t, mem.KnownCards()[2])
+}
+
+func TestDecide_PartnersLocatedAceMakesTheKingABoss(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "king leads as a boss once the ten is gone and the partner is known to hold the ace",
+			hand:       cards("KS", "7C", "8D"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "TS"}},
+			located:    map[int][]string{2: {"AS"}},
+			wantCard:   "KS",
+		},
+		{
+			name:       "king stays a false boss while the ace is unseen",
+			hand:       cards("KS", "7C", "8D"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "TS"}},
+			wantCard:   "7C",
+		},
+	})
 }

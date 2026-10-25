@@ -434,8 +434,8 @@ func unseenCards(v View) []game.Card {
 	return out
 }
 
-// knownHeldBy returns the revealed declaration cards seat still holds, excluding any already
-// played.
+// knownHeldBy returns the publicly known cards (revealed or located) seat still holds, excluding
+// any already played.
 func knownHeldBy(v View, seat int) []game.Card {
 	if seat < 0 || seat > 3 || len(v.KnownCards[seat]) == 0 {
 		return nil
@@ -515,7 +515,7 @@ func trumpRanksProvablyAbsentFromPartner(v View, partner int, trump game.Suit) m
 	}
 	var present [8]bool
 	any := false
-	for _, c := range v.KnownCards[partner] {
+	for _, c := range v.DeclaredCards[partner] {
 		if c.Suit == trump {
 			present[game.NaturalRankOrder[c.Rank]] = true
 			any = true

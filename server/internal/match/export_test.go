@@ -36,6 +36,23 @@ func (m *Manager) DealGraceRemainingForTest(roomID uint) time.Duration {
 	return lm.dealGraceRemaining()
 }
 
+// BotKnownCardsForTest returns the cards the session's bot memory holds per seat, or the zero
+// value when the room has no session or no bot memory.
+func (m *Manager) BotKnownCardsForTest(roomID uint) [4][]game.Card {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return [4][]game.Card{}
+	}
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+	if lm.botMemory == nil {
+		return [4][]game.Card{}
+	}
+	return lm.botMemory.KnownCards()
+}
+
 // BotThinkDelayForTest exposes botThinkDelay: the delay a bot at `seat` would
 // draw before acting on gs.
 func (m *Manager) BotThinkDelayForTest(gs *game.GameState, seat int) time.Duration {
