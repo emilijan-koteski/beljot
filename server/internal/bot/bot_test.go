@@ -71,202 +71,193 @@ func cards(ids ...string) []game.Card {
 
 func TestDecide_Bidding(t *testing.T) {
 	tests := []struct {
-		name        string
-		seat        int
-		hand        []game.Card
-		round       int
-		candidate   string
-		noCandidate bool
-		faceDown    []game.Card
-		forcedPick  bool
-		wantType    string
-		wantSuit    *game.Suit
+		name         string
+		seat         int
+		passesBefore int
+		hand         []game.Card
+		round        int
+		candidate    string
+		noCandidate  bool
+		forcedPick   bool
+		wantType     string
+		wantSuit     *game.Suit
 	}{
 		{
-			name:     "round 1 five of candidate suit picks",
-			seat:     1,
-			hand:     cards("7H", "8H", "9H", "TH", "JH"),
-			round:    1,
-			wantType: game.ActionPickTrump,
-		},
-		{
-			name:     "round 1 four of candidate suit picks",
-			seat:     1,
-			hand:     cards("7H", "8H", "QH", "KH", "7S"),
-			round:    1,
-			wantType: game.ActionPickTrump,
-		},
-		{
-			name:     "round 1 candidate completes jack+nine to a qualifying three picks",
-			seat:     1,
-			hand:     cards("JH", "9H", "7S", "8S", "9S"),
-			round:    1,
-			wantType: game.ActionPickTrump,
-		},
-		{
-			name:      "round 1 candidate completes to three with a seven passes",
+			name:      "row 1: J9 doubleton calls without a side Ace",
 			seat:      1,
-			hand:      cards("JH", "9H", "7S", "8S", "9S"),
+			hand:      cards("JH", "7S", "8S", "9S", "QD"),
 			round:     1,
-			candidate: "7H",
-			wantType:  game.ActionPassTrump,
+			candidate: "9H",
+			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 three with jack and a seven and eight passes",
+			name:      "row 2: J with two small calls",
 			seat:      1,
 			hand:      cards("JH", "7H", "7S", "8S", "9S"),
 			round:     1,
 			candidate: "8H",
-			wantType:  game.ActionPassTrump,
-		},
-		{
-			name:      "round 1 three with jack and a seven and eight but a side ace picks",
-			seat:      1,
-			hand:      cards("JH", "8H", "AS", "7C", "8C"),
-			round:     1,
-			candidate: "7H",
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 three with jack and a seven and eight and no side ace passes",
+			name:      "row 2 negative: J with one other passes",
 			seat:      1,
-			hand:      cards("JH", "8H", "KS", "7C", "8C"),
+			hand:      cards("JH", "7S", "8S", "9S", "QD"),
 			round:     1,
 			candidate: "7H",
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			name:      "round 1 nine ace pair with a side ace picks",
+			name:        "row 3: four with the 9",
+			seat:        1,
+			hand:        cards("9H", "7H", "8H", "QH", "7S", "8S"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitHearts),
+		},
+		{
+			name:        "row 4: four with the Ace",
+			seat:        1,
+			hand:        cards("AH", "7H", "8H", "QH", "7S", "8S"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitHearts),
+		},
+		{
+			name:      "row 5: four small with a side Ace",
 			seat:      1,
-			hand:      cards("9H", "AH", "AS", "8S", "KD"),
+			hand:      cards("7H", "8H", "QH", "AS", "7C"),
+			round:     1,
+			candidate: "KH",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:        "row 5 negative: four small, no side Ace",
+			seat:        1,
+			hand:        cards("7H", "8H", "QH", "KH", "7S", "8S"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:      "row 6: five trumps",
+			seat:      1,
+			hand:      cards("7H", "8H", "QH", "KH", "7S"),
+			round:     1,
+			candidate: "TH",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:      "row 7: 9+A with three and a side Ace, Bitola only",
+			seat:      1,
+			hand:      cards("9H", "AH", "AS", "7C", "8C"),
 			round:     1,
 			candidate: "QH",
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 nine ace pair with a lone side ace picks",
+			name:        "row 7 negative in Croatian",
+			seat:        1,
+			hand:        cards("9H", "AH", "QH", "AS", "7C", "8C"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:      "row 8: J+A doubleton with a side Ace, Bitola only",
 			seat:      1,
-			hand:      cards("9H", "AH", "AS", "8D", "KC"),
+			hand:      cards("JH", "AS", "7C", "8C", "9D"),
 			round:     1,
-			candidate: "QH",
+			candidate: "AH",
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 nine ace pair with no side ace passes",
+			name:      "row 9: J doubleton with two side Aces",
 			seat:      1,
-			hand:      cards("9H", "AH", "KS", "8D", "KC"),
+			hand:      cards("JH", "AS", "AC", "7D", "8D"),
 			round:     1,
-			candidate: "QH",
+			candidate: "7H",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:      "row 10: 9 with two others and a side Ace",
+			seat:      1,
+			hand:      cards("9H", "7H", "AS", "7C", "8C"),
+			round:     1,
+			candidate: "8H",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:         "row 11: third seat J doubleton with one side Ace",
+			seat:         1,
+			passesBefore: 2,
+			hand:         cards("JH", "AS", "7C", "8C", "9D"),
+			round:        1,
+			candidate:    "7H",
+			wantType:     game.ActionPickTrump,
+		},
+		{
+			name:      "row 11 negative at first seat",
+			seat:      1,
+			hand:      cards("JH", "AS", "7C", "8C", "9D"),
+			round:     1,
+			candidate: "7H",
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			name:      "round 1 two trumps jack and nine with a side ace picks",
+			name:         "row 12: Croatian dealer's partner J doubleton with a side Ace",
+			seat:         1,
+			passesBefore: 1,
+			hand:         cards("JH", "7H", "AS", "7C", "8C", "9D"),
+			round:        1,
+			noCandidate:  true,
+			wantType:     game.ActionPickTrump,
+			wantSuit:     suitPtr(game.SuitHearts),
+		},
+		{
+			name:        "row 12 negative at first seat",
+			seat:        1,
+			hand:        cards("JH", "7H", "AS", "7C", "8C", "9D"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:      "round 2 picks the higher-scoring of two matching suits",
 			seat:      1,
-			hand:      cards("JH", "AS", "7C", "8C", "7D"),
-			round:     1,
-			candidate: "9H",
+			hand:      cards("JH", "9H", "JS", "9S", "AS"),
+			round:     2,
+			candidate: "7C",
 			wantType:  game.ActionPickTrump,
+			wantSuit:  suitPtr(game.SuitSpades),
 		},
 		{
-			name:      "round 1 two trumps jack and nine without a side ace passes",
+			name:      "round 2 candidate suit is locked out",
 			seat:      1,
-			hand:      cards("JH", "7C", "8C", "7D", "8D"),
-			round:     1,
-			candidate: "9H",
-			wantType:  game.ActionPassTrump,
-		},
-		{
-			name:      "round 1 two trumps jack and ace does not qualify",
-			seat:      1,
-			hand:      cards("JH", "AS", "7C", "8C", "7D"),
-			round:     1,
+			hand:      cards("7H", "8H", "9H", "TH", "JH"),
+			round:     2,
 			candidate: "AH",
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			name:      "round 1 three without jack or nine+ace passes",
-			seat:      1,
-			hand:      cards("KH", "QH", "7S", "8S", "9S"),
-			round:     1,
-			candidate: "TH",
-			wantType:  game.ActionPassTrump,
-		},
-		{
-			name:     "round 1 junk hand passes",
-			seat:     0,
-			hand:     cards("7S", "8S", "9S", "TS", "JS"),
-			round:    1,
-			wantType: game.ActionPassTrump,
-		},
-		{
-			name:     "round 2 qualifying side suit picked",
-			seat:     1,
-			hand:     cards("JS", "9S", "AS", "9C", "AC"),
-			round:    2,
-			wantType: game.ActionPickTrump,
-			wantSuit: suitPtr(game.SuitSpades),
-		},
-		{
-			name:      "round 2 candidate side card completes a nine ace pick",
-			seat:      1,
-			hand:      cards("9D", "AD", "KD", "AC", "7H"),
-			round:     2,
-			candidate: "TC",
-			wantType:  game.ActionPickTrump,
-			wantSuit:  suitPtr(game.SuitDiamonds),
-		},
-		{
-			name:     "round 2 candidate suit locked out",
-			seat:     1,
-			hand:     cards("7H", "8H", "9H", "TH", "JH"),
-			round:    2,
-			wantType: game.ActionPassTrump,
-		},
-		{
-			name:     "round 2 junk passes",
-			seat:     1,
-			hand:     cards("7S", "8D", "9C", "TS", "KD"),
-			round:    2,
-			wantType: game.ActionPassTrump,
-		},
-		{
-			name:        "no candidate round 1 picks and carries the suit",
-			seat:        1,
-			hand:        cards("7S", "8S", "9S", "TS", "JS", "7H"),
-			round:       1,
-			noCandidate: true,
-			faceDown:    cards("7D", "8D"),
-			wantType:    game.ActionPickTrump,
-			wantSuit:    suitPtr(game.SuitSpades),
-		},
-		{
-			name:        "no candidate round 1 junk passes",
-			seat:        1,
-			hand:        cards("7S", "8H", "9D", "TC", "QS", "KH"),
-			round:       1,
-			noCandidate: true,
-			faceDown:    cards("7D", "8D"),
-			wantType:    game.ActionPassTrump,
-		},
-		{
-			name:        "no candidate does not count the hidden pair",
-			seat:        1,
-			hand:        cards("7D", "8D", "9D", "7S", "8S", "7H"),
-			round:       1,
-			noCandidate: true,
-			faceDown:    cards("TD", "JD"),
-			wantType:    game.ActionPassTrump,
-		},
-		{
-			name:        "forced dealer picks its best suit rather than passing",
+			name:        "forced dealer with nothing picks a suit",
 			seat:        0,
-			hand:        cards("7D", "8D", "JD", "7S", "8H", "9C"),
+			hand:        cards("7H", "8H", "7S", "8S", "7D", "8D"),
 			round:       1,
 			noCandidate: true,
-			faceDown:    cards("QC", "KH"),
 			forcedPick:  true,
 			wantType:    game.ActionPickTrump,
-			wantSuit:    suitPtr(game.SuitDiamonds),
+		},
+		{
+			name:        "forced dealer with no matching suit picks the top-scoring one",
+			seat:        0,
+			hand:        cards("7H", "8H", "JS", "9D", "7C", "8C"),
+			round:       1,
+			noCandidate: true,
+			forcedPick:  true,
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitSpades),
 		},
 	}
 
@@ -275,15 +266,13 @@ func TestDecide_Bidding(t *testing.T) {
 			var gs *game.GameState
 			if tt.noCandidate {
 				gs = testfixtures.NewGameCroatianJustDealt()
-				if tt.faceDown != nil {
-					gs.Players[tt.seat].FaceDownCards = tt.faceDown
-				}
-				if tt.forcedPick {
-					gs.BiddingPassCount = 3
-					gs.DealerSeat = tt.seat
-				}
 			} else {
 				gs = testfixtures.NewGameJustDealt()
+			}
+			gs.DealerSeat = (tt.seat - tt.passesBefore - 1 + 4) % 4
+			if tt.forcedPick {
+				gs.BiddingPassCount = 3
+				gs.DealerSeat = tt.seat
 			}
 			gs.BiddingRound = tt.round
 			gs.ActivePlayerSeat = tt.seat
@@ -299,8 +288,12 @@ func TestDecide_Bidding(t *testing.T) {
 
 			assert.Equal(t, tt.wantType, action.Type)
 			assert.Equal(t, tt.seat, action.PlayerSeat)
-			if tt.round == 1 && gs.TrumpCandidate != nil && tt.wantType == game.ActionPickTrump {
-				assert.Nil(t, action.Suit, "round 1 pick on a candidate carries no suit")
+			if tt.wantType == game.ActionPickTrump {
+				if tt.round == 1 && gs.TrumpCandidate != nil {
+					assert.Nil(t, action.Suit, "round 1 pick on a candidate carries no suit")
+				} else {
+					require.NotNil(t, action.Suit, "a free-suit pick must carry a suit")
+				}
 			}
 			if tt.wantSuit != nil {
 				require.NotNil(t, action.Suit)

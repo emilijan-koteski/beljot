@@ -2,7 +2,7 @@
 
 This document describes exactly how the bot decides, across every scenario, what it
 considers, and with examples. It reflects the current logic including the latest tuning
-(candidate-aware bidding, unbacked side-Ace and two-trump Jack+9 bids, partner trump-draw with
+(simulation-calibrated hand-shape bidding, partner trump-draw with
 a declaration-inference abort when the opponents provably hold the master, boss preservation,
 uncuttable-boss last-trick retention, Ace/Ten boss handling, suppressing trump draws once the
 opponents are void of trump, leading into a partner's void, smearing onto a partner's boss,
@@ -18,7 +18,8 @@ Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, 
 
 | Concern | File | Notes |
 |---|---|---|
-| All decision logic (pure, deterministic) | `server/internal/bot/bot.go` | Almost all tuning goes here |
+| Card-play decision logic (pure, deterministic) | `server/internal/bot/bot.go` | `Decide`, `chooseCard`, declarations |
+| Bidding (the hand-shape table) | `server/internal/bot/bidding.go` | `decideBid`, `matchesBidTable` |
 | What the bot is allowed to know | `server/internal/bot/view.go` | Redacted, seat-local snapshot |
 | What the bot remembers | `server/internal/bot/memory.go` | Played cards, voids, revealed declarations |
 | Timing, humanization, scheduling | `server/internal/match/bot_driver.go` | Think delay, when the bot acts |
@@ -65,107 +66,84 @@ Scenarios 1, 3, 4 are "always do it" with nothing to tune. The real intelligence
 
 ## 4. Scenario A: Bidding (choosing trump)
 
-Bidding happens on the 5-card stage-1 hand. There are two rounds.
+The bot calls a suit when its **bid hand** fits one of twelve hand shapes in a table
+(`matchesBidTable` in `server/internal/bot/bidding.go`). It reads the variant from
+`View.HasTrumpCandidate`, never from a variant name. The rows come from the simulation
+calibration in `BOT_V2_LAB_RESULTS.md` §3.
 
-### 4.0 The revealed candidate card is counted
+### 4.1 The bid hand and the two variants
 
-Whoever picks the trump **always receives the face-up candidate card** (the engine appends it
-in `handlePickTrump`, both rounds). So the bot evaluates the hand it would actually hold after
-picking: `hand + candidate` (built in `decideBid`).
+- **Bitola** has a face-up candidate card. Whoever picks trump always receives it (the engine
+  appends it in `handlePickTrump`, both rounds), so the bot evaluates the hand it would actually
+  hold: `hand + candidate`, six cards. In round 1 only the candidate's suit is offered and the
+  candidate counts toward its trump count. In round 2 the candidate's suit is locked out and the
+  candidate is a side card, which can supply a side Ace.
+- **Croatian** has no candidate. The bot evaluates its six visible cards (the two face-down cards
+  are not counted), any suit may be called, and there is a single round.
 
-- **Round 1**: the candidate is a trump (its suit is the trump suit), so it adds to the trump
-  count. The 3-card rules now apply to **2 in hand + candidate**; the 4-card rule to
-  **3 in hand + candidate**.
-- **Round 2**: the candidate is a side card (its suit is locked out), so it can supply a
-  side Ace for rules 4.3 / 4.4.
+### 4.2 The table
 
-Example: hand J♥ 9♥, candidate A♥ -> 3 trumps (J, 9, A) -> take.
-Example: hand J♥ + side A♣, candidate 9♥ -> 2 trumps (J, 9) + a side Ace -> take (rule 4.4).
+For one suit of the bid hand: **count** is the number of cards of that suit, **side Aces** is the
+number of Aces in the other three suits, and **position** is the number of seats that have
+already passed in the current round, `(seat - dealer - 1) mod 4`: 0 for the first seat to speak,
+3 for the dealer. The bot calls the suit when **any** row matches.
 
-### The hand-strength gate: `wantsTrump`
-
-A single yes/no evaluator used in both rounds. For a given suit, the bot wants it as trump if:
-
-- it holds **4 or more** cards of that suit -> yes (unconditional), or
-- it holds **exactly 3** including the **Jack** with **neither a 7 nor an 8** among them (the
-  other two trumps both 9 or higher); or exactly 3 including the **Jack** with a 7 or 8 among
-  them **plus a side Ace** (the outside winner rescues the weaker holding), or
-- it holds **exactly 3** with the **9 + Ace** pair, and also holds a **side Ace** (any Ace in
-  another suit; it need not be backed by a second card of its suit), or
-- it holds **exactly 2** trumps that are the **Jack and the 9** (the two strongest trumps),
-  and also holds a **side Ace**, or
-- otherwise: no.
-
-#### 4.1 Four or more trumps -> unconditional take.
-
-#### 4.2 Three trumps including the Jack (tightened, with a side-Ace rescue)
-
-Take if the other two trumps are both 9 or higher. If a 7 **or** an 8 is among the three the
-hand is weaker — but it **still calls when the hand holds a side Ace** (an Ace in another suit,
-an outside winner). With a 7/8 and no side Ace, pass.
-
-| 3 trumps (incl. candidate) | Side Ace? | Take? | Why |
+| # | Cards of the suit | Side Aces | Variant and position |
 |---|---|---|---|
-| J♥ 9♥ A♥ | — | yes | Jack, other two (9, A) are above 8 |
-| J♥ K♥ Q♥ | — | yes | Jack, K and Q are above 8 |
-| J♥ 9♥ 7♥ | no | no | contains a 7, no outside Ace |
-| J♥ 8♥ K♥ | no | no | contains an 8, no outside Ace |
-| J♥ 7♥ 8♥ | no | no | contains both 7 and 8, no outside Ace |
-| J♥ 8♥ 7♥ + A♠ | yes | yes | weak three, but the side A♠ rescues it |
+| 1 | Jack and 9 | any | both |
+| 2 | Jack, 3 or more cards | any | both |
+| 3 | the 9, 4 or more cards | any | both |
+| 4 | the Ace, 4 or more cards | any | both |
+| 5 | 4 or more cards | at least 1 | both |
+| 6 | 5 or more cards | any | both |
+| 7 | 9 and Ace, exactly 3 cards | at least 1 | Bitola only |
+| 8 | Jack and Ace, exactly 2 cards | at least 1 | Bitola only |
+| 9 | Jack, exactly 2 cards | at least 2 | Bitola only |
+| 10 | the 9 but neither Jack nor Ace, exactly 3 cards | at least 1 | Bitola only |
+| 11 | Jack, exactly 2 cards | at least 1 | Bitola only, third seat to speak (position 2) |
+| 12 | Jack, exactly 2 cards | at least 1 | Croatian only, dealer's partner (position 1) |
 
-#### 4.3 Pair 9 + Ace with a side Ace
+Every other shape passes, for example the Jack with one small trump and no side Ace, three small
+trumps without the Jack or the 9, or four small trumps with no side Ace.
 
-The 9 + Ace trump pair calls with any **side Ace** — an Ace in another suit. The Ace does
-**not** need a second card of its suit to back it: a lone side Ace is enough. Logic:
-`hasSideAce`.
+| Hand (incl. candidate) | Variant, position | Call? | Why |
+|---|---|---|---|
+| J♥ 9♥ + 7♠ 8♠ 9♠ Q♦ | Bitola | yes | row 1, no side Ace needed |
+| 7♥ 8♥ Q♥ K♥ + A♠ 7♣ | Bitola | yes | row 5, four trumps with a side Ace |
+| 7♥ 8♥ Q♥ K♥ + 7♠ 8♠ | Croatian | no | four small trumps, no side Ace |
+| 9♥ A♥ Q♥ + A♠ 7♣ 8♣ | Bitola | yes | row 7 |
+| 9♥ A♥ Q♥ + A♠ 7♣ 8♣ | Croatian | no | row 7 is Bitola only |
+| J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, first to speak | no | needs position 2 (row 11) |
+| J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, third to speak | yes | row 11 |
 
-| Hand (incl. candidate) | Take? | Why |
-|---|---|---|
-| 9♥ A♥ Q♥ + A♣ T♣ | yes | pair 9+A, side A♣ |
-| 9♥ A♥ Q♥ + A♣ K♦ | yes | a lone side A♣ is enough (no backing needed) |
-| 9♥ A♥ Q♥ + K♣ K♦ | no | no side Ace at all |
+### 4.3 Choosing the suit, and the forced pick
 
-#### 4.4 Two trumps: the Jack and the 9 with a side Ace
+- **Bitola round 1:** only the candidate's suit is offered. The bot picks it exactly when the
+  table matches, otherwise it passes.
+- **Bitola round 2 and Croatian:** the bot evaluates every allowed suit (all but the candidate's,
+  when there is one) and, among the suits that match, picks the one with the highest
+  `trumpSuitScore`:
 
-Exactly two trumps call **only** when they are the **Jack and the 9** — the two strongest
-trumps (J=20, 9=14) — and the hand also holds a **side Ace**. Any other two-trump holding
-passes. Logic: the `count == 2` branch in `wantsTrump` (`hasJack && hasNine && hasSideAce`).
+  ```
+  score(suit) = sum over cards of that suit of ( trumpPoints[rank] + 10 )
+  ```
 
-| Hand (incl. candidate) | Take? | Why |
-|---|---|---|
-| J♥ 9♥ + A♣ | yes | the two strongest trumps, backed by a side Ace |
-| J♥ 9♥ | no | no side Ace |
-| J♥ A♥ + A♣ | no | two trumps but not the Jack **and** the 9 |
-| J♥ T♥ + A♣ | no | the second trump is the Ten, not the 9 |
+  The per-card `trumpLengthBonus` (currently 10) biases toward a longer suit over raw points.
+  Ties go to the first suit in the order ♠ ♥ ♦ ♣.
+- **Forced pick:** when the engine forbids a pass (`View.MustPickTrump`, the Croatian dealer after
+  three passes) and no suit matches, the bot picks the suit with the highest `trumpSuitScore`
+  whatever the rows say. It never passes there, because the engine rejects the pass and the bot
+  timer would re-arm forever. Bitola has no forced pick: if no suit qualifies in round 2, all
+  four pass and the deck reshuffles.
 
-Note: this rule targets **exactly two** trumps; adding a third trump makes it a *three*-trump
-hand judged by rule 4.2. With the side-Ace rescue in 4.2, the two rules now agree — J♥ 9♥ +
-side Ace calls (4.4), and so does J♥ 9♥ 7♥ + side Ace (4.2). A Jack plus a side Ace is enough
-whether the hand holds two or three trumps.
+### 4.4 Bidding tuning levers
 
-### Round 1 (`decideBid`)
-
-Only one option: the candidate's suit. The bot calls
-`wantsTrump(hand + candidate, candidate.Suit)` and picks or passes.
-
-### Round 2
-
-If all four passed in round 1, the candidate's suit is locked out. The bot evaluates **every
-other suit** with the same gate, and among those that pass, picks the **highest-scoring** one
-via `trumpSuitScore`:
-
-```
-score(suit) = sum over cards of that suit of ( trumpPoints[rank] + 10 )
-```
-
-The per-card `trumpLengthBonus` (currently 10) biases toward a longer suit over raw points.
-
-### Bidding tuning levers
-
-- The whole `wantsTrump` threshold logic: the biggest dial for aggressive vs. conservative.
-  It currently considers no partner, score, or dealer position.
-- `trumpLengthBonus` (currently 10): raise to favor length, lower to favor points.
-- There is no forced pick in round 2: if no suit qualifies, all pass and the deck reshuffles.
+- The rows of `matchesBidTable`, including the position conditions on rows 11 and 12: the
+  biggest dial for aggressive vs. conservative. Re-derive them with the lab, not by feel.
+- `trumpLengthBonus` (currently 10): raise to favor length, lower to favor points when several
+  suits match or the pick is forced.
+- The table considers only the bid hand and the seat's position. It considers no partner or
+  match score.
 
 ---
 
@@ -609,8 +587,8 @@ No bearing on which card, only when:
 
 By impact:
 
-1. `wantsTrump` and `hasSideAce`: bidding aggressiveness (the biggest dial).
-2. `trumpSuitScore` + `trumpLengthBonus`: round-2 suit preference (length vs. points).
+1. `matchesBidTable`: bidding aggressiveness (the biggest dial).
+2. `trumpSuitScore` + `trumpLengthBonus`: suit preference when several suits match or the pick is forced (length vs. points).
 3. `chooseLead` priority: when to draw trumps (with the master or for the partner, and
    `opponentsOutOfTrump` stops the draw once opponents are void), cash a boss (Ace/Ten handling),
    feed a partner ruff, or lead safe. The partner draw also aborts on
@@ -665,7 +643,7 @@ Blind spots if you want a stronger bot (the first four are logged in
 - `TeamScores` / `HandPoints` / `TricksWon` are in the View but **never consulted**: no
   "we are behind, play aggressive" or "the contract is secured, coast" logic.
 - No signalling or inference from the **partner's** discards (only voids are used).
-- No forced pick in round 2 (weak hands just reshuffle).
+- No forced pick in Bitola round 2 (weak hands just reshuffle).
 - Belote, declarations, and accepting surrender are unconditional (correct, nothing to tune).
 
 ---
@@ -674,8 +652,8 @@ Blind spots if you want a stronger bot (the first four are logged in
 
 | Behavior | Function | File |
 |---|---|---|
-| Bidding aggressiveness | `wantsTrump`, `hasSideAce` | `server/internal/bot/bot.go` |
-| Round-2 suit preference | `trumpSuitScore`, `trumpLengthBonus` | `server/internal/bot/bot.go` |
+| Bidding aggressiveness | `matchesBidTable` | `server/internal/bot/bidding.go` |
+| Suit preference when several suits match or the pick is forced | `trumpSuitScore`, `trumpLengthBonus` | `server/internal/bot/bidding.go` |
 | Draw trumps for partner (Q/K/T/A, never 9) | `partnerDrawTrump` + block in `chooseLead` | `server/internal/bot/bot.go` |
 | Don't draw into the opponents' master (declaration inference) | `opponentHoldsMasterTrump`, `trumpRanksProvablyAbsentFromPartner` + block in `chooseLead` | `server/internal/bot/bot.go` |
 | Stop drawing once opponents are void of trump | `opponentsOutOfTrump` + blocks in `chooseLead` | `server/internal/bot/bot.go` |
