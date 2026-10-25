@@ -226,11 +226,11 @@ func TestDecide_Bidding(t *testing.T) {
 		{
 			name:      "round 2 picks the higher-scoring of two matching suits",
 			seat:      1,
-			hand:      cards("JH", "9H", "JS", "9S", "AS"),
+			hand:      cards("JS", "9S", "JH", "9H", "AH"),
 			round:     2,
 			candidate: "7C",
 			wantType:  game.ActionPickTrump,
-			wantSuit:  suitPtr(game.SuitSpades),
+			wantSuit:  suitPtr(game.SuitHearts),
 		},
 		{
 			name:      "round 2 candidate suit is locked out",
@@ -252,12 +252,12 @@ func TestDecide_Bidding(t *testing.T) {
 		{
 			name:        "forced dealer with no matching suit picks the top-scoring one",
 			seat:        0,
-			hand:        cards("7H", "8H", "JS", "9D", "7C", "8C"),
+			hand:        cards("7S", "8S", "JH", "9D", "7C", "8C"),
 			round:       1,
 			noCandidate: true,
 			forcedPick:  true,
 			wantType:    game.ActionPickTrump,
-			wantSuit:    suitPtr(game.SuitSpades),
+			wantSuit:    suitPtr(game.SuitHearts),
 		},
 	}
 
