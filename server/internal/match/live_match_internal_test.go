@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/emilijan/beljot/server/internal/bot"
 	"github.com/emilijan/beljot/server/internal/game"
 	"github.com/emilijan/beljot/server/internal/game/testfixtures"
 	"github.com/emilijan/beljot/server/internal/ws"
@@ -456,4 +457,42 @@ func TestBuildBotView_MustPickTrumpIsSeatScoped(t *testing.T) {
 	for seat := 0; seat < 4; seat++ {
 		assert.False(t, buildBotView(bitola, seat, nil).MustPickTrump, "seat %d", seat)
 	}
+}
+
+// TestBuildBotView_HasTrumpCandidateFollowsTheVariant checks that the candidate flag mirrors the
+// rule config: set for Bitola and unset for Croatian, for every seat.
+func TestBuildBotView_HasTrumpCandidateFollowsTheVariant(t *testing.T) {
+	bitola := testfixtures.NewGameMidBidding(0)
+	require.True(t, bitola.Rules.HasTrumpCandidate)
+	croatian := testfixtures.NewGameCroatianMidBidding(0)
+	require.False(t, croatian.Rules.HasTrumpCandidate)
+	for seat := 0; seat < 4; seat++ {
+		assert.True(t, buildBotView(bitola, seat, nil).HasTrumpCandidate, "bitola seat %d", seat)
+		assert.False(t, buildBotView(croatian, seat, nil).HasTrumpCandidate, "croatian seat %d", seat)
+	}
+}
+
+// TestBuildBotView_CarriesTheRevealedDeclarationCards checks that the cards the bot memory holds
+// as publicly declared reach the view, seat by seat.
+func TestBuildBotView_CarriesTheRevealedDeclarationCards(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(1)
+	declared := []game.Card{
+		{Rank: game.RankQueen, Suit: game.SuitSpades},
+		{Rank: game.RankKing, Suit: game.SuitSpades},
+		{Rank: game.RankAce, Suit: game.SuitSpades},
+	}
+	gs.Players[1].Declarations = []game.Declaration{{
+		Type:       game.DeclarationSequence,
+		Cards:      declared,
+		PlayerSeat: 1,
+	}}
+	mem := bot.NewMemory()
+	mem.ObserveDeclarations(gs.Players)
+
+	v := buildBotView(gs, 0, mem)
+
+	assert.Equal(t, declared, v.DeclaredCards[1])
+	assert.Empty(t, v.DeclaredCards[0])
+	assert.Empty(t, v.DeclaredCards[2])
+	assert.Empty(t, v.DeclaredCards[3])
 }

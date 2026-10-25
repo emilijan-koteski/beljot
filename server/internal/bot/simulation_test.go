@@ -87,11 +87,19 @@ func playOneHandWith(
 				observe(t, gs, seat, action)
 			}
 			oldLead := gs.LeadSuit
+			oldCandidate := gs.TrumpCandidate
 			next, err := game.ApplyAction(gs, action)
 			require.NoError(t, err,
 				"ApplyAction must never reject a simulated action (seat %d, %s)", seat, action.Type)
 			if action.Type == game.ActionPlayCard {
 				mem.ObservePlay(seat, *action.Card, oldLead, gs.TrumpSuit)
+			}
+			if action.Type == game.ActionPickTrump && oldCandidate != nil {
+				mem.ObserveLocatedCard(seat, *oldCandidate)
+			}
+			if action.Type == game.ActionAnnounceBelot && next.TrumpSuit != nil {
+				mem.ObserveLocatedCard(seat, game.Card{Rank: game.RankKing, Suit: *next.TrumpSuit})
+				mem.ObserveLocatedCard(seat, game.Card{Rank: game.RankQueen, Suit: *next.TrumpSuit})
 			}
 			gs = next
 			if gs.DeclarationsResolved {

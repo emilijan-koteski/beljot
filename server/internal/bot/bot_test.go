@@ -173,6 +173,14 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPickTrump,
 		},
 		{
+			name:        "row 8 negative in Croatian",
+			seat:        1,
+			hand:        cards("JH", "AH", "AS", "7C", "8C", "9D"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
 			name:      "row 9: J doubleton with two side Aces",
 			seat:      1,
 			hand:      cards("JH", "AS", "AC", "7D", "8D"),
@@ -181,12 +189,28 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPickTrump,
 		},
 		{
+			name:        "row 9 negative in Croatian",
+			seat:        1,
+			hand:        cards("JH", "7H", "AS", "AC", "7D", "8D"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
 			name:      "row 10: 9 with two others and a side Ace",
 			seat:      1,
 			hand:      cards("9H", "7H", "AS", "7C", "8C"),
 			round:     1,
 			candidate: "8H",
 			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:        "row 10 negative in Croatian",
+			seat:        1,
+			hand:        cards("9H", "7H", "8H", "AS", "7C", "8C"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
 		},
 		{
 			name:         "row 11: third seat J doubleton with one side Ace",
@@ -206,6 +230,15 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPassTrump,
 		},
 		{
+			name:         "row 11 negative in Croatian at the third seat",
+			seat:         1,
+			passesBefore: 2,
+			hand:         cards("JH", "7H", "AS", "7C", "8C", "9D"),
+			round:        1,
+			noCandidate:  true,
+			wantType:     game.ActionPassTrump,
+		},
+		{
 			name:         "row 12: Croatian dealer's partner J doubleton with a side Ace",
 			seat:         1,
 			passesBefore: 1,
@@ -222,6 +255,15 @@ func TestDecide_Bidding(t *testing.T) {
 			round:       1,
 			noCandidate: true,
 			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:         "row 12 negative in Bitola at the second seat",
+			seat:         1,
+			passesBefore: 1,
+			hand:         cards("JH", "AS", "7C", "8C", "9D"),
+			round:        1,
+			candidate:    "7H",
+			wantType:     game.ActionPassTrump,
 		},
 		{
 			name:      "round 2 picks the higher-scoring of two matching suits",
@@ -1830,6 +1872,27 @@ func TestDecide_PartnersLocatedAceMakesTheKingABoss(t *testing.T) {
 			hand:       cards("KS", "7C", "8D"),
 			callerSeat: 1,
 			observes:   []obs{{seat: 1, card: "TS"}},
+			wantCard:   "7C",
+		},
+	})
+}
+
+func TestDecide_PlayedLocatedCardStopsCounting(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "opponent's located ace was played: the king is a boss again",
+			hand:       cards("KS", "7C", "8D"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "TS"}, {seat: 1, card: "AS"}},
+			located:    map[int][]string{1: {"AS"}},
+			wantCard:   "KS",
+		},
+		{
+			name:       "opponent's located ace is still held: the king is no boss",
+			hand:       cards("KS", "7C", "8D"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "TS"}},
+			located:    map[int][]string{1: {"AS"}},
 			wantCard:   "7C",
 		},
 	})
