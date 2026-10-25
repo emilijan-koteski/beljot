@@ -180,6 +180,7 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		TrumpCandidate:      gs.TrumpCandidate,
 		TrumpSuit:           gs.TrumpSuit,
 		TrumpCallerSeat:     gs.TrumpCallerSeat,
+		HasTrumpCandidate:   gs.Rules.HasTrumpCandidate,
 		DealerSeat:          gs.DealerSeat,
 		CurrentTrick:        gs.CurrentTrick,
 		LeadSuit:            gs.LeadSuit,
@@ -216,7 +217,7 @@ func (m *Manager) observeBotMemory(session *LiveMatch, oldState, newState *game.
 		return
 	}
 	if action.Type == game.ActionPlayCard && action.Card != nil {
-		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit)
+		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit, oldState.TrumpSuit)
 	}
 	mem.SyncHand(newState.HandNumber)
 	if newState.DeclarationsResolved && newState.Rules.DeclarationsEnabled {

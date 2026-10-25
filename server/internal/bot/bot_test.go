@@ -1,6 +1,7 @@
 package bot_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,6 +27,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		TrumpCandidate:      gs.TrumpCandidate,
 		TrumpSuit:           gs.TrumpSuit,
 		TrumpCallerSeat:     gs.TrumpCallerSeat,
+		HasTrumpCandidate:   gs.Rules.HasTrumpCandidate,
 		DealerSeat:          gs.DealerSeat,
 		CurrentTrick:        gs.CurrentTrick,
 		LeadSuit:            gs.LeadSuit,
@@ -553,7 +555,7 @@ func TestDecide_CardPlay(t *testing.T) {
 
 			mem := bot.NewMemory()
 			for _, id := range tt.played {
-				mem.ObservePlay(1, card(id), nil)
+				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit)
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -629,10 +631,10 @@ func TestDecide_PartnerTakesTrick(t *testing.T) {
 
 			mem := bot.NewMemory()
 			if tt.partnerVoidDiam {
-				mem.ObservePlay(2, card("8C"), &lead)
+				mem.ObservePlay(2, card("8C"), &lead, nil)
 			}
 			for _, id := range tt.playedHearts {
-				mem.ObservePlay(2, card(id), nil)
+				mem.ObservePlay(2, card(id), nil, gs.TrumpSuit)
 			}
 			mem.ObserveDeclarations(gs.Players)
 
@@ -736,7 +738,7 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 
 			mem := bot.NewMemory()
 			for _, id := range tt.played {
-				mem.ObservePlay(1, card(id), nil)
+				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit)
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -796,7 +798,7 @@ func runPlayTweakCases(t *testing.T, tests []playTweakCase) {
 
 			mem := bot.NewMemory()
 			for _, o := range tt.observes {
-				mem.ObservePlay(o.seat, card(o.card), o.lead)
+				mem.ObservePlay(o.seat, card(o.card), o.lead, gs.TrumpSuit)
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -1602,26 +1604,54 @@ func TestMemory_VoidInference(t *testing.T) {
 	mem := bot.NewMemory()
 	lead := game.SuitSpades
 
-	mem.ObservePlay(2, card("7H"), &lead)
+	mem.ObservePlay(2, card("7H"), &lead, nil)
 	voids := mem.KnownVoids()
 	assert.True(t, voids[2][bot.SuitIndex(game.SuitSpades)])
 	assert.False(t, voids[2][bot.SuitIndex(game.SuitHearts)])
 
-	mem.ObservePlay(3, card("9S"), &lead)
+	mem.ObservePlay(3, card("9S"), &lead, nil)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[3][bot.SuitIndex(game.SuitSpades)])
 
-	mem.ObservePlay(0, card("AC"), nil)
+	mem.ObservePlay(0, card("AC"), nil, nil)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[0][bot.SuitIndex(game.SuitClubs)])
 
 	assert.Len(t, mem.PlayedCards(), 3)
 }
 
+func TestMemory_DiscardProvesTrumpVoid(t *testing.T) {
+	spades, hearts := game.SuitSpades, game.SuitHearts
+	tests := []struct {
+		name      string
+		lead      game.Suit
+		seat      int
+		card      string
+		wantVoids []game.Suit
+	}{
+		{"off-suit non-trump discard proves both voids", spades, 1, "9D", []game.Suit{spades, hearts}},
+		{"ruff proves only the led suit void", spades, 2, "8H", []game.Suit{spades}},
+		{"following suit proves nothing", spades, 3, "8S", nil},
+		{"trump led, discard proves void in trump only", hearts, 1, "9D", []game.Suit{hearts}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mem := bot.NewMemory()
+			lead := tt.lead
+			mem.ObservePlay(tt.seat, card(tt.card), &lead, &hearts)
+			voids := mem.KnownVoids()
+			for _, s := range game.AllSuits {
+				want := slices.Contains(tt.wantVoids, s)
+				assert.Equal(t, want, voids[tt.seat][bot.SuitIndex(s)], "suit %s", s)
+			}
+		})
+	}
+}
+
 func TestMemory_SyncHandResets(t *testing.T) {
 	mem := bot.NewMemory()
 	lead := game.SuitSpades
-	mem.ObservePlay(2, card("7H"), &lead)
+	mem.ObservePlay(2, card("7H"), &lead, nil)
 	require.NotEmpty(t, mem.PlayedCards())
 
 	mem.SyncHand(1)

@@ -9,13 +9,14 @@ type View struct {
 	Hand       []game.Card
 	LegalCards []game.Card
 
-	Phase           game.Phase
-	BiddingRound    int
-	TrumpCandidate  *game.Card
-	TrumpSuit       *game.Suit
-	TrumpCallerSeat *int
-	DealerSeat      int
-	MustPickTrump   bool
+	Phase             game.Phase
+	BiddingRound      int
+	TrumpCandidate    *game.Card
+	TrumpSuit         *game.Suit
+	TrumpCallerSeat   *int
+	DealerSeat        int
+	MustPickTrump     bool
+	HasTrumpCandidate bool
 
 	CurrentTrick     []game.TrickCard
 	LeadSuit         *game.Suit

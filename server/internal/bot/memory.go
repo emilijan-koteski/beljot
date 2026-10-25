@@ -32,15 +32,25 @@ func (m *Memory) SyncHand(handNumber int) {
 	}
 }
 
-// ObservePlay records a resolved play and marks the seat void when it did not follow leadSuit.
-// leadSuit is the pre-play lead suit, nil when this card led the trick.
-func (m *Memory) ObservePlay(seat int, card game.Card, leadSuit *game.Suit) {
+// ObservePlay records a resolved play and marks the seat void in the led suit when it did not follow.
+// A non-trump discard also proves a trump void; leadSuit is nil when this card led, trump nil only when unknown.
+func (m *Memory) ObservePlay(seat int, card game.Card, leadSuit, trump *game.Suit) {
 	m.played = append(m.played, card)
-	if leadSuit != nil && card.Suit != *leadSuit && seat >= 0 && seat < 4 {
-		if idx := SuitIndex(*leadSuit); idx >= 0 {
-			m.voids[seat][idx] = true
-		}
+	if leadSuit == nil || card.Suit == *leadSuit {
+		return
 	}
+	m.markVoid(seat, *leadSuit)
+	if trump != nil && card.Suit != *trump {
+		m.markVoid(seat, *trump)
+	}
+}
+
+func (m *Memory) markVoid(seat int, suit game.Suit) {
+	idx := SuitIndex(suit)
+	if seat < 0 || seat >= 4 || idx < 0 {
+		return
+	}
+	m.voids[seat][idx] = true
 }
 
 // ObserveDeclarations records each seat's revealed declaration cards once, deduplicating overlapping melds.

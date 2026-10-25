@@ -91,7 +91,7 @@ func playOneHandWith(
 			require.NoError(t, err,
 				"ApplyAction must never reject a simulated action (seat %d, %s)", seat, action.Type)
 			if action.Type == game.ActionPlayCard {
-				mem.ObservePlay(seat, *action.Card, oldLead)
+				mem.ObservePlay(seat, *action.Card, oldLead, gs.TrumpSuit)
 			}
 			gs = next
 			if gs.DeclarationsResolved {
