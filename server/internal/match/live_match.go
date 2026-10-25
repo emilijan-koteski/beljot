@@ -1187,6 +1187,7 @@ func (m *Manager) handleDeclarationTimeout(session *LiveMatch, generation uint64
 		m.startTimerLocked(session, newState.ActivePlayerSeat)
 	}
 	session.gameState = newState
+	m.observeBotMemoryLocked(session, oldState, newState, game.Action{})
 	playerIDs := session.playerIDs
 	startedAt := session.startedAt
 	session.mu.Unlock()

@@ -1,6 +1,8 @@
 package bot_test
 
 import (
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,6 +28,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		TrumpCandidate:      gs.TrumpCandidate,
 		TrumpSuit:           gs.TrumpSuit,
 		TrumpCallerSeat:     gs.TrumpCallerSeat,
+		HasTrumpCandidate:   gs.Rules.HasTrumpCandidate,
 		DealerSeat:          gs.DealerSeat,
 		CurrentTrick:        gs.CurrentTrick,
 		LeadSuit:            gs.LeadSuit,
@@ -40,6 +43,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		PlayedCards:         mem.PlayedCards(),
 		KnownVoids:          mem.KnownVoids(),
 		KnownCards:          mem.KnownCards(),
+		DeclaredCards:       mem.DeclaredCards(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -69,202 +73,235 @@ func cards(ids ...string) []game.Card {
 
 func TestDecide_Bidding(t *testing.T) {
 	tests := []struct {
-		name        string
-		seat        int
-		hand        []game.Card
-		round       int
-		candidate   string
-		noCandidate bool
-		faceDown    []game.Card
-		forcedPick  bool
-		wantType    string
-		wantSuit    *game.Suit
+		name         string
+		seat         int
+		passesBefore int
+		hand         []game.Card
+		round        int
+		candidate    string
+		noCandidate  bool
+		forcedPick   bool
+		wantType     string
+		wantSuit     *game.Suit
 	}{
 		{
-			name:     "round 1 five of candidate suit picks",
-			seat:     1,
-			hand:     cards("7H", "8H", "9H", "TH", "JH"),
-			round:    1,
-			wantType: game.ActionPickTrump,
-		},
-		{
-			name:     "round 1 four of candidate suit picks",
-			seat:     1,
-			hand:     cards("7H", "8H", "QH", "KH", "7S"),
-			round:    1,
-			wantType: game.ActionPickTrump,
-		},
-		{
-			name:     "round 1 candidate completes jack+nine to a qualifying three picks",
-			seat:     1,
-			hand:     cards("JH", "9H", "7S", "8S", "9S"),
-			round:    1,
-			wantType: game.ActionPickTrump,
-		},
-		{
-			name:      "round 1 candidate completes to three with a seven passes",
+			name:      "row 1: J9 doubleton calls without a side Ace",
 			seat:      1,
-			hand:      cards("JH", "9H", "7S", "8S", "9S"),
+			hand:      cards("JH", "7S", "8S", "9S", "QD"),
 			round:     1,
-			candidate: "7H",
-			wantType:  game.ActionPassTrump,
+			candidate: "9H",
+			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 three with jack and a seven and eight passes",
+			name:      "row 2: J with two small calls",
 			seat:      1,
 			hand:      cards("JH", "7H", "7S", "8S", "9S"),
 			round:     1,
 			candidate: "8H",
-			wantType:  game.ActionPassTrump,
-		},
-		{
-			name:      "round 1 three with jack and a seven and eight but a side ace picks",
-			seat:      1,
-			hand:      cards("JH", "8H", "AS", "7C", "8C"),
-			round:     1,
-			candidate: "7H",
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 three with jack and a seven and eight and no side ace passes",
+			name:      "row 2 negative: J with one other passes",
 			seat:      1,
-			hand:      cards("JH", "8H", "KS", "7C", "8C"),
+			hand:      cards("JH", "7S", "8S", "9S", "QD"),
 			round:     1,
 			candidate: "7H",
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			name:      "round 1 nine ace pair with a side ace picks",
+			name:        "row 3: four with the 9",
+			seat:        1,
+			hand:        cards("9H", "7H", "8H", "QH", "7S", "8S"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitHearts),
+		},
+		{
+			name:        "row 4: four with the Ace",
+			seat:        1,
+			hand:        cards("AH", "7H", "8H", "QH", "7S", "8S"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitHearts),
+		},
+		{
+			name:      "row 5: four small with a side Ace",
 			seat:      1,
-			hand:      cards("9H", "AH", "AS", "8S", "KD"),
+			hand:      cards("7H", "8H", "QH", "AS", "7C"),
+			round:     1,
+			candidate: "KH",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:        "row 5 negative: four small, no side Ace",
+			seat:        1,
+			hand:        cards("7H", "8H", "QH", "KH", "7S", "8S"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:      "row 6: five trumps",
+			seat:      1,
+			hand:      cards("7H", "8H", "QH", "KH", "7S"),
+			round:     1,
+			candidate: "TH",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:      "row 7: 9+A with three and a side Ace, Bitola only",
+			seat:      1,
+			hand:      cards("9H", "AH", "AS", "7C", "8C"),
 			round:     1,
 			candidate: "QH",
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 nine ace pair with a lone side ace picks",
+			name:        "row 7 negative in Croatian",
+			seat:        1,
+			hand:        cards("9H", "AH", "QH", "AS", "7C", "8C"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:      "row 8: J+A doubleton with a side Ace, Bitola only",
 			seat:      1,
-			hand:      cards("9H", "AH", "AS", "8D", "KC"),
+			hand:      cards("JH", "AS", "7C", "8C", "9D"),
 			round:     1,
-			candidate: "QH",
+			candidate: "AH",
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:      "round 1 nine ace pair with no side ace passes",
+			name:        "row 8 negative in Croatian",
+			seat:        1,
+			hand:        cards("JH", "AH", "AS", "7C", "8C", "9D"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:      "row 9: J doubleton with two side Aces",
 			seat:      1,
-			hand:      cards("9H", "AH", "KS", "8D", "KC"),
+			hand:      cards("JH", "AS", "AC", "7D", "8D"),
 			round:     1,
-			candidate: "QH",
+			candidate: "7H",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:        "row 9 negative in Croatian",
+			seat:        1,
+			hand:        cards("JH", "7H", "AS", "AC", "7D", "8D"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:      "row 10: 9 with two others and a side Ace",
+			seat:      1,
+			hand:      cards("9H", "7H", "AS", "7C", "8C"),
+			round:     1,
+			candidate: "8H",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:        "row 10 negative in Croatian",
+			seat:        1,
+			hand:        cards("9H", "7H", "8H", "AS", "7C", "8C"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:         "row 11: third seat J doubleton with one side Ace",
+			seat:         1,
+			passesBefore: 2,
+			hand:         cards("JH", "AS", "7C", "8C", "9D"),
+			round:        1,
+			candidate:    "7H",
+			wantType:     game.ActionPickTrump,
+		},
+		{
+			name:      "row 11 negative at first seat",
+			seat:      1,
+			hand:      cards("JH", "AS", "7C", "8C", "9D"),
+			round:     1,
+			candidate: "7H",
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			name:      "round 1 two trumps jack and nine with a side ace picks",
+			name:         "row 11 negative in Croatian at the third seat",
+			seat:         1,
+			passesBefore: 2,
+			hand:         cards("JH", "7H", "AS", "7C", "8C", "9D"),
+			round:        1,
+			noCandidate:  true,
+			wantType:     game.ActionPassTrump,
+		},
+		{
+			name:         "row 12: Croatian dealer's partner J doubleton with a side Ace",
+			seat:         1,
+			passesBefore: 1,
+			hand:         cards("JH", "7H", "AS", "7C", "8C", "9D"),
+			round:        1,
+			noCandidate:  true,
+			wantType:     game.ActionPickTrump,
+			wantSuit:     suitPtr(game.SuitHearts),
+		},
+		{
+			name:        "row 12 negative at first seat",
+			seat:        1,
+			hand:        cards("JH", "7H", "AS", "7C", "8C", "9D"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
+		},
+		{
+			name:         "row 12 negative in Bitola at the second seat",
+			seat:         1,
+			passesBefore: 1,
+			hand:         cards("JH", "AS", "7C", "8C", "9D"),
+			round:        1,
+			candidate:    "7H",
+			wantType:     game.ActionPassTrump,
+		},
+		{
+			name:      "round 2 picks the higher-scoring of two matching suits",
 			seat:      1,
-			hand:      cards("JH", "AS", "7C", "8C", "7D"),
-			round:     1,
-			candidate: "9H",
+			hand:      cards("JS", "9S", "JH", "9H", "AH"),
+			round:     2,
+			candidate: "7C",
 			wantType:  game.ActionPickTrump,
+			wantSuit:  suitPtr(game.SuitHearts),
 		},
 		{
-			name:      "round 1 two trumps jack and nine without a side ace passes",
+			name:      "round 2 candidate suit is locked out",
 			seat:      1,
-			hand:      cards("JH", "7C", "8C", "7D", "8D"),
-			round:     1,
-			candidate: "9H",
-			wantType:  game.ActionPassTrump,
-		},
-		{
-			name:      "round 1 two trumps jack and ace does not qualify",
-			seat:      1,
-			hand:      cards("JH", "AS", "7C", "8C", "7D"),
-			round:     1,
+			hand:      cards("7H", "8H", "9H", "TH", "JH"),
+			round:     2,
 			candidate: "AH",
 			wantType:  game.ActionPassTrump,
 		},
 		{
-			name:      "round 1 three without jack or nine+ace passes",
-			seat:      1,
-			hand:      cards("KH", "QH", "7S", "8S", "9S"),
-			round:     1,
-			candidate: "TH",
-			wantType:  game.ActionPassTrump,
-		},
-		{
-			name:     "round 1 junk hand passes",
-			seat:     0,
-			hand:     cards("7S", "8S", "9S", "TS", "JS"),
-			round:    1,
-			wantType: game.ActionPassTrump,
-		},
-		{
-			name:     "round 2 qualifying side suit picked",
-			seat:     1,
-			hand:     cards("JS", "9S", "AS", "9C", "AC"),
-			round:    2,
-			wantType: game.ActionPickTrump,
-			wantSuit: suitPtr(game.SuitSpades),
-		},
-		{
-			name:      "round 2 candidate side card completes a nine ace pick",
-			seat:      1,
-			hand:      cards("9D", "AD", "KD", "AC", "7H"),
-			round:     2,
-			candidate: "TC",
-			wantType:  game.ActionPickTrump,
-			wantSuit:  suitPtr(game.SuitDiamonds),
-		},
-		{
-			name:     "round 2 candidate suit locked out",
-			seat:     1,
-			hand:     cards("7H", "8H", "9H", "TH", "JH"),
-			round:    2,
-			wantType: game.ActionPassTrump,
-		},
-		{
-			name:     "round 2 junk passes",
-			seat:     1,
-			hand:     cards("7S", "8D", "9C", "TS", "KD"),
-			round:    2,
-			wantType: game.ActionPassTrump,
-		},
-		{
-			name:        "no candidate round 1 picks and carries the suit",
-			seat:        1,
-			hand:        cards("7S", "8S", "9S", "TS", "JS", "7H"),
-			round:       1,
-			noCandidate: true,
-			faceDown:    cards("7D", "8D"),
-			wantType:    game.ActionPickTrump,
-			wantSuit:    suitPtr(game.SuitSpades),
-		},
-		{
-			name:        "no candidate round 1 junk passes",
-			seat:        1,
-			hand:        cards("7S", "8H", "9D", "TC", "QS", "KH"),
-			round:       1,
-			noCandidate: true,
-			faceDown:    cards("7D", "8D"),
-			wantType:    game.ActionPassTrump,
-		},
-		{
-			name:        "no candidate does not count the hidden pair",
-			seat:        1,
-			hand:        cards("7D", "8D", "9D", "7S", "8S", "7H"),
-			round:       1,
-			noCandidate: true,
-			faceDown:    cards("TD", "JD"),
-			wantType:    game.ActionPassTrump,
-		},
-		{
-			name:        "forced dealer picks its best suit rather than passing",
+			name:        "forced dealer with nothing picks a suit",
 			seat:        0,
-			hand:        cards("7D", "8D", "JD", "7S", "8H", "9C"),
+			hand:        cards("7H", "8H", "7S", "8S", "7D", "8D"),
 			round:       1,
 			noCandidate: true,
-			faceDown:    cards("QC", "KH"),
 			forcedPick:  true,
 			wantType:    game.ActionPickTrump,
-			wantSuit:    suitPtr(game.SuitDiamonds),
+		},
+		{
+			name:        "forced dealer with no matching suit picks the top-scoring one",
+			seat:        0,
+			hand:        cards("7S", "8S", "JH", "9D", "7C", "8C"),
+			round:       1,
+			noCandidate: true,
+			forcedPick:  true,
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitHearts),
 		},
 	}
 
@@ -273,15 +310,13 @@ func TestDecide_Bidding(t *testing.T) {
 			var gs *game.GameState
 			if tt.noCandidate {
 				gs = testfixtures.NewGameCroatianJustDealt()
-				if tt.faceDown != nil {
-					gs.Players[tt.seat].FaceDownCards = tt.faceDown
-				}
-				if tt.forcedPick {
-					gs.BiddingPassCount = 3
-					gs.DealerSeat = tt.seat
-				}
 			} else {
 				gs = testfixtures.NewGameJustDealt()
+			}
+			gs.DealerSeat = (tt.seat - tt.passesBefore - 1 + 4) % 4
+			if tt.forcedPick {
+				gs.BiddingPassCount = 3
+				gs.DealerSeat = tt.seat
 			}
 			gs.BiddingRound = tt.round
 			gs.ActivePlayerSeat = tt.seat
@@ -297,8 +332,12 @@ func TestDecide_Bidding(t *testing.T) {
 
 			assert.Equal(t, tt.wantType, action.Type)
 			assert.Equal(t, tt.seat, action.PlayerSeat)
-			if tt.round == 1 && gs.TrumpCandidate != nil && tt.wantType == game.ActionPickTrump {
-				assert.Nil(t, action.Suit, "round 1 pick on a candidate carries no suit")
+			if tt.wantType == game.ActionPickTrump {
+				if tt.round == 1 && gs.TrumpCandidate != nil {
+					assert.Nil(t, action.Suit, "round 1 pick on a candidate carries no suit")
+				} else {
+					require.NotNil(t, action.Suit, "a free-suit pick must carry a suit")
+				}
 			}
 			if tt.wantSuit != nil {
 				require.NotNil(t, action.Suit)
@@ -324,6 +363,29 @@ func TestDecide_ForcedDealerNeverPasses(t *testing.T) {
 
 		_, err := game.ApplyAction(gs, action)
 		require.NoError(t, err, "seat %d: the forced pick must be legal", seat)
+	}
+}
+
+func TestDecide_BiddingSurvivesAMissingCandidate(t *testing.T) {
+	for _, round := range []int{1, 2} {
+		t.Run(fmt.Sprintf("round %d", round), func(t *testing.T) {
+			v := bot.View{
+				Seat:              1,
+				DealerSeat:        0,
+				Phase:             game.PhaseBidding,
+				BiddingRound:      round,
+				HasTrumpCandidate: true,
+				Hand:              cards("JH", "9H", "AS", "7C", "8C"),
+			}
+
+			var action game.Action
+			require.NotPanics(t, func() { action = bot.Decide(v) })
+
+			assert.Equal(t, game.ActionPickTrump, action.Type)
+			assert.Equal(t, 1, action.PlayerSeat)
+			require.NotNil(t, action.Suit, "with no candidate the pick names its suit")
+			assert.Equal(t, game.SuitHearts, *action.Suit)
+		})
 	}
 }
 
@@ -554,7 +616,7 @@ func TestDecide_CardPlay(t *testing.T) {
 
 			mem := bot.NewMemory()
 			for _, id := range tt.played {
-				mem.ObservePlay(1, card(id), nil)
+				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit)
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -630,10 +692,10 @@ func TestDecide_PartnerTakesTrick(t *testing.T) {
 
 			mem := bot.NewMemory()
 			if tt.partnerVoidDiam {
-				mem.ObservePlay(2, card("8C"), &lead)
+				mem.ObservePlay(2, card("8C"), &lead, nil)
 			}
 			for _, id := range tt.playedHearts {
-				mem.ObservePlay(2, card(id), nil)
+				mem.ObservePlay(2, card(id), nil, gs.TrumpSuit)
 			}
 			mem.ObserveDeclarations(gs.Players)
 
@@ -737,7 +799,7 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 
 			mem := bot.NewMemory()
 			for _, id := range tt.played {
-				mem.ObservePlay(1, card(id), nil)
+				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit)
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -776,6 +838,7 @@ type playTweakCase struct {
 	trick          []game.TrickCard
 	callerSeat     int
 	observes       []obs
+	located        map[int][]string
 	declaredBySeat map[int][]string
 	wantCard       string
 }
@@ -797,7 +860,12 @@ func runPlayTweakCases(t *testing.T, tests []playTweakCase) {
 
 			mem := bot.NewMemory()
 			for _, o := range tt.observes {
-				mem.ObservePlay(o.seat, card(o.card), o.lead)
+				mem.ObservePlay(o.seat, card(o.card), o.lead, gs.TrumpSuit)
+			}
+			for seat, ids := range tt.located {
+				for _, id := range ids {
+					mem.ObserveLocatedCard(seat, card(id))
+				}
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -904,6 +972,13 @@ func TestDecide_DrawTrumpsForPartner(t *testing.T) {
 			callerSeat:     2,
 			declaredBySeat: map[int][]string{2: {"JH", "TH", "9H"}},
 			wantCard:       "QH",
+		},
+		{
+			name:       "partner's located trumps are no declared run: still draw for the partner",
+			hand:       cards("QH", "KH", "AS", "7C"),
+			callerSeat: 2,
+			located:    map[int][]string{2: {"8H", "9H", "TH"}},
+			wantCard:   "QH",
 		},
 	})
 }
@@ -1387,7 +1462,7 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 	diamonds := game.SuitDiamonds
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			name: "smear the ace when the ten protects it",
+			name: "smear the ten and keep the ace it backs",
 			hand: cards("AS", "TS", "7H"),
 			trick: []game.TrickCard{
 				{Card: card("8S"), PlayerSeat: 1},
@@ -1395,7 +1470,7 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 				{Card: card("7D"), PlayerSeat: 3},
 			},
 			callerSeat: 1,
-			wantCard:   "AS",
+			wantCard:   "TS",
 		},
 		{
 			name: "all candidates unprotected bosses falls back to the highest points",
@@ -1479,6 +1554,41 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 	})
 }
 
+func TestDecide_TenUnderTheAceOnPartnersSafeTrick(t *testing.T) {
+	spades := game.SuitSpades
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "void in trump, throws the ten and keeps the ace to show it",
+			hand:       cards("AS", "TS", "7D"),
+			trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}},
+			callerSeat: 2,
+			wantCard:   "TS",
+		},
+		{
+			name:       "ace without the ten keeps the unbacked boss and smears elsewhere",
+			hand:       cards("AS", "KS", "7D"),
+			trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}},
+			callerSeat: 2,
+			wantCard:   "KS",
+		},
+		{
+			name:       "an opponent ruffs spades: the ace is dead, so it is banked rather than signalled",
+			hand:       cards("AS", "TS", "7D"),
+			trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}},
+			callerSeat: 2,
+			observes:   []obs{{seat: 1, card: "8H", lead: &spades}},
+			wantCard:   "AS",
+		},
+		{
+			name:       "two cards left with live opponent trumps: bank the ace",
+			hand:       cards("AS", "TS"),
+			trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}},
+			callerSeat: 2,
+			wantCard:   "AS",
+		},
+	})
+}
+
 // TestDecide_RetainUncuttableBoss checks the bot treats an uncuttable side boss as a trick-8 winner,
 // spending the master trump first and keeping the boss for the last trick.
 func TestDecide_RetainUncuttableBoss(t *testing.T) {
@@ -1505,15 +1615,13 @@ func TestDecide_RetainUncuttableBoss(t *testing.T) {
 	})
 }
 
-// TestDecide_CashBossPrefersTenWithAceTen checks the bot cashes the Ten before the Ace
-// when it holds both of a side suit.
-func TestDecide_CashBossPrefersTenWithAceTen(t *testing.T) {
+func TestDecide_CashBossLeadsTheAceBeforeTheTen(t *testing.T) {
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			name:       "ace and ten of a boss suit leads the ten and keeps the ace",
+			name:       "ace and ten of a boss suit leads the ace",
 			hand:       cards("AS", "TS", "7C"),
 			callerSeat: 1,
-			wantCard:   "TS",
+			wantCard:   "AS",
 		},
 		{
 			name:       "ace without the ten cashes the ace",
@@ -1603,26 +1711,54 @@ func TestMemory_VoidInference(t *testing.T) {
 	mem := bot.NewMemory()
 	lead := game.SuitSpades
 
-	mem.ObservePlay(2, card("7H"), &lead)
+	mem.ObservePlay(2, card("7H"), &lead, nil)
 	voids := mem.KnownVoids()
 	assert.True(t, voids[2][bot.SuitIndex(game.SuitSpades)])
 	assert.False(t, voids[2][bot.SuitIndex(game.SuitHearts)])
 
-	mem.ObservePlay(3, card("9S"), &lead)
+	mem.ObservePlay(3, card("9S"), &lead, nil)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[3][bot.SuitIndex(game.SuitSpades)])
 
-	mem.ObservePlay(0, card("AC"), nil)
+	mem.ObservePlay(0, card("AC"), nil, nil)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[0][bot.SuitIndex(game.SuitClubs)])
 
 	assert.Len(t, mem.PlayedCards(), 3)
 }
 
+func TestMemory_DiscardProvesTrumpVoid(t *testing.T) {
+	spades, hearts := game.SuitSpades, game.SuitHearts
+	tests := []struct {
+		name      string
+		lead      game.Suit
+		seat      int
+		card      string
+		wantVoids []game.Suit
+	}{
+		{"off-suit non-trump discard proves both voids", spades, 1, "9D", []game.Suit{spades, hearts}},
+		{"ruff proves only the led suit void", spades, 2, "8H", []game.Suit{spades}},
+		{"following suit proves nothing", spades, 3, "8S", nil},
+		{"trump led, discard proves void in trump only", hearts, 1, "9D", []game.Suit{hearts}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mem := bot.NewMemory()
+			lead := tt.lead
+			mem.ObservePlay(tt.seat, card(tt.card), &lead, &hearts)
+			voids := mem.KnownVoids()
+			for _, s := range game.AllSuits {
+				want := slices.Contains(tt.wantVoids, s)
+				assert.Equal(t, want, voids[tt.seat][bot.SuitIndex(s)], "suit %s", s)
+			}
+		})
+	}
+}
+
 func TestMemory_SyncHandResets(t *testing.T) {
 	mem := bot.NewMemory()
 	lead := game.SuitSpades
-	mem.ObservePlay(2, card("7H"), &lead)
+	mem.ObservePlay(2, card("7H"), &lead, nil)
 	require.NotEmpty(t, mem.PlayedCards())
 
 	mem.SyncHand(1)
@@ -1750,4 +1886,147 @@ func TestObserveDeclarations_OverlapRecordsEachCardOnce(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{"9S", "TS", "JS", "QS", "JH", "JD", "JC"}, ids,
 		"the shared JS must be recorded exactly once")
+}
+
+func TestMemory_LocatedCardsJoinKnownCardsButNotDeclaredCards(t *testing.T) {
+	mem := bot.NewMemory()
+	mem.ObserveLocatedCard(2, card("AS"))
+	mem.ObserveLocatedCard(2, card("AS"))
+	assert.Equal(t, cards("AS"), mem.KnownCards()[2])
+	assert.Empty(t, mem.DeclaredCards()[2])
+	mem.SyncHand(2)
+	assert.Empty(t, mem.KnownCards()[2])
+}
+
+func TestDecide_PartnersLocatedAceMakesTheKingABoss(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "king leads as a boss once the ten is gone and the partner is known to hold the ace",
+			hand:       cards("KS", "7C", "8D"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "TS"}},
+			located:    map[int][]string{2: {"AS"}},
+			wantCard:   "KS",
+		},
+		{
+			name:       "king stays a false boss while the ace is unseen",
+			hand:       cards("KS", "7C", "8D"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "TS"}},
+			wantCard:   "7C",
+		},
+	})
+}
+
+func TestDecide_PlayedLocatedCardStopsCounting(t *testing.T) {
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "opponent's located ace was played: the king is a boss again",
+			hand:       cards("KS", "7C", "8D"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "TS"}, {seat: 1, card: "AS"}},
+			located:    map[int][]string{1: {"AS"}},
+			wantCard:   "KS",
+		},
+		{
+			name:       "opponent's located ace is still held: the king is no boss",
+			hand:       cards("KS", "7C", "8D"),
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "TS"}},
+			located:    map[int][]string{1: {"AS"}},
+			wantCard:   "7C",
+		},
+	})
+}
+
+func TestDecide_TakesWithTheCardNoLedSuitCardBeats(t *testing.T) {
+	spades := game.SuitSpades
+	runPlayTweakCases(t, []playTweakCase{
+		{
+			name:       "third hand takes with the ace, not the queen the last player can beat",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			wantCard:   "AS",
+		},
+		{
+			name:       "queen suffices once the king and ten are gone",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "KS"}, {seat: 1, card: "TS"}},
+			wantCard:   "QS",
+		},
+		{
+			name:       "a trump cut leaves the rule inert and the bot discards low",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8H"), PlayerSeat: 3}},
+			callerSeat: 1,
+			wantCard:   "QS",
+		},
+		{
+			name:       "ace and ten over an opponent's low card take with the ten",
+			hand:       cards("AS", "TS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			wantCard:   "TS",
+		},
+		{
+			name:       "third hand, last opponent ruffed spades before and may hold trump: queen, not ace",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "7H", lead: &spades}},
+			wantCard:   "QS",
+		},
+		{
+			name:       "second hand, next opponent ruffed spades before and may hold trump: queen, not ace",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "7H", lead: &spades}},
+			wantCard:   "QS",
+		},
+		{
+			name:       "last opponent void in spades and trump: the nine wins for sure, keep the ace",
+			hand:       cards("AS", "9S", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "7C", lead: &spades}},
+			wantCard:   "9S",
+		},
+	})
+}
+
+func TestCardsProvablyAbsent(t *testing.T) {
+	tests := []struct {
+		name     string
+		declared []string
+		want     []string
+	}{
+		{"tierce in the middle excludes both neighbours", []string{"9C", "TC", "JC"}, []string{"8C", "QC"}},
+		{"run at the top excludes only below", []string{"QS", "KS", "AS"}, []string{"JS"}},
+		{"run at the bottom excludes only above", []string{"7H", "8H", "9H"}, []string{"TH"}},
+		{"two suits, two runs", []string{"7H", "8H", "9H", "QS", "KS", "AS"}, []string{"TH", "JS"}},
+		{"a pair excludes nothing", []string{"KD", "AD"}, nil},
+		{"four of a kind excludes nothing", []string{"JS", "JH", "JD", "JC"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := bot.View{}
+			v.DeclaredCards[1] = cards(tt.declared...)
+
+			got := bot.CardsProvablyAbsentForTest(v, 1)
+
+			if len(tt.want) == 0 {
+				assert.Empty(t, got)
+				return
+			}
+			keys := make([]game.Card, 0, len(got))
+			for c := range got {
+				keys = append(keys, c)
+			}
+			assert.ElementsMatch(t, cards(tt.want...), keys)
+		})
+	}
 }

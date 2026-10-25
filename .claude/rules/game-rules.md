@@ -49,7 +49,7 @@ Select the path from a `VariantRules` field, never by comparing the variant name
   - **On (default):** the side taking the hand banks every point, including both sides' declarations and Belote.
   - **Off:** that side banks all card points plus only its own declarations and Belote. The other side's are voided, and nobody scores them.
   - Belote follows the declarations, and a Capot obeys the rule just like a fall. A room with declarations off always stores the rule as on.
-- If both teams cross the target in the same hand, the taker's team wins.
+- If both teams cross the target in the same hand, the higher total wins; an exact tie goes to the taker's team (`determineMatchWinner`).
 - On timer expiry, auto-play picks the first legal card sorted by suit, then rank.
 
 ## Wire and state

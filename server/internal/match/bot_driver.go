@@ -180,6 +180,7 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		TrumpCandidate:      gs.TrumpCandidate,
 		TrumpSuit:           gs.TrumpSuit,
 		TrumpCallerSeat:     gs.TrumpCallerSeat,
+		HasTrumpCandidate:   gs.Rules.HasTrumpCandidate,
 		DealerSeat:          gs.DealerSeat,
 		CurrentTrick:        gs.CurrentTrick,
 		LeadSuit:            gs.LeadSuit,
@@ -203,23 +204,38 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		v.PlayedCards = mem.PlayedCards()
 		v.KnownVoids = mem.KnownVoids()
 		v.KnownCards = mem.KnownCards()
+		v.DeclaredCards = mem.DeclaredCards()
 	}
 	return v
 }
 
-// observeBotMemory updates the per-match bot memory after a successful transition:
-// card plays, hand resets and revealed declarations. No-op for human-only matches.
+// observeBotMemory updates the per-match bot memory (plays, voids, declared and located cards)
+// after a successful transition, taking session.mu itself.
 func (m *Manager) observeBotMemory(session *LiveMatch, oldState, newState *game.GameState, action game.Action) {
 	session.mu.Lock()
 	defer session.mu.Unlock()
+	m.observeBotMemoryLocked(session, oldState, newState, action)
+}
+
+// observeBotMemoryLocked records card plays, hand resets, revealed declarations and located cards
+// (the candidate pick and Belote) in the bot memory. The caller holds session.mu; no-op for
+// human-only matches.
+func (m *Manager) observeBotMemoryLocked(session *LiveMatch, oldState, newState *game.GameState, action game.Action) {
 	mem := session.botMemory
 	if mem == nil {
 		return
 	}
 	if action.Type == game.ActionPlayCard && action.Card != nil {
-		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit)
+		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit, oldState.TrumpSuit)
 	}
 	mem.SyncHand(newState.HandNumber)
+	if action.Type == game.ActionPickTrump && oldState.TrumpCandidate != nil {
+		mem.ObserveLocatedCard(action.PlayerSeat, *oldState.TrumpCandidate)
+	}
+	if action.Type == game.ActionAnnounceBelot && newState.TrumpSuit != nil {
+		mem.ObserveLocatedCard(action.PlayerSeat, game.Card{Rank: game.RankKing, Suit: *newState.TrumpSuit})
+		mem.ObserveLocatedCard(action.PlayerSeat, game.Card{Rank: game.RankQueen, Suit: *newState.TrumpSuit})
+	}
 	if newState.DeclarationsResolved && newState.Rules.DeclarationsEnabled {
 		mem.ObserveDeclarations(newState.Players)
 	}

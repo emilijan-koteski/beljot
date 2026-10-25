@@ -9,13 +9,14 @@ type View struct {
 	Hand       []game.Card
 	LegalCards []game.Card
 
-	Phase           game.Phase
-	BiddingRound    int
-	TrumpCandidate  *game.Card
-	TrumpSuit       *game.Suit
-	TrumpCallerSeat *int
-	DealerSeat      int
-	MustPickTrump   bool
+	Phase             game.Phase
+	BiddingRound      int
+	TrumpCandidate    *game.Card
+	TrumpSuit         *game.Suit
+	TrumpCallerSeat   *int
+	DealerSeat        int
+	MustPickTrump     bool
+	HasTrumpCandidate bool
 
 	CurrentTrick     []game.TrickCard
 	LeadSuit         *game.Suit
@@ -31,9 +32,10 @@ type View struct {
 	HandPoints [2]int
 	TricksWon  [2]int
 
-	PlayedCards []game.Card
-	KnownVoids  [4][4]bool
-	KnownCards  [4][]game.Card
+	PlayedCards   []game.Card
+	KnownVoids    [4][4]bool
+	KnownCards    [4][]game.Card
+	DeclaredCards [4][]game.Card
 }
 
 // SuitIndex maps a suit to its index in KnownVoids' second dimension.

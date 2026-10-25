@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -614,4 +615,92 @@ func TestBot_ForcedDealerPickAdvancesHandWithoutRejection(t *testing.T) {
 
 	assert.Empty(t, logs.matched(roomID, "action rejected by engine"),
 		"the bot must never offer the engine a bid it will refuse")
+}
+
+func TestBot_MemoryLocatesCandidateWithCaller(t *testing.T) {
+	spades := game.SuitSpades
+	tests := []struct {
+		name      string
+		passCount int
+		pickSuit  *game.Suit
+	}{
+		{name: "round 1 pick takes the candidate's suit", passCount: 0},
+		{name: "round 2 pick names another suit", passCount: 4, pickSuit: &spades},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const roomID = uint(100)
+			mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
+			mgr.SetDealGraceForTest(false)
+			mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
+			require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001",
+				mixedPlayers(2), "relaxed", 0, 10, 120, 0, true, false, true, false))
+			t.Cleanup(func() { mgr.RemoveSession(roomID) })
+
+			gs := markBots(testfixtures.NewGameMidBidding(tt.passCount), 2)
+			gs.RoomID = roomID
+			require.NotNil(t, gs.TrumpCandidate)
+			candidate := *gs.TrumpCandidate
+			seat := gs.ActivePlayerSeat
+			require.False(t, gs.Players[seat].IsBot, "the pick must come from a human seat")
+			mgr.SetGameStateForTest(roomID, gs)
+
+			require.NoError(t, mgr.ApplyActionForTest(roomID, game.Action{
+				Type:       game.ActionPickTrump,
+				PlayerSeat: seat,
+				Suit:       tt.pickSuit,
+			}))
+
+			known := mgr.BotKnownCardsForTest(roomID)
+			assert.Contains(t, known[seat], candidate, "the caller receives the candidate")
+			for other := range known {
+				if other != seat {
+					assert.NotContains(t, known[other], candidate)
+				}
+			}
+		})
+	}
+}
+
+func TestBot_MemoryLocatesBelotePair(t *testing.T) {
+	const roomID = uint(100)
+	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
+	mgr.SetDealGraceForTest(false)
+	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001",
+		mixedPlayers(2), "relaxed", 0, 10, 120, 0, true, false, true, false))
+	t.Cleanup(func() { mgr.RemoveSession(roomID) })
+
+	gs := markBots(testfixtures.NewGameMidPlay(1), 2)
+	gs.RoomID = roomID
+	gs.BelotAnnounced = false
+	seat := gs.ActivePlayerSeat
+	require.False(t, gs.Players[seat].IsBot, "the Belote must come from a human seat")
+	trump := *gs.TrumpSuit
+	king := game.Card{Rank: game.RankKing, Suit: trump}
+	queen := game.Card{Rank: game.RankQueen, Suit: trump}
+	hand := slices.DeleteFunc(slices.Clone(gs.Players[seat].Hand), func(c game.Card) bool {
+		return c.Suit == trump
+	})
+	gs.Players[seat].Hand = append(hand, king, queen)
+	mgr.SetGameStateForTest(roomID, gs)
+
+	require.NoError(t, mgr.ApplyActionForTest(roomID, game.Action{
+		Type:       game.ActionPlayCard,
+		PlayerSeat: seat,
+		Card:       &queen,
+	}))
+	pending := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, pending.PendingBelotSeat, "playing the queen must prompt the Belote")
+	assert.NotContains(t, mgr.BotKnownCardsForTest(roomID)[seat], king,
+		"the pair is unknown until it is announced")
+
+	require.NoError(t, mgr.ApplyActionForTest(roomID, game.Action{
+		Type:       game.ActionAnnounceBelot,
+		PlayerSeat: seat,
+	}))
+
+	known := mgr.BotKnownCardsForTest(roomID)[seat]
+	assert.Contains(t, known, king)
+	assert.Contains(t, known, queen)
 }

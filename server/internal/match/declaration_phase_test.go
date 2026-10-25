@@ -588,6 +588,52 @@ func TestDeclarationPhase_AllBotSeatsAnswer(t *testing.T) {
 	assert.Empty(t, after.CurrentTrick, "no card may be played in this phase")
 }
 
+func TestDeclarationPhase_WindowTimeoutUpdatesBotMemory(t *testing.T) {
+	hub := &hubSpy{}
+	const roomID = uint(135)
+	const botSeat = 3
+	const declarerSeat = 0
+
+	mgr := match.NewManager(hub, newMockMatchRepo())
+	mgr.SetDealGraceForTest(false)
+	mgr.SetBotDelayForTest(2*time.Second, 2*time.Second)
+	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", mixedPlayers(botSeat), "relaxed", 0, 10, 120, 0, true, false, true, false))
+	t.Cleanup(func() { mgr.RemoveSession(roomID) })
+
+	gs := markBots(testfixtures.NewGameCroatianDeclaring(game.SuitHearts), botSeat)
+	gs.RoomID = roomID
+	gs.TurnExpiresAt = nil
+	require.NotEqual(t, botSeat, gs.ActivePlayerSeat, "the bot must not lead trick 1")
+	require.True(t, game.HasDeclarableCombinations(gs, declarerSeat), "the declarer holds a meld")
+	mgr.SetGameStateForTest(roomID, gs)
+	mgr.SetDeclarationExpiresAtForTest(roomID, time.Now().Add(30*time.Second))
+
+	client := &ws.Client{UserID: gs.Players[declarerSeat].UserID}
+	mgr.HandleAction(client, ws.WSMessage{Type: "action:declare", Payload: []byte(`{}`)})
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Players[declarerSeat].DeclarationAnswered
+	}, 2*time.Second, 5*time.Millisecond, "the declarer's answer must land")
+
+	mgr.TriggerDeclarationTimeoutForTest(roomID, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		st := mgr.GetStateSnapshot(roomID)
+		return st != nil && st.Phase == game.PhasePlaying
+	}, 2*time.Second, 5*time.Millisecond, "the elapsed window must force-close the phase")
+
+	after := mgr.GetStateSnapshot(roomID)
+	require.NotNil(t, after)
+	require.Empty(t, after.CurrentTrick, "the assertion must run before any card is played")
+	var meldCards []game.Card
+	for _, decl := range after.Players[declarerSeat].Declarations {
+		meldCards = append(meldCards, decl.Cards...)
+	}
+	require.NotEmpty(t, meldCards, "the declarer's winning meld is revealed")
+
+	require.Subset(t, mgr.BotKnownCardsForTest(roomID)[declarerSeat], meldCards,
+		"the bot learns the revealed melds even when the window closes the phase")
+}
+
 // declarationsResolvedMelds reads the full `declarations` array off an
 // event:declarations_resolved payload, flattened exactly as it travels the
 // wire: one entry per meld, each carrying its own seat.
