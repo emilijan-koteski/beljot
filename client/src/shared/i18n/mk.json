@@ -871,7 +871,7 @@
   "match": {
     "seat": {
       "waiting": "Се чека…",
-      "calledSuit": "Зваше {{suit}}",
+      "calledSuit": "Зеде {{suit}}",
       "you": "Ти"
     },
     "chat": {
