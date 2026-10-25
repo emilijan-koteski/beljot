@@ -294,7 +294,7 @@ func trumpsRemainUnseen(v View, trump game.Suit) bool {
 }
 
 // unseenCards returns the cards in unknown hands: the deck minus played cards, the bot's hand, the
-// current trick, and cards placed by the declaration reveal.
+// current trick, and known cards (revealed or located).
 func unseenCards(v View) []game.Card {
 	known := make(map[game.Card]bool, 32)
 	for _, c := range v.PlayedCards {
@@ -376,8 +376,8 @@ func partnerVoidInTrump(v View, partner int, trump game.Suit) bool {
 	return idx >= 0 && partner >= 0 && partner < 4 && v.KnownVoids[partner][idx]
 }
 
-// opponentKnownHoldsTrumpAbove reports whether an opponent is known from the reveal to hold a trump
-// above ref.
+// opponentKnownHoldsTrumpAbove reports whether an opponent is known (revealed or located) to hold a
+// trump above ref.
 func opponentKnownHoldsTrumpAbove(v View, ref game.Card, trump game.Suit) bool {
 	for seat := range 4 {
 		if game.TeamForSeat(seat) == game.TeamForSeat(v.Seat) {
@@ -824,8 +824,8 @@ func securelyWins(v View, c game.Card, trump game.Suit) bool {
 	return true
 }
 
-// seatKnownHoldsSuit reports whether the reveal proves seat still holds a card of the given suit —
-// and is therefore forced to follow while that suit is led.
+// seatKnownHoldsSuit reports whether the reveal or a located card proves seat still holds a card
+// of the given suit — and is therefore forced to follow while that suit is led.
 func seatKnownHoldsSuit(v View, seat int, suit game.Suit) bool {
 	for _, c := range knownHeldBy(v, seat) {
 		if c.Suit == suit {

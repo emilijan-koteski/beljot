@@ -6,8 +6,9 @@ import (
 	"github.com/emilijan/beljot/server/internal/game"
 )
 
-// Memory tracks the cards played this hand and the suit voids those plays revealed.
-// The match layer owns one per bot match because GameState keeps no trick history.
+// Memory tracks the cards played this hand, the suit voids those plays revealed, and the cards
+// publicly declared or located. The match layer owns one per bot match because GameState keeps no
+// trick history.
 type Memory struct {
 	handNumber int
 	played     []game.Card

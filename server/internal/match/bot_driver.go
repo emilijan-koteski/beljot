@@ -208,16 +208,17 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	return v
 }
 
-// observeBotMemory updates the per-match bot memory after a successful transition,
-// taking session.mu itself.
+// observeBotMemory updates the per-match bot memory (plays, voids, declared and located cards)
+// after a successful transition, taking session.mu itself.
 func (m *Manager) observeBotMemory(session *LiveMatch, oldState, newState *game.GameState, action game.Action) {
 	session.mu.Lock()
 	defer session.mu.Unlock()
 	m.observeBotMemoryLocked(session, oldState, newState, action)
 }
 
-// observeBotMemoryLocked records card plays, hand resets and revealed declarations in the
-// bot memory. The caller holds session.mu; no-op for human-only matches.
+// observeBotMemoryLocked records card plays, hand resets, revealed declarations and located cards
+// (the candidate pick and Belote) in the bot memory. The caller holds session.mu; no-op for
+// human-only matches.
 func (m *Manager) observeBotMemoryLocked(session *LiveMatch, oldState, newState *game.GameState, action game.Action) {
 	mem := session.botMemory
 	if mem == nil {
