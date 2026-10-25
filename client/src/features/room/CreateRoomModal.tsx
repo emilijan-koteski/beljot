@@ -46,6 +46,7 @@ import { randomRoomName } from "@/shared/lib/randomRoomName";
 import { modeLabel, modeOptionLabel, variantLabel } from "@/shared/lib/roomLabels";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
+import type { MatchMode } from "@/shared/types/matchTypes";
 
 interface CreateRoomModalProps {
   open: boolean;
@@ -83,7 +84,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [name, setName] = useState(() => randomRoomName(t));
   const [nameShuffleSpin, setNameShuffleSpin] = useState(0);
   const [variant, setVariant] = useState<"bitola" | "croatia">("bitola");
-  const [matchMode, setMatchMode] = useState<"1001" | "501">("1001");
+  const [matchMode, setMatchMode] = useState<MatchMode>("1001");
   const [declarationsEnabled, setDeclarationsEnabled] = useState(true);
   const [stopAtTarget, setStopAtTarget] = useState(false);
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
@@ -238,7 +239,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     label: variantLabel(t, value),
   }));
 
-  const matchModeOptions = (["501", "1001"] as const).map((value) => ({
+  const matchModeOptions = (["501", "701", "1001"] as const).map((value) => ({
     value,
     label: modeOptionLabel(t, value),
   }));
@@ -390,35 +391,35 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 </div>
               </Field>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field
-                  label={t("lobby.createRoomModal.variant")}
-                  info={t("lobby.createRoomModal.variantHint")}
-                  infoTestId="variant-info"
-                >
-                  <Segmented
-                    value={variant}
-                    onValueChange={setVariant}
-                    options={variantOptions}
-                    testId="variant-segmented"
-                    ariaLabel={t("lobby.createRoomModal.variant")}
-                  />
-                </Field>
+              <Field
+                label={t("lobby.createRoomModal.variant")}
+                info={t("lobby.createRoomModal.variantHint")}
+                infoTestId="variant-info"
+              >
+                <Segmented
+                  value={variant}
+                  onValueChange={setVariant}
+                  options={variantOptions}
+                  testId="variant-segmented"
+                  ariaLabel={t("lobby.createRoomModal.variant")}
+                />
+              </Field>
 
-                <Field
-                  label={t("lobby.createRoomModal.matchMode")}
-                  info={t("lobby.createRoomModal.matchModeHint")}
-                  infoTestId="match-mode-info"
-                >
-                  <Segmented
-                    value={matchMode}
-                    onValueChange={setMatchMode}
-                    options={matchModeOptions}
-                    testId="match-mode-segmented"
-                    ariaLabel={t("lobby.createRoomModal.matchMode")}
-                  />
-                </Field>
-              </div>
+              <Field
+                label={t("lobby.createRoomModal.matchMode")}
+                info={t("lobby.createRoomModal.matchModeHint")}
+                infoTestId="match-mode-info"
+              >
+                <Segmented
+                  value={matchMode}
+                  onValueChange={setMatchMode}
+                  options={matchModeOptions}
+                  dense
+                  className="[&>button]:px-1.5 [&>button]:py-2"
+                  testId="match-mode-segmented"
+                  ariaLabel={t("lobby.createRoomModal.matchMode")}
+                />
+              </Field>
 
               <Field
                 label={t("lobby.createRoomModal.timerStyle")}
@@ -810,7 +811,7 @@ function PreviewCard({
 }: {
   name: string;
   variant: "bitola" | "croatia";
-  matchMode: "1001" | "501";
+  matchMode: MatchMode;
   timerStyle: "relaxed" | "per-move";
   timerDuration: number;
   coinBuyIn: number;

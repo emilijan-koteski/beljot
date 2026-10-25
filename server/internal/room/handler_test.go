@@ -568,6 +568,28 @@ func TestCreateRoom_501MatchMode(t *testing.T) {
 	assert.Equal(t, "501", persisted.MatchMode)
 }
 
+func TestCreateRoom_701MatchMode(t *testing.T) {
+	e, repo := setupTest()
+	token := validToken(5)
+
+	body := `{"name":"Medium 701","variant":"bitola","matchMode":"701","timerStyle":"relaxed"}`
+	rec := doCreateRoom(e, body, token)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+
+	var data room.Room
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+	assert.Equal(t, "701", data.MatchMode)
+
+	persisted, err := repo.FindByID(data.ID)
+	require.NoError(t, err)
+	require.NotNil(t, persisted)
+	assert.Equal(t, "701", persisted.MatchMode)
+}
+
 func TestCreateRoom_AutoSeatsCreator(t *testing.T) {
 	e, repo := setupTest()
 	token := validToken(7)

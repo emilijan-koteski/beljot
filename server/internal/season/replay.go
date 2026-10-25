@@ -57,7 +57,7 @@ func OutcomeFor(m match.Match) (match.MatchOutcome, error) {
 		return o, ErrReconcilePlaceholder
 	}
 	target, err := strconv.Atoi(m.MatchMode)
-	if err != nil || (target != 501 && target != 1001) {
+	if err != nil || target != game.MatchTarget(m.MatchMode) {
 		return o, fmt.Errorf("%w %q", ErrUnknownMode, m.MatchMode)
 	}
 	o.Target = target

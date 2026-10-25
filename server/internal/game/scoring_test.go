@@ -423,6 +423,51 @@ func TestMatchEnd_501Mode_ExactlyAtThreshold(t *testing.T) {
 	assert.Equal(t, 501, result.TeamScores[game.TeamA])
 }
 
+func TestMatchTarget(t *testing.T) {
+	tests := []struct {
+		mode string
+		want int
+	}{
+		{"501", 501},
+		{"701", 701},
+		{"1001", 1001},
+		{"", 1001},
+		{"999", 1001},
+	}
+
+	for _, tc := range tests {
+		t.Run("mode "+tc.mode, func(t *testing.T) {
+			assert.Equal(t, tc.want, game.MatchTarget(tc.mode))
+		})
+	}
+}
+
+func TestMatchEnd_701Mode(t *testing.T) {
+	t.Run("ends at exactly 701", func(t *testing.T) {
+		gs := testfixtures.NewGameNearEnd(631, 600)
+		gs.MatchMode = "701"
+
+		result := playTrick8(t, gs)
+
+		assert.Equal(t, game.PhaseMatchEnd, result.Phase)
+		require.NotNil(t, result.WinnerTeam)
+		assert.Equal(t, game.TeamA, *result.WinnerTeam)
+		assert.Equal(t, 701, result.TeamScores[game.TeamA])
+		assert.Less(t, result.TeamScores[game.TeamB], 701)
+	})
+
+	t.Run("plays on at 700", func(t *testing.T) {
+		gs := testfixtures.NewGameNearEnd(630, 600)
+		gs.MatchMode = "701"
+
+		result := playTrick8(t, gs)
+
+		assert.Equal(t, game.PhaseHandComplete, result.Phase, "700 is not 701")
+		assert.Nil(t, result.WinnerTeam)
+		assert.Equal(t, 700, result.TeamScores[game.TeamA])
+	})
+}
+
 func TestMatchEnd_BlueTeamWins(t *testing.T) {
 	gs := testfixtures.NewGameNearEnd(0, 920)
 

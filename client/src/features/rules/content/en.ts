@@ -294,7 +294,7 @@ export const en: RulesLangData = {
         },
         {
           kind: "note",
-          text: "Hands keep coming until at least one team is sitting on 1001 or more at the end of a hand. If both teams cross the line on the same hand, the side with more total points takes the match — and if the two totals are exactly equal, it goes to the team that took trump. For a quicker match, a room can be set up as a race to 501 instead — every other rule stays exactly the same.",
+          text: "Hands keep coming until at least one team is sitting on 1001 or more at the end of a hand. If both teams cross the line on the same hand, the side with more total points takes the match — and if the two totals are exactly equal, it goes to the team that took trump. For a quicker match, a room can be set up as a race to 501 or 701 instead — every other rule stays exactly the same.",
         },
       ],
     },

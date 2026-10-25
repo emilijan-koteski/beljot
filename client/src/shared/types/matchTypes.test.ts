@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import type { ActionType, CardId, MatchState, Phase, Rank, Suit, Variant } from "./matchTypes";
+import {
+  type ActionType,
+  type CardId,
+  type MatchState,
+  matchTargetFor,
+  type Phase,
+  type Rank,
+  type Suit,
+  type Variant,
+} from "./matchTypes";
 
 describe("gameTypes", () => {
   describe("CardId", () => {
@@ -47,6 +56,18 @@ describe("gameTypes", () => {
     it("includes bitola variant", () => {
       const variant: Variant = "bitola";
       expect(variant).toBe("bitola");
+    });
+  });
+
+  describe("matchTargetFor", () => {
+    it.each([
+      ["501", 501],
+      ["701", 701],
+      ["1001", 1001],
+      ["", 1001],
+      ["999", 1001],
+    ])("maps mode %j to a %i-point target", (mode, target) => {
+      expect(matchTargetFor(mode)).toBe(target);
     });
   });
 

@@ -17,7 +17,19 @@ export function normalizeVariant(v: unknown): Variant {
 export type CardDeck = "french" | "croatian";
 
 /** The race target for a match. */
-export type MatchMode = "1001" | "501";
+export type MatchMode = "1001" | "701" | "501";
+
+/** The point target for a match mode, mirroring the server's `game.MatchTarget`: unknown modes race to 1001. */
+export function matchTargetFor(mode: string): number {
+  switch (mode) {
+    case "501":
+      return 501;
+    case "701":
+      return 701;
+    default:
+      return 1001;
+  }
+}
 
 export const SERVER_PHASES = [
   "dealing",

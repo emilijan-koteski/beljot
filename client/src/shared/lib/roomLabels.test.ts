@@ -22,9 +22,23 @@ describe("roomLabels — the single variant/mode label resolver", () => {
     expect(label).not.toContain("lobby.card");
   });
 
-  it.each(["1001", "501"] as const)("resolves the %s mode in both forms", (m) => {
+  it.each(["1001", "701", "501"] as const)("resolves the %s mode in both forms", (m) => {
     expect(modeLabel(t, m)).toContain(m);
+    expect(modeLabel(t, m)).not.toContain("matchMode");
     expect(modeOptionLabel(t, m)).toContain(m);
+    expect(modeOptionLabel(t, m)).not.toContain("matchMode");
+  });
+
+  it.each([
+    ["en", "701 pts", "701 points"],
+    ["sr", "701 bod", "701 bod"],
+    ["hr", "701 bod", "701 bod"],
+    ["mk", "701 поен", "701 поен"],
+  ] as const)("resolves the 701 mode to its own %s copy", async (loc, compact, spelled) => {
+    await i18n.changeLanguage(loc);
+    const labels = [modeLabel(t, "701"), modeOptionLabel(t, "701")];
+    await i18n.changeLanguage("en");
+    expect(labels).toEqual([compact, spelled]);
   });
 
   it("keeps the compact and spelled-out mode forms distinct", () => {

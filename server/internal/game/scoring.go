@@ -261,10 +261,14 @@ func determineMatchWinner(state *GameState, aOver, bOver bool) int {
 	return TeamB
 }
 
-// MatchTarget returns the match's point target: 501 for mode "501", 1001 otherwise.
+// MatchTarget returns the match's point target: 501 or 701 for those modes, 1001 otherwise.
 func MatchTarget(mode string) int {
-	if mode == "501" {
+	switch mode {
+	case "501":
 		return 501
+	case "701":
+		return 701
+	default:
+		return 1001
 	}
-	return 1001
 }

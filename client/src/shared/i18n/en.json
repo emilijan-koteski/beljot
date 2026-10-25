@@ -726,6 +726,7 @@
         ]
       },
       "matchMode501": "501 points",
+      "matchMode701": "701 points",
       "timerDurationSuffix": "seconds / move",
       "submit": "Create room",
       "submitting": "Creating…",
@@ -737,7 +738,7 @@
         "seated": "{{current}}/4"
       },
       "variantHint": "Bitola deals five cards and turns up a trump candidate; Croatian deals six and lets the taker name any suit",
-      "matchModeHint": "501 for a quicker match, 1001 for the full race",
+      "matchModeHint": "501 for a quick match, 701 for a medium one, 1001 for the full race",
       "timerHintRelaxed": "No timer",
       "timerDurationHint": "10–120s · default 30s",
       "coinBuyIn": "Buy-in",
@@ -833,6 +834,7 @@
       "variantCroatia": "Croatian",
       "matchMode1001": "1001 pts",
       "matchMode501": "501 pts",
+      "matchMode701": "701 pts",
       "matchModeGeneric": "{{points}} pts",
       "buyInFree": "No stake",
       "private": "Private",

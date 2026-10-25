@@ -490,6 +490,16 @@ describe("MatchPage", () => {
     expect(screen.getByTestId("score-b")).toHaveTextContent("/ 501");
   });
 
+  it("propagates a 701 matchMode snapshot to the score panel target", () => {
+    useMatchStore.getState().setMatchState({ ...mockMatchState, matchMode: "701" });
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    renderMatchPage();
+
+    expect(screen.getByTestId("score-a")).toHaveTextContent("/ 701");
+    expect(screen.getByTestId("score-b")).toHaveTextContent("/ 701");
+  });
+
   it("renders the 1001 target for a snapshot with the default matchMode", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
