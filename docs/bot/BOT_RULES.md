@@ -1,10 +1,12 @@
-# Bot decision rules (Beljot, Bitola variant)
+# Bot decision rules (Beljot, both variants)
 
 This document describes exactly how the bot decides, across every scenario, what it
-considers, and with examples. It reflects the current logic including the latest tuning
-(simulation-calibrated hand-shape bidding, partner trump-draw with
+considers, and with examples, for both the Bitola and the Croatian variant. It reflects the
+current logic including phase 1 of bot v2 (`BOT_V2_PROPOSAL.md` §4.7: new memory facts, the
+hand-shape bidding table, the led-suit-secure take, the Ace cashed before the Ten and the Ten
+under the Ace on the partner's trick) and the earlier tuning (partner trump-draw with
 a declaration-inference abort when the opponents provably hold the master, boss preservation,
-uncuttable-boss last-trick retention, Ace-first boss cashing, suppressing trump draws once the
+uncuttable-boss last-trick retention, suppressing trump draws once the
 opponents are void of trump, leading into a partner's void, smearing onto a partner's boss,
 seat-aware **secure trick takes** with a material-stake gate and control-trump economy, the
 **boss-preserving smear** with its endgame/dead-suit exceptions, and never fighting a partner
@@ -21,7 +23,7 @@ Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, 
 | Card-play decision logic (pure, deterministic) | `server/internal/bot/bot.go` | `Decide`, `chooseCard`, declarations |
 | Bidding (the hand-shape table) | `server/internal/bot/bidding.go` | `decideBid`, `matchesBidTable` |
 | What the bot is allowed to know | `server/internal/bot/view.go` | Redacted, seat-local snapshot |
-| What the bot remembers | `server/internal/bot/memory.go` | Played cards, voids, revealed declarations |
+| What the bot remembers | `server/internal/bot/memory.go` | Played cards, voids, revealed declarations, located cards |
 | Timing, humanization, scheduling | `server/internal/match/bot_driver.go` | Think delay, when the bot acts |
 | Card point and strength tables | `server/internal/game/types.go` | Tables every heuristic reads |
 | Legality (the rules cage) | `server/internal/game/validation.go` | The bot only ever chooses among legal cards |
@@ -262,9 +264,10 @@ In priority order:
    > (`opponentHoldsMasterTrump`): the "partner holds the top trumps" assumption above is an
    > optimistic default. It can be disproven not only by a known opponent holding a higher
    > trump, but by a **negative** inference from the partner's own declaration
-   > (`trumpRanksProvablyAbsentFromPartner`): a declared sequence is a MAXIMAL consecutive run
-   > in natural rank order, so the rank immediately above its top and immediately below its
-   > bottom cannot be in that hand — either would have extended the run. When the top
+   > (`cardsProvablyAbsent`): a revealed run is MAXIMAL (consecutive in natural rank order), so
+   > the rank immediately above its top and immediately below its bottom cannot be in that
+   > hand — either would have extended the run. The inference holds for every seat and every
+   > suit; `opponentHoldsMasterTrump` reads it for the partner's trump suit. When the top
    > OUTSTANDING trump (not played, not in the bot's own hand) is provably absent from the
    > partner this way, or is already known to sit with an opponent, drawing would only feed a
    > trick to that master — the bot aborts the draw entirely and falls through to cashing a
@@ -482,16 +485,17 @@ gamble.
   risks a ruff. Ruff wins (void in led) and trump-led tricks fall through unchanged.
 - Otherwise: take the trick — with points at stake (trick + cheap winner > 0), the bot calls
   `trumpEconomyTake` (see "Trump economy on the take" below), which secures the trick while
-  preserving the control trumps **J/9** whenever the pot doesn't justify spending one; if
-  nothing is provably secure, or the trick is pointless, take **as cheaply as possible**
-  (`cheapestWinning`) as before.
+  preserving the control trumps **J/9** whenever the pot doesn't justify spending one. After
+  `trumpEconomyTake` declines (nothing is provably secure), or when the trick is pointless, the
+  led-suit-secure take below applies, even on a pointless trick; only after that does the bot
+  take **as cheaply as possible** (`cheapestWinning`).
 - **Plain suit led, an opponent still to play:** before falling back to the cheapest take, the
-  bot takes with the lowest-point led-suit card that overtakes and that **no led-suit card an
-  opponent could still hold** outranks (`cheapestLedSecureWinner`). A ruff would beat the Ace
-  too, so unseen trumps are not an argument for a lower card. Example: opponents play 7♠ and
-  8♠, bot third holds A♠ Q♠ with the K♠ and T♠ unseen -> play **A♠**; the Queen would lose to
-  the last player's King or Ten and the kept Ace would be ruffed later. Once the K♠ and T♠ are
-  gone the Queen suffices. A trump cut, or a trump lead, leaves it inert.
+  bot takes with the lowest-point led-suit card that overtakes and that **no unseen led-suit
+  card, nor one an opponent is known to hold,** outranks (`cheapestLedSecureWinner`). A ruff
+  would beat the Ace too, so unseen trumps are not an argument for a lower card. Example:
+  opponents play 7♠ and 8♠, bot third holds A♠ Q♠ with the K♠ and T♠ unseen -> play **A♠**; the
+  Queen would lose to the last player's King or Ten and the kept Ace would be ruffed later. Once
+  the K♠ and T♠ are gone the Queen suffices. A trump cut, or a trump lead, leaves it inert.
 - Cannot win: **discard** the lowest value, preserving trump.
 
 **The boss-preserving smear (`bestSmear` + `bossWorthGuarding`)** — used at all three smear
@@ -517,7 +521,7 @@ old behavior, by explicit product decision.
 **Ten under the Ace.** When the chosen smear is a non-trump Ace and the Ten of the same suit is
 legal and does not overtake, the bot discards the **Ten** instead and keeps the Ace. That is the
 table convention: it tells a human partner "I hold the Ace of this suit, return it". The cost is
-one point on a trick the team already won (the Ten is worth 10, the Ace 11; the lab measured at
+one point on the partner's trick (the Ten is worth 10, the Ace 11; the lab measured at
 most 0.02 points per hand), and the Ace stays home as the suit's boss. Without the Ten the Ace
 rules above apply unchanged.
 
@@ -556,10 +560,18 @@ what a human in that seat could:
 
 - **Own hand and legal cards** for this turn.
 - **Cards played this hand and inferred voids** (from `Memory`). A player who does not follow
-  the led suit is marked void in it (`ObservePlay`). Voids are tracked for **all 4 seats**
-  (including the partner, used by the lead-into-void and smear rules).
-- **Known cards per seat**: only from the public declaration reveal, and only the winning
-  declaration team's cards. This is the only "x-ray" and it is legal information.
+  the led suit is marked void in it (`ObservePlay`). A seat that plays neither the led suit nor
+  a trump is void in trump as well: it would have had to cut. Voids are tracked for **all 4
+  seats** (including the partner, used by the lead-into-void and smear rules).
+- **Known cards per seat** (`KnownCards` = declared ∪ located). Declared cards
+  (`DeclaredCards`) come from the public declaration reveal, and only the winning declaration
+  team's cards; the run inference below reads these alone. Located cards are public too: the
+  candidate card is with the caller (in both Bitola rounds), and a Belote announcement puts the
+  King and Queen of trump with the announcer. This is the only "x-ray" and it is legal
+  information.
+- **Update points**: the match layer updates the memory on every state replacement — card
+  plays, the trump pick, the Belote announcement and the declaration reveal, including when
+  the declaration window times out — not only on player actions.
 - **Scores, hand points, tricks won**: present in the View but currently **not used** by any
   heuristic.
 
@@ -573,14 +585,15 @@ Reasoning helpers (all pure, in `bot.go`):
   declared the high cards they leave the threat set and the bot stops fighting the partner.
 - `securelyWins` goes **further** than the raw `threats` scan: it reasons **per yet-to-play
   opponent seat** — known holdings per seat, unseen cards filtered by that seat's known voids,
-  and the follow-suit pin (`seatKnownHoldsSuit`: a seat revealed to hold the led suit cannot
+  and the follow-suit pin (`seatKnownHoldsSuit`: a seat known to hold the led suit cannot
   play its trumps this trick). Cards pinned to seats that already acted are not threats.
-- `trumpRanksProvablyAbsentFromPartner` is a **negative** inference from the same reveal: a
-  declared trump sequence is a MAXIMAL consecutive run in natural rank order, so the rank just
-  above its top and just below its bottom cannot be in that hand — either would have extended
-  the run. `opponentHoldsMasterTrump` uses this (plus a direct known-held check) to prove the
-  top outstanding trump sits with an opponent even when no card has been directly revealed in
-  an opponent's own hand, aborting the partner trump-draw in `chooseLead`.
+- `cardsProvablyAbsent(v, seat)` is a **negative** inference from the same reveal: a revealed
+  run is MAXIMAL, so the rank just below its bottom and just above its top cannot be in that
+  seat's hand — either would have extended the run. It holds for every seat and every suit.
+  `opponentHoldsMasterTrump` consumes it for the partner's trump suit (plus a direct
+  known-held check) to prove the top outstanding trump sits with an opponent even when no card
+  has been directly revealed in an opponent's own hand, aborting the partner trump-draw in
+  `chooseLead`.
 
 ---
 
@@ -603,8 +616,8 @@ By impact:
 3. `chooseLead` priority: when to draw trumps (with the master or for the partner, and
    `opponentsOutOfTrump` stops the draw once opponents are void), cash a boss (Ace first),
    feed a partner ruff, or lead safe. The partner draw also aborts on
-   `opponentHoldsMasterTrump` / `trumpRanksProvablyAbsentFromPartner` — a declared sequence's
-   maximal-run boundary that proves the opponents (not the partner) hold the top trump.
+   `opponentHoldsMasterTrump` / `cardsProvablyAbsent` — a revealed run's maximal-run boundary
+   that proves the opponents (not the partner) hold the top trump.
 4. `chooseFollow`: smear, risk-smear, banking, and point management.
 5. `securelyWins` + the material-stake gate (`trickPoints + cardPoints > 0`): when the bot
    pays up for a guaranteed take vs. contests cheaply. The `> 0` threshold is the dial.
@@ -666,17 +679,17 @@ Blind spots if you want a stronger bot (the first four are logged in
 | Bidding aggressiveness | `matchesBidTable` | `server/internal/bot/bidding.go` |
 | Suit preference when several suits match or the pick is forced | `trumpSuitScore`, `trumpLengthBonus` | `server/internal/bot/bidding.go` |
 | Draw trumps for partner (Q/K/T/A, never 9) | `partnerDrawTrump` + block in `chooseLead` | `server/internal/bot/bot.go` |
-| Don't draw into the opponents' master (declaration inference) | `opponentHoldsMasterTrump`, `trumpRanksProvablyAbsentFromPartner` + block in `chooseLead` | `server/internal/bot/bot.go` |
+| Don't draw into the opponents' master (declaration inference) | `opponentHoldsMasterTrump`, `cardsProvablyAbsent` + block in `chooseLead` | `server/internal/bot/bot.go` |
 | Stop drawing once opponents are void of trump | `opponentsOutOfTrump` + blocks in `chooseLead` | `server/internal/bot/bot.go` |
-| Cash a side boss (Ace first; the Ten follows on a later lead) | boss block in `chooseLead`, `findRankOfSuit` | `server/internal/bot/bot.go` |
+| Cash a side boss (Ace first; the Ten follows on a later lead) | boss block in `chooseLead` | `server/internal/bot/bot.go` |
 | Only trumps left: highest if master, else lowest | `chooseLead` only-trumps branch, `isTrumpMaster` | `server/internal/bot/bot.go` |
-| Preserve the boss on a forced overtake (Ace/Ten: smear the Ace) | `strongestPreservingBoss` | `server/internal/bot/bot.go` |
+| Preserve the boss on a forced overtake (Ace/Ten: smear the Ace) | `strongestPreservingBoss`, `findRankOfSuit` | `server/internal/bot/bot.go` |
 | Secure take: cheapest guaranteed winner when points are at stake | `securelyWins`, `cheapestSecureWinning`, `trickPoints`, `seatKnownHoldsSuit` | `server/internal/bot/bot.go` |
 | Preserve control trumps on the take (bank the ace, value-gate the master) — **ruff-only** | `trumpEconomyTake`, `isControlTrump`, `controlTrumpValue`, `knownSafeRuff`, `highestExpendableKnownSafeRuff` | `server/internal/bot/bot.go` |
 | Secure the take on a trump lead when points are on the table | `trumpEconomyTake` (trump-lead branch), `trickPoints` | `server/internal/bot/bot.go` |
 | Trick 7: bank the master unconditionally (do NOT add a contest guard) | `retainLastTrickWinner`, `TestDecide_TrickSevenRetentionBeatsContesting` | `server/internal/bot/bot.go` |
 | Boss-preserving smear (backup test, endgame/dead-suit exceptions) | `bestSmear`, `bossWorthGuarding`, `heldSameSuitBoss` | `server/internal/bot/bot.go` |
-| Ten under the Ace on the partner's safe trick | `bestSmear` (the Ten preference), `tenUnderAce` | `server/internal/bot/bot.go` |
+| Ten under the Ace on the partner's safe trick | `bestSmear` (the Ten preference), `tenUnderAce`, `findRankOfSuit` | `server/internal/bot/bot.go` |
 | Never fight a partner forced to win a trump-led trick | `partnerTakesTrick` (trump-led branch) | `server/internal/bot/bot.go` |
 | Bank the high card as last player | `highestPointsLedSuitWinner` + `chooseFollow` | `server/internal/bot/bot.go` |
 | Take with the cheapest card no led-suit card can beat | `cheapestLedSecureWinner` + `chooseFollow` | `server/internal/bot/bot.go` |
