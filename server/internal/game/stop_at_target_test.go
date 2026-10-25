@@ -941,7 +941,7 @@ func TestStopAtTargetIsCarriedOnTheResolvedConfig(t *testing.T) {
 					[4]uint{10, 20, 30, 40},
 					[4]string{"a", "b", "c", "d"},
 					[4]bool{},
-					tc.variant, "1001", 1, true, want,
+					tc.variant, "1001", 1, true, want, true,
 				)
 				assert.Equal(t, want, gs.Rules.StopAtTarget, "the config the engine reads")
 				assert.Equal(t, want, gs.StopAtTarget, "and the wire flag the client renders")

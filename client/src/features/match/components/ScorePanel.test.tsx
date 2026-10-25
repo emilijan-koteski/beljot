@@ -17,6 +17,9 @@ vi.mock("react-i18next", () => ({
           "This room plays without declarations and without Belote",
         "lobby.card.stopAtTargetAriaLabel":
           "This room ends the match the moment a team reaches the target, without finishing the hand",
+        "lobby.card.noDeclarationsTransfer": "No declaration transfer",
+        "lobby.card.noDeclarationsTransferAriaLabel":
+          "In this room, the declarations and Belote of a team that goes down or is swept are voided instead of going to the other team",
       };
       return (
         translations[key] ?? (typeof opts?.defaultValue === "string" ? opts.defaultValue : key)
@@ -306,6 +309,58 @@ describe("ScorePanel", () => {
 
     expect(declarations).toHaveAccessibleName(/without declarations and without Belote/i);
     expect(stop).toHaveAccessibleName(/without finishing the hand/i);
+  });
+
+  it("defaults to transferring declarations, so a bare render carries no transfer segment", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={0}
+        teamBScore={0}
+        teamATricks={0}
+        teamBTricks={0}
+        handNumber={3}
+        variantLabel="Bitola"
+      />,
+    );
+    expect(screen.queryByTestId("score-meta-no-declarations-transfer")).not.toBeInTheDocument();
+  });
+
+  it("appends the no-transfer segment after every other rule segment", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={0}
+        teamBScore={0}
+        teamATricks={0}
+        teamBTricks={0}
+        handNumber={3}
+        variantLabel="Bitola"
+        declarationsEnabled={false}
+        stopAtTarget
+        declarationsTransfer={false}
+      />,
+    );
+    const chip = screen.getByTestId("score-meta-no-declarations-transfer");
+    expect(chip).toHaveTextContent(/^No declaration transfer$/);
+    expect(chip).toHaveAccessibleName(/voided instead of going to the other team/i);
+    expect(screen.getByTestId("score-meta")).toHaveTextContent(
+      "Hand 3 · Bitola · No declarations · Stop at target · No declaration transfer",
+    );
+  });
+
+  it("shows the no-transfer segment alone when there is no hand or variant", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={0}
+        teamBScore={0}
+        teamATricks={0}
+        teamBTricks={0}
+        declarationsTransfer={false}
+      />,
+    );
+    expect(screen.getByTestId("score-meta")).toHaveTextContent(/^No declaration transfer$/);
   });
 
   it("hides the metadata pill when neither handNumber nor variantLabel is provided", () => {

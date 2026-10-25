@@ -23,6 +23,7 @@ interface ScorePanelProps {
   variantLabel?: string;
   declarationsEnabled?: boolean;
   stopAtTarget?: boolean;
+  declarationsTransfer?: boolean;
 }
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
@@ -148,6 +149,7 @@ export function ScorePanel({
   variantLabel,
   declarationsEnabled = true,
   stopAtTarget = false,
+  declarationsTransfer = true,
 }: ScorePanelProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -278,7 +280,11 @@ export function ScorePanel({
           }}
         >
           <span>{t("match.score.heading", { defaultValue: "Scoreboard" })}</span>
-          {(handNumber !== undefined || variantLabel || !declarationsEnabled || stopAtTarget) && (
+          {(handNumber !== undefined ||
+            variantLabel ||
+            !declarationsEnabled ||
+            stopAtTarget ||
+            !declarationsTransfer) && (
             <span style={{ opacity: 0.85 }} data-testid="score-meta">
               {handNumber !== undefined && variantLabel
                 ? t("match.score.handVariant", {
@@ -313,6 +319,24 @@ export function ScorePanel({
                     aria-label={t("lobby.card.stopAtTargetAriaLabel")}
                   >
                     {t("lobby.card.stopAtTarget", { defaultValue: "Stop at target" })}
+                  </span>
+                </>
+              )}
+              {!declarationsTransfer && (
+                <>
+                  {(handNumber !== undefined ||
+                    variantLabel ||
+                    !declarationsEnabled ||
+                    stopAtTarget) &&
+                    " · "}
+                  <span
+                    data-testid="score-meta-no-declarations-transfer"
+                    role="img"
+                    aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
+                  >
+                    {t("lobby.card.noDeclarationsTransfer", {
+                      defaultValue: "No declaration transfer",
+                    })}
                   </span>
                 </>
               )}

@@ -142,7 +142,7 @@ func TestGameStateJSONCamelCaseKeys(t *testing.T) {
 func TestNewGame(t *testing.T) {
 	playerIDs := [4]uint{10, 20, 30, 40}
 	usernames := [4]string{"alice", "bob", "carol", "dave"}
-	gs := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true, false)
+	gs := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true, false, true)
 
 	t.Run("sets match metadata", func(t *testing.T) {
 		assert.Equal(t, uint(42), gs.RoomID)
@@ -162,7 +162,7 @@ func TestNewGame(t *testing.T) {
 		const draws = 4000
 		var counts [4]int
 		for range draws {
-			g := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true, false)
+			g := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true, false, true)
 			require.GreaterOrEqual(t, g.DealerSeat, 0)
 			require.LessOrEqual(t, g.DealerSeat, 3)
 			require.Equal(t, (g.DealerSeat+1)%4, g.ActivePlayerSeat,
@@ -311,25 +311,27 @@ func TestShuffleDeck(t *testing.T) {
 }
 
 // TestRulesForPresets checks both presets are fully populated, differ on every variant divergence, and that unknown variants fall back to Bitola.
-// DeclarationsEnabled is a per-room setting rather than a divergence, so both presets return true.
+// DeclarationsEnabled and DeclarationsTransfer are per-room settings rather than divergences, so both presets return true.
 func TestRulesForPresets(t *testing.T) {
 	bitola := game.VariantRules{
-		DealShape:           game.DealShapeCandidate,
-		HasTrumpCandidate:   true,
-		AllPassOutcome:      game.AllPassReshuffleAndRotate,
-		DeclarationOverlap:  false,
-		DeclarationTiming:   game.DeclarationTimingDuringFirstTrick,
-		DeclarationsEnabled: true,
-		TieRule:             game.TieRuleHangingPoints,
+		DealShape:            game.DealShapeCandidate,
+		HasTrumpCandidate:    true,
+		AllPassOutcome:       game.AllPassReshuffleAndRotate,
+		DeclarationOverlap:   false,
+		DeclarationTiming:    game.DeclarationTimingDuringFirstTrick,
+		DeclarationsEnabled:  true,
+		DeclarationsTransfer: true,
+		TieRule:              game.TieRuleHangingPoints,
 	}
 	croatia := game.VariantRules{
-		DealShape:           game.DealShapeAllBeforeBidding,
-		HasTrumpCandidate:   false,
-		AllPassOutcome:      game.AllPassDealerMustPick,
-		DeclarationOverlap:  true,
-		DeclarationTiming:   game.DeclarationTimingDedicatedPhase,
-		DeclarationsEnabled: true,
-		TieRule:             game.TieRuleAllToOpponents,
+		DealShape:            game.DealShapeAllBeforeBidding,
+		HasTrumpCandidate:    false,
+		AllPassOutcome:       game.AllPassDealerMustPick,
+		DeclarationOverlap:   true,
+		DeclarationTiming:    game.DeclarationTimingDedicatedPhase,
+		DeclarationsEnabled:  true,
+		DeclarationsTransfer: true,
+		TieRule:              game.TieRuleAllToOpponents,
 	}
 
 	tests := []struct {
@@ -389,7 +391,7 @@ func TestNewGameResolvesRulesOnce(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-				[4]bool{}, tc.variant, "1001", 1, true, false)
+				[4]bool{}, tc.variant, "1001", 1, true, false, true)
 			assert.Equal(t, game.RulesFor(tc.variant), gs.Rules)
 			assert.Equal(t, tc.variant, gs.Variant, "the variant string is stored verbatim")
 		})
@@ -401,7 +403,7 @@ func TestNewGameResolvesRulesOnce(t *testing.T) {
 // conservation.
 func TestNewGameCroatianDeal(t *testing.T) {
 	gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-		[4]bool{}, game.VariantCroatia, "1001", 7, true, false)
+		[4]bool{}, game.VariantCroatia, "1001", 7, true, false, true)
 
 	t.Run("six open cards and two face-down per seat", func(t *testing.T) {
 		for i, p := range gs.Players {
@@ -438,7 +440,7 @@ func TestNewGameCroatianDeal(t *testing.T) {
 		}
 
 		bidding := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-			[4]bool{}, game.VariantCroatia, "1001", 7, true, false)
+			[4]bool{}, game.VariantCroatia, "1001", 7, true, false, true)
 		bidding.Phase = game.PhaseBidding
 		suit := game.SuitSpades
 		resolved, err := game.ApplyAction(bidding, game.Action{
@@ -503,7 +505,7 @@ func TestGameStateJSONOmitsServerOnlyRuleFields(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-				[4]bool{}, tc.variant, "1001", 1, true, false)
+				[4]bool{}, tc.variant, "1001", 1, true, false, true)
 
 			data, err := json.Marshal(gs)
 			require.NoError(t, err)

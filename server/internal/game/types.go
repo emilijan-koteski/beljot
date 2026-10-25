@@ -107,38 +107,41 @@ const (
 )
 
 type VariantRules struct {
-	DealShape           DealShape
-	HasTrumpCandidate   bool
-	AllPassOutcome      AllPassOutcome
-	DeclarationOverlap  bool
-	DeclarationTiming   DeclarationTiming
-	DeclarationsEnabled bool
-	StopAtTarget        bool
-	TieRule             TieRule
+	DealShape            DealShape
+	HasTrumpCandidate    bool
+	AllPassOutcome       AllPassOutcome
+	DeclarationOverlap   bool
+	DeclarationTiming    DeclarationTiming
+	DeclarationsEnabled  bool
+	StopAtTarget         bool
+	DeclarationsTransfer bool
+	TieRule              TieRule
 }
 
 func RulesFor(v Variant) VariantRules {
 	if v == VariantCroatia {
 		return VariantRules{
-			DealShape:           DealShapeAllBeforeBidding,
-			HasTrumpCandidate:   false,
-			AllPassOutcome:      AllPassDealerMustPick,
-			DeclarationOverlap:  true,
-			DeclarationTiming:   DeclarationTimingDedicatedPhase,
-			DeclarationsEnabled: true,
-			StopAtTarget:        false,
-			TieRule:             TieRuleAllToOpponents,
+			DealShape:            DealShapeAllBeforeBidding,
+			HasTrumpCandidate:    false,
+			AllPassOutcome:       AllPassDealerMustPick,
+			DeclarationOverlap:   true,
+			DeclarationTiming:    DeclarationTimingDedicatedPhase,
+			DeclarationsEnabled:  true,
+			StopAtTarget:         false,
+			DeclarationsTransfer: true,
+			TieRule:              TieRuleAllToOpponents,
 		}
 	}
 	return VariantRules{
-		DealShape:           DealShapeCandidate,
-		HasTrumpCandidate:   true,
-		AllPassOutcome:      AllPassReshuffleAndRotate,
-		DeclarationOverlap:  false,
-		DeclarationTiming:   DeclarationTimingDuringFirstTrick,
-		DeclarationsEnabled: true,
-		StopAtTarget:        false,
-		TieRule:             TieRuleHangingPoints,
+		DealShape:            DealShapeCandidate,
+		HasTrumpCandidate:    true,
+		AllPassOutcome:       AllPassReshuffleAndRotate,
+		DeclarationOverlap:   false,
+		DeclarationTiming:    DeclarationTimingDuringFirstTrick,
+		DeclarationsEnabled:  true,
+		StopAtTarget:         false,
+		DeclarationsTransfer: true,
+		TieRule:              TieRuleHangingPoints,
 	}
 }
 

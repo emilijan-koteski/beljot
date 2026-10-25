@@ -54,6 +54,7 @@ export interface MatchListItem {
   endReason?: MatchEndReason;
   declarationsEnabled?: boolean;
   stopAtTarget?: boolean;
+  declarationsTransfer?: boolean;
   players: MatchPlayer[];
   hands: MatchHandView[];
 }

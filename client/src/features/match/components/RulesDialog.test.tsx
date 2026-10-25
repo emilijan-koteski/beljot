@@ -221,4 +221,30 @@ describe("RulesDialog (in-game)", () => {
     render(<RulesDialog open onOpenChange={() => {}} />);
     expect(screen.queryByTestId("rules-dialog-stop-at-target-note")).not.toBeInTheDocument();
   });
+
+  it("notes that a fallen team's declarations are voided when they do not transfer", () => {
+    render(<RulesDialog open onOpenChange={() => {}} declarationsTransfer={false} />);
+    expect(screen.getByTestId("rules-dialog-no-declarations-transfer-note")).toHaveTextContent(
+      /voided instead of going to the other team/i,
+    );
+  });
+
+  it("shows no transfer note when declarations transfer or the flag is absent", () => {
+    const { unmount } = render(<RulesDialog open onOpenChange={() => {}} declarationsTransfer />);
+    expect(
+      screen.queryByTestId("rules-dialog-no-declarations-transfer-note"),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    render(<RulesDialog open onOpenChange={() => {}} />);
+    expect(
+      screen.queryByTestId("rules-dialog-no-declarations-transfer-note"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows both table notes when the table stops at the target and voids declarations", () => {
+    render(<RulesDialog open onOpenChange={() => {}} stopAtTarget declarationsTransfer={false} />);
+    expect(screen.getByTestId("rules-dialog-stop-at-target-note")).toBeInTheDocument();
+    expect(screen.getByTestId("rules-dialog-no-declarations-transfer-note")).toBeInTheDocument();
+  });
 });

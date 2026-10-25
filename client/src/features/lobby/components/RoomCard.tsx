@@ -9,6 +9,7 @@ import {
   KeyRound,
   Lock,
   LockOpen,
+  Unlink,
   UserCheck,
   Users,
   Zap,
@@ -139,6 +140,20 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               >
                 <Flag className="size-3" />
                 {t("lobby.card.stopAtTarget")}
+              </span>
+            </>
+          )}
+          {room.declarationsTransfer === false && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="room-card-no-declarations-transfer"
+                role="img"
+                aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
+              >
+                <Unlink className="size-3" />
+                {t("lobby.card.noDeclarationsTransfer")}
               </span>
             </>
           )}

@@ -55,29 +55,18 @@ func scoreHand(state *GameState) {
 	}
 
 	failedContract := contractingTotal <= opposingTotal
-	allPoints := aTotal + bTotal
-	var aAwarded, bAwarded int
+	declTotals := [2]int{aDeclTotal, bDeclTotal}
+	var awarded [2]int
 	switch {
 	case isCapot:
-		state.TeamScores[*capotTeam] += allPoints
-		if *capotTeam == TeamA {
-			aAwarded = allPoints
-		} else {
-			bAwarded = allPoints
-		}
+		awarded[*capotTeam] = wholeHandAward(state, *capotTeam, declTotals)
 	case failedContract:
-		state.TeamScores[opposingTeam] += allPoints
-		if opposingTeam == TeamA {
-			aAwarded = allPoints
-		} else {
-			bAwarded = allPoints
-		}
+		awarded[opposingTeam] = wholeHandAward(state, opposingTeam, declTotals)
 	default:
-		state.TeamScores[TeamA] += aTotal
-		state.TeamScores[TeamB] += bTotal
-		aAwarded = aTotal
-		bAwarded = bTotal
+		awarded = [2]int{aTotal, bTotal}
 	}
+	state.TeamScores[TeamA] += awarded[TeamA]
+	state.TeamScores[TeamB] += awarded[TeamB]
 
 	state.LastHandResult = &HandScore{
 		HandNumber:      state.HandNumber,
@@ -93,8 +82,8 @@ func scoreHand(state *GameState) {
 		CapotBonus:      capotBonus,
 		FailedContract:  failedContract,
 		ContractingTeam: contractingTeam,
-		TeamAHandTotal:  aAwarded,
-		TeamBHandTotal:  bAwarded,
+		TeamAHandTotal:  awarded[TeamA],
+		TeamBHandTotal:  awarded[TeamB],
 	}
 
 	target := MatchTarget(state.MatchMode)
@@ -110,6 +99,16 @@ func scoreHand(state *GameState) {
 
 	state.Phase = PhaseHandComplete
 	state.HandCompleteReady = [4]bool{}
+}
+
+// wholeHandAward returns what a team taking the whole hand (a fall or a Capot) banks: every card point, plus
+// both sides' declarations and Belote when they transfer, or only its own when they do not.
+func wholeHandAward(state *GameState, winner int, declTotals [2]int) int {
+	cardPoints := state.HandPoints[TeamA] + state.HandPoints[TeamB]
+	if state.Rules.DeclarationsTransfer {
+		return cardPoints + declTotals[TeamA] + declTotals[TeamB]
+	}
+	return cardPoints + declTotals[winner]
 }
 
 // teamRunningTotal returns what team would bank if the match stopped now: its match score plus the unfinished hand's points.

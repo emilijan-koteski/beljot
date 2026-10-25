@@ -1242,3 +1242,9 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A â€
 - source_spec: `_bmad-output/implementation-artifacts/spec-701-match-mode.md`
   summary: Serbian mixes two words for points: the mode labels say "bod" (501/701/1001) while the generic label and the rules text say "poena".
   evidence: `client/src/shared/i18n/sr.json` `lobby.card.matchMode501`/`1001` and `lobby.createRoomModal.matchMode501`/`1001` already read "bod" (copied from hr) while `lobby.card.matchModeGeneric` is "{{points}} poena" and `features/rules/content/sr.ts` says "poena". Pre-existing; the 701 labels follow the existing "bod" pattern.
+- source_spec: `_bmad-output/implementation-artifacts/spec-declaration-transfer-rule.md`
+  summary: Abandoned and reconciled match rows never store `declarationsEnabled` or `stopAtTarget`, so history shows a wrong "No declarations" chip on every abandoned match.
+  evidence: The `Match` literals in `server/internal/match/reconnect.go` (`handleSeatReconnectTimeout`) and `reconcile.go` (`reconcileStaleRoom`) set `DeclarationsTransfer` but not the two sibling flags; with no GORM default tag GORM writes `false`, and `MatchStatsCard.tsx` renders "No declarations" on `declarationsEnabled === false`. Pre-existing; the fix sets both from `gs.Rules` in reconnect and threads them through `StaleRoom` and `room/stale_room_adapter.go` like `DeclarationsTransfer`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-declaration-transfer-rule.md`
+  summary: Record the per-room "declarations transfer" override in `.claude/rules/game-rules.md`'s Scoring section.
+  evidence: Line 43 still says a fall sends all points to the opponents unconditionally. With the flag off, the fallen or swept side's declarations and Belote are voided, and Capot obeys the flag; an agent trusting the owner-confirmed rules file could "fix" `wholeHandAward` back. Deferred because it edits an agent-context rules file the owner confirms.

@@ -766,6 +766,10 @@
       "declarationsOn": "Uključena",
       "declarationsOff": "Isključena",
       "declarationsHint": "Bez zvanja nema ni Bele, a deljenja se broje samo na poene iz karata",
+      "declarationsTransfer": "Zvanja pri padu",
+      "declarationsTransferOn": "Pobednicima",
+      "declarationsTransferOff": "Poništavaju se",
+      "declarationsTransferHint": "Kad ekipa padne ili ne uzme nijedan štih, njena zvanja i Bela obično idu drugoj ekipi. „Poništavaju se“ znači da ih niko ne dobija",
       "matchEnd": "Kraj meča",
       "matchEndFinish": "Dovrši deljenje",
       "matchEndStop": "Dosta",
@@ -773,7 +777,7 @@
       "advanced": {
         "title": "Napredna podešavanja",
         "changedCount": "{{count}} izmenjeno",
-        "summary": "Zvanja, kraj meča, privatnost, ko može da sedne"
+        "summary": "Zvanja, zvanja pri padu, kraj meča, privatnost, ko može da sedne"
       }
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · uživo se osvežava",
@@ -850,7 +854,9 @@
       "noDeclarations": "Bez zvanja",
       "noDeclarationsAriaLabel": "Ova soba igra bez zvanja i bez Bele",
       "stopAtTarget": "Dosta",
-      "stopAtTargetAriaLabel": "Ova soba završava meč u trenutku kad ekipa dostigne cilj, bez dovršavanja deljenja"
+      "stopAtTargetAriaLabel": "Ova soba završava meč u trenutku kad ekipa dostigne cilj, bez dovršavanja deljenja",
+      "noDeclarationsTransfer": "Bez prenosa zvanja",
+      "noDeclarationsTransferAriaLabel": "U ovoj sobi se zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju umesto da idu drugoj ekipi"
     },
     "chat": {
       "title": "Lobi chat",
@@ -1003,6 +1009,8 @@
       "subtitleHeldTheir": "Prošli · oni su zvali adut {{suit}}",
       "subtitleFailedUs": "Pali · svi poeni za nas",
       "subtitleFailedThem": "Pali · svi poeni za njih",
+      "subtitleFailedCardsUs": "Pali · poeni iz karata za nas",
+      "subtitleFailedCardsThem": "Pali · poeni iz karata za njih",
       "cardPoints": "Poeni karata",
       "declarationPoints": "Zvanja",
       "lastTrickBonus": "Bonus poslednjeg štiha",
@@ -1162,7 +1170,8 @@
       "label": "Ulog"
     },
     "rules": {
-      "stopAtTargetNote": "Ovaj stol igra sa dosta: mač završava u trenutku kad jedan tim dostigne cilj, bez dovršavanja ruke. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gde se ruka prvo odigra do kraja."
+      "stopAtTargetNote": "Ovaj stol igra sa dosta: mač završava u trenutku kad jedan tim dostigne cilj, bez dovršavanja ruke. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gde se ruka prvo odigra do kraja.",
+      "noDeclarationsTransferNote": "Na ovom stolu se zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju umesto da idu drugoj ekipi. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gde ta zvanja idu drugoj ekipi."
     }
   },
   "auth": {

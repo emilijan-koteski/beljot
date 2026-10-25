@@ -25,10 +25,21 @@ interface ScoreRevealProps {
   trumpCallerSeat?: number | null;
   acknowledged?: boolean;
   matchTarget?: number;
+  declarationsTransfer?: boolean;
 }
 
 function callerTeamString(seat: number): TeamString {
   return seat % 2 === 0 ? "teamA" : "teamB";
+}
+
+/** Picks the fall subtitle: every point goes to the winners, or only the card points when declarations do not transfer. */
+function failedSubtitleKey(toViewer: boolean, declarationsTransfer: boolean): string {
+  if (declarationsTransfer) {
+    return toViewer ? "match.scoreReveal.subtitleFailedUs" : "match.scoreReveal.subtitleFailedThem";
+  }
+  return toViewer
+    ? "match.scoreReveal.subtitleFailedCardsUs"
+    : "match.scoreReveal.subtitleFailedCardsThem";
 }
 
 const AUTO_CONTINUE_MS = MOTION.SCORE_REVEAL_AUTO_CONTINUE;
@@ -122,6 +133,7 @@ export function ScoreReveal({
   trumpCallerSeat,
   acknowledged = false,
   matchTarget = 1001,
+  declarationsTransfer = true,
 }: ScoreRevealProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -175,11 +187,7 @@ export function ScoreReveal({
   let subtitle: string | null = null;
   if (data.failedContract) {
     const beneficiary: TeamString = data.contractingTeam === 0 ? "teamB" : "teamA";
-    subtitle = t(
-      beneficiary === viewerTeam
-        ? "match.scoreReveal.subtitleFailedUs"
-        : "match.scoreReveal.subtitleFailedThem",
-    );
+    subtitle = t(failedSubtitleKey(beneficiary === viewerTeam, declarationsTransfer));
   } else if (trumpSuitName && callerTeam) {
     subtitle = t(
       callerWasViewer

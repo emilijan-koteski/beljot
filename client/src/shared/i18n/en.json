@@ -766,6 +766,10 @@
       "declarationsOn": "On",
       "declarationsOff": "Off",
       "declarationsHint": "Off means no declarations and no Belote: hands score on card points alone",
+      "declarationsTransfer": "Declarations on a fall",
+      "declarationsTransferOn": "To the winners",
+      "declarationsTransferOff": "Voided",
+      "declarationsTransferHint": "When a team goes down or takes no trick, its declarations and Belote normally go to the other team. Voided means nobody scores them",
       "matchEnd": "Match end",
       "matchEndFinish": "Finish the hand",
       "matchEndStop": "Stop at target",
@@ -773,7 +777,7 @@
       "advanced": {
         "title": "Advanced settings",
         "changedCount": "{{count}} changed",
-        "summary": "Declarations, match end, privacy, who can sit down"
+        "summary": "Declarations, declarations on a fall, match end, privacy, who can sit down"
       }
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
@@ -850,7 +854,9 @@
       "noDeclarations": "No declarations",
       "noDeclarationsAriaLabel": "This room plays without declarations and without Belote",
       "stopAtTarget": "Stop at target",
-      "stopAtTargetAriaLabel": "This room ends the match the moment a team reaches the target, without finishing the hand"
+      "stopAtTargetAriaLabel": "This room ends the match the moment a team reaches the target, without finishing the hand",
+      "noDeclarationsTransfer": "No declaration transfer",
+      "noDeclarationsTransferAriaLabel": "In this room, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team"
     },
     "chat": {
       "title": "Lobby chat",
@@ -1003,6 +1009,8 @@
       "subtitleHeldTheir": "Pulled it off · they took trump on {{suit}}",
       "subtitleFailedUs": "Went down · all points to us",
       "subtitleFailedThem": "Went down · all points to them",
+      "subtitleFailedCardsUs": "Went down · card points to us",
+      "subtitleFailedCardsThem": "Went down · card points to them",
       "cardPoints": "Card Points",
       "declarationPoints": "Declarations",
       "lastTrickBonus": "Last Trick Bonus",
@@ -1162,7 +1170,8 @@
       "label": "Stake"
     },
     "rules": {
-      "stopAtTargetNote": "This table stops at the target: the match ends the moment a team reaches it, without finishing the hand. The scoring chapter below describes the usual rule, where the hand is played out first."
+      "stopAtTargetNote": "This table stops at the target: the match ends the moment a team reaches it, without finishing the hand. The scoring chapter below describes the usual rule, where the hand is played out first.",
+      "noDeclarationsTransferNote": "On this table, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team. The scoring chapter below describes the usual rule, where those declarations go to the other team."
     }
   },
   "auth": {

@@ -45,6 +45,7 @@ const minimalMatchState: MatchState = {
   mustPickTrump: false,
   declarationsEnabled: true,
   stopAtTarget: false,
+  declarationsTransfer: true,
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],

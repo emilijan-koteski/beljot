@@ -32,7 +32,7 @@ func TestBufferHandResult_StaleResultIsNotRePersisted(t *testing.T) {
 
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	require.NoError(t, mgr.StartMatch(
-		910, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false,
+		910, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(910) })
 
@@ -59,7 +59,7 @@ func TestBufferHandResult_StampsTheResultsOwnHand(t *testing.T) {
 
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	require.NoError(t, mgr.StartMatch(
-		911, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false,
+		911, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(911) })
 
@@ -80,7 +80,7 @@ func TestMatchEndPayload_ReportsASaneDuration(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	const roomID = uint(912)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true,
+		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -112,14 +112,15 @@ func TestMatchEndPayload_ReportsASaneDuration(t *testing.T) {
 // reused and its settings can change between matches.
 func TestMatchRecord_CarriesTheRulesItWasPlayedUnder(t *testing.T) {
 	tests := []struct {
-		name                string
-		declarationsEnabled bool
-		stopAtTarget        bool
+		name                 string
+		declarationsEnabled  bool
+		stopAtTarget         bool
+		declarationsTransfer bool
 	}{
-		{"both at their defaults", true, false},
-		{"declarations off, dosta on", false, true},
-		{"declarations on, dosta on", true, true},
-		{"declarations off, dosta off", false, false},
+		{"all at their defaults", true, false, true},
+		{"declarations off, dosta on", false, true, true},
+		{"declarations on, dosta on, no transfer", true, true, false},
+		{"declarations off, dosta off, no transfer", false, false, false},
 	}
 
 	for i, tt := range tests {
@@ -130,7 +131,7 @@ func TestMatchRecord_CarriesTheRulesItWasPlayedUnder(t *testing.T) {
 			mgr := match.NewManager(hub, repo)
 			require.NoError(t, mgr.StartMatch(
 				roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0,
-				tt.declarationsEnabled, tt.stopAtTarget,
+				tt.declarationsEnabled, tt.stopAtTarget, tt.declarationsTransfer,
 			))
 			t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -148,6 +149,7 @@ func TestMatchRecord_CarriesTheRulesItWasPlayedUnder(t *testing.T) {
 			require.Len(t, matches, 1, "the match must be persisted")
 			assert.Equal(t, tt.declarationsEnabled, matches[0].DeclarationsEnabled)
 			assert.Equal(t, tt.stopAtTarget, matches[0].StopAtTarget)
+			assert.Equal(t, tt.declarationsTransfer, matches[0].DeclarationsTransfer)
 		})
 	}
 }

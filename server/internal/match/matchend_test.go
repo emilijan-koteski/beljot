@@ -170,7 +170,7 @@ func TestHandleMatchEnd_PersistsBeforeBroadcast(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 
 	roomID := uint(100)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -228,7 +228,7 @@ func TestHandleMatchEnd_BroadcastsEvenIfPersistFails(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 
 	roomID := uint(101)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)

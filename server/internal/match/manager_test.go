@@ -156,7 +156,7 @@ func TestStartMatch_CreatesSession(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	assert.True(t, mgr.HasSession(100))
@@ -189,7 +189,7 @@ func TestStartMatch_StampsAvatarURLs(t *testing.T) {
 		{UserID: 30, Username: "player3", Seat: 2},
 		{Seat: 3, IsBot: true},
 	}
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", players, "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", players, "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
 	state := mgr.GetStateSnapshot(100)
@@ -212,7 +212,7 @@ func TestStartMatch_501MatchMode_PropagatesToState(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "501", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "501", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -228,7 +228,7 @@ func TestStartMatch_BroadcastsInitialState(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	time.Sleep(50 * time.Millisecond)
@@ -265,7 +265,7 @@ func TestHandleAction_PlayCard_ParsesCorrectly(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -295,7 +295,7 @@ func TestHandleAction_BiddingActions(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -339,7 +339,7 @@ func TestRemoveSession(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 	assert.True(t, mgr.HasSession(100))
 
@@ -358,7 +358,7 @@ func TestHasSession(t *testing.T) {
 
 	assert.False(t, mgr.HasSession(100))
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	assert.True(t, mgr.HasSession(100))
@@ -375,7 +375,7 @@ func TestIsUserInMatch(t *testing.T) {
 	assert.False(t, mgr.IsUserInMatch(10))
 	assert.False(t, mgr.IsUserInMatch(999))
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	assert.True(t, mgr.IsUserInMatch(10))
@@ -404,7 +404,7 @@ func TestMatchParticipantsByUser(t *testing.T) {
 	assert.Equal(t, -1, seat)
 	assert.Equal(t, [4]uint{}, ids)
 
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	for expectedSeat, userID := range []uint{10, 20, 30, 40} {
 		ids, seat, ok := mgr.MatchParticipantsByUser(userID)
@@ -438,7 +438,7 @@ func TestMatchParticipants(t *testing.T) {
 	assert.False(t, ok)
 	assert.Equal(t, [4]uint{}, ids)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	ids, ok = mgr.MatchParticipants(100)
@@ -462,7 +462,7 @@ func TestStartMatch_PerMoveTimer_SetsTurnExpiresAt(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -480,7 +480,7 @@ func TestStartMatch_RelaxedTimer_NilTurnExpiresAt(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -498,7 +498,7 @@ func TestHandleAction_PerMoveTimer_ResetsOnAction(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	mgr.SetDealGraceForTest(false)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -533,7 +533,7 @@ func TestPerMoveTimer_AutoPlayOnExpiry(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -579,7 +579,7 @@ func TestPerMoveTimer_ConcurrentActionAndExpiry(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -657,7 +657,7 @@ func TestBufferHandResultIfScored_HandAdvanced(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(900, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(900, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	old := &game.GameState{HandNumber: 3}
 	next := &game.GameState{HandNumber: 4, LastHandResult: bufferTestResult(3, 81, 81)}
@@ -685,7 +685,7 @@ func TestBufferHandResultIfScored_MatchEnd(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(901, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(901, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	old := &game.GameState{HandNumber: 7}
 	next := &game.GameState{HandNumber: 7, Phase: game.PhaseMatchEnd, LastHandResult: bufferTestResult(7, 100, 62)}
@@ -705,7 +705,7 @@ func TestBufferHandResultIfScored_Noop_NoTransition(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(902, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(902, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	old := &game.GameState{HandNumber: 2}
 	next := &game.GameState{HandNumber: 2, Phase: game.PhasePlaying, LastHandResult: bufferTestResult(2, 10, 20)}
@@ -722,7 +722,7 @@ func TestBufferHandResultIfScored_Noop_NilHandResult(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(903, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(903, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	old := &game.GameState{HandNumber: 2}
 	next := &game.GameState{HandNumber: 3, LastHandResult: nil}
@@ -740,7 +740,7 @@ func TestSurrender_RequestSucceeds(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	require.NoError(t, mgr.StartMatch(800, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(800, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	state := mgr.GetStateSnapshot(800)
 	require.NotNil(t, state)
@@ -770,7 +770,7 @@ func TestSurrender_AcceptPersistsMatchAsCompleted(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	require.NoError(t, mgr.StartMatch(801, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(801, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
@@ -804,7 +804,7 @@ func TestSurrender_DeclineKeepsSessionActive(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	require.NoError(t, mgr.StartMatch(802, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(802, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
@@ -835,7 +835,7 @@ func TestSurrender_ExhaustedAfterDecline(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	require.NoError(t, mgr.StartMatch(803, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(803, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
@@ -868,7 +868,7 @@ func TestSurrender_SecondRequestWhilePending_Rejected(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	require.NoError(t, mgr.StartMatch(804, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(804, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
@@ -897,7 +897,7 @@ func TestSurrender_NonPartnerAccept_Rejected(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	require.NoError(t, mgr.StartMatch(805, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(805, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
@@ -927,7 +927,7 @@ func TestSurrender_PauseInteraction_PreservesProposal(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	require.NoError(t, mgr.StartMatch(806, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(806, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{
 		Type:    "action:surrender_request",
@@ -967,7 +967,7 @@ func TestRemoveSession_CallsUserRemovedHooks(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(900, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false)
+	err := mgr.StartMatch(900, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
 	require.NoError(t, err)
 
 	received := make(chan uint, 4)
@@ -1012,7 +1012,7 @@ func TestHandleAction_Declare_PreservesTurnExpiry(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 
 	expiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(1, expiry, true))
@@ -1039,7 +1039,7 @@ func TestHandleAction_SkipDeclare_PreservesTurnExpiry(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 
 	expiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(1, expiry, true))
@@ -1066,7 +1066,7 @@ func TestHandleAction_PlayCardTriggeringBelot_PreservesTurnExpiry(t *testing.T) 
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 
 	expiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(0, expiry, false))
@@ -1094,7 +1094,7 @@ func TestHandleAction_AnnounceBelot_RefreshesTurnExpiryForNextSeat(t *testing.T)
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 
 	oldExpiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(0, oldExpiry, false))
@@ -1129,7 +1129,7 @@ func TestHandleAction_SkipBelot_RefreshesTurnExpiryForNextSeat(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 
 	oldExpiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(0, oldExpiry, false))
@@ -1166,7 +1166,7 @@ func TestHandleAction_InvalidAction_PreservesOriginalTurnExpiry(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 
 	originalExpiry := time.Now().Add(20 * time.Second)
 	mgr.SetGameStateForTest(100, firstTrickStateAt(1, originalExpiry, false))

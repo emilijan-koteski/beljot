@@ -185,7 +185,7 @@ func TestHandleMatchEnd_AwardsSeasonPoints(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(400)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatch(t, mgr, roomID, game.TeamA, 1010, 700, nil, ws.MatchEndPayload{OutcomeReason: ws.OutcomeReasonNatural}, nil)
@@ -236,7 +236,7 @@ func TestHandleMatchEnd_SeasonPointsFollowHonorAndPrecedeMatchState(t *testing.T
 	mgr.SetSPAwarder(&stubSPAwarder{})
 
 	roomID := uint(401)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatch(t, mgr, roomID, game.TeamA, 1010, 700, nil, ws.MatchEndPayload{}, nil)
@@ -268,7 +268,7 @@ func TestHandleMatchEnd_RankChangeIsPerPlayer(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(402)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatch(t, mgr, roomID, game.TeamA, 1010, 700, nil, ws.MatchEndPayload{}, nil)
@@ -305,7 +305,7 @@ func TestHandleMatchEnd_SingleTiersCarryANullDivision(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(420)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatch(t, mgr, roomID, game.TeamA, 1010, 700, nil, ws.MatchEndPayload{}, nil)
@@ -337,7 +337,7 @@ func TestHandleMatchEnd_CapotBonusGoesToTheCapotTeam(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(403)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	bufferCapot(t, mgr, roomID, game.TeamB)
@@ -362,7 +362,7 @@ func TestHandleMatchEnd_The501TargetScalesTheMargin(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(414)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "501", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "501", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatch(t, mgr, roomID, game.TeamA, 520, 220, nil, ws.MatchEndPayload{}, nil)
@@ -384,7 +384,7 @@ func TestHandleMatchEnd_InstantWinIsTheMaximumMargin(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(404)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatch(t, mgr, roomID, game.TeamA, 0, 0, nil, ws.MatchEndPayload{}, func(gs *game.GameState) {
@@ -408,7 +408,7 @@ func TestHandleMatchEnd_SurrenderScoresAsIfTheWinnersReachedTheTarget(t *testing
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(410)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	surrenderedBy := uint(10)
@@ -436,7 +436,7 @@ func TestSurrender_ThroughTheActionPathIsScoredAsASurrender(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(413)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	mgr.HandleAction(&ws.Client{UserID: 10}, ws.WSMessage{Type: "action:surrender_request", Payload: json.RawMessage(`{}`)})
@@ -465,7 +465,7 @@ func TestHandleMatchEnd_SurrenderThatFinalizesAtTargetIsANaturalMargin(t *testin
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(412)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	surrenderedBy := uint(20)
@@ -493,7 +493,7 @@ func TestAbandonment_ScoresEverySeatByItsRole(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(405)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := mgr.GetStateSnapshot(roomID)
@@ -550,7 +550,7 @@ func TestAbandonment_The501TargetScalesTheMargin(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(415)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "501", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "501", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := mgr.GetStateSnapshot(roomID)
@@ -579,7 +579,7 @@ func TestAbandonment_CapotBonusSkipsOnlyTheAbandoner(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(411)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	bufferCapot(t, mgr, roomID, game.TeamA)
@@ -610,7 +610,7 @@ func TestAbandonment_AnAbsentOpponentIsStillScoredByTheResult(t *testing.T) {
 	mgr.SetSPAwarder(awarder)
 
 	roomID := uint(406)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := mgr.GetStateSnapshot(roomID)
@@ -645,7 +645,7 @@ func TestHandleMatchEnd_BotSeatCountsAsTheGoldFloor(t *testing.T) {
 	mgr.SetBotDelayForTest(time.Hour, time.Hour)
 
 	roomID := uint(407)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(3), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(3), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatch(t, mgr, roomID, game.TeamA, 500, 300, nil, ws.MatchEndPayload{}, nil)
@@ -671,7 +671,7 @@ func TestHandleMatchEnd_NoAwarderNoSeasonPoints(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 
 	roomID := uint(408)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatch(t, mgr, roomID, game.TeamA, 0, 0, nil, ws.MatchEndPayload{}, nil)
@@ -693,7 +693,7 @@ func TestHandleMatchEnd_SeasonPointsFailureDoesNotBlockBroadcasts(t *testing.T) 
 	mgr.SetSPAwarder(&stubSPAwarder{err: errors.New("db down")})
 
 	roomID := uint(409)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatch(t, mgr, roomID, game.TeamA, 0, 0, nil, ws.MatchEndPayload{}, nil)

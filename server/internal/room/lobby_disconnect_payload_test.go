@@ -25,19 +25,20 @@ func (c *captureBroadcaster) BroadcastAll(msg []byte) {
 	c.all = append(c.all, msg)
 }
 
-// TestBroadcastRoomUpdated_CarriesBothRuleFlags checks that the disconnect room_updated
-// payload carries both per-room rule flags. It is internal because broadcastRoomUpdated
+// TestBroadcastRoomUpdated_CarriesEveryRuleFlag checks that the disconnect room_updated
+// payload carries every per-room rule flag. It is internal because broadcastRoomUpdated
 // is unexported and a real disconnect takes 10 seconds.
-func TestBroadcastRoomUpdated_CarriesBothRuleFlags(t *testing.T) {
+func TestBroadcastRoomUpdated_CarriesEveryRuleFlag(t *testing.T) {
 	tests := []struct {
-		name                string
-		declarationsEnabled bool
-		stopAtTarget        bool
+		name                 string
+		declarationsEnabled  bool
+		stopAtTarget         bool
+		declarationsTransfer bool
 	}{
-		{name: "both at their defaults", declarationsEnabled: true, stopAtTarget: false},
-		{name: "declarations off, dosta on", declarationsEnabled: false, stopAtTarget: true},
-		{name: "declarations on, dosta on", declarationsEnabled: true, stopAtTarget: true},
-		{name: "declarations off, dosta off", declarationsEnabled: false, stopAtTarget: false},
+		{name: "all at their defaults", declarationsEnabled: true, stopAtTarget: false, declarationsTransfer: true},
+		{name: "declarations off, dosta on", declarationsEnabled: false, stopAtTarget: true, declarationsTransfer: true},
+		{name: "declarations on, dosta on, no transfer", declarationsEnabled: true, stopAtTarget: true, declarationsTransfer: false},
+		{name: "declarations off, dosta off, no transfer", declarationsEnabled: false, stopAtTarget: false, declarationsTransfer: false},
 	}
 
 	for _, tt := range tests {
@@ -46,16 +47,17 @@ func TestBroadcastRoomUpdated_CarriesBothRuleFlags(t *testing.T) {
 			h := NewLobbyDisconnectHandler(nil, hub, nil, nil)
 
 			h.broadcastRoomUpdated(&Room{
-				ID:                  7,
-				Name:                "Test Room",
-				OwnerID:             100,
-				OwnerUsername:       "Owner",
-				Variant:             "bitola",
-				MatchMode:           "1001",
-				PlayerCount:         3,
-				Status:              "waiting",
-				DeclarationsEnabled: tt.declarationsEnabled,
-				StopAtTarget:        tt.stopAtTarget,
+				ID:                   7,
+				Name:                 "Test Room",
+				OwnerID:              100,
+				OwnerUsername:        "Owner",
+				Variant:              "bitola",
+				MatchMode:            "1001",
+				PlayerCount:          3,
+				Status:               "waiting",
+				DeclarationsEnabled:  tt.declarationsEnabled,
+				StopAtTarget:         tt.stopAtTarget,
+				DeclarationsTransfer: tt.declarationsTransfer,
 			})
 
 			require.Len(t, hub.all, 1, "expected exactly one broadcast")
@@ -74,6 +76,10 @@ func TestBroadcastRoomUpdated_CarriesBothRuleFlags(t *testing.T) {
 			stop, ok := payload["stopAtTarget"]
 			require.True(t, ok, "stopAtTarget key missing from the payload")
 			assert.Equal(t, tt.stopAtTarget, stop)
+
+			transfer, ok := payload["declarationsTransfer"]
+			require.True(t, ok, "declarationsTransfer key missing from the payload")
+			assert.Equal(t, tt.declarationsTransfer, transfer)
 		})
 	}
 }

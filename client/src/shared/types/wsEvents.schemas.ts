@@ -76,6 +76,7 @@ export const EventMatchStateSchema = z.strictObject({
   mustPickTrump: z.boolean(),
   declarationsEnabled: z.boolean(),
   stopAtTarget: z.boolean(),
+  declarationsTransfer: z.boolean(),
   trickNumber: z.number(),
   currentTrick: z.array(TrickCardSchema),
   leadSuit: z.string().nullable(),
