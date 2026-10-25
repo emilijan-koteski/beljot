@@ -492,10 +492,12 @@ gamble.
 - **Plain suit led, an opponent still to play:** before falling back to the cheapest take, the
   bot takes with the lowest-point led-suit card that overtakes and that **no unseen led-suit
   card, nor one an opponent is known to hold,** outranks (`cheapestLedSecureWinner`). A ruff
-  would beat the Ace too, so unseen trumps are not an argument for a lower card. Example:
-  opponents play 7♠ and 8♠, bot third holds A♠ Q♠ with the K♠ and T♠ unseen -> play **A♠**; the
-  Queen would lose to the last player's King or Ten and the kept Ace would be ruffed later. Once
-  the K♠ and T♠ are gone the Queen suffices. A trump cut, or a trump lead, leaves it inert.
+  would beat the Ace too, so unseen trumps are not an argument for a lower card. The rule stands
+  down when an opponent still to play is known void in the led suit, because a ruff is then
+  likely and the cheap card loses less. Example: opponents play 7♠ and 8♠, bot third holds A♠ Q♠
+  with the K♠ and T♠ unseen -> play **A♠**; the Queen would lose to the last player's King or Ten
+  and the kept Ace would be ruffed later. Once the K♠ and T♠ are gone the Queen suffices. A trump
+  cut, or a trump lead, leaves it inert.
 - Cannot win: **discard** the lowest value, preserving trump.
 
 **The boss-preserving smear (`bestSmear` + `bossWorthGuarding`)** — used at all three smear

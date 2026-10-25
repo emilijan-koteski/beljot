@@ -1836,6 +1836,7 @@ func TestDecide_PartnersLocatedAceMakesTheKingABoss(t *testing.T) {
 }
 
 func TestDecide_TakesWithTheCardNoLedSuitCardBeats(t *testing.T) {
+	spades := game.SuitSpades
 	runPlayTweakCases(t, []playTweakCase{
 		{
 			name:       "third hand takes with the ace, not the queen the last player can beat",
@@ -1865,6 +1866,30 @@ func TestDecide_TakesWithTheCardNoLedSuitCardBeats(t *testing.T) {
 			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
 			callerSeat: 1,
 			wantCard:   "TS",
+		},
+		{
+			name:       "third hand, last opponent ruffed spades before and may hold trump: queen, not ace",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "7H", lead: &spades}},
+			wantCard:   "QS",
+		},
+		{
+			name:       "second hand, next opponent ruffed spades before and may hold trump: queen, not ace",
+			hand:       cards("AS", "QS", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "7H", lead: &spades}},
+			wantCard:   "QS",
+		},
+		{
+			name:       "last opponent void in spades and trump: the nine wins for sure, keep the ace",
+			hand:       cards("AS", "9S", "7D"),
+			trick:      []game.TrickCard{{Card: card("7S"), PlayerSeat: 2}, {Card: card("8S"), PlayerSeat: 3}},
+			callerSeat: 1,
+			observes:   []obs{{seat: 1, card: "7C", lead: &spades}},
+			wantCard:   "9S",
 		},
 	})
 }

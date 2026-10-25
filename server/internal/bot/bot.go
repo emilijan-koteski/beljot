@@ -747,12 +747,27 @@ func cheapestWinning(v View, legal []game.Card, trump game.Suit) *game.Card {
 	return best
 }
 
+// opponentYetToPlayVoidIn reports whether an opponent still to act in this trick is known void in
+// suit, so that opponent cannot follow it.
+func opponentYetToPlayVoidIn(v View, suit game.Suit) bool {
+	idx := SuitIndex(suit)
+	if idx < 0 {
+		return false
+	}
+	for _, seat := range seatsYetToPlay(v) {
+		if game.TeamForSeat(seat) != game.TeamForSeat(v.Seat) && v.KnownVoids[seat][idx] {
+			return true
+		}
+	}
+	return false
+}
+
 // cheapestLedSecureWinner returns the lowest-point (then weakest) legal led-suit card that takes
-// the trick and that no led-suit threat outranks, or nil. A ruff beats any led-suit card, so
-// unseen trumps are no argument for a higher one.
+// the trick and that no led-suit threat outranks, or nil. It also returns nil when a ruff is
+// likely: an opponent still to play is known void in the led suit.
 func cheapestLedSecureWinner(v View, legal []game.Card, trump game.Suit) *game.Card {
 	led := v.CurrentTrick[0].Card.Suit
-	if led == trump {
+	if led == trump || opponentYetToPlayVoidIn(v, led) {
 		return nil
 	}
 	ledThreats := threats(v)
