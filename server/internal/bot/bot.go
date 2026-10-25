@@ -506,24 +506,27 @@ func opponentKnownHoldsTrumpAbove(v View, ref game.Card, trump game.Suit) bool {
 	return false
 }
 
-// trumpRanksProvablyAbsentFromPartner returns the trump ranks just outside each run in the
-// partner's raw reveal. A declared run is maximal, so those ranks cannot be in the partner's hand.
-func trumpRanksProvablyAbsentFromPartner(v View, partner int, trump game.Suit) map[game.Rank]bool {
-	absent := map[game.Rank]bool{}
-	if partner < 0 || partner > 3 {
+// cardsProvablyAbsent returns the cards just outside each run in a seat's raw reveal, in every suit.
+// A declared run is maximal, so those cards cannot be in that seat's hand.
+func cardsProvablyAbsent(v View, seat int) map[game.Card]bool {
+	absent := map[game.Card]bool{}
+	if seat < 0 || seat > 3 {
 		return absent
 	}
-	var present [8]bool
-	any := false
-	for _, c := range v.DeclaredCards[partner] {
-		if c.Suit == trump {
-			present[game.NaturalRankOrder[c.Rank]] = true
-			any = true
+	for _, suit := range game.AllSuits {
+		var present [8]bool
+		for _, c := range v.DeclaredCards[seat] {
+			if c.Suit == suit {
+				present[game.NaturalRankOrder[c.Rank]] = true
+			}
 		}
+		markRunNeighboursAbsent(absent, suit, present)
 	}
-	if !any {
-		return absent
-	}
+	return absent
+}
+
+// markRunNeighboursAbsent adds the rank below and above every run of three or more present ranks.
+func markRunNeighboursAbsent(absent map[game.Card]bool, suit game.Suit, present [8]bool) {
 	for i := 0; i < 8; {
 		if !present[i] {
 			i++
@@ -535,15 +538,14 @@ func trumpRanksProvablyAbsentFromPartner(v View, partner int, trump game.Suit) m
 		}
 		if j-i+1 >= 3 {
 			if i-1 >= 0 {
-				absent[game.NaturalRankSequence[i-1]] = true
+				absent[game.Card{Suit: suit, Rank: game.NaturalRankSequence[i-1]}] = true
 			}
 			if j+1 < 8 {
-				absent[game.NaturalRankSequence[j+1]] = true
+				absent[game.Card{Suit: suit, Rank: game.NaturalRankSequence[j+1]}] = true
 			}
 		}
 		i = j + 1
 	}
-	return absent
 }
 
 // opponentHoldsMasterTrump reports whether the top outstanding trump is provably an opponent's.
@@ -588,7 +590,7 @@ func opponentHoldsMasterTrump(v View, trump game.Suit) bool {
 			}
 		}
 	}
-	return trumpRanksProvablyAbsentFromPartner(v, partner, trump)[top.Rank]
+	return cardsProvablyAbsent(v, partner)[*top]
 }
 
 // partnerDrawTrump picks the trump to lead for the partner: the weakest honor (Q, K, T, A), else

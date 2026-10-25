@@ -1824,3 +1824,36 @@ func TestDecide_PartnersLocatedAceMakesTheKingABoss(t *testing.T) {
 		},
 	})
 }
+
+func TestCardsProvablyAbsent(t *testing.T) {
+	tests := []struct {
+		name     string
+		declared []string
+		want     []string
+	}{
+		{"tierce in the middle excludes both neighbours", []string{"9C", "TC", "JC"}, []string{"8C", "QC"}},
+		{"run at the top excludes only below", []string{"QS", "KS", "AS"}, []string{"JS"}},
+		{"run at the bottom excludes only above", []string{"7H", "8H", "9H"}, []string{"TH"}},
+		{"two suits, two runs", []string{"7H", "8H", "9H", "QS", "KS", "AS"}, []string{"TH", "JS"}},
+		{"a pair excludes nothing", []string{"KD", "AD"}, nil},
+		{"four of a kind excludes nothing", []string{"JS", "JH", "JD", "JC"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := bot.View{}
+			v.DeclaredCards[1] = cards(tt.declared...)
+
+			got := bot.CardsProvablyAbsentForTest(v, 1)
+
+			if len(tt.want) == 0 {
+				assert.Empty(t, got)
+				return
+			}
+			keys := make([]game.Card, 0, len(got))
+			for c := range got {
+				keys = append(keys, c)
+			}
+			assert.ElementsMatch(t, cards(tt.want...), keys)
+		})
+	}
+}
