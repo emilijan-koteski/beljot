@@ -152,11 +152,6 @@ func chooseLead(v View, legal []game.Card) game.Card {
 		}
 	}
 	if boss != nil {
-		if boss.Rank == game.RankAce {
-			if ten := findRankOfSuit(legal, boss.Suit, game.RankTen); ten != nil {
-				return *ten
-			}
-		}
 		return *boss
 	}
 

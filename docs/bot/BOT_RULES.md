@@ -4,7 +4,7 @@ This document describes exactly how the bot decides, across every scenario, what
 considers, and with examples. It reflects the current logic including the latest tuning
 (simulation-calibrated hand-shape bidding, partner trump-draw with
 a declaration-inference abort when the opponents provably hold the master, boss preservation,
-uncuttable-boss last-trick retention, Ace/Ten boss handling, suppressing trump draws once the
+uncuttable-boss last-trick retention, Ace-first boss cashing, suppressing trump draws once the
 opponents are void of trump, leading into a partner's void, smearing onto a partner's boss,
 seat-aware **secure trick takes** with a material-stake gate and control-trump economy, the
 **boss-preserving smear** with its endgame/dead-suit exceptions, and never fighting a partner
@@ -278,12 +278,8 @@ In priority order:
 3. **Cash a side-suit boss**: a non-trump card no opponent can beat. Prefers the highest-value
    boss (Aces first).
 
-   **Ace + Ten exception**: when the chosen boss is the **Ace** and the bot **also holds that
-   suit's Ten**, it cashes the **Ten** first (the lower one) and keeps the Ace. Holding the Ace
-   makes the Ten a boss too, so the Ten still wins the trick, and the Ace stays back as the
-   suit's guaranteed master. This applies **only** to the Ace + Ten pair — not to other touching
-   honors (e.g. holding K + Q, it still cashes the King, the general highest-value rule).
-   Example: opponents called, hand A♠ T♠ 7♣ -> lead **T♠**, keep A♠.
+   The Ace is cashed first; the Ten follows on a later lead only while it is still the boss
+   of its suit.
 
 4. **Lead into the partner's void** (`leadIntoPartnerVoid`): with no boss to cash, if the
    partner is known void in a side suit (and not known void in trump, so it can still ruff),
@@ -597,7 +593,7 @@ By impact:
 1. `matchesBidTable`: bidding aggressiveness (the biggest dial).
 2. `trumpSuitScore` + `trumpLengthBonus`: suit preference when several suits match or the pick is forced (length vs. points).
 3. `chooseLead` priority: when to draw trumps (with the master or for the partner, and
-   `opponentsOutOfTrump` stops the draw once opponents are void), cash a boss (Ace/Ten handling),
+   `opponentsOutOfTrump` stops the draw once opponents are void), cash a boss (Ace first),
    feed a partner ruff, or lead safe. The partner draw also aborts on
    `opponentHoldsMasterTrump` / `trumpRanksProvablyAbsentFromPartner` — a declared sequence's
    maximal-run boundary that proves the opponents (not the partner) hold the top trump.
@@ -664,7 +660,7 @@ Blind spots if you want a stronger bot (the first four are logged in
 | Draw trumps for partner (Q/K/T/A, never 9) | `partnerDrawTrump` + block in `chooseLead` | `server/internal/bot/bot.go` |
 | Don't draw into the opponents' master (declaration inference) | `opponentHoldsMasterTrump`, `trumpRanksProvablyAbsentFromPartner` + block in `chooseLead` | `server/internal/bot/bot.go` |
 | Stop drawing once opponents are void of trump | `opponentsOutOfTrump` + blocks in `chooseLead` | `server/internal/bot/bot.go` |
-| Cash a side boss (Ace/Ten: cash the Ten, keep the Ace) | boss block in `chooseLead`, `findRankOfSuit` | `server/internal/bot/bot.go` |
+| Cash a side boss (Ace first; the Ten follows on a later lead) | boss block in `chooseLead`, `findRankOfSuit` | `server/internal/bot/bot.go` |
 | Only trumps left: highest if master, else lowest | `chooseLead` only-trumps branch, `isTrumpMaster` | `server/internal/bot/bot.go` |
 | Preserve the boss on a forced overtake (Ace/Ten: smear the Ace) | `strongestPreservingBoss` | `server/internal/bot/bot.go` |
 | Secure take: cheapest guaranteed winner when points are at stake | `securelyWins`, `cheapestSecureWinning`, `trickPoints`, `seatKnownHoldsSuit` | `server/internal/bot/bot.go` |

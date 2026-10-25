@@ -1513,15 +1513,13 @@ func TestDecide_RetainUncuttableBoss(t *testing.T) {
 	})
 }
 
-// TestDecide_CashBossPrefersTenWithAceTen checks the bot cashes the Ten before the Ace
-// when it holds both of a side suit.
-func TestDecide_CashBossPrefersTenWithAceTen(t *testing.T) {
+func TestDecide_CashBossLeadsTheAceBeforeTheTen(t *testing.T) {
 	runPlayTweakCases(t, []playTweakCase{
 		{
-			name:       "ace and ten of a boss suit leads the ten and keeps the ace",
+			name:       "ace and ten of a boss suit leads the ace",
 			hand:       cards("AS", "TS", "7C"),
 			callerSeat: 1,
-			wantCard:   "TS",
+			wantCard:   "AS",
 		},
 		{
 			name:       "ace without the ten cashes the ace",
