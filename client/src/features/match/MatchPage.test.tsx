@@ -2384,70 +2384,19 @@ describe("MatchPage", () => {
       expect(prompt).not.toHaveTextContent(/or pass/i);
     });
 
-    it("labels the scoreboard when the room plays without declarations", () => {
+    it("keeps room rules out of the scoreboard header", () => {
       useMatchStore.getState().setMatchState({
         ...biddingState(0),
         declarationsEnabled: false,
-      });
-      useMatchStore.getState().setMyPlayerSeat(0);
-      renderMatchPage();
-
-      expect(screen.getByTestId("score-meta-no-declarations")).toBeInTheDocument();
-    });
-
-    it("leaves the scoreboard unlabelled on an ordinary table", () => {
-      useMatchStore.getState().setMatchState({
-        ...biddingState(0),
-        declarationsEnabled: true,
-      });
-      useMatchStore.getState().setMyPlayerSeat(0);
-      renderMatchPage();
-
-      expect(screen.queryByTestId("score-meta-no-declarations")).not.toBeInTheDocument();
-    });
-
-    it("labels the scoreboard when the room stops at the target", () => {
-      useMatchStore.getState().setMatchState({
-        ...biddingState(0),
         stopAtTarget: true,
-      });
-      useMatchStore.getState().setMyPlayerSeat(0);
-      renderMatchPage();
-
-      expect(screen.getByTestId("score-meta-stop-at-target")).toBeInTheDocument();
-    });
-
-    it("leaves the scoreboard unlabelled on a finish-the-hand table", () => {
-      useMatchStore.getState().setMatchState({
-        ...biddingState(0),
-        stopAtTarget: false,
-      });
-      useMatchStore.getState().setMyPlayerSeat(0);
-      renderMatchPage();
-
-      expect(screen.queryByTestId("score-meta-stop-at-target")).not.toBeInTheDocument();
-    });
-
-    it("labels the scoreboard when the room's declarations do not transfer", () => {
-      useMatchStore.getState().setMatchState({
-        ...biddingState(0),
         declarationsTransfer: false,
       });
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 
-      expect(screen.getByTestId("score-meta-no-declarations-transfer")).toBeInTheDocument();
-    });
-
-    it("leaves the scoreboard unlabelled when the room's declarations transfer", () => {
-      useMatchStore.getState().setMatchState({
-        ...biddingState(0),
-        declarationsTransfer: true,
-      });
-      useMatchStore.getState().setMyPlayerSeat(0);
-      renderMatchPage();
-
-      expect(screen.queryByTestId("score-meta-no-declarations-transfer")).not.toBeInTheDocument();
+      const meta = screen.getByTestId("score-meta");
+      expect(meta).not.toHaveTextContent(/declarations|target|transfer/i);
+      expect(meta.textContent?.split(" · ")).toHaveLength(2);
     });
 
     it("reads the open hand alone when nothing is held face-down", () => {

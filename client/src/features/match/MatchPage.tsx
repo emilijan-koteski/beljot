@@ -1264,9 +1264,6 @@ export function MatchPage() {
         lastTrickTeam={scoreRevealData?.lastTrickTeam}
         handNumber={matchState.handNumber}
         variantLabel={variantLabel(t, matchState.variant)}
-        declarationsEnabled={matchState.declarationsEnabled}
-        stopAtTarget={matchState.stopAtTarget}
-        declarationsTransfer={matchState.declarationsTransfer}
         matchTarget={matchTarget}
       />
 
