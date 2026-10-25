@@ -42,6 +42,7 @@ func TestEventsJSONContract(t *testing.T) {
 			DeclarationsEnabled:   true,
 			StopAtTarget:          false,
 			DeclarationsTransfer:  true,
+			Clockwise:             false,
 			Deck:                  []game.Card{},
 			TrickNumber:           4,
 			CurrentTrick:          []game.TrickCard{},

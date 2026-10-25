@@ -30,6 +30,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		CurrentTrick:        gs.CurrentTrick,
 		LeadSuit:            gs.LeadSuit,
 		ActivePlayerSeat:    gs.ActivePlayerSeat,
+		Clockwise:           gs.Rules.Clockwise,
 		AwaitingDeclaration: gs.AwaitingDeclaration && gs.ActivePlayerSeat == seat,
 		HasDeclarations:     game.HasDeclarableCombinations(gs, seat),
 		PendingBelot:        gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,

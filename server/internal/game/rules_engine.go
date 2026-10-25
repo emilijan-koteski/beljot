@@ -20,6 +20,7 @@ func RefreshDerivedFlags(state *GameState) {
 	state.DeclarationsEnabled = state.Rules.DeclarationsEnabled
 	state.StopAtTarget = state.Rules.StopAtTarget
 	state.DeclarationsTransfer = state.Rules.DeclarationsTransfer
+	state.Clockwise = state.Rules.Clockwise
 }
 
 func applyAction(state *GameState, action Action) (*GameState, error) {

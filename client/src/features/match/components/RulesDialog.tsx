@@ -28,6 +28,7 @@ interface RulesDialogProps {
   variant?: Variant;
   stopAtTarget?: boolean;
   declarationsTransfer?: boolean;
+  clockwise?: boolean;
 }
 
 const PANEL_ID = "rules-dialog-panel";
@@ -56,6 +57,7 @@ export function RulesDialog({
   variant,
   stopAtTarget,
   declarationsTransfer,
+  clockwise,
 }: RulesDialogProps) {
   const { t, i18n } = useTranslation();
   const content = getRulesContent(i18n.language);
@@ -291,6 +293,11 @@ export function RulesDialog({
                 {declarationsTransfer === false && (
                   <TableRuleNote testId="rules-dialog-no-declarations-transfer-note">
                     {t("match.rules.noDeclarationsTransferNote")}
+                  </TableRuleNote>
+                )}
+                {clockwise === true && (
+                  <TableRuleNote testId="rules-dialog-clockwise-note">
+                    {t("match.rules.clockwiseNote")}
                   </TableRuleNote>
                 )}
                 <DarkRulesCtx.Provider value={{ content, variant: activeVariant }}>

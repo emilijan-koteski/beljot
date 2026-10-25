@@ -48,7 +48,7 @@ func TestDealGrace_MatchStartCoversSplashAndFirstDeal(t *testing.T) {
 		t.Run(tc.variant, func(t *testing.T) {
 			mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
 			from := time.Now()
-			require.NoError(t, mgr.StartMatch(100, tc.variant, "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true))
+			require.NoError(t, mgr.StartMatch(100, tc.variant, "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true, false))
 			t.Cleanup(func() { mgr.RemoveSession(100) })
 
 			st := mgr.GetStateSnapshot(100)
@@ -60,7 +60,7 @@ func TestDealGrace_MatchStartCoversSplashAndFirstDeal(t *testing.T) {
 
 func TestDealGrace_NextHandPushesOnlyTheFirstBidder(t *testing.T) {
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
 	gs := mgr.GetStateSnapshot(100)
@@ -87,7 +87,7 @@ func TestDealGrace_NextHandPushesOnlyTheFirstBidder(t *testing.T) {
 
 func TestDealGrace_ReshuffleIsADeal(t *testing.T) {
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
 	mgr.SetGameStateForTest(100, testfixtures.NewGameMidBidding(7))
@@ -105,7 +105,7 @@ func TestDealGrace_ReshuffleIsADeal(t *testing.T) {
 // the hand out, and the reshuffle's first bidder gets the deal's grace.
 func TestDealGrace_TimeoutReshuffleIsADeal(t *testing.T) {
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
 	mgr.SetGameStateForTest(100, testfixtures.NewGameMidBidding(7))
@@ -126,7 +126,7 @@ func TestDealGrace_TimeoutReshuffleIsADeal(t *testing.T) {
 // deal's grace too.
 func TestDealGrace_HandCompleteTimeoutIsADeal(t *testing.T) {
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
 	deadline := time.Now().Add(30 * time.Millisecond)
@@ -144,7 +144,7 @@ func TestDealGrace_HandCompleteTimeoutIsADeal(t *testing.T) {
 
 func TestDealGrace_SecondDealPushesTheLeader(t *testing.T) {
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
 	mgr.SetGameStateForTest(100, testfixtures.NewGameJustDealt())
@@ -161,7 +161,7 @@ func TestDealGrace_DisabledLeavesTheBareWindow(t *testing.T) {
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
 	mgr.SetDealGraceForTest(false)
 	from := time.Now()
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 10, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
 	assertWindow(t, mgr.GetStateSnapshot(100), from, perMoveWindow)
@@ -173,7 +173,7 @@ func TestDealGrace_DelaysABotFirstBidder(t *testing.T) {
 	hub := &hubSpy{}
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	mgr.SetBotDelayForTest(time.Millisecond, 2*time.Millisecond)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
 	gs := mgr.GetStateSnapshot(100)
@@ -223,7 +223,7 @@ func TestBot_BelotBeatIsAtMost200ms(t *testing.T) {
 func TestBot_BelotAnswerTakesAShortBeat(t *testing.T) {
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
 	mgr.SetDealGraceForTest(false)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", mixedPlayers(1, 2, 3), "relaxed", 0, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(100) })
 
 	armed := mgr.GetStateSnapshot(100).ActivePlayerSeat

@@ -101,11 +101,12 @@ type CreateRoomRequest struct {
 	DeclarationsEnabled  *bool  `json:"declarationsEnabled"`
 	StopAtTarget         *bool  `json:"stopAtTarget"`
 	DeclarationsTransfer *bool  `json:"declarationsTransfer"`
+	Clockwise            bool   `json:"clockwise"`
 }
 
 // MatchStarter is the interface the room handler uses to start a live match.
 type MatchStarter interface {
-	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool) error
+	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) error
 }
 
 // WalletService is the subset of *wallet.Service the room handler needs. A nil
@@ -298,6 +299,7 @@ func (h *RoomHandler) roomLifecyclePayload(r *Room) map[string]any {
 		"declarationsEnabled":  r.DeclarationsEnabled,
 		"stopAtTarget":         r.StopAtTarget,
 		"declarationsTransfer": r.DeclarationsTransfer,
+		"clockwise":            r.Clockwise,
 		"playerCount":          r.PlayerCount,
 		"status":               r.Status,
 		"isQuickPlay":          r.IsQuickPlay,
@@ -488,6 +490,7 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		DeclarationsEnabled:  declarationsEnabled,
 		StopAtTarget:         stopAtTarget,
 		DeclarationsTransfer: declarationsTransfer,
+		Clockwise:            req.Clockwise,
 		Status:               "waiting",
 		PlayerCount:          1,
 	}
@@ -1938,7 +1941,7 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 		timerDuration = *autoStartRoom.TimerDurationSeconds
 	}
 	reconnectWindow := resolveReconnectWindow(autoStartRoom.ReconnectWindowSec)
-	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled, autoStartRoom.StopAtTarget, autoStartRoom.DeclarationsTransfer); serr != nil {
+	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled, autoStartRoom.StopAtTarget, autoStartRoom.DeclarationsTransfer, autoStartRoom.Clockwise); serr != nil {
 		if charged {
 			refund := make(map[uint]int, len(chargedIDs))
 			for _, id := range chargedIDs {
@@ -2946,7 +2949,7 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 				timerDuration = *updatedRoom.TimerDurationSeconds
 			}
 			reconnectWindow := resolveReconnectWindow(updatedRoom.ReconnectWindowSec)
-			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled, updatedRoom.StopAtTarget, updatedRoom.DeclarationsTransfer); serr != nil {
+			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled, updatedRoom.StopAtTarget, updatedRoom.DeclarationsTransfer, updatedRoom.Clockwise); serr != nil {
 				slog.Error("failed to start game session", "roomID", roomID, "error", serr)
 				if charged {
 					refund := make(map[uint]int, len(chargedIDs))
@@ -3052,6 +3055,7 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				DeclarationsEnabled:  true,
 				StopAtTarget:         false,
 				DeclarationsTransfer: true,
+				Clockwise:            false,
 				Status:               "waiting",
 				PlayerCount:          1,
 			}
@@ -3110,6 +3114,7 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 			"declarationsEnabled":  resultRoom.DeclarationsEnabled,
 			"stopAtTarget":         resultRoom.StopAtTarget,
 			"declarationsTransfer": resultRoom.DeclarationsTransfer,
+			"clockwise":            resultRoom.Clockwise,
 			"playerCount":          resultRoom.PlayerCount,
 			"status":               resultRoom.Status,
 			"isQuickPlay":          resultRoom.IsQuickPlay,

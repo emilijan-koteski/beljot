@@ -34,11 +34,12 @@ func TestBroadcastRoomUpdated_CarriesEveryRuleFlag(t *testing.T) {
 		declarationsEnabled  bool
 		stopAtTarget         bool
 		declarationsTransfer bool
+		clockwise            bool
 	}{
-		{name: "all at their defaults", declarationsEnabled: true, stopAtTarget: false, declarationsTransfer: true},
-		{name: "declarations off, dosta on", declarationsEnabled: false, stopAtTarget: true, declarationsTransfer: true},
-		{name: "declarations on, dosta on, no transfer", declarationsEnabled: true, stopAtTarget: true, declarationsTransfer: false},
-		{name: "declarations off, dosta off, no transfer", declarationsEnabled: false, stopAtTarget: false, declarationsTransfer: false},
+		{name: "all at their defaults", declarationsEnabled: true, stopAtTarget: false, declarationsTransfer: true, clockwise: false},
+		{name: "declarations off, dosta on, clockwise", declarationsEnabled: false, stopAtTarget: true, declarationsTransfer: true, clockwise: true},
+		{name: "declarations on, dosta on, no transfer", declarationsEnabled: true, stopAtTarget: true, declarationsTransfer: false, clockwise: false},
+		{name: "declarations off, dosta off, no transfer, clockwise", declarationsEnabled: false, stopAtTarget: false, declarationsTransfer: false, clockwise: true},
 	}
 
 	for _, tt := range tests {
@@ -58,6 +59,7 @@ func TestBroadcastRoomUpdated_CarriesEveryRuleFlag(t *testing.T) {
 				DeclarationsEnabled:  tt.declarationsEnabled,
 				StopAtTarget:         tt.stopAtTarget,
 				DeclarationsTransfer: tt.declarationsTransfer,
+				Clockwise:            tt.clockwise,
 			})
 
 			require.Len(t, hub.all, 1, "expected exactly one broadcast")
@@ -80,6 +82,10 @@ func TestBroadcastRoomUpdated_CarriesEveryRuleFlag(t *testing.T) {
 			transfer, ok := payload["declarationsTransfer"]
 			require.True(t, ok, "declarationsTransfer key missing from the payload")
 			assert.Equal(t, tt.declarationsTransfer, transfer)
+
+			clockwise, ok := payload["clockwise"]
+			require.True(t, ok, "clockwise key missing from the payload")
+			assert.Equal(t, tt.clockwise, clockwise)
 		})
 	}
 }

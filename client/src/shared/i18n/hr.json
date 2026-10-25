@@ -774,10 +774,14 @@
       "matchEndFinish": "Dovrši dijeljenje",
       "matchEndStop": "Dosta",
       "matchEndHint": "Uz „dosta“ meč završava u trenutku kad ekipa dosegne cilj, i usred dijeljenja, bez bonusa za zadnju ruku i bez kapota",
+      "direction": "Smjer igre",
+      "directionCounterClockwise": "Udesno",
+      "directionClockwise": "Ulijevo",
+      "directionHint": "Udesno je uobičajeni smjer, suprotno od kazaljke na satu; ulijevo igra ide u smjeru kazaljke",
       "advanced": {
         "title": "Napredne postavke",
         "changedCount": "{{count}} promijenjeno",
-        "summary": "Zvanja, zvanja pri padu, kraj meča, privatnost, tko može sjesti"
+        "summary": "Zvanja, zvanja pri padu, kraj meča, smjer igre, privatnost, tko može sjesti"
       }
     },
     "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · živo se osvježava",
@@ -856,7 +860,9 @@
       "stopAtTarget": "Dosta",
       "stopAtTargetAriaLabel": "Ova soba završava meč u trenutku kad ekipa dosegne cilj, bez dovršavanja dijeljenja",
       "noDeclarationsTransfer": "Bez prijenosa zvanja",
-      "noDeclarationsTransferAriaLabel": "U ovoj sobi zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju se umjesto da idu drugoj ekipi"
+      "noDeclarationsTransferAriaLabel": "U ovoj sobi zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju se umjesto da idu drugoj ekipi",
+      "clockwise": "Igra ulijevo",
+      "clockwiseAriaLabel": "U ovoj sobi igra se kreće ulijevo: dijeljenje, licitiranje, štihovi i sljedeći djelitelj idu ulijevo"
     },
     "chat": {
       "title": "Lobi chat",
@@ -1171,7 +1177,8 @@
     },
     "rules": {
       "stopAtTargetNote": "Ovaj stol igra s dosta: mač završava u trenutku kad jedna ekipa dosegne cilj, bez dovršavanja ruke. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gdje se ruka prvo odigra do kraja.",
-      "noDeclarationsTransferNote": "Za ovim stolom zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju se umjesto da idu drugoj ekipi. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gdje ta zvanja idu drugoj ekipi."
+      "noDeclarationsTransferNote": "Za ovim stolom zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju se umjesto da idu drugoj ekipi. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gdje ta zvanja idu drugoj ekipi.",
+      "clockwiseNote": "Za ovim stolom igra se kreće ulijevo: dijeljenje, licitiranje, štihovi i sljedeći djelitelj idu ulijevo. Poglavlja niže opisuju uobičajenu igru udesno."
     }
   },
   "auth": {

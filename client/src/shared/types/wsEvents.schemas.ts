@@ -77,6 +77,7 @@ export const EventMatchStateSchema = z.strictObject({
   declarationsEnabled: z.boolean(),
   stopAtTarget: z.boolean(),
   declarationsTransfer: z.boolean(),
+  clockwise: z.boolean(),
   trickNumber: z.number(),
   currentTrick: z.array(TrickCardSchema),
   leadSuit: z.string().nullable(),

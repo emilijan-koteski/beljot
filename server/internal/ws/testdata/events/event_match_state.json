@@ -8,6 +8,7 @@
   "declarationsEnabled": true,
   "stopAtTarget": false,
   "declarationsTransfer": true,
+  "clockwise": false,
   "handNumber": 3,
   "dealerSeat": 2,
   "trumpSuit": "S",

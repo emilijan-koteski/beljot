@@ -177,6 +177,7 @@ type MatchListItem struct {
 	DeclarationsEnabled  bool            `json:"declarationsEnabled"`
 	StopAtTarget         bool            `json:"stopAtTarget"`
 	DeclarationsTransfer bool            `json:"declarationsTransfer"`
+	Clockwise            bool            `json:"clockwise"`
 	Players              []MatchPlayer   `json:"players"`
 	Hands                []MatchHandView `json:"hands"`
 }
@@ -900,6 +901,7 @@ func buildMatchListItem(m match.Match, viewerID uint, identities map[uint]partic
 		DeclarationsEnabled:  m.DeclarationsEnabled,
 		StopAtTarget:         m.StopAtTarget,
 		DeclarationsTransfer: m.DeclarationsTransfer,
+		Clockwise:            m.Clockwise,
 
 		Players: players,
 		Hands:   hands,

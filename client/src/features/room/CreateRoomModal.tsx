@@ -10,6 +10,8 @@ import {
   KeyRound,
   Lock,
   LockOpen,
+  RotateCcw,
+  RotateCw,
   Settings,
   Shuffle,
   Unlink,
@@ -89,6 +91,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [declarationsEnabled, setDeclarationsEnabled] = useState(true);
   const [stopAtTarget, setStopAtTarget] = useState(false);
   const [declarationsTransfer, setDeclarationsTransfer] = useState(true);
+  const [clockwise, setClockwise] = useState(false);
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("relaxed");
   const [timerDuration, setTimerDuration] = useState(30);
   const [coinBuyIn, setCoinBuyIn] = useState(DEFAULT_BUY_IN);
@@ -130,6 +133,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     declarationsEnabled !== true,
     stopAtTarget !== false,
     effectiveDeclarationsTransfer !== true,
+    clockwise !== false,
     isPrivate !== false,
     effectiveMinHonor !== DEFAULT_MIN_HONOR,
     allowNewPlayers !== true,
@@ -165,6 +169,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         declarationsEnabled,
         stopAtTarget,
         declarationsTransfer: effectiveDeclarationsTransfer,
+        clockwise,
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
@@ -223,6 +228,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setDeclarationsEnabled(true);
       setStopAtTarget(false);
       setDeclarationsTransfer(true);
+      setClockwise(false);
       setTimerStyle("relaxed");
       setTimerDuration(30);
       setCoinBuyIn(DEFAULT_BUY_IN);
@@ -276,6 +282,19 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         : "lobby.createRoomModal.declarationsTransferOff",
     ),
   }));
+
+  const directionOptions = [
+    {
+      value: "counterClockwise" as const,
+      label: t("lobby.createRoomModal.directionCounterClockwise"),
+      icon: <RotateCcw className="size-3.5" />,
+    },
+    {
+      value: "clockwise" as const,
+      label: t("lobby.createRoomModal.directionClockwise"),
+      icon: <RotateCw className="size-3.5" />,
+    },
+  ];
 
   const timerOptions = [
     {
@@ -578,6 +597,20 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 </Field>
 
                 <Field
+                  label={t("lobby.createRoomModal.direction")}
+                  info={t("lobby.createRoomModal.directionHint")}
+                  infoTestId="direction-info-toggle"
+                >
+                  <Segmented
+                    value={clockwise ? "clockwise" : "counterClockwise"}
+                    onValueChange={(v) => setClockwise(v === "clockwise")}
+                    options={directionOptions}
+                    testId="direction-segmented"
+                    ariaLabel={t("lobby.createRoomModal.direction")}
+                  />
+                </Field>
+
+                <Field
                   label={t("lobby.createRoomModal.privateRoom")}
                   info={t("lobby.createRoomModal.privateRoomHint")}
                   infoTestId="private-room-info"
@@ -755,6 +788,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               declarationsEnabled={declarationsEnabled}
               stopAtTarget={stopAtTarget}
               declarationsTransfer={effectiveDeclarationsTransfer}
+              clockwise={clockwise}
               hostUsername={meUsername || "host"}
             />
           </aside>
@@ -840,6 +874,7 @@ function PreviewCard({
   declarationsEnabled,
   stopAtTarget,
   declarationsTransfer,
+  clockwise,
   hostUsername,
 }: {
   name: string;
@@ -854,6 +889,7 @@ function PreviewCard({
   declarationsEnabled: boolean;
   stopAtTarget: boolean;
   declarationsTransfer: boolean;
+  clockwise: boolean;
   hostUsername: string;
 }) {
   const { t } = useTranslation();
@@ -932,6 +968,20 @@ function PreviewCard({
               >
                 <Unlink className="size-3" />
                 {t("lobby.card.noDeclarationsTransfer")}
+              </span>
+            </>
+          )}
+          {clockwise && (
+            <>
+              <Dot />
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="preview-clockwise"
+                role="img"
+                aria-label={t("lobby.card.clockwiseAriaLabel")}
+              >
+                <RotateCw className="size-3" />
+                {t("lobby.card.clockwise")}
               </span>
             </>
           )}

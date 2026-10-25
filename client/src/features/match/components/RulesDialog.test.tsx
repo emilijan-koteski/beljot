@@ -242,6 +242,22 @@ describe("RulesDialog (in-game)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("notes that play moves to the left on a clockwise table", () => {
+    render(<RulesDialog open onOpenChange={() => {}} clockwise />);
+    expect(screen.getByTestId("rules-dialog-clockwise-note")).toHaveTextContent(
+      /play moves to the left \(clockwise\)/i,
+    );
+  });
+
+  it("shows no direction note on a counter-clockwise table or when the flag is absent", () => {
+    const { unmount } = render(<RulesDialog open onOpenChange={() => {}} clockwise={false} />);
+    expect(screen.queryByTestId("rules-dialog-clockwise-note")).not.toBeInTheDocument();
+    unmount();
+
+    render(<RulesDialog open onOpenChange={() => {}} />);
+    expect(screen.queryByTestId("rules-dialog-clockwise-note")).not.toBeInTheDocument();
+  });
+
   it("shows both table notes when the table stops at the target and voids declarations", () => {
     render(<RulesDialog open onOpenChange={() => {}} stopAtTarget declarationsTransfer={false} />);
     expect(screen.getByTestId("rules-dialog-stop-at-target-note")).toBeInTheDocument();

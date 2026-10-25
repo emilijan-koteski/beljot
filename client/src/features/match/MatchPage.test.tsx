@@ -85,6 +85,7 @@ const mockMatchState: MatchState = {
   declarationsEnabled: true,
   stopAtTarget: false,
   declarationsTransfer: true,
+  clockwise: false,
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],
@@ -1837,6 +1838,14 @@ describe("MatchPage", () => {
 
       expect(screen.getByTestId("rules-dialog-no-declarations-transfer-note")).toBeInTheDocument();
     });
+
+    it("notes the leftward play on a clockwise table", () => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, clockwise: true });
+      renderMatchPage();
+      fireEvent.click(screen.getByTestId("rules-button"));
+
+      expect(screen.getByTestId("rules-dialog-clockwise-note")).toBeInTheDocument();
+    });
   });
 
   describe("audio", () => {
@@ -2390,12 +2399,13 @@ describe("MatchPage", () => {
         declarationsEnabled: false,
         stopAtTarget: true,
         declarationsTransfer: false,
+        clockwise: true,
       });
       useMatchStore.getState().setMyPlayerSeat(0);
       renderMatchPage();
 
       const meta = screen.getByTestId("score-meta");
-      expect(meta).not.toHaveTextContent(/declarations|target|transfer/i);
+      expect(meta).not.toHaveTextContent(/declarations|target|transfer|clockwise/i);
       expect(meta.textContent?.split(" · ")).toHaveLength(2);
     });
 
@@ -2571,6 +2581,39 @@ describe("MatchPage", () => {
         expect(screen.getByTestId("trump-prompt")).toBeInTheDocument();
         expect(seatCount(2)).toBe("×5");
         expect(handCardIds()).toHaveLength(5);
+      });
+
+      it("deals a clockwise hand from the seat on the dealer's other side", () => {
+        useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "hand_complete" });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        act(() => {
+          useMatchStore
+            .getState()
+            .setMatchState(dealtState({ clockwise: true, dealerSeat: 1, activePlayerSeat: 0 }));
+        });
+
+        const packetLand = (i: number) =>
+          MOTION.DEAL_LEAD_IN + i * MOTION.DEAL_PACKET_STAGGER + MOTION.DEAL_PACKET_FLIGHT;
+        act(() => {
+          vi.advanceTimersByTime(packetLand(0));
+        });
+        expect(handCardIds()).toHaveLength(3);
+        expect(seatCount(3)).toBe("×0");
+        expect(seatCount(2)).toBe("×0");
+
+        act(() => {
+          vi.advanceTimersByTime(packetLand(1) - packetLand(0));
+        });
+        expect(seatCount(3)).toBe("×3");
+        expect(seatCount(2)).toBe("×0");
+
+        act(() => {
+          vi.advanceTimersByTime(packetLand(2) - packetLand(1));
+        });
+        expect(seatCount(2)).toBe("×3");
+        expect(seatCount(1)).toBe("×0");
       });
 
       it("turns the candidate face-up at the end of the deal", () => {

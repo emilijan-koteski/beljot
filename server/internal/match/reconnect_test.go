@@ -26,7 +26,7 @@ func setupDisconnectedGame(t *testing.T, hub *ws.Hub, disconnectSeat int) (*matc
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true, false)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -110,7 +110,7 @@ func TestHandleDisconnect_DuringHandComplete_PausesAndReconnectRestores(t *testi
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true, false))
 
 	gs := mgr.GetStateSnapshot(100)
 	require.NotNil(t, gs)
@@ -151,7 +151,7 @@ func TestHandComplete_AckDoesNotExtendAutoContinueDeadline(t *testing.T) {
 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true, false))
 
 	gs := mgr.GetStateSnapshot(100)
 	require.NotNil(t, gs)
@@ -183,7 +183,7 @@ func TestHandleReconnect_RejectsExpiredWindow(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0, true, false, true)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0, true, false, true, false)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -331,7 +331,7 @@ func TestHandleReconnect_NoOpWhenNotDisconnectedPhase(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -373,7 +373,7 @@ func TestHandleReconnect_RelaxedTimer_NoTimerRestore(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -424,7 +424,7 @@ func setupDisconnectedGameShortWindow(t *testing.T, hub *ws.Hub, disconnectSeat 
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 
-	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0, true, false, true)
+	err := mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 1, 0, true, false, true, false)
 	require.NoError(t, err)
 
 	state := mgr.GetStateSnapshot(100)
@@ -547,7 +547,7 @@ func TestReconnect_RefreshesDerivedMustPickTrump(t *testing.T) {
 	hub := &hubSpy{}
 	const roomID = uint(1288)
 	mgr := match.NewManager(hub, newMockMatchRepo())
-	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameCroatianMidBidding(3)

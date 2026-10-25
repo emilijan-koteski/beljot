@@ -49,7 +49,7 @@ func TestHandleMatchEnd_SettlesCoins(t *testing.T) {
 	mgr.SetWalletSettler(settler)
 
 	roomID := uint(100)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 500, true, false, true))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 500, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -96,7 +96,7 @@ func TestHandleMatchEnd_NoEconomyNoSettlement(t *testing.T) {
 	mgr.SetWalletSettler(settler)
 
 	roomID := uint(101)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)

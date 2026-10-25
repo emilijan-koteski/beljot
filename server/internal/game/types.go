@@ -115,7 +115,32 @@ type VariantRules struct {
 	DeclarationsEnabled  bool
 	StopAtTarget         bool
 	DeclarationsTransfer bool
+	Clockwise            bool
 	TieRule              TieRule
+}
+
+// StepSeat returns the seat n turns after seat, where n may be negative to step back. Turns pass to seat+1 by
+// default and to seat+3 when clockwise.
+func StepSeat(seat, n int, clockwise bool) int {
+	if clockwise {
+		n = -n
+	}
+	return ((seat+n)%4 + 4) % 4
+}
+
+// NextSeat returns the seat that acts after seat in the rules' direction of play.
+func (r VariantRules) NextSeat(seat int) int {
+	return StepSeat(seat, 1, r.Clockwise)
+}
+
+// SeatAfter returns the seat that acts n turns after seat in the rules' direction of play.
+func (r VariantRules) SeatAfter(seat, n int) int {
+	return StepSeat(seat, n, r.Clockwise)
+}
+
+// PlayDistance returns how many turns play takes to move from seat `from` to seat `to` in the rules' direction of play.
+func (r VariantRules) PlayDistance(from, to int) int {
+	return StepSeat(0, to-from, r.Clockwise)
 }
 
 func RulesFor(v Variant) VariantRules {

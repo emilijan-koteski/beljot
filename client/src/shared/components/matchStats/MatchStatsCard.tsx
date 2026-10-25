@@ -543,6 +543,16 @@ export function MatchStatsCard({
               {t("lobby.card.noDeclarationsTransfer")}
             </span>
           )}
+          {match.clockwise === true && (
+            <span
+              className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              data-testid="match-history-clockwise"
+              role="img"
+              aria-label={t("lobby.card.clockwiseAriaLabel")}
+            >
+              {t("lobby.card.clockwise")}
+            </span>
+          )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-1.5">

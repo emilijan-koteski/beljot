@@ -442,6 +442,7 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	declarationsEnabled := gs.Rules.DeclarationsEnabled
 	stopAtTarget := gs.Rules.StopAtTarget
 	declarationsTransfer := gs.Rules.DeclarationsTransfer
+	clockwise := gs.Rules.Clockwise
 	var botSeats [4]bool
 	var connected [4]bool
 	for i := range gs.Players {
@@ -525,6 +526,7 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		DeclarationsEnabled:  declarationsEnabled,
 		StopAtTarget:         stopAtTarget,
 		DeclarationsTransfer: declarationsTransfer,
+		Clockwise:            clockwise,
 		StartedAt:            startedAt,
 		CompletedAt:          time.Now(),
 		Status:               "abandoned",

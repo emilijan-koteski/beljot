@@ -258,5 +258,23 @@ describe("MatchStatsCard", () => {
         screen.queryByTestId("match-history-no-declarations-transfer"),
       ).not.toBeInTheDocument();
     });
+
+    it("names a match that was played clockwise", () => {
+      renderCard({ match: makeMatch({ clockwise: true }) });
+
+      const chip = screen.getByTestId("match-history-clockwise");
+      expect(chip).toHaveTextContent("Clockwise");
+      expect(chip).toHaveAccessibleName(/play moves to the left/i);
+    });
+
+    it("leaves the direction unchipped when it is counter-clockwise or absent from an older server", () => {
+      renderCard({ match: makeMatch({ clockwise: false }) });
+      expect(screen.queryByTestId("match-history-clockwise")).not.toBeInTheDocument();
+
+      const legacy = makeMatch();
+      delete (legacy as { clockwise?: boolean }).clockwise;
+      renderCard({ match: legacy });
+      expect(screen.queryByTestId("match-history-clockwise")).not.toBeInTheDocument();
+    });
   });
 });

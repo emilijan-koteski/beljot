@@ -2345,10 +2345,11 @@ type fakeMatchStarter struct {
 	lastDeclarationsEnabled  bool
 	lastStopAtTarget         bool
 	lastDeclarationsTransfer bool
+	lastClockwise            bool
 	err                      error
 }
 
-func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool) error {
+func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) error {
 	g.called++
 	g.lastRoom = roomID
 	g.lastPlayers = players
@@ -2360,6 +2361,7 @@ func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode str
 	g.lastDeclarationsEnabled = declarationsEnabled
 	g.lastStopAtTarget = stopAtTarget
 	g.lastDeclarationsTransfer = declarationsTransfer
+	g.lastClockwise = clockwise
 	return g.err
 }
 

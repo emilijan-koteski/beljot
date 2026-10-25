@@ -1849,6 +1849,7 @@ export function MatchPage() {
         variant={matchState.variant}
         stopAtTarget={matchState.stopAtTarget}
         declarationsTransfer={matchState.declarationsTransfer}
+        clockwise={matchState.clockwise}
       />
 
       {errorToast && (

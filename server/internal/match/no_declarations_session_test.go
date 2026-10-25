@@ -32,7 +32,7 @@ func TestStartMatch_CarriesDeclarationsSettingIntoTheSession(t *testing.T) {
 			mgr := match.NewManager(hub, newMockMatchRepo())
 			require.NoError(t, mgr.StartMatch(
 				roomID, tt.variant, "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0,
-				tt.declarationsEnabled, false, true,
+				tt.declarationsEnabled, false, true, false,
 			))
 			t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -64,7 +64,7 @@ func TestCroatianSessionWithoutDeclarationsNeverOpensThePhase(t *testing.T) {
 	hub := &hubSpy{}
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	require.NoError(t, mgr.StartMatch(
-		roomID, "croatia", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, false, false, true,
+		roomID, "croatia", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, false, false, true, false,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 

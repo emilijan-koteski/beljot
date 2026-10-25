@@ -774,10 +774,14 @@
       "matchEndFinish": "Finish the hand",
       "matchEndStop": "Stop at target",
       "matchEndHint": "Stop at target ends the match the moment a team reaches it, even mid-hand, with no last-trick or capot bonus",
+      "direction": "Direction of play",
+      "directionCounterClockwise": "Counter-clockwise",
+      "directionClockwise": "Clockwise",
+      "directionHint": "Counter-clockwise passes the turn to the right, as usual; clockwise passes it to the left",
       "advanced": {
         "title": "Advanced settings",
         "changedCount": "{{count}} changed",
-        "summary": "Declarations, declarations on a fall, match end, privacy, who can sit down"
+        "summary": "Declarations, declarations on a fall, match end, direction of play, privacy, who can sit down"
       }
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
@@ -856,7 +860,9 @@
       "stopAtTarget": "Stop at target",
       "stopAtTargetAriaLabel": "This room ends the match the moment a team reaches the target, without finishing the hand",
       "noDeclarationsTransfer": "No declaration transfer",
-      "noDeclarationsTransferAriaLabel": "In this room, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team"
+      "noDeclarationsTransferAriaLabel": "In this room, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team",
+      "clockwise": "Clockwise",
+      "clockwiseAriaLabel": "In this room, play moves to the left (clockwise): the deal, the bidding, the tricks and the next dealer all go left"
     },
     "chat": {
       "title": "Lobby chat",
@@ -1171,7 +1177,8 @@
     },
     "rules": {
       "stopAtTargetNote": "This table stops at the target: the match ends the moment a team reaches it, without finishing the hand. The scoring chapter below describes the usual rule, where the hand is played out first.",
-      "noDeclarationsTransferNote": "On this table, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team. The scoring chapter below describes the usual rule, where those declarations go to the other team."
+      "noDeclarationsTransferNote": "On this table, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team. The scoring chapter below describes the usual rule, where those declarations go to the other team.",
+      "clockwiseNote": "On this table, play moves to the left (clockwise): the deal, the bidding, the tricks and the next dealer all go left. The chapters below describe the usual rightward play."
     }
   },
   "auth": {

@@ -20,6 +20,7 @@ type View struct {
 	CurrentTrick     []game.TrickCard
 	LeadSuit         *game.Suit
 	ActivePlayerSeat int
+	Clockwise        bool
 
 	AwaitingDeclaration      bool
 	HasDeclarations          bool

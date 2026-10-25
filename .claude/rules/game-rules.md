@@ -13,7 +13,10 @@ These are owner-confirmed rules. Do not "fix" them toward a generic Belot rulese
 
 ## Turn order and tricks
 
-- Play is counter-clockwise for dealing, bidding and tricks. Seats run 0, 1, 2, 3 counter-clockwise and the next seat is `(seat + 1) % 4`.
+- Seats run 0, 1, 2, 3 counter-clockwise around the table, and they never move on screen.
+- Play is counter-clockwise by default: the next seat is `(seat + 1) % 4`. The room's "Direction of play" rule (`VariantRules.Clockwise`, default off) makes it clockwise, so the next seat is `(seat + 3) % 4`. The flag is fixed for the whole match.
+- Never hard-code the step. The engine moves through `VariantRules.NextSeat`, `SeatAfter` and `PlayDistance` in `types.go`, which all go through `game.StepSeat`. The direction covers the deal order, the first bidder, Bitola round 2, the reshuffle and between-hand dealer moves, the trick-1 leader, the turn advance (including after a Belote prompt), the declaration tiebreak distance, the bot's `seatsYetToPlay`, and the client's `dealSchedule.ts`.
+- Partners (`seat + 2`), teams (`seat % 2`) and the trick winner do not depend on the direction.
 - The trick winner leads the next trick.
 - Card IDs are rank plus suit: ranks `7 8 9 T J Q K A`, suits `S H D C` (for example `KS`, `TH`).
 

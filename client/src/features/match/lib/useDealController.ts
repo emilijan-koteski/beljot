@@ -16,6 +16,7 @@ interface DealObservation {
   phase: Phase;
   handNumber: number;
   dealerSeat: number;
+  clockwise: boolean;
   biddingRound: number;
   biddingPassCount: number;
   candidate: Card | null;
@@ -29,6 +30,7 @@ interface DetectedDeal {
   id: string;
   kind: DealKind;
   dealerSeat: number;
+  clockwise: boolean;
   takerSeat: number | null;
   isReshuffle: boolean;
   baseCounts: [number, number, number, number];
@@ -62,6 +64,7 @@ function observeDeal(state: MatchState, mySeat: number): DealObservation {
     phase: state.phase,
     handNumber: state.handNumber,
     dealerSeat: state.dealerSeat,
+    clockwise: state.clockwise === true,
     biddingRound: state.biddingRound,
     biddingPassCount: state.biddingPassCount,
     candidate: state.trumpCandidate,
@@ -89,6 +92,7 @@ function openingDeal(o: DealObservation, isReshuffle: boolean): DetectedDeal {
     id: o.dealId,
     kind: o.candidate !== null ? "candidateFirst" : "allBeforeBidding",
     dealerSeat: o.dealerSeat,
+    clockwise: o.clockwise,
     takerSeat: null,
     isReshuffle,
     baseCounts: [0, 0, 0, 0],
@@ -128,6 +132,7 @@ function detectDeal(
       id: `${cur.dealId}:2`,
       kind: "candidateSecond",
       dealerSeat: cur.dealerSeat,
+      clockwise: cur.clockwise,
       takerSeat: cur.trumpCallerSeat,
       isReshuffle: false,
       baseCounts: prev.seatCounts,
@@ -270,7 +275,12 @@ export function useDealController({
         deal: detected
           ? {
               ...detected,
-              schedule: buildDealSchedule(detected.kind, detected.dealerSeat, detected.takerSeat),
+              schedule: buildDealSchedule(
+                detected.kind,
+                detected.dealerSeat,
+                detected.takerSeat,
+                detected.clockwise,
+              ),
               startedAt: Date.now(),
               landed: 0,
               flipped: false,
