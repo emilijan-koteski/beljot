@@ -221,6 +221,8 @@ func TestSearchAppliesGates(t *testing.T) {
 		{"one legal card", 3, func(v *bot.View) { v.LegalCards = v.LegalCards[:1] }, false},
 		{"pending belote", 3, func(v *bot.View) { v.PendingBelot = true }, false},
 		{"awaiting declaration", 3, func(v *bot.View) { v.AwaitingDeclaration = true }, false},
+		{"another seat is active", 3, func(v *bot.View) { v.ActivePlayerSeat = 1 }, false},
+		{"partner proposed surrender", 3, func(v *bot.View) { v.PartnerProposedSurrender = true }, false},
 		{"not the playing phase", 3, func(v *bot.View) { v.Phase = game.PhaseDeclaring }, false},
 		{"no trump", 3, func(v *bot.View) { v.TrumpSuit = nil }, false},
 		{"team A 20 short of the target", 3, func(v *bot.View) {
