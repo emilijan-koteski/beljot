@@ -117,6 +117,7 @@ Dealer seat 0 in every row.
 - Follow-up commit, at the owner's request, fixed the three deferred triage items (rows 1, 9 and 14):
   - The direction rule is documented in `.claude/rules/game-rules.md` (Croatian bidding), `_bmad-output/project-context.md` (the turn-order line and Croatian bidding), and the root CLAUDE.md list of constants mirrored by hand (the seat step).
   - Every lobby-wide room broadcast now goes through one package-level `roomLifecyclePayload(repo, room)`: `room_created` from CreateRoom and QuickPlay, `room_updated` from the room handler, and the lobby-disconnect `room_updated`. QuickPlay's `room_created` used to omit `players`, `createdAt`, `updatedAt`, the owner fields and the privacy and honor gates. The disconnect frame used to omit `players`, `coinBuyIn`, `isPrivate`, `minHonor`, `allowNewPlayers` and `isQuickPlay`, which left the lobby's seat chips stale after a lobby disconnect.
+- Rebased onto `master` after #30 (`fix(match): trim scoreboard header to heading, hand and variant`), which removed every room-rule chip from the ScorePanel header. The clockwise chip there went with them, so the score panel no longer shows the rule; the lobby card, room page, rules dialog and match history still do. The `MatchPage` test "keeps room rules out of the scoreboard header" now also sets `clockwise: true`.
 
 ## Spec Change Log
 
