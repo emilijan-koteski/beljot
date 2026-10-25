@@ -1,6 +1,6 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -191,6 +191,60 @@ describe("CreateRoomModal", () => {
         name: "Quick Room",
         variant: "bitola",
         matchMode: "501",
+        timerStyle: "relaxed",
+        timerDurationSeconds: null,
+        coinBuyIn: 500,
+        isPrivate: false,
+        password: undefined,
+        minHonor: 0,
+        allowNewPlayers: true,
+        declarationsEnabled: true,
+        stopAtTarget: false,
+      });
+    });
+  });
+
+  it("offers 501, 701 and 1001 in that order with 1001 selected", () => {
+    renderModal(true);
+
+    const options = within(screen.getByTestId("match-mode-segmented")).getAllByRole("radio");
+    expect(options.map((o) => o.textContent)).toEqual(["501 points", "701 points", "1001 points"]);
+    expect(screen.getByTestId("match-mode-segmented-1001")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("match-mode-segmented-701")).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("submits matchMode 701 and previews it when the 701 segment is selected", async () => {
+    const user = userEvent.setup();
+    mockCreateRoom.mockResolvedValueOnce({
+      id: 3,
+      name: "Medium Room",
+      code: "GHJ789",
+      ownerId: 5,
+      ownerUsername: "owner",
+      variant: "bitola",
+      matchMode: "701",
+      timerStyle: "relaxed",
+      timerDurationSeconds: null,
+      status: "waiting",
+      playerCount: 1,
+      createdAt: "2026-10-25T14:30:00Z",
+      updatedAt: "2026-10-25T14:30:00Z",
+    });
+
+    renderModal(true);
+    await setRoomName(user, "Medium Room");
+    await user.click(screen.getByTestId("match-mode-segmented-701"));
+
+    expect(screen.getByTestId("match-mode-segmented-701")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("create-room-preview")).toHaveTextContent("701 pts");
+
+    await user.click(screen.getByTestId("create-room-button"));
+
+    await waitFor(() => {
+      expect(mockCreateRoom).toHaveBeenCalledWith({
+        name: "Medium Room",
+        variant: "bitola",
+        matchMode: "701",
         timerStyle: "relaxed",
         timerDurationSeconds: null,
         coinBuyIn: 500,

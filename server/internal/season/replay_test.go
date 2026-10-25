@@ -98,6 +98,15 @@ func TestOutcomeFor(t *testing.T) {
 		assert.False(t, o.InstantWin, "520 reached the 501 target")
 	})
 
+	t.Run("the 701 target", func(t *testing.T) {
+		m := replayFourHumans(1, [4]uint{1, 2, 3, 4}, 0, 720, 400)
+		m.MatchMode = "701"
+		o, err := season.OutcomeFor(m)
+		require.NoError(t, err)
+		assert.Equal(t, 701, o.Target)
+		assert.False(t, o.InstantWin, "720 reached the 701 target")
+	})
+
 	t.Run("abandonment: the abandoner's seat, and the other team wins", func(t *testing.T) {
 		m := replayFourHumans(1, [4]uint{1, 2, 3, 4}, 0, 200, 400)
 		m.Status = "abandoned"

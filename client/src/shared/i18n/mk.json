@@ -726,6 +726,7 @@
         ]
       },
       "matchMode501": "501 поен",
+      "matchMode701": "701 поен",
       "timerDurationSuffix": "секунди / потег",
       "submit": "Креирај соба",
       "submitting": "Креирање…",
@@ -737,7 +738,7 @@
         "seated": "{{current}}/4"
       },
       "variantHint": "Битолската дели пет карти и отвора адутска карта, хрватската дели шест и адутот се именува слободно",
-      "matchModeHint": "501 за пократок меч, 1001 за целосна трка",
+      "matchModeHint": "501 за краток меч, 701 за среден, 1001 за целосна трка",
       "timerHintRelaxed": "Без тајмер",
       "timerDurationHint": "10–120s · стандардно 30s",
       "coinBuyIn": "Влог",
@@ -833,6 +834,7 @@
       "variantCroatia": "Хрватска",
       "matchMode1001": "1001 поен",
       "matchMode501": "501 поен",
+      "matchMode701": "701 поен",
       "matchModeGeneric": "{{points}} поени",
       "buyInFree": "Без влог",
       "private": "Приватна",
@@ -869,7 +871,7 @@
   "match": {
     "seat": {
       "waiting": "Се чека…",
-      "calledSuit": "Зваше {{suit}}",
+      "calledSuit": "Зеде {{suit}}",
       "you": "Ти"
     },
     "chat": {

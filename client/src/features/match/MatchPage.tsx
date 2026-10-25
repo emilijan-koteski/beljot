@@ -38,7 +38,7 @@ import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
-import type { Suit, TeamString } from "@/shared/types/matchTypes";
+import { matchTargetFor, type Suit, type TeamString } from "@/shared/types/matchTypes";
 import {
   ACTION_ANNOUNCE_BELOT,
   ACTION_CONTINUE,
@@ -1123,7 +1123,7 @@ export function MatchPage() {
 
   const viewerTeam: TeamString = myPlayerSeat % 2 === 0 ? "teamA" : "teamB";
 
-  const matchTarget = matchState.matchMode === "501" ? 501 : 1001;
+  const matchTarget = matchTargetFor(matchState.matchMode);
 
   const matchStake =
     roomBuyIn !== null ? matchState.players.filter((p) => !p.isBot).length * roomBuyIn : 0;

@@ -293,7 +293,7 @@ export const sr: RulesLangData = {
         },
         {
           kind: "note",
-          text: "Ruke se igraju dok bar jedan tim ne sedne na 1001 ili više na kraju ruke. Ako oba tima pređu granicu u istoj ruci, strana sa više ukupnih poena osvaja meč. A ako su oba zbira tačno jednaka, meč osvaja tim koji je zvao adut. Za kraći meč, soba se može podesiti i na trku do 501 poena, uz potpuno ista pravila.",
+          text: "Ruke se igraju dok bar jedan tim ne sedne na 1001 ili više na kraju ruke. Ako oba tima pređu granicu u istoj ruci, strana sa više ukupnih poena osvaja meč. A ako su oba zbira tačno jednaka, meč osvaja tim koji je zvao adut. Za kraći meč, soba se može podesiti i na trku do 501 ili 701 poena, uz potpuno ista pravila.",
         },
       ],
     },

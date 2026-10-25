@@ -872,6 +872,28 @@ func TestStopAtTargetRespectsThe501Target(t *testing.T) {
 	assert.Equal(t, 501, after.TeamScores[winnerTeam])
 }
 
+// TestStopAtTargetRespectsThe701Target stops a 701 match on reaching 701, which a 1001 fallback would play past.
+func TestStopAtTargetRespectsThe701Target(t *testing.T) {
+	const trickNum = 5
+	seats := []int{0, 1, 2, 3}
+
+	winnerTeam, trickPoints := midPlayTrickPoints(t, trickNum, seats)
+
+	gs := testfixtures.NewGameMidPlayWithScores(trickNum, 0, 0)
+	gs.MatchMode = "701"
+	seed := 701 - gs.HandPoints[winnerTeam] - trickPoints
+	require.Positive(t, seed)
+	gs.TeamScores[winnerTeam] = seed
+	gs = testfixtures.WithStopAtTarget(gs)
+
+	after := stopTrick(t, gs, seats)
+
+	require.Equal(t, game.PhaseMatchEnd, after.Phase)
+	require.NotNil(t, after.WinnerTeam)
+	assert.Equal(t, winnerTeam, *after.WinnerTeam)
+	assert.Equal(t, 701, after.TeamScores[winnerTeam])
+}
+
 // TestStopAtTargetJustShortOfTheTargetPlaysOn is the other side of the boundary:
 // one point short is not a stop. Without it, an off-by-one in the comparison
 // would pass every crossing test above.

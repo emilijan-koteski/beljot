@@ -726,6 +726,7 @@
         ]
       },
       "matchMode501": "501 bod",
+      "matchMode701": "701 bod",
       "timerDurationSuffix": "sekundi / potezu",
       "submit": "Kreiraj sobu",
       "submitting": "Kreiram…",
@@ -737,7 +738,7 @@
         "seated": "{{current}}/4"
       },
       "variantHint": "Bitolska deli pet karata i okreće adutsku kartu, hrvatska deli šest i adut se zove slobodno",
-      "matchModeHint": "501 za kraći meč, 1001 za punu trku",
+      "matchModeHint": "501 za kratak meč, 701 za srednji, 1001 za punu trku",
       "timerHintRelaxed": "Bez tajmera",
       "timerDurationHint": "10–120s · podrazumevano 30s",
       "coinBuyIn": "Ulog",
@@ -833,6 +834,7 @@
       "variantCroatia": "Hrvatska",
       "matchMode1001": "1001 bod",
       "matchMode501": "501 bod",
+      "matchMode701": "701 bod",
       "matchModeGeneric": "{{points}} poena",
       "buyInFree": "Bez uloga",
       "private": "Privatna",

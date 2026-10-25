@@ -25,7 +25,7 @@ import (
 
 var (
 	validVariants    = map[string]bool{"bitola": true, "croatia": true}
-	validMatchModes  = map[string]bool{"1001": true, "501": true}
+	validMatchModes  = map[string]bool{"1001": true, "701": true, "501": true}
 	validTimerStyles = map[string]bool{"relaxed": true, "per-move": true}
 	validStatuses    = map[string]bool{"waiting": true, "playing": true, "completed": true}
 )
