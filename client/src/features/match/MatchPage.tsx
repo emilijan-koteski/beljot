@@ -1266,6 +1266,7 @@ export function MatchPage() {
         variantLabel={variantLabel(t, matchState.variant)}
         declarationsEnabled={matchState.declarationsEnabled}
         stopAtTarget={matchState.stopAtTarget}
+        declarationsTransfer={matchState.declarationsTransfer}
         matchTarget={matchTarget}
       />
 
@@ -1816,6 +1817,7 @@ export function MatchPage() {
           trumpCallerSeat={matchState.trumpCallerSeat ?? lastTrumpRef.current.callerSeat}
           acknowledged={handCompleteAcked}
           matchTarget={matchTarget}
+          declarationsTransfer={matchState.declarationsTransfer}
         />
       )}
 
@@ -1849,6 +1851,7 @@ export function MatchPage() {
         onOpenChange={setRulesOpen}
         variant={matchState.variant}
         stopAtTarget={matchState.stopAtTarget}
+        declarationsTransfer={matchState.declarationsTransfer}
       />
 
       {errorToast && (

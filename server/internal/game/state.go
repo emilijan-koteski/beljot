@@ -62,17 +62,18 @@ type HandScore struct {
 // GameState is the complete, serializable game state. ProjectForSeat masks by enumeration, so every new
 // field must be triaged as public, server-only (json:"-"), or masked per seat in ProjectForSeat.
 type GameState struct {
-	ID                  uint         `json:"id"`
-	RoomID              uint         `json:"roomId"`
-	Variant             Variant      `json:"variant"`
-	MatchMode           string       `json:"matchMode"`
-	Phase               Phase        `json:"phase"`
-	OwnerSeat           int          `json:"ownerSeat"`
-	Rules               VariantRules `json:"-"`
-	DeclarationsEnabled bool         `json:"declarationsEnabled"`
-	StopAtTarget        bool         `json:"stopAtTarget"`
-	StoppedAtTarget     bool         `json:"-"`
-	WonByInstantWin     bool         `json:"-"`
+	ID                   uint         `json:"id"`
+	RoomID               uint         `json:"roomId"`
+	Variant              Variant      `json:"variant"`
+	MatchMode            string       `json:"matchMode"`
+	Phase                Phase        `json:"phase"`
+	OwnerSeat            int          `json:"ownerSeat"`
+	Rules                VariantRules `json:"-"`
+	DeclarationsEnabled  bool         `json:"declarationsEnabled"`
+	StopAtTarget         bool         `json:"stopAtTarget"`
+	DeclarationsTransfer bool         `json:"declarationsTransfer"`
+	StoppedAtTarget      bool         `json:"-"`
+	WonByInstantWin      bool         `json:"-"`
 
 	HandNumber       int    `json:"handNumber"`
 	DealerSeat       int    `json:"dealerSeat"`
@@ -138,15 +139,16 @@ func ShuffleDeck(deck []Card) {
 	})
 }
 
-// NewGame creates a 4-player game, resolves the variant rules once with the room's declarationsEnabled
-// and stopAtTarget overrides, picks a random dealer, and deals. The room flags are positional so a
-// forgotten argument fails to compile instead of silently starting a match without declarations.
-func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint, declarationsEnabled bool, stopAtTarget bool) *GameState {
+// NewGame creates a 4-player game, resolves the variant rules once with the room's declarationsEnabled,
+// stopAtTarget and declarationsTransfer overrides, picks a random dealer, and deals. The room flags are
+// positional so a forgotten argument fails to compile instead of silently starting a match on the wrong rules.
+func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool) *GameState {
 	dealerSeat := rand.IntN(4)
 
 	rules := RulesFor(variant)
 	rules.DeclarationsEnabled = declarationsEnabled
 	rules.StopAtTarget = stopAtTarget
+	rules.DeclarationsTransfer = declarationsTransfer
 
 	gs := &GameState{
 		RoomID:               roomID,
@@ -154,6 +156,7 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 		Rules:                rules,
 		DeclarationsEnabled:  rules.DeclarationsEnabled,
 		StopAtTarget:         rules.StopAtTarget,
+		DeclarationsTransfer: rules.DeclarationsTransfer,
 		MatchMode:            matchMode,
 		Phase:                PhaseDealing,
 		HandNumber:           1,

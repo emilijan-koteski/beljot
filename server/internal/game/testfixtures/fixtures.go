@@ -619,6 +619,12 @@ func WithStopAtTarget(gs *game.GameState) *game.GameState {
 	return gs
 }
 
+func WithoutDeclarationsTransfer(gs *game.GameState) *game.GameState {
+	gs.Rules.DeclarationsTransfer = false
+	gs.DeclarationsTransfer = false
+	return gs
+}
+
 func WithScoredPreviousHand(gs *game.GameState, handNumber int) *game.GameState {
 	if handNumber < 2 {
 		panic("testfixtures: WithScoredPreviousHand needs handNumber >= 2 — hand 1 has no previous hand")

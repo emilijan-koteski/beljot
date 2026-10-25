@@ -533,6 +533,16 @@ export function MatchStatsCard({
               {t("lobby.card.stopAtTarget")}
             </span>
           )}
+          {match.declarationsTransfer === false && (
+            <span
+              className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              data-testid="match-history-no-declarations-transfer"
+              role="img"
+              aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
+            >
+              {t("lobby.card.noDeclarationsTransfer")}
+            </span>
+          )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-1.5">

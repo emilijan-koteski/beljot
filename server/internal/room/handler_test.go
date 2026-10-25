@@ -2334,20 +2334,21 @@ func TestLeaveRoom_ReturnsErrMatchAlreadyStarted_WhenRoomPlaying(t *testing.T) {
 }
 
 type fakeMatchStarter struct {
-	called                  int
-	lastRoom                uint
-	lastPlayers             [4]match.PlayerSeatInfo
-	lastCoinBuyIn           int
-	lastTimerStyle          string
-	lastTimerDurationSec    int
-	lastVariant             string
-	lastMatchMode           string
-	lastDeclarationsEnabled bool
-	lastStopAtTarget        bool
-	err                     error
+	called                   int
+	lastRoom                 uint
+	lastPlayers              [4]match.PlayerSeatInfo
+	lastCoinBuyIn            int
+	lastTimerStyle           string
+	lastTimerDurationSec     int
+	lastVariant              string
+	lastMatchMode            string
+	lastDeclarationsEnabled  bool
+	lastStopAtTarget         bool
+	lastDeclarationsTransfer bool
+	err                      error
 }
 
-func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool) error {
+func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool) error {
 	g.called++
 	g.lastRoom = roomID
 	g.lastPlayers = players
@@ -2358,6 +2359,7 @@ func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode str
 	g.lastMatchMode = matchMode
 	g.lastDeclarationsEnabled = declarationsEnabled
 	g.lastStopAtTarget = stopAtTarget
+	g.lastDeclarationsTransfer = declarationsTransfer
 	return g.err
 }
 

@@ -88,7 +88,7 @@ func TestHandleMatchEnd_AwardsXP(t *testing.T) {
 	mgr.SetXPAwarder(awarder)
 
 	roomID := uint(200)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -130,7 +130,7 @@ func TestHandleMatchEnd_NoAwarderNoXP(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 
 	roomID := uint(202)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -159,7 +159,7 @@ func TestHandleMatchEnd_BotSeatEarnsNoXP(t *testing.T) {
 	mgr.SetBotDelayForTest(time.Hour, time.Hour)
 
 	roomID := uint(203)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(3), "relaxed", 0, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(3), "relaxed", 0, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	finalState := mgr.GetStateSnapshot(roomID)
@@ -196,7 +196,7 @@ func TestAbandonment_AwardsXP(t *testing.T) {
 	mgr.SetXPAwarder(awarder)
 
 	roomID := uint(201)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	gs := mgr.GetStateSnapshot(roomID)

@@ -370,7 +370,7 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 		{UserID: 30, Username: "c", Seat: 2},
 		{UserID: 40, Username: "d", Seat: 3},
 	}
-	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0, true, false))
+	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0, true, false, true))
 	t.Cleanup(func() { m.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameCroatianMidBidding(3)

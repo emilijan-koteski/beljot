@@ -235,6 +235,7 @@ func (h *LobbyDisconnectHandler) broadcastRoomUpdated(r *Room) {
 		"timerDurationSeconds": r.TimerDurationSeconds,
 		"declarationsEnabled":  r.DeclarationsEnabled,
 		"stopAtTarget":         r.StopAtTarget,
+		"declarationsTransfer": r.DeclarationsTransfer,
 		"playerCount":          r.PlayerCount,
 		"status":               r.Status,
 		"createdAt":            r.CreatedAt.UTC().Format(time.RFC3339),

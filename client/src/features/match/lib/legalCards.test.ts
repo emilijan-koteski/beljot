@@ -65,6 +65,7 @@ function makeState(args: {
     mustPickTrump: false,
     declarationsEnabled: true,
     stopAtTarget: false,
+    declarationsTransfer: true,
     activePlayerSeat: args.mySeat,
     trickNumber: 1,
     currentTrick: args.currentTrick,

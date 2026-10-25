@@ -20,6 +20,7 @@ const mockMatchState: MatchState = {
   mustPickTrump: false,
   declarationsEnabled: true,
   stopAtTarget: false,
+  declarationsTransfer: true,
   activePlayerSeat: 1,
   trickNumber: 0,
   currentTrick: [],

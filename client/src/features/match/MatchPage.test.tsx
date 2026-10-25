@@ -84,6 +84,7 @@ const mockMatchState: MatchState = {
   mustPickTrump: false,
   declarationsEnabled: true,
   stopAtTarget: false,
+  declarationsTransfer: true,
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],
@@ -1711,6 +1712,29 @@ describe("MatchPage", () => {
       });
       expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
     });
+
+    it("names only the card points on a fall when the room's declarations do not transfer", () => {
+      useMatchStore.getState().setMatchState({
+        ...mockMatchState,
+        phase: "hand_complete",
+        declarationsTransfer: false,
+        lastHandResult: {
+          ...handScore,
+          failedContract: true,
+          contractingTeam: 1,
+          teamAHandTotal: 162,
+          teamBHandTotal: 0,
+        },
+        teamScores: [162, 0],
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.getByTestId("score-reveal")).toHaveTextContent("Went down · card points to us");
+    });
   });
   describe("declaration prompt overlap wiring", () => {
     function overlapPromptState(variant: MatchState["variant"]): MatchState {
@@ -1804,6 +1828,14 @@ describe("MatchPage", () => {
       );
       expect(screen.getByText("Deal five each, then turn one up")).toBeInTheDocument();
       expect(screen.queryByText("Deal all eight up front")).not.toBeInTheDocument();
+    });
+
+    it("notes the voided declarations on a table whose declarations do not transfer", () => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, declarationsTransfer: false });
+      renderMatchPage();
+      fireEvent.click(screen.getByTestId("rules-button"));
+
+      expect(screen.getByTestId("rules-dialog-no-declarations-transfer-note")).toBeInTheDocument();
     });
   });
 
@@ -2394,6 +2426,28 @@ describe("MatchPage", () => {
       renderMatchPage();
 
       expect(screen.queryByTestId("score-meta-stop-at-target")).not.toBeInTheDocument();
+    });
+
+    it("labels the scoreboard when the room's declarations do not transfer", () => {
+      useMatchStore.getState().setMatchState({
+        ...biddingState(0),
+        declarationsTransfer: false,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.getByTestId("score-meta-no-declarations-transfer")).toBeInTheDocument();
+    });
+
+    it("leaves the scoreboard unlabelled when the room's declarations transfer", () => {
+      useMatchStore.getState().setMatchState({
+        ...biddingState(0),
+        declarationsTransfer: true,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      expect(screen.queryByTestId("score-meta-no-declarations-transfer")).not.toBeInTheDocument();
     });
 
     it("reads the open hand alone when nothing is held face-down", () => {

@@ -439,6 +439,9 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	teamBScore := gs.TeamScores[game.TeamB]
 	variant := string(gs.Variant)
 	matchMode := gs.MatchMode
+	declarationsEnabled := gs.Rules.DeclarationsEnabled
+	stopAtTarget := gs.Rules.StopAtTarget
+	declarationsTransfer := gs.Rules.DeclarationsTransfer
 	var botSeats [4]bool
 	var connected [4]bool
 	for i := range gs.Players {
@@ -504,30 +507,33 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 
 	ids, botFlags, hasBots := matchSeatColumns(playerIDs, botSeats)
 	matchRecord := &Match{
-		RoomID:           roomID,
-		Player1ID:        ids[0],
-		Player2ID:        ids[1],
-		Player3ID:        ids[2],
-		Player4ID:        ids[3],
-		Player1IsBot:     botFlags[0],
-		Player2IsBot:     botFlags[1],
-		Player3IsBot:     botFlags[2],
-		Player4IsBot:     botFlags[3],
-		HasBots:          hasBots,
-		TeamAScore:       teamAScore,
-		TeamBScore:       teamBScore,
-		WinnerTeam:       winningTeam,
-		Variant:          variant,
-		MatchMode:        matchMode,
-		StartedAt:        startedAt,
-		CompletedAt:      time.Now(),
-		Status:           "abandoned",
-		AbandonedBy:      &abandonedPlayerID,
-		CoinBuyIn:        coinBuyIn,
-		Player1CoinDelta: deltas[0],
-		Player2CoinDelta: deltas[1],
-		Player3CoinDelta: deltas[2],
-		Player4CoinDelta: deltas[3],
+		RoomID:               roomID,
+		Player1ID:            ids[0],
+		Player2ID:            ids[1],
+		Player3ID:            ids[2],
+		Player4ID:            ids[3],
+		Player1IsBot:         botFlags[0],
+		Player2IsBot:         botFlags[1],
+		Player3IsBot:         botFlags[2],
+		Player4IsBot:         botFlags[3],
+		HasBots:              hasBots,
+		TeamAScore:           teamAScore,
+		TeamBScore:           teamBScore,
+		WinnerTeam:           winningTeam,
+		Variant:              variant,
+		MatchMode:            matchMode,
+		DeclarationsEnabled:  declarationsEnabled,
+		StopAtTarget:         stopAtTarget,
+		DeclarationsTransfer: declarationsTransfer,
+		StartedAt:            startedAt,
+		CompletedAt:          time.Now(),
+		Status:               "abandoned",
+		AbandonedBy:          &abandonedPlayerID,
+		CoinBuyIn:            coinBuyIn,
+		Player1CoinDelta:     deltas[0],
+		Player2CoinDelta:     deltas[1],
+		Player3CoinDelta:     deltas[2],
+		Player4CoinDelta:     deltas[3],
 	}
 
 	if err := m.matchRepo.CreateWithHands(matchRecord, handsCopy); err != nil {

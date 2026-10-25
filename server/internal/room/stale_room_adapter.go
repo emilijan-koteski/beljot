@@ -16,10 +16,13 @@ func (a *StaleRoomRepositoryAdapter) FindByStatus(status string) ([]match.StaleR
 	out := make([]match.StaleRoom, len(rooms))
 	for i, r := range rooms {
 		out[i] = match.StaleRoom{
-			ID:        r.ID,
-			Variant:   r.Variant,
-			MatchMode: r.MatchMode,
-			UpdatedAt: r.UpdatedAt,
+			ID:                   r.ID,
+			Variant:              r.Variant,
+			MatchMode:            r.MatchMode,
+			DeclarationsEnabled:  r.DeclarationsEnabled,
+			StopAtTarget:         r.StopAtTarget,
+			DeclarationsTransfer: r.DeclarationsTransfer,
+			UpdatedAt:            r.UpdatedAt,
 		}
 	}
 	return out, nil

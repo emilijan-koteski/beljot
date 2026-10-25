@@ -19,6 +19,7 @@ func RefreshDerivedFlags(state *GameState) {
 	state.MustPickTrump = MustPickTrump(state, state.ActivePlayerSeat)
 	state.DeclarationsEnabled = state.Rules.DeclarationsEnabled
 	state.StopAtTarget = state.Rules.StopAtTarget
+	state.DeclarationsTransfer = state.Rules.DeclarationsTransfer
 }
 
 func applyAction(state *GameState, action Action) (*GameState, error) {

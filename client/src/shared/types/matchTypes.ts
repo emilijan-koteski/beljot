@@ -143,6 +143,7 @@ export interface MatchState {
   mustPickTrump: boolean;
   declarationsEnabled: boolean;
   stopAtTarget: boolean;
+  declarationsTransfer: boolean;
   activePlayerSeat: number;
   trickNumber: number;
   currentTrick: TrickCard[];

@@ -20,7 +20,7 @@ func TestMatchMessages_CarryServerNow(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 
 	before := time.Now()
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 30, 10, 120, 0, true, false, true))
 	after := time.Now()
 
 	calls := hub.snapshot()
@@ -53,7 +53,7 @@ func TestPerMoveTimer_FiresAfterAdvertisedDeadlineNotBefore(t *testing.T) {
 	mgr.SetDealGraceForTest(false)
 
 	start := time.Now()
-	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false))
+	require.NoError(t, mgr.StartMatch(100, "bitola", "1001", defaultPlayers(), "per-move", 1, 10, 120, 0, true, false, true))
 
 	state := mgr.GetStateSnapshot(100)
 	require.NotNil(t, state)
