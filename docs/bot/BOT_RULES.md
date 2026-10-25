@@ -343,10 +343,10 @@ First it computes who currently wins. Branches:
 overtakes the current winner AND either the bot closes the trick, or **no yet-to-play OPPONENT
 could still play a card that beats it**. The check is per remaining opponent seat:
 
-- cards that seat **provably holds** (declaration reveal, minus already-played) count;
+- cards that seat **provably holds** (known: revealed or located, minus already-played) count;
 - **unseen** cards count only for suits that seat is **not known void in** (`KnownVoids`);
-- a seat revealed to still hold a **led-suit card must follow suit** (`seatKnownHoldsSuit`) —
-  its trumps are unplayable this trick and do not veto security;
+- a seat known (revealed or located) to still hold a **led-suit card must follow suit**
+  (`seatKnownHoldsSuit`) — its trumps are unplayable this trick and do not veto security;
 - the partner is never a threat, and neither are cards pinned to a seat that already acted.
 
 So: forced over the partner's Q♥ holding K♥ A♥ J♥ with the one remaining opponent **known void
@@ -487,17 +487,18 @@ gamble.
   `trumpEconomyTake` (see "Trump economy on the take" below), which secures the trick while
   preserving the control trumps **J/9** whenever the pot doesn't justify spending one. After
   `trumpEconomyTake` declines (nothing is provably secure), or when the trick is pointless, the
-  led-suit-secure take below applies, even on a pointless trick; only after that does the bot
-  take **as cheaply as possible** (`cheapestWinning`).
+  led-suit-secure take below applies; only after that does the bot take **as cheaply as
+  possible** (`cheapestWinning`).
 - **Plain suit led, an opponent still to play:** before falling back to the cheapest take, the
   bot takes with the lowest-point led-suit card that overtakes and that **no unseen led-suit
   card, nor one an opponent is known to hold,** outranks (`cheapestLedSecureWinner`). A ruff
   would beat the Ace too, so unseen trumps are not an argument for a lower card. The rule stands
   down when an opponent still to play is known void in the led suit, because a ruff is then
-  likely and the cheap card loses less. Example: opponents play 7♠ and 8♠, bot third holds A♠ Q♠
-  with the K♠ and T♠ unseen -> play **A♠**; the Queen would lose to the last player's King or Ten
-  and the kept Ace would be ruffed later. Once the K♠ and T♠ are gone the Queen suffices. A trump
-  cut, or a trump lead, leaves it inert.
+  likely and the cheap card loses less. Example: the partner leads 7♠, the right-hand opponent
+  plays 8♠, the bot is third holding A♠ Q♠ with the K♠ and T♠ unseen and the left-hand opponent
+  last -> play **A♠**; the Queen would lose to the last player's King or Ten and the kept Ace would
+  be ruffed later. Once the K♠ and T♠ are gone the Queen suffices. A trump cut, or a trump lead,
+  leaves it inert.
 - Cannot win: **discard** the lowest value, preserving trump.
 
 **The boss-preserving smear (`bestSmear` + `bossWorthGuarding`)** — used at all three smear
@@ -525,7 +526,9 @@ legal and does not overtake, the bot discards the **Ten** instead and keeps the 
 table convention: it tells a human partner "I hold the Ace of this suit, return it". The cost is
 one point on the partner's trick (the Ten is worth 10, the Ace 11; the lab measured at
 most 0.02 points per hand), and the Ace stays home as the suit's boss. Without the Ten the Ace
-rules above apply unchanged.
+rules above apply unchanged. The swap applies only while the Ace can still cash: when an opponent
+can ruff the suit, or in the two-card endgame with a live opponent trump (`bossWorthGuarding`),
+the Ace is smeared for its 11 points and the Ten kept.
 
 Example (boss-guard): partner trumped and safely won, bot last holding **A♠ Q♠ 7♠** (no T♠) ->
 smear **Q♠** and keep the Ace as the master of spades. Old behavior threw the Ace.

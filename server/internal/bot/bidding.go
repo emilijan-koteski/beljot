@@ -86,8 +86,9 @@ func seatsPassedBefore(v View) int {
 func decideBid(v View) game.Action {
 	hand := bidHand(v)
 	pos := seatsPassedBefore(v)
+	hasCandidate := v.HasTrumpCandidate && v.TrumpCandidate != nil
 
-	if v.HasTrumpCandidate && v.BiddingRound == 1 {
+	if hasCandidate && v.BiddingRound == 1 {
 		if matchesBidTable(hand, v.TrumpCandidate.Suit, true, pos) {
 			return game.Action{Type: game.ActionPickTrump, PlayerSeat: v.Seat}
 		}
@@ -97,7 +98,7 @@ func decideBid(v View) game.Action {
 	var best, forced *game.Suit
 	bestScore, forcedScore := -1, -1
 	for _, suit := range game.AllSuits {
-		if v.HasTrumpCandidate && suit == v.TrumpCandidate.Suit {
+		if hasCandidate && suit == v.TrumpCandidate.Suit {
 			continue
 		}
 		score := trumpSuitScore(hand, suit)
@@ -106,7 +107,7 @@ func decideBid(v View) game.Action {
 			forced = &s
 			forcedScore = score
 		}
-		if !matchesBidTable(hand, suit, v.HasTrumpCandidate, pos) {
+		if !matchesBidTable(hand, suit, hasCandidate, pos) {
 			continue
 		}
 		if score > bestScore {

@@ -1,6 +1,7 @@
 package bot_test
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -361,6 +362,29 @@ func TestDecide_ForcedDealerNeverPasses(t *testing.T) {
 
 		_, err := game.ApplyAction(gs, action)
 		require.NoError(t, err, "seat %d: the forced pick must be legal", seat)
+	}
+}
+
+func TestDecide_BiddingSurvivesAMissingCandidate(t *testing.T) {
+	for _, round := range []int{1, 2} {
+		t.Run(fmt.Sprintf("round %d", round), func(t *testing.T) {
+			v := bot.View{
+				Seat:              1,
+				DealerSeat:        0,
+				Phase:             game.PhaseBidding,
+				BiddingRound:      round,
+				HasTrumpCandidate: true,
+				Hand:              cards("JH", "9H", "AS", "7C", "8C"),
+			}
+
+			var action game.Action
+			require.NotPanics(t, func() { action = bot.Decide(v) })
+
+			assert.Equal(t, game.ActionPickTrump, action.Type)
+			assert.Equal(t, 1, action.PlayerSeat)
+			require.NotNil(t, action.Suit, "with no candidate the pick names its suit")
+			assert.Equal(t, game.SuitHearts, *action.Suit)
+		})
 	}
 }
 
@@ -1530,6 +1554,7 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 }
 
 func TestDecide_TenUnderTheAceOnPartnersSafeTrick(t *testing.T) {
+	spades := game.SuitSpades
 	runPlayTweakCases(t, []playTweakCase{
 		{
 			name:       "void in trump, throws the ten and keeps the ace to show it",
@@ -1544,6 +1569,21 @@ func TestDecide_TenUnderTheAceOnPartnersSafeTrick(t *testing.T) {
 			trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}},
 			callerSeat: 2,
 			wantCard:   "KS",
+		},
+		{
+			name:       "an opponent ruffs spades: the ace is dead, so it is banked rather than signalled",
+			hand:       cards("AS", "TS", "7D"),
+			trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}},
+			callerSeat: 2,
+			observes:   []obs{{seat: 1, card: "8H", lead: &spades}},
+			wantCard:   "AS",
+		},
+		{
+			name:       "two cards left with live opponent trumps: bank the ace",
+			hand:       cards("AS", "TS"),
+			trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}},
+			callerSeat: 2,
+			wantCard:   "AS",
 		},
 	})
 }

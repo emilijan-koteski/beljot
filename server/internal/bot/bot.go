@@ -1005,9 +1005,13 @@ func bestSmear(v View, legal []game.Card, trump game.Suit) *game.Card {
 }
 
 // tenUnderAce swaps a non-trump Ace for the Ten of its suit when the Ten is legal and does not
-// overtake. The Ten tells the partner the Ace is still held.
+// overtake. The Ten tells the partner the Ace is still held, so the swap is skipped once the Ace
+// can no longer cash.
 func tenUnderAce(v View, legal []game.Card, best *game.Card, trump game.Suit) *game.Card {
 	if best == nil || best.Suit == trump || best.Rank != game.RankAce {
+		return best
+	}
+	if !bossWorthGuarding(v, *best, trump) {
 		return best
 	}
 	ten := findRankOfSuit(legal, best.Suit, game.RankTen)
