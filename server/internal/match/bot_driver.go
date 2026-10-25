@@ -30,7 +30,64 @@ func (m *Manager) maybeScheduleBotAction(session *LiveMatch) {
 		session.botActionTimers[seat] = time.AfterFunc(delay, func() {
 			m.handleBotActionTimer(session, s, gen, ctx)
 		})
+		m.submitBotSearch(session, seat, gen, ctx)
 	}
+}
+
+// botSearchEntry is a finished card search, valid only for the seat's armed generation and decision context.
+type botSearchEntry struct {
+	generation uint64
+	ctx        botDecisionContext
+	result     bot.SearchResult
+}
+
+// submitBotSearch queues the card search for a seat whose armed decision is a card play, so its result is ready by
+// the time the think delay ends. Call it under session.mu; the search itself runs off the lock.
+func (m *Manager) submitBotSearch(session *LiveMatch, seat int, generation uint64, ctx botDecisionContext) {
+	gs := session.gameState
+	if m.searchPool == nil || !isCardPlayDecision(gs, seat) {
+		return
+	}
+	view := buildBotView(gs, seat, session.botMemory)
+	if !bot.SearchApplies(view, m.botSearch.FromTrick) {
+		return
+	}
+	deadline := time.Now().Add(m.botSearch.Deadline)
+	if !m.searchPool.submit(func() { runBotSearch(session, view, generation, ctx, deadline) }) {
+		slog.Debug("bot: search queue full; rules played", "roomID", session.roomID, "seat", seat, "trick", view.TrickNumber)
+	}
+}
+
+func isCardPlayDecision(gs *game.GameState, seat int) bool {
+	return gs.Phase == game.PhasePlaying && gs.ActivePlayerSeat == seat && gs.PendingBelotSeat == nil &&
+		!gs.AwaitingDeclaration && gs.SurrenderProposerSeat == nil
+}
+
+// runBotSearch searches without holding session.mu and stores the result only if the seat is still waiting on the
+// timer it was started for.
+func runBotSearch(session *LiveMatch, view bot.View, generation uint64, ctx botDecisionContext, deadline time.Time) {
+	result, ok := bot.SearchCard(view, deadline)
+	if !ok {
+		slog.Info("bot: search timed out; rules played", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
+		return
+	}
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	if session.closed || session.botActionGenerations[view.Seat] != generation {
+		return
+	}
+	session.botSearchResults[view.Seat] = &botSearchEntry{generation: generation, ctx: ctx, result: result}
+}
+
+// takeBotSearchResult clears the seat's stored search and returns it when it was made for this generation and context.
+// Call it under session.mu.
+func (s *LiveMatch) takeBotSearchResult(seat int, generation uint64, ctx botDecisionContext) *bot.SearchResult {
+	entry := s.botSearchResults[seat]
+	s.botSearchResults[seat] = nil
+	if entry == nil || entry.generation != generation || entry.ctx != ctx {
+		return nil
+	}
+	return &entry.result
 }
 
 // botDecisionContext identifies the decision point a think delay was armed for.
@@ -134,6 +191,7 @@ func (m *Manager) handleBotActionTimer(session *LiveMatch, seat int, generation 
 		}
 		session.botActionGenerations[seat]++
 		session.botActionTimers[seat] = nil
+		searched := session.takeBotSearchResult(seat, generation, armedCtx)
 
 		still := false
 		for _, s := range botDecisionSeats(gs) {
@@ -154,7 +212,7 @@ func (m *Manager) handleBotActionTimer(session *LiveMatch, seat int, generation 
 		if gs.Phase == game.PhaseHandComplete {
 			action = game.Action{Type: game.ActionContinue, PlayerSeat: seat}
 		} else {
-			action = bot.Decide(buildBotView(gs, seat, session.botMemory))
+			action = bot.DecideWith(buildBotView(gs, seat, session.botMemory), searched)
 		}
 		actionType = action.Type
 		return action, true

@@ -38,6 +38,10 @@ type Config struct {
 	S3SecretKey     string
 	S3PublicBucket  string
 	PublicAssetsURL string
+
+	BotSearchWorkers   int
+	BotSearchDeadline  time.Duration
+	BotSearchFromTrick int
 }
 
 // SMTPConfigured reports whether enough SMTP settings are present to send real
@@ -108,6 +112,10 @@ func Load() *Config {
 		S3SecretKey:     strings.TrimSpace(getEnv("BELJOT_S3_SECRET_KEY", "")),
 		S3PublicBucket:  strings.TrimSpace(getEnv("BELJOT_S3_PUBLIC_BUCKET", "")),
 		PublicAssetsURL: strings.TrimRight(strings.TrimSpace(getEnv("BELJOT_PUBLIC_ASSETS_URL", "")), "/"),
+
+		BotSearchWorkers:   getEnvInt("BELJOT_BOT_SEARCH_WORKERS", 0),
+		BotSearchDeadline:  getEnvDuration("BELJOT_BOT_SEARCH_DEADLINE", 500*time.Millisecond),
+		BotSearchFromTrick: getEnvInt("BELJOT_BOT_SEARCH_FROM_TRICK", 3),
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-in-production" {

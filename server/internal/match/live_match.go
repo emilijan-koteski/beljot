@@ -35,6 +35,7 @@ type LiveMatch struct {
 	botActionTimers          [4]*time.Timer
 	botActionGenerations     [4]uint64
 	botMemory                *bot.Memory
+	botSearchResults         [4]*botSearchEntry
 	dealGraceUntil           time.Time
 	mu                       sync.RWMutex
 }
@@ -140,6 +141,8 @@ type Manager struct {
 	userRemovedHooks []func(userID uint)
 	botDelayMin      time.Duration
 	botDelayMax      time.Duration
+	botSearch        BotSearchSettings
+	searchPool       *searchPool
 	dealGraceEnabled bool
 	mu               sync.RWMutex
 }
@@ -168,6 +171,23 @@ func humanUserIDs(playerIDs [4]uint) []uint {
 		}
 	}
 	return out
+}
+
+// SetBotSearch enables the bots' card search with the given settings and replaces any earlier pool. Call it before
+// serving. Unset workers and deadline take their defaults, and a FromTrick of zero or less turns the search off.
+func (m *Manager) SetBotSearch(s BotSearchSettings) {
+	defaults := DefaultBotSearchSettings()
+	if s.Workers <= 0 {
+		s.Workers = defaults.Workers
+	}
+	if s.Deadline <= 0 {
+		s.Deadline = defaults.Deadline
+	}
+	m.botSearch = s
+	m.searchPool = nil
+	if s.FromTrick > 0 {
+		m.searchPool = newSearchPool(s.Workers)
+	}
 }
 
 // SetRoomUpdater sets the interface for updating room status on match completion.

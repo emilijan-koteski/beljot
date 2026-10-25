@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestStripWhitespace(t *testing.T) {
@@ -144,4 +145,31 @@ func TestLoad_ProductionMissingAvatarVarExits(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConfigReadsBotSearchSettings(t *testing.T) {
+	t.Setenv("BELJOT_ENV", "development")
+
+	t.Run("set", func(t *testing.T) {
+		t.Setenv("BELJOT_BOT_SEARCH_WORKERS", "2")
+		t.Setenv("BELJOT_BOT_SEARCH_DEADLINE", "750ms")
+		t.Setenv("BELJOT_BOT_SEARCH_FROM_TRICK", "5")
+		cfg := Load()
+		if cfg.BotSearchWorkers != 2 || cfg.BotSearchDeadline != 750*time.Millisecond || cfg.BotSearchFromTrick != 5 {
+			t.Errorf("bot search = %d workers, %v deadline, from trick %d; want 2, 750ms, 5",
+				cfg.BotSearchWorkers, cfg.BotSearchDeadline, cfg.BotSearchFromTrick)
+		}
+	})
+
+	t.Run("unset", func(t *testing.T) {
+		for _, key := range []string{"BELJOT_BOT_SEARCH_WORKERS", "BELJOT_BOT_SEARCH_DEADLINE", "BELJOT_BOT_SEARCH_FROM_TRICK"} {
+			t.Setenv(key, "")
+			os.Unsetenv(key)
+		}
+		cfg := Load()
+		if cfg.BotSearchWorkers != 0 || cfg.BotSearchDeadline != 500*time.Millisecond || cfg.BotSearchFromTrick != 3 {
+			t.Errorf("bot search = %d workers, %v deadline, from trick %d; want the defaults 0, 500ms, 3",
+				cfg.BotSearchWorkers, cfg.BotSearchDeadline, cfg.BotSearchFromTrick)
+		}
+	})
 }

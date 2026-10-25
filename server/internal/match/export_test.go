@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/emilijan/beljot/server/internal/bot"
 	"github.com/emilijan/beljot/server/internal/game"
 	"github.com/emilijan/beljot/server/internal/ws"
 )
@@ -254,6 +255,93 @@ func (m *Manager) TriggerTimerExpiryForTest(roomID uint, expectedSeat int, fireA
 		m.handleTimerExpiry(lm, gen, expectedSeat)
 	})
 	lm.mu.Unlock()
+}
+
+// SetBotSearchForTest enables or disables the bot card search with the given settings.
+func (m *Manager) SetBotSearchForTest(s BotSearchSettings) {
+	m.SetBotSearch(s)
+}
+
+// BotSearchResultForTest returns a copy of the search result stored for the seat, or nil when there is none.
+func (m *Manager) BotSearchResultForTest(roomID uint, seat int) *bot.SearchResult {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return nil
+	}
+	lm.mu.RLock()
+	defer lm.mu.RUnlock()
+	entry := lm.botSearchResults[seat]
+	if entry == nil {
+		return nil
+	}
+	result := entry.result
+	return &result
+}
+
+// StoreBotSearchResultForTest stores a search result for the seat under the given generation and the seat's current
+// decision context, as the search job would.
+func (m *Manager) StoreBotSearchResultForTest(roomID uint, seat int, generation uint64, result bot.SearchResult) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+	lm.botSearchResults[seat] = &botSearchEntry{
+		generation: generation,
+		ctx:        botDecisionContextFor(lm.gameState, seat),
+		result:     result,
+	}
+}
+
+// BuildBotViewForTest returns the view the driver would hand the bot at seat right now.
+func (m *Manager) BuildBotViewForTest(roomID uint, seat int) bot.View {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return bot.View{}
+	}
+	lm.mu.RLock()
+	defer lm.mu.RUnlock()
+	return buildBotView(lm.gameState, seat, lm.botMemory)
+}
+
+// CancelBotTimersForTest stops every armed bot think delay of the room and invalidates its generation, so a test
+// that injected a state decides when the driver arms the next one.
+func (m *Manager) CancelBotTimersForTest(roomID uint) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.mu.Lock()
+	lm.cancelAllBotActionTimers()
+	lm.mu.Unlock()
+}
+
+// RecordBotPlaysForTest adds the cards to the bot memory as already played this hand, so a state injected mid-hand
+// has the history its hands imply.
+func (m *Manager) RecordBotPlaysForTest(roomID uint, cards []game.Card) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+	if lm.botMemory == nil {
+		return
+	}
+	for _, c := range cards {
+		lm.botMemory.ObservePlay(0, c, nil, lm.gameState.TrumpSuit)
+	}
 }
 
 var errNoSession = errors.New("match: no live session for room")
