@@ -173,25 +173,30 @@ func (m *Manager) handleBotActionTimer(session *LiveMatch, seat int, generation 
 // never sees other players' hands. Call under session.mu.
 func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	v := bot.View{
-		Seat:                seat,
-		Hand:                gs.Players[seat].Hand,
-		Phase:               gs.Phase,
-		BiddingRound:        gs.BiddingRound,
-		TrumpCandidate:      gs.TrumpCandidate,
-		TrumpSuit:           gs.TrumpSuit,
-		TrumpCallerSeat:     gs.TrumpCallerSeat,
-		HasTrumpCandidate:   gs.Rules.HasTrumpCandidate,
-		DealerSeat:          gs.DealerSeat,
-		CurrentTrick:        gs.CurrentTrick,
-		LeadSuit:            gs.LeadSuit,
-		ActivePlayerSeat:    gs.ActivePlayerSeat,
-		Clockwise:           gs.Rules.Clockwise,
-		AwaitingDeclaration: gs.AwaitingDeclaration && gs.ActivePlayerSeat == seat,
-		HasDeclarations:     gs.Phase == game.PhaseDeclaring && game.HasDeclarableCombinations(gs, seat),
-		PendingBelot:        gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,
-		TeamScores:          gs.TeamScores,
-		HandPoints:          gs.HandPoints,
-		TricksWon:           gs.TricksWon,
+		Seat:                 seat,
+		Hand:                 gs.Players[seat].Hand,
+		Phase:                gs.Phase,
+		BiddingRound:         gs.BiddingRound,
+		TrumpCandidate:       gs.TrumpCandidate,
+		TrumpSuit:            gs.TrumpSuit,
+		TrumpCallerSeat:      gs.TrumpCallerSeat,
+		HasTrumpCandidate:    gs.Rules.HasTrumpCandidate,
+		DealerSeat:           gs.DealerSeat,
+		CurrentTrick:         gs.CurrentTrick,
+		LeadSuit:             gs.LeadSuit,
+		ActivePlayerSeat:     gs.ActivePlayerSeat,
+		Clockwise:            gs.Rules.Clockwise,
+		AwaitingDeclaration:  gs.AwaitingDeclaration && gs.ActivePlayerSeat == seat,
+		HasDeclarations:      gs.Phase == game.PhaseDeclaring && game.HasDeclarableCombinations(gs, seat),
+		PendingBelot:         gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,
+		TeamScores:           gs.TeamScores,
+		HandPoints:           gs.HandPoints,
+		TricksWon:            gs.TricksWon,
+		DeclPoints:           declPointsOf(gs),
+		TrickNumber:          gs.TrickNumber,
+		MatchTarget:          game.MatchTarget(gs.MatchMode),
+		StopAtTarget:         gs.Rules.StopAtTarget,
+		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -207,6 +212,14 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		v.DeclaredCards = mem.DeclaredCards()
 	}
 	return v
+}
+
+// declPointsOf is each team's declaration and Belote points banked this hand.
+func declPointsOf(gs *game.GameState) [2]int {
+	return [2]int{
+		gs.DeclarationPoints[game.TeamA] + gs.BelotPoints[game.TeamA],
+		gs.DeclarationPoints[game.TeamB] + gs.BelotPoints[game.TeamB],
+	}
 }
 
 // observeBotMemory updates the per-match bot memory (plays, voids, declared and located cards)
