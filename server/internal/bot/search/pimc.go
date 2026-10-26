@@ -66,6 +66,7 @@ func Choose(
 	votes := newTally(cards)
 	teamSign := 1 - 2*game.TeamForSeat(in.Seat)
 	rng := rand.New(rand.NewPCG(in.Seed(), samplerStream))
+	solver := NewSolver(pos.Trump, pos.Clockwise)
 	for votes.n < opts.Samples {
 		if time.Now().After(deadline) {
 			return Result{}, false
@@ -74,7 +75,8 @@ func Choose(
 		if !ok {
 			break
 		}
-		remainders := NewSolver(pos.Trump, pos.Clockwise).RootValues(hands, pos.Leader, pos.Trick, pos.Capot)
+		solver.Reset()
+		remainders := solver.RootValues(hands, pos.Leader, pos.Trick, pos.Capot)
 		if !votes.add(remainders, s, teamSign) {
 			return Result{}, false
 		}

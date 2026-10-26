@@ -197,6 +197,28 @@ func TestSolverRootValuesAreTheValueOfEachLegalCard(t *testing.T) {
 	}
 }
 
+func TestSolverResetMatchesAFreshSolver(t *testing.T) {
+	const endgamesPerDirection = 100
+	for _, direction := range directions {
+		t.Run(direction.name, func(t *testing.T) {
+			rng := rand.New(rand.NewPCG(19, 23))
+			trump := rng.IntN(4)
+			reused := search.NewSolver(trump, direction.clockwise)
+			for i := 0; i < endgamesPerDirection; i++ {
+				eg := randomEndgame(rng, reused, direction.clockwise)
+				fresh := search.NewSolver(trump, direction.clockwise)
+
+				want := fresh.RootValues(eg.hands, eg.leader, eg.trick, eg.capot)
+				reused.Reset()
+				got := reused.RootValues(eg.hands, eg.leader, eg.trick, eg.capot)
+
+				require.Equal(t, want, got, "endgame %d", i)
+				require.Equal(t, fresh.Nodes, reused.Nodes, "endgame %d", i)
+			}
+		})
+	}
+}
+
 func TestSolverValueLastTrickAndCapotBonus(t *testing.T) {
 	heart := func(rank game.Rank) int { return search.CardIdx(game.Card{Suit: game.SuitHearts, Rank: rank}) }
 	handOf := func(cards ...int) [4]uint32 {

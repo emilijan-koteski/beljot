@@ -41,13 +41,19 @@ type Solver struct {
 
 // NewSolver returns a solver for the trump suit index and the room's direction of play.
 func NewSolver(trump int, clockwise bool) *Solver {
-	s := &Solver{trump: trump, memo: make(map[memoKey]memoEntry, 1<<14)}
+	s := &Solver{trump: trump, memo: make(map[memoKey]memoEntry)}
 	for leader := range s.seatAt {
 		for k := range s.seatAt[leader] {
 			s.seatAt[leader][k] = game.StepSeat(leader, k, clockwise)
 		}
 	}
 	return s
+}
+
+// Reset forgets every memoised position so the solver can take the next deal as if it were new.
+func (s *Solver) Reset() {
+	clear(s.memo)
+	s.Nodes = 0
 }
 
 func (s *Solver) strength(card int) int {
