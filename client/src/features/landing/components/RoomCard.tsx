@@ -2,6 +2,7 @@ import { Lock } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { Avatar } from "@/shared/components/ui/avatar";
+import { buttonVariants } from "@/shared/components/ui/button";
 
 type Seat = [initial: string | null, name: string, team: "a" | "b"];
 
@@ -131,7 +132,7 @@ export function RoomCard({
           type="button"
           tabIndex={-1}
           aria-hidden="true"
-          className="bg-accent text-accent-ink ml-auto rounded-[10px] px-3.5 py-2 text-[13px] font-semibold"
+          className={buttonVariants({ size: "sm", className: "ml-auto" })}
         >
           {joinLabel} →
         </button>

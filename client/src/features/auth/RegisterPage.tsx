@@ -1,4 +1,3 @@
-import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router";
@@ -9,6 +8,7 @@ import { GoogleSignInButton } from "@/features/auth/components/GoogleSignInButto
 import { LinkAccountDialog } from "@/features/auth/components/LinkAccountDialog";
 import { useGoogleSso } from "@/features/auth/useGoogleSso";
 import { FetchError } from "@/shared/api/axiosClient";
+import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { useRegisterMutation } from "@/shared/hooks/mutations/useAuth";
@@ -208,16 +208,11 @@ export function RegisterPage() {
               aria-invalid={!!errors.password}
               data-testid="password-input"
             />
-            <button
-              type="button"
-              tabIndex={-1}
-              className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
-              onClick={() => setShowPassword(!showPassword)}
-              data-testid="password-toggle"
-              aria-label={showPassword ? t("common.hidePassword") : t("common.showPassword")}
-            >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
+            <PasswordToggle
+              shown={showPassword}
+              onToggle={() => setShowPassword(!showPassword)}
+              testId="password-toggle"
+            />
           </div>
         </Field>
 

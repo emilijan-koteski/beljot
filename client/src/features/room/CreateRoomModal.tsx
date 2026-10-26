@@ -4,8 +4,6 @@ import {
   ChevronDown,
   Clock,
   Coins,
-  Eye,
-  EyeOff,
   Flag,
   KeyRound,
   Lock,
@@ -26,6 +24,7 @@ import { useNavigate } from "react-router";
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
+import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
 import { Chips } from "@/shared/components/ui/chips";
@@ -662,20 +661,11 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                             data-testid="room-password-input"
                             className="h-11 pr-10"
                           />
-                          <button
-                            type="button"
-                            tabIndex={-1}
-                            className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
-                            onClick={() => setShowPassword(!showPassword)}
-                            data-testid="room-password-toggle"
-                            aria-label={showPassword ? "Hide password" : "Show password"}
-                          >
-                            {showPassword ? (
-                              <EyeOff className="size-4" />
-                            ) : (
-                              <Eye className="size-4" />
-                            )}
-                          </button>
+                          <PasswordToggle
+                            shown={showPassword}
+                            onToggle={() => setShowPassword(!showPassword)}
+                            testId="room-password-toggle"
+                          />
                         </div>
                       </Field>
                     )}

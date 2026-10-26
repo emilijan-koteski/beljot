@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { useRules } from "@/features/rules/RulesContext";
+import { Button } from "@/shared/components/ui/button";
 import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -44,20 +45,10 @@ export function RulesFooter() {
         </span>
         <span style={{ fontSize: 13.5, color: "var(--ink-dim)" }}>{ui.footerBody}</span>
       </div>
-      <button
-        type="button"
-        onClick={handlePlay}
-        data-testid="rules-play-cta"
-        className="inline-flex cursor-pointer items-center gap-2 rounded-[10px] border border-transparent px-4.5 py-2.75 text-sm font-semibold transition-transform active:scale-[0.98]"
-        style={{
-          background: "var(--accent)",
-          color: "var(--accent-ink)",
-          boxShadow: "0 8px 22px -10px rgba(25,101,54,0.55)",
-        }}
-      >
+      <Button size="cta" onClick={handlePlay} data-testid="rules-play-cta">
         {ui.footerCta}
-        <ArrowRight className="size-4" strokeWidth={2.2} />
-      </button>
+        <ArrowRight data-icon="inline-end" strokeWidth={2.2} />
+      </Button>
     </footer>
   );
 }
