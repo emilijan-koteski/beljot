@@ -66,9 +66,7 @@
 
   /* Teams — viewer-relative (Us = gold, Them = silver) */
   --color-team-a: var(--team-a);
-  --color-team-a-fill: var(--team-a-fill);
   --color-team-b: var(--team-b);
-  --color-team-b-fill: var(--team-b-fill);
 
   /* Status */
   --color-warning: var(--warning);
@@ -84,7 +82,8 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
+:root,
+.parchment-inset {
   /* ── Surfaces ─────────────────────────────────────────────────────── */
   --bg: #f5f2e8;
   --surface: #fbf9f2;
@@ -98,7 +97,6 @@
   --ink-dim: #466354;
   --ink-mute: #64726b;
   --ink-off: #b1b8b3;
-  --ink-light: #f5f2e8;
 
   /* ── Accent (felt-green action) ───────────────────────────────────── */
   --accent: #196536;
@@ -108,9 +106,14 @@
   /* Soft coloured drop-glow under primary CTAs (re-rooted to lime on felt). */
   --accent-glow: rgba(25, 101, 54, 0.7);
 
+  --brass-deep: #7c633e;
+}
+
+:root {
+  --ink-light: #f5f2e8;
+
   /* ── Brass (chrome accent) ────────────────────────────────────────── */
   --brass: #c9a876;
-  --brass-deep: #7c633e;
   --brass-ink: #2a1a08;
   --brass-soft: rgba(201, 168, 118, 0.18);
 
@@ -360,16 +363,32 @@
    • Urgent   → red flip on ≤1/4 of turn timer remaining
    • Brass    → every chrome edge (borders, filigree, primary buttons)
    ─────────────────────────────────────────────────────────────────────── */
-.game-table {
-  /* Surfaces */
+.game-table,
+.felt-surface {
   --bg: #0a1812;
   --surface: #112a1d;
   --surface-2: #16382a;
   --surface-3: #0e2618;
 
+  --ink: #f5f2e8;
+  --ink-dim: #c8d5cd;
+  --ink-mute: rgba(245, 242, 232, 0.65);
+  --ink-off: rgba(245, 242, 232, 0.35);
+
+  --accent: #00e5a0;
+  --accent-deep: #00b07c;
+  --accent-soft: rgba(0, 229, 160, 0.18);
+  --accent-ink: #0a1812;
+  --accent-glow: rgba(0, 229, 160, 0.7);
+
+  --border: rgba(201, 168, 118, 0.25);
+  --border-2: #c9a876;
+  --brass-deep: #9c7d4e;
+}
+
+.game-table {
   /* Felt — the playing surface */
   --felt-light: #1e7a42;
-  --felt-mid: #196536;
   --felt-dark: #0e4824;
   --felt-deep: #072a14;
   --felt-bg: #061f12;
@@ -379,33 +398,9 @@
   --wood-base: #5b3a1e;
   --wood-dark: #4a2d17;
 
-  /* Ink — flipped for dark surface */
-  --ink: #f5f2e8;
-  --ink-dim: #c8d5cd;
-  --ink-mute: rgba(245, 242, 232, 0.65);
-  --ink-off: rgba(245, 242, 232, 0.35);
-
-  /* Accent — lime turn signal on felt */
-  --accent: #00e5a0;
-  --accent-deep: #00b07c;
-  --accent-soft: rgba(0, 229, 160, 0.18);
-  --accent-ink: #0a1812;
-
-  --border: rgba(201, 168, 118, 0.25);
-  --border-2: #c9a876;
-  --brass-deep: #9c7d4e;
-
-  /* Team colors — viewer-relative (Us = gold, Them = silver) */
-  --team-gold: #e8c25a;
-  --team-gold-deep: #a07d1a;
-  --team-silver: #d8dde4;
-  --team-silver-deep: #8b919a;
-
   /* Turn / action signal */
   --turn-lime: #00e5a0;
-  --turn-lime-deep: #00a878;
   --turn-urgent: #ef4444;
-  --turn-urgent-deep: #b91c1c;
 
   /* Surface panels */
   --panel-dark: rgba(20, 45, 30, 0.85);
@@ -498,24 +493,6 @@
    from :root unchanged.
    ────────────────────────────────────────────────────────────────────── */
 .parchment-inset {
-  --bg: #f5f2e8;
-  --surface: #fbf9f2;
-  --surface-2: #ffffff;
-  --surface-3: #ebe6d6;
-  --border: #d9d1ba;
-  --border-2: #c9a876;
-
-  --ink: #0e3a24;
-  --ink-dim: #466354;
-  --ink-mute: #64726b;
-  --ink-off: #b1b8b3;
-
-  --accent: #196536;
-  --accent-deep: #0e4824;
-  --accent-soft: rgba(25, 101, 54, 0.1);
-  --accent-ink: #f5f2e8;
-  --accent-glow: rgba(25, 101, 54, 0.7);
-
   background: var(--bg);
   color: var(--ink);
 }
@@ -535,26 +512,6 @@
    live here so the gradient utility classes resolve only inside the scope.
    ────────────────────────────────────────────────────────────────────── */
 .felt-surface {
-  --bg: #0a1812;
-  --surface: #112a1d;
-  --surface-2: #16382a;
-  --surface-3: #0e2618;
-
-  --ink: #f5f2e8;
-  --ink-dim: #c8d5cd;
-  --ink-mute: rgba(245, 242, 232, 0.65);
-  --ink-off: rgba(245, 242, 232, 0.35);
-
-  --accent: #00e5a0;
-  --accent-deep: #00b07c;
-  --accent-soft: rgba(0, 229, 160, 0.18);
-  --accent-ink: #0a1812;
-  --accent-glow: rgba(0, 229, 160, 0.7);
-
-  --border: rgba(201, 168, 118, 0.25);
-  --border-2: #c9a876;
-  --brass-deep: #9c7d4e;
-
   /* Decorative felt scene gradient stops (hero / CTA radials) + wood rim
      for the felt-table vignette. */
   --felt-scene-top: #1a5a3a;
