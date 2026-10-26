@@ -108,7 +108,7 @@ export function Checkbox({ checked, onChange, invalid, testId, children }: Check
             checked
               ? "bg-accent border-accent text-accent-ink"
               : invalid
-                ? "bg-surface-elevated border-destructive"
+                ? "bg-surface-elevated border-danger"
                 : "bg-surface-elevated border-border-2",
           )}
         >

@@ -225,7 +225,7 @@ function InviteList({
   }
   if (isError) {
     return (
-      <p className="text-destructive px-1 py-2 text-xs" data-testid={`${stateTestId}-error`}>
+      <p className="text-danger px-1 py-2 text-xs" data-testid={`${stateTestId}-error`}>
         {errorText}
       </p>
     );
@@ -258,9 +258,7 @@ function InviteList({
               {(rowError !== undefined || row.available !== true) && (
                 <span
                   className={
-                    rowError !== undefined
-                      ? "text-destructive text-[11px]"
-                      : "text-ink-mute text-[11px]"
+                    rowError !== undefined ? "text-danger text-[11px]" : "text-ink-mute text-[11px]"
                   }
                   data-testid={`${rowTestId}-reason-${row.userId}`}
                 >

@@ -154,7 +154,7 @@ export function RoomPrivacyDialog({ open, room, onClose }: RoomPrivacyDialogProp
           )}
 
           {errorKey !== null && (
-            <p role="alert" data-testid="room-privacy-error" className="text-destructive text-sm">
+            <p role="alert" data-testid="room-privacy-error" className="text-danger text-sm">
               {t(errorKey)}
             </p>
           )}

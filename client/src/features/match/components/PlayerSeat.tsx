@@ -191,9 +191,9 @@ export function PlayerSeat({
             border: "1px dashed rgba(255,255,255,0.18)",
           }}
         >
-          <span className="text-text-secondary text-xs font-body">?</span>
+          <span className="text-ink-dim text-xs font-body">?</span>
         </div>
-        <span className="text-text-secondary text-sm font-body">{t("match.seat.waiting")}</span>
+        <span className="text-ink-dim text-sm font-body">{t("match.seat.waiting")}</span>
       </div>
     );
   }

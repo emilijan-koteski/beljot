@@ -35,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex min-h-screen items-center justify-center bg-background">
           <div className="text-center">
-            <h1 className="mb-4 font-display text-2xl text-text-primary">Something went wrong</h1>
+            <h1 className="mb-4 font-display text-2xl text-ink">Something went wrong</h1>
             <button
               className="rounded bg-accent px-4 py-2 text-background"
               onClick={() => window.location.reload()}

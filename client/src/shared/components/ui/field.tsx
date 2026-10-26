@@ -43,7 +43,7 @@ export function Field({
             htmlFor={htmlFor}
             className={cn(
               "font-mono text-[11px] font-semibold tracking-[1.8px] uppercase transition-colors",
-              hasError ? "text-destructive" : "text-brass-deep",
+              hasError ? "text-danger" : "text-brass-deep",
             )}
           >
             {label}
@@ -61,7 +61,7 @@ export function Field({
       </div>
       {children}
       {error && (
-        <p className="text-destructive text-xs leading-[1.4] font-medium" data-testid={errorTestId}>
+        <p className="text-danger text-xs leading-[1.4] font-medium" data-testid={errorTestId}>
           {error}
         </p>
       )}

@@ -257,7 +257,7 @@ export function SeatTile({
             aria-label={t("room.removeBotIconLabel", { name: displayName })}
             title={t("room.removeBotIconLabel", { name: displayName })}
             data-testid={`remove-bot-${seatIndex}`}
-            className="bg-surface-elevated text-destructive border-destructive/30 hover:border-destructive/60 inline-flex size-6.5 items-center justify-center rounded-md border disabled:opacity-40"
+            className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 inline-flex size-6.5 items-center justify-center rounded-md border disabled:opacity-40"
           >
             <UserX className="size-3.25" />
           </button>
@@ -291,7 +291,7 @@ export function SeatTile({
               aria-label={t("room.kickIconLabel", { username: player.username })}
               title={t("room.kickIconLabel", { username: player.username })}
               data-testid={`kick-player-${seatIndex}`}
-              className="bg-surface-elevated text-destructive border-destructive/30 hover:border-destructive/60 inline-flex size-6.5 items-center justify-center rounded-md border disabled:opacity-40"
+              className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 inline-flex size-6.5 items-center justify-center rounded-md border disabled:opacity-40"
             >
               <UserX className="size-3.25" />
             </button>

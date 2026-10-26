@@ -7,10 +7,7 @@ export function PrivacyPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="w-full max-w-150 rounded-xl bg-surface p-8">
-        <h1
-          className="mb-3 font-display text-2xl font-bold text-text-primary"
-          data-testid="privacy-title"
-        >
+        <h1 className="mb-3 font-display text-2xl font-bold text-ink" data-testid="privacy-title">
           {t("legal.privacy.title")}
         </h1>
         <p
@@ -19,15 +16,15 @@ export function PrivacyPage() {
         >
           {t("legal.wipBadge")}
         </p>
-        <p className="mb-3 text-text-secondary" data-testid="privacy-wip-notice">
+        <p className="mb-3 text-ink-dim" data-testid="privacy-wip-notice">
           {t("legal.privacy.wipNotice")}
         </p>
-        <p className="mb-6 text-text-secondary">{t("legal.privacy.comingSoon")}</p>
+        <p className="mb-6 text-ink-dim">{t("legal.privacy.comingSoon")}</p>
 
         <div className="flex justify-end">
           <Link
             to="/"
-            className="text-sm text-primary underline-offset-2 hover:underline"
+            className="text-sm text-accent underline-offset-2 hover:underline"
             data-testid="privacy-back-link"
           >
             {t("legal.back")}

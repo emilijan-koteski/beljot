@@ -103,11 +103,7 @@ export function PasswordPromptDialog({
           </div>
 
           {showError && (
-            <p
-              role="alert"
-              data-testid="password-prompt-error"
-              className="text-destructive text-sm"
-            >
+            <p role="alert" data-testid="password-prompt-error" className="text-danger text-sm">
               {t(errorKey)}
             </p>
           )}

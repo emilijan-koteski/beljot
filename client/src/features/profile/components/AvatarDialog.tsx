@@ -222,7 +222,7 @@ export function AvatarDialog({ open, onClose, userId, username, avatarUrl }: Ava
 
           <div aria-live="polite" className="text-center" data-testid="avatar-dialog-live">
             {error && (
-              <p className="text-destructive text-xs font-medium" data-testid="avatar-dialog-error">
+              <p className="text-danger text-xs font-medium" data-testid="avatar-dialog-error">
                 {error}
               </p>
             )}

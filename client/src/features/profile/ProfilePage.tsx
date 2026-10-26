@@ -137,7 +137,7 @@ export function ProfilePage() {
           className="bg-surface border-border mb-5 rounded-lg border p-6"
           data-testid="profile-stats"
         >
-          <p className="text-destructive text-sm" data-testid="profile-stats-error">
+          <p className="text-danger text-sm" data-testid="profile-stats-error">
             {t("profile.stats.error")}
           </p>
         </section>

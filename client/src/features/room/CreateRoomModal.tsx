@@ -736,7 +736,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               <div
                 role="alert"
                 data-testid="create-room-form-error"
-                className="text-destructive border-border shrink-0 border-t px-8 py-2.5 text-sm font-medium"
+                className="text-danger border-border shrink-0 border-t px-8 py-2.5 text-sm font-medium"
               >
                 {formError}
               </div>

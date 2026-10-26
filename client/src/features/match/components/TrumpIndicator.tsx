@@ -25,10 +25,10 @@ function callerTeam(seat: number): TeamString {
 }
 
 const LEGACY_INK_CLASS: Record<Suit, string> = {
-  S: "text-text-primary",
+  S: "text-ink",
   H: "text-red-500",
   D: "text-red-500",
-  C: "text-text-primary",
+  C: "text-ink",
 };
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
@@ -145,7 +145,7 @@ export function TrumpIndicator({
           >
             {callerName && (
               <span
-                className="font-body text-text-primary max-w-32 truncate"
+                className="font-body text-ink max-w-32 truncate"
                 data-testid="trump-caller-name"
               >
                 {callerName}

@@ -42,7 +42,7 @@ describe("TrumpIndicator", () => {
     const indicator = screen.getByTestId("trump-indicator");
     expect(indicator).toBeInTheDocument();
     expect(indicator.textContent).toContain("\u2660");
-    expect(indicator.querySelector(".text-text-primary")?.textContent).toContain("\u2660");
+    expect(indicator.querySelector(".text-ink")?.textContent).toContain("\u2660");
   });
 
   it("renders hearts suit symbol in red", () => {
@@ -63,7 +63,7 @@ describe("TrumpIndicator", () => {
     render(<TrumpIndicator trumpSuit="C" />);
     const indicator = screen.getByTestId("trump-indicator");
     expect(indicator.textContent).toContain("\u2663");
-    expect(indicator.querySelector(".text-text-primary")?.textContent).toContain("\u2663");
+    expect(indicator.querySelector(".text-ink")?.textContent).toContain("\u2663");
   });
 
   it("has aria-live polite for screen reader updates", () => {

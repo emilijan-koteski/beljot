@@ -256,7 +256,7 @@ export function RegisterPage() {
             {t("auth.register.consent.suffix")}
           </Checkbox>
           {errors.consent && (
-            <p className="text-destructive mt-1.5 text-xs font-medium" data-testid="consent-error">
+            <p className="text-danger mt-1.5 text-xs font-medium" data-testid="consent-error">
               {errors.consent}
             </p>
           )}

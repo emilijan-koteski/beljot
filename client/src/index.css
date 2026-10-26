@@ -13,12 +13,6 @@
 
    Token names mirror the Lobby Style System handoff (--bg, --surface, --ink,
    --accent, --brass, --team-a, …) so design references resolve 1:1.
-
-   The `@theme inline` block republishes these as Tailwind utility-class
-   aliases so existing usages (bg-background, bg-surface, text-text-primary,
-   bg-primary, text-team-a…) resolve to the new parchment values without
-   code churn. As each non-auth page gets pixel-perfectly redesigned, the
-   alias names can be retired.
    ────────────────────────────────────────────────────────────────────── */
 
 @theme {
@@ -32,7 +26,6 @@
   --font-display: "Inter", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --font-heading: "Inter", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
   --font-suit: Georgia, "Times New Roman", "DejaVu Serif", serif;
 }
@@ -45,29 +38,19 @@
   --color-surface-sunken: var(--surface-3);
   --color-border: var(--border);
   --color-border-2: var(--border-2);
-  --color-input: var(--border);
   --color-ring: var(--accent);
 
   /* Text */
-  --color-foreground: var(--ink);
   --color-ink: var(--ink);
   --color-ink-dim: var(--ink-dim);
   --color-ink-mute: var(--ink-mute);
   --color-ink-off: var(--ink-off);
-  --color-text-primary: var(--ink);
-  --color-text-secondary: var(--ink-dim);
-  --color-text-disabled: var(--ink-off);
 
   /* Accent (felt-green action) */
   --color-accent: var(--accent);
   --color-accent-deep: var(--accent-deep);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
-  --color-accent-foreground: var(--accent-ink);
-
-  /* Primary = accent (for shadcn primitives that hardcode bg-primary) */
-  --color-primary: var(--accent);
-  --color-primary-foreground: var(--accent-ink);
 
   /* Brass (chrome edge) */
   --color-brass: var(--brass);
@@ -81,16 +64,6 @@
   --color-bot-soft: var(--bot-soft);
   --color-bot-edge: var(--bot-edge);
 
-  /* Shadcn surfaces */
-  --color-secondary: var(--surface-3);
-  --color-secondary-foreground: var(--ink);
-  --color-muted: var(--surface-3);
-  --color-muted-foreground: var(--ink-mute);
-  --color-card: var(--surface);
-  --color-card-foreground: var(--ink);
-  --color-popover: var(--surface-2);
-  --color-popover-foreground: var(--ink);
-
   /* Teams — viewer-relative (Us = gold, Them = silver) */
   --color-team-a: var(--team-a);
   --color-team-a-fill: var(--team-a-fill);
@@ -98,9 +71,7 @@
   --color-team-b-fill: var(--team-b-fill);
 
   /* Status */
-  --color-success: var(--success);
   --color-warning: var(--warning);
-  --color-destructive: var(--danger);
   --color-danger: var(--danger);
 
   /* Radius scale — base radius lives at :root so .game-table could rescale */
@@ -171,7 +142,6 @@
   --team-b-edge-soft: rgba(139, 145, 154, 0.38);
 
   /* ── Status ───────────────────────────────────────────────────────── */
-  --success: #196536;
   --warning: var(--brass-deep);
   --danger: #8b2a1f;
 
@@ -366,7 +336,7 @@
     @apply border-border outline-ring/70;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-ink;
   }
   html {
     @apply font-sans;
