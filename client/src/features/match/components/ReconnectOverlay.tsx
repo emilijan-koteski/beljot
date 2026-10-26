@@ -144,7 +144,7 @@ export function ReconnectOverlay({
             <div className="flex flex-col items-center text-center gap-3">
               <span
                 className="font-body text-[11px] uppercase tracking-[0.25em]"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.55 }}
+                style={{ color: "var(--ink-light)", opacity: 0.55 }}
               >
                 {t("match.matchResult.title")}
               </span>
@@ -166,7 +166,7 @@ export function ReconnectOverlay({
                 <ScoreColumn label={t("team.us")} value={usValue} gradient={TEAM_GOLD} />
                 <span
                   className="font-display text-3xl"
-                  style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.4 }}
+                  style={{ color: "var(--ink-light)", opacity: 0.4 }}
                   aria-hidden
                 >
                   ·
@@ -183,7 +183,7 @@ export function ReconnectOverlay({
               {showResultLine && (
                 <p
                   className="font-body text-sm"
-                  style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.8 }}
+                  style={{ color: "var(--ink-light)", opacity: 0.8 }}
                   data-testid="abandon-result-line"
                   data-result={viewerLost ? "loss" : "win"}
                 >
@@ -197,7 +197,7 @@ export function ReconnectOverlay({
 
               <p
                 className="font-body text-xs mt-1 animate-pulse"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+                style={{ color: "var(--ink-light)", opacity: 0.7 }}
               >
                 {t("match.disconnect.returningToLobby")}
               </p>
@@ -221,7 +221,7 @@ export function ReconnectOverlay({
             <div className="flex flex-col items-center text-center gap-3">
               <span
                 className="font-body text-[11px] uppercase tracking-[0.25em]"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.55 }}
+                style={{ color: "var(--ink-light)", opacity: 0.55 }}
               >
                 {t("match.matchResult.title")}
               </span>
@@ -234,16 +234,13 @@ export function ReconnectOverlay({
                 {t("match.disconnect.matchEnded", { defaultValue: "Match has ended" })}
               </h2>
 
-              <p
-                className="font-body text-sm"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
-              >
+              <p className="font-body text-sm" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
                 {t("match.disconnect.reconnectFailed")}
               </p>
 
               <p
                 className="font-body text-xs mt-1 animate-pulse"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+                style={{ color: "var(--ink-light)", opacity: 0.7 }}
               >
                 {t("match.disconnect.returningToLobby")}
               </p>
@@ -334,7 +331,7 @@ export function ReconnectOverlay({
                   style={{
                     fontSize: 36,
                     letterSpacing: 0.5,
-                    color: isUrgent ? RING_DANGER : "var(--ink-light, #f5f2e8)",
+                    color: isUrgent ? RING_DANGER : "var(--ink-light)",
                     transition: `color ${MOTION.RING_COLOR_FLIP}ms ease-out`,
                   }}
                   data-testid="reconnect-countdown"
@@ -346,14 +343,14 @@ export function ReconnectOverlay({
 
             <p
               className="font-body text-[11px] uppercase tracking-[0.18em]"
-              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.55 }}
+              style={{ color: "var(--ink-light)", opacity: 0.55 }}
             >
               {t("match.disconnect.countdownLabel")}
             </p>
 
             <p
               className="font-body text-center text-xs"
-              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.75, maxWidth: 340 }}
+              style={{ color: "var(--ink-light)", opacity: 0.75, maxWidth: 340 }}
               data-testid="reconnect-honor-note"
               data-viewer-dropped={viewerIsDisconnected ? "true" : "false"}
             >
@@ -416,7 +413,7 @@ function DisconnectedPlayerRow({
               width: "100%",
               height: "100%",
               background: "var(--avatar-inner, #1f2e23)",
-              color: "var(--ink-light, #f5f2e8)",
+              color: "var(--ink-light)",
               fontSize: AVATAR_DISC * 0.5,
             }}
           >
@@ -441,7 +438,7 @@ function DisconnectedPlayerRow({
         style={{
           fontSize: 16,
           letterSpacing: 0.2,
-          color: "var(--ink-light, #f5f2e8)",
+          color: "var(--ink-light)",
         }}
       >
         {name}
@@ -451,7 +448,7 @@ function DisconnectedPlayerRow({
         style={{
           fontSize: 14,
           letterSpacing: 0.4,
-          color: rowUrgent ? RING_DANGER : "var(--ink-light, #f5f2e8)",
+          color: rowUrgent ? RING_DANGER : "var(--ink-light)",
           opacity: rowUrgent ? 1 : 0.75,
           transition: `color ${MOTION.RING_COLOR_FLIP}ms ease-out, opacity ${MOTION.RING_COLOR_FLIP}ms ease-out`,
           minWidth: 40,

@@ -170,7 +170,7 @@ export function LoginPage() {
 
         {formError && (
           <div
-            className="text-destructive rounded-md border border-destructive/30 bg-destructive/6 px-3 py-2 text-xs font-medium"
+            className="text-danger rounded-md border border-danger/30 bg-danger/6 px-3 py-2 text-xs font-medium"
             data-testid="form-error"
           >
             {formError}

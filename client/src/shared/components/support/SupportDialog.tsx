@@ -70,7 +70,7 @@ export function SupportDialog({ open, onOpenChange }: SupportDialogProps) {
             onClick={() => setShowQr((v) => !v)}
             aria-expanded={showQr}
             data-testid="support-qr-toggle"
-            className="text-ink-mute hover:text-ink focus-visible:ring-accent/50 inline-flex cursor-pointer items-center gap-1 rounded text-[11.5px] transition-colors outline-none focus-visible:ring-2"
+            className="text-ink-mute hover:text-ink focus-visible:ring-ring/70 inline-flex cursor-pointer items-center gap-1 rounded text-[11.5px] transition-colors outline-none focus-visible:ring-3"
           >
             <ChevronRight
               className={cn("size-3.5 transition-transform", showQr && "rotate-90")}

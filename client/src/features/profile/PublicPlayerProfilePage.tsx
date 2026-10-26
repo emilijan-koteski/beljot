@@ -86,7 +86,7 @@ export function PublicPlayerProfilePage() {
           className="bg-surface border-border rounded-lg border p-10 text-center text-sm"
           data-testid="public-profile-error"
         >
-          <p className="text-destructive m-0">{t("publicProfile.error")}</p>
+          <p className="text-danger m-0">{t("publicProfile.error")}</p>
         </div>
       </div>
     );

@@ -103,7 +103,7 @@ export function LeaderboardPage() {
     );
   } else if (showError) {
     body = (
-      <p className="text-destructive text-sm" data-testid="leaderboard-error" role="status">
+      <p className="text-danger text-sm" data-testid="leaderboard-error" role="status">
         {t("season.leaderboard.error")}
       </p>
     );
@@ -166,7 +166,7 @@ export function LeaderboardPage() {
 
         {query.isError && (
           <div className="mt-2.5 flex items-center gap-3" data-testid="leaderboard-page-error">
-            <p className="text-destructive m-0 text-xs" role="status">
+            <p className="text-danger m-0 text-xs" role="status">
               {t("season.leaderboard.error")}
             </p>
             <button

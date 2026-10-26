@@ -161,7 +161,7 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
         </div>
         {error && (
           <p
-            className="text-destructive text-xs font-medium"
+            className="text-danger text-xs font-medium"
             aria-live="polite"
             data-testid="profile-username-error"
           >

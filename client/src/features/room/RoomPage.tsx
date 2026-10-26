@@ -938,7 +938,7 @@ export function RoomPage() {
                             {ownerCanKickRow && (
                               <button
                                 type="button"
-                                className="text-ink-mute hover:bg-surface-sunken hover:text-destructive rounded p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                                className="text-ink-mute hover:bg-surface-sunken hover:text-danger rounded p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label={t("room.kickIconLabel", {
                                   username: p.username,
                                 })}
@@ -1087,7 +1087,7 @@ export function RoomPage() {
               onClick={handleLeaveRoom}
               data-testid="leave-room"
               aria-label={t("room.leaveRoom")}
-              className="text-destructive hover:text-destructive size-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
+              className="text-danger hover:text-danger size-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
             >
               <DoorOpen className="size-5 sm:size-4" />
               <span className="hidden sm:inline">{t("room.leaveRoom")}</span>

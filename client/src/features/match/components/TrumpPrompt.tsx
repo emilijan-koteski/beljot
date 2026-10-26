@@ -96,7 +96,7 @@ function MustPickNote() {
         border: "1px dashed rgba(201,168,118,0.45)",
         borderRadius: 8,
         background: "linear-gradient(180deg, rgba(60,90,70,0.35), rgba(30,50,35,0.35))",
-        color: "var(--ink-light, #f5f2e8)",
+        color: "var(--ink-light)",
         fontFamily: "var(--font-body)",
         fontWeight: 600,
         letterSpacing: 0.4,
@@ -125,9 +125,7 @@ export function TrumpPrompt({
   const showRing = isActiveBidder && Boolean(turnExpiresAt) && (timerDurationSec ?? 0) > 0;
 
   if (!isActiveBidder) {
-    const nameColor = activePlayerTeam
-      ? teamColors(activePlayerTeam)[0]
-      : "var(--ink-light, #f5f2e8)";
+    const nameColor = activePlayerTeam ? teamColors(activePlayerTeam)[0] : "var(--ink-light)";
     const showSuitChips = biddingRound === 2 || trumpCandidate === null;
 
     return (
@@ -240,7 +238,7 @@ export function TrumpPrompt({
               <PlayingCard card={trumpCandidate} state="default" size="lg" withTransition={false} />
               <p
                 className="font-body text-[13px] leading-relaxed flex-1"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.8 }}
+                style={{ color: "var(--ink-light)", opacity: 0.8 }}
               >
                 {t("match.trumpPrompt.bodyRound1")}
               </p>
@@ -268,7 +266,7 @@ export function TrumpPrompt({
           <div className="flex items-center justify-between gap-3">
             <span
               className="font-body text-[11px]"
-              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.55 }}
+              style={{ color: "var(--ink-light)", opacity: 0.55 }}
             >
               {trumpCandidate !== null &&
                 t("match.trumpPrompt.roundLabel", {

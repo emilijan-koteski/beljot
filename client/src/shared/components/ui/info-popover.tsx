@@ -26,7 +26,7 @@ export function InfoPopover({ text, ariaLabel, testId, className }: InfoPopoverP
         delay={0}
         closeDelay={0}
         className={cn(
-          "border-border text-ink-mute hover:border-brass hover:text-brass-deep data-popup-open:border-brass data-popup-open:bg-brass-soft data-popup-open:text-brass-deep inline-flex size-4 items-center justify-center rounded-full border align-middle text-[10px] leading-none font-bold transition-colors",
+          "border-border text-ink-mute hover:border-brass hover:text-brass-deep data-popup-open:border-brass data-popup-open:bg-brass-soft data-popup-open:text-brass-deep inline-flex size-4 items-center justify-center rounded-full border align-middle text-[10px] leading-none font-bold transition-[color,background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
           className,
         )}
       >

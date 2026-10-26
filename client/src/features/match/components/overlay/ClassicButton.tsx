@@ -21,9 +21,9 @@ export const ClassicButton = forwardRef<HTMLButtonElement, ClassicButtonProps>(
     const baseStyle: React.CSSProperties = {
       border: isPrimary ? "1px solid rgba(201,168,118,0.85)" : "1px solid rgba(201,168,118,0.4)",
       background: isPrimary
-        ? "linear-gradient(180deg, var(--brass, #c9a876) 0%, var(--brass-deep, #9c7d4e) 100%)"
+        ? "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)"
         : "linear-gradient(180deg, rgba(60,90,70,0.6), rgba(30,50,35,0.6))",
-      color: isPrimary ? "var(--brass-ink, #2a1a08)" : "var(--ink-light, #f5f2e8)",
+      color: isPrimary ? "var(--brass-ink)" : "var(--ink-light)",
       fontFamily: "var(--font-body)",
       fontWeight: 600,
       letterSpacing: 0.4,

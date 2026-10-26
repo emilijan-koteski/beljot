@@ -70,7 +70,7 @@ function SettingRow({
         background: selected
           ? "linear-gradient(90deg, rgba(80,60,30,0.55), rgba(50,38,20,0.35))"
           : "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
-        color: "var(--ink-light, #f5f2e8)",
+        color: "var(--ink-light)",
         boxShadow: selected
           ? "inset 0 1px 0 rgba(201,168,118,0.22), 0 0 0 1px rgba(201,168,118,0.25)"
           : "inset 0 1px 0 rgba(201,168,118,0.10)",
@@ -137,7 +137,7 @@ function SettingSwitchRow({
         background: checked
           ? "linear-gradient(90deg, rgba(80,60,30,0.55), rgba(50,38,20,0.35))"
           : "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
-        color: "var(--ink-light, #f5f2e8)",
+        color: "var(--ink-light)",
         boxShadow: checked
           ? "inset 0 1px 0 rgba(201,168,118,0.22), 0 0 0 1px rgba(201,168,118,0.25)"
           : "inset 0 1px 0 rgba(201,168,118,0.10)",

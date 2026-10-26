@@ -100,7 +100,7 @@ export function DeclarationReveal({
           background: "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)",
           border: "1px solid rgba(201,168,118,0.55)",
           boxShadow: `0 12px 32px rgba(0,0,0,0.55), 0 0 0 2px ${glowColor}88, 0 0 24px ${glowColor}77, inset 0 1px 0 rgba(201,168,118,0.22)`,
-          color: "var(--ink-light, #f5f2e8)",
+          color: "var(--ink-light)",
           fontFamily: "var(--font-body)",
         }}
         data-team={winnerTeamString}
@@ -118,7 +118,7 @@ export function DeclarationReveal({
           <div
             className="text-[11px] uppercase mb-2"
             style={{
-              color: "var(--brass, #c9a876)",
+              color: "var(--brass)",
               fontFamily: "var(--font-body)",
               letterSpacing: 3,
               opacity: 0.85,
@@ -153,7 +153,7 @@ export function DeclarationReveal({
           {showTiebreaker && highestDeclarer && highestLabel && (
             <div
               className="text-[12.5px] mt-1.5"
-              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+              style={{ color: "var(--ink-light)", opacity: 0.7 }}
               data-testid="declaration-reveal-tiebreaker"
             >
               {t("match.declaration.tiebreaker", {
@@ -199,7 +199,7 @@ export function DeclarationReveal({
                   <span
                     className="font-semibold truncate"
                     style={{
-                      color: "var(--ink-light, #f5f2e8)",
+                      color: "var(--ink-light)",
                       fontFamily: "var(--font-body)",
                       fontSize: 15,
                     }}
@@ -209,7 +209,7 @@ export function DeclarationReveal({
                   </span>
                   <span
                     className="text-[12px]"
-                    style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+                    style={{ color: "var(--ink-light)", opacity: 0.7 }}
                     data-testid="declaration-reveal-declarer"
                     data-seat={decl.playerSeat}
                   >
@@ -244,7 +244,7 @@ export function DeclarationReveal({
             <span
               className="text-[10px] uppercase"
               style={{
-                color: "var(--brass, #c9a876)",
+                color: "var(--brass)",
                 fontFamily: "var(--font-body)",
                 letterSpacing: 1.8,
                 opacity: 0.85,
@@ -254,7 +254,7 @@ export function DeclarationReveal({
             </span>
             <span
               className="text-[12px] mt-0.5"
-              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.65 }}
+              style={{ color: "var(--ink-light)", opacity: 0.65 }}
             >
               {t("match.declaration.addedToHand")}
             </span>

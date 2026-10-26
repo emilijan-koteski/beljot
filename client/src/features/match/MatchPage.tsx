@@ -1092,14 +1092,14 @@ export function MatchPage() {
               width: 36,
               height: 36,
               border: "2px solid rgba(201,168,118,0.18)",
-              borderTopColor: "var(--brass, #c9a876)",
+              borderTopColor: "var(--brass)",
               animationDuration: "0.9s",
             }}
           />
           <span
             className="font-body text-base"
             style={{
-              color: "var(--ink-light, #f5f2e8)",
+              color: "var(--ink-light)",
               fontFamily: "var(--font-body)",
               letterSpacing: 0.3,
               opacity: 0.85,
@@ -1462,7 +1462,7 @@ export function MatchPage() {
               zIndex: Z.CHROME_TOP,
               background: "var(--panel-hud, rgba(18,32,22,0.85))",
               border: "1px solid rgba(201,168,118,0.4)",
-              color: "var(--ink-light, #f5f2e8)",
+              color: "var(--ink-light)",
               backdropFilter: "blur(6px)",
               WebkitBackdropFilter: "blur(6px)",
             }}
@@ -1854,7 +1854,7 @@ export function MatchPage() {
 
       {errorToast && (
         <div
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-destructive/90 text-text-primary font-body text-sm px-4 py-2 rounded-lg flex items-center gap-3"
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-danger/90 text-ink font-body text-sm px-4 py-2 rounded-lg flex items-center gap-3"
           style={{ zIndex: Z.TOAST }}
           role="alert"
           data-testid="error-toast"
@@ -1865,7 +1865,7 @@ export function MatchPage() {
             onClick={dismissErrorToast}
             aria-label={t("common.close")}
             data-testid="error-toast-close"
-            className="text-text-primary/80 hover:text-text-primary text-lg leading-none px-1 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-background rounded"
+            className="text-ink/80 hover:text-ink text-lg leading-none px-1 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-background rounded"
           >
             ×
           </button>

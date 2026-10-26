@@ -44,11 +44,12 @@ export function LandingHero() {
                   className="bg-accent size-2 rounded-full"
                   style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }}
                 />
-                <b className="text-ink tabular">{stats.online}</b> {t("landing.hero.playing")}
+                <b className="text-ink tabular-nums">{stats.online}</b> {t("landing.hero.playing")}
               </span>
               <span className="text-brass/40">·</span>
               <span>
-                <b className="text-ink tabular">{stats.openRooms}</b> {t("landing.hero.openTables")}
+                <b className="text-ink tabular-nums">{stats.openRooms}</b>{" "}
+                {t("landing.hero.openTables")}
               </span>
             </div>
           )}

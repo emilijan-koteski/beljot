@@ -650,7 +650,7 @@ export function MatchStatsCard({
               e.stopPropagation();
               onToggle();
             }}
-            className="text-ink-mute hover:text-ink focus-visible:ring-ring/50 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none"
+            className="text-ink-mute hover:text-ink focus-visible:ring-ring/70 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none"
             aria-expanded={isOpen}
             aria-controls={detailId}
             aria-label={

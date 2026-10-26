@@ -23,7 +23,7 @@ export function BrandLockup({
       to={to}
       aria-label="Beljot"
       className={cn(
-        "flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:ring-accent/50 focus-visible:outline-none focus-visible:ring-2",
+        "flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:ring-ring/70 focus-visible:outline-none focus-visible:ring-3",
         className,
       )}
     >

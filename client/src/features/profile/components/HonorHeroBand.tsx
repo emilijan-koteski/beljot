@@ -83,7 +83,7 @@ export function HonorHeroBand({
         <button
           type="button"
           onClick={() => setExplainerOpen(true)}
-          className="text-brass-deep hover:text-ink flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="text-brass-deep hover:text-ink flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:ring-3 focus-visible:ring-ring/70 focus-visible:outline-none"
           aria-label={t("profile.honor.explainer.open")}
           title={t("profile.honor.explainer.open")}
           data-testid="profile-honor-explainer-button"

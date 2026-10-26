@@ -95,7 +95,7 @@ export function LeaderboardRow({
             : t("friends.viewProfileAria", { username })
         }
         title={username}
-        className="text-ink focus-visible:ring-ring/50 min-w-0 flex-1 truncate rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
+        className="text-ink focus-visible:ring-ring/70 min-w-0 flex-1 truncate rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
       >
         {username}
       </Link>

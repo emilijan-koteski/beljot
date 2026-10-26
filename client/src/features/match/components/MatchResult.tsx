@@ -92,7 +92,7 @@ export function MatchResult({
           <div className="flex flex-col items-center text-center gap-3">
             <span
               className="font-body text-[11px] uppercase tracking-[0.25em]"
-              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.55 }}
+              style={{ color: "var(--ink-light)", opacity: 0.55 }}
               data-testid="match-result-title"
             >
               {t("match.matchResult.title")}
@@ -110,7 +110,7 @@ export function MatchResult({
             {data.outcomeReason === "surrender" && (
               <p
                 className="font-body text-sm"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+                style={{ color: "var(--ink-light)", opacity: 0.7 }}
                 data-testid="match-result-surrender-note"
               >
                 {t("match.matchResult.surrenderNote", {
@@ -122,7 +122,7 @@ export function MatchResult({
             {data.outcomeReason === "target_reached" && (
               <p
                 className="font-body text-sm"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+                style={{ color: "var(--ink-light)", opacity: 0.7 }}
                 data-testid="match-result-target-reached-note"
               >
                 {t("match.matchResult.targetReachedNote")}
@@ -140,7 +140,7 @@ export function MatchResult({
                   />
                   <span
                     className="font-display text-3xl"
-                    style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.4 }}
+                    style={{ color: "var(--ink-light)", opacity: 0.4 }}
                   >
                     ·
                   </span>
@@ -161,7 +161,7 @@ export function MatchResult({
                   />
                   <span
                     className="font-display text-3xl"
-                    style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.4 }}
+                    style={{ color: "var(--ink-light)", opacity: 0.4 }}
                   >
                     ·
                   </span>
@@ -229,7 +229,7 @@ export function MatchResult({
 
             <p
               className="font-body text-sm"
-              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+              style={{ color: "var(--ink-light)", opacity: 0.7 }}
               data-testid="match-result-duration"
             >
               {t("match.matchResult.duration")}: {formattedDuration}
@@ -241,7 +241,7 @@ export function MatchResult({
                   type="button"
                   onClick={() => setStatsOpen((v) => !v)}
                   className="font-body focus-visible:ring-brass/60 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-[13px] opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
-                  style={{ color: "var(--ink-light, #f5f2e8)" }}
+                  style={{ color: "var(--ink-light)" }}
                   aria-expanded={statsOpen}
                   aria-controls="match-result-stats-panel"
                   data-testid="match-result-stats-toggle"

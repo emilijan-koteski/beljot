@@ -33,7 +33,7 @@ export function SupportNote({ variant, className }: SupportNoteProps) {
                 type="button"
                 onClick={() => setOpen(true)}
                 data-testid="support-note-link"
-                className="text-ink-dim hover:text-accent focus-visible:ring-accent/50 cursor-pointer rounded underline decoration-dotted underline-offset-2 transition-colors outline-none focus-visible:ring-2"
+                className="text-ink-dim hover:text-accent focus-visible:ring-ring/70 cursor-pointer rounded underline decoration-dotted underline-offset-2 transition-colors outline-none focus-visible:ring-3"
               />
             ),
           }}

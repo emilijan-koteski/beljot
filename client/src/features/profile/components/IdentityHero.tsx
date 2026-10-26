@@ -151,7 +151,7 @@ export function IdentityHero({
                 onClick={() => setAvatarDialogOpen(true)}
                 aria-label={t("profile.avatar.edit")}
                 title={t("profile.avatar.edit")}
-                className="bg-surface border-border text-ink hover:bg-surface-sunken focus-visible:ring-ring/50 absolute -right-1 -bottom-1 inline-flex size-8 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-colors focus-visible:ring-3 focus-visible:outline-none"
+                className="bg-surface border-border text-ink hover:bg-surface-sunken focus-visible:ring-ring/70 absolute -right-1 -bottom-1 inline-flex size-8 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-colors focus-visible:ring-3 focus-visible:outline-none"
                 data-testid="profile-avatar-edit"
               >
                 <Camera className="size-4" aria-hidden="true" />

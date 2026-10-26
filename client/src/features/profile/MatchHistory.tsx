@@ -92,7 +92,7 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
     );
   } else if (query.isError) {
     body = (
-      <p className="text-destructive text-sm" data-testid="match-history-error">
+      <p className="text-danger text-sm" data-testid="match-history-error">
         {t("profile.matchHistory.error")}
       </p>
     );

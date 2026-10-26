@@ -122,15 +122,12 @@ export function DeclarationPrompt({
                       }}
                     >
                       <div className="flex items-center justify-between">
-                        <span
-                          className="font-body text-sm"
-                          style={{ color: "var(--ink-light, #f5f2e8)" }}
-                        >
+                        <span className="font-body text-sm" style={{ color: "var(--ink-light)" }}>
                           {declarationLabel(decl, t)}
                         </span>
                         <span
                           className="font-display text-base font-semibold tabular-nums"
-                          style={{ color: "var(--brass, #c9a876)" }}
+                          style={{ color: "var(--brass)" }}
                         >
                           {decl.value} {t("match.declaration.pts")}
                         </span>
@@ -157,13 +154,13 @@ export function DeclarationPrompt({
                 >
                   <span
                     className="font-body text-sm"
-                    style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+                    style={{ color: "var(--ink-light)", opacity: 0.7 }}
                   >
                     {t("match.declaration.total")}
                   </span>
                   <span
                     className="font-display text-lg font-bold tabular-nums"
-                    style={{ color: "var(--brass, #c9a876)" }}
+                    style={{ color: "var(--brass)" }}
                   >
                     {total} {t("match.declaration.pts")}
                   </span>
@@ -172,7 +169,7 @@ export function DeclarationPrompt({
             ) : (
               <p
                 className="font-body text-sm leading-snug mb-4 py-6 text-center"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.75 }}
+                style={{ color: "var(--ink-light)", opacity: 0.75 }}
                 data-testid="declaration-prompt-none"
               >
                 {t("match.declaration.noneBody")}

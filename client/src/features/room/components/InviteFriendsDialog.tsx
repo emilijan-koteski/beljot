@@ -151,7 +151,7 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
           />
         ) : (
           <div className="flex flex-col gap-2">
-            <div className="bg-surface-elevated border-border flex items-center gap-2 rounded-[10px] border px-2.5 py-1.5">
+            <div className="bg-surface-elevated border-border flex items-center gap-2 rounded-[10px] border px-2.5 py-1.5 transition-[border-color,box-shadow] has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/70">
               <Search className="text-ink-mute size-3.5 shrink-0" aria-hidden="true" />
               <input
                 value={search}
@@ -225,7 +225,7 @@ function InviteList({
   }
   if (isError) {
     return (
-      <p className="text-destructive px-1 py-2 text-xs" data-testid={`${stateTestId}-error`}>
+      <p className="text-danger px-1 py-2 text-xs" data-testid={`${stateTestId}-error`}>
         {errorText}
       </p>
     );
@@ -258,9 +258,7 @@ function InviteList({
               {(rowError !== undefined || row.available !== true) && (
                 <span
                   className={
-                    rowError !== undefined
-                      ? "text-destructive text-[11px]"
-                      : "text-ink-mute text-[11px]"
+                    rowError !== undefined ? "text-danger text-[11px]" : "text-ink-mute text-[11px]"
                   }
                   data-testid={`${rowTestId}-reason-${row.userId}`}
                 >

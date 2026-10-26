@@ -13,12 +13,6 @@
 
    Token names mirror the Lobby Style System handoff (--bg, --surface, --ink,
    --accent, --brass, --team-a, …) so design references resolve 1:1.
-
-   The `@theme inline` block republishes these as Tailwind utility-class
-   aliases so existing usages (bg-background, bg-surface, text-text-primary,
-   bg-primary, text-team-a…) resolve to the new parchment values without
-   code churn. As each non-auth page gets pixel-perfectly redesigned, the
-   alias names can be retired.
    ────────────────────────────────────────────────────────────────────── */
 
 @theme {
@@ -32,7 +26,6 @@
   --font-display: "Inter", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --font-heading: "Inter", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
   --font-suit: Georgia, "Times New Roman", "DejaVu Serif", serif;
 }
@@ -45,29 +38,19 @@
   --color-surface-sunken: var(--surface-3);
   --color-border: var(--border);
   --color-border-2: var(--border-2);
-  --color-input: var(--border);
   --color-ring: var(--accent);
 
   /* Text */
-  --color-foreground: var(--ink);
   --color-ink: var(--ink);
   --color-ink-dim: var(--ink-dim);
   --color-ink-mute: var(--ink-mute);
   --color-ink-off: var(--ink-off);
-  --color-text-primary: var(--ink);
-  --color-text-secondary: var(--ink-dim);
-  --color-text-disabled: var(--ink-off);
 
   /* Accent (felt-green action) */
   --color-accent: var(--accent);
   --color-accent-deep: var(--accent-deep);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
-  --color-accent-foreground: var(--accent-ink);
-
-  /* Primary = accent (for shadcn primitives that hardcode bg-primary) */
-  --color-primary: var(--accent);
-  --color-primary-foreground: var(--accent-ink);
 
   /* Brass (chrome edge) */
   --color-brass: var(--brass);
@@ -81,26 +64,12 @@
   --color-bot-soft: var(--bot-soft);
   --color-bot-edge: var(--bot-edge);
 
-  /* Shadcn surfaces */
-  --color-secondary: var(--surface-3);
-  --color-secondary-foreground: var(--ink);
-  --color-muted: var(--surface-3);
-  --color-muted-foreground: var(--ink-mute);
-  --color-card: var(--surface);
-  --color-card-foreground: var(--ink);
-  --color-popover: var(--surface-2);
-  --color-popover-foreground: var(--ink);
-
   /* Teams — viewer-relative (Us = gold, Them = silver) */
   --color-team-a: var(--team-a);
-  --color-team-a-fill: var(--team-a-fill);
   --color-team-b: var(--team-b);
-  --color-team-b-fill: var(--team-b-fill);
 
   /* Status */
-  --color-success: var(--success);
   --color-warning: var(--warning);
-  --color-destructive: var(--danger);
   --color-danger: var(--danger);
 
   /* Radius scale — base radius lives at :root so .game-table could rescale */
@@ -113,7 +82,8 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
+:root,
+.parchment-inset {
   /* ── Surfaces ─────────────────────────────────────────────────────── */
   --bg: #f5f2e8;
   --surface: #fbf9f2;
@@ -125,7 +95,7 @@
   /* ── Ink (text) ───────────────────────────────────────────────────── */
   --ink: #0e3a24;
   --ink-dim: #466354;
-  --ink-mute: #7a8a82;
+  --ink-mute: #64726b;
   --ink-off: #b1b8b3;
 
   /* ── Accent (felt-green action) ───────────────────────────────────── */
@@ -136,9 +106,14 @@
   /* Soft coloured drop-glow under primary CTAs (re-rooted to lime on felt). */
   --accent-glow: rgba(25, 101, 54, 0.7);
 
+  --brass-deep: #7c633e;
+}
+
+:root {
+  --ink-light: #f5f2e8;
+
   /* ── Brass (chrome accent) ────────────────────────────────────────── */
   --brass: #c9a876;
-  --brass-deep: #9c7d4e;
   --brass-ink: #2a1a08;
   --brass-soft: rgba(201, 168, 118, 0.18);
 
@@ -171,8 +146,7 @@
   --team-b-edge-soft: rgba(139, 145, 154, 0.38);
 
   /* ── Status ───────────────────────────────────────────────────────── */
-  --success: #196536;
-  --warning: #9c7d4e;
+  --warning: var(--brass-deep);
   --danger: #8b2a1f;
 
   /* ── Honour tier ramp (h1 = worst … h5 = best) ─────────────────────────
@@ -363,29 +337,18 @@
   }
 
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/70;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-ink;
   }
   html {
     @apply font-sans;
   }
-}
 
-/* Display helpers — unlayered on purpose so callers can use them as
-   utility-like classes without thinking about layers. */
-.tabular {
-  font-variant-numeric: tabular-nums;
-}
-
-.font-display {
-  font-family: var(--font-display);
-  letter-spacing: -0.01em;
-}
-
-.font-mono {
-  font-family: var(--font-mono);
+  .font-display {
+    letter-spacing: -0.01em;
+  }
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -400,16 +363,32 @@
    • Urgent   → red flip on ≤1/4 of turn timer remaining
    • Brass    → every chrome edge (borders, filigree, primary buttons)
    ─────────────────────────────────────────────────────────────────────── */
-.game-table {
-  /* Surfaces */
+.game-table,
+.felt-surface {
   --bg: #0a1812;
   --surface: #112a1d;
   --surface-2: #16382a;
   --surface-3: #0e2618;
 
+  --ink: #f5f2e8;
+  --ink-dim: #c8d5cd;
+  --ink-mute: rgba(245, 242, 232, 0.65);
+  --ink-off: rgba(245, 242, 232, 0.35);
+
+  --accent: #00e5a0;
+  --accent-deep: #00b07c;
+  --accent-soft: rgba(0, 229, 160, 0.18);
+  --accent-ink: #0a1812;
+  --accent-glow: rgba(0, 229, 160, 0.7);
+
+  --border: rgba(201, 168, 118, 0.25);
+  --border-2: #c9a876;
+  --brass-deep: #9c7d4e;
+}
+
+.game-table {
   /* Felt — the playing surface */
   --felt-light: #1e7a42;
-  --felt-mid: #196536;
   --felt-dark: #0e4824;
   --felt-deep: #072a14;
   --felt-bg: #061f12;
@@ -419,32 +398,9 @@
   --wood-base: #5b3a1e;
   --wood-dark: #4a2d17;
 
-  /* Ink — flipped for dark surface */
-  --ink: #f5f2e8;
-  --ink-dim: #c8d5cd;
-  --ink-mute: rgba(245, 242, 232, 0.65);
-  --ink-off: rgba(245, 242, 232, 0.35);
-
-  /* Accent — lime turn signal on felt */
-  --accent: #00e5a0;
-  --accent-deep: #00b07c;
-  --accent-soft: rgba(0, 229, 160, 0.18);
-  --accent-ink: #0a1812;
-
-  --border: rgba(201, 168, 118, 0.25);
-  --border-2: #c9a876;
-
-  /* Team colors — viewer-relative (Us = gold, Them = silver) */
-  --team-gold: #e8c25a;
-  --team-gold-deep: #a07d1a;
-  --team-silver: #d8dde4;
-  --team-silver-deep: #8b919a;
-
   /* Turn / action signal */
   --turn-lime: #00e5a0;
-  --turn-lime-deep: #00a878;
   --turn-urgent: #ef4444;
-  --turn-urgent-deep: #b91c1c;
 
   /* Surface panels */
   --panel-dark: rgba(20, 45, 30, 0.85);
@@ -537,24 +493,6 @@
    from :root unchanged.
    ────────────────────────────────────────────────────────────────────── */
 .parchment-inset {
-  --bg: #f5f2e8;
-  --surface: #fbf9f2;
-  --surface-2: #ffffff;
-  --surface-3: #ebe6d6;
-  --border: #d9d1ba;
-  --border-2: #c9a876;
-
-  --ink: #0e3a24;
-  --ink-dim: #466354;
-  --ink-mute: #7a8a82;
-  --ink-off: #b1b8b3;
-
-  --accent: #196536;
-  --accent-deep: #0e4824;
-  --accent-soft: rgba(25, 101, 54, 0.1);
-  --accent-ink: #f5f2e8;
-  --accent-glow: rgba(25, 101, 54, 0.7);
-
   background: var(--bg);
   color: var(--ink);
 }
@@ -574,25 +512,6 @@
    live here so the gradient utility classes resolve only inside the scope.
    ────────────────────────────────────────────────────────────────────── */
 .felt-surface {
-  --bg: #0a1812;
-  --surface: #112a1d;
-  --surface-2: #16382a;
-  --surface-3: #0e2618;
-
-  --ink: #f5f2e8;
-  --ink-dim: #c8d5cd;
-  --ink-mute: rgba(245, 242, 232, 0.65);
-  --ink-off: rgba(245, 242, 232, 0.35);
-
-  --accent: #00e5a0;
-  --accent-deep: #00b07c;
-  --accent-soft: rgba(0, 229, 160, 0.18);
-  --accent-ink: #0a1812;
-  --accent-glow: rgba(0, 229, 160, 0.7);
-
-  --border: rgba(201, 168, 118, 0.25);
-  --border-2: #c9a876;
-
   /* Decorative felt scene gradient stops (hero / CTA radials) + wood rim
      for the felt-table vignette. */
   --felt-scene-top: #1a5a3a;

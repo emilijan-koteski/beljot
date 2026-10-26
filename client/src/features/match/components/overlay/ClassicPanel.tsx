@@ -42,7 +42,7 @@ export function ClassicPanel({
         background: PANEL_BG,
         border: "1px solid rgba(201,168,118,0.55)",
         boxShadow: `${glowShadow}${baseShadow}`,
-        color: "var(--ink-light, #f5f2e8)",
+        color: "var(--ink-light)",
         fontFamily: "var(--font-body)",
         ...style,
       }}
@@ -60,7 +60,7 @@ export function ClassicPanel({
               fontFamily: "var(--font-body)",
               fontWeight: 600,
               letterSpacing: 0.3,
-              color: "var(--ink-light, #f5f2e8)",
+              color: "var(--ink-light)",
             }}
           >
             {title}

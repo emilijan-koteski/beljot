@@ -111,7 +111,7 @@ export function LinkAccountDialog({
           </div>
 
           {showError && (
-            <p role="alert" data-testid="link-account-error" className="text-destructive text-sm">
+            <p role="alert" data-testid="link-account-error" className="text-danger text-sm">
               {t(errorKey)}
             </p>
           )}

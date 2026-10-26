@@ -25,15 +25,15 @@ function callerTeam(seat: number): TeamString {
 }
 
 const LEGACY_INK_CLASS: Record<Suit, string> = {
-  S: "text-text-primary",
-  H: "text-red-500",
-  D: "text-red-500",
-  C: "text-text-primary",
+  S: "text-ink",
+  H: "text-(--suit-red-up)",
+  D: "text-(--suit-red-up)",
+  C: "text-ink",
 };
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
-const INK = "var(--ink-light, #f5f2e8)";
-const BRASS = "var(--brass, #c9a876)";
+const INK = "var(--ink-light)";
+const BRASS = "var(--brass)";
 
 /**
  * Top-right trump chip with the suit orb, suit name, and caller with an Us/Them pill.
@@ -145,7 +145,7 @@ export function TrumpIndicator({
           >
             {callerName && (
               <span
-                className="font-body text-text-primary max-w-32 truncate"
+                className="font-body text-ink max-w-32 truncate"
                 data-testid="trump-caller-name"
               >
                 {callerName}

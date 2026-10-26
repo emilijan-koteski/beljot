@@ -87,21 +87,21 @@ export function PauseOverlay({
                   />
                   <span
                     className="font-display text-sm flex-1"
-                    style={{ color: "var(--ink-light, #f5f2e8)" }}
+                    style={{ color: "var(--ink-light)" }}
                   >
                     {playerDisplayName(t, player) ?? `Player ${player.seat + 1}`}
                   </span>
                   {isPaused ? (
                     <span
                       className="font-body text-[11px] font-semibold"
-                      style={{ color: "var(--brass, #c9a876)" }}
+                      style={{ color: "var(--brass)" }}
                     >
                       {t("match.pause.pausedNow", { defaultValue: "paused now" })}
                     </span>
                   ) : (
                     <span
                       className="font-body text-[11px]"
-                      style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.7 }}
+                      style={{ color: "var(--ink-light)", opacity: 0.7 }}
                     >
                       {usedPause
                         ? t("match.pause.pauseUsedRow", { defaultValue: "pause used" })
@@ -133,7 +133,7 @@ export function PauseOverlay({
             ) : (
               <p
                 className="font-body text-sm italic"
-                style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.65 }}
+                style={{ color: "var(--ink-light)", opacity: 0.65 }}
                 data-testid="pause-waiting"
               >
                 {t("match.pause.waitingToResume")}

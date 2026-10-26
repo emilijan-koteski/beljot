@@ -18,7 +18,7 @@ export const HUDButton = forwardRef<HTMLButtonElement, HUDButtonProps>(function 
     background: "var(--panel-hud, rgba(18,32,22,0.85))",
     border:
       variant === "danger" ? "1px solid rgba(255,120,120,0.3)" : "1px solid rgba(201,168,118,0.4)",
-    color: variant === "danger" ? "#ff7676" : "var(--ink-light, #f5f2e8)",
+    color: variant === "danger" ? "#ff7676" : "var(--ink-light)",
     backdropFilter: "blur(6px)",
     WebkitBackdropFilter: "blur(6px)",
     minWidth: 36,
