@@ -24,9 +24,7 @@ export function QuickPlayTile({ onClick, disabled }: Props) {
         <Zap className="size-5.5" strokeWidth={2} />
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="font-display text-base font-semibold">
-          {t("lobby.actions.quickPlay.title")}
-        </span>
+        <span className="text-base font-semibold">{t("lobby.actions.quickPlay.title")}</span>
         <span className="text-ink-dim text-xs">{t("lobby.actions.quickPlay.subtitle")}</span>
       </span>
       <span className="text-accent ml-auto inline-flex items-center gap-1.5 text-xs font-semibold">

@@ -118,22 +118,19 @@ export function TrumpIndicator({
           suit={trumpSuit}
           deck={deck}
           size={22}
-          className={`${LEGACY_INK_CLASS[trumpSuit]} font-display font-semibold leading-none`}
+          className={`${LEGACY_INK_CLASS[trumpSuit]} font-semibold leading-none`}
         />
       </div>
 
       <div className="flex flex-col min-w-0">
         <div className="flex items-baseline gap-1.5">
           <span
-            className="font-body text-[10.5px] uppercase tracking-wider"
+            className="text-2xs uppercase tracking-wider"
             style={{ color: BRASS, opacity: 0.85 }}
           >
             {t("match.trumpIndicator.trump")}
           </span>
-          <span
-            className="font-display font-semibold capitalize"
-            style={{ color: INK, fontSize: 14 }}
-          >
+          <span className="font-semibold capitalize" style={{ color: INK, fontSize: 14 }}>
             {suitName}
           </span>
         </div>
@@ -141,18 +138,15 @@ export function TrumpIndicator({
         {team && teamName && (
           <div
             className="flex items-center gap-2 mt-0.5"
-            style={{ color: INK, opacity: 0.85, fontSize: 11 }}
+            style={{ color: INK, opacity: 0.85, fontSize: 12 }}
           >
             {callerName && (
-              <span
-                className="font-body text-ink max-w-32 truncate"
-                data-testid="trump-caller-name"
-              >
+              <span className="text-ink max-w-32 truncate" data-testid="trump-caller-name">
                 {callerName}
               </span>
             )}
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-px font-body text-[9.5px] font-bold uppercase tracking-wider ${
+              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-px text-2xs font-bold uppercase tracking-wider ${
                 legacyTeamClass !== null ? `text-${legacyTeamClass} bg-${legacyTeamClass}/10` : ""
               }`}
               style={

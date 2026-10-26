@@ -64,12 +64,12 @@ function LevelMedallion({ level, size = 92 }: { level: number; size?: number }) 
           }}
         />
         <span
-          className="font-display"
+          className=""
           style={{
             fontSize: size * 0.42,
             fontWeight: 700,
             color: "#6e520f",
-            letterSpacing: -1,
+            letterSpacing: "-0.025em",
             textShadow: "0 1px 0 rgba(255,255,255,0.55), 0 -1px 1px rgba(0,0,0,0.25)",
           }}
         >
@@ -102,7 +102,7 @@ export function LevelUpDialog({ open, level, newTotalXp, xpEarned, onClose }: Le
         />
 
         <div className="relative flex flex-col items-center gap-4 px-[26px] pt-[26px] pb-6 text-center">
-          <DialogTitle className="text-brass-deep text-[11px] font-bold tracking-[2px] uppercase">
+          <DialogTitle className="text-brass-deep text-2xs font-bold tracking-caps uppercase">
             {t("xp.levelUpDialog.title")}
           </DialogTitle>
 
@@ -111,20 +111,20 @@ export function LevelUpDialog({ open, level, newTotalXp, xpEarned, onClose }: Le
           <div>
             <div
               data-testid="level-up-level"
-              className="font-display text-team-a text-[34px] leading-none font-bold tracking-[-1px]"
+              className="text-team-a text-4xl leading-none font-bold tracking-tight"
             >
               {t("xp.levelLabel", { level })}
             </div>
             <DialogDescription
               data-testid="level-up-earned"
-              className="text-ink-dim mt-1.5 text-sm tracking-[0.3px]"
+              className="text-ink-dim mt-1.5 text-sm"
             >
               {t("xp.levelUpDialog.earned", { amount: xpEarned })}
             </DialogDescription>
           </div>
 
           <div className="w-full">
-            <div className="text-ink-dim mb-1 flex justify-end text-[12.5px] tabular-nums">
+            <div className="text-ink-dim mb-1 flex justify-end text-xs tabular-nums">
               {t("xp.progress", { current: xpIntoLevel, next: xpForNextLevel })}
             </div>
             <XpBar

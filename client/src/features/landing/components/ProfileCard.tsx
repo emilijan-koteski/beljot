@@ -30,7 +30,7 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
     <div className="bg-surface-elevated border-border w-full max-w-95 overflow-hidden rounded-xl border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.45)]">
       <div className="flex items-center gap-3 px-4.5 pt-4.5 pb-4">
         <span
-          className="font-display flex size-11 items-center justify-center rounded-full text-lg font-bold"
+          className="flex size-11 items-center justify-center rounded-full text-lg font-bold"
           style={{
             background: "var(--accent-deep)",
             border: "2px solid var(--brass)",
@@ -40,7 +40,7 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
           K
         </span>
         <div className="leading-tight">
-          <div className="font-display text-ink text-[17px] font-semibold">kiro</div>
+          <div className="text-ink text-lg font-semibold">kiro</div>
           <div className="text-ink-mute text-xs">{labels.member}</div>
         </div>
       </div>
@@ -52,15 +52,13 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
             className="px-3 py-4 text-center"
             style={i ? { borderLeft: "1px solid var(--border)" } : undefined}
           >
-            <div className="font-display text-ink tabular-nums text-[28px] font-bold tracking-[-0.5px]">
-              {value}
-            </div>
-            <div className="text-ink-mute mt-0.5 text-[11.5px]">{label}</div>
+            <div className="text-ink tabular-nums text-3xl font-bold tracking-tight">{value}</div>
+            <div className="text-ink-mute mt-0.5 text-xs">{label}</div>
           </div>
         ))}
       </div>
 
-      <div className="text-brass-deep font-mono px-4.5 pt-3 pb-1.5 text-[10.5px] font-semibold tracking-[1.5px] uppercase">
+      <div className="text-brass-deep font-mono px-4.5 pt-3 pb-1.5 text-2xs font-semibold tracking-caps uppercase">
         {labels.recent}
       </div>
       <div className="px-4.5 pb-3.5">
@@ -71,7 +69,7 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
             style={i < MATCHES.length - 1 ? { borderBottom: "1px solid var(--border)" } : undefined}
           >
             <span
-              className="min-w-13 rounded-md px-2 py-1 text-center text-[11px] font-bold"
+              className="min-w-13 rounded-md px-2 py-1 text-center text-xs font-bold"
               style={
                 m.won
                   ? { background: "var(--accent-soft)", color: "var(--accent)" }
@@ -85,7 +83,7 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
             </span>
             <span className="font-mono text-ink tabular-nums text-sm font-semibold">
               {m.a} <span className="text-ink-off">–</span> {m.b}
-              <span className="font-body text-ink-mute ml-2 text-xs font-normal">
+              <span className="font-sans text-ink-mute ml-2 text-xs font-normal">
                 {labels.with} {m.withWho}
               </span>
             </span>

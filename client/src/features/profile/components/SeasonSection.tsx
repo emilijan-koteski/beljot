@@ -63,7 +63,7 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
           >
             {rankName}
           </span>
-          <span className="text-ink-dim text-[11px] leading-tight tabular-nums">
+          <span className="text-ink-dim text-xs leading-tight tabular-nums">
             {t("season.banner.sp", { sp: sp.toLocaleString() })}
             <span className="text-ink-mute"> · {seasonRank.seasonName}</span>
           </span>

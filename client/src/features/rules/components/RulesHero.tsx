@@ -20,7 +20,7 @@ function Fact({ label, value, caption }: FactData) {
         className="font-mono"
         style={{
           fontSize: 10,
-          letterSpacing: 2,
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           color: "var(--brass-deep)",
           fontWeight: 700,
@@ -29,13 +29,13 @@ function Fact({ label, value, caption }: FactData) {
         {label}
       </span>
       <span
-        className="font-display tabular-nums"
+        className="tabular-nums"
         style={{
-          fontSize: 26,
+          fontSize: 28,
           fontWeight: 700,
           color: "var(--ink)",
-          letterSpacing: -0.6,
-          lineHeight: 1.1,
+          letterSpacing: "-0.025em",
+          lineHeight: 1.2,
         }}
       >
         {value}
@@ -53,8 +53,8 @@ export function RulesHero() {
       <div
         className="font-mono"
         style={{
-          fontSize: 11,
-          letterSpacing: 2.6,
+          fontSize: 10,
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           color: "var(--brass-deep)",
           fontWeight: 600,
@@ -64,13 +64,13 @@ export function RulesHero() {
       </div>
 
       <h1
-        className="font-display"
+        className=""
         style={{
           margin: 0,
           fontSize: 48,
           fontWeight: 700,
-          letterSpacing: -1.4,
-          lineHeight: 1.05,
+          letterSpacing: "-0.025em",
+          lineHeight: 1,
           color: "var(--ink)",
         }}
       >
@@ -78,7 +78,7 @@ export function RulesHero() {
       </h1>
 
       <p
-        style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "var(--ink-dim)", maxWidth: 640 }}
+        style={{ margin: 0, fontSize: 18, lineHeight: 1.6, color: "var(--ink-dim)", maxWidth: 640 }}
       >
         {ui.heroIntro}
       </p>

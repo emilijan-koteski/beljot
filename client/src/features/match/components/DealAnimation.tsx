@@ -45,7 +45,7 @@ export function DealAnimation({
       {isReshuffle && (
         <p
           aria-hidden="true"
-          className="font-body text-sm rounded-md px-3 py-1.5"
+          className="text-sm rounded-md px-3 py-1.5"
           style={{
             color: "var(--ink-light)",
             background: "var(--panel-dark, rgba(20,45,30,0.85))",

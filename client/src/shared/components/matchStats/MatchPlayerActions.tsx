@@ -39,7 +39,7 @@ export function MatchPlayerActions({
 
   return (
     <div className="border-border mt-3.5 border-t pt-3" data-testid="match-player-actions">
-      <p className="text-brass-deep mb-2 font-mono text-[10px] font-semibold tracking-[1.5px] uppercase">
+      <p className="text-brass-deep mb-2 font-mono text-2xs font-semibold tracking-caps uppercase">
         {t("matchStats.actionsTitle")}
       </p>
       <ul className="m-0 flex list-none flex-col gap-1 p-0">

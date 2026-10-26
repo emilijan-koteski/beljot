@@ -106,7 +106,6 @@ export function TrumpReveal({
           border: "1px solid var(--brass-55)",
           boxShadow: `0 22px 54px rgba(0,0,0,0.62), 0 0 0 2px ${glowColor}66, 0 0 28px ${glowColor}55, inset 0 1px 0 var(--brass-25)`,
           color: "var(--ink-light)",
-          fontFamily: "var(--font-body)",
         }}
         data-team={team ?? undefined}
       >
@@ -120,10 +119,9 @@ export function TrumpReveal({
         </div>
 
         <div
-          className="text-[9.5px] uppercase tracking-[0.22em]"
+          className="text-2xs uppercase tracking-caps"
           style={{
             color: "var(--brass)",
-            fontFamily: "var(--font-body)",
             padding: "0 18px",
             marginBottom: 16,
           }}
@@ -178,7 +176,7 @@ export function TrumpReveal({
 
         <div
           className="flex items-center justify-center gap-2"
-          style={{ fontFamily: "var(--font-body)", fontSize: 20, fontWeight: 600 }}
+          style={{ fontSize: 20, fontWeight: 600 }}
           data-testid="trump-reveal-taker"
           data-seat={playerSeat}
         >
@@ -200,7 +198,7 @@ export function TrumpReveal({
 
         <div
           className="mt-1 leading-snug"
-          style={{ fontSize: 13, color: "#e8dfc8" }}
+          style={{ fontSize: 14, color: "#e8dfc8" }}
           data-testid="trump-reveal-copy"
         >
           <Trans
@@ -219,7 +217,7 @@ export function TrumpReveal({
         {isFreePick && (
           <div
             className="mt-1"
-            style={{ fontSize: 11.5, opacity: 0.6 }}
+            style={{ fontSize: 12, opacity: 0.6 }}
             data-testid="trump-reveal-candidate"
           >
             {t("match.trumpReveal.candidateOnTable", {
@@ -232,7 +230,7 @@ export function TrumpReveal({
         {team && teamLabel && (
           <div className="mt-3.5 flex justify-center">
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-bold uppercase tracking-wider"
               style={{
                 background: `${glowColor}22`,
                 border: `1px solid ${glowColor}88`,

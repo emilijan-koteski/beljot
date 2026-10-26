@@ -11,7 +11,7 @@ type SupportNoteProps = {
 };
 
 const VARIANT_CLS: Record<SupportNoteProps["variant"], string> = {
-  auth: "mt-1.5 text-[11.5px]",
+  auth: "mt-1.5 text-xs",
   lobby: "mt-2 text-xs",
 };
 

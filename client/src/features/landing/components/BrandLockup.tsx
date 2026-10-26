@@ -13,7 +13,7 @@ type BrandLockupProps = {
 // Logo tile and "Beljot" wordmark linking home: /lobby when signed in, / otherwise.
 export function BrandLockup({
   size = 34,
-  wordmarkSize = 22,
+  wordmarkSize = 24,
   className,
   showSuffix = false,
 }: BrandLockupProps) {
@@ -34,10 +34,7 @@ export function BrandLockup({
         className="shrink-0"
         style={{ width: size, height: size }}
       />
-      <span
-        className="font-display text-ink font-semibold tracking-[-0.3px]"
-        style={{ fontSize: wordmarkSize }}
-      >
+      <span className="text-ink font-semibold tracking-tight" style={{ fontSize: wordmarkSize }}>
         Beljot
         {showSuffix && <span className="text-ink-dim font-medium">.online</span>}
       </span>

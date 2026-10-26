@@ -23,7 +23,7 @@ type EditableUsernameProps = {
 };
 
 const TITLE_CLASS =
-  "text-ink font-display m-0 min-w-0 [overflow-wrap:anywhere] text-[clamp(32px,6vw,48px)] leading-[1.05] font-bold tracking-[-1.2px]";
+  "text-ink m-0 min-w-0 [overflow-wrap:anywhere] text-[clamp(32px,6vw,48px)] leading-none font-bold tracking-tight";
 
 /**
  * Profile username title with edit-in-place: Enter saves, Escape cancels.
@@ -133,7 +133,7 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
             disabled={mutation.isPending}
             aria-label={t("profile.editUsername.inputLabel")}
             aria-invalid={error ? true : undefined}
-            className="font-display h-auto min-w-0 max-w-60 py-1 text-2xl font-bold"
+            className="h-auto min-w-0 max-w-60 py-1 text-2xl font-bold tracking-tight"
             data-testid="profile-username-input"
           />
           <Button
@@ -194,7 +194,7 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
         )}
       </div>
       {userId !== undefined && onCooldown && cooldownHint && (
-        <p className="text-ink-mute text-[12px]" data-testid="profile-username-cooldown">
+        <p className="text-ink-mute text-xs" data-testid="profile-username-cooldown">
           {cooldownHint}
         </p>
       )}

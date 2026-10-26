@@ -258,7 +258,7 @@ function InviteList({
               {(rowError !== undefined || row.available !== true) && (
                 <span
                   className={
-                    rowError !== undefined ? "text-danger text-[11px]" : "text-ink-mute text-[11px]"
+                    rowError !== undefined ? "text-danger text-xs" : "text-ink-mute text-xs"
                   }
                   data-testid={`${rowTestId}-reason-${row.userId}`}
                 >

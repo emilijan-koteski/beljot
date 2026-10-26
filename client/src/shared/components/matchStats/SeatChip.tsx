@@ -43,7 +43,7 @@ export function SeatChip({
       <span className="truncate">{name}</span>
       {you && (
         <span
-          className="bg-ink ml-0.5 rounded px-1.5 py-px text-[9px] font-bold tracking-[0.6px] uppercase"
+          className="bg-ink ml-0.5 rounded px-1.5 py-px text-2xs font-bold tracking-wider uppercase"
           style={{ color: "var(--bg)" }}
         >
           {t("profile.matchHistory.you")}

@@ -81,12 +81,12 @@ function CoinMedallion({
           }}
         />
         <span
-          className="font-display"
+          className=""
           style={{
             fontSize: size * 0.46,
             fontWeight: 700,
             color: ink,
-            letterSpacing: -1,
+            letterSpacing: "-0.025em",
             textShadow: "0 1px 0 rgba(255,255,255,0.55), 0 -1px 1px rgba(0,0,0,0.25)",
           }}
         >
@@ -189,7 +189,7 @@ export function DailyRewardDialog({
         />
 
         <div className="relative flex flex-col items-center gap-4 px-[26px] pt-[26px] pb-6 text-center">
-          <DialogTitle className="text-brass-deep text-[11px] font-bold tracking-[2px] uppercase">
+          <DialogTitle className="text-brass-deep text-2xs font-bold tracking-caps uppercase">
             {t(milestone ? "rewards.dailyReward.streakMaxed" : "rewards.dailyReward.title")}
           </DialogTitle>
 
@@ -199,20 +199,20 @@ export function DailyRewardDialog({
             <div
               data-testid="daily-reward-amount"
               className={cn(
-                "font-display tabular-nums text-[46px] leading-none font-bold tracking-[-1.5px]",
+                "tabular-nums text-5xl leading-none font-bold tracking-tight",
                 milestone ? "text-team-a" : "text-ink",
               )}
             >
               +{formatCoins(amount)}
             </div>
-            <DialogDescription className="text-ink-dim mt-1 text-sm tracking-[0.3px]">
+            <DialogDescription className="text-ink-dim mt-1 text-sm">
               {t("rewards.dailyReward.coinsAdded")}
             </DialogDescription>
           </div>
 
           <div className="w-full">
             <StreakTrack day={Math.min(streakDay, STREAK_MAX)} />
-            <div className="text-ink-dim mt-3 inline-flex items-center gap-1.5 text-[12.5px]">
+            <div className="text-ink-dim mt-3 inline-flex items-center gap-1.5 text-xs">
               <Flame className="text-brass-deep size-3.5" aria-hidden="true" />
               {t("rewards.dailyReward.streak", { streak: streakDay })}
             </div>
@@ -221,11 +221,11 @@ export function DailyRewardDialog({
           <div className="bg-border h-px w-full" />
 
           <div className="flex w-full items-center justify-between">
-            <span className="text-ink-mute inline-flex items-center gap-2 text-[13px]">
+            <span className="text-ink-mute inline-flex items-center gap-2 text-sm">
               <CoinMedallion size={22} tone={tone} />
               {t("rewards.dailyReward.newBalance")}
             </span>
-            <span className="font-display tabular-nums text-ink text-[18px] font-bold">
+            <span className="tabular-nums text-ink text-lg font-bold">
               {formatCoins(newBalance)}
             </span>
           </div>

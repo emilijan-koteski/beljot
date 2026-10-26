@@ -93,7 +93,7 @@ export function Avatar({
   return (
     <div
       className={cn(
-        "font-display inline-flex shrink-0 items-center justify-center rounded-full font-bold",
+        "inline-flex shrink-0 items-center justify-center rounded-full font-bold",
         className,
       )}
       style={{
@@ -103,7 +103,7 @@ export function Avatar({
         color: textColor,
         border,
         fontSize: Math.max(11, size * 0.42),
-        letterSpacing: -0.3,
+        letterSpacing: "-0.025em",
         boxShadow,
       }}
       aria-hidden="true"

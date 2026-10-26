@@ -45,7 +45,6 @@ export function ClassicPanel({
         border: "1px solid var(--brass-55)",
         boxShadow: `${glowShadow}${baseShadow}`,
         color: "var(--ink-light)",
-        fontFamily: "var(--font-body)",
         ...style,
       }}
     >
@@ -57,18 +56,16 @@ export function ClassicPanel({
           }}
         >
           <div
-            className="text-[17px] sm:text-[20px]"
+            className="text-lg sm:text-xl"
             style={{
-              fontFamily: "var(--font-body)",
               fontWeight: 600,
-              letterSpacing: 0.3,
               color: "var(--ink-light)",
             }}
           >
             {title}
           </div>
           {subtitle && (
-            <div className="text-[11px] sm:text-[12px]" style={{ opacity: 0.65, marginTop: 2 }}>
+            <div className="text-xs sm:text-xs" style={{ opacity: 0.65, marginTop: 2 }}>
               {subtitle}
             </div>
           )}

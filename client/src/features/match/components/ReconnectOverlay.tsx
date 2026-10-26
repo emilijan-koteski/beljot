@@ -143,15 +143,15 @@ export function ReconnectOverlay({
           <ClassicPanel width={520} glowColor={RING_DANGER}>
             <div className="flex flex-col items-center text-center gap-3">
               <span
-                className="font-body text-[11px] uppercase tracking-[0.25em]"
+                className="text-2xs uppercase tracking-caps"
                 style={{ color: "var(--ink-light)", opacity: 0.55 }}
               >
                 {t("match.matchResult.title")}
               </span>
 
               <h2
-                className="font-display text-2xl font-semibold"
-                style={{ color: RING_DANGER, letterSpacing: -0.3 }}
+                className="text-2xl font-semibold tracking-tight"
+                style={{ color: RING_DANGER }}
                 data-testid="abandon-title"
               >
                 {t("match.disconnect.matchAbandoned", {
@@ -165,7 +165,7 @@ export function ReconnectOverlay({
               >
                 <ScoreColumn label={t("team.us")} value={usValue} gradient={TEAM_GOLD} />
                 <span
-                  className="font-display text-3xl"
+                  className="text-3xl tracking-tight"
                   style={{ color: "var(--ink-light)", opacity: 0.4 }}
                   aria-hidden
                 >
@@ -182,7 +182,7 @@ export function ReconnectOverlay({
 
               {showResultLine && (
                 <p
-                  className="font-body text-sm"
+                  className="text-sm"
                   style={{ color: "var(--ink-light)", opacity: 0.8 }}
                   data-testid="abandon-result-line"
                   data-result={viewerLost ? "loss" : "win"}
@@ -196,7 +196,7 @@ export function ReconnectOverlay({
               {seasonSettlement && <SeasonSpLine settlement={seasonSettlement} />}
 
               <p
-                className="font-body text-xs mt-1 animate-pulse"
+                className="text-xs mt-1 animate-pulse"
                 style={{ color: "var(--ink-light)", opacity: 0.7 }}
               >
                 {t("match.disconnect.returningToLobby")}
@@ -220,26 +220,26 @@ export function ReconnectOverlay({
           <ClassicPanel width={440} glowColor={RING_DANGER}>
             <div className="flex flex-col items-center text-center gap-3">
               <span
-                className="font-body text-[11px] uppercase tracking-[0.25em]"
+                className="text-2xs uppercase tracking-caps"
                 style={{ color: "var(--ink-light)", opacity: 0.55 }}
               >
                 {t("match.matchResult.title")}
               </span>
 
               <h2
-                className="font-display text-2xl font-semibold"
-                style={{ color: RING_DANGER, letterSpacing: -0.3 }}
+                className="text-2xl font-semibold tracking-tight"
+                style={{ color: RING_DANGER }}
                 data-testid="match-ended-title"
               >
                 {t("match.disconnect.matchEnded", { defaultValue: "Match has ended" })}
               </h2>
 
-              <p className="font-body text-sm" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
+              <p className="text-sm" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
                 {t("match.disconnect.reconnectFailed")}
               </p>
 
               <p
-                className="font-body text-xs mt-1 animate-pulse"
+                className="text-xs mt-1 animate-pulse"
                 style={{ color: "var(--ink-light)", opacity: 0.7 }}
               >
                 {t("match.disconnect.returningToLobby")}
@@ -327,10 +327,9 @@ export function ReconnectOverlay({
                 style={{ pointerEvents: "none" }}
               >
                 <span
-                  className="font-display font-semibold tabular-nums"
+                  className="font-semibold tabular-nums"
                   style={{
                     fontSize: 36,
-                    letterSpacing: 0.5,
                     color: isUrgent ? RING_DANGER : "var(--ink-light)",
                     transition: `color ${MOTION.RING_COLOR_FLIP}ms ease-out`,
                   }}
@@ -342,14 +341,14 @@ export function ReconnectOverlay({
             </div>
 
             <p
-              className="font-body text-[11px] uppercase tracking-[0.18em]"
+              className="text-2xs uppercase tracking-caps"
               style={{ color: "var(--ink-light)", opacity: 0.55 }}
             >
               {t("match.disconnect.countdownLabel")}
             </p>
 
             <p
-              className="font-body text-center text-xs"
+              className="text-center text-xs"
               style={{ color: "var(--ink-light)", opacity: 0.75, maxWidth: 340 }}
               data-testid="reconnect-honor-note"
               data-viewer-dropped={viewerIsDisconnected ? "true" : "false"}
@@ -408,7 +407,7 @@ function DisconnectedPlayerRow({
           }}
         >
           <div
-            className="rounded-full flex items-center justify-center font-display font-semibold"
+            className="rounded-full flex items-center justify-center font-semibold"
             style={{
               width: "100%",
               height: "100%",
@@ -434,20 +433,18 @@ function DisconnectedPlayerRow({
         />
       </div>
       <span
-        className="font-display font-semibold flex-1"
+        className="font-semibold flex-1"
         style={{
           fontSize: 16,
-          letterSpacing: 0.2,
           color: "var(--ink-light)",
         }}
       >
         {name}
       </span>
       <span
-        className="font-display font-semibold tabular-nums"
+        className="font-semibold tabular-nums"
         style={{
           fontSize: 14,
-          letterSpacing: 0.4,
           color: rowUrgent ? RING_DANGER : "var(--ink-light)",
           opacity: rowUrgent ? 1 : 0.75,
           transition: `color ${MOTION.RING_COLOR_FLIP}ms ease-out, opacity ${MOTION.RING_COLOR_FLIP}ms ease-out`,
@@ -471,13 +468,10 @@ interface ScoreColumnProps {
 function ScoreColumn({ label, value, gradient }: ScoreColumnProps) {
   return (
     <div className="text-center">
-      <p
-        className="font-body text-xs font-semibold uppercase tracking-wider"
-        style={{ color: gradient[0] }}
-      >
+      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: gradient[0] }}>
         {label}
       </p>
-      <p className="font-display text-4xl font-bold tabular-nums" style={{ color: gradient[0] }}>
+      <p className="text-4xl font-bold tabular-nums tracking-tight" style={{ color: gradient[0] }}>
         {value}
       </p>
     </div>

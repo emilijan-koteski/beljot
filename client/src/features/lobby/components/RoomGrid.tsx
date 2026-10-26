@@ -27,9 +27,7 @@ export function RoomGrid({ rooms, onJoin, hasSearch, onClearSearch }: Props) {
         <span className="bg-accent-soft text-accent flex size-14 items-center justify-center rounded-full">
           <DoorOpen className="size-5.5" />
         </span>
-        <h3 className="font-display text-ink m-0 text-lg font-semibold">
-          {t("lobby.empty.title")}
-        </h3>
+        <h3 className="text-ink m-0 text-lg font-semibold">{t("lobby.empty.title")}</h3>
         <p className="text-ink-dim m-0 max-w-90 text-xs">{t("lobby.empty.description")}</p>
         {hasSearch && onClearSearch && (
           <button

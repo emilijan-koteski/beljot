@@ -12,7 +12,7 @@ export function HowItWorks() {
         <div className="mb-4.5">
           <Eyebrow size="xl">{t("landing.how.eyebrow")}</Eyebrow>
         </div>
-        <h2 className="font-display text-ink mb-[clamp(36px,5vw,52px)] max-w-190 text-[clamp(30px,3.4vw,42px)] font-bold tracking-[-0.8px]">
+        <h2 className="text-ink mb-[clamp(36px,5vw,52px)] max-w-190 text-[clamp(30px,3.4vw,42px)] font-bold tracking-tight">
           {t("landing.how.title")}
         </h2>
         <div className="grid gap-12 md:grid-cols-3">

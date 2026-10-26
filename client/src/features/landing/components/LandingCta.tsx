@@ -22,7 +22,7 @@ export function LandingCta({ to, children, size = "md", testId, className }: Lan
         "transition-[transform,box-shadow,background-color] hover:-translate-y-px hover:bg-accent-deep",
         "shadow-[0_14px_34px_-14px_var(--accent-glow)] hover:shadow-[0_18px_40px_-16px_var(--accent-glow)]",
         "focus-visible:ring-ring/70 outline-none focus-visible:ring-3",
-        size === "lg" ? "px-8 py-4 text-[17px]" : "px-6 py-3.5 text-[15px]",
+        size === "lg" ? "px-8 py-4 text-lg" : "px-6 py-3.5 text-base",
         className,
       )}
     >

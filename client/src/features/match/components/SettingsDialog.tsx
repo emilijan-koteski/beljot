@@ -76,13 +76,7 @@ function SettingRow({
           : "inset 0 1px 0 var(--brass-10)",
       }}
     >
-      <span
-        className="font-body text-sm font-medium inline-flex items-center gap-2"
-        style={{
-          fontFamily: "var(--font-body)",
-          letterSpacing: 0.2,
-        }}
-      >
+      <span className="text-sm font-medium inline-flex items-center gap-2" style={{}}>
         <span
           aria-hidden
           className="rounded-full"
@@ -98,11 +92,7 @@ function SettingRow({
         {children}
       </span>
       {selected && (
-        <span
-          className="text-xs uppercase tracking-wider"
-          style={{ color: BRASS, fontFamily: "var(--font-body)" }}
-          aria-hidden
-        >
+        <span className="text-xs uppercase tracking-wider" style={{ color: BRASS }} aria-hidden>
           ✓
         </span>
       )}
@@ -143,13 +133,7 @@ function SettingSwitchRow({
           : "inset 0 1px 0 var(--brass-10)",
       }}
     >
-      <span
-        className="font-body text-sm font-medium"
-        style={{
-          fontFamily: "var(--font-body)",
-          letterSpacing: 0.2,
-        }}
-      >
+      <span className="text-sm font-medium" style={{}}>
         {children}
       </span>
       <span
@@ -220,7 +204,6 @@ function SettingVolumeRow({
         className="text-xs tabular-nums"
         style={{
           color: BRASS,
-          fontFamily: "var(--font-body)",
           minWidth: "4ch",
           textAlign: "right",
         }}
@@ -253,7 +236,6 @@ function SettingSection({
         className="flex items-center gap-2 text-xs uppercase"
         style={{
           color: BRASS,
-          fontFamily: "var(--font-body)",
           letterSpacing: "0.18em",
         }}
       >

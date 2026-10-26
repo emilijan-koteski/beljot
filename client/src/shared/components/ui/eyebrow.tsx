@@ -19,7 +19,7 @@ export function Eyebrow({ tone = "brass", size = "sm", className, children }: Ey
     <span
       className={cn(
         "inline-flex items-center gap-1.5 font-mono font-semibold uppercase",
-        size === "xl" ? "text-[11.5px] tracking-[2.4px]" : "text-[10.5px] tracking-[1.8px]",
+        size === "xl" ? "text-xs tracking-caps" : "text-2xs tracking-caps",
         tone === "accent" ? "text-accent" : "text-brass-deep",
         className,
       )}

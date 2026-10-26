@@ -106,7 +106,7 @@ export function PlayingCard({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    lineHeight: 0.95,
+    lineHeight: 1,
     ...(rotate
       ? { bottom: w * 0.07, right: w * 0.09, transform: "rotate(180deg)" }
       : { top: w * 0.07, left: w * 0.09 }),
@@ -123,7 +123,7 @@ export function PlayingCard({
       }}
     >
       <span style={corner(false)}>
-        <span className="font-display" style={{ fontWeight: 700, fontSize: w * 0.24, color: col }}>
+        <span className="" style={{ fontWeight: 700, fontSize: w * 0.24, color: col }}>
           {rank}
         </span>
         <Suit name={suit} size={w * 0.17} />
@@ -140,7 +140,7 @@ export function PlayingCard({
         <Suit name={suit} size={w * 0.5} />
       </span>
       <span style={corner(true)}>
-        <span className="font-display" style={{ fontWeight: 700, fontSize: w * 0.24, color: col }}>
+        <span className="" style={{ fontWeight: 700, fontSize: w * 0.24, color: col }}>
           {rank}
         </span>
         <Suit name={suit} size={w * 0.17} />

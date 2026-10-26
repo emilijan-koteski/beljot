@@ -7,13 +7,10 @@ export function TermsPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="w-full max-w-150 rounded-xl bg-surface p-8">
-        <h1 className="mb-3 font-display text-2xl font-bold text-ink" data-testid="terms-title">
+        <h1 className="mb-3 text-2xl font-bold text-ink tracking-tight" data-testid="terms-title">
           {t("legal.terms.title")}
         </h1>
-        <p
-          className="mb-2 text-sm uppercase tracking-wide text-accent"
-          data-testid="terms-wip-badge"
-        >
+        <p className="mb-2 text-sm uppercase text-accent" data-testid="terms-wip-badge">
           {t("legal.wipBadge")}
         </p>
         <p className="mb-3 text-ink-dim" data-testid="terms-wip-notice">

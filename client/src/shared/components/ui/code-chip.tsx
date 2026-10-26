@@ -42,15 +42,14 @@ export function CodeChip({
           : {})}
         data-testid={testId}
         className={cn(
-          "inline-flex items-center gap-2 rounded-md border font-mono font-bold transition-[background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
-          dense ? "px-2.5 py-1 text-[13px]" : "px-3 py-2 text-[13px]",
+          "inline-flex items-center gap-2 rounded-md border font-mono font-bold tracking-caps transition-[background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
+          dense ? "px-2.5 py-1 text-sm" : "px-3 py-2 text-sm",
           copied
             ? "border-accent bg-accent-soft text-accent-deep"
             : "border-brass bg-surface-elevated text-ink hover:border-accent/50",
           interactive && "cursor-pointer",
           className,
         )}
-        style={{ letterSpacing: 2 }}
       >
         <KeyRound className={cn("size-3.5", copied ? "text-accent" : "text-brass-deep")} />
         <span data-testid={codeTestId}>{code}</span>
@@ -84,24 +83,22 @@ export function CodeChip({
     >
       <span
         className={cn(
-          "inline-flex items-center font-mono font-semibold uppercase",
-          dense ? "px-2 py-1 text-[9.5px]" : "px-2.5 py-2 text-[10px]",
+          "inline-flex items-center font-mono font-semibold tracking-caps uppercase",
+          dense ? "px-2 py-1 text-2xs" : "px-2.5 py-2 text-2xs",
           copied
             ? "bg-transparent text-accent-deep"
             : "bg-brass-soft text-brass-deep border-r border-border",
         )}
-        style={{ letterSpacing: 1.6 }}
       >
         {label}
       </span>
       <span
         data-testid={codeTestId}
         className={cn(
-          "inline-flex items-center gap-2 font-mono font-bold",
-          dense ? "px-2.5 py-1 text-[13px]" : "px-3 py-2 text-[15px]",
+          "inline-flex items-center gap-2 font-mono font-bold tracking-caps",
+          dense ? "px-2.5 py-1 text-sm" : "px-3 py-2 text-base",
           copied ? "text-accent-deep" : "text-ink",
         )}
-        style={{ letterSpacing: 2.2 }}
       >
         {code}
         {interactive && (

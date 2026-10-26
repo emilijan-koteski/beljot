@@ -71,10 +71,10 @@ export function MatchmakingDiagram({
         {t("lobby.matchmaking.eyebrow")}
       </Eyebrow>
 
-      <h1 className="font-display text-ink mt-2.5 mb-1.5 text-center text-[26px] font-bold tracking-[-0.8px] md:text-[34px]">
+      <h1 className="text-ink mt-2.5 mb-1.5 text-center text-3xl font-bold tracking-tight md:text-4xl">
         {t("lobby.matchmaking.title")}
       </h1>
-      <p className="text-ink-dim m-0 max-w-130 text-center text-[14.5px] leading-relaxed">
+      <p className="text-ink-dim m-0 max-w-130 text-center text-sm leading-relaxed">
         {t("lobby.matchmaking.subtitle")}
       </p>
 
@@ -91,7 +91,7 @@ export function MatchmakingDiagram({
         <Badge tone="neutral" icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}>
           {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
         </Badge>
-        <span className="text-ink-mute font-mono text-[11.5px] tracking-[0.5px]">
+        <span className="text-ink-mute font-mono text-xs tracking-wider">
           {t("lobby.matchmaking.elapsed")}{" "}
           <strong className="text-ink tabular-nums" data-testid="matchmaking-elapsed">
             {elapsed}
@@ -142,7 +142,7 @@ export function MatchmakingDiagram({
               style={{ inset: -6 }}
             />
           </div>
-          <span className="text-accent-deep font-mono text-[10px] font-semibold tracking-[1.5px] uppercase">
+          <span className="text-accent-deep font-mono text-2xs font-semibold tracking-caps uppercase">
             {t("lobby.matchmaking.you")}
           </span>
         </div>
@@ -190,7 +190,7 @@ export function MatchmakingDiagram({
                 </div>
               )}
               <span
-                className="font-mono text-[9.5px] font-semibold tracking-[1.4px] uppercase"
+                className="font-mono text-2xs font-semibold tracking-caps uppercase"
                 style={{
                   color: occupant ? (isUs ? "var(--team-a)" : "var(--team-b)") : "var(--ink-mute)",
                 }}
@@ -220,7 +220,7 @@ export function MatchmakingDiagram({
             }}
           />
         </div>
-        <div className="text-ink-mute flex w-full items-center justify-between font-mono text-[11px] tracking-[1.4px] uppercase">
+        <div className="text-ink-mute flex w-full items-center justify-between font-mono text-2xs tracking-widest uppercase">
           <span data-testid="matchmaking-seated">{t("lobby.matchmaking.seated", { found })}</span>
           <span>{t("lobby.matchmaking.remaining", { count: remaining })}</span>
         </div>

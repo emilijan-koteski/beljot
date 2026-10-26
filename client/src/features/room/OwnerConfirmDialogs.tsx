@@ -65,10 +65,8 @@ function DialogButton({
         gap: 7,
         padding: "8px 14px",
         borderRadius: "var(--radius-sm)",
-        fontFamily: "var(--font-body)",
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: 600,
-        letterSpacing: -0.1,
         lineHeight: 1.2,
         whiteSpace: "nowrap",
         cursor: disabled ? "not-allowed" : "pointer",
@@ -198,8 +196,8 @@ function OwnerConfirmDialog({
             <span
               style={{
                 fontFamily: "var(--font-mono)",
-                fontSize: 10.5,
-                letterSpacing: 2,
+                fontSize: 10,
+                letterSpacing: "0.18em",
                 textTransform: "uppercase",
                 fontWeight: 600,
                 color: accentColor,
@@ -211,12 +209,11 @@ function OwnerConfirmDialog({
               data-testid={titleTestId}
               style={{
                 margin: "6px 0 0",
-                fontFamily: "var(--font-display)",
                 fontWeight: 700,
-                fontSize: "clamp(18px, 4.8vw, 23px)",
-                letterSpacing: -0.5,
+                fontSize: "clamp(18px, 4.8vw, 24px)",
+                letterSpacing: "-0.025em",
                 color: "var(--ink)",
-                lineHeight: 1.15,
+                lineHeight: 1.2,
               }}
             >
               {title}
@@ -228,7 +225,7 @@ function OwnerConfirmDialog({
           style={{
             margin: 0,
             padding: "10px clamp(18px, 5vw, 28px) 0",
-            fontSize: "clamp(13px, 3.6vw, 14px)",
+            fontSize: 14,
             color: "var(--ink-dim)",
             lineHeight: 1.6,
           }}
@@ -288,17 +285,16 @@ function PlayerRow({ name, seat, team, avatarUrl, icon }: DialogTarget & { icon?
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            fontFamily: "var(--font-display)",
             fontWeight: 600,
             fontSize: 16,
-            letterSpacing: -0.2,
+            letterSpacing: "-0.025em",
             color: "var(--ink)",
           }}
         >
           {name}
         </div>
         <div style={{ marginTop: 2, fontSize: 12, color: "var(--ink-mute)" }}>
-          <span style={{ fontFamily: "var(--font-mono)", letterSpacing: 0.4 }}>
+          <span style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.05em" }}>
             {seated
               ? t("room.ownerConfirm.seatLabel", { n: (seat as number) + 1 })
               : t("room.ownerConfirm.standing")}
@@ -452,8 +448,8 @@ export function TransferOwnershipDialog({
   ];
   const captionStyle: CSSProperties = {
     fontFamily: "var(--font-mono)",
-    fontSize: 9.5,
-    letterSpacing: 1,
+    fontSize: 10,
+    letterSpacing: "0.1em",
     textTransform: "uppercase",
     fontWeight: 600,
     textAlign: "center",
@@ -580,7 +576,7 @@ export function TransferOwnershipDialog({
         style={{
           fontFamily: "var(--font-mono)",
           fontSize: 10,
-          letterSpacing: 1.6,
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           fontWeight: 600,
           color: "var(--brass-deep)",
@@ -605,8 +601,8 @@ export function TransferOwnershipDialog({
               display: "flex",
               alignItems: "center",
               gap: 10,
-              fontSize: 13,
-              lineHeight: 1.3,
+              fontSize: 14,
+              lineHeight: 1.2,
               color: "var(--ink-dim)",
               fontWeight: 500,
             }}

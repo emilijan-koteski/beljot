@@ -95,9 +95,7 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
         </p>
       ) : (
         <>
-          <p className="text-ink-mute mb-2.5 text-[12px]">
-            {t("profile.linkedAccounts.description")}
-          </p>
+          <p className="text-ink-mute mb-2.5 text-xs">{t("profile.linkedAccounts.description")}</p>
           <div
             className="bg-surface-elevated border-border rounded-md border px-3 py-2.5"
             data-testid="linked-account-google"
@@ -105,12 +103,12 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
             {google ? (
               <div className="flex items-center justify-between gap-2.5">
                 <div className="min-w-0">
-                  <div className="text-ink flex items-center gap-2 text-[13px] font-medium">
+                  <div className="text-ink flex items-center gap-2 text-sm font-medium">
                     <img src="/google.svg" alt="" aria-hidden="true" className="size-4 shrink-0" />
                     {t("profile.linkedAccounts.google")}
                   </div>
                   <div
-                    className="text-ink-mute mt-0.5 truncate text-[11.5px]"
+                    className="text-ink-mute mt-0.5 truncate text-xs"
                     data-testid="linked-account-google-status"
                   >
                     {t("profile.linkedAccounts.linkedAs", { email: google.email })}
@@ -129,7 +127,7 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
                   </Button>
                   {!canUnlink && (
                     <span
-                      className="text-ink-mute max-w-37.5 text-right text-[10.5px] leading-tight"
+                      className="text-ink-mute max-w-37.5 text-right text-2xs leading-tight"
                       data-testid="unlink-google-hint"
                     >
                       {t("profile.linkedAccounts.passwordlessHint")}
@@ -140,12 +138,12 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
             ) : (
               <div className="flex flex-col gap-2.5">
                 <div>
-                  <div className="text-ink flex items-center gap-2 text-[13px] font-medium">
+                  <div className="text-ink flex items-center gap-2 text-sm font-medium">
                     <img src="/google.svg" alt="" aria-hidden="true" className="size-4 shrink-0" />
                     {t("profile.linkedAccounts.google")}
                   </div>
                   <div
-                    className="text-ink-mute mt-0.5 text-[11.5px]"
+                    className="text-ink-mute mt-0.5 text-xs"
                     data-testid="linked-account-google-status"
                   >
                     {t("profile.linkedAccounts.notLinked")}

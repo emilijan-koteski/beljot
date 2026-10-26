@@ -94,7 +94,7 @@ export function TopBar({
         />
         <span
           className={cn(
-            "font-display text-ink text-xl font-semibold tracking-tight whitespace-nowrap",
+            "text-ink text-xl font-semibold tracking-tight whitespace-nowrap",
             showFullBrand ? "inline" : "hidden lg:inline",
           )}
           data-testid="app-name"
@@ -197,7 +197,7 @@ export function TopBar({
               align="end"
               className="bg-surface-elevated w-max min-w-44 max-w-(--available-width) border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
             >
-              <div className="text-ink-mute px-2.5 pt-2 pb-1.5 text-[11px] tracking-[0.3px]">
+              <div className="text-ink-mute px-2.5 pt-2 pb-1.5 text-xs">
                 {t("nav.signedInAs", { defaultValue: "Signed in as" })}{" "}
                 <span className="text-ink font-semibold">{user.username}</span>
               </div>
@@ -238,7 +238,7 @@ export function TopBar({
             >
               {showUserMenu && user && (
                 <>
-                  <div className="text-ink-mute px-2.5 pt-2 pb-1.5 text-[11px] tracking-[0.3px]">
+                  <div className="text-ink-mute px-2.5 pt-2 pb-1.5 text-xs">
                     {t("nav.signedInAs", { defaultValue: "Signed in as" })}{" "}
                     <span className="text-ink font-semibold">{user.username}</span>
                   </div>

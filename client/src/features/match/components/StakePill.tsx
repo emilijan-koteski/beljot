@@ -20,7 +20,7 @@ export function StakePill({ amount }: StakePillProps) {
 
   return (
     <div
-      className="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5"
+      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5"
       style={{
         background: PANEL_BG,
         border: "1px solid var(--brass-40)",

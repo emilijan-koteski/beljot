@@ -50,9 +50,7 @@ export function PublicPlayerProfilePage() {
           className="bg-surface border-border space-y-3 rounded-lg border border-dashed p-10 text-center text-sm"
           data-testid="public-profile-not-found"
         >
-          <p className="text-ink font-display text-lg font-semibold">
-            {t("publicProfile.notFound.title")}
-          </p>
+          <p className="text-ink text-lg font-semibold">{t("publicProfile.notFound.title")}</p>
           <p className="text-ink-dim m-0">{t("publicProfile.notFound.body")}</p>
           <Link
             to="/lobby"

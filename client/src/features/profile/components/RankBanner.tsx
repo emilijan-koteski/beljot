@@ -52,11 +52,7 @@ export function RankBanner({ season }: Props) {
 
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-          <span
-            data-testid="rank-tier-name"
-            className="font-display text-base font-semibold"
-            style={{ color }}
-          >
+          <span data-testid="rank-tier-name" className="text-base font-semibold" style={{ color }}>
             {rankName}
           </span>
           <span data-testid="rank-sp" className="text-ink-dim text-xs tabular-nums">
@@ -94,10 +90,7 @@ export function RankBanner({ season }: Props) {
           />
         </div>
 
-        <span
-          data-testid="rank-progress-caption"
-          className="text-ink-mute text-[11px] tabular-nums"
-        >
+        <span data-testid="rank-progress-caption" className="text-ink-mute text-xs tabular-nums">
           {atTop
             ? t("season.banner.atTop")
             : t("season.banner.progress", {

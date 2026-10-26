@@ -26,7 +26,7 @@ export function InfoPopover({ text, ariaLabel, testId, className }: InfoPopoverP
         delay={0}
         closeDelay={0}
         className={cn(
-          "border-border text-ink-mute hover:border-brass hover:text-brass-deep data-popup-open:border-brass data-popup-open:bg-brass-soft data-popup-open:text-brass-deep inline-flex size-4 items-center justify-center rounded-full border align-middle text-[10px] leading-none font-bold transition-[color,background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
+          "border-border text-ink-mute hover:border-brass hover:text-brass-deep data-popup-open:border-brass data-popup-open:bg-brass-soft data-popup-open:text-brass-deep inline-flex size-4 items-center justify-center rounded-full border align-middle text-2xs leading-none font-bold transition-[color,background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
           className,
         )}
       >
@@ -42,7 +42,7 @@ export function InfoPopover({ text, ariaLabel, testId, className }: InfoPopoverP
         >
           <PopoverPrimitive.Popup
             data-testid={testId ? `${testId}-content` : undefined}
-            className="border-brass bg-surface-elevated text-ink-dim w-67 max-w-[calc(100vw-32px)] rounded-md border p-2.5 text-[12.5px] leading-normal font-normal normal-case shadow-[0_18px_40px_-20px_rgba(14,58,36,0.45)]"
+            className="border-brass bg-surface-elevated text-ink-dim w-67 max-w-[calc(100vw-32px)] rounded-md border p-2.5 text-xs leading-normal font-normal normal-case shadow-[0_18px_40px_-20px_rgba(14,58,36,0.45)]"
           >
             {text}
           </PopoverPrimitive.Popup>

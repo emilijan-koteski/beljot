@@ -274,7 +274,7 @@ export function RegisterPage() {
 
       <div className="mt-4.5 mb-3.5 flex items-center gap-3" data-testid="sso-divider">
         <div className="bg-border h-px flex-1" />
-        <span className="text-ink-mute text-[11.5px] font-medium tracking-[1.6px] uppercase">
+        <span className="text-ink-mute text-xs font-medium tracking-caps uppercase">
           {t("auth.sso.divider")}
         </span>
         <div className="bg-border h-px flex-1" />

@@ -164,7 +164,7 @@ export function EmotePickerButton({
         data-testid="emote-toggle"
       >
         <Smile className="h-5 w-5 shrink-0" aria-hidden="true" />
-        {label && <span className="font-body text-xs font-semibold">{label}</span>}
+        {label && <span className="text-xs font-semibold">{label}</span>}
       </button>
 
       {isOpen && (

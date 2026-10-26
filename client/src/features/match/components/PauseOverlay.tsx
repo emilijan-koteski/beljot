@@ -85,24 +85,15 @@ export function PauseOverlay({
                       boxShadow: `0 0 6px ${dotColor}`,
                     }}
                   />
-                  <span
-                    className="font-display text-sm flex-1"
-                    style={{ color: "var(--ink-light)" }}
-                  >
+                  <span className="text-sm flex-1" style={{ color: "var(--ink-light)" }}>
                     {playerDisplayName(t, player) ?? `Player ${player.seat + 1}`}
                   </span>
                   {isPaused ? (
-                    <span
-                      className="font-body text-[11px] font-semibold"
-                      style={{ color: "var(--brass)" }}
-                    >
+                    <span className="text-xs font-semibold" style={{ color: "var(--brass)" }}>
                       {t("match.pause.pausedNow", { defaultValue: "paused now" })}
                     </span>
                   ) : (
-                    <span
-                      className="font-body text-[11px]"
-                      style={{ color: "var(--ink-light)", opacity: 0.7 }}
-                    >
+                    <span className="text-xs" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
                       {usedPause
                         ? t("match.pause.pauseUsedRow", { defaultValue: "pause used" })
                         : t("match.pause.pauseAvailable", { defaultValue: "pause available" })}
@@ -132,7 +123,7 @@ export function PauseOverlay({
               </ClassicButton>
             ) : (
               <p
-                className="font-body text-sm italic"
+                className="text-sm italic"
                 style={{ color: "var(--ink-light)", opacity: 0.65 }}
                 data-testid="pause-waiting"
               >
@@ -152,7 +143,7 @@ export function PauseOverlay({
                   boxShadow:
                     "inset 0 1px 0 color-mix(in srgb, var(--danger-light) 18%, transparent)",
                   padding: "8px 14px",
-                  fontSize: 13,
+                  fontSize: 14,
                 }}
               >
                 <span className="inline-flex items-center justify-center gap-1.5">

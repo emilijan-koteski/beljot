@@ -69,7 +69,7 @@ export function BelotPrompt({
             </div>
 
             <div
-              className="mb-3.5 px-3 py-2 rounded-lg flex items-center gap-2 font-body"
+              className="mb-3.5 px-3 py-2 rounded-lg flex items-center gap-2"
               style={{
                 border: "1px solid var(--brass-40)",
                 background: "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",

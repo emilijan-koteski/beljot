@@ -84,8 +84,8 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
             <span
               style={{
                 fontFamily: "var(--font-mono)",
-                fontSize: 10.5,
-                letterSpacing: 2,
+                fontSize: 10,
+                letterSpacing: "0.18em",
                 textTransform: "uppercase",
                 fontWeight: 600,
                 color: "var(--brass-deep)",
@@ -97,12 +97,11 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
               data-testid="honor-explainer-title"
               style={{
                 margin: "6px 0 0",
-                fontFamily: "var(--font-display)",
                 fontWeight: 700,
-                fontSize: 22,
-                letterSpacing: -0.5,
+                fontSize: 24,
+                letterSpacing: "-0.025em",
                 color: "var(--ink)",
-                lineHeight: 1.15,
+                lineHeight: 1.2,
               }}
             >
               {t("profile.honor.explainer.title")}
@@ -123,7 +122,7 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
                   aria-hidden="true"
                   strokeWidth={2.25}
                 />
-                <span className="text-ink-dim text-[13.5px] leading-normal">
+                <span className="text-ink-dim text-sm leading-normal">
                   <strong className="text-ink font-semibold">
                     {t(`profile.honor.explainer.${key}Label`)}
                   </strong>{" "}
@@ -161,7 +160,7 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
             ) : (
               <HonorShield tier={tier} size={16} className="mt-0.5 shrink-0" />
             )}
-            <p className="text-ink m-0 text-[13.5px] leading-normal font-semibold">
+            <p className="text-ink m-0 text-sm leading-normal font-semibold">
               {isNew ? (
                 t("profile.honor.explainer.standingNew")
               ) : (
@@ -192,7 +191,7 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
           <Link
             to="/rules#honour"
             onClick={() => onOpenChange(false)}
-            className="text-accent hover:text-accent-deep inline-flex items-center gap-1.5 text-[13px] font-semibold"
+            className="text-accent hover:text-accent-deep inline-flex items-center gap-1.5 text-sm font-semibold"
             data-testid="honor-explainer-rules-link"
           >
             {t("profile.honor.explainer.fullRules")}
@@ -207,10 +206,8 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
               gap: 8,
               padding: "11px 18px",
               borderRadius: 10,
-              fontFamily: "var(--font-body)",
               fontSize: 14,
               fontWeight: 600,
-              letterSpacing: -0.1,
               lineHeight: 1.2,
               cursor: "pointer",
               background: "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)",

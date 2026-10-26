@@ -87,7 +87,6 @@ export function BelotReveal({
           border: "1px solid var(--brass-55)",
           boxShadow: `0 22px 54px rgba(0,0,0,0.62), 0 0 0 2px ${glowColor}66, 0 0 28px ${glowColor}55, inset 0 1px 0 var(--brass-25)`,
           color: "var(--ink-light)",
-          fontFamily: "var(--font-body)",
         }}
         data-team={team}
       >
@@ -101,10 +100,9 @@ export function BelotReveal({
         </div>
 
         <div
-          className="text-[9.5px] uppercase tracking-[0.22em]"
+          className="text-2xs uppercase tracking-caps"
           style={{
             color: "var(--brass)",
-            fontFamily: "var(--font-body)",
             padding: "0 18px",
             marginBottom: 14,
           }}
@@ -131,7 +129,7 @@ export function BelotReveal({
 
         <div
           className="font-semibold leading-snug"
-          style={{ fontFamily: "var(--font-body)", fontSize: 18, letterSpacing: 0.2 }}
+          style={{ fontSize: 18 }}
           data-testid="belot-reveal-title"
           data-seat={playerSeat}
         >
@@ -140,7 +138,7 @@ export function BelotReveal({
 
         <div className="mt-3 flex justify-center">
           <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider"
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-bold uppercase tracking-wider"
             style={{
               background: `${glowColor}22`,
               border: `1px solid ${glowColor}88`,
@@ -156,7 +154,7 @@ export function BelotReveal({
           </span>
         </div>
 
-        <div className="mt-1.5" style={{ fontSize: 11.5, opacity: 0.7 }}>
+        <div className="mt-1.5" style={{ fontSize: 12, opacity: 0.7 }}>
           {t("match.belot.reveal.bonus", { defaultValue: "+20 to your team's score" })}
         </div>
       </div>

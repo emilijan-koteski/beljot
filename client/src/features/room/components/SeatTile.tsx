@@ -123,7 +123,7 @@ export function SeatTile({
             />
             <div className="flex flex-col items-center gap-1">
               <span
-                className="font-display text-ink inline-flex items-center gap-1 text-[13px] font-semibold tracking-[-0.2px] sm:text-[14.5px]"
+                className="text-ink inline-flex items-center gap-1 text-sm font-semibold tracking-tight sm:text-sm"
                 data-testid={isBot ? `bot-name-${seatIndex}` : undefined}
               >
                 {isHost && <Crown className="text-brass-deep size-3.25" aria-hidden="true" />}
@@ -135,7 +135,7 @@ export function SeatTile({
                   <div className="flex items-center gap-2">
                     {typeof player.level === "number" && (
                       <span
-                        className="text-ink-dim text-[11.5px] leading-none font-bold whitespace-nowrap tabular-nums"
+                        className="text-ink-dim text-xs leading-none font-bold whitespace-nowrap tabular-nums"
                         data-testid={`seat-level-${seatIndex}`}
                         data-level={player.level}
                         title={t("xp.levelLabel", { level: player.level })}
@@ -145,7 +145,7 @@ export function SeatTile({
                     )}
                     {typeof player.honorScore === "number" && (
                       <span
-                        className="text-ink-dim inline-flex items-center gap-1 text-[11.5px] leading-none font-bold tabular-nums"
+                        className="text-ink-dim inline-flex items-center gap-1 text-xs leading-none font-bold tabular-nums"
                         data-testid={`seat-honor-${seatIndex}`}
                         data-honor={player.honorScore}
                         title={t("profile.honor.meterLabel", {
@@ -212,10 +212,10 @@ export function SeatTile({
               />
             </div>
             <div className="text-center">
-              <div className="font-display text-ink-dim text-[12px] font-semibold sm:text-[13.5px]">
+              <div className="text-ink-dim text-xs font-semibold sm:text-sm">
                 {swapMode ? t("room.seatTile.moveHere") : t("room.seatTile.takeSeat")}
               </div>
-              <div className="text-ink-mute mt-0.5 text-[10.5px] sm:text-[11px]">
+              <div className="text-ink-mute mt-0.5 text-2xs sm:text-xs">
                 {mode === "us"
                   ? t("room.seatTile.partnerSeat")
                   : mode === "them"

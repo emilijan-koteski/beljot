@@ -68,7 +68,7 @@ export function SurrenderOpponentBanner({
       aria-live="polite"
     >
       <span
-        className={`font-body ${compact ? "block text-center text-xs leading-snug" : "text-sm whitespace-nowrap"}`}
+        className={`${compact ? "block text-center text-xs leading-snug" : "text-sm whitespace-nowrap"}`}
         style={{ color: "var(--ink-light)" }}
       >
         {t("match.surrender.opponentBanner", { username: proposerUsername })}

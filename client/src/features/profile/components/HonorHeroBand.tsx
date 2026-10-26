@@ -97,7 +97,7 @@ export function HonorHeroBand({
           <HonorShield tier={isNewPlayer ? "fair" : resolvedTier} size={20} className="shrink-0" />
           {isNewPlayer ? (
             <span
-              className="font-display text-ink text-[22px] leading-none font-bold tabular-nums"
+              className="text-ink text-2xl leading-none font-bold tabular-nums tracking-tight"
               data-testid="profile-honor-new"
               data-value={played}
             >
@@ -109,14 +109,14 @@ export function HonorHeroBand({
           ) : (
             <div className="flex items-baseline gap-2">
               <span
-                className="font-display text-[26px] leading-none font-bold tracking-[-0.8px] tabular-nums"
+                className="text-3xl leading-none font-bold tracking-tight tabular-nums"
                 style={{ color: "var(--ink)" }}
                 data-testid="profile-honor-score"
               >
                 {score}
               </span>
               <span
-                className="text-brass-deep font-mono text-[11px] font-semibold tracking-[1px] uppercase"
+                className="text-brass-deep font-mono text-2xs font-semibold tracking-widest uppercase"
                 data-testid="profile-honor-tier"
               >
                 {t(`profile.honor.tier.${resolvedTier}`)}
@@ -127,7 +127,7 @@ export function HonorHeroBand({
 
         <div className="min-w-45 flex-1">
           {isNewPlayer ? (
-            <p className="text-ink-dim m-0 text-[13px]" data-testid="profile-honor-new-hint">
+            <p className="text-ink-dim m-0 text-sm" data-testid="profile-honor-new-hint">
               {t(
                 subjectIsSelf ? "profile.honor.newPlayerHint" : "profile.honor.newPlayerHintPublic",
               )}
@@ -148,11 +148,11 @@ export function HonorHeroBand({
               { window: HONOR_TREND_WINDOW },
             )}
           >
-            <span className="text-brass-deep font-mono text-[9.5px] font-semibold tracking-[1.6px] uppercase">
+            <span className="text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase">
               {t("profile.honor.lastWindow", { window: HONOR_TREND_WINDOW })}
             </span>
             <span
-              className="inline-flex items-center gap-1 text-[15px] leading-none font-bold tabular-nums"
+              className="inline-flex items-center gap-1 text-base leading-none font-bold tabular-nums"
               style={{ color: TREND_COLOR[direction] }}
             >
               <TrendIcon className="size-3.5 shrink-0" aria-hidden="true" />

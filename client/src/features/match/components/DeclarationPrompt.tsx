@@ -122,11 +122,11 @@ export function DeclarationPrompt({
                       }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-body text-sm" style={{ color: "var(--ink-light)" }}>
+                        <span className="text-sm" style={{ color: "var(--ink-light)" }}>
                           {declarationLabel(decl, t)}
                         </span>
                         <span
-                          className="font-display text-base font-semibold tabular-nums"
+                          className="text-base font-semibold tabular-nums"
                           style={{ color: "var(--brass)" }}
                         >
                           {decl.value} {t("match.declaration.pts")}
@@ -152,14 +152,11 @@ export function DeclarationPrompt({
                   style={{ borderTop: "1px solid var(--brass-25)" }}
                   data-testid="declaration-prompt-total"
                 >
-                  <span
-                    className="font-body text-sm"
-                    style={{ color: "var(--ink-light)", opacity: 0.7 }}
-                  >
+                  <span className="text-sm" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
                     {t("match.declaration.total")}
                   </span>
                   <span
-                    className="font-display text-lg font-bold tabular-nums"
+                    className="text-lg font-bold tabular-nums"
                     style={{ color: "var(--brass)" }}
                   >
                     {total} {t("match.declaration.pts")}
@@ -168,7 +165,7 @@ export function DeclarationPrompt({
               </>
             ) : (
               <p
-                className="font-body text-sm leading-snug mb-4 py-6 text-center"
+                className="text-sm leading-snug mb-4 py-6 text-center"
                 style={{ color: "var(--ink-light)", opacity: 0.75 }}
                 data-testid="declaration-prompt-none"
               >

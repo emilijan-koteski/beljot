@@ -41,14 +41,14 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
             }
           >
             <p
-              className="font-body text-sm mb-4"
-              style={{ color: "var(--ink-light)", opacity: 0.82, lineHeight: 1.55 }}
+              className="text-sm mb-4"
+              style={{ color: "var(--ink-light)", opacity: 0.82, lineHeight: 1.6 }}
             >
               {t("match.surrender.prompt.body", { username: proposerUsername })}
             </p>
 
             <div
-              className="mb-4 px-3 py-2 rounded-lg flex items-center gap-2 font-body"
+              className="mb-4 px-3 py-2 rounded-lg flex items-center gap-2"
               style={{
                 border: "1px solid color-mix(in srgb, var(--danger-light) 35%, transparent)",
                 background: "linear-gradient(90deg, rgba(80,28,28,0.55), rgba(50,18,18,0.35))",

@@ -58,7 +58,7 @@ export function ForgotPasswordPage() {
         subtitle={t("auth.forgotPassword.successBody")}
         footer={backToLogin}
       >
-        <p className="text-ink-dim text-[13.5px] leading-[1.55]" data-testid="forgot-success">
+        <p className="text-ink-dim text-sm leading-relaxed" data-testid="forgot-success">
           {t("auth.forgotPassword.successHint")}
         </p>
       </AuthCard>

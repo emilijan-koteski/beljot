@@ -91,15 +91,13 @@ function MustPickNote() {
       role="status"
       aria-live="polite"
       data-testid="trump-prompt-must-pick"
-      className="inline-flex items-center px-3.5 py-2 text-[13px] sm:px-4.5 sm:py-2.5 sm:text-[14px]"
+      className="inline-flex items-center px-3.5 py-2 text-sm sm:px-4.5 sm:py-2.5 sm:text-sm"
       style={{
         border: "1px dashed var(--brass-40)",
         borderRadius: 8,
         background: "linear-gradient(180deg, rgba(60,90,70,0.35), rgba(30,50,35,0.35))",
         color: "var(--ink-light)",
-        fontFamily: "var(--font-body)",
         fontWeight: 600,
-        letterSpacing: 0.4,
       }}
     >
       {t("match.trumpPrompt.mustPick")}
@@ -149,10 +147,7 @@ export function TrumpPrompt({
             </div>
           )}
           <div className="flex min-w-0 flex-col gap-2">
-            <p
-              className="font-body text-sm leading-snug"
-              style={{ color: "rgba(245,242,232,0.85)" }}
-            >
+            <p className="text-sm leading-snug" style={{ color: "rgba(245,242,232,0.85)" }}>
               <Trans
                 i18nKey={
                   !canPass
@@ -185,7 +180,7 @@ export function TrumpPrompt({
                         boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
                         color: suitAccent(suit, deck),
                         fontFamily: "var(--font-suit)",
-                        fontSize: 15,
+                        fontSize: 16,
                         lineHeight: 1,
                         opacity: isLocked ? 0.4 : 1,
                         filter: isLocked ? "grayscale(0.85)" : undefined,
@@ -237,7 +232,7 @@ export function TrumpPrompt({
             <div className="flex items-center gap-5 mb-5">
               <PlayingCard card={trumpCandidate} state="default" size="lg" withTransition={false} />
               <p
-                className="font-body text-[13px] leading-relaxed flex-1"
+                className="text-sm leading-relaxed flex-1"
                 style={{ color: "var(--ink-light)", opacity: 0.8 }}
               >
                 {t("match.trumpPrompt.bodyRound1")}
@@ -264,10 +259,7 @@ export function TrumpPrompt({
           )}
 
           <div className="flex items-center justify-between gap-3">
-            <span
-              className="font-body text-[11px]"
-              style={{ color: "var(--ink-light)", opacity: 0.55 }}
-            >
+            <span className="text-xs" style={{ color: "var(--ink-light)", opacity: 0.55 }}>
               {trumpCandidate !== null &&
                 t("match.trumpPrompt.roundLabel", {
                   round: biddingRound,

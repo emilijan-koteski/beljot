@@ -51,7 +51,7 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span
-          className="font-display text-base font-semibold"
+          className="text-base font-semibold"
           style={{ color: isWin ? "var(--accent)" : COLD_STREAK_ICE.title }}
         >
           {isWin
@@ -71,7 +71,7 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
       {subjectIsSelf && (
         <Link
           to="/lobby"
-          className="ml-auto inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-[13px] font-semibold"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold"
           style={{
             background: isWin ? "var(--accent)" : COLD_STREAK_ICE.buttonBg,
             color: isWin ? "var(--accent-ink)" : COLD_STREAK_ICE.buttonText,

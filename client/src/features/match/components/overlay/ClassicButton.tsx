@@ -24,9 +24,7 @@ export const ClassicButton = forwardRef<HTMLButtonElement, ClassicButtonProps>(
         ? "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)"
         : "linear-gradient(180deg, rgba(60,90,70,0.6), rgba(30,50,35,0.6))",
       color: isPrimary ? "var(--brass-ink)" : "var(--ink-light)",
-      fontFamily: "var(--font-body)",
       fontWeight: 600,
-      letterSpacing: 0.4,
       borderRadius: 8,
       cursor: disabled ? "not-allowed" : "pointer",
       opacity: disabled ? 0.4 : 1,
@@ -42,7 +40,7 @@ export const ClassicButton = forwardRef<HTMLButtonElement, ClassicButtonProps>(
         ref={ref}
         type={type}
         disabled={disabled}
-        className={`px-3.5 py-2 text-[13px] sm:px-4.5 sm:py-2.5 sm:text-[14px] hover:not-disabled:brightness-110 ${className}`}
+        className={`px-3.5 py-2 text-sm sm:px-4.5 sm:py-2.5 sm:text-sm hover:not-disabled:brightness-110 ${className}`}
         style={baseStyle}
         {...rest}
       >

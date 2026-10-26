@@ -81,7 +81,7 @@ function HeroPill({
           {icon}
         </span>
       )}
-      <span className="text-[13px] font-bold tabular-nums" style={{ color: valueColor }}>
+      <span className="text-sm font-bold tabular-nums" style={{ color: valueColor }}>
         {value}
       </span>
       {!icon && <span style={{ color: labelColor }}>{label}</span>}
@@ -173,7 +173,7 @@ export function IdentityHero({
             userId={userId}
             usernameChangedAt={usernameChangedAt}
           />
-          <div className="text-ink-dim flex flex-col gap-0.5 text-[13px] sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+          <div className="text-ink-dim flex flex-col gap-0.5 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
             {memberSince && <span data-testid="profile-member-since">{memberSince}</span>}
             {memberSince && lastPlayed && <span className="text-ink-off hidden sm:inline">·</span>}
             {lastPlayed && <span>{lastPlayed}</span>}
@@ -201,7 +201,7 @@ export function IdentityHero({
                   label={t("wallet.streakLabel")}
                   titleText={t("wallet.streakTooltip", { days: loginStreakDays })}
                   icon={
-                    <span className="text-[13px] leading-none" aria-hidden="true">
+                    <span className="text-sm leading-none" aria-hidden="true">
                       🔥
                     </span>
                   }
@@ -216,7 +216,7 @@ export function IdentityHero({
           className="col-span-2 flex max-w-xs flex-col gap-1 sm:col-span-1 sm:col-start-2"
           data-testid="profile-xp"
         >
-          <div className="flex items-baseline justify-between gap-2 text-[13px]">
+          <div className="flex items-baseline justify-between gap-2 text-sm">
             <span className="text-ink font-semibold" data-testid="profile-level">
               {t("xp.levelLabel", { level })}
             </span>

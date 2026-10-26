@@ -30,11 +30,11 @@ function StatTile({
       data-testid={testId}
       data-value={String(value)}
     >
-      <span className="text-brass-deep font-mono text-[11px] font-semibold tracking-[2px] uppercase">
+      <span className="text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase">
         {label}
       </span>
       <span
-        className="font-display mt-1 text-[44px] leading-none font-bold tracking-[-1.4px] tabular-nums"
+        className="mt-1 text-5xl leading-none font-bold tracking-tight tabular-nums"
         style={{ color: valueColor }}
       >
         {value}
@@ -55,7 +55,7 @@ function OutcomeSplitBar({ wins, losses, abandoned }: Omit<StatsGridProps, "game
       data-testid="profile-outcome-split"
     >
       <div className="text-ink-dim flex flex-wrap items-center gap-3.5 text-xs">
-        <span className="text-brass-deep font-mono text-[10.5px] font-semibold tracking-[2px] uppercase">
+        <span className="text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase">
           {t("profile.stats.outcomeSplit")}
         </span>
         <LegendDot color="var(--accent)" label={t("profile.stats.legendWins", { count: wins })} />

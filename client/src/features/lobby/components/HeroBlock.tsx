@@ -29,7 +29,7 @@ export function HeroBlock({
   return (
     <header className="mb-5 flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-6">
-        <h1 className="font-display text-ink m-0 text-[38px] font-bold tracking-[-0.6px]">
+        <h1 className="text-ink m-0 text-4xl font-bold tracking-tight">
           {t("lobby.title")}
           <span className="text-ink-mute ml-3.5 font-medium tabular-nums">
             {String(openCount).padStart(2, "0")}

@@ -42,7 +42,7 @@ export function Field({
           <label
             htmlFor={htmlFor}
             className={cn(
-              "font-mono text-[11px] font-semibold tracking-[1.8px] uppercase transition-colors",
+              "font-mono text-2xs font-semibold tracking-caps uppercase transition-colors",
               hasError ? "text-danger" : "text-brass-deep",
             )}
           >
@@ -54,14 +54,14 @@ export function Field({
           )}
         </span>
         {hint && (
-          <span className="text-ink-mute text-[11.5px] font-medium tracking-[0.5px] normal-case">
+          <span className="text-ink-mute text-xs font-medium tracking-wider normal-case">
             {hint}
           </span>
         )}
       </div>
       {children}
       {error && (
-        <p className="text-danger text-xs leading-[1.4] font-medium" data-testid={errorTestId}>
+        <p className="text-danger text-xs leading-snug font-medium" data-testid={errorTestId}>
           {error}
         </p>
       )}

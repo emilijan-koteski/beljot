@@ -16,18 +16,38 @@
    ────────────────────────────────────────────────────────────────────── */
 
 @theme {
-  /* Type — constant across all scopes.
-     One text family (Inter) carries body + display + headings; weight and
-     size do the work a second family used to. JetBrains Mono is kept only
-     for genuinely monospaced content (room codes, aligned figures).
-     --font-suit is NOT a UI font: it forces ♠♥♦♣ pips and the playing-card
-     faces to render as serif text glyphs (sans-serif risks colour-emoji
-     fallback for ♥/♦). */
-  --font-display: "Inter", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* Type — constant across all scopes. One text family, Inter (`font-sans`),
+     carries every headline, label and paragraph; weight and size do the work.
+     JetBrains Mono is kept for micro-caps labels and genuinely monospaced
+     content (room codes, aligned figures). --font-suit is NOT a UI font: it
+     forces ♠♥♦♣ pips and the playing-card faces to render as serif text
+     glyphs (sans-serif risks colour-emoji fallback for ♥/♦). */
   --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-suit: Georgia, "Times New Roman", "DejaVu Serif", serif;
+
+  /* Type scale — ten whole-pixel steps: 2xs 10, xs 12, sm 14, base 16, lg 18,
+     xl 20, 2xl 24, 3xl 28, 4xl 36, 5xl 48. Nothing sets a size off it except
+     the landing's fluid clamp() headlines. 2xs is added for micro-caps
+     labels; 3xl is 28px rather than Tailwind's 30px so the display steps run
+     24 → 28 → 36. */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.5;
+  --text-3xl: 1.75rem;
+  --text-3xl--line-height: 1.2;
+
+  /* Tracking — em, so it scales with the size. tight (-0.025em) for
+     headlines and big figures, wider (0.05em) and widest (0.1em) for small
+     caps and figures, caps (0.18em) for mono micro-caps labels. Tailwind's
+     0.025em `wide` step is removed: at these sizes it is under half a pixel. */
+  --tracking-caps: 0.18em;
+  --tracking-wide: initial;
+
+  /* Leading — none 1, tight 1.2 (headlines), snug 1.4, normal 1.5, relaxed
+     1.6 (paragraphs). */
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-relaxed: 1.6;
 
   /* Radius — whole, even pixels. `rounded` (4px) and `rounded-xs` (2px) keep
      Tailwind's defaults; 4xl is unused, so it is removed rather than left to
@@ -315,7 +335,7 @@
     padding: 0;
     background: var(--bg);
     color: var(--ink);
-    font-family: var(--font-body);
+    font-family: var(--font-sans);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -373,10 +393,6 @@
   }
   html {
     @apply font-sans;
-  }
-
-  .font-display {
-    letter-spacing: -0.01em;
   }
 }
 

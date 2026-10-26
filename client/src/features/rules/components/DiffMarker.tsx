@@ -66,7 +66,6 @@ export function DiffMarker({ note, label, tone = "light" }: Props) {
           <span
             aria-hidden="true"
             style={{
-              fontFamily: "var(--font-body)",
               fontSize: 12,
               fontWeight: 700,
               lineHeight: 1,

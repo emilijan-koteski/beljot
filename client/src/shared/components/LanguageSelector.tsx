@@ -84,7 +84,7 @@ export function LanguageSelector({
                   : "text-ink hover:bg-surface-sunken font-medium",
               )}
             >
-              <span className="text-ink-mute w-4 font-mono text-[10px] font-bold tracking-[1px]">
+              <span className="text-ink-mute w-4 font-mono text-2xs font-bold tracking-widest">
                 {lang.code.toUpperCase()}
               </span>
               <span className="flex-1 text-left">{t(lang.labelKey)}</span>

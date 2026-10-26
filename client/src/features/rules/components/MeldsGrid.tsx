@@ -53,12 +53,12 @@ function MeldCard({ meld }: { meld: Declaration }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span
-          className="font-display"
+          className=""
           style={{
             fontSize: 16,
             fontWeight: 600,
             color: tier.text,
-            letterSpacing: -0.2,
+            letterSpacing: "-0.025em",
             flex: "1 1 auto",
             minWidth: 0,
             lineHeight: 1.2,
@@ -68,24 +68,24 @@ function MeldCard({ meld }: { meld: Declaration }) {
         </span>
         <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "baseline", gap: 4 }}>
           <span
-            className="font-display tabular-nums"
+            className="tabular-nums"
             style={{
-              fontSize: 22,
+              fontSize: 24,
               fontWeight: 700,
               color: tier.pts,
-              letterSpacing: -0.5,
+              letterSpacing: "-0.025em",
             }}
           >
             +{meld.pts}
           </span>
-          <span style={{ fontSize: 11, color: "var(--ink-mute)" }}>{ui.pts}</span>
+          <span style={{ fontSize: 12, color: "var(--ink-mute)" }}>{ui.pts}</span>
         </span>
       </div>
       <div
         className="font-mono"
         style={{
-          fontSize: 10.5,
-          letterSpacing: 2,
+          fontSize: 10,
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           color: tier.eyebrow,
           fontWeight: 600,
@@ -93,8 +93,8 @@ function MeldCard({ meld }: { meld: Declaration }) {
       >
         {ui.meldKinds[meld.kind]}
       </div>
-      <div style={{ fontSize: 13.5, lineHeight: 1.5, color: tier.text }}>{meld.summary}</div>
-      <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--ink-dim)" }}>{meld.detail}</div>
+      <div style={{ fontSize: 14, lineHeight: 1.5, color: tier.text }}>{meld.summary}</div>
+      <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--ink-dim)" }}>{meld.detail}</div>
     </div>
   );
 }

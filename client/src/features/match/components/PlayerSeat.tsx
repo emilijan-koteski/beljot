@@ -138,7 +138,7 @@ function CardBackStack({
         </div>
       ))}
       <span
-        className={`font-body tabular-nums ${compact ? "text-[9px]" : "text-[11px]"}`}
+        className={`tabular-nums ${compact ? "text-2xs" : "text-xs"}`}
         style={{
           marginLeft: compact ? 4 : 8,
           color: "var(--ink-light)",
@@ -197,9 +197,9 @@ export function PlayerSeat({
             border: "1px dashed rgba(255,255,255,0.18)",
           }}
         >
-          <span className="text-ink-dim text-xs font-body">?</span>
+          <span className="text-ink-dim text-xs">?</span>
         </div>
-        <span className="text-ink-dim text-sm font-body">{t("match.seat.waiting")}</span>
+        <span className="text-ink-dim text-sm">{t("match.seat.waiting")}</span>
       </div>
     );
   }
@@ -289,7 +289,7 @@ export function PlayerSeat({
           }}
         >
           <div
-            className="rounded-full flex items-center justify-center overflow-hidden font-display font-semibold"
+            className="rounded-full flex items-center justify-center overflow-hidden font-semibold"
             style={{
               width: "100%",
               height: "100%",
@@ -360,22 +360,22 @@ export function PlayerSeat({
         data-testid="player-seat-name-pill"
       >
         <span
-          className={`font-body font-semibold ${compact ? "text-[11px]" : "text-sm"}`}
+          className={`font-semibold ${compact ? "text-xs" : "text-sm"}`}
           style={{ color: "var(--ink-light)" }}
         >
           {displayName}
         </span>
         {!compact && player.isBot !== true && (
           <span
-            className="font-body text-[10px] tabular-nums flex items-center gap-1.5"
+            className="text-2xs tabular-nums flex items-center gap-1.5"
             style={{ color: "var(--ink-mute)" }}
           >
-            <span style={{ letterSpacing: 0.6 }} data-testid="player-seat-level">
+            <span style={{ letterSpacing: "0.05em" }} data-testid="player-seat-level">
               {t("xp.short", { level: player.level })}
             </span>
             {showRing && (
               <span
-                className="font-body font-semibold tabular-nums"
+                className="font-semibold tabular-nums"
                 style={{
                   color: secondsUrgent ? COLOR_URGENT : TURN_LIME,
                   transition: `color ${MOTION.RING_COLOR_FLIP}ms ease`,

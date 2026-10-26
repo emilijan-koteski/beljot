@@ -88,13 +88,13 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               "animate-[pulse-dot_1.8s_ease-in-out_infinite]",
             )}
           />
-          <h3 className="font-display text-ink m-0 flex-1 min-w-0 truncate text-base font-semibold">
+          <h3 className="text-ink m-0 flex-1 min-w-0 truncate text-base font-semibold">
             {room.name}
           </h3>
           {room.isQuickPlay && (
             <span
               data-testid="quick-play-badge"
-              className="border-accent/30 bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-[0.6px] uppercase"
+              className="border-accent/30 bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-bold tracking-wider uppercase"
             >
               <Zap className="size-2.5" strokeWidth={2.4} />
               {t("lobby.card.quickPlay")}
@@ -103,7 +103,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
           {hasBots && (
             <span
               data-testid="room-card-bots"
-              className="border-bot-edge bg-bot-soft text-bot-deep inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-[0.6px] uppercase"
+              className="border-bot-edge bg-bot-soft text-bot-deep inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-bold tracking-wider uppercase"
             >
               <Bot className="size-2.5" strokeWidth={2.4} />
               {t("bots.withBots")}
@@ -312,7 +312,7 @@ function TeamLabel({ team }: { team: "A" | "B" }) {
   return (
     <span
       className={cn(
-        "pr-1 text-[10px] font-bold uppercase tracking-[1.2px]",
+        "pr-1 text-2xs font-bold uppercase tracking-widest",
         team === "A" ? "text-team-a" : "text-team-b",
       )}
     >
@@ -323,7 +323,7 @@ function TeamLabel({ team }: { team: "A" | "B" }) {
 
 function CodeChip({ code }: { code: string }) {
   return (
-    <span className="bg-surface-sunken text-ink-dim inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] font-semibold tabular-nums tracking-[1.5px]">
+    <span className="bg-surface-sunken text-ink-dim inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs font-semibold tabular-nums tracking-caps">
       <KeyRound className="size-2.5" />
       {code}
     </span>
@@ -331,5 +331,5 @@ function CodeChip({ code }: { code: string }) {
 }
 
 function Dot() {
-  return <span className="text-ink-off text-[10px]">·</span>;
+  return <span className="text-ink-off text-2xs">·</span>;
 }

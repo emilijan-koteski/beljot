@@ -41,7 +41,7 @@ export function SeasonSpLine({ settlement }: Props) {
 
   return (
     <div
-      className="font-display inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
+      className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
       style={{
         color,
         border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`,

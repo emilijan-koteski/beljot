@@ -64,11 +64,11 @@ describe("SuitMark", () => {
         suit="S"
         deck="french"
         size={22}
-        className="font-display"
+        className="tracking-tight"
         style={{ opacity: 0.5 }}
       />,
     );
-    expect(screen.getByTestId("suit-mark-S").className).toContain("font-display");
+    expect(screen.getByTestId("suit-mark-S").className).toContain("tracking-tight");
     expect(screen.getByTestId("suit-mark-S").style.opacity).toBe("0.5");
     unmount();
 

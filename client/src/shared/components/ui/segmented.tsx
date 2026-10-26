@@ -54,7 +54,7 @@ export function Segmented<T extends string>({
             data-testid={`${testId ?? "segmented"}-${o.value}`}
             className={cn(
               "inline-flex flex-1 items-center justify-center gap-1.5 rounded-sm font-medium transition-[background-color,box-shadow,color] outline-none",
-              dense ? "px-2.5 py-1.5 text-[12.5px]" : "px-3.5 py-2 text-[13px]",
+              dense ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-2 text-sm",
               active
                 ? "bg-surface-elevated text-ink shadow-[0_1px_2px_rgba(14,58,36,0.06),0_0_0_1px_var(--border)]"
                 : o.disabled

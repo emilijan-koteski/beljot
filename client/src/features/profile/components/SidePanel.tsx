@@ -24,9 +24,7 @@ export function SidePanel({ eyebrow, title, children, className, testId }: SideP
     >
       <div className="px-4 pt-3.5 pb-2.5">
         <Eyebrow className="mb-1">{eyebrow}</Eyebrow>
-        <h3 className="text-ink font-display m-0 text-base font-semibold tracking-[-0.1px]">
-          {title}
-        </h3>
+        <h3 className="text-ink m-0 text-base font-semibold">{title}</h3>
       </div>
       <div className="px-4 pt-1 pb-3.5">{children}</div>
     </section>

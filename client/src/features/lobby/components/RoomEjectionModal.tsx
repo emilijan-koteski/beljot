@@ -34,7 +34,7 @@ function ComparisonRow({
         style={{
           fontFamily: "var(--font-mono)",
           fontSize: 10,
-          letterSpacing: 1.2,
+          letterSpacing: "0.1em",
           textTransform: "uppercase",
           color: "var(--ink-mute)",
           width: 52,
@@ -65,8 +65,7 @@ function ComparisonRow({
       </span>
       <span
         style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 15,
+          fontSize: 16,
           fontWeight: 700,
           color: "var(--ink)",
           fontVariantNumeric: "tabular-nums",
@@ -150,8 +149,8 @@ export function RoomEjectionModal() {
             <span
               style={{
                 fontFamily: "var(--font-mono)",
-                fontSize: 10.5,
-                letterSpacing: 2,
+                fontSize: 10,
+                letterSpacing: "0.18em",
                 textTransform: "uppercase",
                 fontWeight: 600,
                 color: "var(--brass-deep)",
@@ -163,12 +162,11 @@ export function RoomEjectionModal() {
               data-testid="room-ejection-title"
               style={{
                 margin: "6px 0 0",
-                fontFamily: "var(--font-display)",
                 fontWeight: 700,
-                fontSize: 22,
-                letterSpacing: -0.5,
+                fontSize: 24,
+                letterSpacing: "-0.025em",
                 color: "var(--ink)",
-                lineHeight: 1.15,
+                lineHeight: 1.2,
               }}
             >
               {roomClosed
@@ -253,10 +251,8 @@ export function RoomEjectionModal() {
               gap: 8,
               padding: "11px 18px",
               borderRadius: 10,
-              fontFamily: "var(--font-body)",
               fontSize: 14,
               fontWeight: 600,
-              letterSpacing: -0.1,
               lineHeight: 1.2,
               cursor: "pointer",
               background: "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)",
