@@ -199,7 +199,7 @@ export function DailyRewardDialog({
             <div
               data-testid="daily-reward-amount"
               className={cn(
-                "font-display tabular text-[46px] leading-none font-bold tracking-[-1.5px]",
+                "font-display tabular-nums text-[46px] leading-none font-bold tracking-[-1.5px]",
                 milestone ? "text-team-a" : "text-ink",
               )}
             >
@@ -225,7 +225,7 @@ export function DailyRewardDialog({
               <CoinMedallion size={22} tone={tone} />
               {t("rewards.dailyReward.newBalance")}
             </span>
-            <span className="font-display tabular text-ink text-[18px] font-bold">
+            <span className="font-display tabular-nums text-ink text-[18px] font-bold">
               {formatCoins(newBalance)}
             </span>
           </div>

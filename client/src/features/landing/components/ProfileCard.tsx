@@ -52,7 +52,7 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
             className="px-3 py-4 text-center"
             style={i ? { borderLeft: "1px solid var(--border)" } : undefined}
           >
-            <div className="font-display text-ink tabular text-[28px] font-bold tracking-[-0.5px]">
+            <div className="font-display text-ink tabular-nums text-[28px] font-bold tracking-[-0.5px]">
               {value}
             </div>
             <div className="text-ink-mute mt-0.5 text-[11.5px]">{label}</div>
@@ -80,7 +80,7 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
             >
               {m.won ? labels.won : labels.lost}
             </span>
-            <span className="font-mono text-ink tabular text-sm font-semibold">
+            <span className="font-mono text-ink tabular-nums text-sm font-semibold">
               {m.a} <span className="text-ink-off">–</span> {m.b}
               <span className="font-body text-ink-mute ml-2 text-xs font-normal">
                 {labels.with} {m.withWho}

@@ -371,21 +371,10 @@
   html {
     @apply font-sans;
   }
-}
 
-/* Display helpers — unlayered on purpose so callers can use them as
-   utility-like classes without thinking about layers. */
-.tabular {
-  font-variant-numeric: tabular-nums;
-}
-
-.font-display {
-  font-family: var(--font-display);
-  letter-spacing: -0.01em;
-}
-
-.font-mono {
-  font-family: var(--font-mono);
+  .font-display {
+    letter-spacing: -0.01em;
+  }
 }
 
 /* ───────────────────────────────────────────────────────────────────────
