@@ -125,7 +125,7 @@
   /* ── Ink (text) ───────────────────────────────────────────────────── */
   --ink: #0e3a24;
   --ink-dim: #466354;
-  --ink-mute: #7a8a82;
+  --ink-mute: #64726b;
   --ink-off: #b1b8b3;
 
   /* ── Accent (felt-green action) ───────────────────────────────────── */
@@ -138,7 +138,7 @@
 
   /* ── Brass (chrome accent) ────────────────────────────────────────── */
   --brass: #c9a876;
-  --brass-deep: #9c7d4e;
+  --brass-deep: #7c633e;
   --brass-ink: #2a1a08;
   --brass-soft: rgba(201, 168, 118, 0.18);
 
@@ -172,7 +172,7 @@
 
   /* ── Status ───────────────────────────────────────────────────────── */
   --success: #196536;
-  --warning: #9c7d4e;
+  --warning: var(--brass-deep);
   --danger: #8b2a1f;
 
   /* ── Honour tier ramp (h1 = worst … h5 = best) ─────────────────────────
@@ -422,6 +422,7 @@
 
   --border: rgba(201, 168, 118, 0.25);
   --border-2: #c9a876;
+  --brass-deep: #9c7d4e;
 
   /* Team colors — viewer-relative (Us = gold, Them = silver) */
   --team-gold: #e8c25a;
@@ -535,7 +536,7 @@
 
   --ink: #0e3a24;
   --ink-dim: #466354;
-  --ink-mute: #7a8a82;
+  --ink-mute: #64726b;
   --ink-off: #b1b8b3;
 
   --accent: #196536;
@@ -581,6 +582,7 @@
 
   --border: rgba(201, 168, 118, 0.25);
   --border-2: #c9a876;
+  --brass-deep: #9c7d4e;
 
   /* Decorative felt scene gradient stops (hero / CTA radials) + wood rim
      for the felt-table vignette. */
