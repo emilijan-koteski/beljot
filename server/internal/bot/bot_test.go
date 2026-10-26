@@ -21,29 +21,34 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		mem = bot.NewMemory()
 	}
 	v := bot.View{
-		Seat:                seat,
-		Hand:                gs.Players[seat].Hand,
-		Phase:               gs.Phase,
-		BiddingRound:        gs.BiddingRound,
-		TrumpCandidate:      gs.TrumpCandidate,
-		TrumpSuit:           gs.TrumpSuit,
-		TrumpCallerSeat:     gs.TrumpCallerSeat,
-		HasTrumpCandidate:   gs.Rules.HasTrumpCandidate,
-		DealerSeat:          gs.DealerSeat,
-		CurrentTrick:        gs.CurrentTrick,
-		LeadSuit:            gs.LeadSuit,
-		ActivePlayerSeat:    gs.ActivePlayerSeat,
-		Clockwise:           gs.Rules.Clockwise,
-		AwaitingDeclaration: gs.AwaitingDeclaration && gs.ActivePlayerSeat == seat,
-		HasDeclarations:     game.HasDeclarableCombinations(gs, seat),
-		PendingBelot:        gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,
-		TeamScores:          gs.TeamScores,
-		HandPoints:          gs.HandPoints,
-		TricksWon:           gs.TricksWon,
-		PlayedCards:         mem.PlayedCards(),
-		KnownVoids:          mem.KnownVoids(),
-		KnownCards:          mem.KnownCards(),
-		DeclaredCards:       mem.DeclaredCards(),
+		Seat:                 seat,
+		Hand:                 gs.Players[seat].Hand,
+		Phase:                gs.Phase,
+		BiddingRound:         gs.BiddingRound,
+		TrumpCandidate:       gs.TrumpCandidate,
+		TrumpSuit:            gs.TrumpSuit,
+		TrumpCallerSeat:      gs.TrumpCallerSeat,
+		HasTrumpCandidate:    gs.Rules.HasTrumpCandidate,
+		DealerSeat:           gs.DealerSeat,
+		CurrentTrick:         gs.CurrentTrick,
+		LeadSuit:             gs.LeadSuit,
+		ActivePlayerSeat:     gs.ActivePlayerSeat,
+		Clockwise:            gs.Rules.Clockwise,
+		AwaitingDeclaration:  gs.AwaitingDeclaration && gs.ActivePlayerSeat == seat,
+		HasDeclarations:      game.HasDeclarableCombinations(gs, seat),
+		PendingBelot:         gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat,
+		TeamScores:           gs.TeamScores,
+		HandPoints:           gs.HandPoints,
+		TricksWon:            gs.TricksWon,
+		DeclPoints:           declPointsOf(gs),
+		TrickNumber:          gs.TrickNumber,
+		MatchTarget:          game.MatchTarget(gs.MatchMode),
+		StopAtTarget:         gs.Rules.StopAtTarget,
+		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
+		PlayedCards:          mem.PlayedCards(),
+		KnownVoids:           mem.KnownVoids(),
+		KnownCards:           mem.KnownCards(),
+		DeclaredCards:        mem.DeclaredCards(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -53,6 +58,13 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	}
 	v.MustPickTrump = game.MustPickTrump(gs, seat)
 	return v
+}
+
+func declPointsOf(gs *game.GameState) [2]int {
+	return [2]int{
+		gs.DeclarationPoints[game.TeamA] + gs.BelotPoints[game.TeamA],
+		gs.DeclarationPoints[game.TeamB] + gs.BelotPoints[game.TeamB],
+	}
 }
 
 func card(id string) game.Card {

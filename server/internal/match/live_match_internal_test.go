@@ -496,3 +496,32 @@ func TestBuildBotView_CarriesTheRevealedDeclarationCards(t *testing.T) {
 	assert.Empty(t, v.DeclaredCards[2])
 	assert.Empty(t, v.DeclaredCards[3])
 }
+
+func TestBuildBotViewCarriesTheSettlementFields(t *testing.T) {
+	configured := testfixtures.NewGameMidPlay(4)
+	configured.MatchMode = "701"
+	configured.DeclarationPoints = [2]int{50, 20}
+	configured.BelotPoints = [2]int{0, 20}
+	configured.Rules.StopAtTarget = true
+	configured.Rules.DeclarationsTransfer = true
+
+	plain := testfixtures.NewGameMidPlay(1)
+	plain.Rules.StopAtTarget = false
+	plain.Rules.DeclarationsTransfer = false
+
+	for seat := range 4 {
+		v := buildBotView(configured, seat, nil)
+		assert.Equal(t, 4, v.TrickNumber, "seat %d", seat)
+		assert.Equal(t, [2]int{50, 40}, v.DeclPoints, "seat %d", seat)
+		assert.Equal(t, 701, v.MatchTarget, "seat %d", seat)
+		assert.True(t, v.StopAtTarget, "seat %d", seat)
+		assert.True(t, v.DeclarationsTransfer, "seat %d", seat)
+	}
+
+	v := buildBotView(plain, 0, nil)
+	assert.Equal(t, 1, v.TrickNumber)
+	assert.Equal(t, [2]int{0, 0}, v.DeclPoints)
+	assert.Equal(t, 1001, v.MatchTarget)
+	assert.False(t, v.StopAtTarget)
+	assert.False(t, v.DeclarationsTransfer)
+}

@@ -17,9 +17,12 @@ type View struct {
 	DealerSeat      int
 	MustPickTrump   bool
 
+	HasTrumpCandidate bool
+
 	CurrentTrick     []game.TrickCard
 	LeadSuit         *game.Suit
 	ActivePlayerSeat int
+	Clockwise        bool
 
 	AwaitingDeclaration      bool
 	HasDeclarations          bool
@@ -33,6 +36,13 @@ type View struct {
 	PlayedCards []game.Card
 	KnownVoids  [4][4]bool
 	KnownCards  [4][]game.Card
+
+	DeclaredCards [4][]game.Card
+
+	TrickNumber          int
+	MatchTarget          int
+	StopAtTarget         bool
+	DeclarationsTransfer bool
 
 	F Flags
 

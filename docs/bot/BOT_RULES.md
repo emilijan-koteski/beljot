@@ -2,15 +2,16 @@
 
 This document describes exactly how the bot decides, across every scenario, what it
 considers, and with examples, for both the Bitola and the Croatian variant. It reflects the
-current logic including phase 1 of bot v2 (`BOT_V2_PROPOSAL.md` §4.7: new memory facts, the
-hand-shape bidding table, the led-suit-secure take, the Ace cashed before the Ten and the Ten
-under the Ace on the partner's trick) and the earlier tuning (partner trump-draw with
-a declaration-inference abort when the opponents provably hold the master, boss preservation,
-uncuttable-boss last-trick retention, suppressing trump draws once the
-opponents are void of trump, leading into a partner's void, smearing onto a partner's boss,
-seat-aware **secure trick takes** with a material-stake gate and control-trump economy, the
-**boss-preserving smear** with its endgame/dead-suit exceptions, and never fighting a partner
-who is **forced to win a trump-led trick**).
+current logic including phases 1 and 2 of bot v2 (`BOT_V2_PROPOSAL.md` §4.7). Phase 1 is the new
+memory facts, the hand-shape bidding table, the led-suit-secure take, the Ace cashed before the
+Ten and the Ten under the Ace on the partner's trick. Phase 2 is the Monte Carlo search that
+plays the cards from trick 3 (§5), with the rule layer as the fallback. The rule layer also
+carries the earlier tuning: partner trump-draw with a declaration-inference abort when the
+opponents provably hold the master, boss preservation, uncuttable-boss last-trick retention,
+suppressing trump draws once the opponents are void of trump, leading into a partner's void,
+smearing onto a partner's boss, seat-aware **secure trick takes** with a material-stake gate and
+control-trump economy, the **boss-preserving smear** with its endgame/dead-suit exceptions, and
+never fighting a partner who is **forced to win a trump-led trick**.
 
 Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, J, T (ten), 9, 8, 7.
 
@@ -24,14 +25,19 @@ Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, 
 | Bidding (the hand-shape table) | `server/internal/bot/bidding.go` | `decideBid`, `matchesBidTable` |
 | What the bot is allowed to know | `server/internal/bot/view.go` | Redacted, seat-local snapshot |
 | What the bot remembers | `server/internal/bot/memory.go` | Played cards, voids, revealed declarations, located cards |
-| Timing, humanization, scheduling | `server/internal/match/bot_driver.go` | Think delay, when the bot acts |
+| Search layer: solver, belief sampler, settlement, chooser, sample schedule | `server/internal/bot/search/` | `solver.go`, `sampler.go`, `settle.go`, `pimc.go` (`Choose`, `SamplesForTrick`), `cards.go` |
+| View to search input, when the search applies, the searched card | `server/internal/bot/search_bridge.go` | `SearchApplies`, `SearchCard`, `DecideWith` |
+| Worker pool, search settings | `server/internal/match/search_pool.go` | `BotSearchSettings`, bounded queue, panic recovery |
+| Search settings from the environment | `server/internal/config/config.go` | `BELJOT_BOT_SEARCH_*` (§5.6) |
+| Timing, humanization, scheduling | `server/internal/match/bot_driver.go` | Think delay, when the bot acts, queueing and consuming search jobs |
 | Card point and strength tables | `server/internal/game/types.go` | Tables every heuristic reads |
 | Legality (the rules cage) | `server/internal/game/validation.go` | The bot only ever chooses among legal cards |
-| Tests for all of the below | `server/internal/bot/bot_test.go`, `simulation_test.go` | Table tests + heuristic-vs-random simulation |
+| Tests for all of the below | `server/internal/bot/bot_test.go`, `simulation_test.go`, `search_bridge_test.go`, `search/*_test.go`, `server/internal/match/bot_search_test.go` | Table tests, heuristic-vs-random simulation, the search gates |
 
 `Decide(View) game.Action` is **pure and deterministic**: there is no randomness in card
 choice. The only randomness is the think delay in the match layer. Every decision below is
-fully reproducible and table-testable.
+fully reproducible and table-testable. The search (§5) is a separate entry point that `Decide`
+never calls, and it is deterministic for a given view too.
 
 ---
 
@@ -59,7 +65,9 @@ Every time it is the bot's turn, it checks these in strict priority:
 3. **Belote / Rebelote pending** (+20) -> always announce. Unconditional value.
 4. **Awaiting declaration** -> always declare. The engine auto-detects melds; declaring
    always maximizes points.
-5. **Otherwise** -> `chooseCard` (Scenario B).
+5. **Otherwise** -> `chooseCard` (Scenario B). From trick 3 the match layer first offers a card
+   play to the search (§5); `chooseCard` then plays only when the search does not apply or does
+   not deliver in time.
 
 Scenarios 1, 3, 4 are "always do it" with nothing to tune. The real intelligence is in
 **bidding** and **card play**.
@@ -150,7 +158,180 @@ trumps without the Jack or the 9, or four small trumps with no side Ace.
 
 ---
 
-## 5. Scenario B: Card play
+## 5. The search layer (from trick 3)
+
+From the third trick on, a bot seat does not run `chooseCard`. It plays the card found by a Monte
+Carlo search: draw complete deals that agree with everything the seat knows, solve each one
+exactly as if every hand were open, settle the result the way the engine scores a hand, and play
+the card with the best average for the seat's team. Bidding, declarations, Belote, surrender and
+tricks 1 and 2 stay with the rule layer (§3, §4, §6), and the rule layer is also the fallback
+whenever the search does not deliver a card. The search is the phase-2 design of
+`BOT_V2_PROPOSAL.md` §4.7; the lab measurements behind the start at trick 3 are in
+`BOT_V2_LAB_RESULTS.md` §2.2 (searching tricks 1 and 2 as well was worth between 0 and +5 at 12
+samples and costs seconds per decision with the current solver).
+
+`Decide` never calls the search. The search is a separate entry point in
+`server/internal/bot/search_bridge.go` (`SearchApplies`, `SearchCard`, `DecideWith`) that the
+match layer drives (5.5), so `Decide` stays pure and the rule layer needs no search to be tested.
+
+### 5.1 When the search plays (`SearchApplies`)
+
+All of these must hold, otherwise the rule layer plays:
+
+- the first searched trick (`BELJOT_BOT_SEARCH_FROM_TRICK`, default 3) is above 0 and the current
+  trick (`View.TrickNumber`, 1 to 8) has reached it;
+- the phase is playing, the trump suit is known and it is the seat's own turn;
+- nothing else is pending for the seat: no Belote announcement, no declaration, no partner
+  surrender proposal;
+- the seat has more than one legal card;
+- when the room stops at the match target (`StopAtTarget`), neither team can still reach the
+  target inside this hand. The test adds each team's match score, hand points and declaration
+  points, and compares the gap to the target with every card point still to play plus the +10 for
+  the last trick. The search has no race objective yet, so such hands go to the rule layer.
+
+### 5.2 What is sampled
+
+`informationFrom` turns the `View` into what the sampler may use:
+
+| Input | Value |
+|---|---|
+| own cards | the seat's hand |
+| gone | cards played this hand and the cards in the current trick |
+| known per seat | the seat's declared and located cards that are still unplayed (`KnownCards`), minus the seat's own hand |
+| cannot hold per seat | every card of a suit the seat is known void in (including a trump void proven by a discard), plus the cards just outside a revealed run (`cardsProvablyAbsent`), minus the known cards |
+| need per seat | the cards the seat still holds (the hand size, one less for a seat that already played to this trick) minus its known cards |
+| unseen | the whole deck minus own, gone and every known card |
+
+`search.Sample` then deals the unseen cards to the seats' remaining counts. It first shuffles and
+deals up to 200 times, rejecting a deal that puts a card where `cannot hold` forbids it. This is
+uniform over the consistent deals. If every draw is rejected it builds a deal card by card, up to
+200 times, giving each card to a random seat that still needs cards and may hold it. That
+fallback is not exactly uniform. When no deal can be built the search stops with the samples it
+has, and with none it reaches no decision and the rules play.
+
+Every deal that satisfies the hard facts is equally likely when the rejection draw succeeds; the
+constructive fallback is close to uniform but not exactly. The sampler does not weigh deals by
+how the seats bid or by what they led or discarded (see 5.9).
+
+### 5.3 How a sample is solved and settled
+
+- **Solve** (`search.Solver`): an exact double-dummy search for the fixed trump suit and the room's
+  direction of play, alpha-beta with a transposition table at trick boundaries over the four
+  hands as 32-bit masks. Legality mirrors `game/validation.go`: follow the suit, overplay the led
+  suit while able, cut when void, overtrump. It returns, for every legal card of the seat, the
+  best-play value of the rest of the hand as team A minus team B points, including the +10 for
+  the last trick or the Capot bonus. `search/solver_test.go` checks it against a brute-force
+  minimax and against the engine's legality and trick winner; the lab prototype's speed table is
+  in `BOT_V2_LAB_RESULTS.md` §1.1.
+- **Settle** (`search.Settle`): the remainder value becomes the award the engine would bank,
+  mirroring `scoreHand`. It adds the hand points already banked and both teams' declaration and
+  Belote points. A Capot gives the whole hand and the Capot bonus to the sweeping team. A caller
+  who does not beat the defenders (a tie loses) concedes the hand: the defenders take all card
+  points plus either both teams' declarations (`DeclarationsTransfer`) or only their own.
+  `TestSettleMatchesEngineAtTheLastTrick` pins the agreement with the engine.
+- **Choose** (`search.Choose`): for each legal card, the settled values are averaged over the
+  samples, signed for the seat's team, and the best average is played. Equal sums go to the lower
+  card index, so ties are deterministic.
+
+### 5.4 Samples per trick and the early stop
+
+| Trick | Samples (at most) |
+|---|---|
+| 1 and 2 | none (rule layer) |
+| 3 | 16 |
+| 4 | 30 |
+| 5 | 40 |
+| 6, 7 and 8 | 60 |
+
+The search stops early once at least 8 samples are in and the best card leads the runner-up by
+more than one standard error. The standard error is that of the per-sample difference between
+the two cards (the same deals are scored for both, so the comparison is paired). A clear choice
+therefore can stop after 8 solves, and a close one runs the full count.
+
+### 5.5 Deadline, worker pool and fallback
+
+The search runs in the match layer (`match/bot_driver.go`, `match/search_pool.go`):
+
+- When the bot's think timer is armed for a card play (`maybeScheduleBotAction`), the match
+  layer builds the seat's view under the session lock and queues a search job. It does so only
+  when the seat's turn is a plain card play: playing phase, no pending Belote or declaration, and
+  no open surrender proposal from anyone. The job itself runs on a pool worker without the lock.
+  The pool has a fixed number of workers and a bounded queue (four jobs per worker). A full queue
+  drops the new job, so a burst of bot turns never grows memory or blocks a timer goroutine.
+- The job has a deadline of `BELJOT_BOT_SEARCH_DEADLINE` (default 500 ms) counted from when it
+  was queued, so time spent waiting in the queue counts. The deadline is checked before every
+  sample. When it has passed, all samples are discarded and the search reports no decision. A
+  partial answer is never played.
+- A finished search is stored for the seat only if the session is still open and the seat's
+  action generation still equals the one the timer was armed with.
+- When the seat's current timer fires (`handleBotActionTimer`), the stored result is taken and
+  cleared. It is used only if it was made for the same generation and the same decision context
+  (phase, hand number, pending Belote, awaiting declaration, surrender pending). `DecideWith`
+  then plays the searched card if it is still legal and nothing else is pending, and otherwise
+  calls `Decide`.
+- The bot never waits for the search. If the job is still running when the think delay ends (by
+  default 1 to 2.5 s for a play), if it was dropped, timed out, or panicked (the pool recovers and
+  logs it), or if the position changed, the rule layer plays the card. A late result is
+  discarded.
+
+Only `server/cmd/api/main.go` enables the search, through `Manager.SetBotSearch`. A `Manager`
+that never calls it plays every card by the rules.
+
+### 5.6 Settings
+
+Read once in `server/internal/config` and passed to `SetBotSearch`:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BELJOT_BOT_SEARCH_WORKERS` | `0` | worker count; 0 or less means automatic, `max(1, min(4, GOMAXPROCS/2))` |
+| `BELJOT_BOT_SEARCH_DEADLINE` | `500ms` | time one search may take, from queueing; 0 or less means the default |
+| `BELJOT_BOT_SEARCH_FROM_TRICK` | `3` | first trick the search plays; 0 or less turns the search off |
+
+A value below 3 behaves like 3, because no sample count is defined for tricks 1 and 2:
+`SearchApplies` is false there, so no job is queued and the rules play.
+
+### 5.7 Determinism
+
+For a given view and without a deadline hit, `SearchCard` is deterministic. The random stream is
+seeded from a hash (FNV-64a) of the information state: seat, own cards, unseen cards, known and
+cannot-hold masks and need counts. The same information gives the same samples and the same card,
+and any new fact (a void, a revealed card) changes the seed. Reproducing a bot's play therefore
+needs its view, not a recorded seed. The only nondeterminism left is timing: a missed deadline,
+or a job still running when the think timer fires, hands the card to the rule layer, so a
+loaded machine can turn a search into a rule-layer play.
+
+### 5.8 Measured strength and the gates
+
+Measured on this branch (phase 2, the settings above):
+
+| Measurement | Result |
+|---|---|
+| search seats 0/2 vs the random baseline, 60 hands (`TestSimulation_SearchBeatsRandomBaseline`) | 75 to 79% of all points; gate: at least 60% |
+| duplicate search vs the rule layer, 40 deals (`TestSimulation_SearchDoesNotLoseToTheRules`) | +6.0 ± 5.4 per deal; gate: mean at least −3.0 |
+| the same duplicate comparison, 400 deals | +10.05 ± 1.76 per deal |
+| trick-3 search over 20 random positions (`TestSearchTrick3StaysUnderTheDeadline`) | mean about 40 ms, max about 150 ms; gate: mean under 250 ms, max under 500 ms |
+
+The two simulation gates run only when `BELJOT_BOT_SIM=1` is set (CI sets it; `make test` skips
+them to stay fast), take about 9 s together, and need no database. The deadline test always runs.
+A deal that passes out in bidding scores 0 in the duplicate comparison, so the per-deal figures
+include passed-out deals.
+
+### 5.9 What the search does not model
+
+- **No bidding or play inference beyond the hard facts of 5.2.** Deals are not weighed by how the
+  seats bid, led, discarded or signalled. The lab measured the bidding-consistency weighting at
+  −1.9 ± 1.9 and left it out (`BOT_V2_LAB_RESULTS.md` §2.6).
+- **Open-hand solving of each sample.** Every sampled deal is solved as if all four players saw
+  all cards, for the opponents too. A card that is best only because the seat would know the
+  exact deal later (strategy fusion) can be overrated, and a card that hides information is not
+  valued.
+- **No partner conventions** and no objective other than the settled hand score (no match-score
+  or race awareness; the stop-at-target hands within reach go to the rules, 5.1).
+- **No bidding, declaration, Belote or surrender decisions**, and no search on tricks 1 and 2.
+
+---
+
+## 6. Scenario B: Card play
 
 Entry: `chooseCard`. Decision tree:
 
@@ -559,7 +740,7 @@ play **A♠** now (banks 11 safely) instead of T♠ (which would later lead into
 
 ---
 
-## 6. What the bot knows: information model
+## 7. What the bot knows: information model
 
 The bot's intelligence is bounded by the View (`buildBotView`), redacted so the bot only sees
 what a human in that seat could:
@@ -578,8 +759,9 @@ what a human in that seat could:
 - **Update points**: the match layer updates the memory on every state replacement — card
   plays, the trump pick, the Belote announcement and the declaration reveal, including when
   the declaration window times out — not only on player actions.
-- **Scores, hand points, tricks won**: present in the View but currently **not used** by any
-  heuristic.
+- **Scores, hand points, tricks won**: present in the View but **not used** by any rule-layer
+  heuristic. The search reads the hand points, declaration points and tricks won to settle a
+  sample, and the match scores to spot stop-at-target hands within reach (§5.1, §5.3).
 
 Reasoning helpers (all pure, in `bot.go`):
 
@@ -601,19 +783,32 @@ Reasoning helpers (all pure, in `bot.go`):
   has been directly revealed in an opponent's own hand, aborting the partner trump-draw in
   `chooseLead`.
 
+What the search sampler consumes (§5.2): the same View and nothing more. It reads the cards played
+and those in the current trick, the void matrix (including trump voids), the known cards per seat
+(declared and located cards, which it puts into that seat's hand and removes from the unseen
+pool), the run neighbours from `cardsProvablyAbsent` (which it forbids in that seat's hand) and
+each seat's remaining card count. These are hard facts: a deal that contradicts one is never
+drawn. Everything else is unknown, and the sampler treats it as uniform. Which unseen cards sit
+with which seat is equally likely under every deal that fits the facts, so no conclusion is drawn
+from how a seat bid or passed, what it led or discarded, or what it signalled, and the scores do
+not shape the samples.
+
 ---
 
-## 7. Timing and humanization (`bot_driver.go`)
+## 8. Timing and humanization (`bot_driver.go`)
 
 No bearing on which card, only when:
 
 - Game decisions: uniform random delay in `[botDelayMin, botDelayMax]`.
 - Score-reveal acknowledgements: a single short beat.
 - Generation/context guards ensure the bot never double-acts or acts on a stale decision point.
+- Card plays from trick 3: the search job is queued when the think timer is armed, so the think
+  delay is the time the search has to finish. A result that is ready and still valid when the
+  timer fires is played, otherwise the rule layer plays (§5.5).
 
 ---
 
-## 8. Tuning levers and blind spots
+## 9. Tuning levers and blind spots
 
 By impact:
 
@@ -640,9 +835,14 @@ By impact:
    endgame and dead-suit exceptions, the all-unprotected fallback).
 7. `partnerDrawTrump`: the Q/K/T/A order and the "never the 9" rule.
 8. `retainLastTrickWinner` + `isUncuttableBoss`: capturing the +10 in the last trick.
+9. The search: the `BELJOT_BOT_SEARCH_*` settings, `search.SamplesForTrick` and the early-stop
+   constants (`searchEarlyStopAfter`, `searchEarlyStopSE`) trade playing strength from trick 3
+   against CPU time (§5.4, §5.6). Change them only with the simulation gates and the duplicate
+   comparison of §5.8.
 
-Blind spots if you want a stronger bot (the first four are logged in
-`_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass):
+Blind spots if you want a stronger bot. These belong to the rule layer, which from trick 3 plays
+only as the fallback; the search's own limits are in §5.9. (The first four are logged in
+`_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass.)
 
 - **Addressed** — the stake gate used to have no cost/benefit weighing (any > 0 stake could
   spend a 20-point master to secure a 3-point trick). `trumpEconomyTake` now gates a control
@@ -670,15 +870,16 @@ Blind spots if you want a stronger bot (the first four are logged in
   `securelyWins`), so the bot sometimes ducks a smear onto a provably safe partner ruff.
 - No arbitration between a mid-hand secure-spend of the master trump and the trick-7 retention
   logic that prices last-trick control at +10.
-- `TeamScores` / `HandPoints` / `TricksWon` are in the View but **never consulted**: no
-  "we are behind, play aggressive" or "the contract is secured, coast" logic.
+- `TeamScores` / `HandPoints` / `TricksWon` are in the View but **never consulted by the rule
+  layer**: no "we are behind, play aggressive" or "the contract is secured, coast" logic. The
+  search uses the hand points and tricks won only to score a sample, not to change its objective.
 - No signalling or inference from the **partner's** discards (only voids are used).
 - No forced pick in Bitola round 2 (weak hands just reshuffle).
 - Belote, declarations, and accepting surrender are unconditional (correct, nothing to tune).
 
 ---
 
-## 9. Where to change things (quick map)
+## 10. Where to change things (quick map)
 
 | Behavior | Function | File |
 |---|---|---|
@@ -702,5 +903,14 @@ Blind spots if you want a stronger bot (the first four are logged in
 | Lead into the partner's void | `leadIntoPartnerVoid` | `server/internal/bot/bot.go` |
 | Smear onto the partner's boss (risk) | `shouldSmearOntoPartnerBoss`, `opponentMayHoldTrump` | `server/internal/bot/bot.go` |
 | Endgame +10 retention (master trump or uncuttable boss) | `retainLastTrickWinner`, `isUncuttableBoss` | `server/internal/bot/bot.go` |
+| When the search plays (trick, turn, pending actions, stop-at-target reach) | `SearchApplies`, `withinStopAtTargetReach` | `server/internal/bot/search_bridge.go` |
+| What the sampler may know (View to information) | `informationFrom`, `cannotHold`, `cardsHeldBy` | `server/internal/bot/search_bridge.go` |
+| Draw deals consistent with the information; the seed | `Sample`, `Information.Seed` | `server/internal/bot/search/sampler.go` |
+| Solve a deal exactly | `Solver.RootValues` | `server/internal/bot/search/solver.go` |
+| Settle a sample's remainder as the engine scores a hand | `Settle` | `server/internal/bot/search/settle.go` |
+| Samples per trick, the average, the early stop, the deadline check | `SamplesForTrick`, `Choose`, `searchEarlyStopAfter`, `searchEarlyStopSE` | `server/internal/bot/search/pimc.go`, `search_bridge.go` |
+| Queue the search, store and consume its result, fall back to the rules | `submitBotSearch`, `runBotSearch`, `takeBotSearchResult`, `DecideWith` | `server/internal/match/bot_driver.go`, `server/internal/bot/search_bridge.go` |
+| Pool size, deadline, first searched trick | `BotSearchSettings`, `DefaultBotSearchSettings`, `Manager.SetBotSearch` | `server/internal/match/search_pool.go`, `live_match.go`, `server/internal/config/config.go` |
 | Unit tests for all of the above | `TestDecide_*` | `server/internal/bot/bot_test.go` |
 | Strength check (bot vs. random) | `TestSimulation_*` | `server/internal/bot/simulation_test.go` |
+| Search strength and time gates | `TestSimulation_Search*` (need `BELJOT_BOT_SIM=1`), `TestSearchTrick3StaysUnderTheDeadline` | `server/internal/bot/simulation_test.go`, `server/internal/bot/search/bench_test.go` |

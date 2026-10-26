@@ -1,6 +1,6 @@
 # Beljot bot v2: analysis and proposal
 
-Status: proposal, revision 4 (signed off after three rounds of adversarial review), 2026-10-25. Phase 1 (§4.7) is implemented on branch `feat/bot-v2-phase1` (2026-10-25); the lab measured that package at +3.9 ± 0.7 (Bitola) / +5.2 ± 0.7 (Croatian) before implementation, and the implemented package, after the final-review fixes, measured +4.05 ± 0.69 (Bitola) / +5.20 ± 0.71 (Croatian) against the frozen v1 copy (4000 deals ×2 each). Nothing else in this document is implemented. It is the output of a measurement-driven review of `server/internal/bot` for both
+Status: proposal, revision 4 (signed off after three rounds of adversarial review), 2026-10-25. Phase 1 (§4.7) is implemented on branch `feat/bot-v2-phase1` (2026-10-25); the lab measured that package at +3.9 ± 0.7 (Bitola) / +5.2 ± 0.7 (Croatian) before implementation, and the implemented package, after the final-review fixes, measured +4.05 ± 0.69 (Bitola) / +5.20 ± 0.71 (Croatian) against the frozen v1 copy (4000 deals ×2 each). Phase 2 (§4.7) is implemented on branch `feat/bot-v2-phase2` (2026-10-25): the search runs from trick 3 with the default budget; measured +6.0 ± 5.4 (40 deals) and +10.05 ± 1.76 (400 deals) against the rule layer in duplicate self-play. The per-trick sample counts are caps, and a missed deadline (or no consistent deal) plays the rule layer. Nothing else in this document is implemented. It is the output of a measurement-driven review of `server/internal/bot` for both
 variants (Bitola and Croatian). The numbers and the method are in `BOT_V2_LAB_RESULTS.md`; the
 code that produced them is in `docs/bot/lab/`; the review and what changed because of it is in
 `BOT_V2_REVIEW_LOG.md`.
@@ -267,10 +267,10 @@ and 7 in Bitola) are included by the owner's decision and flagged for re-check.
 | 1 | J and 9 of the suit, two or more trumps | +17 ± 2 (two), +62 ± 2 (three), +119 ± 3 (four) | +23 ± 4, +64 ± 3, +101 ± 6 |
 | 2 | J with three or more trumps | +30 ± 2 (three, no side Ace), +49 ± 2 (with one) | +23 ± 3, +47 ± 4 |
 | 3 | four or more trumps including the 9 | +38 ± 4 | +33 ± 7 |
-| 4 | four or more trumps including the Ace (no J/9) | +9 ± 4 | +10 ± 7 (1.4 SE; included by the owner's decision, re-checked after recalibration) |
+| 4 | four or more trumps including the Ace (no J/9) | +9 ± 4 | +10 ± 7 (1.4 SE; included by the owner's decision, re-checked in BOT_V2_LAB_RESULTS §3.4 (2026-10-26): misses the criterion under the phase-1 rule layer; kept pending the owner's decision) |
 | 5 | four or more trumps with a side Ace | +28 ± 11 (exactly one side Ace) | +33 ± 15 (exactly one) |
 | 6 | five or more trumps | +107 to +185 | (no cell with n ≥ 150) |
-| 7 | Bitola only: 9 and A with three trumps and a side Ace | +5 ± 3 (exactly one side Ace), +8 ± 3 (one or more); 1.7–2.6 SE, included by the owner's decision, re-checked after recalibration | −19 ± 5: out |
+| 7 | Bitola only: 9 and A with three trumps and a side Ace | +5 ± 3 (exactly one side Ace), +8 ± 3 (one or more); 1.7–2.6 SE, included by the owner's decision, re-checked in BOT_V2_LAB_RESULTS §3.4 (2026-10-26): misses the criterion under the phase-1 rule layer; kept pending the owner's decision | −19 ± 5: out |
 | 8 | Bitola only: J and A doubleton with a side Ace | +13 ± 3 | −16 ± 5: out |
 | 9 | Bitola only: J doubleton with two side Aces | +22 ± 3 | −2 ± 5: out |
 | 10 | Bitola only: 9 with two other trumps (no J, no A) and a side Ace | +7 ± 2 | −7 ± 4: out |
@@ -410,7 +410,7 @@ four are `BELJOT_*` settings read once in `config`, so raising them is an enviro
 |---|---|---|
 | search deadline per decision | 0.5 s | the anytime rule stops here; the best card so far is played |
 | think-delay cap | 3.0 s | the per-trick minimum samples are a floor; the humanised delay stretches to cover them, never beyond this |
-| search workers per host | `max(1, min(4, NumCPU/2))` | a bounded pool shared by every table; a decision that cannot start before its deadline falls back to the rule layer, so bots never starve the API |
+| search workers per host | `max(1, min(4, GOMAXPROCS/2))` | a bounded pool shared by every table; a decision that cannot start before its deadline falls back to the rule layer, so bots never starve the API |
 | opening search (tricks 1–2) | off | turned on in phase 3 only when 12 samples at trick 1 fit the deadline, i.e. after the solver is roughly 5× faster |
 
 A benchmark test asserts the deadline per trick on the CI runner, and a counter of fallbacks per
@@ -488,7 +488,8 @@ Later (§6): gate Belote as caller on P(make); propose surrender on hopeless han
    scale the host vertically when the fallback counter says so.
 2. ~~The size of the conventions bonus~~ — answered: 3 points, as recommended (§4.4).
 3. ~~The two owner's-choice bidding rows~~ — answered: both included, as recommended, and
-   re-checked after the recalibration under v2 play.
+   re-checked after the recalibration under v2 play (BOT_V2_LAB_RESULTS §3.4, 2026-10-26: the two rows miss the
+   criterion under the phase-1 rule layer; kept pending the owner's decision).
 4. ~~The rules file says "both cross ⇒ the taker wins"~~ — answered: the engine is right;
    `.claude/rules/game-rules.md` now states "higher total wins; an exact tie goes to the taker".
 5. Is a visible "bot strength" setting wanted later? It falls out of the deadline for free.

@@ -59,7 +59,9 @@ func (CurrentBot) Decide(v View) game.Action {
 		DealerSeat: v.DealerSeat, MustPickTrump: v.MustPickTrump, CurrentTrick: v.CurrentTrick, LeadSuit: v.LeadSuit,
 		ActivePlayerSeat: v.ActivePlayerSeat, AwaitingDeclaration: v.AwaitingDeclaration, HasDeclarations: v.HasDeclarations,
 		PendingBelot: v.PendingBelot, PartnerProposedSurrender: v.PartnerProposedSurrender, TeamScores: v.TeamScores,
-		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, KnownVoids: v.KnownVoids, KnownCards: v.KnownCards,
+		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, KnownVoids: v.KnownVoidsWithTrump, KnownCards: v.KnownCards,
+		HasTrumpCandidate: v.HasTrumpCandidate, DeclaredCards: v.DeclaredCards, Clockwise: v.Clockwise, TrickNumber: v.TrickNumber,
+		DeclPoints: v.DeclPoints, MatchTarget: v.MatchTarget, StopAtTarget: v.StopAtTarget, DeclarationsTransfer: v.DeclarationsTransfer,
 	})
 }
 
@@ -136,7 +138,7 @@ func RandomDeal(rng *rand.Rand) Deal {
 
 // NewDealState builds a fresh engine state for the deal under the variant, mirroring game.dealCards.
 func NewDealState(d Deal, variant game.Variant) *game.GameState {
-	gs := game.NewGame([4]uint{0, 0, 0, 0}, [4]string{"", "", "", ""}, [4]bool{true, true, true, true}, variant, "1001", 1, true, false)
+	gs := game.NewGame([4]uint{0, 0, 0, 0}, [4]string{"", "", "", ""}, [4]bool{true, true, true, true}, variant, "1001", 1, true, false, true, false)
 	for i := range gs.Players {
 		gs.Players[i].Hand = []game.Card{}
 		gs.Players[i].FaceDownCards = nil
@@ -201,6 +203,13 @@ func BuildView(gs *game.GameState, seat int, mem *Memory) View {
 		TeamScores:          gs.TeamScores,
 		HandPoints:          gs.HandPoints,
 		TricksWon:           gs.TricksWon,
+
+		HasTrumpCandidate:    gs.Rules.HasTrumpCandidate,
+		Clockwise:            gs.Rules.Clockwise,
+		TrickNumber:          gs.TrickNumber,
+		MatchTarget:          game.MatchTarget(gs.MatchMode),
+		StopAtTarget:         gs.Rules.StopAtTarget,
+		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -214,6 +223,7 @@ func BuildView(gs *game.GameState, seat int, mem *Memory) View {
 		v.KnownVoids = mem.KnownVoids()
 		v.KnownVoidsWithTrump = mem.KnownVoidsWithTrump()
 		v.KnownCards = mem.KnownCards()
+		v.DeclaredCards = mem.DeclaredCards()
 	}
 	v.DeclPoints = [2]int{gs.DeclarationPoints[0] + gs.BelotPoints[0], gs.DeclarationPoints[1] + gs.BelotPoints[1]}
 	v.BidRound = gs.BiddingRound
@@ -326,6 +336,10 @@ func PlayHand(gs *game.GameState, pol [4]Policy, hook PlayHook) (HandOutcome, er
 			if action.Type == game.ActionPlayCard {
 				mem.ObservePlay(seat, *action.Card, oldLead)
 				mem.ObserveDiscard(seat, *action.Card, oldLead, gs.TrumpSuit)
+			}
+			if action.Type == game.ActionAnnounceBelot && next.TrumpSuit != nil {
+				mem.ObserveCandidate(seat, game.Card{Rank: game.RankKing, Suit: *next.TrumpSuit})
+				mem.ObserveCandidate(seat, game.Card{Rank: game.RankQueen, Suit: *next.TrumpSuit})
 			}
 			gs = next
 			if gs.DeclarationsResolved {

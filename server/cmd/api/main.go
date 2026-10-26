@@ -214,6 +214,11 @@ func main() {
 
 	roomRepo := room.NewGormRepository(db)
 	sessionManager := match.NewManager(hub, matchRepo)
+	sessionManager.SetBotSearch(match.BotSearchSettings{
+		Workers:   cfg.BotSearchWorkers,
+		Deadline:  cfg.BotSearchDeadline,
+		FromTrick: cfg.BotSearchFromTrick,
+	})
 	sessionManager.SetRoomUpdater(&room.RoomStatusAdapter{Repo: roomRepo})
 	sessionManager.SetWalletSettler(walletService)
 	sessionManager.SetXPAwarder(user.NewXPService(userRepo))

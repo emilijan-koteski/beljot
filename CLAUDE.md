@@ -19,6 +19,7 @@ make hooks         # once per clone: pre-commit runs make lint and make test
 
 - Always pass `-tags nodynamic` to `go test`, `go run` and `go build`. It selects the pure-Go WebP encoder the production image ships.
 - Server tests that need Postgres skip unless `BELJOT_TEST_DB_URL` is set. CI sets it; locally run `make dev` first and export it.
+- `BELJOT_BOT_SIM=1 go test -tags nodynamic ./internal/bot/` runs the bot simulation gates (≈10 s); CI sets it.
 - Run `make lint` and `make test` for the side you changed before calling work done.
 
 ## Layout

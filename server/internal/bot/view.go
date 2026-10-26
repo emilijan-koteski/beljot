@@ -30,7 +30,13 @@ type View struct {
 
 	TeamScores [2]int
 	HandPoints [2]int
+	DeclPoints [2]int
 	TricksWon  [2]int
+
+	TrickNumber          int
+	MatchTarget          int
+	StopAtTarget         bool
+	DeclarationsTransfer bool
 
 	PlayedCards   []game.Card
 	KnownVoids    [4][4]bool
