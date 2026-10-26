@@ -3,7 +3,7 @@
 Companion to `BOT_V2_PROPOSAL.md`. Everything here was produced by the throwaway lab in
 `docs/bot/lab/` (a copy of the sources; they were run from a git worktree as
 `server/internal/botlab` + `server/cmd/botlab`, against the real engine and the real bot).
-Date: 2026-10-25, commit 2d70456. §3.4 was run later the same day on branch `feat/bot-v2-phase2`
+Date: 2026-10-25, commit 2d70456. §3.4 was run on 2026-10-25/26 on branch `feat/bot-v2-phase2`
 at `dd4ec76`, after the lab snapshot was updated to the phase-1 `View` (§1.5, §4).
 
 ## 1. Instruments
@@ -340,7 +340,7 @@ noisy, the class means are not). Evaluating "call iff fitted gain > threshold" o
 
 The duplicate result in 2.4 is the out-of-sample confirmation, including the opponents' reaction.
 
-### 3.4 Recalibration under the phase-1 rule layer (2026-10-25)
+### 3.4 Recalibration under the phase-1 rule layer (2026-10-25/26)
 
 Phase 1 changed the play (the led-suit-secure take, the Ace before the Ten, the Ten under the Ace,
 located cards in memory) and replaced the bidding formula with the hand-shape table, so the §3.2
@@ -591,8 +591,10 @@ which the bot called a different matching suit.
   most likely to move with it. The Croatian first-to-speak cell of row 12 did (−27 ± 3 in §3.2,
   −17.0 ± 2.1 here) and stays negative.
 
-**Recalibration under the search.** This check does not cover the search. It needs a
-search-backed lab policy, which the lab does not have, and its rollouts are expensive at the
+**Recalibration under the search.** This check does not cover the search. No lab policy
+runs the shipped schedule (`search.SamplesForTrick`, the early stop and the deadline) over the real
+phase-1 `bot.Decide` and `bot.SearchCard`: the lab's `pimc` policies (§2.2) use the frozen `labbot`
+rules on the early tricks and their own sample counts. Its rollouts are also expensive at the
 current solver speed. The two simulation gates measure about 11 ms per searched card play (420
 searches in 4.7 s over 60 hands, with two searching seats), so about 0.16 s per hand with all
 four seats searching. The 60 000 Bitola and 30 000 Croatian deals of the original calibration come

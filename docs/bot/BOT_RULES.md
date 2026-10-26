@@ -209,7 +209,8 @@ uniform over the consistent deals. If every draw is rejected it builds a deal ca
 fallback is not exactly uniform. When no deal can be built the search stops with the samples it
 has, and with none it reaches no decision and the rules play.
 
-Every deal that satisfies the hard facts is equally likely. The sampler does not weigh deals by
+Every deal that satisfies the hard facts is equally likely when the rejection draw succeeds; the
+constructive fallback is close to uniform but not exactly. The sampler does not weigh deals by
 how the seats bid or by what they led or discarded (see 5.9).
 
 ### 5.3 How a sample is solved and settled
@@ -282,13 +283,12 @@ Read once in `server/internal/config` and passed to `SetBotSearch`:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `BELJOT_BOT_SEARCH_WORKERS` | `0` | worker count; 0 or less means automatic, `max(1, min(4, NumCPU/2))` |
+| `BELJOT_BOT_SEARCH_WORKERS` | `0` | worker count; 0 or less means automatic, `max(1, min(4, GOMAXPROCS/2))` |
 | `BELJOT_BOT_SEARCH_DEADLINE` | `500ms` | time one search may take, from queueing; 0 or less means the default |
 | `BELJOT_BOT_SEARCH_FROM_TRICK` | `3` | first trick the search plays; 0 or less turns the search off |
 
-A value below 3 behaves like 3 for the cards played, because no sample count is defined for
-tricks 1 and 2: the job is queued, reaches no decision, and the rules play (the log line is the
-same "search timed out" message as for a missed deadline).
+A value below 3 behaves like 3, because no sample count is defined for tricks 1 and 2:
+`SearchApplies` is false there, so no job is queued and the rules play.
 
 ### 5.7 Determinism
 
