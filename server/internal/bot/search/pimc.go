@@ -163,7 +163,7 @@ func (t *tally) lead() (margin, se float64) {
 
 func (t *tally) decided(stopSE float64) bool {
 	margin, se := t.lead()
-	return se > 0 && margin > stopSE*se
+	return margin > stopSE*se
 }
 
 func (t *tally) result() Result {

@@ -224,7 +224,7 @@ func TestChooseTimesOut(t *testing.T) {
 }
 
 func TestChooseStopsEarlyOnAClearMargin(t *testing.T) {
-	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(9, 9))))
+	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(2, 2))))
 	full := search.Options{Samples: 40, EarlyStopAfter: 41, EarlyStopSE: 1}
 	early := search.Options{Samples: 40, EarlyStopAfter: 4, EarlyStopSE: 2}
 
@@ -241,14 +241,14 @@ func TestChooseStopsEarlyOnAClearMargin(t *testing.T) {
 	assert.Greater(t, stopped.Margin, early.EarlyStopSE*stopped.SE)
 }
 
-func TestChooseDoesNotStopEarlyWhenEveryDealAgrees(t *testing.T) {
+func TestChooseStopsEarlyWhenEveryDealAgrees(t *testing.T) {
 	c := newKeepTheMaster(0, false, unseenWithoutClubs(rand.New(rand.NewPCG(9, 9))))
 	opts := search.Options{Samples: 40, EarlyStopAfter: 4, EarlyStopSE: 2}
 
 	result, ok := search.Choose(c.in, c.pos, c.legal, c.settle, opts, farFuture())
 	require.True(t, ok)
 
-	assert.Equal(t, 40, result.Samples)
+	assert.Equal(t, opts.EarlyStopAfter, result.Samples)
 	assert.Zero(t, result.SE)
 	assert.InDelta(t, 20.0, result.Margin, 1e-9)
 }
