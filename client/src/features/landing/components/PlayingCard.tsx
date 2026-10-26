@@ -85,7 +85,7 @@ export function PlayingCard({
           background:
             "repeating-linear-gradient(45deg, var(--accent-deep) 0 6px, var(--accent) 6px 12px)",
           border: "2px solid var(--brass)",
-          boxShadow: "0 10px 26px -12px rgba(0,0,0,0.55)",
+          boxShadow: "var(--shadow-felt-lg)",
         }}
       >
         <div
@@ -119,7 +119,7 @@ export function PlayingCard({
         ...base,
         background: "var(--card-face)",
         border: "1px solid rgba(0,0,0,0.14)",
-        boxShadow: "0 12px 30px -14px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.7)",
+        boxShadow: "var(--shadow-felt-lg), inset 0 1px 0 rgba(255,255,255,0.6)",
       }}
     >
       <span style={corner(false)}>

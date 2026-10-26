@@ -85,11 +85,11 @@ export function SeatTile({
     boxShadow: belowHonorBar
       ? `0 0 0 3px var(--h1-soft)`
       : isSwapSource
-        ? `0 0 0 3px var(--accent-soft), 0 0 0 1.5px var(--accent)`
+        ? `0 0 0 3px var(--accent-soft), 0 0 0 2px var(--accent)`
         : isYou
-          ? `0 0 0 1.5px var(--accent), 0 8px 22px -16px var(--accent)`
+          ? `0 0 0 2px var(--accent), var(--shadow-glow)`
           : filled
-            ? "0 4px 14px -12px rgba(14,58,36,0.20)"
+            ? "var(--shadow-sm)"
             : "none",
   };
 
@@ -299,7 +299,7 @@ export function SeatTile({
 
       {showSwapHint && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          <span className="border-accent bg-surface text-accent-deep inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold shadow-[0_4px_12px_-4px_rgba(14,58,36,0.35)]">
+          <span className="border-accent bg-surface text-accent-deep inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm">
             <Shuffle className="size-2.5" style={{ color: "var(--accent-deep)" }} />
             {t("room.seatTile.swapHere")}
           </span>

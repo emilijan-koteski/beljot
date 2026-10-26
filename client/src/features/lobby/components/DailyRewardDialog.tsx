@@ -131,9 +131,7 @@ function StreakTrack({ day, total = STREAK_MAX }: { day: number; total?: number 
                 : done
                   ? "1px solid #9c7d4e"
                   : "1px dashed var(--brass)",
-              boxShadow: today
-                ? "0 0 0 3px rgba(232,194,90,0.28), 0 3px 8px -2px rgba(160,125,26,0.6)"
-                : "none",
+              boxShadow: today ? "0 0 0 3px rgba(232,194,90,0.28), var(--shadow-sm)" : "none",
               color: today ? "#6e520f" : done ? "#5a4322" : "var(--ink-off)",
             }}
           >
@@ -173,8 +171,8 @@ export function DailyRewardDialog({
         className={cn(
           "block overflow-hidden rounded-lg border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
           milestone
-            ? "shadow-[0_0_0_1px_rgba(232,194,90,0.18)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]"
-            : "shadow-[0_0_0_1px_var(--brass-soft)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]",
+            ? "shadow-xl inset-ring inset-ring-brass/18"
+            : "shadow-xl inset-ring inset-ring-brass/18",
         )}
       >
         <div className="h-[3px] bg-[linear-gradient(90deg,transparent,var(--brass)_28%,var(--team-a-fill)_50%,var(--brass)_72%,transparent)]" />

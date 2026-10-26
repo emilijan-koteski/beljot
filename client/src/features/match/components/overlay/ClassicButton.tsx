@@ -29,8 +29,8 @@ export const ClassicButton = forwardRef<HTMLButtonElement, ClassicButtonProps>(
       cursor: disabled ? "not-allowed" : "pointer",
       opacity: disabled ? 0.4 : 1,
       boxShadow: isPrimary
-        ? "0 4px 10px var(--brass-40), inset 0 1px 0 rgba(255,255,255,0.3)"
-        : "0 2px 6px rgba(0,0,0,0.3)",
+        ? "0 8px 24px -12px color-mix(in srgb, var(--brass) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)"
+        : "var(--shadow-felt-sm)",
       transition: `transform ${MOTION.BUTTON_HOVER}ms, filter ${MOTION.BUTTON_HOVER}ms`,
       ...style,
     };

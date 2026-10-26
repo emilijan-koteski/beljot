@@ -62,6 +62,31 @@
   --radius-4xl: initial;
 }
 
+/* Shadows — `static` so the inline `var(--shadow-*)` styles always resolve.
+   Parchment elevation is ink green and long; Felt elevation is plain black
+   and tighter, for the dark table and for playing cards wherever they sit.
+   The glow follows --accent-glow, so it is lime on Felt. Bevels are the
+   top highlight on raised parchment cards. */
+@theme static {
+  --shadow-2xs: initial;
+  --shadow-xs: 0 1px 2px rgba(14, 58, 36, 0.08);
+  --shadow-sm: 0 4px 12px -4px rgba(14, 58, 36, 0.3);
+  --shadow-md: 0 8px 22px -10px rgba(14, 58, 36, 0.3);
+  --shadow-lg: 0 18px 40px -20px rgba(14, 58, 36, 0.4);
+  --shadow-xl: 0 30px 70px -28px rgba(14, 58, 36, 0.45);
+  --shadow-2xl: initial;
+
+  --shadow-felt-sm: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-felt-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-felt-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-felt-xl: 0 20px 60px rgba(0, 0, 0, 0.7);
+
+  --shadow-glow: 0 8px 24px -12px var(--accent-glow);
+  --shadow-glow-lg: 0 14px 32px -14px var(--accent-glow);
+
+  --inset-shadow-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
 @theme inline {
   /* Surfaces */
   --color-background: var(--bg);
@@ -261,8 +286,8 @@
 
   /* ── Chat dock shadows — themeable so the felt-scoped dock can swap them
        for a heavier black drop shadow (see `.chat-dock-match`). ─────────── */
-  --chat-shadow-panel: 0 24px 60px -20px rgba(14, 58, 36, 0.3);
-  --chat-shadow-fab: 0 8px 22px -10px rgba(14, 58, 36, 0.3);
+  --chat-shadow-panel: var(--shadow-xl);
+  --chat-shadow-fab: var(--shadow-md);
 }
 
 /* Team companions — resolved per scope like the tier ones below. */
@@ -571,8 +596,8 @@
   --accent-deep: var(--brass-deep);
   --accent-soft: var(--brass-soft);
   --accent-ink: var(--brass-ink);
-  --chat-shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(201, 168, 118, 0.06);
-  --chat-shadow-fab: 0 8px 22px rgba(0, 0, 0, 0.45);
+  --chat-shadow-panel: var(--shadow-felt-xl), inset 0 0 0 1px var(--brass-10);
+  --chat-shadow-fab: var(--shadow-felt-md);
 }
 
 /* The floating message peek sits over the felt + cards (not inside the dark

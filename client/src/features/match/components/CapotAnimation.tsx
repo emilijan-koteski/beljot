@@ -125,7 +125,7 @@ export function CapotAnimation({
               height: 7,
               borderRadius: "50%",
               background: bright,
-              boxShadow: `0 0 8px ${bright}`,
+              boxShadow: `0 0 6px ${bright}`,
             }}
           />
           {isUs

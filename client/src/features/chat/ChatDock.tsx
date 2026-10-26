@@ -307,7 +307,7 @@ export function ChatDock(props: ChatDockProps) {
             "bg-surface text-ink relative inline-flex size-14 items-center justify-center rounded-full transition-transform hover:-translate-y-0.5",
             frosted,
             hasPublicUnread || hasWhisperUnread
-              ? "border border-brass shadow-[0_0_0_3px_var(--brass-soft),0_10px_28px_-10px_rgba(14,58,36,0.35)]"
+              ? "border border-brass shadow-md ring-3 ring-brass/18"
               : "border-brass border shadow-(--chat-shadow-fab)",
           )}
         >
@@ -319,7 +319,7 @@ export function ChatDock(props: ChatDockProps) {
                   data-testid={`${testIdRoot}-unread`}
                   className={cn(
                     FAB_CHIP_CLASS,
-                    "bg-brass text-brass-ink shadow-[0_0_10px_var(--brass-55)]",
+                    "bg-brass text-brass-ink shadow-[0_0_12px_var(--brass-55)]",
                   )}
                 >
                   {chipLabel(unread)}
@@ -330,7 +330,7 @@ export function ChatDock(props: ChatDockProps) {
                   data-testid={`${testIdRoot}-whisper-unread`}
                   className={cn(
                     FAB_CHIP_CLASS,
-                    "bg-(--whisper-ink) text-(--whisper-badge-ink) shadow-[0_0_10px_var(--whisper-glow)]",
+                    "bg-(--whisper-ink) text-(--whisper-badge-ink) shadow-[0_0_12px_var(--whisper-glow)]",
                     bothChips && "z-10 -ml-1.5",
                   )}
                 >

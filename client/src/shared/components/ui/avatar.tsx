@@ -87,7 +87,7 @@ export function Avatar({
   const isProfile = halo === "profile";
   const border = isProfile ? "none" : `2px solid ${ringColor}`;
   const boxShadow = isProfile
-    ? "0 0 0 4px var(--surface), 0 0 0 5px var(--brass), 0 16px 36px -16px rgba(25,101,54,0.55)"
+    ? "0 0 0 4px var(--surface), 0 0 0 6px var(--brass), var(--shadow-glow-lg)"
     : "none";
 
   return (

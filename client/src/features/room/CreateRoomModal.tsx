@@ -356,7 +356,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_var(--brass-soft)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
+        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl border p-0 shadow-xl ring-1 ring-brass/18 sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
         showCloseButton={false}
         data-testid="create-room-modal"
       >
@@ -894,7 +894,7 @@ function PreviewCard({
   return (
     <article
       data-testid="create-room-preview"
-      className="bg-surface text-ink border-border overflow-hidden rounded-2xl border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]"
+      className="bg-surface text-ink border-border overflow-hidden rounded-2xl border shadow-lg"
     >
       <div className="px-4.5 pt-4.5 pb-3.5">
         <div className="flex items-center gap-2.5">

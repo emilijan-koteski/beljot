@@ -119,7 +119,7 @@ export function RulesDialog({
               background: PANEL_BG,
               border: "1px solid var(--brass-55)",
               boxShadow:
-                "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)",
+                "var(--shadow-felt-xl), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)",
               color: INK,
             }}
           >

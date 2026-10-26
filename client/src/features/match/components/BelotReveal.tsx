@@ -85,7 +85,7 @@ export function BelotReveal({
           padding: "20px 24px 22px",
           background: "linear-gradient(180deg, rgba(32,64,43,0.98) 0%, rgba(13,38,23,0.98) 100%)",
           border: "1px solid var(--brass-55)",
-          boxShadow: `0 22px 54px rgba(0,0,0,0.62), 0 0 0 2px ${glowColor}66, 0 0 28px ${glowColor}55, inset 0 1px 0 var(--brass-25)`,
+          boxShadow: `var(--shadow-felt-xl), 0 0 0 2px ${glowColor}66, 0 0 32px ${glowColor}55, inset 0 1px 0 var(--brass-25)`,
           color: "var(--ink-light)",
         }}
         data-team={team}
@@ -115,7 +115,7 @@ export function BelotReveal({
           <div
             aria-hidden
             className="absolute rounded-lg"
-            style={{ inset: -10, boxShadow: `0 0 30px ${glowColor}55`, zIndex: 0 }}
+            style={{ inset: -10, boxShadow: `0 0 32px ${glowColor}55`, zIndex: 0 }}
           />
           <div className="relative z-1">
             <PlayingCard

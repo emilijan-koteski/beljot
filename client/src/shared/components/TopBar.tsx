@@ -195,7 +195,7 @@ export function TopBar({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="bg-surface-elevated w-max min-w-44 max-w-(--available-width) border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
+              className="bg-surface-elevated w-max min-w-44 max-w-(--available-width) border border-border p-1 shadow-lg"
             >
               <div className="text-ink-mute px-2.5 pt-2 pb-1.5 text-xs">
                 {t("nav.signedInAs", { defaultValue: "Signed in as" })}{" "}
@@ -234,7 +234,7 @@ export function TopBar({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="bg-surface-elevated w-max min-w-48 max-w-(--available-width) border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
+              className="bg-surface-elevated w-max min-w-48 max-w-(--available-width) border border-border p-1 shadow-lg"
             >
               {showUserMenu && user && (
                 <>

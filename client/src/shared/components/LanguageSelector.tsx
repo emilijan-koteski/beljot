@@ -68,7 +68,7 @@ export function LanguageSelector({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="bg-surface-elevated min-w-40 border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
+        className="bg-surface-elevated min-w-40 border border-border p-1 shadow-lg"
       >
         {languagesLatinThenCyrillic.map((lang) => {
           const active = lang.code === i18n.language;

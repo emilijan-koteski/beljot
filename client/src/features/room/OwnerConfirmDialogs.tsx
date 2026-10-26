@@ -27,13 +27,15 @@ const BUTTON_TONES: Record<ButtonTone, CSSProperties> = {
     background: "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)",
     color: "var(--brass-ink)",
     border: "1px solid var(--brass-deep)",
-    boxShadow: "0 6px 16px -8px rgba(156,125,78,0.65), inset 0 1px 0 rgba(255,255,255,0.25)",
+    boxShadow:
+      "0 8px 24px -12px color-mix(in srgb, var(--brass-deep) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
   },
   danger: {
     background: "linear-gradient(180deg, #a8362a 0%, var(--danger) 100%)",
     color: "#fbeae6",
     border: "1px solid #6f2018",
-    boxShadow: "0 6px 16px -8px rgba(139,42,31,0.6), inset 0 1px 0 rgba(255,255,255,0.18)",
+    boxShadow:
+      "0 8px 24px -12px color-mix(in srgb, var(--danger) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
   },
 };
 
@@ -140,7 +142,7 @@ function OwnerConfirmDialog({
           border: "1px solid var(--brass)",
           borderRadius: "var(--radius-lg)",
           color: "var(--ink)",
-          boxShadow: "0 40px 90px -30px rgba(14,58,36,0.55), 0 0 0 1px var(--brass-soft)",
+          boxShadow: "var(--shadow-xl), 0 0 0 1px var(--brass-soft)",
         }}
       >
         <div

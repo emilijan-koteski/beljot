@@ -485,7 +485,7 @@ export function MatchStatsCard({
 
   return (
     <li
-      className="bg-surface border-border overflow-hidden rounded-lg border transition-[border-color,box-shadow] hover:border-brass hover:shadow-[0_8px_22px_-10px_rgba(14,58,36,0.30)]"
+      className="bg-surface border-border overflow-hidden rounded-lg border transition-[border-color,box-shadow] hover:border-brass hover:shadow-md"
       data-testid="match-history-row"
       data-match-id={match.id}
     >

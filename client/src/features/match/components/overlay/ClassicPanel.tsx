@@ -28,7 +28,7 @@ export function ClassicPanel({
   children,
 }: ClassicPanelProps) {
   const baseShadow =
-    "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)";
+    "var(--shadow-felt-xl), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)";
   const glowShadow = glowColor
     ? `0 0 0 2px color-mix(in srgb, ${glowColor} 53%, transparent), 0 0 24px color-mix(in srgb, ${glowColor} 47%, transparent), `
     : "";

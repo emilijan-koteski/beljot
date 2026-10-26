@@ -88,7 +88,7 @@ export function TimerRing({
           strokeLinecap="round"
           transform={`rotate(-90 ${px / 2} ${px / 2})`}
           style={{
-            filter: `drop-shadow(0 0 8px ${strokeColor})`,
+            filter: `drop-shadow(0 0 6px ${strokeColor})`,
             transition: `stroke ${MOTION.RING_COLOR_FLIP}ms ease`,
             strokeDashoffset: dashOffset,
             ...(prefersReducedMotion ? undefined : drainStyle),

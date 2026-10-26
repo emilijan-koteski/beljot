@@ -51,7 +51,7 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
           border: "1px solid var(--brass)",
           borderRadius: "var(--radius-lg)",
           color: "var(--ink)",
-          boxShadow: "0 40px 90px -30px rgba(14,58,36,0.55), 0 0 0 1px var(--brass-soft)",
+          boxShadow: "var(--shadow-xl), 0 0 0 1px var(--brass-soft)",
         }}
       >
         <div
@@ -214,7 +214,7 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
               color: "var(--brass-ink)",
               border: "1px solid var(--brass-deep)",
               boxShadow:
-                "0 6px 16px -8px rgba(156,125,78,0.65), inset 0 1px 0 rgba(255,255,255,0.25)",
+                "0 8px 24px -12px color-mix(in srgb, var(--brass-deep) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
             {t("profile.honor.explainer.close")}

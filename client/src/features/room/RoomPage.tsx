@@ -768,7 +768,7 @@ export function RoomPage() {
     <div className="mx-auto max-w-330 px-4 pt-6 pb-24 md:px-8 md:pb-6">
       <div data-testid="room-page">
         <div
-          className="bg-surface border-border relative mb-4 rounded-lg border p-4 shadow-[0_18px_44px_-28px_rgba(14,58,36,0.32),0_2px_0_rgba(255,255,255,0.6)_inset] md:mb-6 md:p-6"
+          className="bg-surface border-border relative mb-4 rounded-lg border p-4 shadow-lg inset-shadow-bevel md:mb-6 md:p-6"
           data-testid="room-info-card"
         >
           <div
@@ -1346,7 +1346,7 @@ export function RoomPage() {
                   background:
                     "radial-gradient(circle at 30% 30%, #1d6c3b 0%, var(--accent-deep) 70%), var(--accent-deep)",
                   borderColor: "var(--brass)",
-                  boxShadow: "0 6px 18px -6px rgba(14,58,36,0.40), inset 0 0 0 4px var(--brass-10)",
+                  boxShadow: "var(--shadow-sm), inset 0 0 0 4px var(--brass-10)",
                 }}
               >
                 <span

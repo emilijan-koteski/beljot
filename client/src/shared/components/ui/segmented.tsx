@@ -56,7 +56,7 @@ export function Segmented<T extends string>({
               "inline-flex flex-1 items-center justify-center gap-1.5 rounded-sm font-medium transition-[background-color,box-shadow,color] outline-none",
               dense ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-2 text-sm",
               active
-                ? "bg-surface-elevated text-ink shadow-[0_1px_2px_rgba(14,58,36,0.06),0_0_0_1px_var(--border)]"
+                ? "bg-surface-elevated text-ink shadow-xs ring-1 ring-border"
                 : o.disabled
                   ? "text-ink-off cursor-not-allowed opacity-55"
                   : "text-ink-dim hover:text-ink cursor-pointer",

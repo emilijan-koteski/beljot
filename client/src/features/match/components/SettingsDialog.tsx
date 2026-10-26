@@ -195,7 +195,7 @@ function SettingVolumeRow({
         aria-label={label}
         getAriaValueText={(v) => `${v}%`}
         className="data-disabled:opacity-100"
-        trackClassName="bg-[rgba(0,0,0,0.3)] shadow-[inset_0_0_0_1px_var(--brass-40)]"
+        trackClassName="bg-[rgba(0,0,0,0.3)] inset-ring inset-ring-brass/40"
         indicatorClassName="bg-brass/85"
         thumbClassName="border-[#c9a876] bg-[#1d3a26] shadow-[0_0_6px_var(--brass-40)] has-[:focus-visible]:ring-brass/55"
       />

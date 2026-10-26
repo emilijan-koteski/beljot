@@ -69,7 +69,7 @@ function ScoreRow({
               height: 10,
               borderRadius: "50%",
               background: dot,
-              boxShadow: `0 0 8px ${dot}`,
+              boxShadow: `0 0 6px ${dot}`,
             }}
           />
           <span
@@ -209,7 +209,7 @@ export function ScorePanel({
           zIndex: Z.HUD,
           background: PANEL_BG,
           border: PANEL_BORDER,
-          boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+          boxShadow: "var(--shadow-felt-md)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
         }}
@@ -229,7 +229,7 @@ export function ScorePanel({
                 height: 6,
                 borderRadius: "50%",
                 background: r.dot,
-                boxShadow: `0 0 5px ${r.dot}`,
+                boxShadow: `0 0 6px ${r.dot}`,
               }}
             />
             <span
@@ -258,7 +258,7 @@ export function ScorePanel({
           zIndex: Z.HUD,
           background: PANEL_BG,
           border: PANEL_BORDER,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+          boxShadow: "var(--shadow-felt-md)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
           minWidth: 240,

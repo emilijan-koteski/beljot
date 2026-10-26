@@ -96,7 +96,7 @@ export function TrumpIndicator({
               border: "1px solid var(--brass-40)",
               backdropFilter: "blur(8px)",
               WebkitBackdropFilter: "blur(8px)",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+              boxShadow: "var(--shadow-felt-md)",
             }
       }
       aria-live="polite"
@@ -111,7 +111,7 @@ export function TrumpIndicator({
           height: 44,
           background: `radial-gradient(circle, ${accent}22, transparent 70%), linear-gradient(180deg, #fdfaf0, #f0e8d0)`,
           border: `2px solid ${accent}`,
-          boxShadow: `0 0 16px ${accent}${glowAlpha}, inset 0 1px 0 rgba(255,255,255,0.6)`,
+          boxShadow: `0 0 12px ${accent}${glowAlpha}, inset 0 1px 0 rgba(255,255,255,0.6)`,
         }}
       >
         <SuitMark
@@ -168,7 +168,7 @@ export function TrumpIndicator({
                   width: 5,
                   height: 5,
                   background: teamGradient ? teamGradient[0] : undefined,
-                  boxShadow: teamGradient ? `0 0 5px ${teamGradient[0]}` : undefined,
+                  boxShadow: teamGradient ? `0 0 6px ${teamGradient[0]}` : undefined,
                 }}
               />
               {teamName}

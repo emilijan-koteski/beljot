@@ -118,10 +118,10 @@ export function PlayingCard({
 
   const haloColor = glowColor === DEFAULT_GLOW ? DEFAULT_GLOW_HALO : glowColor;
   const playableGlow = isPlayable
-    ? `0 10px 22px rgba(0,0,0,0.35), 0 0 0 2px ${glowColor}, 0 0 24px ${haloColor}`
+    ? `var(--shadow-felt-lg), 0 0 0 2px ${glowColor}, 0 0 24px ${haloColor}`
     : isFaceDown
-      ? "0 4px 10px rgba(0,0,0,0.45)"
-      : "0 3px 6px rgba(0,0,0,0.3)";
+      ? "var(--shadow-felt-sm)"
+      : "var(--shadow-felt-sm)";
 
   if (isFaceDown) {
     return (

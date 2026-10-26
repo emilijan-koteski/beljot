@@ -61,7 +61,7 @@ export function CardDeckPanel() {
                 alt=""
                 aria-hidden="true"
                 draggable={false}
-                className="h-[63px] w-[45px] rounded-xs shadow-[0_2px_6px_-2px_rgba(0,0,0,0.35)]"
+                className="h-[63px] w-[45px] rounded-xs shadow-felt-sm"
                 style={{ background: "linear-gradient(180deg, #fdfaf0 0%, #f4ecd8 100%)" }}
                 onError={(e) => {
                   e.currentTarget.style.visibility = "hidden";

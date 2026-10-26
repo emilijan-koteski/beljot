@@ -71,8 +71,8 @@ function StatusChip({
         color: textColor,
         border: `2px solid ${borderColor}`,
         boxShadow: glowColor
-          ? `0 2px 10px rgba(0,0,0,0.55), 0 0 12px ${glowColor}, inset 0 1px 0 rgba(255,255,255,0.6)`
-          : "0 2px 10px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.6)",
+          ? `var(--shadow-felt-sm), 0 0 12px ${glowColor}, inset 0 1px 0 rgba(255,255,255,0.6)`
+          : "var(--shadow-felt-sm), inset 0 1px 0 rgba(255,255,255,0.6)",
         fontFamily: "var(--font-suit)",
         fontWeight: 700,
         lineHeight: 1,
@@ -131,7 +131,7 @@ function CardBackStack({
             background: CARD_BACK_BACKGROUND,
             border: `${compact ? 1 : 1.5}px solid var(--brass)`,
             borderRadius: radius,
-            boxShadow: "0 2px 6px rgba(0,0,0,0.45)",
+            boxShadow: "var(--shadow-felt-sm)",
           }}
         >
           <CardBackFace width={cw} radius={radius} />
@@ -283,8 +283,8 @@ export function PlayerSeat({
             padding: 3,
             boxShadow:
               isActive && !isDisconnected
-                ? `0 0 0 1.5px ${TURN_LIME}, 0 0 18px ${TURN_LIME_GLOW}`
-                : "0 2px 8px rgba(0,0,0,0.3)",
+                ? `0 0 0 2px ${TURN_LIME}, 0 0 24px ${TURN_LIME_GLOW}`
+                : "var(--shadow-felt-sm)",
             transition: `box-shadow ${MOTION.SEAT_RING_TRANSITION}ms ease`,
           }}
         >

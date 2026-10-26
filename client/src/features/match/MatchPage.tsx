@@ -1488,7 +1488,7 @@ export function MatchPage() {
                   zIndex: Z.CHROME_TOP,
                   background: "var(--panel-deeper)",
                   border: "1px solid var(--brass-40)",
-                  boxShadow: "0 14px 36px rgba(0,0,0,0.5)",
+                  boxShadow: "var(--shadow-felt-lg)",
                   backdropFilter: "blur(10px)",
                   WebkitBackdropFilter: "blur(10px)",
                 }}

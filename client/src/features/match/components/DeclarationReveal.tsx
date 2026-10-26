@@ -99,7 +99,7 @@ export function DeclarationReveal({
           overflowY: "auto",
           background: "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)",
           border: "1px solid var(--brass-55)",
-          boxShadow: `0 12px 32px rgba(0,0,0,0.55), 0 0 0 2px ${glowColor}88, 0 0 24px ${glowColor}77, inset 0 1px 0 var(--brass-25)`,
+          boxShadow: `var(--shadow-felt-lg), 0 0 0 2px ${glowColor}88, 0 0 24px ${glowColor}77, inset 0 1px 0 var(--brass-25)`,
           color: "var(--ink-light)",
         }}
         data-team={winnerTeamString}

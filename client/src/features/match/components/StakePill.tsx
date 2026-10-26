@@ -24,7 +24,7 @@ export function StakePill({ amount }: StakePillProps) {
       style={{
         background: PANEL_BG,
         border: "1px solid var(--brass-40)",
-        boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+        boxShadow: "var(--shadow-felt-md)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
         color: INK,

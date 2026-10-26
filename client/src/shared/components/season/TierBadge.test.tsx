@@ -47,11 +47,11 @@ describe("TierBadge", () => {
 
   it("glows by default and drops the glow when asked (the rank-down dialog)", () => {
     const { rerender } = render(<TierBadge tier="gold" />);
-    expect(screen.getByTestId("tier-badge").getAttribute("style") ?? "").toContain("0 0 14px");
+    expect(screen.getByTestId("tier-badge").getAttribute("style") ?? "").toContain("0 0 12px");
     expect(screen.getByTestId("tier-badge").getAttribute("data-glow")).toBe("true");
 
     rerender(<TierBadge tier="gold" glow={false} />);
-    expect(screen.getByTestId("tier-badge").getAttribute("style") ?? "").not.toContain("0 0 14px");
+    expect(screen.getByTestId("tier-badge").getAttribute("style") ?? "").not.toContain("0 0 12px");
     expect(screen.getByTestId("tier-badge").getAttribute("data-glow")).toBe("false");
   });
 

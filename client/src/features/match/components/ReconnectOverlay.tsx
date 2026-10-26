@@ -403,7 +403,7 @@ function DisconnectedPlayerRow({
             background:
               "conic-gradient(from 0deg, var(--brass-85), rgba(156,125,78,0.85), var(--brass-85))",
             padding: 2,
-            boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+            boxShadow: "var(--shadow-felt-sm)",
           }}
         >
           <div
@@ -428,7 +428,7 @@ function DisconnectedPlayerRow({
             height: 12,
             background: RING_DANGER,
             border: "2px solid var(--avatar-inner)",
-            boxShadow: `0 0 8px color-mix(in srgb, ${RING_DANGER} 67%, transparent)`,
+            boxShadow: `0 0 6px color-mix(in srgb, ${RING_DANGER} 67%, transparent)`,
           }}
         />
       </div>

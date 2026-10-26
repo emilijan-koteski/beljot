@@ -92,7 +92,7 @@ export function LevelUpDialog({ open, level, newTotalXp, xpEarned, onClose }: Le
         data-testid="level-up-dialog"
         className={cn(
           "block overflow-hidden rounded-lg border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
-          "shadow-[0_0_0_1px_rgba(232,194,90,0.18)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]",
+          "shadow-xl inset-ring inset-ring-brass/18",
         )}
       >
         <div className="h-[3px] bg-[linear-gradient(90deg,transparent,var(--brass)_28%,var(--team-a-fill)_50%,var(--brass)_72%,transparent)]" />

@@ -142,7 +142,7 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
                   borderColor: "color-mix(in srgb, var(--danger-light) 70%, transparent)",
                   color: "#fff8f3",
                   boxShadow:
-                    "0 4px 10px rgba(217,106,90,0.4), inset 0 1px 0 rgba(255,255,255,0.25)",
+                    "0 8px 24px -12px color-mix(in srgb, var(--danger-light) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
                 }}
               >
                 {t("match.surrender.confirm.confirm")}

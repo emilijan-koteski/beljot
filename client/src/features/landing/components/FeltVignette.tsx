@@ -103,7 +103,7 @@ export function FeltVignette({
         background:
           "radial-gradient(ellipse 70% 60% at 50% 42%, var(--felt-scene-top) 0%, var(--surface) 60%, var(--bg) 100%)",
         border: "3px solid var(--wood-rim)",
-        boxShadow: "inset 0 0 60px rgba(0,0,0,0.55), 0 30px 70px -30px rgba(0,0,0,0.6)",
+        boxShadow: "inset 0 0 60px rgba(0,0,0,0.55), var(--shadow-felt-xl)",
         ...style,
       }}
     >
