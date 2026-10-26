@@ -1,11 +1,12 @@
 import { Coins, Lock, MailOpen } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { FetchError } from "@/shared/api/axiosClient";
+import { playAlertSfx } from "@/shared/audio/audioEngine";
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -25,7 +26,7 @@ import { joinFailureMessage } from "@/shared/lib/joinFailure";
 import { useRoomStore } from "@/shared/stores/roomStore";
 
 /**
- * Incoming friend room-invite popup, mounted app-wide so invites reach players outside the lobby.
+ * App-wide friend room-invite popup; it whistles once when shown unless the player responds or it closes first.
  * Accepting joins directly, or through the password prompt for a non-host invite into a private room.
  */
 export function RoomInviteModal() {
@@ -80,7 +81,32 @@ export function RoomInviteModal() {
   }, [inviteId, expiresAt, isJoining, showPasswordPrompt]);
 
   const ejectionNoticeTakesPriority = ejection !== null;
-  if (invite === null || ejectionNoticeTakesPriority) {
+  const popupShown = invite !== null && !ejectionNoticeTakesPriority;
+  const shownInviteKey = popupShown ? `${invite.inviteId}:${invite.expiresAt}` : null;
+  const whistleRef = useRef<AbortController | null>(null);
+  const silencedInviteKeyRef = useRef<string | null>(null);
+  const playerResponded = isJoining || showPasswordPrompt;
+
+  function silenceWhistle() {
+    if (shownInviteKey !== null) silencedInviteKeyRef.current = shownInviteKey;
+    whistleRef.current?.abort();
+  }
+
+  useEffect(() => {
+    if (!playerResponded || shownInviteKey === null) return;
+    silencedInviteKeyRef.current = shownInviteKey;
+    whistleRef.current?.abort();
+  }, [playerResponded, shownInviteKey]);
+
+  useEffect(() => {
+    if (shownInviteKey === null || shownInviteKey === silencedInviteKeyRef.current) return;
+    const whistle = new AbortController();
+    whistleRef.current = whistle;
+    void playAlertSfx("invite", { dedupeKey: shownInviteKey, signal: whistle.signal });
+    return () => whistle.abort();
+  }, [shownInviteKey]);
+
+  if (!popupShown) {
     return null;
   }
 
@@ -130,7 +156,11 @@ export function RoomInviteModal() {
           if (!next) decline();
         }}
       >
-        <DialogContent showCloseButton={false} data-testid="room-invite-modal">
+        <DialogContent
+          showCloseButton={false}
+          data-testid="room-invite-modal"
+          onPointerDownCapture={silenceWhistle}
+        >
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="bg-brass-soft border-brass/40 text-brass-deep flex size-11 shrink-0 items-center justify-center rounded-xl border">

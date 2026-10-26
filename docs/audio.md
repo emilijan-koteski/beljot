@@ -1,24 +1,29 @@
 # Audio assets
 
 The in-match sound effects and background music in `client/public/audio/`,
-played by `client/src/shared/audio/audioEngine.ts`.
+played by `client/src/shared/audio/audioEngine.ts`. One effect is the
+exception: `invite` plays outside a match, wherever the app-wide room-invite
+popup appears.
 
 ```text
 client/public/audio/
-  sfx/    29 MP3 (mono, 96 kb/s)   — card-slide-1..8 (card played),
+  sfx/    30 MP3 (mono, 96 kb/s)   — card-slide-1..8 (card played),
                                      card-shove-1..4 (trick collected),
                                      card-shuffle (a deal starts),
                                      card-place-1..4 (a deal packet lands),
                                      chips-stack-1..6 (declarations, Belote),
                                      jingle-capot, jingle-win, jingle-lose,
                                      popup-1..2 (avatar popups),
-                                     clock-tick (own timer in the red)
+                                     clock-tick (own timer in the red),
+                                     invite (a room invite pops up,
+                                     outside a match)
   music/   3 MP3 (stereo, 96 kb/s) — the rotating playlist
 ```
 
-Sound effects total ~210 KB (214,109 bytes) and are fetched and decoded when
-the match page mounts with sound on, or the moment sound is switched on. The
-three music tracks total ~8.3 MB and are streamed one at a time by
+Sound effects total ~216 KB (221,362 bytes) and are fetched and decoded when
+the match page mounts with sound on, or the moment sound is switched on.
+Outside a match, the first room invite fetches `invite.mp3` (~7 KB) on its own.
+The three music tracks total ~8.3 MB and are streamed one at a time by
 an `<audio>` element, so only the playing track is downloaded.
 
 Everything here is **CC0 / public domain**. No attribution is required and the
@@ -79,6 +84,23 @@ key is released, not one PATCH per auto-repeat.
   the Croatian declaration window while unanswered. It stops at the click.
   Other seats' timers and the auto-close, score-reveal and reconnect rings
   never tick.
+- **Room invite** — `invite` once when a room-invite popup appears, the one
+  effect that plays outside a match. Invites reach only players who are in
+  neither a room nor a match, and the popup is mounted by the app layout, so
+  it sounds on any page inside it (lobby, profile, player profiles,
+  leaderboard; not the public rules page). It is keyed to the invite (its id
+  and expiry), so a re-render or remount cannot repeat it, and a new invite
+  whistles again. An invite held back behind the room-ejection notice whistles
+  when it shows. The player responding (a press anywhere in the popup, a join
+  in flight, the password prompt) or the popup closing (decline, expiry, a
+  newer invite) before the whistle starts cancels it for good. If no match has
+  run since the page loaded, the first invite creates the `AudioContext`;
+  nothing creates it earlier. Loading the file and starting audio share a
+  one-second grace: if the page has had no click or key press yet, a click
+  within one second of the popup still lets it sound; never later. The
+  context is kept awake through that grace and the whistle plus 0.2 s, without
+  opening the match's audio session, so no other effect can play meanwhile;
+  0.5 s later it is suspended again unless a match needs it.
 - **Music** — only while `MatchPage` is mounted. A random track starts, the
   others follow in order, and it loops round. It fades in over ~1.5 s and out
   over ~0.4 s.
@@ -141,11 +163,16 @@ not mandatory)".)
 | Jingles | `Audio/Sax jingles/jingles_SAX07.ogg` (falling "wah-wah") | `sfx/jingle-lose.mp3` |
 | Interface | `Audio/drop_002.ogg`, `Audio/drop_003.ogg` | `sfx/popup-1.mp3`, `sfx/popup-2.mp3` |
 | Interface | `Audio/tick_004.ogg` | `sfx/clock-tick.mp3` |
+| Interface | `Audio/confirmation_002.ogg` (an up-then-down chirp) | `sfx/invite.mp3` |
 
 The sax jingles were picked to sit with the jazz playlist. Levels were matched
 by measurement against the card sounds, whose loudest 50 ms runs at about −13
 to −20 dBFS RMS: the jingles land a little above that, the popup and the tick
-a little below — that is all the `volume=` filters in the recipe do.
+a little below — that is all the `volume=` filters in the recipe do. The invite
+whistle is matched to `popup-1`: `volume=-8dB` takes its loudest 50 ms from
+about −7.4 toward the popup's −15.5 dBFS; the shipped file measures −15.8 dBFS
+RMS over non-overlapping 50 ms windows. No Kenney pack has a literal whistle;
+`confirmation_002` was the owner's pick from five candidates.
 
 ## Music — provenance
 
@@ -224,6 +251,7 @@ sfx "$SRC/kenney-jingles/Audio/Sax jingles/jingles_SAX07.ogg" "volume=2dB" "$OUT
 sfx "$SRC/kenney-interface/Audio/drop_002.ogg" "volume=-4dB" "$OUT/sfx/popup-1.mp3"
 sfx "$SRC/kenney-interface/Audio/drop_003.ogg" "volume=-4dB" "$OUT/sfx/popup-2.mp3"
 sfx "$SRC/kenney-interface/Audio/tick_004.ogg" "volume=-4dB" "$OUT/sfx/clock-tick.mp3"
+sfx "$SRC/kenney-interface/Audio/confirmation_002.ogg" "volume=-8dB" "$OUT/sfx/invite.mp3"
 
 # Music: stereo, 96 kb/s, loudness-normalised to -18 LUFS (true peak -1.5 dBTP)
 # so the three tracks sit at one level under the same gain.
@@ -237,9 +265,10 @@ done
 `-ar 44100` matters for the music: `loudnorm` resamples to 192 kHz internally,
 and without it the output would stay there. `-map 0:a` drops any embedded cover
 art. The encodes were made with ffmpeg 7.0.2 (the `imageio-ffmpeg` static
-build); measured afterwards, the three tracks land at -18.0, -17.9 and
--18.4 LUFS integrated.
+build). `invite.mp3` was added later and encoded with ffmpeg 7.1, also the
+`imageio-ffmpeg` static build. Measured afterwards, the three music tracks
+land at -18.0, -17.9 and -18.4 LUFS integrated.
 
 `*.mp3` is marked `binary` in `.gitattributes`, so the repo-wide `eol=lf` rule
-never touches these files. `audioEngine.test.ts` fails if any of the 32 files
+never touches these files. `audioEngine.test.ts` fails if any of the 33 files
 the engine references goes missing.

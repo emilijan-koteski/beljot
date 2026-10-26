@@ -1,7 +1,7 @@
 import "@/shared/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +20,13 @@ const joinRoomSpy = vi.fn();
 vi.mock("@/shared/api/rooms", () => ({
   joinRoom: (id: number, password?: string) => joinRoomSpy(id, password),
 }));
+
+const audioEngine = vi.hoisted(() => ({
+  playAlertSfx: vi.fn((_name: string, _options: { dedupeKey: string; signal?: AbortSignal }) =>
+    Promise.resolve(),
+  ),
+}));
+vi.mock("@/shared/audio/audioEngine", () => audioEngine);
 
 import { toast } from "sonner";
 
@@ -205,6 +212,201 @@ describe("RoomInviteModal", () => {
     renderModal();
 
     await waitFor(() => expect(useRoomStore.getState().roomInvite).toBeNull());
+  });
+});
+
+describe("RoomInviteModal sound", () => {
+  beforeEach(() => {
+    useRoomStore.getState().setRoomInvite(null);
+    useRoomStore.getState().setRoomEjection(null);
+    audioEngine.playAlertSfx.mockClear();
+    joinRoomSpy.mockReset();
+  });
+  afterEach(() => {
+    cleanup();
+    useRoomStore.getState().setRoomInvite(null);
+    useRoomStore.getState().setRoomEjection(null);
+  });
+
+  const baseKey = `1:${baseInvite.expiresAt}`;
+  const laterExpiry = new Date(Date.now() + 120_000).toISOString();
+
+  function whistles() {
+    return audioEngine.playAlertSfx.mock.calls.map(([name, options]) => ({
+      name,
+      dedupeKey: options.dedupeKey,
+      aborted: options.signal?.aborted,
+    }));
+  }
+
+  function showEjectionNotice() {
+    useRoomStore.getState().setRoomEjection({
+      roomId: 9,
+      buyIn: 500,
+      balance: 100,
+      reason: "insolvent",
+    });
+  }
+
+  it("stays silent without an invite", () => {
+    renderModal();
+    expect(audioEngine.playAlertSfx).not.toHaveBeenCalled();
+  });
+
+  it("whistles once as the popup appears, keyed to the invite's id and expiry", () => {
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    renderModal();
+
+    expect(screen.getByTestId("room-invite-modal")).toBeInTheDocument();
+    expect(whistles()).toEqual([{ name: "invite", dedupeKey: baseKey, aborted: false }]);
+  });
+
+  it("does not whistle again when the same invite re-renders", () => {
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    renderModal();
+
+    act(() => {
+      useRoomStore.getState().setRoomInvite({ ...baseInvite });
+    });
+
+    expect(whistles()).toEqual([{ name: "invite", dedupeKey: baseKey, aborted: false }]);
+  });
+
+  it("whistles again for a new invite, aborting the replaced one", () => {
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    renderModal();
+
+    act(() => {
+      useRoomStore.getState().setRoomInvite({ ...baseInvite, inviteId: 2 });
+    });
+
+    expect(whistles()).toEqual([
+      { name: "invite", dedupeKey: baseKey, aborted: true },
+      { name: "invite", dedupeKey: `2:${baseInvite.expiresAt}`, aborted: false },
+    ]);
+  });
+
+  it("whistles again for the same inviteId with a new expiry", () => {
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    renderModal();
+
+    act(() => {
+      useRoomStore.getState().setRoomInvite({ ...baseInvite, expiresAt: laterExpiry });
+    });
+
+    expect(whistles().map((w) => w.dedupeKey)).toEqual([baseKey, `1:${laterExpiry}`]);
+  });
+
+  it("stays silent behind the ejection notice, then whistles once the popup shows", () => {
+    showEjectionNotice();
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    renderModal();
+
+    expect(screen.queryByTestId("room-invite-modal")).not.toBeInTheDocument();
+    expect(audioEngine.playAlertSfx).not.toHaveBeenCalled();
+
+    act(() => {
+      useRoomStore.getState().setRoomEjection(null);
+    });
+
+    expect(screen.getByTestId("room-invite-modal")).toBeInTheDocument();
+    expect(whistles()).toEqual([{ name: "invite", dedupeKey: baseKey, aborted: false }]);
+  });
+
+  it("reuses the same key when the same invite is hidden and shown again", () => {
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    renderModal();
+
+    act(() => {
+      showEjectionNotice();
+    });
+    act(() => {
+      useRoomStore.getState().setRoomEjection(null);
+    });
+
+    expect(whistles()).toEqual([
+      { name: "invite", dedupeKey: baseKey, aborted: true },
+      { name: "invite", dedupeKey: baseKey, aborted: false },
+    ]);
+  });
+
+  it("aborts the whistle when the popup unmounts", () => {
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    const { unmount } = renderModal();
+
+    unmount();
+
+    expect(whistles()).toEqual([{ name: "invite", dedupeKey: baseKey, aborted: true }]);
+  });
+
+  it("aborts the whistle when the invite is declined", async () => {
+    const user = userEvent.setup();
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    renderModal();
+
+    await user.click(screen.getByTestId("room-invite-decline"));
+
+    expect(whistles()).toEqual([{ name: "invite", dedupeKey: baseKey, aborted: true }]);
+  });
+
+  it.each(["room-invite-accept", "room-invite-decline"])(
+    "aborts the whistle on a press of %s and never replays it for that invite",
+    (testId) => {
+      useRoomStore.getState().setRoomInvite(baseInvite);
+      renderModal();
+
+      fireEvent.pointerDown(screen.getByTestId(testId));
+      act(() => {
+        showEjectionNotice();
+      });
+      act(() => {
+        useRoomStore.getState().setRoomEjection(null);
+      });
+
+      expect(whistles()).toEqual([{ name: "invite", dedupeKey: baseKey, aborted: true }]);
+    },
+  );
+
+  it("aborts the whistle once a join into a public room is in flight", async () => {
+    joinRoomSpy.mockReturnValue(new Promise(() => {}));
+    useRoomStore.getState().setRoomInvite(baseInvite);
+    renderModal();
+
+    fireEvent.click(screen.getByTestId("room-invite-accept"));
+
+    await waitFor(() =>
+      expect(whistles()).toEqual([{ name: "invite", dedupeKey: baseKey, aborted: true }]),
+    );
+    expect(joinRoomSpy).toHaveBeenCalledWith(7, undefined);
+  });
+
+  it("aborts the whistle when Accept opens the password prompt", async () => {
+    useRoomStore.getState().setRoomInvite({ ...baseInvite, isPrivate: true, isHostInvite: false });
+    renderModal();
+
+    fireEvent.click(screen.getByTestId("room-invite-accept"));
+
+    expect(await screen.findByTestId("password-prompt-dialog")).toBeInTheDocument();
+    expect(whistles()).toEqual([{ name: "invite", dedupeKey: baseKey, aborted: true }]);
+  });
+
+  it("aborts the whistle for an invite already expired on arrival", async () => {
+    const past = new Date(Date.now() - 1000).toISOString();
+    useRoomStore.getState().setRoomInvite({ ...baseInvite, expiresAt: past });
+    renderModal();
+
+    await waitFor(() => expect(useRoomStore.getState().roomInvite).toBeNull());
+    expect(whistles()).toEqual([{ name: "invite", dedupeKey: `1:${past}`, aborted: true }]);
+  });
+
+  it("aborts the whistle when the invite expires on its timer", async () => {
+    const soon = new Date(Date.now() + 150).toISOString();
+    useRoomStore.getState().setRoomInvite({ ...baseInvite, expiresAt: soon });
+    renderModal();
+    expect(whistles()).toEqual([{ name: "invite", dedupeKey: `1:${soon}`, aborted: false }]);
+
+    await waitFor(() => expect(useRoomStore.getState().roomInvite).toBeNull());
+    expect(whistles()).toEqual([{ name: "invite", dedupeKey: `1:${soon}`, aborted: true }]);
   });
 });
 

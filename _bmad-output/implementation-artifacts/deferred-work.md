@@ -1239,3 +1239,15 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A â€
 - source_spec: `_bmad-output/implementation-artifacts/spec-701-match-mode.md`
   summary: Serbian mixes two words for points: the mode labels say "bod" (501/701/1001) while the generic label and the rules text say "poena".
   evidence: `client/src/shared/i18n/sr.json` `lobby.card.matchMode501`/`1001` and `lobby.createRoomModal.matchMode501`/`1001` already read "bod" (copied from hr) while `lobby.card.matchModeGeneric` is "{{points}} poena" and `features/rules/content/sr.ts` says "poena". Pre-existing; the 701 labels follow the existing "bod" pattern.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-room-invite-whistle-sound.md`
+  summary: Verify the room-invite chirp actually sounds on iOS/iPadOS Safari for a player who has only been in the lobby (no match since load).
+  evidence: Unverified (maybe-false), would be medium. WebKit may start an AudioContext only from resume() inside a user-gesture handler, and the alert creates and resumes its context from a WS push. If it is silent on iOS, the fix needs the owner to relax the spec's frozen "do not create the AudioContext before an invite arrives" (for example, unlock on the first tap) or to accept and document the gap. Settled by a device test with two accounts.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-room-invite-whistle-sound.md`
+  summary: Room invites are invisible (no popup, so no chirp) on the public `/rules` page for a logged-in player, because `PublicContentLayout` mounts `WebSocketProvider` but not `RoomInviteModal`.
+  evidence: Pre-existing since Story 11.5. `App.tsx:78-79` routes `/rules` under `PublicContentLayout`, and only `AppLayout.tsx:16` mounts the modal, so an invite arriving there sits in the store until the player navigates and may expire unseen. Found in invite-sound review pass 2.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-room-invite-whistle-sound.md`
+  summary: On WebKit, `resume()` may reject (NotAllowedError) instead of staying pending, which would end the invite chirp's 1 s grace early so a click inside it cannot unlock audio.
+  evidence: Unverified (maybe-false), would be low to medium. `requestStart` maps a rejection to "settled", and `FakeAudioContext` models only a pending or a throwing resume. Settle it alongside the iOS/Safari device check above.

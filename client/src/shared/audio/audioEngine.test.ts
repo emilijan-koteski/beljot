@@ -10,6 +10,7 @@ import {
   __resetAudioEngineForTests,
   MUSIC_TRACKS,
   openAudioSession,
+  playAlertSfx,
   playSfx,
   preloadSfx,
   setMusicVolume,
@@ -58,12 +59,16 @@ class FakeMediaSource {
 class FakeAudioContext {
   static instances: FakeAudioContext[] = [];
   static initialState: AudioContextState = "running";
+  static startAllowed = true;
+  static resumeThrows = false;
+  static decodedDuration: number | undefined = undefined;
   state: AudioContextState = FakeAudioContext.initialState;
   currentTime = 0;
   destination = {};
   gains: FakeGain[] = [];
   sources: FakeBufferSource[] = [];
   mediaSources: FakeMediaSource[] = [];
+  private pendingResumes: Array<() => void> = [];
   constructor() {
     FakeAudioContext.instances.push(this);
   }
@@ -82,9 +87,19 @@ class FakeAudioContext {
     this.mediaSources.push(m);
     return m;
   }
-  decodeAudioData = vi.fn(async (data: ArrayBuffer & { url?: string }) => ({ url: data.url }));
-  resume = vi.fn(async () => {
+  decodeAudioData = vi.fn(async (data: ArrayBuffer & { url?: string }) =>
+    FakeAudioContext.decodedDuration === undefined
+      ? { url: data.url }
+      : { url: data.url, duration: FakeAudioContext.decodedDuration },
+  );
+  resume = vi.fn((): Promise<void> => {
+    if (FakeAudioContext.resumeThrows) throw new Error("InvalidStateError");
+    if (!FakeAudioContext.startAllowed) {
+      return new Promise<void>((resolve) => this.pendingResumes.push(resolve));
+    }
     this.state = "running";
+    for (const resolve of this.pendingResumes.splice(0)) resolve();
+    return Promise.resolve();
   });
   suspend = vi.fn(async () => {
     this.state = "suspended";
@@ -158,6 +173,9 @@ beforeEach(() => {
   __resetAudioEngineForTests();
   FakeAudioContext.instances = [];
   FakeAudioContext.initialState = "running";
+  FakeAudioContext.startAllowed = true;
+  FakeAudioContext.resumeThrows = false;
+  FakeAudioContext.decodedDuration = undefined;
   FakeAudio.instances = [];
   FakeAudio.rejectPlay = false;
   fetchMock.mockClear();
@@ -183,6 +201,7 @@ describe("without Web Audio", () => {
     expect(() => playSfx("cardPlay")).not.toThrow();
     expect(() => startMusic()).not.toThrow();
     expect(() => stopMusic()).not.toThrow();
+    await expect(playAlertSfx("invite", { dedupeKey: "1" })).resolves.toBeUndefined();
     release();
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -210,9 +229,9 @@ describe("sound effects", () => {
     await preloadSfx();
 
     const all = Object.values(SFX_URLS).flat();
-    expect(all).toHaveLength(29);
+    expect(all).toHaveLength(30);
     expect(fetchMock.mock.calls.map(([url]) => url).sort()).toEqual([...all].sort());
-    expect(context().decodeAudioData).toHaveBeenCalledTimes(29);
+    expect(context().decodeAudioData).toHaveBeenCalledTimes(30);
     expect(all.every((url) => url.endsWith(".mp3"))).toBe(true);
   });
 
@@ -225,6 +244,7 @@ describe("sound effects", () => {
     ["matchLose", /jingle-lose\.mp3$/],
     ["popup", /popup-1\.mp3$/],
     ["clockTick", /clock-tick\.mp3$/],
+    ["invite", /invite\.mp3$/],
   ] as const)("plays %s from its own recording set", async (name, file) => {
     openAudioSession();
     await preloadSfx();
@@ -359,6 +379,346 @@ describe("sound effects", () => {
 
     await preloadSfx();
     expect(context().decodeAudioData).toHaveBeenCalledTimes(total);
+  });
+});
+
+describe("alert sound effects", () => {
+  const INVITE_URL = SFX_URLS.invite[0];
+
+  function stallNextFetch(): () => void {
+    let finish: () => void = () => {};
+    fetchMock.mockImplementationOnce(
+      (url: string) =>
+        new Promise((resolve) => {
+          finish = () =>
+            resolve({
+              ok: true,
+              arrayBuffer: async () => Object.assign(new ArrayBuffer(8), { url }),
+            });
+        }),
+    );
+    return () => finish();
+  }
+
+  it("plays outside any session at the sound-effects volume, fetching only its own file", async () => {
+    setAudioPrefs({ soundVolume: 35 });
+
+    await playAlertSfx("invite", { dedupeKey: "1" });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([INVITE_URL]);
+    expect(context().sources).toHaveLength(1);
+    const source = context().sources[0]!;
+    expect(source.buffer).toEqual({ url: INVITE_URL });
+    expect(source.connect).toHaveBeenCalledWith(context().sfxGain);
+    expect(source.start).toHaveBeenCalledTimes(1);
+    expect(context().sfxGain!.gain.value).toBeCloseTo(0.3);
+  });
+
+  it("plays at most once per key", async () => {
+    await playAlertSfx("invite", { dedupeKey: "1" });
+    await playAlertSfx("invite", { dedupeKey: "1" });
+    expect(context().sources).toHaveLength(1);
+
+    await playAlertSfx("invite", { dedupeKey: "2" });
+    expect(context().sources).toHaveLength(2);
+  });
+
+  it("plays once when the same key is requested twice at once", async () => {
+    await Promise.all([
+      playAlertSfx("invite", { dedupeKey: "1" }),
+      playAlertSfx("invite", { dedupeKey: "1" }),
+    ]);
+
+    expect(context().sources).toHaveLength(1);
+  });
+
+  it("stays silent when aborted before it sounds, leaving the key to a remounted popup", async () => {
+    const whistle = new AbortController();
+    const aborted = playAlertSfx("invite", { dedupeKey: "1", signal: whistle.signal });
+    whistle.abort();
+    await aborted;
+    expect(context().sources).toHaveLength(0);
+
+    await playAlertSfx("invite", { dedupeKey: "1", signal: new AbortController().signal });
+    expect(context().sources).toHaveLength(1);
+  });
+
+  it("keeps playSfx silent off the match page while an alert sounds", async () => {
+    FakeAudioContext.decodedDuration = 0.6;
+    await playAlertSfx("invite", { dedupeKey: "1" });
+
+    playSfx("cardPlay");
+
+    expect(context().sources).toHaveLength(1);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([INVITE_URL]);
+  });
+
+  it.each([
+    ["the sound switch is off", { soundEnabled: false }],
+    ["the sound volume is 0", { soundEnabled: true, soundVolume: 0 }],
+  ])("creates and fetches nothing when %s", async (_, prefs) => {
+    setAudioPrefs(prefs);
+
+    await playAlertSfx("invite", { dedupeKey: "1" });
+
+    expect(FakeAudioContext.instances).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("starts a fresh context once the browser allows it, then plays", async () => {
+    FakeAudioContext.initialState = "suspended";
+
+    await playAlertSfx("invite", { dedupeKey: "1" });
+
+    expect(context().resume).toHaveBeenCalledTimes(1);
+    expect(context().state).toBe("running");
+    expect(context().sources).toHaveLength(1);
+  });
+
+  it("resumes a context left suspended by an earlier match, then plays", async () => {
+    vi.useFakeTimers();
+    const release = openAudioSession();
+    await preloadSfx();
+    release();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(context().state).toBe("suspended");
+
+    await playAlertSfx("invite", { dedupeKey: "1" });
+
+    expect(context().state).toBe("running");
+    expect(context().sources).toHaveLength(1);
+  });
+
+  it("stays silent while the browser refuses audio, and never sounds on a later click", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.initialState = "suspended";
+    FakeAudioContext.startAllowed = false;
+
+    const alert = playAlertSfx("invite", { dedupeKey: "1" });
+    await vi.advanceTimersByTimeAsync(1000);
+    await alert;
+    expect(context().sources).toHaveLength(0);
+
+    const resumes = context().resume.mock.calls.length;
+    window.dispatchEvent(new Event("pointerdown"));
+    expect(context().resume).toHaveBeenCalledTimes(resumes);
+
+    FakeAudioContext.startAllowed = true;
+    await context().resume();
+    await flush();
+    expect(context().state).toBe("running");
+    expect(context().sources).toHaveLength(0);
+  });
+
+  it("stays silent when audio unlocks only after the grace, while the sound is still loading", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.initialState = "suspended";
+    FakeAudioContext.startAllowed = false;
+    const finishFetch = stallNextFetch();
+
+    const alert = playAlertSfx("invite", { dedupeKey: "1" });
+    await vi.advanceTimersByTimeAsync(1000);
+    FakeAudioContext.startAllowed = true;
+    await context().resume();
+    await flush();
+    expect(context().state).toBe("running");
+
+    finishFetch();
+    await alert;
+    await flush();
+
+    expect(context().sources).toHaveLength(0);
+  });
+
+  it("gives up at the grace while a fetch stalls, and stays silent when it lands", async () => {
+    vi.useFakeTimers();
+    const finishFetch = stallNextFetch();
+    let settled = false;
+
+    const alert = playAlertSfx("invite", { dedupeKey: "1" }).then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toBe(true);
+
+    finishFetch();
+    await alert;
+    await flush();
+    expect(context().sources).toHaveLength(0);
+  });
+
+  it("suspends a context the browser starts only after the alert gave up", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.initialState = "suspended";
+    FakeAudioContext.startAllowed = false;
+
+    const alert = playAlertSfx("invite", { dedupeKey: "1" });
+    await vi.advanceTimersByTimeAsync(1000);
+    await alert;
+    await vi.advanceTimersByTimeAsync(500);
+    expect(context().suspend).not.toHaveBeenCalled();
+
+    FakeAudioContext.startAllowed = true;
+    void context().resume();
+    await flush();
+    expect(context().state).toBe("running");
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(context().suspend).toHaveBeenCalledTimes(1);
+    expect(context().state).toBe("suspended");
+    expect(context().sources).toHaveLength(0);
+  });
+
+  it("plays when a click within the grace unlocks audio", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.initialState = "suspended";
+    FakeAudioContext.startAllowed = false;
+    let settled = false;
+
+    const alert = playAlertSfx("invite", { dedupeKey: "1" }).then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(500);
+    FakeAudioContext.startAllowed = true;
+    window.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(settled).toBe(true);
+    expect(context().sources).toHaveLength(1);
+    await alert;
+  });
+
+  it("stays silent when resume() throws synchronously", async () => {
+    FakeAudioContext.initialState = "suspended";
+    FakeAudioContext.resumeThrows = true;
+
+    await expect(playAlertSfx("invite", { dedupeKey: "1" })).resolves.toBeUndefined();
+
+    expect(context().sources).toHaveLength(0);
+  });
+
+  it("keeps the context awake until the sound has ended, then lets it suspend", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.decodedDuration = 0.6;
+
+    await playAlertSfx("invite", { dedupeKey: "1" });
+    expect(context().sources).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(600 + 500);
+    expect(context().suspend).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(context().suspend).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a context the alert resumed awake while the whistle plays", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.decodedDuration = 0.57;
+    const release = openAudioSession();
+    await preloadSfx();
+    release();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(context().suspend).toHaveBeenCalledTimes(1);
+
+    await playAlertSfx("invite", { dedupeKey: "1" });
+    expect(context().sources).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(560);
+
+    expect(context().suspend).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the context awake when a match session closes mid-whistle", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.decodedDuration = 0.57;
+    const release = openAudioSession();
+    await playAlertSfx("invite", { dedupeKey: "1" });
+    expect(context().sources).toHaveLength(1);
+
+    release();
+    await vi.advanceTimersByTimeAsync(560);
+    expect(context().suspend).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(context().suspend).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels a pending post-match suspend when an alert arrives in its window", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.decodedDuration = 0.57;
+    const release = openAudioSession();
+    await preloadSfx();
+    release();
+    await vi.advanceTimersByTimeAsync(200);
+
+    await playAlertSfx("invite", { dedupeKey: "1" });
+    await vi.advanceTimersByTimeAsync(560);
+
+    expect(context().sources).toHaveLength(1);
+    expect(context().suspend).not.toHaveBeenCalled();
+  });
+
+  it("creates and fetches nothing for an already-aborted signal", async () => {
+    const whistle = new AbortController();
+    whistle.abort();
+
+    await playAlertSfx("invite", { dedupeKey: "1", signal: whistle.signal });
+
+    expect(FakeAudioContext.instances).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("settles at once and stays silent when aborted mid-wait", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.initialState = "suspended";
+    FakeAudioContext.startAllowed = false;
+    const whistle = new AbortController();
+    let settled = false;
+
+    const alert = playAlertSfx("invite", { dedupeKey: "1", signal: whistle.signal }).then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(settled).toBe(false);
+    whistle.abort();
+    await flush();
+
+    expect(settled).toBe(true);
+    const resumes = context().resume.mock.calls.length;
+    window.dispatchEvent(new Event("pointerdown"));
+    expect(context().resume).toHaveBeenCalledTimes(resumes);
+    expect(context().sources).toHaveLength(0);
+    await alert;
+  });
+
+  it("stays silent when more than the grace has elapsed though its timer fired late", async () => {
+    vi.useFakeTimers();
+    FakeAudioContext.initialState = "suspended";
+    FakeAudioContext.startAllowed = false;
+    const now = vi.spyOn(performance, "now").mockReturnValue(0);
+
+    const alert = playAlertSfx("invite", { dedupeKey: "1" });
+    now.mockReturnValue(1500);
+    FakeAudioContext.startAllowed = true;
+    window.dispatchEvent(new Event("pointerdown"));
+    await alert;
+
+    expect(context().state).toBe("running");
+    expect(context().sources).toHaveLength(0);
+  });
+
+  it("swallows a failed fetch, staying silent and leaving the key unspent", async () => {
+    fetchMock.mockImplementationOnce(async () => ({
+      ok: false,
+      arrayBuffer: async () => Object.assign(new ArrayBuffer(0), { url: "" }),
+    }));
+
+    await expect(playAlertSfx("invite", { dedupeKey: "1" })).resolves.toBeUndefined();
+    expect(context().sources).toHaveLength(0);
+
+    await playAlertSfx("invite", { dedupeKey: "1" });
+    expect(context().sources).toHaveLength(1);
   });
 });
 

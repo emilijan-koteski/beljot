@@ -15,7 +15,8 @@ export type SfxName =
   | "matchWin"
   | "matchLose"
   | "popup"
-  | "clockTick";
+  | "clockTick"
+  | "invite";
 
 const AUDIO_BASE = `${import.meta.env.BASE_URL}audio`;
 
@@ -34,6 +35,7 @@ export const SFX_URLS: Readonly<Record<SfxName, readonly string[]>> = {
   matchLose: [`${AUDIO_BASE}/sfx/jingle-lose.mp3`],
   popup: sfxSet("popup", 2),
   clockTick: [`${AUDIO_BASE}/sfx/clock-tick.mp3`],
+  invite: [`${AUDIO_BASE}/sfx/invite.mp3`],
 };
 
 export const MUSIC_TRACKS: readonly string[] = [
@@ -49,6 +51,8 @@ const MUSIC_FADE_OUT_S = 0.4;
 const MUSIC_VOLUME_RAMP_S = 0.1;
 const DEDUPE_KEYS_REMEMBERED = 256;
 const SUSPEND_DELAY_MS = MUSIC_FADE_OUT_S * 1000 + 100;
+const ALERT_GRACE_MS = 1000;
+const ALERT_RELEASE_MARGIN_MS = 200;
 
 const GESTURE_EVENTS = ["pointerdown", "pointerup", "touchend", "keydown"] as const;
 
@@ -79,6 +83,8 @@ let fadeInEndsAt = 0;
 
 let sessions = 0;
 let suspendTimer: ReturnType<typeof setTimeout> | null = null;
+let alertHolds = 0;
+const alertReleaseTimers = new Set<ReturnType<typeof setTimeout>>();
 
 /**
  * Returns the unprefixed `AudioContext` constructor, or null where it is missing.
@@ -153,24 +159,56 @@ export function preloadSfx(): Promise<void> {
   return Promise.all(urls.map((url) => loadBuffer(context, url))).then(() => undefined);
 }
 
+function dedupeEntry(name: SfxName, dedupeKey: string): string {
+  return `${name}:${dedupeKey}`;
+}
+
+/** Records a dedupe key for `name` and reports whether it is new; the oldest keys are forgotten past the cap. */
+function claimDedupeKey(name: SfxName, dedupeKey: string): boolean {
+  const key = dedupeEntry(name, dedupeKey);
+  if (playedKeys.has(key)) return false;
+  playedKeys.add(key);
+  if (playedKeys.size > DEDUPE_KEYS_REMEMBERED) {
+    const oldest = playedKeys.values().next().value;
+    if (oldest !== undefined) playedKeys.delete(oldest);
+  }
+  return true;
+}
+
+/** The player's sound-effects volume (0-100), or 0 while the sound-effects switch is off. */
+function audibleSfxVolume(): number {
+  const user = useAuthStore.getState().user;
+  if (!resolveAudioEnabled(user?.soundEnabled)) return 0;
+  return resolveAudioVolume(user?.soundVolume);
+}
+
+/** Starts a random decoded variant of `name` on the sfx bus and returns its buffer, or null when none could start. */
+function startSfx(context: AudioContext, name: SfxName, volume: number): AudioBuffer | null {
+  if (!sfxGain) return null;
+  const ready = SFX_URLS[name].filter((url) => buffers.has(url));
+  const url = ready[Math.floor(Math.random() * ready.length)];
+  const buffer = url === undefined ? undefined : buffers.get(url);
+  if (!buffer) return null;
+  sfxGain.gain.value = gainFor(SFX_GAIN_AT_DEFAULT, volume);
+  try {
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(sfxGain);
+    source.start();
+  } catch {
+    return null;
+  }
+  return buffer;
+}
+
 /**
  * Plays a random variant of a sound effect at the player's volume, only inside a session with sound on.
  * A `dedupeKey` makes the call idempotent per name, and is consumed even while sound is off.
  */
 export function playSfx(name: SfxName, options: { dedupeKey?: string } = {}): void {
-  if (options.dedupeKey !== undefined) {
-    const key = `${name}:${options.dedupeKey}`;
-    if (playedKeys.has(key)) return;
-    playedKeys.add(key);
-    if (playedKeys.size > DEDUPE_KEYS_REMEMBERED) {
-      const oldest = playedKeys.values().next().value;
-      if (oldest !== undefined) playedKeys.delete(oldest);
-    }
-  }
+  if (options.dedupeKey !== undefined && !claimDedupeKey(name, options.dedupeKey)) return;
   if (sessions === 0) return;
-  const user = useAuthStore.getState().user;
-  if (!resolveAudioEnabled(user?.soundEnabled)) return;
-  const volume = resolveAudioVolume(user?.soundVolume);
+  const volume = audibleSfxVolume();
   if (volume === 0) return;
 
   const context = ensureContext();
@@ -179,22 +217,128 @@ export function playSfx(name: SfxName, options: { dedupeKey?: string } = {}): vo
   if (queuedSoundsWouldBurstOnResume) return;
 
   const urls = SFX_URLS[name];
-  const ready = urls.filter((url) => buffers.has(url));
-  if (ready.length === 0) {
+  if (!urls.some((url) => buffers.has(url))) {
     for (const url of urls) void loadBuffer(context, url);
     return;
   }
-  const url = ready[Math.floor(Math.random() * ready.length)];
-  const buffer = url === undefined ? undefined : buffers.get(url);
-  if (!buffer) return;
-  sfxGain.gain.value = gainFor(SFX_GAIN_AT_DEFAULT, volume);
+  startSfx(context, name, volume);
+}
+
+/**
+ * Asks the context to start. A start the browser grants only after every alert and session is gone
+ * is suspended again, so a late resume never leaves the context running.
+ */
+function requestStart(context: AudioContext): Promise<void> {
+  if (context.state === "running") return Promise.resolve();
   try {
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(sfxGain);
-    source.start();
+    return context.resume().then(scheduleSuspendIfIdle, () => {});
   } catch {
+    return Promise.resolve();
+  }
+}
+
+/** Resolves true when `work` settles within `deadlineMs`, or false once the deadline passes or `signal` aborts first. */
+function settlesWithin(
+  work: Promise<unknown>,
+  deadlineMs: number,
+  signal: AbortSignal | undefined,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const finish = (settled: boolean) => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abandon);
+      resolve(settled);
+    };
+    const abandon = () => finish(false);
+    const timer = setTimeout(abandon, deadlineMs);
+    signal?.addEventListener("abort", abandon);
+    void work.then(
+      () => finish(true),
+      () => finish(true),
+    );
+  });
+}
+
+/** Keeps the context from being suspended for an alert, without opening the `playSfx` gate; returns the release. */
+function holdForAlert(): () => void {
+  alertHolds += 1;
+  cancelPendingSuspend();
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    alertHolds -= 1;
+    scheduleSuspendIfIdle();
+  };
+}
+
+/** Releases an alert's hold after `delayMs`, or at once when there is nothing to wait for. */
+function releaseAfter(release: () => void, delayMs: number): void {
+  if (delayMs <= 0) {
+    release();
     return;
+  }
+  const timer = setTimeout(() => {
+    alertReleaseTimers.delete(timer);
+    release();
+  }, delayMs);
+  alertReleaseTimers.add(timer);
+}
+
+function playbackMs(buffer: AudioBuffer): number {
+  return Number.isFinite(buffer.duration) ? buffer.duration * 1000 : 0;
+}
+
+/**
+ * Loads `name` and starts the context within the grace, letting a click or key press during it unlock audio.
+ * Resolves false when the grace runs out (by the clock, even if a throttled timer fires late) or `signal` aborts.
+ */
+async function readyWithinGrace(
+  context: AudioContext,
+  name: SfxName,
+  signal: AbortSignal | undefined,
+): Promise<boolean> {
+  const startedAt = performance.now();
+  const startOnGesture = () => resumeContext(context);
+  listenForGestures(startOnGesture);
+  try {
+    const loadsAndStart = Promise.all([
+      ...SFX_URLS[name].map((url) => loadBuffer(context, url)),
+      requestStart(context),
+    ]);
+    const settled = await settlesWithin(loadsAndStart, ALERT_GRACE_MS, signal);
+    return settled && performance.now() - startedAt <= ALERT_GRACE_MS;
+  } finally {
+    stopListeningForGestures(startOnGesture);
+  }
+}
+
+/**
+ * Plays `name` once per `dedupeKey` outside a match, keeping the context awake only while it sounds.
+ * Silent when sound is off, the grace runs out, or `signal` aborts before it starts; a key is spent only once it sounds.
+ */
+export async function playAlertSfx(
+  name: SfxName,
+  { dedupeKey, signal }: { dedupeKey: string; signal?: AbortSignal },
+): Promise<void> {
+  const alreadyPlayed = () => playedKeys.has(dedupeEntry(name, dedupeKey));
+  const aborted = () => signal?.aborted === true;
+  if (aborted() || alreadyPlayed() || audibleSfxVolume() === 0) return;
+  const context = ensureContext();
+  if (!context) return;
+  const release = holdForAlert();
+  let holdMs = 0;
+  try {
+    const ready = await readyWithinGrace(context, name, signal);
+    const volume = audibleSfxVolume();
+    if (!ready || aborted() || context.state !== "running" || volume === 0) return;
+    if (alreadyPlayed()) return;
+    const buffer = startSfx(context, name, volume);
+    if (!buffer) return;
+    claimDedupeKey(name, dedupeKey);
+    holdMs = playbackMs(buffer) + ALERT_RELEASE_MARGIN_MS;
+  } finally {
+    releaseAfter(release, holdMs);
   }
 }
 
@@ -365,23 +509,51 @@ function handleGesture(): void {
   if (musicWanted && musicEl?.paused) beginPlayback();
 }
 
+function listenForGestures(handler: () => void): void {
+  if (typeof window === "undefined") return;
+  for (const type of GESTURE_EVENTS) {
+    window.addEventListener(type, handler, { capture: true, passive: true });
+  }
+}
+
+function stopListeningForGestures(handler: () => void): void {
+  if (typeof window === "undefined") return;
+  for (const type of GESTURE_EVENTS) {
+    window.removeEventListener(type, handler, { capture: true });
+  }
+}
+
+function cancelPendingSuspend(): void {
+  if (suspendTimer === null) return;
+  clearTimeout(suspendTimer);
+  suspendTimer = null;
+}
+
+/** Suspends a running context once the music has faded out, unless a session or an alert hold still needs it. */
+function scheduleSuspendIfIdle(): void {
+  if (sessions > 0 || alertHolds > 0) return;
+  cancelPendingSuspend();
+  suspendTimer = setTimeout(() => {
+    suspendTimer = null;
+    if (sessions > 0 || alertHolds > 0 || !ctx || ctx.state !== "running") return;
+    try {
+      void ctx.suspend().catch(() => {});
+    } catch {
+      return;
+    }
+  }, SUSPEND_DELAY_MS);
+}
+
 /**
  * Opens a match-audio session, allowing sound effects and unlocking audio on the next gesture; returns the release.
- * After the last session closes, the context is suspended once the music has faded out.
+ * Once the last session closes and no alert holds the context, it is suspended after the music has faded out.
  */
 export function openAudioSession(): () => void {
   sessions += 1;
   if (sessions === 1) {
-    if (suspendTimer !== null) {
-      clearTimeout(suspendTimer);
-      suspendTimer = null;
-    }
+    cancelPendingSuspend();
     if (ctx) resumeContext(ctx);
-    if (typeof window !== "undefined") {
-      for (const type of GESTURE_EVENTS) {
-        window.addEventListener(type, handleGesture, { capture: true, passive: true });
-      }
-    }
+    listenForGestures(handleGesture);
   }
   let released = false;
   return () => {
@@ -389,21 +561,8 @@ export function openAudioSession(): () => void {
     released = true;
     sessions -= 1;
     if (sessions !== 0) return;
-    if (typeof window !== "undefined") {
-      for (const type of GESTURE_EVENTS) {
-        window.removeEventListener(type, handleGesture, { capture: true });
-      }
-    }
-    if (suspendTimer !== null) clearTimeout(suspendTimer);
-    suspendTimer = setTimeout(() => {
-      suspendTimer = null;
-      if (sessions > 0 || !ctx || ctx.state !== "running") return;
-      try {
-        void ctx.suspend().catch(() => {});
-      } catch {
-        return;
-      }
-    }, SUSPEND_DELAY_MS);
+    stopListeningForGestures(handleGesture);
+    scheduleSuspendIfIdle();
   };
 }
 
@@ -411,11 +570,9 @@ export function openAudioSession(): () => void {
 export function __resetAudioEngineForTests(): void {
   if (stopTimer !== null) clearTimeout(stopTimer);
   if (suspendTimer !== null) clearTimeout(suspendTimer);
-  if (typeof window !== "undefined") {
-    for (const type of GESTURE_EVENTS) {
-      window.removeEventListener(type, handleGesture, { capture: true });
-    }
-  }
+  for (const timer of alertReleaseTimers) clearTimeout(timer);
+  alertReleaseTimers.clear();
+  stopListeningForGestures(handleGesture);
   ctx = null;
   sfxGain = null;
   musicGain = null;
@@ -433,4 +590,5 @@ export function __resetAudioEngineForTests(): void {
   fadeInEndsAt = 0;
   sessions = 0;
   suspendTimer = null;
+  alertHolds = 0;
 }
