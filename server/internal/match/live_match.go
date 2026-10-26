@@ -173,7 +173,7 @@ func humanUserIDs(playerIDs [4]uint) []uint {
 	return out
 }
 
-// SetBotSearch enables the bots' card search with the given settings and replaces any earlier pool. Call it before
+// SetBotSearch enables the bots' card search with the given settings and replaces any earlier pool, so call it before
 // serving. Unset workers and deadline take their defaults, and a FromTrick of zero or less turns the search off.
 func (m *Manager) SetBotSearch(s BotSearchSettings) {
 	defaults := DefaultBotSearchSettings()

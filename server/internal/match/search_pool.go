@@ -24,7 +24,7 @@ type BotSearchSettings struct {
 // DefaultBotSearchSettings sizes the pool to half the CPUs, between one and four workers.
 func DefaultBotSearchSettings() BotSearchSettings {
 	return BotSearchSettings{
-		Workers:   max(1, min(maxDefaultSearchWorkers, runtime.NumCPU()/2)),
+		Workers:   max(1, min(maxDefaultSearchWorkers, runtime.GOMAXPROCS(0)/2)),
 		Deadline:  defaultBotSearchDeadline,
 		FromTrick: defaultBotSearchFromTrick,
 	}
