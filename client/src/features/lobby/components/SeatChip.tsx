@@ -1,7 +1,7 @@
 import { Bot } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { AvatarImage } from "@/shared/components/ui/avatar";
+import { Avatar } from "@/shared/components/ui/avatar";
 import { cn } from "@/shared/lib/utils";
 
 type SeatTeam = "A" | "B";
@@ -20,14 +20,12 @@ const TOKENS = {
     edgeSoft: "border-[var(--team-a-edge-soft)]",
     tint: "bg-[var(--team-a-tint)]",
     line: "bg-[var(--team-a-line)]",
-    fill: "bg-[var(--team-a-fill)]",
   },
   B: {
     edge: "border-[var(--team-b-edge)]",
     edgeSoft: "border-[var(--team-b-edge-soft)]",
     tint: "bg-[var(--team-b-tint)]",
     line: "bg-[var(--team-b-line)]",
-    fill: "bg-[var(--team-b-fill)]",
   },
 } as const;
 
@@ -62,19 +60,14 @@ export function SeatChip({ username, team, bot = false, avatarUrl, testId }: Pro
         tone.tint,
       )}
     >
-      <span
-        className={cn(
-          "inline-flex size-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-brass-ink",
-          tone.fill,
-        )}
-        data-testid={bot ? "seat-chip-bot-icon" : undefined}
-      >
-        {bot ? (
-          <Bot className="size-3 -translate-y-[5%]" aria-hidden="true" />
-        ) : (
-          <AvatarImage src={avatarUrl} size={18} fallback={username.charAt(0).toUpperCase()} />
-        )}
-      </span>
+      <Avatar
+        name={username}
+        avatarUrl={avatarUrl}
+        size={18}
+        team={team}
+        icon={bot ? <Bot aria-hidden="true" /> : undefined}
+        testId={bot ? "seat-chip-bot-icon" : undefined}
+      />
       <span className="truncate">{username}</span>
     </span>
   );

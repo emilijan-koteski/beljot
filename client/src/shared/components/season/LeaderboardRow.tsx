@@ -84,7 +84,7 @@ export function LeaderboardRow({
 
       <TierBadge tier={safeTier} size="sm" data-testid="leaderboard-tier-badge" />
 
-      <Avatar name={username} avatarUrl={avatarUrl} size={24} you={isSelf} />
+      <Avatar name={username} avatarUrl={avatarUrl} size={24} />
 
       <Link
         data-testid="leaderboard-username"

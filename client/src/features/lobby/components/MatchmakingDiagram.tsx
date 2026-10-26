@@ -136,7 +136,7 @@ export function MatchmakingDiagram({
           }}
         >
           <div className="relative">
-            <Avatar name={currentUsername} avatarUrl={currentAvatarUrl} size={youSize} you />
+            <Avatar name={currentUsername} avatarUrl={currentAvatarUrl} size={youSize} />
             <span
               className="border-accent absolute rounded-full border-2 opacity-40 animate-[pulse-dot_1.6s_ease-in-out_infinite]"
               style={{ inset: -6 }}

@@ -1,6 +1,8 @@
 import { Lock } from "lucide-react";
 import type { CSSProperties } from "react";
 
+import { Avatar } from "@/shared/components/ui/avatar";
+
 type Seat = [initial: string | null, name: string, team: "a" | "b"];
 
 type RoomCardProps = {
@@ -122,9 +124,7 @@ export function RoomCard({
         className="border-border text-ink-dim flex items-center gap-2.5 border-t px-4 py-2.5 text-xs"
         style={{ background: "rgba(14,58,36,0.03)" }}
       >
-        <span className="bg-surface-sunken border-border text-ink inline-flex size-4.5 items-center justify-center rounded-full border text-[10px] font-bold">
-          {host.charAt(0).toUpperCase()}
-        </span>
+        <Avatar name={host} size={18} />
         <span>{host}</span>
         <span className="text-ink-mute">3/4</span>
         <button

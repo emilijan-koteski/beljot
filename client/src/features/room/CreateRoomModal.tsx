@@ -26,6 +26,7 @@ import { useNavigate } from "react-router";
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
+import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
 import { Chips } from "@/shared/components/ui/chips";
 import { Dialog, DialogContent } from "@/shared/components/ui/dialog";
@@ -899,7 +900,6 @@ function PreviewCard({
     timerStyle === "relaxed"
       ? t("lobby.card.relaxed")
       : t("lobby.card.timerSeconds", { seconds: timerDuration });
-  const hostInitial = (hostUsername || "?").charAt(0).toUpperCase();
 
   return (
     <article
@@ -1056,9 +1056,7 @@ function PreviewCard({
 
       <div className="border-border bg-[rgba(14,58,36,0.03)] flex items-center gap-2.5 border-t px-4.5 py-3">
         <span className="text-ink-dim inline-flex items-center gap-1.5 text-xs">
-          <span className="bg-surface-sunken text-ink border-border inline-flex size-4.5 items-center justify-center rounded-full border text-[10px] font-bold">
-            {hostInitial}
-          </span>
+          <Avatar name={hostUsername} size={18} />
           {hostUsername}
         </span>
         <span className="text-ink-mute inline-flex items-center gap-1 text-xs">

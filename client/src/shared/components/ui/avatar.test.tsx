@@ -67,7 +67,7 @@ describe("Avatar", () => {
   });
 
   it("keeps the ring and the profile halo around the picture", () => {
-    const { container: ringed } = render(<Avatar name="marko" avatarUrl={URL_A} owner />);
+    const { container: ringed } = render(<Avatar name="marko" avatarUrl={URL_A} team="A" />);
     expect((ringed.firstChild as HTMLElement).style.border).toContain("2px solid");
 
     const { container: halo } = render(<Avatar name="marko" avatarUrl={URL_A} halo="profile" />);

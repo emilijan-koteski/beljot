@@ -43,16 +43,15 @@ type AvatarProps = {
   eager?: boolean;
   size?: number;
   team?: AvatarTeam;
-  owner?: boolean;
-  you?: boolean;
   halo?: "profile";
   icon?: ReactNode;
   className?: string;
+  testId?: string;
 };
 
 /**
  * Circular player avatar showing the uploaded picture or the initial.
- * Fill follows team colors and the ring encodes role: brass for owner, accent for "you".
+ * Fill and ring both follow the team: gold for Us, silver for Them, felt green edged in brass otherwise.
  */
 export function Avatar({
   name,
@@ -60,11 +59,10 @@ export function Avatar({
   eager = false,
   size = 36,
   team = null,
-  owner,
-  you,
   halo,
   icon,
   className,
+  testId,
 }: AvatarProps) {
   const initial = (name || "?").charAt(0).toUpperCase();
 
@@ -82,21 +80,15 @@ export function Avatar({
   }
 
   let ringColor: string;
-  if (owner) ringColor = "var(--brass)";
-  else if (you) ringColor = "var(--accent)";
-  else if (team === "A") ringColor = "var(--team-a)";
+  if (team === "A") ringColor = "var(--team-a)";
   else if (team === "B") ringColor = "var(--team-b)";
   else ringColor = "var(--border-2)";
 
   const isProfile = halo === "profile";
   const border = isProfile ? "none" : `2px solid ${ringColor}`;
-  let boxShadow = "none";
-  if (isProfile) {
-    boxShadow =
-      "0 0 0 4px var(--surface), 0 0 0 5px var(--brass), 0 16px 36px -16px rgba(25,101,54,0.55)";
-  } else if (owner) {
-    boxShadow = "0 0 0 3px rgba(201,168,118,0.20)";
-  }
+  const boxShadow = isProfile
+    ? "0 0 0 4px var(--surface), 0 0 0 5px var(--brass), 0 16px 36px -16px rgba(25,101,54,0.55)"
+    : "none";
 
   return (
     <div
@@ -115,6 +107,7 @@ export function Avatar({
         boxShadow,
       }}
       aria-hidden="true"
+      data-testid={testId}
     >
       {icon ? (
         <span

@@ -885,10 +885,8 @@ export function RoomPage() {
                             <Avatar
                               name={rowName}
                               avatarUrl={isBotRow ? null : p.avatarUrl}
-                              size={22}
+                              size={24}
                               team={rosterTeam(p)}
-                              you={isYou}
-                              owner={isRoomOwner}
                               icon={isBotRow ? <Bot aria-hidden="true" /> : undefined}
                             />
                             <span className="text-ink flex min-w-0 flex-1 items-center gap-1">

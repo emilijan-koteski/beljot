@@ -282,7 +282,7 @@ function PlayerRow({ name, seat, team, avatarUrl, icon }: DialogTarget & { icon?
         borderRadius: 12,
       }}
     >
-      <Avatar name={name} avatarUrl={avatarUrl} size={42} team={team} icon={icon} />
+      <Avatar name={name} avatarUrl={avatarUrl} size={44} team={team} icon={icon} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -501,7 +501,7 @@ export function TransferOwnershipDialog({
             flex: 1,
           }}
         >
-          <Avatar name={fromName} avatarUrl={fromAvatarUrl} size={44} you owner />
+          <Avatar name={fromName} avatarUrl={fromAvatarUrl} size={44} />
           <span style={{ ...captionStyle, color: "var(--ink-mute)" }}>
             {t("room.ownerConfirm.youHost")}
           </span>

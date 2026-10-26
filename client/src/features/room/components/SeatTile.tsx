@@ -119,8 +119,6 @@ export function SeatTile({
               avatarUrl={isBot ? null : player.avatarUrl}
               size={avatarSize}
               team={mode === "us" ? "A" : mode === "them" ? "B" : null}
-              you={isYou}
-              owner={isHost}
               icon={isBot ? <Bot aria-hidden="true" /> : undefined}
             />
             <div className="flex flex-col items-center gap-1">
