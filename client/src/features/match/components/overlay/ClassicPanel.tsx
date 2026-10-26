@@ -28,7 +28,7 @@ export function ClassicPanel({
   children,
 }: ClassicPanelProps) {
   const baseShadow =
-    "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)";
+    "var(--shadow-felt-xl), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)";
   const glowShadow = glowColor
     ? `0 0 0 2px color-mix(in srgb, ${glowColor} 53%, transparent), 0 0 24px color-mix(in srgb, ${glowColor} 47%, transparent), `
     : "";
@@ -45,7 +45,6 @@ export function ClassicPanel({
         border: "1px solid var(--brass-55)",
         boxShadow: `${glowShadow}${baseShadow}`,
         color: "var(--ink-light)",
-        fontFamily: "var(--font-body)",
         ...style,
       }}
     >
@@ -57,18 +56,16 @@ export function ClassicPanel({
           }}
         >
           <div
-            className="text-[17px] sm:text-[20px]"
+            className="text-lg sm:text-xl"
             style={{
-              fontFamily: "var(--font-body)",
               fontWeight: 600,
-              letterSpacing: 0.3,
               color: "var(--ink-light)",
             }}
           >
             {title}
           </div>
           {subtitle && (
-            <div className="text-[11px] sm:text-[12px]" style={{ opacity: 0.65, marginTop: 2 }}>
+            <div className="text-xs sm:text-xs" style={{ opacity: 0.65, marginTop: 2 }}>
               {subtitle}
             </div>
           )}

@@ -99,9 +99,8 @@ export function DeclarationReveal({
           overflowY: "auto",
           background: "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)",
           border: "1px solid var(--brass-55)",
-          boxShadow: `0 12px 32px rgba(0,0,0,0.55), 0 0 0 2px ${glowColor}88, 0 0 24px ${glowColor}77, inset 0 1px 0 var(--brass-25)`,
+          boxShadow: `var(--shadow-felt-lg), 0 0 0 2px ${glowColor}88, 0 0 24px ${glowColor}77, inset 0 1px 0 var(--brass-25)`,
           color: "var(--ink-light)",
-          fontFamily: "var(--font-body)",
         }}
         data-team={winnerTeamString}
       >
@@ -116,11 +115,9 @@ export function DeclarationReveal({
 
         <div className="text-center mb-5">
           <div
-            className="text-[11px] uppercase mb-2"
+            className="text-2xs tracking-caps uppercase mb-2"
             style={{
               color: "var(--brass)",
-              fontFamily: "var(--font-body)",
-              letterSpacing: 3,
               opacity: 0.85,
             }}
           >
@@ -129,9 +126,7 @@ export function DeclarationReveal({
           <div
             className="flex items-center justify-center gap-2.5 font-semibold leading-tight"
             style={{
-              fontFamily: "var(--font-body)",
-              fontSize: 22,
-              letterSpacing: 0.3,
+              fontSize: 24,
             }}
             data-testid="declaration-reveal-team"
             data-team={winnerTeamString}
@@ -152,7 +147,7 @@ export function DeclarationReveal({
           </div>
           {showTiebreaker && highestDeclarer && highestLabel && (
             <div
-              className="text-[12.5px] mt-1.5"
+              className="text-xs mt-1.5"
               style={{ color: "var(--ink-light)", opacity: 0.7 }}
               data-testid="declaration-reveal-tiebreaker"
             >
@@ -200,15 +195,14 @@ export function DeclarationReveal({
                     className="font-semibold truncate"
                     style={{
                       color: "var(--ink-light)",
-                      fontFamily: "var(--font-body)",
-                      fontSize: 15,
+                      fontSize: 16,
                     }}
                     data-testid="declaration-reveal-meld-label"
                   >
                     {meldLabel}
                   </span>
                   <span
-                    className="text-[12px]"
+                    className="text-xs"
                     style={{ color: "var(--ink-light)", opacity: 0.7 }}
                     data-testid="declaration-reveal-declarer"
                     data-seat={decl.playerSeat}
@@ -220,8 +214,7 @@ export function DeclarationReveal({
                   className="font-bold tabular-nums shrink-0"
                   style={{
                     color: VALUE_COLOR,
-                    fontFamily: "var(--font-body)",
-                    fontSize: 22,
+                    fontSize: 24,
                   }}
                   data-testid="declaration-reveal-meld-value"
                 >
@@ -242,20 +235,15 @@ export function DeclarationReveal({
         >
           <div className="flex flex-col">
             <span
-              className="text-[10px] uppercase"
+              className="text-2xs tracking-caps uppercase"
               style={{
                 color: "var(--brass)",
-                fontFamily: "var(--font-body)",
-                letterSpacing: 1.8,
                 opacity: 0.85,
               }}
             >
               {t("match.declaration.total")}
             </span>
-            <span
-              className="text-[12px] mt-0.5"
-              style={{ color: "var(--ink-light)", opacity: 0.65 }}
-            >
+            <span className="text-xs mt-0.5" style={{ color: "var(--ink-light)", opacity: 0.65 }}>
               {t("match.declaration.addedToHand")}
             </span>
           </div>
@@ -263,9 +251,8 @@ export function DeclarationReveal({
             className="font-bold tabular-nums"
             style={{
               color: VALUE_COLOR,
-              fontFamily: "var(--font-body)",
-              fontSize: 30,
-              letterSpacing: -0.5,
+              fontSize: 28,
+              letterSpacing: "-0.025em",
             }}
             data-testid="declaration-reveal-total-value"
           >

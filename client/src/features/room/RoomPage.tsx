@@ -642,7 +642,7 @@ export function RoomPage() {
   if (isRoomClosed && !matchStarted) {
     return (
       <div className="mx-auto max-w-330 px-8 py-12 text-center" data-testid="room-page-closed">
-        <p className="font-display text-ink mb-2 text-lg font-semibold">{t("room.roomClosed")}</p>
+        <p className="text-ink mb-2 text-lg font-semibold">{t("room.roomClosed")}</p>
         <p className="text-ink-dim animate-pulse text-sm">{t("room.returningToLobby")}</p>
       </div>
     );
@@ -768,7 +768,7 @@ export function RoomPage() {
     <div className="mx-auto max-w-330 px-4 pt-6 pb-24 md:px-8 md:pb-6">
       <div data-testid="room-page">
         <div
-          className="bg-surface border-border relative mb-4 rounded-lg border p-4 shadow-[0_18px_44px_-28px_rgba(14,58,36,0.32),0_2px_0_rgba(255,255,255,0.6)_inset] md:mb-6 md:p-6"
+          className="bg-surface border-border relative mb-4 rounded-lg border p-4 shadow-lg inset-shadow-bevel md:mb-6 md:p-6"
           data-testid="room-info-card"
         >
           <div
@@ -778,7 +778,7 @@ export function RoomPage() {
 
           <div className="flex items-center gap-3">
             <h1
-              className="font-display text-ink m-0 min-w-0 flex-1 truncate text-[20px] leading-tight font-bold tracking-[-0.6px] md:text-[28px]"
+              className="text-ink m-0 min-w-0 flex-1 truncate text-xl leading-tight font-bold tracking-tight md:text-3xl"
               data-testid="room-info-name"
             >
               {room.name}
@@ -814,13 +814,13 @@ export function RoomPage() {
                 ariaLabel={t("room.copyLinkAriaLabel", { code: room.code })}
                 testId="copy-link"
                 codeTestId="room-code"
-                className="px-2.5 py-1 text-[12px] md:px-3 md:py-2 md:text-[13px]"
+                className="px-2.5 py-1 text-xs md:px-3 md:py-2 md:text-sm"
               />
             </div>
           </div>
 
           <div className="mt-3 flex flex-col gap-3 md:mt-4 md:flex-row md:items-center md:justify-between md:gap-4">
-            <div className="text-ink-dim flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] md:text-[13px]">
+            <div className="text-ink-dim flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs md:text-sm">
               <span className="inline-flex items-center gap-1.5">
                 <Crown className="text-brass-deep size-3" aria-hidden />
                 <Trans
@@ -847,7 +847,7 @@ export function RoomPage() {
                   className="bg-surface-elevated min-w-64"
                   data-testid="in-room-list"
                 >
-                  <div className="text-brass-deep px-2 pt-1.5 pb-1 font-mono text-[10.5px] font-semibold tracking-[1.8px] uppercase">
+                  <div className="text-brass-deep px-2 pt-1.5 pb-1 font-mono text-2xs font-semibold tracking-caps uppercase">
                     {t("room.inRoomList.title")}
                   </div>
                   {players.length === 0 ? (
@@ -902,7 +902,7 @@ export function RoomPage() {
                             </span>
                             <span
                               className={cn(
-                                "shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.4px] uppercase",
+                                "shrink-0 rounded border px-1.5 py-0.5 font-mono text-2xs font-semibold tracking-wider uppercase",
                                 seated
                                   ? "border-accent bg-accent-soft text-accent-deep"
                                   : "border-border bg-surface-sunken text-ink-mute",
@@ -976,7 +976,7 @@ export function RoomPage() {
               </span>
             </div>
             <div
-              className="flex flex-wrap items-center gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-[11px] md:justify-end md:gap-2 md:[&>span]:px-2.5 md:[&>span]:py-1 md:[&>span]:text-xs"
+              className="flex flex-wrap items-center gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-xs md:justify-end md:gap-2 md:[&>span]:px-2.5 md:[&>span]:py-1 md:[&>span]:text-xs"
               data-testid="room-info-badges"
             >
               <Badge tone="brass" icon={<Trophy className="size-3" />}>
@@ -1136,7 +1136,7 @@ export function RoomPage() {
                   : undefined
             }
             data-testid={ctaTestId}
-            className="h-9 min-w-0 shrink px-3.5 text-[13px] sm:h-11.5 sm:px-5.5 sm:text-[14.5px]"
+            className="h-9 min-w-0 shrink px-3.5 text-sm sm:h-11.5 sm:px-5.5 sm:text-sm"
           >
             <span className="min-w-0 truncate">{ctaLabel}</span>
           </Button>
@@ -1149,12 +1149,10 @@ export function RoomPage() {
           {viewerSeat === null ? (
             <div className="flex items-center justify-center gap-2 sm:gap-2.5">
               <LegendIndicator variant="neutral" />
-              <span className="text-ink-dim text-[11px] sm:text-[12.5px]">
-                {t("room.legendNeutral")}
-              </span>
+              <span className="text-ink-dim text-xs sm:text-xs">{t("room.legendNeutral")}</span>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] sm:gap-x-4 sm:gap-y-2 sm:text-[12.5px]">
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs sm:gap-x-4 sm:gap-y-2 sm:text-xs">
               <span className="inline-flex items-center gap-2" data-team="teamA">
                 <LegendIndicator variant="us" />
                 <span className="text-team-a font-semibold">{t("room.legendUs")}</span>
@@ -1348,11 +1346,11 @@ export function RoomPage() {
                   background:
                     "radial-gradient(circle at 30% 30%, #1d6c3b 0%, var(--accent-deep) 70%), var(--accent-deep)",
                   borderColor: "var(--brass)",
-                  boxShadow: "0 6px 18px -6px rgba(14,58,36,0.40), inset 0 0 0 4px var(--brass-10)",
+                  boxShadow: "var(--shadow-sm), inset 0 0 0 4px var(--brass-10)",
                 }}
               >
                 <span
-                  className="font-mono text-[9px] font-semibold tracking-[2px] uppercase"
+                  className="font-mono text-2xs font-semibold tracking-caps uppercase"
                   style={{ transform: "rotate(-45deg)", color: "var(--brass)" }}
                 >
                   {t("room.tableCenter")}

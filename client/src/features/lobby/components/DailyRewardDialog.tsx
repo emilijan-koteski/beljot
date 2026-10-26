@@ -81,12 +81,12 @@ function CoinMedallion({
           }}
         />
         <span
-          className="font-display"
+          className=""
           style={{
             fontSize: size * 0.46,
             fontWeight: 700,
             color: ink,
-            letterSpacing: -1,
+            letterSpacing: "-0.025em",
             textShadow: "0 1px 0 rgba(255,255,255,0.55), 0 -1px 1px rgba(0,0,0,0.25)",
           }}
         >
@@ -131,9 +131,7 @@ function StreakTrack({ day, total = STREAK_MAX }: { day: number; total?: number 
                 : done
                   ? "1px solid #9c7d4e"
                   : "1px dashed var(--brass)",
-              boxShadow: today
-                ? "0 0 0 3px rgba(232,194,90,0.28), 0 3px 8px -2px rgba(160,125,26,0.6)"
-                : "none",
+              boxShadow: today ? "0 0 0 3px rgba(232,194,90,0.28), var(--shadow-sm)" : "none",
               color: today ? "#6e520f" : done ? "#5a4322" : "var(--ink-off)",
             }}
           >
@@ -173,8 +171,8 @@ export function DailyRewardDialog({
         className={cn(
           "block overflow-hidden rounded-lg border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
           milestone
-            ? "shadow-[0_0_0_1px_rgba(232,194,90,0.18)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]"
-            : "shadow-[0_0_0_1px_var(--brass-soft)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]",
+            ? "shadow-xl inset-ring inset-ring-brass/18"
+            : "shadow-xl inset-ring inset-ring-brass/18",
         )}
       >
         <div className="h-[3px] bg-[linear-gradient(90deg,transparent,var(--brass)_28%,var(--team-a-fill)_50%,var(--brass)_72%,transparent)]" />
@@ -189,7 +187,7 @@ export function DailyRewardDialog({
         />
 
         <div className="relative flex flex-col items-center gap-4 px-[26px] pt-[26px] pb-6 text-center">
-          <DialogTitle className="text-brass-deep text-[11px] font-bold tracking-[2px] uppercase">
+          <DialogTitle className="text-brass-deep text-2xs font-bold tracking-caps uppercase">
             {t(milestone ? "rewards.dailyReward.streakMaxed" : "rewards.dailyReward.title")}
           </DialogTitle>
 
@@ -199,20 +197,20 @@ export function DailyRewardDialog({
             <div
               data-testid="daily-reward-amount"
               className={cn(
-                "font-display tabular-nums text-[46px] leading-none font-bold tracking-[-1.5px]",
+                "tabular-nums text-5xl leading-none font-bold tracking-tight",
                 milestone ? "text-team-a" : "text-ink",
               )}
             >
               +{formatCoins(amount)}
             </div>
-            <DialogDescription className="text-ink-dim mt-1 text-sm tracking-[0.3px]">
+            <DialogDescription className="text-ink-dim mt-1 text-sm">
               {t("rewards.dailyReward.coinsAdded")}
             </DialogDescription>
           </div>
 
           <div className="w-full">
             <StreakTrack day={Math.min(streakDay, STREAK_MAX)} />
-            <div className="text-ink-dim mt-3 inline-flex items-center gap-1.5 text-[12.5px]">
+            <div className="text-ink-dim mt-3 inline-flex items-center gap-1.5 text-xs">
               <Flame className="text-brass-deep size-3.5" aria-hidden="true" />
               {t("rewards.dailyReward.streak", { streak: streakDay })}
             </div>
@@ -221,11 +219,11 @@ export function DailyRewardDialog({
           <div className="bg-border h-px w-full" />
 
           <div className="flex w-full items-center justify-between">
-            <span className="text-ink-mute inline-flex items-center gap-2 text-[13px]">
+            <span className="text-ink-mute inline-flex items-center gap-2 text-sm">
               <CoinMedallion size={22} tone={tone} />
               {t("rewards.dailyReward.newBalance")}
             </span>
-            <span className="font-display tabular-nums text-ink text-[18px] font-bold">
+            <span className="tabular-nums text-ink text-lg font-bold">
               {formatCoins(newBalance)}
             </span>
           </div>

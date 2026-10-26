@@ -31,7 +31,7 @@ export function Rivalries({ rivals, subjectIsSelf = true }: RivalriesProps) {
       testId="profile-rivals"
     >
       {rivals.length === 0 ? (
-        <p className="text-ink-mute text-[13px]">
+        <p className="text-ink-mute text-sm">
           {t(subjectIsSelf ? "profile.rivals.empty" : "profile.rivals.emptyPublic")}
         </p>
       ) : (
@@ -52,16 +52,12 @@ export function Rivalries({ rivals, subjectIsSelf = true }: RivalriesProps) {
                       className="focus-visible:ring-ring/70 flex min-w-0 flex-1 items-center gap-2.5 rounded-md underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
                     >
                       <Avatar name={r.username} avatarUrl={r.avatarUrl} team="B" size={24} />
-                      <span className="text-ink truncate text-[13px] font-medium">
-                        {r.username}
-                      </span>
+                      <span className="text-ink truncate text-sm font-medium">{r.username}</span>
                     </Link>
                   ) : (
                     <div className="flex min-w-0 flex-1 items-center gap-2.5">
                       <Avatar name={r.username} avatarUrl={r.avatarUrl} team="B" size={24} />
-                      <span className="text-ink truncate text-[13px] font-medium">
-                        {r.username}
-                      </span>
+                      <span className="text-ink truncate text-sm font-medium">{r.username}</span>
                     </div>
                   )}
                   <span className="text-ink-dim text-xs tabular-nums">

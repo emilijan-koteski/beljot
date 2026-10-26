@@ -102,14 +102,14 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
             }
           >
             <p
-              className="font-body text-sm mb-4"
-              style={{ color: "var(--ink-light)", opacity: 0.78, lineHeight: 1.55 }}
+              className="text-sm mb-4"
+              style={{ color: "var(--ink-light)", opacity: 0.78, lineHeight: 1.6 }}
             >
               {t("match.surrender.confirm.body")}
             </p>
 
             <div
-              className="mb-4 px-3 py-2 rounded-lg flex items-center gap-2 font-body"
+              className="mb-4 px-3 py-2 rounded-lg flex items-center gap-2"
               style={{
                 border: "1px solid color-mix(in srgb, var(--danger-light) 35%, transparent)",
                 background: "linear-gradient(90deg, rgba(80,28,28,0.55), rgba(50,18,18,0.35))",
@@ -142,7 +142,7 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
                   borderColor: "color-mix(in srgb, var(--danger-light) 70%, transparent)",
                   color: "#fff8f3",
                   boxShadow:
-                    "0 4px 10px rgba(217,106,90,0.4), inset 0 1px 0 rgba(255,255,255,0.25)",
+                    "0 8px 24px -12px color-mix(in srgb, var(--danger-light) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
                 }}
               >
                 {t("match.surrender.confirm.confirm")}

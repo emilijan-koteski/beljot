@@ -91,7 +91,7 @@ export function MatchResult({
         <ClassicPanel width={520} glowColor={glowColor}>
           <div className="flex flex-col items-center text-center gap-3">
             <span
-              className="font-body text-[11px] uppercase tracking-[0.25em]"
+              className="text-2xs uppercase tracking-caps"
               style={{ color: "var(--ink-light)", opacity: 0.55 }}
               data-testid="match-result-title"
             >
@@ -99,8 +99,8 @@ export function MatchResult({
             </span>
 
             <h2
-              className="font-display text-3xl font-semibold"
-              style={{ color: glowColor, letterSpacing: -0.5 }}
+              className="text-3xl font-semibold tracking-tight"
+              style={{ color: glowColor }}
               data-testid="match-result-winner"
               data-team={winnerTeamString}
             >
@@ -109,7 +109,7 @@ export function MatchResult({
 
             {data.outcomeReason === "surrender" && (
               <p
-                className="font-body text-sm"
+                className="text-sm"
                 style={{ color: "var(--ink-light)", opacity: 0.7 }}
                 data-testid="match-result-surrender-note"
               >
@@ -121,7 +121,7 @@ export function MatchResult({
 
             {data.outcomeReason === "target_reached" && (
               <p
-                className="font-body text-sm"
+                className="text-sm"
                 style={{ color: "var(--ink-light)", opacity: 0.7 }}
                 data-testid="match-result-target-reached-note"
               >
@@ -139,7 +139,7 @@ export function MatchResult({
                     gradient={teamAGradient}
                   />
                   <span
-                    className="font-display text-3xl"
+                    className="text-3xl tracking-tight"
                     style={{ color: "var(--ink-light)", opacity: 0.4 }}
                   >
                     ·
@@ -160,7 +160,7 @@ export function MatchResult({
                     gradient={teamBGradient}
                   />
                   <span
-                    className="font-display text-3xl"
+                    className="text-3xl tracking-tight"
                     style={{ color: "var(--ink-light)", opacity: 0.4 }}
                   >
                     ·
@@ -177,7 +177,7 @@ export function MatchResult({
 
             {showCoins && (
               <div
-                className="font-display inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
+                className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
                 style={{
                   color: coinWon ? COIN_GOLD : COIN_LOSS,
                   border: `1px solid ${coinWon ? "rgba(212,160,23,0.4)" : "color-mix(in srgb, var(--danger-light) 40%, transparent)"}`,
@@ -204,7 +204,7 @@ export function MatchResult({
                 if (tierBefore === tierAfter) return null;
                 return (
                   <div
-                    className="font-display inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
+                    className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
                     style={{
                       color: HONOR_TIER_COLOR[tierAfter],
                       border: "1px solid var(--brass-40)",
@@ -230,7 +230,7 @@ export function MatchResult({
             {seasonSettlement && <SeasonSpLine settlement={seasonSettlement} />}
 
             <p
-              className="font-body text-sm"
+              className="text-sm"
               style={{ color: "var(--ink-light)", opacity: 0.7 }}
               data-testid="match-result-duration"
             >
@@ -242,7 +242,7 @@ export function MatchResult({
                 <button
                   type="button"
                   onClick={() => setStatsOpen((v) => !v)}
-                  className="font-body focus-visible:ring-brass/55 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-[13px] opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+                  className="focus-visible:ring-brass/55 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-sm opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
                   style={{ color: "var(--ink-light)" }}
                   aria-expanded={statsOpen}
                   aria-controls="match-result-stats-panel"
@@ -312,14 +312,11 @@ function ScoreColumn({ team, label, score, gradient }: ScoreColumnProps) {
   const scoreTestId = team === "teamA" ? "match-result-team-a-score" : "match-result-team-b-score";
   return (
     <div className="text-center" data-testid={testId} data-team={team}>
-      <p
-        className="font-body text-xs font-semibold uppercase tracking-wider"
-        style={{ color: gradient[0] }}
-      >
+      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: gradient[0] }}>
         {label}
       </p>
       <p
-        className="font-display text-5xl font-bold tabular-nums"
+        className="text-5xl font-bold tabular-nums tracking-tight"
         style={{ color: gradient[0] }}
         data-testid={scoreTestId}
       >

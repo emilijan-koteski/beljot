@@ -104,7 +104,7 @@ export function LeaderboardRow({
         <span
           data-testid="leaderboard-you"
           aria-hidden="true"
-          className="bg-accent/15 text-accent shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.3px] uppercase"
+          className="bg-accent/15 text-accent shrink-0 rounded-full px-1.5 py-0.5 text-2xs font-semibold tracking-wider uppercase"
         >
           {t("season.leaderboard.you")}
         </span>

@@ -68,10 +68,10 @@ export function CapotAnimation({
       >
         <div
           data-testid="capot-eyebrow"
-          className="font-display"
+          className=""
           style={{
             fontSize: 12,
-            letterSpacing: 4,
+            letterSpacing: "0.18em",
             textTransform: "uppercase",
             color: bright,
             opacity: 0.85,
@@ -84,14 +84,14 @@ export function CapotAnimation({
         <h1
           data-testid="capot-text"
           data-team={team}
-          className={`font-display text-8xl font-bold tracking-tighter sm:text-9xl ${
+          className={`text-8xl font-bold tracking-tighter sm:text-9xl ${
             prefersReducedMotion ? "" : "motion-safe:animate-capot-shimmer"
           }`}
           style={
             {
               color: bright,
               margin: 0,
-              lineHeight: 0.95,
+              lineHeight: 1,
               textShadow: `0 0 30px ${bright}80, 0 4px 18px rgba(0,0,0,0.6)`,
               "--cap-glow": `${bright}80`,
             } as CSSProperties
@@ -102,7 +102,7 @@ export function CapotAnimation({
 
         <div
           data-testid="capot-bonus"
-          className="font-display"
+          className=""
           style={{
             marginTop: 22,
             display: "inline-flex",
@@ -112,8 +112,8 @@ export function CapotAnimation({
             borderRadius: 999,
             background: `${bright}1f`,
             border: `1px solid ${bright}88`,
-            fontSize: 13,
-            letterSpacing: 2.4,
+            fontSize: 14,
+            letterSpacing: "0.18em",
             textTransform: "uppercase",
             color: bright,
             fontWeight: 700,
@@ -125,7 +125,7 @@ export function CapotAnimation({
               height: 7,
               borderRadius: "50%",
               background: bright,
-              boxShadow: `0 0 8px ${bright}`,
+              boxShadow: `0 0 6px ${bright}`,
             }}
           />
           {isUs

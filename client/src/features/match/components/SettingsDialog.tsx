@@ -76,13 +76,7 @@ function SettingRow({
           : "inset 0 1px 0 var(--brass-10)",
       }}
     >
-      <span
-        className="font-body text-sm font-medium inline-flex items-center gap-2"
-        style={{
-          fontFamily: "var(--font-body)",
-          letterSpacing: 0.2,
-        }}
-      >
+      <span className="text-sm font-medium inline-flex items-center gap-2" style={{}}>
         <span
           aria-hidden
           className="rounded-full"
@@ -98,11 +92,7 @@ function SettingRow({
         {children}
       </span>
       {selected && (
-        <span
-          className="text-xs uppercase tracking-wider"
-          style={{ color: BRASS, fontFamily: "var(--font-body)" }}
-          aria-hidden
-        >
+        <span className="text-xs uppercase tracking-wider" style={{ color: BRASS }} aria-hidden>
           ✓
         </span>
       )}
@@ -143,13 +133,7 @@ function SettingSwitchRow({
           : "inset 0 1px 0 var(--brass-10)",
       }}
     >
-      <span
-        className="font-body text-sm font-medium"
-        style={{
-          fontFamily: "var(--font-body)",
-          letterSpacing: 0.2,
-        }}
-      >
+      <span className="text-sm font-medium" style={{}}>
         {children}
       </span>
       <span
@@ -211,7 +195,7 @@ function SettingVolumeRow({
         aria-label={label}
         getAriaValueText={(v) => `${v}%`}
         className="data-disabled:opacity-100"
-        trackClassName="bg-[rgba(0,0,0,0.3)] shadow-[inset_0_0_0_1px_var(--brass-40)]"
+        trackClassName="bg-[rgba(0,0,0,0.3)] inset-ring inset-ring-brass/40"
         indicatorClassName="bg-brass/85"
         thumbClassName="border-[#c9a876] bg-[#1d3a26] shadow-[0_0_6px_var(--brass-40)] has-[:focus-visible]:ring-brass/55"
       />
@@ -220,7 +204,6 @@ function SettingVolumeRow({
         className="text-xs tabular-nums"
         style={{
           color: BRASS,
-          fontFamily: "var(--font-body)",
           minWidth: "4ch",
           textAlign: "right",
         }}
@@ -253,7 +236,6 @@ function SettingSection({
         className="flex items-center gap-2 text-xs uppercase"
         style={{
           color: BRASS,
-          fontFamily: "var(--font-body)",
           letterSpacing: "0.18em",
         }}
       >

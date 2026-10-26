@@ -92,7 +92,7 @@ export function ResetPasswordPage() {
       >
         <Link
           to="/forgot-password"
-          className="text-accent border-accent/30 inline-block border-b pb-px text-[13.5px] font-semibold hover:underline"
+          className="text-accent border-accent/30 inline-block border-b pb-px text-sm font-semibold hover:underline"
           data-testid="request-new-link"
         >
           {t("auth.resetPassword.requestNewLink")}

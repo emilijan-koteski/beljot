@@ -82,7 +82,7 @@ export function HonorBandMeter({
       </div>
 
       {showTicks && (
-        <div className="text-ink-mute relative mt-1.5 h-3 font-mono text-[9.5px] leading-none tracking-[0.6px]">
+        <div className="text-ink-mute relative mt-1.5 h-3 font-mono text-2xs leading-none tracking-wider">
           {BAND_BOUNDARY_TICKS.map((v, i) => {
             const prev = BAND_BOUNDARY_TICKS[i - 1];
             const endTickCrowdsTopFloor = v === 100 && prev !== undefined && v - prev < 12;
@@ -107,7 +107,7 @@ export function HonorBandMeter({
       )}
 
       {showTierLabels && (
-        <div className="mt-1 flex text-[10px] font-semibold" aria-hidden="true">
+        <div className="mt-1 flex text-2xs font-semibold" aria-hidden="true">
           {HONOR_TIER_BANDS.map((b) => (
             <span
               key={b.tier}

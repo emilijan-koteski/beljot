@@ -85,11 +85,11 @@ export function SeatTile({
     boxShadow: belowHonorBar
       ? `0 0 0 3px var(--h1-soft)`
       : isSwapSource
-        ? `0 0 0 3px var(--accent-soft), 0 0 0 1.5px var(--accent)`
+        ? `0 0 0 3px var(--accent-soft), 0 0 0 2px var(--accent)`
         : isYou
-          ? `0 0 0 1.5px var(--accent), 0 8px 22px -16px var(--accent)`
+          ? `0 0 0 2px var(--accent), var(--shadow-glow)`
           : filled
-            ? "0 4px 14px -12px rgba(14,58,36,0.20)"
+            ? "var(--shadow-sm)"
             : "none",
   };
 
@@ -123,7 +123,7 @@ export function SeatTile({
             />
             <div className="flex flex-col items-center gap-1">
               <span
-                className="font-display text-ink inline-flex items-center gap-1 text-[13px] font-semibold tracking-[-0.2px] sm:text-[14.5px]"
+                className="text-ink inline-flex items-center gap-1 text-sm font-semibold tracking-tight sm:text-sm"
                 data-testid={isBot ? `bot-name-${seatIndex}` : undefined}
               >
                 {isHost && <Crown className="text-brass-deep size-3.25" aria-hidden="true" />}
@@ -135,7 +135,7 @@ export function SeatTile({
                   <div className="flex items-center gap-2">
                     {typeof player.level === "number" && (
                       <span
-                        className="text-ink-dim text-[11.5px] leading-none font-bold whitespace-nowrap tabular-nums"
+                        className="text-ink-dim text-xs leading-none font-bold whitespace-nowrap tabular-nums"
                         data-testid={`seat-level-${seatIndex}`}
                         data-level={player.level}
                         title={t("xp.levelLabel", { level: player.level })}
@@ -145,7 +145,7 @@ export function SeatTile({
                     )}
                     {typeof player.honorScore === "number" && (
                       <span
-                        className="text-ink-dim inline-flex items-center gap-1 text-[11.5px] leading-none font-bold tabular-nums"
+                        className="text-ink-dim inline-flex items-center gap-1 text-xs leading-none font-bold tabular-nums"
                         data-testid={`seat-honor-${seatIndex}`}
                         data-honor={player.honorScore}
                         title={t("profile.honor.meterLabel", {
@@ -212,10 +212,10 @@ export function SeatTile({
               />
             </div>
             <div className="text-center">
-              <div className="font-display text-ink-dim text-[12px] font-semibold sm:text-[13.5px]">
+              <div className="text-ink-dim text-xs font-semibold sm:text-sm">
                 {swapMode ? t("room.seatTile.moveHere") : t("room.seatTile.takeSeat")}
               </div>
-              <div className="text-ink-mute mt-0.5 text-[10.5px] sm:text-[11px]">
+              <div className="text-ink-mute mt-0.5 text-2xs sm:text-xs">
                 {mode === "us"
                   ? t("room.seatTile.partnerSeat")
                   : mode === "them"
@@ -299,7 +299,7 @@ export function SeatTile({
 
       {showSwapHint && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          <span className="border-accent bg-surface text-accent-deep inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold shadow-[0_4px_12px_-4px_rgba(14,58,36,0.35)]">
+          <span className="border-accent bg-surface text-accent-deep inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm">
             <Shuffle className="size-2.5" style={{ color: "var(--accent-deep)" }} />
             {t("room.seatTile.swapHere")}
           </span>

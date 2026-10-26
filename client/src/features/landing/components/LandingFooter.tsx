@@ -21,7 +21,7 @@ export function LandingFooter() {
     <footer className="felt-surface border-brass-soft border-t py-10">
       <div className="mx-auto flex max-w-7xl flex-col items-start gap-5 px-[clamp(28px,5vw,72px)] sm:flex-row sm:flex-wrap sm:items-center">
         <BrandLockup size={30} wordmarkSize={18} showSuffix />
-        <nav className="text-ink-mute flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] sm:ml-auto">
+        <nav className="text-ink-mute flex flex-wrap items-center gap-x-6 gap-y-2 text-sm sm:ml-auto">
           {links.map((l) => (
             <Link key={l.label} to={l.to} className="hover:text-ink transition-colors">
               {l.label}
@@ -37,7 +37,7 @@ export function LandingFooter() {
             {t("support.label")}
           </button>
         </nav>
-        <span className="text-ink-off font-mono text-[11px]">{t("landing.foot.copyright")}</span>
+        <span className="text-ink-off font-mono text-2xs">{t("landing.foot.copyright")}</span>
       </div>
 
       <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />

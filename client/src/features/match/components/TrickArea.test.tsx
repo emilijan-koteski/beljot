@@ -61,7 +61,7 @@ describe("TrickArea", () => {
     expect(screen.getByTestId("playing-card-9C")).toBeInTheDocument();
 
     const trickArea = screen.getByTestId("trick-area");
-    const glowEl = trickArea.querySelector('[class*="shadow-[0_0_20px_var(--color-accent)]"]');
+    const glowEl = trickArea.querySelector('[class*="shadow-[0_0_24px_var(--color-accent)]"]');
     expect(glowEl).toBeInTheDocument();
   });
 

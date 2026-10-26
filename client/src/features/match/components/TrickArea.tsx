@@ -111,7 +111,7 @@ export function TrickArea({
         return (
           <div
             key={`${tc.card.rank}${tc.card.suit}`}
-            className={`absolute ${isWinner ? "shadow-[0_0_20px_var(--color-accent)]" : ""}`}
+            className={`absolute ${isWinner ? "shadow-[0_0_24px_var(--color-accent)]" : ""}`}
             data-testid={`trick-slot-card-${compass}${fromSnapshot ? "-resolved" : ""}`}
             style={{
               left: "50%",

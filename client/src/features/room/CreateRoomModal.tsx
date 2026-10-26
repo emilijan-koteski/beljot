@@ -328,7 +328,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         <span className="inline-flex items-center gap-1">
           <HonorShield tier={honorTierForScore(value)} size={12} />
           {t(`profile.honor.tierPlural.${honorTierForScore(value)}`)}
-          <span className="font-mono text-[10px] tracking-[0.4px] opacity-70">
+          <span className="font-mono text-2xs tracking-wider opacity-70">
             {honorFloorLabel(value)}
           </span>
         </span>
@@ -356,7 +356,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_var(--brass-soft)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
+        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl border p-0 shadow-xl ring-1 ring-brass/18 sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
         showCloseButton={false}
         data-testid="create-room-modal"
       >
@@ -376,7 +376,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 <span className="bg-accent inline-block size-1.5 rounded-full" />
                 {t("lobby.createRoomModal.eyebrow")}
               </Eyebrow>
-              <h2 className="font-display text-ink m-0 text-[26px] leading-tight font-bold tracking-[-0.6px]">
+              <h2 className="text-ink m-0 text-3xl leading-tight font-bold tracking-tight">
                 {t("lobby.createRoomModal.headline")}
               </h2>
             </header>
@@ -402,7 +402,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                     aria-invalid={!!error}
                     data-testid="room-name-input"
                     maxLength={MAX_NAME}
-                    className="font-display h-11 pr-11 text-[15px] font-semibold"
+                    className="h-11 pr-11 text-base font-semibold"
                   />
                   <button
                     type="button"
@@ -818,13 +818,13 @@ function AdvancedSettings({
         <span className="text-brass-deep flex">
           <Settings className="size-4" />
         </span>
-        <span className="text-ink text-[13.5px] font-semibold tracking-[-0.1px]">
+        <span className="text-ink text-sm font-semibold">
           {t("lobby.createRoomModal.advanced.title")}
         </span>
         {changedCount > 0 && (
           <span
             data-testid="advanced-settings-badge"
-            className="bg-brass-soft text-brass-deep border-brass/40 rounded-full border px-1.75 py-0.5 font-mono text-[10.5px] font-semibold"
+            className="bg-brass-soft text-brass-deep border-brass/40 rounded-full border px-1.75 py-0.5 font-mono text-2xs font-semibold"
           >
             {t("lobby.createRoomModal.advanced.changedCount", { count: changedCount })}
           </span>
@@ -836,7 +836,7 @@ function AdvancedSettings({
         </span>
       </button>
       {!open && (
-        <p className="text-ink-mute px-3.5 pb-3.5 pl-9.5 text-[12.5px] leading-[1.4]">
+        <p className="text-ink-mute px-3.5 pb-3.5 pl-9.5 text-xs leading-snug">
           {t("lobby.createRoomModal.advanced.summary")}
         </p>
       )}
@@ -894,7 +894,7 @@ function PreviewCard({
   return (
     <article
       data-testid="create-room-preview"
-      className="bg-surface text-ink border-border overflow-hidden rounded-2xl border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]"
+      className="bg-surface text-ink border-border overflow-hidden rounded-2xl border shadow-lg"
     >
       <div className="px-4.5 pt-4.5 pb-3.5">
         <div className="flex items-center gap-2.5">
@@ -904,12 +904,12 @@ function PreviewCard({
             style={{ boxShadow: "0 0 0 3px var(--accent-soft)" }}
           />
           <h3
-            className="font-display text-ink m-0 min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.2px]"
+            className="text-ink m-0 min-w-0 flex-1 truncate text-lg font-semibold"
             data-testid="preview-name"
           >
             {name}
           </h3>
-          <span className="bg-surface-sunken text-ink-dim border-border inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold tracking-[1.5px] tabular-nums">
+          <span className="bg-surface-sunken text-ink-dim border-border inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-2xs font-semibold tracking-caps tabular-nums">
             <KeyRound className="size-2.5" />
             {t("lobby.createRoomModal.preview.codeLabel")}
           </span>
@@ -1054,7 +1054,7 @@ function PreviewCard({
           {t("lobby.createRoomModal.preview.seated", { current: 1 })}
         </span>
         <span className="ml-auto">
-          <span className="bg-accent text-accent-ink inline-flex items-center gap-1.5 rounded-md border border-accent-deep px-3.5 py-1.5 text-[11px] font-semibold opacity-70">
+          <span className="bg-accent text-accent-ink inline-flex items-center gap-1.5 rounded-md border border-accent-deep px-3.5 py-1.5 text-xs font-semibold opacity-70">
             {t("lobby.createRoomModal.preview.joinLabel")}
             <ArrowRight className="size-3.5" strokeWidth={2.2} />
           </span>
@@ -1068,7 +1068,7 @@ function TeamLabel({ team }: { team: "A" | "B" }) {
   return (
     <span
       className={cn(
-        "pr-1 text-[10px] font-bold uppercase tracking-[1.2px]",
+        "pr-1 text-2xs font-bold uppercase tracking-widest",
         team === "A" ? "text-team-a" : "text-team-b",
       )}
     >
@@ -1078,5 +1078,5 @@ function TeamLabel({ team }: { team: "A" | "B" }) {
 }
 
 function Dot() {
-  return <span className="text-ink-off text-[10px]">·</span>;
+  return <span className="text-ink-off text-2xs">·</span>;
 }

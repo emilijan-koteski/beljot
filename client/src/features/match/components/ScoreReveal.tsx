@@ -218,13 +218,13 @@ export function ScoreReveal({
             >
               <span />
               <span
-                className="font-display text-[11px] font-bold uppercase tracking-wider text-right"
+                className="text-2xs font-bold uppercase tracking-wider text-right"
                 style={{ color: teamAGradient[0] }}
               >
                 {viewerTeam === "teamA" ? t("team.us") : t("team.them")}
               </span>
               <span
-                className="font-display text-[11px] font-bold uppercase tracking-wider text-right"
+                className="text-2xs font-bold uppercase tracking-wider text-right"
                 style={{ color: teamBGradient[0] }}
               >
                 {viewerTeam === "teamB" ? t("team.us") : t("team.them")}
@@ -284,12 +284,12 @@ export function ScoreReveal({
             >
               <div className="flex flex-col gap-0.5">
                 <span
-                  className="font-body text-[10.5px] uppercase tracking-widest"
+                  className="text-2xs uppercase tracking-widest"
                   style={{ color: "var(--brass)" }}
                 >
                   {t("match.scoreReveal.matchTotal")}
                 </span>
-                <div className="flex items-baseline gap-1.5 sm:gap-2 font-display text-[16px] sm:text-[18px] font-bold tabular-nums whitespace-nowrap">
+                <div className="flex items-baseline gap-1.5 sm:gap-2 text-base sm:text-lg font-bold tabular-nums whitespace-nowrap">
                   <span style={{ color: teamAGradient[0] }} data-team="teamA">
                     {data.teamAMatchScore}
                   </span>
@@ -298,7 +298,7 @@ export function ScoreReveal({
                     {data.teamBMatchScore}
                   </span>
                   <span
-                    className="text-[11px] sm:text-[12px] font-body font-normal"
+                    className="text-xs sm:text-xs font-normal"
                     style={{ color: "var(--ink-light)", opacity: 0.5 }}
                   >
                     / {matchTarget}
@@ -347,7 +347,7 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
       data-testid={testId}
     >
       <span
-        className="font-body text-[13px] sm:text-[14px]"
+        className="text-sm sm:text-sm"
         style={{
           color: "var(--ink-light)",
           opacity: bold ? 1 : 0.85,
@@ -357,7 +357,7 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
         {label}
       </span>
       <span
-        className={`font-display text-right tabular-nums ${bold ? "text-[16px] sm:text-[18px]" : "text-[14px] sm:text-[15px]"}`}
+        className={`text-right tabular-nums ${bold ? "text-base sm:text-lg" : "text-sm sm:text-base"}`}
         style={{
           color: "var(--ink-light)",
           fontWeight: bold ? 700 : 500,
@@ -367,7 +367,7 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
         {teamAValue}
       </span>
       <span
-        className={`font-display text-right tabular-nums ${bold ? "text-[16px] sm:text-[18px]" : "text-[14px] sm:text-[15px]"}`}
+        className={`text-right tabular-nums ${bold ? "text-base sm:text-lg" : "text-sm sm:text-base"}`}
         style={{
           color: "var(--ink-light)",
           fontWeight: bold ? 700 : 500,
@@ -392,7 +392,7 @@ function BonusRow({ label, amount, team, teamGradient, testId }: BonusRowProps) 
   const teamString = teamStringForIndex(team);
   const value = (
     <span
-      className="font-display text-right tabular-nums text-sm sm:text-[15px]"
+      className="text-right tabular-nums text-sm sm:text-base"
       style={{ color: teamGradient[0], fontWeight: 500 }}
       data-team={teamString}
     >
@@ -410,7 +410,7 @@ function BonusRow({ label, amount, team, teamGradient, testId }: BonusRowProps) 
       }}
       data-testid={testId}
     >
-      <span className="font-body text-[13px] sm:text-[14px]">{label}</span>
+      <span className="text-sm sm:text-sm">{label}</span>
       {team === 0 ? value : <span />}
       {team === 1 ? value : <span />}
     </div>

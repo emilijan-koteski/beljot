@@ -15,7 +15,7 @@ export function PublicTopBar() {
     >
       <Link to="/" className="flex items-center gap-2.5" data-testid="public-logo">
         <img src="/beljot-logo.svg" alt="" aria-hidden="true" className="size-7 shrink-0" />
-        <span className="font-display text-ink text-xl font-semibold tracking-tight">
+        <span className="text-ink text-xl font-semibold tracking-tight">
           Beljot
           <span className="text-brass font-medium">.online</span>
         </span>

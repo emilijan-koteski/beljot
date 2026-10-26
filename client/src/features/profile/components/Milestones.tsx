@@ -16,10 +16,10 @@ function MilestoneRow({ label, hint, value }: { label: string; hint: string; val
   return (
     <li className="bg-surface-elevated border-border grid grid-cols-[1fr_auto] items-center gap-2.5 rounded-md border px-3 py-2.5">
       <div className="min-w-0">
-        <div className="text-ink text-[13px] font-medium">{label}</div>
-        <div className="text-ink-mute mt-0.5 truncate text-[11.5px]">{hint}</div>
+        <div className="text-ink text-sm font-medium">{label}</div>
+        <div className="text-ink-mute mt-0.5 truncate text-xs">{hint}</div>
       </div>
-      <div className="text-ink font-display self-center text-[22px] font-bold tracking-[-0.5px] tabular-nums">
+      <div className="text-ink self-center text-2xl font-bold tracking-tight tabular-nums">
         {value}
       </div>
     </li>

@@ -68,7 +68,7 @@ export function LanguageSelector({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="bg-surface-elevated min-w-40 border border-border p-1 shadow-[0_14px_36px_-18px_rgba(14,58,36,0.30)]"
+        className="bg-surface-elevated min-w-40 border border-border p-1 shadow-lg"
       >
         {languagesLatinThenCyrillic.map((lang) => {
           const active = lang.code === i18n.language;
@@ -84,7 +84,7 @@ export function LanguageSelector({
                   : "text-ink hover:bg-surface-sunken font-medium",
               )}
             >
-              <span className="text-ink-mute w-4 font-mono text-[10px] font-bold tracking-[1px]">
+              <span className="text-ink-mute w-4 font-mono text-2xs font-bold tracking-widest">
                 {lang.code.toUpperCase()}
               </span>
               <span className="flex-1 text-left">{t(lang.labelKey)}</span>

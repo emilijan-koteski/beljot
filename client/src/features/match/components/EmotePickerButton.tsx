@@ -164,7 +164,7 @@ export function EmotePickerButton({
         data-testid="emote-toggle"
       >
         <Smile className="h-5 w-5 shrink-0" aria-hidden="true" />
-        {label && <span className="font-body text-xs font-semibold">{label}</span>}
+        {label && <span className="text-xs font-semibold">{label}</span>}
       </button>
 
       {isOpen && (
@@ -172,7 +172,7 @@ export function EmotePickerButton({
           ref={popoverRef}
           role="group"
           aria-label={t("match.emote.picker.title")}
-          className={`absolute right-0 w-44 rounded-lg p-2 shadow-xl ${openDirection === "down" ? "top-full mt-1" : "bottom-12"}`}
+          className={`absolute right-0 w-44 rounded-lg p-2 shadow-felt-lg ${openDirection === "down" ? "top-full mt-1" : "bottom-12"}`}
           style={{
             zIndex: Z.UTIL,
             background: "var(--panel-deeper)",

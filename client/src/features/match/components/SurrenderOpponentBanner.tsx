@@ -60,7 +60,7 @@ export function SurrenderOpponentBanner({
         zIndex: Z.SEAT_BANNER,
         background: "var(--panel-dark, rgba(20,45,30,0.85))",
         border: "1px solid var(--brass)",
-        boxShadow: "0 4px 14px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)",
+        boxShadow: "var(--shadow-felt-md), inset 0 1px 0 rgba(255,255,255,0.06)",
         ...(compact ? { ...COMPACT_POSITIONS[compassPosition], maxWidth: 150 } : null),
       }}
       data-testid="surrender-opponent-banner"
@@ -68,7 +68,7 @@ export function SurrenderOpponentBanner({
       aria-live="polite"
     >
       <span
-        className={`font-body ${compact ? "block text-center text-xs leading-snug" : "text-sm whitespace-nowrap"}`}
+        className={`${compact ? "block text-center text-xs leading-snug" : "text-sm whitespace-nowrap"}`}
         style={{ color: "var(--ink-light)" }}
       >
         {t("match.surrender.opponentBanner", { username: proposerUsername })}

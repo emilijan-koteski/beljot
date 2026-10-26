@@ -20,8 +20,8 @@ export function ChapterIndex({ activeId, onJump }: Props) {
       <div
         className="font-mono px-3 pb-2"
         style={{
-          fontSize: 10.5,
-          letterSpacing: 2.4,
+          fontSize: 10,
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           color: "var(--brass-deep)",
           fontWeight: 600,
@@ -46,8 +46,8 @@ export function ChapterIndex({ activeId, onJump }: Props) {
             <span
               className="font-mono"
               style={{
-                fontSize: 11,
-                letterSpacing: 1,
+                fontSize: 12,
+                letterSpacing: "0.1em",
                 color: active ? "var(--accent)" : "var(--ink-mute)",
                 fontWeight: 600,
               }}

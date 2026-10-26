@@ -87,13 +87,13 @@ export function Avatar({
   const isProfile = halo === "profile";
   const border = isProfile ? "none" : `2px solid ${ringColor}`;
   const boxShadow = isProfile
-    ? "0 0 0 4px var(--surface), 0 0 0 5px var(--brass), 0 16px 36px -16px rgba(25,101,54,0.55)"
+    ? "0 0 0 4px var(--surface), 0 0 0 6px var(--brass), var(--shadow-glow-lg)"
     : "none";
 
   return (
     <div
       className={cn(
-        "font-display inline-flex shrink-0 items-center justify-center rounded-full font-bold",
+        "inline-flex shrink-0 items-center justify-center rounded-full font-bold",
         className,
       )}
       style={{
@@ -103,7 +103,7 @@ export function Avatar({
         color: textColor,
         border,
         fontSize: Math.max(11, size * 0.42),
-        letterSpacing: -0.3,
+        letterSpacing: "-0.025em",
         boxShadow,
       }}
       aria-hidden="true"

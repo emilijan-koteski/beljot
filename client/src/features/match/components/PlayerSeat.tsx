@@ -71,8 +71,8 @@ function StatusChip({
         color: textColor,
         border: `2px solid ${borderColor}`,
         boxShadow: glowColor
-          ? `0 2px 10px rgba(0,0,0,0.55), 0 0 12px ${glowColor}, inset 0 1px 0 rgba(255,255,255,0.6)`
-          : "0 2px 10px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.6)",
+          ? `var(--shadow-felt-sm), 0 0 12px ${glowColor}, inset 0 1px 0 rgba(255,255,255,0.6)`
+          : "var(--shadow-felt-sm), inset 0 1px 0 rgba(255,255,255,0.6)",
         fontFamily: "var(--font-suit)",
         fontWeight: 700,
         lineHeight: 1,
@@ -131,14 +131,14 @@ function CardBackStack({
             background: CARD_BACK_BACKGROUND,
             border: `${compact ? 1 : 1.5}px solid var(--brass)`,
             borderRadius: radius,
-            boxShadow: "0 2px 6px rgba(0,0,0,0.45)",
+            boxShadow: "var(--shadow-felt-sm)",
           }}
         >
           <CardBackFace width={cw} radius={radius} />
         </div>
       ))}
       <span
-        className={`font-body tabular-nums ${compact ? "text-[9px]" : "text-[11px]"}`}
+        className={`tabular-nums ${compact ? "text-2xs" : "text-xs"}`}
         style={{
           marginLeft: compact ? 4 : 8,
           color: "var(--ink-light)",
@@ -197,9 +197,9 @@ export function PlayerSeat({
             border: "1px dashed rgba(255,255,255,0.18)",
           }}
         >
-          <span className="text-ink-dim text-xs font-body">?</span>
+          <span className="text-ink-dim text-xs">?</span>
         </div>
-        <span className="text-ink-dim text-sm font-body">{t("match.seat.waiting")}</span>
+        <span className="text-ink-dim text-sm">{t("match.seat.waiting")}</span>
       </div>
     );
   }
@@ -283,13 +283,13 @@ export function PlayerSeat({
             padding: 3,
             boxShadow:
               isActive && !isDisconnected
-                ? `0 0 0 1.5px ${TURN_LIME}, 0 0 18px ${TURN_LIME_GLOW}`
-                : "0 2px 8px rgba(0,0,0,0.3)",
+                ? `0 0 0 2px ${TURN_LIME}, 0 0 24px ${TURN_LIME_GLOW}`
+                : "var(--shadow-felt-sm)",
             transition: `box-shadow ${MOTION.SEAT_RING_TRANSITION}ms ease`,
           }}
         >
           <div
-            className="rounded-full flex items-center justify-center overflow-hidden font-display font-semibold"
+            className="rounded-full flex items-center justify-center overflow-hidden font-semibold"
             style={{
               width: "100%",
               height: "100%",
@@ -360,22 +360,22 @@ export function PlayerSeat({
         data-testid="player-seat-name-pill"
       >
         <span
-          className={`font-body font-semibold ${compact ? "text-[11px]" : "text-sm"}`}
+          className={`font-semibold ${compact ? "text-xs" : "text-sm"}`}
           style={{ color: "var(--ink-light)" }}
         >
           {displayName}
         </span>
         {!compact && player.isBot !== true && (
           <span
-            className="font-body text-[10px] tabular-nums flex items-center gap-1.5"
+            className="text-2xs tabular-nums flex items-center gap-1.5"
             style={{ color: "var(--ink-mute)" }}
           >
-            <span style={{ letterSpacing: 0.6 }} data-testid="player-seat-level">
+            <span style={{ letterSpacing: "0.05em" }} data-testid="player-seat-level">
               {t("xp.short", { level: player.level })}
             </span>
             {showRing && (
               <span
-                className="font-body font-semibold tabular-nums"
+                className="font-semibold tabular-nums"
                 style={{
                   color: secondsUrgent ? COLOR_URGENT : TURN_LIME,
                   transition: `color ${MOTION.RING_COLOR_FLIP}ms ease`,

@@ -23,7 +23,7 @@ type AuthCardProps = {
 export function AuthCard({ eyebrow, title, subtitle, children, footer }: AuthCardProps) {
   return (
     <div
-      className="bg-surface relative w-full max-w-125 rounded-2xl border border-border px-10 pt-10 pb-8 shadow-[0_18px_44px_-28px_rgba(14,58,36,0.32),0_2px_0_rgba(255,255,255,0.6)_inset]"
+      className="bg-surface relative w-full max-w-125 rounded-2xl border border-border px-10 pt-10 pb-8 shadow-lg inset-shadow-bevel"
       data-testid="auth-card"
     >
       <div
@@ -31,15 +31,13 @@ export function AuthCard({ eyebrow, title, subtitle, children, footer }: AuthCar
         className="absolute -top-px right-7 left-7 h-0.5 bg-[linear-gradient(90deg,transparent,var(--brass)_50%,transparent)] opacity-70"
       />
 
-      <div className="text-brass-deep mb-3 font-mono text-[11.5px] font-semibold tracking-[2.4px] uppercase">
+      <div className="text-brass-deep mb-3 font-mono text-xs font-semibold tracking-caps uppercase">
         {eyebrow}
       </div>
 
-      <h1 className="font-display text-ink m-0 text-[34px] leading-[1.1] font-bold tracking-[-0.8px]">
-        {title}
-      </h1>
+      <h1 className="text-ink m-0 text-4xl leading-tight font-bold tracking-tight">{title}</h1>
 
-      <p className="text-ink-dim mt-2.5 mb-5.5 max-w-95 text-[14.5px] leading-[1.55]">{subtitle}</p>
+      <p className="text-ink-dim mt-2.5 mb-5.5 max-w-95 text-sm leading-relaxed">{subtitle}</p>
 
       <SuitRule />
 
@@ -60,7 +58,7 @@ type AltLinkProps = {
 /** Bottom prompt and accent link to the alternate auth page. */
 export function AltLink({ prompt, cta, to, testId }: AltLinkProps) {
   return (
-    <div className="text-ink-dim text-center text-[13.5px]">
+    <div className="text-ink-dim text-center text-sm">
       {prompt}{" "}
       <Link
         to={to}
@@ -88,9 +86,7 @@ type CheckboxProps = {
 export function Checkbox({ checked, onChange, invalid, testId, children }: CheckboxProps) {
   return (
     <label
-      className={cn(
-        "text-ink-dim flex cursor-pointer items-start gap-2.5 text-[13px] leading-normal",
-      )}
+      className={cn("text-ink-dim flex cursor-pointer items-start gap-2.5 text-sm leading-normal")}
     >
       <span className="relative mt-px inline-block size-4.5 shrink-0">
         <input

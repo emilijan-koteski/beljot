@@ -23,10 +23,10 @@ export function InvitePrivacyPanel() {
       title={t("profile.invites.title")}
       testId="profile-invites"
     >
-      <p className="text-ink-mute mb-2.5 text-[12px]">{t("profile.invites.description")}</p>
+      <p className="text-ink-mute mb-2.5 text-xs">{t("profile.invites.description")}</p>
       <div className="border-border bg-surface-elevated rounded-md border px-3 py-2.5">
         <label className="flex cursor-pointer items-center justify-between gap-3">
-          <span className="text-ink text-[13px] font-medium">
+          <span className="text-ink text-sm font-medium">
             {t("profile.invites.allowNonFriends")}
           </span>
           <Switch

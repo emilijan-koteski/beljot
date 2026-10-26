@@ -33,7 +33,7 @@ export function FriendRequests() {
     >
       <div className="mb-1.5 flex items-center gap-1.5">
         <Eyebrow>{t("friends.requests.heading")}</Eyebrow>
-        <span className="text-brass-deep font-mono text-[10.5px] font-semibold tabular-nums">
+        <span className="text-brass-deep font-mono text-2xs font-semibold tabular-nums">
           {requests.length}
         </span>
       </div>

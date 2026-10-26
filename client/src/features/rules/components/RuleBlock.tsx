@@ -21,8 +21,8 @@ function NoteBlock({ text, marker }: { text: string; marker: ReactNode }) {
         display: "flex",
         alignItems: "flex-start",
         gap: 10,
-        fontSize: 12.5,
-        lineHeight: 1.55,
+        fontSize: 12,
+        lineHeight: 1.6,
         color: "var(--ink-dim)",
       }}
     >
@@ -30,7 +30,7 @@ function NoteBlock({ text, marker }: { text: string; marker: ReactNode }) {
         className="font-mono"
         style={{
           fontSize: 10,
-          letterSpacing: 2,
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           color: "var(--brass-deep)",
           fontWeight: 700,
@@ -79,10 +79,7 @@ function TiersBlock({
         gap: 4,
       }}
     >
-      <div
-        className="font-display"
-        style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)", letterSpacing: -0.1 }}
-      >
+      <div className="" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
         {block.title}
         {marker}
       </div>
@@ -100,7 +97,7 @@ function TiersBlock({
           <li
             key={it.tier}
             data-testid={`rules-tier-${it.tier}`}
-            style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-dim)" }}
+            style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-dim)" }}
           >
             <strong style={{ fontWeight: 700, color: HONOR_TIER_COLOR[it.tier] }}>
               {t(`profile.honor.tier.${it.tier}`)}
@@ -112,7 +109,7 @@ function TiersBlock({
           </li>
         ))}
       </ul>
-      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-dim)" }}>{block.text}</div>
+      <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-dim)" }}>{block.text}</div>
     </div>
   );
 }
@@ -168,7 +165,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
   switch (block.kind) {
     case "p":
       return (
-        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.65, color: "var(--ink-dim)" }}>
+        <p style={{ margin: 0, fontSize: 16, lineHeight: 1.6, color: "var(--ink-dim)" }}>
           {block.text}
           {marker}
         </p>
@@ -188,16 +185,11 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
             gap: 4,
           }}
         >
-          <div
-            className="font-display"
-            style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)", letterSpacing: -0.1 }}
-          >
+          <div className="" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
             {block.title}
             {marker}
           </div>
-          <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-dim)" }}>
-            {block.text}
-          </div>
+          <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-dim)" }}>{block.text}</div>
         </div>
       );
 
@@ -250,19 +242,18 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
                     color: "var(--accent)",
                     fontSize: 12,
                     fontWeight: 700,
-                    letterSpacing: 0.6,
+                    letterSpacing: "0.05em",
                   }}
                 >
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   <span
-                    className="font-display"
+                    className=""
                     style={{
-                      fontSize: 14.5,
+                      fontSize: 14,
                       fontWeight: 600,
                       color: "var(--ink)",
-                      letterSpacing: -0.1,
                     }}
                   >
                     {it.t}
@@ -270,7 +261,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
                       <DiffMarker note={it.otherVariantNote} label={ui.diffLabel} />
                     ) : null}
                   </span>
-                  <span style={{ fontSize: 13, lineHeight: 1.55, color: "var(--ink-dim)" }}>
+                  <span style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-dim)" }}>
                     {it.d}
                   </span>
                 </div>

@@ -65,20 +65,18 @@ export function DurationSlider({
       <div className="flex items-baseline justify-between">
         <div className="flex items-baseline gap-1.5">
           <span
-            className="font-display text-ink text-[22px] leading-none font-bold tracking-[-0.6px] tabular-nums"
+            className="text-ink text-2xl leading-none font-bold tracking-tight tabular-nums"
             data-testid={testId ? `${testId}-value` : undefined}
             data-value={value}
           >
             {valueText ?? value}
           </span>
-          <span className="text-brass-deep font-mono text-[11px] font-semibold tracking-[1px] uppercase">
+          <span className="text-brass-deep font-mono text-2xs font-semibold tracking-widest uppercase">
             {unitLabel}
           </span>
         </div>
         {rangeLabel && (
-          <span className="text-ink-mute font-mono text-[10.5px] tracking-[0.4px]">
-            {rangeLabel}
-          </span>
+          <span className="text-ink-mute font-mono text-2xs tracking-wider">{rangeLabel}</span>
         )}
       </div>
 
@@ -117,7 +115,7 @@ export function DurationSlider({
                   />
                   {tk.label !== undefined && (
                     <span
-                      className="text-ink-mute absolute -translate-x-1/2 font-mono text-[9.5px] tracking-[0.4px] tabular-nums"
+                      className="text-ink-mute absolute -translate-x-1/2 font-mono text-2xs tracking-wider tabular-nums"
                       style={{ left: `${tickPct}%`, top: "calc(50% + 10px)" }}
                     >
                       {tk.label}
@@ -138,7 +136,7 @@ export function DurationSlider({
                 />
                 {marker?.label && (
                   <span
-                    className="bg-surface-elevated border-border text-ink absolute -translate-x-1/2 rounded border px-1 py-px font-mono text-[9.5px] font-semibold whitespace-nowrap"
+                    className="bg-surface-elevated border-border text-ink absolute -translate-x-1/2 rounded border px-1 py-px font-mono text-2xs font-semibold whitespace-nowrap"
                     style={{ left: `${markerPct}%`, bottom: "calc(100% + 16px)" }}
                   >
                     {marker.label}

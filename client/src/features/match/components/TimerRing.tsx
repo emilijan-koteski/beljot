@@ -13,8 +13,8 @@ interface TimerRingProps {
 
 const SIZE_CONFIG = {
   seat: { px: 70, strokeWidth: 2.5, labelClass: "text-xs" },
-  seatCompact: { px: 50, strokeWidth: 2, labelClass: "text-[10px]" },
-  button: { px: 36, strokeWidth: 2, labelClass: "text-[10px]" },
+  seatCompact: { px: 50, strokeWidth: 2, labelClass: "text-2xs" },
+  button: { px: 36, strokeWidth: 2, labelClass: "text-2xs" },
 } as const;
 
 const COLOR_LIME = "var(--accent)";
@@ -88,7 +88,7 @@ export function TimerRing({
           strokeLinecap="round"
           transform={`rotate(-90 ${px / 2} ${px / 2})`}
           style={{
-            filter: `drop-shadow(0 0 8px ${strokeColor})`,
+            filter: `drop-shadow(0 0 6px ${strokeColor})`,
             transition: `stroke ${MOTION.RING_COLOR_FLIP}ms ease`,
             strokeDashoffset: dashOffset,
             ...(prefersReducedMotion ? undefined : drainStyle),
@@ -98,7 +98,7 @@ export function TimerRing({
       </svg>
       {!hideLabel && (
         <span
-          className={`absolute font-body font-semibold tabular-nums ${labelClass}`}
+          className={`absolute font-semibold tabular-nums ${labelClass}`}
           style={{ color: strokeColor, transition: `color ${MOTION.RING_COLOR_FLIP}ms ease` }}
           data-testid="timer-seconds"
         >

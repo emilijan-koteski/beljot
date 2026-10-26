@@ -16,7 +16,7 @@ export function TableBackdrop({ compact = false }: { compact?: boolean }) {
           background:
             "linear-gradient(135deg, var(--wood-base) 0%, var(--wood-light) 20%, var(--wood-dark) 50%, var(--wood-light) 80%, var(--wood-base) 100%)",
           boxShadow:
-            "inset 0 0 0 1px var(--brass-55), inset 0 0 30px rgba(0,0,0,0.6), 0 20px 60px rgba(0,0,0,0.7)",
+            "inset 0 0 0 1px var(--brass-55), inset 0 0 30px rgba(0,0,0,0.6), var(--shadow-felt-xl)",
         }}
       />
       <div

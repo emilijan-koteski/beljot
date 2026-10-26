@@ -77,7 +77,7 @@ function VolumeRow({
       />
       <span
         aria-hidden
-        className="text-ink-mute min-w-[4ch] text-right font-mono text-[11px] tabular-nums"
+        className="text-ink-mute min-w-[4ch] text-right font-mono text-2xs tabular-nums"
       >
         {value}%
       </span>
@@ -101,7 +101,7 @@ export function AudioPanel() {
       title={t("profile.audio.title")}
       testId="profile-audio"
     >
-      <p className="text-ink-mute mb-2.5 text-[12px]">{t("profile.audio.description")}</p>
+      <p className="text-ink-mute mb-2.5 text-xs">{t("profile.audio.description")}</p>
       <div className="flex flex-col gap-2">
         {ROWS.map((row) => (
           <div
@@ -109,7 +109,7 @@ export function AudioPanel() {
             className="border-border bg-surface-elevated flex flex-col gap-2 rounded-md border px-3 py-2.5"
           >
             <label className="flex cursor-pointer items-center justify-between gap-3">
-              <span className="text-ink text-[13px] font-medium">{t(row.labelKey)}</span>
+              <span className="text-ink text-sm font-medium">{t(row.labelKey)}</span>
               <Switch
                 checked={values[row.field]}
                 onCheckedChange={(checked) =>

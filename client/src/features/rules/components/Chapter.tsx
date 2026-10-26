@@ -26,8 +26,8 @@ export function Chapter({ idx, section, registerRef }: Props) {
         <div
           className="font-mono"
           style={{
-            fontSize: 11,
-            letterSpacing: 2.4,
+            fontSize: 10,
+            letterSpacing: "0.18em",
             textTransform: "uppercase",
             color: "var(--brass-deep)",
             fontWeight: 600,
@@ -36,13 +36,13 @@ export function Chapter({ idx, section, registerRef }: Props) {
           {String(idx + 1).padStart(2, "0")} &nbsp; {section.label}
         </div>
         <h2
-          className="font-display"
+          className=""
           style={{
             margin: 0,
             fontSize: 28,
             fontWeight: 700,
-            letterSpacing: -0.6,
-            lineHeight: 1.15,
+            letterSpacing: "-0.025em",
+            lineHeight: 1.2,
             color: "var(--ink)",
           }}
         >
@@ -52,7 +52,7 @@ export function Chapter({ idx, section, registerRef }: Props) {
           style={{
             margin: "4px 0 0",
             fontSize: 16,
-            lineHeight: 1.55,
+            lineHeight: 1.6,
             color: "var(--ink-dim)",
             maxWidth: 620,
           }}

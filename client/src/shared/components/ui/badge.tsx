@@ -65,7 +65,6 @@ export function Badge({ tone = "neutral", icon, className, children }: BadgeProp
         background: s.bg,
         color: s.color,
         border: `1px solid ${s.border}`,
-        letterSpacing: 0.2,
       }}
     >
       {icon}

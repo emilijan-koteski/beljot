@@ -137,7 +137,7 @@ describe("TimerRing", () => {
     expect(svg?.getAttribute("width")).toBe("36");
     expect(svg?.getAttribute("height")).toBe("36");
     expect(screen.getByTestId("timer-ring").getAttribute("data-size")).toBe("button");
-    expect(screen.getByTestId("timer-seconds").className).toContain("text-[10px]");
+    expect(screen.getByTestId("timer-seconds").className).toContain("text-2xs");
   });
 
   it("drives the arc with the deadline-anchored ring-drain animation", () => {

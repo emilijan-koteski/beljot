@@ -69,8 +69,8 @@ export function RulesPage() {
                 id={VARIANT_LABEL_ID}
                 className="font-mono"
                 style={{
-                  fontSize: 11,
-                  letterSpacing: 2.4,
+                  fontSize: 10,
+                  letterSpacing: "0.18em",
                   textTransform: "uppercase",
                   color: "var(--brass-deep)",
                   fontWeight: 600,

@@ -69,11 +69,11 @@ function ScoreRow({
               height: 10,
               borderRadius: "50%",
               background: dot,
-              boxShadow: `0 0 8px ${dot}`,
+              boxShadow: `0 0 6px ${dot}`,
             }}
           />
           <span
-            className="font-body text-xs font-semibold uppercase tracking-wide"
+            className="text-xs font-semibold uppercase"
             style={{ color: INK, opacity: 0.85 }}
             data-testid={team === "teamA" ? "score-label-a" : "score-label-b"}
           >
@@ -81,20 +81,20 @@ function ScoreRow({
           </span>
         </div>
         <span
-          className="font-display font-bold tabular-nums motion-safe:transition-all motion-safe:duration-300"
-          style={{ color: INK, fontSize: 22, letterSpacing: -0.5 }}
+          className="font-bold tabular-nums motion-safe:transition-all motion-safe:duration-300"
+          style={{ color: INK, fontSize: 24, letterSpacing: "-0.025em" }}
           data-testid={scoreTestId}
         >
           {score}
           <span
-            className="text-[11px]"
+            className="text-xs"
             style={{ opacity: 0.5, marginLeft: 2 }}
           >{` / ${matchTarget}`}</span>
         </span>
       </div>
       {showPotential && (
         <div
-          className="flex items-center gap-2 font-body text-[10.5px] tabular-nums"
+          className="flex items-center gap-2 text-2xs tabular-nums"
           style={{ color: INK, opacity: 0.7 }}
           data-testid={potentialTestId}
         >
@@ -209,7 +209,7 @@ export function ScorePanel({
           zIndex: Z.HUD,
           background: PANEL_BG,
           border: PANEL_BORDER,
-          boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+          boxShadow: "var(--shadow-felt-md)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
         }}
@@ -229,22 +229,22 @@ export function ScorePanel({
                 height: 6,
                 borderRadius: "50%",
                 background: r.dot,
-                boxShadow: `0 0 5px ${r.dot}`,
+                boxShadow: `0 0 6px ${r.dot}`,
               }}
             />
             <span
-              className="font-body text-[11px] font-semibold uppercase"
+              className="text-2xs font-semibold uppercase"
               style={{ opacity: 0.85, minWidth: 30 }}
             >
               {r.label}
             </span>
             <span
-              className="font-body text-[11px] font-semibold tabular-nums"
+              className="text-xs font-semibold tabular-nums"
               style={{ color: BRASS_LABEL, minWidth: 24, textAlign: "right" }}
             >
               +{r.potential}
             </span>
-            <span className="font-display text-[11px] font-bold" style={{ marginLeft: 4 }}>
+            <span className="text-xs font-bold" style={{ marginLeft: 4 }}>
               {r.score}
               <span style={{ opacity: 0.5 }}>{`/${matchTarget}`}</span>
             </span>
@@ -258,7 +258,7 @@ export function ScorePanel({
           zIndex: Z.HUD,
           background: PANEL_BG,
           border: PANEL_BORDER,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+          boxShadow: "var(--shadow-felt-md)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
           minWidth: 240,
@@ -267,7 +267,7 @@ export function ScorePanel({
         aria-live="polite"
       >
         <div
-          className="flex items-center gap-1.5 px-4 py-2 font-body text-[10.5px] uppercase tracking-wider"
+          className="flex items-center gap-1.5 px-4 py-2 text-2xs uppercase tracking-wider"
           style={{
             color: BRASS_LABEL,
             borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -355,7 +355,7 @@ export function ScorePanel({
 
         {showBonus !== null && bonusTeamString !== null && bonusGradient !== null && (
           <div
-            className={`absolute -top-2 right-3 font-display text-sm font-bold ${
+            className={`absolute -top-2 right-3 text-sm font-bold ${
               prefersReducedMotion
                 ? ""
                 : "motion-safe:animate-out motion-safe:fade-out motion-safe:slide-out-to-top-6 motion-safe:duration-1200 motion-safe:ease-out motion-safe:fill-mode-forwards"

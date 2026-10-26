@@ -56,9 +56,7 @@ export function LevelRing({ level, fraction, label, size = 30, testId }: LevelRi
           style={{ transition: reducedMotion ? undefined : "stroke-dasharray .8s ease" }}
         />
       </svg>
-      <span className="text-ink font-display text-[11px] leading-none font-bold tabular-nums">
-        {level}
-      </span>
+      <span className="text-ink text-xs leading-none font-bold tabular-nums">{level}</span>
     </div>
   );
 }

@@ -21,14 +21,11 @@ export function DealerIndicator({ dealerName }: DealerIndicatorProps) {
       aria-label={ariaLabel}
       data-testid="dealer-indicator"
     >
-      <span className="text-ink-dim font-body text-sm">{t("match.dealerIndicator.dealer")}</span>
+      <span className="text-ink-dim text-sm">{t("match.dealerIndicator.dealer")}</span>
       <span className="text-ink-dim/40" aria-hidden>
         ·
       </span>
-      <span
-        className="text-ink font-display text-sm font-semibold max-w-32 truncate"
-        data-testid="dealer-name"
-      >
+      <span className="text-ink text-sm font-semibold max-w-32 truncate" data-testid="dealer-name">
         {trimmed}
       </span>
     </div>

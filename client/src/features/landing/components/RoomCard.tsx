@@ -34,7 +34,7 @@ function SeatChip({ seat, emptyLabel }: { seat?: Seat; emptyLabel: string }) {
   if (!ini) {
     return (
       <span
-        className="text-ink-off flex h-7.5 items-center justify-center rounded-lg border border-dashed px-2.5 text-[11px]"
+        className="text-ink-off flex h-7.5 items-center justify-center rounded-lg border border-dashed px-2.5 text-xs"
         style={{
           borderColor: isA ? "var(--team-a-edge-soft)" : "var(--team-b-edge-soft)",
           background: isA ? "var(--team-a-line)" : "var(--team-b-line)",
@@ -54,7 +54,7 @@ function SeatChip({ seat, emptyLabel }: { seat?: Seat; emptyLabel: string }) {
       }}
     >
       <span
-        className="inline-flex size-4.5 items-center justify-center rounded-full text-[10px] font-bold"
+        className="inline-flex size-4.5 items-center justify-center rounded-full text-2xs font-bold"
         style={{
           color: "var(--brass-ink)",
           background: isA ? "var(--team-a-fill)" : "var(--team-b-fill)",
@@ -87,7 +87,7 @@ export function RoomCard({
       style={{ maxWidth: width, ...style }}
     >
       <div className="px-4 pt-4 pb-3">
-        <div className="font-display flex items-center gap-2 text-base font-semibold">
+        <div className="flex items-center gap-2 text-base font-semibold">
           <span
             className="size-2 shrink-0 rounded-full"
             style={{
@@ -96,7 +96,7 @@ export function RoomCard({
             }}
           />
           <span className="truncate">{title}</span>
-          <span className="bg-surface-sunken border-border text-ink-dim font-mono ml-auto inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold tracking-[1.2px]">
+          <span className="bg-surface-sunken border-border text-ink-dim font-mono ml-auto inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-2xs font-semibold tracking-widest">
             <Lock className="size-2.75" />
             {code}
           </span>
@@ -109,12 +109,12 @@ export function RoomCard({
       </div>
 
       <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-1.5 px-4 pb-3">
-        <span className="text-[10px] font-bold tracking-[1.2px]" style={{ color: "var(--team-a)" }}>
+        <span className="text-2xs font-bold tracking-widest" style={{ color: "var(--team-a)" }}>
           A
         </span>
         <SeatChip seat={seats[0]} emptyLabel={emptyLabel} />
         <SeatChip seat={seats[1]} emptyLabel={emptyLabel} />
-        <span className="text-[10px] font-bold tracking-[1.2px]" style={{ color: "var(--team-b)" }}>
+        <span className="text-2xs font-bold tracking-widest" style={{ color: "var(--team-b)" }}>
           B
         </span>
         <SeatChip seat={seats[2]} emptyLabel={emptyLabel} />

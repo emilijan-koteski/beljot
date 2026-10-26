@@ -145,7 +145,7 @@ export function LeaderboardPage() {
 
         {pinned && (
           <div className="mt-2.5" data-testid="leaderboard-pinned">
-            <p className="text-ink-mute mb-1.5 text-[11px] tracking-[0.3px] uppercase">
+            <p className="text-ink-mute mb-1.5 text-2xs uppercase">
               {t("season.leaderboard.yourPosition")}
             </p>
             <ul className="m-0 flex list-none flex-col p-0">
@@ -228,7 +228,7 @@ export function LeaderboardPage() {
               s.id === currentId ? (
                 <>
                   {s.name}
-                  <span className="text-[10px] tracking-[0.3px] uppercase opacity-70">
+                  <span className="text-2xs tracking-wider uppercase opacity-70">
                     {t("season.picker.current")}
                   </span>
                 </>

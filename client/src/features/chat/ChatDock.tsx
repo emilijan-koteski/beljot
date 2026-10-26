@@ -43,7 +43,7 @@ const PEEK_MS = 2000;
 const PEEK_MAX_CHARS = 90;
 const MAX_MESSAGE_LENGTH = 500;
 const FAB_CHIP_CLASS =
-  "border-surface relative inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 px-1.5 text-[11px] font-bold leading-none tabular-nums";
+  "border-surface relative inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 px-1.5 text-xs font-bold leading-none tabular-nums";
 const PENDING_WHISPER_MS = 5000;
 
 type Variant = "lobby" | "room" | "match";
@@ -291,7 +291,7 @@ export function ChatDock(props: ChatDockProps) {
             )}
           >
             <div
-              className="text-brass-deep text-[10px] font-bold uppercase tracking-[0.8px]"
+              className="text-brass-deep text-2xs font-bold uppercase tracking-widest"
               style={{ color: resolveNameColor?.(peek.userId) }}
             >
               {peek.username}
@@ -307,7 +307,7 @@ export function ChatDock(props: ChatDockProps) {
             "bg-surface text-ink relative inline-flex size-14 items-center justify-center rounded-full transition-transform hover:-translate-y-0.5",
             frosted,
             hasPublicUnread || hasWhisperUnread
-              ? "border border-brass shadow-[0_0_0_3px_var(--brass-soft),0_10px_28px_-10px_rgba(14,58,36,0.35)]"
+              ? "border border-brass shadow-md ring-3 ring-brass/18"
               : "border-brass border shadow-(--chat-shadow-fab)",
           )}
         >
@@ -319,7 +319,7 @@ export function ChatDock(props: ChatDockProps) {
                   data-testid={`${testIdRoot}-unread`}
                   className={cn(
                     FAB_CHIP_CLASS,
-                    "bg-brass text-brass-ink shadow-[0_0_10px_var(--brass-55)]",
+                    "bg-brass text-brass-ink shadow-[0_0_12px_var(--brass-55)]",
                   )}
                 >
                   {chipLabel(unread)}
@@ -330,7 +330,7 @@ export function ChatDock(props: ChatDockProps) {
                   data-testid={`${testIdRoot}-whisper-unread`}
                   className={cn(
                     FAB_CHIP_CLASS,
-                    "bg-(--whisper-ink) text-(--whisper-badge-ink) shadow-[0_0_10px_var(--whisper-glow)]",
+                    "bg-(--whisper-ink) text-(--whisper-badge-ink) shadow-[0_0_12px_var(--whisper-glow)]",
                     bothChips && "z-10 -ml-1.5",
                   )}
                 >
@@ -361,7 +361,7 @@ export function ChatDock(props: ChatDockProps) {
     >
       <div className="flex items-center gap-2 border-b border-border px-3.5 py-3">
         <MessageSquare className="text-accent size-3.5" />
-        <span className="font-display text-ink text-sm font-semibold">{t(keys.title)}</span>
+        <span className="text-ink text-sm font-semibold">{t(keys.title)}</span>
         <button
           onClick={() => setOpen(false)}
           aria-label={t(keys.closeLabel)}
@@ -515,7 +515,7 @@ function ChatLine({
   return (
     <div className={cn("flex flex-col gap-0.5", mine ? "items-end" : "items-start")}>
       {!mine && (
-        <span className="text-ink-mute pl-0.5 text-[11px]">
+        <span className="text-ink-mute pl-0.5 text-xs">
           {whisper ? (
             <strong className="font-semibold text-(--whisper-ink)">{username}</strong>
           ) : nameColor ? (
@@ -570,7 +570,7 @@ function ChannelTab({
       data-testid={testId}
       onClick={onClick}
       className={cn(
-        "inline-flex max-w-32 items-center gap-1 truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+        "inline-flex max-w-32 items-center gap-1 truncate rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
         active
           ? whisper
             ? "border-(--whisper-border) bg-(--whisper-fill) text-(--whisper-ink)"
@@ -582,7 +582,7 @@ function ChannelTab({
       {unread > 0 && !active && (
         <span
           data-testid={`${testId}-unread`}
-          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-(--whisper-ink) px-1 text-[9px] leading-none font-bold text-(--whisper-badge-ink) tabular-nums"
+          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-(--whisper-ink) px-1 text-2xs leading-none font-bold text-(--whisper-badge-ink) tabular-nums"
         >
           {unread > 9 ? "9+" : unread}
         </span>

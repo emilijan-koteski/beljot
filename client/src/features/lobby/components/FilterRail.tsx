@@ -64,7 +64,7 @@ export function FilterRail({ search, setSearch, filter, setFilter, sort, setSort
               {t(`lobby.filters.${f}`)}
               <span
                 className={cn(
-                  "tabular-nums rounded-md px-1.5 py-px text-[10.5px] font-semibold",
+                  "tabular-nums rounded-md px-1.5 py-px text-2xs font-semibold",
                   active ? "bg-accent/15 text-accent" : "bg-surface-elevated text-ink-mute",
                 )}
               >

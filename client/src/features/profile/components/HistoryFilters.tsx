@@ -48,7 +48,7 @@ export function HistoryFilters({
               aria-pressed={active}
               data-testid={`match-history-filter-${f.id}`}
               data-active={active}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
               style={
                 active
                   ? {
@@ -65,7 +65,7 @@ export function HistoryFilters({
             >
               {t(f.labelKey)}
               <span
-                className="rounded-md px-1.5 text-[11px] tabular-nums"
+                className="rounded-md px-1.5 text-xs tabular-nums"
                 style={{
                   background: active ? "rgba(25,101,54,0.14)" : "var(--surface-2)",
                 }}
@@ -84,7 +84,7 @@ export function HistoryFilters({
           onClick={() => onSortChange(sort === "new" ? "old" : "new")}
           data-testid="match-history-sort"
           data-sort={sort}
-          className="bg-surface-elevated border-border text-ink inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-[13px] font-medium"
+          className="bg-surface-elevated border-border text-ink inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
         >
           {sort === "new"
             ? t("profile.matchHistory.sort.newest")

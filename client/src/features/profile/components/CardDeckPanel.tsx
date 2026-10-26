@@ -35,7 +35,7 @@ export function CardDeckPanel() {
       title={t("profile.cardDeck.title")}
       testId="profile-card-deck"
     >
-      <p className="text-ink-mute mb-2.5 text-[12px]">{t("profile.cardDeck.description")}</p>
+      <p className="text-ink-mute mb-2.5 text-xs">{t("profile.cardDeck.description")}</p>
       <div className="flex gap-2.5" role="radiogroup" aria-label={t("profile.cardDeck.title")}>
         {DECKS.map((deck) => {
           const selected = active === deck.code;
@@ -61,7 +61,7 @@ export function CardDeckPanel() {
                 alt=""
                 aria-hidden="true"
                 draggable={false}
-                className="h-[63px] w-[45px] rounded-xs shadow-[0_2px_6px_-2px_rgba(0,0,0,0.35)]"
+                className="h-[63px] w-[45px] rounded-xs shadow-felt-sm"
                 style={{ background: "linear-gradient(180deg, #fdfaf0 0%, #f4ecd8 100%)" }}
                 onError={(e) => {
                   e.currentTarget.style.visibility = "hidden";
@@ -70,7 +70,7 @@ export function CardDeckPanel() {
                   e.currentTarget.style.visibility = "";
                 }}
               />
-              <span className="text-ink flex items-center gap-1 text-[12px] font-medium">
+              <span className="text-ink flex items-center gap-1 text-xs font-medium">
                 {t(deck.labelKey)}
                 {selected && <Check className="text-accent size-3" strokeWidth={2.6} />}
               </span>

@@ -85,7 +85,7 @@ export function PlayingCard({
           background:
             "repeating-linear-gradient(45deg, var(--accent-deep) 0 6px, var(--accent) 6px 12px)",
           border: "2px solid var(--brass)",
-          boxShadow: "0 10px 26px -12px rgba(0,0,0,0.55)",
+          boxShadow: "var(--shadow-felt-lg)",
         }}
       >
         <div
@@ -106,7 +106,7 @@ export function PlayingCard({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    lineHeight: 0.95,
+    lineHeight: 1,
     ...(rotate
       ? { bottom: w * 0.07, right: w * 0.09, transform: "rotate(180deg)" }
       : { top: w * 0.07, left: w * 0.09 }),
@@ -119,11 +119,11 @@ export function PlayingCard({
         ...base,
         background: "var(--card-face)",
         border: "1px solid rgba(0,0,0,0.14)",
-        boxShadow: "0 12px 30px -14px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.7)",
+        boxShadow: "var(--shadow-felt-lg), inset 0 1px 0 rgba(255,255,255,0.6)",
       }}
     >
       <span style={corner(false)}>
-        <span className="font-display" style={{ fontWeight: 700, fontSize: w * 0.24, color: col }}>
+        <span className="" style={{ fontWeight: 700, fontSize: w * 0.24, color: col }}>
           {rank}
         </span>
         <Suit name={suit} size={w * 0.17} />
@@ -140,7 +140,7 @@ export function PlayingCard({
         <Suit name={suit} size={w * 0.5} />
       </span>
       <span style={corner(true)}>
-        <span className="font-display" style={{ fontWeight: 700, fontSize: w * 0.24, color: col }}>
+        <span className="" style={{ fontWeight: 700, fontSize: w * 0.24, color: col }}>
           {rank}
         </span>
         <Suit name={suit} size={w * 0.17} />

@@ -68,9 +68,7 @@ export function RankChangeDialog({
         data-direction={direction}
         className={cn(
           "block overflow-hidden rounded-lg border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
-          promoted
-            ? "shadow-[0_0_0_1px_rgba(232,194,90,0.18)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]"
-            : "shadow-[0_30px_70px_-28px_rgba(14,58,36,0.35)]",
+          promoted ? "shadow-xl inset-ring inset-ring-brass/18" : "shadow-xl",
         )}
       >
         {promoted ? (
@@ -90,7 +88,7 @@ export function RankChangeDialog({
           <DialogTitle
             aria-label={`${title} ${rank}`}
             className={cn(
-              "text-[11px] font-bold tracking-[2px] uppercase",
+              "text-2xs font-bold tracking-caps uppercase",
               promoted ? "text-brass-deep" : "text-ink-dim",
             )}
           >
@@ -103,7 +101,7 @@ export function RankChangeDialog({
             <div
               data-testid="rank-change-rank"
               className={cn(
-                "font-display text-[34px] leading-none font-bold tracking-[-1px]",
+                "text-4xl leading-none font-bold tracking-tight",
                 !promoted && "text-ink",
               )}
               style={promoted ? { color } : undefined}
@@ -112,7 +110,7 @@ export function RankChangeDialog({
             </div>
             <DialogDescription
               data-testid="rank-change-sp"
-              className="text-ink-dim mt-1.5 text-sm tracking-[0.3px] tabular-nums"
+              className="text-ink-dim mt-1.5 text-sm tabular-nums"
             >
               {t("season.rankDialog.sp", { change: formatSpChange(spChange) })}
             </DialogDescription>
@@ -120,7 +118,7 @@ export function RankChangeDialog({
 
           {progress ? (
             <div className="w-full">
-              <div className="text-ink-dim mb-1 flex justify-end text-[12.5px] tabular-nums">
+              <div className="text-ink-dim mb-1 flex justify-end text-xs tabular-nums">
                 {atTop
                   ? t("season.banner.atTop")
                   : t("season.banner.progress", {
@@ -157,7 +155,7 @@ export function RankChangeDialog({
               data-testid="rank-change-progress-placeholder"
               className="w-full"
             >
-              <div className="mb-1 text-[12.5px]">{"\u00a0"}</div>
+              <div className="mb-1 text-xs">{"\u00a0"}</div>
               <div className="bg-surface-sunken h-1.5 rounded-full" />
             </div>
           )}

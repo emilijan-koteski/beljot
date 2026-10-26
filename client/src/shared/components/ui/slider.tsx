@@ -40,7 +40,7 @@ function Slider({
         <SliderPrimitive.Track
           data-slot="slider-track"
           className={cn(
-            "bg-surface-sunken h-1.5 w-full rounded-full shadow-[inset_0_0_0_1px_var(--border)] select-none",
+            "bg-surface-sunken h-1.5 w-full rounded-full inset-ring inset-ring-border select-none",
             trackClassName,
           )}
         >
@@ -55,7 +55,7 @@ function Slider({
               getAriaValueText ? (_formatted, value) => getAriaValueText(value) : undefined
             }
             className={cn(
-              "border-accent bg-surface size-4 rounded-full border-2 shadow-sm outline-none select-none",
+              "border-accent bg-surface size-4 rounded-full border-2 shadow-xs outline-none select-none",
               "has-[:focus-visible]:ring-ring/70 has-[:focus-visible]:ring-[3px]",
               thumbClassName,
             )}

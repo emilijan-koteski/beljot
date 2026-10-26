@@ -16,18 +16,38 @@
    ────────────────────────────────────────────────────────────────────── */
 
 @theme {
-  /* Type — constant across all scopes.
-     One text family (Inter) carries body + display + headings; weight and
-     size do the work a second family used to. JetBrains Mono is kept only
-     for genuinely monospaced content (room codes, aligned figures).
-     --font-suit is NOT a UI font: it forces ♠♥♦♣ pips and the playing-card
-     faces to render as serif text glyphs (sans-serif risks colour-emoji
-     fallback for ♥/♦). */
-  --font-display: "Inter", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* Type — constant across all scopes. One text family, Inter (`font-sans`),
+     carries every headline, label and paragraph; weight and size do the work.
+     JetBrains Mono is kept for micro-caps labels and genuinely monospaced
+     content (room codes, aligned figures). --font-suit is NOT a UI font: it
+     forces ♠♥♦♣ pips and the playing-card faces to render as serif text
+     glyphs (sans-serif risks colour-emoji fallback for ♥/♦). */
   --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-suit: Georgia, "Times New Roman", "DejaVu Serif", serif;
+
+  /* Type scale — ten whole-pixel steps: 2xs 10, xs 12, sm 14, base 16, lg 18,
+     xl 20, 2xl 24, 3xl 28, 4xl 36, 5xl 48. Nothing sets a size off it except
+     the landing's fluid clamp() headlines. 2xs is added for micro-caps
+     labels; 3xl is 28px rather than Tailwind's 30px so the display steps run
+     24 → 28 → 36. */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.5;
+  --text-3xl: 1.75rem;
+  --text-3xl--line-height: 1.2;
+
+  /* Tracking — em, so it scales with the size. tight (-0.025em) for
+     headlines and big figures, wider (0.05em) and widest (0.1em) for small
+     caps and figures, caps (0.18em) for mono micro-caps labels. Tailwind's
+     0.025em `wide` step is removed: at these sizes it is under half a pixel. */
+  --tracking-caps: 0.18em;
+  --tracking-wide: initial;
+
+  /* Leading — none 1, tight 1.2 (headlines), snug 1.4, normal 1.5, relaxed
+     1.6 (paragraphs). */
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-relaxed: 1.6;
 
   /* Radius — whole, even pixels. `rounded` (4px) and `rounded-xs` (2px) keep
      Tailwind's defaults; 4xl is unused, so it is removed rather than left to
@@ -40,6 +60,31 @@
   --radius-2xl: 24px;
   --radius-3xl: 32px;
   --radius-4xl: initial;
+}
+
+/* Shadows — `static` so the inline `var(--shadow-*)` styles always resolve.
+   Parchment elevation is ink green and long; Felt elevation is plain black
+   and tighter, for the dark table and for playing cards wherever they sit.
+   The glow follows --accent-glow, so it is lime on Felt. Bevels are the
+   top highlight on raised parchment cards. */
+@theme static {
+  --shadow-2xs: initial;
+  --shadow-xs: 0 1px 2px rgba(14, 58, 36, 0.08);
+  --shadow-sm: 0 4px 12px -4px rgba(14, 58, 36, 0.3);
+  --shadow-md: 0 8px 22px -10px rgba(14, 58, 36, 0.3);
+  --shadow-lg: 0 18px 40px -20px rgba(14, 58, 36, 0.4);
+  --shadow-xl: 0 30px 70px -28px rgba(14, 58, 36, 0.45);
+  --shadow-2xl: initial;
+
+  --shadow-felt-sm: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-felt-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-felt-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-felt-xl: 0 20px 60px rgba(0, 0, 0, 0.7);
+
+  --shadow-glow: 0 8px 24px -12px var(--accent-glow);
+  --shadow-glow-lg: 0 14px 32px -14px var(--accent-glow);
+
+  --inset-shadow-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 @theme inline {
@@ -241,8 +286,8 @@
 
   /* ── Chat dock shadows — themeable so the felt-scoped dock can swap them
        for a heavier black drop shadow (see `.chat-dock-match`). ─────────── */
-  --chat-shadow-panel: 0 24px 60px -20px rgba(14, 58, 36, 0.3);
-  --chat-shadow-fab: 0 8px 22px -10px rgba(14, 58, 36, 0.3);
+  --chat-shadow-panel: var(--shadow-xl);
+  --chat-shadow-fab: var(--shadow-md);
 }
 
 /* Team companions — resolved per scope like the tier ones below. */
@@ -315,7 +360,7 @@
     padding: 0;
     background: var(--bg);
     color: var(--ink);
-    font-family: var(--font-body);
+    font-family: var(--font-sans);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -373,10 +418,6 @@
   }
   html {
     @apply font-sans;
-  }
-
-  .font-display {
-    letter-spacing: -0.01em;
   }
 }
 
@@ -555,8 +596,8 @@
   --accent-deep: var(--brass-deep);
   --accent-soft: var(--brass-soft);
   --accent-ink: var(--brass-ink);
-  --chat-shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(201, 168, 118, 0.06);
-  --chat-shadow-fab: 0 8px 22px rgba(0, 0, 0, 0.45);
+  --chat-shadow-panel: var(--shadow-felt-xl), inset 0 0 0 1px var(--brass-10);
+  --chat-shadow-fab: var(--shadow-felt-md);
 }
 
 /* The floating message peek sits over the felt + cards (not inside the dark

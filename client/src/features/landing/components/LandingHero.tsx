@@ -24,12 +24,12 @@ export function LandingHero() {
               {t("landing.hero.eyebrow")}
             </Eyebrow>
           </div>
-          <h1 className="font-display text-ink text-[clamp(44px,6.5vw,70px)] font-bold leading-[1.02] tracking-[-2px]">
+          <h1 className="text-ink text-[clamp(44px,6.5vw,70px)] font-bold leading-none tracking-tight">
             {t("landing.hero.title1")}
             <br />
             {t("landing.hero.title2")}
           </h1>
-          <p className="text-ink-dim mt-6 max-w-120 text-[clamp(16px,1.6vw,19px)] leading-[1.6]">
+          <p className="text-ink-dim mt-6 max-w-120 text-[clamp(16px,1.6vw,18px)] leading-relaxed">
             {t("landing.hero.subtitle")}
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3.5">
@@ -38,7 +38,7 @@ export function LandingHero() {
             </LandingCta>
           </div>
           {stats && (
-            <div className="text-ink-mute mt-7 flex flex-wrap items-center gap-4 text-[13.5px]">
+            <div className="text-ink-mute mt-7 flex flex-wrap items-center gap-4 text-sm">
               <span className="inline-flex items-center gap-2">
                 <span
                   className="bg-accent size-2 rounded-full"

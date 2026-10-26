@@ -29,7 +29,7 @@ function FeaturedPartner({ featured }: { featured: PartnerStat }) {
     <>
       <Avatar name={featured.username} avatarUrl={featured.avatarUrl} team="A" size={56} />
       <div className="min-w-0">
-        <div className="text-ink font-display truncate text-lg font-semibold tracking-[-0.1px] underline-offset-2 group-hover:underline">
+        <div className="text-ink truncate text-lg font-semibold underline-offset-2 group-hover:underline">
           {featured.username}
         </div>
         <div className="text-ink-dim text-xs">
@@ -62,7 +62,7 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
         title={t("profile.partners.title")}
         testId="profile-partners"
       >
-        <p className="text-ink-mute text-[13px]">
+        <p className="text-ink-mute text-sm">
           {t(subjectIsSelf ? "profile.partners.empty" : "profile.partners.emptyPublic")}
         </p>
       </SidePanel>
@@ -107,15 +107,15 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
                     className="focus-visible:ring-ring/70 flex min-w-0 flex-1 items-center gap-2.5 rounded-md underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
                   >
                     <Avatar name={p.username} avatarUrl={p.avatarUrl} team="A" size={24} />
-                    <span className="text-ink truncate text-[13px] font-medium">{p.username}</span>
+                    <span className="text-ink truncate text-sm font-medium">{p.username}</span>
                   </Link>
                 ) : (
                   <div className="flex min-w-0 flex-1 items-center gap-2.5">
                     <Avatar name={p.username} avatarUrl={p.avatarUrl} team="A" size={24} />
-                    <span className="text-ink truncate text-[13px] font-medium">{p.username}</span>
+                    <span className="text-ink truncate text-sm font-medium">{p.username}</span>
                   </div>
                 )}
-                <span className="text-ink-dim text-[12px] tabular-nums">
+                <span className="text-ink-dim text-xs tabular-nums">
                   {p.played}
                   <span className="text-ink-off"> · </span>
                   <span className="text-ink font-semibold">{winRate(p.wins, p.played)}%</span>

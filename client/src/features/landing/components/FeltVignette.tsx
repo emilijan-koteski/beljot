@@ -34,7 +34,7 @@ function Seat({ name, sub, team, pos, flip = false }: SeatProps) {
       }}
     >
       <div
-        className="font-display"
+        className=""
         style={{
           width: 34,
           height: 34,
@@ -51,11 +51,11 @@ function Seat({ name, sub, team, pos, flip = false }: SeatProps) {
       >
         {name[0]}
       </div>
-      <div style={{ lineHeight: 1.25, textAlign: flip ? "right" : "left" }}>
-        <div className="text-ink" style={{ fontSize: 12.5, fontWeight: 600 }}>
+      <div style={{ lineHeight: 1.2, textAlign: flip ? "right" : "left" }}>
+        <div className="text-ink" style={{ fontSize: 12, fontWeight: 600 }}>
           {name}
         </div>
-        <div className="text-ink-mute font-mono" style={{ fontSize: 10.5 }}>
+        <div className="text-ink-mute font-mono" style={{ fontSize: 10 }}>
           {sub}
         </div>
       </div>
@@ -103,7 +103,7 @@ export function FeltVignette({
         background:
           "radial-gradient(ellipse 70% 60% at 50% 42%, var(--felt-scene-top) 0%, var(--surface) 60%, var(--bg) 100%)",
         border: "3px solid var(--wood-rim)",
-        boxShadow: "inset 0 0 60px rgba(0,0,0,0.55), 0 30px 70px -30px rgba(0,0,0,0.6)",
+        boxShadow: "inset 0 0 60px rgba(0,0,0,0.55), var(--shadow-felt-xl)",
         ...style,
       }}
     >
@@ -197,7 +197,7 @@ export function FeltVignette({
         >
           <span
             className="text-brass font-mono"
-            style={{ fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase" }}
+            style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase" }}
           >
             {labels.trump}
           </span>

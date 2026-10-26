@@ -58,10 +58,10 @@ export function WinRateRing({ rate }: WinRateRingProps) {
         />
       </svg>
       <div className="flex flex-col items-center">
-        <span className="text-ink font-display text-[40px] leading-none font-bold tracking-[-1px] tabular-nums">
+        <span className="text-ink text-4xl leading-none font-bold tracking-tight tabular-nums">
           {rate === null ? t("profile.stats.winRateEmpty") : `${rate}%`}
         </span>
-        <span className="text-brass-deep mt-1 max-w-30 text-center font-mono text-[11px] leading-tight font-semibold tracking-[2px] uppercase">
+        <span className="text-brass-deep mt-1 max-w-30 text-center font-mono text-2xs leading-tight font-semibold tracking-caps uppercase">
           {t("profile.winRate")}
         </span>
       </div>

@@ -61,7 +61,7 @@ function OutcomeChip({ outcome }: { outcome: MatchOutcome }) {
   const c = cfg[outcome];
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold tracking-[0.2px]"
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
       style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}` }}
       data-testid="match-history-outcome"
       data-outcome={outcome}
@@ -112,7 +112,7 @@ function HandNotes({
     <>
       {h.capot && (
         <span
-          className="rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold tracking-[0.5px]"
+          className="rounded-md px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
           style={{
             background: "var(--accent-soft)",
             color: "var(--accent)",
@@ -126,7 +126,7 @@ function HandNotes({
       )}
       {!h.capot && h.lastTrickBonus > 0 && (
         <span
-          className="rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold tracking-[0.5px]"
+          className="rounded-md px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
           style={{
             background: "var(--surface-3)",
             color: lastTrickIsUs ? usColor : themColor,
@@ -140,7 +140,7 @@ function HandNotes({
       )}
       {h.failedContract && (
         <span
-          className="rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold tracking-[0.5px]"
+          className="rounded-md px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
           style={{
             background: "color-mix(in srgb, var(--danger) 10%, transparent)",
             color: "var(--danger)",
@@ -226,22 +226,22 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
               data-hand-number={h.handNumber}
             >
               <div className="flex items-baseline gap-2">
-                <span className="text-ink-mute font-mono text-[11px] font-semibold tabular-nums">
+                <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
                   {String(h.handNumber).padStart(2, "0")}
                 </span>
-                <span className="text-ink-dim text-[13px]">{d.desc}</span>
+                <span className="text-ink-dim text-sm">{d.desc}</span>
               </div>
 
               <div className="mt-2 flex items-center gap-5">
                 <div className="flex items-baseline gap-1.5">
                   <span
-                    className="text-[10px] font-semibold tracking-[1px] uppercase"
+                    className="text-2xs font-semibold tracking-widest uppercase"
                     style={{ color: usColor }}
                   >
                     {t("team.us")}
                   </span>
                   <span
-                    className="font-display text-[17px] font-bold tabular-nums"
+                    className="text-lg font-bold tabular-nums"
                     style={{ color: d.usWonHand ? usColor : "var(--ink)" }}
                   >
                     {d.us.total}
@@ -249,13 +249,13 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
                 </div>
                 <div className="flex items-baseline gap-1.5">
                   <span
-                    className="text-[10px] font-semibold tracking-[1px] uppercase"
+                    className="text-2xs font-semibold tracking-widest uppercase"
                     style={{ color: themColor }}
                   >
                     {t("team.them")}
                   </span>
                   <span
-                    className="font-display text-[17px] font-bold tabular-nums"
+                    className="text-lg font-bold tabular-nums"
                     style={{ color: !d.usWonHand ? themColor : "var(--ink)" }}
                   >
                     {d.them.total}
@@ -263,15 +263,15 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
                 </div>
               </div>
 
-              <div className="text-ink-mute mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] tabular-nums">
+              <div className="text-ink-mute mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs tabular-nums">
                 <span>
-                  <span className="text-ink-off tracking-[0.5px] uppercase">
+                  <span className="text-ink-off tracking-wider uppercase">
                     {t("profile.matchHistory.hand.col.cards")}
                   </span>{" "}
                   {d.us.card} <span className="text-ink-off">/</span> {d.them.card}
                 </span>
                 <span>
-                  <span className="text-ink-off tracking-[0.5px] uppercase">
+                  <span className="text-ink-off tracking-wider uppercase">
                     {t("profile.matchHistory.hand.col.declarations")}
                   </span>{" "}
                   {d.us.decl} <span className="text-ink-off">/</span> {d.them.decl}
@@ -299,35 +299,31 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
             data-testid="match-history-unscored-hand"
           >
             <div className="flex items-baseline gap-2">
-              <span className="text-ink-mute font-mono text-[11px] font-semibold tabular-nums">
+              <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
                 {String(hands.length + 1).padStart(2, "0")}
               </span>
-              <span className="text-ink-dim text-[13px]">
+              <span className="text-ink-dim text-sm">
                 {t("profile.matchHistory.hand.unfinished")}
               </span>
             </div>
             <div className="mt-2 flex items-center gap-5">
               <div className="flex items-baseline gap-1.5">
                 <span
-                  className="text-[10px] font-semibold tracking-[1px] uppercase"
+                  className="text-2xs font-semibold tracking-widest uppercase"
                   style={{ color: usColor }}
                 >
                   {t("team.us")}
                 </span>
-                <span className="font-display text-[17px] font-bold tabular-nums">
-                  {unscoredUs}
-                </span>
+                <span className="text-lg font-bold tabular-nums">{unscoredUs}</span>
               </div>
               <div className="flex items-baseline gap-1.5">
                 <span
-                  className="text-[10px] font-semibold tracking-[1px] uppercase"
+                  className="text-2xs font-semibold tracking-widest uppercase"
                   style={{ color: themColor }}
                 >
                   {t("team.them")}
                 </span>
-                <span className="font-display text-[17px] font-bold tabular-nums">
-                  {unscoredThem}
-                </span>
+                <span className="text-lg font-bold tabular-nums">{unscoredThem}</span>
               </div>
             </div>
           </div>
@@ -342,7 +338,7 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
     <div className="overflow-x-auto" data-testid="match-history-hands-grid">
       <div className="min-w-155">
         <div
-          className="text-brass-deep grid items-center gap-3 px-2.5 py-1.5 font-mono text-[10px] font-semibold tracking-[1.5px] uppercase"
+          className="text-brass-deep grid items-center gap-3 px-2.5 py-1.5 font-mono text-2xs font-semibold tracking-caps uppercase"
           style={{ gridTemplateColumns: cols }}
         >
           <span>{t("profile.matchHistory.hand.col.number")}</span>
@@ -363,7 +359,7 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
           return (
             <div
               key={h.handNumber}
-              className="grid items-center gap-3 rounded-lg px-2.5 py-2 text-[13px]"
+              className="grid items-center gap-3 rounded-lg px-2.5 py-2 text-sm"
               style={{
                 gridTemplateColumns: cols,
                 background: idx % 2 ? "transparent" : "var(--surface-2)",
@@ -371,18 +367,18 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
               data-testid="match-history-hand-row"
               data-hand-number={h.handNumber}
             >
-              <span className="text-ink-mute font-mono text-[11px] font-semibold tabular-nums">
+              <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
                 {String(h.handNumber).padStart(2, "0")}
               </span>
               <span className="text-ink-dim text-xs">{d.desc}</span>
               <span
-                className="font-display text-right text-[15px] font-semibold tabular-nums"
+                className="text-right text-base font-semibold tabular-nums"
                 style={{ color: d.usWonHand ? usColor : "var(--ink-mute)" }}
               >
                 {d.us.total}
               </span>
               <span
-                className="font-display text-right text-[15px] font-semibold tabular-nums"
+                className="text-right text-base font-semibold tabular-nums"
                 style={{ color: !d.usWonHand ? themColor : "var(--ink-mute)" }}
               >
                 {d.them.total}
@@ -408,18 +404,18 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
         })}
         {hasUnscoredHand && (
           <div
-            className="grid items-center gap-3 rounded-lg px-2.5 py-2 text-[13px]"
+            className="grid items-center gap-3 rounded-lg px-2.5 py-2 text-sm"
             style={{ gridTemplateColumns: cols, background: "transparent" }}
             data-testid="match-history-unscored-hand"
           >
-            <span className="text-ink-mute font-mono text-[11px] font-semibold tabular-nums">
+            <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
               {String(hands.length + 1).padStart(2, "0")}
             </span>
             <span className="text-ink-dim text-xs italic">
               {t("profile.matchHistory.hand.unfinished")}
             </span>
-            <span className="font-display text-right font-bold tabular-nums">{unscoredUs}</span>
-            <span className="font-display text-right font-bold tabular-nums">{unscoredThem}</span>
+            <span className="text-right font-bold tabular-nums">{unscoredUs}</span>
+            <span className="text-right font-bold tabular-nums">{unscoredThem}</span>
             <span />
             <span />
             <span />
@@ -489,7 +485,7 @@ export function MatchStatsCard({
 
   return (
     <li
-      className="bg-surface border-border overflow-hidden rounded-lg border transition-[border-color,box-shadow] hover:border-brass hover:shadow-[0_8px_22px_-10px_rgba(14,58,36,0.30)]"
+      className="bg-surface border-border overflow-hidden rounded-lg border transition-[border-color,box-shadow] hover:border-brass hover:shadow-md"
       data-testid="match-history-row"
       data-match-id={match.id}
     >
@@ -499,15 +495,15 @@ export function MatchStatsCard({
         data-testid="match-history-row-header"
       >
         <div className="flex min-w-22 flex-col gap-0.5">
-          <span className="text-ink font-display text-[15px] font-semibold tracking-[-0.1px]">
+          <span className="text-ink text-base font-semibold">
             {formatLocalizedDate(match.completedAt, t, "short")}
           </span>
-          <span className="text-ink-mute text-[11.5px] tabular-nums">
+          <span className="text-ink-mute text-xs tabular-nums">
             {formatClockTime(match.completedAt)} ·{" "}
             {formatDuration(match.startedAt, match.completedAt, t)}
           </span>
           <span
-            className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+            className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
             data-testid="match-history-variant"
             data-variant={match.variant}
           >
@@ -515,7 +511,7 @@ export function MatchStatsCard({
           </span>
           {match.declarationsEnabled === false && (
             <span
-              className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
               data-testid="match-history-no-declarations"
               role="img"
               aria-label={t("lobby.card.noDeclarationsAriaLabel")}
@@ -525,7 +521,7 @@ export function MatchStatsCard({
           )}
           {match.stopAtTarget === true && (
             <span
-              className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
               data-testid="match-history-stop-at-target"
               role="img"
               aria-label={t("lobby.card.stopAtTargetAriaLabel")}
@@ -535,7 +531,7 @@ export function MatchStatsCard({
           )}
           {match.declarationsTransfer === false && (
             <span
-              className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
               data-testid="match-history-no-declarations-transfer"
               role="img"
               aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
@@ -545,7 +541,7 @@ export function MatchStatsCard({
           )}
           {match.clockwise === true && (
             <span
-              className="text-ink-mute mt-0.5 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
               data-testid="match-history-clockwise"
               role="img"
               aria-label={t("lobby.card.clockwiseAriaLabel")}
@@ -563,7 +559,7 @@ export function MatchStatsCard({
               team={usTeam}
               you={subjectIsSelf}
             />
-            <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
+            <span className="text-ink-mute text-2xs tracking-widest uppercase">
               {t("profile.matchHistory.with")}
             </span>
             <SeatChip
@@ -575,7 +571,7 @@ export function MatchStatsCard({
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
+            <span className="text-ink-mute text-2xs tracking-widest uppercase">
               {t("profile.matchHistory.versus")}
             </span>
             <SeatChip
@@ -585,7 +581,7 @@ export function MatchStatsCard({
               userId={opponent1.userId}
               team={themTeam}
             />
-            <span className="text-ink-mute text-[10px] tracking-[1px] uppercase">
+            <span className="text-ink-mute text-2xs tracking-widest uppercase">
               {t("profile.matchHistory.and")}
             </span>
             <SeatChip
@@ -600,7 +596,7 @@ export function MatchStatsCard({
 
         <div className="bg-surface-elevated border-border flex items-center gap-2.5 self-start rounded-xl border px-3.5 py-2 md:self-center">
           <span
-            className="font-display text-[22px] leading-none font-bold tracking-[-0.4px] tabular-nums"
+            className="text-2xl leading-none font-bold tracking-tight tabular-nums"
             style={{ color: usColor }}
             data-team={usTeam === "A" ? "teamA" : "teamB"}
           >
@@ -608,7 +604,7 @@ export function MatchStatsCard({
           </span>
           <span className="text-ink-off font-medium">–</span>
           <span
-            className="font-display text-[22px] leading-none font-bold tracking-[-0.4px] tabular-nums"
+            className="text-2xl leading-none font-bold tracking-tight tabular-nums"
             style={{ color: themColor }}
             data-team={themTeam === "A" ? "teamA" : "teamB"}
           >
@@ -620,7 +616,7 @@ export function MatchStatsCard({
           {(match.endReason === "abandonment" || match.endReason === "surrender") &&
             match.outcome !== "abandoned" && (
               <span
-                className="text-ink-mute text-[11px] italic"
+                className="text-ink-mute text-xs italic"
                 data-testid="match-history-ended-early"
                 data-end-reason={match.endReason}
               >
@@ -631,7 +627,7 @@ export function MatchStatsCard({
             )}
           {match.hasBots === true && (
             <span
-              className="inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[10.5px] font-semibold tracking-[0.4px] uppercase"
+              className="inline-flex h-6 items-center gap-1 rounded-full border px-2 text-2xs font-semibold tracking-wider uppercase"
               style={{
                 color: "var(--bot-deep)",
                 borderColor: "var(--bot-edge)",

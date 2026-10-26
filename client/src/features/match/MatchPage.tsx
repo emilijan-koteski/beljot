@@ -1097,11 +1097,9 @@ export function MatchPage() {
             }}
           />
           <span
-            className="font-body text-base"
+            className="text-base"
             style={{
               color: "var(--ink-light)",
-              fontFamily: "var(--font-body)",
-              letterSpacing: 0.3,
               opacity: 0.85,
             }}
             data-testid="splash-text"
@@ -1490,7 +1488,7 @@ export function MatchPage() {
                   zIndex: Z.CHROME_TOP,
                   background: "var(--panel-deeper)",
                   border: "1px solid var(--brass-40)",
-                  boxShadow: "0 14px 36px rgba(0,0,0,0.5)",
+                  boxShadow: "var(--shadow-felt-lg)",
                   backdropFilter: "blur(10px)",
                   WebkitBackdropFilter: "blur(10px)",
                 }}
@@ -1854,7 +1852,7 @@ export function MatchPage() {
 
       {errorToast && (
         <div
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 border border-danger/45 bg-(--panel-deeper) text-danger font-body text-sm px-4 py-2 rounded-lg flex items-center gap-3"
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 border border-danger/45 bg-(--panel-deeper) text-danger text-sm px-4 py-2 rounded-lg flex items-center gap-3"
           style={{ zIndex: Z.TOAST }}
           role="alert"
           data-testid="error-toast"

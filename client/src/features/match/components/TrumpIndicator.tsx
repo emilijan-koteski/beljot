@@ -96,7 +96,7 @@ export function TrumpIndicator({
               border: "1px solid var(--brass-40)",
               backdropFilter: "blur(8px)",
               WebkitBackdropFilter: "blur(8px)",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+              boxShadow: "var(--shadow-felt-md)",
             }
       }
       aria-live="polite"
@@ -111,29 +111,26 @@ export function TrumpIndicator({
           height: 44,
           background: `radial-gradient(circle, ${accent}22, transparent 70%), linear-gradient(180deg, #fdfaf0, #f0e8d0)`,
           border: `2px solid ${accent}`,
-          boxShadow: `0 0 16px ${accent}${glowAlpha}, inset 0 1px 0 rgba(255,255,255,0.6)`,
+          boxShadow: `0 0 12px ${accent}${glowAlpha}, inset 0 1px 0 rgba(255,255,255,0.6)`,
         }}
       >
         <SuitMark
           suit={trumpSuit}
           deck={deck}
           size={22}
-          className={`${LEGACY_INK_CLASS[trumpSuit]} font-display font-semibold leading-none`}
+          className={`${LEGACY_INK_CLASS[trumpSuit]} font-semibold leading-none`}
         />
       </div>
 
       <div className="flex flex-col min-w-0">
         <div className="flex items-baseline gap-1.5">
           <span
-            className="font-body text-[10.5px] uppercase tracking-wider"
+            className="text-2xs uppercase tracking-wider"
             style={{ color: BRASS, opacity: 0.85 }}
           >
             {t("match.trumpIndicator.trump")}
           </span>
-          <span
-            className="font-display font-semibold capitalize"
-            style={{ color: INK, fontSize: 14 }}
-          >
+          <span className="font-semibold capitalize" style={{ color: INK, fontSize: 14 }}>
             {suitName}
           </span>
         </div>
@@ -141,18 +138,15 @@ export function TrumpIndicator({
         {team && teamName && (
           <div
             className="flex items-center gap-2 mt-0.5"
-            style={{ color: INK, opacity: 0.85, fontSize: 11 }}
+            style={{ color: INK, opacity: 0.85, fontSize: 12 }}
           >
             {callerName && (
-              <span
-                className="font-body text-ink max-w-32 truncate"
-                data-testid="trump-caller-name"
-              >
+              <span className="text-ink max-w-32 truncate" data-testid="trump-caller-name">
                 {callerName}
               </span>
             )}
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-px font-body text-[9.5px] font-bold uppercase tracking-wider ${
+              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-px text-2xs font-bold uppercase tracking-wider ${
                 legacyTeamClass !== null ? `text-${legacyTeamClass} bg-${legacyTeamClass}/10` : ""
               }`}
               style={
@@ -174,7 +168,7 @@ export function TrumpIndicator({
                   width: 5,
                   height: 5,
                   background: teamGradient ? teamGradient[0] : undefined,
-                  boxShadow: teamGradient ? `0 0 5px ${teamGradient[0]}` : undefined,
+                  boxShadow: teamGradient ? `0 0 6px ${teamGradient[0]}` : undefined,
                 }}
               />
               {teamName}

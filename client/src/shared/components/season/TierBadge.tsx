@@ -48,7 +48,7 @@ export function TierBadge({
       style={{
         background: SEASON_TIER_SOFT[tier],
         border: `1px solid ${color}`,
-        boxShadow: glow ? `0 0 14px -2px ${color}` : "none",
+        boxShadow: glow ? `0 0 12px -2px ${color}` : "none",
         color,
       }}
     >

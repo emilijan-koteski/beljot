@@ -119,7 +119,7 @@ export function RulesDialog({
               background: PANEL_BG,
               border: "1px solid var(--brass-55)",
               boxShadow:
-                "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)",
+                "var(--shadow-felt-xl), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)",
               color: INK,
             }}
           >
@@ -134,9 +134,8 @@ export function RulesDialog({
               <div className="flex flex-col">
                 <span
                   style={{
-                    fontFamily: "var(--font-body)",
-                    fontSize: 11,
-                    letterSpacing: 2,
+                    fontSize: 10,
+                    letterSpacing: "0.18em",
                     textTransform: "uppercase",
                     color: BRASS,
                     opacity: 0.85,
@@ -147,10 +146,8 @@ export function RulesDialog({
                 <span
                   id="rules-dialog-title"
                   style={{
-                    fontFamily: "var(--font-body)",
-                    fontSize: 19,
+                    fontSize: 18,
                     fontWeight: 600,
-                    letterSpacing: 0.2,
                     color: INK,
                     marginTop: 1,
                   }}
@@ -173,9 +170,8 @@ export function RulesDialog({
                 <div
                   style={{
                     padding: "0 10px 10px",
-                    fontFamily: "var(--font-body)",
                     fontSize: 10,
-                    letterSpacing: 2,
+                    letterSpacing: "0.18em",
                     textTransform: "uppercase",
                     color: BRASS,
                     opacity: 0.7,
@@ -202,16 +198,15 @@ export function RulesDialog({
                     >
                       <span
                         style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: 10.5,
+                          fontSize: 10,
                           color: on ? BRASS : TEXT_DIM,
-                          letterSpacing: 0.5,
+                          letterSpacing: "0.05em",
                           fontWeight: 600,
                         }}
                       >
                         {String(i + 1).padStart(2, "0")}
                       </span>
-                      <span style={{ fontSize: 13, fontWeight: on ? 600 : 500 }}>{s.label}</span>
+                      <span style={{ fontSize: 14, fontWeight: on ? 600 : 500 }}>{s.label}</span>
                     </button>
                   );
                 })}
@@ -229,9 +224,8 @@ export function RulesDialog({
                 >
                   <span
                     style={{
-                      fontFamily: "var(--font-body)",
                       fontSize: 10,
-                      letterSpacing: 2,
+                      letterSpacing: "0.18em",
                       textTransform: "uppercase",
                       color: BRASS,
                       opacity: 0.7,
@@ -270,7 +264,7 @@ export function RulesDialog({
                         className="cursor-pointer rounded-sm transition-colors"
                         style={{
                           padding: "5px 11px",
-                          fontSize: 12.5,
+                          fontSize: 12,
                           fontWeight: on ? 600 : 500,
                           background: on ? "var(--brass-soft)" : "transparent",
                           border: on ? "1px solid var(--brass-40)" : "1px solid var(--brass-soft)",
@@ -347,8 +341,7 @@ function TableRuleNote({ testId, children }: { testId: string; children: React.R
       style={{
         background: "var(--brass-10)",
         border: "1px solid var(--brass-40)",
-        fontFamily: "var(--font-body)",
-        fontSize: 12.5,
+        fontSize: 12,
         lineHeight: 1.5,
         color: INK,
       }}
@@ -383,9 +376,8 @@ function DarkChapter({
       <header style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <span
           style={{
-            fontFamily: "var(--font-body)",
             fontSize: 10,
-            letterSpacing: 2,
+            letterSpacing: "0.18em",
             textTransform: "uppercase",
             color: BRASS,
             fontWeight: 600,
@@ -396,16 +388,14 @@ function DarkChapter({
         <h3
           style={{
             margin: 0,
-            fontFamily: "var(--font-body)",
             fontWeight: 600,
-            fontSize: 22,
-            letterSpacing: 0.2,
+            fontSize: 24,
             color: INK,
           }}
         >
           {section.title}
         </h3>
-        <p style={{ margin: "2px 0 0", fontSize: 13.5, lineHeight: 1.55, color: TEXT_DIM }}>
+        <p style={{ margin: "2px 0 0", fontSize: 14, lineHeight: 1.6, color: TEXT_DIM }}>
           {section.lede}
         </p>
       </header>
@@ -436,7 +426,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
   switch (block.kind) {
     case "p":
       return (
-        <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: TEXT }}>
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: TEXT }}>
           {block.text}
           {marker}
         </p>
@@ -455,8 +445,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
         >
           <div
             style={{
-              fontFamily: "var(--font-body)",
-              fontSize: 13.5,
+              fontSize: 14,
               fontWeight: 600,
               color: INK,
               marginBottom: 3,
@@ -465,7 +454,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
             {block.title}
             {marker}
           </div>
-          <div style={{ fontSize: 12.5, lineHeight: 1.55, color: TEXT_DIM }}>{block.text}</div>
+          <div style={{ fontSize: 12, lineHeight: 1.6, color: TEXT_DIM }}>{block.text}</div>
         </div>
       );
 
@@ -484,9 +473,8 @@ function DarkBlock({ block }: { block: RuleBlock }) {
         >
           <span
             style={{
-              fontFamily: "var(--font-body)",
-              fontSize: 9.5,
-              letterSpacing: 2,
+              fontSize: 10,
+              letterSpacing: "0.18em",
               textTransform: "uppercase",
               color: BRASS,
               fontWeight: 700,
@@ -496,7 +484,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
           >
             {ui.noteLabel}
           </span>
-          <span style={{ fontSize: 12.5, lineHeight: 1.55, color: TEXT_DIM }}>
+          <span style={{ fontSize: 12, lineHeight: 1.6, color: TEXT_DIM }}>
             {block.text}
             {marker}
           </span>
@@ -543,11 +531,10 @@ function DarkBlock({ block }: { block: RuleBlock }) {
                     borderRadius: "var(--radius-sm)",
                     background: "var(--brass-soft)",
                     border: "1px solid var(--brass-40)",
-                    fontFamily: "var(--font-body)",
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: 700,
                     color: BRASS,
-                    letterSpacing: 0.5,
+                    letterSpacing: "0.05em",
                   }}
                 >
                   {String(i + 1).padStart(2, "0")}
@@ -555,8 +542,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
                 <div>
                   <div
                     style={{
-                      fontFamily: "var(--font-body)",
-                      fontSize: 13.5,
+                      fontSize: 14,
                       fontWeight: 600,
                       color: INK,
                       marginBottom: 2,
@@ -567,7 +553,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
                       <DiffMarker note={it.otherVariantNote} label={ui.diffLabel} tone="dark" />
                     ) : null}
                   </div>
-                  <div style={{ fontSize: 12.5, lineHeight: 1.55, color: TEXT_DIM }}>{it.d}</div>
+                  <div style={{ fontSize: 12, lineHeight: 1.6, color: TEXT_DIM }}>{it.d}</div>
                 </div>
               </li>
             ))}
@@ -634,9 +620,8 @@ function DarkCardLadder({
       <header style={{ padding: "10px 12px 8px", borderBottom: "1px solid var(--brass-soft)" }}>
         <div
           style={{
-            fontFamily: "var(--font-body)",
-            fontSize: 9.5,
-            letterSpacing: 1.8,
+            fontSize: 10,
+            letterSpacing: "0.18em",
             textTransform: "uppercase",
             color: accent,
             fontWeight: 700,
@@ -646,8 +631,7 @@ function DarkCardLadder({
         </div>
         <div
           style={{
-            fontFamily: "var(--font-body)",
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: 600,
             color: INK,
             marginTop: 1,
@@ -686,7 +670,6 @@ function DarkCardLadder({
                     ? "color-mix(in srgb, var(--accent-light) 10%, transparent)"
                     : "rgba(245,242,232,0.06)",
                   border: `1px solid ${top ? `color-mix(in srgb, ${accent} 53%, transparent)` : "rgba(245,242,232,0.18)"}`,
-                  fontFamily: "var(--font-body)",
                   fontWeight: 700,
                   fontSize: 12,
                   color: top ? accent : INK,
@@ -697,7 +680,7 @@ function DarkCardLadder({
               <span
                 style={{
                   marginLeft: 10,
-                  fontSize: 12.5,
+                  fontSize: 12,
                   color: top ? INK : TEXT,
                   fontWeight: top ? 600 : 500,
                 }}
@@ -712,8 +695,7 @@ function DarkCardLadder({
                 className="tabular-nums"
                 style={{
                   textAlign: "right",
-                  fontFamily: "var(--font-body)",
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: 600,
                   color: r.pts > 0 ? INK : TEXT_DIM,
                 }}
@@ -768,8 +750,7 @@ function DarkMeldChip({
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span
           style={{
-            fontFamily: "var(--font-body)",
-            fontSize: 13.5,
+            fontSize: 14,
             fontWeight: 600,
             color: INK,
             flex: "1 1 auto",
@@ -780,10 +761,7 @@ function DarkMeldChip({
           {meld.name}
         </span>
         <span className="inline-flex shrink-0 items-baseline gap-1">
-          <span
-            className="tabular-nums"
-            style={{ fontFamily: "var(--font-body)", fontSize: 17, fontWeight: 700, color: accent }}
-          >
+          <span className="tabular-nums" style={{ fontSize: 18, fontWeight: 700, color: accent }}>
             +{meld.pts}
           </span>
           <span style={{ fontSize: 10, color: TEXT_DIM }}>{ptsLabel}</span>
@@ -791,9 +769,8 @@ function DarkMeldChip({
       </div>
       <div
         style={{
-          fontFamily: "var(--font-body)",
-          fontSize: 9.5,
-          letterSpacing: 1.6,
+          fontSize: 10,
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           color: jackpot ? accent : BRASS,
           fontWeight: 600,
@@ -801,7 +778,7 @@ function DarkMeldChip({
       >
         {kindLabel}
       </div>
-      <div style={{ fontSize: 11.5, lineHeight: 1.45, color: TEXT_DIM }}>{meld.summary}</div>
+      <div style={{ fontSize: 12, lineHeight: 1.4, color: TEXT_DIM }}>{meld.summary}</div>
     </div>
   );
 }
