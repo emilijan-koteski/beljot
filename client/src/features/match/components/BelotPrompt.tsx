@@ -84,7 +84,7 @@ export function BelotPrompt({
                 style={{
                   width: 7,
                   height: 7,
-                  background: "var(--brass, #c9a876)",
+                  background: "var(--brass)",
                   boxShadow: "0 0 6px rgba(201,168,118,0.55)",
                 }}
               />

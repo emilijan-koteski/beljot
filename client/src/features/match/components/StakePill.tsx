@@ -9,7 +9,7 @@ interface StakePillProps {
 }
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
-const INK = "var(--ink-light, #f5f2e8)";
+const INK = "var(--ink-light)";
 
 /**
  * Positionless brass pill showing the match stake with a coin glyph; the caller anchors it.

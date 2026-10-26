@@ -157,7 +157,7 @@ export function EmotePickerButton({
         style={{
           background: "var(--panel-hud, rgba(18,32,22,0.85))",
           border: "1px solid rgba(201,168,118,0.4)",
-          color: "var(--ink-light, #f5f2e8)",
+          color: "var(--ink-light)",
           backdropFilter: "blur(6px)",
           WebkitBackdropFilter: "blur(6px)",
         }}

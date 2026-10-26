@@ -86,7 +86,7 @@ export function BelotReveal({
           background: "linear-gradient(180deg, rgba(32,64,43,0.98) 0%, rgba(13,38,23,0.98) 100%)",
           border: "1px solid rgba(201,168,118,0.55)",
           boxShadow: `0 22px 54px rgba(0,0,0,0.62), 0 0 0 2px ${glowColor}66, 0 0 28px ${glowColor}55, inset 0 1px 0 rgba(201,168,118,0.25)`,
-          color: "var(--ink-light, #f5f2e8)",
+          color: "var(--ink-light)",
           fontFamily: "var(--font-body)",
         }}
         data-team={team}
@@ -103,7 +103,7 @@ export function BelotReveal({
         <div
           className="text-[9.5px] uppercase tracking-[0.22em]"
           style={{
-            color: "var(--brass, #c9a876)",
+            color: "var(--brass)",
             fontFamily: "var(--font-body)",
             padding: "0 18px",
             marginBottom: 14,

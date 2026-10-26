@@ -42,7 +42,7 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
           >
             <p
               className="font-body text-sm mb-4"
-              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.82, lineHeight: 1.55 }}
+              style={{ color: "var(--ink-light)", opacity: 0.82, lineHeight: 1.55 }}
             >
               {t("match.surrender.prompt.body", { username: proposerUsername })}
             </p>

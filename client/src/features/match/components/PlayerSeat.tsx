@@ -125,7 +125,7 @@ function CardBackStack({
             marginLeft: i === 0 ? 0 : -overlap,
             transform: `rotate(${(i - 2) * 1.5}deg)`,
             background: "linear-gradient(135deg, #2a1a10 0%, #4a2818 50%, #2a1a10 100%)",
-            border: `${compact ? 1 : 1.5}px solid var(--brass, #c9a876)`,
+            border: `${compact ? 1 : 1.5}px solid var(--brass)`,
             borderRadius: compact ? 3 : 4,
             boxShadow: "0 2px 6px rgba(0,0,0,0.45)",
           }}
@@ -135,7 +135,7 @@ function CardBackStack({
         className={`font-body tabular-nums ${compact ? "text-[9px]" : "text-[11px]"}`}
         style={{
           marginLeft: compact ? 4 : 8,
-          color: "var(--ink-light, #f5f2e8)",
+          color: "var(--ink-light)",
           opacity: 0.7,
         }}
         data-testid="player-seat-card-count"
@@ -288,7 +288,7 @@ export function PlayerSeat({
               width: "100%",
               height: "100%",
               background: "var(--avatar-inner, #1f2e23)",
-              color: "var(--ink-light, #f5f2e8)",
+              color: "var(--ink-light)",
               fontSize: discPx * 0.5,
             }}
             data-testid="player-seat-avatar"
@@ -352,7 +352,7 @@ export function PlayerSeat({
       >
         <span
           className={`font-body font-semibold ${compact ? "text-[11px]" : "text-sm"}`}
-          style={{ color: "var(--ink-light, #f5f2e8)" }}
+          style={{ color: "var(--ink-light)" }}
         >
           {displayName}
         </span>

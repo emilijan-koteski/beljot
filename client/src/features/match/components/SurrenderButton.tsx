@@ -103,7 +103,7 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
           >
             <p
               className="font-body text-sm mb-4"
-              style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.78, lineHeight: 1.55 }}
+              style={{ color: "var(--ink-light)", opacity: 0.78, lineHeight: 1.55 }}
             >
               {t("match.surrender.confirm.body")}
             </p>

@@ -25,8 +25,8 @@ interface ScorePanelProps {
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
 const PANEL_BORDER = "1px solid rgba(201,168,118,0.4)";
-const INK = "var(--ink-light, #f5f2e8)";
-const BRASS_LABEL = "var(--brass, #c9a876)";
+const INK = "var(--ink-light)";
+const BRASS_LABEL = "var(--brass)";
 
 interface RowProps {
   label: string;

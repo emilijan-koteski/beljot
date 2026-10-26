@@ -1092,14 +1092,14 @@ export function MatchPage() {
               width: 36,
               height: 36,
               border: "2px solid rgba(201,168,118,0.18)",
-              borderTopColor: "var(--brass, #c9a876)",
+              borderTopColor: "var(--brass)",
               animationDuration: "0.9s",
             }}
           />
           <span
             className="font-body text-base"
             style={{
-              color: "var(--ink-light, #f5f2e8)",
+              color: "var(--ink-light)",
               fontFamily: "var(--font-body)",
               letterSpacing: 0.3,
               opacity: 0.85,
@@ -1462,7 +1462,7 @@ export function MatchPage() {
               zIndex: Z.CHROME_TOP,
               background: "var(--panel-hud, rgba(18,32,22,0.85))",
               border: "1px solid rgba(201,168,118,0.4)",
-              color: "var(--ink-light, #f5f2e8)",
+              color: "var(--ink-light)",
               backdropFilter: "blur(6px)",
               WebkitBackdropFilter: "blur(6px)",
             }}

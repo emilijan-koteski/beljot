@@ -84,7 +84,7 @@ export function EmoteBubble({
         }`}
         style={{
           background: "var(--panel-dark, rgba(20,45,30,0.85))",
-          border: "1px solid var(--brass, #c9a876)",
+          border: "1px solid var(--brass)",
           boxShadow: "0 4px 14px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)",
         }}
         aria-hidden="true"

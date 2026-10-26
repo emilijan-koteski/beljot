@@ -285,7 +285,7 @@ export function ScoreReveal({
               <div className="flex flex-col gap-0.5">
                 <span
                   className="font-body text-[10.5px] uppercase tracking-widest"
-                  style={{ color: "var(--brass, #c9a876)" }}
+                  style={{ color: "var(--brass)" }}
                 >
                   {t("match.scoreReveal.matchTotal")}
                 </span>
@@ -293,13 +293,13 @@ export function ScoreReveal({
                   <span style={{ color: teamAGradient[0] }} data-team="teamA">
                     {data.teamAMatchScore}
                   </span>
-                  <span style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.4 }}>·</span>
+                  <span style={{ color: "var(--ink-light)", opacity: 0.4 }}>·</span>
                   <span style={{ color: teamBGradient[0] }} data-team="teamB">
                     {data.teamBMatchScore}
                   </span>
                   <span
                     className="text-[11px] sm:text-[12px] font-body font-normal"
-                    style={{ color: "var(--ink-light, #f5f2e8)", opacity: 0.5 }}
+                    style={{ color: "var(--ink-light)", opacity: 0.5 }}
                   >
                     / {matchTarget}
                   </span>
@@ -349,7 +349,7 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
       <span
         className="font-body text-[13px] sm:text-[14px]"
         style={{
-          color: "var(--ink-light, #f5f2e8)",
+          color: "var(--ink-light)",
           opacity: bold ? 1 : 0.85,
           fontWeight: bold ? 700 : 400,
         }}
@@ -359,7 +359,7 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
       <span
         className={`font-display text-right tabular-nums ${bold ? "text-[16px] sm:text-[18px]" : "text-[14px] sm:text-[15px]"}`}
         style={{
-          color: "var(--ink-light, #f5f2e8)",
+          color: "var(--ink-light)",
           fontWeight: bold ? 700 : 500,
         }}
         data-team="teamA"
@@ -369,7 +369,7 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
       <span
         className={`font-display text-right tabular-nums ${bold ? "text-[16px] sm:text-[18px]" : "text-[14px] sm:text-[15px]"}`}
         style={{
-          color: "var(--ink-light, #f5f2e8)",
+          color: "var(--ink-light)",
           fontWeight: bold ? 700 : 500,
         }}
         data-team="teamB"
@@ -405,7 +405,7 @@ function BonusRow({ label, amount, team, teamGradient, testId }: BonusRowProps) 
       style={{
         gridTemplateColumns: "1fr 80px 80px",
         gap: 8,
-        color: "var(--ink-light, #f5f2e8)",
+        color: "var(--ink-light)",
         opacity: 0.85,
       }}
       data-testid={testId}

@@ -131,7 +131,7 @@ export function PlayingCard({
           ...boxStyle,
           borderRadius: BACK_RADIUS,
           background: "linear-gradient(135deg, #2a1a10 0%, #4a2818 50%, #2a1a10 100%)",
-          border: "2px solid var(--brass, #c9a876)",
+          border: "2px solid var(--brass)",
           boxShadow: `${playableGlow}, inset 0 0 0 1px rgba(201,168,118,0.35)`,
         }}
       >
@@ -148,7 +148,7 @@ export function PlayingCard({
         <div
           className="absolute inset-0 flex items-center justify-center"
           style={{
-            color: "var(--brass, #c9a876)",
+            color: "var(--brass)",
             fontFamily: "var(--font-suit)",
             fontSize: dims.width * 0.3,
             fontStyle: "italic",
