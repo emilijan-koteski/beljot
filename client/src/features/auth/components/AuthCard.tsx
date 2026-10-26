@@ -99,12 +99,12 @@ export function Checkbox({ checked, onChange, invalid, testId, children }: Check
           onChange={(e) => onChange(e.target.checked)}
           aria-invalid={invalid || undefined}
           data-testid={testId}
-          className="absolute inset-0 size-full cursor-pointer opacity-0"
+          className="peer absolute inset-0 size-full cursor-pointer opacity-0"
         />
         <span
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute inset-0 inline-flex items-center justify-center rounded-[5px] border transition-colors",
+            "pointer-events-none absolute inset-0 inline-flex items-center justify-center rounded-[5px] border transition-[background-color,border-color,box-shadow] peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50",
             checked
               ? "bg-accent border-accent text-accent-ink"
               : invalid

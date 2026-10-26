@@ -151,7 +151,7 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
           />
         ) : (
           <div className="flex flex-col gap-2">
-            <div className="bg-surface-elevated border-border flex items-center gap-2 rounded-[10px] border px-2.5 py-1.5">
+            <div className="bg-surface-elevated border-border flex items-center gap-2 rounded-[10px] border px-2.5 py-1.5 transition-[border-color,box-shadow] has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/50">
               <Search className="text-ink-mute size-3.5 shrink-0" aria-hidden="true" />
               <input
                 value={search}
