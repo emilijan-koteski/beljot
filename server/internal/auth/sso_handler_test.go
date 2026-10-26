@@ -180,6 +180,8 @@ func TestSSOLogin_RegistersNewUser(t *testing.T) {
 	assert.True(t, u.MusicEnabled)
 	assert.True(t, data.SoundEnabled)
 	assert.True(t, data.MusicEnabled)
+	assert.True(t, u.AllowNonFriendInvites)
+	assert.True(t, data.AllowNonFriendInvites)
 	assert.Equal(t, 70, u.SoundVolume)
 	assert.Equal(t, 70, u.MusicVolume)
 	assert.Equal(t, 70, data.SoundVolume)

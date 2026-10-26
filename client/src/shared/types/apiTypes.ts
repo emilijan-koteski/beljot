@@ -11,6 +11,7 @@ export interface User {
   musicEnabled: boolean;
   soundVolume: number;
   musicVolume: number;
+  allowNonFriendInvites: boolean;
   walletBalance: number;
   loginStreakDays: number;
   totalXp: number;
@@ -46,7 +47,7 @@ export interface FriendRequest {
   createdAt: string;
 }
 
-/** A friend row for the invite panel; unavailable friends are included with a `reason` slug ("" when available). */
+/** A row of the invite panel's Friends or Lobby tab; unavailable rows carry a `reason` slug ("" when available). */
 export interface InvitableFriend {
   userId: number;
   username: string;

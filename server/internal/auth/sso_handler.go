@@ -122,14 +122,15 @@ func (h *AuthHandler) createSSOUser(email, displayName string) (*user.User, erro
 			return nil, err
 		}
 		u := &user.User{
-			Email:              email,
-			Username:           username,
-			PasswordHash:       "",
-			LanguagePreference: "en",
-			CardDeckPreference: user.CardDeckFrench,
-			WalletBalance:      5000,
-			LoginStreakDays:    0,
-			LastLoginAt:        &today,
+			Email:                 email,
+			Username:              username,
+			PasswordHash:          "",
+			LanguagePreference:    "en",
+			CardDeckPreference:    user.CardDeckFrench,
+			AllowNonFriendInvites: true,
+			WalletBalance:         5000,
+			LoginStreakDays:       0,
+			LastLoginAt:           &today,
 		}
 		err = h.userRepo.Create(u)
 		switch {

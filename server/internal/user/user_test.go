@@ -259,6 +259,48 @@ func TestGormUserRepository_UpdatePreferences_AudioSwitches(t *testing.T) {
 	assert.False(t, reloaded.MusicEnabled)
 }
 
+func TestGormUserRepository_AllowNonFriendInvitesDefaultTrueOnRawInsert(t *testing.T) {
+	db := getTestDB(t)
+
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (email, username, password_hash, created_at, updated_at)
+		 VALUES ('invite-raw@test.com', 'inviteraw', 'x', NOW(), NOW())`,
+	).Error)
+
+	var got struct{ AllowNonFriendInvites bool }
+	require.NoError(t, db.Raw(
+		"SELECT allow_non_friend_invites FROM users WHERE username = 'inviteraw'",
+	).Scan(&got).Error)
+	assert.True(t, got.AllowNonFriendInvites, "a row inserted without the column must land on TRUE")
+}
+
+func TestGormUserRepository_UpdatePreferences_AllowNonFriendInvites(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormUserRepository(db)
+
+	u := &User{
+		Email:                 "invite-update@test.com",
+		Username:              "inviteupdate",
+		PasswordHash:          "hashedpassword",
+		LanguagePreference:    "mk",
+		AllowNonFriendInvites: true,
+	}
+	require.NoError(t, repo.Create(u))
+
+	off, on := false, true
+	require.NoError(t, repo.UpdatePreferences(u.ID, PreferencesUpdate{AllowNonFriendInvites: &off}))
+	reloaded, err := repo.FindByID(u.ID)
+	require.NoError(t, err)
+	assert.False(t, reloaded.AllowNonFriendInvites)
+	assert.True(t, reloaded.SoundEnabled, "an invite-only update must not touch audio")
+	assert.Equal(t, "mk", reloaded.LanguagePreference)
+
+	require.NoError(t, repo.UpdatePreferences(u.ID, PreferencesUpdate{AllowNonFriendInvites: &on}))
+	reloaded, err = repo.FindByID(u.ID)
+	require.NoError(t, err)
+	assert.True(t, reloaded.AllowNonFriendInvites)
+}
+
 func TestGormUserRepository_UpdatePreferences_EmptyAndMissing(t *testing.T) {
 	db := getTestDB(t)
 	repo := NewGormUserRepository(db)

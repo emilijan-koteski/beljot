@@ -28,6 +28,7 @@ function setAuthState(res: {
   musicEnabled: boolean;
   soundVolume: number;
   musicVolume: number;
+  allowNonFriendInvites: boolean;
   walletBalance: number;
   loginStreakDays: number;
   totalXp: number;
@@ -49,6 +50,7 @@ function setAuthState(res: {
     musicEnabled: res.musicEnabled,
     soundVolume: res.soundVolume,
     musicVolume: res.musicVolume,
+    allowNonFriendInvites: res.allowNonFriendInvites,
     walletBalance: res.walletBalance,
     loginStreakDays: res.loginStreakDays,
     totalXp: res.totalXp,

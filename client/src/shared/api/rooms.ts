@@ -35,7 +35,17 @@ export function listInvitableFriends(roomId: number): Promise<InvitableFriend[]>
   return axiosClient.get(`/rooms/${roomId}/invitable-friends`);
 }
 
-/** Invite a friend into this room; the server decides any password bypass from the room owner. */
+/**
+ * Idle lobby players who are not the caller's friends and accept their invites, filtered by an
+ * optional username substring. The server sorts and caps the list; opted-out players are absent.
+ */
+export function listInvitablePlayers(roomId: number, search: string): Promise<InvitableFriend[]> {
+  return axiosClient.get(`/rooms/${roomId}/invitable-players`, {
+    params: search === "" ? undefined : { search },
+  });
+}
+
+/** Invite a friend or lobby player into this room; the server decides any password bypass from the room owner. */
 export function inviteToRoom(roomId: number, friendUserId: number): Promise<void> {
   return axiosClient.post(`/rooms/${roomId}/invite`, { friendUserId });
 }

@@ -137,9 +137,28 @@ describe("MatchPlayerActions", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows Add-friend and no reinvite for a non-friend", async () => {
+  it("shows Add-friend and reinvite for a non-friend", async () => {
     renderActions({ roomId: 5, showReinvite: true });
     await waitFor(() => expect(screen.getAllByTestId("friend-button-add")).toHaveLength(3));
+    expect(screen.getByTestId("match-player-reinvite-11")).toBeInTheDocument();
+  });
+
+  it("invites a non-friend back and toasts an opt-out refusal", async () => {
+    mockInviteToRoom.mockRejectedValue(new FetchError(409, "NOT_FRIENDS", "nope"));
+    renderActions({ roomId: 5, showReinvite: true });
+    await waitFor(() => expect(screen.getAllByTestId("friend-button-add")).toHaveLength(3));
+
+    await userEvent.click(screen.getByTestId("match-player-reinvite-11"));
+
+    await waitFor(() => expect(mockInviteToRoom).toHaveBeenCalledWith(5, 11));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(i18n.t("roomInvite.errors.notFriends")),
+    );
+  });
+
+  it("hides reinvite for a non-friend already seated in the room", async () => {
+    renderActions({ roomId: 5, showReinvite: true, playersInRoom: [11] });
+    await screen.findByTestId("match-player-reinvite-12");
     expect(screen.queryByTestId("match-player-reinvite-11")).toBeNull();
   });
 

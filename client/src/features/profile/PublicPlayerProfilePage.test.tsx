@@ -196,6 +196,16 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     expect(screen.queryByTestId("profile-music-toggle")).not.toBeInTheDocument();
   });
 
+  it("never mounts the invite privacy switch (a private self-only preference)", async () => {
+    mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
+
+    renderAt("2");
+
+    await waitFor(() => expect(screen.getByTestId("public-profile-page")).toBeInTheDocument());
+    expect(screen.queryByTestId("profile-invites")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("profile-allow-non-friend-invites")).not.toBeInTheDocument();
+  });
+
   it("never mounts the LinkedAccounts (SSO) surface", async () => {
     mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
 

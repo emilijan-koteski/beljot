@@ -404,6 +404,9 @@ func (m *mockUserRepo) UpdatePreferences(id uint, prefs user.PreferencesUpdate) 
 			if prefs.MusicVolume != nil {
 				u.MusicVolume = *prefs.MusicVolume
 			}
+			if prefs.AllowNonFriendInvites != nil {
+				u.AllowNonFriendInvites = *prefs.AllowNonFriendInvites
+			}
 			return nil
 		}
 	}
@@ -530,16 +533,17 @@ func (m *mockUserRepo) ResetHonor(userID uint) error {
 
 func (m *mockUserRepo) addUser(username, email, lang string) *user.User {
 	u := &user.User{
-		ID:                 m.nextID,
-		Username:           username,
-		Email:              email,
-		LanguagePreference: lang,
-		CardDeckPreference: user.CardDeckFrench,
-		SoundEnabled:       true,
-		MusicEnabled:       true,
-		SoundVolume:        70,
-		MusicVolume:        70,
-		CreatedAt:          time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
+		ID:                    m.nextID,
+		Username:              username,
+		Email:                 email,
+		LanguagePreference:    lang,
+		CardDeckPreference:    user.CardDeckFrench,
+		SoundEnabled:          true,
+		MusicEnabled:          true,
+		SoundVolume:           70,
+		MusicVolume:           70,
+		AllowNonFriendInvites: true,
+		CreatedAt:             time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
 	}
 	m.nextID++
 	m.users = append(m.users, u)
@@ -1047,6 +1051,7 @@ func TestGetProfile_PublicProjection_NeverLeaksPrivateFields(t *testing.T) {
 	assert.NotContains(t, body, "cardDeckPreference", "card deck preference is private")
 	assert.NotContains(t, body, "soundEnabled", "audio preferences are private")
 	assert.NotContains(t, body, "musicEnabled", "audio preferences are private")
+	assert.NotContains(t, body, "allowNonFriendInvites", "the invite preference is private")
 	assert.NotContains(t, body, "soundVolume", "audio volumes are private")
 	assert.NotContains(t, body, "musicVolume", "audio volumes are private")
 	assert.NotContains(t, body, "usernameChangedAt", "username-cooldown state is private")
@@ -1598,6 +1603,72 @@ func TestUpdatePreferences_BothAudioSwitches(t *testing.T) {
 	assert.JSONEq(t, "true", string(data["musicEnabled"]))
 	assert.True(t, repo.users[0].SoundEnabled)
 	assert.True(t, repo.users[0].MusicEnabled)
+}
+
+func TestGetProfile_IncludesStoredInvitePreference(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("private", "private@example.com", "en")
+	u.AllowNonFriendInvites = false
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, "1", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(resp["data"], &raw))
+	assert.JSONEq(t, "false", string(raw["allowNonFriendInvites"]))
+}
+
+func TestUpdatePreferences_InvitePreference_WritesAndEchoes(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("testuser", "test@example.com", "mk")
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doUpdatePreferences(e, "1", `{"allowNonFriendInvites":false}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	data := decodePreferencesEcho(t, rec)
+	assert.Len(t, data, 1)
+	assert.JSONEq(t, "false", string(data["allowNonFriendInvites"]))
+	assert.False(t, repo.users[0].AllowNonFriendInvites)
+	assert.True(t, repo.users[0].SoundEnabled)
+	assert.Equal(t, "mk", repo.users[0].LanguagePreference)
+
+	rec = doUpdatePreferences(e, "1", `{"allowNonFriendInvites":true}`, token)
+	require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+	assert.JSONEq(t, "true", string(decodePreferencesEcho(t, rec)["allowNonFriendInvites"]))
+	assert.True(t, repo.users[0].AllowNonFriendInvites)
+}
+
+func TestUpdatePreferences_InvalidInvitePreference_WritesNothing(t *testing.T) {
+	bodies := []string{
+		`{"allowNonFriendInvites":"no"}`,
+		`{"allowNonFriendInvites":"false"}`,
+		`{"allowNonFriendInvites":0}`,
+		`{"allowNonFriendInvites":null}`,
+		`{"soundEnabled":false,"allowNonFriendInvites":"no"}`,
+	}
+	for _, body := range bodies {
+		t.Run(body, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "en")
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", body, token)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+			assert.Equal(t, 0, repo.updatePreferencesCalls)
+			assert.True(t, repo.users[0].AllowNonFriendInvites)
+			assert.True(t, repo.users[0].SoundEnabled)
+		})
+	}
 }
 
 func TestUpdatePreferences_AudioWithLanguage(t *testing.T) {

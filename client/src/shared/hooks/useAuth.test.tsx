@@ -44,6 +44,7 @@ const USER = {
   musicEnabled: true,
   soundVolume: 70,
   musicVolume: 70,
+  allowNonFriendInvites: true,
   walletBalance: 0,
   loginStreakDays: 0,
   totalXp: 0,

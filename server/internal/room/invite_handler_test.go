@@ -2,8 +2,10 @@ package room_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -56,6 +58,34 @@ type stubPresence struct {
 
 func (s *stubPresence) IsConnected(userID uint) bool   { return s.online[userID] }
 func (s *stubPresence) IsUserInMatch(userID uint) bool { return s.inMatch[userID] }
+func (s *stubPresence) ConnectedUserIDs() []uint       { return trueKeys(s.online) }
+func (s *stubPresence) InMatchUserIDs() []uint         { return trueKeys(s.inMatch) }
+
+func trueKeys(set map[uint]bool) []uint {
+	out := make([]uint, 0, len(set))
+	for id, on := range set {
+		if on {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// stubPlayerDirectory implements room.PlayerDirectory over an in-memory roster,
+// omitting unknown IDs exactly like the users-table adapter.
+type stubPlayerDirectory struct {
+	players map[uint]room.PlayerSummary
+}
+
+func (s *stubPlayerDirectory) FindPlayers(userIDs []uint) ([]room.PlayerSummary, error) {
+	out := make([]room.PlayerSummary, 0, len(userIDs))
+	for _, id := range userIDs {
+		if p, ok := s.players[id]; ok {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
 
 type sentPush struct {
 	userID uint
@@ -93,6 +123,7 @@ type inviteHarness struct {
 	repo     *mockRoomRepo
 	invites  *room.InviteRegistry
 	friends  *stubFriendDirectory
+	players  *stubPlayerDirectory
 	presence *stubPresence
 	notifier *spyNotifier
 }
@@ -103,22 +134,39 @@ func setupInviteTest(honor room.HonorService) *inviteHarness {
 	repo := newMockRoomRepo()
 	invites := room.NewInviteRegistry()
 	friends := &stubFriendDirectory{friends: map[uint][]uint{}, names: map[uint]string{}}
+	players := &stubPlayerDirectory{players: map[uint]room.PlayerSummary{}}
 	presence := &stubPresence{online: map[uint]bool{}, inMatch: map[uint]bool{}}
 	notifier := &spyNotifier{}
 
 	roomHandler := room.NewRoomHandler(repo, nil, &mockBroadcaster{}, room.NewPresenceRegistry(), nil, honor, invites)
 	roomHandler.SetQuickFillIntervals(hugeInterval, hugeInterval)
-	inviteHandler := room.NewInviteHandler(repo, invites, friends, presence, presence, notifier)
+	inviteHandler := room.NewInviteHandler(repo, invites, friends, players, presence, presence, notifier)
 
 	e := echo.New()
 	e.HTTPErrorHandler = testErrorHandler
 	api := e.Group("/api/v1", auth.AuthMiddleware("test-jwt-secret"))
 	registerRoomRoutes(api, roomHandler)
 	api.GET("/rooms/:id/invitable-friends", inviteHandler.ListInvitableFriends)
+	api.GET("/rooms/:id/invitable-players", inviteHandler.ListInvitablePlayers)
 	api.POST("/rooms/:id/invite", inviteHandler.InviteToRoom)
 	api.POST("/rooms/:id/invite/decline", inviteHandler.DeclineInvite)
 
-	return &inviteHarness{e: e, repo: repo, invites: invites, friends: friends, presence: presence, notifier: notifier}
+	return &inviteHarness{
+		e: e, repo: repo, invites: invites, friends: friends, players: players, presence: presence, notifier: notifier,
+	}
+}
+
+// registerPlayer adds a user to the player directory with their non-friend invite opt-in.
+func (h *inviteHarness) registerPlayer(userID uint, username string, allowsNonFriendInvites bool) {
+	h.players.players[userID] = room.PlayerSummary{
+		UserID: userID, Username: username, AllowsNonFriendInvites: allowsNonFriendInvites,
+	}
+}
+
+// idleInLobby registers a non-friend who allows invites and marks them online.
+func (h *inviteHarness) idleInLobby(userID uint, username string) {
+	h.registerPlayer(userID, username, true)
+	h.available(userID)
 }
 
 // befriend declares a symmetric friendship and registers both usernames.
@@ -185,6 +233,39 @@ func doListInvitable(e *echo.Echo, roomID string, token string) *httptest.Respon
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	return rec
+}
+
+func doListInvitablePlayers(e *echo.Echo, roomID string, token string, search string) *httptest.ResponseRecorder {
+	target := "/api/v1/rooms/" + roomID + "/invitable-players"
+	if search != "" {
+		target += "?search=" + url.QueryEscape(search)
+	}
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+// decodeInvitableRows decodes the {data: [...]} envelope of either invitable-* list.
+func decodeInvitableRows(t *testing.T, rec *httptest.ResponseRecorder) []room.InvitableFriendDTO {
+	t.Helper()
+	var resp struct {
+		Data []room.InvitableFriendDTO `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	require.NotNil(t, resp.Data, "the list is always an array, never null")
+	return resp.Data
+}
+
+func rowUsernames(rows []room.InvitableFriendDTO) []string {
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.Username)
+	}
+	return out
 }
 
 func errorCode(t *testing.T, raw []byte) string {
@@ -266,7 +347,21 @@ func TestInviteToRoom_NonWaitingRoomIsRejected(t *testing.T) {
 	assert.Equal(t, "ROOM_NOT_FOUND", errorCode(t, rec.Body.Bytes()))
 }
 
-func TestInviteToRoom_NonFriendIsRejected(t *testing.T) {
+func TestInviteToRoom_OptedOutNonFriendIsRejected(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "", 0, true)
+	h.registerPlayer(200, "private", false)
+	h.available(200)
+
+	rec := doInvite(h.e, "1", validToken(100), `{"friendUserId":200}`)
+
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, "NOT_FRIENDS", errorCode(t, rec.Body.Bytes()))
+	assert.False(t, h.invites.Pending(1, 200))
+	assert.Empty(t, h.notifier.sent)
+}
+
+func TestInviteToRoom_UnknownNonFriendIsRejected(t *testing.T) {
 	h := setupInviteTest(nil)
 	seedInviteRoom(t, h.repo, 100, "", 0, true)
 	h.available(200)
@@ -276,6 +371,208 @@ func TestInviteToRoom_NonFriendIsRejected(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	assert.Equal(t, "NOT_FRIENDS", errorCode(t, rec.Body.Bytes()))
 	assert.False(t, h.invites.Pending(1, 200))
+}
+
+func TestInviteToRoom_IdleNonFriendWhoAllowsItIsInvited(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "hunter2", 0, true)
+	h.idleInLobby(200, "stranger")
+
+	rec := doInvite(h.e, "1", validToken(100), `{"friendUserId":200}`)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.True(t, h.invites.Pending(1, 200))
+	assert.True(t, h.invites.HasHostGrant(1, 200), "the owner's invite to a non-friend still bypasses the password")
+	pushes := h.notifier.pushesOfType(t, ws.SystemRoomInvite)
+	require.Len(t, pushes, 1)
+	assert.Equal(t, uint(200), h.notifier.sent[0].userID)
+	assert.True(t, pushes[0].IsHostInvite)
+}
+
+func TestInviteToRoom_MemberInviteToNonFriendIssuesNoHostGrant(t *testing.T) {
+	h := setupInviteTest(nil)
+	r := seedInviteRoom(t, h.repo, 100, "hunter2", 0, true)
+	require.NoError(t, h.repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 150, Username: "member"}))
+	h.idleInLobby(200, "stranger")
+
+	rec := doInvite(h.e, "1", validToken(150), `{"friendUserId":200}`)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.True(t, h.invites.Pending(1, 200))
+	assert.False(t, h.invites.HasHostGrant(1, 200), "a member's invitee still gets the password prompt")
+}
+
+func TestInviteToRoom_OptedOutFriendIsStillInvited(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "", 0, true)
+	h.befriend(100, "owner", 200, "buddy")
+	h.registerPlayer(200, "buddy", false)
+	h.available(200)
+
+	rec := doInvite(h.e, "1", validToken(100), `{"friendUserId":200}`)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.True(t, h.invites.Pending(1, 200))
+	assert.Len(t, h.notifier.pushesOfType(t, ws.SystemRoomInvite), 1)
+}
+
+func TestInviteToRoom_BusyNonFriendIsRejected(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, h *inviteHarness)
+	}{
+		{
+			name:  "offline",
+			setup: func(_ *testing.T, h *inviteHarness) { h.presence.online[200] = false },
+		},
+		{
+			name:  "in a match",
+			setup: func(_ *testing.T, h *inviteHarness) { h.presence.inMatch[200] = true },
+		},
+		{
+			name: "in another room",
+			setup: func(t *testing.T, h *inviteHarness) {
+				other := seedInviteRoom(t, h.repo, 300, "", 0, true)
+				require.NoError(t, h.repo.AddPlayer(&room.RoomPlayer{RoomID: other.ID, UserID: 200, Username: "stranger"}))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := setupInviteTest(nil)
+			seedInviteRoom(t, h.repo, 100, "", 0, true)
+			h.idleInLobby(200, "stranger")
+			tt.setup(t, h)
+
+			rec := doInvite(h.e, "1", validToken(100), `{"friendUserId":200}`)
+
+			assert.Equal(t, http.StatusConflict, rec.Code)
+			assert.Equal(t, "FRIEND_NOT_AVAILABLE", errorCode(t, rec.Body.Bytes()))
+			assert.False(t, h.invites.Pending(1, 200))
+			assert.Empty(t, h.notifier.sent)
+		})
+	}
+}
+
+func TestInviteToRoom_SecondInviteToNonFriendWhilePendingIsRejected(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "", 0, true)
+	h.idleInLobby(200, "stranger")
+
+	require.Equal(t, http.StatusOK, doInvite(h.e, "1", validToken(100), `{"friendUserId":200}`).Code)
+	rec := doInvite(h.e, "1", validToken(100), `{"friendUserId":200}`)
+
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, "INVITE_ALREADY_PENDING", errorCode(t, rec.Body.Bytes()))
+}
+
+func TestListInvitablePlayers_ListsIdleNonFriendsWhoAllowIt(t *testing.T) {
+	h := setupInviteTest(nil)
+	r := seedInviteRoom(t, h.repo, 100, "", 0, true)
+	h.idleInLobby(100, "owner")
+
+	h.idleInLobby(201, "zora")
+	h.idleInLobby(202, "Ana")
+	h.idleInLobby(203, "marko")
+	h.registerPlayer(204, "hidden", false)
+	h.available(204)
+	h.befriend(100, "owner", 205, "buddy")
+	h.idleInLobby(205, "buddy")
+
+	h.idleInLobby(206, "offline")
+	h.presence.online[206] = false
+	h.idleInLobby(207, "playing")
+	h.presence.inMatch[207] = true
+	h.idleInLobby(208, "seatedHere")
+	require.NoError(t, h.repo.AddPlayer(&room.RoomPlayer{RoomID: r.ID, UserID: 208, Username: "seatedHere"}))
+	h.idleInLobby(209, "waitingElsewhere")
+	waiting := seedInviteRoom(t, h.repo, 300, "", 0, true)
+	require.NoError(t, h.repo.AddPlayer(&room.RoomPlayer{RoomID: waiting.ID, UserID: 209, Username: "waitingElsewhere"}))
+	h.idleInLobby(210, "playingElsewhere")
+	playing := seedInviteRoom(t, h.repo, 301, "", 0, true)
+	playing.Status = "playing"
+	require.NoError(t, h.repo.AddPlayer(&room.RoomPlayer{RoomID: playing.ID, UserID: 210, Username: "playingElsewhere"}))
+
+	rec := doListInvitablePlayers(h.e, "1", validToken(100), "")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	rows := decodeInvitableRows(t, rec)
+	assert.Equal(t, []string{"Ana", "marko", "zora"}, rowUsernames(rows), "sorted case-insensitively by username")
+	for _, row := range rows {
+		assert.True(t, row.Available)
+		assert.Empty(t, row.Reason)
+	}
+}
+
+func TestListInvitablePlayers_RoomFullDisablesEveryRow(t *testing.T) {
+	h := setupInviteTest(nil)
+	r := seedInviteRoom(t, h.repo, 100, "", 0, true)
+	require.NoError(t, h.repo.AddBot(r.ID, 1))
+	require.NoError(t, h.repo.AddBot(r.ID, 2))
+	require.NoError(t, h.repo.AddBot(r.ID, 3))
+	h.idleInLobby(201, "ana")
+	h.idleInLobby(202, "bob")
+
+	rec := doListInvitablePlayers(h.e, "1", validToken(100), "")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	rows := decodeInvitableRows(t, rec)
+	require.Len(t, rows, 2)
+	for _, row := range rows {
+		assert.False(t, row.Available)
+		assert.Equal(t, "room_full", row.Reason)
+	}
+}
+
+func TestListInvitablePlayers_SearchMatchesSubstringCaseInsensitively(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "", 0, true)
+	h.idleInLobby(201, "Marija")
+	h.idleInLobby(202, "tomar")
+	h.idleInLobby(203, "petar")
+
+	rec := doListInvitablePlayers(h.e, "1", validToken(100), "  MAR ")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	assert.Equal(t, []string{"Marija", "tomar"}, rowUsernames(decodeInvitableRows(t, rec)))
+}
+
+func TestListInvitablePlayers_CapsTheList(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "", 0, true)
+	for i := range 60 {
+		h.idleInLobby(uint(1000+i), fmt.Sprintf("mar%02d", i))
+	}
+
+	rec := doListInvitablePlayers(h.e, "1", validToken(100), "mar")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	rows := decodeInvitableRows(t, rec)
+	require.Len(t, rows, 50)
+	assert.Equal(t, "mar00", rows[0].Username)
+	assert.Equal(t, "mar49", rows[49].Username)
+}
+
+func TestListInvitablePlayers_EmptyLobbyIsAnEmptyArray(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "", 0, true)
+
+	rec := doListInvitablePlayers(h.e, "1", validToken(100), "")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	assert.Empty(t, decodeInvitableRows(t, rec))
+}
+
+func TestListInvitablePlayers_CallerNotInRoomIsRejected(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "", 0, true)
+	h.idleInLobby(201, "ana")
+
+	rec := doListInvitablePlayers(h.e, "1", validToken(999), "")
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "NOT_IN_ROOM", errorCode(t, rec.Body.Bytes()))
 }
 
 func TestInviteToRoom_SelfInviteIsRejected(t *testing.T) {
@@ -425,6 +722,31 @@ func TestListInvitableFriends_FriendSeatedHereReadsAsAlreadyHere(t *testing.T) {
 	assert.Equal(t, "in_this_room", byID[200].Reason)
 	assert.False(t, byID[201].Available)
 	assert.Equal(t, "in_room", byID[201].Reason, "another room keeps the old reason")
+}
+
+func TestListInvitableFriends_RoomFullDisablesEveryRowKeepingSpecificReasons(t *testing.T) {
+	h := setupInviteTest(nil)
+	r := seedInviteRoom(t, h.repo, 100, "", 0, true)
+	require.NoError(t, h.repo.AddBot(r.ID, 1))
+	require.NoError(t, h.repo.AddBot(r.ID, 2))
+	require.NoError(t, h.repo.AddBot(r.ID, 3))
+	h.befriend(100, "owner", 200, "free")
+	h.befriend(100, "owner", 201, "offline")
+	h.available(200)
+
+	rec := doListInvitable(h.e, "1", validToken(100))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	rows := decodeInvitableRows(t, rec)
+	require.Len(t, rows, 2)
+	byID := map[uint]room.InvitableFriendDTO{}
+	for _, row := range rows {
+		byID[row.UserID] = row
+	}
+	assert.False(t, byID[200].Available)
+	assert.Equal(t, "room_full", byID[200].Reason)
+	assert.False(t, byID[201].Available)
+	assert.Equal(t, "offline", byID[201].Reason, "a more specific reason survives the room-full pass")
 }
 
 func TestListInvitableFriends_CallerNotInRoomIsRejected(t *testing.T) {

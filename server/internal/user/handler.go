@@ -24,36 +24,37 @@ type SeasonRankReader interface {
 // ProfileResponse is the self profile returned by GetProfile when the path id is the viewer.
 // Its wallet, streak, preference and username-change fields are private and must never reach a public shape.
 type ProfileResponse struct {
-	ID                  uint                   `json:"id"`
-	Username            string                 `json:"username"`
-	AvatarURL           *string                `json:"avatarUrl"`
-	AvatarLargeURL      *string                `json:"avatarLargeUrl"`
-	UsernameChangedAt   *time.Time             `json:"usernameChangedAt,omitempty"`
-	LanguagePreference  string                 `json:"languagePreference"`
-	CardDeckPreference  string                 `json:"cardDeckPreference"`
-	SoundEnabled        bool                   `json:"soundEnabled"`
-	MusicEnabled        bool                   `json:"musicEnabled"`
-	SoundVolume         int                    `json:"soundVolume"`
-	MusicVolume         int                    `json:"musicVolume"`
-	WalletBalance       int                    `json:"walletBalance"`
-	LoginStreakDays     int                    `json:"loginStreakDays"`
-	TotalXP             int                    `json:"totalXp"`
-	Level               int                    `json:"level"`
-	XPIntoLevel         int                    `json:"xpIntoLevel"`
-	XPForNextLevel      int                    `json:"xpForNextLevel"`
-	HonorScore          int                    `json:"honorScore"`
-	HonorTier           string                 `json:"honorTier"`
-	HonorCompletedTotal int64                  `json:"honorCompletedTotal"`
-	HonorAbandonedTotal int64                  `json:"honorAbandonedTotal"`
-	IsNewPlayer         bool                   `json:"isNewPlayer"`
-	HonorTrendDelta     int                    `json:"honorTrendDelta"`
-	HonorTrendDirection string                 `json:"honorTrendDirection"`
-	SeasonRank          *season.SeasonRankView `json:"seasonRank"`
-	CreatedAt           time.Time              `json:"createdAt"`
-	TotalGamesPlayed    int                    `json:"totalGamesPlayed"`
-	Wins                int                    `json:"wins"`
-	Losses              int                    `json:"losses"`
-	Abandoned           int                    `json:"abandoned"`
+	ID                    uint                   `json:"id"`
+	Username              string                 `json:"username"`
+	AvatarURL             *string                `json:"avatarUrl"`
+	AvatarLargeURL        *string                `json:"avatarLargeUrl"`
+	UsernameChangedAt     *time.Time             `json:"usernameChangedAt,omitempty"`
+	LanguagePreference    string                 `json:"languagePreference"`
+	CardDeckPreference    string                 `json:"cardDeckPreference"`
+	SoundEnabled          bool                   `json:"soundEnabled"`
+	MusicEnabled          bool                   `json:"musicEnabled"`
+	SoundVolume           int                    `json:"soundVolume"`
+	MusicVolume           int                    `json:"musicVolume"`
+	AllowNonFriendInvites bool                   `json:"allowNonFriendInvites"`
+	WalletBalance         int                    `json:"walletBalance"`
+	LoginStreakDays       int                    `json:"loginStreakDays"`
+	TotalXP               int                    `json:"totalXp"`
+	Level                 int                    `json:"level"`
+	XPIntoLevel           int                    `json:"xpIntoLevel"`
+	XPForNextLevel        int                    `json:"xpForNextLevel"`
+	HonorScore            int                    `json:"honorScore"`
+	HonorTier             string                 `json:"honorTier"`
+	HonorCompletedTotal   int64                  `json:"honorCompletedTotal"`
+	HonorAbandonedTotal   int64                  `json:"honorAbandonedTotal"`
+	IsNewPlayer           bool                   `json:"isNewPlayer"`
+	HonorTrendDelta       int                    `json:"honorTrendDelta"`
+	HonorTrendDirection   string                 `json:"honorTrendDirection"`
+	SeasonRank            *season.SeasonRankView `json:"seasonRank"`
+	CreatedAt             time.Time              `json:"createdAt"`
+	TotalGamesPlayed      int                    `json:"totalGamesPlayed"`
+	Wins                  int                    `json:"wins"`
+	Losses                int                    `json:"losses"`
+	Abandoned             int                    `json:"abandoned"`
 }
 
 // PublicProfileResponse is the public profile returned when the path id is not the viewer.
@@ -84,12 +85,13 @@ type PublicProfileResponse struct {
 
 // UpdatePreferencesRequest is a partial update whose pointer fields tell "absent" apart from empty, false or 0.
 type UpdatePreferencesRequest struct {
-	LanguagePreference *string `json:"languagePreference"`
-	CardDeckPreference *string `json:"cardDeckPreference"`
-	SoundEnabled       *bool   `json:"soundEnabled"`
-	MusicEnabled       *bool   `json:"musicEnabled"`
-	SoundVolume        *int    `json:"soundVolume"`
-	MusicVolume        *int    `json:"musicVolume"`
+	LanguagePreference    *string `json:"languagePreference"`
+	CardDeckPreference    *string `json:"cardDeckPreference"`
+	SoundEnabled          *bool   `json:"soundEnabled"`
+	MusicEnabled          *bool   `json:"musicEnabled"`
+	SoundVolume           *int    `json:"soundVolume"`
+	MusicVolume           *int    `json:"musicVolume"`
+	AllowNonFriendInvites *bool   `json:"allowNonFriendInvites"`
 }
 
 var supportedLanguages = map[string]struct{}{
@@ -317,36 +319,37 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 	if paramID == uint64(authUserID) {
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"data": ProfileResponse{
-				ID:                  u.ID,
-				Username:            u.Username,
-				AvatarURL:           SmallAvatarURL(u.AvatarKey),
-				AvatarLargeURL:      AvatarURL(u.AvatarKey, AvatarSizeLarge),
-				UsernameChangedAt:   u.UsernameChangedAt,
-				LanguagePreference:  u.LanguagePreference,
-				CardDeckPreference:  u.CardDeckPreference,
-				SoundEnabled:        u.SoundEnabled,
-				MusicEnabled:        u.MusicEnabled,
-				SoundVolume:         u.SoundVolume,
-				MusicVolume:         u.MusicVolume,
-				WalletBalance:       u.WalletBalance,
-				LoginStreakDays:     u.LoginStreakDays,
-				TotalXP:             u.TotalXP,
-				Level:               level,
-				XPIntoLevel:         xpIntoLevel,
-				XPForNextLevel:      xpForNextLevel,
-				HonorScore:          honor.Score,
-				HonorTier:           honor.Tier,
-				HonorCompletedTotal: honor.CompletedTotal,
-				HonorAbandonedTotal: honor.AbandonedTotal,
-				IsNewPlayer:         honor.IsNewPlayer,
-				HonorTrendDelta:     trendDelta,
-				HonorTrendDirection: trendDirection,
-				SeasonRank:          seasonRank,
-				CreatedAt:           u.CreatedAt,
-				TotalGamesPlayed:    wins + losses + abandoned,
-				Wins:                wins,
-				Losses:              losses,
-				Abandoned:           abandoned,
+				ID:                    u.ID,
+				Username:              u.Username,
+				AvatarURL:             SmallAvatarURL(u.AvatarKey),
+				AvatarLargeURL:        AvatarURL(u.AvatarKey, AvatarSizeLarge),
+				UsernameChangedAt:     u.UsernameChangedAt,
+				LanguagePreference:    u.LanguagePreference,
+				CardDeckPreference:    u.CardDeckPreference,
+				SoundEnabled:          u.SoundEnabled,
+				MusicEnabled:          u.MusicEnabled,
+				SoundVolume:           u.SoundVolume,
+				MusicVolume:           u.MusicVolume,
+				AllowNonFriendInvites: u.AllowNonFriendInvites,
+				WalletBalance:         u.WalletBalance,
+				LoginStreakDays:       u.LoginStreakDays,
+				TotalXP:               u.TotalXP,
+				Level:                 level,
+				XPIntoLevel:           xpIntoLevel,
+				XPForNextLevel:        xpForNextLevel,
+				HonorScore:            honor.Score,
+				HonorTier:             honor.Tier,
+				HonorCompletedTotal:   honor.CompletedTotal,
+				HonorAbandonedTotal:   honor.AbandonedTotal,
+				IsNewPlayer:           honor.IsNewPlayer,
+				HonorTrendDelta:       trendDelta,
+				HonorTrendDirection:   trendDirection,
+				SeasonRank:            seasonRank,
+				CreatedAt:             u.CreatedAt,
+				TotalGamesPlayed:      wins + losses + abandoned,
+				Wins:                  wins,
+				Losses:                losses,
+				Abandoned:             abandoned,
 			},
 		})
 	}
@@ -583,6 +586,9 @@ func (h *UserHandler) UpdatePreferences(c echo.Context) error {
 	}
 	if req.MusicVolume != nil {
 		data["musicVolume"] = *req.MusicVolume
+	}
+	if req.AllowNonFriendInvites != nil {
+		data["allowNonFriendInvites"] = *req.AllowNonFriendInvites
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": data})
 }

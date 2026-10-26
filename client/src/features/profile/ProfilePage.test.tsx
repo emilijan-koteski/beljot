@@ -81,6 +81,7 @@ function profileFixture(overrides: Partial<ProfileResponse> = {}): ProfileRespon
     musicEnabled: true,
     soundVolume: 70,
     musicVolume: 70,
+    allowNonFriendInvites: true,
     createdAt: "2026-01-15T10:00:00Z",
     totalGamesPlayed: 0,
     wins: 0,
@@ -445,6 +446,27 @@ describe("ProfilePage", () => {
     expect(within(screen.getByTestId("profile-sidebar")).getByTestId("profile-audio")).toBe(panel);
     expect(screen.getByTestId("profile-sound-toggle")).toHaveAttribute("aria-checked", "false");
     expect(screen.getByTestId("profile-music-toggle")).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("renders the invite privacy switch with the store's state, even with no career data", async () => {
+    mockGetProfile.mockResolvedValueOnce(profileFixture());
+    mockGetCareer.mockRejectedValueOnce(new Error("no career yet"));
+    useAuthStore.setState({
+      token: "test-token",
+      user: makeUser({ allowNonFriendInvites: false }),
+      isLoading: false,
+    });
+
+    renderProfilePage();
+
+    const panel = await screen.findByTestId("profile-invites");
+    expect(within(screen.getByTestId("profile-sidebar")).getByTestId("profile-invites")).toBe(
+      panel,
+    );
+    expect(screen.getByTestId("profile-allow-non-friend-invites")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
   });
 
   it("keeps the second-person streak copy and the Play link on the viewer's own profile", async () => {

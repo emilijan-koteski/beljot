@@ -29,25 +29,26 @@ type RegisterRequest struct {
 // RegisterResponseData is the auth envelope shared by Register, Login, and Refresh.
 // Wallet and honor fields are read-only echoes; no auth handler grants the daily bonus.
 type RegisterResponseData struct {
-	ID                 uint      `json:"id"`
-	Username           string    `json:"username"`
-	Email              string    `json:"email"`
-	LanguagePreference string    `json:"languagePreference"`
-	CardDeckPreference string    `json:"cardDeckPreference"`
-	SoundEnabled       bool      `json:"soundEnabled"`
-	MusicEnabled       bool      `json:"musicEnabled"`
-	SoundVolume        int       `json:"soundVolume"`
-	MusicVolume        int       `json:"musicVolume"`
-	WalletBalance      int       `json:"walletBalance"`
-	LoginStreakDays    int       `json:"loginStreakDays"`
-	TotalXP            int       `json:"totalXp"`
-	Level              int       `json:"level"`
-	HonorScore         int       `json:"honorScore"`
-	HonorTier          string    `json:"honorTier"`
-	IsNewPlayer        bool      `json:"isNewPlayer"`
-	AvatarURL          *string   `json:"avatarUrl"`
-	CreatedAt          time.Time `json:"createdAt"`
-	Token              string    `json:"token"`
+	ID                    uint      `json:"id"`
+	Username              string    `json:"username"`
+	Email                 string    `json:"email"`
+	LanguagePreference    string    `json:"languagePreference"`
+	CardDeckPreference    string    `json:"cardDeckPreference"`
+	SoundEnabled          bool      `json:"soundEnabled"`
+	MusicEnabled          bool      `json:"musicEnabled"`
+	SoundVolume           int       `json:"soundVolume"`
+	MusicVolume           int       `json:"musicVolume"`
+	AllowNonFriendInvites bool      `json:"allowNonFriendInvites"`
+	WalletBalance         int       `json:"walletBalance"`
+	LoginStreakDays       int       `json:"loginStreakDays"`
+	TotalXP               int       `json:"totalXp"`
+	Level                 int       `json:"level"`
+	HonorScore            int       `json:"honorScore"`
+	HonorTier             string    `json:"honorTier"`
+	IsNewPlayer           bool      `json:"isNewPlayer"`
+	AvatarURL             *string   `json:"avatarUrl"`
+	CreatedAt             time.Time `json:"createdAt"`
+	Token                 string    `json:"token"`
 }
 
 type AuthHandler struct {
@@ -156,25 +157,26 @@ func authResponseData(u *user.User, accessToken string) RegisterResponseData {
 		u.HonorCompletedTotal, u.HonorAbandonedTotal, time.Now().UTC(),
 	)
 	return RegisterResponseData{
-		ID:                 u.ID,
-		Username:           u.Username,
-		Email:              u.Email,
-		LanguagePreference: u.LanguagePreference,
-		CardDeckPreference: u.CardDeckPreference,
-		SoundEnabled:       u.SoundEnabled,
-		MusicEnabled:       u.MusicEnabled,
-		SoundVolume:        u.SoundVolume,
-		MusicVolume:        u.MusicVolume,
-		WalletBalance:      u.WalletBalance,
-		LoginStreakDays:    u.LoginStreakDays,
-		TotalXP:            u.TotalXP,
-		Level:              user.LevelForXP(u.TotalXP),
-		HonorScore:         honor.Score,
-		HonorTier:          honor.Tier,
-		IsNewPlayer:        honor.IsNewPlayer,
-		AvatarURL:          user.SmallAvatarURL(u.AvatarKey),
-		CreatedAt:          u.CreatedAt,
-		Token:              accessToken,
+		ID:                    u.ID,
+		Username:              u.Username,
+		Email:                 u.Email,
+		LanguagePreference:    u.LanguagePreference,
+		CardDeckPreference:    u.CardDeckPreference,
+		SoundEnabled:          u.SoundEnabled,
+		MusicEnabled:          u.MusicEnabled,
+		SoundVolume:           u.SoundVolume,
+		MusicVolume:           u.MusicVolume,
+		AllowNonFriendInvites: u.AllowNonFriendInvites,
+		WalletBalance:         u.WalletBalance,
+		LoginStreakDays:       u.LoginStreakDays,
+		TotalXP:               u.TotalXP,
+		Level:                 user.LevelForXP(u.TotalXP),
+		HonorScore:            honor.Score,
+		HonorTier:             honor.Tier,
+		IsNewPlayer:           honor.IsNewPlayer,
+		AvatarURL:             user.SmallAvatarURL(u.AvatarKey),
+		CreatedAt:             u.CreatedAt,
+		Token:                 accessToken,
 	}
 }
 
@@ -224,14 +226,15 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	u := &user.User{
-		Email:              req.Email,
-		Username:           req.Username,
-		PasswordHash:       hash,
-		LanguagePreference: lang,
-		CardDeckPreference: deck,
-		WalletBalance:      5000,
-		LoginStreakDays:    0,
-		LastLoginAt:        &today,
+		Email:                 req.Email,
+		Username:              req.Username,
+		PasswordHash:          hash,
+		LanguagePreference:    lang,
+		CardDeckPreference:    deck,
+		AllowNonFriendInvites: true,
+		WalletBalance:         5000,
+		LoginStreakDays:       0,
+		LastLoginAt:           &today,
 	}
 
 	if err := h.userRepo.Create(u); err != nil {

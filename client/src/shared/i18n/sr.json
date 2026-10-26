@@ -37,6 +37,12 @@
       "soundVolume": "Jačina zvučnih efekata",
       "musicVolume": "Jačina muzike"
     },
+    "invites": {
+      "eyebrow": "Privatnost",
+      "title": "Pozivi u sobu",
+      "description": "Igrači koji vam nisu prijatelji mogu da vas pozovu u sobu dok ste slobodni u lobiju. Prijatelji uvek mogu da vas pozovu.",
+      "allowNonFriends": "Pozivi od igrača koji vam nisu prijatelji"
+    },
     "eyebrow": "Profil",
     "memberSince": "Član od {{date}}",
     "winRate": "Procenat pobeda",
@@ -583,12 +589,21 @@
       "decline": "Ne sada"
     },
     "panel": {
-      "openButton": "Pozovi prijatelje",
-      "title": "Pozovi prijatelje",
-      "description": "Prijatelji koji su online i slobodni mogu da se pozovu u ovu sobu.",
+      "openButton": "Pozovi igrače",
+      "title": "Pozovi igrače",
+      "description": "Prijatelji koji su online i igrači koji su slobodni u lobiju mogu da se pozovu u ovu sobu.",
+      "tabsLabel": "Koga da pozoveš",
+      "tabFriends": "Prijatelji",
+      "tabLobby": "Lobi",
       "loading": "Učitavanje prijatelja…",
       "loadFailed": "Učitavanje prijatelja nije uspelo. Pokušaj ponovo.",
       "empty": "Još nemaš prijatelje. Pronađi igrače i pošalji zahtev za prijateljstvo.",
+      "searchLabel": "Pretraži igrače u lobiju",
+      "searchPlaceholder": "Pretraži po korisničkom imenu…",
+      "lobbyLoading": "Učitavanje igrača…",
+      "lobbyLoadFailed": "Učitavanje igrača nije uspelo. Pokušaj ponovo.",
+      "lobbyEmpty": "Trenutno nema drugih slobodnih igrača u lobiju.",
+      "lobbyNoMatch": "Nema igrača u lobiju sa „{{query}}“",
       "invite": "Pozovi",
       "invited": "Pozvan"
     },
@@ -603,7 +618,7 @@
     "errors": {
       "notAvailable": "Više nije slobodan",
       "roomFull": "Ova soba je puna",
-      "notFriends": "Nisi prijatelj sa ovim igračem",
+      "notFriends": "Ovaj igrač prima pozive samo od prijatelja",
       "alreadyPending": "Već ima poziv za ovu sobu",
       "sendFailed": "Slanje poziva nije uspelo. Pokušaj ponovo.",
       "expired": "Ovaj poziv više ne važi.",

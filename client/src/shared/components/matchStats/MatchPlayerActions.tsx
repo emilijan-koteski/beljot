@@ -9,7 +9,6 @@ import { FriendButton } from "@/shared/components/friends/FriendButton";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
 import { useInviteToRoomMutation } from "@/shared/hooks/mutations/useRooms";
-import { useFriendshipStatus } from "@/shared/hooks/queries/useFriendshipStatus";
 import { inviteFailure } from "@/shared/lib/inviteFailure";
 
 interface MatchPlayerActionsProps {
@@ -68,9 +67,8 @@ interface PlayerActionRowProps {
 }
 
 /**
- * One player's row. The friendship read lives here rather than in the parent
- * because it is a hook per subject; TanStack dedupes it against the identical
- * read inside `FriendButton`, so the row still costs one request.
+ * One player's row. "Invite back" is offered to friends and non-friends alike,
+ * because the server enforces the invitee's opt-out and availability.
  */
 function PlayerActionRow({
   player,
@@ -80,15 +78,10 @@ function PlayerActionRow({
   allowRemoveFriend,
 }: PlayerActionRowProps) {
   const { t } = useTranslation();
-  const status = useFriendshipStatus(player.userId);
   const inviteMutation = useInviteToRoomMutation();
   const [invited, setInvited] = useState(false);
 
-  const canReinvite =
-    showReinvite &&
-    roomId !== undefined &&
-    status.data?.status === "friends" &&
-    alreadyInRoom !== true;
+  const canReinvite = showReinvite && roomId !== undefined && alreadyInRoom !== true;
 
   async function reinvite() {
     if (roomId === undefined) return;

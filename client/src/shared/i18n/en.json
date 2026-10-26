@@ -37,6 +37,12 @@
       "soundVolume": "Sound effects volume",
       "musicVolume": "Music volume"
     },
+    "invites": {
+      "eyebrow": "Privacy",
+      "title": "Room invites",
+      "description": "Players who aren't your friends can invite you to a room while you're free in the lobby. Friends can always invite you.",
+      "allowNonFriends": "Invites from non-friends"
+    },
     "eyebrow": "Profile",
     "memberSince": "Member since {{date}}",
     "winRate": "Win rate",
@@ -583,12 +589,21 @@
       "decline": "Not now"
     },
     "panel": {
-      "openButton": "Invite friends",
-      "title": "Invite friends",
-      "description": "Friends who are online and free to play can be invited to this room.",
+      "openButton": "Invite players",
+      "title": "Invite players",
+      "description": "Friends who are online and players who are free in the lobby can be invited to this room.",
+      "tabsLabel": "Who to invite",
+      "tabFriends": "Friends",
+      "tabLobby": "Lobby",
       "loading": "Loading friends…",
       "loadFailed": "Couldn't load your friends. Please try again.",
       "empty": "No friends yet. Find players and send a friend request.",
+      "searchLabel": "Search lobby players",
+      "searchPlaceholder": "Search by username…",
+      "lobbyLoading": "Loading players…",
+      "lobbyLoadFailed": "Couldn't load lobby players. Please try again.",
+      "lobbyEmpty": "Nobody else is free in the lobby right now.",
+      "lobbyNoMatch": "No lobby players match \"{{query}}\"",
       "invite": "Invite",
       "invited": "Invited"
     },
@@ -603,7 +618,7 @@
     "errors": {
       "notAvailable": "No longer free to play",
       "roomFull": "This room is full",
-      "notFriends": "You are not friends with this player",
+      "notFriends": "This player only accepts invites from friends",
       "alreadyPending": "They already have an invite to this room",
       "sendFailed": "Couldn't send the invite. Please try again.",
       "expired": "That invite is no longer valid.",
