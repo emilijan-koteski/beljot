@@ -64,7 +64,7 @@ function DialogButton({
         justifyContent: "center",
         gap: 7,
         padding: "8px 14px",
-        borderRadius: 9,
+        borderRadius: "var(--radius-sm)",
         fontFamily: "var(--font-body)",
         fontSize: 13,
         fontWeight: 600,
@@ -281,7 +281,7 @@ function PlayerRow({ name, seat, team, avatarUrl, icon }: DialogTarget & { icon?
         padding: "12px 14px",
         background: "var(--surface-2)",
         border: "1px solid var(--border)",
-        borderRadius: 12,
+        borderRadius: "var(--radius-lg)",
       }}
     >
       <Avatar name={name} avatarUrl={avatarUrl} size={44} team={team} icon={icon} />

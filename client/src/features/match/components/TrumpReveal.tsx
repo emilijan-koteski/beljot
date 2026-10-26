@@ -98,7 +98,7 @@ export function TrumpReveal({
       data-testid="trump-reveal"
     >
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-[18px] text-center"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-xl text-center"
         style={{
           width: 262,
           padding: "20px 24px 22px",

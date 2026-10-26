@@ -281,7 +281,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               : undefined
           }
           className={cn(
-            "ml-auto inline-flex items-center gap-1.5 rounded-[10px] border border-transparent px-3.5 py-2 text-xs font-semibold transition-transform active:scale-[0.97]",
+            "ml-auto inline-flex items-center gap-1.5 rounded-md border border-transparent px-3.5 py-2 text-xs font-semibold transition-transform active:scale-[0.97]",
             full || locked
               ? "bg-surface-sunken text-ink-mute cursor-default"
               : "bg-accent text-accent-ink cursor-pointer",

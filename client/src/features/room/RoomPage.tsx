@@ -108,7 +108,7 @@ function LegendIndicator({ variant }: { variant: "neutral" | "us" | "them" }) {
   return (
     <span
       aria-hidden
-      className="inline-flex h-4.5 w-7 items-center justify-center rounded-[5px]"
+      className="inline-flex h-4.5 w-7 items-center justify-center rounded"
       style={{ border: `1.5px ${tokens.dashed ? "dashed" : "solid"} ${tokens.border}` }}
     >
       <span

@@ -44,7 +44,7 @@ export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Pr
       <div
         data-testid="profile-season"
         data-tier={tier}
-        className="bg-surface-elevated flex items-center gap-2.5 rounded-[10px] border px-3 py-2"
+        className="bg-surface-elevated flex items-center gap-2.5 rounded-md border px-3 py-2"
         style={{ borderColor: SEASON_TIER_LINE[tier] }}
       >
         <span className="sr-only">

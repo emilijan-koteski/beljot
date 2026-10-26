@@ -59,7 +59,7 @@ export function FriendList() {
           {friends.map((friend) => (
             <li
               key={friend.id}
-              className="bg-surface-elevated border-border flex items-center gap-2 rounded-[10px] border px-2.5 py-1.5"
+              className="bg-surface-elevated border-border flex items-center gap-2 rounded-md border px-2.5 py-1.5"
               data-testid="friend-row"
               data-user-id={friend.id}
             >

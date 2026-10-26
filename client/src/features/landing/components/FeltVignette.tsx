@@ -98,7 +98,7 @@ export function FeltVignette({
         width: "100%",
         maxWidth: width,
         aspectRatio: `${width} / ${height}`,
-        borderRadius: 20,
+        borderRadius: "var(--radius-xl)",
         overflow: "hidden",
         background:
           "radial-gradient(ellipse 70% 60% at 50% 42%, var(--felt-scene-top) 0%, var(--surface) 60%, var(--bg) 100%)",
@@ -111,7 +111,7 @@ export function FeltVignette({
         style={{
           position: "absolute",
           inset: 14,
-          borderRadius: 12,
+          borderRadius: "var(--radius-md)",
           border: "1px solid var(--border)",
         }}
       />

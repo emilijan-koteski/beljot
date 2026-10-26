@@ -1457,7 +1457,7 @@ export function MatchPage() {
             aria-label={t("nav.menu")}
             aria-expanded={hudMenuOpen}
             data-testid="hud-menu-button"
-            className="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-[10px]"
+            className="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-md"
             style={{
               zIndex: Z.CHROME_TOP,
               background: "var(--panel-deeper)",

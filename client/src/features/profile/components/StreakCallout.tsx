@@ -41,7 +41,7 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
       data-streak-length={streak.length}
     >
       <span
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-[10px]"
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-md"
         style={{
           background: isWin ? "var(--accent)" : COLD_STREAK_ICE.disc,
           color: isWin ? "var(--accent-ink)" : COLD_STREAK_ICE.icon,
@@ -71,7 +71,7 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
       {subjectIsSelf && (
         <Link
           to="/lobby"
-          className="ml-auto inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-2 text-[13px] font-semibold"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-[13px] font-semibold"
           style={{
             background: isWin ? "var(--accent)" : COLD_STREAK_ICE.buttonBg,
             color: isWin ? "var(--accent-ink)" : COLD_STREAK_ICE.buttonText,

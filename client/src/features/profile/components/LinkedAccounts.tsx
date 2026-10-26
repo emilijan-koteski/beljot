@@ -86,7 +86,7 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
     >
       {isPending ? (
         <div
-          className="bg-surface-elevated h-14 animate-pulse rounded-[10px]"
+          className="bg-surface-elevated h-14 animate-pulse rounded-md"
           data-testid="linked-accounts-loading"
         />
       ) : isError || !data ? (
@@ -99,7 +99,7 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
             {t("profile.linkedAccounts.description")}
           </p>
           <div
-            className="bg-surface-elevated border-border rounded-[10px] border px-3 py-2.5"
+            className="bg-surface-elevated border-border rounded-md border px-3 py-2.5"
             data-testid="linked-account-google"
           >
             {google ? (

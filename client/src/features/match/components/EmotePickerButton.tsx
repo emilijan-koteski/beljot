@@ -153,7 +153,7 @@ export function EmotePickerButton({
         disabled={disabled}
         aria-label={t("match.emote.button")}
         aria-pressed={isOpen}
-        className={`inline-flex h-9 cursor-pointer items-center rounded-[10px] transition-colors hover:not-disabled:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass disabled:cursor-not-allowed disabled:opacity-40 ${label ? "w-full justify-start gap-2 px-3.5" : "w-9 justify-center"} ${className}`}
+        className={`inline-flex h-9 cursor-pointer items-center rounded-md transition-colors hover:not-disabled:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass disabled:cursor-not-allowed disabled:opacity-40 ${label ? "w-full justify-start gap-2 px-3.5" : "w-9 justify-center"} ${className}`}
         style={{
           background: "var(--panel-deeper)",
           border: "1px solid var(--brass-40)",

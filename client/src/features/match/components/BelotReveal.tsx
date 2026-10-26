@@ -79,7 +79,7 @@ export function BelotReveal({
       data-testid="belot-reveal"
     >
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-[18px] text-center max-w-[calc(100vw-1.5rem)]"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-xl text-center max-w-[calc(100vw-1.5rem)]"
         style={{
           width: 264,
           padding: "20px 24px 22px",

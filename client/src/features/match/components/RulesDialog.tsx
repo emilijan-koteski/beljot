@@ -192,7 +192,7 @@ export function RulesDialog({
                       type="button"
                       onClick={() => jump(s.id)}
                       data-testid={`rules-toc-${s.id}`}
-                      className="grid cursor-pointer grid-cols-[26px_1fr] items-center rounded-[7px] text-left transition-colors"
+                      className="grid cursor-pointer grid-cols-[26px_1fr] items-center rounded-sm text-left transition-colors"
                       style={{
                         padding: "8px 10px",
                         background: on ? "var(--brass-soft)" : "transparent",
@@ -267,7 +267,7 @@ export function RulesDialog({
                         }}
                         onClick={() => setActiveVariant(v)}
                         data-testid={`rules-dialog-variant-${v}`}
-                        className="cursor-pointer rounded-[7px] transition-colors"
+                        className="cursor-pointer rounded-sm transition-colors"
                         style={{
                           padding: "5px 11px",
                           fontSize: 12.5,
@@ -540,7 +540,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
                     justifyContent: "center",
                     width: 24,
                     height: 24,
-                    borderRadius: 6,
+                    borderRadius: "var(--radius-sm)",
                     background: "var(--brass-soft)",
                     border: "1px solid var(--brass-40)",
                     fontFamily: "var(--font-body)",
@@ -681,7 +681,7 @@ function DarkCardLadder({
                   minWidth: 26,
                   height: 26,
                   padding: "0 4px",
-                  borderRadius: 5,
+                  borderRadius: 4,
                   background: top
                     ? "color-mix(in srgb, var(--accent-light) 10%, transparent)"
                     : "rgba(245,242,232,0.06)",

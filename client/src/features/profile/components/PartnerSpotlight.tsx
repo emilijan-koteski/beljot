@@ -97,7 +97,7 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
           {rest.map((p) => (
             <li
               key={p.userId}
-              className="bg-surface-elevated border-border flex flex-col gap-1.5 rounded-[10px] border px-2.5 py-2"
+              className="bg-surface-elevated border-border flex flex-col gap-1.5 rounded-md border px-2.5 py-2"
             >
               <div className="flex items-center gap-2.5">
                 {!isSoftDeleted(p) ? (

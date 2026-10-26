@@ -42,7 +42,7 @@ export function FriendRequests() {
         {requests.map((request) => (
           <li
             key={request.id}
-            className="bg-surface-elevated border-border flex items-center gap-2 rounded-[10px] border px-2.5 py-1.5"
+            className="bg-surface-elevated border-border flex items-center gap-2 rounded-md border px-2.5 py-1.5"
             data-testid="friend-request-row"
             data-request-id={request.id}
           >

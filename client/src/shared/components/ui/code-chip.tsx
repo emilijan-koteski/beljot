@@ -42,7 +42,7 @@ export function CodeChip({
           : {})}
         data-testid={testId}
         className={cn(
-          "inline-flex items-center gap-2 rounded-[10px] border font-mono font-bold transition-[background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
+          "inline-flex items-center gap-2 rounded-md border font-mono font-bold transition-[background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
           dense ? "px-2.5 py-1 text-[13px]" : "px-3 py-2 text-[13px]",
           copied
             ? "border-accent bg-accent-soft text-accent-deep"
@@ -74,7 +74,7 @@ export function CodeChip({
         : {})}
       data-testid={testId}
       className={cn(
-        "inline-flex items-stretch overflow-hidden rounded-[10px] border transition-[background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
+        "inline-flex items-stretch overflow-hidden rounded-md border transition-[background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
         copied
           ? "border-accent bg-accent-soft"
           : "border-brass bg-surface-elevated hover:border-accent/50",

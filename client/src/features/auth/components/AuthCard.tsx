@@ -23,7 +23,7 @@ type AuthCardProps = {
 export function AuthCard({ eyebrow, title, subtitle, children, footer }: AuthCardProps) {
   return (
     <div
-      className="bg-surface relative w-full max-w-125 rounded-[22px] border border-border px-10 pt-10 pb-8 shadow-[0_18px_44px_-28px_rgba(14,58,36,0.32),0_2px_0_rgba(255,255,255,0.6)_inset]"
+      className="bg-surface relative w-full max-w-125 rounded-2xl border border-border px-10 pt-10 pb-8 shadow-[0_18px_44px_-28px_rgba(14,58,36,0.32),0_2px_0_rgba(255,255,255,0.6)_inset]"
       data-testid="auth-card"
     >
       <div
@@ -104,7 +104,7 @@ export function Checkbox({ checked, onChange, invalid, testId, children }: Check
         <span
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute inset-0 inline-flex items-center justify-center rounded-[5px] border transition-[background-color,border-color,box-shadow] peer-focus-visible:ring-3 peer-focus-visible:ring-ring/70",
+            "pointer-events-none absolute inset-0 inline-flex items-center justify-center rounded border transition-[background-color,border-color,box-shadow] peer-focus-visible:ring-3 peer-focus-visible:ring-ring/70",
             checked
               ? "bg-accent border-accent text-accent-ink"
               : invalid

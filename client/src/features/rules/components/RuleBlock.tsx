@@ -73,7 +73,7 @@ function TiersBlock({
         background: "var(--surface-2)",
         border: "1px solid var(--border)",
         borderLeft: "3px solid var(--accent)",
-        borderRadius: 12,
+        borderRadius: "var(--radius-lg)",
         display: "flex",
         flexDirection: "column",
         gap: 4,
@@ -182,7 +182,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
             background: "var(--surface-2)",
             border: "1px solid var(--border)",
             borderLeft: "3px solid var(--accent)",
-            borderRadius: 12,
+            borderRadius: "var(--radius-lg)",
             display: "flex",
             flexDirection: "column",
             gap: 4,
@@ -234,7 +234,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
                   padding: "12px 14px",
                   background: "var(--surface-2)",
                   border: "1px solid var(--border)",
-                  borderRadius: 12,
+                  borderRadius: "var(--radius-lg)",
                 }}
               >
                 <span

@@ -28,6 +28,18 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-sans: "Inter", system-ui, sans-serif;
   --font-suit: Georgia, "Times New Roman", "DejaVu Serif", serif;
+
+  /* Radius — whole, even pixels. `rounded` (4px) and `rounded-xs` (2px) keep
+     Tailwind's defaults; 4xl is unused, so it is removed rather than left to
+     duplicate 3xl. Playing cards are the one exception: their corner follows
+     the artwork's own ratio (cardFace.ts). */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  --radius-4xl: initial;
 }
 
 @theme inline {
@@ -70,15 +82,6 @@
   /* Status */
   --color-warning: var(--warning);
   --color-danger: var(--danger);
-
-  /* Radius scale — base radius lives at :root so .game-table could rescale */
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 :root,
@@ -240,9 +243,6 @@
        for a heavier black drop shadow (see `.chat-dock-match`). ─────────── */
   --chat-shadow-panel: 0 24px 60px -20px rgba(14, 58, 36, 0.3);
   --chat-shadow-fab: 0 8px 22px -10px rgba(14, 58, 36, 0.3);
-
-  /* ── Radius ───────────────────────────────────────────────────────── */
-  --radius: 14px;
 }
 
 /* Team companions — resolved per scope like the tier ones below. */
@@ -358,7 +358,7 @@
   }
   *::-webkit-scrollbar-thumb {
     background: var(--brass);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     border: 2px solid var(--bg);
   }
   *::-webkit-scrollbar-thumb:hover {

@@ -239,7 +239,7 @@ export function RoomEjectionModal() {
                 navigate("/lobby", { state: { lobbyFilter: "qualify" } });
               }}
               data-testid="room-ejection-browse"
-              className="text-ink-dim hover:text-ink border-border hover:border-brass inline-flex cursor-pointer items-center justify-center gap-2 rounded-[10px] border px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/70 focus-visible:outline-none"
+              className="text-ink-dim hover:text-ink border-border hover:border-brass inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/70 focus-visible:outline-none"
             >
               {t("lobby.roomEjection.browseQualifying")}
             </button>

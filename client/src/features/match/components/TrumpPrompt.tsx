@@ -176,7 +176,7 @@ export function TrumpPrompt({
                       aria-disabled={isLocked}
                       data-locked={isLocked ? "true" : undefined}
                       data-testid={`trump-prompt-considering-${suit}`}
-                      className="inline-flex shrink-0 items-center justify-center rounded-[5px]"
+                      className="inline-flex shrink-0 items-center justify-center rounded"
                       style={{
                         width: 22,
                         height: 30,

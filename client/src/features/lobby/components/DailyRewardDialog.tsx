@@ -171,7 +171,7 @@ export function DailyRewardDialog({
         showCloseButton={false}
         data-testid="daily-reward-dialog"
         className={cn(
-          "block overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
+          "block overflow-hidden rounded-lg border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
           milestone
             ? "shadow-[0_0_0_1px_rgba(232,194,90,0.18)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]"
             : "shadow-[0_0_0_1px_var(--brass-soft)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]",

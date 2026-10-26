@@ -84,7 +84,7 @@ export function HistoryFilters({
           onClick={() => onSortChange(sort === "new" ? "old" : "new")}
           data-testid="match-history-sort"
           data-sort={sort}
-          className="bg-surface-elevated border-border text-ink inline-flex cursor-pointer items-center gap-1.5 rounded-[10px] border px-3 py-1.5 text-[13px] font-medium"
+          className="bg-surface-elevated border-border text-ink inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-[13px] font-medium"
         >
           {sort === "new"
             ? t("profile.matchHistory.sort.newest")

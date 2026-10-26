@@ -356,7 +356,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_var(--brass-soft)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
+        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_var(--brass-soft)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
         showCloseButton={false}
         data-testid="create-room-modal"
       >
@@ -413,7 +413,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                     }}
                     aria-label={t("lobby.createRoomModal.roomNameShuffleAria")}
                     data-testid="room-name-shuffle"
-                    className="text-brass-deep bg-brass-soft border-brass/55 absolute top-1/2 right-1.5 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-[9px] border"
+                    className="text-brass-deep bg-brass-soft border-brass/55 absolute top-1/2 right-1.5 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-sm border"
                   >
                     <span
                       key={nameShuffleSpin}
@@ -804,7 +804,7 @@ function AdvancedSettings({
   return (
     <section
       className={cn(
-        "shrink-0 overflow-hidden rounded-[13px] border transition-[border-color,background-color]",
+        "shrink-0 overflow-hidden rounded-lg border transition-[border-color,background-color]",
         open ? "border-brass bg-surface-sunken" : "border-border bg-surface-elevated",
       )}
     >
@@ -894,7 +894,7 @@ function PreviewCard({
   return (
     <article
       data-testid="create-room-preview"
-      className="bg-surface text-ink border-border overflow-hidden rounded-[22px] border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]"
+      className="bg-surface text-ink border-border overflow-hidden rounded-2xl border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]"
     >
       <div className="px-4.5 pt-4.5 pb-3.5">
         <div className="flex items-center gap-2.5">
@@ -1054,7 +1054,7 @@ function PreviewCard({
           {t("lobby.createRoomModal.preview.seated", { current: 1 })}
         </span>
         <span className="ml-auto">
-          <span className="bg-accent text-accent-ink inline-flex items-center gap-1.5 rounded-[10px] border border-accent-deep px-3.5 py-1.5 text-[11px] font-semibold opacity-70">
+          <span className="bg-accent text-accent-ink inline-flex items-center gap-1.5 rounded-md border border-accent-deep px-3.5 py-1.5 text-[11px] font-semibold opacity-70">
             {t("lobby.createRoomModal.preview.joinLabel")}
             <ArrowRight className="size-3.5" strokeWidth={2.2} />
           </span>

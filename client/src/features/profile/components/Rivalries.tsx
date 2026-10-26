@@ -42,7 +42,7 @@ export function Rivalries({ rivals, subjectIsSelf = true }: RivalriesProps) {
             return (
               <li
                 key={r.userId}
-                className="bg-surface-elevated border-border flex flex-col gap-1.5 rounded-[10px] border p-2.5"
+                className="bg-surface-elevated border-border flex flex-col gap-1.5 rounded-md border p-2.5"
               >
                 <div className="flex items-center gap-2.5">
                   {!isSoftDeleted(r) ? (

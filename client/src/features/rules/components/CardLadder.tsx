@@ -41,7 +41,7 @@ function PowerBar({ strength, accent }: { strength: number; accent: LadderAccent
           style={{
             width: 4,
             height: 12,
-            borderRadius: 1,
+            borderRadius: "var(--radius-xs)",
             background: i < filled ? accent.edge : "var(--surface-3)",
           }}
         />
@@ -90,7 +90,7 @@ export function CardLadder({ title, accent, rows, suit, testId }: Props) {
             justifyContent: "center",
             width: 24,
             height: 24,
-            borderRadius: 6,
+            borderRadius: "var(--radius-sm)",
             background: accent.tint,
             color: accent.ink,
             border: `1px solid ${accent.edge}`,
@@ -179,7 +179,7 @@ export function CardLadder({ title, accent, rows, suit, testId }: Props) {
                     minWidth: 28,
                     height: 32,
                     padding: "0 6px",
-                    borderRadius: 6,
+                    borderRadius: "var(--radius-sm)",
                     background: "var(--surface-2)",
                     border: `1px solid ${top ? accent.edge : "var(--border)"}`,
                     fontWeight: 700,
