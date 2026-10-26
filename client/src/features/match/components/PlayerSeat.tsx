@@ -7,10 +7,11 @@ import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { PlayerState, Suit } from "@/shared/types/matchTypes";
 
-import { resolveCardDeck, SEAT_STACK_CARD_WIDTH } from "../lib/cardFace";
+import { CARD_BACK_BACKGROUND, resolveCardDeck, SEAT_STACK_CARD_WIDTH } from "../lib/cardFace";
 import { suitAccent, suitNameKey } from "../lib/suitArt";
 import { type SeatTeam, teamColors, teamLabelKey } from "../lib/tableTheme";
 import { isCountdownUrgent, useTurnCountdown } from "../lib/turnCountdown";
+import { CardBackFace } from "./CardBackFace";
 import { SuitMark } from "./SuitMark";
 import { TimerRing } from "./TimerRing";
 
@@ -101,6 +102,7 @@ function CardBackStack({
   const cw = compact ? SEAT_STACK_CARD_WIDTH.compact : SEAT_STACK_CARD_WIDTH.desktop;
   const ch = compact ? 22 : 38;
   const overlap = compact ? 12 : 22;
+  const radius = compact ? 3 : 4;
   return (
     <div
       className="flex items-center"
@@ -120,16 +122,20 @@ function CardBackStack({
           key={i}
           aria-hidden
           style={{
+            position: "relative",
+            overflow: "hidden",
             width: cw,
             height: ch,
             marginLeft: i === 0 ? 0 : -overlap,
             transform: `rotate(${(i - 2) * 1.5}deg)`,
-            background: "linear-gradient(135deg, #2a1a10 0%, #4a2818 50%, #2a1a10 100%)",
+            background: CARD_BACK_BACKGROUND,
             border: `${compact ? 1 : 1.5}px solid var(--brass)`,
-            borderRadius: compact ? 3 : 4,
+            borderRadius: radius,
             boxShadow: "0 2px 6px rgba(0,0,0,0.45)",
           }}
-        />
+        >
+          <CardBackFace width={cw} radius={radius} />
+        </div>
       ))}
       <span
         className={`font-body tabular-nums ${compact ? "text-[9px]" : "text-[11px]"}`}

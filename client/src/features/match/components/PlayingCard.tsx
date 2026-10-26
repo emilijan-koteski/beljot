@@ -5,7 +5,14 @@ import { useAuthStore } from "@/shared/stores/authStore";
 import type { Card, CardId, Rank, Suit } from "@/shared/types/matchTypes";
 
 import type { CardDeck, CardSize } from "../lib/cardFace";
-import { CARD_FACE_BACKGROUND, CARD_SIZES, cardFaceUrl, resolveCardDeck } from "../lib/cardFace";
+import {
+  CARD_BACK_BACKGROUND,
+  CARD_FACE_BACKGROUND,
+  CARD_SIZES,
+  cardFaceUrl,
+  resolveCardDeck,
+} from "../lib/cardFace";
+import { CardBackFace } from "./CardBackFace";
 
 export type CardState = "default" | "playable" | "unplayable" | "face-down";
 interface PlayingCardProps {
@@ -130,34 +137,12 @@ export function PlayingCard({
         style={{
           ...boxStyle,
           borderRadius: BACK_RADIUS,
-          background: "linear-gradient(135deg, #2a1a10 0%, #4a2818 50%, #2a1a10 100%)",
+          background: CARD_BACK_BACKGROUND,
           border: "2px solid var(--brass)",
           boxShadow: `${playableGlow}, inset 0 0 0 1px rgba(201,168,118,0.35)`,
         }}
       >
-        <div
-          className="absolute"
-          style={{
-            inset: 4,
-            borderRadius: Math.max(0, BACK_RADIUS - 4),
-            border: "1px solid rgba(201,168,118,0.45)",
-            backgroundImage:
-              "repeating-linear-gradient(45deg, transparent 0 6px, rgba(201,168,118,0.1) 6px 7px)",
-          }}
-        />
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{
-            color: "var(--brass)",
-            fontFamily: "var(--font-suit)",
-            fontSize: dims.width * 0.3,
-            fontStyle: "italic",
-            fontWeight: 700,
-            textShadow: "0 1px 2px rgba(0,0,0,0.6)",
-          }}
-        >
-          B
-        </div>
+        <CardBackFace width={dims.width} radius={BACK_RADIUS} />
       </div>
     );
   }
