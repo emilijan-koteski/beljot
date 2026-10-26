@@ -68,7 +68,7 @@ func isCardPlayDecision(gs *game.GameState, seat int) bool {
 func runBotSearch(session *LiveMatch, view bot.View, generation uint64, ctx botDecisionContext, deadline time.Time) {
 	result, ok := bot.SearchCard(view, deadline)
 	if !ok {
-		slog.Info("bot: search timed out; rules played", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
+		slog.Info("bot: search reached no decision; rules played", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
 		return
 	}
 	session.mu.Lock()

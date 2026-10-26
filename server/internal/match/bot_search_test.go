@@ -136,7 +136,7 @@ func TestBotSearchTimeoutFallsBackToRules(t *testing.T) {
 	mgr.BotSchedule(searchRoomID)
 
 	require.True(t, waitFor(5*time.Second, func() bool {
-		return len(logs.matched(searchRoomID, "bot: search timed out; rules played")) > 0
+		return len(logs.matched(searchRoomID, "bot: search reached no decision; rules played")) > 0
 	}), "the timed-out search must be logged")
 	assert.Nil(t, mgr.BotSearchResultForTest(searchRoomID, searchBotSeat), "a timed-out search stores nothing")
 
