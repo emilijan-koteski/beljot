@@ -4,8 +4,6 @@ import {
   ChevronDown,
   Clock,
   Coins,
-  Eye,
-  EyeOff,
   Flag,
   KeyRound,
   Lock,
@@ -26,6 +24,8 @@ import { useNavigate } from "react-router";
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
+import { PasswordToggle } from "@/shared/components/PasswordToggle";
+import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
 import { Chips } from "@/shared/components/ui/chips";
 import { Dialog, DialogContent } from "@/shared/components/ui/dialog";
@@ -356,7 +356,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_rgba(201,168,118,0.20)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
+        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_var(--brass-soft)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
         showCloseButton={false}
         data-testid="create-room-modal"
       >
@@ -413,7 +413,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                     }}
                     aria-label={t("lobby.createRoomModal.roomNameShuffleAria")}
                     data-testid="room-name-shuffle"
-                    className="text-brass-deep bg-brass-soft border-border-2/60 absolute top-1/2 right-1.5 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-[9px] border"
+                    className="text-brass-deep bg-brass-soft border-brass/55 absolute top-1/2 right-1.5 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-sm border"
                   >
                     <span
                       key={nameShuffleSpin}
@@ -661,20 +661,11 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                             data-testid="room-password-input"
                             className="h-11 pr-10"
                           />
-                          <button
-                            type="button"
-                            tabIndex={-1}
-                            className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
-                            onClick={() => setShowPassword(!showPassword)}
-                            data-testid="room-password-toggle"
-                            aria-label={showPassword ? "Hide password" : "Show password"}
-                          >
-                            {showPassword ? (
-                              <EyeOff className="size-4" />
-                            ) : (
-                              <Eye className="size-4" />
-                            )}
-                          </button>
+                          <PasswordToggle
+                            shown={showPassword}
+                            onToggle={() => setShowPassword(!showPassword)}
+                            testId="room-password-toggle"
+                          />
                         </div>
                       </Field>
                     )}
@@ -770,7 +761,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
             className="border-border hidden flex-col gap-4 border-t px-9 py-7 md:flex md:min-h-0 md:overflow-y-auto md:border-t-0 md:border-l"
             style={{
               background:
-                "radial-gradient(ellipse 90% 60% at 50% -10%, rgba(201,168,118,0.18), transparent 70%), var(--surface-3)",
+                "radial-gradient(ellipse 90% 60% at 50% -10%, var(--brass-soft), transparent 70%), var(--surface-3)",
             }}
           >
             <Eyebrow>{t("lobby.createRoomModal.preview.title")}</Eyebrow>
@@ -813,8 +804,8 @@ function AdvancedSettings({
   return (
     <section
       className={cn(
-        "shrink-0 overflow-hidden rounded-[13px] border transition-[border-color,background-color]",
-        open ? "border-border-2 bg-surface-sunken" : "border-border bg-surface-elevated",
+        "shrink-0 overflow-hidden rounded-lg border transition-[border-color,background-color]",
+        open ? "border-brass bg-surface-sunken" : "border-border bg-surface-elevated",
       )}
     >
       <button
@@ -833,7 +824,7 @@ function AdvancedSettings({
         {changedCount > 0 && (
           <span
             data-testid="advanced-settings-badge"
-            className="bg-brass-soft text-brass-deep border-border-2/40 rounded-full border px-1.75 py-0.5 font-mono text-[10.5px] font-semibold"
+            className="bg-brass-soft text-brass-deep border-brass/40 rounded-full border px-1.75 py-0.5 font-mono text-[10.5px] font-semibold"
           >
             {t("lobby.createRoomModal.advanced.changedCount", { count: changedCount })}
           </span>
@@ -899,12 +890,11 @@ function PreviewCard({
     timerStyle === "relaxed"
       ? t("lobby.card.relaxed")
       : t("lobby.card.timerSeconds", { seconds: timerDuration });
-  const hostInitial = (hostUsername || "?").charAt(0).toUpperCase();
 
   return (
     <article
       data-testid="create-room-preview"
-      className="bg-surface text-ink border-border overflow-hidden rounded-[22px] border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]"
+      className="bg-surface text-ink border-border overflow-hidden rounded-2xl border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]"
     >
       <div className="px-4.5 pt-4.5 pb-3.5">
         <div className="flex items-center gap-2.5">
@@ -1056,9 +1046,7 @@ function PreviewCard({
 
       <div className="border-border bg-[rgba(14,58,36,0.03)] flex items-center gap-2.5 border-t px-4.5 py-3">
         <span className="text-ink-dim inline-flex items-center gap-1.5 text-xs">
-          <span className="bg-surface-sunken text-ink border-border inline-flex size-4.5 items-center justify-center rounded-full border text-[10px] font-bold">
-            {hostInitial}
-          </span>
+          <Avatar name={hostUsername} size={18} />
           {hostUsername}
         </span>
         <span className="text-ink-mute inline-flex items-center gap-1 text-xs">
@@ -1066,7 +1054,7 @@ function PreviewCard({
           {t("lobby.createRoomModal.preview.seated", { current: 1 })}
         </span>
         <span className="ml-auto">
-          <span className="bg-accent text-accent-ink inline-flex items-center gap-1.5 rounded-[10px] border border-accent-deep px-3.5 py-1.5 text-[11px] font-semibold opacity-70">
+          <span className="bg-accent text-accent-ink inline-flex items-center gap-1.5 rounded-md border border-accent-deep px-3.5 py-1.5 text-[11px] font-semibold opacity-70">
             {t("lobby.createRoomModal.preview.joinLabel")}
             <ArrowRight className="size-3.5" strokeWidth={2.2} />
           </span>

@@ -48,10 +48,10 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
           padding: 0,
           overflow: "hidden",
           background: "var(--surface)",
-          border: "1px solid var(--border-2)",
+          border: "1px solid var(--brass)",
           borderRadius: "var(--radius-lg)",
           color: "var(--ink)",
-          boxShadow: "0 40px 90px -30px rgba(14,58,36,0.55), 0 0 0 1px rgba(201,168,118,0.18)",
+          boxShadow: "0 40px 90px -30px rgba(14,58,36,0.55), 0 0 0 1px var(--brass-soft)",
         }}
       >
         <div
@@ -75,7 +75,7 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "inset 0 0 0 4px rgba(201,168,118,0.10)",
+              boxShadow: "inset 0 0 0 4px var(--brass-10)",
             }}
           >
             <ShieldCheck size={24} color="var(--brass-deep)" />

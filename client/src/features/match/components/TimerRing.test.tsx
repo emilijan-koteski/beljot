@@ -36,7 +36,7 @@ describe("TimerRing", () => {
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
     const seconds = screen.getByTestId("timer-seconds");
-    expect(seconds.style.color).toContain("--turn-lime");
+    expect(seconds.style.color).toContain("--accent");
     const ring = screen.getByTestId("timer-ring");
     expect(ring.dataset.urgent).toBe("false");
   });
@@ -48,7 +48,7 @@ describe("TimerRing", () => {
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
     const seconds = screen.getByTestId("timer-seconds");
-    expect(seconds.style.color).toContain("--turn-lime");
+    expect(seconds.style.color).toContain("--accent");
     const ring = screen.getByTestId("timer-ring");
     expect(ring.dataset.urgent).toBe("false");
   });
@@ -60,7 +60,7 @@ describe("TimerRing", () => {
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
     const seconds = screen.getByTestId("timer-seconds");
-    expect(seconds.style.color).toContain("--turn-urgent");
+    expect(seconds.style.color).toContain("--danger");
     const ring = screen.getByTestId("timer-ring");
     expect(ring.dataset.urgent).toBe("true");
     expect(ring.className).toContain("motion-safe:animate-pulse");
@@ -73,7 +73,7 @@ describe("TimerRing", () => {
     render(<TimerRing turnExpiresAt={expiry.toISOString()} totalDuration={30} />);
 
     const seconds = screen.getByTestId("timer-seconds");
-    expect(seconds.style.color).toContain("--turn-urgent");
+    expect(seconds.style.color).toContain("--danger");
     expect(seconds.textContent).toBe("0");
     const ring = screen.getByTestId("timer-ring");
     expect(ring.className).not.toContain("motion-safe:animate-pulse");

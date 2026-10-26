@@ -7,7 +7,7 @@ import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { LevelRing } from "@/shared/components/LevelRing";
 import { HeaderRankChip } from "@/shared/components/season/HeaderRankChip";
 import { SupportDialog } from "@/shared/components/support/SupportDialog";
-import { AvatarImage } from "@/shared/components/ui/avatar";
+import { Avatar } from "@/shared/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -182,17 +182,12 @@ export function TopBar({
               className="bg-surface-elevated hover:bg-surface-sunken aria-expanded:bg-surface-sunken hidden min-w-0 items-center gap-2 rounded-full border border-border py-1 pr-3 pl-1 transition-colors md:flex"
               data-testid="nav-user"
             >
-              <span
-                className="bg-accent text-accent-ink flex size-6.5 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold"
-                aria-hidden="true"
-                data-testid="nav-user-avatar"
-              >
-                <AvatarImage
-                  src={user.avatarUrl}
-                  size={26}
-                  fallback={(user.username.charAt(0) || "?").toUpperCase()}
-                />
-              </span>
+              <Avatar
+                name={user.username}
+                avatarUrl={user.avatarUrl}
+                size={26}
+                testId="nav-user-avatar"
+              />
               <span className="text-ink max-w-24 truncate text-sm font-medium lg:max-w-40">
                 {user.username}
               </span>

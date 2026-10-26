@@ -1,7 +1,8 @@
-import { Eye, EyeOff, Link2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -98,16 +99,11 @@ export function LinkAccountDialog({
               data-testid="link-account-password-input"
               className="h-11 pr-10"
             />
-            <button
-              type="button"
-              tabIndex={-1}
-              className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
-              onClick={() => setShowPassword(!showPassword)}
-              data-testid="link-account-password-toggle"
-              aria-label={showPassword ? t("common.hidePassword") : t("common.showPassword")}
-            >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
+            <PasswordToggle
+              shown={showPassword}
+              onToggle={() => setShowPassword(!showPassword)}
+              testId="link-account-password-toggle"
+            />
           </div>
 
           {showError && (

@@ -14,7 +14,7 @@ type MilestonesProps = {
 
 function MilestoneRow({ label, hint, value }: { label: string; hint: string; value: string }) {
   return (
-    <li className="bg-surface-elevated border-border grid grid-cols-[1fr_auto] items-center gap-2.5 rounded-[10px] border px-3 py-2.5">
+    <li className="bg-surface-elevated border-border grid grid-cols-[1fr_auto] items-center gap-2.5 rounded-md border px-3 py-2.5">
       <div className="min-w-0">
         <div className="text-ink text-[13px] font-medium">{label}</div>
         <div className="text-ink-mute mt-0.5 truncate text-[11.5px]">{hint}</div>

@@ -69,7 +69,7 @@ function OutcomeSplitBar({ wins, losses, abandoned }: Omit<StatsGridProps, "game
         />
       </div>
       <div
-        className="flex h-3.5 overflow-hidden rounded-[7px]"
+        className="flex h-3.5 overflow-hidden rounded-full"
         style={{ background: "var(--surface-3)" }}
       >
         <span style={{ width: pct(wins), background: "var(--accent)" }} />

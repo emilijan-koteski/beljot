@@ -480,13 +480,13 @@ describe("ChatDock — whisper", () => {
     });
 
     const chip = screen.getByTestId("lobby-chat-whisper-unread");
-    expect(chip.className).toContain("bg-(--whisper-badge)");
+    expect(chip.className).toContain("bg-(--whisper-ink)");
     expect(chip.className).toContain("text-(--whisper-badge-ink)");
 
     fireEvent.click(screen.getByTestId("lobby-chat-fab"));
 
     const badge = screen.getByTestId("lobby-chat-whisper-tab-bob-unread");
-    expect(badge.className).toContain("bg-(--whisper-badge)");
+    expect(badge.className).toContain("bg-(--whisper-ink)");
     expect(badge.className).toContain("text-(--whisper-badge-ink)");
   });
 

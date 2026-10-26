@@ -43,9 +43,9 @@ const toneStyles: Record<BadgeTone, { bg: string; color: string; border: string 
     border: "var(--team-b-edge-soft)",
   },
   danger: {
-    bg: "rgba(139,42,31,0.10)",
+    bg: "color-mix(in srgb, var(--danger) 10%, transparent)",
     color: "var(--danger)",
-    border: "rgba(139,42,31,0.30)",
+    border: "color-mix(in srgb, var(--danger) 30%, transparent)",
   },
 };
 

@@ -15,10 +15,12 @@ export const HUDButton = forwardRef<HTMLButtonElement, HUDButtonProps>(function 
   const isLabeled = label !== undefined && label !== null;
 
   const baseStyle: React.CSSProperties = {
-    background: "var(--panel-hud, rgba(18,32,22,0.85))",
+    background: "var(--panel-deeper)",
     border:
-      variant === "danger" ? "1px solid rgba(255,120,120,0.3)" : "1px solid rgba(201,168,118,0.4)",
-    color: variant === "danger" ? "#ff7676" : "var(--ink-light)",
+      variant === "danger"
+        ? "1px solid color-mix(in srgb, var(--danger-light) 30%, transparent)"
+        : "1px solid var(--brass-40)",
+    color: variant === "danger" ? "var(--danger-light)" : "var(--ink-light)",
     backdropFilter: "blur(6px)",
     WebkitBackdropFilter: "blur(6px)",
     minWidth: 36,

@@ -84,12 +84,12 @@ export function DurationSlider({
 
       <div
         className={cn(
-          "bg-surface-elevated border-border relative rounded-[10px] border px-3 py-3.5",
+          "bg-surface-elevated border-border relative rounded-md border px-3 py-3.5",
           hasTickLabels && "pb-6",
         )}
       >
         <div className="relative">
-          <div className="bg-surface-sunken border-border relative h-1.5 overflow-hidden rounded-[3px] border">
+          <div className="bg-surface-sunken border-border relative h-1.5 overflow-hidden rounded-full border">
             <div
               className="absolute inset-y-0 left-0"
               style={{
@@ -106,7 +106,7 @@ export function DurationSlider({
                 <span key={tk.value}>
                   <span
                     className={cn(
-                      "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[1px]",
+                      "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xs",
                       tk.emphasis ? "bg-brass-deep opacity-70" : "bg-ink-off opacity-45",
                     )}
                     style={{
@@ -133,12 +133,12 @@ export function DurationSlider({
                 data-value={marker?.value}
               >
                 <span
-                  className="bg-ink absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-[1px]"
+                  className="bg-ink absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-xs"
                   style={{ left: `${markerPct}%` }}
                 />
                 {marker?.label && (
                   <span
-                    className="bg-surface-elevated border-border text-ink absolute -translate-x-1/2 rounded-[4px] border px-1 py-px font-mono text-[9.5px] font-semibold whitespace-nowrap"
+                    className="bg-surface-elevated border-border text-ink absolute -translate-x-1/2 rounded border px-1 py-px font-mono text-[9.5px] font-semibold whitespace-nowrap"
                     style={{ left: `${markerPct}%`, bottom: "calc(100% + 16px)" }}
                   >
                     {marker.label}

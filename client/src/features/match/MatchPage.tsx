@@ -1091,7 +1091,7 @@ export function MatchPage() {
             style={{
               width: 36,
               height: 36,
-              border: "2px solid rgba(201,168,118,0.18)",
+              border: "2px solid var(--brass-soft)",
               borderTopColor: "var(--brass)",
               animationDuration: "0.9s",
             }}
@@ -1457,11 +1457,11 @@ export function MatchPage() {
             aria-label={t("nav.menu")}
             aria-expanded={hudMenuOpen}
             data-testid="hud-menu-button"
-            className="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-[10px]"
+            className="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-md"
             style={{
               zIndex: Z.CHROME_TOP,
-              background: "var(--panel-hud, rgba(18,32,22,0.85))",
-              border: "1px solid rgba(201,168,118,0.4)",
+              background: "var(--panel-deeper)",
+              border: "1px solid var(--brass-40)",
               color: "var(--ink-light)",
               backdropFilter: "blur(6px)",
               WebkitBackdropFilter: "blur(6px)",
@@ -1488,8 +1488,8 @@ export function MatchPage() {
                 className="absolute top-14 right-3 flex w-44 flex-col gap-1.5 rounded-xl p-2"
                 style={{
                   zIndex: Z.CHROME_TOP,
-                  background: "var(--panel-deeper, rgba(18,32,22,0.94))",
-                  border: "1px solid rgba(201,168,118,0.4)",
+                  background: "var(--panel-deeper)",
+                  border: "1px solid var(--brass-40)",
                   boxShadow: "0 14px 36px rgba(0,0,0,0.5)",
                   backdropFilter: "blur(10px)",
                   WebkitBackdropFilter: "blur(10px)",
@@ -1854,7 +1854,7 @@ export function MatchPage() {
 
       {errorToast && (
         <div
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-danger/90 text-ink font-body text-sm px-4 py-2 rounded-lg flex items-center gap-3"
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 border border-danger/45 bg-(--panel-deeper) text-danger font-body text-sm px-4 py-2 rounded-lg flex items-center gap-3"
           style={{ zIndex: Z.TOAST }}
           role="alert"
           data-testid="error-toast"
@@ -1865,7 +1865,7 @@ export function MatchPage() {
             onClick={dismissErrorToast}
             aria-label={t("common.close")}
             data-testid="error-toast-close"
-            className="text-ink/80 hover:text-ink text-lg leading-none px-1 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-background rounded"
+            className="text-danger/80 hover:text-danger text-lg leading-none px-1 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-background rounded"
           >
             ×
           </button>

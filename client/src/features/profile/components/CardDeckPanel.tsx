@@ -49,7 +49,7 @@ export function CardDeckPanel() {
               onClick={() => handleSelect(deck.code)}
               data-testid={`profile-deck-option-${deck.code}`}
               className={cn(
-                "flex flex-1 cursor-pointer flex-col items-center gap-1.5 rounded-[10px] border px-2 py-2.5 transition-colors",
+                "flex flex-1 cursor-pointer flex-col items-center gap-1.5 rounded-md border px-2 py-2.5 transition-colors",
                 selected
                   ? "border-accent bg-accent-soft"
                   : "border-border bg-surface-elevated hover:bg-surface-sunken",
@@ -61,7 +61,7 @@ export function CardDeckPanel() {
                 alt=""
                 aria-hidden="true"
                 draggable={false}
-                className="h-[63px] w-[45px] rounded-[2px] shadow-[0_2px_6px_-2px_rgba(0,0,0,0.35)]"
+                className="h-[63px] w-[45px] rounded-xs shadow-[0_2px_6px_-2px_rgba(0,0,0,0.35)]"
                 style={{ background: "linear-gradient(180deg, #fdfaf0 0%, #f4ecd8 100%)" }}
                 onError={(e) => {
                   e.currentTarget.style.visibility = "hidden";

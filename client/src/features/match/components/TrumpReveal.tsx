@@ -98,13 +98,13 @@ export function TrumpReveal({
       data-testid="trump-reveal"
     >
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-[18px] text-center"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-xl text-center"
         style={{
           width: 262,
           padding: "20px 24px 22px",
           background: "linear-gradient(180deg, rgba(32,64,43,0.98) 0%, rgba(13,38,23,0.98) 100%)",
-          border: "1px solid rgba(201,168,118,0.55)",
-          boxShadow: `0 22px 54px rgba(0,0,0,0.62), 0 0 0 2px ${glowColor}66, 0 0 28px ${glowColor}55, inset 0 1px 0 rgba(201,168,118,0.25)`,
+          border: "1px solid var(--brass-55)",
+          boxShadow: `0 22px 54px rgba(0,0,0,0.62), 0 0 0 2px ${glowColor}66, 0 0 28px ${glowColor}55, inset 0 1px 0 var(--brass-25)`,
           color: "var(--ink-light)",
           fontFamily: "var(--font-body)",
         }}

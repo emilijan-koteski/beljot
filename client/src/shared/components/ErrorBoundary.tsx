@@ -1,6 +1,8 @@
 import type { ErrorInfo, ReactNode } from "react";
 import { Component } from "react";
 
+import { Button } from "@/shared/components/ui/button";
+
 interface Props {
   children: ReactNode;
   resetKey?: string;
@@ -36,12 +38,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex min-h-screen items-center justify-center bg-background">
           <div className="text-center">
             <h1 className="mb-4 font-display text-2xl text-ink">Something went wrong</h1>
-            <button
-              className="rounded bg-accent px-4 py-2 text-background"
-              onClick={() => window.location.reload()}
-            >
-              Try again
-            </button>
+            <Button onClick={() => window.location.reload()}>Try again</Button>
           </div>
         </div>
       );

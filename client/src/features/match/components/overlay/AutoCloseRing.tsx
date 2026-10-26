@@ -79,7 +79,7 @@ export function AutoCloseRing({
         height: 32,
         borderRadius: "50%",
         background: "rgba(0,0,0,0.3)",
-        border: "1px solid rgba(201,168,118,0.35)",
+        border: "1px solid var(--brass-40)",
         color: "var(--ink-light)",
         cursor: "pointer",
         display: "inline-flex",

@@ -36,7 +36,7 @@ function CoinMedallion({
     ? "radial-gradient(circle at 38% 30%, #fbeec0 0%, #e8c25a 50%, #a07d1a 100%)"
     : "radial-gradient(circle at 38% 30%, #f4e3b8 0%, #c9a876 52%, #8a6a3c 100%)";
   const rim = gold ? "#a07d1a" : "#8a6a3c";
-  const halo = gold ? "rgba(232,194,90,0.45)" : "rgba(201,168,118,0.40)";
+  const halo = gold ? "rgba(232,194,90,0.45)" : "var(--brass-40)";
   const ink = gold ? "#6e520f" : "#5a4322";
   return (
     <span
@@ -130,7 +130,7 @@ function StreakTrack({ day, total = STREAK_MAX }: { day: number; total?: number 
                 ? "1.5px solid #a07d1a"
                 : done
                   ? "1px solid #9c7d4e"
-                  : "1px dashed var(--border-2)",
+                  : "1px dashed var(--brass)",
               boxShadow: today
                 ? "0 0 0 3px rgba(232,194,90,0.28), 0 3px 8px -2px rgba(160,125,26,0.6)"
                 : "none",
@@ -171,10 +171,10 @@ export function DailyRewardDialog({
         showCloseButton={false}
         data-testid="daily-reward-dialog"
         className={cn(
-          "block overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
+          "block overflow-hidden rounded-lg border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
           milestone
             ? "shadow-[0_0_0_1px_rgba(232,194,90,0.18)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]"
-            : "shadow-[0_0_0_1px_rgba(201,168,118,0.16)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]",
+            : "shadow-[0_0_0_1px_var(--brass-soft)_inset,0_30px_70px_-28px_rgba(14,58,36,0.45)]",
         )}
       >
         <div className="h-[3px] bg-[linear-gradient(90deg,transparent,var(--brass)_28%,var(--team-a-fill)_50%,var(--brass)_72%,transparent)]" />
@@ -184,7 +184,7 @@ export function DailyRewardDialog({
             "pointer-events-none absolute inset-x-0 top-0 h-[180px]",
             milestone
               ? "bg-[radial-gradient(ellipse_70%_100%_at_50%_0%,rgba(232,194,90,0.18),transparent_70%)]"
-              : "bg-[radial-gradient(ellipse_70%_100%_at_50%_0%,rgba(201,168,118,0.16),transparent_70%)]",
+              : "bg-[radial-gradient(ellipse_70%_100%_at_50%_0%,var(--brass-soft),transparent_70%)]",
           )}
         />
 

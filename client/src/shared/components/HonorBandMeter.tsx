@@ -46,14 +46,14 @@ export function HonorBandMeter({
     <div className={cn("@container flex flex-col", className)} data-testid={testId}>
       <div className="relative h-2 w-full">
         <div
-          className="absolute inset-0 rounded-[4px]"
+          className="absolute inset-0 rounded"
           style={{ background: gradient, opacity: 0.24 }}
           aria-hidden="true"
         />
         {hasScore && (
           <>
             <div
-              className="absolute inset-y-0 left-0 rounded-[4px]"
+              className="absolute inset-y-0 left-0 rounded"
               style={{
                 width: `${value}%`,
                 background: HONOR_TIER_COLOR[tier],
@@ -63,7 +63,7 @@ export function HonorBandMeter({
               aria-hidden="true"
             />
             <div
-              className="absolute top-1/2 h-4 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-[2px]"
+              className="absolute top-1/2 h-4 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-xs"
               style={{
                 left: `${value}%`,
                 background: "var(--ink)",

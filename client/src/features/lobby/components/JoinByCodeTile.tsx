@@ -7,9 +7,9 @@ import { toast } from "sonner";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { FetchError } from "@/shared/api/axiosClient";
 import { getRoomByCode } from "@/shared/api/rooms";
+import { Button } from "@/shared/components/ui/button";
 import { useJoinRoomMutation } from "@/shared/hooks/mutations/useRooms";
 import { joinFailureMessage } from "@/shared/lib/joinFailure";
-import { cn } from "@/shared/lib/utils";
 import type { Room } from "@/shared/types/apiTypes";
 
 const CODE_LENGTH = 6;
@@ -87,19 +87,14 @@ export function JoinByCodeTile() {
         data-testid="join-by-code-input"
         className="text-ink min-w-0 flex-1 bg-transparent py-2.5 text-base font-semibold tracking-[2px] tabular-nums outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-ink-off"
       />
-      <button
+      <Button
+        size="sm"
         onClick={submit}
         disabled={!isValid || busy}
         data-testid="join-by-code-button"
-        className={cn(
-          "rounded-[10px] border border-transparent px-3.5 py-2 text-xs font-semibold transition-colors",
-          isValid
-            ? "bg-ink text-background cursor-pointer"
-            : "bg-surface-sunken text-ink-mute cursor-default opacity-80",
-        )}
       >
         {t("lobby.actions.joinByCode.cta")}
-      </button>
+      </Button>
 
       <PasswordPromptDialog
         open={pendingPrivateRoom !== null}

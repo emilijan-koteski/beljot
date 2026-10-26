@@ -93,7 +93,7 @@ function MustPickNote() {
       data-testid="trump-prompt-must-pick"
       className="inline-flex items-center px-3.5 py-2 text-[13px] sm:px-4.5 sm:py-2.5 sm:text-[14px]"
       style={{
-        border: "1px dashed rgba(201,168,118,0.45)",
+        border: "1px dashed var(--brass-40)",
         borderRadius: 8,
         background: "linear-gradient(180deg, rgba(60,90,70,0.35), rgba(30,50,35,0.35))",
         color: "var(--ink-light)",
@@ -138,7 +138,7 @@ export function TrumpPrompt({
           className="mx-4 flex max-w-[24rem] items-center gap-3 rounded-lg px-4 py-3"
           style={{
             background: "var(--panel-dark, rgba(20,45,30,0.85))",
-            border: "1px solid rgba(201,168,118,0.4)",
+            border: "1px solid var(--brass-40)",
             backdropFilter: "blur(8px)",
             WebkitBackdropFilter: "blur(8px)",
           }}
@@ -176,7 +176,7 @@ export function TrumpPrompt({
                       aria-disabled={isLocked}
                       data-locked={isLocked ? "true" : undefined}
                       data-testid={`trump-prompt-considering-${suit}`}
-                      className="inline-flex shrink-0 items-center justify-center rounded-[5px]"
+                      className="inline-flex shrink-0 items-center justify-center rounded"
                       style={{
                         width: 22,
                         height: 30,

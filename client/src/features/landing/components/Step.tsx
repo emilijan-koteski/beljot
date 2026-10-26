@@ -8,7 +8,7 @@ type StepProps = {
 export function Step({ n, title, body }: StepProps) {
   return (
     <div className="flex items-start gap-4.5">
-      <div className="font-display text-accent border-border-2 flex size-10 shrink-0 items-center justify-center rounded-full border-[1.5px] text-[17px] font-bold">
+      <div className="font-display text-accent border-brass flex size-10 shrink-0 items-center justify-center rounded-full border-[1.5px] text-[17px] font-bold">
         {n}
       </div>
       <div>

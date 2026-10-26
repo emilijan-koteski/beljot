@@ -71,11 +71,11 @@ export function BelotPrompt({
             <div
               className="mb-3.5 px-3 py-2 rounded-lg flex items-center gap-2 font-body"
               style={{
-                border: "1px solid rgba(201,168,118,0.32)",
+                border: "1px solid var(--brass-40)",
                 background: "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
                 color: "#e8dfc8",
                 fontSize: 12,
-                boxShadow: "inset 0 1px 0 rgba(201,168,118,0.12)",
+                boxShadow: "inset 0 1px 0 var(--brass-10)",
               }}
             >
               <span
@@ -85,7 +85,7 @@ export function BelotPrompt({
                   width: 7,
                   height: 7,
                   background: "var(--brass)",
-                  boxShadow: "0 0 6px rgba(201,168,118,0.55)",
+                  boxShadow: "0 0 6px var(--brass-55)",
                 }}
               />
               {t(accentStripKey)}

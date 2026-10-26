@@ -86,7 +86,7 @@ export function ButtonTimerRing({
 
   const pct = totalDuration > 0 ? Math.min(1, Math.max(0, secondsLeft) / totalDuration) : 0;
   const isUrgent = totalDuration > 0 && pct <= URGENT_FRACTION;
-  const stroke = isUrgent ? "var(--turn-urgent, #ef4444)" : "#d4d0c4";
+  const stroke = isUrgent ? "var(--danger)" : "#d4d0c4";
   const pad = 4;
   const strokeW = 1.75;
   const w = size.w + pad * 2;

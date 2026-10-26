@@ -18,7 +18,7 @@ interface SurrenderButtonProps {
   onConfirm: () => void;
 }
 
-const DANGER = "#ff8585";
+const DANGER = "var(--danger-light)";
 
 export function SurrenderButton({
   canRequest,
@@ -111,11 +111,11 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
             <div
               className="mb-4 px-3 py-2 rounded-lg flex items-center gap-2 font-body"
               style={{
-                border: "1px solid rgba(255,133,133,0.35)",
+                border: "1px solid color-mix(in srgb, var(--danger-light) 35%, transparent)",
                 background: "linear-gradient(90deg, rgba(80,28,28,0.55), rgba(50,18,18,0.35))",
                 color: "#ffe1d6",
                 fontSize: 12,
-                boxShadow: "inset 0 1px 0 rgba(255,133,133,0.14)",
+                boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--danger-light) 14%, transparent)",
               }}
             >
               <span
@@ -125,7 +125,7 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
                   width: 7,
                   height: 7,
                   background: DANGER,
-                  boxShadow: "0 0 6px rgba(255,133,133,0.6)",
+                  boxShadow: "0 0 6px color-mix(in srgb, var(--danger-light) 60%, transparent)",
                   flexShrink: 0,
                 }}
               />
@@ -139,7 +139,7 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
                 data-testid="surrender-confirm"
                 style={{
                   background: "linear-gradient(180deg, #d96a5a 0%, #8a3024 100%)",
-                  borderColor: "rgba(255,133,133,0.7)",
+                  borderColor: "color-mix(in srgb, var(--danger-light) 70%, transparent)",
                   color: "#fff8f3",
                   boxShadow:
                     "0 4px 10px rgba(217,106,90,0.4), inset 0 1px 0 rgba(255,255,255,0.25)",

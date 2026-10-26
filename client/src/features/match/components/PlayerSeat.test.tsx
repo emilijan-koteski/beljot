@@ -94,7 +94,7 @@ describe("PlayerSeat", () => {
     const seat = screen.getByTestId("player-seat-0");
     expect(seat).toHaveAttribute("data-active", "true");
     const namePill = screen.getByTestId("player-seat-name-pill");
-    expect(namePill.getAttribute("style")).toContain("--turn-lime");
+    expect(namePill.getAttribute("style")).toContain("--accent");
   });
 
   it("renders self seat with 'You' label and scaled-up transform", () => {

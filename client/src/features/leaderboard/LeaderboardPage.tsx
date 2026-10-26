@@ -97,7 +97,7 @@ export function LeaderboardPage() {
         aria-label={t("season.leaderboard.loading")}
       >
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="bg-surface h-10 animate-pulse rounded-[10px]" />
+          <div key={i} className="bg-surface h-10 animate-pulse rounded-md" />
         ))}
       </div>
     );

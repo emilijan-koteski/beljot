@@ -26,8 +26,8 @@ function callerTeam(seat: number): TeamString {
 
 const LEGACY_INK_CLASS: Record<Suit, string> = {
   S: "text-ink",
-  H: "text-(--suit-red-up)",
-  D: "text-(--suit-red-up)",
+  H: "text-danger",
+  D: "text-danger",
   C: "text-ink",
 };
 
@@ -93,7 +93,7 @@ export function TrumpIndicator({
           ? undefined
           : {
               background: PANEL_BG,
-              border: "1px solid rgba(201,168,118,0.4)",
+              border: "1px solid var(--brass-40)",
               backdropFilter: "blur(8px)",
               WebkitBackdropFilter: "blur(8px)",
               boxShadow: "0 8px 24px rgba(0,0,0,0.3)",

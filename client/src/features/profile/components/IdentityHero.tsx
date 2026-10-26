@@ -63,7 +63,7 @@ function HeroPill({
     tone === "accent"
       ? "rgba(25,101,54,0.33)"
       : tone === "brass"
-        ? "rgba(201,168,118,0.40)"
+        ? "var(--brass-40)"
         : "var(--border)";
   const valueColor =
     tone === "accent" ? "var(--accent)" : tone === "brass" ? "var(--brass-deep)" : "var(--ink)";

@@ -16,7 +16,7 @@ function NoteBlock({ text, marker }: { text: string; marker: ReactNode }) {
       style={{
         padding: "12px 14px",
         background: "var(--brass-soft)",
-        border: "1px dashed var(--border-2)",
+        border: "1px dashed var(--brass)",
         borderRadius: 10,
         display: "flex",
         alignItems: "flex-start",
@@ -73,7 +73,7 @@ function TiersBlock({
         background: "var(--surface-2)",
         border: "1px solid var(--border)",
         borderLeft: "3px solid var(--accent)",
-        borderRadius: 12,
+        borderRadius: "var(--radius-lg)",
         display: "flex",
         flexDirection: "column",
         gap: 4,
@@ -140,9 +140,9 @@ function CardBlock() {
         accent={{
           eyebrow: ui.ladderPlainEyebrow,
           ink: "var(--brass-deep)",
-          edge: "var(--border-2)",
+          edge: "var(--brass)",
           tint: "var(--brass-soft)",
-          softTint: "rgba(201,168,118,0.08)",
+          softTint: "var(--brass-10)",
         }}
         suit="H"
         rows={cardsPlain}
@@ -182,7 +182,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
             background: "var(--surface-2)",
             border: "1px solid var(--border)",
             borderLeft: "3px solid var(--accent)",
-            borderRadius: 12,
+            borderRadius: "var(--radius-lg)",
             display: "flex",
             flexDirection: "column",
             gap: 4,
@@ -234,7 +234,7 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
                   padding: "12px 14px",
                   background: "var(--surface-2)",
                   border: "1px solid var(--border)",
-                  borderRadius: 12,
+                  borderRadius: "var(--radius-lg)",
                 }}
               >
                 <span

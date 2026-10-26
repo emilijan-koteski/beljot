@@ -5,7 +5,14 @@ import { useAuthStore } from "@/shared/stores/authStore";
 import type { Card, CardId, Rank, Suit } from "@/shared/types/matchTypes";
 
 import type { CardDeck, CardSize } from "../lib/cardFace";
-import { CARD_FACE_BACKGROUND, CARD_SIZES, cardFaceUrl, resolveCardDeck } from "../lib/cardFace";
+import {
+  CARD_BACK_BACKGROUND,
+  CARD_FACE_BACKGROUND,
+  CARD_SIZES,
+  cardFaceUrl,
+  resolveCardDeck,
+} from "../lib/cardFace";
+import { CardBackFace } from "./CardBackFace";
 
 export type CardState = "default" | "playable" | "unplayable" | "face-down";
 interface PlayingCardProps {
@@ -42,8 +49,8 @@ function warmDeck(deck: CardDeck): void {
 
 const BACK_RADIUS = 6;
 
-const DEFAULT_GLOW = "var(--turn-lime, #00e5a0)";
-const DEFAULT_GLOW_HALO = "rgba(0, 229, 160, 0.8)";
+const DEFAULT_GLOW = "var(--accent)";
+const DEFAULT_GLOW_HALO = "color-mix(in srgb, var(--accent) 80%, transparent)";
 
 /**
  * Playing card drawn from the player's active deck, in playable, unplayable, or face-down state.
@@ -96,7 +103,7 @@ export function PlayingCard({
   };
 
   const stateClasses = isPlayable
-    ? "motion-safe:translate-y-[-10px] cursor-pointer motion-safe:hover:translate-y-[-14px] focus-visible:ring-2 focus-visible:ring-[color:var(--turn-lime)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--felt-deep)]"
+    ? "motion-safe:translate-y-[-10px] cursor-pointer motion-safe:hover:translate-y-[-14px] focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--felt-deep)]"
     : isUnplayable
       ? "motion-safe:translate-y-[4px] cursor-not-allowed"
       : "";
@@ -130,34 +137,12 @@ export function PlayingCard({
         style={{
           ...boxStyle,
           borderRadius: BACK_RADIUS,
-          background: "linear-gradient(135deg, #2a1a10 0%, #4a2818 50%, #2a1a10 100%)",
+          background: CARD_BACK_BACKGROUND,
           border: "2px solid var(--brass)",
-          boxShadow: `${playableGlow}, inset 0 0 0 1px rgba(201,168,118,0.35)`,
+          boxShadow: `${playableGlow}, inset 0 0 0 1px var(--brass-40)`,
         }}
       >
-        <div
-          className="absolute"
-          style={{
-            inset: 4,
-            borderRadius: Math.max(0, BACK_RADIUS - 4),
-            border: "1px solid rgba(201,168,118,0.45)",
-            backgroundImage:
-              "repeating-linear-gradient(45deg, transparent 0 6px, rgba(201,168,118,0.1) 6px 7px)",
-          }}
-        />
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{
-            color: "var(--brass)",
-            fontFamily: "var(--font-suit)",
-            fontSize: dims.width * 0.3,
-            fontStyle: "italic",
-            fontWeight: 700,
-            textShadow: "0 1px 2px rgba(0,0,0,0.6)",
-          }}
-        >
-          B
-        </div>
+        <CardBackFace width={dims.width} radius={BACK_RADIUS} />
       </div>
     );
   }

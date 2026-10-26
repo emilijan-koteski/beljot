@@ -37,7 +37,7 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       data-testid={testId}
-      className={cn("bg-surface-sunken border-border flex rounded-[10px] border p-0.75", className)}
+      className={cn("bg-surface-sunken border-border flex rounded-md border p-0.75", className)}
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -53,7 +53,7 @@ export function Segmented<T extends string>({
             data-state={active ? "on" : "off"}
             data-testid={`${testId ?? "segmented"}-${o.value}`}
             className={cn(
-              "inline-flex flex-1 items-center justify-center gap-1.5 rounded-[7px] font-medium transition-[background-color,box-shadow,color] outline-none",
+              "inline-flex flex-1 items-center justify-center gap-1.5 rounded-sm font-medium transition-[background-color,box-shadow,color] outline-none",
               dense ? "px-2.5 py-1.5 text-[12.5px]" : "px-3.5 py-2 text-[13px]",
               active
                 ? "bg-surface-elevated text-ink shadow-[0_1px_2px_rgba(14,58,36,0.06),0_0_0_1px_var(--border)]"

@@ -40,7 +40,7 @@ export function PlayerSearch({ onClose }: PlayerSearchProps) {
       className="border-border mb-2 flex flex-col border-b pb-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-150"
       data-testid="player-search-panel"
     >
-      <div className="bg-surface-elevated border-border flex items-center gap-2 rounded-[10px] border px-2.5 py-1.5 transition-[border-color,box-shadow] has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/70">
+      <div className="bg-surface-elevated border-border flex items-center gap-2 rounded-md border px-2.5 py-1.5 transition-[border-color,box-shadow] has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/70">
         <Search className="text-ink-mute size-3.5 shrink-0" aria-hidden="true" />
         <input
           ref={inputRef}

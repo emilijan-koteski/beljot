@@ -10,7 +10,7 @@ function Fact({ label, value, caption }: FactData) {
         padding: "12px 14px",
         background: "var(--surface)",
         border: "1px solid var(--border)",
-        borderRadius: 12,
+        borderRadius: "var(--radius-lg)",
         display: "flex",
         flexDirection: "column",
         gap: 2,

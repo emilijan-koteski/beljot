@@ -108,10 +108,10 @@ export function RoomEjectionModal() {
           padding: 0,
           overflow: "hidden",
           background: "var(--surface)",
-          border: "1px solid var(--border-2)",
+          border: "1px solid var(--brass)",
           borderRadius: "var(--radius-lg)",
           color: "var(--ink)",
-          boxShadow: "0 40px 90px -30px rgba(14,58,36,0.55), 0 0 0 1px rgba(201,168,118,0.18)",
+          boxShadow: "0 40px 90px -30px rgba(14,58,36,0.55), 0 0 0 1px var(--brass-soft)",
         }}
       >
         <div
@@ -135,7 +135,7 @@ export function RoomEjectionModal() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "inset 0 0 0 4px rgba(201,168,118,0.10)",
+              boxShadow: "inset 0 0 0 4px var(--brass-10)",
             }}
           >
             {roomClosed ? (
@@ -239,7 +239,7 @@ export function RoomEjectionModal() {
                 navigate("/lobby", { state: { lobbyFilter: "qualify" } });
               }}
               data-testid="room-ejection-browse"
-              className="text-ink-dim hover:text-ink border-border hover:border-border-2 inline-flex cursor-pointer items-center justify-center gap-2 rounded-[10px] border px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/70 focus-visible:outline-none"
+              className="text-ink-dim hover:text-ink border-border hover:border-brass inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/70 focus-visible:outline-none"
             >
               {t("lobby.roomEjection.browseQualifying")}
             </button>

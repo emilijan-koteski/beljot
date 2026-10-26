@@ -164,7 +164,7 @@ describe("PlayingCard", () => {
 
     const card = screen.getByTestId("playing-card-KS");
     expect(card.className).toContain("cursor-pointer");
-    expect(card.style.boxShadow).toContain("var(--turn-lime");
+    expect(card.style.boxShadow).toContain("var(--accent");
   });
 
   it("stays at full opacity when unplayable but blocks the cursor (per design — visible, not transparent)", () => {

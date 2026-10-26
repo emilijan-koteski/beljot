@@ -101,14 +101,14 @@ function getPlayerAtSeat(players: RoomPlayer[], seatIndex: number): RoomPlayer |
 // solid gold or silver with a team dot once seated.
 function LegendIndicator({ variant }: { variant: "neutral" | "us" | "them" }) {
   const tokens = {
-    neutral: { border: "var(--border-2)", dot: "var(--brass)", dashed: true, pulse: true },
+    neutral: { border: "var(--brass)", dot: "var(--brass)", dashed: true, pulse: true },
     us: { border: "var(--team-a)", dot: "var(--team-a-fill)", dashed: false, pulse: false },
     them: { border: "var(--team-b)", dot: "var(--team-b-fill)", dashed: false, pulse: false },
   }[variant];
   return (
     <span
       aria-hidden
-      className="inline-flex h-4.5 w-7 items-center justify-center rounded-[5px]"
+      className="inline-flex h-4.5 w-7 items-center justify-center rounded"
       style={{ border: `1.5px ${tokens.dashed ? "dashed" : "solid"} ${tokens.border}` }}
     >
       <span
@@ -885,10 +885,8 @@ export function RoomPage() {
                             <Avatar
                               name={rowName}
                               avatarUrl={isBotRow ? null : p.avatarUrl}
-                              size={22}
+                              size={24}
                               team={rosterTeam(p)}
-                              you={isYou}
-                              owner={isRoomOwner}
                               icon={isBotRow ? <Bot aria-hidden="true" /> : undefined}
                             />
                             <span className="text-ink flex min-w-0 flex-1 items-center gap-1">
@@ -1145,7 +1143,7 @@ export function RoomPage() {
         </div>
 
         <div
-          className="border-border-2 bg-surface mb-3 rounded-lg border border-dashed px-3 py-2 sm:px-4 sm:py-3"
+          className="border-brass bg-surface mb-3 rounded-lg border border-dashed px-3 py-2 sm:px-4 sm:py-3"
           data-testid="team-legend"
         >
           {viewerSeat === null ? (
@@ -1181,7 +1179,7 @@ export function RoomPage() {
               style={{
                 background:
                   viewerSeat === null
-                    ? "linear-gradient(180deg, transparent 0%, var(--border-2) 25%, var(--border-2) 75%, transparent 100%)"
+                    ? "linear-gradient(180deg, transparent 0%, var(--brass) 25%, var(--brass) 75%, transparent 100%)"
                     : viewerSeat % 2 === 0
                       ? "linear-gradient(180deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
                       : "linear-gradient(180deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
@@ -1192,7 +1190,7 @@ export function RoomPage() {
               style={{
                 background:
                   viewerSeat === null
-                    ? "linear-gradient(90deg, transparent 0%, var(--border-2) 25%, var(--border-2) 75%, transparent 100%)"
+                    ? "linear-gradient(90deg, transparent 0%, var(--brass) 25%, var(--brass) 75%, transparent 100%)"
                     : viewerSeat % 2 === 1
                       ? "linear-gradient(90deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
                       : "linear-gradient(90deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
@@ -1206,7 +1204,7 @@ export function RoomPage() {
               style={{
                 background:
                   viewerSeat === null
-                    ? "linear-gradient(90deg, transparent 0%, var(--border-2) 25%, var(--border-2) 75%, transparent 100%)"
+                    ? "linear-gradient(90deg, transparent 0%, var(--brass) 25%, var(--brass) 75%, transparent 100%)"
                     : viewerSeat % 2 === 0
                       ? "linear-gradient(90deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
                       : "linear-gradient(90deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
@@ -1217,7 +1215,7 @@ export function RoomPage() {
               style={{
                 background:
                   viewerSeat === null
-                    ? "linear-gradient(90deg, transparent 0%, var(--border-2) 25%, var(--border-2) 75%, transparent 100%)"
+                    ? "linear-gradient(90deg, transparent 0%, var(--brass) 25%, var(--brass) 75%, transparent 100%)"
                     : viewerSeat % 2 === 1
                       ? "linear-gradient(90deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
                       : "linear-gradient(90deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
@@ -1350,8 +1348,7 @@ export function RoomPage() {
                   background:
                     "radial-gradient(circle at 30% 30%, #1d6c3b 0%, var(--accent-deep) 70%), var(--accent-deep)",
                   borderColor: "var(--brass)",
-                  boxShadow:
-                    "0 6px 18px -6px rgba(14,58,36,0.40), inset 0 0 0 4px rgba(201,168,118,0.12)",
+                  boxShadow: "0 6px 18px -6px rgba(14,58,36,0.40), inset 0 0 0 4px var(--brass-10)",
                 }}
               >
                 <span

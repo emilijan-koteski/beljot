@@ -106,7 +106,7 @@ export function AudioPanel() {
         {ROWS.map((row) => (
           <div
             key={row.field}
-            className="border-border bg-surface-elevated flex flex-col gap-2 rounded-[10px] border px-3 py-2.5"
+            className="border-border bg-surface-elevated flex flex-col gap-2 rounded-md border px-3 py-2.5"
           >
             <label className="flex cursor-pointer items-center justify-between gap-3">
               <span className="text-ink text-[13px] font-medium">{t(row.labelKey)}</span>

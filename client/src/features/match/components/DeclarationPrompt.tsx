@@ -118,7 +118,7 @@ export function DeclarationPrompt({
                       className="flex flex-col gap-2 rounded-md px-3 py-2"
                       style={{
                         background: "rgba(0,0,0,0.22)",
-                        border: "1px solid rgba(201,168,118,0.25)",
+                        border: "1px solid var(--brass-25)",
                       }}
                     >
                       <div className="flex items-center justify-between">
@@ -149,7 +149,7 @@ export function DeclarationPrompt({
 
                 <div
                   className="flex items-center justify-between pt-3 mb-4"
-                  style={{ borderTop: "1px solid rgba(201,168,118,0.22)" }}
+                  style={{ borderTop: "1px solid var(--brass-25)" }}
                   data-testid="declaration-prompt-total"
                 >
                   <span

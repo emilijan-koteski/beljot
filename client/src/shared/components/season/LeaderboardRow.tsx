@@ -58,7 +58,7 @@ export function LeaderboardRow({
       data-user-id={userId}
       {...(isSelf ? { "data-self": "true" } : {})}
       className={cn(
-        "border-border flex items-center gap-2.5 rounded-[10px] border px-2.5 py-1.5",
+        "border-border flex items-center gap-2.5 rounded-md border px-2.5 py-1.5",
         isSelf ? "bg-accent-soft border-accent/40" : "bg-surface-elevated",
         className,
       )}
@@ -84,7 +84,7 @@ export function LeaderboardRow({
 
       <TierBadge tier={safeTier} size="sm" data-testid="leaderboard-tier-badge" />
 
-      <Avatar name={username} avatarUrl={avatarUrl} size={24} you={isSelf} />
+      <Avatar name={username} avatarUrl={avatarUrl} size={24} />
 
       <Link
         data-testid="leaderboard-username"

@@ -119,8 +119,6 @@ export function SeatTile({
               avatarUrl={isBot ? null : player.avatarUrl}
               size={avatarSize}
               team={mode === "us" ? "A" : mode === "them" ? "B" : null}
-              you={isYou}
-              owner={isHost}
               icon={isBot ? <Bot aria-hidden="true" /> : undefined}
             />
             <div className="flex flex-col items-center gap-1">
@@ -328,7 +326,7 @@ const MODE_TOKENS: Record<SeatMode, ModeTokens> = {
   },
   neutral: {
     fill: "var(--surface)",
-    edge: "var(--border-2)",
+    edge: "var(--brass)",
     edgeSoft: "var(--border)",
     text: "var(--brass-deep)",
   },

@@ -1,9 +1,10 @@
-import { Eye, EyeOff, Lock, LockOpen } from "lucide-react";
+import { Lock, LockOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { FetchError } from "@/shared/api/axiosClient";
+import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -139,16 +140,11 @@ export function RoomPrivacyDialog({ open, room, onClose }: RoomPrivacyDialogProp
                   data-testid="room-privacy-password-input"
                   className="h-11 pr-10"
                 />
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  className="text-ink-mute hover:text-ink absolute top-1/2 right-2.5 -translate-y-1/2 p-1.5"
-                  onClick={() => setShowPassword(!showPassword)}
-                  data-testid="room-privacy-password-toggle"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
+                <PasswordToggle
+                  shown={showPassword}
+                  onToggle={() => setShowPassword(!showPassword)}
+                  testId="room-privacy-password-toggle"
+                />
               </div>
             </Field>
           )}

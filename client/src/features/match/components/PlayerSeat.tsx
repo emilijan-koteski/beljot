@@ -7,10 +7,11 @@ import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { PlayerState, Suit } from "@/shared/types/matchTypes";
 
-import { resolveCardDeck, SEAT_STACK_CARD_WIDTH } from "../lib/cardFace";
+import { CARD_BACK_BACKGROUND, resolveCardDeck, SEAT_STACK_CARD_WIDTH } from "../lib/cardFace";
 import { suitAccent, suitNameKey } from "../lib/suitArt";
 import { type SeatTeam, teamColors, teamLabelKey } from "../lib/tableTheme";
 import { isCountdownUrgent, useTurnCountdown } from "../lib/turnCountdown";
+import { CardBackFace } from "./CardBackFace";
 import { SuitMark } from "./SuitMark";
 import { TimerRing } from "./TimerRing";
 
@@ -34,9 +35,9 @@ const AVATAR_DISC_PX = 64;
 const AVATAR_DISC_PX_COMPACT = 44;
 const FRAME_PAD_PX = 16;
 
-const TURN_LIME = "var(--turn-lime, #00e5a0)";
-const COLOR_URGENT = "var(--turn-urgent, #ef4444)";
-const TURN_LIME_GLOW = "rgba(0, 229, 160, 0.6)";
+const TURN_LIME = "var(--accent)";
+const COLOR_URGENT = "var(--danger)";
+const TURN_LIME_GLOW = "color-mix(in srgb, var(--accent) 60%, transparent)";
 
 /**
  * Status indicator chip — 30 px circle with a thick felt-toned border so it
@@ -101,6 +102,7 @@ function CardBackStack({
   const cw = compact ? SEAT_STACK_CARD_WIDTH.compact : SEAT_STACK_CARD_WIDTH.desktop;
   const ch = compact ? 22 : 38;
   const overlap = compact ? 12 : 22;
+  const radius = compact ? 3 : 4;
   return (
     <div
       className="flex items-center"
@@ -120,16 +122,20 @@ function CardBackStack({
           key={i}
           aria-hidden
           style={{
+            position: "relative",
+            overflow: "hidden",
             width: cw,
             height: ch,
             marginLeft: i === 0 ? 0 : -overlap,
             transform: `rotate(${(i - 2) * 1.5}deg)`,
-            background: "linear-gradient(135deg, #2a1a10 0%, #4a2818 50%, #2a1a10 100%)",
+            background: CARD_BACK_BACKGROUND,
             border: `${compact ? 1 : 1.5}px solid var(--brass)`,
-            borderRadius: compact ? 3 : 4,
+            borderRadius: radius,
             boxShadow: "0 2px 6px rgba(0,0,0,0.45)",
           }}
-        />
+        >
+          <CardBackFace width={cw} radius={radius} />
+        </div>
       ))}
       <span
         className={`font-body tabular-nums ${compact ? "text-[9px]" : "text-[11px]"}`}
@@ -238,7 +244,7 @@ export function PlayerSeat({
 
   const dealerChipNode = isDealer ? (
     <StatusChip
-      borderColor="#1f2e23"
+      borderColor="var(--avatar-inner)"
       textColor="#0e3a24"
       title="Dealer this hand"
       testId="player-seat-dealer-chip"
@@ -287,7 +293,7 @@ export function PlayerSeat({
             style={{
               width: "100%",
               height: "100%",
-              background: "var(--avatar-inner, #1f2e23)",
+              background: "var(--avatar-inner)",
               color: "var(--ink-light)",
               fontSize: discPx * 0.5,
             }}
@@ -345,7 +351,10 @@ export function PlayerSeat({
             isActive && !isDisconnected
               ? `1px solid ${TURN_LIME}`
               : "1px solid rgba(255,255,255,0.08)",
-          boxShadow: isActive && !isDisconnected ? "0 0 12px rgba(0, 229, 160, 0.33)" : undefined,
+          boxShadow:
+            isActive && !isDisconnected
+              ? "0 0 12px color-mix(in srgb, var(--accent) 33%, transparent)"
+              : undefined,
           transition: `border-color ${MOTION.SEAT_RING_TRANSITION}ms ease, box-shadow ${MOTION.SEAT_RING_TRANSITION}ms ease`,
         }}
         data-testid="player-seat-name-pill"
@@ -359,9 +368,9 @@ export function PlayerSeat({
         {!compact && player.isBot !== true && (
           <span
             className="font-body text-[10px] tabular-nums flex items-center gap-1.5"
-            style={{ color: "rgba(245,242,232,0.6)" }}
+            style={{ color: "var(--ink-mute)" }}
           >
-            <span style={{ letterSpacing: 0.6, opacity: 0.7 }} data-testid="player-seat-level">
+            <span style={{ letterSpacing: 0.6 }} data-testid="player-seat-level">
               {t("xp.short", { level: player.level })}
             </span>
             {showRing && (

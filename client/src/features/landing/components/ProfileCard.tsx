@@ -27,7 +27,7 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
   ];
 
   return (
-    <div className="bg-surface-elevated border-border w-full max-w-95 overflow-hidden rounded-[18px] border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.45)]">
+    <div className="bg-surface-elevated border-border w-full max-w-95 overflow-hidden rounded-xl border shadow-[0_18px_40px_-22px_rgba(14,58,36,0.45)]">
       <div className="flex items-center gap-3 px-4.5 pt-4.5 pb-4">
         <span
           className="font-display flex size-11 items-center justify-center rounded-full text-lg font-bold"
@@ -75,7 +75,10 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
               style={
                 m.won
                   ? { background: "var(--accent-soft)", color: "var(--accent)" }
-                  : { background: "rgba(139,42,31,0.1)", color: "var(--danger)" }
+                  : {
+                      background: "color-mix(in srgb, var(--danger) 10%, transparent)",
+                      color: "var(--danger)",
+                    }
               }
             >
               {m.won ? labels.won : labels.lost}

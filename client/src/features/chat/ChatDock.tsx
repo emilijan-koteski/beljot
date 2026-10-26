@@ -308,7 +308,7 @@ export function ChatDock(props: ChatDockProps) {
             frosted,
             hasPublicUnread || hasWhisperUnread
               ? "border border-brass shadow-[0_0_0_3px_var(--brass-soft),0_10px_28px_-10px_rgba(14,58,36,0.35)]"
-              : "border-border-2 border shadow-(--chat-shadow-fab)",
+              : "border-brass border shadow-(--chat-shadow-fab)",
           )}
         >
           <MessageSquare className="size-5.5" strokeWidth={1.8} />
@@ -319,7 +319,7 @@ export function ChatDock(props: ChatDockProps) {
                   data-testid={`${testIdRoot}-unread`}
                   className={cn(
                     FAB_CHIP_CLASS,
-                    "bg-brass text-brass-ink shadow-[0_0_10px_rgba(201,168,118,0.55)]",
+                    "bg-brass text-brass-ink shadow-[0_0_10px_var(--brass-55)]",
                   )}
                 >
                   {chipLabel(unread)}
@@ -330,7 +330,7 @@ export function ChatDock(props: ChatDockProps) {
                   data-testid={`${testIdRoot}-whisper-unread`}
                   className={cn(
                     FAB_CHIP_CLASS,
-                    "bg-(--whisper-badge) text-(--whisper-badge-ink) shadow-[0_0_10px_var(--whisper-badge-glow)]",
+                    "bg-(--whisper-ink) text-(--whisper-badge-ink) shadow-[0_0_10px_var(--whisper-glow)]",
                     bothChips && "z-10 -ml-1.5",
                   )}
                 >
@@ -517,7 +517,7 @@ function ChatLine({
       {!mine && (
         <span className="text-ink-mute pl-0.5 text-[11px]">
           {whisper ? (
-            <strong className="font-semibold text-(--whisper-name)">{username}</strong>
+            <strong className="font-semibold text-(--whisper-ink)">{username}</strong>
           ) : nameColor ? (
             <strong className="font-semibold" style={{ color: nameColor }}>
               {username}
@@ -582,7 +582,7 @@ function ChannelTab({
       {unread > 0 && !active && (
         <span
           data-testid={`${testId}-unread`}
-          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-(--whisper-badge) px-1 text-[9px] leading-none font-bold text-(--whisper-badge-ink) tabular-nums"
+          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-(--whisper-ink) px-1 text-[9px] leading-none font-bold text-(--whisper-badge-ink) tabular-nums"
         >
           {unread > 9 ? "9+" : unread}
         </span>

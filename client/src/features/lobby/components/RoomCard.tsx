@@ -20,7 +20,7 @@ import { useTranslation } from "react-i18next";
 import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { RelativeTime } from "@/shared/components/RelativeTime";
-import { AvatarImage } from "@/shared/components/ui/avatar";
+import { Avatar } from "@/shared/components/ui/avatar";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
@@ -75,7 +75,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
       style={{ animationDelay: delay }}
       className={cn(
         "bg-surface text-ink relative flex flex-col overflow-hidden rounded-lg border border-border transition-[transform,border-color,box-shadow]",
-        "animate-[card-in_.35s_ease_both] hover:-translate-y-0.5 hover:border-border-2 hover:shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]",
+        "animate-[card-in_.35s_ease_both] hover:-translate-y-0.5 hover:border-brass hover:shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]",
       )}
     >
       <div className="px-5 pt-4.5 pb-3">
@@ -255,16 +255,12 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
 
       <div className="mt-auto flex items-center gap-2.5 border-t border-border bg-[rgba(14,58,36,0.03)] px-5 py-3">
         <span className="text-ink-dim flex items-center gap-1.5 text-xs">
-          <span
-            className="bg-surface-sunken text-ink inline-flex size-4.5 items-center justify-center overflow-hidden rounded-full border border-border text-[10px] font-bold"
-            data-testid="room-card-owner-avatar"
-          >
-            <AvatarImage
-              src={room.ownerAvatarUrl}
-              size={18}
-              fallback={(room.ownerUsername || "?").charAt(0).toUpperCase()}
-            />
-          </span>
+          <Avatar
+            name={room.ownerUsername ?? ""}
+            avatarUrl={room.ownerAvatarUrl}
+            size={18}
+            testId="room-card-owner-avatar"
+          />
           {room.ownerUsername || "—"}
         </span>
         <span className="text-ink-mute inline-flex items-center gap-1 text-xs">
@@ -285,7 +281,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               : undefined
           }
           className={cn(
-            "ml-auto inline-flex items-center gap-1.5 rounded-[10px] border border-transparent px-3.5 py-2 text-xs font-semibold transition-transform active:scale-[0.97]",
+            "ml-auto inline-flex items-center gap-1.5 rounded-md border border-transparent px-3.5 py-2 text-xs font-semibold transition-transform active:scale-[0.97]",
             full || locked
               ? "bg-surface-sunken text-ink-mute cursor-default"
               : "bg-accent text-accent-ink cursor-pointer",

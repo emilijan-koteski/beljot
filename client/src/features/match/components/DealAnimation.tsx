@@ -49,7 +49,7 @@ export function DealAnimation({
           style={{
             color: "var(--ink-light)",
             background: "var(--panel-dark, rgba(20,45,30,0.85))",
-            border: "1px solid rgba(201,168,118,0.4)",
+            border: "1px solid var(--brass-40)",
           }}
           data-testid="deal-reshuffle-caption"
         >

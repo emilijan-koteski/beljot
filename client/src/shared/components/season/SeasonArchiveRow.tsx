@@ -38,7 +38,7 @@ export function SeasonArchiveRow({ seasonName, sp, tier, division, gamesPlayed }
       data-testid="season-archive-row"
       data-season={seasonName}
       data-tier={safeTier}
-      className="border-border bg-surface-elevated flex items-center gap-2.5 rounded-[10px] border px-2.5 py-1.5"
+      className="border-border bg-surface-elevated flex items-center gap-2.5 rounded-md border px-2.5 py-1.5"
     >
       <span className="sr-only" data-testid="season-archive-row-summary">
         {t("season.archive.rowAria", {
