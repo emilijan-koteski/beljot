@@ -581,7 +581,7 @@ which the bot called a different matching suit.
   Croatian +9.6 ± 14.6, n 153, under 2 SE).
 - Keeping or dropping those rows barely moves the table's value: the cell's n × gain over the
   rows of the run is +0.013 per row for Bitola row 7 and −0.012 for the Croatian row 4 cell. They
-  stay in the table, as the owner decided, and whether to keep them remains the owner's call.
+  stay in the table, as the owner decided, and the owner confirmed on 2026-10-26 that they stay.
 - **Croatian row 9 is a candidate, not a change.** The J doubleton with two or more side Aces,
   which the table calls in Bitola only, moved from −2 ± 5 to **+10.0 ± 4.1** (n 1 500, 2.4 SE) in
   the 50 000-deal run when the pair has no Ace, and is +6.4 ± 3.7 (n 1 831, 1.7 SE) in the shape

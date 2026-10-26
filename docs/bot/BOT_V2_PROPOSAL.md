@@ -267,10 +267,10 @@ and 7 in Bitola) are included by the owner's decision and flagged for re-check.
 | 1 | J and 9 of the suit, two or more trumps | +17 ± 2 (two), +62 ± 2 (three), +119 ± 3 (four) | +23 ± 4, +64 ± 3, +101 ± 6 |
 | 2 | J with three or more trumps | +30 ± 2 (three, no side Ace), +49 ± 2 (with one) | +23 ± 3, +47 ± 4 |
 | 3 | four or more trumps including the 9 | +38 ± 4 | +33 ± 7 |
-| 4 | four or more trumps including the Ace (no J/9) | +9 ± 4 | +10 ± 7 (1.4 SE; included by the owner's decision, re-checked in BOT_V2_LAB_RESULTS §3.4 (2026-10-26): misses the criterion under the phase-1 rule layer; kept pending the owner's decision) |
+| 4 | four or more trumps including the Ace (no J/9) | +9 ± 4 | +10 ± 7 (1.4 SE; included by the owner's decision, re-checked in BOT_V2_LAB_RESULTS §3.4 (2026-10-26): misses the criterion under the phase-1 rule layer; kept by the owner's decision of 2026-10-26) |
 | 5 | four or more trumps with a side Ace | +28 ± 11 (exactly one side Ace) | +33 ± 15 (exactly one) |
 | 6 | five or more trumps | +107 to +185 | (no cell with n ≥ 150) |
-| 7 | Bitola only: 9 and A with three trumps and a side Ace | +5 ± 3 (exactly one side Ace), +8 ± 3 (one or more); 1.7–2.6 SE, included by the owner's decision, re-checked in BOT_V2_LAB_RESULTS §3.4 (2026-10-26): misses the criterion under the phase-1 rule layer; kept pending the owner's decision | −19 ± 5: out |
+| 7 | Bitola only: 9 and A with three trumps and a side Ace | +5 ± 3 (exactly one side Ace), +8 ± 3 (one or more); 1.7–2.6 SE, included by the owner's decision, re-checked in BOT_V2_LAB_RESULTS §3.4 (2026-10-26): misses the criterion under the phase-1 rule layer; kept by the owner's decision of 2026-10-26 | −19 ± 5: out |
 | 8 | Bitola only: J and A doubleton with a side Ace | +13 ± 3 | −16 ± 5: out |
 | 9 | Bitola only: J doubleton with two side Aces | +22 ± 3 | −2 ± 5: out |
 | 10 | Bitola only: 9 with two other trumps (no J, no A) and a side Ace | +7 ± 2 | −7 ± 4: out |
@@ -489,7 +489,7 @@ Later (§6): gate Belote as caller on P(make); propose surrender on hopeless han
 2. ~~The size of the conventions bonus~~ — answered: 3 points, as recommended (§4.4).
 3. ~~The two owner's-choice bidding rows~~ — answered: both included, as recommended, and
    re-checked after the recalibration under v2 play (BOT_V2_LAB_RESULTS §3.4, 2026-10-26: the two rows miss the
-   criterion under the phase-1 rule layer; kept pending the owner's decision).
+   criterion under the phase-1 rule layer; kept by the owner's decision of 2026-10-26).
 4. ~~The rules file says "both cross ⇒ the taker wins"~~ — answered: the engine is right;
    `.claude/rules/game-rules.md` now states "higher total wins; an exact tie goes to the taker".
 5. Is a visible "bot strength" setting wanted later? It falls out of the deadline for free.
